@@ -48,6 +48,11 @@ extern char **environ;
 #ifndef RELEASES_URL
 #define RELEASES_URL "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev"
 #endif
+/* Base64 of the raw 32-byte Ed25519 key that signs launcher/stable/SHA256SUMS.sig.
+ * Empty refuses every self-update. */
+#ifndef UPDATE_PUBLIC_KEY
+#define UPDATE_PUBLIC_KEY ""
+#endif
 #define UPSTREAM_BRANCH "main"
 #define UPSTREAM_REMOTE_NAME "stella-upstream"
 #define KNOWN_GOOD_REF "refs/stella/known-good"
@@ -2881,18 +2886,52 @@ static int probe_version(const char *binary) {
     return version;
 }
 
-static char *fetch_text(const char *url) {
+static char *fetch(const char *url, int trim_text) {
     char *argv[] = {"curl", "-fsSL", "--retry", "2", "--connect-timeout", "30", "--max-time", "60", (char *)url, NULL};
     StrList env = base_environment();
     CmdResult r;
     char *text = NULL;
     if (run_cmd(argv, NULL, env.items, NULL, 90, &r) == 0) {
-        if (!r.timed_out && r.code == 0) text = trimmed(r.out);
+        if (!r.timed_out && r.code == 0) text = trim_text ? trimmed(r.out) : xstrdup(r.out);
         else LOG("update: %s failed: %.200s", url, r.err);
         cmd_free(&r);
     }
     sl_free(&env);
     return text;
+}
+
+static char *fetch_text(const char *url) { return fetch(url, 1); }
+
+/* The publisher signs "stella-launcher-update\n<VERSION>\n" followed by the exact
+ * SHA256SUMS bytes, so a signature binds the version to the binaries' hashes. */
+static int update_signature_valid(long version, const char *sums, const char *signature_b64) {
+    size_t key_len = 0, sig_len = 0;
+    unsigned char *key = *UPDATE_PUBLIC_KEY ? base64_decode(UPDATE_PUBLIC_KEY, &key_len) : NULL;
+    unsigned char *sig = signature_b64 ? base64_decode(signature_b64, &sig_len) : NULL;
+    char *message = xasprintf("stella-launcher-update\n%ld\n%s", version, sums);
+    EVP_PKEY *pkey = NULL;
+    EVP_MD_CTX *ctx = NULL;
+    int ok = 0;
+    if (!key || key_len != 32) {
+        LOG("update: this launcher pins no update key; updates are refused");
+        goto out;
+    }
+    if (!sig || sig_len != 64) {
+        LOG("update: SHA256SUMS.sig is missing or malformed");
+        goto out;
+    }
+    pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL, key, key_len);
+    ctx = EVP_MD_CTX_new();
+    ok = pkey && ctx && EVP_DigestVerifyInit(ctx, NULL, NULL, NULL, pkey) == 1 &&
+         EVP_DigestVerify(ctx, sig, sig_len, (const unsigned char *)message, strlen(message)) == 1;
+    if (!ok) LOG("update: SHA256SUMS.sig does not verify against the pinned key");
+out:
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(pkey);
+    free(message);
+    free(sig);
+    free(key);
+    return ok;
 }
 
 static char *sum_for(const char *sums, const char *name) {
@@ -2918,7 +2957,7 @@ static char *sum_for(const char *sums, const char *name) {
 static CheckResult update_check(const char *base) {
     char *url = xasprintf("%s/VERSION", base), *text = fetch_text(url), *end;
     long published = text ? strtol(text, &end, 10) : -1;
-    char *sums = NULL, *sum = NULL, *staged = NULL, *installed = NULL;
+    char *sums = NULL, *signature = NULL, *sum = NULL, *staged = NULL, *installed = NULL;
     int probed;
     CheckResult result = CHECK_FAILED;
     free(url);
@@ -2934,9 +2973,13 @@ static CheckResult update_check(const char *base) {
     LOG("update: %ld available (running %d)", published, LAUNCHER_VERSION);
     update_report("Downloading the update…", 0.05, 0.7);
     url = xasprintf("%s/SHA256SUMS", base);
-    sums = fetch_text(url);
+    sums = fetch(url, 0);
     free(url);
-    if (!sums || !(sum = sum_for(sums, update_asset()))) {
+    url = xasprintf("%s/SHA256SUMS.sig", base);
+    signature = fetch_text(url);
+    free(url);
+    if (!sums || !update_signature_valid(published, sums, signature)) goto out;
+    if (!(sum = sum_for(sums, update_asset()))) {
         LOG("update: %s isn't in SHA256SUMS", update_asset());
         goto out;
     }
@@ -2971,6 +3014,7 @@ static CheckResult update_check(const char *base) {
 out:
     free(text);
     free(sums);
+    free(signature);
     free(sum);
     free(staged);
     free(installed);

@@ -581,8 +581,10 @@ applies until the user clicks Update.
 2. **Launchers** (only when `launcher/` changed): a push only builds and
    self-tests them. Publish with `gh workflow run build-launchers.yml --ref master -f publish=true`.
    It signs and notarizes macOS (DMG + zip), signs `Stella.exe`, builds the Linux
-   binaries, and uploads them with `VERSION` to `launcher/stable/`. Installed
-   launchers update themselves from `VERSION`.
+   binaries, signs `VERSION` + `SHA256SUMS` into `SHA256SUMS.sig` with the
+   `LINUX_LAUNCHER_SIGNING_KEY` secret (Ed25519; Linux launchers refuse an
+   update without it), and uploads them with `VERSION` to `launcher/stable/`.
+   Installed launchers update themselves from `VERSION`.
 3. **Electron version bump**: the push of `package.json` runs
    `build-electron-identity.yml`, which publishes the Developer ID-signed
    `Stella.app` for that Electron version. Let it finish before publishing app

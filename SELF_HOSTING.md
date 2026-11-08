@@ -130,6 +130,7 @@ you don't use (no website, no mobile app) can be skipped.
 | | source runs | `STELLA_RELEASES_URL` for `bun run native:download` / `stella-browser:download` (or one manifest with `STELLA_NATIVE_HELPERS_MANIFEST_URL` / `STELLA_BROWSER_MANIFEST_URL`) | 〃 | 〃 |
 | **Apple team** (desktop) | macOS launcher, `build-electron-identity.yml`, `build-launchers.yml` | `STELLA_APPLE_TEAM_ID` (build env / repository variable); notarization uses the `APPLE_TEAM_ID` secret | `7UVYHQ763X` | your Developer ID team |
 | **Windows signer** | Windows launcher, `build-launchers.yml` | `STELLA_UPDATE_SIGNER` (build env / repository variable) | `FromYou, LLC` | your Authenticode certificate's subject name |
+| **Linux update key** | Linux launcher, `build-launchers.yml` | `STELLA_LINUX_UPDATE_PUBLIC_KEY` (build env / repository variable); the publish signs with the `LINUX_LAUNCHER_SIGNING_KEY` secret | Stella's key, `UPDATE_PUBLIC_KEY` in `launcher/linux/stella-launcher.c` | the public half of your own Ed25519 key (see "With a launcher") |
 | **Native OAuth clients** (desktop connectors) | desktop | `STELLA_NATIVE_OAUTH_<ID>_CLIENT_ID` lines in `packages/desktop-ui/.env`, `<ID>` the upper-cased provider id; Google Workspace (and YouTube) use `WORKSPACE_CLIENT_ID`. Main adopts these into the runtime's environment | Stella's apps, in `packages/runtime/kernel/connectors/native-oauth-provider-config.ts` | your OAuth app's client id (see below) |
 | | cloud-builder | secret `NATIVE_OAUTH_CLIENTS_JSON` (Part 2) | (unset) | the same client ids with their secrets |
 | **Mobile app** | mobile | env read by `packages/mobile/app.config.ts` (see 1.10): `STELLA_MOBILE_OWNER`, `STELLA_MOBILE_SLUG`, `STELLA_MOBILE_EAS_PROJECT_ID` (also sets `updates.url`), `STELLA_MOBILE_APPLE_TEAM_ID`, `STELLA_MOBILE_IOS_BUNDLE_ID` (also the app group and the Live Activities target), `STELLA_MOBILE_ANDROID_PACKAGE`, `EXPO_PUBLIC_STELLA_MOBILE_SCHEME` | `stella-ai`, `stella-mobile`, `892d4162-…`, `7UVYHQ763X`, `com.stella.mobile`, `com.fromyou.stella`, `stella-mobile` | yours |
@@ -476,8 +477,23 @@ STELLA_BACKEND_URL=https://stella-v2-cloud-builder-prod.<sub>.workers.dev \
 STELLA_RELEASES_URL=https://<your public releases bucket> \
 STELLA_APPLE_TEAM_ID=<team>  launcher/macos/build.sh      # macOS
 # launcher/windows/build.sh takes the first two and STELLA_UPDATE_SIGNER (Authenticode name)
-# launcher/linux/build.sh takes the first two
+# launcher/linux/build.sh takes the first two and STELLA_LINUX_UPDATE_PUBLIC_KEY
 ```
+
+A Linux launcher installs an update only when `launcher/stable/SHA256SUMS.sig`
+verifies against the Ed25519 key built into it, so shipping your own Linux
+launchers needs your own key. Generate it once, keep the private key out of
+the repository, and give the workflow both halves:
+
+```bash
+openssl genpkey -algorithm ed25519 -out linux-launcher-signing.pem
+gh secret set LINUX_LAUNCHER_SIGNING_KEY < linux-launcher-signing.pem
+gh variable set STELLA_LINUX_UPDATE_PUBLIC_KEY --body \
+  "$(openssl pkey -in linux-launcher-signing.pem -pubout -outform DER | tail -c 32 | base64 -w0)"
+```
+
+The publish refuses to upload when the secret is missing or the Linux binaries
+pin a different key.
 
 Check a build took them: `strings launcher/linux/build/stella-launcher | grep -E 'workers.dev|https://'`.
 The launcher passes its backend to the app (`VITE_STELLA_BACKEND_URL`) and its
@@ -489,9 +505,9 @@ Stella browser come from your bucket too.
 `native-helpers/` and `stella-browser/`. The release workflows
 (`.github/workflows/build-*.yml`) read the same values from repository
 variables (`STELLA_BACKEND_URL`, `STELLA_DEV_BACKEND_URL`, `STELLA_RELEASES_URL`,
-`STELLA_APPLE_TEAM_ID`, `STELLA_UPDATE_SIGNER`) and upload with the `R2_*`
+`STELLA_APPLE_TEAM_ID`, `STELLA_UPDATE_SIGNER`, `STELLA_LINUX_UPDATE_PUBLIC_KEY`) and upload with the `R2_*`
 repository secrets; unset, they keep Stella's values. Signing needs your own
-Apple Developer ID and Windows code-signing certificate. The git runtime
+Apple Developer ID, Windows code-signing certificate and Linux update key. The git runtime
 objects are content-addressed and pinned by sha256 in
 `launcher/macos/Sources/StellaLauncher/Support.swift`; copy the two objects from
 `https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/git-runtime/objects/` into

@@ -33,6 +33,7 @@ env:
   STELLA_RELEASES_URL: ${{ vars.STELLA_RELEASES_URL }}
   STELLA_APPLE_TEAM_ID: ${{ vars.STELLA_APPLE_TEAM_ID }}
   STELLA_UPDATE_SIGNER: ${{ vars.STELLA_UPDATE_SIGNER || 'FromYou, LLC' }}
+  STELLA_LINUX_UPDATE_PUBLIC_KEY: ${{ vars.STELLA_LINUX_UPDATE_PUBLIC_KEY }}
   STELLA_DEV_BACKEND_URL: ${{ vars.STELLA_DEV_BACKEND_URL || 'https://stella-v2-cloud-builder-dev.fromyou.workers.dev' }}
 
 concurrency:
@@ -344,6 +345,35 @@ jobs:
           # launchers update themselves when it's higher than theirs.
           echo "${{ github.run_number }}" > VERSION
 
+      # Linux launchers accept an update only with SHA256SUMS.sig verifying
+      # against the Ed25519 key built into them (launcher/linux, UPDATE_PUBLIC_KEY).
+      - name: Sign the Linux update metadata
+        env:
+          LINUX_LAUNCHER_SIGNING_KEY: ${{ secrets.LINUX_LAUNCHER_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$LINUX_LAUNCHER_SIGNING_KEY" ]; then
+            echo "LINUX_LAUNCHER_SIGNING_KEY is not set; Linux launchers would refuse this release." >&2
+            exit 1
+          fi
+          key="$RUNNER_TEMP/linux-update-key.pem"
+          (umask 077 && printf '%s\n' "$LINUX_LAUNCHER_SIGNING_KEY" > "$key")
+          trap 'rm -f "$key"' EXIT
+          cd launchers
+          public="$(openssl pkey -in "$key" -pubout -outform DER | tail -c 32 | base64 -w0)"
+          for binary in stella-launcher-linux-x64 stella-launcher-linux-arm64; do
+            if ! grep -qF "$public" "$binary"; then
+              echo "$binary does not pin the signing key's public key $public" >&2
+              exit 1
+            fi
+          done
+          { printf 'stella-launcher-update\n%s\n' "$(cat VERSION)"; cat SHA256SUMS; } > "$RUNNER_TEMP/update-message"
+          openssl pkeyutl -sign -rawin -inkey "$key" -in "$RUNNER_TEMP/update-message" -out "$RUNNER_TEMP/update.sig"
+          openssl pkey -in "$key" -pubout -out "$RUNNER_TEMP/update-public.pem"
+          openssl pkeyutl -verify -rawin -pubin -inkey "$RUNNER_TEMP/update-public.pem" \
+            -in "$RUNNER_TEMP/update-message" -sigfile "$RUNNER_TEMP/update.sig"
+          base64 -w0 "$RUNNER_TEMP/update.sig" > SHA256SUMS.sig
+
       - name: Upload to R2 launcher/stable/
         if: env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' && env.R2_ENDPOINT != ''
         run: |
@@ -352,7 +382,7 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
           export AWS_DEFAULT_REGION="auto"
           # VERSION last: a launcher that sees it finds the binaries and sums already there.
-          for file in Stella-macos.dmg Stella-macos.zip Stella.exe stella-launcher-linux-x64 stella-launcher-linux-arm64 SHA256SUMS VERSION; do
+          for file in Stella-macos.dmg Stella-macos.zip Stella.exe stella-launcher-linux-x64 stella-launcher-linux-arm64 SHA256SUMS SHA256SUMS.sig VERSION; do
             aws s3 cp "launchers/$file" "s3://${R2_BUCKET}/launcher/stable/$file" \
               --cache-control "no-cache" --endpoint-url "$R2_ENDPOINT"
           done

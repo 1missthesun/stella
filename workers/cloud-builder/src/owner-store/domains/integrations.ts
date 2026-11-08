@@ -263,15 +263,19 @@ const connectsWithStellaGoogle = (ctx: OwnerContext, integrationId: string): boo
 /**
  * Whether this integration runs on Stella's own Google connection. A working
  * Composio connection keeps being used until the user connects Google through
- * Stella; with Composio chosen, Stella-connected accounts still work for any
- * service Composio doesn't cover.
+ * Stella; with Composio chosen, accounts already connected through Stella keep
+ * working until a Composio connection for that service completes.
  */
 const usesStellaGoogle = async (ctx: OwnerContext, integrationId: string): Promise<boolean> => {
   if (!isStellaGoogleIntegration(integrationId) || !stellaGoogleAvailable(ctx.env)) return false;
   const stellaAccounts = stellaGoogleAccounts(ctx.db, integrationId).length > 0;
   const composioRow = Boolean(connectionOf(ctx.db, integrationId));
-  if (googleProviderOf(ctx.db) === "composio") return stellaAccounts && !composioRow;
-  if (stellaAccounts || !composioRow) return true;
+  if (googleProviderOf(ctx.db) === "composio") {
+    if (!stellaAccounts) return false;
+    if (!composioRow) return true;
+  } else if (stellaAccounts || !composioRow) {
+    return true;
+  }
   return !(await composioConnectionState(ctx, integrationId)).connected;
 };
 

@@ -179,3 +179,15 @@
 .global-models-control--topbar .execution-target-button {
   max-width: 150px;
 }
+
+/* Narrow windows: icons only, so the tabs keep their room. */
+@media (max-width: 820px) {
+  .global-models-control--topbar .work-models-button {
+    gap: 0;
+    font-size: 0;
+  }
+
+  .global-models-control--topbar .execution-target-button > span {
+    display: none;
+  }
+}

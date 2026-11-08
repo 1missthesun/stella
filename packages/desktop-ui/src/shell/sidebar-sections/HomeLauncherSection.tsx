@@ -24,7 +24,7 @@ function LauncherOptions() {
                 onClick={() => sidebarSections.selectSection(section)}
               >
                 <span className="home-launcher__option-icon" aria-hidden="true">
-                  <Icon size={18} strokeWidth={1.75} />
+                  <Icon size={20} strokeWidth={1.6} />
                 </span>
                 <span className="home-launcher__option-label">{label}</span>
               </button>
@@ -38,7 +38,7 @@ function LauncherOptions() {
             onClick={openTrashDisplayTab}
           >
             <span className="home-launcher__option-icon" aria-hidden="true">
-              <Trash2 size={18} strokeWidth={1.75} />
+              <Trash2 size={20} strokeWidth={1.6} />
             </span>
             <span className="home-launcher__option-label">Trash</span>
           </button>

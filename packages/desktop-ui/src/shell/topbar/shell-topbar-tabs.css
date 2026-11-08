@@ -126,7 +126,8 @@
 
 /* Squeezed tabs fade their title out (as Chrome does) instead of showing a
    lone ellipsis. */
-.topbar-tabs__tab:not(.topbar-tabs__tab--chat) .topbar-tabs__label {
+.topbar-tabs__tab:not(.topbar-tabs__tab--chat)
+  .topbar-tabs__label[data-clipped="true"] {
   text-overflow: clip;
   mask-image: linear-gradient(
     to right,

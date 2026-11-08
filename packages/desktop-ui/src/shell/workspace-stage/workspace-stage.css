@@ -56,9 +56,9 @@
   flex: 1 1 auto;
 }
 
-/* ---------------- Home on the stage: the launcher, given room ---------- */
+/* ---------------- Home on the stage: a new-tab page ------------------- */
 
-.workspace-stage .sidebar-section[data-section="home"] .work-section__body,
+/* Files keeps a readable column on the stage. */
 .workspace-stage .sidebar-section[data-section="files"] .work-section__body {
   width: 100%;
   max-width: 880px;
@@ -67,27 +67,83 @@
   box-sizing: border-box;
 }
 
+/* Home reads like a browser's new tab: a centred search, and a row of
+   compact shortcut tiles under it that wraps on small windows. */
+.workspace-stage .sidebar-section[data-section="home"] .work-section__body {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding: clamp(20px, 11vh, 140px) 20px 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.workspace-stage .sidebar-section[data-section="home"] .files-list__search {
+  width: 100%;
+  max-width: 560px;
+  min-height: 44px;
+  margin: 0 auto 28px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: color-mix(in oklch, var(--foreground) 3%, var(--background));
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.workspace-stage
+  .sidebar-section[data-section="home"]
+  .files-list__search:focus-within {
+  border-color: color-mix(in oklch, var(--foreground) 22%, transparent);
+  background: var(--background);
+}
+
 .workspace-stage .home-launcher {
+  flex: 0 0 auto;
   align-items: flex-start;
-  padding: 18px 0 24px;
+  padding: 0;
 }
 
 .workspace-stage .home-launcher__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
   max-width: none;
 }
 
 .workspace-stage .home-launcher__option {
-  padding: 16px;
-  border: 1px solid var(--border);
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 92px;
+  padding: 14px 4px 12px;
   border-radius: 12px;
-  background: color-mix(in oklch, var(--foreground) 2.5%, transparent);
+  text-align: center;
 }
 
-.workspace-stage .home-launcher__option:hover {
-  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+.workspace-stage .home-launcher__option-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  color: var(--text-base);
+}
+
+.workspace-stage .home-launcher__option:hover .home-launcher__option-icon {
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+}
+
+.workspace-stage .home-launcher__option-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--text-base);
 }
 
 /* ---------------- The file viewer ------------------------------------- */

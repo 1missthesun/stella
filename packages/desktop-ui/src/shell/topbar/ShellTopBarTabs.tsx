@@ -58,6 +58,26 @@ export function ShellTopBarTabs() {
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeTabId, panelOpen]);
 
+  // Fade a tab's title only when it is actually cut off.
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const mark = () => {
+      for (const label of strip.querySelectorAll<HTMLElement>(
+        ".topbar-tabs__label",
+      )) {
+        const clipped = label.scrollWidth > label.clientWidth + 1;
+        if (clipped) label.dataset.clipped = "true";
+        else delete label.dataset.clipped;
+      }
+    };
+    const observer = new ResizeObserver(mark);
+    observer.observe(strip);
+    for (const tab of strip.children) observer.observe(tab);
+    mark();
+    return () => observer.disconnect();
+  }, [tabs, cloudTitles, displayItems]);
+
   const showChat = () => {
     displayTabs.setPanelOpen(false);
     if (!onChatRoute) void navigate({ to: "/chat" });

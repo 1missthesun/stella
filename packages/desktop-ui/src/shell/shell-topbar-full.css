@@ -26,7 +26,7 @@
 .shell-topbar-full--tabs {
   grid-template-columns:
     minmax(0, 1fr)
-    minmax(40px, min(30rem, 24vw))
+    minmax(40px, min(30rem, max(40px, 40vw - 200px)))
     minmax(max-content, 1fr);
 }
 

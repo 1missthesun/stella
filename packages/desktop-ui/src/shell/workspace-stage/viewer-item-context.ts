@@ -67,3 +67,45 @@ export const useRegisterViewerNav = (nav: ViewerNav | null): void => {
   }, [key, register]);
   useEffect(() => () => register?.(null), [register]);
 };
+
+/**
+ * Item actions a viewer body knows how to do and the header offers in its
+ * "⋯" menu: copying the content itself (an image, some text) and removing
+ * the item. Download, Share and Copy path come from the file's path.
+ */
+export type ViewerItemActions = {
+  /** e.g. "Copy image". */
+  copyLabel?: string;
+  copy?: () => Promise<void>;
+  remove?: () => void;
+};
+
+export const ViewerActionsContext = createContext<
+  ((actions: ViewerItemActions | null) => void) | null
+>(null);
+
+/** Register the body's item actions with the viewer it is shown in. */
+export const useRegisterViewerActions = (
+  actions: ViewerItemActions | null,
+): void => {
+  const register = useContext(ViewerActionsContext);
+  const key = actions
+    ? `${actions.copyLabel ?? ""}|${Boolean(actions.copy)}|${Boolean(actions.remove)}`
+    : "none";
+  const ref = useRef(actions);
+  ref.current = actions;
+  useEffect(() => {
+    if (!register) return;
+    const current = ref.current;
+    if (!current) {
+      register(null);
+      return;
+    }
+    register({
+      ...(current.copyLabel ? { copyLabel: current.copyLabel } : {}),
+      ...(current.copy ? { copy: () => ref.current?.copy?.() ?? Promise.resolve() } : {}),
+      ...(current.remove ? { remove: () => ref.current?.remove?.() } : {}),
+    });
+  }, [key, register]);
+  useEffect(() => () => register?.(null), [register]);
+};

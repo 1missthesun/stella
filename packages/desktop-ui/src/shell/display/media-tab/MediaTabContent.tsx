@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { MediaPreviewCard } from "@/shell/MediaPreviewCard";
 import type { SwipeDirection } from "@/shell/ZoomableImage";
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
@@ -11,6 +11,12 @@ import type { MediaTabItem } from "./media-item";
 import { MediaActionBar } from "./MediaActionBar";
 import { HeroPrompt } from "./HeroPrompt";
 import { useT } from "@/shared/i18n";
+import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
+import { copyImageBlob } from "@/shell/media-clipboard";
+import {
+  ViewerItemContext,
+  useRegisterViewerActions,
+} from "@/shell/workspace-stage/viewer-item-context";
 import "../media-tab.css";
 
 const mediaKindOf = (item: MediaTabItem): DisplayTabKind => {
@@ -32,6 +38,29 @@ const wheelGesture: {
   fired: boolean;
   idleTimer: ReturnType<typeof setTimeout> | null;
 } = { travel: 0, fired: false, idleTimer: null };
+
+/**
+ * In the file viewer the header carries the item's actions (Download, Share,
+ * and Copy / Delete in its menu); this hands it the media-specific ones.
+ */
+const useViewerMediaActions = (item: MediaTabItem, onDelete: () => void) => {
+  const imagePath =
+    item.asset.kind === "image" ? (item.asset.filePaths[0] ?? null) : null;
+  const { files } = useDisplayFileBlobs(imagePath ? [imagePath] : []);
+  const blob = files[0]?.blob ?? null;
+  const text = item.asset.kind === "text" ? item.asset.text : null;
+  useRegisterViewerActions({
+    ...(imagePath && blob
+      ? { copyLabel: "Copy image", copy: () => copyImageBlob(blob) }
+      : text !== null
+        ? {
+            copyLabel: "Copy text",
+            copy: () => navigator.clipboard.writeText(text),
+          }
+        : {}),
+    remove: onDelete,
+  });
+};
 
 const useMediaNeighbours = (itemId: string, kind: DisplayTabKind) => {
   const { items, index } = useViewerSiblings(itemId, kind);
@@ -104,6 +133,35 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
     if (fileViewer.getSnapshot().fileId === item.id) fileViewer.close();
     else sidebarSections.clearLocation("files");
   }, [item.id]);
+
+  const inViewer = useContext(ViewerItemContext) === item.id;
+  useViewerMediaActions(item, handleDelete);
+
+  if (inViewer) {
+    // The viewer's header holds the actions, so the media gets the space.
+    return (
+      <div className="media-tab media-tab--viewer">
+        <div
+          ref={previewRef}
+          className="media-tab__hero-preview"
+          onKeyDown={handleKeyDown}
+        >
+          <MediaPreviewCard
+            asset={item.asset}
+            inDialog
+            onSwipe={step}
+            {...(item.prompt ? { prompt: item.prompt } : {})}
+            {...(item.madeBy ? { madeBy: item.madeBy } : {})}
+          />
+        </div>
+        {item.prompt ? (
+          <div className="media-tab__viewer-prompt">
+            <HeroPrompt text={item.prompt} />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="media-tab">

@@ -15,23 +15,49 @@ import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import type { DisplayTabKind } from "@/features/workspace-display/types";
 
-/** Kinds whose viewer gets a strip of the conversation's other items. */
+/**
+ * Kinds the strip holds: every file a conversation can produce, in one
+ * list, so photos, clips, documents and canvases page through together.
+ */
 const STRIP_KINDS: ReadonlySet<DisplayTabKind> = new Set([
   "image",
   "video",
   "audio",
   "canvas",
+  "pdf",
+  "markdown",
+  "office-document",
+  "office-spreadsheet",
+  "office-slides",
+  "model3d",
+  "download",
+  "text",
 ]);
 
 export const hasSiblingStrip = (kind: DisplayTabKind): boolean =>
   STRIP_KINDS.has(kind);
 
-/** The display id the payload opens under, for the kinds the strip shows. */
+/**
+ * The display id the payload opens under (as `payloadToTabSpec` names it),
+ * for the kinds the strip shows.
+ */
 const stripIdFor = (payload: DisplayTabPayload): string | null => {
-  if (payload.kind === "media") return idForMediaPayload(payload);
-  if (payload.kind === "canvas-html")
-    return canvasDisplayTabId(payload.filePath);
-  return null;
+  switch (payload.kind) {
+    case "media":
+      return idForMediaPayload(payload);
+    case "canvas-html":
+      return canvasDisplayTabId(payload.filePath);
+    case "pdf":
+      return `pdf:${payload.filePath}`;
+    case "markdown":
+      return `markdown:${payload.filePath}`;
+    case "office":
+      return `office:${payload.previewRef.sourcePath}`;
+    case "file-artifact":
+      return `file-artifact:${payload.filePath}`;
+    default:
+      return null;
+  }
 };
 
 const EMPTY_MESSAGES: ReadonlyArray<EventRecord> = [];
@@ -63,7 +89,7 @@ const useConversationStripEntries = (): FileEntry[] => {
 };
 
 /**
- * Every item of the same kind in this conversation, plus anything already
+ * Every file in this conversation, whatever its type, plus anything already
  * opened, oldest first, so the strip reads in the order the conversation
  * produced them and → moves forward in time.
  */
@@ -77,10 +103,12 @@ export const useViewerSiblings = (
     if (!STRIP_KINDS.has(kind)) return { items: [], index: -1 };
     const byId = new Map<string, FileEntry>();
     for (const entry of linked) {
-      if (entry.kind === kind) byId.set(entry.id, entry);
+      if (STRIP_KINDS.has(entry.kind)) byId.set(entry.id, entry);
     }
     for (const entry of opened) {
-      if (entry.kind === kind && !byId.has(entry.id)) byId.set(entry.id, entry);
+      if (STRIP_KINDS.has(entry.kind) && !byId.has(entry.id)) {
+        byId.set(entry.id, entry);
+      }
     }
     const items = [...byId.values()].sort(
       (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),

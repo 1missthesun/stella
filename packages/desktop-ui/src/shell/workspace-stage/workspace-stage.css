@@ -128,8 +128,7 @@
   flex: 0 0 auto;
   gap: 8px;
   height: 40px;
-  padding: 0 8px 0 14px;
-  border-bottom: 1px solid var(--border-weak, var(--border));
+  padding: 0 6px 0 14px;
   color: var(--text-base);
   font-size: var(--font-size-sm);
   user-select: none;
@@ -151,7 +150,9 @@
 }
 
 .file-viewer__title {
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 34ch;
   overflow: hidden;
   color: var(--text-strong);
   font-weight: var(--weight-semibold, 600);
@@ -296,82 +297,91 @@
   cursor: nwse-resize;
 }
 
-/* ---------------- Strip: photos, videos, clips, canvases ------------- */
+/* ---------------- Strip: everything in the chat --------------------- */
+
+/* The media and the strip share the space under the header: a row along the
+   bottom by default, a rail on the left once the viewer is wide. */
+.file-viewer__main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 
 .viewer-strip {
   display: flex;
   justify-content: center;
   flex: 0 0 auto;
   min-width: 0;
-  height: 64px;
-  padding: 0 14px;
-  border-top: 1px solid var(--border-weak, var(--border));
+  min-height: 0;
+  padding: 2px 10px 8px;
 }
 
 .viewer-strip__list {
+  position: relative;
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  padding: 3px;
-  overflow-x: auto;
+  padding: 5px;
+  overflow: auto;
   scrollbar-width: none;
-  /* Scrolling into view leaves one neighbour showing at the edge. */
-  scroll-padding-inline: 72px;
+  overscroll-behavior: contain;
 }
 
 .viewer-strip__list::-webkit-scrollbar {
   display: none;
 }
 
+@container file-viewer (min-width: 760px) {
+  .file-viewer__main {
+    flex-direction: row;
+  }
+
+  .viewer-strip {
+    order: -1;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 2px 10px 10px;
+  }
+
+  .viewer-strip__list {
+    flex-direction: column;
+    max-width: none;
+    max-height: 100%;
+  }
+}
+
 .viewer-strip__item {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  gap: 6px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 7px;
-  background: color-mix(in oklch, var(--foreground) 5%, transparent);
-  color: var(--text-base);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  color: var(--text-weak);
   font: inherit;
-  font-size: var(--font-size-xs);
   cursor: default;
-  opacity: 0.62;
-  box-shadow: 0 0 0 1px var(--border);
+  opacity: 0.55;
   transition:
     opacity 0.12s ease,
     box-shadow 0.12s ease;
 }
 
-.viewer-strip__item[data-kind="image"] {
-  width: 56px;
-}
-
-.viewer-strip__item[data-kind="video"] {
-  max-width: 200px;
-  padding-right: 10px;
-}
-
-.viewer-strip__poster {
-  display: block;
-  flex: 0 0 auto;
-  width: 64px;
-  height: 100%;
-  overflow: hidden;
-  background: #000;
-}
-
-.viewer-strip__poster video {
-  pointer-events: none;
-}
-
-.viewer-strip__item[data-kind="file"] {
-  max-width: 180px;
-  padding: 0 10px;
+@container file-viewer (min-width: 760px) {
+  .viewer-strip__item {
+    width: 52px;
+    height: 52px;
+  }
 }
 
 .viewer-strip__item:hover {
@@ -380,7 +390,9 @@
 
 .viewer-strip__item[data-current="true"] {
   opacity: 1;
-  box-shadow: 0 0 0 2px var(--text-strong);
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 3.5px var(--text-strong);
 }
 
 .viewer-strip__item:focus-visible {
@@ -393,22 +405,39 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  pointer-events: none;
 }
 
 .viewer-strip__img--empty {
   background: color-mix(in oklch, var(--foreground) 8%, transparent);
 }
 
-.viewer-strip__icon {
+.viewer-strip__badge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
   display: inline-flex;
-  color: var(--text-weak);
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
 }
 
-.viewer-strip__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.viewer-strip__file {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.viewer-strip__ext {
+  font-size: 8.5px;
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.04em;
+  line-height: 1;
 }
 
 /* ---------------- Code: changed files beside the diff ---------------- */
@@ -543,87 +572,81 @@
   }
 }
 
-/* ---------------- Viewer header: copy path, add to chat -------------- */
+/* ---------------- Viewer header: status, add to chat, menu ---------- */
 
-.file-viewer__name {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+.file-viewer__status {
+  flex: 0 1 auto;
   min-width: 0;
-}
-
-.file-viewer__title--copy {
-  padding: 2px 4px;
-  margin-left: -4px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  font: inherit;
-  cursor: default;
-}
-
-.file-viewer__title--copy:hover {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-}
-
-.file-viewer__copy {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-weak);
-  cursor: default;
-}
-
-.file-viewer__copy:hover {
-  color: var(--text-strong);
-  background: color-mix(in oklch, var(--foreground) 7%, transparent);
-}
-
-.file-viewer__copied {
-  flex: 0 0 auto;
+  overflow: hidden;
   color: var(--text-weak);
   font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: file-viewer-status-in 140ms ease;
 }
 
-.file-viewer__add {
-  display: inline-flex;
-  align-items: center;
+@keyframes file-viewer-status-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Add to chat: the same quiet button as the rest, with a short label. */
+.file-viewer__action[data-labelled="true"] {
   gap: 5px;
-  height: 26px;
-  margin-right: 4px;
-  padding: 0 10px 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-base);
+  width: auto;
+  padding: 0 9px 0 7px;
   font: inherit;
   font-size: var(--font-size-xs);
   font-weight: var(--weight-medium, 500);
   white-space: nowrap;
-  cursor: default;
 }
 
-.file-viewer__add:hover {
+.file-viewer__action[data-pressed="true"] {
   color: var(--text-strong);
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
 }
 
-.file-viewer__add[data-added="true"] {
-  border-color: transparent;
+.file-viewer__action[data-state="open"] {
   color: var(--text-strong);
-  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
 }
 
-.file-viewer__add:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+@container file-viewer (max-width: 460px) {
+  .file-viewer__action-text {
+    display: none;
+  }
+
+  .file-viewer__action[data-labelled="true"] {
+    width: 28px;
+    padding: 0;
+  }
+}
+
+.file-viewer__divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border-weak, var(--border));
+}
+
+.file-viewer__spin {
+  animation: file-viewer-spin 0.9s linear infinite;
+}
+
+@keyframes file-viewer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.file-viewer__menu {
+  min-width: 190px;
+}
+
+.file-viewer__menu [data-armed="true"] {
+  background: color-mix(in srgb, var(--destructive) 14%, transparent);
+  color: color-mix(in srgb, var(--text-strong, var(--foreground)) 30%, var(--destructive) 70%);
 }
 
 /* ---------------- Edge arrows, on hover over the media --------------- */

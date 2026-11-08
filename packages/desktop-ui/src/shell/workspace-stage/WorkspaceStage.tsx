@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -46,18 +47,35 @@ import {
 import type { DisplayTab } from "@/features/workspace-display/types";
 import { DeferredDisplayContent } from "@/shell/sidebar-sections/DeferredDisplayContent";
 import { SidebarSectionBody } from "@/shell/sidebar-sections/SidebarSectionBody";
+import { publicFileLink } from "@/features/cloud/file-share-link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
 import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Download,
+  Link,
+  LoaderCircle,
   Maximize2,
+  MoreHorizontal,
   Plus,
+  Share,
+  Trash2,
   X,
 } from "@/ui/icons";
 import { RetainedSurface } from "@/ui/retained-surface";
 import {
+  ViewerActionsContext,
   ViewerItemContext,
   ViewerNavContext,
+  type ViewerItemActions,
   type ViewerNav,
 } from "./viewer-item-context";
 import { ViewerStrip } from "./ViewerStrip";
@@ -268,48 +286,152 @@ const MinimizeIcon = ({ size = 15 }: { size?: number }) => (
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 const RESIZE_EDGES: ResizeEdge[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
 
-const CopyIcon = ({ size = 12 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <rect x="8.5" y="8.5" width="11" height="11" rx="2.5" />
-    <path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" />
-  </svg>
-);
+const fileNameOf = (path: string): string =>
+  path.split(/[\\/]/).pop() || path;
+
+/** A local file behind the item (not a web address), for Download / Share. */
+const localFilePath = (payload: DisplayTabPayload | undefined): string | null =>
+  payload?.kind === "url" ? null : payloadPath(payload);
+
+const readFileBlob = async (path: string): Promise<Blob | null> => {
+  const read = await window.electronAPI?.display?.readFile?.(path, {
+    conversationId: null,
+  });
+  if (!read || read.missing) return null;
+  const bytes = read.bytes;
+  const part =
+    bytes.buffer instanceof ArrayBuffer
+      ? (bytes as Uint8Array<ArrayBuffer>)
+      : new Uint8Array(bytes);
+  return new Blob([part], {
+    type: read.mimeType || "application/octet-stream",
+  });
+};
+
+const errorText = (err: unknown, fallback: string): string =>
+  err instanceof Error && err.message ? err.message : fallback;
+
+/** A quiet icon button for the viewer's top bar. */
+function HeaderButton({
+  label,
+  shortcut,
+  onClick,
+  disabled,
+  pressed,
+  children,
+  text,
+}: {
+  label: string;
+  shortcut?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  pressed?: boolean;
+  children: ReactNode;
+  text?: string;
+}) {
+  const tip = shortcut ? `${label} (${shortcut})` : label;
+  return (
+    <button
+      type="button"
+      className="file-viewer__action"
+      data-labelled={text ? "true" : undefined}
+      data-pressed={pressed ? "true" : undefined}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={tip}
+      aria-pressed={pressed}
+      title={tip}
+    >
+      {children}
+      {text ? <span className="file-viewer__action-text">{text}</span> : null}
+    </button>
+  );
+}
 
 function ViewerHeader({
   item,
   meta,
   stage,
+  actions,
   onPointerDown,
 }: {
   item: DisplayTab;
   meta: string | null;
   stage: boolean;
+  actions: ViewerItemActions | null;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
 }) {
   const path = payloadPath(item.payload);
-  const [copied, setCopied] = useState(false);
+  const filePath = localFilePath(item.payload);
   const attachment = useViewerChatAttachment(item);
+  const [status, setStatus] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1400);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+    setStatus(null);
+    setArmed(false);
+  }, [item.id]);
 
-  const copyPath = useCallback(() => {
+  useEffect(() => {
+    if (!status) return;
+    const timer = window.setTimeout(() => setStatus(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+
+  const canSave = Boolean(filePath && window.electronAPI?.system?.saveFileAs);
+
+  const download = useCallback(async () => {
+    if (!filePath) return;
+    const result = await window.electronAPI?.system?.saveFileAs?.(
+      filePath,
+      fileNameOf(filePath),
+    );
+    if (!result || result.canceled) return;
+    setStatus(result.ok ? "Saved" : (result.error ?? "Couldn't save"));
+  }, [filePath]);
+
+  const share = useCallback(async () => {
+    if (!filePath || sharing) return;
+    setSharing(true);
+    try {
+      let url: string;
+      try {
+        url = await publicFileLink(filePath, null);
+      } catch {
+        url = await publicFileLink(filePath, await readFileBlob(filePath));
+      }
+      await navigator.clipboard.writeText(url);
+      setStatus("Public link copied");
+    } catch (err) {
+      setStatus(errorText(err, "Couldn't share"));
+    } finally {
+      setSharing(false);
+    }
+  }, [filePath, sharing]);
+
+  const copyBody = useCallback(async () => {
+    if (!actions?.copy) return;
+    try {
+      await actions.copy();
+      setStatus("Copied");
+    } catch (err) {
+      setStatus(errorText(err, "Couldn't copy"));
+    }
+  }, [actions]);
+
+  const copyPath = useCallback(async () => {
     if (!path) return;
-    void navigator.clipboard.writeText(path).then(() => setCopied(true));
+    try {
+      await navigator.clipboard.writeText(path);
+      setStatus("Path copied");
+    } catch (err) {
+      setStatus(errorText(err, "Couldn't copy"));
+    }
   }, [path]);
+
+  const remove = actions?.remove;
+  const hasMenu = Boolean(actions?.copy || path || remove);
 
   return (
     <header
@@ -323,85 +445,137 @@ function ViewerHeader({
       <span className="file-viewer__icon" aria-hidden="true">
         <DisplayTabIcon kind={item.kind} size={15} />
       </span>
-      {path ? (
-        <span className="file-viewer__name">
-          <button
-            type="button"
-            className="file-viewer__title file-viewer__title--copy"
-            title={`${path}\nClick to copy the path`}
-            onClick={copyPath}
-          >
-            {item.title}
-          </button>
-          <button
-            type="button"
-            className="file-viewer__copy"
-            onClick={copyPath}
-            aria-label="Copy path"
-            title="Copy path"
-          >
-            {copied ? <Check size={12} strokeWidth={2.2} /> : <CopyIcon />}
-          </button>
-          {copied ? (
-            <span className="file-viewer__copied" role="status">
-              Copied
-            </span>
-          ) : null}
+      <span
+        className="file-viewer__title"
+        title={path ? `${item.title}\n${path}` : (item.tooltip ?? item.title)}
+      >
+        {item.title}
+      </span>
+      {status ? (
+        <span className="file-viewer__status" role="status">
+          {status}
         </span>
-      ) : (
-        <span className="file-viewer__title" title={item.tooltip ?? item.title}>
-          {item.title}
-        </span>
-      )}
-      {meta && !copied ? (
+      ) : meta ? (
         <span className="file-viewer__meta">{meta}</span>
       ) : null}
       <div className="file-viewer__actions">
         {attachment ? (
-          <button
-            type="button"
-            className="file-viewer__add"
-            data-added={attachment.added ? "true" : undefined}
-            onClick={attachment.toggle}
-            title={
+          <HeaderButton
+            label={
               attachment.added
-                ? "Remove from the message"
-                : "Attach to your next message"
+                ? "In chat · click to remove it from your message"
+                : "Add to chat · attach to your next message"
             }
+            onClick={attachment.toggle}
+            pressed={attachment.added}
+            text={attachment.added ? "In chat" : "Add to chat"}
           >
             {attachment.added ? (
-              <>
-                <Check size={13} strokeWidth={2} /> In chat
-              </>
+              <Check size={15} strokeWidth={1.9} />
             ) : (
-              <>
-                <Plus size={13} strokeWidth={2} /> Add to chat
-              </>
+              <Plus size={15} strokeWidth={1.9} />
             )}
-          </button>
+          </HeaderButton>
         ) : null}
-        <button
-          type="button"
-          className="file-viewer__action"
+        {canSave ? (
+          <HeaderButton label="Download" onClick={() => void download()}>
+            <Download size={15} strokeWidth={1.75} />
+          </HeaderButton>
+        ) : null}
+        {filePath ? (
+          <HeaderButton
+            label="Share · copy a public link anyone can open"
+            onClick={() => void share()}
+            disabled={sharing}
+          >
+            {sharing ? (
+              <LoaderCircle
+                size={15}
+                strokeWidth={1.75}
+                className="file-viewer__spin"
+              />
+            ) : (
+              <Share size={15} strokeWidth={1.75} />
+            )}
+          </HeaderButton>
+        ) : null}
+        {hasMenu ? (
+          <DropdownMenu onOpenChange={(open) => !open && setArmed(false)}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="file-viewer__action"
+                aria-label="More"
+                title="More"
+              >
+                <MoreHorizontal size={15} strokeWidth={1.75} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              sideOffset={6}
+              collisionPadding={8}
+              className="file-viewer__menu"
+            >
+              {actions?.copy ? (
+                <DropdownMenuItem onSelect={() => void copyBody()}>
+                  <span data-slot="dropdown-menu-item-icon">
+                    <Copy size={14} />
+                  </span>
+                  {actions.copyLabel ?? "Copy"}
+                </DropdownMenuItem>
+              ) : null}
+              {path ? (
+                <DropdownMenuItem onSelect={() => void copyPath()}>
+                  <span data-slot="dropdown-menu-item-icon">
+                    <Link size={14} />
+                  </span>
+                  {item.payload?.kind === "url" ? "Copy link" : "Copy path"}
+                </DropdownMenuItem>
+              ) : null}
+              {remove ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    data-variant="destructive"
+                    data-armed={armed ? "true" : undefined}
+                    onSelect={(event) => {
+                      if (!armed) {
+                        event.preventDefault();
+                        setArmed(true);
+                        return;
+                      }
+                      remove();
+                    }}
+                  >
+                    <span data-slot="dropdown-menu-item-icon">
+                      <Trash2 size={14} />
+                    </span>
+                    {armed ? "Click again to delete" : "Delete"}
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        <span className="file-viewer__divider" aria-hidden="true" />
+        <HeaderButton
+          label={stage ? "Shrink to a floating viewer" : "Expand"}
           onClick={() => fileViewer.toggleMode()}
-          aria-label={stage ? "Shrink to a floating viewer" : "Expand"}
-          title={stage ? "Shrink to a floating viewer" : "Expand"}
         >
           {stage ? (
-            <MinimizeIcon size={14} />
+            <MinimizeIcon size={15} />
           ) : (
-            <Maximize2 size={14} strokeWidth={1.75} />
+            <Maximize2 size={15} strokeWidth={1.75} />
           )}
-        </button>
-        <button
-          type="button"
-          className="file-viewer__action"
+        </HeaderButton>
+        <HeaderButton
+          label="Close"
+          shortcut="Esc"
           onClick={() => fileViewer.close()}
-          aria-label="Close (Esc)"
-          title="Close (Esc)"
         >
-          <X size={14} strokeWidth={1.9} />
-        </button>
+          <X size={16} strokeWidth={1.75} />
+        </HeaderButton>
       </div>
     </header>
   );
@@ -438,14 +612,7 @@ function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
   );
 }
 
-const SIBLING_NOUNS: Record<string, string> = {
-  image: "photo",
-  video: "video",
-  audio: "clip",
-  canvas: "canvas",
-};
-
-/** Item-to-item navigation across the conversation's photos, videos, clips. */
+/** Item-to-item navigation across everything the conversation made or opened. */
 const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
   const { items, index } = useViewerSiblings(
     item?.id ?? "",
@@ -453,7 +620,6 @@ const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
   );
   return useMemo(() => {
     if (!item || index === -1 || items.length < 2) return null;
-    const noun = SIBLING_NOUNS[item.kind] ?? "item";
     const previous = items[index - 1];
     const next = items[index + 1];
     return {
@@ -461,8 +627,8 @@ const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
       canNext: Boolean(next),
       previous: () => previous && showSibling(item.id, previous),
       next: () => next && showSibling(item.id, next),
-      previousLabel: `Previous ${noun}`,
-      nextLabel: `Next ${noun}`,
+      previousLabel: "Previous",
+      nextLabel: "Next",
     };
   }, [index, item, items]);
 };
@@ -482,15 +648,12 @@ function FileViewerFrame({
   const [bodyNav, setBodyNav] = useState<ViewerNav | null>(null);
   const siblingNav = useSiblingNav(item);
   const nav = bodyNav ?? siblingNav;
-  const { items: siblings, index: siblingIndex } = useViewerSiblings(
-    item?.id ?? "",
-    item?.kind ?? "text",
+  const [bodyActions, setBodyActions] = useState<ViewerItemActions | null>(
+    null,
   );
-  const meta =
-    siblingIndex !== -1 && siblings.length > 1
-      ? `${siblingIndex + 1} of ${siblings.length}`
-      : detail;
 
+  // Body actions clear themselves when the body unmounts (a parent effect
+  // here would run after the new body registered its own).
   useEffect(() => setBodyNav(null), [fileId]);
 
   useEffect(() => {
@@ -605,19 +768,24 @@ function FileViewerFrame({
     >
       <ViewerHeader
         item={item}
-        meta={meta}
+        meta={detail}
         stage={stage}
+        actions={bodyActions}
         onPointerDown={handleHeaderPointerDown}
       />
+      <div className="file-viewer__main">
       <div className="file-viewer__body">
         <ViewerItemContext value={item.id}>
           <ViewerNavContext value={setBodyNav}>
-            <DeferredDisplayContent key={item.id} render={item.render} />
+            <ViewerActionsContext value={setBodyActions}>
+              <DeferredDisplayContent key={item.id} render={item.render} />
+            </ViewerActionsContext>
           </ViewerNavContext>
         </ViewerItemContext>
         <EdgeArrows nav={nav} />
       </div>
       <ViewerStrip item={item} />
+      </div>
       {!stage
         ? RESIZE_EDGES.map((edge) => (
             <div

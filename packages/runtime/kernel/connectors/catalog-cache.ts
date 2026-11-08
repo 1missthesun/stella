@@ -7,6 +7,8 @@ import {
   type NativeConnectorCatalogEntry,
 } from "./native-integrations.js";
 import { getConnectorStateRoot } from "./state.js";
+import { isGoogleIntegration } from "@stella/contracts/backend/integrations";
+import { fetchGoogleProviderState } from "./backend-accounts.js";
 
 const CACHE_FILE = "catalog-cache.json";
 
@@ -205,6 +207,38 @@ export const buildMergedConnectorCatalog = (
 ): NativeConnectorCatalogEntry[] =>
   buildNativeConnectorCatalog(serverEntries ? [...serverEntries] : undefined);
 
+/**
+ * Google connects through Stella's own Google app by default: a Composio entry
+ * for a Google integration that Stella also ships first-party is dropped,
+ * unless the user chose Composio or is already connected through it.
+ */
+const preferFirstPartyGoogle = async (
+  liveEntries: NativeConnectorCatalogEntry[],
+  auth: { baseUrl: string; authToken: string },
+  fetchImpl?: typeof fetch,
+): Promise<NativeConnectorCatalogEntry[]> => {
+  const firstParty = new Set(
+    buildMergedConnectorCatalog()
+      .filter((entry) => entry.provider === "google-workspace")
+      .map((entry) => entry.id),
+  );
+  const candidates = liveEntries.filter(
+    (entry) =>
+      entry.provider === "backend-composio" &&
+      isGoogleIntegration(entry.id) &&
+      firstParty.has(entry.id),
+  );
+  if (candidates.length === 0) return liveEntries;
+  const state = await fetchGoogleProviderState(auth, {
+    ...(fetchImpl ? { fetchImpl } : {}),
+  }).catch(() => null);
+  if (!state || state.provider === "composio") return liveEntries;
+  const keep = new Set(state.composioConnected);
+  return liveEntries.filter(
+    (entry) => !candidates.includes(entry) || keep.has(entry.id),
+  );
+};
+
 export const resolveNativeConnectorCatalog = async (options: {
   stellaDataDir: string;
   getBackendAuth?: () =>
@@ -221,14 +255,19 @@ export const resolveNativeConnectorCatalog = async (options: {
       ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     });
     if (liveEntries) {
-      await writeCachedServerCatalog(options.stellaDataDir, liveEntries).catch(
+      const preferred = await preferFirstPartyGoogle(
+        liveEntries,
+        backendAuth,
+        options.fetchImpl,
+      );
+      await writeCachedServerCatalog(options.stellaDataDir, preferred).catch(
         () => undefined,
       );
-      const entries = buildMergedConnectorCatalog(liveEntries);
+      const entries = buildMergedConnectorCatalog(preferred);
       return {
         entries,
         source: "live",
-        sources: entrySources(entries, liveEntries, "live"),
+        sources: entrySources(entries, preferred, "live"),
       };
     }
   }
@@ -265,7 +304,10 @@ export const fetchServerNativeCatalog = async (options: {
         authorization: `Bearer ${options.authToken}`,
       },
     },
-    { label: "Loading the connector catalog", timeoutMs: REQUEST_BUDGET_MS.lookup },
+    {
+      label: "Loading the connector catalog",
+      timeoutMs: REQUEST_BUDGET_MS.lookup,
+    },
   ).catch(() => null);
   if (!response?.ok) return null;
   const payload = (await response.json().catch(() => null)) as {

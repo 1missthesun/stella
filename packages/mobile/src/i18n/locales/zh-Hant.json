@@ -2643,6 +2643,13 @@
       "renameSave": "儲存",
       "renameCancel": "取消",
       "renameLabel": "名稱"
+    },
+    "googleComposio": {
+      "title": "Google 使用 Composio",
+      "description": "Google 透過 Stella 連線。開啟後，新的 Google 帳戶將改為透過 Composio 連線。已連線的帳戶可繼續使用。",
+      "loadError": "無法載入此設定。",
+      "saveError": "儲存失敗，請再試一次。",
+      "retry": "重試"
     }
   },
   "shell": {

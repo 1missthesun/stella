@@ -2651,6 +2651,13 @@
       "renameSave": "Opslaan",
       "renameCancel": "Annuleren",
       "renameLabel": "Naam"
+    },
+    "googleComposio": {
+      "title": "Composio gebruiken voor Google",
+      "description": "Google maakt verbinding via Stella. Zet dit aan om nieuwe Google-accounts via Composio te verbinden. Accounts die je al hebt verbonden, blijven werken.",
+      "loadError": "Deze instelling kon niet worden geladen.",
+      "saveError": "Opslaan mislukt. Probeer het opnieuw.",
+      "retry": "Opnieuw proberen"
     }
   },
   "shell": {

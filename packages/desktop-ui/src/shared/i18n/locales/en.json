@@ -2651,6 +2651,13 @@
       "renameSave": "Save",
       "renameCancel": "Cancel",
       "renameLabel": "Name"
+    },
+    "googleComposio": {
+      "title": "Use Composio for Google",
+      "description": "Google connects through Stella. Turn this on to connect new Google accounts through Composio instead. Accounts you already connected keep working.",
+      "loadError": "Couldn't load this setting.",
+      "saveError": "Couldn't save. Try again.",
+      "retry": "Try again"
     }
   },
   "shell": {

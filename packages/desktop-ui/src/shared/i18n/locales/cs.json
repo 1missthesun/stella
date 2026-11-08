@@ -2667,6 +2667,13 @@
       "renameSave": "Uložit",
       "renameCancel": "Zrušit",
       "renameLabel": "Název"
+    },
+    "googleComposio": {
+      "title": "Používat Composio pro Google",
+      "description": "Google se připojuje přes Stellu. Zapněte, chcete-li nové účty Google připojovat přes Composio. Již připojené účty fungují dál.",
+      "loadError": "Nastavení se nepodařilo načíst.",
+      "saveError": "Uložení se nezdařilo. Zkuste to znovu.",
+      "retry": "Zkusit znovu"
     }
   },
   "shell": {

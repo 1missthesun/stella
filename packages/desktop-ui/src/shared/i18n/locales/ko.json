@@ -2643,6 +2643,13 @@
       "renameSave": "저장",
       "renameCancel": "취소",
       "renameLabel": "이름"
+    },
+    "googleComposio": {
+      "title": "Google에 Composio 사용",
+      "description": "Google은 Stella를 통해 연결됩니다. 켜면 새 Google 계정을 Composio를 통해 연결합니다. 이미 연결한 계정은 계속 작동합니다.",
+      "loadError": "이 설정을 불러오지 못했습니다.",
+      "saveError": "저장하지 못했습니다. 다시 시도하세요.",
+      "retry": "다시 시도"
     }
   },
   "shell": {

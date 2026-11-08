@@ -59,6 +59,12 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
   },
   {
     tab: "privacy",
+    titleKey: "settings.googleComposio.title",
+    descriptionKey: "settings.googleComposio.description",
+    keywords: ["google", "gmail", "calendar", "drive", "composio", "connectors", "connections"],
+  },
+  {
+    tab: "privacy",
     titleKey: "settings.yourData.title",
     descriptionKey: "settings.yourData.description",
     keywords: ["privacy", "export", "download", "data", "support", "access", "encryption"],

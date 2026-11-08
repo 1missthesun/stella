@@ -406,6 +406,11 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     registerNativeIntegrationHandlers({
         getStellaAppDir: lifecycle.getStellaDataDir,
         requestExternalOAuthApproval: (payload) => services.connectorOAuthService.requestExternalOAuthApproval(payload),
+        requestPreregisteredOAuth: (payload) => services.connectorCredentialService.requestPreregisteredOAuth({
+            ...payload,
+            presentation: "headless",
+        }),
+        requestDeviceOAuth: (payload) => services.connectorCredentialService.requestDeviceOAuth(payload),
         getAuthToken: () => services.authService.getAuthToken(),
         getBackendUrl: () => services.authService.getBackendUrl(),
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),

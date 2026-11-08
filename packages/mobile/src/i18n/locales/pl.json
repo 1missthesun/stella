@@ -2667,6 +2667,13 @@
       "renameSave": "Zapisz",
       "renameCancel": "Anuluj",
       "renameLabel": "Nazwa"
+    },
+    "googleComposio": {
+      "title": "Używaj Composio dla Google",
+      "description": "Google łączy się przez Stellę. Włącz, aby łączyć nowe konta Google przez Composio. Już połączone konta nadal działają.",
+      "loadError": "Nie udało się wczytać tego ustawienia.",
+      "saveError": "Nie udało się zapisać. Spróbuj ponownie.",
+      "retry": "Spróbuj ponownie"
     }
   },
   "shell": {

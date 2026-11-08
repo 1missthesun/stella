@@ -2643,6 +2643,13 @@
       "renameSave": "Simpan",
       "renameCancel": "Batal",
       "renameLabel": "Nama"
+    },
+    "googleComposio": {
+      "title": "Gunakan Composio untuk Google",
+      "description": "Google terhubung melalui Stella. Aktifkan ini untuk menghubungkan akun Google baru melalui Composio. Akun yang sudah terhubung tetap berfungsi.",
+      "loadError": "Pengaturan ini tidak dapat dimuat.",
+      "saveError": "Gagal menyimpan. Coba lagi.",
+      "retry": "Coba lagi"
     }
   },
   "shell": {

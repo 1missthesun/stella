@@ -1,4 +1,6 @@
 import type {
+  GoogleConnectionProvider,
+  GoogleProviderState,
   IntegrationAccount,
   IntegrationConnection,
 } from "@stella/contracts/backend/integrations";
@@ -152,4 +154,61 @@ export const removeBackendAccount = async (
         .map(readAccount)
         .filter((entry): entry is IntegrationAccount => entry !== null)
     : [];
+};
+
+const readGoogleProviderState = (payload: unknown): GoogleProviderState => ({
+  provider:
+    isRecord(payload) && payload.provider === "composio"
+      ? "composio"
+      : "stella",
+  composioConnected:
+    isRecord(payload) && Array.isArray(payload.composioConnected)
+      ? payload.composioConnected.filter(
+          (id): id is string => typeof id === "string",
+        )
+      : [],
+});
+
+const googleProviderCache = new Map<
+  string,
+  { at: number; state: Promise<GoogleProviderState> }
+>();
+
+/** Whether this user connects Google through Stella's own app (default) or Composio. */
+export const fetchGoogleProviderState = (
+  auth: BackendSiteAuth,
+  options: { fresh?: boolean; fetchImpl?: typeof fetch } = {},
+): Promise<GoogleProviderState> => {
+  const key = `${auth.baseUrl}\0${auth.authToken.slice(-16)}`;
+  const cached = googleProviderCache.get(key);
+  if (!options.fresh && cached && Date.now() - cached.at < CONNECTIONS_TTL_MS) {
+    return cached.state;
+  }
+  const state = backendRequest(
+    auth,
+    "/api/native-integrations/google-provider",
+    { method: "GET" },
+    options.fetchImpl,
+  ).then(readGoogleProviderState);
+  googleProviderCache.set(key, { at: Date.now(), state });
+  state.catch(() => {
+    if (googleProviderCache.get(key)?.state === state) {
+      googleProviderCache.delete(key);
+    }
+  });
+  return state;
+};
+
+export const setGoogleProvider = async (
+  auth: BackendSiteAuth,
+  provider: GoogleConnectionProvider,
+): Promise<GoogleProviderState> => {
+  const state = readGoogleProviderState(
+    await backendRequest(auth, "/api/native-integrations/google-provider", {
+      method: "POST",
+      body: { provider },
+    }),
+  );
+  googleProviderCache.clear();
+  return state;
 };

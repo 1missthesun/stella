@@ -2667,6 +2667,13 @@
       "renameSave": "Сохранить",
       "renameCancel": "Отмена",
       "renameLabel": "Название"
+    },
+    "googleComposio": {
+      "title": "Использовать Composio для Google",
+      "description": "Google подключается через Stella. Включите, чтобы подключать новые аккаунты Google через Composio. Уже подключённые аккаунты продолжат работать.",
+      "loadError": "Не удалось загрузить настройку.",
+      "saveError": "Не удалось сохранить. Попробуйте ещё раз.",
+      "retry": "Повторить"
     }
   },
   "shell": {

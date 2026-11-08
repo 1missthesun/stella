@@ -2651,6 +2651,13 @@
       "renameSave": "Speichern",
       "renameCancel": "Abbrechen",
       "renameLabel": "Name"
+    },
+    "googleComposio": {
+      "title": "Composio für Google verwenden",
+      "description": "Google wird über Stella verbunden. Aktiviere dies, um neue Google-Konten stattdessen über Composio zu verbinden. Bereits verbundene Konten funktionieren weiter.",
+      "loadError": "Diese Einstellung konnte nicht geladen werden.",
+      "saveError": "Speichern fehlgeschlagen. Versuche es erneut.",
+      "retry": "Erneut versuchen"
     }
   },
   "shell": {

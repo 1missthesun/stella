@@ -2683,6 +2683,13 @@
       "renameSave": "حفظ",
       "renameCancel": "إلغاء",
       "renameLabel": "الاسم"
+    },
+    "googleComposio": {
+      "title": "استخدام Composio مع Google",
+      "description": "يتصل Google عبر Stella. فعّل هذا الخيار لربط حسابات Google الجديدة عبر Composio بدلاً من ذلك. تظل الحسابات المتصلة سابقاً تعمل.",
+      "loadError": "تعذّر تحميل هذا الإعداد.",
+      "saveError": "تعذّر الحفظ. حاول مرة أخرى.",
+      "retry": "حاول مرة أخرى"
     }
   },
   "shell": {

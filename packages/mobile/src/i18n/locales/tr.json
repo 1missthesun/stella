@@ -2651,6 +2651,13 @@
       "renameSave": "Kaydet",
       "renameCancel": "İptal",
       "renameLabel": "Ad"
+    },
+    "googleComposio": {
+      "title": "Google için Composio kullan",
+      "description": "Google, Stella üzerinden bağlanır. Yeni Google hesaplarını Composio üzerinden bağlamak için bunu açın. Zaten bağladığınız hesaplar çalışmaya devam eder.",
+      "loadError": "Bu ayar yüklenemedi.",
+      "saveError": "Kaydedilemedi. Tekrar deneyin.",
+      "retry": "Tekrar dene"
     }
   },
   "shell": {

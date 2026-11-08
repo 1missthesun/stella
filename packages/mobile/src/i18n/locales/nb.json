@@ -2651,6 +2651,13 @@
       "renameSave": "Lagre",
       "renameCancel": "Avbryt",
       "renameLabel": "Navn"
+    },
+    "googleComposio": {
+      "title": "Bruk Composio for Google",
+      "description": "Google kobles til via Stella. Slå på for å koble nye Google-kontoer via Composio i stedet. Kontoer du allerede har koblet til, fortsetter å virke.",
+      "loadError": "Kunne ikke laste inn innstillingen.",
+      "saveError": "Kunne ikke lagre. Prøv igjen.",
+      "retry": "Prøv igjen"
     }
   },
   "shell": {

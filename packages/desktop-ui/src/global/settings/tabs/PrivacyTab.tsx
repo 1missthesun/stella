@@ -16,6 +16,7 @@ import { platformCapabilities } from "@/platform/capabilities";
 import { SettingsToggleCard } from "./settings-toggle-card";
 import { CloudSyncCard } from "./CloudSyncCard";
 import { TelemetrySettingsCard } from "./TelemetrySettingsCard";
+import { GoogleConnectionCard } from "./GoogleConnectionCard";
 import { YourDataCard } from "./YourDataCard";
 
 const NativePermissionSettings = lazy(() =>
@@ -114,6 +115,7 @@ export function PrivacyTab() {
         />
       ) : null}
       <YourDataCard />
+      <GoogleConnectionCard />
       {platformCapabilities.nativeSettings ? <TelemetrySettingsCard /> : null}
       <CloudAccountCards />
       {platformCapabilities.nativeSettings ? (

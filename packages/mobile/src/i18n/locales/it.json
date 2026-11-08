@@ -2659,6 +2659,13 @@
       "renameSave": "Salva",
       "renameCancel": "Annulla",
       "renameLabel": "Nome"
+    },
+    "googleComposio": {
+      "title": "Usa Composio per Google",
+      "description": "Google si collega tramite Stella. Attiva questa opzione per collegare i nuovi account Google tramite Composio. Gli account già collegati continuano a funzionare.",
+      "loadError": "Impossibile caricare questa impostazione.",
+      "saveError": "Salvataggio non riuscito. Riprova.",
+      "retry": "Riprova"
     }
   },
   "shell": {

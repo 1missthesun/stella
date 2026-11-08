@@ -1,10 +1,11 @@
 import type {
+  GoogleProviderState,
   IntegrationAccount,
   IntegrationCalls,
   IntegrationConnection,
   XConnection,
 } from "@stella/contracts/backend/integrations";
-import { X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
+import { X_OAUTH_CALLBACK_PATH, isGoogleIntegration } from "@stella/contracts/backend/integrations";
 import type {
   CloudConnectorConnectRequest,
   CloudConnectorConnectState,
@@ -291,6 +292,51 @@ const listConnections = async (
       }),
     ),
   };
+};
+
+export const INTEGRATION_SETTINGS_MIGRATION = {
+  id: "integrations.3-settings",
+  statements: [
+    `CREATE TABLE integration_settings (
+       key TEXT PRIMARY KEY,
+       value TEXT NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`,
+  ],
+};
+
+const GOOGLE_PROVIDER_KEY = "google_provider";
+
+const googleProviderState = async (ctx: OwnerContext): Promise<GoogleProviderState> => {
+  const row = ctx.db.one<{ value: string }>(
+    "SELECT value FROM integration_settings WHERE key = ?",
+    GOOGLE_PROVIDER_KEY,
+  );
+  const googleIds = ctx.db
+    .all<{ integration_id: string }>("SELECT integration_id FROM integration_connections ORDER BY integration_id")
+    .map((entry) => entry.integration_id)
+    .filter(isGoogleIntegration);
+  const states = await Promise.all(
+    googleIds.map(async (id) => ({ id, connected: (await connectionState(ctx, id)).connected })),
+  );
+  return {
+    provider: row?.value === "composio" ? "composio" : "stella",
+    composioConnected: states.filter((entry) => entry.connected).map((entry) => entry.id),
+  };
+};
+
+const setGoogleProvider = async (
+  ctx: OwnerContext,
+  provider: GoogleProviderState["provider"],
+): Promise<GoogleProviderState> => {
+  ctx.db.run(
+    `INSERT INTO integration_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    GOOGLE_PROVIDER_KEY,
+    provider,
+    ctx.now,
+  );
+  return await googleProviderState(ctx);
 };
 
 const settleReceipt = (db: OwnerDb, requestId: string, state: string, now: number): void => {
@@ -903,6 +949,7 @@ const purgeIntegrations = async (
     if (ctx.db.one("SELECT 1 AS left FROM integration_connections LIMIT 1")) return { pending: true };
   }
   ctx.db.run("DELETE FROM integration_accounts");
+  ctx.db.run("DELETE FROM integration_settings");
   ctx.db.run("DELETE FROM integration_principal");
   ctx.db.run("DELETE FROM x_tokens");
   return { pending: false };
@@ -962,7 +1009,7 @@ const accountChangeFailed = (error: unknown, event: string, id: string): never =
 
 export const integrationsDomain = {
   name: "integrations",
-  migrations: [INTEGRATIONS_MIGRATION, INTEGRATION_ACCOUNTS_MIGRATION],
+  migrations: [INTEGRATIONS_MIGRATION, INTEGRATION_ACCOUNTS_MIGRATION, INTEGRATION_SETTINGS_MIGRATION],
   calls: {
     "integrations.connections": {
       scope: "owner",
@@ -983,6 +1030,16 @@ export const integrationsDomain = {
       scope: "owner",
       parse: object({ id: integrationId(), addAccount: optional(boolean()) }),
       handler: (ctx, args) => connectLink(ctx, args.id),
+    },
+    "integrations.googleProvider": {
+      scope: "owner",
+      parse: empty(),
+      handler: googleProviderState,
+    },
+    "integrations.setGoogleProvider": {
+      scope: "owner",
+      parse: object({ provider: literal("stella", "composio") }),
+      handler: (ctx, args) => setGoogleProvider(ctx, args.provider),
     },
     "integrations.setPrimaryAccount": {
       scope: "owner",

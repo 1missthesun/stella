@@ -2651,6 +2651,13 @@
       "renameSave": "Gem",
       "renameCancel": "Annuller",
       "renameLabel": "Navn"
+    },
+    "googleComposio": {
+      "title": "Brug Composio til Google",
+      "description": "Google forbindes via Stella. Slå dette til for at forbinde nye Google-konti via Composio i stedet. Konti, du allerede har forbundet, virker fortsat.",
+      "loadError": "Indstillingen kunne ikke indlæses.",
+      "saveError": "Kunne ikke gemme. Prøv igen.",
+      "retry": "Prøv igen"
     }
   },
   "shell": {

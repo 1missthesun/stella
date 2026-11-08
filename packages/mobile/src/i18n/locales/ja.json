@@ -2643,6 +2643,13 @@
       "renameSave": "保存",
       "renameCancel": "キャンセル",
       "renameLabel": "名前"
+    },
+    "googleComposio": {
+      "title": "Google に Composio を使う",
+      "description": "Google は Stella 経由で接続されます。オンにすると、新しい Google アカウントは Composio 経由で接続されます。接続済みのアカウントは引き続き使えます。",
+      "loadError": "この設定を読み込めませんでした。",
+      "saveError": "保存できませんでした。もう一度お試しください。",
+      "retry": "再試行"
     }
   },
   "shell": {

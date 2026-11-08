@@ -2643,6 +2643,13 @@
       "renameSave": "บันทึก",
       "renameCancel": "ยกเลิก",
       "renameLabel": "ชื่อ"
+    },
+    "googleComposio": {
+      "title": "ใช้ Composio สำหรับ Google",
+      "description": "Google เชื่อมต่อผ่าน Stella เปิดตัวเลือกนี้เพื่อเชื่อมต่อบัญชี Google ใหม่ผ่าน Composio แทน บัญชีที่เชื่อมต่อแล้วยังใช้งานได้ตามเดิม",
+      "loadError": "โหลดการตั้งค่านี้ไม่ได้",
+      "saveError": "บันทึกไม่สำเร็จ ลองอีกครั้ง",
+      "retry": "ลองอีกครั้ง"
     }
   },
   "shell": {

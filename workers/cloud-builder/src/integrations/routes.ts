@@ -243,6 +243,11 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
       return method === "GET"
         ? await ownerCall(request, env, "integrations.connections", () => ({}))
         : methodNotAllowed();
+    case "/api/native-integrations/google-provider":
+      if (method === "GET") return await ownerCall(request, env, "integrations.googleProvider", () => ({}));
+      return method === "POST"
+        ? await ownerCall(request, env, "integrations.setGoogleProvider", (body) => ({ provider: body?.provider }))
+        : methodNotAllowed();
     case "/api/native-integrations/accounts/primary":
       return method === "POST"
         ? await ownerCall(request, env, "integrations.setPrimaryAccount", (body) => ({

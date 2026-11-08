@@ -2659,6 +2659,13 @@
       "renameSave": "Salvează",
       "renameCancel": "Anulează",
       "renameLabel": "Nume"
+    },
+    "googleComposio": {
+      "title": "Folosește Composio pentru Google",
+      "description": "Google se conectează prin Stella. Activează pentru a conecta conturile Google noi prin Composio. Conturile deja conectate continuă să funcționeze.",
+      "loadError": "Setarea nu a putut fi încărcată.",
+      "saveError": "Salvarea a eșuat. Încearcă din nou.",
+      "retry": "Încearcă din nou"
     }
   },
   "shell": {

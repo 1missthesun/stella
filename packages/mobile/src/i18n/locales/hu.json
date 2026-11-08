@@ -2651,6 +2651,13 @@
       "renameSave": "Mentés",
       "renameCancel": "Mégse",
       "renameLabel": "Név"
+    },
+    "googleComposio": {
+      "title": "Composio használata a Google-hoz",
+      "description": "A Google a Stellán keresztül csatlakozik. Kapcsold be, ha az új Google-fiókokat a Composión keresztül szeretnéd csatlakoztatni. A már csatlakoztatott fiókok továbbra is működnek.",
+      "loadError": "A beállítást nem sikerült betölteni.",
+      "saveError": "A mentés nem sikerült. Próbáld újra.",
+      "retry": "Újra"
     }
   },
   "shell": {

@@ -7,6 +7,8 @@ const SLOW_CALLS = new Set<string>([
   "mcpServers.call",
   "integrations.run",
   "integrations.connections",
+  "integrations.googleProvider",
+  "integrations.setGoogleProvider",
   "integrations.status",
   "integrations.connectLink",
   "integrations.removeAccount",

@@ -2651,6 +2651,13 @@
       "renameSave": "Spara",
       "renameCancel": "Avbryt",
       "renameLabel": "Namn"
+    },
+    "googleComposio": {
+      "title": "Använd Composio för Google",
+      "description": "Google ansluts via Stella. Slå på för att ansluta nya Google-konton via Composio i stället. Konton du redan har anslutit fortsätter att fungera.",
+      "loadError": "Inställningen kunde inte läsas in.",
+      "saveError": "Det gick inte att spara. Försök igen.",
+      "retry": "Försök igen"
     }
   },
   "shell": {

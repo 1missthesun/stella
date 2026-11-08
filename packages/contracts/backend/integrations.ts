@@ -82,6 +82,21 @@ export const integrationSupportsMultipleAccounts = (id: string): boolean => {
   return normalized === "gmail" || (normalized.startsWith("google") && normalized !== "googleads");
 };
 
+/** Who connects a user's Google account: Stella's own Google app (default) or Composio. */
+export type GoogleConnectionProvider = "stella" | "composio";
+
+export type GoogleProviderState = {
+  provider: GoogleConnectionProvider;
+  /** Google integrations this user already connected through Composio; they keep working. */
+  composioConnected: string[];
+};
+
+/** Google integrations Stella can connect with its own Google app instead of Composio. */
+export const isGoogleIntegration = (id: string): boolean => {
+  const normalized = id.trim().toLowerCase();
+  return normalized === "gmail" || (normalized.startsWith("google") && normalized !== "googleads");
+};
+
 export type IntegrationCalls = {
   "integrations.catalog": {
     args: Record<string, never>;
@@ -112,6 +127,14 @@ export type IntegrationCalls = {
       account?: string;
     };
     result: unknown;
+  };
+  "integrations.googleProvider": {
+    args: Record<string, never>;
+    result: GoogleProviderState;
+  };
+  "integrations.setGoogleProvider": {
+    args: { provider: GoogleConnectionProvider };
+    result: GoogleProviderState;
   };
   "integrations.setPrimaryAccount": {
     args: { id: string; account: string };

@@ -2643,6 +2643,13 @@
       "renameSave": "Lưu",
       "renameCancel": "Hủy",
       "renameLabel": "Tên"
+    },
+    "googleComposio": {
+      "title": "Dùng Composio cho Google",
+      "description": "Google kết nối qua Stella. Bật tùy chọn này để kết nối tài khoản Google mới qua Composio. Các tài khoản đã kết nối vẫn hoạt động.",
+      "loadError": "Không tải được cài đặt này.",
+      "saveError": "Không lưu được. Hãy thử lại.",
+      "retry": "Thử lại"
     }
   },
   "shell": {

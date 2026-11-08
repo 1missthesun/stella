@@ -2651,6 +2651,13 @@
       "renameSave": "Tallenna",
       "renameCancel": "Peruuta",
       "renameLabel": "Nimi"
+    },
+    "googleComposio": {
+      "title": "Käytä Composiota Googlelle",
+      "description": "Google yhdistetään Stellan kautta. Ota tämä käyttöön, jos haluat yhdistää uudet Google-tilit Composion kautta. Jo yhdistetyt tilit toimivat edelleen.",
+      "loadError": "Asetusta ei voitu ladata.",
+      "saveError": "Tallennus epäonnistui. Yritä uudelleen.",
+      "retry": "Yritä uudelleen"
     }
   },
   "shell": {

@@ -2659,6 +2659,13 @@
       "renameSave": "שמירה",
       "renameCancel": "ביטול",
       "renameLabel": "שם"
+    },
+    "googleComposio": {
+      "title": "שימוש ב-Composio עבור Google",
+      "description": "Google מתחבר דרך Stella. הפעילו כדי לחבר חשבונות Google חדשים דרך Composio. חשבונות שכבר חיברתם ממשיכים לעבוד.",
+      "loadError": "לא ניתן לטעון את ההגדרה.",
+      "saveError": "השמירה נכשלה. נסו שוב.",
+      "retry": "נסו שוב"
     }
   },
   "shell": {

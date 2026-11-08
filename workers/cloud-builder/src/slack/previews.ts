@@ -962,6 +962,23 @@ const appMessagesLink = (install: { appId: string; teamId: string }): string => 
   return link.toString();
 };
 
+type LookedUpUser = {
+  id: string;
+  team_id?: string;
+  deleted?: boolean;
+  is_bot?: boolean;
+  enterprise_user?: { enterprise_id?: string; teams?: string[] };
+};
+
+/** The bot token can also find Slack Connect guests and, on Enterprise Grid, people in the org's other workspaces. */
+const memberOfTeam = (user: LookedUpUser, teamId: string, enterpriseId: string | null): boolean =>
+  user.team_id === teamId ||
+  Boolean(
+    enterpriseId &&
+      user.enterprise_user?.enterprise_id === enterpriseId &&
+      user.enterprise_user.teams?.includes(teamId),
+  );
+
 const sendDmLink = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const form = await request.formData().catch(() => null);
   const preview = await loadPreview(env, String(form?.get("p") ?? ""));
@@ -976,13 +993,9 @@ const sendDmLink = async (request: Request, env: Cloudflare.Env): Promise<Respon
     `<p>If ${escapeHtml(email || "that email")} belongs to a member of ${escapeHtml(install.teamName)}, Stella just sent them a sign-in link in a direct message. It works for 15 minutes.</p><p>Find it in Slack under Apps, in Stella's Messages tab.</p><a class="button" href="${escapeHtml(appMessagesLink(install))}">Open Stella in Slack</a>`,
   );
   if (!/^[^@\s]+@[^@\s]+$/u.test(email)) return sent;
-  const found = await slackTry<{ ok: boolean; user?: { id: string; team_id?: string; deleted?: boolean; is_bot?: boolean } }>(
-    install.botToken,
-    "users.lookupByEmail",
-    { email },
-  );
+  const found = await slackTry<{ ok: boolean; user?: LookedUpUser }>(install.botToken, "users.lookupByEmail", { email });
   const user = found?.user;
-  if (!user || user.deleted || user.is_bot) return sent;
+  if (!user || user.deleted || user.is_bot || !memberOfTeam(user, preview.team_id, install.enterpriseId)) return sent;
   const token = await signToken<DmLinkClaims>(env, DM_LINK, { p: preview.id, r: path, t: preview.team_id, u: user.id }, DM_LINK_TTL_MS);
   const link = `${authOrigin(env, request)}${SIGNIN_DM_PATH}?t=${encodeURIComponent(token)}`;
   await slackTry(install.botToken, "chat.postMessage", {

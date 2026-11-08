@@ -45,6 +45,7 @@ const initializeWindowShell = (context) => {
     });
     configureNotificationActivationHandling(context);
     state.overlayController = new OverlayWindowController({
+        setupExternalLinkHandlers: (window) => services.externalLinkService.setupExternalLinkHandlers(window),
         preloadPath,
         sessionPartition: config.sessionPartition,
         electronDir: config.electronDir,
@@ -59,6 +60,7 @@ const initializeWindowShell = (context) => {
         onMinimizeFullToTray: () => state.trayController?.notifyMinimizedToTray(),
     }));
     state.companionController = new CompanionWindowController({
+        setupExternalLinkHandlers: (window) => services.externalLinkService.setupExternalLinkHandlers(window),
         preloadPath,
         sessionPartition: config.sessionPartition,
         electronDir: config.electronDir,

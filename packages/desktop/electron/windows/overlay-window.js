@@ -141,6 +141,7 @@ class OverlayWindow {
         // macOS) excludes it from every capture path regardless of timing, while
         // leaving it fully visible to the user.
         this.window.setContentProtection(true);
+        this.options.setupExternalLinkHandlers(this.window);
         if (process.platform === 'darwin') {
             // Keep the overlay attached to the active Space on macOS. Without this,
             // the hidden panel stays bound to whichever Space it first materialized

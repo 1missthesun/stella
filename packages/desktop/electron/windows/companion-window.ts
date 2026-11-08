@@ -57,6 +57,7 @@ import {
 import { onIpc, offIpc } from "../ipc/typed-ipc.js";
 
 export type CompanionWindowOptions = {
+  setupExternalLinkHandlers: (window: BrowserWindow) => void;
   preloadPath: string;
   sessionPartition: string;
   electronDir: string;
@@ -350,6 +351,7 @@ export class CompanionWindowController {
       }),
     });
     slot.window = win;
+    this.options.setupExternalLinkHandlers(win);
     win.setTitle(STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES[0]);
     win.setAlwaysOnTop(true, "floating");
     win.setContentProtection(true);

@@ -61,8 +61,10 @@ import {
 import {
   CLOSE_BAD_REQUEST,
   CLOSE_INTERNAL,
+  CLOSE_NOT_FOUND,
   CLOSE_UNAUTHENTICATED,
 } from "../conversation-types.js";
+import { isSlackConversationId } from "../slack/conversation-id.js";
 import { devAcceptanceProbesEnabled } from "../dev-acceptance-probes.js";
 import {
   dispatchErrorResponse,
@@ -271,6 +273,9 @@ const forwardToConversation = async (
   doPath: string,
   caller: ConversationCaller,
 ): Promise<Response> => {
+  if (isSlackConversationId(conversationId)) {
+    return Response.json({ error: "Conversation not found." }, { status: 404 });
+  }
   const source = new URL(request.url);
   const target = new URL(ORCHESTRATOR_INTERNAL_ORIGIN);
   target.pathname = doPath;
@@ -344,6 +349,13 @@ const handleTurnStartRoute = async (
             "Sign in to send messages.",
             false,
           );
+    }
+    if (isSlackConversationId(conversationId)) {
+      return turnStartErrorResponse(
+        "forbidden",
+        "Slack conversations take turns only from Slack.",
+        false,
+      );
     }
     ownerId = auth.caller.ownerId;
     tokenExpiresAtMs = auth.caller.expiresAtMs;
@@ -1085,6 +1097,9 @@ app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: "conversatio
   const conversationId = c.req.param("id");
   const requestId = c.var.requestId;
   const startedAt = Date.now();
+  if (isSlackConversationId(conversationId)) {
+    return refuseUpgrade(c.req.raw, CLOSE_NOT_FOUND, "Conversation not found.");
+  }
   log("info", "conversation_socket_forwarding", { requestId, conversationId });
   try {
     return await withInfrastructureDeadline(

@@ -270,6 +270,10 @@ const nativeOttRedirect = (): BetterAuthPlugin => ({
           const requestOrigin = ctx.request ? new URL(ctx.request.url).origin : new URL(ctx.context.baseURL).origin;
           if (redirectUrl.origin === requestOrigin) {
             ctx.context.responseHeaders?.append("set-cookie", ottCookieHeader(token));
+          } else if (redirectUrl.protocol !== "https:" && redirectUrl.protocol !== "http:") {
+            // A native app scheme (stella://) never reaches a server, and every
+            // shipped mobile build reads the token from the query.
+            redirectUrl.searchParams.set("ott", token);
           } else {
             const fragment = new URLSearchParams(redirectUrl.hash.replace(/^#/, ""));
             fragment.set("ott", token);

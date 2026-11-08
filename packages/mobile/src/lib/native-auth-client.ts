@@ -140,7 +140,11 @@ export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
         );
         if (result.type !== "success") return;
 
-        const ott = new URL(result.url).searchParams.get("ott")?.trim();
+        const returned = new URL(result.url);
+        const ott = (
+          returned.searchParams.get("ott") ??
+          new URLSearchParams(returned.hash.replace(/^#/, "")).get("ott")
+        )?.trim();
         if (!ott) {
           throw new Error("OAuth callback did not include a one-time token.");
         }

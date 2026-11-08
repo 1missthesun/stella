@@ -260,6 +260,68 @@ function BrowserPageError({
   );
 }
 
+/**
+ * Whether an open popover, menu or dialog overlaps the page. The page is a
+ * native view drawn above the whole window, so it must step aside while one
+ * is open or it would cover it.
+ */
+const OVERLAY_SELECTOR = [
+  '[data-radix-popper-content-wrapper] > [data-state="open"]',
+  '[role="dialog"][data-state="open"]',
+  '[role="alertdialog"][data-state="open"]',
+].join(", ");
+
+function useOverlayOverPage(
+  pageRef: { current: HTMLElement | null },
+  enabled: boolean,
+): boolean {
+  const [covered, setCovered] = useState(false);
+  useEffect(() => {
+    if (!enabled) {
+      setCovered(false);
+      return;
+    }
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const page = pageRef.current?.getBoundingClientRect();
+      let next = false;
+      if (page) {
+        for (const overlay of document.querySelectorAll(OVERLAY_SELECTOR)) {
+          const rect = overlay.getBoundingClientRect();
+          if (
+            rect.width > 0 &&
+            rect.left < page.right &&
+            rect.right > page.left &&
+            rect.top < page.bottom &&
+            rect.bottom > page.top
+          ) {
+            next = true;
+            break;
+          }
+        }
+      }
+      setCovered(next);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-state"],
+    });
+    check();
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [enabled, pageRef]);
+  return covered;
+}
+
 export function BrowserSection() {
   const chat = useChatRuntime();
   const activeSection = useActiveSidebarSection();
@@ -277,6 +339,7 @@ export function BrowserSection() {
   const [address, setAddress] = useState("");
   const surfaceRef = useRef<HTMLElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const overlayOverPage = useOverlayOverPage(pageRef, visible);
   const shownRef = useRef(false);
   const mountedRef = useRef(true);
   const tabStripRef = useRef<HTMLDivElement | null>(null);
@@ -385,7 +448,11 @@ export function BrowserSection() {
     const surface = surfaceRef.current;
     const page = pageRef.current;
     const shouldShow =
-      visible && Boolean(activeTabId) && !state.error && !localError;
+      visible &&
+      !overlayOverPage &&
+      Boolean(activeTabId) &&
+      !state.error &&
+      !localError;
     if (!api || !surface || !page || !shouldShow) {
       if (api && shownRef.current) void api.hide();
       shownRef.current = false;
@@ -456,7 +523,7 @@ export function BrowserSection() {
       if (shownRef.current) void api.hide();
       shownRef.current = false;
     };
-  }, [activeTabId, localError, state.error, visible]);
+  }, [activeTabId, localError, overlayOverPage, state.error, visible]);
 
   const requestExtension = useCallback(async () => {
     const api = browserViewApi();

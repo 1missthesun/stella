@@ -3,13 +3,11 @@ import { ChatPanelTab, type ChatPanelOpenRequest } from "@/shell/ChatSidebar";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useChatMessages } from "@/context/use-chat-messages";
 import { TrashTabContent } from "./TrashTabContent";
-import { HomeLauncherTab } from "./HomeLauncherTab";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 import { useFileViewerStageOpen } from "@/features/workspace-display/file-viewer-store";
 import { engineOverlay } from "./engine-overlay-store";
 import {
   CHAT_DISPLAY_TAB_ID,
-  HOME_DISPLAY_TAB_ID,
   TRASH_DISPLAY_TAB_ID,
   registerWorkspaceDefaultTabs,
 } from "@/features/workspace-display/default-tabs";
@@ -78,16 +76,6 @@ export function openChatDisplayTab(
     { activate, openPanel: displayTabs.getLayoutSnapshot().panelOpen },
   );
   if (activate) showInViewer(CHAT_DISPLAY_TAB_ID);
-}
-
-export function openHomeDisplayTab(): void {
-  displayTabs.openTab({
-    id: HOME_DISPLAY_TAB_ID,
-    kind: "home",
-    title: "Home",
-    tooltip: "Jump into Files, Trash, and more",
-    render: () => createElement(HomeLauncherTab),
-  });
 }
 
 export function ensureChatDisplayTab(): void {

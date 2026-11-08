@@ -231,9 +231,14 @@ function AgentGroupRow({ hierarchy, conversationId, expanded, onToggle }) {
  * @param {{
  *   section?: "home" | "files",
  *   idleContent?: import("react").ReactNode,
+ *   embedded?: boolean,
  * }} props
  */
-export function WorkList({ section = "files", idleContent = null }) {
+export function WorkList({
+  section = "files",
+  idleContent = null,
+  embedded = false,
+}) {
   const showSearch = section === "home";
   const chat = useChatRuntime();
   const activity = chat.conversation.activity;
@@ -309,10 +314,13 @@ export function WorkList({ section = "files", idleContent = null }) {
     return () => window.cancelAnimationFrame(frame);
   }, [focusRequest, searchOpen, showSearch]);
   useEffect(() => {
+    // Only a list that shows the search field owns it; hosted outside the
+    // stage (the + menu), the host closes it.
+    if (embedded || !showSearch) return;
     if (searchOpen && (!panelOpen || activeSection !== "home")) {
       displaySearchStore.close();
     }
-  }, [activeSection, panelOpen, searchOpen]);
+  }, [activeSection, embedded, panelOpen, searchOpen, showSearch]);
   const query = showSearch && searchOpen ? deferredQuery : "";
   useEffect(() => {
     if (!query || !activity.hasOlder || activity.isLoadingOlder) return;

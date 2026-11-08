@@ -64,7 +64,6 @@ export const useRegisterViewerNav = (nav: ViewerNav | null): void => {
       previous: () => navRef.current?.previous(),
       next: () => navRef.current?.next(),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, register]);
   useEffect(() => () => register?.(null), [register]);
 };

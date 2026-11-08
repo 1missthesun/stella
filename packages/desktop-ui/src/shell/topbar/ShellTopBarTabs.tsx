@@ -3,6 +3,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   useSyncExternalStore,
 } from "react";
 import {
@@ -22,12 +23,10 @@ import { cloudAppTitles } from "@/features/cloud/cloud-app-title-store";
 import { cloudAppIdFromLocation } from "@/features/cloud/open-cloud-app-panel";
 import { SIDEBAR_SECTION_META } from "@/shell/sidebar-sections/section-meta";
 import { MessageSquare, Plus, X } from "@/ui/icons";
+import { displaySearchStore } from "@/features/workspace-display/display-search-store";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { NewTabMenu } from "./NewTabMenu";
 import "./shell-topbar-tabs.css";
-
-const openNewTab = () => {
-  sidebarSections.openHomeLauncher();
-  displayTabs.setPanelOpen(true);
-};
 
 /**
  * Chrome-style tabs in the top bar: Chat first, then everything that lasts
@@ -50,6 +49,11 @@ export function ShellTopBarTabs() {
   ).titles;
   const stripRef = useRef<HTMLDivElement>(null);
   const chatActive = !panelOpen;
+  const [menuOpen, setMenuOpenState] = useState(false);
+  const setMenuOpen = (next: boolean) => {
+    setMenuOpenState(next);
+    if (!next) displaySearchStore.close();
+  };
 
   useLayoutEffect(() => {
     if (!activeTabId || !panelOpen) return;
@@ -83,14 +87,14 @@ export function ShellTopBarTabs() {
     if (!onChatRoute) void navigate({ to: "/chat" });
   };
 
-  // ⌘T new tab (Home), ⌘1 Chat, ⌘2–9 the tabs after it.
+  // ⌘T opens the + menu, ⌘1 Chat, ⌘2–9 the tabs after it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
         return;
       if (event.key.toLowerCase() === "t") {
         event.preventDefault();
-        openNewTab();
+        setMenuOpenState((open) => !open);
         return;
       }
       if (/^[1-9]$/.test(event.key)) {
@@ -115,8 +119,6 @@ export function ShellTopBarTabs() {
 
   const titleFor = (tab: SidebarTab): string => {
     switch (tab.kind) {
-      case "home":
-        return "New tab";
       case "apps": {
         if (!tab.location) return "Apps";
         const cloudAppId = cloudAppIdFromLocation(tab.location);
@@ -216,15 +218,33 @@ export function ShellTopBarTabs() {
           );
         })}
       </div>
-      <button
-        type="button"
-        className="topbar-tabs__new"
-        onClick={openNewTab}
-        aria-label="New tab"
-        title="New tab (⌘T)"
-      >
-        <Plus size={15} strokeWidth={1.9} aria-hidden="true" />
-      </button>
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="topbar-tabs__new"
+            data-active={menuOpen || undefined}
+            aria-label="Open"
+            title="Open (⌘T)"
+          >
+            <Plus size={15} strokeWidth={1.9} aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="new-tab-menu-popover"
+          side="bottom"
+          align="start"
+          sideOffset={8}
+          collisionPadding={12}
+          onOpenAutoFocus={(event) => {
+            // The search field focuses itself once search opens.
+            event.preventDefault();
+            displaySearchStore.open();
+          }}
+        >
+          <NewTabMenu onPick={() => setMenuOpen(false)} />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

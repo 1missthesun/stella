@@ -31,6 +31,12 @@ import {
 import "@/global/settings/settings.css";
 import { platformCapabilities } from "@/platform/capabilities";
 
+const SecureValuesCard = lazy(() =>
+  import("./tabs/SecureValuesCard").then((module) => ({
+    default: module.SecureValuesCard,
+  })),
+);
+
 const LegalDialog = lazy(() =>
   import("@/global/legal/LegalDialog").then((m) => ({
     default: m.LegalDialog,
@@ -193,6 +199,12 @@ function SettingsTabContent({
         <AudioTab />
       ) : activeTab === "privacy" ? (
         <PrivacyTab />
+      ) : activeTab === "savedValues" && platformCapabilities.nativeSettings ? (
+        <div className="settings-tab-content">
+          <Suspense fallback={null}>
+            <SecureValuesCard />
+          </Suspense>
+        </div>
       ) : (
         <GeneralTab />
       )}

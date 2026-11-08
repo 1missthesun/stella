@@ -292,6 +292,8 @@ const readSavedTabs = (key: string): PersistedState | null => {
             const restored = restoreTabKind(candidate.kind);
             if (!restored) continue;
             if (restored.kind === "takeover") continue;
+            // The New tab page is gone; + opens a menu instead.
+            if (restored.kind === "home") continue;
             const location =
               restored.keepLocation &&
               typeof candidate.location === "string" &&
@@ -374,7 +376,6 @@ const activeTabOf = (state: SidebarSectionsSnapshot): SidebarTab | null =>
   state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
 
 const isReusableNavTab = (tab: SidebarTab): boolean =>
-  tab.kind === "home" ||
   (tab.location === null && (tab.kind === "files" || tab.kind === "apps")) ||
   isFileTabUnavailable(tab);
 
@@ -398,9 +399,22 @@ export const sidebarSections = {
     return activeTabOf(snapshot);
   },
 
-  openHomeLauncher(): void {
-    const tab = makeTab("home");
-    emit({ tabs: [...snapshot.tabs, tab], activeTabId: tab.id });
+  /**
+   * Open a place (Files, Apps, Browser, …) as its own tab, as the top bar's
+   * + menu does: an existing tab for it comes forward, otherwise a new tab
+   * opens beside the others rather than replacing the one on screen.
+   */
+  openSectionTab(section: SidebarSection): void {
+    const kind = resolveSidebarSection(section);
+    const existing = isSingletonTab(kind, null)
+      ? snapshot.tabs.find((tab) => tab.kind === kind && tab.location === null)
+      : undefined;
+    if (existing) {
+      this.activateTab(existing.id);
+    } else {
+      const created = makeTab(kind, null);
+      emit({ tabs: [...snapshot.tabs, created], activeTabId: created.id });
+    }
     displayTabs.setPanelOpen(true);
   },
 
@@ -415,18 +429,7 @@ export const sidebarSections = {
           (SINGLE_TAB_SECTIONS.has(kind) || tab.location === loc),
       );
       if (existing) {
-        const active = activeTabOf(snapshot);
-        if (
-          active &&
-          active.id !== existing.id &&
-          active.kind === "home" &&
-          isSingletonTab(kind, loc)
-        ) {
-          emit({
-            tabs: snapshot.tabs.filter((tab) => tab.id !== active.id),
-            activeTabId: existing.id,
-          });
-        } else if (snapshot.activeTabId !== existing.id || existing.unread) {
+        if (snapshot.activeTabId !== existing.id || existing.unread) {
           emit({
             tabs: snapshot.tabs.map((tab) =>
               tab.id === existing.id && tab.unread

@@ -7,7 +7,6 @@ import { AppsSection } from "./AppsSection";
 import { BrowserSection } from "./BrowserSection";
 import { FileSidebarTabExistenceReconciler } from "./FileSidebarTabExistenceReconciler";
 import { FilesSection } from "./FilesSection";
-import { HomeLauncherSection } from "./HomeLauncherSection";
 import { CloudBrowserTakeoverSection } from "./CloudBrowserTakeoverSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { EmailDigestSection } from "./EmailDigestSection";
@@ -17,7 +16,6 @@ import "./sidebar-sections.css";
 
 const PER_ITEM_BODIES = {
   files: FilesSection,
-  home: HomeLauncherSection,
   takeover: CloudBrowserTakeoverSection,
 };
 

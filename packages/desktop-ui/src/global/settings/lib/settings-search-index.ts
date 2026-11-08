@@ -64,6 +64,13 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
     keywords: ["privacy", "export", "download", "data", "support", "access", "encryption"],
   },
   {
+    tab: "savedValues",
+    availability: "native",
+    titleKey: "settings.secureValues.title",
+    descriptionKey: "settings.secureValues.description",
+    keywords: ["saved", "logins", "passwords", "credentials", "secrets", "keychain", "private"],
+  },
+  {
     tab: "account",
     titleKey: "settings.sessions.title",
     descriptionKey: "settings.sessions.description",

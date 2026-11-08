@@ -67,6 +67,15 @@ const VAD_HANGOVER_MS: u64 = 900;
 /// smaller chunks regardless; we just buffer.
 const AUDIO_CHANNEL_CAPACITY: usize = 64;
 
+/// Exit status that tells the app the input went away or the system default
+/// input changed, so it respawns the listener on the current device at once.
+const INPUT_CHANGED_EXIT_CODE: i32 = 75;
+const DEFAULT_DEVICE_POLL: Duration = Duration::from_secs(2);
+/// An open input stream delivers buffers continuously, silence included.
+/// None for this long means the stream died without reporting an error
+/// (seen after system sleep), so the listener exits to be restarted.
+const AUDIO_STALL_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[derive(Parser, Debug)]
 #[command(name = "wakeword_listener", about = "Stella wake-word listener.")]
 struct Cli {
@@ -463,6 +472,9 @@ fn run_start(
     // ever sees i16 mono.
     let stream = build_input_stream(&device, &config, sample_format, channels, tx)?;
     stream.play().context("start cpal stream")?;
+    if device_name.is_none() {
+        exit_when_default_input_changes(device_label.clone());
+    }
 
     let models = [model_name.clone()];
     emit(&Event::Ready {
@@ -480,6 +492,23 @@ fn run_start(
     Ok(())
 }
 
+fn exit_when_default_input_changes(opened: String) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(DEFAULT_DEVICE_POLL);
+        let current = cpal::default_host()
+            .default_input_device()
+            .and_then(|device| device.name().ok());
+        if current.as_deref() != Some(opened.as_str()) {
+            eprintln!(
+                "wakeword_listener: default input changed from {} to {}",
+                opened,
+                current.as_deref().unwrap_or("<none>")
+            );
+            std::process::exit(INPUT_CHANGED_EXIT_CODE);
+        }
+    });
+}
+
 fn build_input_stream(
     device: &Device,
     config: &StreamConfig,
@@ -487,7 +516,10 @@ fn build_input_stream(
     channels: u16,
     tx: std::sync::mpsc::SyncSender<Vec<i16>>,
 ) -> Result<cpal::Stream> {
-    let err_fn = |err| eprintln!("wakeword_listener: stream error: {}", err);
+    let err_fn = |err| {
+        eprintln!("wakeword_listener: stream error: {}", err);
+        std::process::exit(INPUT_CHANGED_EXIT_CODE);
+    };
     let stream = match sample_format {
         SampleFormat::I16 => device.build_input_stream(
             config,
@@ -577,7 +609,17 @@ fn run_inference_loop(
         Some(SileroVadGate::new(options.vad_hangover_ms)?)
     };
 
-    while let Ok(chunk) = rx.recv() {
+    loop {
+        let chunk = match rx.recv_timeout(AUDIO_STALL_TIMEOUT) {
+            Ok(chunk) => chunk,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                return Err(anyhow!(
+                    "no audio from the input device for {}s",
+                    AUDIO_STALL_TIMEOUT.as_secs()
+                ));
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        };
         let chunk = resampler.process(&chunk);
         if chunk.is_empty() {
             continue;

@@ -225,13 +225,14 @@ export const parseRepoName = (value: string): string | null => {
     .replace(/^git@github\.com:/iu, "")
     .replace(/\.git$/iu, "")
     .replace(/\/+$/u, "");
-  return REPO_PATTERN.test(trimmed) ? trimmed : null;
+  const name = trimmed.split("/")[1];
+  return REPO_PATTERN.test(trimmed) && name !== "." && name !== ".." ? trimmed : null;
 };
 
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]{0,200}$/u;
 
 export const parseBranch = (value: string | undefined): string | null => {
   const trimmed = (value ?? "").trim();
-  if (!BRANCH_PATTERN.test(trimmed) || trimmed.includes("..")) return null;
+  if (!BRANCH_PATTERN.test(trimmed) || trimmed.includes("..") || trimmed.startsWith("-")) return null;
   return trimmed;
 };

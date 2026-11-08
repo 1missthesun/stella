@@ -18,13 +18,16 @@ import type { ExecutionSession } from "../sandbox-client.js";
 import { cloneToken } from "./github.js";
 import { issueSlackRepoCapability } from "./repo-capability.js";
 import { repoForConversation, repoOwnedBy } from "./repos.js";
-import { SLACK_REPO_ROOT, isSlackConversationId } from "./workspace.js";
+import { WORLD_ROOT } from "../workspace.js";
+import { AS_SLACK_TOOL_USER, SLACK_REPO_ROOT, SLACK_TOOL_UID, isSlackConversationId } from "./workspace.js";
 
-const TOOL_UID = 42424;
 const CLONE_TIMEOUT_MS = 120_000;
 const HELPER_DIR = "/opt/stella-slack";
 const CREDENTIAL_HELPER = "/usr/local/bin/stella-git-credential";
 const PREVIEW_HELPER = "/usr/local/bin/stella-preview";
+const MIRROR_DIR = "/opt/stella-slack-mirror";
+const GITHUB_BASIC_ENV = "STELLA_GITHUB_BASIC";
+const BASE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
 const shellQuote = (value: string): string =>
   `'${value.replace(/'/gu, `'\\''`)}'`;
@@ -97,57 +100,87 @@ export const prepareSlackRepo = async (
   const name = repo.fullName.split("/")[1]!;
   const dir = `${SLACK_REPO_ROOT}/${name}`;
   const url = `https://github.com/${repo.fullName}.git`;
-  const auth = capability
-    ? `-c credential.helper= -c credential.helper=${CREDENTIAL_HELPER}`
-    : token
-      ? `-c ${shellQuote(`http.https://github.com/.extraheader=AUTHORIZATION: basic ${btoa(`x-access-token:${token}`)}`)}`
-      : "";
-  const git = `git -c safe.directory='*' -c advice.detachedHead=false ${auth}`;
+  const mirror = `${MIRROR_DIR}/${name}.git`;
+  const source = token ? `file://${mirror}` : url;
   const branch = repo.branch ? shellQuote(repo.branch) : "";
+  const ref = repo.branch ? shellQuote(`refs/heads/${repo.branch}`) : "HEAD";
   const helpers = capability
     ? [
         `mkdir -p ${HELPER_DIR}`,
-        `chown root:${TOOL_UID} ${HELPER_DIR}`,
+        `chown root:${SLACK_TOOL_UID} ${HELPER_DIR}`,
         `chmod 0750 ${HELPER_DIR}`,
-        writeFile(`${HELPER_DIR}/capability`, capability, "0640", `root:${TOOL_UID}`),
+        writeFile(`${HELPER_DIR}/capability`, capability, "0640", `root:${SLACK_TOOL_UID}`),
         writeFile(`${HELPER_DIR}/origin`, origin, "0644", "root:root"),
         writeFile(CREDENTIAL_HELPER, CREDENTIAL_SCRIPT, "0755", "root:root"),
         writeFile(PREVIEW_HELPER, PREVIEW_SCRIPT, "0755", "root:root"),
       ]
     : [`rm -rf ${HELPER_DIR}`];
-  const config = `git -c safe.directory='*' -C ${shellQuote(dir)} config`;
+  // A pasted token must never reach a tool-uid process, so root fetches with it
+  // into a root-owned mirror the tool uid can only read; the token travels in
+  // the exec environment, not in argv.
+  const mirrorGit = `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $${GITHUB_BASIC_ENV}" git -c core.fsmonitor= -c core.hooksPath=/dev/null`;
+  const mirrored = token
+    ? [
+        `mkdir -p ${MIRROR_DIR}`,
+        `chown root:${SLACK_TOOL_UID} ${MIRROR_DIR}`,
+        `chmod 0750 ${MIRROR_DIR}`,
+        `if [ -f ${shellQuote(`${mirror}/HEAD`)} ] && [ "$(git -C ${shellQuote(mirror)} remote get-url origin 2>/dev/null)" = ${shellQuote(url)} ]${
+          branch ? ` && [ "$(git -C ${shellQuote(mirror)} symbolic-ref --short HEAD 2>/dev/null)" = ${branch} ]` : ""
+        }; then`,
+        `  head=$(git -C ${shellQuote(mirror)} symbolic-ref --short HEAD)`,
+        `  ${mirrorGit} -C ${shellQuote(mirror)} fetch --quiet --depth 50 origin "+refs/heads/$head:refs/heads/$head"`,
+        "else",
+        `  rm -rf ${shellQuote(mirror)}`,
+        `  ${mirrorGit} clone --bare --quiet --depth 50 ${branch ? `--branch ${branch}` : ""} ${shellQuote(url)} ${shellQuote(mirror)}`,
+        "fi",
+      ]
+    : [`rm -rf ${MIRROR_DIR}`];
+  const auth = capability
+    ? `-c credential.helper= -c credential.helper=${CREDENTIAL_HELPER}`
+    : token
+      ? `-c safe.directory=${shellQuote(mirror)}`
+      : "";
+  const git = `git -c advice.detachedHead=false ${auth}`;
+  const inRepo = `git -C ${shellQuote(dir)}`;
   const configure = capability
     ? [
-        `${config} --unset-all credential.helper || true`,
-        `${config} --add credential.helper ''`,
-        `${config} --add credential.helper ${CREDENTIAL_HELPER}`,
-        `${config} user.name ${shellQuote("Stella")}`,
-        `${config} user.email ${shellQuote("stella@stella.sh")}`,
-        `${config} push.default upstream`,
+        `${inRepo} config --unset-all credential.helper || true`,
+        `${inRepo} config --add credential.helper ''`,
+        `${inRepo} config --add credential.helper ${CREDENTIAL_HELPER}`,
+        `${inRepo} config user.name ${shellQuote("Stella")}`,
+        `${inRepo} config user.email ${shellQuote("stella@stella.sh")}`,
+        `${inRepo} config push.default upstream`,
       ]
     : [];
+  const checkout = [
+    "set -e",
+    `if [ -d ${shellQuote(`${dir}/.git`)} ] && [ "$(${inRepo} remote get-url origin 2>/dev/null)" = ${shellQuote(url)} ]; then`,
+    `  ${git} -C ${shellQuote(dir)} fetch --quiet --depth 50 ${shellQuote(source)} ${ref}`,
+    `  if ${inRepo} diff --quiet HEAD; then ${git} -C ${shellQuote(dir)} merge --ff-only --quiet FETCH_HEAD || true; fi`,
+    "else",
+    `  rm -rf ${shellQuote(dir)}`,
+    `  ${git} clone --quiet --depth 50 ${branch ? `--branch ${branch}` : ""} ${shellQuote(source)} ${shellQuote(dir)}`,
+    ...(token ? [`  ${inRepo} remote set-url origin ${shellQuote(url)}`] : []),
+    "fi",
+    ...configure,
+  ].join("\n");
+  const toolEnv = `env -i PATH=${BASE_PATH} HOME=${WORLD_ROOT} USER=stella-tools LOGNAME=stella-tools LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0`;
   const command = [
     "set -e",
     "export GIT_TERMINAL_PROMPT=0",
     ...helpers,
+    ...mirrored,
     `mkdir -p ${SLACK_REPO_ROOT}`,
-    `chown ${TOOL_UID}:${TOOL_UID} ${SLACK_REPO_ROOT}`,
+    `chown ${SLACK_TOOL_UID}:${SLACK_TOOL_UID} ${SLACK_REPO_ROOT}`,
     `chmod 0750 ${SLACK_REPO_ROOT}`,
-    `if [ -d ${shellQuote(`${dir}/.git`)} ] && [ "$(git -c safe.directory='*' -C ${shellQuote(dir)} remote get-url origin 2>/dev/null)" = ${shellQuote(url)} ]; then`,
-    `  ${git} -C ${shellQuote(dir)} fetch --quiet --depth 50 origin ${branch || "HEAD"}`,
-    `  if ${git} -C ${shellQuote(dir)} diff --quiet HEAD; then ${git} -C ${shellQuote(dir)} merge --ff-only --quiet FETCH_HEAD || true; fi`,
-    "else",
-    `  rm -rf ${shellQuote(dir)}`,
-    `  ${git} clone --quiet --depth 50 ${branch ? `--branch ${branch}` : ""} ${shellQuote(url)} ${shellQuote(dir)}`,
-    "fi",
-    ...configure,
-    `chown -R ${TOOL_UID}:${TOOL_UID} ${shellQuote(dir)}`,
+    `${toolEnv} ${AS_SLACK_TOOL_USER} /bin/sh -c ${shellQuote(checkout)} < /dev/null`,
   ].join("\n");
   const started = Date.now();
   const access = capability ? "github" : token ? "token" : "public";
   try {
     const result = await session.exec(command, {
       timeout: CLONE_TIMEOUT_MS,
+      ...(token ? { env: { [GITHUB_BASIC_ENV]: btoa(`x-access-token:${token}`) } } : {}),
     } as Parameters<ExecutionSession["exec"]>[1]);
     log(result.success ? "slack_repo_ready" : "slack_repo_failed", {
       repo: repo.fullName,

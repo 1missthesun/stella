@@ -13,6 +13,8 @@ export {
 } from "./conversation-id.js";
 export const SLACK_MEMORY_TOOL_NAME = "slack_memory";
 export const SLACK_REPO_ROOT = "/workspace/repos";
+export const SLACK_TOOL_UID = 42424;
+export const AS_SLACK_TOOL_USER = `/usr/bin/setpriv --reuid=${SLACK_TOOL_UID} --regid=${SLACK_TOOL_UID} --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all --`;
 export const SLACK_NO_REPLY = "<no-reply/>";
 
 export type SlackPerson = { id: string; name: string };

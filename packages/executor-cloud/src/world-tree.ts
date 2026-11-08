@@ -498,7 +498,7 @@ export const extractWorldTree = async (
   if (exitCode !== 0) throw new Error(`World tar extraction exited ${exitCode}.`);
 };
 
-/** Write each requested file's exact bytes to `output`, refusing any that is no longer that regular file's size. */
+/** Write the first `size` bytes of each requested regular file to `output`. */
 export const readWorldFiles = async (
   root: string,
   files: readonly { path: string; size: number }[],
@@ -516,7 +516,7 @@ export const readWorldFiles = async (
     );
     try {
       const stat = await handle.stat();
-      if (!stat.isFile() || stat.size !== file.size) {
+      if (!stat.isFile() || stat.size < file.size) {
         throw new Error(`World file changed while it was sent: ${file.path}`);
       }
       let remaining = file.size;

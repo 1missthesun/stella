@@ -753,9 +753,14 @@ const blobBody = (
           JSON.stringify(blobs.map(({ path: entryPath, size }) => ({ path: entryPath, size }))),
         );
         const reader = new ExactReader(tree.stdout[Symbol.asyncIterator]());
-        for (const blob of blobs) {
-          if (framed) yield blobFrameHeader(blob);
-          yield* reader.exactly(blob.size);
+        try {
+          for (const blob of blobs) {
+            if (framed) yield blobFrameHeader(blob);
+            yield* reader.exactly(blob.size);
+          }
+        } catch (error) {
+          await tree.exited;
+          throw error;
         }
         await tree.exited;
       } finally {

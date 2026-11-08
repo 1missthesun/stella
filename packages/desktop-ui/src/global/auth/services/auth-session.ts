@@ -5,6 +5,7 @@ import {
   isRecognizedAuthRejection,
   resolveAuthSessionObservation,
   type AuthSessionSnapshot,
+  type SignOutOptions,
 } from "@stella/contracts/auth-session";
 import { configurePiRuntime } from "@/platform/electron/device";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
@@ -439,7 +440,7 @@ const browserAuthHandoffPromise = redeemPendingBrowserAuthHandoff();
 export const waitForBrowserAuthHandoff =
   (): Promise<BrowserAuthHandoffResult> => browserAuthHandoffPromise;
 
-export const signOutAuthSession = async () => {
+export const signOutAuthSession = async (options: SignOutOptions = {}) => {
   if (getStellaInteriorBridge()) {
     throw new Error(
       "Sign out must be completed by the trusted Stella browser shell.",
@@ -454,7 +455,7 @@ export const signOutAuthSession = async () => {
     if (!window.electronAPI.system.signOutAuth) {
       throw new Error("Desktop sign-out is unavailable.");
     }
-    await window.electronAPI.system.signOutAuth();
+    await window.electronAPI.system.signOutAuth(options);
   }
   refreshVersion += 1;
   setCurrentSession({

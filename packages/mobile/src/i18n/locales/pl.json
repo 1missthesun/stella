@@ -925,12 +925,22 @@
     "localMode": {
       "authNote": "Logowanie daje modele Stelli, aplikację na telefon, Drive, zadania w chmurze i synchronizację między urządzeniami. Twoje czaty zostają na tym komputerze, dopóki nie zdecydujesz.",
       "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać z modeli Stelli, aplikacji na telefon, Drive, zadań w chmurze i synchronizacji.",
-      "choiceBody": "Używałeś tu Stelli bez logowania. Dodanie skopiuje ten czat i pamięć na Twoje konto, niczego w nim nie zastępując. Jeśli zostawisz go osobno, ten komputer będzie miał własny czat i pamięć.",
+      "choiceBodyBoth": "Gdy korzystałeś tu ze Stelli bez konta: {messages} i {notes}. Dodanie przeniesie je na Twoje konto. Nic nie zostanie zastąpione.",
+      "choiceBodyChat": "Gdy korzystałeś tu ze Stelli bez konta: {messages}. Dodanie umieści je na końcu Twojego czatu. Nic nie zostanie zastąpione.",
+      "choiceBodyMemory": "Gdy korzystałeś tu ze Stelli bez konta: {notes}. Dodanie skopiuje je do Twojej pamięci. Nic nie zostanie zastąpione.",
       "choiceFailed": "Nie udało się zapisać wyboru. Spróbuj ponownie.",
-      "choiceTitle": "Dodać ten czat do konta?",
-      "keep": "Zostaw osobno",
+      "choiceTitle": "Dodać to, co zrobiłeś bez konta?",
+      "keep": "Zachowaj je tylko na tym komputerze",
+      "messages": {
+        "one": "1 wiadomość",
+        "other": "wiadomości: {count}"
+      },
       "needsAccount": "To działa w chmurze Stelli, więc wymaga konta Stella.",
-      "sync": "Dodaj do mojego konta",
+      "notes": {
+        "one": "1 notatka w pamięci",
+        "other": "notatki w pamięci: {count}"
+      },
+      "sync": "Dodaj do mojego czatu",
       "syncFailed": "Nie udało się dodać czatu do konta. Nadal jest na tym komputerze.",
       "synced": "Czat został dodany do Twojego konta."
     },
@@ -964,6 +974,43 @@
         "other": "{count} harmonogramu"
       },
       "untitledTask": "Zadanie zaplanowane"
+    },
+    "sessionPaused": {
+      "accountLabel": "Wylogowano",
+      "body": "Zaloguj się, aby kontynuować.",
+      "bodyAs": "Zaloguj się, aby kontynuować jako {account}.",
+      "dontSend": "Nie wysyłaj",
+      "sending": "Wysyłanie…",
+      "sent": {
+        "one": "Zalogowano. Wysłano 1 oczekującą wiadomość.",
+        "other": "Zalogowano. Wysłano oczekujące wiadomości: {count}."
+      },
+      "title": "Wylogowano.",
+      "waiting": "Zostanie wysłana po zalogowaniu"
+    },
+    "signOut": {
+      "body": "Twój czat zostaje na koncie. Stella ukrywa go na tym komputerze, dopóki się nie zalogujesz ponownie.",
+      "failed": "Nie udało się wylogować. Spróbuj ponownie.",
+      "remove": "Usuń też czat z tego komputera",
+      "removeNote": "Dla wspólnego lub pożyczonego komputera. Po zalogowaniu zostanie pobrany ponownie.",
+      "title": "Wylogować się z tego komputera?"
+    },
+    "signedOut": {
+      "body": "Twój czat jest na Twoim koncie, ukryty na tym komputerze.",
+      "differentAccount": "Użyj innego konta",
+      "title": "Wylogowano Cię",
+      "withoutAccount": "Używaj bez konta"
+    },
+    "switchAccount": {
+      "body": "Czat konta {account} zostanie usunięty z tego komputera. Pozostanie na tym koncie.",
+      "bodyUnsent": {
+        "one": "Czat konta {account} zostanie usunięty z tego komputera, w tym 1 jeszcze niewysłana wiadomość. Czat pozostanie na koncie, ta wiadomość nie.",
+        "other": "Czat konta {account} zostanie usunięty z tego komputera, w tym niewysłane jeszcze wiadomości ({count}). Czat pozostanie na koncie, te wiadomości nie."
+      },
+      "confirm": "Usuń i kontynuuj",
+      "failed": "Nie udało się usunąć czatu poprzedniego konta. Spróbuj ponownie.",
+      "removed": "Czat poprzedniego konta został usunięty z tego komputera.",
+      "title": "Przełączyć na inne konto?"
     }
   },
   "mobile": {

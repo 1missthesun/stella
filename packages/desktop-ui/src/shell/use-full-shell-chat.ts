@@ -28,6 +28,14 @@ import { useConversationUserAsks } from "@/features/user-ask/user-ask-store";
 import { useAgentInputRouting } from "./use-agent-input-routing";
 import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
 import { useChatStore } from "@/context/chat-store-context";
+import type { SendMessageArgs } from "@/features/chat/streaming/chat-types";
+import {
+  addWaitingMessage,
+  removeWaitingMessage,
+  useWaitingMessages,
+} from "@/features/cloud/paused-account";
+import { showToast } from "@/ui/toast";
+import { useTPlural } from "@/shared/i18n";
 import { useCloudChatBridge } from "@/features/cloud/use-cloud-chat-bridge";
 import { useHasUnsentBrowserAttachments } from "@/features/cloud/browser-chat-attachments";
 import { usePiChat } from "@/features/chat/pi/use-pi-chat";
@@ -104,7 +112,9 @@ export function useFullShellChat({
   activeConversationId: string | null;
   isOnChatRoute: boolean;
 }) {
-  const { cloudFeaturesEnabled, storageMode } = useChatStore();
+  const { cloudFeaturesEnabled, cloudChatPaused, storageMode } = useChatStore();
+  const cloudChatShown = cloudFeaturesEnabled || cloudChatPaused;
+  const tPlural = useTPlural();
   const { accountScope } = useCloudConversationSession();
   const { store: composerMessageStore, setMessage } =
     useComposerMessageStore();
@@ -227,7 +237,7 @@ export function useFullShellChat({
   const piChat = usePiChat(activeConversationId);
   const cloudChat = useCloudChatBridge({
     conversationId: activeConversationId,
-    enabled: cloudFeaturesEnabled,
+    enabled: cloudChatShown,
     localMessages: localPersistedMessages,
     localActivities,
     localFiles: localPersistedFiles,
@@ -238,7 +248,7 @@ export function useFullShellChat({
   const ownDeviceId = useOwnDeviceId(cloudFeaturesEnabled);
   const journaledTurns = useMemo(
     () =>
-      cloudFeaturesEnabled
+      cloudChatShown
         ? journaledPiTurns(
             cloudChat.records,
             piChat.projection.turns,
@@ -247,18 +257,18 @@ export function useFullShellChat({
         : NO_JOURNALED_TURNS,
     [
       cloudChat.records,
-      cloudFeaturesEnabled,
+      cloudChatShown,
       ownDeviceId,
       piChat.projection.turns,
     ],
   );
-  const recordLoaded = cloudFeaturesEnabled
+  const recordLoaded = cloudChatShown
     ? journalState.recordsSource !== "none"
     : isPrivateChat && !localMessageFeed.isInitialLoading;
-  const recordHasOlder = cloudFeaturesEnabled
+  const recordHasOlder = cloudChatShown
     ? journalState.hasOlder
     : localMessageFeed.hasOlderMessages;
-  const recordStartMs = cloudFeaturesEnabled
+  const recordStartMs = cloudChatShown
     ? (cloudChat.records[0]?.createdAtMs ?? null)
     : (cloudChat.persistedMessages[0]?.timestamp ?? null);
   const piPending = useMemo(() => {
@@ -267,7 +277,7 @@ export function useFullShellChat({
     }
     if (recordHasOlder && recordStartMs === null) return NO_PI_PENDING_ROWS;
     const sinceMs = recordHasOlder ? recordStartMs : null;
-    return cloudFeaturesEnabled
+    return cloudChatShown
       ? piPendingRows({
           projection: piChat.projection,
           journaled: journaledTurns,
@@ -283,7 +293,7 @@ export function useFullShellChat({
   }, [
     activeConversationId,
     cloudChat.persistedMessages,
-    cloudFeaturesEnabled,
+    cloudChatShown,
     journaledTurns,
     piChat.projection,
     recordHasOlder,
@@ -319,10 +329,10 @@ export function useFullShellChat({
   );
   const replyFiles = useMemo(
     () =>
-      cloudFeaturesEnabled
+      cloudChatShown
         ? replyFileEvents(persistedMessages)
         : EMPTY_EVENTS,
-    [cloudFeaturesEnabled, persistedMessages],
+    [cloudChatShown, persistedMessages],
   );
   const persistedFiles = useMemo(
     () =>
@@ -397,9 +407,67 @@ export function useFullShellChat({
   const pendingUserMessageId = cloudChat.isWebShell
     ? cloudChat.pendingUserMessageId
     : localPendingUserMessageId;
-  const sendMessage = cloudChat.isWebShell
+  const queueWhilePaused = useCallback(
+    async (args: SendMessageArgs) => {
+      const queued = addWaitingMessage(accountScope, args.text);
+      if (queued) args.onClear();
+      return queued;
+    },
+    [accountScope],
+  );
+  const sendMessage = cloudChatPaused
+    ? queueWhilePaused
+    : cloudChat.isWebShell
+      ? cloudChat.sendMessage
+      : localSendMessage;
+  const waitingMessages = useWaitingMessages(accountScope);
+  const flushingWaitingRef = useRef<string | null>(null);
+  const flushedWaitingCountRef = useRef(0);
+  const sendWhenSignedIn = cloudChat.isWebShell
     ? cloudChat.sendMessage
     : localSendMessage;
+  useEffect(() => {
+    if (!cloudFeaturesEnabled || cloudChatPaused || !activeConversationId) return;
+    const next = waitingMessages[0];
+    if (!next) {
+      if (flushedWaitingCountRef.current > 0) {
+        showToast({
+          title: tPlural(
+            "global.sessionPaused.sent",
+            flushedWaitingCountRef.current,
+          ),
+          variant: "success",
+        });
+        flushedWaitingCountRef.current = 0;
+      }
+      return;
+    }
+    if (isStreaming || flushingWaitingRef.current) return;
+    flushingWaitingRef.current = next.id;
+    void sendWhenSignedIn({
+      text: next.text,
+      selectedText: null,
+      chatContext: null,
+      onClear: () => {},
+    })
+      .then((accepted) => {
+        if (!accepted) return;
+        removeWaitingMessage(accountScope, next.id);
+        flushedWaitingCountRef.current += 1;
+      })
+      .finally(() => {
+        flushingWaitingRef.current = null;
+      });
+  }, [
+    accountScope,
+    activeConversationId,
+    cloudChatPaused,
+    cloudFeaturesEnabled,
+    isStreaming,
+    sendWhenSignedIn,
+    tPlural,
+    waitingMessages,
+  ]);
   const cancelCurrentStream = cloudChat.isWebShell
     ? cloudChat.cancelCurrentStream
     : piChat.cancelCurrentStream;

@@ -13,10 +13,13 @@ import {
 export { LocalChatStoreProvider, useChatStore };
 
 export const ChatStoreProvider = ({ children }: { children: ReactNode }) => {
-  const { isCloudConversationReady } = useCloudConversationSession();
+  const { isCloudConversationReady, isCloudConversationPaused } =
+    useCloudConversationSession();
 
   const storageMode: ChatStorageMode = useChatStorageMode();
   const cloudFeaturesEnabled = storageMode === "cloud" && isCloudConversationReady;
+  const cloudChatPaused =
+    storageMode === "cloud" && !isCloudConversationReady && isCloudConversationPaused;
   const isLocalStorage = Boolean(window.electronAPI?.localChat);
 
   const value = useMemo<ChatStoreContextValue>(
@@ -24,9 +27,11 @@ export const ChatStoreProvider = ({ children }: { children: ReactNode }) => {
       storageMode,
       isLocalStorage,
       cloudFeaturesEnabled,
+      cloudChatPaused,
       isAuthenticated: isCloudConversationReady,
     }),
     [
+      cloudChatPaused,
       storageMode,
       isLocalStorage,
       cloudFeaturesEnabled,

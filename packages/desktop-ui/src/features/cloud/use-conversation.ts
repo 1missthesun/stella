@@ -311,16 +311,27 @@ export const useConversation = (
   const { locale } = useI18n();
   const {
     isCloudConversationReady: authCloudReady,
+    isCloudConversationPaused,
     accountScope,
-    ownerGeneration,
+    ownerGeneration: liveOwnerGeneration,
+    pausedOwnerGeneration,
   } = useCloudConversationSession();
   const storageMode = useChatStorageMode();
   const isCloudConversationReady = authCloudReady && storageMode === "cloud";
+  const paused =
+    !isCloudConversationReady &&
+    isCloudConversationPaused &&
+    storageMode === "cloud";
+  const ownerGeneration = isCloudConversationReady
+    ? liveOwnerGeneration
+    : paused
+      ? pausedOwnerGeneration
+      : null;
   const webShell = isWebShell();
   const authority = useMemo<CloudConversationOutboxAuthority | null>(() => {
-    if (!isCloudConversationReady || !ownerGeneration) return null;
+    if ((!isCloudConversationReady && !paused) || !ownerGeneration) return null;
     return { accountScope, ownerGeneration };
-  }, [accountScope, isCloudConversationReady, ownerGeneration]);
+  }, [accountScope, isCloudConversationReady, ownerGeneration, paused]);
   const activeAuthorityKey = authority
     ? `${authority.accountScope}\u0000${authority.ownerGeneration}`
     : null;
@@ -336,7 +347,7 @@ export const useConversation = (
     noLocalExecution,
   );
   const store =
-    isCloudConversationReady && conversationId && authority
+    (isCloudConversationReady || paused) && conversationId && authority
       ? conversationStore(
           conversationId,
           authority.accountScope,
@@ -364,8 +375,9 @@ export const useConversation = (
   }, [activeAuthorityKey, authority]);
 
   useEffect(() => {
-    store?.setConfig(config.socketBaseUrl, config.resolved);
-  }, [store, config.socketBaseUrl, config.resolved]);
+    store?.setPaused(paused);
+    if (!paused) store?.setConfig(config.socketBaseUrl, config.resolved);
+  }, [store, paused, config.socketBaseUrl, config.resolved]);
 
   const state = useSyncExternalStore(
     store?.subscribe ?? noopSubscribe,
@@ -594,6 +606,7 @@ export const useConversation = (
   );
 
   useEffect(() => {
+    if (paused) return;
     if (!authority || !pendingPrompts.isAuthorityReady(authority)) return;
     if (!config.resolved) return;
     for (const entry of allPending) {
@@ -614,6 +627,7 @@ export const useConversation = (
     config.resolved,
     conversationId,
     dispatch,
+    paused,
     webShell,
   ]);
 
@@ -655,9 +669,11 @@ export const useConversation = (
         conversationId,
         submission,
       );
+      if (paused) return;
       if (entry.durable && entry.send.kind === "queued") await dispatch(entry);
     },
     [
+      paused,
       authority,
       cloudSelection,
       conversationId,

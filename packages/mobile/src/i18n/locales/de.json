@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Mit der Anmeldung bekommst du Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung zwischen Geräten. Deine Chats bleiben auf diesem Computer, bis du dich entscheidest.",
       "banner": "Deine Chats bleiben auf diesem Computer. Melde dich an für Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung.",
-      "choiceBody": "Du hast Stella hier ohne Anmeldung benutzt. Beim Hinzufügen werden dieser Chat und die Erinnerungen in dein Konto kopiert, ohne dort etwas zu ersetzen. Wenn du ihn getrennt hältst, behält dieser Computer seinen eigenen Chat und seine eigenen Erinnerungen.",
+      "choiceBodyBoth": "Während du Stella hier ohne Konto genutzt hast: {messages} und {notes}. Beim Hinzufügen kommen sie in dein Konto. Dort wird nichts ersetzt.",
+      "choiceBodyChat": "Während du Stella hier ohne Konto genutzt hast: {messages}. Beim Hinzufügen kommen sie ans Ende deines Chats. Dort wird nichts ersetzt.",
+      "choiceBodyMemory": "Während du Stella hier ohne Konto genutzt hast: {notes}. Beim Hinzufügen werden sie in deine Erinnerungen kopiert. Dort wird nichts ersetzt.",
       "choiceFailed": "Die Auswahl konnte nicht gespeichert werden. Versuch es noch einmal.",
-      "choiceTitle": "Diesen Chat zu deinem Konto hinzufügen?",
-      "keep": "Getrennt halten",
+      "choiceTitle": "Hinzufügen, was du ohne Konto gemacht hast?",
+      "keep": "Nur auf diesem Computer behalten",
+      "messages": {
+        "one": "1 Nachricht",
+        "other": "{count} Nachrichten"
+      },
       "needsAccount": "Das läuft in Stellas Cloud und braucht daher ein Stella-Konto.",
-      "sync": "Zu meinem Konto hinzufügen",
+      "notes": {
+        "one": "1 Erinnerung",
+        "other": "{count} Erinnerungen"
+      },
+      "sync": "Zu meinem Chat hinzufügen",
       "syncFailed": "Der Chat konnte deinem Konto nicht hinzugefügt werden. Er ist noch auf diesem Computer.",
       "synced": "Der Chat wurde deinem Konto hinzugefügt."
     },
@@ -948,6 +958,43 @@
         "other": "{count} Zeitpläne"
       },
       "untitledTask": "Geplante Aufgabe"
+    },
+    "sessionPaused": {
+      "accountLabel": "Abgemeldet",
+      "body": "Melde dich an, um weiterzumachen.",
+      "bodyAs": "Melde dich an, um als {account} weiterzumachen.",
+      "dontSend": "Nicht senden",
+      "sending": "Wird gesendet…",
+      "sent": {
+        "one": "Angemeldet. 1 wartende Nachricht gesendet.",
+        "other": "Angemeldet. {count} wartende Nachrichten gesendet."
+      },
+      "title": "Abgemeldet.",
+      "waiting": "Wird gesendet, sobald du dich anmeldest"
+    },
+    "signOut": {
+      "body": "Dein Chat bleibt in deinem Konto. Stella blendet ihn auf diesem Computer aus, bis du dich wieder anmeldest.",
+      "failed": "Abmelden fehlgeschlagen. Versuch es noch einmal.",
+      "remove": "Chat auch von diesem Computer entfernen",
+      "removeNote": "Für einen geteilten oder geliehenen Computer. Bei der nächsten Anmeldung wird er wieder geladen.",
+      "title": "Auf diesem Computer abmelden?"
+    },
+    "signedOut": {
+      "body": "Dein Chat ist in deinem Konto und auf diesem Computer ausgeblendet.",
+      "differentAccount": "Anderes Konto verwenden",
+      "title": "Du bist abgemeldet",
+      "withoutAccount": "Ohne Konto verwenden"
+    },
+    "switchAccount": {
+      "body": "Der Chat von {account} wird von diesem Computer entfernt. Er bleibt in diesem Konto.",
+      "bodyUnsent": {
+        "one": "Der Chat von {account} wird von diesem Computer entfernt, einschließlich 1 Nachricht, die noch nicht gesendet wurde. Der Chat bleibt im Konto, diese Nachricht nicht.",
+        "other": "Der Chat von {account} wird von diesem Computer entfernt, einschließlich {count} Nachrichten, die noch nicht gesendet wurden. Der Chat bleibt im Konto, diese Nachrichten nicht."
+      },
+      "confirm": "Entfernen und fortfahren",
+      "failed": "Der Chat des vorherigen Kontos konnte nicht entfernt werden. Versuch es noch einmal.",
+      "removed": "Der Chat des vorherigen Kontos wurde von diesem Computer entfernt.",
+      "title": "Zu einem anderen Konto wechseln?"
     }
   },
   "mobile": {

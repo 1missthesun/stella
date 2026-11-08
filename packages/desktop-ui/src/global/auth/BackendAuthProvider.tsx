@@ -1,3 +1,4 @@
+import { readAccountHint } from "./hooks/use-account-hint";
 import {
   enterSignedOutLocalMode,
   useChatStorageMode,
@@ -119,7 +120,18 @@ function DesktopAuthRuntimeEffects({
       }
 
       const selfHosted = isSelfHostedServer();
-      if (!selfHosted) enterSignedOutLocalMode();
+      // Only a computer that has never had an account starts in a chat of its
+      // own; after a sign-out, keeping a separate chat is the user's choice.
+      if (
+        !selfHosted &&
+        snapshot.snapshot.status === "signed_out" &&
+        snapshot.snapshot.reason === "first_install" &&
+        !(await readAccountHint())
+      ) {
+        if (cancelled) return;
+        enterSignedOutLocalMode();
+      }
+      if (cancelled) return;
       setAuthBootstrapState({
         status: selfHosted ? "needs_pairing" : "signed_out",
         error: null,

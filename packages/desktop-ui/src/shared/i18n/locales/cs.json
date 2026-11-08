@@ -925,12 +925,22 @@
     "localMode": {
       "authNote": "Přihlášením získáte modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci mezi zařízeními. Vaše chaty zůstanou v tomto počítači, dokud se nerozhodnete.",
       "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se pro modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci.",
-      "choiceBody": "Používali jste tu Stellu bez přihlášení. Přidáním se ten chat a paměť zkopírují do vašeho účtu, aniž by se v něm cokoli nahradilo. Když je necháte zvlášť, bude mít tento počítač vlastní chat a paměť.",
+      "choiceBodyBoth": "Když jste tu používali Stellu bez účtu: {messages} a {notes}. Přidáním se přesunou do vašeho účtu. Nic se nenahradí.",
+      "choiceBodyChat": "Když jste tu používali Stellu bez účtu: {messages}. Přidáním se umístí na konec vašeho chatu. Nic se nenahradí.",
+      "choiceBodyMemory": "Když jste tu používali Stellu bez účtu: {notes}. Přidáním se zkopírují do vaší paměti. Nic se nenahradí.",
       "choiceFailed": "Volbu se nepodařilo uložit. Zkuste to znovu.",
-      "choiceTitle": "Přidat tento chat do účtu?",
-      "keep": "Nechat zvlášť",
+      "choiceTitle": "Přidat, co jste dělali bez účtu?",
+      "keep": "Ponechat jen na tomto počítači",
+      "messages": {
+        "one": "1 zpráva",
+        "other": "zprávy: {count}"
+      },
       "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
-      "sync": "Přidat do účtu",
+      "notes": {
+        "one": "1 poznámka v paměti",
+        "other": "poznámky v paměti: {count}"
+      },
+      "sync": "Přidat do mého chatu",
       "syncFailed": "Chat se nepodařilo přidat do účtu. Pořád je na tomto počítači.",
       "synced": "Chat byl přidán do vašeho účtu."
     },
@@ -964,6 +974,43 @@
         "other": "{count} plánů"
       },
       "untitledTask": "Naplánovaná úloha"
+    },
+    "sessionPaused": {
+      "accountLabel": "Odhlášeno",
+      "body": "Přihlaste se a pokračujte.",
+      "bodyAs": "Přihlaste se a pokračujte jako {account}.",
+      "dontSend": "Neodesílat",
+      "sending": "Odesílání…",
+      "sent": {
+        "one": "Přihlášeno. Odeslána 1 čekající zpráva.",
+        "other": "Přihlášeno. Odeslané čekající zprávy: {count}."
+      },
+      "title": "Odhlášeno.",
+      "waiting": "Odešle se po přihlášení"
+    },
+    "signOut": {
+      "body": "Váš chat zůstane ve vašem účtu. Stella ho na tomto počítači skryje, dokud se znovu nepřihlásíte.",
+      "failed": "Odhlášení se nezdařilo. Zkuste to znovu.",
+      "remove": "Odebrat chat i z tohoto počítače",
+      "removeNote": "Pro sdílený nebo zapůjčený počítač. Po přihlášení se znovu stáhne.",
+      "title": "Odhlásit se z tohoto počítače?"
+    },
+    "signedOut": {
+      "body": "Váš chat je ve vašem účtu, na tomto počítači skrytý.",
+      "differentAccount": "Použít jiný účet",
+      "title": "Jste odhlášeni",
+      "withoutAccount": "Používat bez účtu"
+    },
+    "switchAccount": {
+      "body": "Chat účtu {account} bude z tohoto počítače odebrán. V tom účtu zůstane.",
+      "bodyUnsent": {
+        "one": "Chat účtu {account} bude z tohoto počítače odebrán včetně 1 zprávy, která ještě nebyla odeslána. Chat zůstane v účtu, ta zpráva ne.",
+        "other": "Chat účtu {account} bude z tohoto počítače odebrán včetně neodeslaných zpráv ({count}). Chat zůstane v účtu, ty zprávy ne."
+      },
+      "confirm": "Odebrat a pokračovat",
+      "failed": "Chat předchozího účtu se nepodařilo odebrat. Zkuste to znovu.",
+      "removed": "Chat předchozího účtu byl z tohoto počítače odebrán.",
+      "title": "Přepnout na jiný účet?"
     }
   },
   "mobile": {

@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "A bejelentkezéssel megkapod Stella modelljeit, a telefonos appot, a Drive-ot, a felhős feladatokat és az eszközök közötti szinkronizálást. A csevegéseid ezen a számítógépen maradnak, amíg nem döntesz.",
       "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be Stella modelljeihez, a telefonos apphoz, a Drive-hoz, a felhős feladatokhoz és a szinkronizáláshoz.",
-      "choiceBody": "Itt bejelentkezés nélkül használtad a Stellát. A hozzáadás átmásolja a csevegést és a memóriát a fiókodba, anélkül hogy bármit lecserélne ott. Ha külön tartod, ennek a számítógépnek saját csevegése és memóriája lesz.",
+      "choiceBodyBoth": "Amíg itt fiók nélkül használtad a Stellát: {messages} és {notes}. Hozzáadáskor a fiókodba kerülnek. Semmi sem cserélődik le.",
+      "choiceBodyChat": "Amíg itt fiók nélkül használtad a Stellát: {messages}. Hozzáadáskor a csevegésed végére kerülnek. Semmi sem cserélődik le.",
+      "choiceBodyMemory": "Amíg itt fiók nélkül használtad a Stellát: {notes}. Hozzáadáskor a memóriádba másolódnak. Semmi sem cserélődik le.",
       "choiceFailed": "Nem sikerült menteni a választást. Próbáld újra.",
-      "choiceTitle": "Hozzáadod ezt a csevegést a fiókodhoz?",
-      "keep": "Külön tartom",
+      "choiceTitle": "Hozzáadod, amit fiók nélkül csináltál?",
+      "keep": "Csak ezen a számítógépen tartom",
+      "messages": {
+        "one": "1 üzenet",
+        "other": "{count} üzenet"
+      },
       "needsAccount": "Ez Stella felhőjében fut, ezért Stella-fiók kell hozzá.",
-      "sync": "Hozzáadás a fiókomhoz",
+      "notes": {
+        "one": "1 memóriajegyzet",
+        "other": "{count} memóriajegyzet"
+      },
+      "sync": "Hozzáadás a csevegésemhez",
       "syncFailed": "Nem sikerült hozzáadni a csevegést a fiókodhoz. Továbbra is ezen a számítógépen van.",
       "synced": "A csevegés bekerült a fiókodba."
     },
@@ -948,6 +958,43 @@
         "other": "{count} ütemezés"
       },
       "untitledTask": "Ütemezett feladat"
+    },
+    "sessionPaused": {
+      "accountLabel": "Kijelentkezve",
+      "body": "Jelentkezz be a folytatáshoz.",
+      "bodyAs": "Jelentkezz be, hogy {account} fiókkal folytasd.",
+      "dontSend": "Ne küldd el",
+      "sending": "Küldés…",
+      "sent": {
+        "one": "Bejelentkezve. 1 várakozó üzenet elküldve.",
+        "other": "Bejelentkezve. {count} várakozó üzenet elküldve."
+      },
+      "title": "Kijelentkezve.",
+      "waiting": "Bejelentkezéskor elküldjük"
+    },
+    "signOut": {
+      "body": "A csevegésed a fiókodban marad. A Stella elrejti ezen a számítógépen, amíg újra be nem jelentkezel.",
+      "failed": "Nem sikerült kijelentkezni. Próbáld újra.",
+      "remove": "A csevegés eltávolítása erről a számítógépről is",
+      "removeNote": "Közös vagy kölcsönkapott számítógéphez. Bejelentkezéskor újra letöltődik.",
+      "title": "Kijelentkezel erről a számítógépről?"
+    },
+    "signedOut": {
+      "body": "A csevegésed a fiókodban van, ezen a számítógépen el van rejtve.",
+      "differentAccount": "Másik fiók használata",
+      "title": "Kijelentkeztél",
+      "withoutAccount": "Használat fiók nélkül"
+    },
+    "switchAccount": {
+      "body": "A(z) {account} fiók csevegése eltávolításra kerül erről a számítógépről. A fiókban megmarad.",
+      "bodyUnsent": {
+        "one": "A(z) {account} fiók csevegése eltávolításra kerül erről a számítógépről, 1 még el nem küldött üzenettel együtt. A csevegés a fiókban marad, az üzenet nem.",
+        "other": "A(z) {account} fiók csevegése eltávolításra kerül erről a számítógépről, {count} még el nem küldött üzenettel együtt. A csevegés a fiókban marad, az üzenetek nem."
+      },
+      "confirm": "Eltávolítás és folytatás",
+      "failed": "Nem sikerült eltávolítani az előző fiók csevegését. Próbáld újra.",
+      "removed": "Az előző fiók csevegése eltávolításra került erről a számítógépről.",
+      "title": "Átváltasz egy másik fiókra?"
     }
   },
   "mobile": {

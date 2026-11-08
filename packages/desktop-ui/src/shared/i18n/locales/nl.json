@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Inloggen geeft je Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie tussen apparaten. Je chats blijven op deze computer tot je zelf kiest.",
       "banner": "Je chats blijven op deze computer. Log in voor Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie.",
-      "choiceBody": "Je hebt Stella hier gebruikt zonder in te loggen. Toevoegen kopieert die chat en het geheugen naar je account, zonder daar iets te vervangen. Houd je hem apart, dan houdt deze computer een eigen chat en geheugen.",
+      "choiceBodyBoth": "Terwijl je Stella hier zonder account gebruikte: {messages} en {notes}. Toevoegen zet ze in je account. Er wordt niets vervangen.",
+      "choiceBodyChat": "Terwijl je Stella hier zonder account gebruikte: {messages}. Toevoegen zet ze aan het einde van je chat. Er wordt niets vervangen.",
+      "choiceBodyMemory": "Terwijl je Stella hier zonder account gebruikte: {notes}. Toevoegen kopieert ze naar je geheugen. Er wordt niets vervangen.",
       "choiceFailed": "Die keuze kon niet worden opgeslagen. Probeer het opnieuw.",
-      "choiceTitle": "Deze chat aan je account toevoegen?",
-      "keep": "Apart houden",
+      "choiceTitle": "Toevoegen wat je zonder account hebt gedaan?",
+      "keep": "Alleen op deze computer houden",
+      "messages": {
+        "one": "1 bericht",
+        "other": "{count} berichten"
+      },
       "needsAccount": "Dit draait in Stella's cloud en heeft dus een Stella-account nodig.",
-      "sync": "Aan mijn account toevoegen",
+      "notes": {
+        "one": "1 geheugennotitie",
+        "other": "{count} geheugennotities"
+      },
+      "sync": "Aan mijn chat toevoegen",
       "syncFailed": "Kan deze chat niet aan je account toevoegen. Hij staat nog op deze computer.",
       "synced": "Deze chat is aan je account toegevoegd."
     },
@@ -948,6 +958,43 @@
         "other": "{count} planningen"
       },
       "untitledTask": "Geplande taak"
+    },
+    "sessionPaused": {
+      "accountLabel": "Afgemeld",
+      "body": "Meld je aan om verder te gaan.",
+      "bodyAs": "Meld je aan om verder te gaan als {account}.",
+      "dontSend": "Niet versturen",
+      "sending": "Versturen…",
+      "sent": {
+        "one": "Aangemeld. 1 wachtend bericht verstuurd.",
+        "other": "Aangemeld. {count} wachtende berichten verstuurd."
+      },
+      "title": "Afgemeld.",
+      "waiting": "Wordt verstuurd zodra je je aanmeldt"
+    },
+    "signOut": {
+      "body": "Je chat blijft in je account. Stella verbergt hem op deze computer tot je je weer aanmeldt.",
+      "failed": "Afmelden is mislukt. Probeer het opnieuw.",
+      "remove": "Je chat ook van deze computer verwijderen",
+      "removeNote": "Voor een gedeelde of geleende computer. Bij opnieuw aanmelden wordt hij weer gedownload.",
+      "title": "Afmelden op deze computer?"
+    },
+    "signedOut": {
+      "body": "Je chat staat in je account en is op deze computer verborgen.",
+      "differentAccount": "Ander account gebruiken",
+      "title": "Je bent afgemeld",
+      "withoutAccount": "Gebruiken zonder account"
+    },
+    "switchAccount": {
+      "body": "De chat van {account} wordt van deze computer verwijderd. Hij blijft in dat account.",
+      "bodyUnsent": {
+        "one": "De chat van {account} wordt van deze computer verwijderd, inclusief 1 bericht dat nog niet is verstuurd. De chat blijft in dat account, dat bericht niet.",
+        "other": "De chat van {account} wordt van deze computer verwijderd, inclusief {count} berichten die nog niet zijn verstuurd. De chat blijft in dat account, die berichten niet."
+      },
+      "confirm": "Verwijderen en doorgaan",
+      "failed": "De chat van het vorige account kon niet worden verwijderd. Probeer het opnieuw.",
+      "removed": "De chat van het vorige account is van deze computer verwijderd.",
+      "title": "Overstappen naar een ander account?"
     }
   },
   "mobile": {

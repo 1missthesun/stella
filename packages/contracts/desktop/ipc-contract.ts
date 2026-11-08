@@ -15,7 +15,9 @@ import type {
 } from "../index.js";
 import type { ReasoningEffortLevel } from "../reasoning-effort.js";
 import type {
+  AccountHint,
   AccountSessionSummary,
+  SignOutOptions,
   AuthSessionSnapshot,
 } from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
@@ -132,6 +134,8 @@ import {
   IPC_APP_SOURCE_UNDO,
   IPC_AUTH_APPLY_SESSION_TOKEN,
   IPC_AUTH_DELETE_USER,
+  IPC_AUTH_FORGET_ACCOUNT_HINT,
+  IPC_AUTH_GET_ACCOUNT_HINT,
   IPC_AUTH_GET_CHALLENGE_TOKEN,
   IPC_AUTH_GET_SESSION,
   IPC_AUTH_GET_TOKEN,
@@ -958,7 +962,9 @@ export type IpcInvokeContract = {
     AuthSessionSnapshot
   >;
   [IPC_AUTH_GET_CHALLENGE_TOKEN]: Invoke<[], string | undefined>;
-  [IPC_AUTH_SIGN_OUT]: Invoke<[], OkResult>;
+  [IPC_AUTH_SIGN_OUT]: Invoke<[options?: SignOutOptions], OkResult>;
+  [IPC_AUTH_GET_ACCOUNT_HINT]: Invoke<[], AccountHint | null>;
+  [IPC_AUTH_FORGET_ACCOUNT_HINT]: Invoke<[], OkResult>;
   [IPC_AUTH_DELETE_USER]: Invoke<[], { ok: true; scheduled?: boolean }>;
   [IPC_AUTH_APPLY_SESSION_TOKEN]: Invoke<
     [payload: { sessionToken: string }],

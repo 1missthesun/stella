@@ -12,7 +12,9 @@ import {
   isRecognizedAuthRejection,
   resolveAuthSessionObservation,
   resolveMissingCredentialSnapshot,
+  type AccountHint,
   type AuthIdentityIntent,
+  type SignOutOptions,
   type AuthSessionError,
   type AuthSessionObservation,
   type AuthSessionSnapshot,
@@ -60,6 +62,7 @@ const SESSION_REFRESH_RETRY_JITTER = 0.2;
 const RUNTIME_AUTH_REFRESH_BUDGET_MS = REQUEST_BUDGET_MS.call - 5_000;
 const AUTH_STORAGE_SCOPE = "desktop-better-auth-storage";
 const AUTH_STORAGE_FILE = "better-auth-storage.json";
+const ACCOUNT_HINT_FILE = "account-hint.json";
 const BETTER_AUTH_SESSION_DATA_STORAGE_KEY = "better-auth_session_data";
 const BETTER_AUTH_TOKEN_STORAGE_KEY = "better-auth_session_token";
 const AUTH_IDENTITY_INTENT_STORAGE_KEY = "auth_identity_intent";
@@ -438,19 +441,117 @@ export class AuthService {
     const stored = this.getAuthStorageItem(
       BETTER_AUTH_SESSION_DATA_STORAGE_KEY,
     );
-    if (!stored) return null;
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as unknown;
+        if (getAuthSessionIdentityIntent(parsed)) return parsed;
+      } catch {
+        // Fall through to the account hint.
+      }
+    }
+    const hint = this.readAccountHint();
+    if (!hint || hint.signedOut || this.storedIntent() === "anonymous") {
+      return null;
+    }
+    return {
+      user: {
+        id: hint.userId,
+        email: hint.email,
+        name: hint.name,
+        isAnonymous: false,
+      },
+      session: null,
+    };
+  }
+
+  private storedIntent(): AuthIdentityIntent | null {
+    const stored = this.getAuthStorageItem(AUTH_IDENTITY_INTENT_STORAGE_KEY);
+    return stored === "anonymous" || stored === "connected" ? stored : null;
+  }
+
+  private getIdentityIntent(): AuthIdentityIntent | null {
+    const stored = this.storedIntent();
+    if (stored) return stored;
+    const fromSession = getAuthSessionIdentityIntent(this.getStoredSession());
+    if (fromSession) return fromSession;
+    // Credentials are on disk but this keyring can no longer read them: an
+    // account was signed in here, so its session ended rather than never began.
+    const encoded = this.readEncodedAuthStorage();
+    if (
+      encoded[BETTER_AUTH_TOKEN_STORAGE_KEY] ||
+      encoded[BETTER_AUTH_SESSION_DATA_STORAGE_KEY]
+    ) {
+      return "connected";
+    }
+    return null;
+  }
+
+  private getAccountHintPath() {
+    return path.join(path.dirname(this.getAuthStoragePath()), ACCOUNT_HINT_FILE);
+  }
+
+  readAccountHint(): AccountHint | null {
     try {
-      const parsed = JSON.parse(stored) as unknown;
-      return getAuthSessionIdentityIntent(parsed) ? parsed : null;
+      const parsed = JSON.parse(
+        fs.readFileSync(this.getAccountHintPath(), "utf8"),
+      ) as Record<string, unknown>;
+      const userId = typeof parsed.userId === "string" ? parsed.userId.trim() : "";
+      if (!userId || userId.length > 256) return null;
+      const optional = (value: unknown) =>
+        typeof value === "string" && value.trim() ? value.trim().slice(0, 320) : null;
+      return {
+        userId,
+        email: optional(parsed.email),
+        name: optional(parsed.name),
+        signedOut: parsed.signedOut === true,
+      };
     } catch {
       return null;
     }
   }
 
-  private getIdentityIntent(): AuthIdentityIntent | null {
-    const stored = this.getAuthStorageItem(AUTH_IDENTITY_INTENT_STORAGE_KEY);
-    if (stored === "anonymous" || stored === "connected") return stored;
-    return getAuthSessionIdentityIntent(this.getStoredSession());
+  private writeAccountHint(hint: AccountHint | null) {
+    const target = this.getAccountHintPath();
+    if (!hint) {
+      fs.rmSync(target, { force: true });
+      return;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(hint), { mode: 0o600 });
+  }
+
+  private rememberAccount(session: unknown) {
+    const user = (session as { user?: Record<string, unknown> } | null)?.user;
+    const userId = typeof user?.id === "string" ? user.id.trim() : "";
+    if (!userId || user?.isAnonymous === true) return;
+    const text = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value.trim() : null;
+    const next: AccountHint = {
+      userId,
+      email: text(user?.email),
+      name: text(user?.name),
+      signedOut: false,
+    };
+    const current = this.readAccountHint();
+    if (
+      current &&
+      current.userId === next.userId &&
+      current.email === next.email &&
+      current.name === next.name &&
+      !current.signedOut
+    ) {
+      return;
+    }
+    try {
+      this.writeAccountHint(next);
+    } catch (error) {
+      console.warn("[auth] Couldn't record the signed-in account.", (error as Error).message);
+    }
+  }
+
+  forgetAccountHint() {
+    this.writeAccountHint(null);
+    return { ok: true as const };
   }
 
   private setIdentityIntent(intent: AuthIdentityIntent) {
@@ -805,12 +906,18 @@ export class AuthService {
         JSON.stringify(snapshot.session),
       );
       this.applySessionDerivedState(snapshot.session);
+      this.rememberAccount(snapshot.session);
       this.sessionRefreshRetryAttempt = 0;
       this.clearSessionRetryTimer();
     } else if (snapshot.status === "unknown") {
       this.scheduleSessionRetry();
     } else if (snapshot.status === "reauth_required") {
       this.clearBearerPreservingCachedIdentity();
+      try {
+        this.setIdentityIntent("connected");
+      } catch (error) {
+        console.warn("[auth] Couldn't keep the expired account's identity.", (error as Error).message);
+      }
       this.stopAuthRefreshLoop();
     } else {
       this.setIdentityIntent("anonymous");
@@ -886,7 +993,7 @@ export class AuthService {
     return getAuthSnapshotSession(await this.getAuthSessionSnapshot());
   }
 
-  async signOut() {
+  async signOut(options: SignOutOptions = {}) {
     const response = await this.authFetch("/sign-out", {
       method: "POST",
       headers: {
@@ -904,6 +1011,14 @@ export class AuthService {
     this.setIdentityIntent("anonymous");
     this.clearStoredCredentials();
     this.stopAuthRefreshLoop();
+    const hint = this.readAccountHint();
+    try {
+      this.writeAccountHint(
+        options.forgetAccount || !hint ? null : { ...hint, signedOut: true },
+      );
+    } catch (error) {
+      console.warn("[auth] Couldn't update the signed-out account.", (error as Error).message);
+    }
     this.lastSessionSnapshot = resolveMissingCredentialSnapshot({
       identityIntent: "anonymous",
       staleSession: null,
@@ -1034,6 +1149,7 @@ export class AuthService {
     this.setIdentityIntent("anonymous");
     this.clearStoredCredentials();
     this.stopAuthRefreshLoop();
+    this.writeAccountHint(null);
     this.lastSessionSnapshot = resolveMissingCredentialSnapshot({
       identityIntent: "anonymous",
       staleSession: null,

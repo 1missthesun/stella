@@ -7,6 +7,8 @@ export type ChatStoreContextValue = {
   storageMode: ChatStorageMode;
   isLocalStorage: boolean;
   cloudFeaturesEnabled: boolean;
+  /** The account's session ended: its chat is shown read-only from this computer's copy. */
+  cloudChatPaused: boolean;
   isAuthenticated: boolean;
 };
 
@@ -16,6 +18,7 @@ const LOCAL_CHAT_STORE_VALUE: ChatStoreContextValue = {
   storageMode: "local",
   isLocalStorage: true,
   cloudFeaturesEnabled: false,
+  cloudChatPaused: false,
   isAuthenticated: false,
 };
 

@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { showToast } from "@/ui/toast";
-import { useT } from "@/shared/i18n";
+import { useT, useTPlural } from "@/shared/i18n";
 import {
   clearLocalChatSync,
   markLocalChatSync,
@@ -39,6 +39,8 @@ export function SignedOutLocalChoice({
   const t = useT();
   const signedOutLocal = useSignedOutLocalMode();
   const [localId, setLocalId] = useState<string | null>(null);
+  const [messageCount, setMessageCount] = useState(0);
+  const tPlural = useTPlural();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const memorySync = useMemorySyncStatus();
@@ -68,6 +70,7 @@ export function SignedOutLocalChoice({
         return;
       }
       setLocalId(chatEmpty ? null : id);
+      setMessageCount(window_.visibleMessageCount);
       setOpen(true);
     })().catch((error: unknown) => console.warn("[local-mode] Couldn't read the local chat.", error));
     return () => {
@@ -123,6 +126,15 @@ export function SignedOutLocalChoice({
   }, [conversationId, isPrivate, runImport, signedIn]);
 
   if (!open) return null;
+  const notes = waitingMemory ?? 0;
+  const messages = tPlural("global.localMode.messages", messageCount);
+  const notesText = tPlural("global.localMode.notes", notes);
+  const choiceBody =
+    localId && notes > 0
+      ? t("global.localMode.choiceBodyBoth", { messages, notes: notesText })
+      : localId
+        ? t("global.localMode.choiceBodyChat", { messages })
+        : t("global.localMode.choiceBodyMemory", { notes: notesText });
   return (
     <Dialog open onOpenChange={(next) => !next && !busy && setOpen(false)}>
       <DialogContent fit className="local-mode-choice">
@@ -132,19 +144,18 @@ export function SignedOutLocalChoice({
         </DialogHeader>
         <DialogBody className="local-mode-choice-body">
           <DialogDescription className="local-mode-choice-text">
-            {t("global.localMode.choiceBody")}
+            {choiceBody}
           </DialogDescription>
-          <div className="local-mode-choice-actions">
-            <Button
+          <div className="local-mode-choice-actions local-mode-choice-actions--split">
+            <button
               type="button"
-              variant="ghost"
               disabled={busy}
-              className="pill-btn pill-btn--lg"
+              className="local-mode-choice-keep"
               data-local-choice="keep"
               onClick={() => void choose("local")}
             >
               {t("global.localMode.keep")}
-            </Button>
+            </button>
             <Button
               type="button"
               variant="primary"

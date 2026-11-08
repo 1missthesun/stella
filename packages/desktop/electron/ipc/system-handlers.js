@@ -34,6 +34,8 @@ import {
   IPC_AUTH_GET_SESSION,
   IPC_AUTH_GET_TOKEN,
   IPC_AUTH_REVOKE_SESSIONS,
+  IPC_AUTH_GET_ACCOUNT_HINT,
+  IPC_AUTH_FORGET_ACCOUNT_HINT,
   IPC_AUTH_LIST_SESSIONS,
   IPC_AUTH_REVOKE_SESSION,
   IPC_AUTH_SIGN_OUT,
@@ -411,11 +413,23 @@ export const registerSystemHandlers = (options) => {
         }
         return await options.authService.getChallengeToken();
     });
-    handleIpc(IPC_AUTH_SIGN_OUT, async (event) => {
+    handleIpc(IPC_AUTH_SIGN_OUT, async (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_SIGN_OUT)) {
             throw new Error("Blocked untrusted sign-out request.");
         }
-        return await options.authService.signOut();
+        return await options.authService.signOut({ forgetAccount: payload?.forgetAccount === true });
+    });
+    handleIpc(IPC_AUTH_GET_ACCOUNT_HINT, async (event) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_GET_ACCOUNT_HINT)) {
+            throw new Error("Blocked untrusted account request.");
+        }
+        return options.authService.readAccountHint();
+    });
+    handleIpc(IPC_AUTH_FORGET_ACCOUNT_HINT, async (event) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_FORGET_ACCOUNT_HINT)) {
+            throw new Error("Blocked untrusted account request.");
+        }
+        return options.authService.forgetAccountHint();
     });
     handleIpc(IPC_AUTH_DELETE_USER, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_DELETE_USER)) {

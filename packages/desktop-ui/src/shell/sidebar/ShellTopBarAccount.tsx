@@ -3,7 +3,6 @@ import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import {
   Fragment,
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -19,15 +18,9 @@ import { SUBSCRIPTION_UPGRADED_EVENT } from "@/global/billing/SubscriptionUpgrad
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { useCurrentUser } from "@/global/auth/hooks/use-current-user";
 import { useNickname } from "@/global/auth/hooks/use-nickname";
-import { secureSignOut } from "@/global/auth/services/auth";
-import { Button } from "@/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/ui/dialog";
+import { openSignOutDialog } from "@/global/auth/SignOutDialog";
+import { useAuthBootstrapState } from "@/global/auth/BackendAuthProvider";
+import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +46,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
   const { user: accountUser, hasConnectedAccount } = useCurrentUser();
   const { user: sessionUser } = useAuthSessionState();
   const { nickname } = useNickname();
+  const sessionPaused = useAuthBootstrapState().status === "reauth_required";
   const user = {
     email: accountUser?.email ?? sessionUser?.email ?? undefined,
     name: accountUser?.name ?? sessionUser?.name ?? undefined,
@@ -94,7 +88,6 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
   );
 
   const pendingSignOutRef = useRef(false);
-  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
   const {
     destinations: settingsDestinations,
@@ -108,13 +101,8 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
     if (applyPendingPopover()) return;
     if (!pendingSignOutRef.current) return;
     pendingSignOutRef.current = false;
-    setSignOutConfirmOpen(true);
+    openSignOutDialog();
   };
-
-  const handleConfirmSignOut = useCallback(() => {
-    setSignOutConfirmOpen(false);
-    void secureSignOut();
-  }, []);
 
   if (!hasConnectedAccount) {
     return (
@@ -146,9 +134,11 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
     (user.name ?? user.email ?? t("sidebar.account")).trim() ||
     t("sidebar.account");
   const displayLabel = nickname.trim() || accountName;
-  const sidebarPlanLabel = billingQueryReady && !selfHosted
-    ? planLabel(billingStatus?.plan)
-    : null;
+  const sidebarPlanLabel = sessionPaused
+    ? t("global.sessionPaused.accountLabel")
+    : billingQueryReady && !selfHosted
+      ? planLabel(billingStatus?.plan)
+      : null;
 
   return (
     <div className="shell-topbar-account">
@@ -236,6 +226,14 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
             ),
           )}
           <DropdownMenuSeparator />
+          {sessionPaused ? (
+            <DropdownMenuItem onClick={SIGN_IN_TOAST_ACTION.onClick}>
+              <span data-slot="dropdown-menu-item-icon">
+                <LogIn size={15} strokeWidth={1.75} />
+              </span>
+              {t("common.signIn")}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             data-variant="destructive"
             onClick={() => {
@@ -250,39 +248,6 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
         </DropdownMenuContent>
       </DropdownMenu>
       {settingsPopovers}
-      <Dialog open={signOutConfirmOpen} onOpenChange={setSignOutConfirmOpen}>
-        <DialogContent
-          fit
-          className="sidebar-signout-dialog"
-          aria-describedby={undefined}
-        >
-          <DialogHeader>
-            <DialogTitle>{t("shell.sidebar.account.signOutTitle")}</DialogTitle>
-          </DialogHeader>
-          <DialogDescription className="sidebar-signout-description">
-            {t("shell.sidebar.account.signOutDescription")}
-          </DialogDescription>
-          <div className="sidebar-confirm-actions">
-            <Button
-              variant="ghost"
-              size="large"
-              className="pill-btn pill-btn--lg"
-              onClick={() => setSignOutConfirmOpen(false)}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              size="large"
-              onClick={handleConfirmSignOut}
-              data-tone="destructive"
-              className="pill-btn pill-btn--danger pill-btn--lg"
-            >
-              {t("common.signOut")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

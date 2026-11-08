@@ -918,12 +918,22 @@
     "localMode": {
       "authNote": "Accedendo ottieni i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione tra dispositivi. Le tue chat restano su questo computer finché non scegli.",
       "banner": "Le tue chat restano su questo computer. Accedi per i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione.",
-      "choiceBody": "Hai usato Stella qui senza accedere. Aggiungendola, quella chat e la memoria vengono copiate nel tuo account, senza sostituire nulla di ciò che c'è già. Se la tieni separata, questo computer mantiene la propria chat e la propria memoria.",
+      "choiceBodyBoth": "Mentre usavi Stella qui senza account: {messages} e {notes}. Aggiungendoli finiscono nel tuo account. Non viene sostituito nulla.",
+      "choiceBodyChat": "Mentre usavi Stella qui senza account: {messages}. Aggiungendoli finiscono in fondo alla tua chat. Non viene sostituito nulla.",
+      "choiceBodyMemory": "Mentre usavi Stella qui senza account: {notes}. Aggiungendole vengono copiate nella tua memoria. Non viene sostituito nulla.",
       "choiceFailed": "Impossibile salvare la scelta. Riprova.",
-      "choiceTitle": "Aggiungere questa chat al tuo account?",
-      "keep": "Tienila separata",
+      "choiceTitle": "Aggiungere ciò che hai fatto senza account?",
+      "keep": "Tienili solo su questo computer",
+      "messages": {
+        "one": "1 messaggio",
+        "other": "{count} messaggi"
+      },
       "needsAccount": "Funziona nel cloud di Stella, quindi serve un account Stella.",
-      "sync": "Aggiungi al mio account",
+      "notes": {
+        "one": "1 nota di memoria",
+        "other": "{count} note di memoria"
+      },
+      "sync": "Aggiungi alla mia chat",
       "syncFailed": "Impossibile aggiungere questa chat al tuo account. È ancora su questo computer.",
       "synced": "Questa chat è stata aggiunta al tuo account."
     },
@@ -956,6 +966,43 @@
         "other": "{count} pianificazioni"
       },
       "untitledTask": "Attività pianificata"
+    },
+    "sessionPaused": {
+      "accountLabel": "Disconnesso",
+      "body": "Accedi per continuare.",
+      "bodyAs": "Accedi per continuare come {account}.",
+      "dontSend": "Non inviare",
+      "sending": "Invio…",
+      "sent": {
+        "one": "Accesso effettuato. 1 messaggio in attesa inviato.",
+        "other": "Accesso effettuato. {count} messaggi in attesa inviati."
+      },
+      "title": "Disconnesso.",
+      "waiting": "Verrà inviato quando accedi"
+    },
+    "signOut": {
+      "body": "La tua chat resta nel tuo account. Stella la nasconde su questo computer finché non accedi di nuovo.",
+      "failed": "Impossibile uscire. Riprova.",
+      "remove": "Rimuovi anche la chat da questo computer",
+      "removeNote": "Per un computer condiviso o in prestito. Accedendo di nuovo verrà riscaricata.",
+      "title": "Uscire da questo computer?"
+    },
+    "signedOut": {
+      "body": "La tua chat è nel tuo account, nascosta su questo computer.",
+      "differentAccount": "Usa un altro account",
+      "title": "Sei disconnesso",
+      "withoutAccount": "Usa senza account"
+    },
+    "switchAccount": {
+      "body": "La chat di {account} verrà rimossa da questo computer. Resta in quell'account.",
+      "bodyUnsent": {
+        "one": "La chat di {account} verrà rimossa da questo computer, incluso 1 messaggio non ancora inviato. La chat resta nell'account, quel messaggio no.",
+        "other": "La chat di {account} verrà rimossa da questo computer, inclusi {count} messaggi non ancora inviati. La chat resta nell'account, quei messaggi no."
+      },
+      "confirm": "Rimuovi e continua",
+      "failed": "Impossibile rimuovere la chat dell'account precedente. Riprova.",
+      "removed": "La chat dell'account precedente è stata rimossa da questo computer.",
+      "title": "Passare a un altro account?"
     }
   },
   "mobile": {

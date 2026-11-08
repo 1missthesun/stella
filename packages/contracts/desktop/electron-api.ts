@@ -28,6 +28,8 @@ import {
   IPC_APP_SOURCE_UNDO,
   IPC_AUTH_APPLY_SESSION_TOKEN,
   IPC_AUTH_DELETE_USER,
+  IPC_AUTH_FORGET_ACCOUNT_HINT,
+  IPC_AUTH_GET_ACCOUNT_HINT,
   IPC_AUTH_GET_CHALLENGE_TOKEN,
   IPC_AUTH_GET_SESSION,
   IPC_AUTH_GET_TOKEN,
@@ -633,6 +635,8 @@ export const createElectronApi = (
       getChallengeToken: invoker(IPC_AUTH_GET_CHALLENGE_TOKEN),
       signOutAuth: invoker(IPC_AUTH_SIGN_OUT),
       deleteAuthUser: invoker(IPC_AUTH_DELETE_USER),
+      getAccountHint: invoker(IPC_AUTH_GET_ACCOUNT_HINT),
+      forgetAccountHint: invoker(IPC_AUTH_FORGET_ACCOUNT_HINT),
       applyAuthSessionToken: (sessionToken: string) =>
         ipc.invoke(IPC_AUTH_APPLY_SESSION_TOKEN, { sessionToken }),
       getAuthToken: invoker(IPC_AUTH_GET_TOKEN),

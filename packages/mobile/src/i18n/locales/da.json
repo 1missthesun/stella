@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Når du logger ind, får du Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering mellem enheder. Dine chats bliver på denne computer, indtil du vælger.",
       "banner": "Dine chats bliver på denne computer. Log ind for Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering.",
-      "choiceBody": "Du har brugt Stella her uden at være logget ind. Hvis du tilføjer den, kopieres chatten og hukommelsen til din konto, uden at noget der bliver erstattet. Holder du den adskilt, får denne computer sin egen chat og hukommelse.",
+      "choiceBodyBoth": "Mens du brugte Stella her uden konto: {messages} og {notes}. Når du tilføjer dem, kommer de ind på din konto. Intet der erstattes.",
+      "choiceBodyChat": "Mens du brugte Stella her uden konto: {messages}. Når du tilføjer dem, kommer de sidst i din chat. Intet der erstattes.",
+      "choiceBodyMemory": "Mens du brugte Stella her uden konto: {notes}. Når du tilføjer dem, kopieres de til din hukommelse. Intet der erstattes.",
       "choiceFailed": "Valget kunne ikke gemmes. Prøv igen.",
-      "choiceTitle": "Vil du føje denne chat til din konto?",
-      "keep": "Hold den adskilt",
+      "choiceTitle": "Tilføj det, du lavede uden konto?",
+      "keep": "Behold dem kun på denne computer",
+      "messages": {
+        "one": "1 besked",
+        "other": "{count} beskeder"
+      },
       "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
-      "sync": "Føj til min konto",
+      "notes": {
+        "one": "1 hukommelsesnote",
+        "other": "{count} hukommelsesnoter"
+      },
+      "sync": "Tilføj til min chat",
       "syncFailed": "Chatten kunne ikke føjes til din konto. Den er stadig på denne computer.",
       "synced": "Chatten er føjet til din konto."
     },
@@ -948,6 +958,43 @@
         "other": "{count} tidsplaner"
       },
       "untitledTask": "Planlagt opgave"
+    },
+    "sessionPaused": {
+      "accountLabel": "Logget ud",
+      "body": "Log ind for at fortsætte.",
+      "bodyAs": "Log ind for at fortsætte som {account}.",
+      "dontSend": "Send ikke",
+      "sending": "Sender…",
+      "sent": {
+        "one": "Logget ind. 1 ventende besked sendt.",
+        "other": "Logget ind. {count} ventende beskeder sendt."
+      },
+      "title": "Logget ud.",
+      "waiting": "Sendes, når du logger ind"
+    },
+    "signOut": {
+      "body": "Din chat bliver i din konto. Stella skjuler den på denne computer, indtil du logger ind igen.",
+      "failed": "Kunne ikke logge ud. Prøv igen.",
+      "remove": "Fjern også din chat fra denne computer",
+      "removeNote": "Til en delt eller lånt computer. Den hentes igen, når du logger ind.",
+      "title": "Log ud af denne computer?"
+    },
+    "signedOut": {
+      "body": "Din chat er i din konto og skjult på denne computer.",
+      "differentAccount": "Brug en anden konto",
+      "title": "Du er logget ud",
+      "withoutAccount": "Brug uden konto"
+    },
+    "switchAccount": {
+      "body": "Chatten for {account} fjernes fra denne computer. Den bliver i den konto.",
+      "bodyUnsent": {
+        "one": "Chatten for {account} fjernes fra denne computer, inklusive 1 besked, der ikke er sendt endnu. Chatten bliver i kontoen, men det gør beskeden ikke.",
+        "other": "Chatten for {account} fjernes fra denne computer, inklusive {count} beskeder, der ikke er sendt endnu. Chatten bliver i kontoen, men det gør beskederne ikke."
+      },
+      "confirm": "Fjern og fortsæt",
+      "failed": "Kunne ikke fjerne den forrige kontos chat. Prøv igen.",
+      "removed": "Den forrige kontos chat er fjernet fra denne computer.",
+      "title": "Skift til en anden konto?"
     }
   },
   "mobile": {

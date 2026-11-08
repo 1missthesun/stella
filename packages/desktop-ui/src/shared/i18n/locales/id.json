@@ -904,12 +904,22 @@
     "localMode": {
       "authNote": "Dengan masuk, kamu mendapat model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi antarperangkat. Obrolanmu tetap di komputer ini sampai kamu memilih.",
       "banner": "Obrolanmu tetap di komputer ini. Masuk untuk model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi.",
-      "choiceBody": "Kamu memakai Stella di sini tanpa masuk. Menambahkannya akan menyalin obrolan dan memori itu ke akunmu tanpa mengganti apa pun di sana. Jika dipisahkan, komputer ini akan punya obrolan dan memorinya sendiri.",
+      "choiceBodyBoth": "Selama kamu memakai Stella di sini tanpa akun: {messages} dan {notes}. Menambahkannya akan memindahkannya ke akunmu. Tidak ada yang diganti.",
+      "choiceBodyChat": "Selama kamu memakai Stella di sini tanpa akun: {messages}. Menambahkannya akan menaruhnya di akhir obrolanmu. Tidak ada yang diganti.",
+      "choiceBodyMemory": "Selama kamu memakai Stella di sini tanpa akun: {notes}. Menambahkannya akan menyalinnya ke memorimu. Tidak ada yang diganti.",
       "choiceFailed": "Pilihan itu tidak bisa disimpan. Coba lagi.",
-      "choiceTitle": "Tambahkan obrolan ini ke akunmu?",
-      "keep": "Pisahkan",
+      "choiceTitle": "Tambahkan yang kamu lakukan tanpa akun?",
+      "keep": "Simpan hanya di komputer ini",
+      "messages": {
+        "one": "1 pesan",
+        "other": "{count} pesan"
+      },
       "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
-      "sync": "Tambahkan ke akunku",
+      "notes": {
+        "one": "1 catatan memori",
+        "other": "{count} catatan memori"
+      },
+      "sync": "Tambahkan ke obrolanku",
       "syncFailed": "Tidak bisa menambahkan obrolan ini ke akunmu. Obrolan masih ada di komputer ini.",
       "synced": "Obrolan ini sudah ditambahkan ke akunmu."
     },
@@ -940,6 +950,43 @@
         "other": "{count} jadwal"
       },
       "untitledTask": "Tugas terjadwal"
+    },
+    "sessionPaused": {
+      "accountLabel": "Sudah keluar",
+      "body": "Masuk untuk melanjutkan.",
+      "bodyAs": "Masuk untuk melanjutkan sebagai {account}.",
+      "dontSend": "Jangan kirim",
+      "sending": "Mengirim…",
+      "sent": {
+        "one": "Sudah masuk. 1 pesan yang menunggu terkirim.",
+        "other": "Sudah masuk. {count} pesan yang menunggu terkirim."
+      },
+      "title": "Sudah keluar.",
+      "waiting": "Terkirim saat kamu masuk"
+    },
+    "signOut": {
+      "body": "Obrolanmu tetap ada di akunmu. Stella menyembunyikannya di komputer ini sampai kamu masuk lagi.",
+      "failed": "Tidak bisa keluar. Coba lagi.",
+      "remove": "Hapus juga obrolan dari komputer ini",
+      "removeNote": "Untuk komputer bersama atau pinjaman. Saat masuk lagi, obrolan diunduh ulang.",
+      "title": "Keluar dari komputer ini?"
+    },
+    "signedOut": {
+      "body": "Obrolanmu ada di akunmu, tersembunyi di komputer ini.",
+      "differentAccount": "Gunakan akun lain",
+      "title": "Kamu sudah keluar",
+      "withoutAccount": "Gunakan tanpa akun"
+    },
+    "switchAccount": {
+      "body": "Obrolan untuk {account} akan dihapus dari komputer ini. Obrolan tetap ada di akun itu.",
+      "bodyUnsent": {
+        "one": "Obrolan untuk {account} akan dihapus dari komputer ini, termasuk 1 pesan yang belum terkirim. Obrolan tetap ada di akun itu, pesan tersebut tidak.",
+        "other": "Obrolan untuk {account} akan dihapus dari komputer ini, termasuk {count} pesan yang belum terkirim. Obrolan tetap ada di akun itu, pesan-pesan tersebut tidak."
+      },
+      "confirm": "Hapus dan lanjutkan",
+      "failed": "Tidak bisa menghapus obrolan akun sebelumnya. Coba lagi.",
+      "removed": "Obrolan akun sebelumnya sudah dihapus dari komputer ini.",
+      "title": "Beralih ke akun lain?"
     }
   },
   "mobile": {

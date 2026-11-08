@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Kirjautuminen tuo Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin laitteiden välillä. Keskustelusi pysyvät tällä tietokoneella, kunnes päätät toisin.",
       "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään saadaksesi Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin.",
-      "choiceBody": "Käytit Stellaa täällä kirjautumatta. Lisääminen kopioi keskustelun ja muistin tiliisi korvaamatta siellä mitään. Jos pidät sen erillään, tällä tietokoneella on oma keskustelunsa ja muistinsa.",
+      "choiceBodyBoth": "Kun käytit Stellaa täällä ilman tiliä: {messages} ja {notes}. Lisääminen siirtää ne tilillesi. Mitään ei korvata.",
+      "choiceBodyChat": "Kun käytit Stellaa täällä ilman tiliä: {messages}. Lisääminen siirtää ne keskustelusi loppuun. Mitään ei korvata.",
+      "choiceBodyMemory": "Kun käytit Stellaa täällä ilman tiliä: {notes}. Lisääminen kopioi ne muistiisi. Mitään ei korvata.",
       "choiceFailed": "Valintaa ei voitu tallentaa. Yritä uudelleen.",
-      "choiceTitle": "Lisätäänkö tämä keskustelu tiliisi?",
-      "keep": "Pidä erillään",
+      "choiceTitle": "Lisätäänkö se, mitä teit ilman tiliä?",
+      "keep": "Pidä ne vain tällä tietokoneella",
+      "messages": {
+        "one": "1 viesti",
+        "other": "{count} viestiä"
+      },
       "needsAccount": "Tämä toimii Stellan pilvessä, joten se vaatii Stella-tilin.",
-      "sync": "Lisää tililleni",
+      "notes": {
+        "one": "1 muistimerkintä",
+        "other": "{count} muistimerkintää"
+      },
+      "sync": "Lisää keskusteluuni",
       "syncFailed": "Keskustelua ei voitu lisätä tiliisi. Se on yhä tällä tietokoneella.",
       "synced": "Keskustelu lisättiin tiliisi."
     },
@@ -948,6 +958,43 @@
         "other": "{count} ajastusta"
       },
       "untitledTask": "Ajastettu tehtävä"
+    },
+    "sessionPaused": {
+      "accountLabel": "Kirjauduttu ulos",
+      "body": "Kirjaudu sisään jatkaaksesi.",
+      "bodyAs": "Kirjaudu sisään jatkaaksesi tilillä {account}.",
+      "dontSend": "Älä lähetä",
+      "sending": "Lähetetään…",
+      "sent": {
+        "one": "Kirjauduttu sisään. 1 odottava viesti lähetetty.",
+        "other": "Kirjauduttu sisään. {count} odottavaa viestiä lähetetty."
+      },
+      "title": "Kirjauduttu ulos.",
+      "waiting": "Lähetetään, kun kirjaudut sisään"
+    },
+    "signOut": {
+      "body": "Keskustelusi pysyy tililläsi. Stella piilottaa sen tällä tietokoneella, kunnes kirjaudut takaisin.",
+      "failed": "Uloskirjautuminen epäonnistui. Yritä uudelleen.",
+      "remove": "Poista keskustelu myös tältä tietokoneelta",
+      "removeNote": "Jaetulle tai lainatulle tietokoneelle. Se ladataan uudelleen, kun kirjaudut sisään.",
+      "title": "Kirjaudutaanko ulos tältä tietokoneelta?"
+    },
+    "signedOut": {
+      "body": "Keskustelusi on tililläsi ja piilotettu tällä tietokoneella.",
+      "differentAccount": "Käytä toista tiliä",
+      "title": "Olet kirjautunut ulos",
+      "withoutAccount": "Käytä ilman tiliä"
+    },
+    "switchAccount": {
+      "body": "Tilin {account} keskustelu poistetaan tältä tietokoneelta. Se säilyy kyseisellä tilillä.",
+      "bodyUnsent": {
+        "one": "Tilin {account} keskustelu poistetaan tältä tietokoneelta, mukaan lukien 1 viesti, jota ei ole vielä lähetetty. Keskustelu säilyy tilillä, mutta viesti ei.",
+        "other": "Tilin {account} keskustelu poistetaan tältä tietokoneelta, mukaan lukien {count} viestiä, joita ei ole vielä lähetetty. Keskustelu säilyy tilillä, mutta viestit eivät."
+      },
+      "confirm": "Poista ja jatka",
+      "failed": "Edellisen tilin keskustelua ei voitu poistaa. Yritä uudelleen.",
+      "removed": "Edellisen tilin keskustelu poistettiin tältä tietokoneelta.",
+      "title": "Vaihdetaanko toiseen tiliin?"
     }
   },
   "mobile": {

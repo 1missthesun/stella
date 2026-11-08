@@ -1,5 +1,22 @@
 export type AuthIdentityIntent = "anonymous" | "connected";
 
+/**
+ * The last account signed in on this computer, kept outside protected storage
+ * so an unreadable keyring still reads as "this account's session ended", not
+ * as a first install. Identity only; never a credential.
+ */
+export type AccountHint = {
+  userId: string;
+  email: string | null;
+  name: string | null;
+  signedOut: boolean;
+};
+
+export type SignOutOptions = {
+  /** Also forget which account was here, for a shared or borrowed computer. */
+  forgetAccount?: boolean;
+};
+
 export type AccountSessionSummary = {
   id: string;
   createdAt: number;

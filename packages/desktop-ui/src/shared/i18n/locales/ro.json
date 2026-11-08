@@ -918,12 +918,22 @@
     "localMode": {
       "authNote": "Conectarea îți aduce modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare între dispozitive. Conversațiile tale rămân pe acest computer până alegi tu.",
       "banner": "Conversațiile tale rămân pe acest computer. Conectează-te pentru modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare.",
-      "choiceBody": "Ai folosit Stella aici fără să fii conectat. Adăugarea copiază conversația și memoria în contul tău, fără să înlocuiască nimic de acolo. Dacă o păstrezi separat, acest computer își păstrează propria conversație și memorie.",
+      "choiceBodyBoth": "Cât ai folosit Stella aici fără cont: {messages} și {notes}. Dacă le adaugi, ajung în contul tău. Nu se înlocuiește nimic.",
+      "choiceBodyChat": "Cât ai folosit Stella aici fără cont: {messages}. Dacă le adaugi, ajung la finalul conversației tale. Nu se înlocuiește nimic.",
+      "choiceBodyMemory": "Cât ai folosit Stella aici fără cont: {notes}. Dacă le adaugi, sunt copiate în memoria ta. Nu se înlocuiește nimic.",
       "choiceFailed": "Alegerea nu a putut fi salvată. Încearcă din nou.",
-      "choiceTitle": "Adaugi această conversație în contul tău?",
-      "keep": "Păstreaz-o separat",
+      "choiceTitle": "Adaugi ce ai făcut fără cont?",
+      "keep": "Păstrează-le doar pe acest computer",
+      "messages": {
+        "one": "1 mesaj",
+        "other": "{count} mesaje"
+      },
       "needsAccount": "Funcționează în cloudul Stella, deci are nevoie de un cont Stella.",
-      "sync": "Adaugă în contul meu",
+      "notes": {
+        "one": "1 notă de memorie",
+        "other": "{count} note de memorie"
+      },
+      "sync": "Adaugă în conversația mea",
       "syncFailed": "Conversația nu a putut fi adăugată în contul tău. Este încă pe acest computer.",
       "synced": "Conversația a fost adăugată în contul tău."
     },
@@ -956,6 +966,43 @@
         "other": "{count} de programări"
       },
       "untitledTask": "Sarcină programată"
+    },
+    "sessionPaused": {
+      "accountLabel": "Deconectat",
+      "body": "Conectează-te ca să continui.",
+      "bodyAs": "Conectează-te ca să continui ca {account}.",
+      "dontSend": "Nu trimite",
+      "sending": "Se trimite…",
+      "sent": {
+        "one": "Conectat. A fost trimis 1 mesaj în așteptare.",
+        "other": "Conectat. Au fost trimise {count} mesaje în așteptare."
+      },
+      "title": "Deconectat.",
+      "waiting": "Se trimite când te conectezi"
+    },
+    "signOut": {
+      "body": "Conversația rămâne în contul tău. Stella o ascunde pe acest computer până te conectezi din nou.",
+      "failed": "Nu te-ai putut deconecta. Încearcă din nou.",
+      "remove": "Elimină și conversația de pe acest computer",
+      "removeNote": "Pentru un computer comun sau împrumutat. La conectare va fi descărcată din nou.",
+      "title": "Te deconectezi de pe acest computer?"
+    },
+    "signedOut": {
+      "body": "Conversația ta e în cont, ascunsă pe acest computer.",
+      "differentAccount": "Folosește alt cont",
+      "title": "Ești deconectat",
+      "withoutAccount": "Folosește fără cont"
+    },
+    "switchAccount": {
+      "body": "Conversația pentru {account} va fi eliminată de pe acest computer. Rămâne în acel cont.",
+      "bodyUnsent": {
+        "one": "Conversația pentru {account} va fi eliminată de pe acest computer, inclusiv 1 mesaj care nu a fost trimis încă. Conversația rămâne în cont, mesajul nu.",
+        "other": "Conversația pentru {account} va fi eliminată de pe acest computer, inclusiv {count} mesaje care nu au fost trimise încă. Conversația rămâne în cont, mesajele nu."
+      },
+      "confirm": "Elimină și continuă",
+      "failed": "Nu s-a putut elimina conversația contului anterior. Încearcă din nou.",
+      "removed": "Conversația contului anterior a fost eliminată de pe acest computer.",
+      "title": "Treci la alt cont?"
     }
   },
   "mobile": {

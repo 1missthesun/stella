@@ -904,12 +904,22 @@
     "localMode": {
       "authNote": "Đăng nhập sẽ thêm các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ giữa các thiết bị. Các cuộc trò chuyện của bạn ở lại trên máy tính này cho đến khi bạn quyết định.",
       "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ.",
-      "choiceBody": "Bạn đã dùng Stella ở đây khi chưa đăng nhập. Thêm vào sẽ sao chép cuộc trò chuyện và bộ nhớ đó vào tài khoản của bạn, không thay thế gì ở đó. Nếu để riêng, máy tính này sẽ giữ cuộc trò chuyện và bộ nhớ của riêng nó.",
+      "choiceBodyBoth": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {messages} và {notes}. Thêm vào sẽ đưa chúng vào tài khoản của bạn. Không có gì bị thay thế.",
+      "choiceBodyChat": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {messages}. Thêm vào sẽ đặt chúng ở cuối cuộc trò chuyện của bạn. Không có gì bị thay thế.",
+      "choiceBodyMemory": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {notes}. Thêm vào sẽ sao chép chúng vào bộ nhớ của bạn. Không có gì bị thay thế.",
       "choiceFailed": "Không thể lưu lựa chọn đó. Hãy thử lại.",
-      "choiceTitle": "Thêm cuộc trò chuyện này vào tài khoản?",
-      "keep": "Để riêng",
+      "choiceTitle": "Thêm những gì bạn đã làm khi không có tài khoản?",
+      "keep": "Chỉ giữ trên máy tính này",
+      "messages": {
+        "one": "1 tin nhắn",
+        "other": "{count} tin nhắn"
+      },
       "needsAccount": "Tính năng này chạy trên đám mây của Stella nên cần tài khoản Stella.",
-      "sync": "Thêm vào tài khoản của tôi",
+      "notes": {
+        "one": "1 ghi chú bộ nhớ",
+        "other": "{count} ghi chú bộ nhớ"
+      },
+      "sync": "Thêm vào cuộc trò chuyện của tôi",
       "syncFailed": "Không thể thêm cuộc trò chuyện này vào tài khoản. Nó vẫn ở trên máy tính này.",
       "synced": "Đã thêm cuộc trò chuyện này vào tài khoản của bạn."
     },
@@ -940,6 +950,43 @@
         "other": "{count} lịch"
       },
       "untitledTask": "Tác vụ theo lịch"
+    },
+    "sessionPaused": {
+      "accountLabel": "Đã đăng xuất",
+      "body": "Đăng nhập để tiếp tục.",
+      "bodyAs": "Đăng nhập để tiếp tục với {account}.",
+      "dontSend": "Không gửi",
+      "sending": "Đang gửi…",
+      "sent": {
+        "one": "Đã đăng nhập. Đã gửi 1 tin nhắn đang chờ.",
+        "other": "Đã đăng nhập. Đã gửi {count} tin nhắn đang chờ."
+      },
+      "title": "Đã đăng xuất.",
+      "waiting": "Sẽ gửi khi bạn đăng nhập"
+    },
+    "signOut": {
+      "body": "Cuộc trò chuyện vẫn ở trong tài khoản của bạn. Stella ẩn nó trên máy tính này cho đến khi bạn đăng nhập lại.",
+      "failed": "Không thể đăng xuất. Hãy thử lại.",
+      "remove": "Xóa cả cuộc trò chuyện khỏi máy tính này",
+      "removeNote": "Dành cho máy dùng chung hoặc mượn. Khi đăng nhập lại, nó sẽ được tải xuống lại.",
+      "title": "Đăng xuất khỏi máy tính này?"
+    },
+    "signedOut": {
+      "body": "Cuộc trò chuyện của bạn ở trong tài khoản, đang được ẩn trên máy tính này.",
+      "differentAccount": "Dùng tài khoản khác",
+      "title": "Bạn đã đăng xuất",
+      "withoutAccount": "Dùng không cần tài khoản"
+    },
+    "switchAccount": {
+      "body": "Cuộc trò chuyện của {account} sẽ bị xóa khỏi máy tính này. Nó vẫn ở trong tài khoản đó.",
+      "bodyUnsent": {
+        "one": "Cuộc trò chuyện của {account} sẽ bị xóa khỏi máy tính này, kể cả 1 tin nhắn chưa được gửi. Cuộc trò chuyện vẫn ở trong tài khoản, tin nhắn đó thì không.",
+        "other": "Cuộc trò chuyện của {account} sẽ bị xóa khỏi máy tính này, kể cả {count} tin nhắn chưa được gửi. Cuộc trò chuyện vẫn ở trong tài khoản, các tin nhắn đó thì không."
+      },
+      "confirm": "Xóa và tiếp tục",
+      "failed": "Không thể xóa cuộc trò chuyện của tài khoản trước. Hãy thử lại.",
+      "removed": "Đã xóa cuộc trò chuyện của tài khoản trước khỏi máy tính này.",
+      "title": "Chuyển sang tài khoản khác?"
     }
   },
   "mobile": {

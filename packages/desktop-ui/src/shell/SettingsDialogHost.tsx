@@ -1,6 +1,6 @@
 import { lazy, memo, Suspense, useCallback } from "react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { secureSignOut } from "@/global/auth/services/auth";
+import { openSignOutDialog } from "@/global/auth/SignOutDialog";
 import {
   Dialog,
   DialogBody,
@@ -21,7 +21,7 @@ export const SettingsDialogHost = memo(function SettingsDialogHost() {
   const open = useSettingsDialogOpen();
   const handleSignOut = useCallback(() => {
     settingsDialog.close();
-    void secureSignOut();
+    openSignOutDialog();
   }, []);
 
   if (!open) return null;

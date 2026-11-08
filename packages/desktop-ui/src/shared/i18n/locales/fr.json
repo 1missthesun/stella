@@ -918,12 +918,22 @@
     "localMode": {
       "authNote": "La connexion ajoute les modèles de Stella, l'app mobile, Drive, les tâches dans le cloud et la synchronisation entre appareils. Vos conversations restent sur cet ordinateur jusqu'à ce que vous choisissiez.",
       "banner": "Vos conversations restent sur cet ordinateur. Connectez-vous pour les modèles de Stella, l'app mobile, Drive, les tâches dans le cloud et la synchronisation.",
-      "choiceBody": "Vous avez utilisé Stella ici sans être connecté. L'ajout copie cette conversation et la mémoire dans votre compte, sans rien y remplacer. Si vous la gardez à part, cet ordinateur conserve sa propre conversation et sa propre mémoire.",
+      "choiceBodyBoth": "Pendant que vous utilisiez Stella ici sans compte : {messages} et {notes}. Les ajouter les place dans votre compte. Rien n'y est remplacé.",
+      "choiceBodyChat": "Pendant que vous utilisiez Stella ici sans compte : {messages}. Les ajouter les place à la fin de votre conversation. Rien n'y est remplacé.",
+      "choiceBodyMemory": "Pendant que vous utilisiez Stella ici sans compte : {notes}. Les ajouter les copie dans votre mémoire. Rien n'y est remplacé.",
       "choiceFailed": "Impossible d'enregistrer ce choix. Réessayez.",
-      "choiceTitle": "Ajouter cette conversation à votre compte ?",
-      "keep": "La garder à part",
+      "choiceTitle": "Ajouter ce que vous avez fait sans compte ?",
+      "keep": "Les garder seulement sur cet ordinateur",
+      "messages": {
+        "one": "1 message",
+        "other": "{count} messages"
+      },
       "needsAccount": "Cela fonctionne dans le cloud de Stella et nécessite donc un compte Stella.",
-      "sync": "Ajouter à mon compte",
+      "notes": {
+        "one": "1 note de mémoire",
+        "other": "{count} notes de mémoire"
+      },
+      "sync": "Ajouter à ma conversation",
       "syncFailed": "Impossible d'ajouter cette conversation à votre compte. Elle est toujours sur cet ordinateur.",
       "synced": "Cette conversation a été ajoutée à votre compte."
     },
@@ -956,6 +966,43 @@
         "other": "{count} planifications"
       },
       "untitledTask": "Tâche planifiée"
+    },
+    "sessionPaused": {
+      "accountLabel": "Déconnecté",
+      "body": "Connectez-vous pour continuer.",
+      "bodyAs": "Connectez-vous pour continuer en tant que {account}.",
+      "dontSend": "Ne pas envoyer",
+      "sending": "Envoi…",
+      "sent": {
+        "one": "Connecté. 1 message en attente envoyé.",
+        "other": "Connecté. {count} messages en attente envoyés."
+      },
+      "title": "Déconnecté.",
+      "waiting": "Envoyé dès que vous vous connectez"
+    },
+    "signOut": {
+      "body": "Votre conversation reste dans votre compte. Stella la masque sur cet ordinateur jusqu'à votre prochaine connexion.",
+      "failed": "Impossible de se déconnecter. Réessayez.",
+      "remove": "Supprimer aussi la conversation de cet ordinateur",
+      "removeNote": "Pour un ordinateur partagé ou emprunté. Elle sera retéléchargée à la prochaine connexion.",
+      "title": "Se déconnecter de cet ordinateur ?"
+    },
+    "signedOut": {
+      "body": "Votre conversation est dans votre compte, masquée sur cet ordinateur.",
+      "differentAccount": "Utiliser un autre compte",
+      "title": "Vous êtes déconnecté",
+      "withoutAccount": "Utiliser sans compte"
+    },
+    "switchAccount": {
+      "body": "La conversation de {account} sera supprimée de cet ordinateur. Elle reste dans ce compte.",
+      "bodyUnsent": {
+        "one": "La conversation de {account} sera supprimée de cet ordinateur, y compris 1 message pas encore envoyé. La conversation reste dans ce compte, pas ce message.",
+        "other": "La conversation de {account} sera supprimée de cet ordinateur, y compris {count} messages pas encore envoyés. La conversation reste dans ce compte, pas ces messages."
+      },
+      "confirm": "Supprimer et continuer",
+      "failed": "Impossible de supprimer la conversation du compte précédent. Réessayez.",
+      "removed": "La conversation du compte précédent a été supprimée de cet ordinateur.",
+      "title": "Passer à un autre compte ?"
     }
   },
   "mobile": {

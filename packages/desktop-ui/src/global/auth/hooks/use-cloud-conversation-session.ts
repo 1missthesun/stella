@@ -12,6 +12,11 @@ import {
 } from "../lib/cloud-conversation-session";
 import { useAuthSessionState } from "./use-auth-session-state";
 import { reportCloudReadiness } from "@/features/cloud/cloud-readiness-timing";
+import {
+  isAccountScope,
+  readOwnerGeneration,
+  rememberOwnerGeneration,
+} from "@/features/cloud/paused-account";
 
 export function useCloudConversationSession() {
   const auth = useAuthState();
@@ -52,6 +57,23 @@ export function useCloudConversationSession() {
     authBootstrapReady: authBootstrap.status === "ready",
     authBootstrapFailed: authBootstrap.status === "failed",
   };
+  const confirmedOwnerGeneration = identityConfirmed
+    ? (identity?.ownerGeneration ?? null)
+    : null;
+  useEffect(() => {
+    if (confirmedOwnerGeneration) {
+      rememberOwnerGeneration(session.cacheScope, confirmedOwnerGeneration);
+    }
+  }, [confirmedOwnerGeneration, session.cacheScope]);
+  // The account's session ended without the user signing out: its chat stays
+  // readable from this computer's copy until the same account signs back in.
+  const pausedOwnerGeneration =
+    authBootstrap.status === "reauth_required" &&
+    session.hasSession &&
+    Boolean(expectedSubject) &&
+    isAccountScope(session.cacheScope)
+      ? readOwnerGeneration(session.cacheScope)
+      : null;
   const mode = resolveCloudConversationSession({
     ...sessionGate,
     identityConfirmed,
@@ -90,7 +112,10 @@ export function useCloudConversationSession() {
     accountScope: session.cacheScope,
     expectedSubject,
     ownerSubject,
-    ownerGeneration: identityConfirmed ? (identity?.ownerGeneration ?? null) : null,
+    ownerGeneration: confirmedOwnerGeneration,
+    isCloudConversationPaused: pausedOwnerGeneration !== null,
+    pausedOwnerGeneration,
+    accountUser: session.user,
     mainConversationId: identityConfirmed ? (identity?.conversationId ?? null) : null,
     refreshMainConversation,
     identityRevision: session.identityRevision,

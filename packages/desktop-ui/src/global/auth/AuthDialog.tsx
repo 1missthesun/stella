@@ -11,6 +11,7 @@ import {
 import { MagicLinkAuthFlow } from "./MagicLinkAuthFlow";
 import { authClient } from "./lib/auth-client";
 import { useAuthSessionState } from "./hooks/use-auth-session-state";
+import { useAuthBootstrapState } from "./BackendAuthProvider";
 import {
   applyAndVerifyAccountSessionToken,
   startBrowserGoogleSignIn,
@@ -136,9 +137,12 @@ const pollDesktopSocialAuth = async (
 export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
+  // An expired session keeps its account on screen; only a live sign-in closes this.
+  const bootstrapStatus = useAuthBootstrapState().status;
+  const signedIn = hasConnectedAccount && bootstrapStatus === "ready";
   useEffect(() => {
-    if (hasConnectedAccount && open) onOpenChange(false);
-  }, [hasConnectedAccount, open, onOpenChange]);
+    if (signedIn && open) onOpenChange(false);
+  }, [signedIn, open, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -160,9 +164,14 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   );
 };
 
-export function AuthMethods() {
+export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
   const t = useT();
   const localMode = useSignedOutLocalMode();
+  const { user } = useAuthSessionState();
+  const bootstrapStatus = useAuthBootstrapState().status;
+  const accountHint =
+    loginHint ??
+    (bootstrapStatus === "reauth_required" ? (user?.email ?? null) : null);
   return (
     <>
       <div className="auth-dialog-hero">
@@ -170,7 +179,7 @@ export function AuthMethods() {
         <p className="auth-dialog-sub">{t("global.auth.welcomeSub")}</p>
         {localMode ? <p className="auth-dialog-local-note">{t("global.localMode.authNote")}</p> : null}
       </div>
-      <GoogleAuthButton />
+      <GoogleAuthButton loginHint={accountHint} />
       <PasskeyAuthButton />
       <div className="auth-dialog-method-divider">
         <span>{t("global.auth.orUseEmail")}</span>
@@ -200,7 +209,7 @@ export function AuthMethods() {
   );
 }
 
-function GoogleAuthButton() {
+function GoogleAuthButton({ loginHint }: { loginHint?: string | null }) {
   const t = useT();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,6 +245,7 @@ function GoogleAuthButton() {
         provider: "google",
         callbackURL,
         disableRedirect: true,
+        ...(loginHint ? { loginHint } : {}),
       })) as SocialSignInResult | undefined;
       const url = result?.data?.url;
 
@@ -257,7 +267,7 @@ function GoogleAuthButton() {
     } finally {
       setIsSigningIn(false);
     }
-  }, [t]);
+  }, [loginHint, t]);
 
   return (
     <div className="auth-dialog-google-wrap">

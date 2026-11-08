@@ -1,6 +1,9 @@
 import { authClient } from "@/global/auth/lib/auth-client";
 import { signOutAuthSession } from "@/global/auth/services/auth-session";
-import type { AccountSessionSummary } from "@stella/contracts/auth-session";
+import type {
+  AccountSessionSummary,
+  SignOutOptions,
+} from "@stella/contracts/auth-session";
 
 type SignOutScope = "current_device" | "all_devices";
 
@@ -71,9 +74,12 @@ export const revokeAccountSession = async (sessionId: string) => {
   browserSessionTokens.delete(sessionId);
 };
 
-export const secureSignOut = async (scope: SignOutScope = "current_device") => {
+export const secureSignOut = async (
+  scope: SignOutScope = "current_device",
+  options: SignOutOptions = {},
+) => {
   if (scope === "all_devices") {
     await revokeAllSessions();
   }
-  await signOutAuthSession();
+  await signOutAuthSession(options);
 };

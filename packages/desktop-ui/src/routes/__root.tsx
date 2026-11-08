@@ -29,13 +29,15 @@ import { OPEN_CONNECT_DIALOG_EVENT } from "@/global/integrations/connect-action"
 import { conversationTabs } from "@/features/chat/services/conversation-tabs-store";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useShellConversationSource } from "@/global/auth/hooks/use-shell-conversation-source";
-import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import {
   cloudConversationBelongsToOwnerSubject,
   resolveCloudConversationForShell,
   resolveCloudConversationRoute,
 } from "@/features/cloud/cloud-conversation-selection";
-import { writeActiveCloudConversationIdCache } from "@/features/cloud/cloud-conversation-cache";
+import {
+  readActiveCloudConversationIdCache,
+  writeActiveCloudConversationIdCache,
+} from "@/features/cloud/cloud-conversation-cache";
 import { retireCloudConversationClientAuthority } from "@/features/cloud/conversation-store";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
 import { retireCloudExecutionClientAuthority } from "@/features/cloud/cloud-execution-store";
@@ -74,6 +76,8 @@ import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
 import { SignInScreen } from "@/global/auth/SignInScreen";
 import { SignedOutLocalChoice } from "@/global/local-mode/SignedOutLocalChoice";
+import { SignOutDialog } from "@/global/auth/SignOutDialog";
+import { AccountSwitchGuard } from "@/global/local-mode/AccountSwitchGuard";
 import {
   STELLA_COMPOSE_TEXT_EVENT,
   type StellaComposeTextDetail,
@@ -261,11 +265,17 @@ function RootLayout() {
   const shellConversationSelectionIsLoading =
     cloudConversations === undefined ||
     (isOnChatRoute ? routeOwnershipIsLoading : mainOwnershipIsLoading);
+  const pausedConversationId =
+    !isPrivate && cloudSession.isCloudConversationPaused
+      ? readActiveCloudConversationIdCache(accountScope)
+      : null;
   const conversationId = isPrivate
     ? privateSelection?.intent === routeIntent
       ? privateSelection.id
       : null
-    : !isAuthLoading &&
+    : pausedConversationId
+      ? pausedConversationId
+      : !isAuthLoading &&
         isCloudConversationReady &&
         !shellConversationSelectionIsLoading
       ? resolveCloudConversationForShell({
@@ -290,7 +300,11 @@ function RootLayout() {
     }
     cloudAttachmentsStore.clear();
     conversationTabs.setAccountScope(
-      isPrivate ? "local" : isCloudConversationReady ? accountScope : null,
+      isPrivate
+        ? "local"
+        : isCloudConversationReady || cloudSession.isCloudConversationPaused
+          ? accountScope
+          : null,
     );
     setConversationId(null);
   }, [
@@ -298,6 +312,7 @@ function RootLayout() {
     settledAccountScope,
     isPrivate,
     isCloudConversationReady,
+    cloudSession.isCloudConversationPaused,
     setConversationId,
   ]);
 
@@ -425,43 +440,8 @@ function RootLayout() {
 
   return (
     <>
-      {authBootstrapStatus === "reauth_required" ? (
-        <div
-          role="status"
-          style={{
-            position: "fixed",
-            zIndex: 10000,
-            left: "50%",
-            top: 12,
-            transform: "translateX(-50%)",
-            padding: "8px 14px",
-            borderRadius: 999,
-            background: "rgba(32, 28, 39, 0.94)",
-            color: "white",
-            fontSize: 13,
-            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.3)",
-          }}
-        >
-          Your session expired.{" "}
-          <button
-            type="button"
-            onClick={SIGN_IN_TOAST_ACTION.onClick}
-            style={{
-              margin: 0,
-              padding: 0,
-              border: 0,
-              background: "transparent",
-              color: "inherit",
-              font: "inherit",
-              textDecoration: "underline",
-              cursor: "pointer",
-            }}
-          >
-            Sign in again
-          </button>{" "}
-          to reconnect your account.
-        </div>
-      ) : null}
+      <SignOutDialog />
+      <AccountSwitchGuard />
       <SignedOutLocalChoice
         signedIn={authBootstrapStatus === "ready"}
         isPrivate={isPrivate}

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { secureSignOut } from "@/global/auth/services/auth";
+import { openSignOutDialog } from "@/global/auth/SignOutDialog";
 import {
   SettingsScreen,
   type SettingsTab,
@@ -12,7 +12,7 @@ export function SettingsApp() {
 
   const handleSignOut = useCallback(() => {
     void navigate({ to: "/chat" });
-    void secureSignOut();
+    openSignOutDialog();
   }, [navigate]);
 
   const handleActiveTabChange = useCallback(

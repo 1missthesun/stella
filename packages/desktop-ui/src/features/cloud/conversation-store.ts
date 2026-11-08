@@ -68,6 +68,7 @@ class ConversationStore {
   private olderRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private teardownTimer: ReturnType<typeof setTimeout> | null = null;
   private authorityRetired = false;
+  private paused = false;
   private cacheHydrationStarted = false;
   private cacheHydrated = false;
   private cacheContainsUnverifiedRecords = false;
@@ -235,6 +236,18 @@ class ConversationStore {
     }
   }
 
+  /** No live connection while the account's session has ended; the cached copy stays. */
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    if (paused) {
+      this.socket?.stop();
+      this.socket = null;
+      return;
+    }
+    this.ensureSocket();
+  }
+
   get idle(): boolean {
     return this.subscribers <= 0;
   }
@@ -327,6 +340,7 @@ class ConversationStore {
   private ensureSocket(): void {
     if (
       this.authorityRetired ||
+      this.paused ||
       this.socket ||
       this.subscribers <= 0 ||
       !this.baseUrl ||
@@ -652,6 +666,9 @@ export const retireCloudConversationClientAuthority = (
   for (const scope of activeOwnerGenerationByAccount.keys()) {
     if (scope !== accountScope) activeOwnerGenerationByAccount.delete(scope);
   }
+  // Signed out keeps the last account's copy hidden for its return; another
+  // account signing in, or "remove from this computer", is what deletes it.
+  if (accountScope === "signed-out") return;
   pendingPrompts.retainAccountScope(accountScope);
   void cloudConversationCacheClient.retainAccount(accountScope);
 };

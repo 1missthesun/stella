@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Giriş yapmak Stella'nın modellerini, telefon uygulamasını, Drive'ı, bulut görevlerini ve cihazlar arası eşitlemeyi ekler. Sen karar verene kadar sohbetlerin bu bilgisayarda kalır.",
       "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'nın modelleri, telefon uygulaması, Drive, bulut görevleri ve eşitleme için giriş yap.",
-      "choiceBody": "Stella'yı burada oturum açmadan kullandın. Eklemek, o sohbeti ve belleği hesabındaki hiçbir şeyi değiştirmeden hesabına kopyalar. Ayrı tutarsan bu bilgisayarın kendi sohbeti ve belleği olur.",
+      "choiceBodyBoth": "Stella'yı burada hesapsız kullanırken: {messages} ve {notes}. Eklersen hesabına geçerler. Oradaki hiçbir şey değiştirilmez.",
+      "choiceBodyChat": "Stella'yı burada hesapsız kullanırken: {messages}. Eklersen sohbetinin sonuna eklenirler. Oradaki hiçbir şey değiştirilmez.",
+      "choiceBodyMemory": "Stella'yı burada hesapsız kullanırken: {notes}. Eklersen belleğine kopyalanırlar. Oradaki hiçbir şey değiştirilmez.",
       "choiceFailed": "Seçim kaydedilemedi. Tekrar dene.",
-      "choiceTitle": "Bu sohbet hesabına eklensin mi?",
-      "keep": "Ayrı tut",
+      "choiceTitle": "Hesapsız yaptıkların eklensin mi?",
+      "keep": "Yalnızca bu bilgisayarda tut",
+      "messages": {
+        "one": "1 mesaj",
+        "other": "{count} mesaj"
+      },
       "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
-      "sync": "Hesabıma ekle",
+      "notes": {
+        "one": "1 bellek notu",
+        "other": "{count} bellek notu"
+      },
+      "sync": "Sohbetime ekle",
       "syncFailed": "Bu sohbet hesabına eklenemedi. Hâlâ bu bilgisayarda.",
       "synced": "Bu sohbet hesabına eklendi."
     },
@@ -948,6 +958,43 @@
         "other": "{count} zamanlama"
       },
       "untitledTask": "Zamanlanmış görev"
+    },
+    "sessionPaused": {
+      "accountLabel": "Oturum kapalı",
+      "body": "Devam etmek için oturum aç.",
+      "bodyAs": "{account} olarak devam etmek için oturum aç.",
+      "dontSend": "Gönderme",
+      "sending": "Gönderiliyor…",
+      "sent": {
+        "one": "Oturum açıldı. Bekleyen 1 mesaj gönderildi.",
+        "other": "Oturum açıldı. Bekleyen {count} mesaj gönderildi."
+      },
+      "title": "Oturum kapatıldı.",
+      "waiting": "Oturum açtığında gönderilecek"
+    },
+    "signOut": {
+      "body": "Sohbetin hesabında kalır. Stella, tekrar oturum açana kadar onu bu bilgisayarda gizler.",
+      "failed": "Oturum kapatılamadı. Tekrar dene.",
+      "remove": "Sohbeti bu bilgisayardan da kaldır",
+      "removeNote": "Ortak veya ödünç alınmış bir bilgisayar için. Tekrar oturum açınca yeniden indirilir.",
+      "title": "Bu bilgisayarda oturum kapatılsın mı?"
+    },
+    "signedOut": {
+      "body": "Sohbetin hesabında, bu bilgisayarda gizli.",
+      "differentAccount": "Başka bir hesap kullan",
+      "title": "Oturumun kapalı",
+      "withoutAccount": "Hesapsız kullan"
+    },
+    "switchAccount": {
+      "body": "{account} hesabının sohbeti bu bilgisayardan kaldırılacak. O hesapta kalır.",
+      "bodyUnsent": {
+        "one": "{account} hesabının sohbeti, henüz gönderilmemiş 1 mesajla birlikte bu bilgisayardan kaldırılacak. Sohbet hesapta kalır, o mesaj kalmaz.",
+        "other": "{account} hesabının sohbeti, henüz gönderilmemiş {count} mesajla birlikte bu bilgisayardan kaldırılacak. Sohbet hesapta kalır, o mesajlar kalmaz."
+      },
+      "confirm": "Kaldır ve devam et",
+      "failed": "Önceki hesabın sohbeti kaldırılamadı. Tekrar dene.",
+      "removed": "Önceki hesabın sohbeti bu bilgisayardan kaldırıldı.",
+      "title": "Başka bir hesaba geçilsin mi?"
     }
   },
   "mobile": {

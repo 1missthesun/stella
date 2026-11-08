@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Inloggning ger dig Stellas modeller, mobilappen, Drive, molnuppgifter och synkning mellan enheter. Dina chattar stannar på den här datorn tills du väljer.",
       "banner": "Dina chattar stannar på den här datorn. Logga in för Stellas modeller, mobilappen, Drive, molnuppgifter och synkning.",
-      "choiceBody": "Du använde Stella här utan att vara inloggad. Om du lägger till den kopieras chatten och minnet till ditt konto, utan att något där ersätts. Håller du den separat behåller den här datorn sin egen chatt och sitt eget minne.",
+      "choiceBodyBoth": "Medan du använde Stella här utan konto: {messages} och {notes}. Om du lägger till dem hamnar de i ditt konto. Inget där ersätts.",
+      "choiceBodyChat": "Medan du använde Stella här utan konto: {messages}. Om du lägger till dem hamnar de i slutet av din chatt. Inget där ersätts.",
+      "choiceBodyMemory": "Medan du använde Stella här utan konto: {notes}. Om du lägger till dem kopieras de till ditt minne. Inget där ersätts.",
       "choiceFailed": "Valet kunde inte sparas. Försök igen.",
-      "choiceTitle": "Lägga till den här chatten i ditt konto?",
-      "keep": "Håll den separat",
+      "choiceTitle": "Lägga till det du gjorde utan konto?",
+      "keep": "Behåll dem bara på den här datorn",
+      "messages": {
+        "one": "1 meddelande",
+        "other": "{count} meddelanden"
+      },
       "needsAccount": "Det här körs i Stellas moln och kräver därför ett Stella-konto.",
-      "sync": "Lägg till i mitt konto",
+      "notes": {
+        "one": "1 minnesanteckning",
+        "other": "{count} minnesanteckningar"
+      },
+      "sync": "Lägg till i min chatt",
       "syncFailed": "Det gick inte att lägga till chatten i ditt konto. Den finns kvar på den här datorn.",
       "synced": "Chatten har lagts till i ditt konto."
     },
@@ -948,6 +958,43 @@
         "other": "{count} scheman"
       },
       "untitledTask": "Schemalagd uppgift"
+    },
+    "sessionPaused": {
+      "accountLabel": "Utloggad",
+      "body": "Logga in för att fortsätta.",
+      "bodyAs": "Logga in för att fortsätta som {account}.",
+      "dontSend": "Skicka inte",
+      "sending": "Skickar…",
+      "sent": {
+        "one": "Inloggad. 1 väntande meddelande skickat.",
+        "other": "Inloggad. {count} väntande meddelanden skickade."
+      },
+      "title": "Utloggad.",
+      "waiting": "Skickas när du loggar in"
+    },
+    "signOut": {
+      "body": "Din chatt finns kvar i ditt konto. Stella döljer den på den här datorn tills du loggar in igen.",
+      "failed": "Det gick inte att logga ut. Försök igen.",
+      "remove": "Ta även bort chatten från den här datorn",
+      "removeNote": "För en delad eller lånad dator. Den laddas ned igen när du loggar in.",
+      "title": "Logga ut från den här datorn?"
+    },
+    "signedOut": {
+      "body": "Din chatt finns i ditt konto och är dold på den här datorn.",
+      "differentAccount": "Använd ett annat konto",
+      "title": "Du är utloggad",
+      "withoutAccount": "Använd utan konto"
+    },
+    "switchAccount": {
+      "body": "Chatten för {account} tas bort från den här datorn. Den finns kvar i det kontot.",
+      "bodyUnsent": {
+        "one": "Chatten för {account} tas bort från den här datorn, inklusive 1 meddelande som inte har skickats än. Chatten finns kvar i kontot, men inte det meddelandet.",
+        "other": "Chatten för {account} tas bort från den här datorn, inklusive {count} meddelanden som inte har skickats än. Chatten finns kvar i kontot, men inte de meddelandena."
+      },
+      "confirm": "Ta bort och fortsätt",
+      "failed": "Det gick inte att ta bort det förra kontots chatt. Försök igen.",
+      "removed": "Det förra kontots chatt har tagits bort från den här datorn.",
+      "title": "Byta till ett annat konto?"
     }
   },
   "mobile": {

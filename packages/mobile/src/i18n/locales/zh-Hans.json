@@ -904,12 +904,22 @@
     "localMode": {
       "authNote": "登录后可使用 Stella 的模型、手机应用、Drive、云端任务和跨设备同步。在你做出选择之前，聊天会保留在这台电脑上。",
       "banner": "你的聊天保留在这台电脑上。登录即可使用 Stella 的模型、手机应用、Drive、云端任务和同步。",
-      "choiceBody": "你在未登录时在这台电脑上使用了 Stella。添加后，这段聊天和记忆会复制到你的账号中，不会替换账号里的任何内容。如果分开保留，这台电脑会保留自己的聊天和记忆。",
+      "choiceBodyBoth": "你在这里未登录使用 Stella 时：{messages}和{notes}。添加后会放入你的账号，不会替换任何内容。",
+      "choiceBodyChat": "你在这里未登录使用 Stella 时：{messages}。添加后会放在你的聊天末尾，不会替换任何内容。",
+      "choiceBodyMemory": "你在这里未登录使用 Stella 时：{notes}。添加后会复制到你的记忆中，不会替换任何内容。",
       "choiceFailed": "无法保存该选择。请重试。",
-      "choiceTitle": "将这段聊天添加到你的账号？",
-      "keep": "分开保留",
+      "choiceTitle": "要添加你未登录时的内容吗？",
+      "keep": "只保留在这台电脑上",
+      "messages": {
+        "one": "1 条消息",
+        "other": "{count} 条消息"
+      },
       "needsAccount": "此功能在 Stella 云端运行，因此需要 Stella 账户。",
-      "sync": "添加到我的账号",
+      "notes": {
+        "one": "1 条记忆笔记",
+        "other": "{count} 条记忆笔记"
+      },
+      "sync": "添加到我的聊天",
       "syncFailed": "无法将这段聊天添加到你的账号。它仍在这台电脑上。",
       "synced": "这段聊天已添加到你的账号。"
     },
@@ -940,6 +950,43 @@
         "other": "{count} 个日程"
       },
       "untitledTask": "定时任务"
+    },
+    "sessionPaused": {
+      "accountLabel": "已退出",
+      "body": "登录以继续。",
+      "bodyAs": "登录以继续使用 {account}。",
+      "dontSend": "不发送",
+      "sending": "正在发送…",
+      "sent": {
+        "one": "已登录。已发送 1 条待发消息。",
+        "other": "已登录。已发送 {count} 条待发消息。"
+      },
+      "title": "已退出登录。",
+      "waiting": "登录后发送"
+    },
+    "signOut": {
+      "body": "你的聊天保留在账号中。在你重新登录之前，Stella 会在这台电脑上隐藏它。",
+      "failed": "无法退出登录，请重试。",
+      "remove": "同时从这台电脑上删除聊天",
+      "removeNote": "适用于共用或借用的电脑。重新登录后会再次下载。",
+      "title": "要在这台电脑上退出登录吗？"
+    },
+    "signedOut": {
+      "body": "你的聊天在账号中，已在这台电脑上隐藏。",
+      "differentAccount": "使用其他账号",
+      "title": "你已退出登录",
+      "withoutAccount": "不使用账号"
+    },
+    "switchAccount": {
+      "body": "{account} 的聊天将从这台电脑上删除，但仍保留在该账号中。",
+      "bodyUnsent": {
+        "one": "{account} 的聊天将从这台电脑上删除，包括 1 条尚未发送的消息。聊天仍保留在该账号中，但这条消息不会。",
+        "other": "{account} 的聊天将从这台电脑上删除，包括 {count} 条尚未发送的消息。聊天仍保留在该账号中，但这些消息不会。"
+      },
+      "confirm": "删除并继续",
+      "failed": "无法删除上一个账号的聊天，请重试。",
+      "removed": "已从这台电脑上删除上一个账号的聊天。",
+      "title": "要切换到其他账号吗？"
     }
   },
   "mobile": {

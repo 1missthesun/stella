@@ -911,12 +911,22 @@
     "localMode": {
       "authNote": "Signing in adds Stella's models, the phone app, Drive, cloud tasks and sync across devices. Your chats stay on this computer until you choose.",
       "banner": "Your chats stay on this computer. Sign in for Stella's models, the phone app, Drive, cloud tasks and sync.",
-      "choiceBody": "You used Stella here while signed out. Adding copies that chat and Memory into your account, without replacing anything there. Keeping it separate leaves this computer with its own chat and Memory.",
+      "choiceBodyBoth": "While you used Stella here without an account: {messages} and {notes}. Adding puts them into your account. Nothing there is replaced.",
+      "choiceBodyChat": "While you used Stella here without an account: {messages}. Adding puts them at the end of your chat. Nothing there is replaced.",
+      "choiceBodyMemory": "While you used Stella here without an account: {notes}. Adding copies them into your Memory. Nothing there is replaced.",
       "choiceFailed": "Couldn't save that choice. Try again.",
-      "choiceTitle": "Add this chat to your account?",
-      "keep": "Keep it separate",
+      "choiceTitle": "Add what you did without an account?",
+      "keep": "Keep them on this computer only",
+      "messages": {
+        "one": "1 message",
+        "other": "{count} messages"
+      },
       "needsAccount": "This runs in Stella's cloud, so it needs a Stella account.",
-      "sync": "Add to my account",
+      "notes": {
+        "one": "1 Memory note",
+        "other": "{count} Memory notes"
+      },
+      "sync": "Add to my chat",
       "syncFailed": "Couldn't add this chat to your account. It's still on this computer.",
       "synced": "This chat was added to your account."
     },
@@ -948,6 +958,43 @@
         "other": "{count} schedules"
       },
       "untitledTask": "Scheduled task"
+    },
+    "sessionPaused": {
+      "accountLabel": "Signed out",
+      "body": "Sign in to continue.",
+      "bodyAs": "Sign in to continue as {account}.",
+      "dontSend": "Don't send",
+      "sending": "Sending…",
+      "sent": {
+        "one": "Signed in. 1 waiting message sent.",
+        "other": "Signed in. {count} waiting messages sent."
+      },
+      "title": "Signed out.",
+      "waiting": "Sends when you sign in"
+    },
+    "signOut": {
+      "body": "Your chat stays in your account. Stella hides it on this computer until you sign back in.",
+      "failed": "Couldn't sign out. Try again.",
+      "remove": "Also remove your chat from this computer",
+      "removeNote": "For a shared or borrowed computer. Signing back in downloads it again.",
+      "title": "Sign out of this computer?"
+    },
+    "signedOut": {
+      "body": "Your chat is in your account, hidden on this computer.",
+      "differentAccount": "Use a different account",
+      "title": "You're signed out",
+      "withoutAccount": "Use without an account"
+    },
+    "switchAccount": {
+      "body": "The chat for {account} will be removed from this computer. It stays in that account.",
+      "bodyUnsent": {
+        "one": "The chat for {account} will be removed from this computer, including 1 message that hasn't sent yet. The chat stays in that account; that message won't.",
+        "other": "The chat for {account} will be removed from this computer, including {count} messages that haven't sent yet. The chat stays in that account; those messages won't."
+      },
+      "confirm": "Remove and continue",
+      "failed": "Couldn't remove the previous account's chat. Try again.",
+      "removed": "The previous account's chat was removed from this computer.",
+      "title": "Switch to another account?"
     }
   },
   "mobile": {

@@ -82,3 +82,114 @@
   line-height: 1.45;
   text-align: center;
 }
+
+.local-mode-banner__lead {
+  color: var(--text-base);
+  font-weight: 600;
+}
+
+.waiting-messages {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.waiting-message {
+  max-width: 78%;
+  padding: 9px 13px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 55%, transparent);
+  border-radius: 18px;
+  color: var(--text-base);
+  font-size: var(--font-size-md);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.waiting-messages__note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.waiting-messages__remove {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sign-out-choice[data-slot="dialog-content"] {
+  max-width: 420px;
+}
+
+.sign-out-choice-body[data-slot="dialog-body"] {
+  padding: 4px 24px 24px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.sign-out-choice .sign-out-choice-text[data-slot="dialog-description"] {
+  display: block;
+  padding: 0;
+  margin: 0;
+  color: var(--text-base);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+}
+
+.sign-out-choice-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-base);
+  font-size: var(--font-size-base);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.sign-out-choice-check input {
+  margin: 2px 0 0;
+  accent-color: var(--primary);
+}
+
+.sign-out-choice-check small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.local-mode-choice-actions--split {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.local-mode-choice-keep {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: var(--font-size-base);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.local-mode-choice-keep:hover {
+  color: var(--text-base);
+}

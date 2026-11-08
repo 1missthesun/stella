@@ -904,12 +904,22 @@
     "localMode": {
       "authNote": "登入後可使用 Stella 的模型、手機 App、Drive、雲端任務和跨裝置同步。在你做出選擇之前，聊天會保留在這台電腦上。",
       "banner": "你的聊天保留在這台電腦上。登入即可使用 Stella 的模型、手機 App、Drive、雲端任務和同步。",
-      "choiceBody": "你在未登入時於這台電腦使用了 Stella。加入後，這段聊天和記憶會複製到你的帳號中，不會取代帳號裡的任何內容。若分開保留，這台電腦會保留自己的聊天和記憶。",
+      "choiceBodyBoth": "你在這裡未登入使用 Stella 時：{messages}和{notes}。加入後會放進你的帳號，不會取代任何內容。",
+      "choiceBodyChat": "你在這裡未登入使用 Stella 時：{messages}。加入後會放在你的聊天末尾，不會取代任何內容。",
+      "choiceBodyMemory": "你在這裡未登入使用 Stella 時：{notes}。加入後會複製到你的記憶中，不會取代任何內容。",
       "choiceFailed": "無法儲存該選擇。請再試一次。",
-      "choiceTitle": "將這段聊天加入你的帳號？",
-      "keep": "分開保留",
+      "choiceTitle": "要加入你未登入時的內容嗎？",
+      "keep": "只保留在這台電腦上",
+      "messages": {
+        "one": "1 則訊息",
+        "other": "{count} 則訊息"
+      },
       "needsAccount": "此功能在 Stella 雲端執行，因此需要 Stella 帳戶。",
-      "sync": "加入我的帳號",
+      "notes": {
+        "one": "1 則記憶筆記",
+        "other": "{count} 則記憶筆記"
+      },
+      "sync": "加入我的聊天",
       "syncFailed": "無法將這段聊天加入你的帳號。它仍在這台電腦上。",
       "synced": "這段聊天已加入你的帳號。"
     },
@@ -940,6 +950,43 @@
         "other": "{count} 個排程"
       },
       "untitledTask": "排程工作"
+    },
+    "sessionPaused": {
+      "accountLabel": "已登出",
+      "body": "登入以繼續。",
+      "bodyAs": "登入以繼續使用 {account}。",
+      "dontSend": "不要傳送",
+      "sending": "正在傳送…",
+      "sent": {
+        "one": "已登入。已傳送 1 則待傳訊息。",
+        "other": "已登入。已傳送 {count} 則待傳訊息。"
+      },
+      "title": "已登出。",
+      "waiting": "登入後傳送"
+    },
+    "signOut": {
+      "body": "你的聊天會保留在帳號中。在你重新登入前，Stella 會在這台電腦上隱藏它。",
+      "failed": "無法登出，請再試一次。",
+      "remove": "同時從這台電腦移除聊天",
+      "removeNote": "適用於共用或借用的電腦。重新登入後會再次下載。",
+      "title": "要在這台電腦上登出嗎？"
+    },
+    "signedOut": {
+      "body": "你的聊天在帳號中，已在這台電腦上隱藏。",
+      "differentAccount": "使用其他帳號",
+      "title": "你已登出",
+      "withoutAccount": "不使用帳號"
+    },
+    "switchAccount": {
+      "body": "{account} 的聊天將從這台電腦移除，但仍保留在該帳號中。",
+      "bodyUnsent": {
+        "one": "{account} 的聊天將從這台電腦移除，包括 1 則尚未傳送的訊息。聊天仍保留在該帳號中，但這則訊息不會。",
+        "other": "{account} 的聊天將從這台電腦移除，包括 {count} 則尚未傳送的訊息。聊天仍保留在該帳號中，但這些訊息不會。"
+      },
+      "confirm": "移除並繼續",
+      "failed": "無法移除上一個帳號的聊天，請再試一次。",
+      "removed": "已從這台電腦移除上一個帳號的聊天。",
+      "title": "要切換到其他帳號嗎？"
     }
   },
   "mobile": {

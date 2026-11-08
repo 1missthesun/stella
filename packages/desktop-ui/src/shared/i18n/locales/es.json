@@ -918,12 +918,22 @@
     "localMode": {
       "authNote": "Al iniciar sesión obtienes los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización entre dispositivos. Tus chats se quedan en este ordenador hasta que decidas.",
       "banner": "Tus chats se quedan en este ordenador. Inicia sesión para usar los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización.",
-      "choiceBody": "Usaste Stella aquí sin iniciar sesión. Al añadirlo, ese chat y la memoria se copian en tu cuenta sin reemplazar nada de lo que hay allí. Si lo mantienes aparte, este ordenador conserva su propio chat y su propia memoria.",
+      "choiceBodyBoth": "Mientras usabas Stella aquí sin cuenta: {messages} y {notes}. Al añadirlos pasan a tu cuenta. No se reemplaza nada.",
+      "choiceBodyChat": "Mientras usabas Stella aquí sin cuenta: {messages}. Al añadirlos se colocan al final de tu chat. No se reemplaza nada.",
+      "choiceBodyMemory": "Mientras usabas Stella aquí sin cuenta: {notes}. Al añadirlas se copian a tu memoria. No se reemplaza nada.",
       "choiceFailed": "No se pudo guardar tu elección. Inténtalo de nuevo.",
-      "choiceTitle": "¿Añadir este chat a tu cuenta?",
-      "keep": "Mantenerlo aparte",
+      "choiceTitle": "¿Añadir lo que hiciste sin cuenta?",
+      "keep": "Guardarlos solo en este ordenador",
+      "messages": {
+        "one": "1 mensaje",
+        "other": "{count} mensajes"
+      },
       "needsAccount": "Esto funciona en la nube de Stella, así que necesita una cuenta de Stella.",
-      "sync": "Añadir a mi cuenta",
+      "notes": {
+        "one": "1 nota de memoria",
+        "other": "{count} notas de memoria"
+      },
+      "sync": "Añadir a mi chat",
       "syncFailed": "No se pudo añadir este chat a tu cuenta. Sigue en este ordenador.",
       "synced": "Este chat se añadió a tu cuenta."
     },
@@ -956,6 +966,43 @@
         "other": "{count} programaciones"
       },
       "untitledTask": "Tarea programada"
+    },
+    "sessionPaused": {
+      "accountLabel": "Sesión cerrada",
+      "body": "Inicia sesión para continuar.",
+      "bodyAs": "Inicia sesión para continuar como {account}.",
+      "dontSend": "No enviar",
+      "sending": "Enviando…",
+      "sent": {
+        "one": "Sesión iniciada. Se envió 1 mensaje pendiente.",
+        "other": "Sesión iniciada. Se enviaron {count} mensajes pendientes."
+      },
+      "title": "Sesión cerrada.",
+      "waiting": "Se enviará cuando inicies sesión"
+    },
+    "signOut": {
+      "body": "Tu chat se queda en tu cuenta. Stella lo oculta en este ordenador hasta que vuelvas a iniciar sesión.",
+      "failed": "No se pudo cerrar sesión. Inténtalo de nuevo.",
+      "remove": "Eliminar también tu chat de este ordenador",
+      "removeNote": "Para un ordenador compartido o prestado. Se volverá a descargar cuando inicies sesión.",
+      "title": "¿Cerrar sesión en este ordenador?"
+    },
+    "signedOut": {
+      "body": "Tu chat está en tu cuenta, oculto en este ordenador.",
+      "differentAccount": "Usar otra cuenta",
+      "title": "Has cerrado sesión",
+      "withoutAccount": "Usar sin cuenta"
+    },
+    "switchAccount": {
+      "body": "El chat de {account} se eliminará de este ordenador. Seguirá en esa cuenta.",
+      "bodyUnsent": {
+        "one": "El chat de {account} se eliminará de este ordenador, incluido 1 mensaje que aún no se ha enviado. El chat sigue en esa cuenta; ese mensaje no.",
+        "other": "El chat de {account} se eliminará de este ordenador, incluidos {count} mensajes que aún no se han enviado. El chat sigue en esa cuenta; esos mensajes no."
+      },
+      "confirm": "Eliminar y continuar",
+      "failed": "No se pudo eliminar el chat de la cuenta anterior. Inténtalo de nuevo.",
+      "removed": "Se eliminó de este ordenador el chat de la cuenta anterior.",
+      "title": "¿Cambiar a otra cuenta?"
     }
   },
   "mobile": {

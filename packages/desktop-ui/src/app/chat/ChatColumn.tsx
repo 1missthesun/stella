@@ -36,6 +36,8 @@ import {
 import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
 import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
+import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
+import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
 import "./full-shell.chat.css";
 
 const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
@@ -269,6 +271,7 @@ export const ChatColumn = memo(function ChatColumn({
         {extraTail}
         <AppSourceOffers conversationId={conversationId} />
         <UsageLimitChatCard conversationId={conversationId} />
+        <WaitingMessages />
       </>
     ),
     [conversationId, extraTail],
@@ -295,6 +298,7 @@ export const ChatColumn = memo(function ChatColumn({
       >
         <div className="full-body-main" {...dropHandlers}>
           <SignedOutBanner />
+          <SessionPausedBanner />
           {/* Viewport region: list + overlay scroll-to-bottom.
             The custom scrollbar deliberately hangs off the layer (sibling
             below) rather than the viewport region so it pins to the

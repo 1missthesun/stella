@@ -158,7 +158,7 @@ export const readCloudConnectorCatalogEntry = (
 ): CloudConnectorCatalogEntry | null => {
   if (!isRecord(value)) return null;
   const connector = isRecord(value.connector) ? value.connector : null;
-  if (connector?.type !== "composio") return null;
+  if (connector?.type !== "composio" && connector?.type !== "stella") return null;
   const id = typeof value.id === "string" ? value.id.trim().toLowerCase() : "";
   const name = typeof value.name === "string" ? value.name.trim() : "";
   const description =

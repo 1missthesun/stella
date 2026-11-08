@@ -32,6 +32,7 @@ import {
   listIntegrationActions,
   listIntegrationCatalog,
 } from "../integrations/catalog.js";
+import { withStellaGoogle } from "../integrations/google.js";
 import {
   type CloudConnectorConnectionOutcome,
   type CloudConnectorConnectionRequest,
@@ -129,15 +130,22 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         })()
       : undefined;
     const connectors = new CloudConnectorDirectory({
-      source: {
-        catalog: () => listIntegrationCatalog(this.env),
-        actions: (args) => listIntegrationActions(this.env, args),
-        connections: async () =>
-          (await toolContext.ownerInternal("integrations.connections", {})) as {
-            connections: IntegrationConnection[];
-          },
-        run: (args) => toolContext.ownerInternal("integrations.run", args),
-      },
+      source: withStellaGoogle(
+        {
+          catalog: () => listIntegrationCatalog(this.env),
+          actions: (args) => listIntegrationActions(this.env, args),
+          connections: async () =>
+            (await toolContext.ownerInternal("integrations.connections", {})) as {
+              connections: IntegrationConnection[];
+            },
+          run: (args) => toolContext.ownerInternal("integrations.run", args),
+        },
+        async () =>
+          (await toolContext.ownerInternal("integrations.googleRoutes", {})) as Record<
+            string,
+            "stella" | "composio"
+          >,
+      ),
       ...(isSlackConversationId(turn.conversationId)
         ? {}
         : { mcp: ownerMcpSource(toolContext.ownerInternal) }),

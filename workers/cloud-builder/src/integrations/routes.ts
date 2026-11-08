@@ -1,5 +1,9 @@
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
-import { X_FINISH_CONNECT_PATH, X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
+import {
+  GOOGLE_OAUTH_CALLBACK_PATH,
+  X_FINISH_CONNECT_PATH,
+  X_OAUTH_CALLBACK_PATH,
+} from "@stella/contracts/backend/integrations";
 import { PROVIDER_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/providers";
 import { verifyOAuthState } from "../oauth-state.js";
 import { RpcError } from "../owner-store/errors.js";
@@ -11,6 +15,7 @@ import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { listIntegrationActions, listIntegrationCatalog, publishIntegration } from "./catalog.js";
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
 import { X_STATE_KIND, xConnectCodePage, xResultPage } from "./x.js";
+import { GOOGLE_STATE_KIND, googleResultPage } from "./google.js";
 import { formatConnectCode } from "../owner-store/oauth-claims.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { adminAccessDenied } from "../admin/access.js";
@@ -211,6 +216,37 @@ const xCallback = async (request: Request, env: RouteEnv): Promise<Response> => 
   return xConnectCodePage(username, formatConnectCode(connectCode));
 };
 
+const googleCallback = async (request: Request, env: RouteEnv): Promise<Response> => {
+  const url = new URL(request.url);
+  const failed = (message: string, status: number) =>
+    googleResultPage(false, "Google didn't connect", message, status);
+  const state = url.searchParams.get("state");
+  if (!state) return failed("This link is missing its sign-in details. Start again from Stella.", 400);
+  const verified = await verifyOAuthState(env, state);
+  if (!verified || verified.kind !== GOOGLE_STATE_KIND) {
+    return failed("This link expired. Start connecting Google again from Stella.", 400);
+  }
+  const code = url.searchParams.get("code");
+  const error = url.searchParams.get("error");
+  let response: RpcResponse;
+  try {
+    response = await internal(env, verified.ownerId, "google.completeOAuth", {
+      nonce: verified.nonce,
+      ...(code ? { code } : {}),
+      ...(error ? { error: error.slice(0, 512) } : {}),
+    });
+  } catch (cause) {
+    console.error(JSON.stringify({
+      event: "google_oauth_callback_failed",
+      message: cause instanceof Error ? cause.message : String(cause),
+    }));
+    return failed("Something went wrong. Try connecting again.", 500);
+  }
+  if (!response.ok) return failed(response.error.message, rpcErrorStatus(response.error.code));
+  const { email } = response.value as { email: string };
+  return googleResultPage(true, "Google connected", `${email} is connected to Stella. You can close this tab.`, 200);
+};
+
 const methodNotAllowed = () => fail(405, "Method not allowed.");
 
 export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): Promise<Response | null> => {
@@ -285,6 +321,8 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
       return method === "POST" ? await xRequest(request, env) : methodNotAllowed();
     case X_OAUTH_CALLBACK_PATH:
       return method === "GET" ? await xCallback(request, env) : methodNotAllowed();
+    case GOOGLE_OAUTH_CALLBACK_PATH:
+      return method === "GET" ? await googleCallback(request, env) : methodNotAllowed();
     case PROVIDER_OAUTH_CALLBACK_PATH:
       return method === "GET" ? providerCallbackPage(request) : methodNotAllowed();
     default:

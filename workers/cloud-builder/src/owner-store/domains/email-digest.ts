@@ -7,10 +7,13 @@ import type {
 } from "@stella/contracts/backend/email-digest";
 import { ComposioHttpError, composioConfig, type ComposioConfig } from "../../integrations/composio.js";
 import { accountSessionsFor, type ResolvedIntegrationAccount } from "./integration-accounts.js";
+import { stellaGmailTokens, stellaGoogleAvailable } from "./google-accounts.js";
 import {
   GMAIL_INTEGRATION_ID,
   type GmailMessage,
+  type GmailPage,
   fetchGmailSince,
+  fetchGmailSinceDirect,
   pickImportant,
 } from "../../integrations/gmail-digest.js";
 import { empty } from "../args.js";
@@ -118,18 +121,56 @@ const gmailToolkit = (db: OwnerDbReader): string | null =>
     GMAIL_INTEGRATION_ID,
   )?.toolkit ?? null;
 
-const gmailAccounts = async (
+/** One Gmail inbox the digest reads, through Composio or Stella's own Google connection. */
+type DigestAccount = {
+  key: string;
+  email?: string;
+  label: string;
+  primary: boolean;
+  fetch: (since: number, cursor?: string) => Promise<GmailPage>;
+};
+
+const composioGmailAccounts = async (
   ctx: OwnerContext,
   config: ComposioConfig | null,
-): Promise<ResolvedIntegrationAccount[]> => {
+): Promise<DigestAccount[]> => {
   const toolkit = gmailToolkit(ctx.db);
   if (!toolkit || !config) return [];
+  let accounts: ResolvedIntegrationAccount[];
   try {
-    return await accountSessionsFor(ctx, config, { id: GMAIL_INTEGRATION_ID, toolkit });
+    accounts = await accountSessionsFor(ctx, config, { id: GMAIL_INTEGRATION_ID, toolkit });
   } catch (error) {
     if (error instanceof ComposioHttpError && error.status === 404) return [];
     throw error;
   }
+  return accounts.map((account) => ({
+    key: account.accountId || "primary",
+    ...(account.email ? { email: account.email } : {}),
+    label: account.label,
+    primary: account.primary,
+    fetch: (since, cursor) => fetchGmailSince(config, account.sessionId, since, cursor),
+  }));
+};
+
+const googleProviderIsComposio = (db: OwnerDbReader): boolean =>
+  db.one<{ value: string }>("SELECT value FROM integration_settings WHERE key = 'google_provider'")?.value ===
+  "composio";
+
+const gmailAccounts = async (
+  ctx: OwnerContext,
+  config: ComposioConfig | null,
+): Promise<DigestAccount[]> => {
+  const stella = stellaGoogleAvailable(ctx.env) ? await stellaGmailTokens(ctx) : [];
+  if (stella.length > 0 && !(googleProviderIsComposio(ctx.db) && gmailToolkit(ctx.db))) {
+    return stella.map((account) => ({
+      key: `google:${account.email}`,
+      email: account.email,
+      label: account.email,
+      primary: account.primary,
+      fetch: async (since, cursor) => fetchGmailSinceDirect(await account.accessToken(), since, cursor),
+    }));
+  }
+  return await composioGmailAccounts(ctx, config);
 };
 
 const resumeTokensOf = (raw: string | null): Record<string, string> => {
@@ -306,7 +347,7 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
   const windowEnd = state.window_end ?? ctx.now;
   const priorCount = state.window_count ?? 0;
   const config = composioConfig(ctx.env);
-  let accounts: ResolvedIntegrationAccount[];
+  let accounts: DigestAccount[];
   try {
     accounts = await gmailAccounts(ctx, config);
   } catch (error) {
@@ -314,7 +355,7 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
     finishRun(ctx, { kind: "error", error: errorText(error), newCount: 0, since, rate: state.rate_per_hour });
     return;
   }
-  if (!config || accounts.length === 0) {
+  if (accounts.length === 0) {
     disableDisconnected(ctx);
     return;
   }
@@ -337,13 +378,13 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
     const labelled = accounts.length > 1;
     const perAccount = Math.max(1, Math.ceil(MAX_FRESH_PER_RUN / accounts.length));
     for (const account of accounts) {
-      const accountKey = account.accountId || "primary";
+      const accountKey = account.key;
       if (resuming && !resume[accountKey]) continue;
       let cursor: string | undefined = resume[accountKey];
       let pages = 0;
       let added = 0;
       do {
-        const page = await fetchGmailSince(config, account.sessionId, since, cursor);
+        const page = await account.fetch(since, cursor);
         pages += 1;
         for (const message of page.messages) {
           const key = `${accountKey}:${message.id}`;

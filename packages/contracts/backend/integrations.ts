@@ -6,9 +6,11 @@ import type {
 
 export const X_OAUTH_CALLBACK_PATH = "/api/x/oauth_callback";
 export const X_FINISH_CONNECT_PATH = "/api/x/finish";
+export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/google/oauth_callback";
 
 export type IntegrationConnector = {
-  type: "composio";
+  /** "stella": Google services Stella connects with its own Google app. */
+  type: "composio" | "stella";
   toolkit: string;
   actionNamespace?: string;
   provider?: string;

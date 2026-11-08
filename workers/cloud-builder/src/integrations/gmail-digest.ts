@@ -11,6 +11,7 @@ import { mintTurnCapability } from "../capability-signer.js";
 import { piModelSpec } from "../orchestrator/support.js";
 import { runClaudeDigest } from "./claude-digest.js";
 import { composioExecute, type ComposioConfig } from "./composio.js";
+import { fetchGmailPageDirect } from "./google.js";
 
 export const GMAIL_INTEGRATION_ID = "gmail";
 const FETCH_ACTION = "GMAIL_FETCH_EMAILS";
@@ -101,13 +102,32 @@ const toMessage = (raw: unknown): GmailMessage | null => {
 
 export type GmailPage = { messages: GmailMessage[]; nextPageToken?: string };
 
+const digestQuery = (sinceMs: number): string =>
+  `in:inbox -category:promotions -category:social after:${Math.floor(sinceMs / 1000)}`;
+
+/** The same page as fetchGmailSince, read straight from Gmail with Stella's own Google connection. */
+export const fetchGmailSinceDirect = async (
+  accessToken: string,
+  sinceMs: number,
+  pageToken?: string,
+): Promise<GmailPage> => {
+  const page = await fetchGmailPageDirect(accessToken, digestQuery(sinceMs), MAX_MESSAGES, pageToken);
+  return {
+    messages: page.messages.flatMap((raw) => {
+      const message = toMessage(raw);
+      return message ? [message] : [];
+    }),
+    ...(page.nextPageToken ? { nextPageToken: page.nextPageToken } : {}),
+  };
+};
+
 export const fetchGmailSince = async (
   config: ComposioConfig,
   sessionId: string,
   sinceMs: number,
   pageToken?: string,
 ): Promise<GmailPage> => {
-  const query = `in:inbox -category:promotions -category:social after:${Math.floor(sinceMs / 1000)}`;
+  const query = digestQuery(sinceMs);
   const payload = await composioExecute(config, sessionId, {
     action: FETCH_ACTION,
     input: {

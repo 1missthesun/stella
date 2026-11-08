@@ -57,6 +57,19 @@ import {
   type XTokenResponse,
 } from "../../integrations/x.js";
 import { GMAIL_INTEGRATION_ID } from "../../integrations/gmail-digest.js";
+import { GOOGLE_SERVICES, googleAction, isStellaGoogleIntegration } from "../../integrations/google.js";
+import {
+  GOOGLE_ACCOUNTS_MIGRATION,
+  completeStellaGoogleOAuth,
+  hasStellaGoogleAccounts,
+  purgeStellaGoogleAccounts,
+  removeStellaGoogleAccount,
+  runStellaGoogleAction,
+  setPrimaryStellaGoogleAccount,
+  stellaGoogleAccounts,
+  stellaGoogleAvailable,
+  stellaGoogleConnectUrl,
+} from "./google-accounts.js";
 import { signOAuthState } from "../../oauth-state.js";
 import { issueOAuthClaim, redeemOAuthClaim } from "../oauth-claims.js";
 import {
@@ -200,7 +213,7 @@ const integrationRef = (db: OwnerDbReader, integrationId: string): IntegrationRe
   return connection ? { id: integrationId, toolkit: connection.toolkit } : null;
 };
 
-const connectionState = async (
+const composioConnectionState = async (
   ctx: OwnerContext,
   integrationId: string,
   options: { force?: boolean } = {},
@@ -233,6 +246,60 @@ const connectionState = async (
 const isConnected = async (ctx: OwnerContext, integrationId: string, options: { force?: boolean } = {}) =>
   (await connectionState(ctx, integrationId, options)).connected;
 
+const GOOGLE_PROVIDER_KEY = "google_provider";
+
+const googleProviderOf = (db: OwnerDbReader): GoogleProviderState["provider"] =>
+  db.one<{ value: string }>("SELECT value FROM integration_settings WHERE key = ?", GOOGLE_PROVIDER_KEY)?.value ===
+  "composio"
+    ? "composio"
+    : "stella";
+
+/** New Google connections go through Stella's own Google app unless the user chose Composio. */
+const connectsWithStellaGoogle = (ctx: OwnerContext, integrationId: string): boolean =>
+  isStellaGoogleIntegration(integrationId) &&
+  stellaGoogleAvailable(ctx.env) &&
+  googleProviderOf(ctx.db) === "stella";
+
+/**
+ * Whether this integration runs on Stella's own Google connection. A working
+ * Composio connection keeps being used until the user connects Google through
+ * Stella; with Composio chosen, Stella-connected accounts still work for any
+ * service Composio doesn't cover.
+ */
+const usesStellaGoogle = async (ctx: OwnerContext, integrationId: string): Promise<boolean> => {
+  if (!isStellaGoogleIntegration(integrationId) || !stellaGoogleAvailable(ctx.env)) return false;
+  const stellaAccounts = stellaGoogleAccounts(ctx.db, integrationId).length > 0;
+  const composioRow = Boolean(connectionOf(ctx.db, integrationId));
+  if (googleProviderOf(ctx.db) === "composio") return stellaAccounts && !composioRow;
+  if (stellaAccounts || !composioRow) return true;
+  return !(await composioConnectionState(ctx, integrationId)).connected;
+};
+
+const connectionState = async (
+  ctx: OwnerContext,
+  integrationId: string,
+  options: { force?: boolean } = {},
+): Promise<{ connected: boolean; accounts?: IntegrationAccount[] }> => {
+  if (await usesStellaGoogle(ctx, integrationId)) {
+    const accounts = stellaGoogleAccounts(ctx.db, integrationId);
+    return { connected: accounts.some((account) => account.connected), accounts };
+  }
+  return await composioConnectionState(ctx, integrationId, options);
+};
+
+/** Which Google integrations run on Stella's own Google connection, for the agent's catalog. */
+const googleRoutes = async (ctx: OwnerContext): Promise<Record<string, "stella" | "composio">> => {
+  const routes: Record<string, "stella" | "composio"> = {};
+  for (const service of GOOGLE_SERVICES) {
+    routes[service.id] =
+      (await usesStellaGoogle(ctx, service.id)) ||
+      (connectsWithStellaGoogle(ctx, service.id) && !connectionOf(ctx.db, service.id))
+        ? "stella"
+        : "composio";
+  }
+  return routes;
+};
+
 const linkAlias = (): string => `stella-${crypto.randomUUID().slice(0, 8)}`;
 
 const createConnectLink = async (
@@ -257,6 +324,7 @@ const connectLink = async (ctx: OwnerContext, id: string): Promise<{ url: string
     { count: 20, windowMs: 10 * 60_000 },
     "Too many connection attempts. Wait a moment and try again.",
   );
+  if (connectsWithStellaGoogle(ctx, id)) return { url: await stellaGoogleConnectUrl(ctx) };
   const integration = await requireIntegration(ctx.env, id);
   const config = requireComposio(ctx.env);
   try {
@@ -275,9 +343,17 @@ const connectLink = async (ctx: OwnerContext, id: string): Promise<{ url: string
 const listConnections = async (
   ctx: OwnerContext,
 ): Promise<IntegrationCalls["integrations.connections"]["result"]> => {
-  const rows = ctx.db.all<{ integration_id: string }>(
-    "SELECT integration_id FROM integration_connections ORDER BY integration_id",
+  const ids = new Set(
+    ctx.db
+      .all<{ integration_id: string }>("SELECT integration_id FROM integration_connections ORDER BY integration_id")
+      .map((row) => row.integration_id),
   );
+  if (stellaGoogleAvailable(ctx.env) && hasStellaGoogleAccounts(ctx.db)) {
+    for (const service of GOOGLE_SERVICES) {
+      if (stellaGoogleAccounts(ctx.db, service.id).length > 0) ids.add(service.id);
+    }
+  }
+  const rows = [...ids].sort().map((integration_id) => ({ integration_id }));
   return {
     connections: await Promise.all(
       rows.map(async (row): Promise<IntegrationConnection> => {
@@ -305,8 +381,6 @@ export const INTEGRATION_SETTINGS_MIGRATION = {
   ],
 };
 
-const GOOGLE_PROVIDER_KEY = "google_provider";
-
 const googleProviderState = async (ctx: OwnerContext): Promise<GoogleProviderState> => {
   const row = ctx.db.one<{ value: string }>(
     "SELECT value FROM integration_settings WHERE key = ?",
@@ -317,7 +391,7 @@ const googleProviderState = async (ctx: OwnerContext): Promise<GoogleProviderSta
     .map((entry) => entry.integration_id)
     .filter(isGoogleIntegration);
   const states = await Promise.all(
-    googleIds.map(async (id) => ({ id, connected: (await connectionState(ctx, id)).connected })),
+    googleIds.map(async (id) => ({ id, connected: (await composioConnectionState(ctx, id)).connected })),
   );
   return {
     provider: row?.value === "composio" ? "composio" : "stella",
@@ -359,6 +433,10 @@ const runAction = async (
     { count: 60, windowMs: 60_000 },
     "Too many integration requests. Wait a moment and try again.",
   );
+  if (await usesStellaGoogle(ctx, args.id)) {
+    if (!googleAction(args.id, args.action)) throw new RpcError("BAD_REQUEST", "Integration action is not allowed.");
+    return await runStellaGoogleAction(ctx, args.id, args.action, args.input, args.account);
+  }
   const resolved = await loadIntegrationAction(ctx.env, args.id, args.action);
   if (!resolved) throw new RpcError("BAD_REQUEST", "Integration action is not allowed.");
   const { integration, action } = resolved;
@@ -505,11 +583,13 @@ const createConnectRequest = async (ctx: OwnerContext, raw: unknown): Promise<Cl
   const args = parseConnectCreate(raw);
   const integrationId = args.integrationId.trim().toLowerCase();
   const addAccount = args.addAccount === true && isMultiAccountIntegration(integrationId);
-  const baseline = addAccount
-    ? ((await connectionState(ctx, integrationId, { force: true })).accounts ?? []).filter(
-        (account) => account.connected,
-      ).length
-    : 0;
+  const baseline = !addAccount
+    ? 0
+    : connectsWithStellaGoogle(ctx, integrationId)
+      ? stellaGoogleAccounts(ctx.db, integrationId).filter((account) => account.connected).length
+      : ((await connectionState(ctx, integrationId, { force: true })).accounts ?? []).filter(
+          (account) => account.connected,
+        ).length;
   const live = ctx.db
     .all<ConnectRow>(
       "SELECT * FROM connect_requests WHERE turn_id = ? AND integration_id = ? ORDER BY created_at DESC LIMIT 4",
@@ -593,16 +673,20 @@ const decideConnectRequest = async (
       request: settleConnect(ctx, args.requestId, "declined", LIVE_STATES, args.decisionRequestId) ?? current,
     };
   }
-  const integration = await loadExecutableIntegration(ctx.env, current.integrationId);
-  if (!integration) throw new RpcError("NOT_FOUND", "This integration cannot be connected here.");
-  const config = requireComposio(ctx.env);
   let url: string;
   try {
-    url = await createConnectLink(ctx, config, integration);
+    if (connectsWithStellaGoogle(ctx, current.integrationId)) {
+      url = await stellaGoogleConnectUrl(ctx);
+    } else {
+      const integration = await loadExecutableIntegration(ctx.env, current.integrationId);
+      if (!integration) throw new RpcError("NOT_FOUND", "This integration cannot be connected here.");
+      url = await createConnectLink(ctx, requireComposio(ctx.env), integration);
+    }
   } catch (error) {
+    if (error instanceof RpcError) throw error;
     console.error(JSON.stringify({
       event: "connect_decide_link_failed",
-      integrationId: integration.id,
+      integrationId: current.integrationId,
       message: error instanceof Error ? error.message : String(error),
     }));
     throw new RpcError("UNAVAILABLE", "Could not create the connection link.");
@@ -948,6 +1032,7 @@ const purgeIntegrations = async (
     }
     if (ctx.db.one("SELECT 1 AS left FROM integration_connections LIMIT 1")) return { pending: true };
   }
+  await purgeStellaGoogleAccounts(ctx);
   ctx.db.run("DELETE FROM integration_accounts");
   ctx.db.run("DELETE FROM integration_settings");
   ctx.db.run("DELETE FROM integration_principal");
@@ -1009,7 +1094,12 @@ const accountChangeFailed = (error: unknown, event: string, id: string): never =
 
 export const integrationsDomain = {
   name: "integrations",
-  migrations: [INTEGRATIONS_MIGRATION, INTEGRATION_ACCOUNTS_MIGRATION, INTEGRATION_SETTINGS_MIGRATION],
+  migrations: [
+    INTEGRATIONS_MIGRATION,
+    INTEGRATION_ACCOUNTS_MIGRATION,
+    INTEGRATION_SETTINGS_MIGRATION,
+    GOOGLE_ACCOUNTS_MIGRATION,
+  ],
   calls: {
     "integrations.connections": {
       scope: "owner",
@@ -1020,7 +1110,9 @@ export const integrationsDomain = {
       scope: "owner",
       parse: object({ id: integrationId() }),
       handler: async (ctx, args) => {
-        await requireIntegration(ctx.env, args.id);
+        if (!(isStellaGoogleIntegration(args.id) && stellaGoogleAvailable(ctx.env))) {
+          await requireIntegration(ctx.env, args.id);
+        }
         const state = await connectionState(ctx, args.id, { force: true });
         if (state.connected && args.id === GMAIL_INTEGRATION_ID) startEmailDigest(ctx);
         return state;
@@ -1045,6 +1137,9 @@ export const integrationsDomain = {
       scope: "owner",
       parse: parseAccountChange,
       handler: async (ctx, args) => {
+        if (await usesStellaGoogle(ctx, args.id)) {
+          return { accounts: setPrimaryStellaGoogleAccount(ctx, args.id, args.account) };
+        }
         const { config, integration } = await accountTarget(ctx, args.id);
         try {
           return { accounts: await setPrimaryIntegrationAccount(ctx, config, integration, args.account) };
@@ -1064,6 +1159,9 @@ export const integrationsDomain = {
           { count: 20, windowMs: 10 * 60_000 },
           "Too many account changes. Wait a moment and try again.",
         );
+        if (await usesStellaGoogle(ctx, args.id)) {
+          return { accounts: await removeStellaGoogleAccount(ctx, args.id, args.account) };
+        }
         const { config, integration } = await accountTarget(ctx, args.id);
         try {
           return { accounts: await removeIntegrationAccount(ctx, config, integration, args.account) };
@@ -1139,6 +1237,8 @@ export const integrationsDomain = {
     "integrations.connections": (ctx) => listConnections(ctx),
     "integrations.run": (ctx, raw) => runAction(ctx, parseRun(raw)),
     "x.completeOAuth": completeXOAuth,
+    "google.completeOAuth": completeStellaGoogleOAuth,
+    "integrations.googleRoutes": (ctx) => googleRoutes(ctx),
     "slack.installClaim": (ctx, raw) => ({
       code: issueOAuthClaim(ctx, "slack_install", parseSlackInstallClaim(raw)),
     }),

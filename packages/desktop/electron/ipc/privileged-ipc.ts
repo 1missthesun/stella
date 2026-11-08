@@ -1,6 +1,14 @@
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import type { IpcInvokeChannel } from "@stella/contracts/desktop/ipc-contract";
-import { handleIpc, type IpcInvokeHandler } from "./typed-ipc.js";
+import type {
+  IpcInvokeChannel,
+  IpcSendChannel,
+} from "@stella/contracts/desktop/ipc-contract";
+import {
+  handleIpc,
+  onIpc,
+  type IpcInvokeHandler,
+  type IpcSendListener,
+} from "./typed-ipc.js";
 
 export type PrivilegedIpcOptions = {
   assertPrivilegedSender: (
@@ -27,5 +35,16 @@ export function registerPrivilegedHandle<C extends IpcInvokeChannel>(
   handleIpc(channel, async (event, ...args) => {
     assertPrivilegedRequest(options, event, channel);
     return await handler(event, ...args);
+  });
+}
+
+export function onPrivilegedIpc<C extends IpcSendChannel>(
+  options: PrivilegedIpcOptions,
+  channel: C,
+  listener: IpcSendListener<C>,
+) {
+  onIpc(channel, (event, ...args) => {
+    if (!options.assertPrivilegedSender(event, channel)) return;
+    return listener(event, ...args);
   });
 }

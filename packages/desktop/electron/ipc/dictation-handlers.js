@@ -20,9 +20,9 @@ import {
   IPC_DICTATION_PLAY_SOUND,
 } from "@stella/contracts/desktop/ipc-channels";
 import {
-  handleIpc,
-  onIpc,
-} from "./typed-ipc.js";
+  registerPrivilegedHandle,
+  onPrivilegedIpc,
+} from "./privileged-ipc.js";
 const DEFAULT_DICTATION_SHORTCUT = "Alt";
 const DEFAULT_NON_MAC_DICTATION_SHORTCUT = "Control+M";
 const LEGACY_DEFAULT_DICTATION_SHORTCUT = "Control+M";
@@ -320,7 +320,7 @@ export const registerDictationHandlers = (options) => {
     if (!initial.ok) {
         console.warn("[dictation]", initial.error);
     }
-    handleIpc(IPC_DICTATION_SET_SHORTCUT, (_event, shortcut) => {
+    registerPrivilegedHandle(options, IPC_DICTATION_SET_SHORTCUT, (_event, shortcut) => {
         const result = applyDictationShortcutRegistration(shortcut);
         if (!result.ok) {
             console.warn("[dictation]", result.error);
@@ -330,18 +330,12 @@ export const registerDictationHandlers = (options) => {
         }
         return result;
     });
-    handleIpc(IPC_DICTATION_GET_SHORTCUT, () => currentShortcut);
+    registerPrivilegedHandle(options, IPC_DICTATION_GET_SHORTCUT, () => currentShortcut);
     let openRouterTranscription = null;
-    handleIpc(IPC_DICTATION_HAS_OPENROUTER_KEY, (event) => {
-        if (!options.assertPrivilegedSender(event, IPC_DICTATION_HAS_OPENROUTER_KEY)) {
-            throw new Error("Blocked untrusted dictation request.");
-        }
+    registerPrivilegedHandle(options, IPC_DICTATION_HAS_OPENROUTER_KEY, (event) => {
         return hasOpenRouterDictationKey(options.getStellaDataDir());
     });
-    handleIpc(IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER, async (event, payload) => {
-        if (!options.assertPrivilegedSender(event, IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER)) {
-            throw new Error("Blocked untrusted dictation request.");
-        }
+    registerPrivilegedHandle(options, IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER, async (event, payload) => {
         const requestId = typeof payload?.requestId === "string" ? payload.requestId : "";
         const wav = payload?.wav;
         if (!requestId || (!(wav instanceof ArrayBuffer) && !(wav instanceof Uint8Array))) {
@@ -360,16 +354,14 @@ export const registerDictationHandlers = (options) => {
                 openRouterTranscription = null;
         }
     });
-    onIpc(IPC_DICTATION_CANCEL_OPENROUTER, (event, payload) => {
-        if (!options.assertPrivilegedSender(event, IPC_DICTATION_CANCEL_OPENROUTER))
-            return;
+    onPrivilegedIpc(options, IPC_DICTATION_CANCEL_OPENROUTER, (event, payload) => {
         if (openRouterTranscription && openRouterTranscription.requestId === payload?.requestId) {
             openRouterTranscription.controller.abort();
             openRouterTranscription = null;
         }
     });
-    handleIpc(IPC_DICTATION_GET_SOUND_EFFECTS_ENABLED, () => areDictationSoundsEnabled());
-    handleIpc(IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED, (_event, enabled) => {
+    registerPrivilegedHandle(options, IPC_DICTATION_GET_SOUND_EFFECTS_ENABLED, () => areDictationSoundsEnabled());
+    registerPrivilegedHandle(options, IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED, (_event, enabled) => {
         const nextEnabled = enabled === true;
         const stellaDataDir = options.getStellaDataDir();
         if (stellaDataDir) {
@@ -377,14 +369,14 @@ export const registerDictationHandlers = (options) => {
         }
         return { enabled: nextEnabled };
     });
-    onIpc(IPC_DICTATION_ACTIVE_CHANGED, (event, payload) => {
+    onPrivilegedIpc(options, IPC_DICTATION_ACTIVE_CHANGED, (event, payload) => {
         const source = `renderer:${event.sender.id}`;
         setDictationSourceActive(source, payload?.active === true);
         if (payload?.active === true) {
             event.sender.once("destroyed", () => setDictationSourceActive(source, false));
         }
     });
-    onIpc(IPC_DICTATION_PLAY_SOUND, (_event, payload) => {
+    onPrivilegedIpc(options, IPC_DICTATION_PLAY_SOUND, (_event, payload) => {
         if (payload?.sound !== "startRecording" &&
             payload?.sound !== "stopRecording" &&
             payload?.sound !== "cancel") {

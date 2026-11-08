@@ -26,9 +26,9 @@ import { requireMatchingCloudConversationId, requireRequestedCloudConversationId
 import { randomUUID } from "node:crypto";
 import { isVoiceSessionFailure } from "@stella/contracts/voice-failure";
 import {
-  handleIpc,
-  onIpc,
-} from "./typed-ipc.js";
+  registerPrivilegedHandle,
+  onPrivilegedIpc,
+} from "./privileged-ipc.js";
 const ACCOUNT_SETUP_STATUSES = new Set([401, 402, 403, 429]);
 const voiceSetupRefusal = (message) => ({
     failure: { message, action: "settings" },
@@ -128,11 +128,11 @@ export const registerVoiceHandlers = (options) => {
             });
         }
     };
-    onIpc(IPC_VOICE_REPORT_SESSION_ERROR, (_event, failure) => {
+    onPrivilegedIpc(options, IPC_VOICE_REPORT_SESSION_ERROR, (_event, failure) => {
         emitVoiceSessionErrorToast(failure);
     });
     let lastVoiceSessionError = "";
-    onIpc(IPC_VOICE_REPORT_SESSION_ERROR_STATE, (_event, message) => {
+    onPrivilegedIpc(options, IPC_VOICE_REPORT_SESSION_ERROR_STATE, (_event, message) => {
         lastVoiceSessionError = typeof message === "string" ? message.trim() : "";
         for (const window of options.windowManager.getAllWindows()) {
             if (window.isDestroyed())
@@ -140,15 +140,13 @@ export const registerVoiceHandlers = (options) => {
             window.webContents.send(IPC_VOICE_SESSION_ERROR_STATE, lastVoiceSessionError);
         }
     });
-    handleIpc(IPC_VOICE_GET_SESSION_ERROR_STATE, () => lastVoiceSessionError);
+    registerPrivilegedHandle(options, IPC_VOICE_GET_SESSION_ERROR_STATE, () => lastVoiceSessionError);
     const toggleVoiceRtc = () => {
         if (!options.getAppReady())
             return;
         options.toggleRealtimeVoice();
     };
-    onIpc(IPC_VOICE_RTC_TOGGLE, (event) => {
-        if (!options.assertPrivilegedSender(event, IPC_VOICE_RTC_TOGGLE))
-            return;
+    onPrivilegedIpc(options, IPC_VOICE_RTC_TOGGLE, (event) => {
         toggleVoiceRtc();
     });
     const loadConfiguredShortcut = () => {
@@ -167,7 +165,7 @@ export const registerVoiceHandlers = (options) => {
     if (!initialVoiceRtcShortcut.ok) {
         console.warn("[voice]", initialVoiceRtcShortcut.error);
     }
-    handleIpc(IPC_VOICE_RTC_SET_SHORTCUT, (_event, shortcut) => {
+    registerPrivilegedHandle(options, IPC_VOICE_RTC_SET_SHORTCUT, (_event, shortcut) => {
         const result = applyShortcutRegistration({
             label: "Voice realtime",
             requestedShortcut: shortcut,
@@ -183,8 +181,8 @@ export const registerVoiceHandlers = (options) => {
         }
         return result;
     });
-    handleIpc(IPC_VOICE_RTC_GET_SHORTCUT, () => currentVoiceRtcShortcut);
-    handleIpc(IPC_VOICE_CREATE_OPENAI_SESSION, async (_event, payload) => {
+    registerPrivilegedHandle(options, IPC_VOICE_RTC_GET_SHORTCUT, () => currentVoiceRtcShortcut);
+    registerPrivilegedHandle(options, IPC_VOICE_CREATE_OPENAI_SESSION, async (_event, payload) => {
         const preferences = getRealtimeVoicePreferences(options.stellaAppDir);
         if (preferences.provider !== "openai") {
             throw new Error("OpenAI is not selected for voice.");
@@ -247,7 +245,7 @@ export const registerVoiceHandlers = (options) => {
             sessionId: typeof data.session?.id === "string" ? data.session.id : undefined,
         };
     });
-    handleIpc(IPC_VOICE_CREATE_XAI_SESSION, async (_event, _payload) => {
+    registerPrivilegedHandle(options, IPC_VOICE_CREATE_XAI_SESSION, async (_event, _payload) => {
         const preferences = getRealtimeVoicePreferences(options.stellaAppDir);
         if (preferences.provider !== "xai") {
             throw new Error("xAI is not selected for voice.");
@@ -305,7 +303,7 @@ export const registerVoiceHandlers = (options) => {
             expiresAt,
         };
     });
-    onIpc(IPC_VOICE_PERSIST_TRANSCRIPT, (_event, payload) => {
+    onPrivilegedIpc(options, IPC_VOICE_PERSIST_TRANSCRIPT, (_event, payload) => {
         let conversationId;
         try {
             conversationId = resolveVoiceConversation(false, payload?.conversationId);
@@ -324,7 +322,7 @@ export const registerVoiceHandlers = (options) => {
             console.debug("[voice] transcript persistence failed (best-effort):", err.message);
         });
     });
-    handleIpc(IPC_VOICE_ORCHESTRATOR_CHAT, async (_event, payload) => {
+    registerPrivilegedHandle(options, IPC_VOICE_ORCHESTRATOR_CHAT, async (_event, payload) => {
         if (!options.uiState.isVoiceRtcActive) {
             throw new Error("Voice mode is no longer active.");
         }
@@ -380,7 +378,7 @@ export const registerVoiceHandlers = (options) => {
             conversationId,
         });
     };
-    handleIpc(IPC_VOICE_ORCHESTRATOR_CONFIG, async (_event, payload) => await voiceConfig(false, payload));
+    registerPrivilegedHandle(options, IPC_VOICE_ORCHESTRATOR_CONFIG, async (_event, payload) => await voiceConfig(false, payload));
     const executeVoiceTool = async (remote, payload) => {
         const conversationId = resolveVoiceConversation(remote, payload?.conversationId);
         const currentPayload = { ...payload, conversationId };
@@ -395,8 +393,8 @@ export const registerVoiceHandlers = (options) => {
         }
         return result;
     };
-    handleIpc(IPC_VOICE_GET_RUNTIME_STATE, () => runtimeState);
-    onIpc(IPC_VOICE_RUNTIME_STATE, (_event, nextState) => {
+    registerPrivilegedHandle(options, IPC_VOICE_GET_RUNTIME_STATE, () => runtimeState);
+    onPrivilegedIpc(options, IPC_VOICE_RUNTIME_STATE, (_event, nextState) => {
         runtimeState = {
             sessionState: nextState?.sessionState ?? "idle",
             isConnected: Boolean(nextState?.isConnected),

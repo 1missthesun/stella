@@ -302,7 +302,10 @@ const setGooglePrimaryChoice = (ctx: OwnerContext, integrationId: string, value:
     ctx.now,
   );
 
-type StellaRoutePrimary = { kind: "stella"; email?: string } | { kind: "composio"; id: string } | null;
+type StellaRoutePrimary = { kind: "stella"; email?: string } | { kind: "composio"; id: string; ref: string } | null;
+
+/** How resolveIntegrationAccount finds a Composio account (it matches case-insensitively). */
+const composioRef = (account: IntegrationAccount): string => account.email ?? account.label;
 
 /**
  * The accounts of a Google service on Stella's actions: the ones connected
@@ -328,13 +331,13 @@ const stellaRouteAccounts = async (
   const choice = googlePrimaryChoice(ctx.db, integrationId);
   let primary: StellaRoutePrimary = null;
   if (choice !== "stella" && composioPrimary && composio.includes(composioPrimary)) {
-    primary = { kind: "composio", id: composioPrimary.id };
+    primary = { kind: "composio", id: composioPrimary.id, ref: composioRef(composioPrimary) };
   } else if (choice !== "stella" && composioPrimary?.email && stellaEmails.has(composioPrimary.email.toLowerCase())) {
     primary = { kind: "stella", email: composioPrimary.email.toLowerCase() };
   } else if (stella.length > 0) {
     primary = { kind: "stella" };
   } else if (composio[0]) {
-    primary = { kind: "composio", id: composio[0].id };
+    primary = { kind: "composio", id: composio[0].id, ref: composioRef(composio[0]) };
   }
   const isPrimaryStella = (account: IntegrationAccount) =>
     primary?.kind === "stella" &&
@@ -357,12 +360,12 @@ const resolveStellaRouteAccount = async (
   ctx: OwnerContext,
   integrationId: string,
   requested?: string,
-): Promise<{ kind: "stella"; email?: string } | { kind: "composio"; id: string }> => {
+): Promise<{ kind: "stella"; email?: string } | { kind: "composio"; ref: string }> => {
   const state = await stellaRouteAccounts(ctx, integrationId);
   const wanted = requested?.trim().toLowerCase();
   if (!wanted) {
     if (!state.primary) throw new RpcError("CONFLICT", "Connect this integration before using it.", { reason: "not_connected" });
-    return state.primary;
+    return state.primary.kind === "composio" ? { kind: "composio", ref: state.primary.ref } : state.primary;
   }
   const stella = stellaGoogleAccounts(ctx.db, integrationId).find(
     (account) => (account.email ?? account.id).toLowerCase() === wanted,
@@ -374,7 +377,7 @@ const resolveStellaRouteAccount = async (
       account.email?.toLowerCase() === wanted ||
       account.label.toLowerCase() === wanted,
   );
-  if (composio) return { kind: "composio", id: composio.id };
+  if (composio) return { kind: "composio", ref: composioRef(composio) };
   throw new RpcError(
     "BAD_REQUEST",
     `${requested} isn't connected. Connected: ${state.accounts.map((account) => account.email ?? account.label).join(", ")}.`,
@@ -387,7 +390,7 @@ const runComposioGoogleAction = async (
   integrationId: string,
   action: string,
   input: Record<string, unknown>,
-  accountId: string,
+  accountRef: string,
 ): Promise<unknown> => {
   const connection = connectionOf(ctx.db, integrationId);
   if (!connection) throw new RpcError("CONFLICT", "Connect this integration before using it.", { reason: "not_connected" });
@@ -396,7 +399,7 @@ const runComposioGoogleAction = async (
     ctx,
     config,
     { id: integrationId, toolkit: connection.toolkit },
-    accountId,
+    accountRef,
   );
   const get = proxyFetcher(connection.toolkit, (request) =>
     composioExecute(config, account.sessionId, { proxy: request }),
@@ -578,7 +581,7 @@ const runAction = async (
     if (!googleAction(args.id, args.action)) throw new RpcError("BAD_REQUEST", "Integration action is not allowed.");
     const target = await resolveStellaRouteAccount(ctx, args.id, args.account);
     return target.kind === "composio"
-      ? await runComposioGoogleAction(ctx, args.id, args.action, args.input, target.id)
+      ? await runComposioGoogleAction(ctx, args.id, args.action, args.input, target.ref)
       : await runStellaGoogleAction(ctx, args.id, args.action, args.input, target.email);
   }
   const resolved = await loadIntegrationAction(ctx.env, args.id, args.action);
@@ -1290,7 +1293,7 @@ export const integrationsDomain = {
           const target = await resolveStellaRouteAccount(ctx, args.id, args.account);
           if (target.kind === "composio") {
             const { config, integration } = await accountTarget(ctx, args.id);
-            await setPrimaryIntegrationAccount(ctx, config, integration, target.id);
+            await setPrimaryIntegrationAccount(ctx, config, integration, target.ref);
             setGooglePrimaryChoice(ctx, args.id, "composio");
           } else {
             setPrimaryStellaGoogleAccount(ctx, args.id, args.account);
@@ -1322,7 +1325,7 @@ export const integrationsDomain = {
           if (target.kind === "composio") {
             const { config, integration } = await accountTarget(ctx, args.id);
             try {
-              await removeIntegrationAccount(ctx, config, integration, target.id);
+              await removeIntegrationAccount(ctx, config, integration, target.ref);
             } catch (error) {
               return accountChangeFailed(error, "integration_remove_account_failed", args.id);
             }

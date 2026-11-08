@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "ค้นหา",
       "title": "ตัวเชื่อมต่อ",
       "noMatchesTitle": "ไม่พบรายการที่ตรงกัน",
-      "noMatchesBody": "ลองใช้ชื่ออื่น"
+      "noMatchesBody": "ลองใช้ชื่ออื่น",
+      "addAccount": "เพิ่มบัญชีอื่น",
+      "setPrimary": "ตั้งเป็นบัญชีหลัก",
+      "primary": "บัญชีหลัก",
+      "removeAccount": "ลบ"
     },
     "display": {
       "agentThread": {

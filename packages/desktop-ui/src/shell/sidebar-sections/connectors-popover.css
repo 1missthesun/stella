@@ -177,3 +177,99 @@
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
+.connectors-popover__item {
+  display: flex;
+  flex-direction: column;
+}
+
+.connectors-popover__accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 6px 38px;
+  padding: 0 6px 0 0;
+  list-style: none;
+}
+
+.connectors-popover__account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.connectors-popover__account[data-disconnected]
+  .connectors-popover__account-email {
+  color: var(--text-weaker);
+  text-decoration: line-through;
+}
+
+.connectors-popover__account-email {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectors-popover__badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text-strong);
+  font-size: 10.5px;
+  font-weight: var(--weight-medium);
+}
+
+.connectors-popover__link {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: 11px;
+  cursor: default;
+}
+
+.connectors-popover__link:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+.connectors-popover__link--danger:hover:not(:disabled) {
+  color: var(--danger, #d14343);
+}
+
+.connectors-popover__link:focus-visible,
+.connectors-popover__add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 4px;
+}
+
+.connectors-popover__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: 12px;
+  cursor: default;
+}
+
+.connectors-popover__add:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+.connectors-popover__account-error {
+  color: var(--danger, #d14343);
+  font-size: 11px;
+  line-height: 1.35;
+}

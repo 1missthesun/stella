@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "検索",
       "title": "コネクタ",
       "noMatchesTitle": "一致なし",
-      "noMatchesBody": "別の名前で試してください。"
+      "noMatchesBody": "別の名前で試してください。",
+      "addAccount": "別のアカウントを追加",
+      "setPrimary": "メインに設定",
+      "primary": "メイン",
+      "removeAccount": "削除"
     },
     "display": {
       "agentThread": {

@@ -1,3 +1,5 @@
+import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
+import { readBackendConnections } from "./backend-accounts.js";
 import { connect, type Socket } from "node:net";
 import { z } from "zod";
 
@@ -267,6 +269,7 @@ export const requestBackendConnectorActionFromBridge = async ({
   action,
   input,
   requestId,
+  account,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   socketPath: string;
@@ -274,12 +277,13 @@ export const requestBackendConnectorActionFromBridge = async ({
   action: string;
   input: Record<string, unknown>;
   requestId?: string;
+  account?: string;
   timeoutMs?: number;
 }): Promise<BackendConnectorActionResult> => {
   const result = await sendRequest(
     socketPath,
     "connector.runBackendAction",
-    { connectorId, action, input, requestId },
+    { connectorId, action, input, requestId, ...(account ? { account } : {}) },
     timeoutMs,
   );
   if (!result || typeof result !== "object") {
@@ -299,6 +303,24 @@ export const requestBackendConnectorActionFromBridge = async ({
       ? { requestId: record.requestId }
       : {}),
   };
+};
+
+export const requestBackendConnectionsFromBridge = async ({
+  socketPath,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}: {
+  socketPath: string;
+  timeoutMs?: number;
+}): Promise<IntegrationConnection[] | null> => {
+  const result = await sendRequest(
+    socketPath,
+    "connector.listBackendConnections",
+    {},
+    timeoutMs,
+  ).catch(() => null);
+  if (!result || typeof result !== "object") return null;
+  const record = result as Record<string, unknown>;
+  return record.ok === true ? readBackendConnections(record) : null;
 };
 
 export const requestBackendConnectorActionsFromBridge = async ({

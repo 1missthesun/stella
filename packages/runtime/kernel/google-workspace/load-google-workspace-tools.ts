@@ -27,7 +27,18 @@ import type { PeopleService } from "./PeopleService.js";
 import { TimeService } from "./TimeService.js";
 import { formatGoogleWorkspaceCallToolResult } from "./format-google-workspace-result.js";
 import { GOOGLE_WORKSPACE_TOOL_METADATA } from "./google-workspace-tool-metadata.js";
-import { loadConnectorAccessToken } from "../connectors/oauth.js";
+import {
+  hasConnectorAccount,
+  listConnectorAccounts,
+  removeConnectorAccount,
+  resolveConnectorAccount,
+} from "../connectors/accounts.js";
+import {
+  connectorAccountToolHint,
+  splitConnectorAccountArg,
+  withConnectorAccountParameter,
+} from "../connectors/connector-tools.js";
+import { GOOGLE_WORKSPACE_ACCOUNTS } from "./accounts.js";
 
 const logger = createRuntimeLogger("google-workspace");
 
@@ -49,17 +60,6 @@ function buildHandlers(
   time: TimeService,
 ): Record<string, (args: Record<string, unknown>) => Promise<unknown>> {
   return {
-    "auth.clear": async () => {
-      await auth.clearAuth();
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: "Authentication credentials cleared. You will be prompted to log in again on the next request.",
-          },
-        ],
-      };
-    },
     "auth.refreshToken": async () => {
       await auth.refreshToken();
       return {
@@ -168,26 +168,31 @@ function buildHandlers(
     "gmail.listLabels": () => gmail.listLabels(),
     "gmail.createLabel": (args) =>
       gmail.createLabel(args as never),
-    "time.getCurrentDate": () => time.getCurrentDate(),
-    "time.getCurrentTime": () => time.getCurrentTime(),
-    "time.getTimeZone": () => time.getTimeZone(),
+    ...buildTimeHandlers(time),
     "people.getMe": () => people.getMe(),
   };
 }
 
-export const loadGoogleWorkspaceTools = async (options: {
-  stellaAppDir: string;
-  onAuthStateChanged?: (authenticated: boolean) => void;
-}): Promise<{
-  tools: ToolDefinition[];
-  disconnect: () => Promise<void>;
-  callTool: GoogleWorkspaceCallToolFn | null;
-  hasStoredCredentials: boolean;
-}> => {
-  const root = path.join(options.stellaAppDir, "google-workspace");
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  setGoogleWorkspaceProjectRoot(root);
+function buildTimeHandlers(
+  time: TimeService,
+): Record<string, (args: Record<string, unknown>) => Promise<unknown>> {
+  return {
+    "time.getCurrentDate": () => time.getCurrentDate(),
+    "time.getCurrentTime": () => time.getCurrentTime(),
+    "time.getTimeZone": () => time.getTimeZone(),
+  };
+}
 
+type GoogleWorkspaceModules = {
+  AuthManager: typeof import("./AuthManager.js").AuthManager;
+  DriveService: typeof import("./DriveService.js").DriveService;
+  DocsService: typeof import("./DocsService.js").DocsService;
+  CalendarService: typeof import("./CalendarService.js").CalendarService;
+  GmailService: typeof import("./GmailService.js").GmailService;
+  PeopleService: typeof import("./PeopleService.js").PeopleService;
+};
+
+const loadGoogleWorkspaceModules = async (): Promise<GoogleWorkspaceModules> => {
   const [
     { AuthManager },
     { DriveService },
@@ -203,55 +208,116 @@ export const loadGoogleWorkspaceTools = async (options: {
     import("./GmailService.js"),
     import("./PeopleService.js"),
   ]);
+  return {
+    AuthManager,
+    DriveService,
+    DocsService,
+    CalendarService,
+    GmailService,
+    PeopleService,
+  };
+};
 
-  const authManager = new AuthManager(SCOPES);
-  const drive = new DriveService(authManager);
-  const docs = new DocsService(authManager);
-  const calendar = new CalendarService(authManager);
-  const gmail = new GmailService(authManager);
-  const people = new PeopleService(authManager);
+export const loadGoogleWorkspaceTools = async (options: {
+  stellaAppDir: string;
+  onAuthStateChanged?: (authenticated: boolean) => void;
+}): Promise<{
+  tools: ToolDefinition[];
+  disconnect: () => Promise<void>;
+  callTool: GoogleWorkspaceCallToolFn | null;
+  hasStoredCredentials: boolean;
+}> => {
+  const root = path.join(options.stellaAppDir, "google-workspace");
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  setGoogleWorkspaceProjectRoot(root);
+
+  const modules = await loadGoogleWorkspaceModules();
   const time = new TimeService();
-  const handlers = buildHandlers(
-    authManager,
-    drive,
-    docs,
-    calendar,
-    gmail,
-    people,
-    time,
-  );
+  const authManagers = new Set<AuthManager>();
+
+  const handlersForAccount = (tokenKey: string) => {
+    const authManager = new modules.AuthManager(SCOPES, tokenKey);
+    authManagers.add(authManager);
+    return {
+      authManager,
+      handlers: buildHandlers(
+        authManager,
+        new modules.DriveService(authManager),
+        new modules.DocsService(authManager),
+        new modules.CalendarService(authManager),
+        new modules.GmailService(authManager),
+        new modules.PeopleService(authManager),
+        time,
+      ),
+    };
+  };
 
   const NON_AUTH_TOOLS = new Set(["time.getCurrentDate", "time.getCurrentTime", "time.getTimeZone"]);
 
   const callGoogleWorkspaceTool = async (
     name: string,
-    args: Record<string, unknown>,
+    rawArgs: Record<string, unknown>,
   ): Promise<ToolResult> => {
-    if (
-      !NON_AUTH_TOOLS.has(name) &&
-      !(await loadConnectorAccessToken(options.stellaAppDir, "google-workspace"))
-    ) {
+    const { account: requestedAccount, rest: args } =
+      splitConnectorAccountArg(rawArgs);
+    if (NON_AUTH_TOOLS.has(name)) {
+      const timeHandlers = buildTimeHandlers(time);
+      const handler = timeHandlers[name];
+      if (!handler) return { error: `Unknown Google Workspace tool: ${name}` };
+      return formatGoogleWorkspaceCallToolResult(await handler(args));
+    }
+    if (!(await hasConnectorAccount(options.stellaAppDir, GOOGLE_WORKSPACE_ACCOUNTS))) {
       options.onAuthStateChanged?.(false);
       return {
         error:
           "Google Workspace is not connected. Enable Gmail / Calendar / Docs / Drive in the Store first.",
       };
     }
+    let account;
+    try {
+      account = await resolveConnectorAccount(
+        options.stellaAppDir,
+        GOOGLE_WORKSPACE_ACCOUNTS,
+        requestedAccount,
+      );
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+    const accountLabel = account.email ?? "the primary Google account";
 
     try {
+      if (name === "auth.clear") {
+        await removeConnectorAccount(
+          options.stellaAppDir,
+          GOOGLE_WORKSPACE_ACCOUNTS,
+          account.id,
+        );
+        return {
+          result: `Disconnected ${accountLabel}. Connect it again from the Store to use it.`,
+        };
+      }
+      const { handlers, authManager } = handlersForAccount(account.tokenKey);
       const handler = handlers[name];
       if (!handler) {
         return { error: `Unknown Google Workspace tool: ${name}` };
       }
-      const raw = await handler(args);
+      const raw = await handler(args).finally(() => {
+        authManager.dispose();
+        authManagers.delete(authManager);
+      });
       const formatted = formatGoogleWorkspaceCallToolResult(raw);
       if (
         "error" in formatted &&
         AUTH_ERROR_PATTERN.test(formatted.error ?? "")
       ) {
         options.onAuthStateChanged?.(false);
-      } else if (!("error" in formatted)) {
+        return { error: `${formatted.error} (account: ${accountLabel})` };
+      }
+      if (!("error" in formatted)) {
         options.onAuthStateChanged?.(true);
+        return account.email
+          ? { ...formatted, details: { account: account.email } }
+          : formatted;
       }
       return formatted;
     } catch (error) {
@@ -259,9 +325,16 @@ export const loadGoogleWorkspaceTools = async (options: {
       if (AUTH_ERROR_PATTERN.test(message)) {
         options.onAuthStateChanged?.(false);
       }
-      return { error: `Google Workspace tool failed: ${message}` };
+      return {
+        error: `Google Workspace tool failed for ${accountLabel}: ${message}`,
+      };
     }
   };
+
+  const accounts = await listConnectorAccounts(
+    options.stellaAppDir,
+    GOOGLE_WORKSPACE_ACCOUNTS,
+  ).catch(() => []);
 
   const toolsOut: ToolDefinition[] = [];
   for (const toolName of GOOGLE_WORKSPACE_TOOL_ALLOWLIST) {
@@ -272,21 +345,22 @@ export const loadGoogleWorkspaceTools = async (options: {
       logger.warn("google_workspace.missing_metadata", { toolName });
       continue;
     }
-    if (!handlers[toolName]) {
-      logger.warn("google_workspace.missing_handler", { toolName });
-      continue;
-    }
 
     const execute = async (
       executeArgs: Record<string, unknown>,
       _context: ToolContext,
     ): Promise<ToolResult> => callGoogleWorkspaceTool(toolName, executeArgs);
 
+    const accountAware = !toolName.startsWith("time.");
     toolsOut.push({
       name: registrationToolName,
-      description: meta.description,
+      description: accountAware
+        ? `${meta.description} ${connectorAccountToolHint(accounts)}`
+        : meta.description,
       agentTypes: ["general"],
-      parameters: meta.parameters,
+      parameters: accountAware
+        ? withConnectorAccountParameter(meta.parameters, accounts)
+        : meta.parameters,
       execute,
     });
   }
@@ -297,17 +371,14 @@ export const loadGoogleWorkspaceTools = async (options: {
   });
 
   const disconnect = async () => {
-    authManager.dispose();
+    for (const authManager of authManagers) authManager.dispose();
+    authManagers.clear();
   };
-
-  const hasStoredCredentials = Boolean(
-    await loadConnectorAccessToken(options.stellaAppDir, "google-workspace"),
-  );
 
   return {
     tools: toolsOut,
     disconnect,
     callTool: callGoogleWorkspaceTool,
-    hasStoredCredentials,
+    hasStoredCredentials: accounts.length > 0,
   };
 };

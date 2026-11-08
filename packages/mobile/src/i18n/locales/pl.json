@@ -2753,7 +2753,11 @@
       "searchPlaceholder": "Szukaj",
       "title": "Łączniki",
       "noMatchesTitle": "Brak wyników",
-      "noMatchesBody": "Spróbuj innej nazwy."
+      "noMatchesBody": "Spróbuj innej nazwy.",
+      "addAccount": "Dodaj kolejne konto",
+      "setPrimary": "Ustaw jako główne",
+      "primary": "Główne",
+      "removeAccount": "Usuń"
     },
     "display": {
       "agentThread": {

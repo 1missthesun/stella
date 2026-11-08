@@ -1,5 +1,7 @@
 import type {
+  IntegrationAccount,
   IntegrationCalls,
+  IntegrationConnection,
   XConnection,
 } from "@stella/contracts/backend/integrations";
 import { X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
@@ -20,13 +22,23 @@ import {
   composioConnectLink,
   composioDefinitelyRejected,
   composioExecute,
-  composioPrincipalFor,
   composioToolkitConnected,
-  createComposioSession,
-  deleteComposioSession,
   purgeComposioConnection,
   type ComposioConfig,
 } from "../../integrations/composio.js";
+import {
+  INTEGRATION_ACCOUNTS_MIGRATION,
+  ensureLinkSession,
+  integrationAccounts,
+  isMultiAccountIntegration,
+  principalOf,
+  purgeIntegrationAccountSessions,
+  removeIntegrationAccount,
+  resolveIntegrationAccount,
+  setPrimaryIntegrationAccount,
+  syncIntegrationAccounts,
+  type IntegrationRef,
+} from "./integration-accounts.js";
 import {
   buildGoogleAdsMutationProxyRequest,
   normalizeGoogleAdsProxyResponse,
@@ -47,6 +59,7 @@ import { GMAIL_INTEGRATION_ID } from "../../integrations/gmail-digest.js";
 import { signOAuthState } from "../../oauth-state.js";
 import { issueOAuthClaim, redeemOAuthClaim } from "../oauth-claims.js";
 import {
+  boolean,
   empty,
   json,
   literal,
@@ -145,6 +158,8 @@ type ConnectRow = {
   expires_at: number;
   created_at: number;
   updated_at: number;
+  add_account: number;
+  baseline_accounts: number;
 };
 
 type XTokenRow = {
@@ -179,57 +194,58 @@ const connectionOf = (db: OwnerDbReader, integrationId: string) =>
     integrationId,
   );
 
-const principalOf = async (ctx: OwnerContext): Promise<string> => {
-  const row = ctx.db.one<{ composio_user_id: string }>(
-    "SELECT composio_user_id FROM integration_principal WHERE id = 1",
-  );
-  if (row) return row.composio_user_id;
-  const userId = await composioPrincipalFor(ctx.ownerId);
-  ctx.db.run(
-    "INSERT OR IGNORE INTO integration_principal (id, composio_user_id, created_at) VALUES (1, ?, ?)",
-    userId,
-    ctx.now,
-  );
-  return userId;
+const integrationRef = (db: OwnerDbReader, integrationId: string): IntegrationRef | null => {
+  const connection = connectionOf(db, integrationId);
+  return connection ? { id: integrationId, toolkit: connection.toolkit } : null;
 };
 
-const ensureSession = async (
+const connectionState = async (
   ctx: OwnerContext,
-  config: ComposioConfig,
-  integration: ExecutableIntegration,
-): Promise<string> => {
-  const existing = connectionOf(ctx.db, integration.id);
-  if (existing) return existing.session_id;
-  const sessionId = await createComposioSession(config, await principalOf(ctx), integration.toolkit);
-  const raced = connectionOf(ctx.db, integration.id);
-  if (raced) {
-    await deleteComposioSession(config, sessionId).catch(() => undefined);
-    return raced.session_id;
-  }
-  ctx.db.run(
-    "INSERT INTO integration_connections (integration_id, toolkit, session_id, created_at) VALUES (?, ?, ?, ?)",
-    integration.id,
-    integration.toolkit,
-    sessionId,
-    ctx.now,
-  );
-  return sessionId;
-};
-
-const isConnected = async (ctx: OwnerContext, integrationId: string): Promise<boolean> => {
+  integrationId: string,
+  options: { force?: boolean } = {},
+): Promise<{ connected: boolean; accounts?: IntegrationAccount[] }> => {
   const connection = connectionOf(ctx.db, integrationId);
   const config = composioConfig(ctx.env);
-  if (!connection || !config) return false;
+  if (!connection || !config) return { connected: false };
   try {
-    return await composioToolkitConnected(config, connection.session_id, connection.toolkit);
+    if (isMultiAccountIntegration(integrationId)) {
+      const active = await syncIntegrationAccounts(
+        ctx,
+        config,
+        { id: integrationId, toolkit: connection.toolkit },
+        options,
+      );
+      const accounts = integrationAccounts(ctx.db, integrationId, active);
+      return { connected: accounts.some((account) => account.connected), accounts };
+    }
+    return { connected: await composioToolkitConnected(config, connection.session_id, connection.toolkit) };
   } catch (error) {
     console.error(JSON.stringify({
       event: "integration_status_failed",
       integrationId,
       message: error instanceof Error ? error.message : String(error),
     }));
-    return false;
+    return { connected: false };
   }
+};
+
+const isConnected = async (ctx: OwnerContext, integrationId: string, options: { force?: boolean } = {}) =>
+  (await connectionState(ctx, integrationId, options)).connected;
+
+const linkAlias = (): string => `stella-${crypto.randomUUID().slice(0, 8)}`;
+
+const createConnectLink = async (
+  ctx: OwnerContext,
+  config: ComposioConfig,
+  integration: IntegrationRef,
+): Promise<string> => {
+  const sessionId = await ensureLinkSession(ctx, config, integration);
+  return await composioConnectLink(
+    config,
+    sessionId,
+    integration.toolkit,
+    isMultiAccountIntegration(integration.id) ? linkAlias() : undefined,
+  );
 };
 
 const connectLink = async (ctx: OwnerContext, id: string): Promise<{ url: string }> => {
@@ -243,8 +259,7 @@ const connectLink = async (ctx: OwnerContext, id: string): Promise<{ url: string
   const integration = await requireIntegration(ctx.env, id);
   const config = requireComposio(ctx.env);
   try {
-    const sessionId = await ensureSession(ctx, config, integration);
-    return { url: await composioConnectLink(config, sessionId, integration.toolkit) };
+    return { url: await createConnectLink(ctx, config, integration) };
   } catch (error) {
     if (error instanceof RpcError) throw error;
     console.error(JSON.stringify({
@@ -264,10 +279,16 @@ const listConnections = async (
   );
   return {
     connections: await Promise.all(
-      rows.map(async (row) => ({
-        id: row.integration_id,
-        connected: await isConnected(ctx, row.integration_id),
-      })),
+      rows.map(async (row): Promise<IntegrationConnection> => {
+        const state = await connectionState(ctx, row.integration_id);
+        return {
+          id: row.integration_id,
+          connected: state.connected,
+          ...(isMultiAccountIntegration(row.integration_id)
+            ? { multiAccount: true, accounts: state.accounts ?? [] }
+            : {}),
+        };
+      }),
     ),
   };
 };
@@ -300,6 +321,19 @@ const runAction = async (
     throw new RpcError("CONFLICT", "Connect this integration before using it.", { reason: "not_connected" });
   }
   const config = requireComposio(ctx.env);
+  let sessionId = connection.session_id;
+  if (isMultiAccountIntegration(integration.id)) {
+    sessionId = (
+      await resolveIntegrationAccount(
+        ctx,
+        config,
+        { id: integration.id, toolkit: connection.toolkit },
+        args.account,
+      )
+    ).sessionId;
+  } else if (args.account) {
+    throw new RpcError("BAD_REQUEST", "This integration connects a single account; omit `account`.");
+  }
   let proxy: Record<string, unknown> | null;
   try {
     proxy = buildGoogleAdsMutationProxyRequest(integration.toolkit, action.name, args.input);
@@ -311,7 +345,7 @@ const runAction = async (
       id: integration.id,
       action: action.name,
       revision: action.revision,
-      sessionId: connection.session_id,
+      sessionId,
       input: args.input,
     }),
   );
@@ -329,13 +363,13 @@ const runAction = async (
   );
   let payload: Record<string, unknown>;
   try {
-    if (!(await composioToolkitConnected(config, connection.session_id, connection.toolkit))) {
+    if (!(await composioToolkitConnected(config, sessionId, connection.toolkit))) {
       settleReceipt(ctx.db, args.requestId, "failed", Date.now());
       throw new RpcError("CONFLICT", "This integration is no longer connected.", { reason: "not_connected" });
     }
     payload = await composioExecute(
       config,
-      connection.session_id,
+      sessionId,
       proxy ? { proxy } : { action: action.name, input: args.input },
     );
   } catch (error) {
@@ -364,6 +398,7 @@ const toRequest = (row: ConnectRow, now: number): CloudConnectorConnectRequest =
   ...(row.icon_url ? { iconUrl: row.icon_url } : {}),
   ...(row.category ? { category: row.category } : {}),
   ...(row.reason ? { reason: row.reason } : {}),
+  ...(row.add_account === 1 ? { addAccount: true } : {}),
   state:
     LIVE_STATES.includes(row.state as CloudConnectorConnectState) && row.expires_at <= now
       ? "expired"
@@ -417,11 +452,18 @@ const parseConnectCreate = object({
   iconUrl: trimmed(1_000),
   category: trimmed(80),
   reason: trimmed(300),
+  addAccount: optional(boolean()),
 });
 
-const createConnectRequest = (ctx: OwnerContext, raw: unknown): CloudConnectorConnectRequest => {
+const createConnectRequest = async (ctx: OwnerContext, raw: unknown): Promise<CloudConnectorConnectRequest> => {
   const args = parseConnectCreate(raw);
   const integrationId = args.integrationId.trim().toLowerCase();
+  const addAccount = args.addAccount === true && isMultiAccountIntegration(integrationId);
+  const baseline = addAccount
+    ? ((await connectionState(ctx, integrationId, { force: true })).accounts ?? []).filter(
+        (account) => account.connected,
+      ).length
+    : 0;
   const live = ctx.db
     .all<ConnectRow>(
       "SELECT * FROM connect_requests WHERE turn_id = ? AND integration_id = ? ORDER BY created_at DESC LIMIT 4",
@@ -435,8 +477,9 @@ const createConnectRequest = (ctx: OwnerContext, raw: unknown): CloudConnectorCo
   const expiresAt = ctx.now + CONNECT_REQUEST_TTL_MS;
   ctx.db.run(
     `INSERT INTO connect_requests (request_id, conversation_id, turn_id, integration_id, name,
-       description, icon_url, category, reason, state, revision, expires_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?, ?, ?)`,
+       description, icon_url, category, reason, state, revision, expires_at, created_at, updated_at,
+       add_account, baseline_accounts)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?, ?, ?, ?, ?)`,
     requestId,
     args.conversationId,
     args.turnId,
@@ -449,6 +492,8 @@ const createConnectRequest = (ctx: OwnerContext, raw: unknown): CloudConnectorCo
     expiresAt,
     ctx.now,
     ctx.now,
+    addAccount ? 1 : 0,
+    baseline,
   );
   ctx.jobs.schedule(EXPIRE_JOB, expiresAt, { requestId }, { id: `${EXPIRE_JOB}:${requestId}` });
   return toRequest(connectRow(ctx.db, requestId)!, ctx.now);
@@ -469,8 +514,13 @@ const pollConnectRequest = async (
   }
   // The OAuth hop ends on Composio's hosted page with no callback to us, so
   // each poll of a `connecting` card asks Composio whether it finished.
-  if (current.state === "connecting" && (await isConnected(ctx, row.integration_id))) {
-    return settleConnect(ctx, requestId, "connected", ["connecting"]);
+  if (current.state === "connecting") {
+    const state = await connectionState(ctx, row.integration_id, { force: true });
+    const done =
+      row.add_account === 1
+        ? (state.accounts ?? []).filter((account) => account.connected).length > row.baseline_accounts
+        : state.connected;
+    if (done) return settleConnect(ctx, requestId, "connected", ["connecting"]);
   }
   return current;
 };
@@ -502,7 +552,7 @@ const decideConnectRequest = async (
   const config = requireComposio(ctx.env);
   let url: string;
   try {
-    url = await composioConnectLink(config, await ensureSession(ctx, config, integration), integration.toolkit);
+    url = await createConnectLink(ctx, config, integration);
   } catch (error) {
     console.error(JSON.stringify({
       event: "connect_decide_link_failed",
@@ -835,6 +885,7 @@ const purgeIntegrations = async (
     const userId = await principalOf(ctx);
     for (const row of rows) {
       try {
+        await purgeIntegrationAccountSessions(ctx, config, row.integration_id);
         await purgeComposioConnection(config, {
           sessionId: row.session_id,
           toolkit: row.toolkit,
@@ -851,6 +902,7 @@ const purgeIntegrations = async (
     }
     if (ctx.db.one("SELECT 1 AS left FROM integration_connections LIMIT 1")) return { pending: true };
   }
+  ctx.db.run("DELETE FROM integration_accounts");
   ctx.db.run("DELETE FROM integration_principal");
   ctx.db.run("DELETE FROM x_tokens");
   return { pending: false };
@@ -875,11 +927,42 @@ const parseRun = object({
   action: string({ min: 2, max: 128, pattern: SAFE_ACTION_NAME }),
   input: jsonObject(512 * 1024),
   requestId: string({ min: 8, max: 128, pattern: SAFE_REQUEST_ID }),
+  account: optional(string({ min: 1, max: 320 })),
 });
+
+const parseAccountChange = object({
+  id: integrationId(),
+  account: string({ min: 1, max: 320 }),
+});
+
+const accountTarget = async (
+  ctx: OwnerContext,
+  id: string,
+): Promise<{ config: ComposioConfig; integration: IntegrationRef }> => {
+  if (!isMultiAccountIntegration(id)) {
+    throw new RpcError("BAD_REQUEST", "This integration connects a single account.");
+  }
+  const config = requireComposio(ctx.env);
+  const integration = integrationRef(ctx.db, id);
+  if (!integration) {
+    throw new RpcError("CONFLICT", "Connect this integration before using it.", { reason: "not_connected" });
+  }
+  return { config, integration };
+};
+
+const accountChangeFailed = (error: unknown, event: string, id: string): never => {
+  if (error instanceof RpcError) throw error;
+  console.error(JSON.stringify({
+    event,
+    integrationId: id,
+    message: error instanceof Error ? error.message : String(error),
+  }));
+  throw new RpcError("UNAVAILABLE", "Could not update the connected accounts. Try again.");
+};
 
 export const integrationsDomain = {
   name: "integrations",
-  migrations: [INTEGRATIONS_MIGRATION],
+  migrations: [INTEGRATIONS_MIGRATION, INTEGRATION_ACCOUNTS_MIGRATION],
   calls: {
     "integrations.connections": {
       scope: "owner",
@@ -891,15 +974,46 @@ export const integrationsDomain = {
       parse: object({ id: integrationId() }),
       handler: async (ctx, args) => {
         await requireIntegration(ctx.env, args.id);
-        const connected = await isConnected(ctx, args.id);
-        if (connected && args.id === GMAIL_INTEGRATION_ID) startEmailDigest(ctx);
-        return { connected };
+        const state = await connectionState(ctx, args.id, { force: true });
+        if (state.connected && args.id === GMAIL_INTEGRATION_ID) startEmailDigest(ctx);
+        return state;
       },
     },
     "integrations.connectLink": {
       scope: "owner",
-      parse: object({ id: integrationId() }),
+      parse: object({ id: integrationId(), addAccount: optional(boolean()) }),
       handler: (ctx, args) => connectLink(ctx, args.id),
+    },
+    "integrations.setPrimaryAccount": {
+      scope: "owner",
+      parse: parseAccountChange,
+      handler: async (ctx, args) => {
+        const { config, integration } = await accountTarget(ctx, args.id);
+        try {
+          return { accounts: await setPrimaryIntegrationAccount(ctx, config, integration, args.account) };
+        } catch (error) {
+          return accountChangeFailed(error, "integration_set_primary_failed", args.id);
+        }
+      },
+    },
+    "integrations.removeAccount": {
+      scope: "owner",
+      parse: parseAccountChange,
+      handler: async (ctx, args) => {
+        enforceOwnerRateLimit(
+          ctx.db,
+          ctx.now,
+          "integrations.removeAccount",
+          { count: 20, windowMs: 10 * 60_000 },
+          "Too many account changes. Wait a moment and try again.",
+        );
+        const { config, integration } = await accountTarget(ctx, args.id);
+        try {
+          return { accounts: await removeIntegrationAccount(ctx, config, integration, args.account) };
+        } catch (error) {
+          return accountChangeFailed(error, "integration_remove_account_failed", args.id);
+        }
+      },
     },
     "integrations.run": {
       scope: "owner",

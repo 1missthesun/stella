@@ -23,6 +23,7 @@ export type CloudConnectorConnectRequest = Readonly<{
   iconUrl?: string;
   category?: string;
   reason?: string;
+  addAccount?: boolean;
   state: CloudConnectorConnectState;
   revision: number;
   expiresAt: number;

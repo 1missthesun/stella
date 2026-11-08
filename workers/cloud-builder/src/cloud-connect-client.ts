@@ -7,8 +7,10 @@ import {
   sanitizeSensitiveData,
 } from "@stella/contracts/sensitive-data";
 import type {
+  IntegrationAccount,
   IntegrationActionsPage,
   IntegrationCatalogEntry,
+  IntegrationConnection,
 } from "@stella/contracts/backend/integrations";
 import {
   mcpServerReach,
@@ -17,6 +19,7 @@ import {
 import {
   MCP_AUTHORIZE_ACTION,
   buildConnectorToolEntries,
+  splitConnectorAccountArg,
   invalidConnectorToolArgsMessage,
   requireConnectorTool,
   validateConnectorToolArgs,
@@ -34,12 +37,13 @@ export type CloudConnectorSource = Readonly<{
     cursor?: string;
     limit?: number;
   }): Promise<IntegrationActionsPage | null>;
-  connections(): Promise<{ connections: ReadonlyArray<{ id: string; connected: boolean }> }>;
+  connections(): Promise<{ connections: ReadonlyArray<IntegrationConnection> }>;
   run(args: {
     id: string;
     action: string;
     input: Record<string, unknown>;
     requestId: string;
+    account?: string;
   }): Promise<unknown>;
 }>;
 
@@ -98,7 +102,14 @@ export type CloudConnectorCatalogEntry = Readonly<{
 export type CloudConnectorConnection = Readonly<{
   id: string;
   connected: boolean;
+  multiAccount?: boolean;
+  accounts?: readonly IntegrationAccount[];
 }>;
+
+export const accountsListText = (accounts: readonly IntegrationAccount[]): string =>
+  accounts
+    .map((account) => `${account.email ?? account.label}${account.primary ? " (primary)" : ""}${account.connected ? "" : " (needs reconnecting)"}`)
+    .join(", ");
 
 const DISCOVER_MAX_MATCHES = 8;
 const MCP_LIST_TTL_MS = 10_000;
@@ -264,7 +275,12 @@ export class CloudConnectorDirectory {
     return (this.#connections ??= (async () => {
       const { connections } = await this.#context.source.connections();
       return Object.freeze(
-        connections.map((entry) => ({ id: entry.id, connected: entry.connected === true })),
+        connections.map((entry) => ({
+          id: entry.id,
+          connected: entry.connected === true,
+          ...(entry.multiAccount ? { multiAccount: true } : {}),
+          ...(entry.accounts ? { accounts: entry.accounts } : {}),
+        })),
       );
     })().catch((error) => {
       this.#connections = undefined;
@@ -273,8 +289,15 @@ export class CloudConnectorDirectory {
   }
 
   async isConnected(id: string, options?: { refresh?: boolean }): Promise<boolean> {
+    return (await this.connection(id, options))?.connected === true;
+  }
+
+  async connection(
+    id: string,
+    options?: { refresh?: boolean },
+  ): Promise<CloudConnectorConnection | undefined> {
     const connections = await this.connections(options);
-    return connections.some((entry) => entry.id === id && entry.connected);
+    return connections.find((entry) => entry.id === id);
   }
 
   allActions(id: string): Promise<readonly ActionRecord[]> {
@@ -311,10 +334,17 @@ export class CloudConnectorDirectory {
     id: string,
     action: string,
     input: Record<string, unknown>,
+    account?: string,
   ): Promise<unknown> {
     try {
       return sanitizeSensitiveData(
-        await this.#context.source.run({ id, action, input, requestId: crypto.randomUUID() }),
+        await this.#context.source.run({
+          id,
+          action,
+          input,
+          requestId: crypto.randomUUID(),
+          ...(account ? { account } : {}),
+        }),
       );
     } catch (error) {
       if (error instanceof RpcError && error.reason === "not_connected") {
@@ -424,8 +454,25 @@ const connectedSources = async (
         const entry = catalog.find((candidate) => candidate.id === connection.id);
         if (!entry) return null;
         const actions = await directory.allActions(entry.id).catch(() => null);
+        const accounts = connection.multiAccount
+          ? (connection.accounts ?? []).filter((account) => account.connected)
+          : [];
         return actions
-          ? { id: entry.id, name: entry.name, kind: "native", actions }
+          ? {
+              id: entry.id,
+              name: entry.name,
+              kind: "native",
+              actions,
+              ...(accounts.length > 0
+                ? {
+                    accounts: accounts.map((account) => ({
+                      label: account.label,
+                      ...(account.email ? { email: account.email } : {}),
+                      primary: account.primary,
+                    })),
+                  }
+                : {}),
+            }
           : null;
       }),
   );
@@ -552,6 +599,15 @@ export const createCloudConnectClient = (
             kind: "native" as const,
             connected: connection.connected,
             description: collapseLine(entry.description),
+            ...(connection.multiAccount
+              ? {
+                  accounts: (connection.accounts ?? []).map((account) => ({
+                    email: account.email ?? account.label,
+                    primary: account.primary,
+                    connected: account.connected,
+                  })),
+                }
+              : {}),
           },
         ];
       })];
@@ -589,6 +645,10 @@ export const createCloudConnectClient = (
         } catch (error) {
           throw new Error(sourceErrorMessage(error, `${entry.connectorName} could not run ${entry.action}.`));
         }
+      }
+      if (entry.accountAware) {
+        const { account, rest } = splitConnectorAccountArg(args);
+        return await directory.run(entry.connector, entry.action, rest, account);
       }
       return await directory.run(entry.connector, entry.action, args);
     },

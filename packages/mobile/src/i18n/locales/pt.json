@@ -2744,7 +2744,11 @@
       "searchPlaceholder": "Pesquisar",
       "title": "Conectores",
       "noMatchesTitle": "Nenhum resultado",
-      "noMatchesBody": "Tente outro nome."
+      "noMatchesBody": "Tente outro nome.",
+      "addAccount": "Adicionar outra conta",
+      "setPrimary": "Definir como principal",
+      "primary": "Principal",
+      "removeAccount": "Remover"
     },
     "display": {
       "agentThread": {

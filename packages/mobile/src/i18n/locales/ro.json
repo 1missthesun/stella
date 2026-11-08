@@ -2744,7 +2744,11 @@
       "searchPlaceholder": "Caută",
       "title": "Conectori",
       "noMatchesTitle": "Niciun rezultat",
-      "noMatchesBody": "Încearcă alt nume."
+      "noMatchesBody": "Încearcă alt nume.",
+      "addAccount": "Adaugă alt cont",
+      "setPrimary": "Setează ca principal",
+      "primary": "Principal",
+      "removeAccount": "Elimină"
     },
     "display": {
       "agentThread": {

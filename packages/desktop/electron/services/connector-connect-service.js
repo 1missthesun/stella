@@ -71,6 +71,7 @@ export class ConnectorConnectService {
             kind: "integration",
             state: "pending",
             ...(payload.offerId ? { offerId: payload.offerId } : {}),
+            ...(payload.addAccount === true ? { addAccount: true } : {}),
             canonicalFingerprint: connectorIdentityFingerprint({
                 catalog: target.catalog,
                 entry: entry,
@@ -87,6 +88,7 @@ export class ConnectorConnectService {
             category: entry.category,
             reason: payload.reason,
             kind: "integration",
+            ...(payload.addAccount === true ? { addAccount: true } : {}),
             ...(payload.conversationId
                 ? { conversationId: payload.conversationId }
                 : {}),
@@ -265,7 +267,7 @@ export class ConnectorConnectService {
                     meta.canonicalFingerprint) {
                 throw new Error(`${meta.name} connector changed while the card was open. Retry the connection.`);
             }
-            await ensureNativeCredential(flowOptions, stellaAppDir, entry.id, acceptedTarget);
+            await ensureNativeCredential(flowOptions, stellaAppDir, entry.id, acceptedTarget, { addAccount: meta.addAccount === true });
             const configuredOAuthProviders = await loadConfiguredOAuthProviders(flowOptions);
             await enableNativeConnector(stellaAppDir, entry.id, "store", {
                 configuredBackendProviders: configuredOAuthProviders.backend,

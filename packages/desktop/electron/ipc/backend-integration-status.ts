@@ -11,14 +11,41 @@ export type BackendIntegrationWaitResult =
   | "unsupported"
   | "auth_unavailable";
 
-const readConnected = (payload: unknown): boolean =>
-  Boolean(
-    payload &&
-      typeof payload === "object" &&
-      (payload as { connected?: unknown }).connected === true,
+const readConnected = (
+  payload: unknown,
+  minConnectedAccounts?: number,
+): boolean => {
+  if (!payload || typeof payload !== "object") return false;
+  const record = payload as { connected?: unknown; accounts?: unknown };
+  if (record.connected !== true) return false;
+  if (minConnectedAccounts === undefined) return true;
+  const accounts = Array.isArray(record.accounts) ? record.accounts : [];
+  return (
+    accounts.filter(
+      (account) =>
+        account &&
+        typeof account === "object" &&
+        (account as { connected?: unknown }).connected === true,
+    ).length >= minConnectedAccounts
   );
+};
 
-const DEFAULT_PROBE_TIMEOUT_MS = 10_000;
+export const connectedAccountCountOf = (payload: unknown): number => {
+  const accounts =
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as { accounts?: unknown }).accounts)
+      ? (payload as { accounts: unknown[] }).accounts
+      : [];
+  return accounts.filter(
+    (account) =>
+      account &&
+      typeof account === "object" &&
+      (account as { connected?: unknown }).connected === true,
+  ).length;
+};
+
+const DEFAULT_PROBE_TIMEOUT_MS = 25_000;
 
 const probeSignal = (probeTimeoutMs: number, signal?: AbortSignal) => {
   const timeout = AbortSignal.timeout(probeTimeoutMs);
@@ -30,6 +57,7 @@ export const probeBackendIntegrationConnection = async (options: {
   authToken: string;
   id: string;
   probeTimeoutMs?: number;
+  minConnectedAccounts?: number;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }): Promise<BackendIntegrationProbeResult> => {
@@ -52,7 +80,9 @@ export const probeBackendIntegrationConnection = async (options: {
   if (response.status === 404 || response.status === 405) return "unsupported";
   if (!response.ok) return "error";
   const payload = (await response.json().catch(() => null)) as unknown;
-  return readConnected(payload) ? "connected" : "not_connected";
+  return readConnected(payload, options.minConnectedAccounts)
+    ? "connected"
+    : "not_connected";
 };
 
 const sleep = (ms: number, signal?: AbortSignal) =>
@@ -73,6 +103,7 @@ export const waitForBackendIntegrationConnection = async (options: {
   timeoutMs?: number;
   intervalMs?: number;
   probeTimeoutMs?: number;
+  minConnectedAccounts?: number;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
   now?: () => number;

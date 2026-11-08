@@ -1,3 +1,4 @@
+import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { AGENT_STOP_WIRE_REASON, AGENT_STOPPED_REASON } from "@stella/contracts/agent-status";
 import {
   agentAttemptOutcomeOf,
@@ -1893,7 +1894,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             actions: (args) => listIntegrationActions(this.env, args),
             connections: async () =>
               (await ownerInternal("integrations.connections", {})) as {
-                connections: Array<{ id: string; connected: boolean }>;
+                connections: IntegrationConnection[];
               },
             run: (args) => ownerInternal("integrations.run", args),
           },

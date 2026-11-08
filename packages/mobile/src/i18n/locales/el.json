@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Αναζήτηση",
       "title": "Συνδέσεις",
       "noMatchesTitle": "Κανένα αποτέλεσμα",
-      "noMatchesBody": "Δοκιμάστε άλλο όνομα."
+      "noMatchesBody": "Δοκιμάστε άλλο όνομα.",
+      "addAccount": "Προσθήκη άλλου λογαριασμού",
+      "setPrimary": "Ορισμός ως κύριου",
+      "primary": "Κύριος",
+      "removeAccount": "Κατάργηση"
     },
     "display": {
       "agentThread": {

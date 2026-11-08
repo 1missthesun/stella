@@ -15,9 +15,16 @@ import {
   CONNECTOR_STATUS_TOOL_PARAMETERS,
   CONNECTOR_STATUS_TOOL_REPLAY,
   CONNECTOR_STATUS_TOOL_WORKING_TEXT,
+  connectorAccountsText,
   connectorConnectedText,
   connectorNotConnectedText,
+  findConnectorStatusAccount,
+  type ConnectorStatusAccount,
 } from "./connector-status-def.js";
+import { listConnectorAccounts } from "../../connectors/accounts.js";
+import { fetchBackendConnections } from "../../connectors/backend-accounts.js";
+import { GOOGLE_WORKSPACE_ACCOUNTS } from "../../google-workspace/accounts.js";
+import { integrationSupportsMultipleAccounts } from "@stella/contracts/backend/integrations";
 
 export { CONNECTOR_STATUS_TOOL_NAME };
 
@@ -30,6 +37,7 @@ export type ConnectorConnectionRequester = (
     category?: string;
     reason?: string;
     conversationId?: string;
+    addAccount?: boolean;
   },
   signal?: AbortSignal,
 ) => Promise<
@@ -127,6 +135,34 @@ const resolveEntry = (
   };
 };
 
+const connectorAccounts = async (
+  options: ConnectorStatusToolOptions,
+  entry: NativeConnectorCatalogEntry,
+): Promise<{ multiAccount: boolean; accounts: ConnectorStatusAccount[] }> => {
+  if (entry.provider === "google-workspace") {
+    const accounts = await listConnectorAccounts(
+      options.stellaDataDir,
+      GOOGLE_WORKSPACE_ACCOUNTS,
+    ).catch(() => []);
+    return { multiAccount: true, accounts };
+  }
+  if (
+    entry.provider !== "backend-composio" ||
+    !integrationSupportsMultipleAccounts(entry.id)
+  ) {
+    return { multiAccount: false, accounts: [] };
+  }
+  const auth = options.getCloudBackendAuth?.();
+  if (!auth) return { multiAccount: true, accounts: [] };
+  const connections = await fetchBackendConnections(auth, { fresh: true }).catch(
+    () => [],
+  );
+  return {
+    multiAccount: true,
+    accounts: connections.find((row) => row.id === entry.id)?.accounts ?? [],
+  };
+};
+
 export const createConnectorStatusTool = (
   options: ConnectorStatusToolOptions,
 ): ToolDefinition => ({
@@ -149,6 +185,10 @@ export const createConnectorStatusTool = (
       typeof args.reason === "string" && args.reason.trim()
         ? args.reason.trim()
         : undefined;
+    const requestedAccount =
+      typeof args.account === "string" && args.account.trim()
+        ? args.account.trim()
+        : undefined;
 
     const catalog = await loadCatalog(options);
     const { entry, suggestions } = resolveEntry(catalog.entries, query);
@@ -170,6 +210,8 @@ export const createConnectorStatusTool = (
     );
     const toolCount = state.toolCount;
     const executable = state.executable;
+    const { multiAccount, accounts } = await connectorAccounts(options, entry);
+    const addAccount = args.add_account === true && multiAccount;
     const diagnostics = {
       id: entry.id,
       catalogSource: catalog.sources[entry.id] ?? catalog.source,
@@ -179,10 +221,19 @@ export const createConnectorStatusTool = (
       accountVerified: state.accountVerified,
       toolCount,
       executable,
+      ...(multiAccount ? { accounts } : {}),
     };
-    if (executable) {
+    if (executable && requestedAccount && !addAccount && accounts.length > 0) {
+      if (!findConnectorStatusAccount(accounts, requestedAccount)) {
+        return {
+          result: `${entry.name} has no connected account ${requestedAccount}.${connectorAccountsText(accounts)} To add it, call connector_status again with add_account: true (only if the user wants it connected).`,
+          details: { ...diagnostics, status: "account_not_connected" },
+        };
+      }
+    }
+    if (executable && !addAccount) {
       return {
-        result: `${connectorConnectedText(entry.name, entry.id)}${state.accountVerified ? "" : " Its account link is managed by the backend and was not verified here."}`,
+        result: `${connectorConnectedText(entry.name, entry.id)}${connectorAccountsText(accounts)}${state.accountVerified || accounts.length > 0 ? "" : " Its account link is managed by the backend and was not verified here."}`,
         details: { ...diagnostics, status: "executable" },
       };
     }
@@ -224,14 +275,18 @@ export const createConnectorStatusTool = (
         ...(context?.conversationId
           ? { conversationId: context.conversationId }
           : {}),
+        ...(addAccount ? { addAccount: true } : {}),
       },
       extras?.signal,
     );
 
     if (outcome.ok) {
+      const updated = await connectorAccounts(options, entry).catch(() => ({
+        accounts: [] as ConnectorStatusAccount[],
+      }));
       return {
-        result: `${connectorConnectedText(entry.name, entry.id)} The user approved the card.`,
-        details: { id: entry.id, status: "connected" },
+        result: `${connectorConnectedText(entry.name, entry.id)} The user approved the card.${connectorAccountsText(updated.accounts)}`,
+        details: { id: entry.id, status: "connected", accounts: updated.accounts },
       };
     }
     if (outcome.reason === "declined") {

@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Search",
       "title": "Connectors",
       "noMatchesTitle": "No matches",
-      "noMatchesBody": "Try a different name."
+      "noMatchesBody": "Try a different name.",
+      "addAccount": "Add another account",
+      "setPrimary": "Set as primary",
+      "primary": "Primary",
+      "removeAccount": "Remove"
     },
     "display": {
       "agentThread": {

@@ -2753,7 +2753,11 @@
       "searchPlaceholder": "Hledat",
       "title": "Konektory",
       "noMatchesTitle": "Žádné shody",
-      "noMatchesBody": "Zkuste jiný název."
+      "noMatchesBody": "Zkuste jiný název.",
+      "addAccount": "Přidat další účet",
+      "setPrimary": "Nastavit jako hlavní",
+      "primary": "Hlavní",
+      "removeAccount": "Odebrat"
     },
     "display": {
       "agentThread": {

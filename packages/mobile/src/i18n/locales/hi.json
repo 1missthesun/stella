@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "खोजें",
       "title": "कनेक्टर",
       "noMatchesTitle": "कोई मिलान नहीं",
-      "noMatchesBody": "कोई दूसरा नाम आज़माएँ।"
+      "noMatchesBody": "कोई दूसरा नाम आज़माएँ।",
+      "addAccount": "एक और खाता जोड़ें",
+      "setPrimary": "प्राथमिक बनाएं",
+      "primary": "प्राथमिक",
+      "removeAccount": "हटाएं"
     },
     "display": {
       "agentThread": {

@@ -395,6 +395,12 @@ export const IPC_NATIVE_INTEGRATIONS_ENABLE =
   "nativeIntegrations:enable" as const;
 export const IPC_NATIVE_INTEGRATIONS_DISABLE =
   "nativeIntegrations:disable" as const;
+export const IPC_NATIVE_INTEGRATIONS_ADD_ACCOUNT =
+  "nativeIntegrations:addAccount" as const;
+export const IPC_NATIVE_INTEGRATIONS_SET_PRIMARY_ACCOUNT =
+  "nativeIntegrations:setPrimaryAccount" as const;
+export const IPC_NATIVE_INTEGRATIONS_REMOVE_ACCOUNT =
+  "nativeIntegrations:removeAccount" as const;
 
 export const IPC_CLOUD_CONVERSATION_CACHE_RETAIN_ACCOUNT =
   "cloudConversationCache:retainAccount" as const;

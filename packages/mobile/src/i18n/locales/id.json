@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "Cari",
       "title": "Konektor",
       "noMatchesTitle": "Tidak ada yang cocok",
-      "noMatchesBody": "Coba nama lain."
+      "noMatchesBody": "Coba nama lain.",
+      "addAccount": "Tambahkan akun lain",
+      "setPrimary": "Jadikan utama",
+      "primary": "Utama",
+      "removeAccount": "Hapus"
     },
     "display": {
       "agentThread": {

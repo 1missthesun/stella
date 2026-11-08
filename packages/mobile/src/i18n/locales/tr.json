@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Ara",
       "title": "Bağlayıcılar",
       "noMatchesTitle": "Eşleşme yok",
-      "noMatchesBody": "Başka bir ad deneyin."
+      "noMatchesBody": "Başka bir ad deneyin.",
+      "addAccount": "Başka bir hesap ekle",
+      "setPrimary": "Birincil yap",
+      "primary": "Birincil",
+      "removeAccount": "Kaldır"
     },
     "display": {
       "agentThread": {

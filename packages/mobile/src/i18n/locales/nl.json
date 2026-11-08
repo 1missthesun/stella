@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Zoeken",
       "title": "Connectors",
       "noMatchesTitle": "Geen resultaten",
-      "noMatchesBody": "Probeer een andere naam."
+      "noMatchesBody": "Probeer een andere naam.",
+      "addAccount": "Nog een account toevoegen",
+      "setPrimary": "Als primair instellen",
+      "primary": "Primair",
+      "removeAccount": "Verwijderen"
     },
     "display": {
       "agentThread": {

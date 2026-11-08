@@ -2753,7 +2753,11 @@
       "searchPlaceholder": "Поиск",
       "title": "Коннекторы",
       "noMatchesTitle": "Ничего не найдено",
-      "noMatchesBody": "Попробуйте другое название."
+      "noMatchesBody": "Попробуйте другое название.",
+      "addAccount": "Добавить ещё аккаунт",
+      "setPrimary": "Сделать основным",
+      "primary": "Основной",
+      "removeAccount": "Удалить"
     },
     "display": {
       "agentThread": {

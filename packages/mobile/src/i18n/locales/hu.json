@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Keresés",
       "title": "Összekötők",
       "noMatchesTitle": "Nincs találat",
-      "noMatchesBody": "Próbálj másik nevet."
+      "noMatchesBody": "Próbálj másik nevet.",
+      "addAccount": "Másik fiók hozzáadása",
+      "setPrimary": "Beállítás elsődlegesként",
+      "primary": "Elsődleges",
+      "removeAccount": "Eltávolítás"
     },
     "display": {
       "agentThread": {

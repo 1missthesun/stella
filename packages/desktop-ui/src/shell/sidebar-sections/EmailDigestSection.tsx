@@ -18,8 +18,8 @@ const GMAIL_ID = "gmail";
 
 type Connection = "checking" | "connected" | "disconnected" | "unavailable";
 
-const threadUrl = (threadId: string) =>
-  `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`;
+const threadUrl = (threadId: string, account?: string) =>
+  `https://mail.google.com/mail/u/${account?.includes("@") ? encodeURIComponent(account) : "0"}/#all/${encodeURIComponent(threadId)}`;
 
 const clockTime = (locale: string, at: number, now: number) =>
   new Intl.DateTimeFormat(locale, {
@@ -59,7 +59,7 @@ function DigestGroup({
       <ul className="email-digest__list">
         {digest.items.map((item, index) => {
           const open = item.threadId
-            ? () => openExternalUrl(threadUrl(item.threadId!))
+            ? () => openExternalUrl(threadUrl(item.threadId!, item.account))
             : undefined;
           return (
             <li key={`${digest.digestId}:${index}`}>
@@ -71,6 +71,9 @@ function DigestGroup({
               >
                 <span className="email-digest__from" title={item.from}>
                   {item.from.replace(/\s*<[^>]*>\s*$/u, "")}
+                  {item.account ? (
+                    <span className="email-digest__account"> · {item.account}</span>
+                  ) : null}
                 </span>
                 <span className="email-digest__summary">{item.summary}</span>
                 <span className="email-digest__subject" title={item.subject}>

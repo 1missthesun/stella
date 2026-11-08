@@ -8,16 +8,24 @@ export type ConnectorActionSource = {
   annotations?: Record<string, unknown>;
 };
 
+export type ConnectorToolAccount = {
+  label: string;
+  email?: string;
+  primary: boolean;
+};
+
 export type ConnectorToolSource = {
   id: string;
   name: string;
   kind: ConnectorToolKind;
   actions: readonly ConnectorActionSource[];
   stripPrefixes?: readonly string[];
+  accounts?: readonly ConnectorToolAccount[];
 };
 
 export type ConnectorToolEntry = {
   name: string;
+  accountAware?: boolean;
   description: string;
   parameters: Record<string, unknown>;
   annotations?: Record<string, unknown>;
@@ -96,6 +104,54 @@ export const connectorToolName = (
   return `${namespace}_${actionSlug}`;
 };
 
+export const CONNECTOR_ACCOUNT_ARG = "account";
+
+const accountName = (account: ConnectorToolAccount) =>
+  account.email ?? account.label;
+
+export const connectorAccountToolHint = (
+  accounts: readonly ConnectorToolAccount[],
+): string => {
+  if (accounts.length === 0) return "";
+  const primary = accounts.find((account) => account.primary) ?? accounts[0]!;
+  if (accounts.length === 1) {
+    return `Uses the connected account ${accountName(primary)}; pass \`${CONNECTOR_ACCOUNT_ARG}\` (an email) only after another account is connected.`;
+  }
+  const list = accounts
+    .map((account) => `${accountName(account)}${account.primary ? " (primary)" : ""}`)
+    .join(", ");
+  return `Several accounts are connected: ${list}. Pass \`${CONNECTOR_ACCOUNT_ARG}\` (an email) to choose one; without it the primary is used. When the user names no account and the answer could be in any of them (searching, reading, listing), call once per account and label each result with its account; for sending, creating or changing, use the account the user named or the primary.`;
+};
+
+export const withConnectorAccountParameter = (
+  schema: Record<string, unknown>,
+  accounts: readonly ConnectorToolAccount[],
+): Record<string, unknown> => {
+  const properties = isRecord(schema.properties) ? schema.properties : {};
+  if (CONNECTOR_ACCOUNT_ARG in properties) return schema;
+  const names = accounts.map(accountName);
+  return {
+    ...schema,
+    type: "object",
+    properties: {
+      ...properties,
+      [CONNECTOR_ACCOUNT_ARG]: {
+        type: "string",
+        description: `Email of the connected account to use${names.length ? ` (${names.join(", ")})` : ""}. Defaults to the primary account.`,
+      },
+    },
+  };
+};
+
+export const splitConnectorAccountArg = (
+  args: Record<string, unknown>,
+): { account?: string; rest: Record<string, unknown> } => {
+  const { [CONNECTOR_ACCOUNT_ARG]: account, ...rest } = args;
+  return typeof account === "string" && account.trim()
+    ? { account: account.trim(), rest }
+    : { rest };
+};
+
 const collapse = (value: string | undefined): string =>
   (value ?? "").replace(/\s+/gu, " ").trim();
 
@@ -130,16 +186,30 @@ export const buildConnectorToolEntries = (
         collapse(action.description) ||
         collapse(action.title) ||
         `Run ${action.name}.`;
+      const baseParameters = isRecord(action.inputSchema)
+        ? action.inputSchema
+        : action.name === API_REQUEST_ACTION
+          ? API_REQUEST_INPUT_SCHEMA
+          : action.name === MCP_AUTHORIZE_ACTION
+            ? NO_INPUT_SCHEMA
+            : OPEN_INPUT_SCHEMA;
+      const accounts = source.accounts ?? [];
+      const accountAware =
+        accounts.length > 0 &&
+        !action.name.startsWith("$") &&
+        !(
+          isRecord(baseParameters.properties) &&
+          CONNECTOR_ACCOUNT_ARG in baseParameters.properties
+        );
       entries.push({
         name,
-        description: `${source.name}: ${summary}`,
-        parameters: isRecord(action.inputSchema)
-          ? action.inputSchema
-          : action.name === API_REQUEST_ACTION
-            ? API_REQUEST_INPUT_SCHEMA
-            : action.name === MCP_AUTHORIZE_ACTION
-              ? NO_INPUT_SCHEMA
-              : OPEN_INPUT_SCHEMA,
+        ...(accountAware ? { accountAware: true } : {}),
+        description: accountAware
+          ? `${source.name}: ${summary} ${connectorAccountToolHint(accounts)}`
+          : `${source.name}: ${summary}`,
+        parameters: accountAware
+          ? withConnectorAccountParameter(baseParameters, accounts)
+          : baseParameters,
         ...(action.annotations ? { annotations: action.annotations } : {}),
         label: `${source.name}: ${collapse(action.title) || action.name}`,
         connector: source.id,

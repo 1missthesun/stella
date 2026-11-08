@@ -121,6 +121,11 @@
   box-shadow: var(--focus-ring);
 }
 
+.email-digest__account {
+  color: var(--text-weak);
+  font-weight: var(--weight-regular, 400);
+}
+
 .email-digest__from {
   overflow: hidden;
   color: var(--text-strong);

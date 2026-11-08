@@ -174,15 +174,27 @@ export const toolkitConnectedFromPayload = (
 
 const sessionPath = (sessionId: string): string => `/session/${encodeURIComponent(sessionId)}`;
 
-/** Create a session for one toolkit. Composio has no idempotency key for this. */
+/**
+ * Create a session for one toolkit. Composio has no idempotency key for this.
+ * `multiAccount` lets its connect links add further accounts instead of
+ * replacing one; `connectedAccountId` pins every execution to that account.
+ */
 export const createComposioSession = async (
   config: ComposioConfig,
   userId: string,
   toolkit: string,
+  options: { multiAccount?: boolean; connectedAccountId?: string } = {},
 ): Promise<string> => {
   const payload = await composioFetch(config, "/session", {
     method: "POST",
-    body: { user_id: userId, toolkits: { enable: [toolkit] } },
+    body: {
+      user_id: userId,
+      toolkits: { enable: [toolkit] },
+      ...(options.multiAccount ? { multi_account: { enable: true } } : {}),
+      ...(options.connectedAccountId
+        ? { connected_accounts: { [toolkit]: [options.connectedAccountId] } }
+        : {}),
+    },
   });
   const sessionId = sessionIdFromPayload(payload);
   if (!sessionId) throw new Error("Composio did not return a session id.");
@@ -206,11 +218,12 @@ export const composioConnectLink = async (
   config: ComposioConfig,
   sessionId: string,
   toolkit: string,
+  alias?: string,
 ): Promise<string> => {
   const url = linkFromPayload(
     await composioFetch(config, `${sessionPath(sessionId)}/link`, {
       method: "POST",
-      body: { toolkit },
+      body: { toolkit, ...(alias ? { alias } : {}) },
     }),
   );
   if (!url) throw new Error("Composio did not return a connect link.");
@@ -268,6 +281,96 @@ const listConnectedAccountIds = async (
     if (!cursor) return ids;
   }
   throw new Error("Composio account listing exceeded its page bound.");
+};
+
+export type ComposioAccount = {
+  id: string;
+  status: string;
+  createdAt: number;
+  identity?: string;
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
+const accountIdentity = (item: Record<string, unknown>): string | undefined => {
+  const state = isRecord(item.state) ? item.state : null;
+  const val = isRecord(state?.val) ? state.val : null;
+  const data = isRecord(item.data) ? item.data : null;
+  const params = isRecord(item.params) ? item.params : null;
+  const candidates = [
+    val?.displayName,
+    val?.email,
+    val?.user_email,
+    data?.displayName,
+    data?.email,
+    params?.email,
+    item.alias,
+  ];
+  for (const candidate of candidates) {
+    const value = readString(candidate);
+    if (value && EMAIL_PATTERN.test(value)) return value.toLowerCase();
+  }
+  return undefined;
+};
+
+/** Every connected account (any status) the user has for one toolkit, oldest first. */
+export const listComposioAccounts = async (
+  config: ComposioConfig,
+  toolkit: string,
+  userId: string,
+): Promise<ComposioAccount[]> => {
+  const apiBaseUrl = toolsApiBaseUrl(config.baseUrl);
+  const wanted = toolkit.trim().toLowerCase();
+  const accounts: ComposioAccount[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_ACCOUNT_PAGES; page += 1) {
+    const params = new URLSearchParams({
+      toolkit_slugs: wanted,
+      user_ids: userId,
+      limit: "50",
+      order_by: "created_at",
+      order_direction: "asc",
+    });
+    if (cursor) params.set("cursor", cursor);
+    const payload = await composioFetch(
+      config,
+      `/connected_accounts?${params.toString()}`,
+      { method: "GET" },
+      { baseUrl: apiBaseUrl },
+    );
+    if (!Array.isArray(payload.items)) throw new Error("Composio account list is malformed.");
+    for (const item of payload.items) {
+      if (!isRecord(item)) continue;
+      const id = readString(item.id);
+      const slug = readString(isRecord(item.toolkit) ? item.toolkit.slug : null)?.toLowerCase();
+      const owner = readString(item.user_id);
+      if (!id || slug !== wanted || (owner && owner !== userId)) continue;
+      const createdAt = Date.parse(readString(item.created_at) ?? "");
+      const identity = accountIdentity(item);
+      accounts.push({
+        id,
+        status: (readString(item.status) ?? "").toUpperCase(),
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+        ...(identity ? { identity } : {}),
+      });
+    }
+    cursor = readString(payload.next_cursor);
+    if (!cursor) break;
+  }
+  return accounts.sort((left, right) => left.createdAt - right.createdAt);
+};
+
+export const deleteComposioAccount = async (config: ComposioConfig, accountId: string): Promise<void> => {
+  const apiBaseUrl = toolsApiBaseUrl(config.baseUrl);
+  const accountPath = `/connected_accounts/${encodeURIComponent(accountId)}`;
+  await ignoreStatus(
+    composioFetch(config, `${accountPath}/revoke`, { method: "POST", body: {} }, { baseUrl: apiBaseUrl }),
+    [404, 409],
+  );
+  await ignoreStatus(
+    composioFetch(config, `${accountPath}?revoke_on_delete=true`, { method: "DELETE" }, { baseUrl: apiBaseUrl }),
+    [404],
+  );
 };
 
 export const purgeComposioConnection = async (

@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Hae",
       "title": "Liitännät",
       "noMatchesTitle": "Ei osumia",
-      "noMatchesBody": "Kokeile toista nimeä."
+      "noMatchesBody": "Kokeile toista nimeä.",
+      "addAccount": "Lisää toinen tili",
+      "setPrimary": "Aseta ensisijaiseksi",
+      "primary": "Ensisijainen",
+      "removeAccount": "Poista"
     },
     "display": {
       "agentThread": {

@@ -18,6 +18,7 @@ import {
   redactSensitiveText,
   sanitizeSensitiveData,
 } from "@stella/contracts/sensitive-data";
+import { fetchBackendConnections } from "../kernel/connectors/backend-accounts.js";
 
 type SiteAuth = { baseUrl: string; authToken: string };
 
@@ -316,6 +317,29 @@ export const createBackendConnectorActionsBroker =
     };
   };
 
+export const createBackendConnectionsBroker =
+  (options: Pick<BackendConnectorActionBrokerOptions, "getSiteAuth" | "refreshSiteAuth" | "fetchImpl">) =>
+  async (): Promise<{ ok: true; connections: unknown[] } | { ok: false; reason: string }> => {
+    let auth = options.getSiteAuth();
+    const status = auth ? jwtStatus(auth.authToken) : "expired";
+    if (!auth || status === "expired" || status === "malformed") {
+      auth = await options.refreshSiteAuth();
+    }
+    if (!auth?.baseUrl.trim() || !auth.authToken.trim()) {
+      return { ok: false, reason: "not_signed_in" };
+    }
+    try {
+      return {
+        ok: true,
+        connections: await fetchBackendConnections(auth, {
+          ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+        }),
+      };
+    } catch {
+      return { ok: false, reason: "backend_error" };
+    }
+  };
+
 export const createBackendConnectorActionBroker =
   (options: BackendConnectorActionBrokerOptions) =>
   async (params: {
@@ -323,6 +347,7 @@ export const createBackendConnectorActionBroker =
     action: string;
     input: Record<string, unknown>;
     requestId?: string;
+    account?: string;
     signal?: AbortSignal;
   }): Promise<BackendConnectorActionResult> => {
     const connectorId = params.connectorId.trim().toLowerCase();
@@ -441,6 +466,7 @@ export const createBackendConnectorActionBroker =
             id: connectorId,
             action,
             input: params.input,
+            ...(params.account ? { account: params.account } : {}),
           }),
           signal: requestSignal,
         },

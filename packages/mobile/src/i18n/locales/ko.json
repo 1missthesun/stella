@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "검색",
       "title": "커넥터",
       "noMatchesTitle": "일치하는 항목 없음",
-      "noMatchesBody": "다른 이름으로 시도해 보세요."
+      "noMatchesBody": "다른 이름으로 시도해 보세요.",
+      "addAccount": "다른 계정 추가",
+      "setPrimary": "기본으로 설정",
+      "primary": "기본",
+      "removeAccount": "제거"
     },
     "display": {
       "agentThread": {

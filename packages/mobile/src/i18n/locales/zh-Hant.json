@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "搜尋",
       "title": "連接器",
       "noMatchesTitle": "沒有相符項目",
-      "noMatchesBody": "換個名稱試試。"
+      "noMatchesBody": "換個名稱試試。",
+      "addAccount": "新增其他帳號",
+      "setPrimary": "設為主要帳號",
+      "primary": "主要帳號",
+      "removeAccount": "移除"
     },
     "display": {
       "agentThread": {

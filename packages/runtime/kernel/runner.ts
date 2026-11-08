@@ -25,9 +25,10 @@ import { getClaudeCodeConfig } from "./storage/local-llm-credential-access.js";
 import { resolveAgentWorkingDirectory } from "./agent-runtime/shared.js";
 import { loadGoogleWorkspaceTools } from "./google-workspace/load-google-workspace-tools.js";
 import {
-  deleteConnectorAccessTokens,
-  loadConnectorAccessToken,
-} from "./connectors/oauth.js";
+  listConnectorAccounts,
+  removeAllConnectorAccounts,
+} from "./connectors/accounts.js";
+import { GOOGLE_WORKSPACE_ACCOUNTS } from "./google-workspace/accounts.js";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { canResolveRunnerLlmRoute } from "./runner/model-selection.js";
 import { sanitizeStellaBase } from "./runner/shared.js";
@@ -532,13 +533,14 @@ export const createStellaHostRunner = (
       read: async (args) => await context.backend.require().call("agentLogs.read", args),
     },
     googleWorkspaceGetAuthStatus: async () => {
+      const accounts = await listConnectorAccounts(
+        context.stellaDataDir,
+        GOOGLE_WORKSPACE_ACCOUNTS,
+      );
+      const primary = accounts.find((account) => account.primary);
       return {
-        connected: Boolean(
-          await loadConnectorAccessToken(
-            context.stellaDataDir,
-            "google-workspace",
-          ),
-        ),
+        connected: accounts.length > 0,
+        ...(primary?.email ? { email: primary.email } : {}),
       };
     },
 
@@ -555,9 +557,10 @@ export const createStellaHostRunner = (
     },
 
     googleWorkspaceDisconnect: async () => {
-      await deleteConnectorAccessTokens(context.stellaDataDir, [
-        "google-workspace",
-      ]);
+      await removeAllConnectorAccounts(
+        context.stellaDataDir,
+        GOOGLE_WORKSPACE_ACCOUNTS,
+      );
       return { ok: true };
     },
   };

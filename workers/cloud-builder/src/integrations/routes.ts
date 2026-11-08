@@ -130,6 +130,7 @@ const run = async (request: Request, env: RouteEnv): Promise<Response> =>
     id: body?.id,
     action: body?.action,
     input: body?.input,
+    ...(typeof body?.account === "string" && body.account.trim() ? { account: body.account } : {}),
     requestId: (request.headers.get("x-stella-request-id") ?? request.headers.get("idempotency-key") ?? "").trim(),
   }));
 
@@ -238,7 +239,28 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
         : methodNotAllowed();
     case "/api/native-integrations/connect-link":
       return method === "POST"
-        ? await ownerCall(request, env, "integrations.connectLink", (body) => ({ id: body?.id }))
+        ? await ownerCall(request, env, "integrations.connectLink", (body) => ({
+            id: body?.id,
+            ...(body?.addAccount === true ? { addAccount: true } : {}),
+          }))
+        : methodNotAllowed();
+    case "/api/native-integrations/connections":
+      return method === "GET"
+        ? await ownerCall(request, env, "integrations.connections", () => ({}))
+        : methodNotAllowed();
+    case "/api/native-integrations/accounts/primary":
+      return method === "POST"
+        ? await ownerCall(request, env, "integrations.setPrimaryAccount", (body) => ({
+            id: body?.id,
+            account: body?.account,
+          }))
+        : methodNotAllowed();
+    case "/api/native-integrations/accounts/remove":
+      return method === "POST"
+        ? await ownerCall(request, env, "integrations.removeAccount", (body) => ({
+            id: body?.id,
+            account: body?.account,
+          }))
         : methodNotAllowed();
     case "/api/native-integrations/run":
       return method === "POST" ? await run(request, env) : methodNotAllowed();

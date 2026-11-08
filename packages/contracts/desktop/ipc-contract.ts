@@ -301,9 +301,12 @@ import {
   IPC_MEMORY_SYNC_NOW,
   IPC_MEMORY_SYNC_SET_HELD,
   IPC_MEMORY_SYNC_STATUS,
+  IPC_NATIVE_INTEGRATIONS_ADD_ACCOUNT,
   IPC_NATIVE_INTEGRATIONS_DISABLE,
   IPC_NATIVE_INTEGRATIONS_ENABLE,
   IPC_NATIVE_INTEGRATIONS_LIST,
+  IPC_NATIVE_INTEGRATIONS_REMOVE_ACCOUNT,
+  IPC_NATIVE_INTEGRATIONS_SET_PRIMARY_ACCOUNT,
   IPC_OFFICE_PREVIEW_LIST,
   IPC_OFFICE_PREVIEW_START,
   IPC_OFFICE_PREVIEW_UPDATE,
@@ -701,6 +704,14 @@ export type MeetingStopResult = {
   reason?: string;
 };
 
+export type NativeIntegrationAccount = {
+  id: string;
+  email?: string;
+  label: string;
+  primary: boolean;
+  connected: boolean;
+};
+
 export type NativeIntegration = {
   id: string;
   name: string;
@@ -731,6 +742,8 @@ export type NativeIntegration = {
   enabledAt?: number;
   toolCount: number;
   actionCount?: number;
+  multiAccount?: boolean;
+  accounts?: NativeIntegrationAccount[];
 };
 
 type Invoke<Req extends unknown[], Res> = { req: Req; res: Res };
@@ -1475,6 +1488,18 @@ export type IpcInvokeContract = {
   >;
   [IPC_NATIVE_INTEGRATIONS_DISABLE]: Invoke<
     [payload: { id: string }],
+    NativeIntegration
+  >;
+  [IPC_NATIVE_INTEGRATIONS_ADD_ACCOUNT]: Invoke<
+    [payload: { id: string }],
+    NativeIntegration
+  >;
+  [IPC_NATIVE_INTEGRATIONS_SET_PRIMARY_ACCOUNT]: Invoke<
+    [payload: { id: string; account: string }],
+    NativeIntegration
+  >;
+  [IPC_NATIVE_INTEGRATIONS_REMOVE_ACCOUNT]: Invoke<
+    [payload: { id: string; account: string }],
     NativeIntegration
   >;
 

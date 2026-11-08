@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "Tìm kiếm",
       "title": "Trình kết nối",
       "noMatchesTitle": "Không có kết quả",
-      "noMatchesBody": "Hãy thử tên khác."
+      "noMatchesBody": "Hãy thử tên khác.",
+      "addAccount": "Thêm tài khoản khác",
+      "setPrimary": "Đặt làm chính",
+      "primary": "Chính",
+      "removeAccount": "Xóa"
     },
     "display": {
       "agentThread": {

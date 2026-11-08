@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Søk",
       "title": "Tilkoblinger",
       "noMatchesTitle": "Ingen treff",
-      "noMatchesBody": "Prøv et annet navn."
+      "noMatchesBody": "Prøv et annet navn.",
+      "addAccount": "Legg til en annen konto",
+      "setPrimary": "Angi som primær",
+      "primary": "Primær",
+      "removeAccount": "Fjern"
     },
     "display": {
       "agentThread": {

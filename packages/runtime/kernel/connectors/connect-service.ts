@@ -19,6 +19,7 @@ import {
 import {
   requestAccountMcpFromBridge,
   requestBackendConnectorActionFromBridge,
+  requestBackendConnectionsFromBridge,
   requestBackendConnectorActionsFromBridge,
   cancelConnectorCredentialFromBridge,
   requestConnectorCredentialFromBridge,
@@ -70,6 +71,7 @@ import {
   buildConnectorToolEntries,
   invalidConnectorToolArgsMessage,
   requireConnectorTool,
+  splitConnectorAccountArg,
   validateConnectorToolArgs,
   type ConnectorActionSource,
   type ConnectorToolEntry,
@@ -80,6 +82,9 @@ import {
   validateMcpConnectorId,
 } from "./mcp-add-options.js";
 import { loadGoogleWorkspaceTools } from "../google-workspace/load-google-workspace-tools.js";
+import { GOOGLE_WORKSPACE_ACCOUNTS } from "../google-workspace/accounts.js";
+import { listConnectorAccounts } from "./accounts.js";
+import { integrationSupportsMultipleAccounts } from "@stella/contracts/backend/integrations";
 
 export type ConnectorCaller = {
   conversationId?: string;
@@ -336,6 +341,7 @@ export const callBackendNativeIntegration = async (
   id: string,
   action: string,
   input: Record<string, unknown>,
+  account?: string,
 ): Promise<unknown> => {
   const socketPath = options.cliBridgeSocketPath?.trim();
   if (!socketPath) {
@@ -347,6 +353,7 @@ export const callBackendNativeIntegration = async (
       connectorId: id,
       action,
       input,
+      ...(account ? { account } : {}),
     }).catch(() => ({
       ok: false as const,
       reason: "bridge_unavailable",
@@ -388,6 +395,7 @@ export const ensureNativeEnabled = async (
 
 export type NativeConnectorCallArgs = {
   body: Record<string, unknown>;
+  account?: string;
   method?: string;
   query?: Record<string, string | number | boolean>;
   headers?: Record<string, string>;
@@ -426,9 +434,10 @@ export const callNativeConnector = async (
           !Array.isArray(nestedArgs)
           ? (nestedArgs as Record<string, unknown>)
           : {},
+        args.account,
       );
     }
-    return await callBackendNativeIntegration(options, id, action, args.body);
+    return await callBackendNativeIntegration(options, id, action, args.body, args.account);
   }
   const entry = await ensureNativeEnabled(options, id, catalogEntries);
   if (!entry) return null;
@@ -457,9 +466,10 @@ export const callNativeConnector = async (
           !Array.isArray(nestedArgs)
           ? (nestedArgs as Record<string, unknown>)
           : {},
+        args.account,
       );
     }
-    return await callBackendNativeIntegration(options, id, action, args.body);
+    return await callBackendNativeIntegration(options, id, action, args.body, args.account);
   }
   const allowedTools = new Set(
     getNativeConnectorTools(entry).map((tool) => tool.name),
@@ -641,7 +651,12 @@ export const callNativeConnector = async (
     stellaAppDir,
   });
   try {
-    if (callTool) return await callTool(action, args.body);
+    if (callTool) {
+      return await callTool(
+        action,
+        args.account ? { ...args.body, account: args.account } : args.body,
+      );
+    }
     throw new Error("Google Workspace tools are unavailable.");
   } finally {
     await disconnect().catch(() => undefined);
@@ -1510,6 +1525,7 @@ export type ConnectorSummary = {
   transport?: "stdio" | "streamable_http";
   reach?: "anywhere" | "this-device" | "other-device";
   where?: string;
+  accounts?: Array<{ email: string; primary: boolean; connected?: boolean }>;
 };
 
 export const listEnabledConnectorSummaries = async (
@@ -1523,22 +1539,53 @@ export const listEnabledConnectorSummaries = async (
     listConfiguredConnectorCommands(stellaAppDir).catch(() => []),
     listConfiguredApiConnectors(stellaAppDir).catch(() => []),
   ]);
+  const enabledNative = native.filter((entry) => entry.enabled);
+  const socketPath = options.cliBridgeSocketPath?.trim();
+  const [googleAccounts, backendConnections] = await Promise.all([
+    enabledNative.some((entry) => entry.provider === "google-workspace")
+      ? listConnectorAccounts(stellaAppDir, GOOGLE_WORKSPACE_ACCOUNTS).catch(() => [])
+      : Promise.resolve([]),
+    socketPath &&
+    enabledNative.some(
+      (entry) =>
+        entry.provider === "backend-composio" &&
+        integrationSupportsMultipleAccounts(entry.id),
+    )
+      ? requestBackendConnectionsFromBridge({ socketPath }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const accountsFor = (entry: NativeConnectorCatalogEntry) => {
+    if (entry.provider === "google-workspace") {
+      return googleAccounts.map((account) => ({
+        email: account.email ?? account.label,
+        primary: account.primary,
+      }));
+    }
+    const connection = backendConnections?.find((row) => row.id === entry.id);
+    return connection?.multiAccount
+      ? (connection.accounts ?? []).map((account) => ({
+          email: account.email ?? account.label,
+          primary: account.primary,
+          connected: account.connected,
+        }))
+      : [];
+  };
   const summaries: ConnectorSummary[] = await Promise.all(
-    native
-      .filter((entry) => entry.enabled)
-      .map(async (entry) => {
-        const readiness = await getNativeConnectorReadiness(
-          stellaAppDir,
-          entry,
-        );
-        return {
-          id: entry.id,
-          name: entry.name,
-          kind: "native" as const,
-          connected: readiness.executable,
-          description: collapseLine(entry.description),
-        };
-      }),
+    enabledNative.map(async (entry) => {
+      const readiness = await getNativeConnectorReadiness(
+        stellaAppDir,
+        entry,
+      );
+      const accounts = accountsFor(entry);
+      return {
+        id: entry.id,
+        name: entry.name,
+        kind: "native" as const,
+        connected: readiness.executable,
+        description: collapseLine(entry.description),
+        ...(accounts.length > 0 ? { accounts } : {}),
+      };
+    }),
   );
   for (const command of commands) {
     const authStatus = await connectorAuthStatus(stellaAppDir, command.auth);
@@ -1707,17 +1754,52 @@ export const listConnectorToolSources = async (
     readMcpToolsCache(stellaAppDir),
   ]);
   const nativeById = new Map(native.map((entry) => [entry.id, entry]));
+  const needsBackendAccounts = enabledIds.some((id) => {
+    const entry = nativeById.get(id);
+    return (!entry || entry.provider === "backend-composio") &&
+      integrationSupportsMultipleAccounts(id);
+  });
+  const needsGoogleAccounts = enabledIds.some(
+    (id) => nativeById.get(id)?.provider === "google-workspace",
+  );
+  const [backendConnections, googleAccounts] = await Promise.all([
+    needsBackendAccounts && socketPath
+      ? requestBackendConnectionsFromBridge({ socketPath }).catch(() => null)
+      : Promise.resolve(null),
+    needsGoogleAccounts
+      ? listConnectorAccounts(stellaAppDir, GOOGLE_WORKSPACE_ACCOUNTS).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+  const backendAccountsFor = (id: string) => {
+    const connection = backendConnections?.find((row) => row.id === id);
+    const accounts = (connection?.accounts ?? []).filter((account) => account.connected);
+    return accounts.length > 0
+      ? {
+          accounts: accounts.map((account) => ({
+            label: account.label,
+            ...(account.email ? { email: account.email } : {}),
+            primary: account.primary,
+          })),
+        }
+      : {};
+  };
   const nativeSources = await Promise.all(
     enabledIds.map(async (id): Promise<ConnectorToolSource | null> => {
       const entry = nativeById.get(id);
       if (!entry || entry.provider === "backend-composio") {
         if (entry?.actions?.length) {
-          return { id, name: entry.name, kind: "native", actions: entry.actions };
+          return {
+            id,
+            name: entry.name,
+            kind: "native",
+            actions: entry.actions,
+            ...backendAccountsFor(id),
+          };
         }
         if (!socketPath) return null;
         const actions = await backendActions(socketPath, id).catch(() => null);
         return actions
-          ? { id, name: entry?.name ?? id, kind: "native", actions }
+          ? { id, name: entry?.name ?? id, kind: "native", actions, ...backendAccountsFor(id) }
           : null;
       }
       if (entry.localExecution !== "production-ready") return null;
@@ -1732,6 +1814,9 @@ export const listConnectorToolSources = async (
         actions: tools,
         ...(entry.toolPrefix
           ? { stripPrefixes: [entry.toolPrefix.replace(/\.+$/u, "")] }
+          : {}),
+        ...(entry.provider === "google-workspace" && googleAccounts.length > 0
+          ? { accounts: googleAccounts }
           : {}),
       };
     }),
@@ -1821,6 +1906,7 @@ export const callConnectorAction = async (
   target: string,
   args: Record<string, unknown>,
   resolved: ResolvedNativeCatalog,
+  account?: string,
 ): Promise<unknown> => {
   const pathArgs = () => {
     const { method, query, headers, body, ...rest } = args;
@@ -1843,7 +1929,7 @@ export const callConnectorAction = async (
         options,
         id,
         target,
-        pathArgs(),
+        { ...pathArgs(), ...(account ? { account } : {}) },
         resolved.entries,
       );
     }
@@ -1851,7 +1937,7 @@ export const callConnectorAction = async (
       options,
       id,
       target,
-      { body: args },
+      { body: args, ...(account ? { account } : {}) },
       resolved.entries,
     );
   }
@@ -1986,6 +2072,17 @@ export const createReplConnectClient = (
           apiPath,
           rest,
           await catalog(),
+        );
+      }
+      if (entry.accountAware) {
+        const { account, rest } = splitConnectorAccountArg(args);
+        return await callConnectorAction(
+          options,
+          entry.connector,
+          entry.action,
+          rest,
+          await catalog(),
+          account,
         );
       }
       return await callConnectorAction(

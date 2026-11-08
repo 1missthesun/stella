@@ -1,3 +1,4 @@
+import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { ownerGateStub } from "../rpc-release.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
@@ -68,7 +69,7 @@ const agentConnectClient = (
               actions: (args) => listIntegrationActions(env, args),
               connections: async () =>
                 (await ownerInternal("integrations.connections", {})) as {
-                  connections: Array<{ id: string; connected: boolean }>;
+                  connections: IntegrationConnection[];
                 },
               run: (args) => ownerInternal("integrations.run", args),
             },

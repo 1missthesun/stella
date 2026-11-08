@@ -5,7 +5,8 @@ import type {
   EmailDigestNotice,
   EmailDigestOutcome,
 } from "@stella/contracts/backend/email-digest";
-import { ComposioHttpError, composioConfig, composioToolkitConnected } from "../../integrations/composio.js";
+import { ComposioHttpError, composioConfig, type ComposioConfig } from "../../integrations/composio.js";
+import { accountSessionsFor, type ResolvedIntegrationAccount } from "./integration-accounts.js";
 import {
   GMAIL_INTEGRATION_ID,
   type GmailMessage,
@@ -111,11 +112,40 @@ const noticeOf = (json: string | null): EmailDigestNotice | undefined => {
   }
 };
 
-const gmailSession = (db: OwnerDbReader): string | null =>
-  db.one<{ session_id: string }>(
-    "SELECT session_id FROM integration_connections WHERE integration_id = ?",
+const gmailToolkit = (db: OwnerDbReader): string | null =>
+  db.one<{ toolkit: string }>(
+    "SELECT toolkit FROM integration_connections WHERE integration_id = ?",
     GMAIL_INTEGRATION_ID,
-  )?.session_id ?? null;
+  )?.toolkit ?? null;
+
+const gmailAccounts = async (
+  ctx: OwnerContext,
+  config: ComposioConfig | null,
+): Promise<ResolvedIntegrationAccount[]> => {
+  const toolkit = gmailToolkit(ctx.db);
+  if (!toolkit || !config) return [];
+  try {
+    return await accountSessionsFor(ctx, config, { id: GMAIL_INTEGRATION_ID, toolkit });
+  } catch (error) {
+    if (error instanceof ComposioHttpError && error.status === 404) return [];
+    throw error;
+  }
+};
+
+const resumeTokensOf = (raw: string | null): Record<string, string> => {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0,
+      ),
+    );
+  } catch {
+    return {};
+  }
+};
 
 const scheduleRun = (ctx: OwnerContext, at: number): void => {
   ctx.jobs.schedule(RUN_JOB, at, {}, { id: RUN_JOB });
@@ -133,17 +163,8 @@ export const startEmailDigest = (ctx: OwnerContext): void => {
   scheduleRun(ctx, ctx.now + FIRST_RUN_DELAY_MS);
 };
 
-const gmailConnected = async (ctx: OwnerContext): Promise<boolean> => {
-  const sessionId = gmailSession(ctx.db);
-  const config = composioConfig(ctx.env);
-  if (!sessionId || !config) return false;
-  try {
-    return await composioToolkitConnected(config, sessionId, GMAIL_INTEGRATION_ID);
-  } catch (error) {
-    if (error instanceof ComposioHttpError && error.status === 404) return false;
-    throw error;
-  }
-};
+const gmailConnected = async (ctx: OwnerContext): Promise<boolean> =>
+  (await gmailAccounts(ctx, composioConfig(ctx.env))).length > 0;
 
 export const nextInterval = (ratePerHour: number): number =>
   ratePerHour <= 0
@@ -284,17 +305,16 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
     (state.last_checked_at === null ? ctx.now - FIRST_WINDOW_MS : state.last_checked_at - OVERLAP_MS);
   const windowEnd = state.window_end ?? ctx.now;
   const priorCount = state.window_count ?? 0;
-  const sessionId = gmailSession(ctx.db);
   const config = composioConfig(ctx.env);
-  let connected: boolean;
+  let accounts: ResolvedIntegrationAccount[];
   try {
-    connected = Boolean(sessionId && config) && (await gmailConnected(ctx));
+    accounts = await gmailAccounts(ctx, config);
   } catch (error) {
     console.error(JSON.stringify({ event: "email_digest_probe_failed", message: errorText(error) }));
     finishRun(ctx, { kind: "error", error: errorText(error), newCount: 0, since, rate: state.rate_per_hour });
     return;
   }
-  if (!sessionId || !config || !connected) {
+  if (!config || accounts.length === 0) {
     disableDisconnected(ctx);
     return;
   }
@@ -309,24 +329,45 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
   try {
     const fresh: GmailMessage[] = [];
     const taken = new Set<string>();
-    let pageToken = state.page_token ?? undefined;
-    let pages = 0;
-    do {
-      const page = await fetchGmailSince(config, sessionId, since, pageToken);
-      pages += 1;
-      for (const message of page.messages) {
-        if (taken.has(message.id)) continue;
-        if (message.receivedAt !== undefined && message.receivedAt < since) continue;
-        if (ctx.db.one("SELECT 1 AS seen FROM email_digest_seen WHERE message_id = ?", message.id)) continue;
-        taken.add(message.id);
-        fresh.push(message);
-      }
-      pageToken = page.nextPageToken;
-    } while (pageToken && fresh.length < MAX_FRESH_PER_RUN && pages < MAX_PAGES_PER_RUN);
+    const seen = (key: string) =>
+      Boolean(ctx.db.one("SELECT 1 AS seen FROM email_digest_seen WHERE message_id = ?", key));
+    const resume = resumeTokensOf(state.page_token);
+    const resuming = Object.keys(resume).length > 0;
+    const pending: Record<string, string> = {};
+    const labelled = accounts.length > 1;
+    const perAccount = Math.max(1, Math.ceil(MAX_FRESH_PER_RUN / accounts.length));
+    for (const account of accounts) {
+      const accountKey = account.accountId || "primary";
+      if (resuming && !resume[accountKey]) continue;
+      let cursor: string | undefined = resume[accountKey];
+      let pages = 0;
+      let added = 0;
+      do {
+        const page = await fetchGmailSince(config, account.sessionId, since, cursor);
+        pages += 1;
+        for (const message of page.messages) {
+          const key = `${accountKey}:${message.id}`;
+          if (taken.has(key)) continue;
+          if (message.receivedAt !== undefined && message.receivedAt < since) continue;
+          if (seen(key) || (account.primary && seen(message.id))) continue;
+          taken.add(key);
+          fresh.push({ ...message, id: key, ...(labelled ? { account: account.email ?? account.label } : {}) });
+          added += 1;
+        }
+        cursor = page.nextPageToken;
+      } while (cursor && added < perAccount && pages < MAX_PAGES_PER_RUN);
+      if (cursor) pending[accountKey] = cursor;
+    }
     newCount = fresh.length;
     const outcome: EmailDigestOutcome = fresh.length > 0 ? (await judge(ctx, state, fresh)).outcome : "nothing_new";
-    if (pageToken) {
-      continueWindow(ctx, { since, end: windowEnd, count: priorCount + newCount, pageToken, outcome });
+    if (Object.keys(pending).length > 0) {
+      continueWindow(ctx, {
+        since,
+        end: windowEnd,
+        count: priorCount + newCount,
+        pageToken: JSON.stringify(pending),
+        outcome,
+      });
       return;
     }
     finishRun(ctx, {

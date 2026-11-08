@@ -31,6 +31,7 @@ export type GmailMessage = {
   receivedAt?: number;
   important: boolean;
   starred: boolean;
+  account?: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -227,6 +228,7 @@ const promptFor = (messages: GmailMessage[]): string =>
     .map((message, index) =>
       [
         `id: m${index + 1}`,
+        ...(message.account ? [`to account: ${message.account}`] : []),
         `from: ${message.from}`,
         `subject: ${message.subject}`,
         ...(message.important || message.starred
@@ -257,6 +259,7 @@ const itemsFrom = (raw: unknown, messages: GmailMessage[]): EmailDigestItem[] =>
         summary,
         ...(message.threadId ? { threadId: message.threadId } : {}),
         ...(message.receivedAt !== undefined ? { receivedAt: message.receivedAt } : {}),
+        ...(message.account ? { account: message.account } : {}),
       },
     ];
   });

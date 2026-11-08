@@ -21,6 +21,7 @@ import {
 import { parseCliBridgeEndpoint } from "../../../kernel/connectors/cli-bridge-endpoint.js";
 import {
   createBackendConnectorActionBroker,
+  createBackendConnectionsBroker,
   createBackendConnectorActionsBroker,
 } from "../../backend-connector-action-broker.js";
 import {
@@ -89,6 +90,21 @@ export const layer = Layer.effect(
 
     const runBackendConnectorAction = createBackendConnectorActionBroker({
       stellaDataDir: init.stellaDataDirPath,
+      getSiteAuth: () => {
+        const baseUrl = config.get().backendUrl?.trim();
+        const authToken = config.get().authToken?.trim();
+        return baseUrl && authToken ? { baseUrl, authToken } : null;
+      },
+      refreshSiteAuth: async () => {
+        try {
+          return await refreshSiteAuth();
+        } catch {
+          return null;
+        }
+      },
+    });
+
+    const listBackendConnections = createBackendConnectionsBroker({
       getSiteAuth: () => {
         const baseUrl = config.get().backendUrl?.trim();
         const authToken = config.get().authToken?.trim();
@@ -185,6 +201,7 @@ export const layer = Layer.effect(
           handlers: {
             runBackendConnectorAction,
             listBackendConnectorActions,
+            listBackendConnections,
             requestMedia,
             requestXApi,
             requestAccountMcp,

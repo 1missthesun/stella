@@ -7,8 +7,10 @@ import {
   CONNECTOR_STATUS_TOOL_PARAMETERS,
   CONNECTOR_STATUS_TOOL_REPLAY,
   CONNECTOR_STATUS_TOOL_WORKING_TEXT,
+  connectorAccountsText,
   connectorConnectedText,
   connectorNotConnectedText,
+  findConnectorStatusAccount,
 } from "@stella/runtime/kernel/tools/defs/connector-status-def.js";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import {
@@ -24,6 +26,7 @@ export type CloudConnectorConnectionRequest = Readonly<{
   iconUrl?: string;
   category?: string;
   reason?: string;
+  addAccount?: boolean;
 }>;
 
 export type CloudConnectorConnectionOutcome =
@@ -69,7 +72,16 @@ export const createCloudConnectorStatusTool = (
   parameters: CONNECTOR_STATUS_TOOL_PARAMETERS as unknown as TSchema,
   demoted: { searchTerms: CONNECTOR_STATUS_SEARCH_TERMS },
   execute: async (_toolCallId, params, signal) => {
-    const args = params as { connector?: unknown; reason?: unknown };
+    const args = params as {
+      connector?: unknown;
+      reason?: unknown;
+      account?: unknown;
+      add_account?: unknown;
+    };
+    const requestedAccount =
+      typeof args.account === "string" && args.account.trim()
+        ? args.account.trim()
+        : undefined;
     const query =
       typeof args.connector === "string" ? args.connector.trim() : "";
     if (!query) {
@@ -96,13 +108,29 @@ export const createCloudConnectorStatusTool = (
       );
     }
 
-    const connected = await options.directory.isConnected(entry.id, {
+    const connection = await options.directory.connection(entry.id, {
       refresh: true,
     });
-    const diagnostics = diagnosticsFor(entry, connected);
-    if (connected) {
+    const connected = connection?.connected === true;
+    const accounts = connection?.accounts ?? [];
+    const addAccount =
+      args.add_account === true && connection?.multiAccount === true;
+    const diagnostics = {
+      ...diagnosticsFor(entry, connected),
+      ...(connection?.multiAccount ? { accounts } : {}),
+    };
+    if (connected && requestedAccount && !addAccount) {
+      const match = findConnectorStatusAccount(accounts, requestedAccount);
+      if (!match) {
+        return text(
+          `${entry.name} has no connected account ${requestedAccount}.${connectorAccountsText(accounts)} To add it, call connector_status again with add_account: true (only if the user wants it connected).`,
+          { ...diagnostics, status: "account_not_connected" },
+        );
+      }
+    }
+    if (connected && !addAccount) {
       return text(
-        connectorConnectedText(entry.name, entry.id),
+        `${connectorConnectedText(entry.name, entry.id)}${connectorAccountsText(accounts)}`,
         { ...diagnostics, status: "executable" },
       );
     }
@@ -129,15 +157,18 @@ export const createCloudConnectorStatusTool = (
         ...(entry.iconUrl ? { iconUrl: entry.iconUrl } : {}),
         category: entry.category,
         ...(reason ? { reason } : {}),
+        ...(addAccount ? { addAccount: true } : {}),
       },
       signal,
     );
 
     if (outcome.ok) {
-      await options.directory.connections({ refresh: true }).catch(() => []);
+      const updated = await options.directory
+        .connection(entry.id, { refresh: true })
+        .catch(() => undefined);
       return text(
-        `${connectorConnectedText(entry.name, entry.id)} The user approved the card.`,
-        { id: entry.id, status: "connected" },
+        `${connectorConnectedText(entry.name, entry.id)} The user approved the card.${connectorAccountsText(updated?.accounts ?? [])}`,
+        { id: entry.id, status: "connected", ...(updated?.accounts ? { accounts: updated.accounts } : {}) },
       );
     }
     if (outcome.reason === "declined") {

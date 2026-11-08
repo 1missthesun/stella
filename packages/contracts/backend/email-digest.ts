@@ -4,6 +4,8 @@ export type EmailDigestItem = {
   summary: string;
   threadId?: string;
   receivedAt?: number;
+  /** The connected Gmail account it arrived in, when several are connected. */
+  account?: string;
 };
 
 export type EmailDigest = {

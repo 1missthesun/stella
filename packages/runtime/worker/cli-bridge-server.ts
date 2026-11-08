@@ -97,8 +97,12 @@ export type CliBridgeHandlers = {
     action: string;
     input: Record<string, unknown>;
     requestId?: string;
+    account?: string;
     signal?: AbortSignal;
   }) => Promise<BackendConnectorActionResult>;
+  listBackendConnections?: (params: {
+    signal?: AbortSignal;
+  }) => Promise<{ ok: true; connections: unknown[] } | { ok: false; reason: string }>;
   listBackendConnectorActions?: (params: {
     connectorId: string;
     action?: string;
@@ -149,6 +153,7 @@ const runBackendActionParamsSchema = z.strictObject({
   action: z.string().trim().min(1),
   input: z.record(z.string(), z.unknown()),
   requestId: z.string().trim().min(1).optional().catch(undefined),
+  account: z.string().trim().min(1).max(320).optional(),
 });
 
 const listBackendActionsParamsSchema = z.strictObject({
@@ -337,14 +342,21 @@ const dispatch = async (
           "connector.runBackendAction: connectorId, action, and object input are required",
         );
       }
-      const { connectorId, action, input, requestId } = parsed.data;
+      const { connectorId, action, input, requestId, account } = parsed.data;
       return await handlers.runBackendConnectorAction({
         connectorId,
         action,
         input,
         ...(requestId ? { requestId } : {}),
+        ...(account ? { account } : {}),
         ...(signal ? { signal } : {}),
       });
+    }
+    case "connector.listBackendConnections": {
+      if (!handlers.listBackendConnections) {
+        return { ok: false, reason: "unsupported" };
+      }
+      return await handlers.listBackendConnections(signal ? { signal } : {});
     }
     case "connector.listBackendActions": {
       if (!handlers.listBackendConnectorActions) {

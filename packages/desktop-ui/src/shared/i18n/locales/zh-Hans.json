@@ -2726,7 +2726,11 @@
       "searchPlaceholder": "搜索",
       "title": "连接器",
       "noMatchesTitle": "没有匹配项",
-      "noMatchesBody": "换个名称试试。"
+      "noMatchesBody": "换个名称试试。",
+      "addAccount": "添加其他账号",
+      "setPrimary": "设为主账号",
+      "primary": "主账号",
+      "removeAccount": "移除"
     },
     "display": {
       "agentThread": {

@@ -1,3 +1,4 @@
+import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { AgentHome } from "../agent-home.js";
 import { createWorldMemory, ownerMemoryWorld } from "../world-memory.js";
 import type { CloudSkillCatalogSnapshot } from "../cloud-home-store.js";
@@ -133,7 +134,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         actions: (args) => listIntegrationActions(this.env, args),
         connections: async () =>
           (await toolContext.ownerInternal("integrations.connections", {})) as {
-            connections: Array<{ id: string; connected: boolean }>;
+            connections: IntegrationConnection[];
           },
         run: (args) => toolContext.ownerInternal("integrations.run", args),
       },
@@ -337,6 +338,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           ...(request.iconUrl ? { iconUrl: request.iconUrl } : {}),
           ...(request.category ? { category: request.category } : {}),
           ...(request.reason ? { reason: request.reason } : {}),
+          ...(request.addAccount ? { addAccount: true } : {}),
         }),
       );
     } catch (error) {

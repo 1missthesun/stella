@@ -2744,7 +2744,11 @@
       "searchPlaceholder": "חיפוש",
       "title": "מחברים",
       "noMatchesTitle": "אין התאמות",
-      "noMatchesBody": "נסו שם אחר."
+      "noMatchesBody": "נסו שם אחר.",
+      "addAccount": "הוספת חשבון נוסף",
+      "setPrimary": "הגדרה כראשי",
+      "primary": "ראשי",
+      "removeAccount": "הסרה"
     },
     "display": {
       "agentThread": {

@@ -28,8 +28,8 @@ const CONNECT_POLL_MS = 3000;
 
 type Connection = "checking" | "connected" | "disconnected" | "unavailable";
 
-const threadUrl = (threadId: string) =>
-  `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`;
+const threadUrl = (threadId: string, account?: string) =>
+  `https://mail.google.com/mail/u/${account?.includes("@") ? encodeURIComponent(account) : "0"}/#all/${encodeURIComponent(threadId)}`;
 
 type Translate = ReturnType<typeof useT>;
 
@@ -293,12 +293,13 @@ function DigestGroup({
           onPress={() => {
             if (!item.threadId) return;
             tapLight();
-            void Linking.openURL(threadUrl(item.threadId)).catch(() => undefined);
+            void Linking.openURL(threadUrl(item.threadId, item.account)).catch(() => undefined);
           }}
           style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
         >
           <Text style={styles.from} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
             {senderName(item.from)}
+            {item.account ? <Text style={styles.account}> · {item.account}</Text> : null}
           </Text>
           <Text style={styles.summary} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
             {item.summary}
@@ -418,6 +419,10 @@ const makeStyles = (colors: Colors) =>
       fontFamily: fonts.sans.medium,
       fontSize: 15,
       letterSpacing: -0.2,
+    },
+    account: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
     },
     summary: {
       color: colors.textBase,

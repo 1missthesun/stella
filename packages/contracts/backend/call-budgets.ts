@@ -6,6 +6,10 @@ export type CallBudget = { timeoutMs: number; idempotent: boolean };
 const SLOW_CALLS = new Set<string>([
   "mcpServers.call",
   "integrations.run",
+  "integrations.connections",
+  "integrations.status",
+  "integrations.connectLink",
+  "integrations.removeAccount",
   "x.request",
   "search.web",
   "data.export",

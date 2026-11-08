@@ -17,8 +17,32 @@ import {
   isNativeOAuthBlockedOnSelfHostedServer,
   isNativeOAuthProviderConfigReady,
 } from "@stella/runtime/kernel/connectors/native-oauth-provider-config";
-import { loadConnectorAccessToken } from "@stella/runtime/kernel/connectors/oauth";
-import { waitForBackendIntegrationConnection } from "./backend-integration-status.js";
+import {
+  deleteConnectorAccessTokens,
+  loadConnectorAccessToken,
+} from "@stella/runtime/kernel/connectors/oauth";
+import {
+  hasConnectorAccount,
+  listConnectorAccounts,
+  recordConnectorAccount,
+  removeConnectorAccount,
+  setPrimaryConnectorAccount,
+} from "@stella/runtime/kernel/connectors/accounts";
+import {
+  fetchBackendConnections,
+  forgetBackendConnections,
+  removeBackendAccount,
+  setBackendPrimaryAccount,
+} from "@stella/runtime/kernel/connectors/backend-accounts";
+import {
+  GOOGLE_WORKSPACE_ACCOUNTS,
+  newGoogleWorkspacePendingTokenKey,
+} from "@stella/runtime/kernel/google-workspace/accounts";
+import { integrationSupportsMultipleAccounts } from "@stella/contracts/backend/integrations";
+import {
+  connectedAccountCountOf,
+  waitForBackendIntegrationConnection,
+} from "./backend-integration-status.js";
 import { loadConfig } from "@stella/runtime/kernel/google-workspace/config";
 import { SCOPES as GOOGLE_WORKSPACE_SCOPES } from "@stella/runtime/kernel/google-workspace/scopes";
 import { assertPrivilegedRequest } from "./privileged-ipc.js";
@@ -26,7 +50,11 @@ import {
   IPC_NATIVE_INTEGRATIONS_LIST,
   IPC_NATIVE_INTEGRATIONS_ENABLE,
   IPC_NATIVE_INTEGRATIONS_DISABLE,
+  IPC_NATIVE_INTEGRATIONS_ADD_ACCOUNT,
+  IPC_NATIVE_INTEGRATIONS_SET_PRIMARY_ACCOUNT,
+  IPC_NATIVE_INTEGRATIONS_REMOVE_ACCOUNT,
 } from "@stella/contracts/desktop/ipc-channels";
+import type { NativeIntegrationAccount } from "@stella/contracts/desktop/ipc-contract";
 import { handleIpc } from "./typed-ipc.js";
 
 export type NativeIntegrationHandlersOptions = {
@@ -171,6 +199,7 @@ const createBackendIntegrationConnectLink = async (
   auth: { backendUrl: string; authToken: string },
   id: string,
   signal?: AbortSignal,
+  addAccount?: boolean,
 ) => {
   const { backendUrl, authToken } = auth;
   const timeout = AbortSignal.timeout(30_000);
@@ -183,7 +212,7 @@ const createBackendIntegrationConnectLink = async (
         "content-type": "application/json",
         authorization: `Bearer ${authToken}`,
       },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, ...(addAccount ? { addAccount: true } : {}) }),
       signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
     },
   ).catch(() => {
@@ -248,6 +277,7 @@ export const ensureNativeCredential = async (
   stellaAppDir: string,
   id: string,
   acceptedTarget?: ResolvedNativeCredentialTarget,
+  flow: { addAccount?: boolean } = {},
 ) => {
   const configuredOAuthProviders = await loadConfiguredOAuthProviders(options);
   const entry = acceptedTarget
@@ -258,8 +288,12 @@ export const ensureNativeCredential = async (
     throw new Error("Accepted connector snapshot does not match the request.");
   }
   if (entry?.provider === "google-workspace") {
-    if (await loadConnectorAccessToken(stellaAppDir, "google-workspace"))
+    if (
+      !flow.addAccount &&
+      (await hasConnectorAccount(stellaAppDir, GOOGLE_WORKSPACE_ACCOUNTS))
+    ) {
       return;
+    }
     if (!options.requestPreregisteredOAuth) {
       throw new Error("Google Workspace connection is unavailable.");
     }
@@ -267,13 +301,15 @@ export const ensureNativeCredential = async (
     if (!configuredOAuthProviders.backend.has("google-workspace")) {
       throw new Error("Google Workspace secure connection is not ready yet.");
     }
+    const pendingTokenKey = newGoogleWorkspacePendingTokenKey();
     const connected = await options.requestPreregisteredOAuth({
-      tokenKey: "google-workspace",
+      tokenKey: pendingTokenKey,
       displayName: "Google Workspace",
       clientId: config.clientId,
       authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenEndpoint: "https://oauth2.googleapis.com/token",
       scopes: GOOGLE_WORKSPACE_SCOPES,
+      authorizationParams: { prompt: "select_account consent" },
       tokenExchange: {
         type: "backend",
         provider: "google-workspace",
@@ -282,10 +318,18 @@ export const ensureNativeCredential = async (
         "Stella needs to open Google in your browser so you can sign in and approve Workspace access.",
     });
     if (!connected.ok) {
+      await deleteConnectorAccessTokens(stellaAppDir, [pendingTokenKey]).catch(
+        () => undefined,
+      );
       throw new Error(
         `Could not connect Google Workspace: ${connected.reason}`,
       );
     }
+    await recordConnectorAccount(
+      stellaAppDir,
+      GOOGLE_WORKSPACE_ACCOUNTS,
+      pendingTokenKey,
+    );
     return;
   }
 
@@ -299,10 +343,23 @@ export const ensureNativeCredential = async (
     if (!authToken) {
       throw new Error(`Sign in to Stella before connecting ${entry.name}.`);
     }
+    const addAccount =
+      flow.addAccount === true && integrationSupportsMultipleAccounts(id);
+    const baseline = addAccount
+      ? connectedAccountCountOf(
+          (
+            await fetchBackendConnections(
+              { baseUrl: backendUrl, authToken },
+              { fresh: true },
+            ).catch(() => [])
+          ).find((row) => row.id === id),
+        )
+      : 0;
     const url = await createBackendIntegrationConnectLink(
       { backendUrl, authToken },
       id,
       options.abortSignal,
+      addAccount,
     );
     const approved = await options.requestExternalOAuthApproval({
       tokenKey: `backend-integration:${id}`,
@@ -317,8 +374,10 @@ export const ensureNativeCredential = async (
       backendUrl,
       authToken,
       id,
+      ...(addAccount ? { minConnectedAccounts: baseline + 1 } : {}),
       ...(options.abortSignal ? { signal: options.abortSignal } : {}),
     });
+    forgetBackendConnections();
     if (wait === "connected") return;
     if (wait === "unsupported") {
       throw new Error(
@@ -441,6 +500,118 @@ export const ensureNativeCredential = async (
   );
 };
 
+const readAccountArg = (payload: unknown) => {
+  const account =
+    payload && typeof payload === "object"
+      ? (payload as { account?: unknown }).account
+      : undefined;
+  if (typeof account !== "string" || !account.trim()) {
+    throw new Error("Missing account.");
+  }
+  return account.trim();
+};
+
+const backendAuthOf = async (options: NativeCredentialFlowOptions) => {
+  const baseUrl = options.getBackendUrl?.()?.trim().replace(/\/+$/u, "");
+  const authToken = (await options.getAuthToken?.())?.trim();
+  return baseUrl && authToken ? { baseUrl, authToken } : null;
+};
+
+export const listNativeIntegrationAccounts = async (
+  options: NativeCredentialFlowOptions,
+  stellaAppDir: string,
+  entries: readonly NativeConnectorCatalogEntry[],
+): Promise<Map<string, NativeIntegrationAccount[]>> => {
+  const result = new Map<string, NativeIntegrationAccount[]>();
+  const googleEntries = entries.filter(
+    (entry) => entry.provider === "google-workspace",
+  );
+  if (googleEntries.length > 0) {
+    const accounts = await listConnectorAccounts(
+      stellaAppDir,
+      GOOGLE_WORKSPACE_ACCOUNTS,
+    ).catch(() => []);
+    for (const entry of googleEntries) {
+      result.set(
+        entry.id,
+        accounts.map((account) => ({
+          id: account.id,
+          ...(account.email ? { email: account.email } : {}),
+          label: account.label,
+          primary: account.primary,
+          connected: true,
+        })),
+      );
+    }
+  }
+  const backendEntries = entries.filter(
+    (entry) =>
+      entry.provider === "backend-composio" &&
+      integrationSupportsMultipleAccounts(entry.id),
+  );
+  if (backendEntries.length > 0) {
+    const auth = await backendAuthOf(options);
+    const connections = auth
+      ? await fetchBackendConnections(auth).catch(() => [])
+      : [];
+    for (const entry of backendEntries) {
+      result.set(
+        entry.id,
+        connections.find((row) => row.id === entry.id)?.accounts ?? [],
+      );
+    }
+  }
+  return result;
+};
+
+const changeNativeIntegrationAccount = async (
+  options: NativeIntegrationHandlersOptions,
+  payload: unknown,
+  change: "primary" | "remove",
+) => {
+  const stellaAppDir = requireRoot(options);
+  const id = readId(payload);
+  const account = readAccountArg(payload);
+  const { entry } = await resolveDesktopNativeConnectorEntry(
+    options,
+    stellaAppDir,
+    id,
+  );
+  if (entry?.provider === "google-workspace") {
+    if (change === "primary") {
+      await setPrimaryConnectorAccount(
+        stellaAppDir,
+        GOOGLE_WORKSPACE_ACCOUNTS,
+        account,
+      );
+    } else {
+      await removeConnectorAccount(
+        stellaAppDir,
+        GOOGLE_WORKSPACE_ACCOUNTS,
+        account,
+      );
+    }
+    return;
+  }
+  if (
+    entry?.provider === "backend-composio" &&
+    integrationSupportsMultipleAccounts(id)
+  ) {
+    const auth = await backendAuthOf(options);
+    if (!auth)
+      throw new Error(
+        `Sign in to Stella before changing ${entry.name} accounts.`,
+      );
+    if (change === "primary") {
+      await setBackendPrimaryAccount(auth, id, account);
+    } else {
+      await removeBackendAccount(auth, id, account);
+    }
+    return;
+  }
+  throw new Error(`${entry?.name ?? id} connects a single account.`);
+};
+
 export const registerNativeIntegrationHandlers = (
   options: NativeIntegrationHandlersOptions,
 ) => {
@@ -452,8 +623,30 @@ export const registerNativeIntegrationHandlers = (
       options,
       requireRoot(options),
     );
-    return await listNativeConnectors(
+    return await listWithAccounts(
+      options,
       requireRoot(options),
+      await listNativeConnectors(
+        requireRoot(options),
+        {
+          configuredBackendProviders: configuredOAuthProviders.backend,
+          configuredExternalCallbackProviders:
+            configuredOAuthProviders.externalCallback,
+        },
+        catalog.entries,
+      ),
+    );
+  });
+
+  const refreshedEntry = async (stellaAppDir: string, id: string) => {
+    const configuredOAuthProviders =
+      await loadConfiguredOAuthProviders(options);
+    const catalog = await resolveDesktopNativeConnectorCatalog(
+      options,
+      stellaAppDir,
+    );
+    const list = await listNativeConnectors(
+      stellaAppDir,
       {
         configuredBackendProviders: configuredOAuthProviders.backend,
         configuredExternalCallbackProviders:
@@ -461,7 +654,55 @@ export const registerNativeIntegrationHandlers = (
       },
       catalog.entries,
     );
-  });
+    const entry = list.find((candidate) => candidate.id === id);
+    if (!entry) throw new Error("Unknown integration.");
+    return (await listWithAccounts(options, stellaAppDir, [entry]))[0]!;
+  };
+
+  handleIpc(
+    IPC_NATIVE_INTEGRATIONS_ADD_ACCOUNT,
+    async (event, payload: unknown) => {
+      assertPrivilegedRequest(
+        options,
+        event,
+        IPC_NATIVE_INTEGRATIONS_ADD_ACCOUNT,
+      );
+      const stellaAppDir = requireRoot(options);
+      const id = readId(payload);
+      await ensureNativeCredential(options, stellaAppDir, id, undefined, {
+        addAccount: true,
+      });
+      return await refreshedEntry(stellaAppDir, id);
+    },
+  );
+
+  handleIpc(
+    IPC_NATIVE_INTEGRATIONS_SET_PRIMARY_ACCOUNT,
+    async (event, payload: unknown) => {
+      assertPrivilegedRequest(
+        options,
+        event,
+        IPC_NATIVE_INTEGRATIONS_SET_PRIMARY_ACCOUNT,
+      );
+      const stellaAppDir = requireRoot(options);
+      await changeNativeIntegrationAccount(options, payload, "primary");
+      return await refreshedEntry(stellaAppDir, readId(payload));
+    },
+  );
+
+  handleIpc(
+    IPC_NATIVE_INTEGRATIONS_REMOVE_ACCOUNT,
+    async (event, payload: unknown) => {
+      assertPrivilegedRequest(
+        options,
+        event,
+        IPC_NATIVE_INTEGRATIONS_REMOVE_ACCOUNT,
+      );
+      const stellaAppDir = requireRoot(options);
+      await changeNativeIntegrationAccount(options, payload, "remove");
+      return await refreshedEntry(stellaAppDir, readId(payload));
+    },
+  );
 
   handleIpc(IPC_NATIVE_INTEGRATIONS_ENABLE, async (event, payload: unknown) => {
     assertPrivilegedRequest(options, event, IPC_NATIVE_INTEGRATIONS_ENABLE);
@@ -474,7 +715,7 @@ export const registerNativeIntegrationHandlers = (
       options,
       stellaAppDir,
     );
-    return await enableNativeConnector(
+    const enabled = await enableNativeConnector(
       stellaAppDir,
       id,
       "store",
@@ -485,6 +726,7 @@ export const registerNativeIntegrationHandlers = (
       },
       catalog.entries,
     );
+    return (await listWithAccounts(options, stellaAppDir, [enabled]))[0]!;
   });
 
   handleIpc(
@@ -527,7 +769,25 @@ export const registerNativeIntegrationHandlers = (
           await options.disconnectGoogleWorkspace();
         }
       }
-      return result;
+      return (await listWithAccounts(options, stellaAppDir, [result]))[0]!;
     },
   );
+};
+
+const listWithAccounts = async <T extends NativeConnectorCatalogEntry>(
+  options: NativeCredentialFlowOptions,
+  stellaAppDir: string,
+  entries: T[],
+): Promise<
+  Array<T & { multiAccount?: boolean; accounts?: NativeIntegrationAccount[] }>
+> => {
+  const accounts = await listNativeIntegrationAccounts(
+    options,
+    stellaAppDir,
+    entries,
+  );
+  return entries.map((entry) => {
+    const list = accounts.get(entry.id);
+    return list ? { ...entry, multiAccount: true, accounts: list } : entry;
+  });
 };

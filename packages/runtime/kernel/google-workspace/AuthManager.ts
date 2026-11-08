@@ -25,7 +25,6 @@ import {
   GoogleWorkspaceReconnectRequiredError,
 } from "./errors.js";
 
-const TOKEN_KEY = "google-workspace";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
 const stellaAppDirFromProjectRoot = () => {
@@ -42,7 +41,10 @@ export class AuthManager {
   private readonly clientId = loadConfig().clientId;
   private onStatusUpdate: ((message: string) => void) | null = null;
 
-  constructor(private scopes: string[]) {}
+  constructor(
+    private scopes: string[],
+    private readonly tokenKey: string,
+  ) {}
 
   public setOnStatusUpdate(callback: (message: string) => void) {
     this.onStatusUpdate = callback;
@@ -62,7 +64,7 @@ export class AuthManager {
         stellaAppDirFromProjectRoot,
       );
       const payload = yield* tryGoogleWorkspaceOp(() =>
-        loadConnectorTokenPayload(stellaAppDir, TOKEN_KEY),
+        loadConnectorTokenPayload(stellaAppDir, this.tokenKey),
       );
       if (!payload?.accessToken) {
         return yield* Effect.fail(new GoogleWorkspaceNotConnectedError());
@@ -88,8 +90,8 @@ export class AuthManager {
         token_type: "Bearer",
       });
       client.on("tokens", async (tokens) => {
-        const current = await loadConnectorTokenPayload(stellaAppDir, TOKEN_KEY);
-        await saveConnectorTokenPayload(stellaAppDir, TOKEN_KEY, {
+        const current = await loadConnectorTokenPayload(stellaAppDir, this.tokenKey);
+        await saveConnectorTokenPayload(stellaAppDir, this.tokenKey, {
           accessToken:
             tokens.access_token ?? current?.accessToken ?? payload.accessToken,
           refreshToken:
@@ -122,7 +124,7 @@ export class AuthManager {
           stellaAppDirFromProjectRoot,
         );
         yield* tryGoogleWorkspaceOp(() =>
-          deleteConnectorAccessTokens(stellaAppDir, [TOKEN_KEY]),
+          deleteConnectorAccessTokens(stellaAppDir, [this.tokenKey]),
         );
       }),
     );
@@ -140,7 +142,7 @@ export class AuthManager {
           stellaAppDirFromProjectRoot,
         );
         yield* tryGoogleWorkspaceOp(() =>
-          saveConnectorTokenPayload(stellaAppDir, TOKEN_KEY, {
+          saveConnectorTokenPayload(stellaAppDir, this.tokenKey, {
             accessToken: response.credentials.access_token ?? "",
             refreshToken:
               response.credentials.refresh_token ??

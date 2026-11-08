@@ -5,6 +5,8 @@ import {
 } from "./native-integrations.js";
 import { getNativeOAuthProviderConfig } from "./native-oauth-provider-config.js";
 import { loadConnectorAccessToken } from "./oauth.js";
+import { hasConnectorAccount } from "./accounts.js";
+import { GOOGLE_WORKSPACE_ACCOUNTS } from "../google-workspace/accounts.js";
 
 export type NativeConnectorAuthStatus =
   | "connected"
@@ -18,7 +20,7 @@ export const nativeConnectorAuthStatus = async (
   entry: NativeConnectorCatalogEntry,
 ): Promise<NativeConnectorAuthStatus> => {
   if (entry.provider === "google-workspace") {
-    return (await loadConnectorAccessToken(stellaDataDir, "google-workspace"))
+    return (await hasConnectorAccount(stellaDataDir, GOOGLE_WORKSPACE_ACCOUNTS))
       ? "connected"
       : "not_logged_in";
   }

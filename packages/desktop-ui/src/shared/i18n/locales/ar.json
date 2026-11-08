@@ -2771,7 +2771,11 @@
       "searchPlaceholder": "بحث",
       "title": "الموصلات",
       "noMatchesTitle": "لا توجد نتائج",
-      "noMatchesBody": "جرّب اسمًا مختلفًا."
+      "noMatchesBody": "جرّب اسمًا مختلفًا.",
+      "addAccount": "إضافة حساب آخر",
+      "setPrimary": "تعيين كأساسي",
+      "primary": "أساسي",
+      "removeAccount": "إزالة"
     },
     "display": {
       "agentThread": {

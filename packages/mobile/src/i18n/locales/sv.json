@@ -2735,7 +2735,11 @@
       "searchPlaceholder": "Sök",
       "title": "Anslutningar",
       "noMatchesTitle": "Inga träffar",
-      "noMatchesBody": "Prova ett annat namn."
+      "noMatchesBody": "Prova ett annat namn.",
+      "addAccount": "Lägg till ett konto till",
+      "setPrimary": "Ange som primärt",
+      "primary": "Primärt",
+      "removeAccount": "Ta bort"
     },
     "display": {
       "agentThread": {

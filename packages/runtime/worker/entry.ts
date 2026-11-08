@@ -32,6 +32,7 @@ import {
   createRuntimeServerIdentity,
   type RuntimeServerIdentity,
 } from "./server-identity.js";
+import { ensureRuntimeAuthKey } from "./runtime-auth.js";
 import {
   parseWorkerListenUrl,
   startWorkerTransport,
@@ -128,6 +129,7 @@ const main = async () => {
 
   let lifecycle: WorkerLifecycleServer | null = null;
   let serverIdentity: RuntimeServerIdentity | undefined;
+  let authKey: Buffer | undefined;
   let detachedMode = false;
   if (transport.kind !== "stdio") {
     if (!cliArgs.stellaAppDir) {
@@ -205,6 +207,7 @@ const main = async () => {
       });
     }
     configureAgentProcessRegistry(agentRegistryFile);
+    authKey = await ensureRuntimeAuthKey(lifecycle.paths.authKeyFile);
     serverIdentity = createRuntimeServerIdentity({
       rootHash: lifecycle.paths.rootHash,
       buildStamp:
@@ -279,6 +282,7 @@ const main = async () => {
             attach: attachPeer,
             ...(protocolVersion ? { protocolVersion } : {}),
             ...(serverIdentity ? { identity: serverIdentity } : {}),
+            ...(authKey ? { authKey } : {}),
             onError: (error) => {
               console.error("[runtime-worker] transport error:", error);
             },

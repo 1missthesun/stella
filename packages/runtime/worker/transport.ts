@@ -12,15 +12,24 @@ import { attachJsonRpcPeerToStreams } from "@stella/contracts/protocol/jsonl";
 import {
   STELLA_RUNTIME_PROTOCOL_VERSION,
   STELLA_RUNTIME_READY_METHOD,
-  type JsonRpcMessage,
 } from "@stella/contracts/protocol";
 import type { JsonRpcPeer } from "@stella/contracts/protocol/rpc-peer";
 import { workerRuntime } from "./effect-runtime.js";
 import type { RuntimeServerIdentity } from "./server-identity.js";
 import {
+  ensurePrivateSocketDir,
   isWindowsNamedPipePath,
   runtimeIpcPathUsesFilesystem,
 } from "./runtime-paths.js";
+import {
+  createRuntimeAuthNonce,
+  isRuntimeAuthNonce,
+  runtimeClientProof,
+  runtimeProofMatches,
+  runtimeServerProof,
+  STELLA_RUNTIME_AUTH_METHOD,
+  type RuntimeAuthNonces,
+} from "./runtime-auth.js";
 
 export type WorkerTransport =
   | { kind: "stdio" }
@@ -84,6 +93,7 @@ export type StartTransportArgs = {
   attach: (peer: JsonRpcPeer) => void;
   protocolVersion?: string;
   identity?: RuntimeServerIdentity;
+  authKey?: Buffer;
   onError?: (error: unknown) => void;
 };
 
@@ -158,6 +168,22 @@ const removeIfStaleSocket = async (socketPath: string) => {
   }
 };
 
+const HANDSHAKE_TIMEOUT_MS = 10_000;
+const MAX_HANDSHAKE_LINE_BYTES = 16 * 1024;
+
+const parseHandshakeLine = (
+  line: string,
+): { id?: unknown; method?: unknown; params?: Record<string, unknown> } | null => {
+  try {
+    const message = JSON.parse(line) as unknown;
+    return message && typeof message === "object"
+      ? (message as { id?: unknown; method?: unknown; params?: Record<string, unknown> })
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 const startIpcSocketTransport = async (
   args: StartTransportArgs & {
     transport:
@@ -166,9 +192,13 @@ const startIpcSocketTransport = async (
   },
 ): Promise<StartTransportResult> => {
   const { socketPath } = args.transport;
+  const { authKey, identity } = args;
+  if (!authKey || !identity) {
+    throw new Error("A socket transport requires the runtime auth key and identity.");
+  }
   const usesFilesystem = runtimeIpcPathUsesFilesystem(socketPath);
   if (usesFilesystem) {
-    await fsPromises.mkdir(path.dirname(socketPath), { recursive: true });
+    await ensurePrivateSocketDir(socketPath);
   }
   await removeIfStaleSocket(socketPath);
 
@@ -183,13 +213,14 @@ const startIpcSocketTransport = async (
       // Connection-level errors (e.g. host crashed) just close the socket;
       // peer.dispose runs via the readline 'close' handler downstream.
     });
+    socket.setTimeout(HANDSHAKE_TIMEOUT_MS, () => socket.destroy());
 
     let buffered = "";
-    let attached = false;
+    let nonces: RuntimeAuthNonces | null = null;
     const attachSocket = (initialInput: string) => {
-      if (attached) return;
-      attached = true;
-      socket.off("data", onFirstData);
+      socket.off("data", onHandshakeData);
+      socket.setTimeout(0);
+      socket.pause();
       const input = new PassThrough();
       if (initialInput) {
         input.write(initialInput);
@@ -203,47 +234,61 @@ const startIpcSocketTransport = async (
       args.attach(handle.peer);
       socket.resume();
     };
-    const onFirstData = (chunk: Buffer) => {
+    const reject = () => {
+      socket.off("data", onHandshakeData);
+      socket.destroy();
+    };
+    const onHandshakeData = (chunk: Buffer) => {
       buffered += chunk.toString("utf-8");
-      const newlineIndex = buffered.indexOf("\n");
-      if (newlineIndex < 0) {
-        if (buffered.length > 64 * 1024) {
-          attachSocket(buffered);
+      for (;;) {
+        const newlineIndex = buffered.indexOf("\n");
+        if (newlineIndex < 0) {
+          if (buffered.length > MAX_HANDSHAKE_LINE_BYTES) reject();
+          return;
         }
-        return;
-      }
-      const firstLine = buffered.slice(0, newlineIndex).trim();
-      if (firstLine) {
-        try {
-          const message = JSON.parse(firstLine) as JsonRpcMessage;
+        const message = parseHandshakeLine(buffered.slice(0, newlineIndex));
+        buffered = buffered.slice(newlineIndex + 1);
+        if (!nonces) {
+          const clientNonce = message?.params?.clientNonce;
           if (
-            "method" in message &&
-            "id" in message &&
-            message.method === STELLA_RUNTIME_READY_METHOD
+            message?.method !== STELLA_RUNTIME_READY_METHOD ||
+            message.id === undefined ||
+            !isRuntimeAuthNonce(clientNonce)
           ) {
-            socket.write(
-              `${JSON.stringify({
-                id: message.id,
-                result: {
-                  ok: true,
-                  protocolVersion:
-                    args.protocolVersion ?? STELLA_RUNTIME_PROTOCOL_VERSION,
-                  ...(args.identity ? { identity: args.identity } : {}),
-                },
-              })}\n`,
-              () => socket.end(),
-            );
+            reject();
             return;
           }
-        } catch {
-          // Fall through to the normal JSON-RPC parser so it reports the
-          // parse error consistently.
+          nonces = { clientNonce, serverNonce: createRuntimeAuthNonce() };
+          socket.write(
+            `${JSON.stringify({
+              id: message.id,
+              result: {
+                ok: true,
+                protocolVersion:
+                  args.protocolVersion ?? STELLA_RUNTIME_PROTOCOL_VERSION,
+                identity,
+                serverNonce: nonces.serverNonce,
+                serverProof: runtimeServerProof(authKey, nonces, identity),
+              },
+            })}\n`,
+          );
+          continue;
         }
+        if (
+          message?.method !== STELLA_RUNTIME_AUTH_METHOD ||
+          !runtimeProofMatches(
+            runtimeClientProof(authKey, nonces),
+            message.params?.clientProof,
+          )
+        ) {
+          reject();
+          return;
+        }
+        attachSocket(buffered);
+        return;
       }
-      socket.pause();
-      attachSocket(buffered);
     };
-    socket.on("data", onFirstData);
+    socket.on("data", onHandshakeData);
   });
 
   server.on("error", (error) => {

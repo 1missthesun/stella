@@ -11,6 +11,7 @@ import {
   probeRunningWorkerOwner,
   removeStaleRuntimeArtifacts,
 } from "../../worker/lifecycle-server.js";
+import { ensureRuntimeAuthKey } from "../../worker/runtime-auth.js";
 import { getFileLogger } from "../../observability/file-logger.js";
 import type { ExpectedRuntimeServerIdentity } from "../../worker/server-identity.js";
 import {
@@ -47,6 +48,7 @@ const hostExecutableMatches = (
 
 export const pollForWorkerReady = (
   paths: RuntimePaths,
+  authKey: Buffer,
   timeoutMs: number,
   budgets: LifecycleBudgets,
   expectedProtocolVersion?: string,
@@ -63,6 +65,7 @@ export const pollForWorkerReady = (
     attempt: connectReadySocket(
       paths.socketPath,
       budgets.socketConnectTimeoutMs,
+      authKey,
       expectedProtocolVersion,
       expectedIdentity,
     ).pipe(
@@ -121,6 +124,7 @@ const stopRunningWorkerForRestart = (
 const discoverExistingWorker = (
   options: LifecycleStartOptions,
   paths: RuntimePaths,
+  authKey: Buffer,
   budgets: LifecycleBudgets,
 ): Effect.Effect<LifecycleConnection | null, never, Scope.Scope> =>
   Effect.gen(function* () {
@@ -151,6 +155,7 @@ const discoverExistingWorker = (
     const ready = yield* connectReadySocket(
       paths.socketPath,
       budgets.socketConnectTimeoutMs,
+      authKey,
       options.expectedProtocolVersion,
       expectedIdentity,
     );
@@ -196,6 +201,7 @@ const discoverExistingWorker = (
     let retryIdentity: LifecycleConnection["identity"] = null;
     const retry = yield* pollForWorkerReady(
       paths,
+      authKey,
       budgets.staleRetryTimeoutMs,
       budgets,
       options.expectedProtocolVersion,
@@ -242,16 +248,17 @@ export const startOrAttachWorkerEffect = (
 ): Effect.Effect<LifecycleConnection, unknown, Scope.Scope> =>
   Effect.gen(function* () {
     const paths = resolveRuntimePaths(options.stellaAppDir);
-    yield* Effect.promise(() =>
-      Promise.all([
+    const authKey = yield* Effect.promise(async () => {
+      await Promise.all([
         fsPromises.mkdir(paths.rootDir, { recursive: true }),
         ensureRuntimeIpcDir(paths),
-      ]),
-    );
+      ]);
+      return await ensureRuntimeAuthKey(paths.authKeyFile);
+    });
     const hostLockFile = `${paths.lockFile}.host`;
     yield* acquireHostLock(hostLockFile, budgets.hostLockTimeoutMs);
 
-    const existing = yield* discoverExistingWorker(options, paths, budgets);
+    const existing = yield* discoverExistingWorker(options, paths, authKey, budgets);
     if (existing) {
       return existing;
     }
@@ -261,6 +268,7 @@ export const startOrAttachWorkerEffect = (
     let spawnedIdentity: LifecycleConnection["identity"] = null;
     const socket = yield* pollForWorkerReady(
       paths,
+      authKey,
       budgets.startTimeoutMs,
       budgets,
       options.expectedProtocolVersion,

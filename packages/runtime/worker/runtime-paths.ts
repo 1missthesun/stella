@@ -41,6 +41,7 @@ export type RuntimePaths = {
   ipcDir: string;
   pidFile: string;
   lockFile: string;
+  authKeyFile: string;
   socketPath: string;
   /**
    * Companion local-IPC endpoint the worker listens on for sidecar
@@ -153,6 +154,14 @@ export const ensurePrivateRuntimeIpcDir = async (
   await ensureOwnedPrivateDirectory(ipcDir);
 };
 
+export const ensurePrivateSocketDir = async (
+  socketPath: string,
+): Promise<void> => {
+  const socketDir = path.dirname(socketPath);
+  await fs.mkdir(path.dirname(socketDir), { recursive: true });
+  await ensureOwnedPrivateDirectory(socketDir);
+};
+
 export const ensureRuntimeIpcDir = async (
   paths: Pick<RuntimePaths, "ipcDir" | "socketPath">,
 ): Promise<void> => {
@@ -189,6 +198,7 @@ export const resolveRuntimePaths = (
     ipcDir,
     pidFile: path.join(rootDir, "runtime.pid"),
     lockFile: path.join(rootDir, "runtime.lock"),
+    authKeyFile: path.join(rootDir, "runtime-auth.key"),
     // macOS caps Unix domain socket paths at 104 bytes (BSD), Linux at 108.
     // Keep sockets in a short per-user /tmp namespace; durable control files
     // and logs remain under Electron userData.

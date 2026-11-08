@@ -11,7 +11,7 @@ import type { OwnerContext } from "./registry.js";
  * removes them.
  */
 
-export type OAuthClaimKind = "x" | "slack_install";
+export type OAuthClaimKind = "x" | "slack_install" | "google";
 
 export const OAUTH_CLAIM_TTL_MS = 10 * 60_000;
 export const CONNECT_CODE_LENGTH = 12;

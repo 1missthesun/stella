@@ -21,6 +21,8 @@ import {
 } from "../../integrations/google.js";
 import { signOAuthState } from "../../oauth-state.js";
 import { object, optional, string } from "../args.js";
+import { issueOAuthClaim, redeemOAuthClaim } from "../oauth-claims.js";
+import { enforceOwnerRateLimit } from "../rate-limit.js";
 import { RpcError } from "../errors.js";
 import type { OwnerContext, OwnerDbReader } from "../registry.js";
 
@@ -157,7 +159,7 @@ const parseComplete = object({
 export const completeStellaGoogleOAuth = async (
   ctx: OwnerContext,
   raw: unknown,
-): Promise<{ email: string; scopes: string[] }> => {
+): Promise<{ email: string; connectCode: string }> => {
   const args = parseComplete(raw);
   const nonce = ctx.db.one<{ expires_at: number }>(
     "SELECT expires_at FROM oauth_nonces WHERE nonce = ? AND kind = ?",
@@ -185,6 +187,41 @@ export const completeStellaGoogleOAuth = async (
   if (!identity) throw new RpcError("BAD_REQUEST", "Couldn't read which Google account this is. Try again.");
   const granted = parseGoogleScope(token.body.scope);
   const scopes = granted.length > 0 ? granted : [...GOOGLE_OAUTH_SCOPES];
+  // Whoever approved at Google may not be the Stella user who started the
+  // link, so nothing attaches yet: the result waits under a one-time code
+  // that only the approver's own Stella app receives and redeems.
+  const connectCode = issueOAuthClaim(ctx, "google", {
+    email: identity.email,
+    googleUserId: identity.googleUserId,
+    accessToken,
+    refreshToken: text(token.body.refresh_token),
+    scopes,
+    accessTokenExpiresAt: expiresAtOf(token.body.expires_in, Date.now()),
+  });
+  return { email: identity.email, connectCode };
+};
+
+/** Redeems a connect code in the caller's own store; a code issued to another Stella user isn't there. */
+export const finishStellaGoogleConnect = (ctx: OwnerContext, connectCode: string): { email: string } => {
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "integrations.finishConnect",
+    { count: 20, windowMs: 10 * 60_000 },
+    "Too many connect attempts. Wait a few minutes and try again.",
+  );
+  const claim = redeemOAuthClaim(ctx, "google", connectCode);
+  const email = text(claim?.email);
+  const accessToken = text(claim?.accessToken);
+  if (!claim || !email || !accessToken) {
+    throw new RpcError(
+      "CONFLICT",
+      "That code has expired, was already used, or was made for a different Stella account. Start connecting Google again from this account.",
+    );
+  }
+  const scopes = Array.isArray(claim.scopes)
+    ? claim.scopes.filter((scope): scope is string => typeof scope === "string")
+    : [...GOOGLE_OAUTH_SCOPES];
   const now = Date.now();
   const first = !hasStellaGoogleAccounts(ctx.db);
   ctx.db.run(
@@ -196,17 +233,17 @@ export const completeStellaGoogleOAuth = async (
        refresh_token = COALESCE(excluded.refresh_token, google_accounts.refresh_token),
        scopes = excluded.scopes, access_token_expires_at = excluded.access_token_expires_at,
        needs_reconnect = 0, updated_at = excluded.updated_at`,
-    identity.email,
-    identity.googleUserId,
+    email,
+    text(claim.googleUserId),
     accessToken,
-    text(token.body.refresh_token),
+    text(claim.refreshToken),
     JSON.stringify(scopes),
-    expiresAtOf(token.body.expires_in, now),
+    typeof claim.accessTokenExpiresAt === "number" ? claim.accessTokenExpiresAt : null,
     first ? 1 : 0,
     now,
     now,
   );
-  return { email: identity.email, scopes };
+  return { email };
 };
 
 const refreshing = new Map<string, Promise<string>>();

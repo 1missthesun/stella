@@ -1,3 +1,4 @@
+import { FINISH_CONNECT_PATH } from "@stella/contracts/backend/integrations";
 import type {
   GoogleConnectionProvider,
   GoogleProviderState,
@@ -211,4 +212,19 @@ export const setGoogleProvider = async (
   );
   googleProviderCache.clear();
   return state;
+};
+
+/** Redeems a Google connect code for the signed-in Stella user (the cloud keeps the account). */
+export const finishBackendConnect = async (
+  auth: BackendSiteAuth,
+  connectCode: string,
+): Promise<{ email: string }> => {
+  const payload = await backendRequest(auth, FINISH_CONNECT_PATH, {
+    method: "POST",
+    body: { connectCode },
+  });
+  forgetBackendConnections();
+  const email = isRecord(payload) && typeof payload.email === "string" ? payload.email : "";
+  if (!email) throw new Error("Stella's backend didn't confirm the connection.");
+  return { email };
 };

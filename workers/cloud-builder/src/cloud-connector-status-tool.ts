@@ -44,6 +44,8 @@ export type CloudConnectorConnectionRequester = (
 export type CloudConnectorStatusToolOptions = Readonly<{
   directory: CloudConnectorDirectory;
   requestConnection?: CloudConnectorConnectionRequester;
+  /** Redeems a pasted Google connect code for this user. */
+  finishConnect?: (connectCode: string) => Promise<{ email: string }>;
 }>;
 
 const text = (value: string, details: Record<string, unknown>, isError = false) => ({
@@ -77,7 +79,27 @@ export const createCloudConnectorStatusTool = (
       reason?: unknown;
       account?: unknown;
       add_account?: unknown;
+      connect_code?: unknown;
     };
+    const connectCode = typeof args.connect_code === "string" ? args.connect_code.trim() : "";
+    if (connectCode) {
+      if (!options.finishConnect) {
+        return text("Connect codes can't be redeemed here.", {}, true);
+      }
+      try {
+        const { email } = await options.finishConnect(connectCode);
+        return text(
+          `${email} is connected to Google for this user. Its Google tools work now: await tools.$search({ query: "Gmail" }).`,
+          { status: "connected", account: email },
+        );
+      } catch (error) {
+        return text(
+          error instanceof Error && error.message ? error.message : "That code didn't work.",
+          { status: "not_connected", reason: "connect_code_rejected" },
+          true,
+        );
+      }
+    }
     const requestedAccount =
       typeof args.account === "string" && args.account.trim()
         ? args.account.trim()

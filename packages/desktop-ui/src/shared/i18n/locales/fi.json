@@ -688,7 +688,13 @@
     "notNow": "Ei nyt",
     "openAgain": "Avaa uudelleen",
     "titleOffer": "Yhdistetäänkö {name}?",
-    "titleWaiting": "Odotetaan palvelua {name}"
+    "titleWaiting": "Odotetaan palvelua {name}",
+    "googleClaim": {
+      "connected": "Google yhdistetty",
+      "connectedBody": "{email} on yhdistetty Stellaan.",
+      "failed": "Googlea ei yhdistetty",
+      "failedBody": "Aloita Googlen yhdistäminen uudelleen Stellasta."
+    }
   },
   "common": {
     "appName": "Stella",

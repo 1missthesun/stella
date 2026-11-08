@@ -688,7 +688,13 @@
     "notNow": "Όχι τώρα",
     "openAgain": "Άνοιγμα ξανά",
     "titleOffer": "Σύνδεση του {name};",
-    "titleWaiting": "Αναμονή για {name}"
+    "titleWaiting": "Αναμονή για {name}",
+    "googleClaim": {
+      "connected": "Το Google συνδέθηκε",
+      "connectedBody": "Το {email} συνδέθηκε με τη Stella.",
+      "failed": "Το Google δεν συνδέθηκε",
+      "failedBody": "Ξεκινήστε ξανά τη σύνδεση Google από τη Stella."
+    }
   },
   "common": {
     "appName": "Stella",

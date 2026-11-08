@@ -688,7 +688,13 @@
     "notNow": "Ikke nu",
     "openAgain": "Åbn igen",
     "titleOffer": "Vil du forbinde {name}?",
-    "titleWaiting": "Venter på {name}"
+    "titleWaiting": "Venter på {name}",
+    "googleClaim": {
+      "connected": "Google forbundet",
+      "connectedBody": "{email} er forbundet til Stella.",
+      "failed": "Google blev ikke forbundet",
+      "failedBody": "Start forbindelsen til Google igen fra Stella."
+    }
   },
   "common": {
     "appName": "Stella",

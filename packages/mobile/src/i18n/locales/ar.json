@@ -708,7 +708,13 @@
     "notNow": "ليس الآن",
     "openAgain": "فتح مرة أخرى",
     "titleOffer": "توصيل {name}؟",
-    "titleWaiting": "في انتظار {name}"
+    "titleWaiting": "في انتظار {name}",
+    "googleClaim": {
+      "connected": "تم ربط Google",
+      "connectedBody": "تم ربط {email} بـ Stella.",
+      "failed": "تعذّر ربط Google",
+      "failedBody": "ابدأ ربط Google من جديد من Stella."
+    }
   },
   "common": {
     "appName": "Stella",

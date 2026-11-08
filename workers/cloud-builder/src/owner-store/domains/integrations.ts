@@ -61,6 +61,7 @@ import { GOOGLE_SERVICES, googleAction, isStellaGoogleIntegration } from "../../
 import {
   GOOGLE_ACCOUNTS_MIGRATION,
   completeStellaGoogleOAuth,
+  finishStellaGoogleConnect,
   hasStellaGoogleAccounts,
   purgeStellaGoogleAccounts,
   removeStellaGoogleAccount,
@@ -1127,6 +1128,11 @@ export const integrationsDomain = {
       parse: object({ id: integrationId(), addAccount: optional(boolean()) }),
       handler: (ctx, args) => connectLink(ctx, args.id),
     },
+    "integrations.finishConnect": {
+      scope: "owner",
+      parse: object({ connectCode: string({ min: 1, max: 64 }) }),
+      handler: (ctx, args) => finishStellaGoogleConnect(ctx, args.connectCode),
+    },
     "integrations.googleProvider": {
       scope: "owner",
       parse: empty(),
@@ -1242,6 +1248,8 @@ export const integrationsDomain = {
     "integrations.run": (ctx, raw) => runAction(ctx, parseRun(raw)),
     "x.completeOAuth": completeXOAuth,
     "google.completeOAuth": completeStellaGoogleOAuth,
+    "integrations.finishConnect": (ctx, raw) =>
+      finishStellaGoogleConnect(ctx, object({ connectCode: string({ min: 1, max: 64 }) })(raw).connectCode),
     "integrations.googleRoutes": (ctx) => googleRoutes(ctx),
     "slack.installClaim": (ctx, raw) => ({
       code: issueOAuthClaim(ctx, "slack_install", parseSlackInstallClaim(raw)),

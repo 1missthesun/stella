@@ -688,7 +688,13 @@
     "notNow": "Inte nu",
     "openAgain": "Öppna igen",
     "titleOffer": "Anslut {name}?",
-    "titleWaiting": "Väntar på {name}"
+    "titleWaiting": "Väntar på {name}",
+    "googleClaim": {
+      "connected": "Google anslutet",
+      "connectedBody": "{email} är anslutet till Stella.",
+      "failed": "Google anslöts inte",
+      "failedBody": "Börja ansluta Google igen från Stella."
+    }
   },
   "common": {
     "appName": "Stella",

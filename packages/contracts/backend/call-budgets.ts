@@ -11,6 +11,7 @@ const SLOW_CALLS = new Set<string>([
   "integrations.setGoogleProvider",
   "integrations.status",
   "integrations.connectLink",
+  "integrations.finishConnect",
   "integrations.removeAccount",
   "x.request",
   "search.web",

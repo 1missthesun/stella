@@ -683,7 +683,13 @@
     "notNow": "暂不",
     "openAgain": "重新打开",
     "titleOffer": "要连接 {name} 吗？",
-    "titleWaiting": "正在等待 {name}"
+    "titleWaiting": "正在等待 {name}",
+    "googleClaim": {
+      "connected": "已连接 Google",
+      "connectedBody": "{email} 已连接到 Stella。",
+      "failed": "Google 未连接",
+      "failedBody": "请在 Stella 中重新连接 Google。"
+    }
   },
   "common": {
     "appName": "Stella",

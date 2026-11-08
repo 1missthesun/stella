@@ -19,7 +19,7 @@ export const CONNECTOR_STATUS_SEARCH_TERMS = [
 ] as const;
 
 export const CONNECTOR_STATUS_TOOL_DESCRIPTION =
-  "Check whether a Store connector (Gmail, Outlook, Slack, Notion and hundreds more) is connected; if not, show the user a connect card, which is their consent, and wait for their choice. Once connected, its actions are tools in code (find them with tools.$search); continue the task without asking again. After a decline or a dismissed card, mention once that it's in the Store, don't offer it again unless asked, and continue another way (the browser or computer). Google connectors (Gmail, Calendar, Drive, Docs, Sheets) can have several accounts: the result lists each connected account's email and which is primary; their tools take an optional `account` email (default: the primary). Pass `account` to check one account, or `add_account: true` when the user asks to connect another account (shows the connect card again).";
+  "Check whether a Store connector (Gmail, Outlook, Slack, Notion and hundreds more) is connected; if not, show the user a connect card, which is their consent, and wait for their choice. Once connected, its actions are tools in code (find them with tools.$search); continue the task without asking again. After a decline or a dismissed card, mention once that it's in the Store, don't offer it again unless asked, and continue another way (the browser or computer). Google connectors (Gmail, Calendar, Drive, Docs, Sheets) can have several accounts: the result lists each connected account's email and which is primary; their tools take an optional `account` email (default: the primary). Pass `account` to check one account, or `add_account: true` when the user asks to connect another account (shows the connect card again). When the user pastes a Google connect code, pass it as `connect_code`.";
 
 export const connectorConnectedText = (
   name: string,
@@ -86,6 +86,11 @@ export const CONNECTOR_STATUS_TOOL_PARAMETERS: Record<string, unknown> = {
       type: "boolean",
       description:
         "Show the connect card even when already connected, to add another account (Google connectors). Only when the user asked to connect another account.",
+    },
+    connect_code: {
+      type: "string",
+      description:
+        "A Google connect code the user pasted (like ABCD-EFGH-JKMN) after approving Google in a browser without the Stella app. Finishes that connection for this user.",
     },
   },
   required: ["connector"],

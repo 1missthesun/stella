@@ -693,7 +693,13 @@
     "notNow": "Pas maintenant",
     "openAgain": "Rouvrir",
     "titleOffer": "Connecter {name} ?",
-    "titleWaiting": "En attente de {name}"
+    "titleWaiting": "En attente de {name}",
+    "googleClaim": {
+      "connected": "Google connecté",
+      "connectedBody": "{email} est connecté à Stella.",
+      "failed": "Google ne s'est pas connecté",
+      "failedBody": "Relancez la connexion à Google depuis Stella."
+    }
   },
   "common": {
     "appName": "Stella",

@@ -257,6 +257,10 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       ...createCloudScheduleTools(toolContext),
       createCloudConnectorStatusTool({
         directory: connectors,
+        finishConnect: async (connectCode) =>
+          (await toolContext.ownerInternal("integrations.finishConnect", { connectCode })) as {
+            email: string;
+          },
         requestConnection: (request, signal) =>
           this.requestCloudConnectorConnection(
             turn,

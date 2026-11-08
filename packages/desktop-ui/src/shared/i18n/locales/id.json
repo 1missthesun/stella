@@ -683,7 +683,13 @@
     "notNow": "Nanti saja",
     "openAgain": "Buka lagi",
     "titleOffer": "Hubungkan {name}?",
-    "titleWaiting": "Menunggu {name}"
+    "titleWaiting": "Menunggu {name}",
+    "googleClaim": {
+      "connected": "Google terhubung",
+      "connectedBody": "{email} terhubung ke Stella.",
+      "failed": "Google tidak terhubung",
+      "failedBody": "Mulai hubungkan Google lagi dari Stella."
+    }
   },
   "common": {
     "appName": "Stella",

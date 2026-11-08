@@ -688,7 +688,13 @@
     "notNow": "Most nem",
     "openAgain": "Megnyitás újra",
     "titleOffer": "Csatlakoztatod: {name}?",
-    "titleWaiting": "Várakozás erre: {name}"
+    "titleWaiting": "Várakozás erre: {name}",
+    "googleClaim": {
+      "connected": "Google csatlakoztatva",
+      "connectedBody": "A(z) {email} csatlakozott a Stellához.",
+      "failed": "A Google nem csatlakozott",
+      "failedBody": "Kezdd újra a Google csatlakoztatását a Stellából."
+    }
   },
   "common": {
     "appName": "Stella",

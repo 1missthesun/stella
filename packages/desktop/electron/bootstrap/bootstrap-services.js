@@ -2,6 +2,7 @@ import path from "path";
 import { app } from "electron";
 import { AuthService } from "../services/auth-service.js";
 import { SelfHostService } from "../services/self-host-service.js";
+import { redeemConnectClaim } from "../services/connect-claim-service.js";
 import { isLauncherPresent, relaunchApp } from "../launcher-client.js";
 import { CaptureService } from "../services/capture-service.js";
 import { MouseHookManager } from "../input/mouse-hook.js";
@@ -75,6 +76,20 @@ export const createBootstrapServices = (options) => {
         },
         onPairingLink: (url) => {
             selfHostService?.receiveLink(url);
+        },
+        onConnectClaim: (code) => {
+            void redeemConnectClaim({
+                getBackendUrl: () => authService.getBackendUrl(),
+                getAuthToken: () => authService.getAuthToken(),
+                focusApp: () => {
+                    const full = state.windowManager?.getFullWindow();
+                    if (full && !full.isDestroyed()) {
+                        if (full.isMinimized()) full.restore();
+                        full.show();
+                        full.focus();
+                    }
+                },
+            }, code);
         },
         onSecondInstanceFocus: () => {
             state.windowManager?.getFullWindow()?.focus();

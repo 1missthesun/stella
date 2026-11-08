@@ -6,6 +6,7 @@ import { isDevHarness } from "../app-identity.js";
 import type { PiRunnerTarget } from "@stella/runtime/kernel/lifecycle-targets";
 import { readConfiguredBackendUrl } from "@stella/contracts/stella-api";
 import { parsePairingLink } from "@stella/contracts/self-host";
+import { parseConnectClaimLink } from "@stella/contracts/backend/integrations";
 import {
   getAuthSessionIdentityIntent,
   getAuthSnapshotSession,
@@ -267,6 +268,7 @@ type AuthServiceOptions = {
   runnerTarget: PiRunnerTarget;
   onAuthCallback: (url: string) => void;
   onPairingLink?: (url: string) => void;
+  onConnectClaim?: (code: string) => void;
   onSecondInstanceFocus: () => void;
   onSessionInvalidated?: () => void;
 };
@@ -1308,6 +1310,11 @@ export class AuthService {
     }
     if (this.options.onPairingLink && parsePairingLink(url)) {
       this.options.onPairingLink(url);
+      return "auth";
+    }
+    const connectCode = this.options.onConnectClaim ? parseConnectClaimLink(url) : null;
+    if (connectCode) {
+      this.options.onConnectClaim?.(connectCode);
       return "auth";
     }
     if (!this.isTrustedAuthCallbackUrl(url)) {

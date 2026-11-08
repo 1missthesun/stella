@@ -693,7 +693,13 @@
     "notNow": "Nu acum",
     "openAgain": "Deschide din nou",
     "titleOffer": "Conectezi {name}?",
-    "titleWaiting": "Se așteaptă {name}"
+    "titleWaiting": "Se așteaptă {name}",
+    "googleClaim": {
+      "connected": "Google conectat",
+      "connectedBody": "{email} este conectat la Stella.",
+      "failed": "Google nu s-a conectat",
+      "failedBody": "Reîncepe conectarea Google din Stella."
+    }
   },
   "common": {
     "appName": "Stella",

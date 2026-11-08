@@ -1,6 +1,8 @@
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import {
+  FINISH_CONNECT_PATH,
   GOOGLE_OAUTH_CALLBACK_PATH,
+  connectClaimLink,
   X_FINISH_CONNECT_PATH,
   X_OAUTH_CALLBACK_PATH,
 } from "@stella/contracts/backend/integrations";
@@ -15,7 +17,7 @@ import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { listIntegrationActions, listIntegrationCatalog, publishIntegration } from "./catalog.js";
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
 import { X_STATE_KIND, xConnectCodePage, xResultPage } from "./x.js";
-import { GOOGLE_STATE_KIND, googleResultPage } from "./google.js";
+import { GOOGLE_STATE_KIND, googleConnectCodePage, googleResultPage } from "./google.js";
 import { formatConnectCode } from "../owner-store/oauth-claims.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { adminAccessDenied } from "../admin/access.js";
@@ -243,8 +245,9 @@ const googleCallback = async (request: Request, env: RouteEnv): Promise<Response
     return failed("Something went wrong. Try connecting again.", 500);
   }
   if (!response.ok) return failed(response.error.message, rpcErrorStatus(response.error.code));
-  const { email } = response.value as { email: string };
-  return googleResultPage(true, "Google connected", `${email} is connected to Stella. You can close this tab.`, 200);
+  const { email, connectCode } = response.value as { email: string; connectCode: string };
+  const claimCode = formatConnectCode(connectCode);
+  return googleConnectCodePage(email, claimCode, connectClaimLink(claimCode));
 };
 
 const methodNotAllowed = () => fail(405, "Method not allowed.");
@@ -274,6 +277,10 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
             id: body?.id,
             ...(body?.addAccount === true ? { addAccount: true } : {}),
           }))
+        : methodNotAllowed();
+    case FINISH_CONNECT_PATH:
+      return method === "POST"
+        ? await ownerCall(request, env, "integrations.finishConnect", (body) => ({ connectCode: body?.connectCode }))
         : methodNotAllowed();
     case "/api/native-integrations/connections":
       return method === "GET"

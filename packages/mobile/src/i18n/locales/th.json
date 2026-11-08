@@ -683,7 +683,13 @@
     "notNow": "ยังไม่ตอนนี้",
     "openAgain": "เปิดอีกครั้ง",
     "titleOffer": "เชื่อมต่อ {name} ไหม",
-    "titleWaiting": "กำลังรอ {name}"
+    "titleWaiting": "กำลังรอ {name}",
+    "googleClaim": {
+      "connected": "เชื่อมต่อ Google แล้ว",
+      "connectedBody": "เชื่อมต่อ {email} กับ Stella แล้ว",
+      "failed": "เชื่อมต่อ Google ไม่สำเร็จ",
+      "failedBody": "เริ่มเชื่อมต่อ Google ใหม่จาก Stella"
+    }
   },
   "common": {
     "appName": "Stella",

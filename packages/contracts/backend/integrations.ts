@@ -7,6 +7,34 @@ import type {
 export const X_OAUTH_CALLBACK_PATH = "/api/x/oauth_callback";
 export const X_FINISH_CONNECT_PATH = "/api/x/finish";
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/google/oauth_callback";
+export const FINISH_CONNECT_PATH = "/api/native-integrations/finish-connect";
+
+/**
+ * A finished Google sign-in waits under a one-time code until the Stella app
+ * of whoever approved it redeems the code as its own signed-in user, so a
+ * forwarded connect link can never attach someone else's account. The
+ * callback page hands the code to the local app with this link.
+ */
+const CONNECT_CLAIM_HOST = "connect";
+const CONNECT_CODE_PATTERN = /^[0-9A-Za-z]{4}(-?[0-9A-Za-z]{4}){2}$/u;
+
+export const connectClaimLink = (code: string): string =>
+  `stella://${CONNECT_CLAIM_HOST}?code=${encodeURIComponent(code)}`;
+
+export const parseConnectClaimLink = (raw: string): string | null => {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  const scheme = url.protocol.replace(/:$/u, "").toLowerCase();
+  if (scheme !== "stella" && scheme !== "stella-mobile") return null;
+  const host = url.hostname || url.pathname.replace(/^\/+/u, "").split("/")[0];
+  if (host?.toLowerCase() !== CONNECT_CLAIM_HOST) return null;
+  const code = (url.searchParams.get("code") ?? "").trim();
+  return CONNECT_CODE_PATTERN.test(code) ? code : null;
+};
 
 export type IntegrationConnector = {
   /** "stella": Google services Stella connects with its own Google app. */
@@ -129,6 +157,10 @@ export type IntegrationCalls = {
       account?: string;
     };
     result: unknown;
+  };
+  "integrations.finishConnect": {
+    args: { connectCode: string };
+    result: { email: string };
   };
   "integrations.googleProvider": {
     args: Record<string, never>;

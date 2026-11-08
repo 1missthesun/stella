@@ -688,7 +688,13 @@
     "notNow": "अभी नहीं",
     "openAgain": "दोबारा खोलें",
     "titleOffer": "{name} कनेक्ट करें?",
-    "titleWaiting": "{name} का इंतज़ार है"
+    "titleWaiting": "{name} का इंतज़ार है",
+    "googleClaim": {
+      "connected": "Google जुड़ गया",
+      "connectedBody": "{email} Stella से जुड़ गया है।",
+      "failed": "Google नहीं जुड़ा",
+      "failedBody": "Stella से Google को फिर से जोड़ना शुरू करें।"
+    }
   },
   "common": {
     "appName": "Stella",

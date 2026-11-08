@@ -698,7 +698,13 @@
     "notNow": "Не сейчас",
     "openAgain": "Открыть снова",
     "titleOffer": "Подключить {name}?",
-    "titleWaiting": "Ожидание {name}"
+    "titleWaiting": "Ожидание {name}",
+    "googleClaim": {
+      "connected": "Google подключён",
+      "connectedBody": "{email} подключён к Stella.",
+      "failed": "Google не подключился",
+      "failedBody": "Начните подключение Google заново в Stella."
+    }
   },
   "common": {
     "appName": "Stella",

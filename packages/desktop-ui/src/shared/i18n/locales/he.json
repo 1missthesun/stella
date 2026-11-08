@@ -693,7 +693,13 @@
     "notNow": "לא עכשיו",
     "openAgain": "פתיחה שוב",
     "titleOffer": "לחבר את {name}?",
-    "titleWaiting": "ממתין ל-{name}"
+    "titleWaiting": "ממתין ל-{name}",
+    "googleClaim": {
+      "connected": "Google חובר",
+      "connectedBody": "{email} מחובר ל-Stella.",
+      "failed": "Google לא חובר",
+      "failedBody": "התחילו לחבר את Google מחדש מתוך Stella."
+    }
   },
   "common": {
     "appName": "Stella",

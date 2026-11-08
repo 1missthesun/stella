@@ -1459,3 +1459,51 @@ export const withStellaGoogle = <Source extends ConnectorSourceLike>(
     },
   };
 };
+
+/**
+ * The callback page for a Google sign-in waiting on its one-time code. It
+ * opens the Stella app on this device, which redeems the code as its own
+ * signed-in user; the code is also shown to paste into a Stella chat.
+ */
+export const googleConnectCodePage = (email: string, code: string, appLink: string): Response =>
+  new Response(
+    `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Finish in Stella</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #e5e5e5; }
+  .card { text-align: center; padding: 3rem 1.5rem; max-width: 440px; }
+  h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+  p { color: #a3a3a3; line-height: 1.6; margin: 0 0 1.5rem; }
+  a.open { display: inline-block; padding: .75rem 1.8rem; border-radius: 999px; background: #e5e5e5; color: #0a0a0a; font-weight: 600; text-decoration: none; }
+  .code { font: 600 1.4rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; user-select: all; margin: .5rem 0 1rem; }
+  button { padding: .5rem 1.2rem; border: 1px solid #3f3f3f; border-radius: 999px; background: transparent; color: #e5e5e5; font: inherit; cursor: pointer; }
+  .note { font-size: .85rem; margin: 2rem 0 0; }
+</style></head>
+<body><div class="card">
+<h1>Finish in Stella</h1>
+<p>Open Stella to connect ${escapeHtml(email)}. Only the Stella account on this device can finish it.</p>
+<a class="open" id="open" href="${escapeHtml(appLink)}">Open Stella</a>
+<p class="note">No Stella app here? Paste this code into a Stella chat:</p>
+<div class="code" id="code">${escapeHtml(code)}</div>
+<button type="button" id="copy">Copy code</button>
+<p class="note">Works for 10 minutes. Only use it in your own Stella.</p>
+</div>
+<script>
+document.getElementById("copy").addEventListener("click", function () {
+  var button = this;
+  navigator.clipboard.writeText(document.getElementById("code").textContent).then(function () { button.textContent = "Copied"; });
+});
+window.location.href = document.getElementById("open").getAttribute("href");
+</script>
+</body></html>`,
+    {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
+        "x-frame-options": "DENY",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+      },
+    },
+  );

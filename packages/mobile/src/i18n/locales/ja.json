@@ -683,7 +683,13 @@
     "notNow": "後で",
     "openAgain": "もう一度開く",
     "titleOffer": "{name} を接続しますか？",
-    "titleWaiting": "{name} を待機中"
+    "titleWaiting": "{name} を待機中",
+    "googleClaim": {
+      "connected": "Google を接続しました",
+      "connectedBody": "{email} を Stella に接続しました。",
+      "failed": "Google を接続できませんでした",
+      "failedBody": "Stella から Google の接続をやり直してください。"
+    }
   },
   "common": {
     "appName": "Stella",

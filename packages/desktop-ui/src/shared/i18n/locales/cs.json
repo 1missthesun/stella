@@ -698,7 +698,13 @@
     "notNow": "Teď ne",
     "openAgain": "Otevřít znovu",
     "titleOffer": "Připojit {name}?",
-    "titleWaiting": "Čekání na {name}"
+    "titleWaiting": "Čekání na {name}",
+    "googleClaim": {
+      "connected": "Google připojen",
+      "connectedBody": "{email} je připojen ke Stelle.",
+      "failed": "Google se nepřipojil",
+      "failedBody": "Začněte připojovat Google znovu ze Stelly."
+    }
   },
   "common": {
     "appName": "Stella",

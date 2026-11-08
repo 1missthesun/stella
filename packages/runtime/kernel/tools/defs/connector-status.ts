@@ -22,7 +22,7 @@ import {
   type ConnectorStatusAccount,
 } from "./connector-status-def.js";
 import { listConnectorAccounts } from "../../connectors/accounts.js";
-import { fetchBackendConnections } from "../../connectors/backend-accounts.js";
+import { fetchBackendConnections, finishBackendConnect } from "../../connectors/backend-accounts.js";
 import { GOOGLE_WORKSPACE_ACCOUNTS } from "../../google-workspace/accounts.js";
 import { integrationSupportsMultipleAccounts } from "@stella/contracts/backend/integrations";
 
@@ -176,6 +176,22 @@ export const createConnectorStatusTool = (
   description: CONNECTOR_STATUS_TOOL_DESCRIPTION,
   parameters: CONNECTOR_STATUS_TOOL_PARAMETERS,
   execute: async (args, context, extras) => {
+    const connectCode =
+      typeof args.connect_code === "string" ? args.connect_code.trim() : "";
+    if (connectCode) {
+      const auth = options.getCloudBackendAuth?.();
+      if (!auth) return { error: "Sign in to Stella to use a Google connect code." };
+      try {
+        const { email } = await finishBackendConnect(auth, connectCode);
+        return {
+          result: `${email} is connected to Google for this user's cloud tasks.`,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error && error.message ? error.message : "That code didn't work.",
+        };
+      }
+    }
     const query =
       typeof args.connector === "string" ? args.connector.trim() : "";
     if (!query) {

@@ -688,7 +688,13 @@
     "notNow": "Şimdi değil",
     "openAgain": "Yeniden aç",
     "titleOffer": "{name} bağlansın mı?",
-    "titleWaiting": "{name} bekleniyor"
+    "titleWaiting": "{name} bekleniyor",
+    "googleClaim": {
+      "connected": "Google bağlandı",
+      "connectedBody": "{email}, Stella'ya bağlandı.",
+      "failed": "Google bağlanamadı",
+      "failedBody": "Google'ı Stella'dan yeniden bağlamaya başlayın."
+    }
   },
   "common": {
     "appName": "Stella",

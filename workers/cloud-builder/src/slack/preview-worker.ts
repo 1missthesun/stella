@@ -686,18 +686,68 @@ export class SlackPreviewAssets extends WorkerEntrypoint<Cloudflare.Env, AssetPr
   }
 }
 
+const MAX_REDIRECTS = 20;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+const outboundHost = (url: URL): string => url.hostname.toLowerCase().replace(/\.+$/u, "");
+
+const redirected = (request: Request, status: number, location: URL, body: ArrayBuffer | null): Request => {
+  const toGet = (status === 303 && request.method !== "GET" && request.method !== "HEAD") ||
+    ((status === 301 || status === 302) && request.method === "POST");
+  const headers = new Headers(request.headers);
+  if (location.origin !== new URL(request.url).origin) {
+    headers.delete("authorization");
+    headers.delete("cookie");
+  }
+  if (toGet) {
+    for (const name of ["content-type", "content-length", "content-encoding", "content-language", "content-location"]) {
+      headers.delete(name);
+    }
+  }
+  return new Request(location, {
+    method: toGet ? "GET" : request.method,
+    headers,
+    body: toGet ? null : body,
+    redirect: "follow",
+    signal: request.signal,
+  });
+};
+
 export class SlackPreviewOutbound extends WorkerEntrypoint<Cloudflare.Env, OutboundProps> {
   override async fetch(request: Request): Promise<Response> {
-    let host = "";
+    const body = request.body && request.redirect === "follow" ? await request.arrayBuffer() : null;
+    let current = body ? new Request(request, { body }) : request;
+    for (let hops = 0; ; hops += 1) {
+      const response = await this.#send(current);
+      const location = response.headers.get("location");
+      if (current.redirect !== "follow" || !REDIRECT_STATUSES.has(response.status) || !location) return response;
+      if (hops >= MAX_REDIRECTS) {
+        return new Response("Too many redirects.", { status: 502, headers: { "content-type": "text/plain; charset=utf-8" } });
+      }
+      let next: URL;
+      try {
+        next = new URL(location, current.url);
+      } catch {
+        return response;
+      }
+      if (next.protocol !== "https:" && next.protocol !== "http:") return response;
+      await response.body?.cancel();
+      current = redirected(current, response.status, next, body);
+    }
+  }
+
+  async #send(request: Request): Promise<Response> {
+    let url: URL;
     try {
-      host = new URL(request.url).hostname.toLowerCase();
+      url = new URL(request.url);
     } catch {
       return new Response("Invalid URL", { status: 400 });
     }
+    const host = outboundHost(url);
     const { id, appHost, previewOrigin } = this.ctx.props;
-    if (host === appHost || host === new URL(previewOrigin).hostname) {
+    if (host === appHost || host === outboundHost(new URL(previewOrigin))) {
       const origins = { app: `https://${appHost}`, preview: previewOrigin };
-      const self = new Request(new URL(`${new URL(request.url).pathname}${new URL(request.url).search}`, previewOrigin), request);
+      const self = new Request(new URL(`${url.pathname}${url.search}`, previewOrigin), request);
       const asset = await findAsset(this.env, id, self, false);
       if (asset) return asset;
       return await previewWorker(this.env, this.ctx.exports as unknown as Exports, id, origins)
@@ -706,13 +756,14 @@ export class SlackPreviewOutbound extends WorkerEntrypoint<Cloudflare.Env, Outbo
     }
     const blocked =
       host === "localhost" ||
+      host.endsWith(".localhost") ||
       /^\d+\.\d+\.\d+\.\d+$/u.test(host) ||
       host.startsWith("[") ||
       this.ctx.props.blocked.some((item) => host === item || host.endsWith(`.${item}`));
     if (blocked) {
       return new Response(`Stella previews can't reach ${host}.`, { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
     }
-    return await fetch(request);
+    return await fetch(request, { redirect: "manual" });
   }
 }
 

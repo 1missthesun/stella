@@ -103,8 +103,23 @@ const requireClient = (env: Cloudflare.Env) => {
   return { client, redirectUri: redirectUriOf(env) };
 };
 
-export const stellaGoogleAvailable = (env: Cloudflare.Env): boolean =>
-  Boolean(googleClient(env) && env.CLOUD_BUILDER_PUBLIC_URL);
+let reportedUnavailable = false;
+
+export const stellaGoogleAvailable = (env: Cloudflare.Env): boolean => {
+  const available = Boolean(googleClient(env) && env.CLOUD_BUILDER_PUBLIC_URL);
+  if (!available && !reportedUnavailable) {
+    reportedUnavailable = true;
+    const raw = (env as unknown as Record<string, unknown>).GOOGLE_CLOUD_OAUTH_CLIENT_JSON;
+    console.warn(JSON.stringify({
+      event: "google_cloud_client_unavailable",
+      clientJsonType: typeof raw,
+      clientJsonLength: typeof raw === "string" ? raw.length : 0,
+      clientParsed: Boolean(googleClient(env)),
+      publicUrl: Boolean(env.CLOUD_BUILDER_PUBLIC_URL),
+    }));
+  }
+  return available;
+};
 
 /** A Google sign-in link for this owner. */
 export const stellaGoogleConnectUrl = async (ctx: OwnerContext, options: { loginHint?: string } = {}): Promise<string> => {

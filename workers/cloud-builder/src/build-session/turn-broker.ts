@@ -172,24 +172,33 @@ export const resolveAgentTurnState = async (
       throw new Error("Canonical turn state candidate was invalid.");
     }
     if (turn.execution?.engine === "anthropic") {
-      if (Boolean(candidate.native) !== Boolean(candidate.nativeCheckpoint)) {
-        throw new AgentTurnError(
-          "Stella couldn't validate this agent's saved native session. Try again.",
-        );
-      }
-      if (!candidate.nativeCheckpoint) return resolved;
-      const integrityKey = await nativeStateIntegrityKeysFor(host.env, turn);
-      if (
-        candidate.nativeCheckpoint.cursor !== canonicalHistoryCursor ||
-        !(await validNativeStateCheckpointMac({
-          checkpoint: candidate.nativeCheckpoint,
-          threadId: turn.threadId!,
-          integrityKey,
-        }))
-      ) {
-        throw new AgentTurnError(
-          "Stella couldn't validate this agent's saved native session. Try again.",
-        );
+      const unverifiable =
+        Boolean(candidate.native) !== Boolean(candidate.nativeCheckpoint)
+          ? "incomplete"
+          : !candidate.nativeCheckpoint
+            ? undefined
+            : candidate.nativeCheckpoint.cursor !== canonicalHistoryCursor
+              ? "cursor"
+              : !(await validNativeStateCheckpointMac({
+                    checkpoint: candidate.nativeCheckpoint,
+                    threadId: turn.threadId!,
+                    integrityKey: await nativeStateIntegrityKeysFor(host.env, turn),
+                  }))
+                ? "signature"
+                : undefined;
+      if (unverifiable) {
+        // A saved Claude session this deployment cannot verify (signed with a
+        // retired service key, or left half-written) is never restored. The
+        // thread's own history is canonical, so the turn rebuilds the session
+        // from it instead of failing every message until someone intervenes.
+        log("info", "native_state_checkpoint_discarded", {
+          turnId: turn.turnId,
+          threadId: turn.threadId,
+          reason: unverifiable,
+          candidateCreatedAt: candidate.createdAt,
+        });
+        const { restore: _discarded, ...rest } = resolved;
+        return { ...rest, confirmationRequired: false };
       }
     }
   }

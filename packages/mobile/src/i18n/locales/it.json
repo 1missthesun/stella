@@ -918,14 +918,14 @@
     "localMode": {
       "authNote": "Accedendo ottieni i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione tra dispositivi. Le tue chat restano su questo computer finché non scegli.",
       "banner": "Le tue chat restano su questo computer. Accedi per i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione.",
-      "choiceBody": "Hai usato Stella prima di accedere, quindi quella chat e ciò che Stella ricorda sono solo su questo computer. Sincronizzali con il tuo account per vederli sul telefono e sugli altri dispositivi, oppure tienili qui.",
+      "choiceBody": "Hai usato Stella qui senza accedere. Aggiungendola, quella chat e la memoria vengono copiate nel tuo account, senza sostituire nulla di ciò che c'è già. Se la tieni separata, questo computer mantiene la propria chat e la propria memoria.",
       "choiceFailed": "Impossibile salvare la scelta. Riprova.",
-      "choiceTitle": "Sincronizzare chat e memoria?",
-      "keep": "Tieni su questo computer",
+      "choiceTitle": "Aggiungere questa chat al tuo account?",
+      "keep": "Tienila separata",
       "needsAccount": "Funziona nel cloud di Stella, quindi serve un account Stella.",
-      "sync": "Sincronizza con il mio account",
-      "syncFailed": "Impossibile sincronizzare la chat. È ancora su questo computer.",
-      "synced": "La tua chat è sincronizzata con il tuo account."
+      "sync": "Aggiungi al mio account",
+      "syncFailed": "Impossibile aggiungere questa chat al tuo account. È ancora su questo computer.",
+      "synced": "Questa chat è stata aggiunta al tuo account."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

@@ -904,14 +904,14 @@
     "localMode": {
       "authNote": "Đăng nhập sẽ thêm các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ giữa các thiết bị. Các cuộc trò chuyện của bạn ở lại trên máy tính này cho đến khi bạn quyết định.",
       "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ.",
-      "choiceBody": "Bạn đã dùng Stella trước khi đăng nhập, nên cuộc trò chuyện đó và những gì Stella ghi nhớ chỉ có trên máy tính này. Hãy đồng bộ vào tài khoản để xem trên điện thoại và thiết bị khác, hoặc giữ chúng tại đây.",
+      "choiceBody": "Bạn đã dùng Stella ở đây khi chưa đăng nhập. Thêm vào sẽ sao chép cuộc trò chuyện và bộ nhớ đó vào tài khoản của bạn, không thay thế gì ở đó. Nếu để riêng, máy tính này sẽ giữ cuộc trò chuyện và bộ nhớ của riêng nó.",
       "choiceFailed": "Không thể lưu lựa chọn đó. Hãy thử lại.",
-      "choiceTitle": "Đồng bộ cuộc trò chuyện và bộ nhớ?",
-      "keep": "Giữ trên máy tính này",
+      "choiceTitle": "Thêm cuộc trò chuyện này vào tài khoản?",
+      "keep": "Để riêng",
       "needsAccount": "Tính năng này chạy trên đám mây của Stella nên cần tài khoản Stella.",
-      "sync": "Đồng bộ vào tài khoản của tôi",
-      "syncFailed": "Không thể đồng bộ cuộc trò chuyện. Nó vẫn ở trên máy tính này.",
-      "synced": "Cuộc trò chuyện của bạn đã được đồng bộ vào tài khoản."
+      "sync": "Thêm vào tài khoản của tôi",
+      "syncFailed": "Không thể thêm cuộc trò chuyện này vào tài khoản. Nó vẫn ở trên máy tính này.",
+      "synced": "Đã thêm cuộc trò chuyện này vào tài khoản của bạn."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

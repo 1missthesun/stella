@@ -911,14 +911,14 @@
     "localMode": {
       "authNote": "Giriş yapmak Stella'nın modellerini, telefon uygulamasını, Drive'ı, bulut görevlerini ve cihazlar arası eşitlemeyi ekler. Sen karar verene kadar sohbetlerin bu bilgisayarda kalır.",
       "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'nın modelleri, telefon uygulaması, Drive, bulut görevleri ve eşitleme için giriş yap.",
-      "choiceBody": "Stella'yı oturum açmadan önce kullandın, bu yüzden o sohbet ve Stella'nın hatırladıkları yalnızca bu bilgisayarda. Telefonunda ve diğer cihazlarında görmek için hesabınla eşitle ya da burada tut.",
+      "choiceBody": "Stella'yı burada oturum açmadan kullandın. Eklemek, o sohbeti ve belleği hesabındaki hiçbir şeyi değiştirmeden hesabına kopyalar. Ayrı tutarsan bu bilgisayarın kendi sohbeti ve belleği olur.",
       "choiceFailed": "Seçim kaydedilemedi. Tekrar dene.",
-      "choiceTitle": "Sohbetin ve belleğin eşitlensin mi?",
-      "keep": "Bu bilgisayarda tut",
+      "choiceTitle": "Bu sohbet hesabına eklensin mi?",
+      "keep": "Ayrı tut",
       "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
-      "sync": "Hesabıma eşitle",
-      "syncFailed": "Sohbetin eşitlenemedi. Hâlâ bu bilgisayarda.",
-      "synced": "Sohbetin hesabına eşitlendi."
+      "sync": "Hesabıma ekle",
+      "syncFailed": "Bu sohbet hesabına eklenemedi. Hâlâ bu bilgisayarda.",
+      "synced": "Bu sohbet hesabına eklendi."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

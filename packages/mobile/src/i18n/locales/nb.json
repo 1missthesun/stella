@@ -911,14 +911,14 @@
     "localMode": {
       "authNote": "Når du logger inn, får du Stellas modeller, mobilappen, Drive, skyoppgaver og synkronisering mellom enheter. Chattene dine blir på denne datamaskinen til du velger.",
       "banner": "Chattene dine blir på denne datamaskinen. Logg inn for Stellas modeller, mobilappen, Drive, skyoppgaver og synkronisering.",
-      "choiceBody": "Du brukte Stella før du logget på, så den chatten og det Stella husker, finnes bare på denne datamaskinen. Synkroniser dem til kontoen din for å se dem på telefonen og andre enheter, eller behold dem her.",
+      "choiceBody": "Du brukte Stella her uten å være logget inn. Når du legger den til, kopieres chatten og minnet til kontoen din uten at noe der erstattes. Holder du den atskilt, beholder denne datamaskinen sin egen chat og sitt eget minne.",
       "choiceFailed": "Kunne ikke lagre valget. Prøv igjen.",
-      "choiceTitle": "Synkronisere chatten og minnet?",
-      "keep": "Behold på denne datamaskinen",
+      "choiceTitle": "Vil du legge til denne chatten i kontoen din?",
+      "keep": "Hold den atskilt",
       "needsAccount": "Dette kjører i Stellas sky og krever derfor en Stella-konto.",
-      "sync": "Synkroniser til kontoen min",
-      "syncFailed": "Kunne ikke synkronisere chatten. Den er fortsatt på denne datamaskinen.",
-      "synced": "Chatten din er synkronisert til kontoen din."
+      "sync": "Legg til i kontoen min",
+      "syncFailed": "Kunne ikke legge chatten til i kontoen din. Den er fortsatt på denne datamaskinen.",
+      "synced": "Chatten er lagt til i kontoen din."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

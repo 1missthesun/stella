@@ -925,14 +925,14 @@
     "localMode": {
       "authNote": "Logowanie daje modele Stelli, aplikację na telefon, Drive, zadania w chmurze i synchronizację między urządzeniami. Twoje czaty zostają na tym komputerze, dopóki nie zdecydujesz.",
       "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać z modeli Stelli, aplikacji na telefon, Drive, zadań w chmurze i synchronizacji.",
-      "choiceBody": "Używałeś Stelli przed zalogowaniem, więc ten czat i to, co pamięta Stella, są tylko na tym komputerze. Zsynchronizuj je z kontem, aby widzieć je na telefonie i innych urządzeniach, albo zostaw je tutaj.",
+      "choiceBody": "Używałeś tu Stelli bez logowania. Dodanie skopiuje ten czat i pamięć na Twoje konto, niczego w nim nie zastępując. Jeśli zostawisz go osobno, ten komputer będzie miał własny czat i pamięć.",
       "choiceFailed": "Nie udało się zapisać wyboru. Spróbuj ponownie.",
-      "choiceTitle": "Zsynchronizować czat i pamięć?",
-      "keep": "Zostaw na tym komputerze",
+      "choiceTitle": "Dodać ten czat do konta?",
+      "keep": "Zostaw osobno",
       "needsAccount": "To działa w chmurze Stelli, więc wymaga konta Stella.",
-      "sync": "Synchronizuj z moim kontem",
-      "syncFailed": "Nie udało się zsynchronizować czatu. Nadal jest na tym komputerze.",
-      "synced": "Twój czat jest zsynchronizowany z kontem."
+      "sync": "Dodaj do mojego konta",
+      "syncFailed": "Nie udało się dodać czatu do konta. Nadal jest na tym komputerze.",
+      "synced": "Czat został dodany do Twojego konta."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

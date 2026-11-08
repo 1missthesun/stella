@@ -904,14 +904,14 @@
     "localMode": {
       "authNote": "Dengan masuk, kamu mendapat model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi antarperangkat. Obrolanmu tetap di komputer ini sampai kamu memilih.",
       "banner": "Obrolanmu tetap di komputer ini. Masuk untuk model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi.",
-      "choiceBody": "Kamu memakai Stella sebelum masuk, jadi obrolan itu dan hal yang diingat Stella hanya ada di komputer ini. Sinkronkan ke akunmu untuk melihatnya di ponsel dan perangkat lain, atau simpan di sini.",
+      "choiceBody": "Kamu memakai Stella di sini tanpa masuk. Menambahkannya akan menyalin obrolan dan memori itu ke akunmu tanpa mengganti apa pun di sana. Jika dipisahkan, komputer ini akan punya obrolan dan memorinya sendiri.",
       "choiceFailed": "Pilihan itu tidak bisa disimpan. Coba lagi.",
-      "choiceTitle": "Sinkronkan obrolan dan memorimu?",
-      "keep": "Simpan di komputer ini",
+      "choiceTitle": "Tambahkan obrolan ini ke akunmu?",
+      "keep": "Pisahkan",
       "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
-      "sync": "Sinkronkan ke akunku",
-      "syncFailed": "Obrolanmu tidak bisa disinkronkan. Masih ada di komputer ini.",
-      "synced": "Obrolanmu sudah disinkronkan ke akunmu."
+      "sync": "Tambahkan ke akunku",
+      "syncFailed": "Tidak bisa menambahkan obrolan ini ke akunmu. Obrolan masih ada di komputer ini.",
+      "synced": "Obrolan ini sudah ditambahkan ke akunmu."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

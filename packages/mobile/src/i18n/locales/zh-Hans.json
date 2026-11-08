@@ -904,14 +904,14 @@
     "localMode": {
       "authNote": "登录后可使用 Stella 的模型、手机应用、Drive、云端任务和跨设备同步。在你做出选择之前，聊天会保留在这台电脑上。",
       "banner": "你的聊天保留在这台电脑上。登录即可使用 Stella 的模型、手机应用、Drive、云端任务和同步。",
-      "choiceBody": "你在登录前使用了 Stella，所以那段聊天和 Stella 记住的内容只在这台电脑上。同步到你的账户即可在手机和其他设备上查看，或者保留在这里。",
+      "choiceBody": "你在未登录时在这台电脑上使用了 Stella。添加后，这段聊天和记忆会复制到你的账号中，不会替换账号里的任何内容。如果分开保留，这台电脑会保留自己的聊天和记忆。",
       "choiceFailed": "无法保存该选择。请重试。",
-      "choiceTitle": "同步你的聊天和记忆？",
-      "keep": "保留在这台电脑上",
+      "choiceTitle": "将这段聊天添加到你的账号？",
+      "keep": "分开保留",
       "needsAccount": "此功能在 Stella 云端运行，因此需要 Stella 账户。",
-      "sync": "同步到我的账户",
-      "syncFailed": "无法同步你的聊天。它仍在这台电脑上。",
-      "synced": "你的聊天已同步到账户。"
+      "sync": "添加到我的账号",
+      "syncFailed": "无法将这段聊天添加到你的账号。它仍在这台电脑上。",
+      "synced": "这段聊天已添加到你的账号。"
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

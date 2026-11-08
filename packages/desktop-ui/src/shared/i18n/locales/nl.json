@@ -911,14 +911,14 @@
     "localMode": {
       "authNote": "Inloggen geeft je Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie tussen apparaten. Je chats blijven op deze computer tot je zelf kiest.",
       "banner": "Je chats blijven op deze computer. Log in voor Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie.",
-      "choiceBody": "Je gebruikte Stella voordat je inlogde, dus die chat en wat Stella onthoudt staan alleen op deze computer. Synchroniseer ze met je account om ze op je telefoon en andere apparaten te zien, of houd ze hier.",
+      "choiceBody": "Je hebt Stella hier gebruikt zonder in te loggen. Toevoegen kopieert die chat en het geheugen naar je account, zonder daar iets te vervangen. Houd je hem apart, dan houdt deze computer een eigen chat en geheugen.",
       "choiceFailed": "Die keuze kon niet worden opgeslagen. Probeer het opnieuw.",
-      "choiceTitle": "Je chat en geheugen synchroniseren?",
-      "keep": "Op deze computer houden",
+      "choiceTitle": "Deze chat aan je account toevoegen?",
+      "keep": "Apart houden",
       "needsAccount": "Dit draait in Stella's cloud en heeft dus een Stella-account nodig.",
-      "sync": "Synchroniseren met mijn account",
-      "syncFailed": "Je chat kon niet worden gesynchroniseerd. Hij staat nog op deze computer.",
-      "synced": "Je chat is gesynchroniseerd met je account."
+      "sync": "Aan mijn account toevoegen",
+      "syncFailed": "Kan deze chat niet aan je account toevoegen. Hij staat nog op deze computer.",
+      "synced": "Deze chat is aan je account toegevoegd."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

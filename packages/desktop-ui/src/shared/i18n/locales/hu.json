@@ -911,14 +911,14 @@
     "localMode": {
       "authNote": "A bejelentkezéssel megkapod Stella modelljeit, a telefonos appot, a Drive-ot, a felhős feladatokat és az eszközök közötti szinkronizálást. A csevegéseid ezen a számítógépen maradnak, amíg nem döntesz.",
       "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be Stella modelljeihez, a telefonos apphoz, a Drive-hoz, a felhős feladatokhoz és a szinkronizáláshoz.",
-      "choiceBody": "Bejelentkezés előtt használtad a Stellát, ezért az a csevegés és amire a Stella emlékszik, csak ezen a számítógépen van. Szinkronizáld őket a fiókodba, hogy a telefonodon és más eszközeiden is lásd, vagy tartsd meg itt.",
+      "choiceBody": "Itt bejelentkezés nélkül használtad a Stellát. A hozzáadás átmásolja a csevegést és a memóriát a fiókodba, anélkül hogy bármit lecserélne ott. Ha külön tartod, ennek a számítógépnek saját csevegése és memóriája lesz.",
       "choiceFailed": "Nem sikerült menteni a választást. Próbáld újra.",
-      "choiceTitle": "Szinkronizálod a csevegést és a memóriát?",
-      "keep": "Megtartás ezen a számítógépen",
+      "choiceTitle": "Hozzáadod ezt a csevegést a fiókodhoz?",
+      "keep": "Külön tartom",
       "needsAccount": "Ez Stella felhőjében fut, ezért Stella-fiók kell hozzá.",
-      "sync": "Szinkronizálás a fiókomba",
-      "syncFailed": "Nem sikerült szinkronizálni a csevegést. Továbbra is ezen a számítógépen van.",
-      "synced": "A csevegésed szinkronizálva van a fiókodba."
+      "sync": "Hozzáadás a fiókomhoz",
+      "syncFailed": "Nem sikerült hozzáadni a csevegést a fiókodhoz. Továbbra is ezen a számítógépen van.",
+      "synced": "A csevegés bekerült a fiókodba."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

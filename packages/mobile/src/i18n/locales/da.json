@@ -911,14 +911,14 @@
     "localMode": {
       "authNote": "Når du logger ind, får du Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering mellem enheder. Dine chats bliver på denne computer, indtil du vælger.",
       "banner": "Dine chats bliver på denne computer. Log ind for Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering.",
-      "choiceBody": "Du brugte Stella, før du loggede ind, så den chat og det, Stella husker, findes kun på denne computer. Synkroniser dem til din konto for at se dem på din telefon og andre enheder, eller behold dem her.",
+      "choiceBody": "Du har brugt Stella her uden at være logget ind. Hvis du tilføjer den, kopieres chatten og hukommelsen til din konto, uden at noget der bliver erstattet. Holder du den adskilt, får denne computer sin egen chat og hukommelse.",
       "choiceFailed": "Valget kunne ikke gemmes. Prøv igen.",
-      "choiceTitle": "Synkroniser din chat og hukommelse?",
-      "keep": "Behold på denne computer",
+      "choiceTitle": "Vil du føje denne chat til din konto?",
+      "keep": "Hold den adskilt",
       "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
-      "sync": "Synkroniser til min konto",
-      "syncFailed": "Din chat kunne ikke synkroniseres. Den er stadig på denne computer.",
-      "synced": "Din chat er synkroniseret til din konto."
+      "sync": "Føj til min konto",
+      "syncFailed": "Chatten kunne ikke føjes til din konto. Den er stadig på denne computer.",
+      "synced": "Chatten er føjet til din konto."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

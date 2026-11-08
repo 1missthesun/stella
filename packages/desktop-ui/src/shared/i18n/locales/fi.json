@@ -911,14 +911,14 @@
     "localMode": {
       "authNote": "Kirjautuminen tuo Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin laitteiden välillä. Keskustelusi pysyvät tällä tietokoneella, kunnes päätät toisin.",
       "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään saadaksesi Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin.",
-      "choiceBody": "Käytit Stellaa ennen kirjautumista, joten se keskustelu ja se, mitä Stella muistaa, ovat vain tällä tietokoneella. Synkronoi ne tiliisi, niin näet ne puhelimessa ja muilla laitteilla, tai pidä ne täällä.",
+      "choiceBody": "Käytit Stellaa täällä kirjautumatta. Lisääminen kopioi keskustelun ja muistin tiliisi korvaamatta siellä mitään. Jos pidät sen erillään, tällä tietokoneella on oma keskustelunsa ja muistinsa.",
       "choiceFailed": "Valintaa ei voitu tallentaa. Yritä uudelleen.",
-      "choiceTitle": "Synkronoidaanko keskustelu ja muisti?",
-      "keep": "Pidä tällä tietokoneella",
+      "choiceTitle": "Lisätäänkö tämä keskustelu tiliisi?",
+      "keep": "Pidä erillään",
       "needsAccount": "Tämä toimii Stellan pilvessä, joten se vaatii Stella-tilin.",
-      "sync": "Synkronoi tiliini",
-      "syncFailed": "Keskustelua ei voitu synkronoida. Se on yhä tällä tietokoneella.",
-      "synced": "Keskustelusi on synkronoitu tiliisi."
+      "sync": "Lisää tililleni",
+      "syncFailed": "Keskustelua ei voitu lisätä tiliisi. Se on yhä tällä tietokoneella.",
+      "synced": "Keskustelu lisättiin tiliisi."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

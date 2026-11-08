@@ -925,14 +925,14 @@
     "localMode": {
       "authNote": "Přihlášením získáte modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci mezi zařízeními. Vaše chaty zůstanou v tomto počítači, dokud se nerozhodnete.",
       "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se pro modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci.",
-      "choiceBody": "Stellu jste používali před přihlášením, takže ten chat a to, co si Stella pamatuje, jsou jen v tomto počítači. Synchronizujte je do svého účtu, abyste je viděli v telefonu a na dalších zařízeních, nebo si je nechte tady.",
+      "choiceBody": "Používali jste tu Stellu bez přihlášení. Přidáním se ten chat a paměť zkopírují do vašeho účtu, aniž by se v něm cokoli nahradilo. Když je necháte zvlášť, bude mít tento počítač vlastní chat a paměť.",
       "choiceFailed": "Volbu se nepodařilo uložit. Zkuste to znovu.",
-      "choiceTitle": "Synchronizovat chat a paměť?",
-      "keep": "Ponechat v tomto počítači",
+      "choiceTitle": "Přidat tento chat do účtu?",
+      "keep": "Nechat zvlášť",
       "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
-      "sync": "Synchronizovat s mým účtem",
-      "syncFailed": "Chat se nepodařilo synchronizovat. Je stále v tomto počítači.",
-      "synced": "Váš chat je synchronizovaný s účtem."
+      "sync": "Přidat do účtu",
+      "syncFailed": "Chat se nepodařilo přidat do účtu. Pořád je na tomto počítači.",
+      "synced": "Chat byl přidán do vašeho účtu."
     },
     "remoteExecutionConsent": {
       "allow": "Allow",

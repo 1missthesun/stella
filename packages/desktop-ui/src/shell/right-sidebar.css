@@ -585,6 +585,45 @@
   background: var(--card);
 }
 
+.display-artifact-panel__sheets {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px;
+  overflow-x: auto;
+  border-top: 1px solid color-mix(in oklch, var(--border) 38%, transparent);
+}
+
+.display-artifact-panel__sheet {
+  flex-shrink: 0;
+  max-width: 14rem;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.display-artifact-panel__sheet:hover {
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.display-artifact-panel__sheet[aria-selected="true"] {
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+  color: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.display-artifact-panel__sheet:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .display-artifact-panel__footer {
   flex-shrink: 0;
   display: flex;

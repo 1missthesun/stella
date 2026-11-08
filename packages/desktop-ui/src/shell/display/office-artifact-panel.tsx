@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Copy,
   Download,
@@ -48,33 +48,57 @@ const titleForPreview = (
   snapshot?: OfficePreviewSnapshot,
 ) => snapshot?.title ?? previewRef.title;
 
+type SheetTab = { index: number; name: string };
+
 const parsePreviewMeta = (html?: string, kind?: ArtifactKind) => {
-  if (!html || typeof DOMParser === "undefined") {
-    return { count: 0, sheets: [] as string[] };
-  }
+  const empty = { count: 0, sheets: [] as SheetTab[], activeSheet: null as number | null };
+  if (!html || typeof DOMParser === "undefined") return empty;
 
   const doc = new DOMParser().parseFromString(html, "text/html");
   if (kind === "spreadsheet") {
-    const sheets = Array.from(doc.querySelectorAll(".sheet-tab"))
-      .map((node) => node.textContent?.trim() ?? "")
-      .filter(Boolean);
-    return { count: sheets.length, sheets };
+    const sheets: SheetTab[] = [];
+    let activeSheet: number | null = null;
+    for (const node of doc.querySelectorAll<HTMLElement>(".sheet-tab[data-sheet]")) {
+      const index = Number(node.getAttribute("data-sheet"));
+      if (!Number.isInteger(index)) continue;
+      sheets.push({ index, name: node.textContent?.trim() || String(index + 1) });
+      if (activeSheet === null && node.classList.contains("active")) activeSheet = index;
+    }
+    return { count: sheets.length, sheets, activeSheet: activeSheet ?? sheets[0]?.index ?? null };
   }
 
   if (kind === "presentation") {
     return {
+      ...empty,
       count: doc.querySelectorAll(".slide-container, [data-slide-index]").length,
-      sheets: [] as string[],
     };
   }
 
   return {
+    ...empty,
     count: doc.querySelectorAll("section, article, .page, [data-page]").length,
-    sheets: [] as string[],
   };
 };
 
-const injectPreviewChrome = (html: string, zoomPercent: number) => {
+// The preview runs no script (the frame is sandboxed and inherits the app's
+// CSP), so the sheet tabs live in the panel and the chosen sheet is shown by CSS.
+const injectPreviewChrome = (
+  html: string,
+  zoomPercent: number,
+  sheet: number | null,
+) => {
+  const sheetRules =
+    sheet === null
+      ? ""
+      : `
+  .sheet-tabs,
+  .sheet-content {
+    display: none !important;
+  }
+  .sheet-content[data-sheet="${sheet}"] {
+    display: flex !important;
+    flex-direction: column;
+  }`;
   const style = `
 <style id="stella-artifact-preview-style">
   html {
@@ -85,7 +109,7 @@ const injectPreviewChrome = (html: string, zoomPercent: number) => {
   }
   .file-title {
     display: none !important;
-  }
+  }${sheetRules}
 </style>`;
   const next = html.includes("</head>")
     ? html.replace("</head>", `${style}</head>`)
@@ -131,7 +155,6 @@ export function OfficeArtifactPanel({
   const t = useT();
   const tPlural = useTPlural();
   const snapshot = useOfficePreview(previewRef.sessionId);
-  const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [zoomPercent, setZoomPercent] = useState(100);
   const format = snapshot?.format ?? formatFromPath(previewRef.sourcePath);
   const kind = kindForFormat(format);
@@ -145,74 +168,18 @@ export function OfficeArtifactPanel({
     () => parsePreviewMeta(snapshot?.html, kind),
     [snapshot?.html, kind],
   );
+  const [chosenSheet, setChosenSheet] = useState<number | null>(null);
+  const sheet =
+    chosenSheet !== null && meta.sheets.some((tab) => tab.index === chosenSheet)
+      ? chosenSheet
+      : meta.activeSheet;
   const srcDoc = useMemo(
     () =>
       snapshot?.html
-        ? injectPreviewChrome(snapshot.html, zoomPercent)
+        ? injectPreviewChrome(snapshot.html, zoomPercent, sheet)
         : undefined,
-    [snapshot?.html, zoomPercent],
+    [snapshot?.html, zoomPercent, sheet],
   );
-
-  useEffect(() => {
-    const frame = frameRef.current;
-    if (!frame || kind !== "spreadsheet") return;
-    const applySheetSelection = (index: number) => {
-      const doc = frame.contentDocument;
-      if (!doc) return;
-      doc
-        .querySelectorAll<HTMLElement>(".sheet-tab[data-sheet]")
-        .forEach((tab) => {
-          tab.classList.toggle(
-            "active",
-            Number(tab.getAttribute("data-sheet")) === index,
-          );
-        });
-      doc
-        .querySelectorAll<HTMLElement>(".sheet-content[data-sheet]")
-        .forEach((content) => {
-          content.classList.toggle(
-            "active",
-            Number(content.getAttribute("data-sheet")) === index,
-          );
-        });
-    };
-    const attachSheetHandlers = () => {
-      const doc = frame.contentDocument;
-      if (!doc) return;
-      doc
-        .querySelectorAll<HTMLElement>(".sheet-tab[data-sheet]")
-        .forEach((tab) => {
-          tab.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const index = Number(tab.getAttribute("data-sheet"));
-            if (Number.isFinite(index)) applySheetSelection(index);
-          });
-          tab.addEventListener("keydown", (event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            event.stopPropagation();
-            const index = Number(tab.getAttribute("data-sheet"));
-            if (Number.isFinite(index)) applySheetSelection(index);
-          });
-        });
-      const active =
-        doc.querySelector<HTMLElement>(".sheet-tab.active[data-sheet]") ??
-        doc.querySelector<HTMLElement>(".sheet-tab[data-sheet]");
-      const activeIndex = Number(active?.getAttribute("data-sheet"));
-      if (Number.isFinite(activeIndex)) applySheetSelection(activeIndex);
-      active?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    };
-    const handleLoad = () => {
-      attachSheetHandlers();
-    };
-    frame.addEventListener("load", handleLoad);
-    const timeout = window.setTimeout(attachSheetHandlers, 0);
-    return () => {
-      window.clearTimeout(timeout);
-      frame.removeEventListener("load", handleLoad);
-    };
-  }, [kind, srcDoc]);
 
   const ready = snapshot?.status === "ready" && Boolean(srcDoc);
   const error =
@@ -309,19 +276,35 @@ export function OfficeArtifactPanel({
         ) : null}
         {ready ? (
           <iframe
-            ref={frameRef}
             className="display-artifact-panel__frame"
             title={t("shell.display.office.frameTitle", {
               kind: t(labelKeyForKind(kind)),
               title,
             })}
-            sandbox="allow-scripts allow-same-origin"
+            sandbox=""
             srcDoc={srcDoc}
           />
         ) : (
           <StatusPanel error={error} loading={loading} />
         )}
       </div>
+
+      {ready && meta.sheets.length > 1 && (
+        <div className="display-artifact-panel__sheets" role="tablist">
+          {meta.sheets.map((tab) => (
+            <button
+              key={tab.index}
+              type="button"
+              role="tab"
+              aria-selected={tab.index === sheet}
+              className="display-artifact-panel__sheet"
+              onClick={() => setChosenSheet(tab.index)}
+            >
+              {tab.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {(actionStatus || snapshot?.status === "ready") && (
         <footer className="display-artifact-panel__footer">

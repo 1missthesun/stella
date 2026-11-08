@@ -1,5 +1,5 @@
 import type { BetterAuthPlugin } from "better-auth";
-import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 
 export const OAUTH_BINDING_COOKIE = "__Host-stella-oauth-state";
 
@@ -28,6 +28,20 @@ const providerAuthorization = (value: unknown): { url: URL; state: string } | nu
     if (url.protocol !== "https:" || !PROVIDER_HOSTS.has(url.hostname) || url.username || url.password) return null;
     const state = url.searchParams.get("state") ?? "";
     return STATE_PATTERN.test(state) ? { url, state } : null;
+  } catch {
+    return null;
+  }
+};
+
+const pendingLinkUserId = async (
+  adapter: { findVerificationValue(identifier: string): Promise<{ value: string } | null> },
+  state: string,
+): Promise<string | null> => {
+  const pending = await adapter.findVerificationValue(`auth-state:${state}`);
+  if (!pending) return null;
+  try {
+    const link = (JSON.parse(pending.value) as { link?: { userId?: unknown } }).link;
+    return link ? String(link.userId ?? "") : null;
   } catch {
     return null;
   }
@@ -78,6 +92,15 @@ export const oauthStateBinding = (): BetterAuthPlugin => ({
             throw ctx.redirect(`${ctx.context.baseURL}/error?error=state_mismatch`);
           }
           ctx.setCookie(OAUTH_BINDING_COOKIE, "", cookieAttributes(0));
+          // Better Auth links the provider account to the state's user without
+          // looking at who finishes the flow, so only that user's own session may.
+          const linkUserId = await pendingLinkUserId(ctx.context.internalAdapter, state);
+          if (linkUserId === null) return;
+          const session = await getSessionFromCtx(ctx).catch(() => null);
+          if (!linkUserId || session?.user.id !== linkUserId) {
+            logBinding("auth_oauth_link_session_mismatch", { session: session ? "other_user" : "missing" });
+            throw ctx.redirect(`${ctx.context.baseURL}/error?error=link_session_mismatch`);
+          }
         }),
       },
     ],

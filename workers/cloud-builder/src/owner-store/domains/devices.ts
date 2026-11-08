@@ -273,8 +273,10 @@ const register = async (
       ownerGeneration: snapshot.ownerGeneration,
       remoteExecutionEnabled: false,
       remoteExecution: "unconfigured",
-      rotated: false,
     };
+  }
+  if (existing.public_key && existing.public_key !== args.devicePublicKey) {
+    throw new RpcError("CONFLICT", "This device id is registered to a different device key.");
   }
   ctx.db.run(
     `UPDATE devices SET public_key = ?, name = COALESCE(?, name), platform = COALESCE(?, platform),
@@ -292,7 +294,6 @@ const register = async (
     ownerGeneration: snapshot.ownerGeneration,
     remoteExecutionEnabled: remoteExecutionOf(existing) === "enabled",
     remoteExecution: remoteExecutionOf(existing),
-    rotated: Boolean(existing.public_key && existing.public_key !== args.devicePublicKey),
   };
 };
 
@@ -449,8 +450,11 @@ const adoptSuccession = (
       inherited !== "unconfigured" &&
       remoteExecutionOf(successor) === "unconfigured",
   );
-  if (migratedRemoteExecution) {
-    writeRemoteExecution(ctx, args.deviceId, inherited, retired?.remote_execution_asked_at ?? null);
+  if (migratedRemoteExecution && inherited === "declined") {
+    writeRemoteExecution(ctx, args.deviceId, "declined", null);
+  } else if (migratedRemoteExecution) {
+    writeRemoteExecution(ctx, args.deviceId, "asking", ctx.now);
+    ctx.host.askDeviceConsent({ deviceId: args.deviceId, requestedAt: ctx.now });
   }
   if (retired?.brain_home === 1 && successor) {
     ctx.db.run("UPDATE devices SET brain_home = CASE WHEN device_id = ? THEN 1 ELSE 0 END", args.deviceId);

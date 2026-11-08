@@ -25,7 +25,6 @@ export type DeviceCalls = {
       ownerGeneration: string;
       remoteExecutionEnabled: boolean;
       remoteExecution: DeviceRemoteExecution;
-      rotated: boolean;
     };
   };
   "devices.setRemoteExecution": {

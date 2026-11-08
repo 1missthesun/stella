@@ -18,6 +18,7 @@ import {
   listIntegrationActions,
   listIntegrationCatalog,
 } from "../integrations/catalog.js";
+import { withStellaGoogle } from "../integrations/google.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { SLACK_CONNECTOR_SOURCE } from "../slack/workspace.js";
 import { isSlackConversationId } from "../slack/conversation-id.js";
@@ -64,15 +65,22 @@ const agentConnectClient = (
       source:
         slack
           ? SLACK_CONNECTOR_SOURCE
-          : {
-              catalog: () => listIntegrationCatalog(env),
-              actions: (args) => listIntegrationActions(env, args),
-              connections: async () =>
-                (await ownerInternal("integrations.connections", {})) as {
-                  connections: IntegrationConnection[];
-                },
-              run: (args) => ownerInternal("integrations.run", args),
-            },
+          : withStellaGoogle(
+              {
+                catalog: () => listIntegrationCatalog(env),
+                actions: (args) => listIntegrationActions(env, args),
+                connections: async () =>
+                  (await ownerInternal("integrations.connections", {})) as {
+                    connections: IntegrationConnection[];
+                  },
+                run: (args) => ownerInternal("integrations.run", args),
+              },
+              async () =>
+                (await ownerInternal("integrations.googleRoutes", {})) as Record<
+                  string,
+                  "stella" | "composio"
+                >,
+            ),
     }),
   );
   clients.set(key, client);

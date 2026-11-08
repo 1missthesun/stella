@@ -91,6 +91,7 @@ import {
   listIntegrationActions,
   listIntegrationCatalog,
 } from "../integrations/catalog.js";
+import { withStellaGoogle } from "../integrations/google.js";
 import { sleepWithAbort } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { utf8Length } from "../conversation-types.js";
 import { localTurnId as makeLocalTurnId } from "../local-turn-protocol.js";
@@ -1889,15 +1890,22 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const connectors = new CloudConnectorDirectory({
       source: isSlackConversationId(authority.conversationId)
         ? SLACK_CONNECTOR_SOURCE
-        : {
-            catalog: () => listIntegrationCatalog(this.env),
-            actions: (args) => listIntegrationActions(this.env, args),
-            connections: async () =>
-              (await ownerInternal("integrations.connections", {})) as {
-                connections: IntegrationConnection[];
-              },
-            run: (args) => ownerInternal("integrations.run", args),
-          },
+        : withStellaGoogle(
+            {
+              catalog: () => listIntegrationCatalog(this.env),
+              actions: (args) => listIntegrationActions(this.env, args),
+              connections: async () =>
+                (await ownerInternal("integrations.connections", {})) as {
+                  connections: IntegrationConnection[];
+                },
+              run: (args) => ownerInternal("integrations.run", args),
+            },
+            async () =>
+              (await ownerInternal("integrations.googleRoutes", {})) as Record<
+                string,
+                "stella" | "composio"
+              >,
+          ),
       ...(isSlackConversationId(authority.conversationId)
         ? {}
         : { mcp: ownerMcpSource(ownerInternal) }),

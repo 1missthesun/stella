@@ -41,6 +41,12 @@ export const forgetSessionRevocations = (ownerId: string): void => {
   cache.delete(ownerId);
 };
 
+const NO_REVOCATIONS: SessionRevocations = { minIatMs: 0, sessionIds: [] };
+
+const isMissingRevocationMethod = (error: unknown): boolean =>
+  error instanceof Error &&
+  error.message.includes('does not implement the method "sessionRevocations"');
+
 const ownerSessionRevocations = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   ownerId: string,
@@ -48,11 +54,20 @@ const ownerSessionRevocations = async (
   const now = Date.now();
   const cached = cache.get(ownerId);
   if (cached && now - cached.fetchedAtMs < REVOCATION_CACHE_MS) return cached.revocations;
-  const revocations = await withInfrastructureDeadline(
-    ownerGateStub(env.OWNER_GATES, ownerId).sessionRevocations(),
-    REVOCATION_LOOKUP_TIMEOUT_MS,
-    "session revocation lookup timed out",
-  );
+  let revocations: SessionRevocations;
+  try {
+    revocations = await withInfrastructureDeadline(
+      ownerGateStub(env.OWNER_GATES, ownerId).sessionRevocations(),
+      REVOCATION_LOOKUP_TIMEOUT_MS,
+      "session revocation lookup timed out",
+    );
+  } catch (error) {
+    // For a few minutes after a deploy, an OwnerGate still running code from
+    // before sign-out revocation existed answers without this method. That
+    // code never recorded a revocation, so it has none to report.
+    if (isMissingRevocationMethod(error)) return NO_REVOCATIONS;
+    throw error;
+  }
   if (cache.size >= CACHE_MAX) cache.clear();
   cache.set(ownerId, { revocations, fetchedAtMs: now });
   return revocations;

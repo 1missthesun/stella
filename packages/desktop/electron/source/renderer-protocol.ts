@@ -191,7 +191,7 @@ export const serveRendererSource = (options: {
   firstPage?: (html: string) => string;
 }): RendererSourceHandle => {
   const partitionSession = session.fromPartition(options.partition);
-  serveMediaProtocol(options.partition);
+  serveMediaProtocol(options.partition, { readerOrigin: RENDERER_ORIGIN });
   serveCanvasProtocol(options.partition);
   const pages = () =>
     webContents

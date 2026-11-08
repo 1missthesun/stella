@@ -7,6 +7,8 @@ import {
 } from "../source/media-protocol.js";
 
 const PROBE_TIMEOUT_MS = 25_000;
+/** The probe page is a data: document, whose origin serializes as "null". */
+const OPAQUE_ORIGIN = "null";
 const IDLE_SHUTDOWN_MS = 30_000;
 
 let probeWindow: BrowserWindow | null = null;
@@ -26,7 +28,7 @@ const ensureWindow = async (): Promise<BrowserWindow> => {
     releaseLater();
     return probeWindow;
   }
-  serveMediaProtocol(MEDIA_PROBE_PARTITION, { devices: false });
+  serveMediaProtocol(MEDIA_PROBE_PARTITION, { readerOrigin: OPAQUE_ORIGIN, devices: false });
   const window = new BrowserWindow({
     width: 16,
     height: 16,

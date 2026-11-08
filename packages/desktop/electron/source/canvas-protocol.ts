@@ -76,7 +76,7 @@ const ASSET_TYPES: Record<string, string> = {
 
 /**
  * Where a canvas may load scripts, styles and fonts from, and fetch. Never
- * `stella-media:` (it serves any absolute path to any origin), `stella-app:`,
+ * `stella-media:` (local files, for the app renderer only), `stella-app:`,
  * or a wildcard.
  */
 const CANVAS_CDN_SOURCES = [

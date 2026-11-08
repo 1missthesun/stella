@@ -129,10 +129,11 @@ const streamFromPeer = async (
   holder: PeerHolder,
   requested: string,
   request: Request,
+  readerOrigin: string,
 ): Promise<Response> => {
   const sizeBytes = holder.stat.sizeBytes;
   const headers = new Headers({
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": readerOrigin,
     "accept-ranges": "bytes",
     "content-type": holder.stat.mimeType || "application/octet-stream",
   });
@@ -166,12 +167,16 @@ const streamFromPeer = async (
 
 // Media elements seek with Range requests; a 200 with the whole file instead
 // of a 206 leaves the element unseekable, so scrubbing snaps back to the start.
-const serveLocalFile = async (filePath: string, request: Request): Promise<Response> => {
+const serveLocalFile = async (
+  filePath: string,
+  request: Request,
+  readerOrigin: string,
+): Promise<Response> => {
   const stat = await fsPromises.stat(filePath);
   if (!stat.isFile()) return new Response("Not found", { status: 404 });
   const sizeBytes = stat.size;
   const headers = new Headers({
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": readerOrigin,
     "accept-ranges": "bytes",
   });
   // Unknown extensions go without a type so Chromium sniffs them, as it did for file:// loads.
@@ -199,9 +204,13 @@ const serveLocalFile = async (filePath: string, request: Request): Promise<Respo
   return new Response(body, { status: asked ? 206 : 200, headers });
 };
 
-const withMediaHeaders = (upstream: Response, contentType?: string): Response => {
+const withMediaHeaders = (
+  upstream: Response,
+  readerOrigin: string,
+  contentType?: string,
+): Response => {
   const responseHeaders = new Headers(upstream.headers);
-  responseHeaders.set("access-control-allow-origin", "*");
+  responseHeaders.set("access-control-allow-origin", readerOrigin);
   responseHeaders.set("accept-ranges", "bytes");
   if (contentType && !responseHeaders.get("content-type")) {
     responseHeaders.set("content-type", contentType);
@@ -224,6 +233,7 @@ const streamDriveCopy = async (
   locator: DeviceFileLocator,
   drivePath: string,
   request: Request,
+  readerOrigin: string,
 ): Promise<Response> => {
   for (const fresh of [false, true]) {
     const file = await locator.copyUrl(drivePath, { fresh });
@@ -240,18 +250,32 @@ const streamDriveCopy = async (
       await upstream.body?.cancel().catch(() => undefined);
       continue;
     }
-    return withMediaHeaders(upstream, file.contentType);
+    return withMediaHeaders(upstream, readerOrigin, file.contentType);
   }
   return new Response("Drive copy unavailable", { status: 502 });
 };
 
+/**
+ * A media URL is a plain encoding of an absolute path, so the URL is no
+ * authority: only frames of `readerOrigin` may load it. The partition also
+ * hosts web content (URL tabs, workspace apps, Live View), and requests
+ * reaching the handler carry neither Origin nor Referer, so the initiating
+ * frame is judged in webRequest, the one place that sees it.
+ */
 export const serveMediaProtocol = (
   partition: string,
-  options: { devices?: boolean } = {},
+  options: { readerOrigin: string; devices?: boolean },
 ) => {
   const partitionSession = session.fromPartition(partition);
   if (partitionSession.protocol.isProtocolHandled(MEDIA_SCHEME)) return;
+  const { readerOrigin } = options;
   const useDevices = options.devices ?? true;
+  partitionSession.webRequest.onBeforeRequest(
+    { urls: [`${MEDIA_SCHEME}://*/*`] },
+    (details, callback) => {
+      callback({ cancel: details.frame?.origin !== readerOrigin });
+    },
+  );
   partitionSession.protocol.handle(MEDIA_SCHEME, async (request) => {
     const requested = requestedMediaPath(request.url);
     if (!requested) return new Response("Bad media path", { status: 400 });
@@ -259,14 +283,14 @@ export const serveMediaProtocol = (
     try {
       const source = await resolveDeviceFileSource(requested, devices);
       if (source.kind === "local") {
-        return await serveLocalFile(source.filePath, request);
+        return await serveLocalFile(source.filePath, request, readerOrigin);
       }
       const holder = useDevices ? await findPeerHolder(requested, source) : null;
       if (holder && peerFiles) {
-        return await streamFromPeer(peerFiles, holder, requested, request);
+        return await streamFromPeer(peerFiles, holder, requested, request, readerOrigin);
       }
       if (source.kind === "drive" && devices) {
-        return await streamDriveCopy(devices.locator, source.drivePath, request);
+        return await streamDriveCopy(devices.locator, source.drivePath, request, readerOrigin);
       }
       return new Response("Not found", { status: 404 });
     } catch {

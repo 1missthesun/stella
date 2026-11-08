@@ -339,17 +339,19 @@ export const runStellaGoogleAction = async (
       throw error;
     }
   } catch (error) {
-    if (error instanceof RpcError) throw error;
-    if (error instanceof GoogleApiError) {
-      throw new RpcError(
+    throw googleRpcError(error);
+  }
+};
+
+/** A Google API failure as the RPC error the agent sees. */
+export const googleRpcError = (error: unknown): unknown =>
+  error instanceof GoogleApiError
+    ? new RpcError(
         error.status === 404 ? "NOT_FOUND" : error.status === 429 ? "RATE_LIMITED" : "BAD_REQUEST",
         `Google: ${error.message}`,
         { retryable: error.status === 429 || error.status >= 500 },
-      );
-    }
-    throw error;
-  }
-};
+      )
+    : error;
 
 /** Live access tokens for every connected account that granted Gmail, for the digest. */
 export const stellaGmailTokens = async (

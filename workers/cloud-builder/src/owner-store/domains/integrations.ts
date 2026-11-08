@@ -57,11 +57,18 @@ import {
   type XTokenResponse,
 } from "../../integrations/x.js";
 import { GMAIL_INTEGRATION_ID } from "../../integrations/gmail-digest.js";
-import { GOOGLE_SERVICES, googleAction, isStellaGoogleIntegration } from "../../integrations/google.js";
+import {
+  GOOGLE_SERVICES,
+  googleAction,
+  isStellaGoogleIntegration,
+  proxyFetcher,
+  runGoogleAction,
+} from "../../integrations/google.js";
 import {
   GOOGLE_ACCOUNTS_MIGRATION,
   completeStellaGoogleOAuth,
   finishStellaGoogleConnect,
+  googleRpcError,
   hasStellaGoogleAccounts,
   purgeStellaGoogleAccounts,
   removeStellaGoogleAccount,
@@ -262,22 +269,151 @@ const connectsWithStellaGoogle = (ctx: OwnerContext, integrationId: string): boo
   googleProviderOf(ctx.db) === "stella";
 
 /**
- * Whether this integration runs on Stella's own Google connection. A working
- * Composio connection keeps being used until the user connects Google through
- * Stella; with Composio chosen, accounts already connected through Stella keep
- * working until a Composio connection for that service completes.
+ * Whether this integration runs on Stella's own Google actions. It does once
+ * any account is connected through Stella; accounts connected through
+ * Composio before that keep working alongside them (see stellaRouteAccounts).
+ * Without a Stella account, a working Composio connection keeps its own
+ * actions.
  */
 const usesStellaGoogle = async (ctx: OwnerContext, integrationId: string): Promise<boolean> => {
   if (!isStellaGoogleIntegration(integrationId) || !stellaGoogleAvailable(ctx.env)) return false;
-  const stellaAccounts = stellaGoogleAccounts(ctx.db, integrationId).length > 0;
-  const composioRow = Boolean(connectionOf(ctx.db, integrationId));
-  if (googleProviderOf(ctx.db) === "composio") {
-    if (!stellaAccounts) return false;
-    if (!composioRow) return true;
-  } else if (stellaAccounts || !composioRow) {
-    return true;
-  }
+  if (stellaGoogleAccounts(ctx.db, integrationId).length > 0) return true;
+  if (googleProviderOf(ctx.db) === "composio") return false;
+  if (!connectionOf(ctx.db, integrationId)) return true;
   return !(await composioConnectionState(ctx, integrationId)).connected;
+};
+
+const googlePrimaryKey = (integrationId: string) => `google_primary:${integrationId}`;
+
+const googlePrimaryChoice = (db: OwnerDbReader, integrationId: string): "stella" | "composio" | null => {
+  const value = db.one<{ value: string }>(
+    "SELECT value FROM integration_settings WHERE key = ?",
+    googlePrimaryKey(integrationId),
+  )?.value;
+  return value === "stella" || value === "composio" ? value : null;
+};
+
+const setGooglePrimaryChoice = (ctx: OwnerContext, integrationId: string, value: "stella" | "composio") =>
+  ctx.db.run(
+    `INSERT INTO integration_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    googlePrimaryKey(integrationId),
+    value,
+    ctx.now,
+  );
+
+type StellaRoutePrimary = { kind: "stella"; email?: string } | { kind: "composio"; id: string } | null;
+
+/**
+ * The accounts of a Google service on Stella's actions: the ones connected
+ * through Stella, plus each Composio-connected account whose address hasn't
+ * been reconnected through Stella yet. The Composio primary stays primary
+ * until the user picks another; once its address is reconnected through
+ * Stella, that Stella entry takes its place.
+ */
+const stellaRouteAccounts = async (
+  ctx: OwnerContext,
+  integrationId: string,
+  options: { force?: boolean } = {},
+): Promise<{ accounts: IntegrationAccount[]; composio: IntegrationAccount[]; primary: StellaRoutePrimary }> => {
+  const stella = stellaGoogleAccounts(ctx.db, integrationId);
+  const stellaEmails = new Set(stella.map((account) => (account.email ?? account.id).toLowerCase()));
+  const all = connectionOf(ctx.db, integrationId)
+    ? ((await composioConnectionState(ctx, integrationId, options)).accounts ?? []).filter(
+        (account) => account.connected,
+      )
+    : [];
+  const composio = all.filter((account) => !(account.email && stellaEmails.has(account.email.toLowerCase())));
+  const composioPrimary = all.find((account) => account.primary);
+  const choice = googlePrimaryChoice(ctx.db, integrationId);
+  let primary: StellaRoutePrimary = null;
+  if (choice !== "stella" && composioPrimary && composio.includes(composioPrimary)) {
+    primary = { kind: "composio", id: composioPrimary.id };
+  } else if (choice !== "stella" && composioPrimary?.email && stellaEmails.has(composioPrimary.email.toLowerCase())) {
+    primary = { kind: "stella", email: composioPrimary.email.toLowerCase() };
+  } else if (stella.length > 0) {
+    primary = { kind: "stella" };
+  } else if (composio[0]) {
+    primary = { kind: "composio", id: composio[0].id };
+  }
+  const isPrimaryStella = (account: IntegrationAccount) =>
+    primary?.kind === "stella" &&
+    (primary.email ? (account.email ?? account.id).toLowerCase() === primary.email : account.primary);
+  return {
+    accounts: [
+      ...stella.map((account) => ({ ...account, primary: isPrimaryStella(account) })),
+      ...composio.map((account) => ({
+        ...account,
+        primary: primary?.kind === "composio" && account.id === primary.id,
+      })),
+    ],
+    composio,
+    primary,
+  };
+};
+
+/** Which connection an action on Stella's Google actions runs as. */
+const resolveStellaRouteAccount = async (
+  ctx: OwnerContext,
+  integrationId: string,
+  requested?: string,
+): Promise<{ kind: "stella"; email?: string } | { kind: "composio"; id: string }> => {
+  const state = await stellaRouteAccounts(ctx, integrationId);
+  const wanted = requested?.trim().toLowerCase();
+  if (!wanted) {
+    if (!state.primary) throw new RpcError("CONFLICT", "Connect this integration before using it.", { reason: "not_connected" });
+    return state.primary;
+  }
+  const stella = stellaGoogleAccounts(ctx.db, integrationId).find(
+    (account) => (account.email ?? account.id).toLowerCase() === wanted,
+  );
+  if (stella) return { kind: "stella", email: wanted };
+  const composio = state.composio.find(
+    (account) =>
+      account.id.toLowerCase() === wanted ||
+      account.email?.toLowerCase() === wanted ||
+      account.label.toLowerCase() === wanted,
+  );
+  if (composio) return { kind: "composio", id: composio.id };
+  throw new RpcError(
+    "BAD_REQUEST",
+    `${requested} isn't connected. Connected: ${state.accounts.map((account) => account.email ?? account.label).join(", ")}.`,
+  );
+};
+
+/** Runs one of Stella's Google actions as a Composio-connected account, through Composio's proxy. */
+const runComposioGoogleAction = async (
+  ctx: OwnerContext,
+  integrationId: string,
+  action: string,
+  input: Record<string, unknown>,
+  accountId: string,
+): Promise<unknown> => {
+  const connection = connectionOf(ctx.db, integrationId);
+  if (!connection) throw new RpcError("CONFLICT", "Connect this integration before using it.", { reason: "not_connected" });
+  const config = requireComposio(ctx.env);
+  const account = await resolveIntegrationAccount(
+    ctx,
+    config,
+    { id: integrationId, toolkit: connection.toolkit },
+    accountId,
+  );
+  const get = proxyFetcher(connection.toolkit, (request) =>
+    composioExecute(config, account.sessionId, { proxy: request }),
+  );
+  try {
+    return await runGoogleAction(get, integrationId, action, input as Record<string, never>);
+  } catch (error) {
+    if (error instanceof RpcError) throw error;
+    const mapped = googleRpcError(error);
+    if (mapped !== error) throw mapped;
+    console.error(JSON.stringify({
+      event: "integration_google_proxy_failed",
+      integrationId,
+      message: error instanceof Error ? error.message : String(error),
+    }));
+    throw new RpcError("UNAVAILABLE", "Could not run the integration action.", { retryable: false });
+  }
 };
 
 const connectionState = async (
@@ -286,7 +422,7 @@ const connectionState = async (
   options: { force?: boolean } = {},
 ): Promise<{ connected: boolean; accounts?: IntegrationAccount[] }> => {
   if (await usesStellaGoogle(ctx, integrationId)) {
-    const accounts = stellaGoogleAccounts(ctx.db, integrationId);
+    const { accounts } = await stellaRouteAccounts(ctx, integrationId, options);
     return { connected: accounts.some((account) => account.connected), accounts };
   }
   return await composioConnectionState(ctx, integrationId, options);
@@ -440,7 +576,10 @@ const runAction = async (
   );
   if (await usesStellaGoogle(ctx, args.id)) {
     if (!googleAction(args.id, args.action)) throw new RpcError("BAD_REQUEST", "Integration action is not allowed.");
-    return await runStellaGoogleAction(ctx, args.id, args.action, args.input, args.account);
+    const target = await resolveStellaRouteAccount(ctx, args.id, args.account);
+    return target.kind === "composio"
+      ? await runComposioGoogleAction(ctx, args.id, args.action, args.input, target.id)
+      : await runStellaGoogleAction(ctx, args.id, args.action, args.input, target.email);
   }
   const resolved = await loadIntegrationAction(ctx.env, args.id, args.action);
   if (!resolved) throw new RpcError("BAD_REQUEST", "Integration action is not allowed.");
@@ -1148,7 +1287,16 @@ export const integrationsDomain = {
       parse: parseAccountChange,
       handler: async (ctx, args) => {
         if (await usesStellaGoogle(ctx, args.id)) {
-          return { accounts: setPrimaryStellaGoogleAccount(ctx, args.id, args.account) };
+          const target = await resolveStellaRouteAccount(ctx, args.id, args.account);
+          if (target.kind === "composio") {
+            const { config, integration } = await accountTarget(ctx, args.id);
+            await setPrimaryIntegrationAccount(ctx, config, integration, target.id);
+            setGooglePrimaryChoice(ctx, args.id, "composio");
+          } else {
+            setPrimaryStellaGoogleAccount(ctx, args.id, args.account);
+            setGooglePrimaryChoice(ctx, args.id, "stella");
+          }
+          return { accounts: (await stellaRouteAccounts(ctx, args.id)).accounts };
         }
         const { config, integration } = await accountTarget(ctx, args.id);
         try {
@@ -1170,7 +1318,21 @@ export const integrationsDomain = {
           "Too many account changes. Wait a moment and try again.",
         );
         if (await usesStellaGoogle(ctx, args.id)) {
-          return { accounts: await removeStellaGoogleAccount(ctx, args.id, args.account) };
+          const target = await resolveStellaRouteAccount(ctx, args.id, args.account);
+          if (target.kind === "composio") {
+            const { config, integration } = await accountTarget(ctx, args.id);
+            try {
+              await removeIntegrationAccount(ctx, config, integration, target.id);
+            } catch (error) {
+              return accountChangeFailed(error, "integration_remove_account_failed", args.id);
+            }
+          } else {
+            await removeStellaGoogleAccount(ctx, args.id, args.account);
+          }
+          if (!(await usesStellaGoogle(ctx, args.id))) {
+            return { accounts: (await composioConnectionState(ctx, args.id, { force: true })).accounts ?? [] };
+          }
+          return { accounts: (await stellaRouteAccounts(ctx, args.id, { force: true })).accounts };
         }
         const { config, integration } = await accountTarget(ctx, args.id);
         try {

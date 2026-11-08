@@ -222,7 +222,20 @@ export class GoogleApiError extends Error {
   }
 }
 
-type Fetcher = (url: string, init?: { method?: string; body?: unknown; raw?: BodyInit; contentType?: string }) => Promise<unknown>;
+/** A Google API call. `text` returns the response body as a string (file contents). */
+export type Fetcher = (
+  url: string,
+  init?: { method?: string; body?: unknown; raw?: string; contentType?: string; text?: boolean },
+) => Promise<unknown>;
+
+const googleErrorMessage = (payload: unknown, status: number): string => {
+  const error = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
+  return (
+    (error && typeof error.message === "string" && error.message) ||
+    (isRecord(payload) && typeof payload.error_description === "string" && payload.error_description) ||
+    `Google answered ${status}.`
+  ).slice(0, 500);
+};
 
 const fetcherFor = (accessToken: string): Fetcher => async (url, init = {}) => {
   const method = init.method ?? "GET";
@@ -237,20 +250,55 @@ const fetcherFor = (accessToken: string): Fetcher => async (url, init = {}) => {
     ...(init.raw !== undefined ? { body: init.raw } : {}),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  if (init.text) {
+    if (!response.ok) throw new GoogleApiError(response.status, `Google answered ${response.status}.`);
+    return await response.text();
+  }
   if (response.status === 204) return { ok: true };
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("json")
     ? await response.json().catch(() => null)
     : { text: await response.text().catch(() => "") };
-  if (!response.ok) {
-    const error = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
-    const message =
-      (error && typeof error.message === "string" && error.message) ||
-      (isRecord(payload) && typeof payload.error_description === "string" && payload.error_description) ||
-      `Google answered ${response.status}.`;
-    throw new GoogleApiError(response.status, message.slice(0, 500));
-  }
+  if (!response.ok) throw new GoogleApiError(response.status, googleErrorMessage(payload, response.status));
   return payload;
+};
+
+const base64Utf8 = (value: string): string => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+};
+
+/**
+ * Google API calls made through a Composio-connected account (Composio's
+ * proxy signs them with that account's own grant), so an account connected
+ * before Stella's own Google sign-in runs the same actions.
+ */
+export const proxyFetcher = (
+  toolkit: string,
+  execute: (request: Record<string, unknown>) => Promise<Record<string, unknown>>,
+): Fetcher => async (url, init = {}) => {
+  const body =
+    init.raw !== undefined
+      ? { base64: base64Utf8(init.raw), content_type: init.contentType ?? "text/plain" }
+      : init.body !== undefined
+        ? { base64: base64Utf8(JSON.stringify(init.body)), content_type: "application/json" }
+        : null;
+  const payload = await execute({
+    toolkit_slug: toolkit,
+    endpoint: url,
+    method: init.method ?? "GET",
+    ...(body ? { binary_body: body } : {}),
+  });
+  const status = typeof payload.status === "number" ? payload.status : 502;
+  const data = payload.data;
+  if (status < 200 || status >= 300) throw new GoogleApiError(status, googleErrorMessage(data, status));
+  if (init.text) return typeof data === "string" ? data : JSON.stringify(data ?? "");
+  if (status === 204 || data === undefined || data === null || data === "") return { ok: true };
+  return typeof data === "string" ? { text: data } : data;
 };
 
 const str = (input: JsonObject, key: string): string | undefined => {
@@ -422,7 +470,7 @@ const EXPORT_TYPES: Record<string, string> = {
   "application/vnd.google-apps.drawing": "image/svg+xml",
 };
 
-const readDriveFile = async (accessToken: string, get: Fetcher, fileId: string): Promise<JsonObject> => {
+const readDriveFile = async (get: Fetcher, fileId: string): Promise<JsonObject> => {
   const meta = (await get(`${DRIVE}/files/${enc(fileId)}?fields=${enc(DRIVE_FILE_FIELDS)}&supportsAllDrives=true`)) as JsonObject;
   const mime = typeof meta.mimeType === "string" ? meta.mimeType : "";
   const exportType = EXPORT_TYPES[mime];
@@ -433,12 +481,15 @@ const readDriveFile = async (accessToken: string, get: Fetcher, fileId: string):
   const url = exportType
     ? `${DRIVE}/files/${enc(fileId)}/export?mimeType=${enc(exportType)}`
     : `${DRIVE}/files/${enc(fileId)}?alt=media&supportsAllDrives=true`;
-  const response = await fetch(url, {
-    headers: { authorization: `Bearer ${accessToken}` },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new GoogleApiError(response.status, `Could not read the file (${response.status}).`);
-  const text = await response.text();
+  let text: string;
+  try {
+    text = String(await get(url, { text: true }));
+  } catch (error) {
+    if (error instanceof GoogleApiError) {
+      throw new GoogleApiError(error.status, `Could not read the file (${error.status}).`);
+    }
+    throw error;
+  }
   return {
     file: meta,
     content: text.length > MAX_FILE_CHARS ? `${text.slice(0, MAX_FILE_CHARS)}…` : text,
@@ -556,7 +607,7 @@ type ActionSpec = {
   readOnly: boolean;
   destructive?: boolean;
   schema: JsonObject;
-  run: (ctx: { get: Fetcher; accessToken: string; input: JsonObject }) => Promise<unknown>;
+  run: (ctx: { get: Fetcher; input: JsonObject }) => Promise<unknown>;
 };
 
 const obj = (properties: JsonObject, required: string[] = []): JsonObject => ({
@@ -974,7 +1025,7 @@ const ACTIONS: Record<string, ActionSpec[]> = {
       description: "A file's details and its text. Docs come back as text, Sheets as CSV.",
       readOnly: true,
       schema: obj({ file_id: S("File id.") }, ["file_id"]),
-      run: async ({ get, accessToken, input }) => await readDriveFile(accessToken, get, need(input, "file_id")),
+      run: async ({ get, input }) => await readDriveFile(get, need(input, "file_id")),
     },
     {
       name: "GOOGLEDRIVE_CREATE_FILE",
@@ -1325,14 +1376,14 @@ export const googleAction = (id: string, name: string): IntegrationAction | null
 
 /** Runs one action with a live access token. Throws GoogleApiError (401 = token rejected). */
 export const runGoogleAction = async (
-  accessToken: string,
+  access: string | Fetcher,
   id: string,
   name: string,
   input: JsonObject,
 ): Promise<unknown> => {
   const spec = ACTIONS[id]?.find((action) => action.name === name);
   if (!spec) throw new GoogleApiError(400, "This Google action is not available.");
-  return await spec.run({ get: fetcherFor(accessToken), accessToken, input });
+  return await spec.run({ get: typeof access === "string" ? fetcherFor(access) : access, input });
 };
 
 // Email digest -------------------------------------------------------------

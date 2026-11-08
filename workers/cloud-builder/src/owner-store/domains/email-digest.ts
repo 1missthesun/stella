@@ -152,25 +152,33 @@ const composioGmailAccounts = async (
   }));
 };
 
-const googleProviderIsComposio = (db: OwnerDbReader): boolean =>
-  db.one<{ value: string }>("SELECT value FROM integration_settings WHERE key = 'google_provider'")?.value ===
-  "composio";
-
 const gmailAccounts = async (
   ctx: OwnerContext,
   config: ComposioConfig | null,
 ): Promise<DigestAccount[]> => {
   const stella = stellaGoogleAvailable(ctx.env) ? await stellaGmailTokens(ctx) : [];
-  if (stella.length > 0 && !(googleProviderIsComposio(ctx.db) && gmailToolkit(ctx.db))) {
-    return stella.map((account) => ({
+  if (stella.length === 0) return await composioGmailAccounts(ctx, config);
+  const emails = new Set(stella.map((account) => account.email.toLowerCase()));
+  // Inboxes connected through Composio keep being read until the same
+  // address is reconnected through Stella.
+  const composio = (await composioGmailAccounts(ctx, config).catch((error: unknown) => {
+    console.error(JSON.stringify({
+      event: "email_digest_composio_accounts_failed",
+      message: error instanceof Error ? error.message : String(error),
+    }));
+    return [];
+  })).filter((account) => !(account.email && emails.has(account.email.toLowerCase())));
+  return [
+    ...stella.map((account) => ({
       key: `google:${account.email}`,
       email: account.email,
       label: account.email,
-      primary: account.primary,
-      fetch: async (since, cursor) => fetchGmailSinceDirect(await account.accessToken(), since, cursor),
-    }));
-  }
-  return await composioGmailAccounts(ctx, config);
+      primary: account.primary && !composio.some((entry) => entry.primary),
+      fetch: async (since: number, cursor?: string) =>
+        fetchGmailSinceDirect(await account.accessToken(), since, cursor),
+    })),
+    ...composio,
+  ];
 };
 
 const resumeTokensOf = (raw: string | null): Record<string, string> => {

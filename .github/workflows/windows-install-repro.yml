@@ -21,6 +21,9 @@ on:
         description: Backend URL for STELLA_LAUNCHER_BACKEND_URL (empty = the launcher's default, prod)
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   build:
     if: inputs.launcher == 'built'

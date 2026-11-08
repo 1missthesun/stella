@@ -301,9 +301,12 @@ jobs:
       - name: Determine release sha
         id: sha
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            echo "sha=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$INPUT_TAG" ]; then
+            [[ "$INPUT_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "tag must match [A-Za-z0-9._-]+, got $INPUT_TAG" >&2; exit 1; }
+            echo "sha=$INPUT_TAG" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             echo "sha=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           else

@@ -21,8 +21,9 @@
 import {
   CLOUD_TOOL_HOME,
   WORLD_UNSYNCED_PATHS,
+  worldSyncMarkerPath,
 } from "@stella/contracts/cloud-tool-home";
-import { WORLD_ROOT } from "./workspace.js";
+import { IN_TOOL_TREE, WORLD_ROOT } from "./workspace.js";
 
 export const DEPENDENCY_BACKUP_MAX_BYTES = 5 * 1024 * 1024 * 1024;
 
@@ -84,7 +85,7 @@ mark=$1
 previous=$2
 cd ${DEPENDENCY_BACKUP_DIR}
 now=$(date +%s.%3N)
-if [ ! -f ${WORLD}/.stella/world-manifest ]; then jq -cn --argjson now "$now" '{state:"no_world",now:$now}'; exit 0; fi
+if [ ! -f ${worldSyncMarkerPath(WORLD_ROOT)} ]; then jq -cn --argjson now "$now" '{state:"no_world",now:$now}'; exit 0; fi
 if [ -e ${DEPENDENCY_RESTORE_ROOT} ]; then jq -cn --argjson now "$now" '{state:"restore_pending",now:$now}'; exit 0; fi
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
@@ -119,16 +120,38 @@ rm -rf -- "$stage/${TOOL_HOME}"
 if [ ! -d "$stage/${WORLD}" ]; then rm -rf -- "$stage"; fi
 `;
 
+const shellQuote = (value: string): string =>
+  `'${value.replace(/'/gu, `'"'"'`)}'`;
+
+const ADOPT_NODE_MODULES_SCRIPT = `set -u
+root=$1
+restored=$2
+find "$restored" -type d -name node_modules -prune -printf '%P\\0' | while IFS= read -r -d '' rel; do
+  target="$root/$rel"
+  if [ -d "\${target%/*}" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then mv -T -- "$restored/$rel" "$target" || true; fi
+done`;
+
+/**
+ * Move the restored `node_modules` directories into a freshly extracted world.
+ * Root hands the restored tree to the tool uid while no tool process can reach
+ * it, and every operation inside the world runs as the tool uid.
+ */
 export const dependencyAdoptionLines = (indexPath: string): string[] => [
   `restored=${DEPENDENCY_RESTORE_ROOT}/${WORLD}`,
-  `if [ -d "$restored" ] && find "$root" -type d -name node_modules -prune -printf '%P\\0%T@\\0%m\\0' | jq -cRs 'split("\\u0000") as $f | {complete: false, entries: ([range(0; ($f | length) - 2; 3) | {key: $f[.], value: {kind: "dir", mode: ($f[. + 2] | explode | reduce .[] as $digit (0; . * 8 + $digit - 48)), size: 0, mtime: (($f[. + 1] | tonumber) * 1000 | floor)}}] | from_entries)}' >"${indexPath}.tmp" && mv -f -- "${indexPath}.tmp" "${indexPath}"; then`,
-  `find "$restored" -type d -name node_modules -prune -printf '%P\\0' | while IFS= read -r -d '' rel; do`,
-  'target="$root/$rel"',
-  'parent=${target%/*}',
-  'if [ -d "$parent" ] && [ "$(realpath -e -- "$parent")" = "$parent" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then mv -T -- "$restored/$rel" "$target" || true; fi',
-  "done || true",
+  `adopt=${DEPENDENCY_BACKUP_DIR}/.stella-dependency-adopt`,
+  'if [ -d "$restored" ] && [ ! -L "$restored" ]; then',
+  'rm -rf -- "$adopt"',
+  'mkdir -m 0700 -- "$adopt"',
+  'mv -T -- "$restored" "$adopt/world"',
+  'chown -R 42424:42424 -- "$adopt/world"',
+  'chgrp 42424 -- "$adopt"',
+  'chmod 0750 -- "$adopt"',
+  `if ${IN_TOOL_TREE} /usr/bin/find "$root" -type d -name node_modules -prune -printf '%P\\0%T@\\0%m\\0' | jq -cRs 'split("\\u0000") as $f | {complete: false, entries: ([range(0; ($f | length) - 2; 3) | {key: $f[.], value: {kind: "dir", mode: ($f[. + 2] | explode | reduce .[] as $digit (0; . * 8 + $digit - 48)), size: 0, mtime: (($f[. + 1] | tonumber) * 1000 | floor)}}] | from_entries)}' >"${indexPath}.tmp" && mv -f -- "${indexPath}.tmp" "${indexPath}"; then`,
+  `${IN_TOOL_TREE} /bin/bash -c ${shellQuote(ADOPT_NODE_MODULES_SCRIPT)} adopt-node-modules "$root" "$adopt/world" || true`,
   "fi",
-  `rm -rf -- "${indexPath}.tmp" ${DEPENDENCY_RESTORE_ROOT}`,
+  `${IN_TOOL_TREE} /bin/rm -rf -- "$adopt/world" || true`,
+  "fi",
+  `rm -rf -- "${indexPath}.tmp" ${DEPENDENCY_RESTORE_ROOT} "$adopt"`,
 ];
 
 export type StoredDependencyBackup = {

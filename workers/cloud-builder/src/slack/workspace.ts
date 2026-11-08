@@ -6,6 +6,7 @@ import type { OwnerInternalCall } from "../owner-store/registry.js";
 import type { DriveTurnFilesResult } from "../owner-store/domains/drive.js";
 import type { SlackPlace } from "./format.js";
 import slackPrompt from "./slack.md";
+import { AS_TOOL_USER, TOOL_UID } from "../workspace.js";
 
 export {
   isSlackConversationId,
@@ -13,8 +14,8 @@ export {
 } from "./conversation-id.js";
 export const SLACK_MEMORY_TOOL_NAME = "slack_memory";
 export const SLACK_REPO_ROOT = "/workspace/repos";
-export const SLACK_TOOL_UID = 42424;
-export const AS_SLACK_TOOL_USER = `/usr/bin/setpriv --reuid=${SLACK_TOOL_UID} --regid=${SLACK_TOOL_UID} --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all --`;
+export const SLACK_TOOL_UID = TOOL_UID;
+export const AS_SLACK_TOOL_USER = AS_TOOL_USER;
 export const SLACK_NO_REPLY = "<no-reply/>";
 
 export type SlackPerson = { id: string; name: string };

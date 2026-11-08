@@ -88,9 +88,12 @@ export const createCloudConnectorStatusTool = (
       }
       try {
         const { email } = await options.finishConnect(connectCode);
+        const gmail = await options.directory
+          .connection("gmail", { refresh: true })
+          .catch(() => undefined);
         return text(
-          `${email} is connected to Google for this user. Its Google tools work now: await tools.$search({ query: "Gmail" }).`,
-          { status: "connected", account: email },
+          `${email} is now connected to Google for this user. Its Google tools work now: await tools.$search({ query: "Gmail" }).${connectorAccountsText(gmail?.accounts ?? [])}`,
+          { status: "connected", account: email, ...(gmail?.accounts ? { accounts: gmail.accounts } : {}) },
         );
       } catch (error) {
         return text(

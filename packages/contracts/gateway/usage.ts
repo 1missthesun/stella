@@ -120,6 +120,9 @@ export type GatewayConfigSnapshot = {
 
 export type SessionCapabilityRequest = {
   ownerId: string;
+  /** The Stella sign-in the capability is minted from; a signed-out one is refused. */
+  sessionId: string;
+  sessionIssuedAtMs: number;
   ipHash?: string;
   networkClass?: NetworkClass;
   turnstileToken?: string;

@@ -3,7 +3,12 @@ import { empty } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import { log } from "../../build-session/shared/keys.js";
-import type { OwnerCaller, OwnerContext, OwnerDb, OwnerDomain, OwnerPurgeMode } from "../registry.js";
+import {
+  sessionRevokedBy,
+  type SessionHolder,
+  type SessionRevocations,
+} from "../../session-revocation.js";
+import type { OwnerContext, OwnerDb, OwnerDomain, OwnerPurgeMode } from "../registry.js";
 import { REMINDER_RETURN_JOB, SCHEDULE_FIRE_JOB } from "./schedules.js";
 
 export const ACCOUNT_PURGE_JOB = "account.purge";
@@ -41,6 +46,18 @@ const ACCOUNT_DELETION_HOLD_MIGRATION = {
   statements: ["ALTER TABLE owner_state ADD COLUMN deletion_hold INTEGER NOT NULL DEFAULT 0"],
 };
 
+const ACCOUNT_CONVERSATION_SOCKETS_MIGRATION = {
+  id: "account.4-conversation-sockets",
+  statements: [
+    `CREATE TABLE conversation_sockets (
+       conversation_id TEXT PRIMARY KEY,
+       noted_at INTEGER NOT NULL
+     )`,
+  ],
+};
+
+// Longer than a Stella JWT lives, so it outlasts every token it can refuse
+// and every socket authenticated by one.
 const REVOKED_SESSION_HOLD_MS = 20 * 60_000;
 
 export type OwnerState = {
@@ -102,21 +119,34 @@ export const noteCallerIdentity = (
   db.run("UPDATE owner_state SET is_anonymous = 0, identity_level = ? WHERE id = 1", identityLevel);
 };
 
-export const callerSessionRevoked = (
-  db: OwnerDb,
-  caller: Pick<OwnerCaller, "issuedAtMs"> & { sessionId?: string },
-): boolean => {
-  const { minIatMs } = readOwnerState(db);
-  // JWT `iat` has second precision.
-  if (minIatMs > 0 && (caller.issuedAtMs ?? 0) < Math.floor(minIatMs / 1000) * 1000) return true;
-  if (!caller.sessionId) return false;
-  return (
-    db.one<{ until_ms: number }>(
-      "SELECT until_ms FROM revoked_sessions WHERE session_id = ? AND until_ms > ?",
-      caller.sessionId,
-      Date.now(),
-    ) !== null
+export const readSessionRevocations = (db: OwnerDb): SessionRevocations => ({
+  minIatMs: readOwnerState(db).minIatMs,
+  sessionIds: db
+    .all<{ session_id: string }>("SELECT session_id FROM revoked_sessions WHERE until_ms > ?", Date.now())
+    .map((row) => row.session_id),
+});
+
+export const callerSessionRevoked = (db: OwnerDb, caller: SessionHolder): boolean =>
+  sessionRevokedBy(readSessionRevocations(db), caller);
+
+/** A conversation socket authenticated now; it can carry data until its token expires. */
+export const noteConversationSocket = (db: OwnerDb, conversationId: string, now: number): void => {
+  db.run(
+    "INSERT OR REPLACE INTO conversation_sockets (conversation_id, noted_at) VALUES (?, ?)",
+    conversationId,
+    now,
   );
+};
+
+export const conversationsWithSockets = (db: OwnerDb, now: number): string[] => {
+  db.run("DELETE FROM conversation_sockets WHERE noted_at <= ?", now - REVOKED_SESSION_HOLD_MS);
+  return db
+    .all<{ conversation_id: string }>("SELECT conversation_id FROM conversation_sockets")
+    .map((row) => row.conversation_id);
+};
+
+export const forgetConversationSocket = (db: OwnerDb, conversationId: string): void => {
+  db.run("DELETE FROM conversation_sockets WHERE conversation_id = ?", conversationId);
 };
 
 export const setDeletionHold = (db: OwnerDb, hold: boolean): void => {
@@ -217,7 +247,12 @@ const parseSessionsRevoked = (args: unknown): { minIatMs: number } => {
 
 export const accountDomain: OwnerDomain = {
   name: "account",
-  migrations: [ACCOUNT_MIGRATION, ACCOUNT_REVOKED_SESSIONS_MIGRATION, ACCOUNT_DELETION_HOLD_MIGRATION],
+  migrations: [
+    ACCOUNT_MIGRATION,
+    ACCOUNT_REVOKED_SESSIONS_MIGRATION,
+    ACCOUNT_DELETION_HOLD_MIGRATION,
+    ACCOUNT_CONVERSATION_SOCKETS_MIGRATION,
+  ],
   calls: {
     "account.reset": {
       scope: "owner",

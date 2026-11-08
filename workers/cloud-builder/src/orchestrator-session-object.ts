@@ -48,6 +48,7 @@ import type { AgentReportTarget } from "./owner-store/registry.js";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { PI_BRAIN_KEY } from "./orchestrator/constants.js";
 import { parseSlackWorkspaceContext } from "./slack/workspace.js";
+import type { SessionRevocations } from "./session-revocation.js";
 
 export type { ChatTurnRequest } from "./orchestrator/types.js";
 
@@ -58,6 +59,10 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
 
   async prepareCloudChatReader(): Promise<string> {
     return this.isolateId;
+  }
+
+  closeRevokedSockets(revocations: SessionRevocations): { closed: number; open: number } {
+    return this.hub.closeRevokedSockets(revocations);
   }
 
   async alarm(): Promise<void> {

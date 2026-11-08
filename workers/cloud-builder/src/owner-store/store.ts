@@ -9,6 +9,7 @@ import {
 } from "@stella/contracts/backend/protocol";
 import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { RpcError, toBackendError } from "./errors.js";
+import { sessionRevokedBy, type SessionRevocations } from "../session-revocation.js";
 import type {
   InternalDef,
   OwnerCaller,
@@ -815,6 +816,13 @@ export class OwnerStore {
     } catch {
       // The close handler cleans up.
     }
+  }
+
+  closeLiveIfRevoked(socket: WebSocket, revocations: SessionRevocations): boolean {
+    const attachment = this.liveAttachment(socket);
+    if (!attachment || !sessionRevokedBy(revocations, attachment.caller)) return false;
+    this.closeLive(socket, LIVE_CLOSE.unauthenticated, "session_revoked");
+    return true;
   }
 
   private closeLive(socket: WebSocket, code: number, reason: string): void {

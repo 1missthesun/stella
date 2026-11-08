@@ -18,6 +18,8 @@ export type PresenceAttachment = {
   v: 1;
   deviceId: string;
   authExpiresAtMs: number;
+  sessionId?: string;
+  issuedAtMs?: number;
   connectionId: string;
   nonce: string;
   presenceSessionId?: string;

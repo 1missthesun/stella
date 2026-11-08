@@ -26,6 +26,7 @@ export type VerifiedToken = {
   ownerId: string;
   subject: string;
   sessionId: string;
+  issuedAtMs: number;
   expiresAtMs: number;
   testAccount: boolean;
 };
@@ -265,6 +266,7 @@ export const verifyUserToken = async (
       ownerId: subject,
       subject,
       sessionId: typeof payload.sid === "string" ? payload.sid : "",
+      issuedAtMs: typeof payload.iat === "number" ? payload.iat * 1000 : 0,
       expiresAtMs: exp * 1000,
       testAccount: payload.tst === true,
     },

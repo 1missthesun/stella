@@ -21,6 +21,7 @@
 import type { IdentityLevel } from "@stella/contracts/gateway/api";
 import { CLOCK_SKEW_S, JWKS_MIN_REFETCH_MS } from "./conversation-types.js";
 import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
+import { admitSession, ownerGateRevocations, type RevocationSource } from "./session-revocation.js";
 
 export type VerifiedToken = {
   ownerId: string;
@@ -148,7 +149,21 @@ const userKey = async (env: Cloudflare.Env, kid: string): Promise<CryptoKey | nu
   return (await loadUserKeys(env)).keys.get(kid) ?? null;
 };
 
-export const verifyUserToken = async (token: string, env: Cloudflare.Env): Promise<VerifyResult> => {
+/**
+ * A token whose session was signed out is refused like an invalid one.
+ * `revocations` defaults to the owner object's state through the isolate
+ * cache; code running inside the owner object passes its own store.
+ */
+export const verifyUserToken = async (
+  token: string,
+  env: Cloudflare.Env,
+  revocations: RevocationSource = ownerGateRevocations(env),
+): Promise<VerifyResult> => {
+  const verified = await verifySignedUserToken(token, env);
+  return verified.ok ? await admitSession(verified.token, revocations) : verified;
+};
+
+const verifySignedUserToken = async (token: string, env: Cloudflare.Env): Promise<VerifyResult> => {
   const issuer = (env.CLOUD_BUILDER_PUBLIC_URL ?? "").trim().replace(/\/+$/, "");
   if (!issuer) return fail("no_issuer_configured", true);
   const parts = token.split(".");

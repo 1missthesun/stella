@@ -13,6 +13,7 @@ import { makeSignature } from "better-auth/crypto";
 import { bearerCredential } from "../../../shared/bearer.js";
 import { adminAccessDenied } from "../admin/access.js";
 import { createAuth, backendUrl, ownerInternalCall } from "../auth/auth.js";
+import { revokeOwnerSessions } from "../session-revocation.js";
 import { verifyUserToken } from "../auth-jwt.js";
 import { fail, json } from "../http/response.js";
 import { fixedWorkSha256SecretEqual } from "../service-bearer.js";
@@ -261,7 +262,7 @@ const revokePairingSessions = async (env: Cloudflare.Env, pairingId: string, own
     .all<{ session_id: string }>();
   for (const { session_id: sessionId } of results) {
     await db(env).prepare(`DELETE FROM "session" WHERE "id" = ? AND "userId" = ?`).bind(sessionId, ownerUserId).run();
-    await ownerInternalCall(env, ownerUserId, "account.sessionRevoked", { sessionId }).catch(() => undefined);
+    await revokeOwnerSessions(env, ownerUserId, { sessionId }).catch(() => undefined);
     await ownerInternalCall(env, ownerUserId, "devices.pushSessionEnded", { sessionId }).catch(() => undefined);
   }
   await db(env).prepare("DELETE FROM device_pairing_sessions WHERE pairing_id = ?").bind(pairingId).run();

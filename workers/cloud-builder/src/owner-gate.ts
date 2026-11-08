@@ -7,6 +7,8 @@ import {
   cloudChatTurnKey,
 } from "./cloud-chat-admission.js";
 import { verifyUserToken } from "./auth-jwt.js";
+import { releasingStub } from "./rpc-release.js";
+import { HEADER_SESSION, HEADER_TOKEN_EXP, HEADER_TOKEN_IAT } from "./conversation-types.js";
 import { OwnerStore } from "./owner-store/store.js";
 import type {
   OwnerCaller,
@@ -38,10 +40,19 @@ import {
 import {
   beginOwnerPurge,
   callerSessionRevoked,
+  conversationsWithSockets,
+  forgetConversationSocket,
   noteCallerIdentity,
+  noteConversationSocket,
   readOwnerState,
+  readSessionRevocations,
   setDeletionHold,
 } from "./owner-store/domains/account.js";
+import {
+  sessionRevokedBy,
+  type SessionRevocation,
+  type SessionRevocations,
+} from "./session-revocation.js";
 import type {
   BillingControlResult,
   GatewayUsageEvent,
@@ -221,6 +232,8 @@ export {
 
 const turnGrantId = (turnId: string): string => `turn:${turnId}`;
 
+const CONVERSATION_SOCKET_REVOKE_TIMEOUT_MS = 5_000;
+
 export class OwnerGate extends OwnerGateCloudDispatch {
   private testClaudeChecked = false;
 
@@ -282,6 +295,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         const verified = await verifyUserToken(
           token,
           this.env as unknown as Cloudflare.Env,
+          () => this.sessionRevocations(),
         );
         return verified.ok ? verified.token : null;
       },
@@ -362,6 +376,78 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       await this.scheduleAlarm(Date.now());
     }
     return response;
+  }
+
+  sessionRevocations(): SessionRevocations {
+    return readSessionRevocations(this.ownerStore().context(null).db);
+  }
+
+  /**
+   * Records a sign-out, then closes every socket it reaches that the signed-out
+   * session opened: this object's live and presence sockets, and the sockets
+   * of each conversation that noted one within the token lifetime.
+   */
+  async revokeSessions(revocation: SessionRevocation): Promise<void> {
+    const response =
+      "minIatMs" in revocation
+        ? await this.ownerStore().internalCall("account.sessionsRevoked", {
+            minIatMs: revocation.minIatMs,
+          })
+        : await this.ownerStore().internalCall("account.sessionRevoked", {
+            sessionId: revocation.sessionId,
+          });
+    if (!response.ok) throw new Error(`Session revocation failed: ${response.error.message}`);
+    const revocations = this.sessionRevocations();
+    const now = Date.now();
+    const closed = { live: 0, presence: 0, conversation: 0 };
+    for (const socket of this.ownerStore().liveSockets()) {
+      if (this.ownerStore().closeLiveIfRevoked(socket, revocations)) closed.live += 1;
+    }
+    for (const socket of this.sockets()) {
+      const attachment = this.attachment(socket);
+      if (attachment && sessionRevokedBy(revocations, attachment)) {
+        await this.dropSocket(
+          socket,
+          attachment,
+          DEVICE_PRESENCE_CLOSE.unauthorized,
+          "session_revoked",
+          now,
+        );
+        closed.presence += 1;
+      }
+    }
+    const { db } = this.ownerStore().context(null);
+    const sessions = this.env.ORCHESTRATOR_SESSIONS;
+    const conversations = sessions
+      ? conversationsWithSockets(db, now).map((id) => ({ id, stub: releasingStub(sessions.getByName(id)) }))
+      : [];
+    await Promise.all(
+      conversations.map(async ({ id, stub }) => {
+        try {
+          const result = await withTimeout(
+            stub.closeRevokedSockets(revocations),
+            CONVERSATION_SOCKET_REVOKE_TIMEOUT_MS,
+            "Conversation socket revocation timed out.",
+          );
+          closed.conversation += result.closed;
+          if (result.open === 0) forgetConversationSocket(db, id);
+        } catch (error) {
+          log("error", "conversation_socket_revoke_failed", {
+            conversationId: id,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }),
+    );
+    log("info", "owner_sessions_revoked", {
+      kind: "minIatMs" in revocation ? "all" : "session",
+      conversations: conversations.length,
+      closed,
+    });
+  }
+
+  noteConversationSocket(conversationId: string): void {
+    noteConversationSocket(this.ownerStore().context(null).db, conversationId, Date.now());
   }
 
   async storageReport(): Promise<{
@@ -579,6 +665,18 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     request: SessionCapabilityRequest,
   ): Promise<BillingControlResult<GatewaySessionCapabilityResponse>> {
     const now = Date.now();
+    // Gateways deployed before the session fields send neither.
+    if (
+      typeof request.sessionId === "string" &&
+      callerSessionRevoked(this.ownerStore().context(null, now).db, {
+        sessionId: request.sessionId,
+        ...(Number.isSafeInteger(request.sessionIssuedAtMs)
+          ? { issuedAtMs: request.sessionIssuedAtMs }
+          : {}),
+      })
+    ) {
+      return { ok: false, status: 403, code: "sign_in_required", retryable: false };
+    }
     const paying = billingPaying(this.ownerStore().context(null, now));
     let snapshot: OwnerSnapshot;
     try {
@@ -1426,7 +1524,9 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const ownerId = request.headers.get("x-stella-owner")?.trim() ?? "";
     const deviceId =
       request.headers.get(HEADER_PRESENCE_DEVICE_ID)?.trim() ?? "";
-    const authExpiresAtMs = Number(request.headers.get("x-stella-token-exp"));
+    const authExpiresAtMs = Number(request.headers.get(HEADER_TOKEN_EXP));
+    const sessionId = request.headers.get(HEADER_SESSION)?.trim() ?? "";
+    const issuedAtMs = Number(request.headers.get(HEADER_TOKEN_IAT) ?? NaN);
     const now = Date.now();
     if (
       !ownerId ||
@@ -1441,6 +1541,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         { status: 401 },
       );
     }
+    const holder = {
+      ...(sessionId ? { sessionId } : {}),
+      ...(Number.isSafeInteger(issuedAtMs) ? { issuedAtMs } : {}),
+    };
+    if (callerSessionRevoked(this.ownerStore().context(null).db, holder)) {
+      return Response.json({ error: "You were signed out." }, { status: 401 });
+    }
     this.ensureSchema();
     const pair = new WebSocketPair();
     const server = pair[1]!;
@@ -1448,6 +1555,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       v: 1,
       deviceId,
       authExpiresAtMs,
+      ...holder,
       connectionId: crypto.randomUUID(),
       nonce: crypto.randomUUID(),
       phase: "challenged",

@@ -75,6 +75,7 @@ import {
 } from "./conversation-types.js";
 import { READY_RUNNING_AGENTS_LIMIT, type AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
 import { sha256Hex } from "./hash.js";
+import { sessionRevokedBy, type SessionRevocations } from "./session-revocation.js";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 
 export type ReadyFrame = {
@@ -342,6 +343,7 @@ type SocketAttachment = {
   ownerId: string;
   subject: string;
   sessionId: string;
+  issuedAtMs?: number;
   issuer: string;
   authExpiresAtMs: number;
   protocol: number;
@@ -380,6 +382,8 @@ type TurnToolState = {
   turnId: string;
   tools: Map<string, ToolInput>;
 };
+
+const WEBSOCKET_OPEN = 1;
 
 class ConversationHubImpl implements ConversationHub {
   private readonly turns = new Map<string, TurnToolState>();
@@ -512,6 +516,7 @@ class ConversationHubImpl implements ConversationHub {
       ownerId,
       subject: identity.subject,
       sessionId: identity.sessionId ?? "",
+      ...(identity.issuedAtMs !== undefined ? { issuedAtMs: identity.issuedAtMs } : {}),
       issuer: request.headers.get(HEADER_ISSUER)?.trim() ?? "",
       authExpiresAtMs: identity.authExpiresAtMs,
       protocol: PROTOCOL_VERSION,
@@ -526,6 +531,7 @@ class ConversationHubImpl implements ConversationHub {
 
     this.deps.ctx.acceptWebSocket(server, [tag]);
     server.serializeAttachment(attachment);
+    this.deps.onSocketAuthenticated(ownerId);
     // A socket that connects with less than RE_AUTH_LEAD_MS of token left would
     // otherwise be warned by the very first send — which is `ready`, so the
     // client would receive `auth.expiring` before it had been told anything at
@@ -1110,8 +1116,11 @@ class ConversationHubImpl implements ConversationHub {
       return;
     }
     attachment.authExpiresAtMs = verified.token.expiresAtMs;
+    attachment.sessionId = verified.token.sessionId;
+    attachment.issuedAtMs = verified.token.issuedAtMs;
     ws.serializeAttachment(attachment);
     this.warned.delete(ws);
+    this.deps.onSocketAuthenticated(attachment.ownerId);
   }
 
   private async handleBackfill(
@@ -1275,6 +1284,21 @@ class ConversationHubImpl implements ConversationHub {
       );
     }
     this.turns.clear();
+  }
+
+  closeRevokedSockets(revocations: SessionRevocations): { closed: number; open: number } {
+    const counts = { closed: 0, open: 0 };
+    for (const ws of this.deps.ctx.getWebSockets()) {
+      if (ws.readyState !== WEBSOCKET_OPEN) continue;
+      const attachment = readAttachment(ws);
+      if (attachment && !sessionRevokedBy(revocations, attachment)) {
+        counts.open += 1;
+        continue;
+      }
+      this.closeWith(ws, CLOSE_UNAUTHENTICATED, "You were signed out.");
+      counts.closed += 1;
+    }
+    return counts;
   }
 
   /**

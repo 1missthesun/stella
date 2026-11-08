@@ -16,6 +16,7 @@ import type {
   PiThreadSteerResult,
 } from "./cloud-agent-dispatch.js";
 import type { OwnerModelGrantFreezeRequest } from "./owner-model-grants.js";
+import type { SessionRevocations } from "./session-revocation.js";
 import type { Env } from "./build-session/shared/env.js";
 
 export class OrchestratorSession extends DurableObject<Env> {
@@ -70,6 +71,10 @@ export class OrchestratorSession extends DurableObject<Env> {
     args: OwnerModelGrantFreezeRequest,
   ): Promise<{ frozen: true }> {
     return await (await this.loadImplementation()).freezeOwnerModelGrants(args);
+  }
+
+  async closeRevokedSockets(revocations: SessionRevocations): Promise<{ closed: number; open: number }> {
+    return (await this.loadImplementation()).closeRevokedSockets(revocations);
   }
 
   async startPiThread(input: PiThreadStart): Promise<void> {

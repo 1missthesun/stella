@@ -30,7 +30,8 @@ import {
   TURN_OWNER_ID_HEADER,
 } from "@stella/contracts/turn-plane/turn-start";
 import { bearerCredential } from "../../../shared/bearer.js";
-import { verifyUserToken } from "../auth-jwt.js";
+import { verifyUserToken, type VerifiedToken } from "../auth-jwt.js";
+import { admitSession, ownerGateRevocations } from "../session-revocation.js";
 import { noteOwnerIdentity } from "../owner-identity.js";
 import { readBoundedRequestText } from "../bounded-body.js";
 import { withBrowserCors } from "../browser-cors.js";
@@ -63,6 +64,7 @@ import {
   CLOSE_INTERNAL,
   CLOSE_NOT_FOUND,
   CLOSE_UNAUTHENTICATED,
+  HEADER_TOKEN_IAT,
 } from "../conversation-types.js";
 import { isSlackConversationId } from "../slack/conversation-id.js";
 import { devAcceptanceProbesEnabled } from "../dev-acceptance-probes.js";
@@ -197,8 +199,9 @@ const authenticateConversationCaller = async (
   }
 
   const authStartedAt = Date.now();
+  let ticketCaller: VerifiedToken | null = null;
   if (ticket) {
-    const ticketCaller = socketScope
+    ticketCaller = socketScope
       ? await verifySocketTicket({
           secret: builderServiceSecrets(env),
           ticket,
@@ -219,11 +222,10 @@ const authenticateConversationCaller = async (
         false,
       );
     }
-    await noteOwnerIdentity(env, ticketCaller);
-    logCallerAuthenticated(requestId, wantsSocket, "ticket", Date.now() - authStartedAt);
-    return { ok: true, caller: { ...ticketCaller, issuer } };
   }
-  const verified = await verifyUserToken(token, env);
+  const verified = ticketCaller
+    ? await admitSession(ticketCaller, ownerGateRevocations(env))
+    : await verifyUserToken(token, env);
   if (!verified.ok) {
     log(verified.retryable ? "error" : "info", "conversation_auth_rejected", {
       requestId,
@@ -247,7 +249,7 @@ const authenticateConversationCaller = async (
   logCallerAuthenticated(
     requestId,
     wantsSocket,
-    wantsSocket ? "legacy_token" : "bearer",
+    ticketCaller ? "ticket" : wantsSocket ? "legacy_token" : "bearer",
     Date.now() - authStartedAt,
   );
   return { ok: true, caller: { ...verified.token, issuer } };
@@ -288,6 +290,7 @@ const forwardToConversation = async (
       [HEADER_SUBJECT]: caller.subject,
       ...(caller.sessionId ? { [HEADER_SESSION]: caller.sessionId } : {}),
       [HEADER_TOKEN_EXP]: String(caller.expiresAtMs),
+      [HEADER_TOKEN_IAT]: String(caller.issuedAtMs),
       [HEADER_ISSUER]: caller.issuer,
       [HEADER_CONVERSATION_ID]: conversationId,
     },
@@ -438,6 +441,8 @@ const forwardToDevicePresence = async (
     identity: {
       [HEADER_OWNER]: caller.ownerId,
       [HEADER_TOKEN_EXP]: String(caller.expiresAtMs),
+      ...(caller.sessionId ? { [HEADER_SESSION]: caller.sessionId } : {}),
+      [HEADER_TOKEN_IAT]: String(caller.issuedAtMs),
       [HEADER_PRESENCE_DEVICE_ID]: deviceId,
     },
   });

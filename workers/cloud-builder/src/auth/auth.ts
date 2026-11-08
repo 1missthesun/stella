@@ -24,6 +24,7 @@ import { integrityErrorMessage, integrityPurposeForPath, verifyAuthRequestProof 
 import { oauthStateBinding } from "./oauth-binding.js";
 import { ottCookieHeader } from "./ott-cookie.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { revokeOwnerSessions } from "../session-revocation.js";
 import { ownerModeEnabled, ownerModeRefusesAuthPath } from "../selfhost/owner-mode.js";
 import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 
@@ -330,9 +331,7 @@ const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
             console.warn(JSON.stringify({ event: "auth_revoke_floor_skipped", reason: "no_session" }));
             return;
           }
-          await ownerInternalCall(env, ending.userId, "account.sessionsRevoked", {
-            minIatMs: Date.now(),
-          });
+          await revokeOwnerSessions(env, ending.userId, { minIatMs: Date.now() });
           await ownerInternalCall(env, ending.userId, "devices.pushSessionsRevoked", {});
         }),
       },
@@ -357,7 +356,7 @@ const revokedSessionTeardown = (env: AuthEnv): BetterAuthPlugin => ({
             | null;
           const sessionId = typeof target?.session?.id === "string" ? target.session.id : "";
           if (!sessionId || target?.session?.userId !== caller.userId) return;
-          await ownerInternalCall(env, caller.userId, "account.sessionRevoked", { sessionId });
+          await revokeOwnerSessions(env, caller.userId, { sessionId });
           await ownerInternalCall(env, caller.userId, "devices.pushSessionEnded", { sessionId }).catch(
             (error: unknown) => {
               console.error(
@@ -386,9 +385,16 @@ const pushSignOutTeardown = (env: AuthEnv): BetterAuthPlugin => ({
             console.warn(JSON.stringify({ event: "auth_push_teardown_skipped", reason: "no_session" }));
             return;
           }
-          await ownerInternalCall(env, ending.userId, "account.sessionRevoked", {
-            sessionId: ending.sessionId,
-          }).catch(() => undefined);
+          await revokeOwnerSessions(env, ending.userId, { sessionId: ending.sessionId }).catch(
+            (error: unknown) => {
+              console.error(
+                JSON.stringify({
+                  event: "auth_sign_out_revoke_failed",
+                  message: error instanceof Error ? error.message : String(error),
+                }),
+              );
+            },
+          );
           await ownerInternalCall(env, ending.userId, "devices.pushSessionEnded", {
             sessionId: ending.sessionId,
           }).catch((error: unknown) => {

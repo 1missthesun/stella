@@ -1,5 +1,6 @@
 import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
 import type { CloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
+import type { SessionRevocations } from "./session-revocation.js";
 import type {
   MessageRole,
   TurnPhase,
@@ -191,6 +192,7 @@ export type SocketIdentity = {
   ownerId: string;
   subject: string;
   sessionId?: string;
+  issuedAtMs?: number;
   authExpiresAtMs: number;
 };
 
@@ -215,10 +217,12 @@ export const parseSocketIdentity = (
   const subject = request.headers.get(HEADER_SUBJECT)?.trim() ?? "";
   const expires = Number(request.headers.get(HEADER_TOKEN_EXP) ?? "");
   if (!ownerId || !subject || !Number.isFinite(expires)) return null;
+  const issuedAtMs = Number(request.headers.get(HEADER_TOKEN_IAT) ?? NaN);
   return {
     ownerId,
     subject,
     sessionId: request.headers.get(HEADER_SESSION)?.trim() || undefined,
+    ...(Number.isSafeInteger(issuedAtMs) ? { issuedAtMs } : {}),
     authExpiresAtMs: expires,
   };
 };
@@ -251,6 +255,7 @@ export interface ConversationHub {
   piSocketCount(): number;
   endTurn(turnId: string): void;
   closeAll(code: number): void;
+  closeRevokedSockets(revocations: SessionRevocations): { closed: number; open: number };
 }
 
 export type ConversationLogger = (
@@ -276,6 +281,8 @@ export interface ConversationHubDeps {
   cancelTurn: (turnId: string) => Promise<void>;
   /** Storage flushes a lagging owner index row on first connect. */
   onConnect: () => void;
+  /** A socket authenticated, on connect or by a refreshed token. */
+  onSocketAuthenticated: (ownerId: string) => void;
   conversationId: () => string;
   log: ConversationLogger;
   verifyToken: (token: string) => Promise<import("./auth-jwt.js").VerifyResult>;
@@ -323,6 +330,9 @@ export class NullConversationHub implements ConversationHub {
   }
   endTurn(): void {}
   closeAll(): void {}
+  closeRevokedSockets(): { closed: number; open: number } {
+    return { closed: 0, open: 0 };
+  }
 }
 
 let hubFactory: ConversationHubFactory | null = null;

@@ -298,6 +298,8 @@ const handleSessionCapability = async (
         })
       : await billingControl(env).issueSessionCapability({
           ownerId,
+          sessionId: verified.token.sessionId,
+          sessionIssuedAtMs: verified.token.issuedAtMs,
           ipHash,
           networkClass,
           deviceKeyHash: deviceProof.deviceKeyHash,

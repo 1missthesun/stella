@@ -194,6 +194,19 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
         this.flushIndexIfLagging();
         this.reconcileRunningAgentsSoon();
       },
+      onSocketAuthenticated: (ownerId) => {
+        const conversationId = this.conversationId();
+        this.ctx.waitUntil(
+          this.ownerGate(ownerId)
+            .noteConversationSocket(conversationId)
+            .catch((error: unknown) =>
+              log("error", "conversation_socket_note_failed", {
+                conversationId,
+                message: error instanceof Error ? error.message : String(error),
+              }),
+            ),
+        );
+      },
       conversationId: () => this.conversationId(),
       log,
       verifyToken: (token) =>

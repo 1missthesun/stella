@@ -21,6 +21,7 @@ import {
 } from "../conversation-types.js";
 import { readJsonObject } from "../http/body.js";
 import { requireCaller, verifyCaller } from "../http/caller.js";
+import { admitSession, ownerGateRevocations } from "../session-revocation.js";
 import { ownerRegistry } from "./domains.js";
 import { RpcError, toBackendError } from "./errors.js";
 import type { OwnerCaller, OwnerRegistry } from "./registry.js";
@@ -154,12 +155,14 @@ const verifyLiveCaller = async (
     resource: "",
     now: Date.now(),
   }).catch(() => null);
-  return caller
-    ? { ok: true, caller }
-    : {
-        ok: false,
-        error: new RpcError("UNAUTHENTICATED", "Your sign-in expired. Sign in again to continue."),
-      };
+  const admitted = caller ? await admitSession(caller, ownerGateRevocations(env)) : null;
+  if (admitted?.ok) return { ok: true, caller: admitted.token };
+  return {
+    ok: false,
+    error: admitted?.retryable
+      ? new RpcError("UNAVAILABLE", "Stella couldn't check your sign-in. Try again shortly.")
+      : new RpcError("UNAUTHENTICATED", "Your sign-in expired. Sign in again to continue."),
+  };
 };
 
 /**

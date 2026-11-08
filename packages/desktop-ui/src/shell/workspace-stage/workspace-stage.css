@@ -1,0 +1,702 @@
+/* The stage: one layer over the chat, under the top bar and above the
+   composer, with a margin of chat showing at the edges. Nothing here ever
+   resizes or moves the chat column. */
+
+:root {
+  --workspace-stage-inset: 20px;
+  --workspace-stage-radius: 14px;
+}
+
+.workspace-stage,
+.file-viewer[data-mode="stage"] {
+  position: fixed;
+  top: calc(var(--shell-topbar-height, 38px) + 2px);
+  left: var(--workspace-stage-inset);
+  right: var(--workspace-stage-inset);
+  bottom: var(--workspace-stage-bottom, 14px);
+}
+
+.workspace-stage {
+  z-index: 58;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--panel-surface-border, var(--border));
+  border-radius: var(--workspace-stage-radius);
+  background: var(--background);
+  box-shadow: var(--shadow-lg);
+  container-type: inline-size;
+  container-name: workspace-stage;
+  transition:
+    opacity 160ms ease-out,
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.workspace-stage[data-visible="false"] {
+  opacity: 0;
+  transform: translateY(6px) scale(0.995);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 120ms ease-in,
+    transform 120ms ease-in,
+    visibility 0s linear 120ms;
+}
+
+.workspace-stage__body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-stage__body > .sidebar-section {
+  flex: 1 1 auto;
+}
+
+/* ---------------- Home on the stage: the launcher, given room ---------- */
+
+.workspace-stage .sidebar-section[data-section="home"] .work-section__body,
+.workspace-stage .sidebar-section[data-section="files"] .work-section__body {
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+  padding-inline: 20px;
+  box-sizing: border-box;
+}
+
+.workspace-stage .home-launcher {
+  align-items: flex-start;
+  padding: 18px 0 24px;
+}
+
+.workspace-stage .home-launcher__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  max-width: none;
+}
+
+.workspace-stage .home-launcher__option {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--foreground) 2.5%, transparent);
+}
+
+.workspace-stage .home-launcher__option:hover {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+/* ---------------- The file viewer ------------------------------------- */
+
+.file-viewer {
+  position: fixed;
+  z-index: 64;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-surface-border, var(--border));
+  border-radius: var(--workspace-stage-radius);
+  background: var(--background);
+  box-shadow:
+    var(--shadow-xl, var(--shadow-lg)),
+    var(--panel-surface-highlight, 0 0 0 0 transparent);
+  container-type: inline-size;
+  container-name: file-viewer;
+  animation: file-viewer-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.file-viewer[data-mode="stage"] {
+  z-index: 62;
+  box-shadow: var(--shadow-lg);
+}
+
+.file-viewer[data-hidden="true"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.file-viewer[data-interacting="true"] iframe,
+.file-viewer[data-interacting="true"] video {
+  pointer-events: none;
+}
+
+@keyframes file-viewer-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-viewer,
+  .workspace-stage {
+    animation: none;
+    transition: none;
+  }
+}
+
+.file-viewer__header {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--border-weak, var(--border));
+  color: var(--text-base);
+  font-size: var(--font-size-sm);
+  user-select: none;
+  cursor: grab;
+}
+
+.file-viewer[data-mode="stage"] .file-viewer__header {
+  cursor: default;
+}
+
+.file-viewer[data-interacting="true"] .file-viewer__header {
+  cursor: grabbing;
+}
+
+.file-viewer__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--text-weak);
+}
+
+.file-viewer__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-weight: var(--weight-semibold, 600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-viewer__meta {
+  flex: 0 0 auto;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.file-viewer__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.file-viewer__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-muted, var(--text-weak));
+  cursor: default;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.file-viewer__action:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.file-viewer__action:disabled {
+  opacity: 0.35;
+}
+
+.file-viewer__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.file-viewer__body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-viewer__body > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Viewer bodies were laid out for the sidebar; keep big media centred on
+   the stage. */
+.file-viewer[data-mode="stage"]
+  .file-viewer__body
+  > .right-sidebar__rich--markdown,
+.file-viewer[data-mode="stage"]
+  .file-viewer__body
+  > .right-sidebar__rich--diff {
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+}
+
+.file-viewer__resize {
+  position: absolute;
+  z-index: 2;
+}
+
+.file-viewer__resize[data-edge="n"],
+.file-viewer__resize[data-edge="s"] {
+  left: 12px;
+  right: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.file-viewer__resize[data-edge="e"],
+.file-viewer__resize[data-edge="w"] {
+  top: 12px;
+  bottom: 12px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.file-viewer__resize[data-edge="n"] {
+  top: -3px;
+}
+.file-viewer__resize[data-edge="s"] {
+  bottom: -3px;
+}
+.file-viewer__resize[data-edge="e"] {
+  right: -3px;
+}
+.file-viewer__resize[data-edge="w"] {
+  left: -3px;
+}
+
+.file-viewer__resize[data-edge="ne"],
+.file-viewer__resize[data-edge="nw"],
+.file-viewer__resize[data-edge="se"],
+.file-viewer__resize[data-edge="sw"] {
+  width: 14px;
+  height: 14px;
+}
+
+.file-viewer__resize[data-edge="ne"] {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.file-viewer__resize[data-edge="sw"] {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+.file-viewer__resize[data-edge="nw"] {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.file-viewer__resize[data-edge="se"] {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+
+/* ---------------- Strip: photos, videos, clips, canvases ------------- */
+
+.viewer-strip {
+  display: flex;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 64px;
+  padding: 0 14px;
+  border-top: 1px solid var(--border-weak, var(--border));
+}
+
+.viewer-strip__list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Scrolling into view leaves one neighbour showing at the edge. */
+  scroll-padding-inline: 72px;
+}
+
+.viewer-strip__list::-webkit-scrollbar {
+  display: none;
+}
+
+.viewer-strip__item {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  height: 40px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  color: var(--text-base);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: default;
+  opacity: 0.62;
+  box-shadow: 0 0 0 1px var(--border);
+  transition:
+    opacity 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.viewer-strip__item[data-kind="image"] {
+  width: 56px;
+}
+
+.viewer-strip__item[data-kind="video"] {
+  max-width: 200px;
+  padding-right: 10px;
+}
+
+.viewer-strip__poster {
+  display: block;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.viewer-strip__poster video {
+  pointer-events: none;
+}
+
+.viewer-strip__item[data-kind="file"] {
+  max-width: 180px;
+  padding: 0 10px;
+}
+
+.viewer-strip__item:hover {
+  opacity: 1;
+}
+
+.viewer-strip__item[data-current="true"] {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--text-strong);
+}
+
+.viewer-strip__item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.viewer-strip__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewer-strip__img--empty {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.viewer-strip__icon {
+  display: inline-flex;
+  color: var(--text-weak);
+}
+
+.viewer-strip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------- Code: changed files beside the diff ---------------- */
+
+.display-diff-files-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+.display-diff-files-layout > .display-diff-batches-body__scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.display-diff-files-nav {
+  display: flex;
+  flex: 0 0 196px;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.display-diff-files-nav__label {
+  padding: 4px 8px 8px;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs);
+}
+
+.display-diff-files-nav__item {
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-base);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: var(--font-size-xs);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.display-diff-files-nav__item:hover {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+.display-diff-files-nav__item[data-current="true"] {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+@container file-viewer (max-width: 620px) {
+  .display-diff-files-nav {
+    display: none;
+  }
+}
+
+/* ---------------- Word and Slides: slides or headings ---------------- */
+
+.office-outline-rail {
+  display: flex;
+  flex: 0 0 200px;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  padding: 10px 6px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border-weak, var(--border));
+  background: var(--background);
+  scrollbar-width: thin;
+}
+
+.office-outline-rail__item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-base);
+  font-size: var(--font-size-xs);
+  text-align: left;
+  cursor: default;
+}
+
+.office-outline-rail__item[data-level="2"] {
+  padding-left: 18px;
+}
+
+.office-outline-rail__item[data-level="3"] {
+  padding-left: 28px;
+  color: var(--text-weak);
+}
+
+.office-outline-rail__item:hover {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+.office-outline-rail__item[data-current="true"] {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.office-outline-rail__number {
+  flex: 0 0 auto;
+  min-width: 14px;
+  color: var(--text-weak);
+  font-variant-numeric: tabular-nums;
+}
+
+.office-outline-rail__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Only in the viewer, and only when there's room. */
+.office-outline-rail {
+  display: none;
+}
+
+@container file-viewer (min-width: 621px) {
+  .office-outline-rail {
+    display: flex;
+  }
+}
+
+/* ---------------- Viewer header: copy path, add to chat -------------- */
+
+.file-viewer__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-viewer__title--copy {
+  padding: 2px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  cursor: default;
+}
+
+.file-viewer__title--copy:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+
+.file-viewer__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-weak);
+  cursor: default;
+}
+
+.file-viewer__copy:hover {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.file-viewer__copied {
+  flex: 0 0 auto;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs);
+}
+
+.file-viewer__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  margin-right: 4px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-base);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-medium, 500);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.file-viewer__add:hover {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+
+.file-viewer__add[data-added="true"] {
+  border-color: transparent;
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+}
+
+.file-viewer__add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------------- Edge arrows, on hover over the media --------------- */
+
+.file-viewer__edge {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--background) 72%, transparent);
+  color: var(--text-strong);
+  box-shadow:
+    0 0 0 1px var(--border),
+    var(--shadow-sm);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease;
+  cursor: default;
+}
+
+.file-viewer__edge[data-dir="previous"] {
+  left: 14px;
+}
+
+.file-viewer__edge[data-dir="next"] {
+  right: 22px;
+}
+
+.file-viewer__body:hover .file-viewer__edge:not(:disabled),
+.file-viewer__edge:focus-visible {
+  opacity: 1;
+}
+
+.file-viewer__edge:hover {
+  background: var(--background);
+}
+
+.file-viewer__edge:disabled {
+  pointer-events: none;
+}
+
+.file-viewer__edge:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

@@ -17,6 +17,7 @@ import { useOfficePreview } from "@/features/chat/office-preview-store";
 import { useFilePreviewActions } from "@/features/chat/hooks/use-file-preview-actions";
 import { Select } from "@/ui/select";
 import { PreviewProblem } from "./preview-states";
+import { OfficeOutlineRail } from "./office-outline-rail";
 
 const ZOOM_OPTIONS = [75, 100, 125, 150] as const;
 
@@ -299,6 +300,13 @@ export function OfficeArtifactPanel({
       </header>
 
       <div className="display-artifact-panel__body">
+        {ready && kind !== "spreadsheet" ? (
+          <OfficeOutlineRail
+            html={snapshot?.html}
+            kind={kind}
+            frameRef={frameRef}
+          />
+        ) : null}
         {ready ? (
           <iframe
             ref={frameRef}

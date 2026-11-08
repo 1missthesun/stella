@@ -163,3 +163,19 @@
   justify-content: flex-end;
   padding-top: 8px;
 }
+
+/* In the top bar (the right sidebar's footer went away with it). */
+.global-models-control--topbar {
+  position: static;
+  gap: 2px;
+}
+
+.global-models-control--topbar .sidebar-footer-button {
+  min-height: 26px;
+  padding: 4px 8px;
+  color: var(--text-muted, var(--text-weak));
+}
+
+.global-models-control--topbar .execution-target-button {
+  max-width: 150px;
+}

@@ -4,10 +4,8 @@ import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useChatMessages } from "@/context/use-chat-messages";
 import { TrashTabContent } from "./TrashTabContent";
 import { HomeLauncherTab } from "./HomeLauncherTab";
-import {
-  displayTabs,
-  useDisplayPanelExpanded,
-} from "@/features/workspace-display/tab-store";
+import { displayTabs } from "@/features/workspace-display/tab-store";
+import { useFileViewerStageOpen } from "@/features/workspace-display/file-viewer-store";
 import { engineOverlay } from "./engine-overlay-store";
 import {
   CHAT_DISPLAY_TAB_ID,
@@ -16,6 +14,7 @@ import {
   registerWorkspaceDefaultTabs,
 } from "@/features/workspace-display/default-tabs";
 import type { OpenTabOptions } from "@/features/workspace-display/types";
+import { showInViewer } from "@/features/workspace-display/open-payload";
 
 export {
   CHAT_DISPLAY_TAB_ID,
@@ -28,7 +27,7 @@ function ChatDisplayTab({
 }: {
   openRequest: ChatPanelOpenRequest | null;
 }) {
-  const panelExpanded = useDisplayPanelExpanded();
+  const panelExpanded = useFileViewerStageOpen();
   const chat = useChatRuntime();
   const messages = useChatMessages();
 
@@ -60,10 +59,15 @@ function ChatDisplayTab({
   );
 }
 
+/**
+ * The Chat tab: the conversation shown in the viewer while you're on another
+ * route (Billing, Apps) and something sends text to Stella.
+ */
 export function openChatDisplayTab(
   openRequest: ChatPanelOpenRequest | null = null,
   opts?: OpenTabOptions,
 ): void {
+  const activate = opts?.activate ?? true;
   displayTabs.openTab(
     {
       id: CHAT_DISPLAY_TAB_ID,
@@ -71,8 +75,9 @@ export function openChatDisplayTab(
       title: "Chat",
       render: () => createElement(ChatDisplayTab, { openRequest }),
     },
-    opts,
+    { activate, openPanel: displayTabs.getLayoutSnapshot().panelOpen },
   );
+  if (activate) showInViewer(CHAT_DISPLAY_TAB_ID);
 }
 
 export function openHomeDisplayTab(): void {
@@ -90,16 +95,20 @@ export function ensureChatDisplayTab(): void {
 }
 
 export function openTrashDisplayTab(): void {
-  displayTabs.openTab({
-    id: TRASH_DISPLAY_TAB_ID,
-    kind: "trash",
-    title: "Trash",
-    render: () => createElement(TrashTabContent),
-  });
+  displayTabs.openTab(
+    {
+      id: TRASH_DISPLAY_TAB_ID,
+      kind: "trash",
+      title: "Trash",
+      render: () => createElement(TrashTabContent),
+    },
+    { activate: true, openPanel: displayTabs.getLayoutSnapshot().panelOpen },
+  );
+  showInViewer(TRASH_DISPLAY_TAB_ID);
 }
 
 export function openModelPicker(): void {
-  displayTabs.setPanelOpen(true);
+  // The Models control lives in the top bar; it opens in place.
   engineOverlay.setOpen(true);
 }
 

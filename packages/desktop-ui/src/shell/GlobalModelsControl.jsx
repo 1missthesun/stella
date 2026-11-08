@@ -28,13 +28,16 @@ const AgentModelPicker = lazy(() =>
 );
 
 /**
- * @param {{ visible?: boolean }} props `visible` follows the shell's
+ * @param {{ visible?: boolean, placement?: "footer" | "topbar" }} props
+ *   `placement="topbar"` renders the compact pair in the top bar, where it
+ *   moved when the right sidebar went away. `visible` follows the shell's
  *   authoritative right-side Activity-workspace visibility. When the right
  *   region isn't displaying, the control renders nothing so it never leaves an
  *   empty right gutter behind. State/overlay/lifecycle stay globally owned
  *   (engine-overlay store) — this only gates whether the button is on screen.
  */
-export function GlobalModelsControl({ visible = true }) {
+export function GlobalModelsControl({ visible = true, placement = "footer" }) {
+  const inTopbar = placement === "topbar";
   const open = useEngineOverlayOpen();
   const modelPinned = useComposerModelPinned();
 
@@ -56,7 +59,13 @@ export function GlobalModelsControl({ visible = true }) {
   if (!visible) return null;
 
   return (
-    <div className="global-models-control">
+    <div
+      className={
+        inTopbar
+          ? "global-models-control global-models-control--topbar"
+          : "global-models-control"
+      }
+    >
       <GlobalExecutionTargetControl />
       <Popover open={open} onOpenChange={(next) => engineOverlay.setOpen(next)}>
         <PopoverTrigger asChild>
@@ -74,7 +83,7 @@ export function GlobalModelsControl({ visible = true }) {
         </PopoverTrigger>
         <PopoverContent
           className="models-popover"
-          side="top"
+          side={inTopbar ? "bottom" : "top"}
           align="end"
           sideOffset={8}
           collisionPadding={8}

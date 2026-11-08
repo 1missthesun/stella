@@ -5,7 +5,7 @@ import {
   type DisplayFileBlob,
 } from "@/shared/hooks/use-display-file-data";
 import { copyImageBlob } from "@/shell/media-clipboard";
-import { displayTabs } from "@/features/workspace-display/tab-store";
+import { fileViewer } from "@/features/workspace-display/file-viewer-store";
 import { AudioPlayer } from "@/shell/AudioPlayer";
 import { useMediaStream } from "@/shared/hooks/use-media-stream-url";
 import { useT } from "@/shared/i18n";
@@ -25,7 +25,7 @@ const filenameOf = (filePath: string): string =>
   filePath.split(/[\\/]/).pop() ?? filePath;
 
 const expandDisplayPanel = () => {
-  displayTabs.setPanelExpanded(true);
+  fileViewer.expand();
 };
 
 const PromptHeader = ({

@@ -155,7 +155,7 @@ export function GlobalExecutionTargetControl() {
       </PopoverTrigger>
       <PopoverContent
         className="execution-target-popover"
-        side="top"
+        side="bottom"
         align="end"
         sideOffset={8}
         collisionPadding={8}

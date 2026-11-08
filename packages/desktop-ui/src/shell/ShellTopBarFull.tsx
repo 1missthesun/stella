@@ -1,4 +1,7 @@
 /**
+ * The left side carries the Chrome-style tabs (see ShellTopBarTabs) that
+ * replaced the right sidebar's tab strip.
+ *
  * Apps are deliberately absent from the nav: they now open inside the right
  * sidebar's Apps section rather than the main content area, so a nav entry
  * pointing at the `/apps` route would compete with the sidebar for the same
@@ -13,10 +16,6 @@
 
 import { memo } from "react";
 import { getPlatform } from "@/platform/electron/platform";
-import {
-  displayTabs,
-  useDisplayPanelOpen,
-} from "@/features/workspace-display/tab-store";
 import { SettingsMenuButton } from "@/shell/SettingsMenuButton";
 import { ShellTopBarActivity } from "@/shell/ShellTopBarActivity";
 import { ShellTopBarAccount } from "@/shell/sidebar/ShellTopBarAccount";
@@ -24,8 +23,8 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 import { ShellTopBarPrimaryNav } from "@/shell/sidebar/ShellTopBarNav";
 import { ShellTopBarUpdatePill } from "@/shell/ShellTopBarUpdatePill";
 import { WindowControls } from "@/shell/WindowControls";
-import { PanelRight } from "@/ui/icons";
-import { useT } from "@/shared/i18n";
+import { ShellTopBarTabs } from "@/shell/topbar/ShellTopBarTabs";
+import { GlobalModelsControl } from "@/shell/GlobalModelsControl";
 import "./shell-topbar-full.css";
 
 const OMITTED_NAV_IDS = ["chat"] as const;
@@ -35,47 +34,31 @@ type ShellTopBarFullProps = {
 };
 
 export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: ShellTopBarFullProps) {
-  const t = useT();
   const platform = getPlatform();
   const isMac = platform === "darwin";
   const isWin = platform === "win32";
-  const panelOpen = useDisplayPanelOpen();
   const { hasConnectedAccount } = useAuthSessionState();
 
   return (
     <header
-      className="shell-topbar-full"
+      className="shell-topbar-full shell-topbar-full--tabs"
       data-platform={isMac ? "mac" : isWin ? "win" : "other"}
-      data-display-open={panelOpen ? "true" : "false"}
     >
       <div className="shell-topbar-full__left">
         <ShellTopBarPrimaryNav omitIds={OMITTED_NAV_IDS} />
+        <ShellTopBarTabs />
       </div>
 
       <ShellTopBarActivity />
 
       <div className="shell-topbar-full__right">
         <ShellTopBarUpdatePill />
+        <GlobalModelsControl placement="topbar" />
         <ShellTopBarAccount onSignIn={onSignIn} />
-        {!panelOpen ? (
-          <>
-            {!hasConnectedAccount ? (
-              <SettingsMenuButton className="shell-topbar-account-settings" />
-            ) : null}
-            <button
-              type="button"
-              className="shell-topbar-icon-btn"
-              onClick={() => displayTabs.setPanelOpen(true)}
-              aria-label={t("shell.displayPanel.openPanel")}
-              title={t("shell.displayPanel.openPanel")}
-            >
-              <PanelRight size={16} strokeWidth={1.75} />
-            </button>
-          </>
+        {!hasConnectedAccount ? (
+          <SettingsMenuButton className="shell-topbar-account-settings" />
         ) : null}
-        {isWin && !panelOpen ? (
-          <WindowControls useWindowsIcons />
-        ) : null}
+        {isWin ? <WindowControls useWindowsIcons /> : null}
       </div>
     </header>
   );

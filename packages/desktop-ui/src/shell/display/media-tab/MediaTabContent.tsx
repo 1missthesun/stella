@@ -3,17 +3,26 @@ import { MediaPreviewCard } from "@/shell/MediaPreviewCard";
 import type { SwipeDirection } from "@/shell/ZoomableImage";
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { displayTabs } from "@/features/workspace-display/tab-store";
-import {
-  useFileEntries,
-  type FileEntry,
-} from "@/features/workspace-display/files-index";
-import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
+import { fileViewer } from "@/features/workspace-display/file-viewer-store";
+import type { DisplayTabKind } from "@/features/workspace-display/types";
+import { showSibling, useViewerSiblings } from "@/shell/workspace-stage/viewer-siblings";
 import { removeGeneratedMediaItem } from "../payload-to-tab-spec";
 import type { MediaTabItem } from "./media-item";
 import { MediaActionBar } from "./MediaActionBar";
 import { HeroPrompt } from "./HeroPrompt";
 import { useT } from "@/shared/i18n";
 import "../media-tab.css";
+
+const mediaKindOf = (item: MediaTabItem): DisplayTabKind => {
+  switch (item.asset.kind) {
+    case "image":
+    case "video":
+    case "audio":
+      return item.asset.kind;
+    default:
+      return "media";
+  }
+};
 
 const WHEEL_SWIPE_PX = 80;
 const WHEEL_GESTURE_IDLE_MS = 220;
@@ -24,34 +33,20 @@ const wheelGesture: {
   idleTimer: ReturnType<typeof setTimeout> | null;
 } = { travel: 0, fired: false, idleTimer: null };
 
-const isSwipeableMedia = (entry: FileEntry): boolean =>
-  entry.source === "media" &&
-  entry.payload.kind === "media" &&
-  (entry.payload.asset.kind === "image" ||
-    entry.payload.asset.kind === "video" ||
-    entry.payload.asset.kind === "audio");
-
-const useMediaNeighbours = (itemId: string) => {
-  const entries = useFileEntries();
+const useMediaNeighbours = (itemId: string, kind: DisplayTabKind) => {
+  const { items, index } = useViewerSiblings(itemId, kind);
   return useMemo(() => {
-    const media = entries.filter(isSwipeableMedia);
-    const index = media.findIndex((entry) => entry.id === itemId);
     if (index === -1) return { previous: null, next: null };
     return {
-      previous: media[index - 1] ?? null,
-      next: media[index + 1] ?? null,
+      previous: items[index - 1] ?? null,
+      next: items[index + 1] ?? null,
     };
-  }, [entries, itemId]);
-};
-
-const showInPlace = (entry: FileEntry) => {
-  openDisplayPayloadTab(entry.payload, { activate: false });
-  sidebarSections.setLocation("files", entry.id);
+  }, [index, items]);
 };
 
 export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
   const t = useT();
-  const neighbours = useMediaNeighbours(item.id);
+  const neighbours = useMediaNeighbours(item.id, mediaKindOf(item));
   const neighboursRef = useRef(neighbours);
   neighboursRef.current = neighbours;
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -61,8 +56,8 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
       direction === "next"
         ? neighboursRef.current.next
         : neighboursRef.current.previous;
-    if (target) showInPlace(target);
-  }, []);
+    if (target) showSibling(item.id, target);
+  }, [item.id]);
 
   useEffect(() => {
     const preview = previewRef.current;
@@ -106,7 +101,8 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
   const handleDelete = useCallback(() => {
     removeGeneratedMediaItem(item.id);
     displayTabs.closeTab(item.id);
-    sidebarSections.clearLocation("files");
+    if (fileViewer.getSnapshot().fileId === item.id) fileViewer.close();
+    else sidebarSections.clearLocation("files");
   }, [item.id]);
 
   return (

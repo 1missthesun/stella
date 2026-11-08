@@ -1,0 +1,190 @@
+.topbar-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.topbar-tabs__strip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-app-region: no-drag;
+}
+
+.topbar-tabs__strip::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-tabs__tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 180px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--text-muted, var(--text-weak));
+  -webkit-app-region: no-drag;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.topbar-tabs__tab:not(.topbar-tabs__tab--chat) {
+  min-width: 40px;
+}
+
+/* Chat stays reachable when many tabs make the strip scroll. */
+.topbar-tabs__tab--chat {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex-shrink: 0;
+  background: var(--background);
+}
+
+.topbar-tabs__tab--chat:hover {
+  background: color-mix(in oklch, var(--foreground) 5%, var(--background));
+}
+
+.topbar-tabs__tab--chat[data-active="true"] {
+  background: color-mix(in oklch, var(--foreground) 9%, var(--background));
+}
+
+.topbar-tabs__tab:hover {
+  color: var(--text-base);
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+.topbar-tabs__tab[data-active="true"] {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+}
+
+.topbar-tabs__target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 9px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-xs, 12px);
+  font-weight: var(--weight-medium, 500);
+  cursor: default;
+}
+
+.topbar-tabs__tab:not(.topbar-tabs__tab--chat):hover .topbar-tabs__target,
+.topbar-tabs__tab:not(.topbar-tabs__tab--chat)[data-active="true"]
+  .topbar-tabs__target {
+  padding-right: 24px;
+}
+
+.topbar-tabs__target:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.topbar-tabs__icon {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-tabs__dot {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary, #2f7cf6);
+  box-shadow: 0 0 0 1.5px var(--background);
+}
+
+.topbar-tabs__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Squeezed tabs fade their title out (as Chrome does) instead of showing a
+   lone ellipsis. */
+.topbar-tabs__tab:not(.topbar-tabs__tab--chat) .topbar-tabs__label {
+  text-overflow: clip;
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 16px),
+    transparent calc(100% - 2px)
+  );
+}
+
+.topbar-tabs__close {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-weak);
+  transform: translateY(-50%);
+  cursor: default;
+}
+
+.topbar-tabs__tab:hover .topbar-tabs__close,
+.topbar-tabs__tab[data-active="true"] .topbar-tabs__close {
+  display: inline-flex;
+}
+
+.topbar-tabs__close:hover {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+}
+
+.topbar-tabs__new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted, var(--text-weak));
+  cursor: default;
+  -webkit-app-region: no-drag;
+}
+
+.topbar-tabs__new:hover {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.topbar-tabs__new:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

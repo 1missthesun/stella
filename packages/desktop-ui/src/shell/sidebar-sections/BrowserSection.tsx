@@ -1,3 +1,4 @@
+import { useFileViewerStageOpen } from "@/features/workspace-display/file-viewer-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type {
@@ -55,24 +56,8 @@ const boundsKey = (layout: BrowserViewLayout) =>
   `${layout.pageBounds.x},${layout.pageBounds.y},${layout.pageBounds.width},${layout.pageBounds.height}|` +
   `${layout.surfaceBounds.x},${layout.surfaceBounds.y},${layout.surfaceBounds.width},${layout.surfaceBounds.height}`;
 
-/* WebContentsView is composited above the renderer, so any part of it that
-   overlaps the DOM resize handle wins hit-testing. Keep the native page clear
-   of the handle's full hit target; the browser chrome remains renderer-owned
-   and does not need this inset. Keep this in sync with
-   `.right-sidebar__resize-handle` in right-sidebar.css. */
-const SIDEBAR_RESIZE_HANDLE_WIDTH = 12;
-
-const browserPageBounds = (rect: DOMRect): BrowserViewBounds => {
-  const bounds = toBounds(rect);
-  const inset = document.documentElement.dataset.displayPanelTakeover
-    ? 0
-    : Math.min(SIDEBAR_RESIZE_HANDLE_WIDTH, bounds.width);
-  return {
-    ...bounds,
-    x: bounds.x + inset,
-    width: bounds.width - inset,
-  };
-};
+/* The browser fills a stage tab; nothing HTML sits over its page. */
+const browserPageBounds = (rect: DOMRect): BrowserViewBounds => toBounds(rect);
 
 const normalizeAddress = (raw: string): string | null => {
   const value = raw.trim();
@@ -279,7 +264,9 @@ export function BrowserSection() {
   const chat = useChatRuntime();
   const activeSection = useActiveSidebarSection();
   const panelOpen = useDisplayPanelOpen();
-  const visible = panelOpen && activeSection === "browser";
+  // An expanded file sits over the stage; the native view would draw on top.
+  const fileStageOpen = useFileViewerStageOpen();
+  const visible = panelOpen && activeSection === "browser" && !fileStageOpen;
   const [state, setState] = useState<BrowserViewState>(EMPTY_STATE);
   const [connectingExtension, setConnectingExtension] = useState(false);
   const [reconnectingLogins, setReconnectingLogins] = useState(false);

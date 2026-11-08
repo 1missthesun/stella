@@ -92,6 +92,8 @@ export type SidebarTab = {
   kind: SidebarSection;
   location: string | null;
   file?: SidebarFileRecord;
+  /** Added by an agent and not looked at yet (shows a dot on the tab). */
+  unread?: boolean;
 };
 
 export type SidebarSectionsSnapshot = {
@@ -101,7 +103,10 @@ export type SidebarSectionsSnapshot = {
 
 type Listener = () => void;
 
-const STORAGE_KEY_TABS = "stella.sidebar.tabs";
+// Top-bar tabs. The right sidebar's tabs lived under the older key and are
+// migrated once (see `readPersistedState`).
+const STORAGE_KEY_TABS = "stella.topbar.tabs";
+const STORAGE_KEY_SIDEBAR_TABS = "stella.sidebar.tabs";
 // Legacy keys used only to migrate a pre-per-item layout on first load.
 const STORAGE_KEY_SECTION = "stella.sidebar.activeSection";
 const STORAGE_KEY_LOCATIONS = "stella.sidebar.sectionLocations";
@@ -121,7 +126,8 @@ const makeTab = (
   location: location ?? null,
 });
 
-const defaultTabs = (): SidebarTab[] => [makeTab("home")];
+// The top bar's Chat tab stands in when nothing else is open.
+const defaultTabs = (): SidebarTab[] => [];
 
 const MAX_PERSISTED_FILE_PAYLOAD_CHARS = 32_000;
 
@@ -187,11 +193,14 @@ export const fileNameFromDisplayTabId = (location: string): string => {
 
 type PersistedState = { tabs: SidebarTab[]; activeTabId: string | null };
 
-const withActive = (tabs: SidebarTab[], activeTabId: string | null): string => {
+const withActive = (
+  tabs: SidebarTab[],
+  activeTabId: string | null,
+): string | null => {
   if (activeTabId && tabs.some((tab) => tab.id === activeTabId)) {
     return activeTabId;
   }
-  return tabs[tabs.length - 1]?.id ?? tabs[0]!.id;
+  return tabs[tabs.length - 1]?.id ?? null;
 };
 
 /** Migrate the previous section-keyed layout into per-item tabs, once. */
@@ -227,11 +236,48 @@ const migrateLegacyTabs = (): PersistedState | null => {
   }
 };
 
+/**
+ * What the right sidebar's saved tabs keep when they move to the top bar:
+ * the browser, cloud apps and canvases. Home and the old places (Files,
+ * Schedule, Email, Updates) live on the New tab page now, and single files
+ * open in the viewer, so those tabs are dropped rather than left behind.
+ */
+const keptFromSidebar = (tab: SidebarTab): boolean => {
+  if (tab.kind === "browser") return true;
+  if (tab.kind === "apps") return tab.location !== null;
+  if (tab.kind === "files" && tab.location) {
+    return tab.file?.kind === "canvas" || tab.location.startsWith("canvas:");
+  }
+  return false;
+};
+
+const fromSidebarLayout = (
+  state: PersistedState | null,
+): PersistedState | null => {
+  if (!state) return null;
+  const tabs = state.tabs.filter(keptFromSidebar);
+  // The stage starts closed, so nothing is active until a tab is clicked.
+  return { tabs, activeTabId: withActive(tabs, state.activeTabId) };
+};
+
 const readPersistedState = (): PersistedState => {
   if (typeof window === "undefined") {
     return { tabs: defaultTabs(), activeTabId: null };
   }
-  const raw = uiState.getItem(STORAGE_KEY_TABS);
+  if (uiState.getItem(STORAGE_KEY_TABS) === null) {
+    const migrated =
+      fromSidebarLayout(readSavedTabs(STORAGE_KEY_SIDEBAR_TABS)) ??
+      fromSidebarLayout(migrateLegacyTabs());
+    if (migrated) return migrated;
+    return { tabs: defaultTabs(), activeTabId: null };
+  }
+  return (
+    readSavedTabs(STORAGE_KEY_TABS) ?? { tabs: defaultTabs(), activeTabId: null }
+  );
+};
+
+const readSavedTabs = (key: string): PersistedState | null => {
+  const raw = uiState.getItem(key);
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -261,6 +307,7 @@ const readPersistedState = (): PersistedState => {
               kind: restored.kind,
               location,
               ...(file ? { file } : {}),
+              ...(candidate.unread === true ? { unread: true } : {}),
             });
           }
           const kept = withoutRepeats(tabs);
@@ -272,13 +319,10 @@ const readPersistedState = (): PersistedState => {
         }
       }
     } catch {
-      // fall through to migration / default
+      // fall through to the default
     }
   }
-  const migrated = migrateLegacyTabs();
-  if (migrated) return migrated;
-  const tabs = defaultTabs();
-  return { tabs, activeTabId: tabs[0]!.id };
+  return null;
 };
 
 let snapshot: SidebarSectionsSnapshot = readPersistedState();
@@ -310,8 +354,7 @@ const isFileTabUnavailable = (tab: SidebarTab): boolean =>
 
 const persist = (next: SidebarSectionsSnapshot): void => {
   if (typeof window === "undefined") return;
-  const persistableTabs = next.tabs.filter((tab) => tab.kind !== "takeover");
-  const tabs = persistableTabs.length > 0 ? persistableTabs : defaultTabs();
+  const tabs = next.tabs.filter((tab) => tab.kind !== "takeover");
   uiState.setItem(
     STORAGE_KEY_TABS,
     JSON.stringify({
@@ -383,8 +426,15 @@ export const sidebarSections = {
             tabs: snapshot.tabs.filter((tab) => tab.id !== active.id),
             activeTabId: existing.id,
           });
-        } else if (snapshot.activeTabId !== existing.id) {
-          emit({ ...snapshot, activeTabId: existing.id });
+        } else if (snapshot.activeTabId !== existing.id || existing.unread) {
+          emit({
+            tabs: snapshot.tabs.map((tab) =>
+              tab.id === existing.id && tab.unread
+                ? { ...tab, unread: false }
+                : tab,
+            ),
+            activeTabId: existing.id,
+          });
         }
         displayTabs.setPanelOpen(true);
         return;
@@ -392,7 +442,13 @@ export const sidebarSections = {
     }
 
     const active = activeTabOf(snapshot);
-    if (active && isReusableNavTab(active)) {
+    // Only a tab that's on screen is reused; one waiting behind the chat
+    // keeps what it shows, like a background browser tab.
+    if (
+      active &&
+      isReusableNavTab(active) &&
+      displayTabs.getLayoutSnapshot().panelOpen
+    ) {
       const tabs = snapshot.tabs.map((tab) =>
         tab.id === active.id ? withLocation(tab, kind, loc) : tab,
       );
@@ -410,9 +466,48 @@ export const sidebarSections = {
   },
 
   activateTab(tabId: string): void {
-    if (snapshot.activeTabId === tabId) return;
-    if (!snapshot.tabs.some((tab) => tab.id === tabId)) return;
-    emit({ ...snapshot, activeTabId: tabId });
+    const target = snapshot.tabs.find((tab) => tab.id === tabId);
+    if (!target) return;
+    if (snapshot.activeTabId === tabId && !target.unread) return;
+    emit({
+      tabs: target.unread
+        ? snapshot.tabs.map((tab) =>
+            tab.id === tabId ? { ...tab, unread: false } : tab,
+          )
+        : snapshot.tabs,
+      activeTabId: tabId,
+    });
+  },
+
+  /**
+   * Add a tab for something an agent put on screen, without switching to it.
+   * It carries a dot until it is looked at.
+   */
+  addInBackground(section: SidebarSection, location: string): void {
+    const kind = resolveSidebarSection(section);
+    const existing = snapshot.tabs.find(
+      (tab) => tab.kind === kind && tab.location === location,
+    );
+    const showing =
+      existing !== undefined &&
+      existing.id === snapshot.activeTabId &&
+      displayTabs.getLayoutSnapshot().panelOpen;
+    if (existing) {
+      if (showing || existing.unread) return;
+      emit({
+        ...snapshot,
+        tabs: snapshot.tabs.map((tab) =>
+          tab.id === existing.id ? { ...tab, unread: true } : tab,
+        ),
+      });
+      return;
+    }
+    const created = makeTab(kind, location);
+    const tab = { ...withLocation(created, kind, location), unread: true };
+    emit({
+      tabs: [...snapshot.tabs, tab],
+      activeTabId: snapshot.activeTabId ?? tab.id,
+    });
   },
 
   closeTab(tabId: string): void {
@@ -426,8 +521,7 @@ export const sidebarSections = {
     }
 
     if (tabs.length === 0) {
-      const seeded = defaultTabs();
-      emit({ tabs: seeded, activeTabId: seeded[0]!.id });
+      emit({ tabs: [], activeTabId: null });
       displayTabs.setPanelOpen(false);
       return;
     }
@@ -529,8 +623,7 @@ export const sidebarSections = {
   },
 
   reset(): void {
-    const tabs = defaultTabs();
-    emit({ tabs, activeTabId: tabs[0]!.id });
+    emit({ tabs: defaultTabs(), activeTabId: null });
   },
 };
 

@@ -4,11 +4,11 @@ import {
   type DisplayTabPayload,
   normalizeDisplayPayload,
 } from "@stella/contracts/desktop/display-payload";
-import type { RightSidebarHandle } from "@/shell/RightSidebar";
+import type { WorkspaceStageHandle } from "@/shell/workspace-stage/WorkspaceStage";
 import { maybeHandleCanvasShareUrl } from "@/features/canvas-share/open-shared-canvas";
 
 type UseDisplayPayloadRoutingOptions = {
-  rightSidebarRef: RefObject<RightSidebarHandle | null>;
+  rightSidebarRef: RefObject<WorkspaceStageHandle | null>;
 };
 
 export function useDisplayPayloadRouting({
@@ -45,11 +45,14 @@ export function useDisplayPayloadRouting({
       ?.then((result: { items?: unknown[] } | null) => {
         if (cancelled || !result || !Array.isArray(result.items)) return;
         if (result.items.length === 0) return;
-        rightSidebarRef.current?.update({
-          kind: "trash",
-          title: "Trash",
-          createdAt: Date.now(),
-        });
+        rightSidebarRef.current?.update(
+          {
+            kind: "trash",
+            title: "Trash",
+            createdAt: Date.now(),
+          },
+          { tab: false },
+        );
       })
       .catch(() => undefined);
     return () => {
@@ -57,5 +60,14 @@ export function useDisplayPayloadRouting({
     };
   }, [rightSidebarRef]);
 
-  useMediaMaterializer({ onMaterialized: routeDisplayPayload });
+  // Generated media already shows inline in the chat: register it for the
+  // viewer's strip without adding a top-bar tab for every image.
+  const routeMaterializedPayload = useCallback(
+    (payload: DisplayTabPayload) => {
+      rightSidebarRef.current?.update(payload, { tab: false });
+    },
+    [rightSidebarRef],
+  );
+
+  useMediaMaterializer({ onMaterialized: routeMaterializedPayload });
 }

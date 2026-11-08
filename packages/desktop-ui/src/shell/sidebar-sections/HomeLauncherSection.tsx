@@ -2,6 +2,8 @@ import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { useAppSourceState } from "@/features/app-source/app-source-store";
 import { WorkList } from "./FilesSection";
 import { HOME_LAUNCHER_SECTIONS, SIDEBAR_SECTION_META } from "./section-meta";
+import { openTrashDisplayTab } from "@/shell/display/default-tabs";
+import { Trash2 } from "@/ui/icons";
 import "./home-launcher.css";
 
 function LauncherOptions() {
@@ -29,6 +31,18 @@ function LauncherOptions() {
             </li>
           );
         })}
+        <li>
+          <button
+            type="button"
+            className="home-launcher__option"
+            onClick={openTrashDisplayTab}
+          >
+            <span className="home-launcher__option-icon" aria-hidden="true">
+              <Trash2 size={18} strokeWidth={1.75} />
+            </span>
+            <span className="home-launcher__option-label">Trash</span>
+          </button>
+        </li>
       </ul>
     </div>
   );

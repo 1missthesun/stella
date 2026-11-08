@@ -24,8 +24,11 @@ import {
   TextQuote,
   Video,
   X,
+  Eye,
 } from "@/ui/icons";
 import { ChipPreviewPortal } from "./ChipPreviewPortal";
+import { showInViewer } from "@/features/workspace-display/open-payload";
+import { VIEWER_SELECTION_SURFACE } from "@/features/workspace-display/file-viewer-store";
 import { PastedTextTile } from "./AttachmentTiles";
 import { useHoverPreview } from "./use-hover-preview";
 import { ImageLightbox } from "@/ui/image-lightbox";
@@ -79,7 +82,8 @@ export type ContextPillKind =
   | "app-selection"
   | "activity"
   | "pasted-text"
-  | "selected-text";
+  | "selected-text"
+  | "viewing";
 
 const CONTEXT_PILL_ICONS = {
   window: AppWindowMac,
@@ -87,6 +91,7 @@ const CONTEXT_PILL_ICONS = {
   activity: ClipboardList,
   "pasted-text": ClipboardPaste,
   "selected-text": TextQuote,
+  viewing: Eye,
 } as const;
 
 type ContextPillProps = HTMLAttributes<HTMLElement> & {
@@ -299,6 +304,27 @@ export function AppSelectionChip({
   const t = useT();
   const label =
     appSelection.label || t("app.chat.contextChips.selectedAreaFallback");
+  if (appSelection.surface === VIEWER_SELECTION_SURFACE) {
+    const viewedId = appSelection.anchor?.path;
+    return (
+      <span className="composer-chip-shell">
+        <ContextPill
+          as="button"
+          kind="viewing"
+          label={truncateChipLabel(label, 30)}
+          title={label}
+          className={className}
+          onClick={() => {
+            if (viewedId) showInViewer(viewedId);
+          }}
+        />
+        <ChipRemoveButton
+          label={t("app.chat.contextChips.removeSelectedArea", { label })}
+          onRemove={() => removeComposerAppSelectionContext(index, setChatContext)}
+        />
+      </span>
+    );
+  }
   const source = appSelection.source;
   const sourceSuffix = source?.filePath
     ? `\n${source.componentName ? `${source.componentName} — ` : ""}${source.filePath}${

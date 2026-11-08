@@ -39,9 +39,11 @@ import { writeActiveCloudConversationIdCache } from "@/features/cloud/cloud-conv
 import { retireCloudConversationClientAuthority } from "@/features/cloud/conversation-store";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
 import { retireCloudExecutionClientAuthority } from "@/features/cloud/cloud-execution-store";
-import type { RightSidebarHandle } from "@/shell/RightSidebar";
-const RightSidebar = lazy(() =>
-  import("@/shell/RightSidebar").then((m) => ({ default: m.RightSidebar })),
+import type { WorkspaceStageHandle } from "@/shell/workspace-stage/WorkspaceStage";
+const WorkspaceStage = lazy(() =>
+  import("@/shell/workspace-stage/WorkspaceStage").then((m) => ({
+    default: m.WorkspaceStage,
+  })),
 );
 const ProviderConnectedDialog = lazy(() =>
   import("@/global/settings/ProviderConnectedDialog").then((m) => ({
@@ -59,19 +61,11 @@ const SubscriptionUpgradeDialog = lazy(() =>
   })),
 );
 import { ShellTopBarFull } from "@/shell/ShellTopBarFull";
-import { GlobalModelsControl } from "@/shell/GlobalModelsControl";
-import { DisplayPanelTopBar } from "@/shell/DisplayPanelTopBar";
-import {
-  displayTabs,
-  useDisplayPanelExpanded,
-  useDisplayPanelOpen,
-} from "@/features/workspace-display/tab-store";
+import { fileViewer } from "@/features/workspace-display/file-viewer-store";
 import {
   CHAT_DISPLAY_TAB_ID,
-  HOME_DISPLAY_TAB_ID,
   ensureChatDisplayTab,
   openChatDisplayTab,
-  openHomeDisplayTab,
 } from "@/shell/display/default-tabs";
 import { FullShellDialogs } from "@/shell/full-shell-dialogs";
 import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
@@ -94,7 +88,6 @@ import { useLastLocationRestore } from "@/shell/root-chrome/use-last-location-re
 import { usePersistLastLocation } from "@/shell/root-chrome/use-persist-last-location";
 import {
   shellBreakpointStore,
-  useShellBreakpointState,
 } from "@/shell/shell-breakpoints";
 import "@/shell/error-boundary.css";
 import { platformCapabilities } from "@/platform/capabilities";
@@ -490,39 +483,13 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
   const navigate = useNavigate();
   const { dialog: activeDialog } = Route.useSearch();
   const chat = useChatRuntime();
-  const panelOpen = useDisplayPanelOpen();
-  const panelExpanded = useDisplayPanelExpanded();
-  const shellBreakpoints = useShellBreakpointState();
-  const modelControlVisible = panelOpen;
-  const panelExpandedBeforeTakeoverRef = useRef<boolean | null>(null);
-  const displayBreakpointTransitionTimeoutRef = useRef<number | null>(null);
 
-  const rightSidebarRef = useRef<RightSidebarHandle>(null);
+  const rightSidebarRef = useRef<WorkspaceStageHandle>(null);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isOnChatRoute = pathname === "/chat";
 
-  const triggerDisplayBreakpointTransition = useCallback(() => {
-    document.body.dataset.displayBreakpointTransition = "true";
-    if (displayBreakpointTransitionTimeoutRef.current !== null) {
-      window.clearTimeout(displayBreakpointTransitionTimeoutRef.current);
-    }
-    displayBreakpointTransitionTimeoutRef.current = window.setTimeout(() => {
-      displayBreakpointTransitionTimeoutRef.current = null;
-      delete document.body.dataset.displayBreakpointTransition;
-    }, 520);
-  }, []);
 
-  useEffect(
-    () => () => {
-      if (displayBreakpointTransitionTimeoutRef.current !== null) {
-        window.clearTimeout(displayBreakpointTransitionTimeoutRef.current);
-        displayBreakpointTransitionTimeoutRef.current = null;
-      }
-      delete document.body.dataset.displayBreakpointTransition;
-    },
-    [],
-  );
 
   useEffect(() => {
     window.electronAPI?.window.setNativeButtonsVisible?.(true);
@@ -640,33 +607,13 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
   useDictationToggleBridge();
 
+  // The Chat tab shows in the viewer only while you're away from the chat;
+  // coming back to it puts that copy away.
   useEffect(() => {
-    const { panelOpen, activeTabId } = displayTabs.getSnapshot();
-    if (!panelOpen) return;
-    const isDefaultSurface =
-      activeTabId === CHAT_DISPLAY_TAB_ID ||
-      activeTabId === HOME_DISPLAY_TAB_ID;
-    if (!isDefaultSurface) return;
-    if (isOnChatRoute) {
-      if (activeTabId !== HOME_DISPLAY_TAB_ID) openHomeDisplayTab();
-    } else if (activeTabId !== CHAT_DISPLAY_TAB_ID) {
-      displayTabs.activateTab(CHAT_DISPLAY_TAB_ID);
+    if (isOnChatRoute && fileViewer.getSnapshot().fileId === CHAT_DISPLAY_TAB_ID) {
+      fileViewer.close();
     }
   }, [isOnChatRoute]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (panelOpen) root.dataset.displayPanelOpen = "true";
-    else delete root.dataset.displayPanelOpen;
-
-    if (panelOpen && panelExpanded) root.dataset.displayPanelExpanded = "true";
-    else delete root.dataset.displayPanelExpanded;
-
-    return () => {
-      delete root.dataset.displayPanelOpen;
-      delete root.dataset.displayPanelExpanded;
-    };
-  }, [panelExpanded, panelOpen]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -740,42 +687,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
     };
   }, [applyShellBreakpoints]);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (shellBreakpoints.displayPanelTakeover) {
-      root.dataset.displayPanelTakeover = "true";
-    } else {
-      delete root.dataset.displayPanelTakeover;
-    }
-    return () => {
-      delete root.dataset.displayPanelTakeover;
-    };
-  }, [shellBreakpoints.displayPanelTakeover]);
 
-  useEffect(() => {
-    const { panelExpanded } = displayTabs.getSnapshot();
-    if (shellBreakpoints.displayPanelTakeover) {
-      if (panelExpandedBeforeTakeoverRef.current === null) {
-        panelExpandedBeforeTakeoverRef.current = panelExpanded;
-      }
-      if (panelExpanded) {
-        triggerDisplayBreakpointTransition();
-        displayTabs.setPanelExpanded(false);
-      }
-      return;
-    }
-
-    const restoreExpanded = panelExpandedBeforeTakeoverRef.current;
-    panelExpandedBeforeTakeoverRef.current = null;
-    if (restoreExpanded && !panelExpanded) {
-      triggerDisplayBreakpointTransition();
-      displayTabs.setPanelExpanded(true);
-    }
-  }, [
-    panelExpanded,
-    shellBreakpoints.displayPanelTakeover,
-    triggerDisplayBreakpointTransition,
-  ]);
 
   return (
     <>
@@ -809,17 +721,11 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
       <ShellTopBarFull onSignIn={showAuthDialog} />
 
-      <DisplayPanelTopBar />
-
+      {/* Tabs on the stage and the floating file viewer, both over the chat.
+          The Models and run-location controls live in the top bar. */}
       <Suspense fallback={null}>
-        <RightSidebar ref={rightSidebarRef} />
+        <WorkspaceStage ref={rightSidebarRef} />
       </Suspense>
-
-      {/* Global bottom-right Models control — top-level, not owned by the
-          right sidebar (state/overlay/lifecycle stay global), but its on-screen
-          visibility follows the display panel so it never creates an empty
-          right gutter when there is nothing on the right. */}
-      <GlobalModelsControl visible={modelControlVisible} />
 
       <FullShellDialogs
         activeDialog={activeDialog ?? null}

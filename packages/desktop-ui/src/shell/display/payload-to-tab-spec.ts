@@ -35,8 +35,6 @@ import {
   setFileEntries,
   type FileEntry,
 } from "@/features/workspace-display/files-index";
-import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
-import { displayTabs } from "@/features/workspace-display/tab-store";
 
 
 export const createSourceDiffTabSpec = (): DisplayTabSpec => ({
@@ -156,7 +154,7 @@ const hashText = (text: string): string => {
   return (hash >>> 0).toString(36);
 };
 
-const idForMediaPayload = (
+export const idForMediaPayload = (
   payload: Extract<DisplayPayload, { kind: "media" }>,
 ): string => {
   const { asset } = payload;
@@ -221,15 +219,9 @@ export const removeGeneratedMediaItem = (
   return generatedMediaSnapshot;
 };
 
-const rememberInFiles = (spec: DisplayTabSpec): DisplayTabSpec => {
-  if (
-    !displayTabs.getLayoutSnapshot().panelOpen &&
-    !sidebarSections.hasLocation("files", spec.id)
-  ) {
-    sidebarSections.setLocation("files", spec.id);
-  }
-  return spec;
-};
+// Files used to retarget the sidebar's hidden Files tab here. They now open
+// in the floating viewer, so a background tab never changes under you.
+const rememberInFiles = (spec: DisplayTabSpec): DisplayTabSpec => spec;
 
 const indexInFiles = (
   spec: DisplayTabSpec,

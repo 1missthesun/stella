@@ -1,6 +1,10 @@
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 
-import { lazy, Suspense, useContext, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useRegisterViewerNav,
+  useViewerDetailReporter,
+} from "@/shell/workspace-stage/viewer-item-context";
 import type { OfficePreviewRef } from "@stella/contracts/office-preview";
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { useT } from "@/shared/i18n";
@@ -368,13 +372,26 @@ export const PdfTabContent = ({
 }: {
   filePath: string;
   title?: string;
-}) => (
-  <div className="right-sidebar__rich right-sidebar__rich--pdf">
-    <Suspense fallback={null}>
-      <PdfViewerCard filePath={filePath} {...(title ? { title } : {})} />
-    </Suspense>
-  </div>
-);
+}) => {
+  const reportDetail = useViewerDetailReporter();
+  const handlePageChange = useCallback(
+    (page: number, total: number) =>
+      reportDetail(total > 1 ? `p. ${page}` : null),
+    [reportDetail],
+  );
+  return (
+    <div className="right-sidebar__rich right-sidebar__rich--pdf">
+      <Suspense fallback={null}>
+        <PdfViewerCard
+          filePath={filePath}
+          {...(title ? { title } : {})}
+          pageRail
+          onPageChange={handlePageChange}
+        />
+      </Suspense>
+    </div>
+  );
+};
 
 export const MarkdownTabContent = (props: {
   filePath: string;
@@ -651,6 +668,87 @@ const SourceDiffBatchFooter = ({
   );
 };
 
+const diffFileName = (filePath: string): string =>
+  filePath.split(/[\\/]/).pop() ?? filePath;
+
+/** The batch's files, with a changed-files list to jump between them. */
+const SourceDiffBatchFiles = ({
+  payloads,
+}: {
+  payloads: SourceDiffPayload[];
+}) => {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [current, setCurrent] = useState<string | null>(
+    payloads[0]?.filePath ?? null,
+  );
+  const reportDetail = useViewerDetailReporter();
+  useEffect(() => {
+    reportDetail(current && payloads.length > 1 ? diffFileName(current) : null);
+  }, [current, payloads.length, reportDetail]);
+  const currentIndex = Math.max(
+    0,
+    payloads.findIndex((payload) => payload.filePath === current),
+  );
+  useRegisterViewerNav(
+    payloads.length > 1
+      ? {
+          canPrevious: currentIndex > 0,
+          canNext: currentIndex < payloads.length - 1,
+          previous: () => {
+            const target = payloads[currentIndex - 1];
+            if (target) jumpTo(target.filePath);
+          },
+          next: () => {
+            const target = payloads[currentIndex + 1];
+            if (target) jumpTo(target.filePath);
+          },
+          previousLabel: "Previous file",
+          nextLabel: "Next file",
+        }
+      : null,
+  );
+  const jumpTo = useCallback((filePath: string) => {
+    setCurrent(filePath);
+    scrollRef.current
+      ?.querySelector<HTMLElement>(
+        `[data-diff-file="${CSS.escape(filePath)}"]`,
+      )
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, []);
+  const blocks = (
+    <div ref={scrollRef} className="display-diff-batches-body__scroll">
+      {payloads.map((payload) => (
+        <div key={payload.filePath} data-diff-file={payload.filePath}>
+          <SourceDiffFileBlock payload={payload} />
+        </div>
+      ))}
+    </div>
+  );
+  if (payloads.length <= 1) return blocks;
+  return (
+    <div className="display-diff-files-layout">
+      <nav className="display-diff-files-nav" aria-label="Changed files">
+        <div className="display-diff-files-nav__label">
+          {payloads.length} files changed
+        </div>
+        {payloads.map((payload) => (
+          <button
+            key={payload.filePath}
+            type="button"
+            className="display-diff-files-nav__item"
+            data-current={payload.filePath === current ? "true" : undefined}
+            title={payload.filePath}
+            onClick={() => jumpTo(payload.filePath)}
+          >
+            {diffFileName(payload.filePath)}
+          </button>
+        ))}
+      </nav>
+      {blocks}
+    </div>
+  );
+};
+
 export const SourceDiffTabContent = () => {
   const t = useT();
   const { batches, activeBatchId } = useSourceDiffBatches();
@@ -693,19 +791,12 @@ export const SourceDiffTabContent = () => {
               body={t("shell.display.diff.emptyBody")}
             />
           ) : (
-            <div className="display-diff-batches-body__scroll">
-              {activeBatch.payloads
-                .filter(
-                  (payload): payload is SourceDiffPayload =>
-                    payload.kind === "source-diff",
-                )
-                .map((payload) => (
-                  <SourceDiffFileBlock
-                    key={payload.filePath}
-                    payload={payload}
-                  />
-                ))}
-            </div>
+            <SourceDiffBatchFiles
+              payloads={activeBatch.payloads.filter(
+                (payload): payload is SourceDiffPayload =>
+                  payload.kind === "source-diff",
+              )}
+            />
           )}
         </div>
         <SourceDiffBatchFooter

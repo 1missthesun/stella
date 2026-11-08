@@ -1,11 +1,13 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
+import { VIEWER_SELECTION_SURFACE } from "@/features/workspace-display/file-viewer-store";
 
 type ComposerContextState = {
   hasScreenshotContext: boolean;
   hasFileContext: boolean;
   hasPastedTextContext: boolean;
   hasAppSelectionContext: boolean;
+  hasViewerContext: boolean;
   hasActivityContext: boolean;
   hasWindowContext: boolean;
   hasVisibleWindowContext: boolean;
@@ -86,8 +88,15 @@ export const resolveComposerContextState = (
   const hasScreenshotContext = Boolean(chatContext?.regionScreenshots?.length);
   const hasFileContext = Boolean(chatContext?.files?.length);
   const hasPastedTextContext = Boolean(chatContext?.pastedTexts?.length);
+  // The viewer's "what's open" chip rides along with a message but isn't
+  // something to send on its own.
   const hasAppSelectionContext = getComposerAppSelections(chatContext).some(
-    (selection) => Boolean(selection.snapshot),
+    (selection) =>
+      Boolean(selection.snapshot) &&
+      selection.surface !== VIEWER_SELECTION_SURFACE,
+  );
+  const hasViewerContext = getComposerAppSelections(chatContext).some(
+    (selection) => selection.surface === VIEWER_SELECTION_SURFACE,
   );
   const hasActivityContext = Boolean(chatContext?.activity?.id);
   const hasWindowContext = windowContextEnabled;
@@ -108,6 +117,7 @@ export const resolveComposerContextState = (
     hasFileContext,
     hasPastedTextContext,
     hasAppSelectionContext,
+    hasViewerContext,
     hasActivityContext,
     hasWindowContext,
     hasVisibleWindowContext,
@@ -115,7 +125,10 @@ export const resolveComposerContextState = (
     hasPendingCaptureContext,
     hasSubmittableContext,
     hasComposerContext: Boolean(
-      hasSubmittableContext || hasPendingCaptureContext || hasVisibleWindowContext,
+      hasSubmittableContext ||
+        hasPendingCaptureContext ||
+        hasVisibleWindowContext ||
+        hasViewerContext,
     ),
   };
 };
@@ -137,6 +150,9 @@ const resolveComposerPlaceholder = ({
   }
   if (contextState.hasAppSelectionContext) {
     return "Ask about the selected area...";
+  }
+  if (contextState.hasViewerContext) {
+    return "Ask about what's open...";
   }
   if (contextState.hasActivityContext) {
     return "Ask about this activity...";

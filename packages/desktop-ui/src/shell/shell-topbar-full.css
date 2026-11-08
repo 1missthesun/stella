@@ -21,16 +21,13 @@
     opacity 120ms ease-out;
 }
 
-.shell-topbar-full[data-display-open="true"] {
-  right: var(--display-panel-width, clamp(380px, 34vw, 520px));
-}
-
-:root[data-display-panel-expanded="true"]
-  .shell-topbar-full[data-display-open="true"],
-:root[data-display-panel-takeover="true"]
-  .shell-topbar-full[data-display-open="true"] {
-  opacity: 0;
-  pointer-events: none;
+/* With tabs on the left, let the tab strip shrink and scroll instead of
+   pushing the centred mark and the right-hand controls aside. */
+.shell-topbar-full--tabs {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(40px, min(30rem, 24vw))
+    minmax(max-content, 1fr);
 }
 
 body[data-display-resizing="true"] .shell-topbar-full,
@@ -78,11 +75,6 @@ body[data-display-expanding="true"] .shell-topbar-full,
   padding-right: 0;
 }
 
-.shell-topbar-full[data-platform="win"][data-display-open="true"]
-  .shell-topbar-full__right {
-  padding-right: 10px;
-}
-
 .shell-topbar-full__right .shell-topbar-account {
   flex: 0 1 auto;
   min-width: 0;
@@ -99,133 +91,8 @@ body[data-display-expanding="true"] .shell-topbar-full,
   .shell-topbar-account-signin {
   padding-right: 8px;
 }
-
-.display-panel-topbar {
-  position: absolute;
-  top: 0;
-  right: 6px;
-  z-index: 81;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: var(--display-panel-width, clamp(380px, 34vw, 520px));
-  height: var(--shell-topbar-height, 38px);
-  padding: 0 10px 0 6px;
-  box-sizing: border-box;
-  overflow: clip;
-  container-type: inline-size;
-  container-name: display-panel;
-  -webkit-app-region: drag;
-  clip-path: inset(0);
-  transition:
-    width 250ms ease-out,
-    clip-path 250ms ease-out;
-}
-
-.display-panel-topbar[data-display-open="false"] {
-  clip-path: inset(0 0 0 100%);
-  pointer-events: none;
-  -webkit-app-region: no-drag;
-}
-
-.display-panel-topbar[data-display-open="false"] * {
-  -webkit-app-region: no-drag;
-}
-
-.display-panel-topbar[data-display-open="true"][data-display-expanded="false"] {
-  border-left: 1px solid
-    var(--shell-junction-border, var(--border-base));
-}
-
-.display-panel-topbar[data-display-open="true"][data-display-expanded="false"]::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-  background: var(--border-strong);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-}
-
-:root:has(.right-sidebar--open .right-sidebar__resize-handle:hover)
-  .display-panel-topbar[data-display-open="true"][data-display-expanded="false"]::before,
-body[data-display-resizing="true"]
-  .display-panel-topbar[data-display-open="true"][data-display-expanded="false"]::before {
-  opacity: 1;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .display-panel-topbar[data-display-open="true"][data-display-expanded="false"]::before {
-    transition: none;
-  }
-}
-
-:root[data-reduce-motion="reduce"]
-  .display-panel-topbar[data-display-open="true"][data-display-expanded="false"]::before {
-  transition: none;
-}
-
-.display-panel-topbar[data-platform="win"] {
-  right: 0;
-  width: calc(
-    var(--display-panel-width, clamp(380px, 34vw, 520px)) + 6px
-  );
-  padding-right: 0;
-}
-
-.display-panel-topbar__tabs {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  min-width: 0;
-  height: 100%;
-  -webkit-app-region: drag;
-}
-
-.display-panel-topbar .shell-topbar-display-controls,
-.display-panel-topbar .shell-topbar-icon-btn,
-.display-panel-topbar .shell-topbar-window-controls {
-  position: relative;
-  z-index: 1;
-  pointer-events: auto;
-  -webkit-app-region: no-drag;
-}
-
-body[data-display-resizing="true"] .display-panel-topbar,
-body[data-display-expanding="true"] .display-panel-topbar,
-:root[data-shell-window-resizing="true"] .display-panel-topbar {
-  transition: none;
-}
-
-.display-panel-topbar[data-display-open="true"][data-display-expanded="true"] {
-  left: 6px;
-  width: auto;
-}
-
-.display-panel-topbar[data-display-open="true"][data-display-expanded="true"][data-platform="mac"] {
-  padding-left: 84px;
-}
-
-:root[data-display-panel-takeover="true"]
-  .display-panel-topbar[data-display-open="true"] {
-  left: 6px;
-  right: 6px;
-  width: auto;
-  border-left: none;
-  transition: none;
-}
-
-:root:not([data-platform="mobile"])[data-display-panel-takeover="true"]
-  .display-panel-topbar[data-display-open="true"][data-platform="mac"] {
-  padding-left: 84px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .shell-topbar-full,
-  .display-panel-topbar {
+  .shell-topbar-full {
     transition: none;
   }
 }

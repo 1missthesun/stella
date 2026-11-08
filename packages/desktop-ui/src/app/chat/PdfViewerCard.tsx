@@ -9,6 +9,7 @@ import {
 import { Document, Page, pdfjs } from "react-pdf";
 import { useFilePreviewActions } from "@/features/chat/hooks/use-file-preview-actions";
 import { FilePreviewCardShell } from "./FilePreviewCardShell";
+import { useRegisterViewerNav } from "@/shell/workspace-stage/viewer-item-context";
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { useT } from "@/shared/i18n";
 import { PreviewBoundary, PreviewProblem } from "@/shell/display/preview-states";
@@ -25,13 +26,24 @@ if (pdfjs.GlobalWorkerOptions.workerSrc !== PDF_WORKER_URL) {
 type PdfViewerCardProps = {
   filePath: string;
   title?: string;
+  /** Show a rail of page thumbnails beside the pages. */
+  pageRail?: boolean;
+  onPageChange?: (page: number, total: number) => void;
 };
+
+const PAGE_RAIL_MAX_PAGES = 80;
+const PAGE_RAIL_THUMB_WIDTH = 76;
 
 type LoadStatus = "loading" | "ready" | "error";
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-export function PdfViewerCard({ filePath, title }: PdfViewerCardProps) {
+export function PdfViewerCard({
+  filePath,
+  title,
+  pageRail,
+  onPageChange,
+}: PdfViewerCardProps) {
   const [attempt, setAttempt] = useState(0);
   return (
     <PreviewBoundary key={filePath}>
@@ -39,6 +51,8 @@ export function PdfViewerCard({ filePath, title }: PdfViewerCardProps) {
         key={attempt}
         filePath={filePath}
         title={title}
+        {...(pageRail ? { pageRail } : {})}
+        {...(onPageChange ? { onPageChange } : {})}
         onRetry={() => setAttempt((value) => value + 1)}
       />
     </PreviewBoundary>
@@ -48,6 +62,8 @@ export function PdfViewerCard({ filePath, title }: PdfViewerCardProps) {
 function PdfViewerCardContent({
   filePath,
   title,
+  pageRail = false,
+  onPageChange,
   onRetry,
 }: PdfViewerCardProps & { onRetry: () => void }) {
   const t = useT();
@@ -65,8 +81,11 @@ function PdfViewerCardContent({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageWidth, setPageWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const layoutRef = useRef<HTMLDivElement | null>(null);
   const resizeTimerRef = useRef<number | null>(null);
   const lastWidthRef = useRef<number | null>(null);
+  // While a page jump animates, scroll position lags behind the target.
+  const jumpUntilRef = useRef(0);
 
   const status: LoadStatus = fileError ? "error" : loadStatus;
   const errorMessage = fileError ?? loadErrorMessage;
@@ -103,7 +122,8 @@ function PdfViewerCardContent({
         resizeTimerRef.current = null;
       }
     };
-  }, []);
+    // The page pane mounts inside <Document> once it loads; re-attach then.
+  }, [numPages]);
 
   const handleLoadSuccess = useCallback(
     ({ numPages }: { numPages: number }) => {
@@ -123,41 +143,78 @@ function PdfViewerCardContent({
 
   const documentFile = useMemo(() => (bytes ? { data: bytes } : null), [bytes]);
 
+  // The current page is the last one whose top has passed the upper third
+  // of the pane. (Pages are usually taller than the pane, so visibility
+  // ratios can't tell which one you're reading.)
   useEffect(() => {
+    const layout = layoutRef.current;
+    if (!layout || numPages <= 0) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const container = containerRef.current;
+      if (!container) return;
+      const line =
+        container.getBoundingClientRect().top + container.clientHeight / 3;
+      let page = 1;
+      for (const el of container.querySelectorAll<HTMLElement>(
+        "[data-pdf-page]",
+      )) {
+        if (el.getBoundingClientRect().top > line) break;
+        page = Number(el.dataset.pdfPage) || page;
+      }
+      setCurrentPage(page);
+    };
+    const onScroll = () => {
+      if (Date.now() < jumpUntilRef.current) return;
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    // Scroll doesn't bubble; capture on the stable wrapper, since react-pdf
+    // can remount the scrolling pane.
+    layout.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    update();
+    return () => {
+      layout.removeEventListener("scroll", onScroll, { capture: true });
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [numPages]);
+
+  useEffect(() => {
+    if (numPages > 0) onPageChange?.(currentPage, numPages);
+  }, [currentPage, numPages, onPageChange]);
+
+  const scrollToPage = useCallback((pageNumber: number) => {
     const container = containerRef.current;
-    if (
-      !container ||
-      numPages <= 0 ||
-      typeof IntersectionObserver === "undefined"
-    ) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let bestPage = currentPage;
-        let bestRatio = 0;
-        for (const entry of entries) {
-          if (entry.intersectionRatio <= bestRatio) continue;
-          const pageAttr = (entry.target as HTMLElement).dataset.pdfPage;
-          const pageNumber = pageAttr ? Number.parseInt(pageAttr, 10) : NaN;
-          if (Number.isFinite(pageNumber)) {
-            bestRatio = entry.intersectionRatio;
-            bestPage = pageNumber;
-          }
-        }
-        setCurrentPage(bestPage);
-      },
-      {
-        root: container,
-        threshold: [0.1, 0.5, 0.9],
-      },
+    const page = container?.querySelector<HTMLElement>(
+      `[data-pdf-page="${pageNumber}"]`,
     );
+    if (!container || !page) return;
+    // Scroll only the pages pane; scrollIntoView would also move whatever
+    // scrolls around the card (the chat behind a floating viewer).
+    const top =
+      page.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop;
+    jumpUntilRef.current = Date.now() + 700;
+    setCurrentPage(pageNumber);
+    container.scrollTo({ top, behavior: "smooth" });
+  }, []);
 
-    const pageEls = container.querySelectorAll("[data-pdf-page]");
-    pageEls.forEach((el) => observer.observe(el));
+  const showRail = pageRail && numPages > 1;
 
-    return () => observer.disconnect();
-  }, [numPages, currentPage]);
+  // In the viewer, ← → and the edge arrows turn pages.
+  useRegisterViewerNav(
+    pageRail && numPages > 1
+      ? {
+          canPrevious: currentPage > 1,
+          canNext: currentPage < numPages,
+          previous: () => scrollToPage(Math.max(1, currentPage - 1)),
+          next: () => scrollToPage(Math.min(numPages, currentPage + 1)),
+          previousLabel: "Previous page",
+          nextLabel: "Next page",
+        }
+      : null,
+  );
 
   const headerTitle =
     title?.replace(/\.pdf$/i, "") ??
@@ -197,7 +254,11 @@ function PdfViewerCardContent({
           {...(fileMissing ? {} : { onRetry })}
         />
       ) : (
-        <div ref={containerRef} className="pdf-viewer-card__scroll">
+        <div
+          ref={layoutRef}
+          className="pdf-viewer-card__layout"
+          data-page-rail={showRail ? "true" : undefined}
+        >
           {documentFile ? (
             <Document
               file={documentFile}
@@ -205,8 +266,47 @@ function PdfViewerCardContent({
               noData={null}
               onLoadSuccess={handleLoadSuccess}
               onLoadError={handleLoadError}
-              className="pdf-viewer-card__document"
+              className="pdf-viewer-card__document-root"
             >
+              {showRail ? (
+                <nav className="pdf-viewer-card__rail" aria-label="Pages">
+                  {Array.from(
+                    { length: Math.min(numPages, PAGE_RAIL_MAX_PAGES) },
+                    (_, index) => {
+                      const pageNumber = index + 1;
+                      return (
+                        <button
+                          key={pageNumber}
+                          type="button"
+                          className="pdf-viewer-card__rail-page"
+                          data-current={
+                            pageNumber === currentPage ? "true" : undefined
+                          }
+                          aria-label={`Page ${pageNumber}`}
+                          aria-current={
+                            pageNumber === currentPage ? "page" : undefined
+                          }
+                          onClick={() => scrollToPage(pageNumber)}
+                        >
+                          <Page
+                            pageNumber={pageNumber}
+                            width={PAGE_RAIL_THUMB_WIDTH}
+                            renderAnnotationLayer={false}
+                            renderTextLayer={false}
+                            loading={null}
+                            className="pdf-viewer-card__rail-thumb"
+                          />
+                          <span className="pdf-viewer-card__rail-number">
+                            {pageNumber}
+                          </span>
+                        </button>
+                      );
+                    },
+                  )}
+                </nav>
+              ) : null}
+              <div ref={containerRef} className="pdf-viewer-card__scroll">
+              <div className="pdf-viewer-card__document">
               {Array.from({ length: numPages }, (_, index) => {
                 const pageNumber = index + 1;
                 return (
@@ -225,9 +325,14 @@ function PdfViewerCardContent({
                   </div>
                 );
               })}
+              </div>
+              </div>
             </Document>
           ) : (
-            <div className="file-preview-card__placeholder pdf-viewer-card__placeholder">
+            <div
+              ref={containerRef}
+              className="file-preview-card__placeholder pdf-viewer-card__placeholder"
+            >
               {t("app.chat.pdfViewer.loading")}
             </div>
           )}

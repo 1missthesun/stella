@@ -184,12 +184,12 @@ export class InAppBrowserBootstrapServer {
   }
 
   private async startInternal(): Promise<void> {
-    mkdirSync(path.dirname(this.tokenPath), { recursive: true });
+    mkdirSync(path.dirname(this.tokenPath), { recursive: true, mode: 0o700 });
     const releaseDiscoveryLock = await acquireDiscoveryLock(this.discoveryLockPath);
     try {
       const filesystemEndpointPath = this.filesystemEndpointPath();
       if (filesystemEndpointPath) {
-        mkdirSync(path.dirname(filesystemEndpointPath), { recursive: true });
+        mkdirSync(path.dirname(filesystemEndpointPath), { recursive: true, mode: 0o700 });
         const existingIdentity = readFileIdentity(filesystemEndpointPath);
         if (existingIdentity) {
           if (await endpointIsLive(filesystemEndpointPath)) {

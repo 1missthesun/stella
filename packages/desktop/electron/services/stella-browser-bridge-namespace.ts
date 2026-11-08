@@ -234,7 +234,7 @@ export const writeBrowserBridgeOwner = (
   session: string,
   record: BrowserBridgeOwnerRecord,
 ): void => {
-  mkdirSync(socketDir, { recursive: true });
+  mkdirSync(socketDir, { recursive: true, mode: 0o700 });
   const target = ownerRecordPath(socketDir, session);
   const temp = `${target}.${process.pid}.tmp`;
   writeFileSync(temp, `${JSON.stringify(record, null, 2)}\n`, {
@@ -254,7 +254,7 @@ export const withBrowserBridgeClaimLock = async <T>(
   section: () => T,
   timeoutMs = CLAIM_LOCK_TIMEOUT_MS,
 ): Promise<T> => {
-  mkdirSync(socketDir, { recursive: true });
+  mkdirSync(socketDir, { recursive: true, mode: 0o700 });
   const lockFile = `${ownerRecordPath(socketDir, session)}.lock`;
   const deadline = Date.now() + timeoutMs;
   for (;;) {

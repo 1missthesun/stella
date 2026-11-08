@@ -93,7 +93,7 @@ export const getStellaInAppBrowserInitTokenPath = (
 
 const getBridgeTokenPath = (): string => {
   const socketDir = getStellaBrowserSocketDir();
-  mkdirSync(socketDir, { recursive: true });
+  mkdirSync(socketDir, { recursive: true, mode: 0o700 });
   return path.join(socketDir, `${STELLA_BROWSER_BRIDGE_SESSION}.ext-token`);
 };
 

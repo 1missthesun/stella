@@ -178,7 +178,7 @@ export async function registerStellaNativeMessagingHost(): Promise<{
     }
 
     const socketDir = getSocketDir();
-    mkdirSync(socketDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true, mode: 0o700 });
 
     const { manifestPath, manifest } = writeShimAndManifest(
       binaryPath,

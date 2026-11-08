@@ -259,8 +259,7 @@ export class RemoteRuntimeHost {
         (connection.serverId &&
           result.serverId !== undefined &&
           result.serverId !== connection.serverId) ||
-        (result.attachmentId !== undefined &&
-          result.attachmentId !== connection.attachmentId)
+        result.attachmentId !== connection.attachmentId
       ) {
         throw new RpcError(
           RPC_ERROR_CODES.INVALID_PARAMS,
@@ -303,10 +302,7 @@ export class RemoteRuntimeHost {
       reason = "retired-connection";
     } else if (!this.started) {
       reason = "client-stopped";
-    } else if (
-      attachmentId !== undefined &&
-      attachmentId !== connection.attachmentId
-    ) {
+    } else if (attachmentId !== connection.attachmentId) {
       reason = "attachment-mismatch";
     }
     if (!reason) return true;

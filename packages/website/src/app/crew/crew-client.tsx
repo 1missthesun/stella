@@ -1286,12 +1286,15 @@ function WorkspaceSettings({
 const accessHint = (repo: SlackWorkspaceRepo, githubAvailable: boolean): string =>
   repo.access === "github"
     ? "Agents get it cloned, work on its branch and push through GitHub, each in this repository's environment."
+    : repo.access === "github-read"
+      ? "Cloned through GitHub; agents can't push, because the GitHub account that connected it can only read it. Reconnect as someone who can write to let them."
     : repo.access === "token"
       ? `Cloned with an access token saved earlier; agents can't push.${githubAvailable ? " Connect the GitHub account that owns it to replace the token." : ""}`
       : `Cloned as a public repository; agents can't push.${githubAvailable ? " Connect the GitHub account that owns it to let them." : ""}`;
 
 const ACCESS_LABEL: Record<SlackWorkspaceRepo["access"], string> = {
   github: "Push",
+  "github-read": "Read-only",
   public: "Read-only",
   token: "Token",
 };
@@ -1986,7 +1989,9 @@ function GithubSection({
                       : "Personal account"
                     : account.status === "suspended"
                       ? "Suspended on GitHub. Unsuspend Stella Crew there, or reconnect."
-                      : "Stella lost access: the app was uninstalled or its access removed. Reconnect."}
+                      : account.status === "reconnect"
+                        ? "Reconnect so Stella can check which repositories you can reach. Agents can't use it until then."
+                        : "Stella lost access: the app was uninstalled or its access removed. Reconnect."}
                 </span>
               </span>
               <span className={s.connectionActions}>

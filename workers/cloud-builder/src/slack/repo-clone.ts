@@ -17,7 +17,7 @@
 import type { ExecutionSession } from "../sandbox-client.js";
 import { cloneToken } from "./github.js";
 import { issueSlackRepoCapability } from "./repo-capability.js";
-import { repoForConversation, repoOwnedBy } from "./repos.js";
+import { repoForConversation, repoPermission } from "./repos.js";
 import { WORLD_ROOT } from "../workspace.js";
 import { AS_SLACK_TOOL_USER, SLACK_REPO_ROOT, SLACK_TOOL_UID, isSlackConversationId } from "./workspace.js";
 
@@ -78,7 +78,7 @@ const writeFile = (path: string, content: string, mode: string, owner: string): 
   `printf '%s' ${shellQuote(btoa(content))} | base64 -d > ${shellQuote(path)} && chown ${owner} ${shellQuote(path)} && chmod ${mode} ${shellQuote(path)}`;
 
 const redact = (value: string): string =>
-  value.replace(/basic [A-Za-z0-9+/=]+/gu, "basic ***").replace(/sr1\.[A-Za-z0-9._-]+/gu, "sr1.***").slice(0, 300);
+  value.replace(/basic [A-Za-z0-9+/=]+/gu, "basic ***").replace(/sr2\.[A-Za-z0-9._-]+/gu, "sr2.***").slice(0, 300);
 
 export const prepareSlackRepo = async (
   env: Partial<Cloudflare.Env>,
@@ -86,15 +86,19 @@ export const prepareSlackRepo = async (
   conversationId: string,
   origin: string,
   log: (event: string, fields: Record<string, unknown>) => void,
+  expiresAt: number,
 ): Promise<string | null> => {
   if (!isSlackConversationId(conversationId)) return null;
   const repo = await repoForConversation(env as Cloudflare.Env, conversationId).catch(() => null);
   if (!repo) return null;
-  const viaGithub = Boolean(
-    repo.github && repo.github.status === "active" && repoOwnedBy(repo.github, repo.fullName),
-  );
+  const viaGithub = Boolean(repo.github?.status === "active" && repoPermission(repo.github, repo.fullName));
   const capability = viaGithub
-    ? await issueSlackRepoCapability(env as Cloudflare.Env, { team: repo.teamId, repo: repo.fullName }).catch(() => null)
+    ? await issueSlackRepoCapability(env as Cloudflare.Env, {
+        team: repo.teamId,
+        repo: repo.fullName,
+        conversation: conversationId,
+        exp: expiresAt,
+      }).catch(() => null)
     : null;
   const token = capability ? null : await cloneToken(env as Cloudflare.Env, repo).catch(() => null);
   const name = repo.fullName.split("/")[1]!;

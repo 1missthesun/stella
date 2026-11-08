@@ -15,6 +15,7 @@ import {
   githubSecret,
   INSTALLATION_ID_PATTERN,
   installationIndex,
+  listUserInstallationRepos,
   verifyInstallationBelongsToUser,
 } from "./github.js";
 import { json } from "../http/response.js";
@@ -112,11 +113,13 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
         ? verified.account
         : ((await fetchInstallationAccount(env, installationId)) ?? EMPTY_ACCOUNT);
     const connector = await fetchOAuthUser(userToken).catch(() => undefined);
+    const { repos } = await listUserInstallationRepos(userToken, installationId);
     const claimed = await internal(env, state.ownerId, "projects.githubClaim", {
       nonce: verifyNonce,
       installationId,
       accountLogin: account.accountLogin.slice(0, 200),
       accountType: account.accountType.slice(0, 50),
+      repos,
       ...(connector ? { githubLogin: connector.login, githubUserId: connector.id } : {}),
     });
     const connectCode = claimed.ok ? (claimed.value as { connectCode: string } | null)?.connectCode : undefined;

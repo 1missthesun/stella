@@ -21,9 +21,9 @@ import type {
   SlackWorkspacesResponse,
 } from "@stella/contracts/slack-workspace";
 
-export type SlackMockMode = "empty" | "connected" | "unavailable" | "github" | "revoked" | "legacy";
+export type SlackMockMode = "empty" | "connected" | "unavailable" | "github" | "revoked" | "reconnect" | "legacy";
 
-const MODES: readonly SlackMockMode[] = ["empty", "connected", "unavailable", "github", "revoked", "legacy"];
+const MODES: readonly SlackMockMode[] = ["empty", "connected", "unavailable", "github", "revoked", "reconnect", "legacy"];
 
 export function readMockMode(): SlackMockMode | null {
   if (process.env.NODE_ENV !== "development" || typeof window === "undefined") return null;
@@ -149,6 +149,12 @@ const current = (mode: SlackMockMode | null): SlackWorkspace => {
         }
       : mode === "revoked"
         ? { ...base, githubAccounts: [githubAccount("acme", "1", "revoked")], repos: [firmware("public")] }
+        : mode === "reconnect"
+          ? {
+              ...base,
+              githubAccounts: [githubAccount("acme", "1", "reconnect"), githubAccount("clearshelf", "3", "active")],
+              repos: [firmware("public"), { ...dashboard, access: "github-read" }],
+            }
         : mode === "legacy"
           ? { ...base, repos: [firmware("token")] }
           : base;

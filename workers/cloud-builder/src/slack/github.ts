@@ -10,6 +10,7 @@ import {
 import { signOAuthState, verifyOAuthState } from "../oauth-state.js";
 import {
   exchangeUserCode,
+  fetchInstallationState,
   githubAppConfigured,
   githubAuthorizeUrl,
   GithubError,
@@ -17,16 +18,20 @@ import {
   GithubInstallationGoneError,
   githubInstallUrl,
   githubSecret,
+  listUserInstallationRepos,
   listUserInstallations,
   mintInstallationToken,
+  type UserInstallationRepo,
 } from "../projects/github.js";
 import { slackPublicOrigin } from "./config.js";
+import { installationActive } from "./store.js";
 import { verifySlackRepoCapability } from "./repo-capability.js";
 import {
   connectionFor,
   findRepoByName,
   listGithubConnections,
-  repoOwnedBy,
+  repoPermission,
+  resolveConversationRepo,
   setGithubStatus,
   type SlackGithubConnection,
   type SlackRepoSettings,
@@ -44,13 +49,14 @@ const REPO_PAGES = 10;
 const BRANCH_PAGES = 5;
 const MAX_WEBHOOK_BYTES = 1_000_000;
 const PICKER_ACCESS = { contents: "read", metadata: "read" } as const;
-const AGENT_ACCESS = {
-  contents: "write",
+const AGENT_READ_ACCESS = {
+  contents: "read",
   metadata: "read",
   deployments: "read",
   statuses: "read",
   checks: "read",
 } as const;
+const AGENT_WRITE_ACCESS = { ...AGENT_READ_ACCESS, contents: "write" } as const;
 
 const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
@@ -69,7 +75,7 @@ export const describeGithub = (connection: SlackGithubConnection): SlackWorkspac
   installationId: connection.installationId,
   account: connection.account,
   accountType: connection.accountType,
-  status: connection.status,
+  status: connection.repos === null && connection.status === "active" ? "reconnect" : connection.status,
   manageUrl: githubManageUrl(connection),
 });
 
@@ -139,6 +145,8 @@ const back = (row: ConnectRow, param: string, value: string): Response => {
 
 const RESTART = "Start again from the Stella Crew page. Connect links work once and last 15 minutes.";
 
+type StoredChoice = SlackGithubInstallationChoice & { repos: UserInstallationRepo[] };
+
 const callback = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const url = new URL(request.url);
   const stateToken = url.searchParams.get("state")?.trim() ?? "";
@@ -173,11 +181,23 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
       const installState = await signOAuthState(env, { ...state, extra: { installing: "1" } });
       return Response.redirect(githubInstallUrl(env, installState, "slack"), 302);
     }
-    const choices: SlackGithubInstallationChoice[] = installations.map((item) => ({
-      installationId: String(item.id),
-      account: (item.account?.login ?? "").slice(0, 200),
-      accountType: (item.account?.type ?? "").slice(0, 50),
-    }));
+    const choices: StoredChoice[] = [];
+    for (const item of installations) {
+      const repos = await listUserInstallationRepos(userToken, String(item.id)).then(
+        (found) => found.repos,
+        () => null,
+      );
+      if (!repos) continue;
+      choices.push({
+        installationId: String(item.id),
+        account: (item.account?.login ?? "").slice(0, 200),
+        accountType: (item.account?.type ?? "").slice(0, 50),
+        repos,
+      });
+    }
+    if (choices.length === 0) {
+      return back(row, SLACK_GITHUB_ERROR_PARAM, "GitHub wouldn't list the repositories you can reach. Try again.");
+    }
     await d1(env)
       .prepare("UPDATE slack_github_connects SET installations = ? WHERE nonce = ?")
       .bind(JSON.stringify(choices), row.nonce)
@@ -217,24 +237,32 @@ export const finishGithubConnect = async (
     await d1(env).prepare("DELETE FROM slack_github_connects WHERE nonce = ?").bind(row.nonce).run();
     return { ok: false, message: "That GitHub connection was started by a different Stella account." };
   }
-  const choices = JSON.parse(row.installations) as SlackGithubInstallationChoice[];
+  const choices = JSON.parse(row.installations) as Array<Partial<StoredChoice>>;
   const chosen = args.installationId
     ? choices.find((choice) => choice.installationId === args.installationId)
     : choices.length === 1
       ? choices[0]
       : undefined;
-  if (!chosen) {
+  if (!chosen?.installationId || !Array.isArray(chosen.repos)) {
     if (args.installationId) return { ok: false, message: "Pick one of the GitHub accounts listed." };
-    return { ok: true, choices };
+    return {
+      ok: true,
+      choices: choices.map((choice) => ({
+        installationId: choice.installationId ?? "",
+        account: choice.account ?? "",
+        accountType: choice.accountType ?? "",
+      })),
+    };
   }
   await d1(env).prepare("DELETE FROM slack_github_connects WHERE nonce = ?").bind(row.nonce).run();
   return {
     ok: true,
     connection: {
       installationId: chosen.installationId,
-      account: chosen.account,
-      accountType: chosen.accountType,
+      account: chosen.account ?? "",
+      accountType: chosen.accountType ?? "",
       status: "active",
+      repos: chosen.repos,
     },
   };
 };
@@ -257,11 +285,23 @@ const minted = async (
       })
     ).token;
   } catch (error) {
-    if (error instanceof GithubInstallationGoneError) {
-      await setGithubStatus(env, connection.installationId, error.status === 403 ? "suspended" : "revoked");
-    }
+    if (error instanceof GithubInstallationGoneError) await settleInstallation(env, connection);
     throw error;
   }
+};
+
+/**
+ * A refused mint can be about the request (one repository, a rate limit), but
+ * the status is shared by every workspace on the installation, so only the
+ * installation's own state changes it.
+ */
+const settleInstallation = async (
+  env: Cloudflare.Env,
+  connection: SlackGithubConnection,
+): Promise<SlackGithubConnection["status"] | null> => {
+  const state = await fetchInstallationState(env, connection.installationId, "slack");
+  if (state && state !== connection.status) await setGithubStatus(env, connection.installationId, state);
+  return state;
 };
 
 export const checkInstallation = async (
@@ -269,11 +309,15 @@ export const checkInstallation = async (
   connection: SlackGithubConnection,
 ): Promise<SlackGithubConnection["status"] | null> => {
   try {
-    await minted(env, connection);
+    await mintInstallationToken(env, {
+      installationId: connection.installationId,
+      app: "slack",
+      permissions: PICKER_ACCESS,
+    });
     if (connection.status !== "active") await setGithubStatus(env, connection.installationId, "active");
     return "active";
   } catch (error) {
-    if (error instanceof GithubInstallationGoneError) return error.status === 403 ? "suspended" : "revoked";
+    if (error instanceof GithubInstallationGoneError) return await settleInstallation(env, connection);
     return null;
   }
 };
@@ -286,45 +330,17 @@ const get = async <T>(token: string | null, path: string): Promise<{ status: num
   return { status: response.status, body, next: /rel="next"/u.test(response.headers.get("link") ?? "") };
 };
 
-export const listInstallationRepos = async (
-  env: Cloudflare.Env,
-  connections: SlackGithubConnection[],
-): Promise<SlackGithubReposResponse> => {
+export const listInstallationRepos = (connections: SlackGithubConnection[]): SlackGithubReposResponse => {
   const repos: SlackGithubRepoOption[] = [];
-  let truncated = false;
-  const active = connections.filter((connection) => connection.status === "active");
-  for (const connection of active) {
-    const found = await listConnectionRepos(env, connection);
-    truncated ||= found.truncated;
-    for (const repo of found.repos) {
-      if (!repos.some((seen) => seen.fullName.toLowerCase() === repo.fullName.toLowerCase())) repos.push(repo);
+  for (const connection of connections) {
+    if (connection.status !== "active") continue;
+    for (const repo of connection.repos ?? []) {
+      if (repos.some((seen) => seen.fullName.toLowerCase() === repo.fullName.toLowerCase())) continue;
+      repos.push({ fullName: repo.fullName, private: repo.private, defaultBranch: repo.defaultBranch });
     }
   }
   repos.sort((a, b) => a.fullName.localeCompare(b.fullName));
-  return { repos, truncated };
-};
-
-const listConnectionRepos = async (
-  env: Cloudflare.Env,
-  connection: SlackGithubConnection,
-): Promise<SlackGithubReposResponse> => {
-  const token = await minted(env, connection);
-  const repos: SlackGithubRepoOption[] = [];
-  let truncated = false;
-  for (let page = 1; page <= REPO_PAGES; page += 1) {
-    const result = await get<{
-      repositories?: Array<{ full_name?: string; private?: boolean; default_branch?: string }>;
-    }>(token, `installation/repositories?per_page=100&page=${page}`);
-    if (!result.body) throw new GithubError("GitHub wouldn't list the repositories Stella can see.");
-    for (const repo of result.body.repositories ?? []) {
-      if (!repo.full_name) continue;
-      repos.push({ fullName: repo.full_name, private: repo.private === true, defaultBranch: repo.default_branch ?? "" });
-    }
-    if (!result.next) break;
-    if (page === REPO_PAGES) truncated = true;
-  }
-  repos.sort((a, b) => a.fullName.localeCompare(b.fullName));
-  return { repos, truncated };
+  return { repos, truncated: false };
 };
 
 export const listRepoBranches = async (
@@ -332,15 +348,19 @@ export const listRepoBranches = async (
   connection: SlackGithubConnection | null,
   fullName: string,
 ): Promise<SlackGithubBranchesResponse & { viaGithub: boolean }> => {
-  const owned = connection && connection.status === "active" && repoOwnedBy(connection, fullName);
-  const token = owned ? await minted(env, connection, fullName.split("/")[1]) : null;
+  const owned = Boolean(connection && connection.status === "active" && repoPermission(connection, fullName));
+  const token = owned ? await minted(env, connection!, fullName.split("/")[1]) : null;
   const repo = await get<{ default_branch?: string }>(token, `repos/${fullName}`);
   if (!repo.body) {
     throw new (repo.status === 404 ? RepoNotFoundError : GithubError)(
       repo.status === 404
         ? owned
           ? `Stella can't see ${fullName}. Add it to the GitHub connection's repositories.`
-          : `GitHub can't find ${fullName}. If it's private, connect GitHub and give Stella access to it.`
+          : connection?.status === "active" && connection.repos === null
+            ? `Reconnect GitHub (${connection.account}) so Stella can check which repositories you can reach.`
+            : connection?.status === "active"
+              ? `The GitHub account that connected ${connection.account} can't reach ${fullName}. Reconnect GitHub as someone who can.`
+              : `GitHub can't find ${fullName}. If it's private, connect GitHub and give Stella access to it.`
         : `GitHub didn't answer for ${fullName} (${repo.status}). Try again.`,
     );
   }
@@ -361,14 +381,14 @@ export const listRepoBranches = async (
 
 /**
  * The token an agent clones with: minted for this one repository with
- * `contents: read` when the workspace's GitHub connection owns it, else a
+ * `contents: read` when the workspace's GitHub connection grants it, else a
  * token pasted before connections existed, else none (public).
  */
 export const cloneToken = async (env: Cloudflare.Env, repo: SlackRepoSettings): Promise<string | null> => {
   const connection = repo.github;
-  if (connection && connection.status !== "revoked" && repoOwnedBy(connection, repo.fullName)) {
+  if (connection && connection.status !== "revoked" && repoPermission(connection, repo.fullName)) {
     try {
-      return await minted(env, connection, repo.fullName.split("/")[1], AGENT_ACCESS);
+      return await minted(env, connection, repo.fullName.split("/")[1], PICKER_ACCESS);
     } catch (error) {
       console.warn(
         JSON.stringify({
@@ -466,26 +486,39 @@ export const findPreview = async (token: string, fullName: string, sha: string):
 const agentConnection = async (
   env: Cloudflare.Env,
   request: Request,
-): Promise<{ connection: SlackGithubConnection; fullName: string; branch: string } | Response> => {
+): Promise<
+  { connection: SlackGithubConnection; fullName: string; branch: string; permission: "read" | "write" } | Response
+> => {
   const header = request.headers.get("authorization") ?? "";
   const claims = header.startsWith("Bearer ") ? await verifySlackRepoCapability(env, header.slice(7).trim()) : null;
   if (!claims) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const gone = Response.json({ error: "This workspace no longer gives agents this repository." }, { status: 403 });
+  if (!(await installationActive(env, claims.team))) return gone;
+  const current = await resolveConversationRepo(env, claims.conversation);
+  if (current?.teamId !== claims.team || current.repo?.fullName.toLowerCase() !== claims.repo.toLowerCase()) return gone;
   const repo = await findRepoByName(env, claims.team, claims.repo);
   const github = repo ? connectionFor(await listGithubConnections(env, claims.team), repo.fullName) : null;
-  if (!repo || !github) {
-    return Response.json({ error: "This workspace no longer gives agents this repository." }, { status: 403 });
+  const permission = repo ? repoPermission(github, repo.fullName) : null;
+  if (!repo || !github) return gone;
+  if (github.status !== "active" || !permission) {
+    return Response.json(
+      { error: `GitHub access to ${repo.fullName} was removed. The workspace owner needs to reconnect ${github.account}.` },
+      { status: 403 },
+    );
   }
-  if (github.status !== "active") {
-    return Response.json({ error: `GitHub access to ${github.account} was removed. The workspace owner needs to reconnect it.` }, { status: 403 });
-  }
-  return { connection: github, fullName: repo.fullName, branch: repo.branch };
+  return { connection: github, fullName: repo.fullName, branch: repo.branch, permission };
 };
 
 const agentToken = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const access = await agentConnection(env, request);
   if (access instanceof Response) return access;
   try {
-    const token = await minted(env, access.connection, access.fullName.split("/")[1], AGENT_ACCESS);
+    const token = await minted(
+      env,
+      access.connection,
+      access.fullName.split("/")[1],
+      access.permission === "write" ? AGENT_WRITE_ACCESS : AGENT_READ_ACCESS,
+    );
     return Response.json({ token }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return Response.json(
@@ -501,7 +534,7 @@ const agentPreview = async (request: Request, env: Cloudflare.Env): Promise<Resp
   const sha = new URL(request.url).searchParams.get("sha") ?? "";
   if (!/^[0-9a-f]{7,40}$/u.test(sha)) return Response.json({ error: "Pass the commit as ?sha=<full sha>." }, { status: 400 });
   try {
-    const token = await minted(env, access.connection, access.fullName.split("/")[1], AGENT_ACCESS);
+    const token = await minted(env, access.connection, access.fullName.split("/")[1], AGENT_READ_ACCESS);
     return Response.json(await findPreview(token, access.fullName, sha), { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return Response.json(

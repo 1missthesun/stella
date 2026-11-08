@@ -43,6 +43,7 @@ import {
   listChannelDefaults,
   listGithubConnections,
   listRepos,
+  repoPermission,
   resolveConversationRepo,
 } from "./repos.js";
 import type { SlackPerson, SlackRepoContext, SlackWorkspaceContext } from "./workspace.js";
@@ -481,7 +482,7 @@ const handleMessage = async (
       return {
         fullName: repo.fullName,
         branch: repo.branch,
-        push: github?.status === "active",
+        push: github?.status === "active" && repoPermission(github, repo.fullName) === "write",
         ...(environments
           ? { environment: environmentSummary(await loadEnvironment(env, install.teamId, repo.id)) }
           : {}),

@@ -1,3 +1,4 @@
+import { parseUserRepos, userRepoPermission, type UserInstallationRepo, type UserRepoPermission } from "../projects/github.js";
 import { decryptToken } from "./crypto.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
@@ -12,6 +13,12 @@ export type SlackGithubConnection = {
   account: string;
   accountType: string;
   status: SlackGithubStatus;
+  /**
+   * The repositories the GitHub user who connected it can reach, with their
+   * permission: all a workspace may use. Null on connections made before it
+   * was recorded, which grant nothing until reconnected.
+   */
+  repos: UserInstallationRepo[] | null;
 };
 
 export type SlackRepoRecord = {
@@ -66,15 +73,16 @@ export const listGithubConnections = async (
 ): Promise<SlackGithubConnection[]> => {
   const rows = await d1(env)
     .prepare(
-      "SELECT installation_id, account, account_type, status FROM slack_github_connections WHERE team_id = ? ORDER BY created_at",
+      "SELECT installation_id, account, account_type, status, user_repos FROM slack_github_connections WHERE team_id = ? ORDER BY created_at",
     )
     .bind(teamId)
-    .all<{ installation_id: string; account: string; account_type: string; status: string }>();
+    .all<{ installation_id: string; account: string; account_type: string; status: string; user_repos: string | null }>();
   return (rows.results ?? []).map((row) => ({
     installationId: row.installation_id,
     account: row.account,
     accountType: row.account_type,
     status: isGithubStatus(row.status) ? row.status : "active",
+    repos: parseUserRepos(row.user_repos),
   }));
 };
 
@@ -85,12 +93,20 @@ export const saveGithubConnection = async (
 ): Promise<void> => {
   await d1(env)
     .prepare(
-      `INSERT INTO slack_github_connections (team_id, installation_id, account, account_type, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO slack_github_connections (team_id, installation_id, account, account_type, status, user_repos, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (team_id, installation_id) DO UPDATE SET account = excluded.account,
-         account_type = excluded.account_type, status = excluded.status`,
+         account_type = excluded.account_type, status = excluded.status, user_repos = excluded.user_repos`,
     )
-    .bind(teamId, connection.installationId, connection.account, connection.accountType, connection.status, Date.now())
+    .bind(
+      teamId,
+      connection.installationId,
+      connection.account,
+      connection.accountType,
+      connection.status,
+      connection.repos ? JSON.stringify(connection.repos) : null,
+      Date.now(),
+    )
     .run();
 };
 
@@ -122,12 +138,23 @@ export const repoOwnedBy = (github: SlackGithubConnection | null, fullName: stri
   Boolean(github?.account) &&
   fullName.split("/")[0]!.toLowerCase() === github!.account.toLowerCase();
 
+/** What the workspace may do in `fullName` through this connection: its connecting user's permission. */
+export const repoPermission = (
+  github: SlackGithubConnection | null,
+  fullName: string,
+): UserRepoPermission | null =>
+  github && repoOwnedBy(github, fullName) ? userRepoPermission(github.repos, fullName) : null;
+
 export const connectionFor = (
   connections: SlackGithubConnection[],
   fullName: string,
 ): SlackGithubConnection | null => {
+  const rank = (connection: SlackGithubConnection): number => {
+    const permission = repoPermission(connection, fullName);
+    return (permission ? 4 : 0) + (connection.status === "active" ? 2 : 0) + (permission === "write" ? 1 : 0);
+  };
   const owned = connections.filter((connection) => repoOwnedBy(connection, fullName));
-  return owned.find((connection) => connection.status === "active") ?? owned[0] ?? null;
+  return owned.sort((a, b) => rank(b) - rank(a))[0] ?? null;
 };
 
 export const listRepos = async (env: Cloudflare.Env, teamId: string): Promise<SlackRepoRecord[]> => {
@@ -223,14 +250,16 @@ export const removeRepo = async (env: Cloudflare.Env, teamId: string, repoId: st
   ]);
 };
 
+export const workspaceRepoDeletes = (db: D1Database, teamId: string): D1PreparedStatement[] => [
+  db.prepare("DELETE FROM slack_repos WHERE team_id = ?").bind(teamId),
+  db.prepare("DELETE FROM slack_github_connections WHERE team_id = ?").bind(teamId),
+  db.prepare("DELETE FROM slack_channel_repos WHERE team_id = ?").bind(teamId),
+  db.prepare("DELETE FROM slack_conversation_repos WHERE team_id = ?").bind(teamId),
+];
+
 export const deleteWorkspaceRepos = async (env: Cloudflare.Env, teamId: string): Promise<void> => {
   const db = d1(env);
-  await db.batch([
-    db.prepare("DELETE FROM slack_repos WHERE team_id = ?").bind(teamId),
-    db.prepare("DELETE FROM slack_github_connections WHERE team_id = ?").bind(teamId),
-    db.prepare("DELETE FROM slack_channel_repos WHERE team_id = ?").bind(teamId),
-    db.prepare("DELETE FROM slack_conversation_repos WHERE team_id = ?").bind(teamId),
-  ]);
+  await db.batch(workspaceRepoDeletes(db, teamId));
 };
 
 export const repoSettings = async (

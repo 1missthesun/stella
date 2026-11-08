@@ -1,4 +1,5 @@
 import { decryptToken, encryptToken, isCurrentTokenVersion } from "./crypto.js";
+import { workspaceRepoDeletes } from "./repos.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
@@ -47,7 +48,13 @@ export const saveInstallation = async (
   },
 ): Promise<void> => {
   const sealed = await encryptToken(env, install.botToken);
-  await d1(env)
+  const db = d1(env);
+  const prior = await db
+    .prepare("SELECT installed_by FROM slack_installations WHERE team_id = ?")
+    .bind(install.teamId)
+    .first<{ installed_by: string }>();
+  const ownerChanges = Boolean(prior && prior.installed_by !== install.installedBy);
+  const upsert = db
     .prepare(
       `INSERT INTO slack_installations
        (team_id, enterprise_id, team_name, app_id, bot_user_id, bot_token_enc, scopes, installed_by, installed_at, revoked_at)
@@ -69,9 +76,18 @@ export const saveInstallation = async (
       install.scopes,
       install.installedBy,
       Date.now(),
-    )
-    .run();
+    );
+  await db.batch([...(ownerChanges ? workspaceRepoDeletes(db, install.teamId) : []), upsert]);
 };
+
+/** Whether the workspace still has Stella installed and a Stella account running her. */
+export const installationActive = async (env: Cloudflare.Env, teamId: string): Promise<boolean> =>
+  Boolean(
+    await d1(env)
+      .prepare("SELECT 1 FROM slack_installations WHERE team_id = ? AND revoked_at IS NULL AND owner_id IS NOT NULL")
+      .bind(teamId)
+      .first(),
+  );
 
 export const loadInstallation = async (
   env: Cloudflare.Env,
@@ -147,10 +163,16 @@ export const setInstallationOwner = async (
   teamId: string,
   ownerId: string | null,
 ): Promise<void> => {
-  await d1(env)
-    .prepare("UPDATE slack_installations SET owner_id = ? WHERE team_id = ?")
-    .bind(ownerId, teamId)
-    .run();
+  const db = d1(env);
+  const prior = await db
+    .prepare("SELECT owner_id FROM slack_installations WHERE team_id = ?")
+    .bind(teamId)
+    .first<{ owner_id: string | null }>();
+  const ownerChanges = Boolean(prior?.owner_id && prior.owner_id !== ownerId);
+  await db.batch([
+    ...(ownerChanges ? workspaceRepoDeletes(db, teamId) : []),
+    db.prepare("UPDATE slack_installations SET owner_id = ? WHERE team_id = ?").bind(ownerId, teamId),
+  ]);
 };
 
 export const revokeInstallation = async (
@@ -166,6 +188,7 @@ export const revokeInstallation = async (
     d1(env)
       .prepare("DELETE FROM slack_messages WHERE team_id = ?")
       .bind(teamId),
+    ...workspaceRepoDeletes(d1(env), teamId),
   ]);
 };
 

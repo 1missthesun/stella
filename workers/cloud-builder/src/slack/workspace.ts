@@ -132,7 +132,7 @@ export const repoCheckout = (fullName: string): string => `${SLACK_REPO_ROOT}/${
 
 const repoLine = (repo: SlackRepoContext): string =>
   [
-    `- ${repo.fullName}: branch ${repo.branch || "(the default branch)"}; ${repo.push ? "agents can commit and push" : "agents can't push (no GitHub connection for it)"}.`,
+    `- ${repo.fullName}: branch ${repo.branch || "(the default branch)"}; ${repo.push ? "agents can commit and push" : "agents can't push (no GitHub connection with write access to it)"}.`,
     repo.environment ? `  Environment: ${repo.environment}` : "",
     repo.rules ? `  Rules for this repository:\n${repo.rules.split("\n").map((line) => `    ${line}`).join("\n")}` : "",
   ]

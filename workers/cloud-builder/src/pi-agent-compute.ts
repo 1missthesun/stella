@@ -250,7 +250,7 @@ export const openPiComputeLease = async (
       throw new Error(worldMaterializationFailure(materialized));
     }
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
-    const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
+    const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log, expiresAt);
     await prepareSlackPreviews(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     if (isSlackConversationId(owner.conversationId) && slackEnvironmentsEnabled(host.env)) {
       const prepared = await prepareSlackEnvironment(

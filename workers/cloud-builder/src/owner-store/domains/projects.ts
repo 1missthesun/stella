@@ -9,9 +9,11 @@ import {
   githubInstallUrl,
   INSTALLATION_ID_PATTERN,
   installationIndex,
+  parseUserRepos,
   revokeInstallation,
+  userRepoPermission,
 } from "../../projects/github.js";
-import { empty, number, object, optional, string } from "../args.js";
+import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -68,6 +70,19 @@ export const PROJECTS_MIGRATION = {
   ],
 };
 
+/**
+ * The repositories the GitHub user who connected an installation can reach,
+ * with their permission. NULL on installations connected before it was
+ * recorded: those back no new project until reconnected.
+ */
+const PROJECTS_USER_REPOS_MIGRATION = {
+  id: "projects.2-user-repos",
+  statements: [
+    "ALTER TABLE github_installations ADD COLUMN user_repos TEXT",
+    "ALTER TABLE github_connect_states ADD COLUMN user_repos TEXT",
+  ],
+};
+
 type ProjectRow = {
   project_id: string;
   slug: string;
@@ -86,6 +101,7 @@ type InstallationRow = {
   account_login: string;
   account_type: string;
   status: string;
+  user_repos: string | null;
   updated_at: number;
 };
 
@@ -97,6 +113,7 @@ type StateRow = {
   account_type: string | null;
   github_login: string | null;
   github_user_id: number | null;
+  user_repos: string | null;
   expires_at: number;
 };
 
@@ -193,13 +210,13 @@ const listProjects = (db: OwnerDbReader): CloudProject[] =>
 const listConnections = (db: OwnerDbReader): GithubConnection[] =>
   db
     .all<InstallationRow>(
-      "SELECT installation_id, account_login, account_type, status, updated_at FROM github_installations ORDER BY updated_at DESC LIMIT 10",
+      "SELECT installation_id, account_login, account_type, status, user_repos, updated_at FROM github_installations ORDER BY updated_at DESC LIMIT 10",
     )
     .map((row) => ({
       installationId: row.installation_id,
       accountLogin: row.account_login,
       accountType: row.account_type,
-      status: row.status,
+      status: row.user_repos === null && row.status === "active" ? "reconnect" : row.status,
       updatedAt: row.updated_at,
     }));
 
@@ -231,9 +248,11 @@ const createProject = (ctx: OwnerContext, args: CreateArgs): CloudProject => {
   const remoteUrl = args.remoteUrl?.trim() ? parseGithubRemote(args.remoteUrl) : null;
   let installationId: string | null = null;
   if (remoteUrl) {
+    type Connection = { installation_id: string; account_login: string; user_repos: string | null };
+    let connection: Connection;
     if (args.installationId) {
-      const row = ctx.db.one<{ installation_id: string }>(
-        "SELECT installation_id FROM github_installations WHERE installation_id = ?",
+      const row = ctx.db.one<Connection>(
+        "SELECT installation_id, account_login, user_repos FROM github_installations WHERE installation_id = ?",
         args.installationId.trim(),
       );
       if (!row) {
@@ -241,17 +260,26 @@ const createProject = (ctx: OwnerContext, args: CreateArgs): CloudProject => {
           "That GitHub connection isn't available on this account. Connect GitHub from Settings first.",
         );
       }
-      installationId = row.installation_id;
+      connection = row;
     } else {
-      const rows = ctx.db.all<{ installation_id: string }>(
-        "SELECT installation_id FROM github_installations LIMIT 2",
+      const rows = ctx.db.all<Connection>(
+        "SELECT installation_id, account_login, user_repos FROM github_installations LIMIT 2",
       );
       if (rows.length === 0) {
         throw bad("Connect GitHub first — Stella needs its app installed on that repository to clone it.");
       }
       if (rows.length > 1) throw bad("Pick which GitHub connection owns that repository.");
-      installationId = rows[0]!.installation_id;
+      connection = rows[0]!;
     }
+    const repos = parseUserRepos(connection.user_repos);
+    if (!repos) throw bad("Reconnect GitHub from Settings so Stella can check which repositories you can reach.");
+    const fullName = remoteUrl.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
+    if (!userRepoPermission(repos, fullName)) {
+      throw bad(
+        `The GitHub account that connected ${connection.account_login || "GitHub"} can't reach ${fullName}. Reconnect GitHub as someone who can.`,
+      );
+    }
+    installationId = connection.installation_id;
   }
   const projectId = `prj-${crypto.randomUUID().slice(0, 18)}`;
   ctx.db.run(
@@ -337,20 +365,29 @@ const claim = (ctx: OwnerContext, args: unknown): { connectCode: string } | null
     accountType: string({ max: 50 }),
     githubLogin: optional(string({ max: 200 })),
     githubUserId: optional(number({ int: true, min: 1 })),
+    repos: array(
+      object({
+        fullName: string({ max: 200 }),
+        private: boolean(),
+        defaultBranch: string({ max: 255 }),
+        permission: literal("read", "write"),
+      }),
+    ),
   })(args);
   const row = spendState(ctx, parsed.nonce, "verify");
   if (!row || row.installation_id !== parsed.installationId) return null;
   const connectCode = randomConnectCode();
   ctx.db.run(
     `INSERT INTO github_connect_states
-       (id, phase, installation_id, account_login, account_type, github_login, github_user_id, expires_at)
-     VALUES (?, 'claim', ?, ?, ?, ?, ?, ?)`,
+       (id, phase, installation_id, account_login, account_type, github_login, github_user_id, user_repos, expires_at)
+     VALUES (?, 'claim', ?, ?, ?, ?, ?, ?, ?)`,
     connectCode,
     parsed.installationId,
     parsed.accountLogin,
     parsed.accountType,
     parsed.githubLogin ?? null,
     parsed.githubUserId ?? null,
+    JSON.stringify(parsed.repos),
     ctx.now + CLAIM_TTL_MS,
   );
   return { connectCode };
@@ -396,13 +433,14 @@ const finishGithubConnect = async (
   }
   ctx.db.run(
     `INSERT INTO github_installations
-       (installation_id, account_login, account_type, github_login, github_user_id, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+       (installation_id, account_login, account_type, github_login, github_user_id, user_repos, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
      ON CONFLICT (installation_id) DO UPDATE SET
        account_login = CASE WHEN excluded.account_login = '' THEN account_login ELSE excluded.account_login END,
        account_type = CASE WHEN excluded.account_type = '' THEN account_type ELSE excluded.account_type END,
        github_login = COALESCE(excluded.github_login, github_login),
        github_user_id = COALESCE(excluded.github_user_id, github_user_id),
+       user_repos = excluded.user_repos,
        status = 'active',
        updated_at = excluded.updated_at`,
     installationId,
@@ -410,6 +448,7 @@ const finishGithubConnect = async (
     row.account_type ?? "",
     row.github_login,
     row.github_user_id,
+    row.user_repos,
     ctx.now,
     ctx.now,
   );
@@ -477,7 +516,7 @@ const purgeProjects = async (ctx: OwnerContext): Promise<{ pending: boolean }> =
 
 export const projectsDomain = {
   name: "projects",
-  migrations: [PROJECTS_MIGRATION],
+  migrations: [PROJECTS_MIGRATION, PROJECTS_USER_REPOS_MIGRATION],
   calls: {
     "projects.create": {
       scope: "owner",

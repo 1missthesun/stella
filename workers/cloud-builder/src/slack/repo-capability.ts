@@ -1,10 +1,11 @@
 import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
 
-const PREFIX = "sr1";
-const DOMAIN = "stella.slack-repo.v1";
-export const SLACK_REPO_CAPABILITY_TTL_MS = 12 * 60 * 60_000;
+const PREFIX = "sr2";
+const DOMAIN = "stella.slack-repo.v2";
+const MAX_TTL_MS = 60 * 60_000;
 
-export type SlackRepoClaims = { team: string; repo: string; exp: number };
+/** One agent container's access to its conversation's repository, for as long as that container's turn credentials. */
+export type SlackRepoClaims = { team: string; repo: string; conversation: string; exp: number };
 
 const base64Url = (bytes: Uint8Array): string => {
   let binary = "";
@@ -45,13 +46,9 @@ const verifiedWithAny = async (env: Cloudflare.Env, signature: Uint8Array, data:
 
 const input = (payload: string): Uint8Array => new TextEncoder().encode(`${DOMAIN}.${payload}`);
 
-export const issueSlackRepoCapability = async (
-  env: Cloudflare.Env,
-  claims: { team: string; repo: string },
-): Promise<string> => {
-  const payload = base64Url(
-    new TextEncoder().encode(JSON.stringify({ ...claims, exp: Date.now() + SLACK_REPO_CAPABILITY_TTL_MS })),
-  );
+export const issueSlackRepoCapability = async (env: Cloudflare.Env, claims: SlackRepoClaims): Promise<string> => {
+  const exp = Math.min(claims.exp, Date.now() + MAX_TTL_MS);
+  const payload = base64Url(new TextEncoder().encode(JSON.stringify({ ...claims, exp })));
   const signature = new Uint8Array(await crypto.subtle.sign("HMAC", await key(builderServiceSecret(env), "sign"), input(payload)));
   return `${PREFIX}.${payload}.${base64Url(signature)}`;
 };
@@ -69,10 +66,17 @@ export const verifySlackRepoCapability = async (
   if (!valid) return null;
   try {
     const claims = JSON.parse(new TextDecoder().decode(payloadBytes)) as Partial<SlackRepoClaims>;
-    if (typeof claims.team !== "string" || typeof claims.repo !== "string" || typeof claims.exp !== "number") {
+    if (
+      typeof claims.team !== "string" ||
+      typeof claims.repo !== "string" ||
+      typeof claims.conversation !== "string" ||
+      typeof claims.exp !== "number"
+    ) {
       return null;
     }
-    return claims.exp > Date.now() ? { team: claims.team, repo: claims.repo, exp: claims.exp } : null;
+    return claims.exp > Date.now() && claims.exp <= Date.now() + MAX_TTL_MS
+      ? { team: claims.team, repo: claims.repo, conversation: claims.conversation, exp: claims.exp }
+      : null;
   } catch {
     return null;
   }

@@ -33,7 +33,8 @@ export type SlackWorkspaceGithub = {
   installationId: string;
   account: string;
   accountType: string;
-  status: "active" | "suspended" | "revoked";
+  /** `reconnect`: connected before Stella recorded which repositories the connecting GitHub user can reach. */
+  status: "active" | "suspended" | "revoked" | "reconnect";
   manageUrl: string;
 };
 
@@ -110,7 +111,7 @@ export type SlackWorkspaceRepo = {
   id: string;
   fullName: string;
   branch: string;
-  access: "github" | "public" | "token";
+  access: "github" | "github-read" | "public" | "token";
   rules: string;
   channels: SlackRepoChannel[];
   environment: SlackWorkspaceEnvironment | null;

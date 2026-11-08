@@ -59,6 +59,7 @@ import {
   loadRepo,
   removeChannelDefaults,
   removeRepo,
+  repoPermission,
   saveGithubConnection,
   updateRepo,
   type RepoPatch,
@@ -169,7 +170,8 @@ const repoAccess = (
   connections: SlackGithubConnection[],
 ): SlackWorkspaceRepo["access"] => {
   const github = connectionFor(connections, repo.fullName);
-  return github && github.status !== "revoked" ? "github" : repo.hasToken ? "token" : "public";
+  const permission = github && github.status !== "revoked" ? repoPermission(github, repo.fullName) : null;
+  return permission === "write" ? "github" : permission === "read" ? "github-read" : repo.hasToken ? "token" : "public";
 };
 
 const describe = async (
@@ -530,7 +532,7 @@ const githubAction = async (
     }
     if (action === "repos" && request.method === "GET") {
       if (!connections.length) return fail(409, "Connect GitHub first.");
-      return ok(await listInstallationRepos(env, connections));
+      return ok(listInstallationRepos(connections));
     }
     if (action === "branches" && request.method === "GET") {
       const fullName = parseRepoName(new URL(request.url).searchParams.get("repo") ?? "");

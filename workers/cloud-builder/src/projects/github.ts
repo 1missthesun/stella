@@ -266,6 +266,26 @@ export const fetchInstallationAccount = async (
   }
 };
 
+/** The installation's own state from the App's view, or null when GitHub didn't say. */
+export const fetchInstallationState = async (
+  env: Cloudflare.Env,
+  installationId: string,
+  app: GithubAppKind = "projects",
+): Promise<"active" | "suspended" | "revoked" | null> => {
+  try {
+    const response = await fetch(`${GITHUB_API_BASE}/app/installations/${encodeURIComponent(installationId)}`, {
+      headers: headers(`Bearer ${await appJwt(env, app)}`),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.status === 404) return "revoked";
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { suspended_at?: string | null };
+    return payload.suspended_at ? "suspended" : "active";
+  } catch {
+    return null;
+  }
+};
+
 export const githubAuthorizeUrl = (
   env: Cloudflare.Env,
   state: string,
@@ -348,6 +368,88 @@ export const listUserInstallations = async (userToken: string): Promise<UserInst
     if (batch.length < 100) break;
   }
   return collected;
+};
+
+export type UserRepoPermission = "read" | "write";
+
+export type UserInstallationRepo = {
+  fullName: string;
+  private: boolean;
+  defaultBranch: string;
+  permission: UserRepoPermission;
+};
+
+const USER_REPO_PAGES = 10;
+
+const userPermission = (permissions?: Partial<Record<string, boolean>>): UserRepoPermission | null =>
+  permissions?.admin || permissions?.maintain || permissions?.push
+    ? "write"
+    : permissions?.triage || permissions?.pull
+      ? "read"
+      : null;
+
+/**
+ * The repositories of `installationId` the GitHub user behind `userToken` can
+ * reach, with that user's own permission. Seeing an installation in
+ * /user/installations only means the user can reach one of its repositories.
+ */
+export const listUserInstallationRepos = async (
+  userToken: string,
+  installationId: string,
+): Promise<{ repos: UserInstallationRepo[]; truncated: boolean }> => {
+  const repos: UserInstallationRepo[] = [];
+  let truncated = false;
+  for (let page = 1; page <= USER_REPO_PAGES; page += 1) {
+    const response = await fetch(
+      `${GITHUB_API_BASE}/user/installations/${encodeURIComponent(installationId)}/repositories?per_page=100&page=${page}`,
+      { headers: headers(`Bearer ${userToken}`), signal: AbortSignal.timeout(10_000) },
+    );
+    if (!response.ok) {
+      throw new GithubError(await errorText(response, "GitHub wouldn't list the repositories you can reach."));
+    }
+    const batch =
+      ((await response.json()) as {
+        repositories?: Array<{
+          full_name?: string;
+          private?: boolean;
+          default_branch?: string;
+          permissions?: Partial<Record<string, boolean>>;
+        }>;
+      }).repositories ?? [];
+    for (const repo of batch) {
+      const permission = userPermission(repo.permissions);
+      if (!repo.full_name || !permission) continue;
+      repos.push({
+        fullName: repo.full_name.slice(0, 200),
+        private: repo.private === true,
+        defaultBranch: (repo.default_branch ?? "").slice(0, 255),
+        permission,
+      });
+    }
+    if (batch.length < 100) break;
+    if (page === USER_REPO_PAGES) truncated = true;
+  }
+  return { repos, truncated };
+};
+
+export const userRepoPermission = (
+  repos: readonly UserInstallationRepo[] | null,
+  fullName: string,
+): UserRepoPermission | null =>
+  repos?.find((repo) => repo.fullName.toLowerCase() === fullName.toLowerCase())?.permission ?? null;
+
+export const parseUserRepos = (raw: string | null): UserInstallationRepo[] | null => {
+  if (raw === null) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (repo): repo is UserInstallationRepo =>
+        typeof repo?.fullName === "string" && (repo.permission === "read" || repo.permission === "write"),
+    );
+  } catch {
+    return null;
+  }
 };
 
 /**

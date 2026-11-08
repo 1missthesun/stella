@@ -3,6 +3,13 @@ import { sandboxLifecycleId } from "./sandbox-lifecycle.js";
 
 export const WORLD_ROOT = "/workspace/world";
 
+export const TOOL_UID = 42424;
+
+export const AS_TOOL_USER = `/usr/bin/setpriv --reuid=${TOOL_UID} --regid=${TOOL_UID} --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all --`;
+
+/** Prefix for a root shell command that must act on a tree the tool uid owns. */
+export const IN_TOOL_TREE = `/usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/workspace/.stella-tool-home LANG=C.UTF-8 ${AS_TOOL_USER}`;
+
 /**
  * Scratch root for the legacy app-build turn. Outside the world on purpose:
  * an app build is rebuilt from its sources every time and is never restored.

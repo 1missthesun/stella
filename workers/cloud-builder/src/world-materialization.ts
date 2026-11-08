@@ -1,5 +1,6 @@
 import { dependencyAdoptionLines } from "./sandbox-dependencies.js";
-import { WORLD_ROOT } from "./workspace.js";
+import { worldSyncMarkerPath } from "@stella/contracts/cloud-tool-home";
+import { IN_TOOL_TREE, WORLD_ROOT } from "./workspace.js";
 
 const shellQuote = (value: string): string => {
   if (value.includes("\0")) throw new TypeError("Shell value contains NUL.");
@@ -14,11 +15,12 @@ export const worldMaterializationCommand = (args: {
   if (!args.worldRoot.startsWith("/")) {
     throw new TypeError("World materialization target must be exact.");
   }
-  const marker = `${args.worldRoot}/.stella/world-manifest`;
+  const marker = worldSyncMarkerPath(args.worldRoot);
   const index = `${args.worldRoot.slice(0, args.worldRoot.lastIndexOf("/"))}/.stella-world-index.json`;
   return [
     "set -euo pipefail",
     "umask 077",
+    "cd /",
     "exec 9>/workspace/.world-materialize.lock",
     "/usr/bin/flock --exclusive 9",
     `root=${shellQuote(args.worldRoot)}`,
@@ -26,17 +28,16 @@ export const worldMaterializationCommand = (args: {
     'if [ ! -f "$marker" ]; then',
     "headers=/workspace/.world-export-headers",
     "trap 'rm -f -- \"$headers\"' EXIT",
-    `find ${shellQuote(args.worldRoot)} -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`,
-    `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | tar -x -f - -C ${shellQuote(args.worldRoot)}`,
+    `in_world_root() { ${IN_TOOL_TREE} /usr/bin/find "$root" -mindepth 1 -maxdepth 1 -exec "$@" -- {} +; }`,
+    "in_world_root rm -rf || { in_world_root chmod -R u+rwX && in_world_root rm -rf; }",
+    `rm -f -- ${shellQuote(index)}`,
+    `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | ${IN_TOOL_TREE} /usr/bin/tar -x -f - -C "$root" --no-same-owner --preserve-permissions`,
     `manifest="$(tr -d '\\r' <"$headers" | awk 'tolower($0) ~ /^x-stella-world-manifest:/ { sub(/^[^:]*: */, ""); print }' | tail -1)"`,
     'case "$manifest" in ""|*[!A-Za-z0-9:_-]*) { echo "The world export named no manifest."; } >&2; exit 1;; esac',
     `revision="$(tr -d '\\r' <"$headers" | awk -F': *' 'tolower($1) == "x-stella-world-revision" { print $2 }' | tail -1)"`,
     'case "$revision" in ""|*[!0-9]*) { echo "The world export named no revision. Its response headers:"; cut -d: -f1 "$headers"; } >&2; exit 1;; esac',
-    `mkdir -p ${shellQuote(`${args.worldRoot}/.stella`)}`,
-    `printf '{"manifestId":"%s","revision":%s}\\n' "$manifest" "$revision" > "$marker"`,
-    `chown -R 42424:42424 ${shellQuote(args.worldRoot)}`,
-    'chown 0:0 "$marker"',
-    'chmod 0600 "$marker"',
+    `printf '{"manifestId":"%s","revision":%s}\\n' "$manifest" "$revision" > "$marker.tmp"`,
+    'mv -f -- "$marker.tmp" "$marker"',
     ...(args.worldRoot === WORLD_ROOT ? dependencyAdoptionLines(index) : []),
     "fi",
   ].join("\n");

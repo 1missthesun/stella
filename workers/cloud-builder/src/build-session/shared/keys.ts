@@ -9,7 +9,7 @@ import { HEADER_OWNER } from "../../conversation-types.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../../hash.js";
 import { builderServiceSecret, builderServiceSecrets } from "../../secret-rotation.js";
-import { APP_BUILD_ROOT, WORLD_ROOT } from "../../workspace.js";
+import { APP_BUILD_ROOT, IN_TOOL_TREE, WORLD_ROOT } from "../../workspace.js";
 import type { OwnerGateRefusalCode } from "../../owner-gate.js";
 import { AgentTurnAuthorityLostError } from "./errors.js";
 import type { Env } from "./env.js";
@@ -355,9 +355,9 @@ export const normalizeToolWorkspaceRoot = async (
     `test "$(stat -c '%u:%g:%a' '${workspaceRoot}')" = 42424:42424:750`,
     ...(workspaceRoot !== APP_BUILD_ROOT
       ? [
-          `if [ -e '${workspaceRoot}/drive' ] || [ -L '${workspaceRoot}/drive' ]; then test -d '${workspaceRoot}/drive' && test ! -L '${workspaceRoot}/drive'; else mkdir -m 0750 '${workspaceRoot}/drive'; fi`,
-          `chown 42424:42424 '${workspaceRoot}/drive'`,
-          `chmod 0750 '${workspaceRoot}/drive'`,
+          `if [ -e '${workspaceRoot}/drive' ] || [ -L '${workspaceRoot}/drive' ]; then test -d '${workspaceRoot}/drive' && test ! -L '${workspaceRoot}/drive'; else ${IN_TOOL_TREE} mkdir -m 0750 '${workspaceRoot}/drive'; fi`,
+          `chown -h 42424:42424 '${workspaceRoot}/drive'`,
+          `${IN_TOOL_TREE} chmod 0750 '${workspaceRoot}/drive'`,
           `test "$(readlink -f '${workspaceRoot}/drive')" = '${workspaceRoot}/drive'`,
           `test "$(stat -c '%u:%g:%a' '${workspaceRoot}/drive')" = 42424:42424:750`,
         ]

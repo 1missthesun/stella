@@ -586,6 +586,7 @@ const buildOptions = (env: AuthEnv) => {
         backendUrl: authUrl(env),
         websiteUrl: websiteUrl(env),
         cipherKey: betterAuthCipherKey(authKeys),
+        browserClientOrigins: browserClientOrigins(env),
         api,
       }),
     ],

@@ -6,9 +6,12 @@
  *   GET  /link/status             {status: pending | completed | expired}
  *   POST /link/claim              {requestId, claimSecret} → {token}, once
  *   GET  /link/verify             magic-link landing; the one-time token
- *                                 arrives in a short-lived HttpOnly cookie
+ *                                 arrives in a short-lived HttpOnly cookie,
+ *                                 and the page asks the person to confirm
+ *   POST /link/verify             the confirmation; releases the session
  *   POST /desktop-social/start    {claimHash} → {requestId, callbackURL, url?}
- *   GET  /desktop-social/verify   social landing; same cookie
+ *   GET  /desktop-social/verify   social landing; same cookie and confirmation
+ *   POST /desktop-social/verify   the confirmation; releases the session
  *   POST /browser-social/start    {returnTo} → {callbackURL, url?}
  *   GET  /browser-social/verify   social landing; the token moves into a fragment
  *   POST /integrity/challenge     {purpose} → {nonce, expiresAt}
@@ -16,7 +19,10 @@
  * The app never sees a session credential in a URL: it sends SHA-256 of a
  * claim secret, the server exchanges the one-time token for the session token
  * and stores it encrypted under BETTER_AUTH_SECRET, and only the holder of the
- * secret can claim it.
+ * secret can claim it. Anyone can start a handoff for any email or claim
+ * hash, so the browser that finishes it must confirm with a click (a
+ * same-origin POST; the SameSite=Lax cookie never rides a cross-site one)
+ * before the session reaches the app.
  *
  * The starts take no bearer. Older clients still send one (and
  * `requireAnonymousOwner`); both are ignored.
@@ -44,6 +50,7 @@ export type HandoffConfig = {
   backendUrl: string;
   websiteUrl: string;
   cipherKey: string | SecretConfig;
+  browserClientOrigins: readonly string[];
   api: () => HandoffApi;
 };
 
@@ -56,6 +63,7 @@ const CLAIM_HASH_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CLAIM_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{32,64}$/;
 const OTT_PATTERN = /^[A-Za-z0-9._~-]{8,2048}$/;
+const FORM_MEDIA_TYPE = "application/x-www-form-urlencoded";
 
 type LinkRow = {
   request_id: string;
@@ -90,6 +98,71 @@ const bridgeResponse = (status: number, location?: string): Response =>
       ...(location ? { location } : {}),
     },
   });
+
+const CONFIRM_COPY = {
+  desktop: {
+    title: "Finish signing in to Stella on your computer",
+    detail: "You started signing in from the Stella app on your computer. Only continue if you did that just now.",
+  },
+  app: {
+    title: "Finish signing in to the Stella app",
+    detail: "You started signing in from the Stella app on your computer or phone. Only continue if you did that just now.",
+  },
+} as const;
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+const confirmPage = (copy: { title: string; detail: string }, action: string, websiteUrl: string): Response =>
+  new Response(
+    `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(copy.title)}</title>
+<style>
+:root{color-scheme:light dark;--bg:#f2f4f8;--card:#fff;--ink:#161616;--muted:rgba(22,22,22,.6);--line:rgba(22,22,22,.08)}
+@media (prefers-color-scheme:dark){:root{--bg:#111214;--card:#1b1c1f;--ink:#f2f2f2;--muted:rgba(242,242,242,.62);--line:rgba(242,242,242,.1)}}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{box-sizing:border-box;width:min(440px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:12px;padding:36px 32px}
+h1{margin:0 0 8px;font-size:22px;line-height:1.2;letter-spacing:-.01em}
+p{margin:0 0 28px;color:var(--muted)}
+button{width:100%;padding:12px 16px;border:0;border-radius:999px;background:var(--ink);color:var(--bg);font:inherit;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+<h1>${escapeHtml(copy.title)}</h1>
+<p>${escapeHtml(copy.detail)}</p>
+<form method="post" action="${escapeHtml(action)}"><button type="submit">Continue</button></form>
+</main>
+</body>
+</html>`,
+    {
+      status: 200,
+      headers: {
+        ...noStore,
+        "content-type": "text/html; charset=utf-8",
+        "referrer-policy": "same-origin",
+        "content-security-policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${websiteUrl}; frame-ancestors 'none'; base-uri 'none'`,
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+      },
+    },
+  );
+
+const isSameOriginPost = (request: Request | undefined): boolean => {
+  if (!request || request.method !== "POST") return false;
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin") return false;
+  return request.headers.get("origin") === new URL(request.url).origin;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -139,7 +212,7 @@ export const stellaHandoff = (config: HandoffConfig) => {
     return config.env.DB;
   };
   const encrypt = (token: string) => symmetricEncrypt({ key: config.cipherKey, data: token });
-  const doneRedirect = () => bridgeResponse(302, `${config.websiteUrl}/auth/callback?done=true`);
+  const doneRedirect = (status = 302) => bridgeResponse(status, `${config.websiteUrl}/auth/callback?done=true`);
 
   const linkRow = (requestId: string) =>
     db().prepare("SELECT * FROM auth_link_requests WHERE request_id = ?").bind(requestId).first<LinkRow>();
@@ -177,6 +250,28 @@ export const stellaHandoff = (config: HandoffConfig) => {
       console.error("[auth] Server-side OTT verification failed");
       return { token: "", userId: "" };
     }
+  };
+
+  const releaseToApp = async (
+    ctx: { query?: Record<string, unknown>; headers?: Headers; request?: Request },
+    copy: { title: string; detail: string },
+    path: string,
+  ): Promise<Response> => {
+    const requestId = text(ctx.query?.requestId);
+    const ott = readOttCookie(ctx.headers);
+    const row = REQUEST_ID_PATTERN.test(requestId) ? await linkRow(requestId) : null;
+    const pending = Boolean(row && row.status === "pending" && row.expires_at > Date.now() && ott);
+    if (ctx.request?.method !== "POST") {
+      if (!pending) return withClearedOttCookie(doneRedirect());
+      const action = `${config.backendUrl}/api/auth${path}?requestId=${encodeURIComponent(requestId)}`;
+      return confirmPage(copy, action, config.websiteUrl);
+    }
+    if (!isSameOriginPost(ctx.request)) return bridgeResponse(403);
+    if (pending) {
+      const { token, userId } = await exchangeOtt(ott);
+      if (token && userId) await completeLinkRequest(requestId, token, userId);
+    }
+    return withClearedOttCookie(doneRedirect(303));
   };
 
   return {
@@ -255,15 +350,11 @@ export const stellaHandoff = (config: HandoffConfig) => {
         }
       }),
 
-      linkVerify: createAuthEndpoint("/link/verify", { method: "GET" }, async (ctx) => {
-        const requestId = text(ctx.query?.requestId);
-        const ott = readOttCookie(ctx.headers);
-        if (requestId && ott) {
-          const { token, userId } = await exchangeOtt(ott);
-          if (token && userId) await completeLinkRequest(requestId, token, userId);
-        }
-        return withClearedOttCookie(doneRedirect());
-      }),
+      linkVerify: createAuthEndpoint(
+        "/link/verify",
+        { method: ["GET", "POST"], metadata: { allowedMediaTypes: [FORM_MEDIA_TYPE] } },
+        async (ctx) => releaseToApp(ctx, CONFIRM_COPY.app, "/link/verify"),
+      ),
 
       desktopSocialStart: createAuthEndpoint("/desktop-social/start", { method: "POST" }, async (ctx) => {
         const body = isRecord(ctx.body) ? ctx.body : null;
@@ -276,21 +367,17 @@ export const stellaHandoff = (config: HandoffConfig) => {
         return reply({ requestId, callbackURL });
       }),
 
-      desktopSocialVerify: createAuthEndpoint("/desktop-social/verify", { method: "GET" }, async (ctx) => {
-        const requestId = text(ctx.query?.requestId);
-        const ott = readOttCookie(ctx.headers);
-        const row = REQUEST_ID_PATTERN.test(requestId) ? await linkRow(requestId) : null;
-        if (row && row.status === "pending" && row.expires_at > Date.now() && ott) {
-          const { token, userId } = await exchangeOtt(ott);
-          if (token && userId) await completeLinkRequest(requestId, token, userId);
-        }
-        return withClearedOttCookie(doneRedirect());
-      }),
+      desktopSocialVerify: createAuthEndpoint(
+        "/desktop-social/verify",
+        { method: ["GET", "POST"], metadata: { allowedMediaTypes: [FORM_MEDIA_TYPE] } },
+        async (ctx) => releaseToApp(ctx, CONFIRM_COPY.desktop, "/desktop-social/verify"),
+      ),
 
       browserSocialStart: createAuthEndpoint("/browser-social/start", { method: "POST" }, async (ctx) => {
         const origin = ctx.headers?.get("origin") ?? "";
         const body = isRecord(ctx.body) ? ctx.body : null;
         if (!body) return fail(400, "Invalid JSON body");
+        if (!config.browserClientOrigins.includes(origin)) return fail(400, "Invalid browser auth return target.");
         const returnTo = normalizeReturnTarget(text(body.returnTo), origin);
         if (!returnTo) return fail(400, "Invalid browser auth return target.");
         const requestId = crypto.randomUUID();

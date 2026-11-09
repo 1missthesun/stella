@@ -54,6 +54,7 @@ import {
   deviceRefusal,
   deviceStanding,
   movedAgentBrief,
+  offlineMoveRefusal,
   type AgentMove,
   type StellaExecutionHost,
 } from "@stella/agent/stella/execution";
@@ -1349,7 +1350,7 @@ export class PiConversationRuntime {
         }
         const name = device.label?.trim() || device.deviceId;
         if (!device.online) {
-          return { error: `${name} is offline, so you can't move there now. Carry on here, or tell Stella with send_message to "stella" if the work needs that computer.` };
+          return { error: offlineMoveRefusal(device, name, 'Carry on here, or tell Stella with send_message to "stella" if the work needs that computer.') };
         }
         const refusal = deviceRefusal(device, name);
         if (refusal) return { error: refusal };
@@ -1366,7 +1367,7 @@ export class PiConversationRuntime {
         const listed = await this.#gate(authority)
           .devices()
           .catch(() => undefined);
-        const device = listed?.devices.find((entry) => entry.deviceId === deviceId);
+        const device = listed ? findDeviceDestination(listed.devices, deviceId) : undefined;
         return device ? deviceStanding(device) : undefined;
       },
       ...(this.#options.moveBrain

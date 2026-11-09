@@ -1,6 +1,13 @@
 import type { Context } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ConversationId, type ToolExecutionApi } from "@earendil-works/pi-durable";
+import {
+  DEVICE_OFFLINE_POLL_MS,
+  DEVICE_OFFLINE_REASON,
+  DEVICE_OFFLINE_RETRY_MS,
+  deviceOfflineText,
+  isDeviceOfflineError,
+} from "@stella/contracts/device-offline";
 import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { StellaAgentDoc } from "./agent-doc.ts";
 import { describePlacement, parseSpawnDestination, samePlacement, type StellaPlacement } from "./placement.ts";
@@ -54,9 +61,62 @@ export const deviceStanding = (device: DeviceDestination): DeviceStanding => ({
   ...(device.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}),
 });
 
+const pause = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", stop);
+      resolve();
+    }, ms);
+    const stop = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    signal?.addEventListener("abort", stop, { once: true });
+  });
+
+const RETRIED_NOTE = `Checked again for ${DEVICE_OFFLINE_RETRY_MS / 1000} seconds.`;
+
+/** Retries an attempt the backend refused because its computer is offline, for a few seconds, then throws that refusal. */
+export const whileDeviceOffline = async <T>(attempt: () => Promise<T>, signal?: AbortSignal): Promise<T> => {
+  const deadline = Date.now() + DEVICE_OFFLINE_RETRY_MS;
+  for (;;) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (!isDeviceOfflineError(error)) throw error;
+      if (Date.now() >= deadline) {
+        throw Object.assign(new Error(`${(error as Error).message} ${RETRIED_NOTE}`), { reason: DEVICE_OFFLINE_REASON });
+      }
+      await pause(DEVICE_OFFLINE_POLL_MS, signal);
+    }
+  }
+};
+
+/** Waits a few seconds for an offline computer to come back; the standing it ends on. */
+export const untilOnline = async (
+  standing: ((deviceId: string, context: Context) => Promise<DeviceStanding | undefined>) | undefined,
+  deviceId: string,
+  context: Context,
+): Promise<DeviceStanding | undefined> => {
+  if (!standing) return undefined;
+  const deadline = Date.now() + DEVICE_OFFLINE_RETRY_MS;
+  for (;;) {
+    const current = await standing(deviceId, context).catch(() => undefined);
+    if (!current || current.online || Date.now() >= deadline) return current;
+    await pause(DEVICE_OFFLINE_POLL_MS, context.abortSignal);
+  }
+};
+
+export const offlineMoveRefusal = (device: Pick<DeviceDestination, "deviceId" | "lastSeenAt">, name: string, stay: string): string =>
+  deviceOfflineText(
+    { name, deviceId: device.deviceId, ...(device.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}) },
+    `You can't move there now, and nothing moved. ${stay}`,
+  );
+
 export const deviceRefusal = (device: DeviceDestination, name: string): string | undefined => {
   if (!device.online) {
-    return `${name} is offline, so you can't move there now. Tell the user, or start an agent there with spawn_agent if the work can wait for it to come back.`;
+    return offlineMoveRefusal(device, name, "You still run where you are.");
   }
   switch (device.remoteExecution) {
     case "enabled":
@@ -125,6 +185,7 @@ export const switchDestinationTool = (
       }
       const brief = args.prompt?.trim();
       if (!brief) throw new Error("Pass your brief as prompt: what you will do there, as you will read it there.");
+      if (target.kind === "device") await untilOnline(host.standing, target.deviceId, context);
       const moved = await moveBrain(target, brief, context);
       if ("error" in moved) throw new Error(moved.error);
       return {

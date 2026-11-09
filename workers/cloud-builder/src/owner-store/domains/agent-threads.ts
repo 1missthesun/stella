@@ -39,6 +39,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
+import { DEVICE_OFFLINE_REASON, deviceOfflineText } from "@stella/contracts/device-offline";
 import {
   findDeviceDestination,
   SELECTED_DEVICE_NEEDS_CONSENT,
@@ -598,10 +599,31 @@ const recordSteered = (
   );
 };
 
+const offlineRefusal = (device: DeviceDestination, outcome: string): RpcError =>
+  new RpcError(
+    "CONFLICT",
+    deviceOfflineText(
+      {
+        name: device.label?.trim() || device.deviceId,
+        deviceId: device.deviceId,
+        ...(device.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}),
+      },
+      outcome,
+    ),
+    { reason: DEVICE_OFFLINE_REASON },
+  );
+
+const assertDeviceOnline = async (ctx: OwnerContext, deviceId: string, outcome: string): Promise<void> => {
+  const devices = await ctx.host.deviceDestinations().catch(() => undefined);
+  const device = devices?.find((candidate) => candidate.deviceId === deviceId);
+  if (device && !device.online) throw offlineRefusal(device, outcome);
+};
+
 const assertDeviceDestination = async (
   ctx: OwnerContext,
   targetDeviceId: string,
   requestingDeviceId?: string,
+  options?: { refuseOffline?: true },
 ): Promise<{ deviceId: string; waiting: boolean }> => {
   const device = findDeviceDestination(await ctx.host.deviceDestinations(), targetDeviceId);
   if (!device) {
@@ -619,6 +641,7 @@ const assertDeviceDestination = async (
     );
   }
   const name = device.label || device.deviceId;
+  if (options?.refuseOffline && !device.online) throw offlineRefusal(device, "Nothing was started or queued.");
   if (device.remoteExecution === "declined") {
     throw new RpcError("CONFLICT", `${name} is set not to accept work from other devices.`, {
       reason: "device_remote_execution_declined",
@@ -868,7 +891,7 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
     { count: 30, windowMs: 10 * 60_000 },
     "Too many agents started at once. Wait a moment and try again.",
   );
-  const destination = await assertDeviceDestination(ctx, args.targetDeviceId);
+  const destination = await assertDeviceDestination(ctx, args.targetDeviceId, undefined, { refuseOffline: true });
   const raced = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
   if (raced) return raced;
   const threadId = newAgentThreadId();
@@ -968,6 +991,7 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
     source: `cloud:${args.conversationId}`,
     detail: { requester: args.conversationId, controlRequestId: args.controlRequestId },
     next: { clientMsgId: args.controlRequestId, fingerprint },
+    refuseOffline: true,
   });
   return {
     ...control(readThread(ctx.db, thread.thread_id)!),
@@ -1231,7 +1255,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
     "Too many cloud agents started at once. Wait a moment and try again.",
   );
   const destination = args.targetDeviceId?.trim()
-    ? await assertDeviceDestination(ctx, args.targetDeviceId.trim(), args.originDeviceId)
+    ? await assertDeviceDestination(ctx, args.targetDeviceId.trim(), args.originDeviceId, { refuseOffline: true })
     : null;
   const targetDeviceId = destination?.deviceId ?? null;
   const lookupConversationId = args.conversationId ?? readMainConversationId(ctx.db);
@@ -1413,7 +1437,7 @@ const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffRe
     }
     const name = device.label?.trim() || device.deviceId;
     if (!device.online) {
-      throw new RpcError("CONFLICT", `${name} is offline, so the agent can't move there now.`, { reason: "device_offline" });
+      throw offlineRefusal(device, "The agent can't move there now, and nothing moved.");
     }
     if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) {
       throw new RpcError("CONFLICT", `${name} doesn't take work from other devices.`, {
@@ -1541,7 +1565,7 @@ const agentDirectory = async (
       status,
       where: deviceId ? (device?.label?.trim() || "another computer") : "cloud",
       updatedAt: row.updated_at,
-      ...(live && deviceId && devices.size > 0 && !device?.online
+      ...(deviceId && devices.size > 0 && !device?.online
         ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
         : {}),
       ...(live && device?.online && device.remoteExecution !== "enabled" ? { awaitingConsent: true as const } : {}),
@@ -1622,6 +1646,7 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
       ...(args.framed ? { framed: true } : {}),
       kind: "message",
       source: `${ctx.caller ? "client" : "cloud"}:${args.from.threadId}`,
+      refuseOffline: true,
     }),
   );
   ctx.db.run(
@@ -1702,6 +1727,7 @@ const deliverAgentMessage = async (
     framed?: boolean;
     kind: "message" | "resume";
     source: string;
+    refuseOffline?: true;
   },
 ): Promise<AgentControlResult> => {
   const framed = (starter?: boolean) =>
@@ -1742,6 +1768,7 @@ const deliverAgentMessage = async (
       source: args.source,
       detail: { from: args.from.threadId },
       next: { clientMsgId: args.commandId, fingerprint: "agent-message" },
+      ...(args.refuseOffline ? { refuseOffline: true as const } : {}),
     })
   ).result;
 };
@@ -1804,6 +1831,8 @@ type ControlInput = {
   source: string;
   detail?: Record<string, unknown>;
   next?: NextAttempt;
+  /** Refuse a message to a thread whose computer is offline instead of holding it for that computer. */
+  refuseOffline?: true;
 };
 
 type Routed =
@@ -1820,6 +1849,9 @@ const controlAgent = async (
   }
   const executor = threadExecutor(input.thread);
   const deviceId = executorDevice(ctx, executor);
+  if (input.refuseOffline && input.kind !== "stop" && deviceId) {
+    await assertDeviceOnline(ctx, deviceId, "Nothing was sent or queued.");
+  }
   if (prior) {
     ctx.db.run(
       "UPDATE agent_commands SET state = 'pending', attempts = attempts + 1, updated_at = ? WHERE command_id = ?",

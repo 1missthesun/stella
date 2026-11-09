@@ -6,7 +6,7 @@ import {
   type DeviceDestination,
   type DevicesResponse,
 } from "@stella/contracts/turn-plane/placement";
-import { AGENT_MOVE_CLOUD, deviceRefusal, deviceStanding, type StellaExecutionHost } from "../stella/execution.ts";
+import { AGENT_MOVE_CLOUD, deviceRefusal, deviceStanding, offlineMoveRefusal, type StellaExecutionHost } from "../stella/execution.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 
 const LIST_TIMEOUT_MS = 15_000;
@@ -96,7 +96,7 @@ export function desktopExecution(options: {
     const name = device.label?.trim() || device.deviceId;
     if (device.deviceId === options.deviceId) return { deviceId: device.deviceId, name, here: true };
     if (!device.online) {
-      return { error: `${name} is offline, so you can't move there now. Carry on here, or tell Stella with send_message to "stella" if the work needs that computer.` };
+      return { error: offlineMoveRefusal(device, name, 'Carry on here, or tell Stella with send_message to "stella" if the work needs that computer.') };
     }
     const refusal = deviceRefusal(device, name);
     if (refusal) return { error: refusal };
@@ -111,7 +111,7 @@ export function desktopExecution(options: {
   const host: StellaExecutionHost = {
     standing: async (deviceId) => {
       const listed = await options.devices?.devices().catch(() => undefined);
-      const device = listed?.find((entry) => entry.deviceId === deviceId);
+      const device = listed ? findDeviceDestination(listed, deviceId) : undefined;
       return device ? deviceStanding(device) : undefined;
     },
     ...(options.moveAgent && options.devices && !options.localOnly

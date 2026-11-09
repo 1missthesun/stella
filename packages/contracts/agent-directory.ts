@@ -85,7 +85,9 @@ const lastSeen = (lastSeenAt: number | undefined, now: number) =>
 
 const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefined =>
   row.offline
-    ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects`
+    ? isLive(row.status)
+      ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects. Messages to it are refused until then`
+      : `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}; messages to it are refused until ${row.where} reconnects`
     : undefined;
 
 const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>

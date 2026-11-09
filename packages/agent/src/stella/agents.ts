@@ -45,11 +45,20 @@ import {
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
+import { isDeviceOfflineError } from "@stella/contracts/device-offline";
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
-import { AGENT_MOVE_CLOUD, switchDestinationTool, type AgentSwitch, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
+import {
+  AGENT_MOVE_CLOUD,
+  switchDestinationTool,
+  untilOnline,
+  whileDeviceOffline,
+  type AgentSwitch,
+  type DeviceStanding,
+  type StellaExecutionHost,
+} from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
 import {
   describePlacement,
@@ -659,9 +668,19 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (current?.moved) {
           const remote = remoteHostOf(current);
           const text = [...carried, message].join("\n\n");
-          if (remote) await remote.message({ key: `moved:${reporter.id}`, threadId, message: text, framed: true }, context);
-          else await host.directory?.message({ key: `moved:${reporter.id}`, to: threadId, text, from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" } }, context);
-          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), context);
+          const offline = await (async () => {
+            if (remote) await remote.message({ key: `moved:${reporter.id}`, threadId, message: text, framed: true }, context);
+            else await host.directory?.message({ key: `moved:${reporter.id}`, to: threadId, text, from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" } }, context);
+            return false;
+          })().catch((error: unknown) => {
+            if (isDeviceOfflineError(error)) return true;
+            throw error;
+          });
+          await runtime.commit(async (tx) => {
+            const agent = offline ? (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId] : undefined;
+            if (agent) agent.held = [...(agent.held ?? []), ...carried, message];
+            return { status: "terminal", outcome: { status: "completed", result: null } };
+          }, context);
           return;
         }
         const self = await roleOf(runtime, runtime.conversationId, context);
@@ -1108,7 +1127,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       destination: Type.Optional(
         Type.String({
           description:
-            'Omit to run it where you run. Otherwise "cloud" or a device_id: the agent runs entirely there, with that machine\'s files, apps, browser, sign-ins and Claude Code; an offline computer gets it within an hour. Its reports still come to you.',
+            'Omit to run it where you run. Otherwise "cloud" or a device_id: the agent runs entirely there, with that machine\'s files, apps, browser, sign-ins and Claude Code. Its reports still come to you. An offline computer is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on.',
         }),
       ),
       directory: Type.Optional(
@@ -1173,16 +1192,20 @@ export function stellaAgents(host: StellaAgentsHost) {
         const prior = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.calls[callKey];
         const started = prior
           ? { threadId: prior.threadId }
-          : await remote.start(
-              {
-                key: `spawn:${callKey}`,
-                description,
-                prompt: args.prompt,
-                ...(requested ? { model: requested } : {}),
-                ...(!orchestrator && caller.threadId ? { parentThreadId: caller.threadId } : {}),
-                ...(args.workspace === "large" ? { workspace: "large" as const } : {}),
-              },
-              context,
+          : await whileDeviceOffline(
+              () =>
+                remote.start(
+                  {
+                    key: `spawn:${callKey}`,
+                    description,
+                    prompt: args.prompt,
+                    ...(requested ? { model: requested } : {}),
+                    ...(!orchestrator && caller.threadId ? { parentThreadId: caller.threadId } : {}),
+                    ...(args.workspace === "large" ? { workspace: "large" as const } : {}),
+                  },
+                  context,
+                ),
+              context.abortSignal,
             );
         const threadId = started.threadId;
         await api.commit(async (tx) => {
@@ -1208,7 +1231,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         const waitingFor =
           standing?.online && standing.remoteExecution && standing.remoteExecution !== "enabled"
             ? `${describePlacement(where)} is asking the user on its screen to allow work from other devices, so it starts once they allow it there, waiting up to an hour. Tell the user to answer that prompt on ${describePlacement(where)}.`
-            : `${describePlacement(where)} can't take it yet (offline, not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`;
+            : `${describePlacement(where)} can't take it yet (not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`;
         return {
           content: [
             {
@@ -1429,7 +1452,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers or stops it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion.',
+      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers or stops it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on.',
     parameters: Type.Object({
       thread_id: Type.String({ description: 'A thread_id from agent_status, or "stella".' }),
       message: Type.String({ description: "The message. To your own agent, only what is new." }),
@@ -1451,10 +1474,14 @@ export function stellaAgents(host: StellaAgentsHost) {
       );
       if (known?.remote) {
         if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
-        const delivery = await remote.message({ key: `message:${api.taskId}`, threadId, message: framed, framed: true }, context);
+        const delivery = await whileDeviceOffline(
+          () => remote.message({ key: `message:${api.taskId}`, threadId, message: framed, framed: true }, context),
+          context.abortSignal,
+        );
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
         return deliveredResult(delivery ?? { threadId });
       }
+      if (known.away) return await messageAway(api, api.conversationId, threadId, framed, `message:${api.taskId}`, context);
       const running = (await api.snapshot(LiveDoc, known.conversationId as ConversationId, context))?.run !== undefined;
       await api.commit(async (tx) => {
         const state = await tx.doc(StellaAgentsDoc, api.conversationId);
@@ -1515,6 +1542,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     context: Context,
   ): Promise<Record<string, unknown>> => {
     if (agent.remote) return {};
+    if (agent.away) return agent.held?.length ? { held_messages: agent.held.length } : {};
     const conversationId = agent.conversationId as ConversationId;
     const live = await api.snapshot(LiveDoc, conversationId, context);
     const running = live?.tools?.filter((tool) => tool.status === "running").map((tool) => tool.name) ?? [];
@@ -1588,7 +1616,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       ...(agent.parentThreadId ? { parentThreadId: agent.parentThreadId } : {}),
       description: record.description,
     };
-    if (record.remote) {
+    if (record.remote || record.away) {
       const there = ledger?.agents.find((entry) => entry.threadId === agent.threadId);
       if (there) {
         return {
@@ -1609,7 +1637,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         status,
         where: computer?.name ?? placed,
         updatedAt: record.startedAt ?? Date.now(),
-        ...(computer && !computer.online && isLiveAgentStatus(status)
+        ...(computer && !computer.online
           ? { offline: computer.lastSeenAt !== undefined ? { lastSeenAt: computer.lastSeenAt } : {} }
           : {}),
         ...(computer?.online && computer.remoteExecution && computer.remoteExecution !== "enabled" && isLiveAgentStatus(status)
@@ -1647,7 +1675,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     const conversationId = (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET;
     const tree = root === undefined ? [] : await agentTree(api, root, context);
     const threadIds = tree
-      .filter((agent) => agent.record.remote)
+      .filter((agent) => agent.record.remote || agent.record.away)
       .sort(
         (a, b) =>
           Number(remoteRunOf(a.record, a.given).phase === "settled") - Number(remoteRunOf(b.record, b.given).phase === "settled"),
@@ -1698,13 +1726,19 @@ export function stellaAgents(host: StellaAgentsHost) {
     }
     const from = senderOf(self, conversation ?? STELLA_MESSAGE_TARGET);
     const target = root === undefined ? undefined : (await agentTree(api, root, context)).find((agent) => agent.threadId === threadId);
-    if (target && !target.record.origin && (target.reports || target.record.remote)) {
+    if (target && !target.record.origin && (target.reports || target.record.remote || target.record.away)) {
       const text = formatAgentMessage(from, message);
       const key = `note:${api.taskId}`;
+      if (target.record.away && !target.record.remote) {
+        return await messageAway(api, target.parentConversationId, threadId, text, key, context);
+      }
       if (target.record.remote) {
         const remote = remoteHostOf(target.record);
         if (!remote) return await messageThroughLedger(api, threadId, message, conversation, context);
-        const delivery = await remote.message({ key, threadId, message: text, framed: true }, context);
+        const delivery = await whileDeviceOffline(
+          () => remote.message({ key, threadId, message: text, framed: true }, context),
+          context.abortSignal,
+        );
         await expectRemoteReport(api, target.parentConversationId, key, threadId, context);
         return deliveredResult(delivery ?? { threadId });
       }
@@ -1730,7 +1764,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         outcome: running ? "steered" : "resumed",
       });
     }
-    const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
+    const delivery = await whileDeviceOffline(
+      async () => await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context),
+      context.abortSignal,
+    );
     if (delivery) return deliveredResult(delivery);
     throw new Error(`No agent or Stella session has thread_id ${threadId}. agent_status without a thread_id lists who you can reach.`);
   };
@@ -1745,9 +1782,57 @@ export function stellaAgents(host: StellaAgentsHost) {
     assertMessageSize(message);
     const { self } = await chainOf(api, context);
     const from = senderOf(self, conversation ?? STELLA_MESSAGE_TARGET);
-    const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
+    const delivery = await whileDeviceOffline(
+      async () => await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context),
+      context.abortSignal,
+    );
     if (delivery) return deliveredResult(delivery);
     throw new Error(`${threadId} runs where this conversation cannot reach it now.`);
+  };
+
+  const messageAway = async (
+    api: ToolExecutionApi,
+    home: ConversationId,
+    threadId: string,
+    framed: string,
+    key: string,
+    context: Context,
+  ) => {
+    const callKey = String(api.taskId);
+    const before = await api.snapshot(StellaAgentsDoc, home, context);
+    if (before?.calls[callKey]) return deliveredResult({ threadId });
+    const record = before?.agents[threadId];
+    if (!record) throw new Error(`No agent ${threadId} here. agent_status lists the ones you started.`);
+    const held = record.held ?? [];
+    const text = [...held, framed].join("\n\n");
+    const remote = remoteHostOf(record);
+    const delivery = await whileDeviceOffline(
+      async () =>
+        remote
+          ? await remote.message({ key: `moved:${key}`, threadId, message: text, framed: true }, context)
+          : await host.directory?.message(
+              { key: `moved:${key}`, to: threadId, text, from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" } },
+              context,
+            ),
+      context.abortSignal,
+    );
+    if (!remote && !delivery) throw new Error(`${threadId} runs where this conversation cannot reach it now.`);
+    await api.commit(async (tx) => {
+      const state = await tx.doc(StellaAgentsDoc, home);
+      if (state.calls[callKey]) return;
+      const agent = state.agents[threadId];
+      if (agent?.held && held.length > 0) {
+        const rest = agent.held.slice(held.length);
+        if (rest.length > 0) agent.held = rest;
+        else delete agent.held;
+      }
+      if (agent) {
+        delete agent.stopped;
+        delete agent.paused;
+      }
+      state.calls[callKey] = { threadId, reporter: -1 };
+    }, context);
+    return deliveredResult(delivery ?? { threadId });
   };
 
   const agentStatus = defineTool({
@@ -1789,7 +1874,8 @@ export function stellaAgents(host: StellaAgentsHost) {
             }
           : undefined);
       if (found) {
-        const listed = found.record.remote
+        const listed =
+          found.record.remote || found.record.away
           ? await host.directory?.list(context, { threadIds: [threadId] }).catch(() => undefined)
           : undefined;
         const ledger: DirectoryLedger | undefined = listed;
@@ -2283,6 +2369,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           if (current) {
             current.moved = true;
             current.away = true;
+            current.placement = move.deviceId === AGENT_MOVE_CLOUD ? { kind: "cloud" } : { kind: "device", deviceId: move.deviceId };
           }
           return undefined;
         }, context);
@@ -2380,6 +2467,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     const brief = args.prompt?.trim();
     if (!brief) throw new Error("Pass your brief as prompt: what you will do there next, as you will read it there.");
     const agent = await api.snapshot(AgentDoc, api.conversationId, context);
+    if (where !== AGENT_MOVE_CLOUD) await untilOnline(execution?.standing, where, context);
     const target = await agentTarget(where, { claudeCode: onClaudeCode(agent?.model) }, context);
     if ("error" in target) throw new Error(target.error);
     if (target.here) return { content: [{ type: "text", text: `You already run on ${target.name}. Carry on here.` }] };

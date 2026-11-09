@@ -282,6 +282,20 @@ layers. A pruned cache or a different machine rebuilds them with new
 timestamps and a new digest, and every snapshot resets once (containers start
 from the image and the owner's dependency archive).
 
+Claude Code is the one tool turns do not run from the image. The image's pinned
+copy (`scripts/prepare-image.mjs`) is only what a container falls back to:
+moving that pin changes the image and resets every snapshot, and Claude Code
+ships almost daily. Turns run a native install that Claude Code's own
+installer keeps root-owned under `/opt/stella/claude-cli`
+(`packages/executor-cloud/src/claude-cli.ts`): `stella-executor --warm`
+installs it at container start and afterwards lets it check for a newer
+release at most twice a day, and snapshots carry it. A Claude Code turn on a
+container that has no copy yet waits for the install (up to a minute, about
+15 s in practice) rather than run a model alias on the old pin. The executor
+logs `claude_cli_refreshed`, `claude_cli_refresh_failed` or
+`claude_cli_image_fallback`; `cat /opt/stella/claude-cli/refresh.json` in a
+container shows its last check.
+
 Which code a container runs: `bunx wrangler tail --format json` shows
 `sandbox_container_started` with `source` (`snapshot` or `image`, plus
 `snapshotSkipped: "image_changed"` when the image moved), `codeBundle` (the

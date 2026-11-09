@@ -13,6 +13,7 @@ import { ConnectorConnectService } from "../services/connector-connect-service.j
 import { EngineAccountAccess } from "../services/engine-account-access.js";
 import { MemorySyncService } from "../services/memory-sync/memory-sync-service.js";
 import { ClaudeLocalAccounts } from "../services/claude-local-accounts.js";
+import { ClaudeCliUpdater } from "../services/claude-cli-updater.js";
 import { ExternalLinkService } from "../services/external-link-service.js";
 import { readConfiguredCanvasShareBaseUrl } from "../services/canvas-share-service.js";
 import { isCanvasShareUrl } from "@stella/contracts/canvas-share";
@@ -154,6 +155,8 @@ export const createBootstrapServices = (options) => {
             }
         },
     });
+    const claudeCliUpdater = new ClaudeCliUpdater(config.stellaDataDirPath);
+    claudeCliUpdater.start();
     const memorySync = new MemorySyncService({
         stellaDataDir: config.stellaDataDirPath,
         getBackendUrl: () => authService.getBackendUrl(),
@@ -228,6 +231,7 @@ export const createBootstrapServices = (options) => {
         connectorConnectService,
         engineAccountAccess,
         claudeLocalAccounts,
+        claudeCliUpdater,
         memorySync,
         externalLinkService,
         localChatHistoryService,

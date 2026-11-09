@@ -64,6 +64,8 @@ The harness runs an isolated browser bridge by default, so the user's Chrome ext
 
 `--claude-login host` writes this computer's newest Claude Code access token (from `$CLAUDE_CONFIG_DIR`, `~/.claude`, or the macOS keychain) into the run's `provider-homes/claude/.credentials.json` with no refresh token, and reports `claudeLogin.status` from `claude auth status` in that directory. It refuses a token with under 30 minutes left (run any `claude` command to refresh it). `--claude-login token` writes `STELLA_VERIFY_CLAUDE_OAUTH_TOKEN` (environment or `.dev.vars`) instead. Cleanup deletes the file. On macOS the CLI may keep reading its keychain item for that config dir; trust `claudeLogin.status.loggedIn`, not the flag.
 
+Stella keeps Claude Code updated in the background (`claude update` shortly after start, then twice a day). A run turns that off (`STELLA_CLAUDE_CLI_UPDATES=off`), because it shares the host's `claude` but has its own home, where the updater would install a second copy. For a claim about updating, install an old copy into the run's home (`HOME=<homeDir> CLAUDE_CONFIG_DIR=<providerHomes.CLAUDE_CONFIG_DIR> claude install <version>`), then `session relaunch` with `STELLA_CLAUDE_CLI_PATH=<homeDir>/.local/bin/claude STELLA_CLAUDE_CLI_UPDATES=on`; the outcome lands in `<dataDir>/claude-cli-updates.json` and the process log (`claude-cli.update-*`). Never downgrade the host's own install.
+
 The optional `--model-gateway <origin>` overrides gateway discovery for a specific
 deployment; omit it to verify discovery from the signed-in catalog.
 

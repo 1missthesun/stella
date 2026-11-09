@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { execFile } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { promises as fs, realpathSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -84,45 +84,59 @@ export const listClaudeSessionFiles = async (
   ];
 };
 
-let cachedCliVersion: Promise<string> | null = null;
-
-export const claudeCliVersion = (): Promise<string> => {
-  cachedCliVersion ??= new Promise<string>((resolve) => {
-    let executable: string;
-    try {
-      executable = resolveExternalCliPath("claude");
-    } catch {
-      resolve("unknown");
-      return;
-    }
-    execFile(executable, ["--version"], { timeout: 15_000 }, (error, stdout) => {
-      const match = /\d+\.\d+\.\d+/.exec(String(stdout ?? ""));
-      resolve(!error && match ? match[0] : "unknown");
-    });
-  });
-  return cachedCliVersion;
+/**
+ * Which `claude` binary a new process would run right now. An update replaces
+ * the launcher's target (native installs) or the file itself (npm, package
+ * managers), so anything learned from the binary is keyed by this.
+ */
+export const claudeCliIdentity = (): string | null => {
+  try {
+    const realPath = realpathSync(resolveExternalCliPath("claude"));
+    const stat = statSync(realPath);
+    return `${realPath}:${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return null;
+  }
 };
 
-let cachedCliHelp: Promise<string> | null = null;
-
-export const claudeCliHasOption = async (option: string): Promise<boolean> => {
-  cachedCliHelp ??= new Promise<string>((resolve) => {
-    let executable: string;
-    try {
-      executable = resolveExternalCliPath("claude");
-    } catch {
-      resolve("");
-      return;
+const perCliBinary = <T>(read: (executable: string) => Promise<T>, missing: T) => {
+  let cached: { identity: string; value: Promise<T> } | null = null;
+  return (): Promise<T> => {
+    const identity = claudeCliIdentity();
+    if (!identity) return Promise.resolve(missing);
+    if (cached?.identity !== identity) {
+      cached = { identity, value: read(resolveExternalCliPath("claude")) };
     }
-    execFile(
-      executable,
-      ["--help"],
-      { timeout: 15_000, maxBuffer: 4 * 1024 * 1024 },
-      (error, stdout) => resolve(error ? "" : String(stdout ?? "")),
-    );
-  });
-  return (await cachedCliHelp).split(/[\s,]+/).includes(option);
+    return cached.value;
+  };
 };
+
+export const claudeCliVersion = perCliBinary<string>(
+  (executable) =>
+    new Promise((resolve) => {
+      execFile(executable, ["--version"], { timeout: 15_000 }, (error, stdout) => {
+        const match = /\d+\.\d+\.\d+/.exec(String(stdout ?? ""));
+        resolve(!error && match ? match[0] : "unknown");
+      });
+    }),
+  "unknown",
+);
+
+const claudeCliHelp = perCliBinary<string>(
+  (executable) =>
+    new Promise((resolve) => {
+      execFile(
+        executable,
+        ["--help"],
+        { timeout: 15_000, maxBuffer: 4 * 1024 * 1024 },
+        (error, stdout) => resolve(error ? "" : String(stdout ?? "")),
+      );
+    }),
+  "",
+);
+
+export const claudeCliHasOption = async (option: string): Promise<boolean> =>
+  (await claudeCliHelp()).split(/[\s,]+/).includes(option);
 
 export const compareClaudeCliVersions = (left: string, right: string): number => {
   const parse = (value: string) =>

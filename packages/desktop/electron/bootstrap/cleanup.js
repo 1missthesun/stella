@@ -45,6 +45,7 @@ export const registerBootstrapProcessCleanups = (context) => {
     });
     processRuntime.registerCleanup("before-quit", "engine-account-access", () => {
         context.services.claudeLocalAccounts.dispose();
+        context.services.claudeCliUpdater.dispose();
         context.services.engineAccountAccess.dispose();
     });
     processRuntime.registerCleanup("before-quit", "memory-sync", async () => {

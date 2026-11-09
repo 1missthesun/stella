@@ -37,7 +37,12 @@ export const sandboxCodeAssetPath = (sha256: string): string =>
 export const SANDBOX_CODE_INSTALL = "/opt/stella/bin/stella-code-install";
 export const SANDBOX_EXECUTOR = "/opt/stella/bin/stella-executor";
 
-export const SANDBOX_PAGE_CACHE_WARM_COMMAND = `setsid sh -c '${SANDBOX_EXECUTOR} --warm; cat "$(readlink -f "$(command -v claude)")" >/dev/null; claude --version' </dev/null >/dev/null 2>&1 &`;
+/**
+ * Runs detached at container start: loads the executor's modules and the
+ * Claude Code binary into the page cache, then lets Claude Code check for a
+ * newer release (`packages/executor-cloud/src/claude-cli.ts`).
+ */
+export const SANDBOX_PAGE_CACHE_WARM_COMMAND = `setsid ${SANDBOX_EXECUTOR} --warm </dev/null >/dev/null 2>&1 &`;
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 

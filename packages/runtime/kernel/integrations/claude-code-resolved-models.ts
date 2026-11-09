@@ -112,6 +112,29 @@ export const recordClaudeCodeResolvedModel = (
   });
 };
 
+/**
+ * An alias resolves inside the CLI, so what one version resolved it to says
+ * nothing about the next version.
+ */
+export const forgetClaudeCodeResolvedAliases = (
+  stellaAppDir: string,
+): Promise<void> => {
+  const filePath = resolvedModelsPath(stellaAppDir);
+  return withFileQueue(filePath, async () => {
+    try {
+      const current = Object.entries(readClaudeCodeResolvedModels(stellaAppDir));
+      const kept = current.filter(([key]) => !ALIAS_KEYS.has(key));
+      if (kept.length === current.length) return;
+      await writeFileAtomic(
+        filePath,
+        JSON.stringify(Object.fromEntries(kept), null, 2),
+      );
+    } catch {
+      // Best-effort: the next turn on each alias records its resolution again.
+    }
+  });
+};
+
 const CONTEXT_WINDOWS_FILE = "claude-code-context-windows.json";
 
 const contextWindowsPath = (stellaAppDir: string): string =>

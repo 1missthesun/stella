@@ -41,6 +41,7 @@ import {
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 import {
   claudeCliHasOption,
+  claudeCliIdentity,
   claudeSessionProjectDir,
   resolveClaudeWorkingFolder,
   stripClaudeThinkingFromSessionFile,
@@ -227,6 +228,7 @@ type ClaudeCodeProcessState = {
   compacting: boolean;
   compactionCount: number;
   launchConfig: string;
+  cliIdentity: string | null;
   claudeConfigDir: string | null;
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
   adrift?: {
@@ -2593,6 +2595,7 @@ class ClaudeCodeSessionRuntime {
     );
     const claudeConfig = await getClaudeCodeConfig();
     const claudeConfigDir = claudeConfig.configDir ?? null;
+    const cliIdentity = claudeCliIdentity();
     if (
       session.process &&
       !session.process.closed &&
@@ -2607,7 +2610,11 @@ class ClaudeCodeSessionRuntime {
     ) {
       if (
         session.process.launchConfig === launchConfig &&
-        session.process.claudeConfigDir === claudeConfigDir
+        session.process.claudeConfigDir === claudeConfigDir &&
+        (cliIdentity === null ||
+          session.process.cliIdentity === cliIdentity ||
+          (session.backgroundTasks ?? 0) > 0 ||
+          session.process.adrift !== undefined)
       ) {
         return session.process;
       }
@@ -2693,6 +2700,7 @@ class ClaudeCodeSessionRuntime {
       compactionCount: 0,
       launchConfig,
       claudeConfigDir,
+      cliIdentity,
     };
     session.process = processState;
     this.activeProcesses.set(request.sessionKey, child);

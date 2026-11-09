@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { markTurnStep } from "./turn-timing.js";
 import * as Effect from "effect/Effect";
 import {
@@ -50,6 +51,8 @@ import {
   isRejectedThinkingSignatureError,
   MAX_COMPACTIONS_PER_TURN,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
+import { resolveExternalCliPath } from "@stella/runtime/kernel/integrations/external-cli-resolution.js";
+import { prepareCloudClaudeCli } from "./claude-cli.js";
 import { CLOUD_HOST_STATE } from "./cloud-process-isolation.js";
 import { WORLD_ROOT } from "./workspace-paths.js";
 import {
@@ -769,6 +772,7 @@ export const runCloudClaude = async (options: {
       ? { autoCompactWindowTokens: profile.autoCompactWindowTokens }
       : {}),
   });
+  const claudeCommand = resolveExternalCliPath("claude");
   let keeper: ClaudeKeeperClient | undefined;
   if (options.keeper && inbox) {
     const env = stringEnv(childEnv);
@@ -776,6 +780,7 @@ export const runCloudClaude = async (options: {
       .update(
         JSON.stringify({
           threadId: options.keeper.threadId,
+          command: realpathSync(claudeCommand),
           account: options.claudeAccount,
           toolCatalogHash: options.keeper.toolCatalogHash,
           args: argsFor(CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER, false),
@@ -802,7 +807,7 @@ export const runCloudClaude = async (options: {
           authorization: options.mcpServerConfig.headers.Authorization,
         },
         spawn: {
-          command: "claude",
+          command: claudeCommand,
           args: argsFor(CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER, resume),
           env,
           cwd: profile.cwd,
@@ -1051,7 +1056,7 @@ export const runCloudClaude = async (options: {
                 },
               }
             : { input: options.inputPrompt }),
-          command: "claude",
+          command: claudeCommand,
           args,
           cwd: profile.cwd,
           env: childEnv,
@@ -1278,6 +1283,7 @@ export const runNativeAgentTurn = async (options: {
       "Native agent session state must remain outside the agent workspace.",
     );
   }
+  await prepareCloudClaudeCli();
   let inputPrompt = options.prompt;
   const adopted =
     !options.fresh && options.recoveryHistory === undefined && options.adoptedSession

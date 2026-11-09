@@ -265,24 +265,43 @@ export const safeguardCardLabel = (card: Pick<SafeguardCard, "state"> & { label?
  * outcomes of their turns, and the removal's own card. Returns `records`
  * itself when nothing was removed.
  */
-export const withoutSafeguardRemoved = <Record extends { seq: number; kind: string; card?: unknown }>(
-  records: readonly Record[],
-): readonly Record[] => {
-  const spans: Array<{ fromSeq: number; toSeq: number; cardSeq: number }> = [];
+type RemovedSpan = { fromSeq: number; toSeq: number; cardSeq: number };
+
+const removedSpans = (records: readonly { seq: number; kind: string; card?: unknown }[]): RemovedSpan[] => {
+  const spans: RemovedSpan[] = [];
   for (const record of records) {
     if (record.kind !== "card") continue;
     const card = parseSafeguardCard(record.card);
     if (card?.state === "removed") spans.push({ fromSeq: card.fromSeq, toSeq: card.toSeq, cardSeq: record.seq });
   }
+  return spans;
+};
+
+const inRemovedSpan = (spans: readonly RemovedSpan[], record: { seq: number; kind: string }): boolean =>
+  (record.kind === "message" || record.kind === "turn") &&
+  spans.some((span) => record.seq >= span.fromSeq && record.seq <= span.toSeq);
+
+export const withoutSafeguardRemoved = <Record extends { seq: number; kind: string; card?: unknown }>(
+  records: readonly Record[],
+): readonly Record[] => {
+  const spans = removedSpans(records);
   if (spans.length === 0) return records;
   return records.filter(
-    (record) =>
-      !spans.some(
-        (span) =>
-          record.seq === span.cardSeq ||
-          ((record.kind === "message" || record.kind === "turn") && record.seq >= span.fromSeq && record.seq <= span.toSeq),
-      ),
+    (record) => !spans.some((span) => record.seq === span.cardSeq) && !inRemovedSpan(spans, record),
   );
+};
+
+/** The client message ids of the prompts a removal took out, for a client that still holds its own copy of one. */
+export const safeguardRemovedClientMsgIds = (
+  records: readonly { seq: number; kind: string; card?: unknown; role?: string; clientMsgId?: string }[],
+): ReadonlySet<string> => {
+  const spans = removedSpans(records);
+  const ids = new Set<string>();
+  if (spans.length === 0) return ids;
+  for (const record of records) {
+    if (record.role === "user" && record.clientMsgId && inRemovedSpan(spans, record)) ids.add(record.clientMsgId);
+  }
+  return ids;
 };
 
 /** The failed turn's notice, for clients that only show a turn's text. */

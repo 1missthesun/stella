@@ -90,6 +90,7 @@ import {
   useClaudeUsageLimitNotice,
 } from "./claude-usage-limit-notice";
 import { useStellaUsageLimitNotice } from "./stella-usage-limit-notice";
+import { safeguardRemovedClientMsgIds } from "@stella/contracts/safeguard-block";
 import { useSafeguardNotice } from "./safeguard-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
@@ -686,11 +687,22 @@ export const useCloudCanonicalChatThread = (
     sentAnchorsRef.current = { store, anchors: new SentMessageAnchors() };
   }
   const sentAnchors = sentAnchorsRef.current.anchors;
+  const localMessages = useMemo(() => {
+    const removed = safeguardRemovedClientMsgIds(state.records);
+    if (removed.size === 0) return local.messages;
+    const gone = new Set<string>();
+    for (const [localId, dispatchId] of dispatchBindings) {
+      if (removed.has(localId) || (dispatchId && removed.has(dispatchId))) gone.add(localId);
+    }
+    return gone.size === 0
+      ? local.messages
+      : local.messages.filter((message) => !gone.has(message.id) && !(message.requestId && gone.has(message.requestId)));
+  }, [dispatchBindings, local.messages, state.records]);
   const mergedMessages = useMemo(
     () =>
       mergeCanonicalCloudMessages({
         canonical,
-        local: local.messages,
+        local: localMessages,
         dispatchBindings,
         acknowledgedDispatchIds,
         sentAnchors,
@@ -699,7 +711,7 @@ export const useCloudCanonicalChatThread = (
       acknowledgedDispatchIds,
       canonical,
       dispatchBindings,
-      local.messages,
+      localMessages,
       sentAnchors,
     ],
   );

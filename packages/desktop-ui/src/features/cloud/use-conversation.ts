@@ -1,3 +1,4 @@
+import { isSafeguardBlockText } from "@stella/contracts/safeguard-block";
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 
 import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
@@ -572,7 +573,11 @@ export const useConversation = (
         }
         if (settled.status === "terminal") {
           pendingPrompts.transition(sendAuthority, clientMsgId, { type: "settled" });
-          if (settled.dispatch.state === "canceled") {
+          if (
+            settled.dispatch.state === "canceled" ||
+            (settled.dispatch.state === "failed" &&
+              isSafeguardBlockText(settled.dispatch.errorMessage))
+          ) {
             pendingPrompts.drop(sendAuthority, clientMsgId);
           } else if (settled.dispatch.state === "failed") {
             pendingPrompts.transition(sendAuthority, clientMsgId, {

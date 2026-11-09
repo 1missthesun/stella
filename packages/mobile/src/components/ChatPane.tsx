@@ -1721,7 +1721,12 @@ export function ChatPane({
     () => (
       <View style={styles.chatTail}>
         <UsageLimitChatCard conversationId={conversationId} colors={colors} />
-        <SafeguardChatCard conversationId={conversationId} replying={streaming} colors={colors} />
+        <SafeguardChatCard
+          conversationId={conversationId}
+          replying={streaming}
+          colors={colors}
+          onGrew={scroll.scrollToBottom}
+        />
         <WorkingIndicator
           active={workingIndicator?.active ?? streaming}
           exitImmediately={workingIndicator?.exitImmediately}
@@ -1738,6 +1743,7 @@ export function ChatPane({
       workingIndicator,
       styles.chatTail,
       scroll.tailOffscreen,
+      scroll.scrollToBottom,
       landingReplyId,
       conversationId,
       colors,

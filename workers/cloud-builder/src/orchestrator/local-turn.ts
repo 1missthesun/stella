@@ -22,7 +22,7 @@ import {
   parseJournalCheckpointFirstKept,
 } from "@stella/contracts/journal-checkpoint";
 import { sha256Hex } from "../hash.js";
-import { HISTORY_SQL_MAX_BYTES, historySearchOptions, runHistoryQuery } from "../history-sql.js";
+import { HISTORY_SQL_MAX_BYTES, historySearchOptions, runHistoryQueryWithout } from "../history-sql.js";
 import {
   APPEND_WINDOW_MAX_BYTES,
   APPEND_WINDOW_MAX_REQUESTS,
@@ -341,7 +341,9 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       toSeq?: unknown;
       text?: unknown;
       options?: unknown;
+      forModel?: unknown;
     } | null;
+    const forModel = body?.forModel === true;
     if (body?.op === "search") {
       if (typeof body.text !== "string" || !body.text.trim()) {
         throw new Error("history.search requires the text to look for.");
@@ -360,7 +362,13 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           typeof value === "number",
       );
       await this.archive.reindexArchivedSearch();
-      return runHistoryQuery(this.ctx.storage, body.query, params, HISTORY_SQL_MAX_BYTES);
+      return runHistoryQueryWithout(
+        this.ctx.storage,
+        forModel ? this.journal.removedSpans() : [],
+        body.query,
+        params,
+        HISTORY_SQL_MAX_BYTES,
+      );
     }
     if (body?.op === "read") {
       if (
@@ -369,11 +377,12 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       ) {
         throw new Error("history.read requires integer fromSeq and toSeq.");
       }
-      return await this.archive.readRange(
+      const range = await this.archive.readRange(
         Math.max(0, body.fromSeq as number),
         body.toSeq as number,
         BACKFILL_BATCH_RECORDS,
       );
+      return forModel ? this.journal.withoutRemoved(range) : range;
     }
     if (body?.op === "usageLimitHolds") return { holds: this.usageLimitHolds() };
     throw new Error('history query op must be "search", "sql", "read" or "usageLimitHolds".');

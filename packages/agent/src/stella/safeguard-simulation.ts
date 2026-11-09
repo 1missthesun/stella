@@ -9,6 +9,28 @@ import type { Models } from "@earendil-works/pi-ai/models";
 import { SAFEGUARD_TEST_TRIGGER } from "@stella/contracts/safeguard-block";
 
 type StreamArgs = Parameters<Models["streamSimple"]>;
+type CompleteArgs = Parameters<Models["completeSimple"]>;
+type Blocked = Pick<AssistantMessage, "api" | "provider" | "model">;
+
+const blockOf = (model: { api: Blocked["api"]; provider: Blocked["provider"]; id: string }): AssistantMessage => ({
+  role: "assistant",
+  content: [],
+  api: model.api,
+  provider: model.provider,
+  model: model.id,
+  usage: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  },
+  stopReason: "error",
+  rawStopReason: "refusal",
+  errorMessage: "The model refused to complete the request",
+  timestamp: Date.now(),
+});
 
 const textOf = (message: Message): string =>
   typeof message.content === "string"
@@ -34,30 +56,18 @@ export const simulateSafeguardBlocks = (models: Models): Models =>
           const [model, context] = args;
           if (!triggers(context.messages, model.id)) return target.streamSimple(...args);
           const out = createAssistantMessageEventStream();
-          const error: AssistantMessage = {
-            role: "assistant",
-            content: [],
-            api: model.api,
-            provider: model.provider,
-            model: model.id,
-            usage: {
-              input: 0,
-              output: 0,
-              cacheRead: 0,
-              cacheWrite: 0,
-              totalTokens: 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-            },
-            stopReason: "error",
-            rawStopReason: "refusal",
-            errorMessage: "The model refused to complete the request",
-            timestamp: Date.now(),
-          };
+          const error = blockOf(model);
           queueMicrotask(() => {
             out.push({ type: "error", reason: "error", error });
             out.end(error);
           });
           return out;
+        };
+      }
+      if (key === "completeSimple") {
+        return async (...args: CompleteArgs) => {
+          const [model, context] = args;
+          return triggers(context.messages, model.id) ? blockOf(model) : await target.completeSimple(...args);
         };
       }
       const value = Reflect.get(target, key, receiver);

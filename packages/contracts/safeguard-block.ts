@@ -18,7 +18,7 @@ const BLOCK_STOP_REASONS: ReadonlySet<string> = new Set(["refusal", "sensitive",
  * stops, the Claude Code CLI's refusal error, and Anthropic's policy errors.
  */
 const BLOCK_TEXT =
-  /the model refused to complete the request|provider stopped with: sensitive|finish_reason: content_filter|unable to respond to this request|violate our usage policy|blocked by content filtering policy|stop_reason "?refusal"?/i;
+  /the model refused to complete the request|provider stopped with: sensitive|finish_reason: content_filter|unable to respond to this request|violate our usage policy|blocked by content filtering policy|stop_reason "?refusal"?|safety system stopped the reply/i;
 
 const BLOCK_MARK = /^\s*\[[a-z-]+\/safeguard-block\]\s*/;
 
@@ -318,6 +318,10 @@ export const SAFEGUARD_REMOVED_CONTEXT_NOTICE = `${REMOVED_NOTICE_OPEN}; you can
 
 export const SAFEGUARD_CLEARED_CONTEXT_NOTICE =
   "<system-reminder>\nThe user started this conversation's context over: everything before this point was removed from what you can see, without a summary. Search the conversation's history only if the user asks about something earlier.\n</system-reminder>";
+
+/** Stands in for a context summary the safety system stopped. */
+export const SAFEGUARD_UNSUMMARIZED_CONTEXT_NOTICE =
+  "No summary of the earlier conversation is available: the model's safety system stopped the summary, so that part was dropped from what you can see. Only the recent part follows. Search the conversation's history only if the user asks about something earlier.";
 
 export const isSafeguardRemovedContextNotice = (text: string): boolean => text.startsWith(REMOVED_NOTICE_OPEN);
 

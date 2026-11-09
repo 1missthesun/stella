@@ -3,6 +3,7 @@ import type { ConversationId, EntryId, EntryRecord, Harness } from "@earendil-wo
 import { answerOwnHistory, withoutThinking, type OwnHistoryRow, type OwnHistorySql } from "@stella/contracts/history-search";
 import { MAX_AGENT_DEPTH } from "./agent-doc.ts";
 import { StellaAgentsDoc } from "./agents.ts";
+import { SAFEGUARD_ENTRY_KIND, type SafeguardEntryData } from "./safeguard.ts";
 
 const PAGE = 500;
 
@@ -42,8 +43,13 @@ const threadRows = async (
   archived?: ArchivedEntries,
 ): Promise<OwnHistoryRow[]> => {
   const rows: OwnHistoryRow[] = [];
+  const removed = new Set<number>();
   let after = 0;
   const take = (entry: EntryRecord) => {
+    if (entry.kind === SAFEGUARD_ENTRY_KIND) {
+      const data = entry.data as SafeguardEntryData | undefined;
+      if (data?.state === "removed") for (const target of data.targets) removed.add(target);
+    }
     const role = ROLE_OF[entry.kind];
     const message = entry.model?.[0] as { timestamp?: unknown } | undefined;
     if (role && message) {
@@ -66,7 +72,7 @@ const threadRows = async (
       context,
     );
     for (const entry of page as readonly EntryRecord[]) take(entry);
-    if (page.length < PAGE) return rows;
+    if (page.length < PAGE) return removed.size > 0 ? rows.filter((row) => !removed.has(row.seq)) : rows;
   }
 };
 

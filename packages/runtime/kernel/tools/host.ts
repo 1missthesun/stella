@@ -262,7 +262,7 @@ export const createToolHost = ({
             authorization: `Bearer ${auth.authToken}`,
             "content-type": "application/json",
           },
-          body: JSON.stringify(args),
+          body: JSON.stringify({ ...args, forModel: true }),
           signal: AbortSignal.timeout(30_000),
         },
       );

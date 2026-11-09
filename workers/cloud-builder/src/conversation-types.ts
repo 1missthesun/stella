@@ -26,7 +26,7 @@ export {
 } from "@stella/contracts/conversation-protocol";
 export type { MessageRole, TurnPhase };
 
-export const JOURNAL_SCHEMA_VERSION = 12;
+export const JOURNAL_SCHEMA_VERSION = 13;
 
 export const RESIDENT_CONTEXT_TOKENS = 1_000_000;
 export const RESIDENT_ROLLOVER_TOKENS = 1_500_000;

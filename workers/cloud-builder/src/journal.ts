@@ -200,6 +200,10 @@ const DDL = [
      result_json  TEXT NOT NULL,
      created_at   INTEGER NOT NULL
    )`,
+  `CREATE TABLE IF NOT EXISTS removed_spans (
+     from_seq INTEGER PRIMARY KEY,
+     to_seq   INTEGER NOT NULL
+   )`,
 ];
 
 /**
@@ -228,6 +232,7 @@ const CURRENT_SCHEMA_OBJECT_NAMES = [
   "retired_writers",
   "retired_turns",
   "conversation_edit_receipts",
+  "removed_spans",
 ] as const;
 
 const MIGRATIONS: Array<{
@@ -334,6 +339,15 @@ const MIGRATIONS: Array<{
     to: 12,
     statements: [],
     contentlessSearch: true,
+  },
+  {
+    to: 13,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS removed_spans (
+         from_seq INTEGER PRIMARY KEY,
+         to_seq INTEGER NOT NULL
+       )`,
+    ],
   },
 ];
 
@@ -977,6 +991,7 @@ export class Journal {
       | "spill_key"
     >,
   ): void {
+    if (this.isRemoved(row.seq)) return;
     let payload: unknown;
     try {
       payload = JSON.parse(this.decodePayload(row.payload_json));
@@ -2047,8 +2062,8 @@ export class Journal {
 
   /**
    * Takes every message in `fromSeq..toSeq` out of what any model is given
-   * from this journal, and returns the turns they belong to. The rows stay,
-   * so the history still shows them.
+   * from this journal (its context, history search and history reads), and
+   * returns the turns they belong to. The rows themselves stay.
    */
   skipModelRange(fromSeq: number, toSeq: number, turnLimit: number): string[] {
     const turnIds = this.sql
@@ -2063,12 +2078,60 @@ export class Journal {
       .toArray()
       .map((row) => row.turn_id)
       .reverse();
+    const seqs = this.sql
+      .exec<{ seq: number }>(
+        `SELECT seq FROM journal WHERE kind = 'message' AND seq >= ? AND seq <= ?`,
+        fromSeq,
+        toSeq,
+      )
+      .toArray();
     this.sql.exec(
       `UPDATE journal SET model_skip = 1 WHERE kind = 'message' AND seq >= ? AND seq <= ?`,
       fromSeq,
       toSeq,
     );
+    this.sql.exec(
+      `INSERT INTO removed_spans (from_seq, to_seq) VALUES (?, ?)
+       ON CONFLICT(from_seq) DO UPDATE SET to_seq = MAX(to_seq, excluded.to_seq)`,
+      fromSeq,
+      toSeq,
+    );
+    for (const { seq } of seqs) this.transcriptSearch.remove(seq);
     return turnIds;
+  }
+
+  removedSpans(): Array<{ fromSeq: number; toSeq: number }> {
+    return this.sql
+      .exec<{ from_seq: number; to_seq: number }>(
+        `SELECT from_seq, to_seq FROM removed_spans ORDER BY from_seq`,
+      )
+      .toArray()
+      .map((row) => ({ fromSeq: row.from_seq, toSeq: row.to_seq }));
+  }
+
+  withoutRemoved<Range extends { records: JournalRecord[] }>(range: Range): Range {
+    const spans = this.removedSpans();
+    if (spans.length === 0) return range;
+    return {
+      ...range,
+      records: range.records.filter(
+        (record) =>
+          record.kind !== "message" ||
+          !spans.some((span) => record.seq >= span.fromSeq && record.seq <= span.toSeq),
+      ),
+    };
+  }
+
+  isRemoved(seq: number): boolean {
+    return (
+      this.sql
+        .exec(
+          `SELECT 1 FROM removed_spans WHERE from_seq <= ? AND to_seq >= ? LIMIT 1`,
+          seq,
+          seq,
+        )
+        .toArray().length > 0
+    );
   }
 
   rowToRecord(row: JournalRow): JournalRecord {

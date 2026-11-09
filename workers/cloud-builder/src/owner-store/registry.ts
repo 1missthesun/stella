@@ -123,6 +123,8 @@ export type OwnerHost = {
     conversationId: string;
     clientMsgId: string;
     prompt: string;
+    /** The model this turn and the conversation's later backend-started turns run on, when it changes here. */
+    execution?: import("@stella/contracts/agent-engine").CloudExecutionSelection;
   }): Promise<void>;
   startScheduledTurn(input: ScheduledTurnStart): Promise<void>;
   purgeOwner(mode: OwnerPurgeMode, requestId: string): Promise<{ pending: string[] }>;

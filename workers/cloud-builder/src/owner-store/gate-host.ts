@@ -261,6 +261,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
       lane: "wake",
       source: "agent-thread",
       hiddenMessage: true,
+      ...(input.execution ? { execution: input.execution } : {}),
     });
     if (response.ok) {
       await response.body?.cancel().catch(() => undefined);

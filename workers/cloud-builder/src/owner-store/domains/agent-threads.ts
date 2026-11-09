@@ -3783,12 +3783,12 @@ const resolveSafeguard = async (
     requestId: args.requestId,
   });
   if (card.state === "switched" && ranInCloud) {
-    selectCloudModel(ctx, card.pick);
     await ctx.host.startAgentMessageTurn({
       ownerGeneration: snapshot.ownerGeneration,
       conversationId: args.conversationId,
       clientMsgId: `sgc-${args.requestId}`.slice(0, 64),
       prompt: SAFEGUARD_CONTINUE_PROMPT,
+      execution: selectCloudModel(ctx, card.pick),
     });
   }
   return { card };

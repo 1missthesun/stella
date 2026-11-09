@@ -859,7 +859,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           } satisfies ChatTurnAdmissionReceipt,
           ownerDataGeneration: turn.ownerGeneration,
           [CONVERSATION_PROJECTED_KEY]: true,
-          ...(lane === "chat" && !turn.piAgent
+          ...((lane === "chat" || start.execution) && !turn.piAgent
             ? { [CONVERSATION_EXECUTION_KEY]: execution }
             : {}),
         });

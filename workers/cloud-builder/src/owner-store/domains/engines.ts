@@ -1597,8 +1597,10 @@ const cancelClaudeDeviceLogin = async (
 };
 
 /** Selects `pick` (a spawn-style model name) for the owner's cloud turns, keeping the current effort. */
-export const selectCloudModel = (ctx: OwnerContext, pick: string): void => {
-  writeSelection(ctx, parseExecution(resolveCloudSpawnExecution(pick, readSelection(ctx.db).selection)));
+export const selectCloudModel = (ctx: OwnerContext, pick: string): CloudExecutionSelection => {
+  const execution = parseExecution(resolveCloudSpawnExecution(pick, readSelection(ctx.db).selection));
+  writeSelection(ctx, execution);
+  return execution;
 };
 
 const setExecution = (

@@ -29,9 +29,9 @@ const LOCK_DIR = path.join(CLI_HOME, "refresh.lock");
 const CHECK_INTERVAL_MS = 12 * 60 * 60_000;
 const REFRESH_TIMEOUT_MS = 10 * 60_000;
 const FIRST_INSTALL_WAIT_MS = 60_000;
-const REFRESH_START_GRACE_MS = 5_000;
 const EXECUTOR = "/opt/stella/bin/stella-executor";
 export const CLAUDE_CLI_REFRESH_FLAG = "--claude-cli-refresh";
+export const CLAUDE_CLI_LOCK_HELD_FLAG = "--lock-held";
 
 const isExecutable = (file: string): boolean => {
   try {
@@ -76,11 +76,65 @@ const refreshInFlight = async (): Promise<boolean> => {
   return false;
 };
 
+const takeRefreshLock = async (): Promise<boolean> => {
+  await mkdir(CLI_HOME, { recursive: true, mode: 0o755 });
+  if (await refreshInFlight()) return false;
+  try {
+    await mkdir(LOCK_DIR);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const runRefresh = async (): Promise<void> => {
+  const installed = isExecutable(NATIVE_CLI);
+  const last = await readStatus();
+  const env = installerEnv();
+  const result = installed
+    ? await runClaudeCliCommand(NATIVE_CLI, ["update"], {
+        env,
+        timeoutMs: REFRESH_TIMEOUT_MS,
+      })
+    : await runClaudeCliCommand(IMAGE_CLI, ["install", "latest"], {
+        env,
+        timeoutMs: REFRESH_TIMEOUT_MS,
+      });
+  const version = isExecutable(NATIVE_CLI)
+    ? await readClaudeCliVersion(NATIVE_CLI, env)
+    : null;
+  const status: RefreshStatus = {
+    checkedAt: Date.now(),
+    ok: result.exitCode === 0 && version !== null,
+    version,
+    output: result.output.slice(-500),
+  };
+  await writeFile(STATUS_FILE, `${JSON.stringify(status)}\n`, { mode: 0o644 });
+  console.error(
+    JSON.stringify({
+      event: status.ok ? "claude_cli_refreshed" : "claude_cli_refresh_failed",
+      action: installed ? "update" : "install",
+      from: last?.version ?? null,
+      ...status,
+    }),
+  );
+};
+
 /**
  * `stella-executor --claude-cli-refresh`: install the native copy, or let it
  * update itself. One at a time per container; a no-op when checked recently.
  */
-export const refreshCloudClaudeCli = async (): Promise<void> => {
+export const refreshCloudClaudeCli = async (
+  options: { lockHeld?: boolean } = {},
+): Promise<void> => {
+  if (options.lockHeld) {
+    try {
+      await runRefresh();
+    } finally {
+      await rm(LOCK_DIR, { recursive: true, force: true });
+    }
+    return;
+  }
   await mkdir(CLI_HOME, { recursive: true, mode: 0o755 });
   const installed = isExecutable(NATIVE_CLI);
   const last = await readStatus();
@@ -92,52 +146,21 @@ export const refreshCloudClaudeCli = async (): Promise<void> => {
   ) {
     return;
   }
-  if (await refreshInFlight()) return;
+  if (!(await takeRefreshLock())) return;
   try {
-    await mkdir(LOCK_DIR);
-  } catch {
-    return;
-  }
-  try {
-    const env = installerEnv();
-    const result = installed
-      ? await runClaudeCliCommand(NATIVE_CLI, ["update"], {
-          env,
-          timeoutMs: REFRESH_TIMEOUT_MS,
-        })
-      : await runClaudeCliCommand(IMAGE_CLI, ["install", "latest"], {
-          env,
-          timeoutMs: REFRESH_TIMEOUT_MS,
-        });
-    const version = isExecutable(NATIVE_CLI)
-      ? await readClaudeCliVersion(NATIVE_CLI, env)
-      : null;
-    const status: RefreshStatus = {
-      checkedAt: Date.now(),
-      ok: result.exitCode === 0 && version !== null,
-      version,
-      output: result.output.slice(-500),
-    };
-    await writeFile(STATUS_FILE, `${JSON.stringify(status)}\n`, { mode: 0o644 });
-    console.error(
-      JSON.stringify({
-        event: status.ok ? "claude_cli_refreshed" : "claude_cli_refresh_failed",
-        action: installed ? "update" : "install",
-        from: last?.version ?? null,
-        ...status,
-      }),
-    );
+    await runRefresh();
   } finally {
     await rm(LOCK_DIR, { recursive: true, force: true });
   }
 };
 
-const startRefresh = (): void => {
-  const child = spawn(EXECUTOR, [CLAUDE_CLI_REFRESH_FLAG], {
+const startRefreshHoldingLock = (): void => {
+  const release = () => void rm(LOCK_DIR, { recursive: true, force: true });
+  const child = spawn(EXECUTOR, [CLAUDE_CLI_REFRESH_FLAG, CLAUDE_CLI_LOCK_HELD_FLAG], {
     detached: true,
     stdio: "ignore",
   });
-  child.on("error", () => undefined);
+  child.on("error", release);
   child.unref();
 };
 
@@ -156,14 +179,12 @@ const pointAtNativeCli = (): boolean => {
 export const prepareCloudClaudeCli = async (): Promise<void> => {
   if (!existsSync(EXECUTOR) || pointAtNativeCli()) return;
   const startedAt = Date.now();
-  if (!(await refreshInFlight())) startRefresh();
-  while (Date.now() - startedAt < FIRST_INSTALL_WAIT_MS) {
+  if (await takeRefreshLock()) startRefreshHoldingLock();
+  while (
+    Date.now() - startedAt < FIRST_INSTALL_WAIT_MS &&
+    (await refreshInFlight())
+  ) {
     await Effect.runPromise(Effect.sleep(500));
-    if (isExecutable(NATIVE_CLI)) break;
-    const settled =
-      Date.now() - startedAt > REFRESH_START_GRACE_MS &&
-      !(await refreshInFlight());
-    if (settled) break;
   }
   if (!pointAtNativeCli()) {
     console.error(
@@ -182,6 +203,9 @@ export const prepareCloudClaudeCli = async (): Promise<void> => {
  */
 export const warmCloudClaudeCli = async (): Promise<void> => {
   if (!existsSync(EXECUTOR)) return;
+  if (!isExecutable(NATIVE_CLI)) {
+    await refreshCloudClaudeCli().catch(() => undefined);
+  }
   const cli = isExecutable(NATIVE_CLI) ? NATIVE_CLI : IMAGE_CLI;
   await new Promise<void>((resolve) => {
     const reader = spawn("sh", ["-c", 'cat -- "$(readlink -f -- "$0")" >/dev/null', cli], {

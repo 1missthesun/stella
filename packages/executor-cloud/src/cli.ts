@@ -19,11 +19,19 @@ import {
 } from "./attached-tool-host.js";
 import { attachedToolPathsForDirectory } from "./attached-tool-protocol.js";
 import {
+  CLAUDE_CLI_LOCK_HELD_FLAG,
   CLAUDE_CLI_REFRESH_FLAG,
   refreshCloudClaudeCli,
   warmCloudClaudeCli,
 } from "./claude-cli.js";
 import { markTurnStep, turnTimings } from "./turn-timing.js";
+
+if (process.argv.includes(CLAUDE_CLI_REFRESH_FLAG)) {
+  await refreshCloudClaudeCli({
+    lockHeld: process.argv.includes(CLAUDE_CLI_LOCK_HELD_FLAG),
+  }).catch(() => undefined);
+  process.exit(0);
+}
 
 markTurnStep("modulesLoaded");
 await loadModelRegistry();
@@ -31,11 +39,6 @@ markTurnStep("modelRegistryLoaded");
 
 if (process.argv.includes("--warm")) {
   await warmCloudClaudeCli();
-  process.exit(0);
-}
-
-if (process.argv.includes(CLAUDE_CLI_REFRESH_FLAG)) {
-  await refreshCloudClaudeCli().catch(() => undefined);
   process.exit(0);
 }
 

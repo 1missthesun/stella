@@ -45,9 +45,16 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds">
   let turn: Turn = { assistantMessages: 0 };
   const turns: PiTurnIndex[] = [];
   let ending: JournalRecord | undefined;
+  const removed = new Set<number>();
+  for (const entry of state.entries) {
+    const choice = entry.kind === "stella.safeguard" ? (entry.data as { state?: unknown; targets?: unknown }) : null;
+    if (choice?.state === "removed" && Array.isArray(choice.targets)) {
+      for (const target of choice.targets) removed.add(Number(target));
+    }
+  }
   for (const entry of state.entries) {
     const message = entry.model?.[0];
-    if (!message || message.role === "system") continue;
+    if (!message || message.role === "system" || removed.has(entry.id) || entry.kind === "stella.safeguard") continue;
     const base = { seq: entry.id, turnId, createdAtMs: message.timestamp, kind: "message" as const };
     if (entry.kind === "pi.user" && message.role === "user") {
       if (ending) records.push(ending);

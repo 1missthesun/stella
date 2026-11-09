@@ -849,6 +849,21 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       (resumedDelta.some((message) => message.role === "assistant" && message.stopReason !== "aborted" && message.stopReason !== "error") ||
         (boundary !== undefined && boundary !== record.boundary && !record.seen.includes(boundary)));
     const delta = foreign ? undefined : resumedDelta;
+    const startedOver =
+      !steering &&
+      resumeSessionId !== undefined &&
+      seenAt < 0 &&
+      boundary !== undefined &&
+      boundary !== record.boundary &&
+      !record.seen.includes(boundary);
+    if (startedOver) {
+      record.seen = [];
+      delete record.undelivered;
+      delete record.cliSessionId;
+      delete session.cliSessionId;
+      options.transport.close?.(binding.session);
+    }
+    const resumable = startedOver ? undefined : resumeSessionId;
     const baselineAt = conversation.findLastIndex((message) => residentContextKind(message) === "baseline");
     const baseline = baselineAt >= 0 ? messageKey(conversation[baselineAt]!) : undefined;
     const missed =
@@ -942,7 +957,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     void options.transport
       .runTurn({
         session: binding.session,
-        ...((hydrated ?? resumeSessionId) ? { resumeSessionId: hydrated ?? resumeSessionId } : {}),
+        ...((hydrated ?? resumable) ? { resumeSessionId: hydrated ?? resumable } : {}),
         model: request.model.id,
         thinkingLevel: request.thinkingLevel,
         systemPrompt: fitted.systemPrompt,

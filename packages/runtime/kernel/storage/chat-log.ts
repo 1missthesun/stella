@@ -826,6 +826,35 @@ export class ChatLog {
     });
   }
 
+  /** Takes events out of the chat: those with an id in `ids`, or one that starts with a prefix in `idPrefixes`. */
+  hideEvents(
+    conversationId: string,
+    ids: readonly string[],
+    idPrefixes: readonly string[],
+  ): number {
+    conversationId = requireConversationId(conversationId);
+    let hidden = 0;
+    this.tx.immediate(() => {
+      for (const id of ids) {
+        hidden += Number(
+          (this.cached
+            .prepare("UPDATE entry SET visible = 0 WHERE conversation_id = ? AND id = ? AND visible = 1")
+            .run(conversationId, id) as { changes: number }).changes,
+        );
+      }
+      for (const prefix of idPrefixes) {
+        hidden += Number(
+          (this.cached
+            .prepare(
+              "UPDATE entry SET visible = 0 WHERE conversation_id = ? AND substr(id, 1, ?) = ? AND visible = 1",
+            )
+            .run(conversationId, prefix.length, prefix) as { changes: number }).changes,
+        );
+      }
+    });
+    return hidden;
+  }
+
   hasEvent(
     conversationId: string,
     eventIdInput: string,

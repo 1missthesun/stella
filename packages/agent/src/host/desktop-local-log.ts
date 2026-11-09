@@ -44,6 +44,8 @@ export type LocalLogMessage = { id: string; seq: number; role: "user" | "assista
 export type DesktopLocalLog = {
   read(afterSeq: number, limit: number): Promise<{ messages: LocalLogMessage[]; throughSeq: number; complete: boolean }>;
   write(message: LocalLogWrite): Promise<{ id: string; seq?: number }>;
+  /** Takes the rows written under `keys`, and the user rows `clientMsgIds`, out of the chat. */
+  hide(rows: { keys: string[]; clientMsgIds: string[] }): Promise<void>;
 };
 
 export type LocalLogWrite =
@@ -330,13 +332,24 @@ export async function localLogMirror(args: {
         const message = entry.model?.[0];
         if (entry.kind === SAFEGUARD_ENTRY_KIND && !fromLog(entry)) {
           const choice = entry.data as SafeguardEntryData;
-          await log.write({
-            key: `${root.id}:${entry.id}:safeguard`,
-            role: "assistant",
-            text: safeguardCardLabel(choice),
-            timestamp: choice.at,
-            notice: true,
-          });
+          const label = safeguardCardLabel(choice);
+          if (choice.state === "removed") {
+            const clientMsgIds: string[] = [];
+            for (const target of choice.targets) {
+              const removed = (await harness.commit((tx) => tx.entry(target as EntryId), context))?.model?.[0];
+              const clientMsgId = removed?.role === "user" ? piJournalUserMessage(removed as PiUserMessage).clientMsgId : undefined;
+              if (clientMsgId) clientMsgIds.push(clientMsgId);
+            }
+            await log.hide({ keys: choice.targets.map((target) => `${root.id}:${target}`), clientMsgIds });
+          } else if (label) {
+            await log.write({
+              key: `${root.id}:${entry.id}:safeguard`,
+              role: "assistant",
+              text: label,
+              timestamp: choice.at,
+              notice: true,
+            });
+          }
         } else if (message && !fromLog(entry)) {
           const key = `${root.id}:${entry.id}`;
           if (entry.kind === "pi.user" && message.role === "user") {

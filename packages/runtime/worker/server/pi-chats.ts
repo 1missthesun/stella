@@ -62,6 +62,14 @@ const piLocalLog = (
         messages: page.messages.filter((message) => !message.id.startsWith(PI_LOG_ROW) && message.writer !== PI_WRITER),
       };
     },
+    hide: async ({ keys, clientMsgIds }) => {
+      const hidden = session.storage.chatStore.chat.hideEvents(
+        conversationId,
+        [...clientMsgIds.filter((id) => CLIENT_MSG_ID_PATTERN.test(id)), ...keys.map(rowId)],
+        keys.map((key) => `${rowId(key)}:`),
+      );
+      if (hidden > 0) session.storage.notifyLocalChatUpdated(conversationId);
+    },
     write: async (message) => {
       const written = (eventId: string) => {
         if (message.role !== "user") return { id: eventId };
@@ -388,7 +396,7 @@ export const piChatsFor = (
           return await runner.usageLimits.resume(args);
         },
       },
-      simulateSafeguardBlocks: process.env.STELLA_TEST_SAFEGUARD_BLOCK === "1",
+      simulateSafeguardBlocks: process.env.STELLA_DEV_HARNESS === "1",
       safeguards: {
         resolve: async (args) => {
           const runner = session.runnerCell.get();

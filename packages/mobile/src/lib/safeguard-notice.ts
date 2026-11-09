@@ -4,23 +4,12 @@ import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import {
   applySafeguardEvent,
   emptySafeguardFold,
-  parseSafeguardCard,
   safeguardEventOfRecord,
   safeguardNotice,
   type SafeguardAction,
   type SafeguardNotice,
 } from "@stella/contracts/safeguard-block";
 import { getBackendClient } from "./backend";
-import type { JournalView } from "./journal-index";
-
-/** Turn outcomes and choices on a block, the only records the card reads. */
-export const SAFEGUARD_RECORDS: JournalView = {
-  id: "safeguard-records",
-  test: (record) =>
-    record.kind === "turn"
-      ? record.phase === "completed" || record.phase === "failed"
-      : record.kind === "card" && parseSafeguardCard(record.card) !== null,
-};
 
 /** What the chat's safety-block card shows; it sits in the message list where the stopped reply would be. */
 export type SafeguardCardState = {

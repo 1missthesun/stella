@@ -7,7 +7,11 @@ import type {
 import { isPiAgentText } from "@stella/contracts/pi-chat";
 import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
-import { parseSafeguardCard, safeguardCardLabel } from "@stella/contracts/safeguard-block";
+import {
+  parseSafeguardCard,
+  safeguardCardLabel,
+  withoutSafeguardRemoved,
+} from "@stella/contracts/safeguard-block";
 import { journalAgentTitles } from "@stella/contracts/agent-titles";
 import {
   agentToolResultThreadId,
@@ -285,8 +289,9 @@ const terminalNoticeEvent = (
 };
 
 export const journalRecordsToMessageRecords = (
-  records: readonly JournalRecord[],
+  journaled: readonly JournalRecord[],
 ): MessageRecord[] => {
+  const records = withoutSafeguardRemoved(journaled);
   const byTurn = new Map<string, JournalRecord[]>();
   const recordsBySeq = new Map<number, JournalMessageRecord>();
   const agentTitles = journalAgentTitles(records);
@@ -341,12 +346,13 @@ export const journalRecordsToMessageRecords = (
         continue;
       }
       const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
-      if (safeguard) {
+      const safeguardLabel = safeguard ? safeguardCardLabel(safeguard) : null;
+      if (safeguardLabel) {
         events.push({
           _id: `cloud:${turnId}:safeguard:${record.seq}`,
           timestamp: record.createdAtMs,
           type: "assistant_message",
-          payload: { text: safeguardCardLabel(safeguard), source: "cloud-turn-notice" },
+          payload: { text: safeguardLabel, source: "cloud-turn-notice" },
         });
         continue;
       }

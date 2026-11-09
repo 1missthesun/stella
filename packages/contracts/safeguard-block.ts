@@ -95,7 +95,7 @@ export type SafeguardAction = "remove" | "switch" | "clear";
 /**
  * What the user chose on a block, journaled so every host that holds the
  * conversation applies it. `removed`: the messages in `fromSeq..toSeq` (the
- * turns `turnIds`) leave the model's context. `cleared`: the model's context
+ * turns `turnIds`) leave the model's context and every timeline. `cleared`: the model's context
  * starts over after this card. `switched`: the conversation continues on
  * `pick`, set by the host that ran the blocked turn.
  */
@@ -233,31 +233,57 @@ export const safeguardNotice = (fold: SafeguardFold): SafeguardNotice | null => 
     block.switchTo && block.switchTo.label !== block.model && !fold.blockedModels.includes(block.switchTo.label)
       ? block.switchTo
       : undefined;
-  const who = block.model ? `${block.model}'s safety system` : "The model's safety system";
+  const who = block.model ? `${block.model}'s safety system stopped it. ` : "";
   return {
     turnId: block.turnId,
     title: block.afterRemoval ? "Still stopped by the safety system" : "This reply was stopped",
     description: block.afterRemoval
       ? "Something earlier in the conversation is probably setting it off. Remove these messages too, or start fresh: your history stays, and Stella begins again without the earlier context."
-      : `${who} stopped it. That can happen by mistake. Remove the messages it stopped on and carry on${switchTo ? `, or continue with ${switchTo.label}` : ""}.`,
+      : `${who}That can happen by mistake. Remove the messages it stopped on and carry on${switchTo ? `, or continue with ${switchTo.label}` : ""}.`,
     remove: { label: "Remove messages" },
     ...(switchTo ? { switchTo: { ...switchTo, actionLabel: `Continue with ${switchTo.label}` } } : {}),
     ...(block.afterRemoval ? { clear: { label: "Start fresh" } } : {}),
   };
 };
 
-/** The line the timeline shows where messages were taken out of the model's context. */
-export const SAFEGUARD_REMOVED_LABEL = "Removed from the conversation. Stella no longer sees these messages.";
 export const SAFEGUARD_CLEARED_LABEL = "Started fresh. Stella no longer sees the conversation before this point.";
 export const safeguardSwitchedLabel = (label: string): string => `Continuing with ${label}.`;
 
-/** The line the timeline shows where a choice on a block was made. */
-export const safeguardCardLabel = (card: Pick<SafeguardCard, "state"> & { label?: string }): string =>
+/**
+ * The line the timeline shows where a choice on a block was made. A removal
+ * shows none: its messages leaving the timeline is the whole of it.
+ */
+export const safeguardCardLabel = (card: Pick<SafeguardCard, "state"> & { label?: string }): string | null =>
   card.state === "removed"
-    ? SAFEGUARD_REMOVED_LABEL
+    ? null
     : card.state === "cleared"
       ? SAFEGUARD_CLEARED_LABEL
       : safeguardSwitchedLabel(card.label ?? "another model");
+
+/**
+ * The records a timeline shows: without the messages a removal took out, the
+ * outcomes of their turns, and the removal's own card. Returns `records`
+ * itself when nothing was removed.
+ */
+export const withoutSafeguardRemoved = <Record extends { seq: number; kind: string; card?: unknown }>(
+  records: readonly Record[],
+): readonly Record[] => {
+  const spans: Array<{ fromSeq: number; toSeq: number; cardSeq: number }> = [];
+  for (const record of records) {
+    if (record.kind !== "card") continue;
+    const card = parseSafeguardCard(record.card);
+    if (card?.state === "removed") spans.push({ fromSeq: card.fromSeq, toSeq: card.toSeq, cardSeq: record.seq });
+  }
+  if (spans.length === 0) return records;
+  return records.filter(
+    (record) =>
+      !spans.some(
+        (span) =>
+          record.seq === span.cardSeq ||
+          ((record.kind === "message" || record.kind === "turn") && record.seq >= span.fromSeq && record.seq <= span.toSeq),
+      ),
+  );
+};
 
 /** The failed turn's notice, for clients that only show a turn's text. */
 export const SAFEGUARD_TERMINAL_NOTICE = "The model's safety system stopped this reply.";
@@ -272,7 +298,7 @@ const REMOVED_NOTICE_OPEN = "<system-reminder>\nMessages were removed from this 
 export const SAFEGUARD_REMOVED_CONTEXT_NOTICE = `${REMOVED_NOTICE_OPEN}; you can no longer see them. Work started in them (tasks, file changes) may still exist and may report back later. Carry on from the user's next message without asking what was removed.\n</system-reminder>`;
 
 export const SAFEGUARD_CLEARED_CONTEXT_NOTICE =
-  "The user started this conversation's context over: everything before this point was removed from what you can see, without a summary. Search the conversation's history only if the user asks about something earlier.";
+  "<system-reminder>\nThe user started this conversation's context over: everything before this point was removed from what you can see, without a summary. Search the conversation's history only if the user asks about something earlier.\n</system-reminder>";
 
 export const isSafeguardRemovedContextNotice = (text: string): boolean => text.startsWith(REMOVED_NOTICE_OPEN);
 

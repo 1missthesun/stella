@@ -290,11 +290,12 @@ const projectTurn = (
   }
   for (const record of turn) {
     const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
-    if (!safeguard) continue;
+    const label = safeguard ? safeguardCardLabel(safeguard) : null;
+    if (!label) continue;
     out.push({
       id: `cloud:${turnId}:safeguard:${record.seq}`,
       role: "assistant",
-      text: safeguardCardLabel(safeguard),
+      text: label,
       createdAt: record.createdAtMs,
       canonicalCreatedAt: record.createdAtMs,
       sequence: record.seq,

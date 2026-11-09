@@ -46,7 +46,12 @@ import {
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
-import { isSafeguardBlock, safeguardModelLabel, safeguardTaskFailure } from "@stella/contracts/safeguard-block";
+import {
+  isSafeguardBlock,
+  isSafeguardBlockText,
+  safeguardModelLabel,
+  safeguardTaskFailure,
+} from "@stella/contracts/safeguard-block";
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
@@ -492,6 +497,10 @@ const agentFailureText = (message: AssistantMessage | undefined): string =>
     ? safeguardTaskFailure(safeguardModelLabel(message.responseModel, message.model))
     : (message?.errorMessage ?? "The agent failed.");
 
+/** Why a task's turn got no answer: a block in plain words, else the harness's reason. */
+const unansweredText = (settled: { reason: string; detail?: unknown }): string =>
+  typeof settled.detail === "string" && isSafeguardBlockText(settled.detail) ? safeguardTaskFailure(undefined) : settled.reason;
+
 export const failedReport = (args: { threadId: string; description: string; error: string }): string =>
   ["[Task failed]", `description: ${args.description}`, `thread_id: ${args.threadId}`, "status: failed", `error: ${bounded(args.error)}`].join("\n");
 
@@ -743,7 +752,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           const withdrawn = settled?.status === "unanswered" && settled.reason === "aborted" && settled.entry === undefined;
           if (settled?.status === "unanswered" && settled.reason === "aborted") end = { aborted: true };
           else if (refused !== undefined || settled === undefined) end = { error: refused ?? "The agent did not run." };
-          else if (settled.status === "unanswered") end = { error: settled.reason };
+          else if (settled.status === "unanswered") end = { error: unansweredText(settled) };
           let busy = false;
           if (settled?.status === "done" && settled.type === "input" && !siblings?.agents[threadId]?.origin) {
             const read: BusyReader = {
@@ -846,7 +855,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               if (settled.reason === "aborted") {
                 return { status: "running", checkpoint: { phase: "report", status: "canceled", stopped: true, ...(send(false).length ? { notes: send(false) } : {}) } };
               }
-              return next(failedReport({ threadId, description, error: settled.reason }), "failed");
+              return next(failedReport({ threadId, description, error: unansweredText(settled) }), "failed");
             }
             if (settled.type !== "input" || !agent) return next();
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
@@ -2373,7 +2382,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       if (settled.status !== "done" || settled.type !== "input") {
         await settle();
-        return { threadId, status: "error", error: settled.status === "unanswered" ? settled.reason : "The agent did not answer." };
+        return { threadId, status: "error", error: settled.status === "unanswered" ? unansweredText(settled) : "The agent did not answer." };
       }
       const move = await takeMove(harness, agent.id, context);
       if (move) await settle();

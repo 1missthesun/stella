@@ -90,7 +90,8 @@ import {
   useClaudeUsageLimitNotice,
 } from "./claude-usage-limit-notice";
 import { useStellaUsageLimitNotice } from "./stella-usage-limit-notice";
-import { SAFEGUARD_RECORDS, useSafeguardNotice } from "./safeguard-notice";
+import { withoutSafeguardRemoved } from "@stella/contracts/safeguard-block";
+import { useSafeguardNotice } from "./safeguard-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
 import type { ChatMessage } from "../types";
@@ -485,9 +486,10 @@ export const useCloudCanonicalChatThread = (
     store.getSnapshot,
     emptySnapshot,
   );
+  const shownRecords = useMemo(() => withoutSafeguardRemoved(state.records), [state.records]);
   const journalWindow = useMemo(
-    () => journalIndex(authority.conversationId, state.records),
-    [authority.conversationId, state.records],
+    () => journalIndex(authority.conversationId, shownRecords),
+    [authority.conversationId, shownRecords],
   );
   const lastSeq = state.records.at(-1)?.seq ?? -1;
   const caughtUp =
@@ -585,7 +587,7 @@ export const useCloudCanonicalChatThread = (
   );
   useSafeguardNotice(
     threadId === "cloud" ? authority.conversationId : null,
-    journalWindow.view(SAFEGUARD_RECORDS),
+    state.records,
   );
   useStellaUsageLimitNotice(
     threadId === "cloud" ? authority.conversationId : null,

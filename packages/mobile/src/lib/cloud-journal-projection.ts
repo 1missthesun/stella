@@ -1,6 +1,10 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
-import { parseSafeguardCard, safeguardCardLabel } from "@stella/contracts/safeguard-block";
+import {
+  parseSafeguardCard,
+  safeguardCardLabel,
+  withoutSafeguardRemoved,
+} from "@stella/contracts/safeguard-block";
 import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/user-ask-deck";
 import { projectMobileLifecycle, type ProjectedTurn } from "./mobile-reply-context";
 import {
@@ -652,7 +656,11 @@ export const projectCloudConversationMessages = (args: {
   records: readonly JournalRecord[];
   hasOlder?: boolean;
 }): ChatMessage[] => {
-  const index = journalIndex(args.conversationId ?? "", args.records);
+  const shown = withoutSafeguardRemoved(args.records);
+  const index = journalIndex(
+    shown === args.records ? (args.conversationId ?? "") : `${args.conversationId ?? ""}:shown`,
+    shown,
+  );
   const reactions = windowReactions(index);
   const displayed = displayedJournalTurns(index, args.hasOlder === true);
   const dropped = displayed === index.turns ? undefined : index.turns[0];

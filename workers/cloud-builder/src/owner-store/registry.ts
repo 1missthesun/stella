@@ -107,6 +107,15 @@ export type OwnerHost = {
     sourceTurnId: string;
     card: unknown;
   }): Promise<boolean>;
+  resolveSafeguard(input: {
+    conversationId: string;
+    ownerGeneration: string;
+    action: import("@stella/contracts/safeguard-block").SafeguardAction;
+    requestId: string;
+  }): Promise<{
+    card: import("@stella/contracts/safeguard-block").SafeguardCard;
+    ranInCloud: boolean;
+  }>;
   homeChanged(ownerGeneration: string, revision: number): Promise<void>;
   changeMemoryPolicy(change: MemoryPolicyChange): Promise<void>;
   startAgentMessageTurn(input: {

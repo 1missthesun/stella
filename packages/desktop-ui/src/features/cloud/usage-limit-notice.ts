@@ -9,6 +9,13 @@ import {
 } from "@stella/contracts/claude-usage-limit";
 import { backendClient } from "@/platform/backend/backend-client";
 import {
+  applySafeguardEvent,
+  emptySafeguardFold,
+  safeguardEventOfRecord,
+  safeguardNotice,
+} from "@stella/contracts/safeguard-block";
+import { presentSafeguardBlock } from "@/features/chat/safeguard-card";
+import {
   dismissUsageLimitCard,
   presentUsageLimitPaused,
   presentUsageLimitResumed,
@@ -76,4 +83,28 @@ export const presentUsageLimitPauses = (
     return;
   }
   dismissUsageLimitCard(conversationId);
+};
+
+const shownSafeguards = new Map<string, string>();
+
+/**
+ * The web chat's safety-block card, from the chat's journal. The desktop
+ * shows the same card from its own chat host.
+ */
+export const presentSafeguardBlocks = (
+  conversationId: string,
+  records: readonly JournalRecord[],
+): void => {
+  let fold = emptySafeguardFold();
+  for (const record of records) {
+    const event = safeguardEventOfRecord(record);
+    if (event) fold = applySafeguardEvent(fold, event);
+  }
+  const notice = safeguardNotice(fold);
+  const key = JSON.stringify(notice);
+  if (shownSafeguards.get(conversationId) === key) return;
+  shownSafeguards.set(conversationId, key);
+  presentSafeguardBlock(conversationId, notice, (action) =>
+    backendClient.call("safeguards.resolve", { conversationId, action, requestId: crypto.randomUUID() }),
+  );
 };

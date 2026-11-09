@@ -76,6 +76,7 @@ export const CLOCK_SKEW_S = 60;
 export const CLOSE_INTERNAL = 1011;
 
 export type ConversationCard =
+  | import("@stella/contracts/safeguard-block").SafeguardCard
   | CloudAgentLifecycleCard
   | import("@stella/contracts/claude-usage-limit").ClaudeUsageLimitCard
   | import("@stella/contracts/reminders").ReminderCard
@@ -117,6 +118,7 @@ export type JournalTurnRecord = {
   notice?: string;
   promptSeq?: number;
   wallClockMs?: number;
+  safeguard?: import("@stella/contracts/safeguard-block").SafeguardBlockInfo;
 };
 
 export type JournalCardRecord = {

@@ -250,6 +250,7 @@ export const cloudJournalFor = (
         records: turn.records,
         phase: turn.phase,
         ...(turn.notice ? { notice: turn.notice } : {}),
+        ...(turn.safeguard ? { safeguard: turn.safeguard } : {}),
         ...(turn.onDeliveryFailure ? { onDeliveryFailure: turn.onDeliveryFailure } : {}),
       });
       if (!status.queued) {

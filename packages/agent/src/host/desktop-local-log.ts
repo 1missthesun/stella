@@ -1,3 +1,5 @@
+import { safeguardCardLabel } from "@stella/contracts/safeguard-block";
+import { SAFEGUARD_ENTRY_KIND, type SafeguardEntryData } from "../stella/safeguard.ts";
 import type { Context } from "@earendil-works/chord";
 import type { AssistantMessage, Message, TextContent } from "@earendil-works/pi-ai";
 import {
@@ -326,7 +328,16 @@ export async function localLogMirror(args: {
       );
       for (const entry of page) {
         const message = entry.model?.[0];
-        if (message && !fromLog(entry)) {
+        if (entry.kind === SAFEGUARD_ENTRY_KIND && !fromLog(entry)) {
+          const choice = entry.data as SafeguardEntryData;
+          await log.write({
+            key: `${root.id}:${entry.id}:safeguard`,
+            role: "assistant",
+            text: safeguardCardLabel(choice),
+            timestamp: choice.at,
+            notice: true,
+          });
+        } else if (message && !fromLog(entry)) {
           const key = `${root.id}:${entry.id}`;
           if (entry.kind === "pi.user" && message.role === "user") {
             const { text, display } = piUserView(message as PiUserMessage);

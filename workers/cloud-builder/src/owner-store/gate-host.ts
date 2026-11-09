@@ -1,3 +1,4 @@
+import { parseSafeguardCard } from "@stella/contracts/safeguard-block";
 import { releasingStub } from "../rpc-release.js";
 import { AGENT_STOP_WIRE_REASON } from "@stella/contracts/agent-status";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
@@ -352,6 +353,36 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
         attemptGeneration: input.attemptGeneration,
       },
     });
+  },
+
+  async resolveSafeguard(input) {
+    const response = await deps.env.ORCHESTRATOR_SESSIONS.getByName(input.conversationId).fetch(
+      "https://orchestrator-session/safeguard",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ownerId: deps.ownerId(),
+          ownerGeneration: input.ownerGeneration,
+          action: input.action,
+          requestId: input.requestId,
+        }),
+      },
+    );
+    const body = (await response.json().catch(() => null)) as {
+      card?: unknown;
+      ranInCloud?: unknown;
+      message?: unknown;
+    } | null;
+    const card = parseSafeguardCard(body?.card);
+    if (!response.ok || !card) {
+      throw new RpcError(
+        response.status >= 500 ? "UNAVAILABLE" : "CONFLICT",
+        typeof body?.message === "string" ? body.message : "That didn't go through. Try again.",
+        response.status >= 500 ? { retryable: true } : undefined,
+      );
+    }
+    return { card, ranInCloud: body?.ranInCloud === true };
   },
 
   async postConversationCard(input) {

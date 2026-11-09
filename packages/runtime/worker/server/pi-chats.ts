@@ -16,6 +16,7 @@ import {
   getModelOverride,
   getReasoningEffort,
   loadLocalPreferences,
+  updateLocalModelPreferences,
 } from "../../kernel/preferences/local-preferences.js";
 import {
   getAccessibleLocalLlmApiKey,
@@ -386,6 +387,24 @@ export const piChatsFor = (
           if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to resume work paused in the cloud or on your other devices.");
           return await runner.usageLimits.resume(args);
         },
+      },
+      simulateSafeguardBlocks: process.env.STELLA_TEST_SAFEGUARD_BLOCK === "1",
+      safeguards: {
+        resolve: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to change this conversation.");
+          return await runner.safeguards.resolve(args);
+        },
+      },
+      setStellaModel: (pick) => {
+        const dataDir = session.config.get().stellaDataDirPath;
+        const claudeCode = /^claude-code\/(.+)$/.exec(pick)?.[1];
+        updateLocalModelPreferences(
+          dataDir,
+          claudeCode
+            ? { claudeCodeModel: claudeCode }
+            : { modelOverrides: { ...loadLocalPreferences(dataDir).modelOverrides, orchestrator: pick } },
+        );
       },
       agentLogs: {
         append: async (args) => {

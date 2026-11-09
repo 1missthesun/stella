@@ -6,6 +6,15 @@ import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effor
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import {
+  isOpusModel,
+  isSafeguardBlock,
+  parseSafeguardCard,
+  safeguardModelLabel,
+  type SafeguardBlockInfo,
+  type SafeguardCard,
+} from "@stella/contracts/safeguard-block";
+import { clearContext, entriesOfJournalSpan, removeFromContext } from "@stella/agent/stella/safeguard";
+import {
   AssistantEntry,
   defineExtension,
   hook,
@@ -332,6 +341,8 @@ export type PiRuntimeOptions = {
     ): Promise<{ entries: ReadonlyArray<{ id: number; record: unknown }>; hasOlder: boolean }>;
     has(piConversationId: number, beforeId?: number): boolean;
   };
+  /** Test deployments only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
+  simulateSafeguardBlocks?: boolean;
   waitUntil(work: Promise<unknown>): void;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
@@ -1696,6 +1707,7 @@ export class PiConversationRuntime {
         {
           storage,
           models: this.#models,
+          ...(this.#options.simulateSafeguardBlocks ? { simulateSafeguardBlocks: true } : {}),
           sources: this.#sources(),
           agents: this.#agents(),
           tools: this.#tools(),
@@ -2071,8 +2083,15 @@ export class PiConversationRuntime {
     const ran = new Map<string, boolean>();
     for (;;) {
       const page = await read(after);
-      const messages: JournalMessage[] = [];
+      let messages: JournalMessage[] = [];
       for (const record of page.records) {
+        const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
+        if (safeguard) {
+          await importJournal(harness, root, messages, record.seq - 1, context, start.seed);
+          messages = [];
+          await this.#applySafeguardCard(harness, root, safeguard, record.seq, context);
+          continue;
+        }
         const reminder = record.kind === "card" ? parseReminderCard(record.card) : null;
         if (reminder) {
           messages.push({
@@ -2102,6 +2121,69 @@ export class PiConversationRuntime {
       }
       after = through;
     }
+  }
+
+  async #applySafeguardCard(
+    harness: Harness,
+    root: Conversation,
+    card: SafeguardCard,
+    seq: number,
+    context: Context,
+  ): Promise<void> {
+    if (card.state === "cleared") {
+      await clearContext(harness, root, { requestId: card.requestId, journalCheckpoint: seq }, context);
+      return;
+    }
+    if (card.state !== "removed") return;
+    const ownPrompts: EntryId[] = [];
+    for (const turnId of card.turnIds) {
+      const submission = await root.commit((tx) => tx.submissionByRequest(root.id, `turn:${turnId}`), context);
+      if (submission?.entry !== undefined) ownPrompts.push(submission.entry);
+    }
+    const targets = await entriesOfJournalSpan(
+      harness,
+      root,
+      { fromSeq: card.fromSeq, toSeq: card.toSeq, ownPrompts },
+      context,
+    );
+    await removeFromContext(harness, root, { requestId: card.requestId, targets }, context);
+    this.#options.log("pi_safeguard_removed", { seq, entries: targets.length });
+  }
+
+  /** What the turn's failed reply says about a safety block, when a block is what ended it. */
+  async safeguardBlock(execution: PiExecution, context: Context): Promise<SafeguardBlockInfo | undefined> {
+    const { harness, root } = await this.open();
+    const blocked = await harness.commit(async (tx) => {
+      const page = await tx.scanEntries({ conversationId: root.id, order: "descending" }, 16);
+      for (const entry of page.items) {
+        const message = entry.model?.[0];
+        if (entry.kind === AssistantEntry.kind && message?.role === "assistant") {
+          return isSafeguardBlock(message) ? message : undefined;
+        }
+        if (message?.role === "user") return undefined;
+      }
+      return undefined;
+    }, context);
+    return blocked ? this.safeguardInfo(execution, blocked.responseModel, blocked.model) : undefined;
+  }
+
+  safeguardInfo(execution: PiExecution, ...models: Array<string | undefined>): SafeguardBlockInfo {
+    const model = safeguardModelLabel(...models, execution.model);
+    const anthropicOpus = () =>
+      this.#models
+        .getModels("anthropic")
+        .map((candidate) => candidate.id)
+        .filter((id) => /^claude-opus-/.test(id))
+        .sort()
+        .at(-1);
+    const switchTo = isOpusModel(...models, execution.model)
+      ? undefined
+      : execution.engine === "anthropic"
+        ? { pick: "claude/opus", label: "Opus" }
+        : execution.engine === "provider" && execution.provider === "anthropic" && anthropicOpus()
+          ? { pick: `anthropic/${anthropicOpus()}`, label: safeguardModelLabel(anthropicOpus()) ?? "Opus" }
+          : undefined;
+    return { ...(model ? { model } : {}), ...(switchTo ? { switchTo } : {}) };
   }
 
   async #adoptCheckpoint(harness: Harness, root: Conversation, context: Context): Promise<void> {

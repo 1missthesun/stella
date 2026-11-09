@@ -7,6 +7,10 @@ import {
 } from "@stella/contracts/stella-usage-limit";
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
+import {
+  isSafeguardBlockText,
+  SAFEGUARD_TERMINAL_NOTICE,
+} from "@stella/contracts/safeguard-block";
 import { formatTurnClock } from "@stella/contracts/schedule-zone";
 import { attachedFilesText } from "../prompt-context.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
@@ -67,6 +71,7 @@ import {
   OwnerPurgeFenceError,
   mintOrchestratorTurnCapability,
   CliTurnFailedError,
+  SafeguardBlockedError,
   cloudExecutionContext,
   piModelSpec,
   ChatTurnNotResumableError,
@@ -831,9 +836,13 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         !contextFailure && gatewayRefusal
           ? await this.planRefusalNotice(turn, gatewayRefusal)
           : undefined;
+      const safeguard =
+        error instanceof SafeguardBlockedError ? error.info : undefined;
       const terminalNotice = contextFailure
         ? CLOUD_CONTEXT_NOTICE
-        : planNotice
+        : safeguard
+          ? SAFEGUARD_TERMINAL_NOTICE
+          : planNotice
           ? planNotice.message
           : error instanceof CliTurnFailedError && error.userMessage
             ? error.userMessage
@@ -872,7 +881,13 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         eventSeq: await this.nextTurnEventSeq(turn.turnId),
       };
       if ((await this.claimTerminal(turn.turnId, failedOwed)) === failedOwed) {
-        this.recordTerminal(turn, "failed", terminalNotice);
+        this.recordTerminal(
+          turn,
+          "failed",
+          terminalNotice,
+          undefined,
+          safeguard,
+        );
         await this.deliverTerminal(turn, failedOwed);
       }
       await this.afterTerminal(turn);
@@ -1196,6 +1211,14 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         if (usageLimit && (await this.holdForClaudeUsageLimit(turn, usageLimit))) {
           return await this.completeChatTurn(turn, "", args.started);
         }
+        const safeguard =
+          (await runtime
+            .safeguardBlock(args.execution, context)
+            .catch(() => undefined)) ??
+          (isSafeguardBlockText(claudeCodeFailure)
+            ? runtime.safeguardInfo(args.execution)
+            : undefined);
+        if (safeguard) throw new SafeguardBlockedError(safeguard);
         throw claudeCodeFailure
           ? new CliTurnFailedError(
               `Claude Code turn failed: ${claudeCodeFailure}`,

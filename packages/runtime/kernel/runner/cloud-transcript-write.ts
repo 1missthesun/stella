@@ -5,6 +5,7 @@ import type {
 } from "../storage/runtime-store.js";
 import { forkDelayedCall } from "./cloud-effect-runtime.js";
 import { parseJournalCheckpoint, type JournalCheckpoint } from "@stella/contracts/journal-checkpoint";
+import type { SafeguardBlockInfo } from "@stella/contracts/safeguard-block";
 import {
   parsePiBrainRecord,
   PI_BRAIN_ELSEWHERE_CODE,
@@ -99,6 +100,7 @@ export type CloudTranscriptFinishRequest = {
   records: CloudTranscriptFinishRecord[];
   phase: "completed" | "failed" | "canceled" | "timeout";
   notice?: string;
+  safeguard?: SafeguardBlockInfo;
   failureNotificationUserMessageId?: string;
   onDeliveryFailure?: (message: string) => void;
 };
@@ -224,6 +226,7 @@ type FinishPayload = {
   records: CloudTranscriptFinishRecord[];
   phase: CloudTranscriptFinishRequest["phase"];
   notice?: string;
+  safeguard?: SafeguardBlockInfo;
 };
 
 type JournalAppendPayload = {
@@ -1553,6 +1556,7 @@ export const createCloudTranscriptWriter = (
         records: request.records,
         phase: request.phase,
         ...(request.notice ? { notice: request.notice } : {}),
+        ...(request.safeguard ? { safeguard: request.safeguard } : {}),
       };
       const payloadBytes = jsonBytes(payload);
       const tooManyBytes = payloadBytes > FINISH_MAX_BYTES;

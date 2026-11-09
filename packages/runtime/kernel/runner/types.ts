@@ -363,7 +363,12 @@ export type RunnerPublicApi = {
       args: AgentThreadCalls["usageLimits.resume"]["args"],
     ) => Promise<AgentThreadCalls["usageLimits.resume"]["result"]>;
   };
-  agentLogs: {
+safeguards: {
+    resolve: (
+      args: AgentThreadCalls["safeguards.resolve"]["args"],
+    ) => Promise<AgentThreadCalls["safeguards.resolve"]["result"]>;
+  };
+    agentLogs: {
     append: (
       args: import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.append"]["args"],
     ) => Promise<import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.append"]["result"]>;

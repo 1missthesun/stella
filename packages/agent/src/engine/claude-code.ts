@@ -40,6 +40,7 @@ import {
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
+import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
 import { createHash } from "node:crypto";
 import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
@@ -48,6 +49,7 @@ import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { residentContextAsOf, residentContextKind, withResidentContext } from "../stella/resident-context.ts";
 import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "@stella/runtime/kernel/integrations/claude-code-transcript";
 import { isPiCompactionBoundary } from "../stella/handover.ts";
+import { isSafeguardContextBoundary } from "../stella/safeguard.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 import { abandonToolCall } from "./abandoned-calls.ts";
 
@@ -246,6 +248,7 @@ const markedError = (error: unknown): string => {
   const message = errorText(error);
   if (code === "CLAUDE_CODE_AUTH_REAUTH_REQUIRED") return `[claude-code/login-required] ${message}`;
   if (code === "CLAUDE_CODE_USAGE_LIMIT") return `[claude-code/usage-limit] ${message}`;
+  if (code === "CLAUDE_CODE_SAFEGUARD_BLOCK" || isSafeguardBlockText(message)) return markSafeguardBlock("claude-code", message);
   return message;
 };
 
@@ -379,6 +382,12 @@ const userPrompt = (users: readonly Message[]): { text: string; images: ImageCon
     .join("\n\n"),
   images: users.flatMap((message) => imagesOf(message.content)),
 });
+
+/**
+ * A message after which the held CLI session no longer matches the
+ * conversation: another engine compacted it, or messages were taken out of it.
+ */
+const isContextBoundary = (message: Message): boolean => isPiCompactionBoundary(message) || isSafeguardContextBoundary(message);
 
 const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
 
@@ -548,7 +557,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     for (const message of messages) {
       const key = messageKey(message);
       if (key && !record.seen.includes(key)) record.seen.push(key);
-      if (key && isPiCompactionBoundary(message)) record.boundary = key;
+      if (key && isContextBoundary(message)) record.boundary = key;
       const undelivered = key ? (record.undelivered?.indexOf(key) ?? -1) : -1;
       if (undelivered >= 0) record.undelivered!.splice(undelivered, 1);
     }
@@ -832,7 +841,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
     const resumedDelta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
-    const boundaryAt = conversation.findLastIndex(isPiCompactionBoundary);
+    const boundaryAt = conversation.findLastIndex(isContextBoundary);
     const boundary = boundaryAt >= 0 ? messageKey(conversation[boundaryAt]!) : undefined;
     const foreign =
       options.transport.hydrate !== undefined &&
@@ -1100,6 +1109,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       finalUsage();
       output.stopReason = reason;
       output.errorMessage = message;
+      if (reason === "error" && isSafeguardBlockText(message)) output.rawStopReason = "refusal";
       out.push({ type: "error", reason, error: output });
       out.end(output);
     };

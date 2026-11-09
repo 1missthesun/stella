@@ -197,3 +197,16 @@ button.schedule-card:focus-visible {
 .schedule-card:has(.schedule-card__dismiss) .schedule-card__meta {
   margin-top: 5px;
 }
+
+.safeguard-card__text {
+  color: var(--text-weak);
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+}
+
+.safeguard-card__actions {
+  flex-wrap: wrap;
+  margin-top: 8px;
+  row-gap: 8px;
+  font-size: var(--font-size-base, 13px);
+}

@@ -7,6 +7,8 @@ import {
   presentUsageLimitResumed,
   usageLimitCardId,
 } from "@/features/chat/usage-limit-card";
+import { presentSafeguardBlock } from "@/features/chat/safeguard-card";
+import { isSafeguardBlock, type SafeguardAction } from "@stella/contracts/safeguard-block";
 import {
   clearComposerNotices,
   VOICE_FAILURE_NOTICE_ID,
@@ -106,8 +108,18 @@ const presentUsageLimit = (conversationId: string, event: PiChatEvent & { type: 
   else dismissUsageLimitCard(conversationId);
 };
 
+const resolveSafeguard = async (conversationId: string, action: SafeguardAction) => {
+  const chat = api();
+  if (!chat) throw new Error("Stella's runtime isn't available.");
+  await chat.request({ op: "safeguard", conversationId, action });
+};
+
 const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) => {
   for (const event of events) {
+    if (event.type === "safeguard") {
+      presentSafeguardBlock(conversationId, event.notice, (action) => resolveSafeguard(conversationId, action));
+      continue;
+    }
     if (event.type === "engine_status" && (event.state === "usage-limit" || event.state === "usage-limit-end")) {
       presentUsageLimit(conversationId, event);
       continue;
@@ -125,6 +137,7 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     if (event.type !== "message_end" || event.entry.kind !== "pi.assistant") continue;
     const message = event.entry.model?.[0];
     if (message?.role !== "assistant") continue;
+    if (isSafeguardBlock(message)) continue;
     if (message.stopReason === "error") {
       presentStellaProviderError(message.errorMessage ?? null, { conversationId });
     } else if (message.stopReason !== "aborted") {

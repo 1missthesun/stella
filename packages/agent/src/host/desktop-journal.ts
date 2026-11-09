@@ -1,5 +1,13 @@
 import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
+import {
+  isSafeguardBlock,
+  parseSafeguardBlockInfo,
+  safeguardEventOfRecord,
+  type SafeguardBlockInfo,
+  type SafeguardCard,
+  type SafeguardEvent,
+} from "@stella/contracts/safeguard-block";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
@@ -59,6 +67,7 @@ export type JournalReadRecord = {
   payload?: unknown;
   card?: unknown;
   clientMsgId?: string;
+  safeguard?: unknown;
 };
 
 const AGENT_OPERATION = /^pia:/;
@@ -92,6 +101,7 @@ export type DesktopJournal = {
     records: Array<{ ordinal: number; role: "assistant" | "toolResult"; payloadJson: string }>;
     phase: "completed" | "failed" | "canceled";
     notice?: string;
+    safeguard?: SafeguardBlockInfo;
     onDeliveryFailure?: () => void;
   }): Promise<void>;
   finishOutcome?(localTurnId: string): { s: "pending" } | { s: "delivered" } | { s: "dead"; reason: string };
@@ -181,6 +191,8 @@ export type JournalMirror = {
   importNow(): Promise<void>;
   remoteTurns(): PiRemoteTurn[];
   turnOpen(): boolean;
+  /** Waits until the journal has every turn this computer ran; false when `withinMs` passes first. */
+  delivered(withinMs: number): Promise<boolean>;
   standing: Promise<boolean>;
   sync(): void;
   stop(): Promise<void>;
@@ -244,6 +256,12 @@ export async function journalMirror(args: {
   report: (error: unknown) => void;
   onRemoteTurns?: (turns: PiRemoteTurn[]) => void;
   onUsageLimit?: (card: ClaudeUsageLimitCard, createdAtMs: number) => void;
+  /** What a blocked reply of this computer's own turn says about the block. */
+  safeguardInfo?: (blocked: AssistantMessage) => Promise<SafeguardBlockInfo> | SafeguardBlockInfo;
+  /** A turn's outcome or a choice on a block, in journal order. */
+  onSafeguard?: (event: SafeguardEvent) => Promise<void>;
+  /** A choice on a block, once every message before it is imported. */
+  onSafeguardCard?: (card: SafeguardCard, record: { seq: number; ownPrompts: EntryId[]; own: boolean }) => Promise<void>;
   readBrain?: () => Promise<PiBrainRecord | null>;
   resumed: boolean;
   context: Context;
@@ -401,8 +419,28 @@ export async function journalMirror(args: {
     let stoppedElsewhere = false;
     for (;;) {
       const page = await journal.read(after);
-      const messages: JournalMessage[] = [];
+      let messages: JournalMessage[] = [];
       for (const record of page.records) {
+        const safeguard = safeguardEventOfRecord({
+          kind: record.kind,
+          turnId: record.turnId,
+          ...(record.phase ? { phase: record.phase } : {}),
+          ...(parseSafeguardBlockInfo(record.safeguard) ? { safeguard: parseSafeguardBlockInfo(record.safeguard)! } : {}),
+          card: record.card,
+        });
+        if (safeguard) {
+          if (safeguard.e === "card") {
+            await importJournal(harness, root, messages, record.seq - 1, context, start.seed);
+            messages = [];
+            await args.onSafeguardCard?.(safeguard.card, {
+              seq: record.seq,
+              ownPrompts: safeguard.card.state === "removed" ? ownPromptsOf(safeguard.card.turnIds) : [],
+              own: safeguard.card.state === "switched" && journal.ownTurn(safeguard.card.turnId),
+            });
+          }
+          if (safeguard.e === "card" || !journal.ownTurn(record.turnId)) await args.onSafeguard?.(safeguard);
+          if (safeguard.e === "card") continue;
+        }
         const usageLimit = record.kind === "card" ? parseClaudeUsageLimitCard(record.card) : null;
         if (usageLimit) {
           args.onUsageLimit?.(usageLimit, record.createdAtMs ?? Date.now());
@@ -467,6 +505,12 @@ export async function journalMirror(args: {
     }
   };
 
+  const ownPromptsOf = (turnIds: readonly string[]): EntryId[] =>
+    turnIds.flatMap((turnId) => {
+      const entryId = journal.ownTurn(turnId) ? Number(turnId.split(":").at(-1)) : Number.NaN;
+      return Number.isSafeInteger(entryId) ? [entryId as EntryId] : [];
+    });
+
   const finishTurn = async (localTurnId: string) => {
     const open = known.get(localTurnId);
     if (open?.s !== "held" || open.holder !== holder) return;
@@ -479,6 +523,8 @@ export async function journalMirror(args: {
       if (known.get(localTurnId)?.s !== "held") return;
       const messages = entries.map((entry) => entry.model![0]!);
       const last = [...messages].reverse().find((message) => message.role === "assistant");
+      const safeguard =
+        last?.role === "assistant" && isSafeguardBlock(last) ? ((await args.safeguardInfo?.(last)) ?? {}) : undefined;
       await journal.finish({
         localTurnId: open.localTurnId,
         leaseToken: open.leaseToken,
@@ -489,6 +535,7 @@ export async function journalMirror(args: {
           payloadJson: JSON.stringify(message),
         })),
         ...((last?.role === "assistant" ? piTerminalNotice(last) : undefined) ?? { phase: "completed" as const }),
+        ...(safeguard ? { safeguard } : {}),
         onDeliveryFailure: () => sync(),
       });
       await apply([[open.localTurnId, { e: "ending" }]]);
@@ -803,6 +850,17 @@ export async function journalMirror(args: {
     importNow,
     remoteTurns,
     turnOpen: () => [...known.values()].some((turn) => turn.s === "held" || turn.s === "beginning"),
+    async delivered(withinMs) {
+      const deadline = Date.now() + withinMs;
+      for (;;) {
+        await settleEnding();
+        if (![...known.values()].some((turn) => turn.s === "held" || turn.s === "beginning" || turn.s === "ending")) {
+          return true;
+        }
+        if (stopped || Date.now() >= deadline) return false;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    },
     standing,
     sync,
     async stop() {

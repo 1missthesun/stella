@@ -11,7 +11,11 @@ import {
 import { journalWorkingActivity } from "@stella/contracts/journal-working-activity";
 import { journalAgents } from "@stella/contracts/agent-titles";
 import { publishJournalAgents } from "./journal-agent-store";
-import { presentLatestTurnUsageLimit, presentUsageLimitPauses } from "./usage-limit-notice";
+import {
+  presentLatestTurnUsageLimit,
+  presentSafeguardBlocks,
+  presentUsageLimitPauses,
+} from "./usage-limit-notice";
 import {
   useCallback,
   useEffect,
@@ -388,6 +392,7 @@ export function useCloudChatBridge({
     publishJournalAgents(journalConversationId, journalAgents(completeRecords));
     presentLatestTurnUsageLimit(journalConversationId, completeRecords);
     if (webShell) presentUsageLimitPauses(journalConversationId, completeRecords);
+    if (webShell) presentSafeguardBlocks(journalConversationId, completeRecords);
   }, [completeRecords, enabled, journalConversationId, webShell]);
   const activeUserIds = useMemo(
     () => activeCloudUserMessageIds(completeRecords),

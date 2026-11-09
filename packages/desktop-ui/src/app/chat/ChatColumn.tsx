@@ -11,6 +11,7 @@ import { ChevronDown } from "@/ui/icons";
 import { ConnectorConnectCard } from "./ConnectorConnectCard";
 import { AppSourceOffers } from "@/features/app-source/AppSourceCards";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
+import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import { ComposerNotice } from "./ComposerNotice";
 import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "@/features/cloud/CloudConnectorConnectCard";
@@ -265,16 +266,18 @@ export const ChatColumn = memo(function ChatColumn({
   );
 
   const extraTail = conversation.extraTail;
+  const replying = Boolean(conversation.streaming.isStreaming);
   const chatTail = useMemo(
     () => (
       <>
         {extraTail}
         <AppSourceOffers conversationId={conversationId} />
         <UsageLimitChatCard conversationId={conversationId} />
+        <SafeguardChatCard conversationId={conversationId} replying={replying} />
         <WaitingMessages />
       </>
     ),
-    [conversationId, extraTail],
+    [conversationId, extraTail, replying],
   );
 
   return (

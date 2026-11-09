@@ -2,6 +2,7 @@ import type { AgentStatus } from "./agent-status.js";
 import type { ChatContext } from "./index.js";
 import { parseAgentReportEnvelope, type AgentReportEnvelope } from "./agent-wake-prompt.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
+import { isSafeguardBlock, SAFEGUARD_TERMINAL_NOTICE, type SafeguardAction, type SafeguardNotice } from "./safeguard-block.js";
 import { stellaUsageLimitText } from "./stella-usage-limit.js";
 import { workingToolName } from "./working-status.js";
 
@@ -51,6 +52,7 @@ export type PiAssistantMessage = {
   model?: string;
   stopReason?: string;
   errorMessage?: string;
+  rawStopReason?: string;
   timestamp: number;
   stella?: { hidden?: true };
 } & PiVoiceMarks;
@@ -140,6 +142,8 @@ export type PiChatEvent =
       paused?: import("./claude-usage-limit.js").UsageLimitSummary;
     }
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
+  /** The chat's unresolved safety block, or null once nothing is blocked. */
+  | { type: "safeguard"; notice: SafeguardNotice | null }
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
   | { type: "brain"; brain: PiChatBrainResult }
   | { type: "send_failed"; requestId: string; message: string }
@@ -194,6 +198,8 @@ export type PiChatRequest =
   | { op: "welcome"; conversationId: string; message: string }
   | { op: "files"; conversationId: string }
   | { op: "journal"; conversationId: string }
+  /** A choice on the safety-block card: remove the blocked messages, continue on another model, or start fresh. */
+  | { op: "safeguard"; conversationId: string; action: SafeguardAction }
   /** Resume on the usage-limit card: continue everything the limit paused in this chat. */
   | { op: "resumeUsageLimit"; conversationId: string }
   | {
@@ -257,6 +263,7 @@ export type PiChatState = {
   failure?: string;
   compacting: boolean;
   engineStatus?: string;
+  safeguard?: SafeguardNotice;
   remote: PiRemoteTurn[];
 };
 
@@ -411,6 +418,8 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
     }
     case "remote_turns":
       return { ...state, remote: event.turns };
+    case "safeguard":
+      return { ...state, safeguard: event.notice ?? undefined };
     case "auto_retry_start":
       return { ...state, retry: { at: event.at, error: event.errorMessage } };
     case "auto_retry_end":
@@ -448,11 +457,13 @@ export const piMessageText = (message: PiMessage | undefined): string => {
 export const piTerminalNotice = (message: {
   stopReason?: string;
   errorMessage?: string;
+  rawStopReason?: string;
 }): { phase: "failed" | "canceled"; notice: string } | undefined =>
   message.stopReason === "error"
     ? {
         phase: "failed",
         notice:
+          (isSafeguardBlock(message) ? SAFEGUARD_TERMINAL_NOTICE : null) ??
           stellaUsageLimitText(message.errorMessage) ??
           `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
       }

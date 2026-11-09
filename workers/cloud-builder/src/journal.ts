@@ -1,6 +1,10 @@
 import type { OwnerKeks } from "./secret-rotation.js";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
+import {
+  parseSafeguardBlockInfo,
+  type SafeguardBlockInfo,
+} from "@stella/contracts/safeguard-block";
 import { estimateTokens } from "@stella/executor-cloud/prune-history";
 import {
   READY_RUNNING_AGENTS_LIMIT,
@@ -419,6 +423,7 @@ export type AppendTurnInput = {
   notice?: string;
   promptSeq?: number;
   wallClockMs?: number;
+  safeguard?: SafeguardBlockInfo;
   createdAt?: number;
 };
 
@@ -1436,6 +1441,7 @@ export class Journal {
     const detail: Record<string, unknown> = {};
     if (input.promptSeq !== undefined) detail.promptSeq = input.promptSeq;
     if (input.wallClockMs !== undefined) detail.wallClockMs = input.wallClockMs;
+    if (input.safeguard && input.phase === "failed") detail.safeguard = input.safeguard;
     const payloadJson = JSON.stringify(detail);
     const { seq, inserted } = this.insert(
       {
@@ -1480,6 +1486,7 @@ export class Journal {
         ...(input.wallClockMs !== undefined
           ? { wallClockMs: input.wallClockMs }
           : {}),
+        ...(detail.safeguard ? { safeguard: input.safeguard } : {}),
       },
     };
   }
@@ -1715,6 +1722,17 @@ export class Journal {
         .exec(`SELECT 1 FROM journal WHERE writer_key = ? LIMIT 1`, writerKey)
         .toArray().length > 0
     );
+  }
+
+  cardByWriterKey(writerKey: string): unknown {
+    const row = this.sql
+      .exec<JournalRow>(
+        `SELECT * FROM journal WHERE writer_key = ? AND kind = 'card' LIMIT 1`,
+        writerKey,
+      )
+      .toArray()[0];
+    const record = row ? this.rowToRecord(row) : undefined;
+    return record?.kind === "card" ? record.card : undefined;
   }
 
   turnContextRange(turnId: string): { startSeq: number; endSeq: number } | null {
@@ -2006,6 +2024,53 @@ export class Journal {
     this.sql.exec(`UPDATE journal SET model_skip = 1 WHERE seq = ?`, seq);
   }
 
+  /** The newest turn and card records, oldest first. */
+  recentOutcomes(limit: number): JournalRecord[] {
+    return this.selectRows(
+      `WHERE kind IN ('turn', 'card') ORDER BY seq DESC LIMIT ?`,
+      limit,
+    )
+      .reverse()
+      .map((row) => this.rowToRecord(row));
+  }
+
+  /** Seq of the newest completed turn's terminal record, or -1. */
+  lastCompletedSeq(): number {
+    return (
+      this.sql
+        .exec<{ seq: number | null }>(
+          `SELECT MAX(seq) AS seq FROM journal WHERE kind = 'turn' AND phase = 'completed'`,
+        )
+        .one().seq ?? -1
+    );
+  }
+
+  /**
+   * Takes every message in `fromSeq..toSeq` out of what any model is given
+   * from this journal, and returns the turns they belong to. The rows stay,
+   * so the history still shows them.
+   */
+  skipModelRange(fromSeq: number, toSeq: number, turnLimit: number): string[] {
+    const turnIds = this.sql
+      .exec<{ turn_id: string }>(
+        `SELECT turn_id, MIN(seq) AS first FROM journal
+          WHERE kind = 'message' AND seq >= ? AND seq <= ?
+          GROUP BY turn_id ORDER BY first DESC LIMIT ?`,
+        fromSeq,
+        toSeq,
+        turnLimit,
+      )
+      .toArray()
+      .map((row) => row.turn_id)
+      .reverse();
+    this.sql.exec(
+      `UPDATE journal SET model_skip = 1 WHERE kind = 'message' AND seq >= ? AND seq <= ?`,
+      fromSeq,
+      toSeq,
+    );
+    return turnIds;
+  }
+
   rowToRecord(row: JournalRow): JournalRecord {
     const parse = (): unknown => {
       try {
@@ -2018,7 +2083,10 @@ export class Journal {
       const detail = (parse() ?? {}) as {
         promptSeq?: number;
         wallClockMs?: number;
+        safeguard?: unknown;
       };
+      const safeguard =
+        row.phase === "failed" ? parseSafeguardBlockInfo(detail.safeguard) : null;
       return {
         seq: row.seq,
         kind: "turn",
@@ -2034,6 +2102,7 @@ export class Journal {
         ...(detail.wallClockMs !== undefined
           ? { wallClockMs: detail.wallClockMs }
           : {}),
+        ...(safeguard ? { safeguard } : {}),
       };
     }
     if (row.kind === "card") {

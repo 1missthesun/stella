@@ -373,6 +373,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (url.pathname === "/slack/bind") return this.handleSlackBind(request);
     if (url.pathname === "/slack/stop") return this.handleSlackStop(request);
     if (url.pathname === "/cards") return this.handleCard(request);
+    if (url.pathname === "/safeguard") return this.handleSafeguard(request);
     if (url.pathname === "/purge") return this.handlePurge();
     if (url.pathname === "/owner-purge-cancel") {
       const body = (await request.json().catch(() => ({}))) as {

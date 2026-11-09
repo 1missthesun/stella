@@ -1,3 +1,4 @@
+import type { SafeguardBlockInfo } from "@stella/contracts/safeguard-block";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { assistantMessageHasUsableOutput } from "@stella/runtime/kernel/agent-runtime/run-shared.js";
@@ -471,6 +472,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     phase: TurnPhase,
     notice?: string,
     wallClockMs?: number,
+    safeguard?: SafeguardBlockInfo,
   ): void {
     try {
       const now = Date.now();
@@ -483,6 +485,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
         source: turn.source,
         notice,
         wallClockMs,
+        ...(safeguard ? { safeguard } : {}),
         createdAt: now,
       });
       this.journal.setTurnSpan(turn.turnId, row.seq);

@@ -90,6 +90,7 @@ import {
   useClaudeUsageLimitNotice,
 } from "./claude-usage-limit-notice";
 import { useStellaUsageLimitNotice } from "./stella-usage-limit-notice";
+import { SAFEGUARD_RECORDS, useSafeguardNotice } from "./safeguard-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
 import type { ChatMessage } from "../types";
@@ -581,6 +582,10 @@ export const useCloudCanonicalChatThread = (
   useClaudeUsageLimitNotice(
     threadId === "cloud" ? authority.conversationId : null,
     journalWindow.view(USAGE_LIMIT_CARDS),
+  );
+  useSafeguardNotice(
+    threadId === "cloud" ? authority.conversationId : null,
+    journalWindow.view(SAFEGUARD_RECORDS),
   );
   useStellaUsageLimitNotice(
     threadId === "cloud" ? authority.conversationId : null,

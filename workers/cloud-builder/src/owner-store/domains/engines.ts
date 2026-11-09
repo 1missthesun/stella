@@ -1,6 +1,7 @@
 // Claude logins stay in each place's own Claude Code CLI; this domain keeps
 // only identities. ChatGPT tokens leave it only through `credentials.chatgpt`.
 
+import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
 import {
   isLegacyCloudExecution,
   type AgentModelReasoningEffort,
@@ -1593,6 +1594,11 @@ const cancelClaudeDeviceLogin = async (
     loginId: args.loginId,
   }).catch(() => undefined);
   return null;
+};
+
+/** Selects `pick` (a spawn-style model name) for the owner's cloud turns, keeping the current effort. */
+export const selectCloudModel = (ctx: OwnerContext, pick: string): void => {
+  writeSelection(ctx, parseExecution(resolveCloudSpawnExecution(pick, readSelection(ctx.db).selection)));
 };
 
 const setExecution = (

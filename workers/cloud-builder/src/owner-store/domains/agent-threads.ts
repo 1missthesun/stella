@@ -53,6 +53,8 @@ import {
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
+import { selectCloudModel } from "./engines.js";
+import { SAFEGUARD_CONTINUE_PROMPT } from "@stella/contracts/safeguard-block";
 import {
   AGENT_REPORT_MAX_CHARS,
   AGENT_REPORT_NOTE_MAX_CHARS,
@@ -3768,6 +3770,30 @@ const resumeUsageLimit = async (
   return { cloud };
 };
 
+const resolveSafeguard = async (
+  ctx: OwnerContext,
+  args: AgentThreadCalls["safeguards.resolve"]["args"],
+): Promise<AgentThreadCalls["safeguards.resolve"]["result"]> => {
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) throw new RpcError("CONFLICT", "Account data is currently being reset or deleted.");
+  const { card, ranInCloud } = await ctx.host.resolveSafeguard({
+    conversationId: args.conversationId,
+    ownerGeneration: snapshot.ownerGeneration,
+    action: args.action,
+    requestId: args.requestId,
+  });
+  if (card.state === "switched" && ranInCloud) {
+    selectCloudModel(ctx, card.pick);
+    await ctx.host.startAgentMessageTurn({
+      ownerGeneration: snapshot.ownerGeneration,
+      conversationId: args.conversationId,
+      clientMsgId: `sgc-${args.requestId}`.slice(0, 64),
+      prompt: SAFEGUARD_CONTINUE_PROMPT,
+    });
+  }
+  return { card };
+};
+
 export type AgentThreadEffects = {
   cards: Array<{ conversationId: string; ownerGeneration: string; sourceTurnId: string; card: unknown }>;
 };
@@ -4480,6 +4506,15 @@ export const agentThreadsDomain = {
       scope: "owner",
       parse: object({ conversationId: id(256), requestId: id() }),
       handler: resumeUsageLimit,
+    },
+    "safeguards.resolve": {
+      scope: "owner",
+      parse: object({
+        conversationId: id(256),
+        action: literal("remove", "switch", "clear"),
+        requestId: id(),
+      }),
+      handler: resolveSafeguard,
     },
     "computerThreads.running": {
       scope: "owner",

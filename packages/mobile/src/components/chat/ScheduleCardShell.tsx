@@ -17,6 +17,7 @@ export function ScheduleCardShell({
   headline,
   status,
   trailing,
+  actions,
   icon = "clock",
   iconColor,
   wrap,
@@ -32,6 +33,8 @@ export function ScheduleCardShell({
   headline: string;
   status: string;
   trailing?: ReactNode;
+  /** Controls on their own row under the status, for a card with several choices. */
+  actions?: ReactNode;
   icon?: IconName;
   iconColor?: string;
   /** Let long text wrap instead of truncating. */
@@ -71,6 +74,7 @@ export function ScheduleCardShell({
             {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
           </View>
         ) : null}
+        {actions ? <View style={styles.actions}>{actions}</View> : null}
       </View>
       {onDismiss ? (
         <Pressable
@@ -135,6 +139,15 @@ const makeStyles = (colors: Colors) =>
     // With a ✕: the status line drops so its primary pill clears the ✕ by ~10pt.
     metaDismiss: { marginTop: 4 },
     trailing: { flexShrink: 0 },
+    actions: {
+      alignItems: "center",
+      columnGap: 16,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginTop: 8,
+      paddingBottom: 3,
+      rowGap: 10,
+    },
     // On the headline row; its visible 14pt icon's right edge = the card's
     // content edge (paddingRight 14), so trailing buttons line up under it.
     dismiss: {

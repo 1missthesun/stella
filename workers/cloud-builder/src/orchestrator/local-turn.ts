@@ -1,3 +1,4 @@
+import { parseSafeguardBlockInfo } from "@stella/contracts/safeguard-block";
 import {
   parsePiBrainClaim,
   parsePiBrainHost,
@@ -1247,6 +1248,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       }>;
       phase?: string;
       notice?: string;
+      safeguard?: unknown;
     };
     try {
       body = (await request.json()) as typeof body;
@@ -1282,11 +1284,16 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     if (owner instanceof Response) return owner;
     const turnId = makeLocalTurnId(deviceId, localTurnId);
     const { records: parsed, totalBytes } = parsedRecords;
+    const safeguard =
+      terminalPhase === "failed"
+        ? parseSafeguardBlockInfo(body.safeguard)
+        : null;
     const finishFingerprint = await sha256Hex(
       JSON.stringify({
         expectedOwnerGeneration,
         phase: terminalPhase,
         notice: body.notice?.trim() ?? "",
+        ...(safeguard ? { safeguard } : {}),
         records: parsed.map(({ ordinal, role, payloadJson }) => ({
           ordinal,
           role,
@@ -1572,6 +1579,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         ...(body.notice?.trim()
           ? { notice: body.notice.trim().slice(0, 500) }
           : {}),
+        ...(safeguard ? { safeguard } : {}),
         createdAt: terminalAt,
       });
       if (firstSeq === null) firstSeq = terminal.seq;

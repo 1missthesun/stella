@@ -11,6 +11,7 @@ import {
 } from "react";
 import { CompactConversationSurface } from "@/features/chat/CompactConversationSurface";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
+import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import type { ChatColumnScroll } from "@/features/chat/chat-column-types";
 import { useChatScrollManagement } from "@/shell/use-chat-scroll-management";
 import {
@@ -412,6 +413,7 @@ function AccountScopedChatPanelTab({
                 <>
                   {extraTail}
                   <UsageLimitChatCard conversationId={conversationId} />
+                  <SafeguardChatCard conversationId={conversationId} replying={isStreaming} />
                 </>
               }
             />

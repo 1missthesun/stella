@@ -1,3 +1,4 @@
+import type { SafeguardBlockInfo } from "@stella/contracts/safeguard-block";
 import { Buffer } from "node:buffer";
 import { reportStatusOf, type AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
@@ -79,6 +80,14 @@ export class CliTurnFailedError extends Error {
   ) {
     super(message);
     this.name = "CliTurnFailedError";
+  }
+}
+
+/** The model's safety system ended the turn's reply. */
+export class SafeguardBlockedError extends Error {
+  constructor(readonly info: SafeguardBlockInfo) {
+    super("The model's safety system stopped the reply.");
+    this.name = "SafeguardBlockedError";
   }
 }
 

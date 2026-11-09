@@ -28,6 +28,7 @@ import type { StellaContextSources } from "./stella/context.ts";
 import { STELLA_AGENT_TOOLS, stellaToolExtensions, type StellaToolHost } from "./stella/host-tools.ts";
 import { createImageBudget } from "./stella/image-budget.ts";
 import { stellaPromptExtension } from "./stella/prompt-extension.ts";
+import { simulateSafeguardBlocks } from "./stella/safeguard-simulation.ts";
 
 const MODEL_REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -65,6 +66,8 @@ export type StellaHarnessOptions = {
   extensions?: readonly Extension[];
   env?: HarnessOptions["env"];
   settings?: HarnessSettings;
+  /** Test builds only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
+  simulateSafeguardBlocks?: boolean;
   onReport?: (error: unknown) => void;
 };
 
@@ -134,7 +137,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   const harness = await Harness.open(
     options.storage,
     {
-      models: imageBudget.models(options.models),
+      models: imageBudget.models(options.simulateSafeguardBlocks ? simulateSafeguardBlocks(options.models) : options.models),
       registry,
       settings,
       ...(options.env ? { env: options.env } : {}),

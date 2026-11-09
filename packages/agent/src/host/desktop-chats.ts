@@ -78,6 +78,28 @@ import {
   stellaModelRef,
 } from "../harness.ts";
 import { fitForHandover } from "../stella/handover.ts";
+import {
+  isOpusModel,
+  isSafeguardBlock,
+  SAFEGUARD_CARD_TYPE,
+  SAFEGUARD_CONTINUE_PROMPT,
+  safeguardModelLabel,
+  safeguardNotice,
+  type SafeguardAction,
+  type SafeguardBlockInfo,
+  type SafeguardCard,
+  type SafeguardEvent,
+  type SafeguardFold,
+} from "@stella/contracts/safeguard-block";
+import {
+  clearContext,
+  entriesOfJournalSpan,
+  entriesSinceLastReply,
+  noteInTimeline,
+  noteSafeguardEvents,
+  readSafeguardFold,
+  removeFromContext,
+} from "../stella/safeguard.ts";
 import { recordEngineCompaction } from "../stella/journal-sync.ts";
 import {
   agentRunOutcome,
@@ -247,6 +269,14 @@ export type DesktopChatsOptions = {
     }): Promise<void>;
     resume(args: { conversationId: string; requestId: string }): Promise<{ cloud: number }>;
   };
+  /** Records a choice on a safety block in the chat's journal, where every place that holds the chat applies it. */
+  safeguards?: {
+    resolve(args: { conversationId: string; action: SafeguardAction; requestId: string }): Promise<unknown>;
+  };
+  /** Test builds only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
+  simulateSafeguardBlocks?: boolean;
+  /** Saves the model Stella answers with on this computer. */
+  setStellaModel?(pick: string): void | Promise<void>;
   emit(payload: PiChatEventsPayload): void;
   report(error: unknown): void;
 };
@@ -291,6 +321,7 @@ type Chat = {
   localLog?: LocalLogMirror;
   execution: DesktopExecution;
   stream?: AgentEventStream;
+  safeguardStream: AgentEventStream;
   watchers: number;
   idleCheck: ReturnType<typeof setInterval>;
   followCheck: ReturnType<typeof setInterval>;
@@ -1205,6 +1236,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           {
             storage,
             models,
+            ...(options.simulateSafeguardBlocks ? { simulateSafeguardBlocks: true } : {}),
             sources: desktopContextSources({
               stellaHome: options.dataDir,
               backendUrl: options.siteAuth()?.baseUrl,
@@ -1400,6 +1432,9 @@ export function desktopChats(options: DesktopChatsOptions) {
                 }
               },
               onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),
+              safeguardInfo: safeguardInfoOf,
+              onSafeguard: (event) => noteSafeguard(conversationId, { harness, root }, [event]),
+              onSafeguardCard: (card, record) => applySafeguardCard(conversationId, { harness, root }, card, record),
               ...(brain ? { readBrain: () => brain.read() } : {}),
               resumed,
               context,
@@ -1463,9 +1498,25 @@ export function desktopChats(options: DesktopChatsOptions) {
             });
         }, FOLLOW_MS);
         followCheck.unref?.();
+        const safeguardStream = await watchEvents(harness, root.id, context);
+        safeguardStream.start(async (events) => {
+          const noted: SafeguardEvent[] = [];
+          for (const event of events as unknown as PiChatEvent[]) {
+            if (event.type !== "message_end" || event.entry.kind !== "pi.assistant") continue;
+            const message = event.entry.model?.[0] as AssistantMessage | undefined;
+            if (!message) continue;
+            if (isSafeguardBlock(message)) {
+              noted.push({ e: "blocked", turnId: `entry:${event.entry.id}`, info: safeguardInfoOf(message) });
+            } else if (message.stopReason === "stop") {
+              noted.push({ e: "replied" });
+            }
+          }
+          if (noted.length > 0) await noteSafeguard(conversationId, { harness, root }, noted).catch(options.report);
+        });
         opened = {
           harness,
           root,
+          safeguardStream,
           refreshTools,
           startAgent,
           agentRecords,
@@ -1535,6 +1586,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const [snapshot] = eventsForClients([stream.snapshot as unknown as PiChatEvent]) as [PiChatWatchResult["snapshot"]];
     const held = usageLimitEvent(conversationId);
     if (held) options.emit({ conversationId, events: [held] });
+    emitSafeguard(conversationId, await readSafeguardFold(chat.harness, chat.root.id, context));
     return {
       snapshot: { ...snapshot, entries: mergePiEntries(entries, snapshot.entries) },
       hasOlder,
@@ -1802,7 +1854,118 @@ export function desktopChats(options: DesktopChatsOptions) {
     return [...parts, ...hidden];
   };
 
-  const followPickedModel = async (chat: Chat): Promise<void> => {
+  const safeguardInfoOf = (blocked: AssistantMessage): SafeguardBlockInfo => {
+    const model = safeguardModelLabel(blocked.responseModel, blocked.model);
+    const opus = isOpusModel(blocked.responseModel, blocked.model);
+    const anthropicOpus = () =>
+      models
+        .getModels("anthropic")
+        .map((candidate) => candidate.id)
+        .filter((id) => /^claude-opus-/.test(id))
+        .sort()
+        .at(-1);
+    const switchTo = opus
+      ? undefined
+      : blocked.provider === CLAUDE_CODE_PROVIDER_ID
+        ? { pick: `${CLAUDE_CODE_PROVIDER_ID}/opus`, label: "Opus" }
+        : blocked.provider === "anthropic" && anthropicOpus()
+          ? { pick: `anthropic/${anthropicOpus()}`, label: safeguardModelLabel(anthropicOpus()) ?? "Opus" }
+          : undefined;
+    return { ...(model ? { model } : {}), ...(switchTo ? { switchTo } : {}) };
+  };
+
+  const emitSafeguard = (conversationId: string, fold: SafeguardFold) =>
+    options.emit({ conversationId, events: [{ type: "safeguard", notice: safeguardNotice(fold) }] });
+
+  const noteSafeguard = async (
+    conversationId: string,
+    chat: Pick<Chat, "harness" | "root">,
+    events: readonly SafeguardEvent[],
+  ): Promise<void> => {
+    const { fold, changed } = await noteSafeguardEvents(chat.harness, chat.root.id, events, context);
+    if (changed) emitSafeguard(conversationId, fold);
+  };
+
+  /** Continues a blocked chat on `pick`: saves it as this computer's model and asks for the rest of the reply. */
+  const continueOnModel = async (
+    chat: Pick<Chat, "harness" | "root">,
+    choice: { requestId: string; pick: string; label: string },
+  ): Promise<void> => {
+    if (!options.setStellaModel) throw new Error("This computer can't switch the model from here.");
+    await options.setStellaModel(choice.pick);
+    await followPickedModel(chat);
+    await noteInTimeline(chat.harness, chat.root, { state: "switched", requestId: choice.requestId, label: choice.label }, context);
+    const hidden: TextContent & { stella: { hidden: true } } = {
+      type: "text",
+      text: SAFEGUARD_CONTINUE_PROMPT,
+      stella: { hidden: true },
+    };
+    await chat.root.submit(
+      { type: "input", content: [hidden], whenBusy: "followUp", requestId: `safeguard:${choice.requestId}:continue` },
+      context,
+    );
+  };
+
+  /** Applies a journaled choice on a block to this computer's copy of the chat. */
+  const applySafeguardCard = async (
+    conversationId: string,
+    chat: Pick<Chat, "harness" | "root">,
+    card: SafeguardCard,
+    record: { seq: number; ownPrompts: EntryId[]; own: boolean },
+  ): Promise<void> => {
+    if (card.state === "removed") {
+      const targets = await entriesOfJournalSpan(
+        chat.harness,
+        chat.root,
+        { fromSeq: card.fromSeq, toSeq: card.toSeq, ownPrompts: record.ownPrompts },
+        context,
+      );
+      await removeFromContext(chat.harness, chat.root, { requestId: card.requestId, targets }, context);
+      return;
+    }
+    if (card.state === "cleared") {
+      await clearContext(chat.harness, chat.root, { requestId: card.requestId, journalCheckpoint: record.seq }, context);
+      return;
+    }
+    if (!record.own) return;
+    await markActive(conversationId, true);
+    await continueOnModel(chat, card);
+  };
+
+  const resolveSafeguard = async (conversationId: string, action: SafeguardAction): Promise<{ ok: true }> => {
+    const chat = await open(conversationId);
+    const requestId = randomUUID();
+    if (!conversationId.startsWith("local_") && options.safeguards && chat.mirror) {
+      await chat.mirror.delivered(JOURNAL_CATCH_UP_MS);
+      await options.safeguards.resolve({ conversationId, action, requestId });
+      await chat.mirror.importNow();
+      return { ok: true };
+    }
+    const base = { type: SAFEGUARD_CARD_TYPE, requestId };
+    if (action === "remove") {
+      const targets = await entriesSinceLastReply(chat.harness, chat.root, context);
+      await removeFromContext(chat.harness, chat.root, { requestId, targets }, context);
+      await noteSafeguard(conversationId, chat, [
+        { e: "card", card: { ...base, state: "removed", fromSeq: 0, toSeq: 0, turnIds: [] } },
+      ]);
+      return { ok: true };
+    }
+    if (action === "clear") {
+      await clearContext(chat.harness, chat.root, { requestId }, context);
+      await noteSafeguard(conversationId, chat, [{ e: "card", card: { ...base, state: "cleared" } }]);
+      return { ok: true };
+    }
+    const block = (await readSafeguardFold(chat.harness, chat.root.id, context)).block;
+    if (!block?.switchTo) throw new Error("There is no other model to continue with here.");
+    await noteSafeguard(conversationId, chat, [
+      { e: "card", card: { ...base, state: "switched", turnId: block.turnId, ...block.switchTo } },
+    ]);
+    await markActive(conversationId, true);
+    await continueOnModel(chat, { requestId, ...block.switchTo });
+    return { ok: true };
+  };
+
+  const followPickedModel = async (chat: Pick<Chat, "harness" | "root">): Promise<void> => {
     const model = await pickedModel();
     const agent = await chat.root.agent(context);
     const thinkingLevel = options.thinkingLevel?.() ?? "off";
@@ -2224,6 +2387,8 @@ export function desktopChats(options: DesktopChatsOptions) {
           return { ok: true };
         case "resumeUsageLimit":
           return await resumeUsageLimit(request.conversationId);
+        case "safeguard":
+          return await resolveSafeguard(request.conversationId, request.action);
         case "journaled": {
           const chat = await open(request.conversationId);
           await caughtUp(chat);
@@ -2266,6 +2431,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         clearInterval(chat.idleCheck);
         clearInterval(chat.followCheck);
         await chat.mirror?.stop();
+        await chat.safeguardStream.stop().catch(() => undefined);
         await chat.localLog?.stop();
         await chat.stream?.stop().catch(() => undefined);
         await chat.harness.close(context).catch(() => undefined);

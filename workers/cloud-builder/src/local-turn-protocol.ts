@@ -79,6 +79,9 @@ const TERMINAL_PHASES = new Set<string>([
 export const localTurnId = (deviceId: string, localId: string): string =>
   `desktop:${deviceId}:${localId}`;
 
+export const isLocalTurnId = (turnId: string): boolean =>
+  turnId.startsWith("desktop:");
+
 export const parseExpectedOwnerGeneration = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const normalized = value.trim();

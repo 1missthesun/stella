@@ -1,3 +1,4 @@
+import type { SafeguardAction, SafeguardCard } from "../safeguard-block.js";
 import type { CloudExecutionSelection } from "../agent-engine.js";
 import type { AgentWorkspaceSize } from "../turn-plane/turn-start.js";
 import type {
@@ -299,6 +300,16 @@ export type AgentThreadCalls = {
   "usageLimits.resume": {
     args: { conversationId: string; requestId: string };
     result: { cloud: number };
+  };
+  /**
+   * A choice on a chat's safety block (`@stella/contracts/safeguard-block`):
+   * the chat's journal settles it and posts the card every host applies. A
+   * switch of a turn the cloud ran also selects the model there and
+   * continues the reply.
+   */
+  "safeguards.resolve": {
+    args: { conversationId: string; action: SafeguardAction; requestId: string };
+    result: { card: SafeguardCard };
   };
 };
 

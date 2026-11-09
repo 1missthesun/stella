@@ -23,6 +23,10 @@ import { watchChildStdio } from "../shared/child-stdio.js";
 import { trackAgentProcess } from "../shared/agent-process-registry.js";
 import { sanitizeSensitiveData } from "@stella/contracts/sensitive-data";
 import {
+  isSafeguardBlockText,
+  markSafeguardBlock,
+} from "@stella/contracts/safeguard-block";
+import {
   CLAUDE_CODE_MODEL_ALIASES,
   formatClaudeCodeResolvedModel,
   readClaudeCodeResolvedModels,
@@ -213,6 +217,7 @@ type PendingStep = {
   abortListener?: () => void;
   detachTurnControl?: () => void;
   intermediateResult?: ClaudeCodeStepResult;
+  safeguardBlock?: ClaudeCodeSafeguardBlock;
   answeredMcpCallCount?: number;
   stellaToolsRunning?: number;
 };
@@ -282,7 +287,7 @@ type ClaudeCodeSession = {
   activeMcpTurn?: ClaudeCodeToolMcpActiveTurn;
   activeNativeToolUseCorrelator?: ClaudeNativeToolUseCorrelator;
   modelOverride?: string;
-  fableSafetyFailures?: number;
+  fableOverloadFailures?: number;
   allowEmptyNativeFinal?: boolean;
   consumedSteeringTexts?: string[];
   toolSetChanges?: number;
@@ -298,15 +303,49 @@ type ClaudeCodeSession = {
 type ClaudeCodeError = Error & { code?: string; status?: number };
 const CLAUDE_CODE_MODEL_PREFIX = "claude-code/";
 const CLAUDE_CODE_FALLBACK_MODEL = "claude-opus-4-8";
-const SAFETY_ABORT_FABLE_ATTEMPTS = 3;
+const OVERLOAD_FABLE_ATTEMPTS = 3;
+/** CLI error text for an exhausted-overload failure. Wording verified against CLI 2.1.32. */
+export const isClaudeCodeOverloadError = (message: string) =>
+  /overloaded/i.test(message);
+export type ClaudeCodeSafeguardBlock = { model?: string };
 /**
- * CLI error text for a model-side refusal (safety / Usage Policy stop) or
- * an exhausted-overload failure — the two failures where retrying the
- * configured model, then falling back, makes sense. Wording verified
- * against CLI 2.1.32; anything else propagates as a normal turn error.
+ * What a stream event says about a safety block on the step's last model
+ * response: the block, `"answered"` when a later response ended normally
+ * (the CLI retries a refusal itself), or null. The CLI reports a block as
+ * `system`/`model_refusal_no_fallback` and as a response whose
+ * `stop_reason` is `refusal` (verified against CLI 2.1.321).
  */
-export const isClaudeCodeModelRefusalOrOverloadError = (message: string) =>
-  /unable to respond to this request|usage policy|overloaded/i.test(message);
+export const getClaudeCodeSafeguardBlockFromStreamEvent = (
+  event: ClaudeStreamEvent,
+): ClaudeCodeSafeguardBlock | "answered" | null => {
+  const model = (value: unknown) =>
+    typeof value === "string" && value.trim()
+      ? { model: formatClaudeCodeResolvedModel(value.trim()) }
+      : {};
+  if (event.type === "system") {
+    return event.subtype === "model_refusal_no_fallback"
+      ? model(event.original_model)
+      : null;
+  }
+  if (typeof event.parent_tool_use_id === "string") return null;
+  const stopped = (stopReason: unknown, modelId: unknown) =>
+    typeof stopReason !== "string" || !stopReason
+      ? null
+      : stopReason === "refusal"
+        ? model(modelId)
+        : ("answered" as const);
+  if (event.type === "assistant") {
+    const message = asObject(event.message);
+    return stopped(message?.stop_reason, message?.model);
+  }
+  if (event.type === "stream_event") {
+    const inner = asObject(event.event);
+    return inner?.type === "message_delta"
+      ? stopped(asObject(inner.delta)?.stop_reason, undefined)
+      : null;
+  }
+  return null;
+};
 /**
  * Model aliases the `claude` CLI accepts via `--model` — canonical list in
  * claude-code-resolved-models.ts. `default` is special: it clears any
@@ -466,6 +505,16 @@ export class ClaudeCodeProcessEndedError extends Error {
 /**
  * The step completed but its `result` payload contained no final text.
  */
+export class ClaudeCodeSafeguardBlockError extends Error {
+  code = "CLAUDE_CODE_SAFEGUARD_BLOCK";
+
+  model?: string;
+  constructor(message: string, block: ClaudeCodeSafeguardBlock) {
+    super(markSafeguardBlock("claude-code", message));
+    this.name = "ClaudeCodeSafeguardBlockError";
+    if (block.model) this.model = block.model;
+  }
+}
 export class ClaudeCodeMalformedResultError extends Error {
   kind: "result_error" | "empty_result";
 
@@ -538,6 +587,24 @@ export const claudeCodeAuthFailureOf = (error: unknown) => {
   return { revoked: /revoked|token_revoked/i.test(message) };
 };
 
+/**
+ * The step's result as a safety block: its last model response was a
+ * refusal, or the CLI's error result says so in its own words.
+ */
+const claudeCodeSafeguardBlockOfResult = (
+  result: ClaudeStreamEvent,
+  observed: ClaudeCodeSafeguardBlock | undefined,
+): ClaudeCodeSafeguardBlockError | null => {
+  const text =
+    result.is_error === true && typeof result.result === "string"
+      ? result.result.trim()
+      : "";
+  if (!observed && !isSafeguardBlockText(text)) return null;
+  return new ClaudeCodeSafeguardBlockError(
+    text || "The model's safety system stopped this reply.",
+    observed ?? {},
+  );
+};
 const asRecoverableStepError = (error: unknown) =>
   error instanceof ClaudeCodeProcessEndedError ||
   error instanceof ClaudeCodeMalformedResultError
@@ -1654,7 +1721,7 @@ const CLAUDE_CODE_MODEL_FALLBACK_RE =
  * Detect the CLI's model-fallback announcement on the stream. When the
  * configured model errors as overloaded (529) and a `--fallback-model` is
  * in play (e.g. from the user's own CLI settings — we don't pass one; our
- * fable fallback policy lives in `applyFableFallbackPolicy`), the CLI
+ * fable overload policy lives in `applyFableOverloadPolicy`), the CLI
  * stickily switches the session's main-loop model to the fallback for the
  * rest of the session — the model actually answering is no longer the
  * configured one. We surface that switch as a visible toast,
@@ -1921,7 +1988,7 @@ class ClaudeCodeSessionRuntime {
         );
     const prompt = buildInitialPrompt(session, request);
     session.modelOverride = undefined;
-    session.fableSafetyFailures = 0;
+    session.fableOverloadFailures = 0;
     session.allowEmptyNativeFinal = false;
     session.consumedSteeringTexts = [];
     session.toolSetChanges = 0;
@@ -2145,9 +2212,12 @@ class ClaudeCodeSessionRuntime {
           throw withClaudeLoginRejected(error, session.claudeLoginEmail);
         }
 
+        if (error instanceof ClaudeCodeSafeguardBlockError) {
+          throw error;
+        }
         if (
           !hasPossibleSideEffects &&
-          this.applyFableFallbackPolicy(session, request, error)
+          this.applyFableOverloadPolicy(session, request, error)
         ) {
           continue;
         }
@@ -2232,18 +2302,19 @@ class ClaudeCodeSessionRuntime {
     }
   }
   /**
-   * Fable refusal/overload policy, mirroring the stella engine's safety
-   * swap: give the configured fable model SAFETY_ABORT_FABLE_ATTEMPTS
-   * consecutive attempts at the failing step, then switch the REST OF THIS
-   * TURN to CLAUDE_CODE_FALLBACK_MODEL via `session.modelOverride` (the
-   * next ensureStreamingProcess sees the config change and restarts on the
-   * fallback with --resume, keeping the CLI conversation). executeTurn
-   * clears the override at every turn start, so each new user message
-   * reattempts fable. Returns true when the caller should resend the same
-   * prompt; false when the policy doesn't apply (including a failure on the
-   * fallback itself) and the error should propagate.
+   * Fable overload policy: give the configured fable model
+   * OVERLOAD_FABLE_ATTEMPTS consecutive attempts at the failing step, then
+   * switch the REST OF THIS TURN to CLAUDE_CODE_FALLBACK_MODEL via
+   * `session.modelOverride` (the next ensureStreamingProcess sees the config
+   * change and restarts on the fallback with --resume, keeping the CLI
+   * conversation). executeTurn clears the override at every turn start, so
+   * each new user message reattempts fable. Returns true when the caller
+   * should resend the same prompt; false when the policy doesn't apply
+   * (including a failure on the fallback itself) and the error should
+   * propagate. A safety block never comes here: it ends the turn as
+   * `ClaudeCodeSafeguardBlockError`, and the user chooses what happens next.
    */
-  applyFableFallbackPolicy(
+  applyFableOverloadPolicy(
     session: ClaudeCodeSession,
     request: ClaudeCodeTurnRequest,
     error: unknown,
@@ -2252,16 +2323,16 @@ class ClaudeCodeSessionRuntime {
     const modelName = parseClaudeCodeModel(request.modelId);
     if (!modelName || !/\bfable\b/.test(modelName)) return false;
     const message = error instanceof Error ? error.message : "";
-    if (!isClaudeCodeModelRefusalOrOverloadError(message)) return false;
-    session.fableSafetyFailures = (session.fableSafetyFailures ?? 0) + 1;
+    if (!isClaudeCodeOverloadError(message)) return false;
+    session.fableOverloadFailures = (session.fableOverloadFailures ?? 0) + 1;
     const prettyFrom = formatClaudeCodeResolvedModel(modelName);
-    if (session.fableSafetyFailures < SAFETY_ABORT_FABLE_ATTEMPTS) {
+    if (session.fableOverloadFailures < OVERLOAD_FABLE_ATTEMPTS) {
       request.onStatusChange?.({
         state: "running",
         text:
-          `${prettyFrom} refused this request — retrying ` +
-          `(attempt ${session.fableSafetyFailures + 1} of ` +
-          `${SAFETY_ABORT_FABLE_ATTEMPTS})`,
+          `${prettyFrom} is overloaded — retrying ` +
+          `(attempt ${session.fableOverloadFailures + 1} of ` +
+          `${OVERLOAD_FABLE_ATTEMPTS})`,
       });
       return true;
     }
@@ -2272,8 +2343,8 @@ class ClaudeCodeSessionRuntime {
       request.onStatusChange?.({
         state: "model-fallback",
         text:
-          `${prettyFrom} failed ${SAFETY_ABORT_FABLE_ATTEMPTS} attempts ` +
-          `(refusal/overload), so this turn switched to ${prettyTo}. ` +
+          `${prettyFrom} was overloaded for ${OVERLOAD_FABLE_ATTEMPTS} attempts, ` +
+          `so this turn switched to ${prettyTo}. ` +
           `${prettyFrom} will be retried on your next message.`,
       });
     }
@@ -2847,6 +2918,11 @@ class ClaudeCodeSessionRuntime {
         if (!current.request.vanilla) {
           observeNativeToolCalls(parsedLine, current);
         }
+        const safeguard = getClaudeCodeSafeguardBlockFromStreamEvent(parsedLine);
+        if (safeguard === "answered") current.safeguardBlock = undefined;
+        else if (safeguard) {
+          current.safeguardBlock = { ...current.safeguardBlock, ...safeguard };
+        }
         if (status) {
           current.request.onStatusChange?.(status);
         }
@@ -2897,6 +2973,14 @@ class ClaudeCodeSessionRuntime {
           }
         }
         this.detachAbortListener(completed);
+        const blocked = claudeCodeSafeguardBlockOfResult(
+          parsedLine,
+          completed.safeguardBlock,
+        );
+        if (blocked) {
+          completed.reject(blocked);
+          return undefined;
+        }
         try {
           const stepResult = this.parseResultPayload(
             session,

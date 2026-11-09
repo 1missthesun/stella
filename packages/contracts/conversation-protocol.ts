@@ -3,6 +3,13 @@ import {
   type CloudAgentLifecycleCard,
 } from "./cloud-agent-lifecycle.js";
 import {
+  parseSafeguardBlockInfo,
+  parseSafeguardCard,
+  SAFEGUARD_CARD_TYPE,
+  type SafeguardBlockInfo,
+  type SafeguardCard,
+} from "./safeguard-block.js";
+import {
   parseClaudeUsageLimitCard,
   type ClaudeUsageLimitCard,
 } from "./claude-usage-limit.js";
@@ -87,6 +94,7 @@ export type JournalFile = {
 };
 
 export type JournalCard =
+  | SafeguardCard
   | CloudAgentLifecycleCard
   | { type: "build"; buildId: string; appId?: string }
   | {
@@ -121,6 +129,8 @@ export type JournalTurnRecord = JournalRecordBase & {
   source?: string;
   notice?: string;
   wallClockMs?: number;
+  /** Set on a `failed` turn a model's safety system stopped. */
+  safeguard?: SafeguardBlockInfo;
 };
 
 export type JournalCardRecord = JournalRecordBase & {
@@ -277,6 +287,9 @@ export const decodeRecord = (value: unknown): KnownJournalRecord | null => {
       ...(num(raw.wallClockMs) !== undefined
         ? { wallClockMs: num(raw.wallClockMs) as number }
         : {}),
+      ...(parseSafeguardBlockInfo(raw.safeguard)
+        ? { safeguard: parseSafeguardBlockInfo(raw.safeguard)! }
+        : {}),
     };
   }
   if (kind === "card") {
@@ -311,6 +324,7 @@ const decodeCard = (value: unknown): JournalCard | null => {
   if (!raw || !type) return null;
   if (type === "agent-lifecycle") return parseCloudAgentLifecycleCard(raw);
   if (type === "usage-limit") return parseClaudeUsageLimitCard(raw);
+  if (type === SAFEGUARD_CARD_TYPE) return parseSafeguardCard(raw);
   if (type === REMINDER_CARD_TYPE) return parseReminderCard(raw);
   if (type === SCHEDULE_NOTICE_CARD_TYPE) return parseScheduleNoticeCard(raw);
   if (type === "build") {

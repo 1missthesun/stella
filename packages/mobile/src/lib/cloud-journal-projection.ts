@@ -1,5 +1,6 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
+import { parseSafeguardCard, safeguardCardLabel } from "@stella/contracts/safeguard-block";
 import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/user-ask-deck";
 import { projectMobileLifecycle, type ProjectedTurn } from "./mobile-reply-context";
 import {
@@ -285,6 +286,18 @@ const projectTurn = (
       canonicalCreatedAt: record.createdAtMs,
       sequence: record.seq,
       scheduleNotice: record.card,
+    });
+  }
+  for (const record of turn) {
+    const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
+    if (!safeguard) continue;
+    out.push({
+      id: `cloud:${turnId}:safeguard:${record.seq}`,
+      role: "assistant",
+      text: safeguardCardLabel(safeguard),
+      createdAt: record.createdAtMs,
+      canonicalCreatedAt: record.createdAtMs,
+      sequence: record.seq,
     });
   }
   if (out.length > 0) return out;

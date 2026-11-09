@@ -1,4 +1,15 @@
 import { parseCloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
+import {
+  applySafeguardEvent,
+  emptySafeguardFold,
+  parseSafeguardCard,
+  SAFEGUARD_CARD_TYPE,
+  SAFEGUARD_CLEARED_CONTEXT_NOTICE,
+  safeguardEventOfRecord,
+  safeguardNotice,
+  type SafeguardAction,
+  type SafeguardCard,
+} from "@stella/contracts/safeguard-block";
 import { redactSensitiveJson } from "@stella/contracts/sensitive-data";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import type { ConversationDeletedEvent } from "@stella/contracts/turn-plane/owner-events";
@@ -21,6 +32,7 @@ import {
 } from "../conversation-types.js";
 import { ConversationDeletedError } from "../journal.js";
 import {
+  isLocalTurnId,
   LOCAL_DEVICE_ID_PATTERN,
   LOCAL_TURN_ID_PATTERN,
   parseExpectedOwnerGeneration,
@@ -29,6 +41,10 @@ import { parseVoiceJournalRecords } from "../journal-append-protocol.js";
 import type { ChatTurnRequest, OwnerFencedTurn } from "./types.js";
 import { json, errorMessage, log, truncateMessage } from "./support.js";
 import { OrchestratorRunTurn } from "./run-turn.js";
+import { JOURNAL_CHECKPOINT_KEY } from "./constants.js";
+
+const SAFEGUARD_FOLD_RECORDS = 400;
+const SAFEGUARD_REMOVED_TURNS = 64;
 
 export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
   protected async handleJournalAppend(request: Request): Promise<Response> {
@@ -523,6 +539,153 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       });
       return json({ error: "Recording that card failed." }, 503);
     }
+  }
+
+  /**
+   * A choice on the conversation's unresolved safety block, made on any of
+   * the owner's devices. The journal is what every host builds a model's
+   * context from, so the choice is settled here first: `remove` takes every
+   * message since the last completed turn out of model context, `clear`
+   * starts the context over after the card. The card then tells each host
+   * to apply the same to the copy it holds.
+   */
+  protected async handleSafeguard(request: Request): Promise<Response> {
+    let body: {
+      ownerId?: string;
+      ownerGeneration?: string;
+      action?: SafeguardAction;
+      requestId?: string;
+    };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return json({ error: "Malformed request." }, 400);
+    }
+    const ownerId = body.ownerId?.trim();
+    const ownerGeneration = body.ownerGeneration?.trim();
+    const requestId = body.requestId?.trim();
+    const action = body.action;
+    if (
+      !ownerId ||
+      !ownerGeneration ||
+      !requestId ||
+      (action !== "remove" && action !== "switch" && action !== "clear")
+    ) {
+      return json({ error: "Malformed request." }, 400);
+    }
+    if (this.purged()) {
+      return json({ error: "This conversation was deleted." }, 410);
+    }
+    const owner = await this.resolveOwnerForCaller(
+      { ownerId },
+      { refreshGeneration: true },
+    ).catch(() => null);
+    if (
+      !owner ||
+      owner.ownerId !== ownerId ||
+      owner.ownerGeneration !== ownerGeneration
+    ) {
+      return json({ error: "Conversation generation is stale." }, 409);
+    }
+    const writerKey = `card:safeguard:${requestId}:${SAFEGUARD_CARD_TYPE}`;
+    const settled = parseSafeguardCard(this.journal.cardByWriterKey(writerKey));
+    if (settled) return json({ resolved: true, card: settled, ranInCloud: false });
+    if (await this.turnRunning()) {
+      return json(
+        {
+          code: "turn_running",
+          message: "Stella is replying right now. Try again when she's done.",
+        },
+        409,
+      );
+    }
+    let fold = emptySafeguardFold();
+    for (const record of this.journal.recentOutcomes(SAFEGUARD_FOLD_RECORDS)) {
+      const event = safeguardEventOfRecord(record);
+      if (event) fold = applySafeguardEvent(fold, event);
+    }
+    const block = fold.block;
+    if (!block) {
+      return json(
+        {
+          code: "not_blocked",
+          message: "Nothing is stopped in this conversation right now.",
+        },
+        409,
+      );
+    }
+    const meta = this.journal.meta();
+    const base = { type: SAFEGUARD_CARD_TYPE, requestId };
+    let card: SafeguardCard;
+    if (action === "remove") {
+      const checkpoint = await this.journalCheckpoint();
+      const fromSeq = Math.max(
+        this.journal.lastCompletedSeq() + 1,
+        meta.hot_min_seq,
+        (checkpoint?.throughSeq ?? -1) + 1,
+        0,
+      );
+      const toSeq = Math.max(fromSeq, meta.next_seq - 1);
+      card = {
+        ...base,
+        state: "removed",
+        fromSeq,
+        toSeq,
+        turnIds: this.journal.skipModelRange(fromSeq, toSeq, SAFEGUARD_REMOVED_TURNS),
+      };
+    } else if (action === "clear") {
+      card = { ...base, state: "cleared" };
+    } else {
+      const to = safeguardNotice(fold)?.switchTo;
+      if (!to) {
+        return json(
+          {
+            code: "no_other_model",
+            message: "There is no other model to continue with here.",
+          },
+          409,
+        );
+      }
+      card = {
+        ...base,
+        state: "switched",
+        turnId: block.turnId,
+        pick: to.pick,
+        label: to.label,
+      };
+    }
+    const now = Date.now();
+    const appended = this.journal.appendCard({
+      turnId: `safeguard:${requestId}`,
+      writer: "service",
+      writerKey,
+      card,
+      createdAt: now,
+    });
+    if (card.state === "cleared") {
+      await this.ctx.storage.put(JOURNAL_CHECKPOINT_KEY, {
+        summary: SAFEGUARD_CLEARED_CONTEXT_NOTICE,
+        throughSeq: appended.seq,
+        epoch: meta.epoch,
+      });
+    }
+    this.publish(appended.record);
+    void this.index
+      .flush({ activity: "idle", updatedAt: now })
+      .catch(() => undefined);
+    log("info", "safeguard_block_resolved", {
+      conversationId: this.conversationId(),
+      action,
+      seq: appended.seq,
+      ...(card.state === "removed"
+        ? { fromSeq: card.fromSeq, toSeq: card.toSeq, turns: card.turnIds.length }
+        : {}),
+    });
+    return json({
+      resolved: true,
+      card,
+      ranInCloud: !isLocalTurnId(block.turnId),
+    });
   }
 
   /**

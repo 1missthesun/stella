@@ -46,6 +46,7 @@ import {
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
+import { isSafeguardBlock, safeguardModelLabel, safeguardTaskFailure } from "@stella/contracts/safeguard-block";
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
@@ -485,6 +486,12 @@ export const completedReport = (args: {
       : []),
   ].join("\n");
 
+/** What a task's failed model response says in its report: a block in plain words, else the provider's error. */
+const agentFailureText = (message: AssistantMessage | undefined): string =>
+  message && isSafeguardBlock(message)
+    ? safeguardTaskFailure(safeguardModelLabel(message.responseModel, message.model))
+    : (message?.errorMessage ?? "The agent failed.");
+
 export const failedReport = (args: { threadId: string; description: string; error: string }): string =>
   ["[Task failed]", `description: ${args.description}`, `thread_id: ${args.threadId}`, "status: failed", `error: ${bounded(args.error)}`].join("\n");
 
@@ -844,6 +851,13 @@ export function stellaAgents(host: StellaAgentsHost) {
             if (settled.type !== "input" || !agent) return next();
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
             const failed = answer?.stopReason === "error";
+            if (answer && isSafeguardBlock(answer)) {
+              const error = agentFailureText(answer);
+              end = { answer: "", error };
+              if (agent.reported.includes(settled.answer)) return next();
+              agent.reported.push(settled.answer);
+              return next(failedReport({ threadId, description, error }), "failed");
+            }
             const said = failed ? textOf(answer) : withClosingNotes(notes.closing.map((note) => note.message), textOf(answer));
             const result =
               failed || said.trim()
@@ -856,7 +870,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                   );
             end = {
               answer: result,
-              ...(failed ? { error: answer?.errorMessage ?? "The agent failed." } : {}),
+              ...(failed ? { error: agentFailureText(answer) } : {}),
             };
             if (agent.reported.includes(settled.answer)) return next();
             agent.reported.push(settled.answer);
@@ -2159,7 +2173,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         startedAt: oldest?.timestamp ?? latest?.timestamp ?? Date.now(),
         updatedAt: latest?.timestamp ?? oldest?.timestamp ?? Date.now(),
         assistantMessages: prose,
-        ...(latest?.stopReason === "error" && latest.errorMessage ? { error: latest.errorMessage } : {}),
+        ...(latest?.stopReason === "error" && latest.errorMessage ? { error: agentFailureText(latest) } : {}),
         ...(stopped ? { stopped: true as const } : {}),
         agentStatus: running
           ? "running"
@@ -2384,7 +2398,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       const message = answer?.model?.[0] as AssistantMessage | undefined;
       if (message?.stopReason === "error") {
         await settle();
-        return { threadId, status: "error", error: message.errorMessage ?? "The agent failed." };
+        return { threadId, status: "error", error: agentFailureText(message) };
       }
       const finalText = withClosingNotes(await settle(settled.answer), textOf(message));
       if (finalText.trim()) return { threadId, status: "ok", finalText };

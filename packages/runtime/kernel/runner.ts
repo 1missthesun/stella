@@ -477,6 +477,9 @@ export const createStellaHostRunner = (
         }),
       resume: async (args) => await context.backend.require().call("usageLimits.resume", args),
     },
+    safeguards: {
+      resolve: async (args) => await context.backend.require().call("safeguards.resolve", args),
+    },
     agentThreads: {
       directory: async (conversationId, threadIds) =>
         await withinAgentControlTimeout(

@@ -272,6 +272,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           gatewayOrigin,
           images: this.images,
           journalStart: () => this.journalStart(),
+          simulateSafeguardBlocks:
+            (this.env as { STELLA_TEST_ACCOUNTS?: string })
+              .STELLA_TEST_ACCOUNTS === "1",
           archivedEntries: {
             read: (piConversationId, options) =>
               this.archive.readPiEntries(piConversationId, options),

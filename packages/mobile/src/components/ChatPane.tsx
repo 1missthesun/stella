@@ -171,6 +171,7 @@ import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { type Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { UsageLimitChatCard } from "./chat/UsageLimitChatCard";
+import { SafeguardChatCard } from "./chat/SafeguardChatCard";
 import { fonts } from "../theme/fonts";
 import type {
   ChatArtifact,
@@ -1720,6 +1721,7 @@ export function ChatPane({
     () => (
       <View style={styles.chatTail}>
         <UsageLimitChatCard conversationId={conversationId} colors={colors} />
+        <SafeguardChatCard conversationId={conversationId} replying={streaming} colors={colors} />
         <WorkingIndicator
           active={workingIndicator?.active ?? streaming}
           exitImmediately={workingIndicator?.exitImmediately}

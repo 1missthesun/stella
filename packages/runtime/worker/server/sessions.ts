@@ -25,7 +25,7 @@ import * as ModelCatalog from "./model-catalog.js";
 import * as RunnerModule from "./runner-module.js";
 import {
   closePiChats,
-  terminatePiChatCommands,
+  quitPiChats,
   piChatsBusy,
   piBackgroundExitTarget,
   piDeliverReport,
@@ -582,13 +582,9 @@ export const layer = Layer.effect(
     const interruptWork = Effect.suspend(() => {
       const session = currentSession;
       if (!session) return Effect.void;
-      return Effect.promise(async () => {
-        await Promise.allSettled([
-          terminatePiChatCommands(session),
-          session.runnerCell.get()?.killAllShells(),
-        ]);
-        await closePiChats(session).catch(() => undefined);
-      });
+      return Effect.promise(() =>
+        quitPiChats(session, () => session.runnerCell.get()?.killAllShells()).catch(() => undefined),
+      );
     });
 
     return {

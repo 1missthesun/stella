@@ -20,14 +20,10 @@ export const registerBootstrapProcessCleanups = (context) => {
             const teardown = keep ? runner.stop({}).catch((error) => {
                 console.warn("[cleanup] Runtime detach failed:", error);
             }) : (async () => {
-                await joinWithTimeout(Promise.resolve()
-                    .then(() => runner.killAllShells())
-                    .catch((error) => {
-                    console.warn("[cleanup] Runtime shell teardown failed:", error);
-                }), RUNTIME_SHELLS_SHUTDOWN_TIMEOUT_MS, () => {
-                    console.warn("[cleanup] Runtime shell teardown exceeded the quit bound; stopping the runtime anyway.");
-                });
-                await runner.stop({ shutdownRuntime: true, quit: true, exitTimeoutMs: RUNTIME_EXIT_TIMEOUT_MS });
+                // The runtime's quit seals Stella's chats and then stops their shells and engines, so work cut off
+                // by the quit resumes on the next start. Killing the shells from here first would let a killed
+                // command be written down as a task's failure.
+                await runner.stop({ shutdownRuntime: true, quit: true, exitTimeoutMs: RUNTIME_SHELLS_SHUTDOWN_TIMEOUT_MS + RUNTIME_EXIT_TIMEOUT_MS });
             })().catch((error) => {
                 console.warn("[cleanup] Runtime shutdown failed:", error);
             });

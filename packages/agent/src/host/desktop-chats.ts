@@ -2436,20 +2436,27 @@ export function desktopChats(options: DesktopChatsOptions) {
     async terminateCommands(): Promise<void> {
       await environments.terminateCommands(context);
     },
+    /**
+     * Closing seals each harness first: from then on nothing commits, and running tasks stay running in storage, so
+     * they resume when the chat opens again. Only then do Claude Code and the shells stop; stopped first, a killed
+     * command or engine would be written down as the task's failure.
+     */
     async close(): Promise<void> {
-      for (const conversationId of chats.keys()) claudeCodeEngine?.close(conversationId);
+      const ids = [...chats.keys()];
       const opened = await Promise.all([...chats.values()].map((chat) => chat.catch(() => undefined)));
       chats.clear();
+      const sealed = opened.map((chat) => chat?.harness.close(context).catch(() => undefined));
+      for (const conversationId of ids) claudeCodeEngine?.close(conversationId);
       for (const chat of opened) {
         if (!chat) continue;
         clearInterval(chat.idleCheck);
         clearInterval(chat.followCheck);
-        await chat.mirror?.stop();
+        await chat.mirror?.stop().catch(() => undefined);
         await chat.safeguardStream.stop().catch(() => undefined);
-        await chat.localLog?.stop();
+        await chat.localLog?.stop().catch(() => undefined);
         await chat.stream?.stop().catch(() => undefined);
-        await chat.harness.close(context).catch(() => undefined);
       }
+      await Promise.all(sealed);
       await environments.cleanup(context);
     },
   };

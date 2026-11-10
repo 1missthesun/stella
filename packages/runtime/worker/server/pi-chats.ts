@@ -263,6 +263,20 @@ export const closePiChats = async (session: OpenSession): Promise<void> => {
   await (await chats?.catch(() => undefined))?.close();
 };
 
+/**
+ * Quitting: seal the chats before anything is killed, so a command or engine stopped by the quit isn't recorded as the
+ * task's outcome and the task resumes after the restart. `stop` kills the session's shells.
+ */
+export const quitPiChats = async (session: OpenSession, stop: () => Promise<unknown> | undefined): Promise<void> => {
+  const chats = chatsBySession.get(session);
+  chatsBySession.delete(session);
+  loadedBySession.delete(session);
+  const loaded = await chats?.catch(() => undefined);
+  const closing = loaded?.close();
+  await Promise.allSettled([loaded?.terminateCommands(), stop()]);
+  await closing;
+};
+
 export const terminatePiChatCommands = async (session: OpenSession): Promise<void> => {
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
   await chats?.terminateCommands();

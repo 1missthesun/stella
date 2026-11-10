@@ -176,7 +176,7 @@ Newark, DE 19713, United States
 contact@fromyou.ai`;
 
 export const PRIVACY_POLICY = `Stella — FROMYOU, LLC
-Last updated: October 16, 2026
+Last updated: ${PRIVACY_LAST_UPDATED}
 
 1. Scope and our privacy approach
 

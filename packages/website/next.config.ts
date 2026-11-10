@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "path";
 import { loadEnv } from "vite";
+import { MOVED_ANSWER_SLUGS } from "./src/lib/moved-answers";
 
 const desktopPublicEnv = loadEnv(
   process.env.NODE_ENV || "production",
@@ -61,17 +62,25 @@ const nextConfig: NextConfig = {
       { source: "/agents.md", destination: "/one-chat.md", permanent: true },
       { source: "/go", destination: "/", statusCode: 301 },
       { source: "/slack", destination: "/crew", permanent: true },
+      ...Object.entries(MOVED_ANSWER_SLUGS).flatMap(([from, to]) => [
+        { source: `/ai/${from}`, destination: `/ai/${to}`, permanent: true },
+        { source: `/ai/${from}.md`, destination: `/ai/${to}.md`, permanent: true },
+      ]),
     ];
   },
   async rewrites() {
-    return stellaBackendUrl
-      ? [
-          {
-            source: "/chat-app/u/:fork/:tree/:path*",
-            destination: `${stellaBackendUrl}/web-renderer/:fork/:tree/:path*`,
-          },
-        ]
-      : [];
+    return [
+      // Markdown twins of the /ai answer pages.
+      { source: "/ai/:slug([a-z0-9-]+).md", destination: "/ai-md/:slug" },
+      ...(stellaBackendUrl
+        ? [
+            {
+              source: "/chat-app/u/:fork/:tree/:path*",
+              destination: `${stellaBackendUrl}/web-renderer/:fork/:tree/:path*`,
+            },
+          ]
+        : []),
+    ];
   },
   async headers() {
     return [

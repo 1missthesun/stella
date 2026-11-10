@@ -1,11 +1,11 @@
 import { changelogEntries } from "@/app/learn-more/changelog-entries";
-import { ANSWER_PAGES, FAQ } from "@/lib/answers";
+import { ANSWER_GROUPS, ANSWER_PAGES, FAQ, PAID_LINE, PRICE_LINE, TRIAL_LINE, answerTitle, plainText, type AnswerPage } from "@/lib/answers";
 import {
   LEGAL_TITLES,
   PRIVACY_POLICY,
   TERMS_OF_SERVICE,
 } from "@/lib/legal-text";
-import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PLAN_CATALOG, PLAN_ORDER, planPriceLabel, planSummary } from "@/lib/plans";
+import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PLAN_CATALOG, PLAN_ORDER, planPriceLabel } from "@/lib/plans";
 import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
@@ -39,8 +39,8 @@ const HOME_MD = `${header(
   "Give Stella a task and keep moving. It can work with your computer, browser, files, and apps.",
 )}
 Stella is your personal AI assistant, available in your browser, desktop app,
-and mobile app. Keep one ongoing conversation while Stella routes work to
-background agents and tools.
+and mobile app. Keep one ongoing conversation while Stella works on tasks in
+the background. ${PRICE_LINE}
 
 ## One chat for everything
 No more juggling threads. Fire off a plan, a file, a message, and a background
@@ -59,9 +59,9 @@ Ask once. Stella creates editable reports, spreadsheets, decks, and PDFs ready
 for the apps you already use (Word, Excel, PowerPoint, PDF).
 
 ## Choose your tools
-Work with your preferred agents, providers, keys, and models.
+Use the ChatGPT or Claude plan you already have, or your own keys and models.
 
-Agents & harnesses: Claude Code, Codex.
+Plans: your ChatGPT plan (Sign in with ChatGPT), your Claude plan (through Claude Code).
 Models & providers: OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot AI.
 
 ## Explore
@@ -69,6 +69,7 @@ Models & providers: OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot AI.
 - One chat: ${abs("/one-chat.md")}
 - Voice: ${abs("/voice.md")}
 - Pricing: ${abs("/pricing.md")}
+- Stella compared and explained: ${abs("/ai.md")}
 - What's New: ${abs("/learn-more/whats-new.md")}
 `;
 
@@ -93,10 +94,10 @@ There's no hunting for the chat where you asked that thing. Follow-ups,
 results, reminders, and scheduled work all land in the one conversation you
 already have — with the context still intact.
 
-## Nothing to set up — or bring your own
-Out of the box, Stella runs on her own models. No keys, no accounts, no setup —
-just open the app and go. Prefer something else? Plug in Claude Code, Codex,
-your own key or a local model and Stella runs on that instead.
+## Use the plan you already have
+Stella runs on the ChatGPT or Claude plan you already pay for: sign in with
+ChatGPT, or use your Claude plan through Claude Code. Your own key or a local
+model works too. ${PRICE_LINE} ${TRIAL_LINE}
 
 ## Pictures, voice, and more — on every paid plan
 Ask Stella to make an image, a video, a song, or a spoken reading, and she just
@@ -104,8 +105,8 @@ does it. It runs on the house models with nothing extra to wire up, and it
 comes with every paid plan.
 
 ## Ask once. Keep talking
-One ongoing chat, with the work happening behind it — on Stella's models or
-yours. See ${abs("/pricing.md")} for plans.
+One ongoing chat, with the work happening behind it — on your ChatGPT or
+Claude plan, or Stella's models. See ${abs("/pricing.md")} for plans.
 `;
 
 const VOICE_MD = `${header(
@@ -142,7 +143,7 @@ const PRICING_MD = `${header(
   "Same Stella on every plan. Bigger plans give you more usage.",
 )}
 ## Plans
-${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
+${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${id === "free" ? "free with the ChatGPT or Claude plan you already have; new accounts get a small free trial of Stella's own models" : PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
 
 ## What the usage budget pays for
 One budget pays for everything Stella runs for you:
@@ -155,7 +156,7 @@ Shorter limits spread usage across the month so one busy day can't use it all up
 ${INCLUDED_IN_EVERY_PLAN.map((item) => `- ${item}`).join("\n")}
 
 ## Choose Stella and get started
-Free to start, no credit card. Download Stella and try it today.
+${PRICE_LINE} ${TRIAL_LINE} No credit card. Download Stella at ${abs("/download")}.
 `;
 
 const LEARN_MORE_MD = `${header(
@@ -163,10 +164,9 @@ const LEARN_MORE_MD = `${header(
   "/learn-more",
 )}
 Your personal AI assistant, available in your browser, desktop app, and mobile app. Ask once, keep
-talking, and Stella figures out which agent, app, file,
-browser, model, or tool should handle the work. Background agents can handle
-independent work and report progress inline without making you manage separate
-threads.
+talking, and Stella figures out which app, file, browser, model, or tool should
+handle the work. Background tasks report progress inline without making you
+manage separate threads.
 
 ## One assistant, wherever you are
 Stella works with your files, apps, and browser to help you get things done. You can use Stella for research, writing, spreadsheets, PDFs, Word
@@ -176,10 +176,10 @@ connected apps. Keep your work in one conversation, whether you use Stella in yo
 on your desktop, or on your phone.
 
 ## You keep talking in the same place
-Most agent products make you choose a mode, start a new thread, pick a
+Most AI apps make you choose a mode, start a new thread, pick a
 specialist, then remember where everything went. Stella keeps the top-level
 experience continuous. Behind the scenes, it can split work into smaller jobs,
-run specialized agents, keep track of active threads, and bring the result back
+run several tasks side by side, keep track of what's running, and bring the result back
 into the conversation. Orchestrator mode is the default, so you stay in one
 conversation instead of becoming the project manager for your assistant.
 
@@ -275,23 +275,68 @@ function renderFaq(): string {
   return `${header(
     "Stella — frequently asked questions",
     "/#faq",
-    "Direct answers about price, platforms, computer use, open source, models and agents.",
+    "Direct answers about price, platforms, computer use, open source, models and tasks.",
   )}\n${faqBody()}\n`;
 }
 
-function renderAnswerPage(page: (typeof ANSWER_PAGES)[number]): string {
+function answerBody(page: AnswerPage, level: "##" | "#"): string {
+  const sub = level === "#" ? "##" : "###";
+  const lines = [page.answer, ""];
+  const c = page.compare;
+  if (c) {
+    lines.push(`${sub} Side by side`, "", `| | Stella | ${c.them} |`, "| --- | --- | --- |");
+    for (const row of c.rows) lines.push(`| ${row.label} | ${row.stella} | ${row.them} |`);
+    lines.push(
+      "",
+      `${sub} ${c.pickThem ?? `Pick the ${c.them} if`}`,
+      ...c.themBetter.map((item) => `- ${item}`),
+      "",
+      `${sub} Pick Stella if`,
+      ...c.stellaBetter.map((item) => `- ${item}`),
+      "",
+      `${c.checked} Sources: ${c.sources.map((source) => `[${source.label}](${source.href})`).join(", ")}.`,
+      "",
+    );
+  }
+  if (page.steps?.length) {
+    lines.push(`${sub} ${(page.stepsTitle ?? "How to do it.").replace(/\.$/, "")}`, "");
+    page.steps.forEach((step, i) => lines.push(`${i + 1}. **${step.title}** ${step.body}`));
+    lines.push("");
+  }
+  if (page.points?.length) {
+    lines.push(...page.points.map((point) => `- **${point.title}** — ${point.body}`), "");
+  }
+  lines.push(`${sub} Questions`, "");
+  for (const item of page.questions) lines.push(`**${item.q}**`, item.a, "");
+  return lines.join("\n").replace(/\]\(\//g, `](${getSiteUrl().origin}/`);
+}
+
+function renderAnswerPage(page: AnswerPage): string {
+  return [`## ${answerTitle(page)}`, "", `Source: ${abs(`/ai/${page.slug}`)}`, "", answerBody(page, "##")].join("\n");
+}
+
+/** The .md twin of /ai/<slug>. */
+export function renderAnswerMarkdown(page: AnswerPage): string {
+  return `${header(page.metaTitle, `/ai/${page.slug}`, plainText(page.metaDescription))}\n${answerBody(page, "#").trimEnd()}\n\nGet Stella: ${abs("/download")}. ${PRICE_LINE}\n`;
+}
+
+/** The .md twin of /ai. */
+export function renderAnswersIndexMarkdown(): string {
   const lines = [
-    `## ${page.headline}`,
-    "",
-    `Source: ${abs(`/ai/${page.slug}`)}`,
-    "",
-    page.answer,
-    "",
-    ...page.points.map((point) => `- **${point.title}** — ${point.body}`),
-    "",
-    ...page.questions.flatMap((item) => [`### ${item.q}`, item.a, ""]),
+    header(
+      "Stella compared and explained",
+      "/ai",
+      "Honest comparisons of Stella (stella.sh) with the ChatGPT, Claude, Copilot and Gemini apps, and plain answers on using your ChatGPT or Claude plan on your computer.",
+    ),
   ];
-  return lines.join("\n");
+  for (const group of ANSWER_GROUPS) {
+    lines.push(`## ${group.title}`, "");
+    for (const page of ANSWER_PAGES.filter((p) => p.kind === group.kind)) {
+      lines.push(`- [${answerTitle(page)}](${abs(`/ai/${page.slug}.md`)}): ${page.metaDescription}`);
+    }
+    lines.push("");
+  }
+  return `${lines.join("\n").trimEnd()}\n`;
 }
 
 export type AgentPage = {
@@ -315,7 +360,7 @@ export const AGENT_PAGES: AgentPage[] = [
     mdPath: "/faq.md",
     label: "FAQ",
     description:
-      "Direct answers: price, platforms (Mac, Windows, Linux, phone, web), computer use, open source, models and agents.",
+      "Direct answers: price, platforms (Mac, Windows, Linux, phone, web), computer use, open source, models and tasks.",
     markdown: renderFaq(),
   },
   {
@@ -348,6 +393,13 @@ export const AGENT_PAGES: AgentPage[] = [
     markdown: VOICE_MD,
   },
   {
+    route: "/ai",
+    mdPath: "/ai.md",
+    label: "Stella compared and explained",
+    description: "Stella vs the ChatGPT, Claude, Copilot and Gemini apps, and how to use your ChatGPT or Claude plan on your computer.",
+    markdown: renderAnswersIndexMarkdown(),
+  },
+  {
     route: "/learn-more/whats-new",
     mdPath: "/learn-more/whats-new.md",
     label: "What's New",
@@ -376,10 +428,12 @@ const SUMMARY = [
   "> Windows, Linux (including Arch and Omarchy), iPhone, Android and the web.",
   "",
   "Key facts:",
-  `- Price: ${PLAN_ORDER.map(planSummary).join("; ")}. One usage budget pays for models, tasks, media, voice, search and hosting. Paid plans add image/video/music/3D generation.`,
+  `- Price: ${PRICE_LINE} ${TRIAL_LINE} ${PAID_LINE} No credit card.`,
   "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
-  "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source and can redesign its own interface on request.",
-  "- Models: Stella's own models by default, or Claude Code, a ChatGPT plan, your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot) or local models.",
+  "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source code on your computer.",
+  "- Changes itself: other assistants that change themselves do it through plug-ins or extensions; Stella can rewrite any part of its own app, any line of its own code, just by asking. Preview it, keep it or undo it. No coding.",
+  "- Models: your ChatGPT plan (Sign in with ChatGPT) or your Claude Pro or Max plan (through Claude Code, Anthropic's own tool), your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot), local models, or Stella's own models (a small free trial for new accounts, then paid plans).",
+  "- Name: several products are called \"Stella AI\". This one is Stella (stella.sh), made by FromYou LLC.",
   "- Get it: https://stella.sh/download (Mac, Windows and Linux downloads), `curl -fsSL https://stella.sh/install.sh | sh` on Linux, iPhone and Android apps, or https://stella.sh/chat in a browser.",
   "- Self-hosting: Stella's server can run on your own Cloudflare account ($5/month Workers Paid plus usage, your own Claude or ChatGPT subscription for models). Agents: follow https://stella.sh/self-host.md.",
 ];
@@ -394,22 +448,24 @@ export function renderLlmsTxt(): string {
     "## Run your own server",
     `- [Self-host Stella](${abs("/self-host.md")}): For agents: set up a Stella server on the user's own Cloudflare account with one command, then connect the phone and desktop by QR code.`,
   );
-  lines.push("", "## Answers");
-  for (const page of ANSWER_PAGES) {
-    lines.push(`- [${page.headline.replace(/\.$/, "")}](${abs(`/ai/${page.slug}`)}): ${page.metaDescription}`);
+  for (const group of ANSWER_GROUPS) {
+    lines.push("", `## ${group.title}`);
+    for (const page of ANSWER_PAGES.filter((p) => p.kind === group.kind)) {
+      lines.push(`- [${answerTitle(page)}](${abs(`/ai/${page.slug}.md`)}): ${page.metaDescription}`);
+    }
   }
   lines.push("", "## Optional", `- [Everything in one file](${abs("/llms-full.txt")}): The pages and answers above, in full.`);
   return `${lines.join("\n")}\n`;
 }
 
 export function renderLlmsFull(): string {
-  const skip = new Set(["/learn-more/whats-new.md", "/privacy.md", "/terms.md", "/faq.md"]);
+  const skip = new Set(["/learn-more/whats-new.md", "/privacy.md", "/terms.md", "/faq.md", "/ai.md"]);
   const parts = ["# Stella", "", ...SUMMARY, ""];
   for (const page of AGENT_PAGES) {
     if (skip.has(page.mdPath)) continue;
     parts.push(page.markdown.trim(), "");
   }
-  parts.push("# Answers", "");
+  parts.push("# Stella compared and explained", "");
   for (const page of ANSWER_PAGES) parts.push(renderAnswerPage(page));
   return `${parts.join("\n").trimEnd()}\n`;
 }

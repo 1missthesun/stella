@@ -1,3 +1,4 @@
+import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -58,7 +59,7 @@ export default async function FixPage({
           title={page.ctaHeadline}
           body="Download Stella for Mac or Windows and tell it what's broken."
           actions={<Link href="/fix">More things Stella fixes</Link>}
-          note="Free. No credit card, no trial."
+          note={PRICE_LINE}
           after={<WindowsInstallNote />}
         />
       }
@@ -79,7 +80,7 @@ export default async function FixPage({
         <div className={pg.note}>
           <WindowsInstallNote />
         </div>
-        <p className={pg.reassure}>Free to use</p>
+        <p className={pg.reassure}>{PRICE_LINE}</p>
       </section>
 
       <section className={f.symptomsSection} data-tone="light" data-bg="#f1f1f4" aria-labelledby="familiar">

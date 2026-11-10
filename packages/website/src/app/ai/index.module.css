@@ -1,0 +1,62 @@
+.group {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: clamp(20px, 5vw, 100px);
+  margin: 0 var(--l-margin);
+  padding: clamp(40px, 7svh, 72px) 0 clamp(50px, 8svh, 90px);
+  border-top: 1px solid rgba(10, 10, 13, 0.12);
+}
+
+.group .groupTitle {
+  margin: 0;
+  font-size: clamp(30px, 3.6vw, 64px);
+  font-weight: 820;
+  line-height: 0.92;
+  letter-spacing: -0.058em;
+  color: #0a0a0d;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(10, 10, 13, 0.12);
+}
+
+.list li {
+  border-bottom: 1px solid rgba(10, 10, 13, 0.12);
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(18px, 2.6svh, 26px) 0;
+  color: inherit;
+}
+
+.itemTitle {
+  font-size: clamp(20px, 1.7vw, 27px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: #0a0a0d;
+  transition: color 150ms ease;
+}
+
+.item:hover .itemTitle {
+  color: #703cff;
+}
+
+.itemBody {
+  max-width: 64ch;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #4a4a55;
+}
+
+@media (max-width: 860px) {
+  .group {
+    grid-template-columns: 1fr;
+  }
+}

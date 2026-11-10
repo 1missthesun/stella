@@ -24,6 +24,7 @@ export const homeFooterGroups: FooterGroup[] = [
       { label: "One chat", href: "/one-chat" },
       { label: "Voice", href: "/voice" },
       { label: "Stella Crew", href: "/crew" },
+      { label: "Compare", href: "/ai" },
       { label: "Pricing", href: "/pricing" },
       { label: "Sign In", href: "/sign-in" },
     ],

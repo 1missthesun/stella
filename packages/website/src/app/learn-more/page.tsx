@@ -1,3 +1,4 @@
+import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -144,7 +145,7 @@ export default function LearnMore() {
           title="Your assistant, wherever you need it."
           body="Use Stella in your browser, desktop app, or mobile app."
           actions={<Link href="/chat">Open Stella</Link>}
-          note="Free. No credit card, no trial."
+          note={PRICE_LINE}
         />
       }
     >
@@ -155,11 +156,10 @@ export default function LearnMore() {
         </h1>
         <p className={pg.lede}>
           Your personal AI assistant, available in your browser, desktop app, and mobile app. Ask once, keep
-          talking, and Stella figures out which agent, app, file, browser, model, or tool should handle the work.
+          talking, and Stella figures out which app, file, browser, model, or tool should handle the work.
         </p>
         <p className={pg.lede}>
-          Background agents can handle independent work and report progress inline without making you manage
-          separate threads.
+          Background tasks report their progress inline without making you manage separate threads.
         </p>
         <div className={pg.cta}>
           <DownloadButton />
@@ -170,7 +170,7 @@ export default function LearnMore() {
         <div className={pg.note}>
           <WindowsInstallNote />
         </div>
-        <p className={pg.reassure}>Free. No credit card, no trial.</p>
+        <p className={pg.reassure}>{PRICE_LINE}</p>
         <nav className={lm.index} aria-label="Learn More sections">
           {sections.map((item) =>
             item.href.startsWith("#") ? (
@@ -218,12 +218,12 @@ export default function LearnMore() {
           <p className={pg.eyebrow}>One chat</p>
           <h2 className={pg.h2}>You keep talking in the same place</h2>
           <p>
-            Most agent products make you choose a mode, start a new thread, pick a specialist, then remember where
+            Most AI apps make you choose a mode, start a new thread, pick a specialist, then remember where
             everything went. Stella keeps the top-level experience continuous.
           </p>
           <p>
-            Behind the scenes, Stella can split work into smaller jobs, run specialized agents, keep track of active
-            threads, and bring the result back into the conversation. Orchestrator mode is the default, so you stay
+            Behind the scenes, Stella can split work into smaller jobs, run several tasks side by side, keep track of
+            what&apos;s running, and bring the result back into the conversation. Orchestrator mode is the default, so you stay
             in one conversation instead of becoming the project manager for your assistant.
           </p>
         </div>

@@ -1,3 +1,4 @@
+import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, CalendarClock, Cpu, FileText, KeyRound } from "lucide-react";
@@ -26,12 +27,12 @@ export default function OneChatPage() {
           title="Ask once. Keep talking."
           body={
             <>
-              One ongoing chat, with the work happening behind it — on Stella&apos;s models or yours. Agents run
-              on your computer on every plan, and <Link href="/pricing">paid plans</Link> run them in the cloud
-              too, several at once.
+              One ongoing chat, with the work happening behind it — on your ChatGPT or Claude plan, or
+              Stella&apos;s models. Tasks run on your computer on every plan, and{" "}
+              <Link href="/pricing">paid plans</Link> run them in the cloud too, several at once.
             </>
           }
-          note="Free. No credit card, no trial."
+          note={PRICE_LINE}
           after={<WindowsInstallNote />}
         />
       }
@@ -123,12 +124,12 @@ export default function OneChatPage() {
         <div className={`${pg.copy} ${styles.onDark}`}>
           <p className={pg.eyebrow}>Any brain you like</p>
           <h2 id="any-brain" className={pg.h2}>
-            Nothing to set up — or bring your own.
+            Use the plan you already have.
           </h2>
           <p>
-            Out of the box, Stella runs on her own models. No keys, no accounts, no setup — just open the app and
-            go. Prefer something else? Plug in Claude Code, Codex, your own key or a local model and Stella runs on
-            that instead.
+            Stella runs on the ChatGPT or Claude plan you already pay for: sign in with ChatGPT, or use your Claude
+            plan through Claude Code. Your own key or a local model works too, and new accounts get a small free
+            trial of Stella&apos;s own models.
           </p>
         </div>
         <MockStage dark className={styles.engineStage}>

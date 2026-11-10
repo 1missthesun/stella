@@ -1,3 +1,4 @@
+import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -62,7 +63,7 @@ const QUESTIONS = [
 
 export default function Pricing() {
   return (
-    <PageShell closing={<Finale title="Choose Stella and get started" note="Free to start. No credit card." />}>
+    <PageShell closing={<Finale title="Choose Stella and get started" note={`${PRICE_LINE} No credit card.`} />}>
       <section className={`${pg.hero} ${pg.center} ${pr.hero}`} data-tone="light" data-bg="#ffffff">
         <p className={pg.eyebrow}>Pricing</p>
         <h1 className={pg.title}>One budget for everything</h1>
@@ -77,7 +78,7 @@ export default function Pricing() {
               <article key={id} className={pr.col} data-featured={featured ? "1" : "0"} style={{ ["--i" as string]: i }}>
                 <p className={pr.flag}>{featured ? "Recommended" : "\u00a0"}</p>
                 <h2 className={pr.name}>{plan.label}</h2>
-                <p className={pr.tagline}>{plan.tagline}</p>
+                <p className={pr.tagline}>{id === "free" ? "On the ChatGPT or Claude plan you already have" : plan.tagline}</p>
                 <p className={pr.price}>
                   <span className={pr.amount}>{formatPlanPrice(plan.monthlyPriceCents)}</span>
                   <span className={pr.period}>{plan.interval ? "per month" : "No card needed"}</span>
@@ -110,7 +111,7 @@ export default function Pricing() {
           <h2 id="budget-title" className={pg.h2}>
             Spend it on anything
           </h2>
-          <p>Models, agents, images, voice. One pool, no separate meters.</p>
+          <p>Models, tasks, images, voice. One pool, no separate meters.</p>
         </div>
         <div className={pr.stage}>
           <BudgetVisual />

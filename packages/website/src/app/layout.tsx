@@ -13,7 +13,7 @@ import "./globals.css";
 
 const siteUrl = getSiteUrl();
 const description =
-  "Stella is a personal AI assistant that uses your computer, browses the web, works with your files and makes images and video, all from one chat. For Mac, Windows, Linux, iPhone, Android and the web. Free. Open source.";
+  "Stella is a personal AI assistant that uses your computer, browses the web, works with your files and makes images and video, all from one chat. For Mac, Windows, Linux, iPhone, Android and the web. Free with the ChatGPT or Claude plan you already have. Open source.";
 const sans = Manrope({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -133,19 +133,19 @@ const jsonLd = {
       url: siteUrl.origin,
       applicationCategory: "BusinessApplication",
       operatingSystem: "macOS, Windows, Linux, iOS, Android, Web",
-      license: "https://www.apache.org/licenses/LICENSE-2.0",
+      license: "https://opensource.org/licenses/MIT",
       isAccessibleForFree: true,
       publisher: { "@id": `${siteUrl.origin}/#organization` },
       featureList: [
         "Uses your computer: sees the screen, clicks and types in your apps (macOS, Windows)",
         "Browses the web and fills in forms",
         "Creates and edits documents, spreadsheets, presentations and PDFs",
-        "One ongoing chat with background agents",
-        "Agents working in parallel, on your computer or in the cloud (paid plans)",
+        "One ongoing chat with tasks running in the background",
+        "Several tasks at once, on your computer or in the cloud (paid plans)",
         "Image, video, music and 3D generation (paid plans)",
         "Dictation and “Hey Stella” wake word",
-        "Runs on Stella's models, Claude Code, a ChatGPT plan, your own API keys or local models",
-        "Redesigns its own interface on request",
+        "Runs on the ChatGPT or Claude plan you already have (Claude through Claude Code), your own API keys, local models or Stella's models",
+        "Changes itself on request: rewrites any part of its own app, with preview and undo",
         "Open source under MIT",
       ],
       offers: [

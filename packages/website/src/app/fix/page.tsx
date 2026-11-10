@@ -1,3 +1,4 @@
+import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -39,7 +40,7 @@ export default function FixIndexPage() {
         <div className={pg.note}>
           <WindowsInstallNote />
         </div>
-        <p className={pg.reassure}>Free to use</p>
+        <p className={pg.reassure}>{PRICE_LINE}</p>
       </section>
 
       <section className={f.index} data-tone="light" data-bg="#f1f1f4" aria-label="Problems Stella fixes">

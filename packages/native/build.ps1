@@ -184,4 +184,27 @@ if ($cargo) {
     Write-Host "Skipping wakeword_listener: cargo not on PATH (install rustup to enable)."
 }
 
+# stella_show — Show Stella's capture builder (Rust, from Scrawl).
+if ($cargo) {
+    Write-Host "Building stella_show.exe..."
+    Push-Location (Join-Path $PSScriptRoot "show")
+    try {
+        & cargo build --release --quiet --target x86_64-pc-windows-msvc
+        if ($LASTEXITCODE -eq 0) {
+            $src = Join-Path (Get-Location) "target\x86_64-pc-windows-msvc\release\stella_show.exe"
+            $dst = Join-Path $outputDir "stella_show.exe"
+            Copy-Item -Force $src $dst
+            Write-Host "  Build successful: $dst"
+        } else {
+            Write-Host "  ERROR: cargo build failed"
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+} elseif ($Strict) {
+    Write-Host "ERROR: cargo is required with -Strict; stella_show.exe ships in the helper set."
+    exit 1
+}
+
 exit 0

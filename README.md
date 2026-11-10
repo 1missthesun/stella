@@ -34,3 +34,7 @@ For the manual reference, see [SELF_HOSTING.md](SELF_HOSTING.md).
 ## License
 
 [MIT](LICENSE).
+
+## Credits
+
+Show Stella's capture builder (keyframes, marks, auto-crop and contact sheets) is adapted from [Scrawl](https://github.com/kitlangton/scrawl) by Kit Langton, under the MIT license ([notice](packages/native/show/LICENSE-scrawl)).

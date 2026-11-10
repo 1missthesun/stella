@@ -42,6 +42,12 @@ const BLOCKER_LABELS: Record<DeviceExecutionBlocker, string> = {
   notReady: "Not ready",
 };
 
+/** A computer's name as the top bar shows it: without the network suffix
+    macOS and routers add ("Rahuls-MacBook-Air.local"). The picker and the
+    tooltip keep the full name. */
+const shortDeviceName = (name: string): string =>
+  name.replace(/\.(?:local|lan|home|localdomain)$/iu, "") || name;
+
 const moveErrorMessage = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error)).replace(
     /^Error invoking remote method '[^']*': (?:\w*Error: )?/u,
@@ -118,6 +124,7 @@ export function GlobalExecutionTargetControl() {
           (brain && !brain.here ? brain.label : undefined) ??
           "Computer")
         : platformCapabilities.automaticExecutionLabel;
+  const isDeviceName = target.mode === "device";
   const TriggerIcon = target.mode === "cloud" ? Globe : AppWindowMac;
 
   const choose = (next: DesktopExecutionTarget) => {
@@ -148,9 +155,11 @@ export function GlobalExecutionTargetControl() {
           aria-busy={moving || undefined}
           aria-label={`Run on ${label}`}
           aria-pressed={open}
+          data-device-name={isDeviceName || undefined}
+          title={isDeviceName ? label : undefined}
         >
           <TriggerIcon size={14} strokeWidth={1.75} />
-          <span>{label}</span>
+          <span>{isDeviceName ? shortDeviceName(label) : label}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent

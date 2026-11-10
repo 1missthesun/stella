@@ -180,6 +180,14 @@
   max-width: 150px;
 }
 
+/* A computer's own name gets 40% less room than the button allows (68px of
+   text instead of 114px); "This computer" and "Cloud" always fit whole. */
+.global-models-control--topbar
+  .execution-target-button[data-device-name="true"]
+  > span {
+  max-width: 68px;
+}
+
 /* Narrow windows: icons only, so the tabs keep their room. */
 @media (max-width: 820px) {
   .global-models-control--topbar .work-models-button {

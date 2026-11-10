@@ -2805,7 +2805,8 @@
         "upToDateBody": "Các phiên bản mới của Stella sẽ hiện ở đây."
       },
       "updating": "Đang cập nhật…",
-      "afterRecording": "Sau khi ghi xong"
+      "afterRecording": "Sau khi ghi xong",
+      "afterReply": "Sau khi Stella trả lời xong"
     },
     "audioPlayer": {
       "pause": "Tạm dừng",

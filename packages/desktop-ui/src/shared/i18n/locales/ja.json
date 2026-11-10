@@ -2805,7 +2805,8 @@
         "upToDateBody": "Stellaの新しいバージョンがここに表示されます。"
       },
       "updating": "アップデート中…",
-      "afterRecording": "録画の終了後"
+      "afterRecording": "録画の終了後",
+      "afterReply": "Stellaの返信が終わったら"
     },
     "audioPlayer": {
       "pause": "一時停止",

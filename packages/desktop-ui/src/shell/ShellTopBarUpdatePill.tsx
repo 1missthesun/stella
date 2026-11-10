@@ -24,7 +24,9 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   const label = updating
     ? state.heldForRecording
       ? t("shell.appSource.afterRecording")
-      : t("shell.appSource.updating")
+      : state.heldForReply
+        ? t("shell.appSource.afterReply")
+        : t("shell.appSource.updating")
     : t("shell.appSource.update");
 
   return (

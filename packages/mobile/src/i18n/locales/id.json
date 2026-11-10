@@ -2805,7 +2805,8 @@
         "upToDateBody": "Versi baru Stella muncul di sini."
       },
       "updating": "Memperbarui…",
-      "afterRecording": "Setelah rekaman Anda"
+      "afterRecording": "Setelah rekaman Anda",
+      "afterReply": "Setelah Stella selesai membalas"
     },
     "audioPlayer": {
       "pause": "Jeda",

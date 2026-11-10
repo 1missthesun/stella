@@ -2815,7 +2815,8 @@
         "upToDateBody": "Stella के नए संस्करण यहाँ दिखेंगे।"
       },
       "updating": "अपडेट हो रहा है…",
-      "afterRecording": "आपकी रिकॉर्डिंग के बाद"
+      "afterRecording": "आपकी रिकॉर्डिंग के बाद",
+      "afterReply": "Stella का जवाब पूरा होने के बाद"
     },
     "audioPlayer": {
       "pause": "रोकें",

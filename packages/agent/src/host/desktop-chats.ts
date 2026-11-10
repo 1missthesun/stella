@@ -2358,6 +2358,14 @@ export function desktopChats(options: DesktopChatsOptions) {
     busy(): boolean {
       return activeNow.size > 0;
     },
+    /** Stella herself is mid-reply in an open chat here (her tasks don't count): a restart now would cut the reply. */
+    async replying(): Promise<boolean> {
+      for (const pending of chats.values()) {
+        const chat = await pending.catch(() => undefined);
+        if (chat && (await chat.harness.snapshot(LiveDoc, chat.root.id, context).catch(() => undefined))?.run) return true;
+      }
+      return false;
+    },
     async resumeActive(): Promise<void> {
       for (const conversationId of await activeSet()) {
         await open(conversationId).catch((error: unknown) => options.report(error));

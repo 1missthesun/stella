@@ -2815,7 +2815,8 @@
         "upToDateBody": "Nye versjoner av Stella vises her."
       },
       "updating": "Oppdaterer…",
-      "afterRecording": "Etter opptaket ditt"
+      "afterRecording": "Etter opptaket ditt",
+      "afterReply": "Når Stella har svart ferdig"
     },
     "audioPlayer": {
       "pause": "Pause",

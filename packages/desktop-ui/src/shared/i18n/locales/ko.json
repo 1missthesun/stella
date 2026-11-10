@@ -2805,7 +2805,8 @@
         "upToDateBody": "Stella의 새 버전이 여기에 표시돼요."
       },
       "updating": "업데이트 중…",
-      "afterRecording": "녹화가 끝나면"
+      "afterRecording": "녹화가 끝나면",
+      "afterReply": "Stella의 답장이 끝나면"
     },
     "audioPlayer": {
       "pause": "일시정지",

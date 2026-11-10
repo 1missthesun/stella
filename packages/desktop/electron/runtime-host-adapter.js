@@ -137,6 +137,13 @@ export class RuntimeHostAdapter {
     requestRuntimeRestart() {
         return this.host.requestRuntimeRestart();
     }
+    async replying() {
+        if (!this.started) {
+            return false;
+        }
+        const health = await this.host.health().catch(() => null);
+        return health?.replying === true;
+    }
     queueRuntimeConfigPatch(patch) {
         this.pendingConfig = {
             ...this.pendingConfig,

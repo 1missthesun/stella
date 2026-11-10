@@ -185,8 +185,14 @@ export const UpdateCard = ({
   placement?: "message" | "composer";
 }) => {
   const t = useT();
-  const held = useAppSourceState()?.heldForRecording === true;
-  const shownDetail = busy && held ? t("shell.appSource.afterRecording") : detail;
+  const state = useAppSourceState();
+  const shownDetail = !busy
+    ? detail
+    : state?.heldForRecording === true
+      ? t("shell.appSource.afterRecording")
+      : state?.heldForReply === true
+        ? t("shell.appSource.afterReply")
+        : detail;
   return (
   <div
     className={`app-update-card app-update-card--${placement}`}

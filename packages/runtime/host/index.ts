@@ -2264,6 +2264,7 @@ export class StellaRuntimeHost {
         ? { pendingWorkerRestart: true }
         : {}),
       busy: workerHealth?.piBusy === true,
+      replying: workerHealth?.piReplying === true,
     };
   }
   fenceWorkerPeer(peer: JsonRpcPeer): WorkerPeerRegistrar {

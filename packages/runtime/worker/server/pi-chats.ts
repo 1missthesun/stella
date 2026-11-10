@@ -253,6 +253,9 @@ const loadedBySession = new WeakMap<OpenSession, DesktopChats>();
 
 export const piChatsBusy = (session: OpenSession): boolean => loadedBySession.get(session)?.busy() ?? false;
 
+export const piChatsReplying = async (session: OpenSession): Promise<boolean> =>
+  (await loadedBySession.get(session)?.replying().catch(() => false)) ?? false;
+
 export const closePiChats = async (session: OpenSession): Promise<void> => {
   const chats = chatsBySession.get(session);
   chatsBySession.delete(session);

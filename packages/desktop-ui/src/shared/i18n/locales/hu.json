@@ -2815,7 +2815,8 @@
         "upToDateBody": "A Stella új verziói itt jelennek meg."
       },
       "updating": "Frissítés…",
-      "afterRecording": "A felvétel után"
+      "afterRecording": "A felvétel után",
+      "afterReply": "Miután Stella befejezte a választ"
     },
     "audioPlayer": {
       "pause": "Szünet",

@@ -2815,7 +2815,8 @@
         "upToDateBody": "Nieuwe versies van Stella verschijnen hier."
       },
       "updating": "Bijwerken…",
-      "afterRecording": "Na je opname"
+      "afterRecording": "Na je opname",
+      "afterReply": "Zodra Stella klaar is met antwoorden"
     },
     "audioPlayer": {
       "pause": "Pauzeren",

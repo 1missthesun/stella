@@ -2805,7 +2805,8 @@
         "upToDateBody": "Stella 的新版本會顯示在這裡。"
       },
       "updating": "正在更新…",
-      "afterRecording": "錄製結束後"
+      "afterRecording": "錄製結束後",
+      "afterReply": "等 Stella 回覆完"
     },
     "audioPlayer": {
       "pause": "暫停",

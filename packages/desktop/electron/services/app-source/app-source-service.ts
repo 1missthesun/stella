@@ -88,6 +88,8 @@ type AppSourceServiceOptions = {
   isUserAway?: () => boolean;
   /** A screen recording or its finish card is open; a reload would end it. */
   recordingOpen?: () => boolean;
+  /** Stella is mid-reply on this computer; a restart of the runtime would cut it off. */
+  replying?: () => Promise<boolean>;
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
@@ -205,6 +207,8 @@ const errorMessage = (error: unknown) =>
 
 /** Longest an update waits for a screen recording: past its 10-minute cap, building and its card. */
 const RECORDING_HOLD_MAX_MS = 20 * 60_000;
+/** Longest an update that restarts the runtime waits for Stella to finish her reply. */
+const REPLY_HOLD_MAX_MS = 3 * 60_000;
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms).unref?.());
@@ -240,6 +244,7 @@ export class AppSourceService {
   private queue: Promise<unknown> = Promise.resolve();
   private busy = false;
   private heldForRecording = false;
+  private heldForReply = false;
   private refreshing: Promise<void> | null = null;
   private refreshAgain = false;
   private syncing = false;
@@ -853,6 +858,7 @@ export class AppSourceService {
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;
     let phase: ApplyPhase = "planned";
     let holding: Promise<RelaunchHold | null> | null = null;
+    if (restart && (install || restartsRuntime(paths))) await this.waitForReply();
     try {
       await this.moveHead(cwd, from, to);
       phase = "signed";
@@ -1109,6 +1115,26 @@ export class AppSourceService {
     this.publish(rest);
   }
 
+  /**
+   * An update that restarts the runtime waits while Stella is mid-reply here: the restart would cut the reply off
+   * between a tool call and its result. Bounded, so a reply that never ends can't hold updates forever; one cut off
+   * then resumes after the restart.
+   */
+  private async waitForReply() {
+    const replying = this.options.replying;
+    if (!replying || !(await replying().catch(() => false))) return;
+    this.heldForReply = true;
+    this.publish({ ...this.state, heldForReply: true });
+    this.options.log("app-source.held-for-reply", {});
+    const startedAt = Date.now();
+    const until = startedAt + REPLY_HOLD_MAX_MS;
+    while (!this.disposed && Date.now() < until && (await replying().catch(() => false))) await delay(500);
+    this.heldForReply = false;
+    const { heldForReply: _held, ...rest } = this.state;
+    this.publish(rest);
+    this.options.log("app-source.reply-hold-ended", { ms: Date.now() - startedAt });
+  }
+
   private setBusy(busy: boolean) {
     this.busy = busy;
     this.publish({ ...this.state, busy });
@@ -1137,6 +1163,7 @@ export class AppSourceService {
             ...next,
             busy: this.busy,
             ...(this.heldForRecording ? { heldForRecording: true } : {}),
+            ...(this.heldForReply ? { heldForReply: true } : {}),
           });
           this.considerAutoApply(this.state);
         } catch (error) {

@@ -1234,7 +1234,9 @@ export class ExecutionPlacementBridge {
           outcome: "canceled",
           errorCode: "LOCAL_EXECUTION_BRIDGE_STOPPED",
           errorMessage:
-            "The desktop execution bridge stopped before the local run settled.",
+            row.kind === "agent"
+              ? "Stella restarted on the computer running this task (for example to install an update) before it finished. Its work so far is kept there: message the task to continue it."
+              : "Stella restarted on the computer running this before it finished.",
           orphanOnAck:
             row.ownerGeneration !== this.ownerGeneration ||
             row.presenceSessionId !== this.presenceSessionId,

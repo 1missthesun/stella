@@ -2855,7 +2855,8 @@
         "upToDateBody": "تظهر الإصدارات الجديدة من Stella هنا."
       },
       "updating": "جارٍ التحديث…",
-      "afterRecording": "بعد انتهاء التسجيل"
+      "afterRecording": "بعد انتهاء التسجيل",
+      "afterReply": "بعد أن تُنهي Stella ردها"
     },
     "audioPlayer": {
       "pause": "إيقاف مؤقت",

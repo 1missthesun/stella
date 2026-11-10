@@ -6,7 +6,7 @@ import {
 } from "@stella/contracts/protocol";
 import { BootTimeline } from "../../../observability/boot-timing.js";
 import * as ModelCatalog from "../model-catalog.js";
-import { piChatsBusy } from "../pi-chats.js";
+import { piChatsBusy, piChatsReplying } from "../pi-chats.js";
 import * as WorkerSessions from "../sessions.js";
 import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
 import type { WorkerInitializationState } from "../types.js";
@@ -55,6 +55,7 @@ export const lifecycleHandlers: WorkerRpcHandlers = {
         pid: process.pid,
         deviceId: session?.config.deviceId ?? null,
         piBusy: session ? piChatsBusy(session) : false,
+        piReplying: session ? yield* fromPromise(() => piChatsReplying(session)) : false,
       };
     }),
 

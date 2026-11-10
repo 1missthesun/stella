@@ -60,6 +60,8 @@ export type AppSourceState = {
   busy: boolean;
   /** An update the user asked for waits until their screen recording and its finish card are done. */
   heldForRecording?: boolean;
+  /** An update that restarts Stella's runtime waits until she finishes the reply she's in the middle of. */
+  heldForReply?: boolean;
 };
 
 export type AppSourceActionResult =

@@ -2825,7 +2825,8 @@
         "upToDateBody": "Novas versões da Stella aparecem aqui."
       },
       "updating": "Atualizando…",
-      "afterRecording": "Depois da sua gravação"
+      "afterRecording": "Depois da sua gravação",
+      "afterReply": "Quando a Stella terminar de responder"
     },
     "audioPlayer": {
       "pause": "Pausar",

@@ -2835,7 +2835,8 @@
         "upToDateBody": "Nowe wersje Stelli pojawią się tutaj."
       },
       "updating": "Aktualizowanie…",
-      "afterRecording": "Po nagraniu"
+      "afterRecording": "Po nagraniu",
+      "afterReply": "Gdy Stella skończy odpowiadać"
     },
     "audioPlayer": {
       "pause": "Wstrzymaj",

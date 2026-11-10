@@ -43,6 +43,8 @@ export type WorkerHealthSnapshot = {
   voiceBusy?: boolean;
   pendingVoiceRequestCount?: number;
   piBusy?: boolean;
+  /** Stella is mid-reply in a chat here. */
+  piReplying?: boolean;
 };
 
 const waitForWorkerProcessExitEffect = (

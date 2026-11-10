@@ -461,6 +461,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 return (await state.rendererSource?.quietFor()) ?? null;
             },
             recordingOpen: () => Boolean(state.showStella?.isActive()),
+            replying: async () => (await state.stellaHostRunner?.replying?.()) === true,
             isUserAway: () => {
                 if (state.showStella?.isActive()) return false;
                 const window = state.windowManager?.getFullWindow() ?? null;

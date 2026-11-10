@@ -1,11 +1,11 @@
 ---
 name: modify-stella
-description: Change Stella itself (its UI, runtime, or desktop shell) by preparing a draft in a git worktree that the user applies with the Update button. Use when the user asks to change, fix, or add to Stella, to rebase a draft, to merge changes from their other computer, to update Stella to the latest version, or to undo a change that conflicts.
+description: Change Stella itself (its UI, runtime, or desktop shell) by preparing a draft in a git worktree; interface-only drafts are added when finished, the rest the user applies with the Update button. Use when the user asks to change, fix, or add to Stella, to rebase a draft, to merge changes from their other computer, to update Stella to the latest version, or to undo a change that conflicts.
 ---
 
 # Modifying Stella
 
-Stella runs from its own git checkout at `$STELLA_APP_DIR`. That checkout is what runs, so never edit it, commit in it, merge into it, or push it. Every change is a **draft**: a worktree at `$STELLA_DRAFTS_DIR/<name>` on branch `draft/<name>`. The user applies finished drafts with the Update button on the card Stella shows under your completion in the chat.
+Stella runs from its own git checkout at `$STELLA_APP_DIR`. That checkout is what runs, so never edit it, commit in it, merge into it, or push it. Every change is a **draft**: a worktree at `$STELLA_DRAFTS_DIR/<name>` on branch `draft/<name>`. A finished draft that only changes the interface's source (`packages/desktop-ui/src`) is added by Stella itself; the user applies every other finished draft with the Update button on the card Stella shows under your completion in the chat.
 
 ## Layout
 
@@ -54,13 +54,26 @@ Finish only after the check above passed (for UI changes, after you saw the chan
 1. Commit everything as one normal commit with a plain, descriptive message (no tags or trailers). If git has no identity, add `-c user.name=Stella -c user.email=stella@localhost`.
 2. Rebase onto the checkout's current branch so the draft is a fast-forward: `git rebase "$(git -C "$STELLA_APP_DIR" branch --show-current)"`. Resolve any conflicts yourself, then typecheck again.
 3. Remove the worktree: `git -C "$STELLA_APP_DIR" worktree remove "$STELLA_DRAFTS_DIR/<name>"`. The `draft/<name>` branch stays; that is the finished draft.
-4. Tell the user it is ready and that they apply it with the Update button. Never apply it yourself.
+4. Tell the user. A draft whose every changed file is under `packages/desktop-ui/src` is added by Stella as soon as the worktree is gone and the user's hands are off the app (no typing, clicking or scrolling for a moment), so say it is in and that Undo is on the card. Any other draft waits: say it is ready and that they apply it with the Update button. Never apply a draft yourself.
 
-What it takes to take effect after Update, so you can tell the user:
+Removing the worktree is what marks a draft finished, so remove it only when the whole change is in the commit.
 
-- Renderer: updates in place.
+What it takes to take effect, so you can tell the user:
+
+- Interface only: it appears in place, without a reload, when everything that has to load again only declares things (components, functions, constants). Otherwise the window reloads behind a still frame and comes back where the user was: same view, scroll position, unsent text, open panels.
 - Runtime or contracts: the runtime restarts between turns.
-- Main or preload: Stella relaunches.
+- Main or preload: Stella relaunches, and the window comes back where the user was.
+
+If an interface change does not load or throws while rendering, Stella takes it back by itself and the card shows what went wrong. Reopen the draft (`git worktree add "$STELLA_DRAFTS_DIR/<name>" draft/<name>`, no `-b`), fix it, and finish again.
+
+## Keep the user's place
+
+A reload, a restart or a change arriving must not cost the user anything they would notice. Scroll positions, text in inputs, focus and the caret are kept for every element without any code. For state of your own:
+
+- `useViewState("settings.tab", "general")` from `@/platform/view-state/view-state` is `useState` that survives reloads and restarts; `viewAtom(key, initial)` is the same for a store outside React. Use them for what is open, selected, expanded or half-entered. Values are JSON.
+- `data-view-scope={id}` on a container keeps what is inside it apart per id (the chat does this per conversation). `data-view-state="off"` leaves an element out; passwords and secrets are never recorded.
+
+For a change to appear in place, the modules that load again must hold no state of their own. Keep module-level variables, filled maps and code that runs on load out of component files: put real state in a store module of its own or in the view state. A module whose only state is a cache, a count of what is mounted, or a registration the newer copy should replace says so with a `// @reloadable <why>` comment. Nothing breaks when a module does hold state: that change takes the reload instead.
 
 ## Rebase, merge, or undo for the user
 

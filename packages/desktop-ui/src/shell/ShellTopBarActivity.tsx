@@ -46,6 +46,7 @@ import "./shell-topbar-activity.css";
 type ActivityOverviewComponent =
   (typeof import("@/shell/sidebar-sections/HomeSection"))["ActivityOverview"];
 
+// @reloadable the loaded component is a cache of an import
 let loadedActivityOverview: ActivityOverviewComponent | null = null;
 
 const loadActivityOverview = () =>

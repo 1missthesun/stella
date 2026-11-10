@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import "./platform/swap/swap-runtime";
 import "./index.css";
 import "./ui/register-styles";
 import "./shared/styles/app-base.css";
@@ -13,6 +13,7 @@ import { installRendererErrorReporting } from "./platform/diagnostics/report-err
 import { AppRoot } from "./app-root";
 import { prefetchAuthSessionBeforeRender } from "./global/auth/services/auth-session";
 import { startDomState } from "./platform/view-state/dom-state";
+import { mountApp } from "./platform/swap/app-mount";
 
 applyLowPowerDocumentFlag();
 installRendererErrorReporting();
@@ -28,5 +29,5 @@ if (import.meta.env.VITE_STELLA_WEB_BUILD === "1") {
 
 document.documentElement.dataset.stellaWindow = "full";
 
-createRoot(document.getElementById("root")!).render(<AppRoot />);
+mountApp(document.getElementById("root")!, AppRoot);
 startDomState();

@@ -1,7 +1,7 @@
 import { parentPort, Worker, workerData } from "node:worker_threads";
 import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createTailwindBuild, type TailwindBuild } from "./css.js";
-import { createRendererSource } from "./renderer-source.js";
+import { createRendererSource, type RanImports } from "./renderer-source.js";
 import { loadTailwindTools } from "./tools.js";
 import { SOURCE_DATA_ARG } from "./origin.js";
 
@@ -15,7 +15,7 @@ export type SourceWorkerData = {
 
 export type SourceWorkerRequest =
   | { type: "request"; id: number; url: string }
-  | { type: "apply"; id: number; paths: string[] };
+  | { type: "apply"; id: number; paths: string[]; ran: RanImports | null };
 
 export type SourceWorkerMessage =
   | { type: "response"; id: number; status: number; contentType: string; body: Uint8Array }
@@ -133,7 +133,7 @@ port.listen((message) => {
       );
   } else if (message.type === "apply") {
     void source
-      .then((ready) => ready.applyChanges(message.paths))
+      .then((ready) => ready.applyChanges(message.paths, message.ran))
       .then(
         (result) => post({ type: "applied", id: message.id, result }),
         (error: unknown) =>

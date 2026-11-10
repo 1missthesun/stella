@@ -41,10 +41,12 @@ import {
 } from "./merge-record.js";
 import { tokenSubject } from "../engine-account-access.js";
 import type { CoveredWindow, RelaunchHold } from "./update-transition.js";
+import type { RendererApplyOutcome } from "../../source/renderer-protocol.js";
 import {
   classifyUpdate,
   conflictedPaths,
   installs,
+  interfaceOnly,
   relaunches,
   restartsRuntime,
   type UpdatePlan,
@@ -75,7 +77,14 @@ type AppSourceServiceOptions = {
   broadcast: (state: AppSourceState) => void;
   isAnyWindowVisible: () => boolean;
   requestRuntimeRestart: () => void;
-  applyRendererChanges: (paths: string[]) => Promise<unknown> | undefined;
+  applyRendererChanges: (
+    paths: string[],
+    options?: { reload?: boolean },
+  ) => Promise<RendererApplyOutcome> | undefined;
+  /** Milliseconds since the user last touched Stella; null when no window can say. */
+  userQuietFor?: () => Promise<number | null>;
+  /** The user is not looking at Stella or has left the computer. */
+  isUserAway?: () => boolean;
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
@@ -124,6 +133,10 @@ type SourceAccess = {
 };
 
 const STATE_POLL_MS = 10_000;
+const AUTO_APPLY_QUIET_MS = 1_500;
+const AUTO_APPLY_RETRY_MS = 500;
+const SWAPS_BEFORE_RELOAD = 12;
+const RELOAD_WHEN_AWAY_POLL_MS = 30_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
 const SYNC_RETRY_MS = 30_000;
 const SYNC_RETRY_MAX_MS = 10 * 60_000;
@@ -160,6 +173,9 @@ const EMPTY_STATE: AppSourceState = {
 };
 
 type Offer = { tip: string; real: boolean; catchUp: boolean };
+
+/** The windows could not show the change, and the checkout is back where it was. */
+class RendererRejected extends Error {}
 
 type ApplyPhase = "planned" | "signed" | "holding" | "installed" | "relaunching";
 
@@ -240,6 +256,10 @@ export class AppSourceService {
   private timeline: { last: number; startedAt: number; steps: string[] } | null =
     null;
   private readonly onFocus = () => void this.refresh();
+  private readonly rejected = new Map<string, string>();
+  private readonly autoTried = new Set<string>();
+  private autoTimer: NodeJS.Timeout | null = null;
+  private reloadTimer: NodeJS.Timeout | null = null;
   private readonly preparer: UpdatePreparer;
 
   constructor(options: AppSourceServiceOptions) {
@@ -288,6 +308,10 @@ export class AppSourceService {
     this.timers = [];
     if (this.syncTimer) clearTimeout(this.syncTimer);
     this.syncTimer = null;
+    if (this.autoTimer) clearTimeout(this.autoTimer);
+    this.autoTimer = null;
+    if (this.reloadTimer) clearInterval(this.reloadTimer);
+    this.reloadTimer = null;
     this.releases.dispose();
     this.forkWatch?.stop();
     this.forkWatch = null;
@@ -385,9 +409,12 @@ export class AppSourceService {
     const paths = (await git(cwd, ["diff", "--name-only", `${head}...${sha}`]))
       .split("\n")
       .filter(Boolean);
+    const rejected = this.rejected.get(sha);
     return {
       files: paths.length,
       restart: relaunches(paths),
+      interfaceOnly: interfaceOnly(paths),
+      ...(rejected ? { problem: rejected } : {}),
     };
   }
 
@@ -560,13 +587,19 @@ export class AppSourceService {
         }
       }
     }
-    await this.swapIn(
-      cwd,
-      head,
-      to,
-      source.settle && (() => source.settle!(to)),
-      prepared,
-    );
+    try {
+      await this.swapIn(
+        cwd,
+        head,
+        to,
+        source.settle && (() => source.settle!(to)),
+        prepared,
+      );
+      this.rejected.delete(tip);
+    } catch (error) {
+      if (error instanceof RendererRejected) this.rejected.set(tip, error.message);
+      throw error;
+    }
   }
 
   private async dispatchMerge(
@@ -803,11 +836,13 @@ export class AppSourceService {
       await this.moveHead(cwd, from, to);
       phase = "signed";
       this.mark("sign");
-      const settling = (settle?.() ?? Promise.resolve()).catch((error: unknown) =>
-        this.options.log("app-source.settle-failed", { message: errorMessage(error) }),
-      );
-      this.options.log("app-source.applied", { files: paths.length });
+      const settled = () =>
+        (settle?.() ?? Promise.resolve()).catch((error: unknown) =>
+          this.options.log("app-source.settle-failed", { message: errorMessage(error) }),
+        );
       if (restart) {
+        const settling = settled();
+        this.options.log("app-source.applied", { files: paths.length });
         holding = this.options.beforeRelaunch?.() ?? Promise.resolve(null);
         phase = "holding";
         if (install) {
@@ -847,17 +882,28 @@ export class AppSourceService {
         this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
         return;
       }
-      if (restartsRuntime(paths)) {
-        this.options.requestRuntimeRestart();
-      }
       const covered = await covering;
       this.mark("cover");
       const swap = async () => {
-        await this.options.applyRendererChanges(paths);
+        const outcome = (await this.options.applyRendererChanges(paths)) ?? { mode: "none" as const };
+        if (outcome.mode === "failed") await this.takeBack(cwd, from, to, paths, outcome);
+        return outcome;
       };
-      await (covered ? covered.reveal(swap) : swap());
+      const outcome = await (covered ? covered.reveal(swap) : swap());
       this.mark("reveal");
-      await settling;
+      if (outcome.mode === "failed") {
+        throw new RendererRejected("This change stopped Stella from showing, so it was taken back.");
+      }
+      this.options.log("app-source.applied", {
+        files: paths.length,
+        renderer: outcome.mode,
+        ...(outcome.mode === "reload" && outcome.reason ? { reason: outcome.reason } : {}),
+      });
+      if (restartsRuntime(paths)) {
+        this.options.requestRuntimeRestart();
+      }
+      if (outcome.mode === "swap" && outcome.swaps >= SWAPS_BEFORE_RELOAD) this.reloadWhenAway();
+      await settled();
     } catch (error) {
       this.options.log("app-source.apply-stopped", { phase, message: errorMessage(error) });
       if (phase !== "relaunching") {
@@ -866,6 +912,100 @@ export class AppSourceService {
       }
       throw error;
     }
+  }
+
+  /**
+   * The windows refused the change: the checkout goes back to where it was
+   * and the windows are given those files again, by a reload when the change
+   * already cost them one or cannot be taken out in place.
+   */
+  private async takeBack(
+    cwd: string,
+    from: string,
+    to: string,
+    paths: string[],
+    failure: Extract<RendererApplyOutcome, { mode: "failed" }>,
+  ) {
+    await git(cwd, ["reset", "--keep", from]);
+    await this.options.afterApply?.(cwd);
+    let restored = (await this.options.applyRendererChanges(paths, { reload: failure.reloaded })) ?? {
+      mode: "none" as const,
+    };
+    if (restored.mode === "failed" && !restored.reloaded) {
+      restored = (await this.options.applyRendererChanges(paths, { reload: true })) ?? restored;
+    }
+    this.options.log("app-source.renderer-rejected", {
+      to: to.slice(0, 12),
+      error: failure.error,
+      reloaded: failure.reloaded,
+      restored: restored.mode,
+    });
+  }
+
+  /**
+   * Every change taken in place leaves the modules it replaced in memory. Once
+   * enough have piled up, the windows load again the next time nobody is
+   * looking; until then nothing is checked.
+   */
+  private reloadWhenAway() {
+    if (this.reloadTimer || this.disposed) return;
+    const timer = setInterval(() => {
+      if (this.busy || !this.options.isUserAway?.()) return;
+      clearInterval(timer);
+      this.reloadTimer = null;
+      this.queue = this.queue.then(async () => {
+        const covered = (await this.options.coverRenderer?.()) ?? null;
+        const reload = async () => {
+          const outcome = await this.options.applyRendererChanges([], { reload: true });
+          this.options.log("app-source.renderer-refreshed", { outcome: outcome?.mode ?? "none" });
+        };
+        await (covered ? covered.reveal(reload) : reload()).catch((error: unknown) =>
+          this.options.log("app-source.renderer-refresh-failed", { message: errorMessage(error) }),
+        );
+      });
+    }, RELOAD_WHEN_AWAY_POLL_MS);
+    timer.unref?.();
+    this.reloadTimer = timer;
+  }
+
+  /**
+   * A finished change that only touches the interface is added without a
+   * click, once, as soon as the user's hands are off Stella. One that fails
+   * stays in Updates with what went wrong.
+   */
+  private considerAutoApply(state: AppSourceState) {
+    if (this.autoTimer || this.disposed || state.busy || state.merging) return;
+    const offer = state.waiting.find(
+      (entry): entry is AppSourceDraftOffer =>
+        entry.kind === "draft" &&
+        entry.interfaceOnly &&
+        !entry.stale &&
+        !entry.adding &&
+        !this.autoTried.has(entry.sha),
+    );
+    if (!offer) return;
+    const attempt = async () => {
+      this.autoTimer = null;
+      if (this.disposed) return;
+      const current = this.state.waiting.find(
+        (entry) => entry.kind === "draft" && entry.sha === offer.sha && !entry.adding,
+      );
+      if (!current || this.state.merging) return;
+      const quiet = this.busy ? 0 : ((await this.options.userQuietFor?.()) ?? Infinity);
+      if (quiet < AUTO_APPLY_QUIET_MS) {
+        this.autoTimer = setTimeout(() => void attempt(), AUTO_APPLY_RETRY_MS);
+        this.autoTimer.unref?.();
+        return;
+      }
+      this.autoTried.add(offer.sha);
+      const result = await this.applyDraft(offer.name);
+      this.options.log("app-source.auto-applied", {
+        draft: offer.name,
+        ok: result.ok,
+        ...(result.ok ? {} : { error: result.error }),
+      });
+    };
+    this.autoTimer = setTimeout(() => void attempt(), 0);
   }
 
   /** A HEAD the launcher refuses to sign is moved back, so Stella never runs on an unsigned version. */
@@ -940,6 +1080,7 @@ export class AppSourceService {
         try {
           const next = await this.readState();
           this.publish({ ...next, busy: this.busy });
+          this.considerAutoApply(this.state);
         } catch (error) {
           this.options.log("app-source.refresh-failed", {
             message: errorMessage(error),
@@ -1134,6 +1275,7 @@ export class AppSourceService {
         stale: true,
         files: 0,
         restart: false,
+        interfaceOnly: false,
         ...(agentId ? { agentId } : {}),
       });
     }

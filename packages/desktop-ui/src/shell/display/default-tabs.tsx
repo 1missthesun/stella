@@ -100,6 +100,7 @@ export function openModelPicker(): void {
   engineOverlay.setOpen(true);
 }
 
+// @reloadable the newer handlers replace the registered ones
 registerWorkspaceDefaultTabs({
   openModelPicker,
 });

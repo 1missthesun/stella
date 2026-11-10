@@ -154,6 +154,7 @@ const sameGeometry = (a: Geometry, b: Geometry) =>
   Math.round(a.composer?.left ?? -1) === Math.round(b.composer?.left ?? -1) &&
   Math.round(a.composer?.width ?? -1) === Math.round(b.composer?.width ?? -1);
 
+// @reloadable the geometry is measured again on first use
 let geometry: Geometry | null = null;
 const geometryListeners = new Set<() => void>();
 const refreshGeometry = () => {

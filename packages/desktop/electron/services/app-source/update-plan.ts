@@ -9,6 +9,11 @@ export const restartsRuntime = (paths: string[]) =>
 export const relaunches = (paths: string[]) =>
   installs(paths) || paths.some((file) => file.startsWith(RESTART_PREFIX));
 
+const INTERFACE_PREFIX = "packages/desktop-ui/src/";
+/** Only the interface's own source: nothing the main process, the runtime or an install reads. */
+export const interfaceOnly = (paths: string[]) =>
+  paths.length > 0 && !installs(paths) && paths.every((file) => file.startsWith(INTERFACE_PREFIX));
+
 export type UpdatePlan =
   | { kind: "none" }
   | {

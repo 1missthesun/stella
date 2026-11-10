@@ -6,6 +6,7 @@ import { app, protocol, session, utilityProcess, webContents } from "electron";
 import { RENDERER_ORIGIN, RENDERER_SCHEME, SOURCE_DATA_ARG } from "./origin.js";
 import { MEDIA_SCHEME_PRIVILEGES, serveMediaProtocol } from "./media-protocol.js";
 import { CANVAS_SCHEME_PRIVILEGES, serveCanvasProtocol } from "./canvas-protocol.js";
+import type { RanImports } from "./renderer-source.js";
 import type { SourceWorkerData, SourceWorkerMessage, SourceWorkerRequest } from "./source-worker.js";
 
 /** Must run before `ready`: the scheme behaves like https (ESM, fetch, CSP 'self'). */
@@ -51,9 +52,64 @@ export const resolveRendererBuildMode = (options: {
   return options.isInstalledProduct ? "production" : "development";
 };
 
+/**
+ * How a change reached the windows. `swap`: the full window took it in place.
+ * `reload`: the windows loaded again and came back. `failed`: the new code
+ * does not load or does not render; the window is showing what it showed
+ * before (after a failed reload, whatever the files now hold once reloaded).
+ */
+export type RendererApplyOutcome =
+  | { mode: "none" | "hot" }
+  | { mode: "swap"; swaps: number }
+  | { mode: "reload"; reason?: string }
+  | { mode: "failed"; error: string; reloaded: boolean };
+
 export type RendererSourceHandle = {
-  applyChanges(paths: string[]): Promise<{ mode: "none" | "hot" | "reload" }>;
+  /** `reload`: load the windows again whatever the change allows. */
+  applyChanges(paths: string[], options?: { reload?: boolean }): Promise<RendererApplyOutcome>;
+  /** Milliseconds since the user last touched the full window; null when there is none to ask. */
+  quietFor(): Promise<number | null>;
   dispose(): void;
+};
+
+const SWAP_PAGE = "index.html";
+const SWAP_PAGE_PATHS = new Set(["/", "/index.html"]);
+const pageName = (url: string) => {
+  const pathname = new URL(url).pathname;
+  return SWAP_PAGE_PATHS.has(pathname) ? SWAP_PAGE : pathname.slice(1);
+};
+
+const RELOAD_HEALTH_TIMEOUT_MS = 15_000;
+const RELOAD_EMPTY_TIMEOUT_MS = 3_000;
+const HEALTH_SCRIPT = `(() => {
+  if (document.querySelector(".error-boundary")) return "crashed";
+  if (document.readyState !== "complete") return "loading";
+  if (document.getElementById("stella-mini-boot")) return "empty";
+  const splash = document.getElementById("stella-launch");
+  return !splash || splash.dataset.exiting === "true" ? "ok" : "loading";
+})()`;
+const ANSI_STYLE = /\u001b\[[0-9;]*m/g;
+
+/** Whether a window that loaded again shows the app rather than a crash or a page that never starts. */
+const cameBack = async (contents: Electron.WebContents): Promise<string | null> => {
+  const deadline = Date.now() + RELOAD_HEALTH_TIMEOUT_MS;
+  let emptySince: number | null = null;
+  while (Date.now() < deadline) {
+    if (contents.isDestroyed()) return null;
+    const state = contents.isLoading()
+      ? "loading"
+      : await (contents.executeJavaScript(HEALTH_SCRIPT) as Promise<string>).catch(() => "loading");
+    if (state === "ok") return null;
+    if (state === "crashed") return "The new version stopped with an error when it started.";
+    if (state === "empty") {
+      emptySince ??= Date.now();
+      if (Date.now() - emptySince >= RELOAD_EMPTY_TIMEOUT_MS) break;
+    } else {
+      emptySince = null;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return "The new version did not start.";
 };
 
 type Answer = { status: number; contentType: string; body: Uint8Array };
@@ -170,8 +226,10 @@ const startSourceWorker = (options: {
     });
   return {
     request: (url: string) => call<Answer>({ type: "request", url }),
-    apply: (paths: string[]) =>
-      call<{ result?: ApplyAnswer }>({ type: "apply", paths }).then((answer) => answer.result ?? { mode: "none" as const }),
+    apply: (paths: string[], ran: RanImports | null) =>
+      call<{ result?: ApplyAnswer }>({ type: "apply", paths, ran }).then(
+        (answer) => answer.result ?? { mode: "none" as const },
+      ),
     dispose: () => {
       disposed = true;
       worker?.terminate();
@@ -205,6 +263,7 @@ export const serveRendererSource = (options: {
   const reloadPages = () => {
     for (const contents of pages()) contents.reload();
   };
+  const fullPage = () => pages().find((contents) => pageName(contents.getURL()) === SWAP_PAGE) ?? null;
   const uiRoot = path.join(options.sourceRoot, "packages", "desktop-ui");
   const source = startSourceWorker({
     workerData: {
@@ -284,9 +343,51 @@ export const serveRendererSource = (options: {
     });
   }
   return {
-    applyChanges: async (paths) => {
-      const result = await source.apply(paths);
-      if (result.mode === "reload") reloadPages();
+    quietFor: async () => {
+      const full = fullPage();
+      if (!full) return null;
+      return (full.executeJavaScript("globalThis.__stellaSwap?.quietFor() ?? null") as Promise<number | null>).catch(
+        () => null,
+      );
+    },
+    applyChanges: async (paths, { reload = false } = {}) => {
+      const full = fullPage();
+      const ran = full
+        ? await (full.executeJavaScript("globalThis.__stellaSwap?.ran() ?? null") as Promise<RanImports | null>).catch(
+            () => null,
+          )
+        : null;
+      const result = await source.apply(paths, ran);
+      if (result.mode === "failed" && !reload) {
+        return { mode: "failed", error: result.error.replace(ANSI_STYLE, ""), reloaded: false };
+      }
+      if (result.mode === "reload" || reload) {
+        reloadPages();
+        const problem = full ? await cameBack(full) : null;
+        return problem
+          ? { mode: "failed", error: problem, reloaded: true }
+          : { mode: "reload", reason: result.mode === "reload" ? result.reason : "asked" };
+      }
+      if (result.mode === "swap") {
+        for (const contents of pages()) {
+          if (result.reloadPages.includes(pageName(contents.getURL()))) contents.reload();
+        }
+        if (!full || full.isDestroyed()) return { mode: "swap", swaps: 0 };
+        const outcome = await (
+          full.executeJavaScript(`globalThis.__stellaSwap.apply(${JSON.stringify(result.payload)})`) as Promise<{
+            ok: boolean;
+            error?: string;
+            swaps?: number;
+          }>
+        ).catch((error: unknown) => ({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+          swaps: 0,
+        }));
+        if (outcome.ok) return { mode: "swap", swaps: outcome.swaps ?? 0 };
+        options.log(`[source] swap failed: ${outcome.error ?? "unknown"}`);
+        return { mode: "failed", error: outcome.error ?? "The change did not load.", reloaded: false };
+      }
       if (result.mode === "hot") {
         const script = `globalThis.__stellaHot?.update(${JSON.stringify(result.payload)})`;
         await Promise.all(
@@ -298,7 +399,7 @@ export const serveRendererSource = (options: {
           ),
         );
       }
-      return { mode: result.mode };
+      return { mode: result.mode === "hot" ? "hot" : "none" };
     },
     dispose: () => {
       if (buffered) sessionProtocol.unregisterProtocol(RENDERER_SCHEME);

@@ -72,8 +72,14 @@ const sync = () => {
   git(appDir, ["fetch", "--quiet", repoRoot, sha]);
   git(appDir, ["checkout", "--quiet", "-B", "master", sha]);
   git(appDir, ["reset", "--quiet", "--hard", sha]);
+  const inUse = new Set(
+    git(appDir, ["worktree", "list", "--porcelain"])
+      .split("\n")
+      .filter((line) => line.startsWith("branch refs/heads/"))
+      .map((line) => line.slice("branch refs/heads/".length)),
+  );
   for (const ref of git(appDir, ["for-each-ref", "--format=%(refname:short)", "refs/heads/draft/"]).split("\n")) {
-    if (ref) git(appDir, ["branch", "-D", ref]);
+    if (ref && !inUse.has(ref)) git(appDir, ["branch", "-D", ref]);
   }
   const lockAfter = readFileSync(path.join(appDir, "bun.lock"), "utf8");
   if (lockBefore !== lockAfter || !existsSync(path.join(appDir, "node_modules"))) install();
@@ -386,7 +392,7 @@ class LogTail {
 }
 
 const TOPBAR = "packages/desktop-ui/src/shell/ShellTopBarFull.tsx";
-const TOPBAR_ANCHOR = `<div className="shell-topbar-full__spacer" aria-hidden="true" />`;
+const TOPBAR_ANCHOR = `<ShellTopBarActivity />`;
 const NAV = "packages/desktop-ui/src/shell/ShellTopBarActivity.tsx";
 const NAV_ANCHOR = `<div className="shell-topbar-activity" data-busy={busy ? "true" : "false"}>`;
 const MAIN = "packages/desktop/electron/main.ts";
@@ -496,6 +502,7 @@ const iterate = async (variation) => {
   const nonce = `b${Date.now().toString(36)}`;
   let action;
   let markerSelector = null;
+  let addedItself = null;
   if (variation === "undo") {
     const sha = git(appDir, ["log", "-1", "--format=%H", "--first-parent", "--", TOPBAR]);
     action = `window.electronAPI.appSource.undo(${JSON.stringify(sha)})`;
@@ -508,13 +515,24 @@ const iterate = async (variation) => {
     const prepareTail = new LogTail(run);
     const prepareResources = new ResourceSampler(await runMainPid(run));
     const createdAt = Date.now();
+    if (variation === "renderer") markerSelector = `[data-update-bench="${nonce}"]`;
+    if (variation === "stale") markerSelector = `[data-update-bench-stale="${nonce}"]`;
+    let watching = markerSelector !== null;
+    let shownAt = null;
+    const watch = (async () => {
+      while (watching && !shownAt) {
+        if (await tryEvaluate(run.cdpPort, `Boolean(document.querySelector(${JSON.stringify(markerSelector)})) && (${LIVE})`)) {
+          shownAt = Date.now();
+        } else await sleep(10);
+      }
+    })();
     git(appDir, ["branch", "--force", `draft/${name}`, commit]);
     const offeredBy = Date.now() + 180_000;
     let offeredAt = null;
     while (Date.now() < offeredBy) {
       const ready = await tryEvaluate(
         run.cdpPort,
-        `window.electronAPI.appSource.getState().then((state) => [...(state?.ready ?? []), ...(state?.stale ?? [])].some((draft) => draft.name === ${JSON.stringify(name)}))`,
+        `window.electronAPI.appSource.getState().then((state) => [...(state?.waiting ?? []), ...(state?.skipped ?? [])].some((offer) => offer.kind === "draft" && offer.name === ${JSON.stringify(name)}))`,
       );
       if (ready) {
         offeredAt = Date.now();
@@ -532,9 +550,47 @@ const iterate = async (variation) => {
       resources: prepareResources.stop(),
     };
     await sleep(1000);
+    prepareTail.poll();
+    const planned = prepareTail.find("app-source.take-planned");
+    if (planned) {
+      const timing = await prepareTail.waitFor("app-source.timing", Date.now() + 120_000);
+      const until = Date.now() + 10_000;
+      while (!shownAt && Date.now() < until) await sleep(10);
+      addedItself = { planned, timing, shownAt, tail: prepareTail };
+    }
+    watching = false;
+    await watch;
     action = `window.electronAPI.appSource.apply(${JSON.stringify(name)})`;
-    if (variation === "renderer") markerSelector = `[data-update-bench="${nonce}"]`;
-    if (variation === "stale") markerSelector = `[data-update-bench-stale="${nonce}"]`;
+  }
+  if (addedItself) {
+    const { planned, timing, shownAt, tail } = addedItself;
+    if (!timing || !shownAt) throw new Error("the change added itself but never showed");
+    tail.poll();
+    const failed = tail.find("app-source.action-failed");
+    if (failed) throw new Error(`apply failed: ${failed.fields.message}`);
+    const stepsTaken = steps(timing.fields.steps);
+    const t0 = planned.at - (stepsTaken.plan ?? 0);
+    const transition = tail.find("app-source.transition");
+    const applied = tail.find("app-source.applied");
+    const record = {
+      at: new Date(t0).toISOString(),
+      variation,
+      mode: run.benchMode ?? "development",
+      nonce,
+      addedItself: true,
+      renderer: applied?.fields.renderer,
+      prepare: pendingPrepare,
+      visibleMs: shownAt - t0,
+      doneMs: Math.max(shownAt, timing.at) - t0,
+      steps: stepsTaken,
+    };
+    if (transition) {
+      record.transition = Object.fromEntries(
+        ["coverMs", "swapMs", "paintMs", "compareMs", "prepMs", "totalMs"].map((key) => [key, transition.fields[key]]),
+      );
+    }
+    pendingPrepare = null;
+    return record;
   }
   const kind = KIND[variation];
   const tail = new LogTail(run);

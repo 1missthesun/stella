@@ -90,6 +90,7 @@ const persistGeneratedMediaItems = (): void => {
   );
 };
 
+// @reloadable generated media is read back from the UI state, and registering re-derives open tabs
 const generatedMediaItems: GeneratedMediaItem[] = loadGeneratedMediaItems();
 const generatedMediaItemIds = new Set(
   generatedMediaItems.map((item) => item.id),

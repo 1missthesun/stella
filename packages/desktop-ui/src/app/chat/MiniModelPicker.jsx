@@ -22,6 +22,7 @@ const getModelBrandKey = (modelId, providersById) => {
         return "openai";
     return (providersById.get(modelId) ?? modelId.split("/")[0] ?? "stella");
 };
+// @reloadable the preferences are a cache of what the host holds
 let cachedMiniPickerPreferences = null;
 export function MiniModelPicker() {
     const t = useT();

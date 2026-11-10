@@ -266,6 +266,7 @@ const COMPONENTS = {
 };
 const COMPONENTS_WITHOUT_RULES = { ...COMPONENTS, hr: HiddenHorizontalRule };
 
+// @reloadable render caches refill on the next render
 let nextAnonCacheKey = 0;
 
 export const Markdown = memo(function Markdown({

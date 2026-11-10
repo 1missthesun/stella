@@ -19,6 +19,7 @@ import "./pdf-viewer-card.css";
 
 const PDF_WORKER_URL = `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`;
 
+// @reloadable pointing pdf.js at its worker is the same every time
 if (pdfjs.GlobalWorkerOptions.workerSrc !== PDF_WORKER_URL) {
   pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
 }

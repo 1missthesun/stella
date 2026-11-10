@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { moduleStateReason } from "./module-state.js";
 import type { OxcTools } from "./tools.js";
 
 export type ImportRef = {
@@ -8,6 +9,8 @@ export type ImportRef = {
   end: number;
   specifier: string;
   dynamic: boolean;
+  /** Where a dynamic import's `import(` starts. */
+  callStart?: number;
 };
 
 export type TransformedModule = {
@@ -16,6 +19,8 @@ export type TransformedModule = {
   imports: ImportRef[];
   exports: string[];
   hotAccepts: string[];
+  /** Why loading the module again is not harmless; null when it only declares. */
+  state: string | null;
 };
 
 export type ResolvedImport =
@@ -24,7 +29,7 @@ export type ResolvedImport =
   | { kind: "asset"; file: string; url: string };
 
 /** Part of every cache key: bump it whenever transform output changes. */
-const TRANSFORM_VERSION = "4";
+const TRANSFORM_VERSION = "5";
 const SIDE_EFFECT_IMPORT = /(?<=^|[;\s])import\s*$/;
 
 export const isSideEffectImport = (code: string, ref: ImportRef): boolean =>
@@ -185,7 +190,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   const collectImportsAndExports = async (
     file: string,
     code: string,
-  ): Promise<Pick<TransformedModule, "imports" | "exports">> => {
+  ): Promise<Pick<TransformedModule, "imports" | "exports" | "state">> => {
     const parsed = await parse(file, code, { lang: "js", sourceType: "module" });
     const imports: ImportRef[] = [];
     const exports: string[] = [];
@@ -217,6 +222,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
           end: entry.moduleRequest.end,
           specifier: match[2]!,
           dynamic: true,
+          callStart: entry.start,
         });
       }
     }
@@ -226,6 +232,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         .filter((ref) => (seen.has(ref.start) ? false : (seen.add(ref.start), true)))
         .sort((a, b) => a.start - b.start),
       exports,
+      state: moduleStateReason(parsed.program as never, parsed.comments as never, code),
     };
   };
 
@@ -304,6 +311,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     file: string,
     urlFor: (ref: ImportRef) => string | null | false,
     prefix = "",
+    dynamicImport?: (url: string) => string | null,
   ): string => {
     let code = module.code;
     for (let index = module.imports.length - 1; index >= 0; index -= 1) {
@@ -318,7 +326,10 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         }
         continue;
       }
-      code = `${code.slice(0, ref.start)}${JSON.stringify(url)}${code.slice(ref.end)}`;
+      const call = ref.dynamic && ref.callStart !== undefined ? dynamicImport?.(url) : null;
+      code = call
+        ? `${code.slice(0, ref.callStart)}${call}${code.slice(ref.end)}`
+        : `${code.slice(0, ref.start)}${JSON.stringify(url)}${code.slice(ref.end)}`;
     }
     if (module.map) {
       const map = module.map.replace(

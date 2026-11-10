@@ -80,9 +80,12 @@ const DraftUpdateCard = ({
     : tPlural("shell.appSource.files", draft.files);
   return (
     <UpdateCard
-      tone="update"
+      tone={draft.problem ? "attention" : "update"}
       title={draft.summary}
-      detail={draft.stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`}
+      detail={
+        draft.problem ??
+        (draft.stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`)
+      }
       busy={busy}
       disabled={disabled}
       placement={placement}

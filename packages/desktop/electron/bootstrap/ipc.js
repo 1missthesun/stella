@@ -66,6 +66,7 @@ import {
 const DEFAULT_STELLA_WEB_URL = "https://stella.sh";
 const POST_READY_NATIVE_DELAY_MS = 4_000;
 const EXTENSION_STATUS_SETTLE_MS = 30_000;
+const USER_AWAY_SECONDS = 120;
 const readStellaWebBaseUrl = () => {
     const raw = (process.env.STELLA_WEB_URL ??
         process.env.VITE_STELLA_WEB_URL ??
@@ -449,7 +450,17 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             },
             isAnyWindowVisible: () => BrowserWindow.getAllWindows().some((window) => !window.isDestroyed() && window.isVisible() && !window.isMinimized()),
             requestRuntimeRestart: () => state.stellaHostRunner?.requestRuntimeRestart(),
-            applyRendererChanges: (paths) => state.rendererSource?.applyChanges(paths),
+            applyRendererChanges: (paths, options) => state.rendererSource?.applyChanges(paths, options),
+            userQuietFor: async () => {
+                const window = state.windowManager?.getFullWindow() ?? null;
+                if (!window || window.isDestroyed() || !window.isVisible() || !window.isFocused()) return null;
+                return (await state.rendererSource?.quietFor()) ?? null;
+            },
+            isUserAway: () => {
+                const window = state.windowManager?.getFullWindow() ?? null;
+                return !window || window.isDestroyed() || !window.isVisible() || window.isMinimized() ||
+                    powerMonitor.getSystemIdleTime() >= USER_AWAY_SECONDS;
+            },
             coverRenderer: () => updateTransition.cover(),
             beforeRelaunch: () => updateTransition.holdForRelaunch(),
             launcherPreparesOnRelaunch: isLauncherPresent(),

@@ -79,6 +79,7 @@ export const COMPOSER_ENGINE_MENTION_OPTIONS: readonly ComposerModelMentionOptio
     },
   ];
 
+// @reloadable the preferences are a cache of what the host holds
 let cachedEngineMentionPreferences: EngineMentionPreferences | null = null;
 
 export function resolveCurrentModelMentionValue(

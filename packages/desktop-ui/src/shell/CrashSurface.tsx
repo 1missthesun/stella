@@ -10,10 +10,10 @@ type Props = {
 export function CrashSurface({ error, componentStack }: Props) {
   useLayoutEffect(() => {
     document.getElementById("stella-launch")?.remove();
-    discardViewState();
   }, []);
 
   const handleReload = useCallback(() => {
+    discardViewState();
     window.location.reload();
   }, []);
 

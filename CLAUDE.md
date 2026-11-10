@@ -20,9 +20,17 @@ that we publish, plus a private fork per user.
 
 - A change the user asks for is made by an agent in a draft (a git worktree
   under the drafts dir), checked in a preview window inside the running app,
-  and applied only when the user clicks Update. Applying fast-forwards the
-  checkout and pushes it to the user's fork; Undo reverts. The agent workflow
-  is the seeded skill `packages/home-seed/skills/modify-stella/SKILL.md`.
+  and applied when the user clicks Update. A finished draft that changes only
+  `packages/desktop-ui/src` is added without the click, once the user's hands
+  are off the app. Applying fast-forwards the checkout and pushes it to the
+  user's fork; Undo reverts. The agent workflow is the seeded skill
+  `packages/home-seed/skills/modify-stella/SKILL.md`.
+- An interface change is taken in place when every module that must load
+  again only declares things (`electron/source/module-state.ts`; the app root
+  is rendered again, the page and its stores stay). Anything else reloads the
+  window or relaunches behind a still frame, and the window comes back where
+  the user was (`desktop-ui/src/platform/view-state`). A change the window
+  cannot show is taken back by itself.
 - The user's other computers fetch the fork and offer what it would actually
   change there; a fork whose files this computer already has (duplicate merge
   history) is joined silently and never offered. Neither is a fork that holds

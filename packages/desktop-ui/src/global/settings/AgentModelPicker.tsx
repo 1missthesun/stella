@@ -101,6 +101,7 @@ const VOICE_PROVIDER_OPTIONS: readonly ProviderOption[] = [
     { key: "openai", label: "OpenAI" },
     { key: "xai", label: "xAI" },
 ];
+// @reloadable the preferences are a cache of what the host holds
 let cachedLocalPreferences: LocalModelPreferences | null = null;
 export function warmAgentModelPickerCache() {
     if (cachedLocalPreferences)

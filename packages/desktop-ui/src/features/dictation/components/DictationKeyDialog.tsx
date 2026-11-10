@@ -18,6 +18,7 @@ export const DICTATION_KEY_SAVED_EVENT = "stella:dictation-key-saved";
 
 const OPENROUTER_KEYS_URL = "https://openrouter.ai/keys";
 
+// @reloadable the count follows what is mounted
 let mountedHosts = 0;
 
 export const requestDictationKey = (): boolean => {

@@ -23,6 +23,10 @@ const HOT_CLIENT_URL = "/src/platform/hot/hot-client.ts";
 const PDF_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.mjs";
 const PACK_PREFIX = "/@pack/";
 const GRAPH_FORMAT_VERSION = "1";
+const ROOT_MODULE_URL = "/src/app-root.tsx";
+const SWAP_PAGE = "index.html";
+const IMPORT_HEADER =
+  "const __stella_import = globalThis.__stellaSwap?.load ?? ((url) => import(url));";
 const HOT_HEADER =
   "const __stella_hot = (import.meta.hot = globalThis.__stellaHot?.module(import.meta.url)) ?? { register() {}, signature: () => (type) => type };";
 
@@ -86,9 +90,26 @@ export type HotUpdate =
   | { type: "self"; id: string; url: string }
   | { type: "dep"; id: string; spec: string; url: string }
   | { type: "css"; id: string; url: string };
+/**
+ * A change the full window takes without loading again: the modules that must
+ * run again (`modules`, already at `version`) are imported through `root` and
+ * the app is rendered from it; `css` are style modules to run again first.
+ */
+export type SwapPayload = {
+  version: number;
+  root: string | null;
+  css: string[];
+  modules: string[];
+};
 export type ApplyResult =
-  | { mode: "none" | "reload" }
-  | { mode: "hot"; payload: { updates: HotUpdate[]; stale: string[] } };
+  | { mode: "none" }
+  | { mode: "reload"; reason?: string }
+  | { mode: "hot"; payload: { updates: HotUpdate[]; stale: string[] } }
+  | { mode: "swap"; payload: SwapPayload; reloadPages: string[] }
+  | { mode: "failed"; error: string };
+
+/** `[importer, imported]` URL paths of dynamic imports a window has run. */
+export type RanImports = [string, string][];
 
 export type RendererSourceOptions = {
   uiRoot: string;
@@ -523,10 +544,13 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const imported = new Set<string>();
     const skipped = packed.get(file);
     const page = [...packs].find(([, pack]) => pack.entry === file)?.[0];
+    const importsLater = !hot && module.imports.some((ref) => ref.dynamic);
     const prefix = [
       hot && file !== hotClientFile ? HOT_HEADER : "",
+      importsLater ? IMPORT_HEADER : "",
       page ? `import ${JSON.stringify(`${PACK_PREFIX}${page}`)};` : "",
     ].join("");
+    const importer = graph.urlForFile(file);
     const code = graph.render(
       module,
       file,
@@ -548,6 +572,12 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         return `/@deps/${entry}`;
       },
       prefix,
+      importsLater
+        ? (url) =>
+            url.startsWith("/@") || url.includes("?import")
+              ? null
+              : `__stella_import(${JSON.stringify(url)}, ${JSON.stringify(importer)}`
+        : undefined,
     );
     if (missing.length === 0) {
       servedImports.set(file, imported);
@@ -578,6 +608,9 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   };
 
   const packCss = new Map<string, Promise<Uint8Array>>();
+  const digestOf = (body: Uint8Array) => createHash("sha256").update(body).digest("hex");
+  /** The pack each page last ran, by digest: a swap skips styles that did not change. */
+  const pagePack = new Map<string, string>();
   const packModule = (name: string): Promise<Uint8Array> => {
     let built = packCss.get(name);
     if (!built) {
@@ -616,7 +649,10 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
           : respond("Not found", "text/plain", 404);
       }
       if (pathname.startsWith(PACK_PREFIX)) {
-        return javascript(await packModule(pathname.slice(PACK_PREFIX.length)));
+        const name = pathname.slice(PACK_PREFIX.length);
+        const body = await packModule(name);
+        pagePack.set(name, digestOf(body));
+        return javascript(body);
       }
       if (pathname === PDF_WORKER_URL) {
         // pdf.js's worker, from the copy react-pdf imports, so it always
@@ -680,7 +716,137 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     exports.length > 0 &&
     exports.every((name) => name === "default" || /^[A-Z]/.test(name));
 
-  const applyChanges = async (repoPaths: string[]): Promise<ApplyResult> => {
+  const rootFile = graph.fileForUrlPath(ROOT_MODULE_URL);
+  const describe = (file: string) => path.relative(uiRoot, file);
+
+  const planSwap = (changed: Set<string>, ran: RanImports | null): Promise<ApplyResult> => {
+    const planned = chain.then(() => planSwapNow(changed, ran));
+    chain = planned.then(
+      () => undefined,
+      () => undefined,
+    );
+    return planned;
+  };
+
+  const planSwapNow = async (changed: Set<string>, ran: RanImports | null): Promise<ApplyResult> => {
+    const reload = (reason: string): ApplyResult => {
+      log(`[source] reload: ${reason}`);
+      return { mode: "reload", reason };
+    };
+    for (const file of changed) {
+      if (!SOURCE_EXTENSIONS.has(path.extname(file)) || !exists(file)) continue;
+      try {
+        await graph.load(file);
+      } catch (error) {
+        return { mode: "failed", error: `${describe(file)}: ${error instanceof Error ? error.message : String(error)}` };
+      }
+    }
+    const validated = await validate();
+    if (validated.moved) {
+      graph.invalidate();
+      await planPacks();
+    }
+    const bundle = deps;
+    if (!bundle || [...depFiles].some((file) => !bundle.entries.has(file))) {
+      await buildDeps();
+      return reload("it uses a package the window has not loaded");
+    }
+    generation += 1;
+    if (!ran || !rootFile) return reload("the window cannot take a swap");
+
+    const importers = new Map<string, string[]>();
+    const imports = (imported: string, importer: string) =>
+      importers.set(imported, [...(importers.get(imported) ?? []), importer]);
+    for (const [file, node] of nodes) {
+      for (const edge of node.edges) {
+        if (edge.dynamic) continue;
+        if (edge.kind === "source" || (edge.kind === "asset" && !edge.bare)) imports(edge.file, file);
+      }
+    }
+    for (const [importerUrl, importedUrl] of ran) {
+      const importer = graph.fileForUrlPath(importerUrl);
+      const imported = graph.fileForUrlPath(importedUrl);
+      if (importer && imported) imports(imported, importer);
+    }
+
+    const reachable = (name: string) => {
+      const reach = new Set<string>();
+      const pending = htmlEntryModules(name);
+      while (pending.length > 0) {
+        const file = pending.pop()!;
+        if (reach.has(file)) continue;
+        reach.add(file);
+        for (const edge of nodes.get(file)?.edges ?? []) if (edge.kind !== "dep") pending.push(edge.file);
+      }
+      return reach;
+    };
+    const page = reachable(SWAP_PAGE);
+    const styles = new Set<string>();
+    const stale = new Set<string>();
+    const pending: string[] = [];
+    for (const file of changed) {
+      const ext = path.extname(file);
+      if (ext === ".css") styles.add(file);
+      if (SOURCE_EXTENSIONS.has(ext) && nodes.has(file)) pending.push(file);
+      else if (importers.has(file)) {
+        if (ext !== ".css" && ext !== ".json") return reload(`${describe(file)} is a file the window keeps by its address`);
+        pending.push(...importers.get(file)!);
+      }
+    }
+    while (pending.length > 0) {
+      const file = pending.pop()!;
+      if (stale.has(file)) continue;
+      stale.add(file);
+      if (file !== rootFile) pending.push(...(importers.get(file) ?? []));
+    }
+    const entries = new Set(htmlEntryModules(SWAP_PAGE));
+    for (const file of stale) {
+      if (!page.has(file)) continue;
+      if (entries.has(file)) return reload(`${describe(file)} starts the app`);
+      const state = file === routes.routeTreeFile ? null : (await graph.load(file)).state;
+      if (state) return reload(`${describe(file)}: ${state}`);
+    }
+    const swapped = [...stale].filter((file) => page.has(file));
+    if (swapped.length > 0 && !stale.has(rootFile)) return reload("the change is outside the app's root");
+
+    const version = (lastVersion = Math.max(Date.now(), lastVersion + 1));
+    for (const file of stale) versions.set(file, version);
+    const css: string[] = [];
+    const packedStyles = new Set(packs.get(SWAP_PAGE)?.stylesheets ?? []);
+    for (const file of styles) {
+      if (packedStyles.has(file) || !servedStylesheets.has(file)) continue;
+      versions.set(file, version);
+      css.push(withVersion(`${graph.urlForFile(file)}?import`, file));
+    }
+    if (packs.has(SWAP_PAGE)) {
+      const digest = digestOf(await packModule(SWAP_PAGE));
+      if (pagePack.get(SWAP_PAGE) !== digest) {
+        pagePack.set(SWAP_PAGE, digest);
+        css.push(`${PACK_PREFIX}${SWAP_PAGE}?t=${version}`);
+      }
+    }
+    const reloadPages = HTML_ENTRIES.filter(
+      (name) => name !== SWAP_PAGE && [...reachable(name)].some((file) => stale.has(file) || styles.has(file)),
+    );
+    if (swapped.length === 0 && css.length === 0) {
+      return reloadPages.length > 0
+        ? { mode: "swap", payload: { version, root: null, css, modules: [] }, reloadPages }
+        : { mode: "none" };
+    }
+    log(`[source] swap: ${swapped.length} modules, ${css.length} style sheets`);
+    return {
+      mode: "swap",
+      payload: {
+        version,
+        root: swapped.length > 0 ? withVersion(ROOT_MODULE_URL, rootFile) : null,
+        css,
+        modules: swapped.map((file) => graph.urlForFile(file)),
+      },
+      reloadPages,
+    };
+  };
+
+  const applyChanges = async (repoPaths: string[], ran: RanImports | null = null): Promise<ApplyResult> => {
     await prepare();
     const changed = new Set(
       repoPaths.map((repoPath) => path.resolve(repoRoot, repoPath)).filter(isRendererInput),
@@ -707,7 +873,8 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     }
     const reloads = (file: string) =>
       file === hotClientFile || isInside(publicDir, file) || path.extname(file) === ".html";
-    if (!hot || [...changed].some(reloads)) return { mode: "reload" };
+    if ([...changed].some(reloads)) return { mode: "reload", reason: "a page or public file changed" };
+    if (!hot) return await planSwap(changed, ran);
 
     const importers = new Map<string, string[]>();
     for (const [importer, imported] of servedImports) {

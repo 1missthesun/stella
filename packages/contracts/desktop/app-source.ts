@@ -30,6 +30,10 @@ export type AppSourceWaiting =
       stale: boolean;
       files: number;
       restart: boolean;
+      /** Touches only the interface's source, so it is added without a click once it is finished. */
+      interfaceOnly: boolean;
+      /** Why the windows could not show this change the last time it was added. */
+      problem?: string;
     };
 
 export type AppSourceDraftOffer = Extract<AppSourceWaiting, { kind: "draft" }>;

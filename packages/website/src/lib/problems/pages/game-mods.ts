@@ -155,7 +155,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         width: 1280,
         height: 800,
         duration: 48.8,
-        realDuration: 154,
+        realDuration: 125,
       },
       moments: [
         { at: 0, text: "Stella on a Linux computer. The modpack server crashed earlier with exit code 1." },

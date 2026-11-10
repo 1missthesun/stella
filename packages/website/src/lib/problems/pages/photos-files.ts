@@ -42,7 +42,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         width: 1280,
         height: 800,
         duration: 93,
-        realDuration: 322,
+        realDuration: 308,
       },
       moments: [
         { at: 0, text: "Stella on a Linux computer. The Takeout export is already unzipped in Downloads." },

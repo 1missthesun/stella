@@ -9,7 +9,7 @@ InstallerType: portable
 Scope: user
 UpgradeBehavior: install
 Commands:
-- stella
+- stella-desktop
 ReleaseDate: 2026-11-08
 Installers:
 - Architecture: x64

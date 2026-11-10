@@ -25,7 +25,7 @@ Description: |-
 
   This is Stella's small launcher. On first start it downloads the rest of Stella into your user
   folder, adds Stella to the Start menu, and keeps itself up to date.
-Moniker: stella
+Moniker: stella-desktop
 Tags:
 - ai
 - ai-assistant

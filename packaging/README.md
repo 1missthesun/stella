@@ -10,7 +10,8 @@ we want new installs to start from a newer launcher.
 ## AUR: `stella-desktop-bin`
 
 `yay -S stella-desktop-bin` → https://aur.archlinux.org/packages/stella-desktop-bin
-(account `fromyou`, SSH key `~/.ssh/aur_stella`).
+(account `fromyou`, SSH key `~/.ssh/aur_stella` on omarchy; as of 2026-11-10 not yet
+published: the AUR has paused new account registrations).
 
 Not `stella`/`stella-bin`: Arch's official `stella` is the Atari 2600 emulator,
 which owns `/usr/bin/stella`, `stella.desktop` and the `stella` icon. This
@@ -44,7 +45,7 @@ raise `pkgrel` by hand, then `bump.sh <current version> --push`.
 
 `winget install FROMYOU.Stella`. Manifests for microsoft/winget-pkgs live under
 `winget/manifests/`. Stella.exe is a portable install (winget copies it and adds
-a `stella` command); on first start it installs itself into
+a `stella-desktop` command; the Atari emulator Stella is also on winget, as TheStellaTeam.Stella); on first start it installs itself into
 `%LOCALAPPDATA%\Programs\Stella` with a Start-menu shortcut and updates itself
 there. A new version is a copy of the folder with the new version, URL
 (`launcher/releases/<n>/Stella.exe`) and SHA256, opened as a PR to

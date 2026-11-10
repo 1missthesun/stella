@@ -126,11 +126,18 @@ export const writeViewState = (key: string, value: unknown) => {
   store(key, value);
 };
 
-/** Forget where the user was: a view that cannot be shown must not be restored again. */
+/**
+ * Forget where the user was: a view that cannot be shown, or that belongs to
+ * another account, must not be restored again.
+ */
 export const discardViewState = () => {
   unwritten.clear();
   parsed.clear();
   for (const key of uiState.keys()) {
     if (key.startsWith(VIEW_STATE_KEY_PREFIX)) uiState.removeItem(key);
+  }
+  for (const key of listeners.keys()) {
+    parsed.set(key, undefined);
+    for (const listener of listeners.get(key) ?? []) listener();
   }
 };

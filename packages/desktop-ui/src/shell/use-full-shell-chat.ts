@@ -57,7 +57,9 @@ import {
 } from "@/features/chat/lib/reply-file-events";
 import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
-import { viewAtom } from "@/platform/view-state/view-state";
+import { discardViewState, viewAtom } from "@/platform/view-state/view-state";
+import { closeOpenItems } from "@/features/workspace-display/open-payload";
+import { router } from "@/router";
 import {
   composerTabMemory,
   type TabComposerMemory,
@@ -121,16 +123,20 @@ export function useFullShellChat({
   );
   const pendingAutoSendTextRef = useRef<string | null>(null);
   // Auth scope is a hard renderer privacy boundary. Composer content,
-  // attachment handles and per-tab memories belong to the scope they were
-  // written under and are cleared in a layout effect when it changes, so no
-  // frame paints the previous owner's unsent text. The owner is remembered
+  // attachment handles, per-tab memories and everything remembered about
+  // the view (route, open items) belong to the scope they were written under
+  // and are cleared in a layout effect when it changes, so no frame paints
+  // the previous owner's things. The owner is remembered
   // with the content: a reload, a restart or an interface change arriving
   // under the same owner keeps it.
   useLayoutEffect(() => {
     if (sessionIsLoading) return;
     const scope = `${accountScope}\0${storageMode}`;
     if (composerOwner.get() === scope) return;
+    discardViewState();
     composerOwner.set(scope);
+    closeOpenItems();
+    if (router.state.location.href !== "/chat") void router.navigate({ to: "/chat" });
     composerTabMemory.clear();
     previousComposerConversationIdRef.current = null;
     setMessage("");

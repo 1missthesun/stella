@@ -92,6 +92,14 @@ export const registerWorkspaceDisplayPayloadAdapter = (
   fileViewer.subscribe(rememberOpenItems);
 };
 
+/** Put away every item on screen: they belong to whoever opened them. */
+export const closeOpenItems = (): void => {
+  fileViewer.close();
+  for (const tab of displayTabs.getTabListSnapshot().tabs) {
+    if (tab.payload || tab.kind === SOURCE_DIFF_KIND) displayTabs.closeTab(tab.id);
+  }
+};
+
 const getAdapter = (): WorkspaceDisplayPayloadAdapter => {
   if (!adapter) {
     throw new Error(

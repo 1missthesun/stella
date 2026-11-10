@@ -2448,6 +2448,7 @@
       "sound": "Geluid",
       "sounds": {
         "bloop": "Bloep",
+        "bubble": "Bel",
         "chime": "Klokje",
         "marimba": "Marimba",
         "pop": "Plop",

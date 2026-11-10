@@ -2448,6 +2448,7 @@
       "sound": "Ljud",
       "sounds": {
         "bloop": "Blopp",
+        "bubble": "Bubbla",
         "chime": "Klockspel",
         "marimba": "Marimba",
         "pop": "Pop",

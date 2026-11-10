@@ -2456,6 +2456,7 @@
       "sound": "Suono",
       "sounds": {
         "bloop": "Blop",
+        "bubble": "Bolla",
         "chime": "Campanello",
         "marimba": "Marimba",
         "pop": "Pop",

@@ -174,6 +174,7 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
       "sound notifications",
       "message sound",
       "new message",
+      "bubble",
       "marimba",
       "pop",
       "bloop",

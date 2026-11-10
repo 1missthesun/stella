@@ -2448,6 +2448,7 @@
       "sound": "Ton",
       "sounds": {
         "bloop": "Blubb",
+        "bubble": "Blase",
         "chime": "Glockenspiel",
         "marimba": "Marimba",
         "pop": "Plopp",

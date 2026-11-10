@@ -88,7 +88,7 @@ export type LocalPreferences = {
   preventComputerSleep: boolean;
   lockedComputerUseEnabled: boolean;
   messageSoundEnabled: boolean;
-  messageSound: MessageSound;
+  messageSoundChoice: MessageSound | null;
   dictationSoundEffectsEnabled: boolean;
   telemetryEnabled: boolean;
   telemetryAccountOffPending: boolean;
@@ -155,7 +155,7 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   preventComputerSleep: false,
   lockedComputerUseEnabled: false,
   messageSoundEnabled: true,
-  messageSound: DEFAULT_MESSAGE_SOUND,
+  messageSoundChoice: null,
   dictationSoundEffectsEnabled: true,
   telemetryEnabled: true,
   telemetryAccountOffPending: false,
@@ -255,7 +255,10 @@ const normalizeStoredPreferences = (
   messageSoundEnabled:
     (parsed.messageSoundEnabled ??
       (parsed as { soundNotificationsEnabled?: unknown }).soundNotificationsEnabled) !== false,
-  messageSound: normalizeMessageSound(parsed.messageSound),
+  messageSoundChoice:
+    parsed.messageSoundChoice == null
+      ? null
+      : normalizeMessageSound(parsed.messageSoundChoice),
   dictationSoundEffectsEnabled: parsed.dictationSoundEffectsEnabled !== false,
   telemetryEnabled: parsed.telemetryEnabled !== false,
   telemetryAccountOffPending: parsed.telemetryAccountOffPending === true,
@@ -729,7 +732,10 @@ export const getMessageSoundPreferences = (
   stellaDataDir: string,
 ): MessageSoundPreferences => {
   const prefs = loadLocalPreferences(stellaDataDir);
-  return { enabled: prefs.messageSoundEnabled, sound: prefs.messageSound };
+  return {
+    enabled: prefs.messageSoundEnabled,
+    sound: prefs.messageSoundChoice ?? DEFAULT_MESSAGE_SOUND,
+  };
 };
 
 export const getTelemetryEnabled = (stellaDataDir: string): boolean => {

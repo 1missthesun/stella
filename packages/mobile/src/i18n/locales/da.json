@@ -2448,6 +2448,7 @@
       "sound": "Lyd",
       "sounds": {
         "bloop": "Blob",
+        "bubble": "Boble",
         "chime": "Klokkespil",
         "marimba": "Marimba",
         "pop": "Pop",

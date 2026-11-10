@@ -2448,6 +2448,7 @@
       "sound": "Sound",
       "sounds": {
         "bloop": "Bloop",
+        "bubble": "Bubble",
         "chime": "Chime",
         "marimba": "Marimba",
         "pop": "Pop",

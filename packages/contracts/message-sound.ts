@@ -1,8 +1,8 @@
-export const MESSAGE_SOUNDS = ["marimba", "chime", "pop", "bloop", "twinkle"] as const;
+export const MESSAGE_SOUNDS = ["bubble", "marimba", "chime", "pop", "bloop", "twinkle"] as const;
 
 export type MessageSound = (typeof MESSAGE_SOUNDS)[number];
 
-export const DEFAULT_MESSAGE_SOUND: MessageSound = "marimba";
+export const DEFAULT_MESSAGE_SOUND: MessageSound = "bubble";
 
 export type MessageSoundPreferences = {
   enabled: boolean;

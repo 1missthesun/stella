@@ -114,7 +114,7 @@ export const registerChatAlertHandlers = (options: ChatAlertHandlersOptions) => 
     if (dataDir) {
       updateLocalPreferences(dataDir, {
         messageSoundEnabled: next.enabled,
-        messageSound: next.sound,
+        ...(patch?.sound === undefined ? {} : { messageSoundChoice: next.sound }),
       });
     }
     return next;

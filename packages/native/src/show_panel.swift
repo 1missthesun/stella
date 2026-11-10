@@ -21,7 +21,7 @@
 //        {"cmd":"hideCard"}  {"cmd":"quit"}
 //   out: {"event":"ready"}  {"event":"hit","id":"done"}
 //        {"event":"card","action":"send"|"open"|"discard","note":"…"}
-//        {"event":"engaged","on":true}
+//        {"event":"engaged","on":true,"typing":false}
 
 import AppKit
 
@@ -309,6 +309,7 @@ final class Card: NSObject, NSTextFieldDelegate {
   var hovered = false
   var focused = false
   var lastEngaged = false
+  var lastTyping = false
   var imagePath: String?
   var answered = false
 
@@ -316,6 +317,11 @@ final class Card: NSObject, NSTextFieldDelegate {
     super.init()
     panel.keyable = true
     panel.becomesKeyOnlyIfNeeded = true
+    for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+      NotificationCenter.default.addObserver(forName: name, object: panel, queue: .main) { [weak self] _ in
+        self?.reportEngaged()
+      }
+    }
     // Shown after the recording has ended, so it can appear in screenshots.
     panel.sharingType = .readOnly
     panel.hasShadow = true
@@ -402,10 +408,15 @@ final class Card: NSObject, NSTextFieldDelegate {
   }
 
   func reportEngaged() {
-    let engaged = hovered || focused || !note.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
-    if engaged == lastEngaged { return }
+    // The window hands the note field focus by itself when it first shows;
+    // only focus in a card the user made key (by clicking it) counts.
+    let typing = (focused && panel.isKeyWindow)
+      || !note.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
+    let engaged = hovered || typing
+    if engaged == lastEngaged && typing == lastTyping { return }
     lastEngaged = engaged
-    emit(["event": "engaged", "on": engaged])
+    lastTyping = typing
+    emit(["event": "engaged", "on": engaged, "typing": typing])
   }
 
   func controlTextDidChange(_ obj: Notification) { reportEngaged() }
@@ -453,6 +464,8 @@ final class Card: NSObject, NSTextFieldDelegate {
         note.stringValue = ""
         panel.alphaValue = 0
         panel.orderFrontRegardless()
+        panel.makeFirstResponder(nil)
+        focused = false
         NSAnimationContext.runAnimationGroup { context in
           context.duration = 0.18
           panel.animator().alphaValue = 1
@@ -466,6 +479,7 @@ final class Card: NSObject, NSTextFieldDelegate {
     hovered = false
     focused = false
     lastEngaged = false
+    lastTyping = false
   }
 
   func answer(_ action: String) {

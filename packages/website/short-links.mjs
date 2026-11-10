@@ -24,6 +24,16 @@ const SOURCES = new Set([
   "podcast",
   "qr",
   "bio",
+  "bringyoursubs",
+  "futuretools",
+  "rundown",
+  "vellum",
+  "simular",
+  "goodday",
+  "lindy",
+  "guidy",
+  "chatai",
+  "winget",
 ]);
 
 const ALIASES = { twitter: "x", yt: "youtube", ig: "instagram", tt: "tiktok", fb: "facebook" };

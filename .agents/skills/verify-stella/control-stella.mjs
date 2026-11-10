@@ -7,6 +7,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -749,6 +750,54 @@ const runStorageKeyFile = (runDir) => {
   return file;
 };
 
+/**
+ * macOS charges privacy prompts (Speech Recognition, Screen Recording,
+ * Microphone) to the responsible app, which for a run launched from an agent's
+ * shell is the user's own Stella. `--own-app-identity` runs a copy of
+ * Electron.app with its own bundle id ("Stella Verify"), spawned with
+ * responsibility disclaimed, so every prompt and grant belongs to it. The copy
+ * is ad-hoc signed from identical bytes, so a grant survives later runs of the
+ * same Electron version.
+ */
+const VERIFY_APP_BUNDLE_ID = "com.stella.app.verify";
+const VERIFY_APP_USAGE = {
+  NSMicrophoneUsageDescription: "Stella Verify uses the microphone in test runs.",
+  NSSpeechRecognitionUsageDescription: "Stella Verify transcribes dictation on this Mac in test runs.",
+  NSCameraUsageDescription: "Stella Verify uses the camera in test runs.",
+};
+const ownIdentityPrefix = (run) => {
+  const sourceApp = path.resolve(path.dirname(electronBin()), "..", "..");
+  const version = JSON.parse(readFileSync(path.join(repoRoot, "node_modules/electron/package.json"), "utf8")).version;
+  const root = path.join(os.homedir(), "Library", "Caches", "stella-verify-identity", `electron-${version}`);
+  const app = path.join(root, "Stella Verify.app");
+  const marker = path.join(root, "identity.json");
+  const expected = JSON.stringify({ version, bundleId: VERIFY_APP_BUNDLE_ID, usage: VERIFY_APP_USAGE });
+  if (!existsSync(marker) || readFileSync(marker, "utf8") !== expected) {
+    const staging = `${app}.partial`;
+    spawnSync("rm", ["-rf", staging, app]);
+    mkdirSync(root, { recursive: true });
+    const copy = spawnSync("/usr/bin/ditto", [sourceApp, staging]);
+    if (copy.status !== 0) fail(`Could not copy Electron.app for --own-app-identity: ${copy.stderr}`);
+    const plist = path.join(staging, "Contents", "Info.plist");
+    const set = (key, value) => spawnSync("/usr/bin/plutil", ["-replace", key, "-string", value, plist]);
+    set("CFBundleIdentifier", VERIFY_APP_BUNDLE_ID);
+    set("CFBundleName", "Stella Verify");
+    set("CFBundleDisplayName", "Stella Verify");
+    for (const [key, value] of Object.entries(VERIFY_APP_USAGE)) set(key, value);
+    const sign = spawnSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", staging]);
+    if (sign.status !== 0) fail(`codesign failed for --own-app-identity: ${sign.stderr}`);
+    renameSync(staging, app);
+    writeFileSync(marker, expected);
+  }
+  const disclaim = path.join(root, "disclaim-spawn");
+  if (!existsSync(disclaim)) {
+    const build = spawnSync("clang", ["-O2", "-o", disclaim, path.join(repoRoot, "packages/desktop/scripts/disclaim-spawn.c")]);
+    if (build.status !== 0) fail(`Could not build disclaim-spawn: ${build.stderr}`);
+  }
+  run.ownAppIdentity = { app, bundleId: VERIFY_APP_BUNDLE_ID };
+  return [disclaim, path.join(app, "Contents", "MacOS", "Electron")];
+};
+
 const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge }) => {
   const { runDir, dataDir, userDataDir, cdpPort, providerHomes } = run;
   process.stderr.write("Starting Electron...\n");
@@ -784,7 +833,9 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
   const baseEnv = isolatedElectronEnvironment();
   const jail = homeJail(run, baseEnv);
   run.homeJail = jail.status;
-  const [command, ...commandArgs] = [...jail.prefix, electronBin(), ...electronArgs];
+  const electronCommand =
+    run.ownIdentity && process.platform === "darwin" ? ownIdentityPrefix(run) : [electronBin()];
+  const [command, ...commandArgs] = [...jail.prefix, ...electronCommand, ...electronArgs];
   const electron = spawnLogged(command, commandArgs, {
     cwd: repoRoot,
     env: {
@@ -1001,6 +1052,7 @@ const cmdLaunch = async (options) => {
     providerHomes,
     modelGateway,
     fakeMic,
+    ownIdentity: Boolean(options["own-app-identity"]) && process.platform === "darwin",
     displayMode: displayMode === "host" ? "host" : "xvfb",
     display: null,
     browserExtension: null,

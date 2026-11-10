@@ -121,4 +121,120 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       { label: "ExifTool", href: "https://exiftool.org" },
     ],
   },
+  {
+    slug: "rename-pdf-files-based-on-content",
+    niche: "photos-files",
+    searchPhrases: [
+      "rename pdf files based on content",
+      "bulk rename pdf files",
+      "auto rename pdf files based on content free",
+      "ai to rename pdf files",
+      "rename scanned pdf files automatically",
+    ],
+    title: "Rename PDF files based on their content, in bulk",
+    description:
+      "Turn scan0001.pdf into 2026-03-14_Northwind_Plumbing.pdf: rename PDFs by date and company by hand, with Power Automate, or with Stella (stella.sh) reading each one.",
+    h1: "Rename PDF files based on their content",
+    short: "Rename PDFs by content",
+    answer:
+      "Windows and macOS can only rename files by their old names or a counter, not by what's inside. For a few dozen PDFs, open each in the preview pane and rename it by hand; for one repeating layout, a Power Automate Desktop flow can read the text and rename. Scans need OCR first. Stella (stella.sh) reads every PDF, scans included, and renames them to a pattern like date and company.",
+    stellaSteps: [
+      "Finds the folder and pulls the text out of every PDF; in the recording, `pdftotext` and the OCR tool `tesseract` were already on the computer, so it installed nothing",
+      "Spots the scans with no text layer, renders them as images and reads them with OCR",
+      "Works out each document's date and company, telling apart look-alikes such as an invoice and a credit note from the same firm",
+      "Renames every file through temporary names, so no two files can overwrite each other, and turns characters like “&” and “é” into safe ones",
+      "Checks that every file is still there afterwards and mentions any judgement call, such as which date it used for a bank statement",
+    ],
+    prompt:
+      "Rename all these scanned PDFs based on what's in them, like date and company. They're in my Documents/Scans folder.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "All 26 PDFs renamed to YYYY-MM-DD_Company.pdf in about a minute, including three image-only scans read with OCR. Checked afterwards by file hash: contents unchanged, nothing overwritten, and 24 names match our answer key exactly. The other two used a different date printed on the document (a statement's start date, a tenancy's agreement date), and Stella mentioned the statement one.",
+      note: "The 26 documents are fictitious invoices, bills, payslips, letters and receipts made for this run, named scan0001.pdf and so on. The wait is sped up 6×.",
+      video: {
+        src: `${PROOFS}/photos-files/rename-pdf-files-based-on-content/proof.mp4`,
+        poster: `${PROOFS}/photos-files/rename-pdf-files-based-on-content/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 45,
+        realDuration: 71,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. The scans are in Documents/Scans with names like scan0012.pdf." },
+        { at: 5, text: "The prompt: rename the PDFs by what's in them, like date and company." },
+        { at: 11, text: "Stella replies that it will read the PDFs and rename them by the date and company in each." },
+        { at: 12, text: "Reading 26 PDFs, running OCR on three scans and renaming, sped up 6×." },
+        { at: 26, text: "Done: all 26 renamed to YYYY-MM-DD_Company.pdf, contents unchanged, with a note on the one date it had to choose." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/photos-files/rename-pdf-files-based-on-content/names.png`,
+          alt: "A table of all 26 files: scan0012.pdf became 2025-08-18_Morgan_Lettings.pdf, scan0013.pdf became 2026-03-14_Northwind_Plumbing.pdf, Scanned Document.pdf became 2026-06-18_Hotel_Alfama_Lisboa.pdf, and so on.",
+          width: 1400,
+          height: 1250,
+          caption: "Every file before and after, with what each document is. Three were image-only scans.",
+        },
+      ],
+    },
+    manualTitle: "Rename them yourself",
+    manualSteps: [
+      {
+        title: "Pick one naming pattern",
+        body: "Date first, in year-month-day order, then who it's from: `2026-03-14 Northwind Plumbing.pdf`. Files then sort by date in any folder. Add the type or number only if you need it (`Invoice 2231`); long names get cut off in some apps.",
+      },
+      {
+        title: "Do a few dozen by hand",
+        body: "On Windows, turn on File Explorer's preview pane (Alt+P), click a PDF to see it, press F2 and type the new name. On a Mac, select a file, press Space for Quick Look, close it, press Return and type. It's dull but reliable for up to about 50 files.",
+      },
+      {
+        title: "Make scans readable first",
+        body: "A scan is only a picture of text, so nothing can read its date until it has been through OCR. The free OCRmyPDF adds a text layer from the command line (`ocrmypdf scan.pdf scan.pdf`); Adobe Acrobat's paid Scan & OCR tool does the same in a window.",
+      },
+      {
+        title: "Automate one repeating layout",
+        body: "Power Automate Desktop is free on Windows. Build a flow with Get files in folder, then Extract text from PDF, pull the date and supplier out with a text or regular-expression action, then Rename file(s). It works well when every PDF comes from the same company, and breaks on mixed documents.",
+      },
+      {
+        title: "Or try a renaming app",
+        body: "Apps like renamer.ai read each file with AI and suggest a name. Its free plan covers 25 files a month, paid plans start at $9.95 for 200, and files go to its servers by default. Check a handful of names before you trust a whole batch.",
+      },
+    ],
+    limits: [
+      "In the recording Stella renamed straight away, without showing the new names first, and the chat didn't list them. Add “show me the new names before you rename” to the prompt if you want to check them, or ask for a list of old and new names afterwards.",
+      "There's no undo file. Renaming is easy to reverse while you have the list, so keep it, or copy the folder first for anything important.",
+      "Each document gets one date. Stella used the first date of a bank statement's period and the date a tenancy was signed; say which date you want (issue, due, period end) if it matters.",
+      "The OCR tool was already installed on the test computer. On a typical Windows PC, Stella has to install one first or read scans with the AI model, which hasn't been recorded yet.",
+      "The text of your documents goes to the AI model you use in Stella. For payslips or bank letters, choose your model accordingly.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Windows rename PDFs by their content on its own?",
+        a: "No. File Explorer and PowerToys PowerRename only change names using the existing name, a counter or file dates. Reading what's inside needs Power Automate, a script, an app or Stella.",
+      },
+      {
+        q: "Will it work on scanned documents?",
+        a: "Yes, once they've been through OCR. In the recording, three of the 26 were image-only scans, grey and slightly crooked, and each got the right date and company.",
+      },
+      {
+        q: "Can it put the files into folders too?",
+        a: "Yes, ask in the same chat: by year, by company or by type. The same approach is used to [sort a messy Downloads folder](/how/pc-cleanup/organize-downloads-folder), and the numbers inside statements can go into [one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel).",
+      },
+      {
+        q: "Is renamer.ai or Stella better for this?",
+        a: "renamer.ai is built for renaming and has a desktop app with watched folders. Stella has no per-file limit beyond your plan's usage and runs on your own computer; it's free with the ChatGPT or Claude plan you already have, and it does the next job too.",
+      },
+    ],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pc-cleanup/organize-downloads-folder"],
+    lastChecked: "2026-11-10",
+    sources: [
+      { label: "Microsoft: Extract text from PDF (Power Automate Desktop)", href: "https://learn.microsoft.com/en-us/power-automate/desktop-flows/actions-reference/pdf" },
+      { label: "OCRmyPDF", href: "https://ocrmypdf.readthedocs.io" },
+      { label: "renamer.ai pricing", href: "https://renamer.ai/pricing" },
+    ],
+  },
 ];

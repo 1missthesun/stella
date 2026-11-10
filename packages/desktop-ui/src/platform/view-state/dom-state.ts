@@ -123,7 +123,13 @@ const mayHoldSecret = (field: TextField) =>
 const recordable = (field: TextField) =>
   !field.closest(OFF) && !field.readOnly && !field.disabled && !mayHoldSecret(field);
 
-/** The element saved at `path`, or the only one on the page with the same mark (the first, for a keyed one). */
+const shown = (element: Element) =>
+  element.checkVisibility({ visibilityProperty: true }) && !element.closest("[inert]");
+
+/**
+ * The element saved at `path`, or the only one on the page with the same
+ * mark. Of several sharing a key, the one on show.
+ */
 const find = <T extends Element>(
   entry: { path: string; mark: string; scope: string | null },
   markOf: (element: T) => string,
@@ -133,13 +139,12 @@ const find = <T extends Element>(
     element !== null && markOf(element as T) === entry.mark && scopeOf(element) === entry.scope;
   const direct = atPath(entry.path);
   if (matches(direct)) return direct;
-  let only: T | null = null;
+  const found: T[] = [];
   for (const candidate of candidates()) {
-    if (!matches(candidate)) continue;
-    if (only) return entry.mark.startsWith(KEYED) ? only : null;
-    only = candidate;
+    if (matches(candidate)) found.push(candidate);
   }
-  return only;
+  if (found.length <= 1) return found[0] ?? null;
+  return entry.mark.startsWith(KEYED) ? (found.find(shown) ?? found[0]!) : null;
 };
 
 const scrollers = new Set<Element>();
@@ -254,21 +259,35 @@ const placeField = (entry: Field): Placement => {
   return field.value === entry.value ? "placed" : "waiting";
 };
 
-/** A field that cannot take focus yet (inert, disabled) is asked again on each pass, never waited for. */
+const select = (field: TextField, entry: Focus) => {
+  if (entry.start === null || entry.end === null) return;
+  const length = field.value.length;
+  try {
+    field.setSelectionRange(
+      Math.min(entry.start, length),
+      Math.min(entry.end, length),
+      entry.direction ?? "none",
+    );
+  } catch {
+    // Some input types have no selection.
+  }
+};
+
+/**
+ * A field that cannot take focus yet (inert, disabled) is asked again on each
+ * pass, never waited for. Fields sharing a key all take the selection: which
+ * of them is on show can change after this.
+ */
 const placeFocus = (entry: Focus): Placement => {
   const element = find(entry, fieldMark, allFields);
   if (!element) return "missing";
   if (document.activeElement !== element) element.focus({ preventScroll: true });
-  if (entry.start !== null && entry.end !== null) {
-    const length = element.value.length;
-    try {
-      element.setSelectionRange(
-        Math.min(entry.start, length),
-        Math.min(entry.end, length),
-        entry.direction ?? "none",
-      );
-    } catch {
-      // Some input types have no selection.
+  select(element, entry);
+  if (entry.mark.startsWith(KEYED)) {
+    for (const field of allFields()) {
+      if (field !== element && fieldMark(field) === entry.mark && scopeOf(field) === entry.scope) {
+        select(field, entry);
+      }
     }
   }
   return "placed";

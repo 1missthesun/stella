@@ -30,6 +30,7 @@ import {
   type Harness,
   type ModelRef,
   type Submission,
+  type TaskId,
   type UserInput,
 } from "@earendil-works/pi-durable";
 import {
@@ -1224,6 +1225,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         const standing = new Promise<boolean>((resolve) => {
           settleStanding = resolve;
         });
+        let resumedRun: TaskId | undefined;
         const {
           harness,
           refreshTools,
@@ -1383,7 +1385,7 @@ export function desktopChats(options: DesktopChatsOptions) {
             })(),
             ...(options.tools ? { tools: options.tools(conversationId) } : {}),
             extensions: [
-              journalTurnGate(standing),
+              journalTurnGate(standing, () => resumedRun),
               ...(agentLog ? [agentLog.extension()] : []),
               ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : []),
             ],
@@ -1396,7 +1398,8 @@ export function desktopChats(options: DesktopChatsOptions) {
         const orchestrator = orchestratorAgent(stellaModelRef("orchestrator"));
         const root = await harness.root(context, { agent: orchestrator });
         if (offersAgentTools(await root.agent(context))) await root.configure(orchestrator, context);
-        const resumed = (await harness.snapshot(LiveDoc, root.id, context))?.run !== undefined;
+        resumedRun = (await harness.snapshot(LiveDoc, root.id, context))?.run?.taskId;
+        const resumed = resumedRun !== undefined;
         const log = options.localLog?.(conversationId);
         const localLog = log ? await localLogMirror({ harness, root, log, report: options.report, context }) : undefined;
         const rootModel = (await root.agent(context)).model;

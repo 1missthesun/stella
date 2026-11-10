@@ -27,6 +27,7 @@ import {
   type Extension,
   type Harness,
   type HookApi,
+  type TaskId,
 } from "@earendil-works/pi-durable";
 import {
   piJournalUserMessage,
@@ -214,13 +215,24 @@ const abortOf = (signal: AbortSignal | undefined): Promise<void> =>
     else signal.addEventListener("abort", () => resolve(), { once: true });
   });
 
-export const journalTurnGate = (standing: Promise<boolean>): Extension => {
+/**
+ * Holds the run this computer was in the middle of when its runtime opened the chat until the journal confirms the
+ * turn is still this computer's. The verdict belongs to that run only: every later run began its own journal turn,
+ * which decided where it runs, so a turn lost across a restart never takes the next turns' tools with it.
+ */
+export const journalTurnGate = (standing: Promise<boolean>, resumedRun: () => TaskId | undefined): Extension => {
   const proceed = async (api: HookApi, context: Context): Promise<undefined> => {
     if (api.conversationId !== ROOT_CONVERSATION_ID) return undefined;
+    const held = resumedRun();
+    if (held === undefined) return undefined;
+    const run = (await api.snapshot(LiveDoc, api.conversationId, context))?.run?.taskId;
+    if (run !== held) return undefined;
     const aborted = abortOf(context.abortSignal);
     if (await Promise.race([standing, aborted.then(() => false)])) return undefined;
     await Promise.race([aborted, new Promise((resolve) => setTimeout(resolve, REFUSED_STOP_WAIT_MS))]);
-    throw new Error("This turn was settled without this computer, so it does not run on here.");
+    throw new Error(
+      "Stella restarted while this reply was running, and the reply was closed in the meantime, so it stops here. The next message runs normally.",
+    );
   };
   return defineExtension({
     name: "stella-journal-turn-gate",

@@ -205,6 +205,62 @@ export const fetchLiveProviderModels = async (
   return [...models.values()];
 };
 
+const PUBLISHED_CATALOG_URL = "https://pi.dev/api/models/providers/";
+
+const publishedModel = (value: unknown): LiveProviderModel | undefined => {
+  const raw = record(value);
+  if (!raw || typeof raw.id !== "string" || !raw.id) return undefined;
+  if (typeof raw.type === "string" && raw.type !== "chat") return undefined;
+  const inputs = strings(raw.input);
+  const cost = record(raw.cost);
+  const input = rate(cost?.input, false);
+  const output = rate(cost?.output, false);
+  const contextWindow = positive(raw.contextWindow);
+  const maxTokens = positive(raw.maxTokens);
+  return {
+    id: raw.id,
+    ...(typeof raw.name === "string" && raw.name ? { name: raw.name } : {}),
+    ...(contextWindow ? { contextWindow } : {}),
+    ...(maxTokens ? { maxTokens } : {}),
+    ...(inputs ? { input: inputs.includes("image") ? ["text", "image"] : ["text"] } : {}),
+    ...(typeof raw.reasoning === "boolean" ? { reasoning: raw.reasoning } : {}),
+    ...(input !== undefined && output !== undefined
+      ? {
+          cost: {
+            input,
+            output,
+            cacheRead: rate(cost?.cacheRead, false) ?? 0,
+            cacheWrite: rate(cost?.cacheWrite, false) ?? 0,
+          },
+        }
+      : {}),
+  };
+};
+
+/**
+ * What pi-ai's published catalog says of a provider's models: the limits
+ * and prices of ones released after this build's bundled list. Throws when
+ * the request fails.
+ */
+export const fetchPublishedProviderModels = async (
+  provider: string,
+  options: { fetch?: typeof fetch; signal?: AbortSignal } = {},
+): Promise<LiveProviderModel[]> => {
+  const timeout = AbortSignal.timeout(LIVE_LIST_TIMEOUT_MS);
+  const response = await (options.fetch ?? fetch)(`${PUBLISHED_CATALOG_URL}${encodeURIComponent(provider)}`, {
+    headers: { accept: "application/json" },
+    signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
+  });
+  if (response.status === 404) return [];
+  if (!response.ok) throw new Error(`${provider} published catalog request failed: ${response.status}`);
+  const payload: unknown = await response.json();
+  const entries = Array.isArray(payload) ? payload : Object.values(record(payload) ?? {});
+  return entries.flatMap((entry) => {
+    const model = publishedModel(entry);
+    return model ? [model] : [];
+  });
+};
+
 const familyStem = (id: string): string => /^[^0-9]*/.exec(id.toLowerCase())![0];
 
 const versionOf = (id: string): [number, number] | undefined => {

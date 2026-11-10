@@ -1,6 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
-import { getAllModels } from "@stella/contracts/model-catalog";
 import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
 import type { StellaGatewayAccess, StellaModelSpec } from "@stella/agent/provider/stella";
 import { getModelProviders, getModels } from "./model-catalog.js";
@@ -250,7 +249,7 @@ const resolveCatalogContextWindow = (modelId: string): number | undefined => {
   const slash = trimmed.indexOf("/");
   const baseId = slash > 0 ? trimmed.slice(slash + 1) : trimmed;
   let best = 0;
-  for (const model of getAllModels()) {
+  for (const model of modelRuntime.getAllModels()) {
     const id = model.id;
     const idSlash = id.indexOf("/");
     const idBase = idSlash > 0 ? id.slice(idSlash + 1) : id;

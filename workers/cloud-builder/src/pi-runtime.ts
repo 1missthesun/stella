@@ -46,7 +46,7 @@ import {
   type ClaudeCodeSessionRecord,
   type ClaudeCodeTransport,
 } from "@stella/agent/engine/claude-code";
-import { accountByokProvider, accountProviderModel } from "@stella/agent/provider/account-byok";
+import { accountByokProvider, listedAccountProviderModel } from "@stella/agent/provider/account-byok";
 import { effectiveContextModels } from "@stella/agent/provider/effective-context";
 import {
   STELLA_PROVIDER_ID,
@@ -488,13 +488,13 @@ const planModels = (executions: Iterable<PiExecution | undefined>): Model<"opena
   return [...plans.values()];
 };
 
-const providerModels = (executions: Iterable<PiExecution | undefined>): Map<string, Model<Api>[]> => {
+const providerModels = async (executions: Iterable<PiExecution | undefined>): Promise<Map<string, Model<Api>[]>> => {
   const byProvider = new Map<string, Model<Api>[]>();
   for (const execution of executions) {
     if (execution?.engine !== "provider") continue;
     const models = byProvider.get(execution.provider) ?? [];
     if (models.some((model) => model.id === execution.model)) continue;
-    const model = accountProviderModel(execution.provider, execution.model);
+    const model = await listedAccountProviderModel(execution.provider, execution.model);
     if (!model) continue;
     models.push(model);
     byProvider.set(execution.provider, models);
@@ -730,7 +730,7 @@ export class PiConversationRuntime {
     return this.#state;
   }
 
-  #setModels(state: Pick<PiAgentState, "models" | "authority"> | undefined): void {
+  async #setModels(state: Pick<PiAgentState, "models" | "authority"> | undefined): Promise<void> {
     if (!state && this.#threadAgents.size === 0) return;
     const models = [...(state?.models ?? [])];
     for (const { model } of this.#threadAgents.values()) {
@@ -743,7 +743,7 @@ export class PiConversationRuntime {
       ...[...this.#threadAgents.values()].map((agent) => agent.authority.execution),
     ];
     const plans = planModels(executions);
-    const byok = providerModels(executions);
+    const byok = await providerModels(executions);
     const key = JSON.stringify([
       models,
       plans.map((plan) => plan.id),
@@ -1701,7 +1701,7 @@ export class PiConversationRuntime {
         this.#threadAgents.set(key.slice(THREAD_AGENT_PREFIX.length), agent);
       }
       if (kept) this.#state = kept;
-      this.#setModels(kept);
+      await this.#setModels(kept);
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
       const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp } = await openStellaHarness(
         {
@@ -1764,7 +1764,7 @@ export class PiConversationRuntime {
       await this.#options.storage.put(PI_AGENT_STATE_KEY, state);
       this.#state = state;
     }
-    this.#setModels(state);
+    await this.#setModels(state);
     (await this.#opening?.catch(() => undefined))?.refreshTools();
     this.#binding = binding;
     this.#notify("root");
@@ -1871,7 +1871,7 @@ export class PiConversationRuntime {
       this.#state = state;
       refreshTools();
     }
-    this.#setModels(this.#state);
+    await this.#setModels(this.#state);
     const key = threadCallKey(attempt.threadId, attempt.attemptGeneration);
     const state = await harness.snapshot(StellaAgentsDoc, root.id, context);
     if (state?.calls[`host:${key}`] || state?.calls[`user:${key}`]) return;

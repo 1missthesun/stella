@@ -1,5 +1,4 @@
 import { Cause, Effect, Exit, Scope } from "effect";
-import { loadModelRegistry } from "@stella/contracts/model-registry";
 import "../kernel/shared/http-proxy.js";
 import path from "node:path";
 import {
@@ -76,7 +75,6 @@ const parseEntryArgs = (argv: string[]): ParsedArgs => {
 const SHUTDOWN_DEADLINE_MS = 5_000;
 
 const main = async () => {
-  await loadModelRegistry();
   const cliArgs = parseEntryArgs(process.argv.slice(2));
   const transportResult = parseWorkerListenUrl(cliArgs.listenUrl);
   if (!transportResult.ok) {

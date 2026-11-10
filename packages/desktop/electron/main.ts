@@ -1,5 +1,4 @@
 import { app } from "electron";
-import { loadModelRegistry } from "@stella/contracts/model-registry";
 import "@stella/runtime/kernel/shared/http-proxy.js";
 import { configureLinuxGraphics } from "./linux-graphics.js";
 import { configureLinuxProtectedStorage } from "./linux-protected-storage.js";
@@ -29,7 +28,6 @@ if (!devHarnessProtectedStorage) {
 }
 
 const main = async () => {
-  await loadModelRegistry();
   const { bootstrapMainProcess } = await import("./bootstrap.js");
   bootstrapMainProcess();
 };

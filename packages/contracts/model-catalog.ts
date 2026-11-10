@@ -1,5 +1,3 @@
-import { getLoadedModelRegistry } from "./model-registry.js";
-import { isRetiredAssistantProvider } from "./provider-display.js";
 
 export type CatalogApi = string;
 export type Api = CatalogApi;
@@ -56,13 +54,3 @@ export type RuntimeModelCatalogSnapshot = {
   configError?: string;
   catalogError?: string;
 };
-
-export function getAllModels(): CatalogModel[] {
-  const models = getLoadedModelRegistry();
-  return Object.keys(models)
-    .filter((provider) => !isRetiredAssistantProvider(provider))
-    .sort()
-    .flatMap((provider) =>
-      Object.values(models[provider as keyof typeof models]),
-    ) as CatalogModel[];
-}

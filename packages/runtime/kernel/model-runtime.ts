@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getLoadedModelRegistry } from "@stella/contracts/model-registry";
+import { bundledModels } from "./bundled-models.js";
 import { STELLA_RELAY_PROVIDERS } from "@stella/contracts/stella-api";
 import { isRetiredAssistantProvider } from "@stella/contracts/provider-display";
 import {
@@ -391,16 +391,8 @@ export class ModelRuntime {
 
   private ensureBuiltinsLoaded(): void {
     if (this.builtinsLoaded) return;
-    for (const [providerId, models] of Object.entries(
-      getLoadedModelRegistry(),
-    )) {
-      if (providerId === "grok" || isRetiredAssistantProvider(providerId)) {
-        continue;
-      }
-      this.builtins.set(
-        providerId,
-        Object.values(models).map((model) => ownModel(model as Model<Api>)),
-      );
+    for (const [providerId, models] of bundledModels()) {
+      this.builtins.set(providerId, models.map(ownModel));
     }
     this.builtinsLoaded = true;
     this.recompose();

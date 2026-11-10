@@ -2,7 +2,6 @@ import {
   CLOUD_TURN_ATTEMPT_DIRECTORY_FLAG,
   parseCloudTurnAttemptDirectory,
 } from "@stella/contracts/cloud-turn-attempt";
-import { loadModelRegistry } from "@stella/contracts/model-registry";
 import "@stella/runtime/kernel/shared/http-proxy.js";
 import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { Effect } from "effect";
@@ -34,8 +33,6 @@ if (process.argv.includes(CLAUDE_CLI_REFRESH_FLAG)) {
 }
 
 markTurnStep("modulesLoaded");
-await loadModelRegistry();
-markTurnStep("modelRegistryLoaded");
 
 if (process.argv.includes("--warm")) {
   await warmCloudClaudeCli();

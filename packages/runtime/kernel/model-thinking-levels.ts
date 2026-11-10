@@ -1,10 +1,7 @@
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai/models";
 
-/**
- * Models that take xhigh although the vendored catalog has no thinking map
- * entry saying so (it predates the maps).
- */
+/** Models that take xhigh when their catalog entry carries no thinking map saying so. */
 const takesXhigh = (model: Model<Api>): boolean =>
   /gpt-5\.[2-6]/.test(model.id) ||
   (model.api === "anthropic-messages" && /opus-4[.-]6/.test(model.id));

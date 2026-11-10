@@ -15,7 +15,13 @@ import { OPENROUTER_MODELS } from "@earendil-works/pi-ai/providers/openrouter.mo
 import { VERCEL_AI_GATEWAY_MODELS } from "@earendil-works/pi-ai/providers/vercel-ai-gateway.models";
 import { XAI_MODELS } from "@earendil-works/pi-ai/providers/xai.models";
 import { ZAI_MODELS } from "@earendil-works/pi-ai/providers/zai.models";
-import { modelForUnlistedId, type LiveProviderModel } from "@stella/contracts/provider-live-models";
+import {
+  fetchLiveProviderModels,
+  fetchPublishedProviderModels,
+  liveProviderModelListNeedsKey,
+  modelForUnlistedId,
+  type LiveProviderModel,
+} from "@stella/contracts/provider-live-models";
 import {
   GATEWAY_BYOK_HEADER_PREFIX,
   GATEWAY_BYOK_PLACEHOLDER_KEY,
@@ -82,6 +88,41 @@ export const accountProviderModel = (
 ): Model<Api> | undefined => {
   const models = accountProviderModels(providerId);
   return models.find((model) => model.id === modelId) ?? modelForUnlistedId(models, modelId, listed);
+};
+
+const LISTED_MODELS_TTL_MS = 60 * 60_000;
+const listedModels = new Map<string, { at: number; models: Promise<LiveProviderModel[]> }>();
+
+const settled = (models: Promise<LiveProviderModel[] | undefined>): Promise<LiveProviderModel[]> =>
+  models.then(
+    (found) => found ?? [],
+    () => [],
+  );
+
+const listedProviderModels = (providerId: string): Promise<LiveProviderModel[]> => {
+  const cached = listedModels.get(providerId);
+  if (cached && Date.now() - cached.at < LISTED_MODELS_TTL_MS) return cached.models;
+  const models = Promise.all([
+    settled(fetchPublishedProviderModels(providerId)),
+    settled(liveProviderModelListNeedsKey(providerId) ? Promise.resolve([]) : fetchLiveProviderModels(providerId)),
+  ]).then(([published, live]) => {
+    if (published.length + live.length === 0) listedModels.delete(providerId);
+    return [...published, ...live];
+  });
+  listedModels.set(providerId, { at: Date.now(), models });
+  return models;
+};
+
+/**
+ * `accountProviderModel` for a host with no catalog of its own: an unlisted
+ * model takes the limits and price pi-ai's published catalog or the
+ * provider's public list gives it.
+ */
+export const listedAccountProviderModel = async (providerId: string, modelId: string): Promise<Model<Api> | undefined> => {
+  const known = accountProviderModels(providerId).find((model) => model.id === modelId);
+  if (known) return known;
+  const listed = (await listedProviderModels(providerId)).find((model) => model.id === modelId);
+  return accountProviderModel(providerId, modelId, listed);
 };
 
 export const accountProviderBaseUrls = (providerId: string): string[] => [

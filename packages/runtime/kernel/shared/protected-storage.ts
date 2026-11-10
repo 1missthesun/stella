@@ -9,23 +9,26 @@ type SafeStorageLike = {
 const require = createRequire(import.meta.url);
 const PROTECTED_PREFIX = "stella-protected";
 
-let safeStorageCache: SafeStorageLike | null | undefined;
+let safeStorageOverride: SafeStorageLike | null | undefined;
 
 export const setProtectedStorageProviderOverride = (
   provider: SafeStorageLike | null,
 ): void => {
-  safeStorageCache = provider;
+  safeStorageOverride = provider;
 };
 
+/**
+ * Electron reports encryption unavailable until the app is ready (and Linux
+ * Secret Service can come up late), so an unavailable answer is never kept.
+ */
 const getSafeStorage = (): SafeStorageLike => {
-  if (safeStorageCache) {
-    return safeStorageCache;
+  if (safeStorageOverride) {
+    return safeStorageOverride;
   }
-  if (safeStorageCache === null) {
+  if (safeStorageOverride === null) {
     throw new Error("Protected storage is unavailable.");
   }
   if (!process.versions.electron) {
-    safeStorageCache = null;
     throw new Error("Protected storage requires Electron runtime.");
   }
 
@@ -36,11 +39,8 @@ const getSafeStorage = (): SafeStorageLike => {
     typeof electronModule === "string" ? undefined : electronModule.safeStorage;
 
   if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
-    safeStorageCache = null;
     throw new Error("OS protected storage is unavailable.");
   }
-
-  safeStorageCache = safeStorage;
   return safeStorage;
 };
 

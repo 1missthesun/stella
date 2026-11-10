@@ -23,6 +23,7 @@ import {
 import {
   deleteProtectedValue,
   protectValue,
+  readProtectedValue,
   unprotectValue,
 } from "@stella/runtime/kernel/shared/protected-storage";
 import type { HostRuntimeAuthRefreshResult } from "@stella/contracts/protocol";
@@ -199,6 +200,12 @@ export const writeServerSession = (
   fs.writeFileSync(staging, JSON.stringify(encoded, null, 2), { mode: 0o600 });
   fs.renameSync(staging, file);
 };
+class ProtectedStorageUnavailableError extends Error {
+  constructor() {
+    super("Protected storage is unavailable.");
+  }
+}
+
 const DESKTOP_AUTH_ORIGIN = "http://127.0.0.1:57314";
 const DEFAULT_STELLA_WEB_URL = "https://stella.sh";
 const CHALLENGE_INTERACTION_DELAY_MS = 3_000;
@@ -338,16 +345,22 @@ export class AuthService {
       const raw = fs.readFileSync(this.getAuthStoragePath(), "utf8");
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       const next: Record<string, string | null> = {};
+      let unavailable = false;
       for (const [key, value] of Object.entries(parsed)) {
         if (typeof value !== "string") {
           continue;
         }
-        const decoded = this.decodeAuthStorageValue(value);
-        next[key] = decoded;
+        const read = readProtectedValue(AUTH_STORAGE_SCOPE, value);
+        if (!read.ok && read.reason === "unavailable") unavailable = true;
+        next[key] = read.ok ? read.value : null;
+      }
+      if (unavailable) {
+        throw new ProtectedStorageUnavailableError();
       }
       this.authStorageCache = next;
       return next;
-    } catch {
+    } catch (error) {
+      if (error instanceof ProtectedStorageUnavailableError) throw error;
       this.authStorageCache = {};
       return this.authStorageCache;
     }
@@ -401,7 +414,12 @@ export class AuthService {
     if (!normalizedKey) {
       return null;
     }
-    return this.readAuthStorage()[normalizedKey] ?? null;
+    try {
+      return this.readAuthStorage()[normalizedKey] ?? null;
+    } catch (error) {
+      if (error instanceof ProtectedStorageUnavailableError) return null;
+      throw error;
+    }
   }
 
   setAuthStorageItem(key: string, value: string | null) {

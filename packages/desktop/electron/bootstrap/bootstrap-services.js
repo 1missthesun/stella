@@ -1,6 +1,6 @@
 import path from "path";
 import { app } from "electron";
-import { AuthService } from "../services/auth-service.js";
+import { AuthService, launcherServerId } from "../services/auth-service.js";
 import { SelfHostService } from "../services/self-host-service.js";
 import { redeemConnectClaim } from "../services/connect-claim-service.js";
 import { isLauncherPresent, relaunchApp } from "../launcher-client.js";
@@ -134,7 +134,7 @@ export const createBootstrapServices = (options) => {
         stellaDataDirPath: config.stellaDataDirPath,
         environment: config.telemetryEnvironment,
         isSignedIn: async () => Boolean((await authService.getAuthToken())?.trim()),
-        isSelfHosted: () => selfHostService.getState().selfHosted,
+        isSelfHosted: () => Boolean(launcherServerId()),
     });
     anonymousCounts.start();
     const userAskService = new UserAskService({

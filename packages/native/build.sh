@@ -214,3 +214,24 @@ if command -v cargo >/dev/null 2>&1; then
 else
   echo "Skipping wakeword_listener: cargo not on PATH (install rustup to enable)."
 fi
+
+# stella_show — Show Stella's capture builder (Rust, from Scrawl), universal macOS.
+if command -v cargo >/dev/null 2>&1; then
+  echo "Building stella_show (macOS universal)..."
+  pushd show >/dev/null
+  rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null 2>&1 || true
+  MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN_VERSION" cargo build --release --quiet --target aarch64-apple-darwin
+  MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN_VERSION" cargo build --release --quiet --target x86_64-apple-darwin
+  popd >/dev/null
+  lipo -create \
+    -output "$STAGE_DIR/stella_show" \
+    "show/target/aarch64-apple-darwin/release/stella_show" \
+    "show/target/x86_64-apple-darwin/release/stella_show"
+  if command -v codesign >/dev/null 2>&1; then
+    codesign --force --sign - "$STAGE_DIR/stella_show" >/dev/null 2>&1 || true
+  fi
+  install_into_place "$STAGE_DIR/stella_show" "$OUTPUT_DIR/stella_show"
+  echo "Build successful: $OUTPUT_DIR/stella_show"
+else
+  echo "Skipping stella_show: cargo not on PATH (install rustup to enable)."
+fi

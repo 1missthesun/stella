@@ -53,6 +53,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             packages/native/wakeword/target
+            packages/native/show/target
           key: native-rust-v1-macos-${{ hashFiles('packages/native/wakeword/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
             native-rust-v1-macos-${{ hashFiles('packages/native/wakeword/Cargo.lock') }}-
@@ -141,6 +142,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             packages/native/wakeword/target
+            packages/native/show/target
           key: native-rust-v1-windows-${{ hashFiles('packages/native/wakeword/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
             native-rust-v1-windows-${{ hashFiles('packages/native/wakeword/Cargo.lock') }}-
@@ -268,7 +270,7 @@ jobs:
           # Hard-fail if Defender (or anything else) ate a binary the
           # build script said it produced; surface the regression in CI
           # rather than shipping a broken Windows tarball.
-          required=("window_info.exe" "recent_apps.exe" "window_text.exe" "selected_text.exe" "dictation_bridge.exe" "stella-computer-helper.exe" "meeting_capture.exe" "wakeword_listener.exe" "wakeword_models/hey_stella.onnx")
+          required=("window_info.exe" "recent_apps.exe" "window_text.exe" "selected_text.exe" "dictation_bridge.exe" "stella-computer-helper.exe" "meeting_capture.exe" "wakeword_listener.exe" "stella_show.exe" "wakeword_models/hey_stella.onnx")
           missing=0
           for name in "${required[@]}"; do
             if [ ! -f "$OUT/$name" ]; then

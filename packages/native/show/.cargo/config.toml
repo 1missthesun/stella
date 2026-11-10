@@ -1,0 +1,4 @@
+# Static CRT, like wakeword_listener and every other Windows helper, so a clean
+# Windows box needs no Visual C++ redistributable.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

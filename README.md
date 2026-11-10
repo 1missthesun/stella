@@ -37,4 +37,4 @@ For the manual reference, see [SELF_HOSTING.md](SELF_HOSTING.md).
 
 ## Credits
 
-Record screen is adapted from [Scrawl](https://github.com/kitlangton/scrawl) by Kit Langton (MIT).
+Record screen's capture builder (keyframes, marks, auto-crop and contact sheets) is adapted from [Scrawl](https://github.com/kitlangton/scrawl) by Kit Langton, under the MIT license ([notice](packages/native/show/LICENSE-scrawl)).

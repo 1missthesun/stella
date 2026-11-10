@@ -1,4 +1,5 @@
 import openNext from "./.open-next/worker.js";
+import { shortLinkResponse, shortLinkSource } from "./short-links.mjs";
 
 const SHARED_CACHE_ONLY = /^s-maxage=\d+(, stale-while-revalidate=\d+)?$/;
 const BROWSER_CACHE = "public, max-age=0, must-revalidate";
@@ -184,6 +185,8 @@ const optimizedImage = async (request, env, ctx) => {
 const worker = {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
+    const shortLink = request.method === "GET" || request.method === "HEAD" ? shortLinkSource(pathname) : null;
+    if (shortLink) return shortLinkResponse(request, env, shortLink);
     if (request.method === "GET" && pathname === "/_next/image") {
       return optimizedImage(request, env, ctx);
     }

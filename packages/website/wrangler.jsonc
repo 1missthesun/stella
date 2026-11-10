@@ -14,6 +14,10 @@
   },
   "images": { "binding": "IMAGES" },
   "observability": { "enabled": true, "redact_query_string": true },
+  // stella.sh/r/<source> hits (short-links.mjs).
+  "analytics_engine_datasets": [
+    { "binding": "SHORT_LINKS", "dataset": "stella_short_links_dev" }
+  ],
   "vars": {
     "CSP_BACKEND_ORIGINS": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev https://auth-dev.stella.sh"
   },
@@ -31,6 +35,9 @@
       },
       "images": { "binding": "IMAGES" },
       "observability": { "enabled": true, "redact_query_string": true },
+      "analytics_engine_datasets": [
+        { "binding": "SHORT_LINKS", "dataset": "stella_short_links" }
+      ],
       "vars": {
         "CSP_BACKEND_ORIGINS": "https://stella-v2-cloud-builder-prod.fromyou.workers.dev https://auth.stella.sh"
       }

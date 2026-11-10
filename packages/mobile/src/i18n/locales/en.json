@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Done",
       "hint": "Hold {shift} to draw · {shift}-click to pin · Esc to discard",
-      "hintNoInk": "Esc to discard"
+      "hintNoInk": "Esc to discard",
+      "review": {
+        "note": "Add a note…",
+        "send": "Send",
+        "open": "Open in Stella",
+        "discard": "Discard"
+      }
     }
   },
   "global": {

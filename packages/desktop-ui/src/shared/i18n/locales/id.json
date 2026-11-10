@@ -852,7 +852,13 @@
     "showStella": {
       "done": "Selesai",
       "hint": "Tahan {shift} untuk menggambar · {shift}-klik untuk pin · Esc untuk membuang",
-      "hintNoInk": "Esc untuk membuang"
+      "hintNoInk": "Esc untuk membuang",
+      "review": {
+        "note": "Tambahkan catatan…",
+        "send": "Kirim",
+        "open": "Buka di Stella",
+        "discard": "Buang"
+      }
     }
   },
   "global": {

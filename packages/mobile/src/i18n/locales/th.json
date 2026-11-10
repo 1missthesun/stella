@@ -852,7 +852,13 @@
     "showStella": {
       "done": "เสร็จ",
       "hint": "กด {shift} ค้างไว้เพื่อวาด · {shift}+คลิกเพื่อปักหมุด · Esc เพื่อทิ้ง",
-      "hintNoInk": "Esc เพื่อทิ้ง"
+      "hintNoInk": "Esc เพื่อทิ้ง",
+      "review": {
+        "note": "เพิ่มบันทึก…",
+        "send": "ส่ง",
+        "open": "เปิดใน Stella",
+        "discard": "ทิ้ง"
+      }
     }
   },
   "global": {

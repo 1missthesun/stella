@@ -852,7 +852,13 @@
     "showStella": {
       "done": "完成",
       "hint": "按住 {shift} 繪製 · {shift}+點按放置圖釘 · Esc 放棄",
-      "hintNoInk": "Esc 放棄"
+      "hintNoInk": "Esc 放棄",
+      "review": {
+        "note": "新增備註…",
+        "send": "傳送",
+        "open": "在 Stella 中開啟",
+        "discard": "放棄"
+      }
     }
   },
   "global": {

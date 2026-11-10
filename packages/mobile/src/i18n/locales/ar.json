@@ -882,7 +882,13 @@
     "showStella": {
       "done": "تم",
       "hint": "اضغط مطولاً على {shift} للرسم · {shift} مع النقر لوضع دبوس · Esc للتجاهل",
-      "hintNoInk": "Esc للتجاهل"
+      "hintNoInk": "Esc للتجاهل",
+      "review": {
+        "note": "أضف ملاحظة…",
+        "send": "إرسال",
+        "open": "فتح في Stella",
+        "discard": "تجاهل"
+      }
     }
   },
   "global": {

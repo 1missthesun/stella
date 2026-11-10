@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Bitti",
       "hint": "Çizmek için {shift} basılı tutun · İğne için {shift}+tıklayın · Vazgeçmek için Esc",
-      "hintNoInk": "Vazgeçmek için Esc"
+      "hintNoInk": "Vazgeçmek için Esc",
+      "review": {
+        "note": "Not ekleyin…",
+        "send": "Gönder",
+        "open": "Stella'da aç",
+        "discard": "Vazgeç"
+      }
     }
   },
   "global": {

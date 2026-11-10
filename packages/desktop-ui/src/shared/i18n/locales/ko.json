@@ -852,7 +852,13 @@
     "showStella": {
       "done": "완료",
       "hint": "{shift}를 누른 채 그리기 · {shift}+클릭으로 핀 · Esc로 취소",
-      "hintNoInk": "Esc로 취소"
+      "hintNoInk": "Esc로 취소",
+      "review": {
+        "note": "메모 추가…",
+        "send": "보내기",
+        "open": "Stella에서 열기",
+        "discard": "취소"
+      }
     }
   },
   "global": {

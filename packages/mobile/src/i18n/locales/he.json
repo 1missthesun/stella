@@ -864,7 +864,13 @@
     "showStella": {
       "done": "סיום",
       "hint": "החזקת {shift} לציור · {shift}+לחיצה לנעץ · Esc לביטול",
-      "hintNoInk": "Esc לביטול"
+      "hintNoInk": "Esc לביטול",
+      "review": {
+        "note": "הוספת הערה…",
+        "send": "שליחה",
+        "open": "פתיחה ב-Stella",
+        "discard": "ביטול"
+      }
     }
   },
   "global": {

@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Kész",
       "hint": "Rajzoláshoz tartsd lenyomva: {shift} · {shift}+kattintás: tű · Esc: elvetés",
-      "hintNoInk": "Esc: elvetés"
+      "hintNoInk": "Esc: elvetés",
+      "review": {
+        "note": "Megjegyzés hozzáadása…",
+        "send": "Küldés",
+        "open": "Megnyitás a Stellában",
+        "discard": "Elvetés"
+      }
     }
   },
   "global": {

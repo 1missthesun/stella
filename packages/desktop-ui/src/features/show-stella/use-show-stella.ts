@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ShowCaptureAttachment } from "@stella/contracts";
 import type {
+  ShowStellaSendRequest,
   ShowStellaStatus,
   ShowStellaTranscript,
 } from "@stella/contracts/desktop/show-stella";
@@ -9,36 +10,88 @@ import { transcribeCapture } from "./capture-transcript";
 
 const api = () => window.electronAPI?.showStella;
 
+/** Recordings and sends this window has taken, so a re-sent one isn't done twice. */
+const taken = new Set<string>();
+
+const prepare = async (captureId: string, hasAudio: boolean) => {
+  const showStella = api();
+  if (!showStella || taken.has(captureId)) return;
+  taken.add(captureId);
+  let transcript: ShowStellaTranscript;
+  try {
+    const wav = hasAudio ? await showStella.readAudio({ captureId }) : null;
+    transcript = await transcribeCapture(wav);
+  } catch (error) {
+    console.warn("[show-stella] no transcript:", (error as Error)?.message);
+    transcript = {
+      source: "none",
+      text: "",
+      segments: [],
+      words: [],
+      missing: { reason: "The words couldn't be transcribed." },
+    };
+  }
+  await showStella.build({ captureId, transcript }).catch((error: unknown) => {
+    console.warn("[show-stella] build failed:", (error as Error)?.message);
+  });
+};
+
 /**
  * In the main window: a recording that has stopped gets its words from the
- * user's dictation engine, then the builder makes the capture, which lands in
- * the composer.
+ * user's dictation engine, then the builder makes the capture. A window that
+ * opened (hidden) for it asks what's waiting.
  */
 export function useShowStellaRecordings() {
   useEffect(() => {
     const showStella = api();
     if (!showStella) return;
-    return showStella.onRecorded(({ captureId, hasAudio }) => {
-      void (async () => {
-        let transcript: ShowStellaTranscript;
-        try {
-          const wav = hasAudio ? await showStella.readAudio({ captureId }) : null;
-          transcript = await transcribeCapture(wav);
-        } catch (error) {
-          console.warn("[show-stella] no transcript:", (error as Error)?.message);
-          transcript = {
-            source: "none",
-            text: "",
-            segments: [],
-            words: [],
-            missing: { reason: "The words couldn't be transcribed." },
-          };
-        }
-        await showStella.build({ captureId, transcript }).catch((error: unknown) => {
-          console.warn("[show-stella] build failed:", (error as Error)?.message);
-        });
-      })();
-    });
+    const off = showStella.onRecorded(({ captureId, hasAudio }) => void prepare(captureId, hasAudio));
+    void showStella
+      .pending()
+      .then(({ recordings }) => {
+        for (const { captureId, hasAudio } of recordings) void prepare(captureId, hasAudio);
+      })
+      .catch(() => undefined);
+    return off;
+  }, []);
+}
+
+const SEND_ATTEMPTS = 40;
+const SEND_RETRY_MS = 500;
+
+/**
+ * Sends a capture from the finish card as a message, with its note, without
+ * bringing the window forward. A window still opening is retried until it
+ * has a conversation to send to.
+ */
+export function useShowStellaSends(
+  send: (text: string, context: ChatContext) => Promise<boolean>,
+) {
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    const showStella = api();
+    if (!showStella) return;
+    const handle = async (request: ShowStellaSendRequest) => {
+      if (taken.has(request.requestId)) return;
+      taken.add(request.requestId);
+      let ok = false;
+      for (let attempt = 0; attempt < SEND_ATTEMPTS && !ok; attempt += 1) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, SEND_RETRY_MS));
+        ok = await sendRef
+          .current(request.note, { showCaptures: [request.capture] })
+          .catch(() => false);
+      }
+      await showStella.sent({ requestId: request.requestId, ok }).catch(() => undefined);
+    };
+    const off = showStella.onSend((request) => void handle(request));
+    void showStella
+      .pending()
+      .then(({ sends }) => {
+        for (const request of sends) void handle(request);
+      })
+      .catch(() => undefined);
+    return off;
   }, []);
 }
 

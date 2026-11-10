@@ -18,8 +18,11 @@ import type {
   ShowStellaBuildResult,
   ShowStellaInk,
   ShowStellaOverlayState,
+  ShowStellaOverlayInfo,
   ShowStellaRecorded,
   ShowStellaRecorderResult,
+  ShowStellaReviewAction,
+  ShowStellaSendRequest,
   ShowStellaStatus,
   ShowStellaTranscript,
 } from "./show-stella.js";
@@ -268,6 +271,12 @@ import {
   IPC_SHOW_STELLA_RECORDER_STOPPED,
   IPC_SHOW_STELLA_RECORDER_FAILED,
   IPC_SHOW_STELLA_DONE,
+  IPC_SHOW_STELLA_REVIEW,
+  IPC_SHOW_STELLA_REVIEW_FOCUSABLE,
+  IPC_SHOW_STELLA_PENDING,
+  IPC_SHOW_STELLA_SEND,
+  IPC_SHOW_STELLA_SENT,
+  IPC_SHOW_STELLA_OVERLAY_INFO,
   IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
@@ -1038,6 +1047,15 @@ export type IpcInvokeContract = {
     [payload: ShowStellaRecorderResult],
     { ok: true }
   >;
+  [IPC_SHOW_STELLA_REVIEW]: Invoke<[payload: ShowStellaReviewAction], { ok: boolean }>;
+  [IPC_SHOW_STELLA_PENDING]: Invoke<
+    [],
+    { recordings: ShowStellaRecorded[]; sends: ShowStellaSendRequest[] }
+  >;
+  [IPC_SHOW_STELLA_SENT]: Invoke<
+    [payload: { requestId: string; ok: boolean }],
+    { ok: true }
+  >;
 
   [IPC_COMPANION_GET_STATE]: Invoke<[], CompanionState | null>;
   [IPC_COMPANION_GET_VISIBLE]: Invoke<[], CompanionVisibility>;
@@ -1646,6 +1664,8 @@ export type IpcSendContract = {
     payload: { captureId: string; message: string },
   ];
   [IPC_SHOW_STELLA_DONE]: [];
+  [IPC_SHOW_STELLA_REVIEW_FOCUSABLE]: [payload: { focusable: boolean }];
+  [IPC_SHOW_STELLA_OVERLAY_INFO]: [payload: ShowStellaOverlayInfo];
   [IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS]: [];
   [IPC_DICTATION_PLAY_SOUND]: [
     payload: { sound: "startRecording" | "stopRecording" | "cancel" },
@@ -1702,6 +1722,7 @@ export type IpcEventContract = {
   [IPC_OVERLAY_START_REGION_CAPTURE]: { mode?: "capture" | "window-attach" };
   [IPC_OVERLAY_END_REGION_CAPTURE]: void;
   [IPC_SHOW_STELLA_RECORDED]: ShowStellaRecorded;
+  [IPC_SHOW_STELLA_SEND]: ShowStellaSendRequest;
   [IPC_SHOW_STELLA_OVERLAY_STATE]: ShowStellaOverlayState;
   [IPC_SHOW_STELLA_INK]: ShowStellaInk;
   [IPC_SHOW_STELLA_STOP_RECORDER]: { captureId: string };

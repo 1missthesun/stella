@@ -570,8 +570,11 @@ export class OverlayWindowController {
             focusable: false,
         });
     }
-    /** Show Stella: the capture bar, the red edge and live ink, never captured. */
-    /** `state.display` is in screen points; the overlay gets it in its own. */
+    /**
+     * Show Stella: the capture bar, the red edge and live ink, never captured,
+     * then the finish card. `state.display` is in screen points; the overlay
+     * gets it in its own.
+     */
     async startShowStella(state) {
         const local = () => {
             const origin = this.overlayWindow.getOverlayOrigin();
@@ -606,6 +609,11 @@ export class OverlayWindowController {
     sendShowStellaInk(ink) {
         if (this.activeShowStella)
             this.overlayWindow.send(IPC_SHOW_STELLA_INK, ink);
+    }
+    /** The finish card's note field needs keys; a panel takes them without activating Stella. */
+    setShowStellaFocusable(focusable) {
+        if (this.activeShowStella)
+            this.overlayWindow.setFocusable(focusable);
     }
     stopShowStellaRecorder(captureId) {
         this.overlayWindow.send(IPC_SHOW_STELLA_STOP_RECORDER, { captureId });

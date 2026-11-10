@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Valmis",
       "hint": "Piirrä pitämällä {shift} pohjassa · {shift}+napsautus lisää nastan · Esc hylkää",
-      "hintNoInk": "Esc hylkää"
+      "hintNoInk": "Esc hylkää",
+      "review": {
+        "note": "Lisää muistiinpano…",
+        "send": "Lähetä",
+        "open": "Avaa Stellassa",
+        "discard": "Hylkää"
+      }
     }
   },
   "global": {

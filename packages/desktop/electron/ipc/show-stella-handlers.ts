@@ -3,10 +3,15 @@ import {
   IPC_SHOW_STELLA_BUILD,
   IPC_SHOW_STELLA_DONE,
   IPC_SHOW_STELLA_FRAME,
+  IPC_SHOW_STELLA_OVERLAY_INFO,
+  IPC_SHOW_STELLA_PENDING,
   IPC_SHOW_STELLA_READ_AUDIO,
   IPC_SHOW_STELLA_RECORDER_FAILED,
   IPC_SHOW_STELLA_RECORDER_STARTED,
   IPC_SHOW_STELLA_RECORDER_STOPPED,
+  IPC_SHOW_STELLA_REVIEW,
+  IPC_SHOW_STELLA_REVIEW_FOCUSABLE,
+  IPC_SHOW_STELLA_SENT,
   IPC_SHOW_STELLA_STATUS,
   IPC_SHOW_STELLA_TOGGLE,
   IPC_SHOW_STELLA_VIDEO_CHUNK,
@@ -58,6 +63,21 @@ export const registerShowStellaHandlers = (options: ShowStellaHandlersOptions) =
   });
   onPrivilegedIpc(overlayOnly, IPC_SHOW_STELLA_DONE, () => {
     void controller.stop(false);
+  });
+
+  registerPrivilegedHandle(overlayOnly, IPC_SHOW_STELLA_REVIEW, async (_event, payload) => ({
+    ok: await controller.review(payload),
+  }));
+  onPrivilegedIpc(overlayOnly, IPC_SHOW_STELLA_OVERLAY_INFO, (_event, payload) => {
+    controller.overlayInfo(payload);
+  });
+  onPrivilegedIpc(overlayOnly, IPC_SHOW_STELLA_REVIEW_FOCUSABLE, (_event, payload) => {
+    controller.setReviewFocusable(Boolean(payload?.focusable));
+  });
+  registerPrivilegedHandle(options, IPC_SHOW_STELLA_PENDING, () => controller.pendingRecordings());
+  registerPrivilegedHandle(options, IPC_SHOW_STELLA_SENT, (_event, payload) => {
+    controller.sent(payload.requestId, payload.ok);
+    return { ok: true } as const;
   });
 
   controller.registerShortcut();

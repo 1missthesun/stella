@@ -864,7 +864,13 @@
     "showStella": {
       "done": "Fine",
       "hint": "Tieni premuto {shift} per disegnare · {shift}+clic per una puntina · Esc per scartare",
-      "hintNoInk": "Esc per scartare"
+      "hintNoInk": "Esc per scartare",
+      "review": {
+        "note": "Aggiungi una nota…",
+        "send": "Invia",
+        "open": "Apri in Stella",
+        "discard": "Scarta"
+      }
     }
   },
   "global": {

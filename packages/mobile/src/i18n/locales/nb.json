@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Ferdig",
       "hint": "Hold {shift} for å tegne · {shift}-klikk for en nål · Esc for å forkaste",
-      "hintNoInk": "Esc for å forkaste"
+      "hintNoInk": "Esc for å forkaste",
+      "review": {
+        "note": "Legg til et notat…",
+        "send": "Send",
+        "open": "Åpne i Stella",
+        "discard": "Forkast"
+      }
     }
   },
   "global": {

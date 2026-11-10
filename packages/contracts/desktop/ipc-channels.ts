@@ -176,6 +176,12 @@ export const IPC_SHOW_STELLA_RECORDER_STOPPED =
 export const IPC_SHOW_STELLA_RECORDER_FAILED =
   "showStella:recorderFailed" as const;
 export const IPC_SHOW_STELLA_DONE = "showStella:done" as const;
+export const IPC_SHOW_STELLA_REVIEW = "showStella:review" as const;
+export const IPC_SHOW_STELLA_REVIEW_FOCUSABLE = "showStella:reviewFocusable" as const;
+export const IPC_SHOW_STELLA_PENDING = "showStella:pending" as const;
+export const IPC_SHOW_STELLA_SEND = "showStella:send" as const;
+export const IPC_SHOW_STELLA_SENT = "showStella:sent" as const;
+export const IPC_SHOW_STELLA_OVERLAY_INFO = "showStella:overlayInfo" as const;
 
 export const IPC_AGENT_SEND_INPUT = "agent:sendInput" as const;
 export const IPC_PI_CHAT_REQUEST = "piChat:request" as const;

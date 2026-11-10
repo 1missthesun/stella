@@ -569,6 +569,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         getStellaDataDir: lifecycle.getStellaDataDir,
         getOverlay: () => state.overlayController ?? null,
         getFullWindow: () => state.windowManager?.getFullWindow() ?? null,
+        ensureFullWindow: () => state.windowManager?.ensureFullWindow({ hidden: true }) ?? null,
         showFullWindow: () => state.windowManager?.showWindow(),
         input: services.globalInputHook,
         captureService: services.captureService,

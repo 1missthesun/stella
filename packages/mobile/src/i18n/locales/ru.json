@@ -870,7 +870,13 @@
     "showStella": {
       "done": "Готово",
       "hint": "Удерживайте {shift}, чтобы рисовать · {shift}+клик — метка · Esc — отменить",
-      "hintNoInk": "Esc — отменить"
+      "hintNoInk": "Esc — отменить",
+      "review": {
+        "note": "Добавьте заметку…",
+        "send": "Отправить",
+        "open": "Открыть в Stella",
+        "discard": "Отменить"
+      }
     }
   },
   "global": {

@@ -4,6 +4,7 @@ import type {
   ShowStellaOverlayState,
 } from "@stella/contracts/desktop/show-stella";
 import { ShowStellaRecorder } from "@/features/show-stella/show-stella-recorder";
+import { ShowStellaReviewCard } from "./ShowStellaReviewCard";
 import { viewAtom } from "@/platform/view-state/view-state";
 import { useT } from "@/shared/i18n";
 import "./show-stella-overlay.css";
@@ -140,6 +141,7 @@ function useInkCanvas(active: boolean) {
           pins.current.clear();
           break;
         case "click":
+        case "catch":
           break;
       }
       schedule();
@@ -170,7 +172,11 @@ export function ShowStellaOverlay() {
   const [now, setNow] = useState(() => Date.now());
   const [hintVisible, setHintVisible] = useState(false);
   const recorder = useRef<{ id: string; recorder: ShowStellaRecorder } | null>(null);
-  const hovering = useRef(false);
+  const interactive = useRef(false);
+  const hoveringBar = useRef(false);
+  const hoveringCard = useRef(false);
+  const [catching, setCatching] = useState(false);
+  const catchingRef = useRef(false);
   const recording = state.phase === "recording";
   const { canvasRef, apply } = useInkCanvas(state.phase !== "idle");
 
@@ -207,7 +213,14 @@ export function ShowStellaOverlay() {
           });
         });
       }),
-      api.onInk(apply),
+      api.onInk((ink) => {
+        if (ink.kind === "catch") {
+          catchingRef.current = ink.on;
+          setCatching(ink.on);
+          return;
+        }
+        apply(ink);
+      }),
       api.onStopRecorder(({ captureId }) => void stopRecorder(captureId)),
     ];
     return () => cleanups.forEach((cleanup) => cleanup?.());
@@ -220,6 +233,44 @@ export function ShowStellaOverlay() {
   }, [recording]);
 
   const captureId = state.phase === "recording" ? state.captureId : null;
+  const nativeControls = state.phase === "recording" && state.nativeControls;
+  const doneRef = useRef<HTMLButtonElement | null>(null);
+
+  // macOS: the bar only draws; a native panel takes the Done click (and shows
+  // the finish card) so clicking never brings Stella forward.
+  useEffect(() => {
+    if (!captureId) return;
+    const report = () => {
+      const rect = nativeControls ? doneRef.current?.getBoundingClientRect() : null;
+      window.electronAPI?.showStella?.overlayInfo({
+        captureId,
+        done: rect
+          ? {
+              x: rect.x + window.screenX,
+              y: rect.y + window.screenY,
+              width: rect.width,
+              height: rect.height,
+            }
+          : null,
+        strings: {
+          title: t("app.chat.contextChips.showCapture.title", { duration: "{duration}" }),
+          preparing: t("app.chat.contextChips.showCapture.preparing"),
+          failed: t("app.chat.contextChips.showCapture.failed"),
+          note: t("features.showStella.review.note"),
+          send: t("features.showStella.review.send"),
+          open: t("features.showStella.review.open"),
+          discard: t("features.showStella.review.discard"),
+        },
+      });
+    };
+    const frame = requestAnimationFrame(report);
+    // Again once the hint has finished sliding in or out.
+    const settled = setTimeout(report, 450);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(settled);
+    };
+  }, [captureId, nativeControls, hintVisible, t]);
   useEffect(() => {
     if (!captureId) return;
     const seen = hintsShown.get();
@@ -229,17 +280,40 @@ export function ShowStellaOverlay() {
     return () => clearTimeout(timer);
   }, [captureId]);
 
-  const setInteractive = useCallback((interactive: boolean) => {
-    if (hovering.current === interactive) return;
-    hovering.current = interactive;
-    window.electronAPI?.overlay?.setInteractive(interactive);
+  /** The overlay takes the mouse over the bar, the finish card, or everywhere while ⇧ is held. */
+  const syncInteractive = useCallback(() => {
+    const next = hoveringBar.current || hoveringCard.current || catchingRef.current;
+    if (interactive.current === next) return;
+    interactive.current = next;
+    window.electronAPI?.overlay?.setInteractive(next);
   }, []);
 
   useEffect(() => {
-    if (!recording) setInteractive(false);
-  }, [recording, setInteractive]);
+    syncInteractive();
+  }, [catching, syncInteractive]);
+
+  useEffect(() => {
+    if (recording) return;
+    hoveringBar.current = false;
+    catchingRef.current = false;
+    setCatching(false);
+    if (state.phase !== "review") hoveringCard.current = false;
+    syncInteractive();
+  }, [recording, state.phase, syncInteractive]);
 
   if (state.phase === "idle") return null;
+  if (state.phase === "review") {
+    return (
+      <ShowStellaReviewCard
+        key={state.captureId}
+        state={state}
+        onHover={(hovered) => {
+          hoveringCard.current = hovered;
+          syncInteractive();
+        }}
+      />
+    );
+  }
   // macOS keeps the overlay below the menu bar, so the display's top edge can
   // sit above the window; keep the edge and bar where they can be seen.
   const display =
@@ -254,6 +328,13 @@ export function ShowStellaOverlay() {
   return (
     <>
       <canvas ref={canvasRef} className="show-stella-ink" />
+      {display && catching && (
+        <div
+          className="show-stella-catch"
+          style={{ left: display.x, top: display.y, width: display.width, height: display.height }}
+          onMouseDown={(event) => event.preventDefault()}
+        />
+      )}
       {display && (
         <div
           className="show-stella-edge"
@@ -262,10 +343,17 @@ export function ShowStellaOverlay() {
       )}
       {display && state.phase === "recording" && (
         <div
-          className="show-stella-bar"
+          className={nativeControls ? "show-stella-bar show-stella-bar--passive" : "show-stella-bar"}
           style={{ left: display.x + display.width / 2, top: display.y + 14 }}
-          onMouseEnter={() => setInteractive(true)}
-          onMouseLeave={() => setInteractive(false)}
+          onMouseEnter={() => {
+            if (nativeControls) return;
+            hoveringBar.current = true;
+            syncInteractive();
+          }}
+          onMouseLeave={() => {
+            hoveringBar.current = false;
+            syncInteractive();
+          }}
         >
           <span className="show-stella-bar__time">{clock(now - state.startedAtMs)}</span>
           <span
@@ -278,10 +366,12 @@ export function ShowStellaOverlay() {
               : t("features.showStella.hintNoInk")}
           </span>
           <button
+            ref={doneRef}
             type="button"
             className="show-stella-bar__done"
             onClick={() => {
-              setInteractive(false);
+              hoveringBar.current = false;
+              syncInteractive();
               window.electronAPI?.showStella?.done();
             }}
           >

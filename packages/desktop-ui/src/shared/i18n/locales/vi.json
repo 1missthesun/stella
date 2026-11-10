@@ -852,7 +852,13 @@
     "showStella": {
       "done": "Xong",
       "hint": "Giữ {shift} để vẽ · {shift}+nhấp để ghim · Esc để hủy",
-      "hintNoInk": "Esc để hủy"
+      "hintNoInk": "Esc để hủy",
+      "review": {
+        "note": "Thêm ghi chú…",
+        "send": "Gửi",
+        "open": "Mở trong Stella",
+        "discard": "Hủy"
+      }
     }
   },
   "global": {

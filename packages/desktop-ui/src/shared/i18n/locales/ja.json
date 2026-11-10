@@ -852,7 +852,13 @@
     "showStella": {
       "done": "完了",
       "hint": "{shift}を押しながらで描画 · {shift}+クリックでピン · Escで破棄",
-      "hintNoInk": "Escで破棄"
+      "hintNoInk": "Escで破棄",
+      "review": {
+        "note": "メモを追加…",
+        "send": "送信",
+        "open": "Stellaで開く",
+        "discard": "破棄"
+      }
     }
   },
   "global": {

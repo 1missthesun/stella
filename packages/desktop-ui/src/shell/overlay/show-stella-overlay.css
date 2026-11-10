@@ -35,6 +35,11 @@
   animation: show-stella-bar-in 160ms ease-out both;
 }
 
+/* macOS: a native panel takes the bar's clicks so Stella never comes forward. */
+.show-stella-bar--passive {
+  pointer-events: none;
+}
+
 .show-stella-bar__time {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
@@ -90,4 +95,170 @@
     opacity: 1;
     transform: translate(-50%, 0);
   }
+}
+
+/* While ⇧ is held the overlay takes the mouse, so pins and ⇧-drags stay off the app below. */
+.show-stella-catch {
+  position: absolute;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.004);
+  cursor: crosshair;
+}
+
+.show-stella-review {
+  position: absolute;
+  z-index: 6;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(22, 22, 26, 0.96);
+  color: #f4f2ec;
+  font: 500 12.5px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 10px 32px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+  user-select: none;
+  animation: show-stella-review-in 180ms ease-out both;
+}
+
+@keyframes show-stella-review-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.show-stella-review__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.show-stella-review__thumb {
+  flex: none;
+  width: 88px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.show-stella-review__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  display: block;
+}
+
+.show-stella-review__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.show-stella-review__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.show-stella-review__status {
+  color: #a9a7a0;
+}
+
+.show-stella-review__discard {
+  flex: none;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #a9a7a0;
+  cursor: pointer;
+}
+
+.show-stella-review__discard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f2ec;
+}
+
+.show-stella-review__note input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4f2ec;
+  font: inherit;
+  outline: none;
+  user-select: text;
+}
+
+.show-stella-review__note input::placeholder {
+  color: #7d7b75;
+}
+
+.show-stella-review__note input:focus {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.show-stella-review__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.show-stella-review__open,
+.show-stella-review__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font: 600 12.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+
+.show-stella-review__open {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #f4f2ec;
+}
+
+.show-stella-review__open:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.show-stella-review__send {
+  border: 0;
+  background: #f4f2ec;
+  color: #16161a;
+}
+
+.show-stella-review__send:hover {
+  background: #ffffff;
+}
+
+.show-stella-review__send:disabled {
+  opacity: 0.4;
+  cursor: default;
 }

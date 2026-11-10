@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Færdig",
       "hint": "Hold {shift} for at tegne · {shift}-klik for en nål · Esc for at kassere",
-      "hintNoInk": "Esc for at kassere"
+      "hintNoInk": "Esc for at kassere",
+      "review": {
+        "note": "Tilføj en note…",
+        "send": "Send",
+        "open": "Åbn i Stella",
+        "discard": "Kassér"
+      }
     }
   },
   "global": {

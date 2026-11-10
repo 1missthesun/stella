@@ -864,7 +864,13 @@
     "showStella": {
       "done": "Gata",
       "hint": "Ține apăsat {shift} pentru a desena · {shift}+clic pentru un pin · Esc pentru a renunța",
-      "hintNoInk": "Esc pentru a renunța"
+      "hintNoInk": "Esc pentru a renunța",
+      "review": {
+        "note": "Adaugă o notă…",
+        "send": "Trimite",
+        "open": "Deschide în Stella",
+        "discard": "Renunță"
+      }
     }
   },
   "global": {

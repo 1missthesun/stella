@@ -858,7 +858,13 @@
     "showStella": {
       "done": "हो गया",
       "hint": "ड्रॉ करने के लिए {shift} दबाए रखें · पिन के लिए {shift}-क्लिक · हटाने के लिए Esc",
-      "hintNoInk": "हटाने के लिए Esc"
+      "hintNoInk": "हटाने के लिए Esc",
+      "review": {
+        "note": "नोट जोड़ें…",
+        "send": "भेजें",
+        "open": "Stella में खोलें",
+        "discard": "हटाएँ"
+      }
     }
   },
   "global": {

@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Τέλος",
       "hint": "Κράτα το {shift} για σχεδίαση · {shift}+κλικ για πινέζα · Esc για απόρριψη",
-      "hintNoInk": "Esc για απόρριψη"
+      "hintNoInk": "Esc για απόρριψη",
+      "review": {
+        "note": "Πρόσθεσε σημείωση…",
+        "send": "Αποστολή",
+        "open": "Άνοιγμα στη Stella",
+        "discard": "Απόρριψη"
+      }
     }
   },
   "global": {

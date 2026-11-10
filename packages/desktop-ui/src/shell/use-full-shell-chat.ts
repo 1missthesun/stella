@@ -61,7 +61,7 @@ import {
 import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
 import { discardViewState, viewAtom } from "@/platform/view-state/view-state";
-import { useShowStellaRecordings } from "@/features/show-stella/use-show-stella";
+import { useShowStellaRecordings, useShowStellaSends } from "@/features/show-stella/use-show-stella";
 import { closeOpenItems } from "@/features/workspace-display/open-payload";
 import { router } from "@/router";
 import {
@@ -561,6 +561,7 @@ export function useFullShellChat({
     sendContextlessMessage,
     sendAgentInputMessage,
   });
+  useShowStellaSends(sendMessageWithContext);
   const {
     list,
     isPlacingInitialScroll,

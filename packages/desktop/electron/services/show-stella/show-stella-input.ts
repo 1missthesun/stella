@@ -130,6 +130,7 @@ export class ShowStellaInput {
   private lastCursorAt = -Infinity;
   private lastPoint: Point | null = null;
   private drewThisHold = false;
+  private catching = false;
 
   constructor(private readonly options: InputOptions) {}
 
@@ -190,6 +191,7 @@ export class ShowStellaInput {
     const code = event.keycode ?? -1;
     const repeat = this.pressed.has(code);
     this.pressed.add(code);
+    this.syncCatch();
     if (SHIFT_KEYS.has(code)) {
       if (!repeat && !this.otherModifierHeld()) this.beginInk();
       return;
@@ -221,11 +223,23 @@ export class ShowStellaInput {
   private keyup(event: HookEvent): void {
     const code = event.keycode ?? -1;
     this.pressed.delete(code);
+    this.syncCatch();
     if (!SHIFT_KEYS.has(code)) return;
     if (!this.shiftHeld()) {
       this.finishInk();
       this.drewThisHold = false;
     }
+  }
+
+  /**
+   * While ⇧ alone is held the overlay takes the mouse, so a pin's click or a
+   * ⇧-drag never reaches the app below. Plain clicks still go through.
+   */
+  private syncCatch(): void {
+    const catching = this.options.inkEnabled && this.shiftHeld() && !this.otherModifierHeld();
+    if (catching === this.catching) return;
+    this.catching = catching;
+    this.options.onInk({ kind: "catch", on: catching });
   }
 
   private beginInk(): void {
@@ -433,6 +447,10 @@ export class ShowStellaInput {
 
   finish(): CaptureTimeline {
     this.finishInk();
+    if (this.catching) {
+      this.catching = false;
+      this.options.onInk({ kind: "catch", on: false });
+    }
     return {
       strokes: this.strokes.map(({ id: _id, ...stroke }) => stroke),
       events: [...this.events],

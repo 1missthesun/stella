@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Fertig",
       "hint": "{shift} halten zum Zeichnen · {shift}-Klick für eine Markierung · Esc zum Verwerfen",
-      "hintNoInk": "Esc zum Verwerfen"
+      "hintNoInk": "Esc zum Verwerfen",
+      "review": {
+        "note": "Notiz hinzufügen…",
+        "send": "Senden",
+        "open": "In Stella öffnen",
+        "discard": "Verwerfen"
+      }
     }
   },
   "global": {

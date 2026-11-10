@@ -870,7 +870,13 @@
     "showStella": {
       "done": "Gotowe",
       "hint": "Przytrzymaj {shift}, aby rysować · {shift}+klik, aby dodać pinezkę · Esc, aby odrzucić",
-      "hintNoInk": "Esc, aby odrzucić"
+      "hintNoInk": "Esc, aby odrzucić",
+      "review": {
+        "note": "Dodaj notatkę…",
+        "send": "Wyślij",
+        "open": "Otwórz w Stelli",
+        "discard": "Odrzuć"
+      }
     }
   },
   "global": {

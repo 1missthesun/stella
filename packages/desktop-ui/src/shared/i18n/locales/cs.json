@@ -870,7 +870,13 @@
     "showStella": {
       "done": "Hotovo",
       "hint": "Podržte {shift} a kreslete · {shift}+klik vloží špendlík · Esc zahodí",
-      "hintNoInk": "Esc zahodí"
+      "hintNoInk": "Esc zahodí",
+      "review": {
+        "note": "Přidat poznámku…",
+        "send": "Odeslat",
+        "open": "Otevřít ve Stelle",
+        "discard": "Zahodit"
+      }
     }
   },
   "global": {

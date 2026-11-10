@@ -3,28 +3,39 @@ import { createWriteStream, promises as fs, type WriteStream } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import {
+  BrowserWindow,
   desktopCapturer,
   globalShortcut,
   nativeImage,
   screen,
-  type BrowserWindow,
   type Display,
+  type WebContents,
 } from "electron";
 import type { ShowCaptureAttachment } from "@stella/contracts";
 import type {
+  ShowStellaCardStrings,
   ShowStellaInk,
+  ShowStellaOverlayInfo,
   ShowStellaOverlayState,
+  ShowStellaRecorded,
   ShowStellaRecorderResult,
+  ShowStellaReviewAction,
+  ShowStellaReviewState,
+  ShowStellaSendRequest,
   ShowStellaStatus,
   ShowStellaTranscript,
   ShowStellaBuildResult,
 } from "@stella/contracts/desktop/show-stella";
-import { IPC_SHOW_STELLA_RECORDED } from "@stella/contracts/desktop/ipc-channels";
+import {
+  IPC_SHOW_STELLA_RECORDED,
+  IPC_SHOW_STELLA_SEND,
+} from "@stella/contracts/desktop/ipc-channels";
 import { resolveNativeHelperPath } from "../../native-helper-path.js";
 import { hasMacPermission, requestMacPermission } from "../../utils/macos-permissions.js";
 import { openMacPermissionSettings } from "../../utils/macos-permission-settings.js";
 import { applyShortcutRegistration } from "../../ipc/shortcut-registration.js";
 import { ShowStellaInput, type CaptureTimeline, type HookEvent } from "./show-stella-input.js";
+import { ShowPanel, type PanelEvent } from "./show-panel.js";
 
 const HELPER = "stella_show";
 const SHORTCUT = "Alt+Shift+S";
@@ -43,6 +54,13 @@ const RECORDING_KEEP_MS = 7 * 24 * 60 * 60_000;
 const CAPTURE_KEEP_MS = 30 * 24 * 60 * 60_000;
 const CAPTURES_DIR = "captures";
 const SAID_PREVIEW_CHARS = 140;
+/** A finish card nobody answers goes to the composer after this, at the latest. */
+const REVIEW_SAFETY_MS = 3 * 60_000;
+/** An untouched finish card goes to the composer this long after it's ready. */
+const KEEP_AFTER_MS = 20_000;
+const CARD_TOP = 14;
+/** A send the main window hasn't taken by then goes to the composer instead. */
+const SEND_TIMEOUT_MS = 2 * 60_000;
 
 type OverlayApi = {
   startShowStella: (state: ShowStellaOverlayState) => Promise<boolean>;
@@ -50,7 +68,9 @@ type OverlayApi = {
   stopShowStellaRecorder: (captureId: string) => void;
   showStellaFinishing: (captureId: string) => void;
   endShowStella: () => void;
+  setShowStellaFocusable: (focusable: boolean) => void;
   getOverlayOrigin: () => { x: number; y: number };
+  getWebContents: () => WebContents | null;
 };
 
 type InputHook = {
@@ -66,6 +86,8 @@ export type ShowStellaControllerOptions = {
   getStellaDataDir: () => string | null;
   getOverlay: () => OverlayApi | null;
   getFullWindow: () => BrowserWindow | null;
+  /** The main window, made hidden if it was closed: it transcribes and sends captures. */
+  ensureFullWindow: () => BrowserWindow | null;
   showFullWindow: () => void;
   input: InputHook;
   captureService: CaptureService;
@@ -89,6 +111,27 @@ type Recording = {
 };
 
 type Pending = { id: string; dir: string; durationMs: number; hasAudio: boolean };
+
+/** The finish card shown while another app is in front. */
+type Review = {
+  id: string;
+  dir: string;
+  durationMs: number;
+  /** The recorded display, in screen points. */
+  display: { x: number; y: number; width: number; height: number };
+  /** Top of the usable area (below the menu bar), in screen points. */
+  top: number;
+  capture: ShowCaptureAttachment | null;
+  timer: NodeJS.Timeout | null;
+  /** The native card: someone is hovering, typing, or has a note. */
+  engaged: boolean;
+  keepTimer: NodeJS.Timeout | null;
+};
+
+const clock = (ms: number) => {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
 
 const supportedPlatform = () => process.platform === "darwin" || process.platform === "win32";
 
@@ -124,6 +167,17 @@ export class ShowStellaController {
   private lastStartAt = 0;
   private pruned = false;
   private askedForInk = false;
+  private reviewing: Review | null = null;
+  private panel: ShowPanel | null = null;
+  private cardStrings: ShowStellaCardStrings | null = null;
+  /** Captures sent from the finish card before they were ready, with their notes. */
+  private readonly sendWhenReady = new Map<string, string>();
+  private readonly discarded = new Set<string>();
+  /** Sends waiting for the main window to take them. */
+  private readonly outbox = new Map<
+    string,
+    { request: ShowStellaSendRequest; timer: NodeJS.Timeout }
+  >();
 
   constructor(private readonly options: ShowStellaControllerOptions) {}
 
@@ -197,6 +251,7 @@ export class ShowStellaController {
     }
     const overlay = this.options.getOverlay();
     if (!overlay) return false;
+    if (this.reviewing) await this.review({ captureId: this.reviewing.id, action: "keep" });
     const now = new Date();
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const sources = await desktopCapturer
@@ -240,6 +295,7 @@ export class ShowStellaController {
     this.recording = recording;
 
     const inkEnabled = this.inkAvailable();
+    const panel = this.nativePanel();
     const input = new ShowStellaInput({
       display: display.bounds,
       now: () => Date.now() - startedAtMs,
@@ -252,7 +308,11 @@ export class ShowStellaController {
         return { x: point.x - origin.x, y: point.y - origin.y };
       },
       inkEnabled,
-      onInk: (ink) => overlay.sendShowStellaInk(ink),
+      onInk: (ink) => {
+        // The native panel catches ⇧-clicks by itself (armed below).
+        if (ink.kind === "catch" && panel) return;
+        overlay.sendShowStellaInk(ink);
+      },
       onInkChanged: (hasInk) => this.setUndo(recording, hasInk),
       isMac: process.platform === "darwin",
     });
@@ -279,6 +339,7 @@ export class ShowStellaController {
       },
       inkAvailable: Boolean(recording.input) && inkEnabled,
       shortcut: this.activeShortcut,
+      nativeControls: Boolean(panel),
       recorder: {
         captureId: id,
         sourceId: source.id,
@@ -293,6 +354,7 @@ export class ShowStellaController {
       await this.abandon(recording);
       return false;
     }
+    if (panel && recording.input && inkEnabled) panel.arm(display.bounds);
     recording.phase = "recording";
     recording.maxTimer = setTimeout(() => void this.stop(false), MAX_DURATION_MS);
     return true;
@@ -335,6 +397,8 @@ export class ShowStellaController {
       });
     }
     this.options.input.unsubscribeCapture();
+    this.panel?.arm(null);
+    this.panel?.setHit("done", null);
     return recording.input?.finish() ?? { strokes: [], events: [], cursor: [] };
   }
 
@@ -345,6 +409,8 @@ export class ShowStellaController {
     recording.phase = "stopping";
     recording.discard = discard;
     const durationMs = Date.now() - recording.startedAtMs;
+    // Finished from another app: Stella stays in the background.
+    const quiet = !this.stellaInFront();
     const timeline = this.releaseInput(recording);
     const overlay = this.options.getOverlay();
     overlay?.showStellaFinishing(recording.id);
@@ -361,10 +427,10 @@ export class ShowStellaController {
       if (!recording.video) return resolve();
       recording.video.end(() => resolve());
     });
-    overlay?.endShowStella();
     this.recording = null;
 
     if (discard) {
+      overlay?.endShowStella();
       await fs.rm(recording.dir, { recursive: true, force: true }).catch(() => undefined);
       return;
     }
@@ -375,6 +441,7 @@ export class ShowStellaController {
     }
     const frames = await fs.readdir(path.join(recording.dir, "stream")).catch(() => []);
     if (frames.length === 0) {
+      overlay?.endShowStella();
       console.warn("[show-stella] recording has no frames:", result?.error ?? "recorder did not answer");
       await fs.rm(recording.dir, { recursive: true, force: true }).catch(() => undefined);
       return;
@@ -404,27 +471,248 @@ export class ShowStellaController {
     });
     const pending: Pending = { id: recording.id, dir: recording.dir, durationMs, hasAudio };
     this.pending.set(recording.id, pending);
-    this.options.captureService.upsertShowCapture(
-      { id: recording.id, status: "preparing", durationMs, dir: recording.dir },
-      { add: true },
-    );
-    this.options.showFullWindow();
-    const full = this.options.getFullWindow();
-    if (full && !full.isDestroyed()) {
-      full.webContents.send(IPC_SHOW_STELLA_RECORDED, {
-        captureId: recording.id,
+    if (quiet && overlay) {
+      this.reviewing = {
+        id: recording.id,
+        dir: recording.dir,
         durationMs,
-        hasAudio,
-      });
+        display: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+        top: recording.display.workArea.y,
+        capture: null,
+        timer: null,
+        engaged: false,
+        keepTimer: null,
+      };
+      if (this.panel && this.cardStrings) overlay.endShowStella();
+      await this.showReview();
     } else {
-      void this.build(recording.id, {
+      overlay?.endShowStella();
+      this.options.captureService.upsertShowCapture(
+        { id: recording.id, status: "preparing", durationMs, dir: recording.dir },
+        { add: true },
+      );
+      this.options.showFullWindow();
+    }
+    this.requestTranscript(pending);
+  }
+
+  /** Whether one of Stella's own windows (not the overlay) has focus. */
+  private stellaInFront(): boolean {
+    const focused = BrowserWindow.getFocusedWindow();
+    if (!focused || focused.isDestroyed()) return false;
+    return focused.webContents !== this.options.getOverlay()?.getWebContents();
+  }
+
+  /** The main window gets the words from the user's dictation engine, then calls build. */
+  private requestTranscript(pending: Pending): void {
+    const full = this.options.getFullWindow() ?? this.options.ensureFullWindow();
+    if (!full || full.isDestroyed()) {
+      void this.build(pending.id, {
         source: "none",
         text: "",
         segments: [],
         words: [],
-        missing: { reason: "Stella's window was closed while the capture was prepared." },
+        missing: { reason: "Stella's window couldn't be opened to prepare the capture." },
+      });
+      return;
+    }
+    // A window still loading asks for waiting recordings once it's up.
+    if (!full.webContents.isLoading()) {
+      full.webContents.send(IPC_SHOW_STELLA_RECORDED, {
+        captureId: pending.id,
+        durationMs: pending.durationMs,
+        hasAudio: pending.hasAudio,
       });
     }
+  }
+
+  /** What a main window that just opened still has to do. */
+  pendingRecordings(): { recordings: ShowStellaRecorded[]; sends: ShowStellaSendRequest[] } {
+    return {
+      recordings: [...this.pending.values()]
+        .filter((pending) => !this.discarded.has(pending.id))
+        .map((pending) => ({
+          captureId: pending.id,
+          durationMs: pending.durationMs,
+          hasAudio: pending.hasAudio,
+        })),
+      sends: [...this.outbox.values()].map((entry) => entry.request),
+    };
+  }
+
+  private async showReview(): Promise<void> {
+    const review = this.reviewing;
+    const overlay = this.options.getOverlay();
+    if (!review || !overlay) return;
+    const capture = review.capture;
+    if (capture && !review.timer) {
+      review.timer = setTimeout(() => {
+        void this.review({ captureId: review.id, action: "keep" });
+      }, REVIEW_SAFETY_MS);
+    }
+    const strings = this.cardStrings;
+    if (this.panel && strings) {
+      const failed = capture !== null && capture.status !== "ready";
+      this.panel.showCard({
+        x: review.display.x + review.display.width / 2,
+        y: review.top + CARD_TOP,
+        title: strings.title.replace("{duration}", clock(review.durationMs)),
+        status: !capture ? strings.preparing : failed ? strings.failed : null,
+        image: capture?.contactSheet?.path ?? null,
+        sendEnabled: !failed,
+        strings: { note: strings.note, send: strings.send, open: strings.open, discard: strings.discard },
+      });
+      this.scheduleKeep(review);
+      return;
+    }
+    const state: ShowStellaReviewState = {
+      phase: "review",
+      captureId: review.id,
+      durationMs: review.durationMs,
+      display: review.display,
+      status: capture ? (capture.status === "ready" ? "ready" : "failed") : "preparing",
+      ...(capture?.contactSheet
+        ? {
+            preview: capture.contactSheet.previewUrl,
+            previewWidth: capture.contactSheet.width,
+            previewHeight: capture.contactSheet.height,
+          }
+        : {}),
+    };
+    await overlay.startShowStella(state);
+  }
+
+  private nativePanel(): ShowPanel | null {
+    if (!ShowPanel.available()) return null;
+    this.panel ??= new ShowPanel((event) => this.onPanelEvent(event));
+    return this.panel;
+  }
+
+  /** The overlay's Done button and the card's words, for the native panels. */
+  overlayInfo(info: ShowStellaOverlayInfo): void {
+    this.cardStrings = info.strings;
+    const recording = this.recording;
+    if (recording && recording.id === info.captureId && recording.phase === "recording") {
+      this.panel?.setHit("done", info.done);
+    }
+  }
+
+  private onPanelEvent(event: PanelEvent): void {
+    const review = this.reviewing;
+    switch (event.event) {
+      case "hit":
+        if (event.id === "done" && this.recording?.phase === "recording") void this.stop(false);
+        return;
+      case "card":
+        if (!review) return;
+        void this.review(
+          event.action === "send"
+            ? { captureId: review.id, action: "send", note: event.note }
+            : { captureId: review.id, action: event.action },
+        );
+        return;
+      case "engaged":
+        if (!review) return;
+        review.engaged = event.on;
+        this.scheduleKeep(review);
+        return;
+      default:
+        return;
+    }
+  }
+
+  /** An untouched native card goes to the composer a little after it's ready. */
+  private scheduleKeep(review: Review): void {
+    if (review.keepTimer) clearTimeout(review.keepTimer);
+    review.keepTimer = null;
+    if (!review.capture || review.engaged) return;
+    review.keepTimer = setTimeout(() => {
+      void this.review({ captureId: review.id, action: "keep" });
+    }, KEEP_AFTER_MS);
+  }
+
+  setReviewFocusable(focusable: boolean): void {
+    if (this.reviewing) this.options.getOverlay()?.setShowStellaFocusable(focusable);
+  }
+
+  /** The finish card's answer: send, open in Stella, keep in the composer, or discard. */
+  async review(action: ShowStellaReviewAction): Promise<boolean> {
+    const review = this.reviewing;
+    if (!review || review.id !== action.captureId) return false;
+    if (review.timer) clearTimeout(review.timer);
+    if (review.keepTimer) clearTimeout(review.keepTimer);
+    this.reviewing = null;
+    this.panel?.hideCard();
+    this.options.getOverlay()?.endShowStella();
+    const capture =
+      review.capture ??
+      ({ id: review.id, status: "preparing", durationMs: review.durationMs, dir: review.dir } as const);
+    switch (action.action) {
+      case "discard":
+        if (this.pending.has(review.id)) this.discarded.add(review.id);
+        await fs.rm(review.dir, { recursive: true, force: true }).catch(() => undefined);
+        return true;
+      case "send":
+        if (review.capture) void this.dispatchSend(review.capture, action.note);
+        else this.sendWhenReady.set(review.id, action.note);
+        return true;
+      case "open":
+        this.options.captureService.upsertShowCapture(capture, { add: true });
+        this.options.showFullWindow();
+        return true;
+      case "keep":
+        this.options.captureService.upsertShowCapture(capture, { add: true });
+        return true;
+    }
+  }
+
+  /** Sends a capture as a message from the main window, which stays where it is. */
+  private dispatchSend(capture: ShowCaptureAttachment, note: string): void {
+    if (capture.status !== "ready") {
+      this.options.captureService.upsertShowCapture(capture, { add: true });
+      return;
+    }
+    const request: ShowStellaSendRequest = {
+      requestId: randomBytes(8).toString("hex"),
+      capture,
+      note: note.trim(),
+    };
+    const timer = setTimeout(() => this.sent(request.requestId, false), SEND_TIMEOUT_MS);
+    this.outbox.set(request.requestId, { request, timer });
+    const full = this.options.getFullWindow() ?? this.options.ensureFullWindow();
+    if (full && !full.isDestroyed() && !full.webContents.isLoading()) {
+      full.webContents.send(IPC_SHOW_STELLA_SEND, request);
+    }
+  }
+
+  /** The main window's answer to a send; one it couldn't make lands in the composer. */
+  sent(requestId: string, ok: boolean): void {
+    const entry = this.outbox.get(requestId);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    this.outbox.delete(requestId);
+    if (!ok) this.options.captureService.upsertShowCapture(entry.request.capture, { add: true });
+  }
+
+  /** A built (or failed) capture goes to its finish card, its send, or the composer. */
+  private deliver(capture: ShowCaptureAttachment): void {
+    if (this.discarded.delete(capture.id)) {
+      void fs.rm(capture.dir, { recursive: true, force: true }).catch(() => undefined);
+      return;
+    }
+    const review = this.reviewing;
+    if (review && review.id === capture.id) {
+      review.capture = capture;
+      void this.showReview();
+      return;
+    }
+    const note = this.sendWhenReady.get(capture.id);
+    if (note !== undefined) {
+      this.sendWhenReady.delete(capture.id);
+      this.dispatchSend(capture, note);
+      return;
+    }
+    this.options.captureService.upsertShowCapture(capture);
   }
 
   private async abandon(recording: Recording): Promise<void> {
@@ -492,6 +780,10 @@ export class ShowStellaController {
       return { ok: false, captureId, error: "This capture is no longer waiting." };
     }
     this.pending.delete(captureId);
+    if (this.discarded.delete(captureId)) {
+      await fs.rm(pending.dir, { recursive: true, force: true }).catch(() => undefined);
+      return { ok: false, captureId, error: "The capture was discarded." };
+    }
     const helper = resolveNativeHelperPath(HELPER);
     try {
       if (!helper) throw new Error("Show Stella isn't installed on this computer.");
@@ -511,7 +803,7 @@ export class ShowStellaController {
         : `data:image/jpeg;base64,${image.resize({ width: PREVIEW_WIDTH, quality: "good" }).toJPEG(82).toString("base64")}`;
       const video = await this.videoOf(pending.dir);
       const said = transcript.text.trim();
-      this.options.captureService.upsertShowCapture({
+      this.deliver({
         id: captureId,
         status: "ready",
         durationMs: pending.durationMs,
@@ -533,7 +825,7 @@ export class ShowStellaController {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn("[show-stella] build failed:", message);
-      this.options.captureService.upsertShowCapture({
+      this.deliver({
         id: captureId,
         status: "failed",
         durationMs: pending.durationMs,
@@ -589,6 +881,10 @@ export class ShowStellaController {
   }
 
   dispose(): void {
+    if (this.reviewing?.timer) clearTimeout(this.reviewing.timer);
+    if (this.reviewing?.keepTimer) clearTimeout(this.reviewing.keepTimer);
+    this.panel?.dispose();
+    for (const entry of this.outbox.values()) clearTimeout(entry.timer);
     const recording = this.recording;
     if (recording) {
       this.releaseInput(recording);

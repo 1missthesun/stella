@@ -858,7 +858,13 @@
     "showStella": {
       "done": "Klaar",
       "hint": "Houd {shift} ingedrukt om te tekenen · {shift}-klik voor een speld · Esc om te verwerpen",
-      "hintNoInk": "Esc om te verwerpen"
+      "hintNoInk": "Esc om te verwerpen",
+      "review": {
+        "note": "Voeg een notitie toe…",
+        "send": "Versturen",
+        "open": "Openen in Stella",
+        "discard": "Verwerpen"
+      }
     }
   },
   "global": {

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
-import { PRICE_LINE } from "@/lib/answers";
+import { FREE_LINE } from "./index";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
@@ -20,10 +20,9 @@ export async function problemOgImage({
   /** A frame from the proof recording, shown beside the headline. */
   poster?: string;
 }) {
-  const [medium, heavy, mono, logo] = await Promise.all([
+  const [medium, heavy, logo] = await Promise.all([
     font("MonaSans-Medium.ttf"),
     font("MonaSans-ExtraBold.ttf"),
-    font("MartianMono-Regular.ttf"),
     readFile(path.join(process.cwd(), "public/stella-logo.svg")),
   ]);
   const size = poster
@@ -51,10 +50,9 @@ export async function problemOgImage({
         <div
           style={{
             marginTop: 54,
-            fontFamily: "Martian Mono",
-            fontSize: 19,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
+            fontSize: 26,
+            fontWeight: 500,
+            letterSpacing: "-0.015em",
             color: "rgba(10,10,13,0.5)",
           }}
         >
@@ -91,12 +89,13 @@ export async function problemOgImage({
             alignItems: "flex-end",
             paddingTop: 20,
             borderTop: "1px solid rgba(10,10,13,0.14)",
-            fontFamily: "Martian Mono",
-            fontSize: 17,
+            fontSize: 22,
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
             color: "rgba(10,10,13,0.6)",
           }}
         >
-          <span>{note ?? PRICE_LINE}</span>
+          <span>{note ?? FREE_LINE}</span>
           <span style={{ color: "#703cff" }}>stella.sh</span>
         </div>
       </div>
@@ -106,7 +105,6 @@ export async function problemOgImage({
       fonts: [
         { name: "Mona Sans", data: medium, weight: 500, style: "normal" },
         { name: "Mona Sans", data: heavy, weight: 800, style: "normal" },
-        { name: "Martian Mono", data: mono, weight: 400, style: "normal" },
       ],
     },
   );

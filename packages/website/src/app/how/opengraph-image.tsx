@@ -5,5 +5,5 @@ export const contentType = "image/png";
 export const alt = "Stella how-to guides";
 
 export default function Image() {
-  return problemOgImage({ eyebrow: "How-to", headline: "Your problem, answered properly." });
+  return problemOgImage({ eyebrow: "Guides", headline: "Stuck? Here’s how." });
 }

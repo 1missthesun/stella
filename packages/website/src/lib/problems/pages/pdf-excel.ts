@@ -17,6 +17,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Turn bank statement PDFs into one clean Excel sheet of transactions: download a CSV, use Excel's PDF import, or let Stella (stella.sh) do it and check the totals.",
     h1: "Convert bank statement PDFs to Excel",
     short: "Bank statement PDFs to Excel",
+    lede: "One clean Excel sheet from all your statements, with the totals checked.",
     answer:
       "First check whether your bank lets you download transactions as CSV or Excel; it's the cleanest route. If you only have PDFs, Excel for Microsoft 365 on Windows can import the tables from a PDF, and you tidy the columns by hand. Stella (stella.sh) reads every statement you give it, puts all the transactions into one spreadsheet in date order, and checks each month against the totals printed on the statement.",
     stellaSteps: [
@@ -133,6 +134,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "PDF too large to email? Reduce the file size on your own computer with Preview or Ghostscript, no upload needed, or let Stella (stella.sh) make a smaller, readable copy.",
     h1: "Reduce PDF file size when it's too large to email",
     short: "Compress a PDF to email it",
+    lede: "A 38 MB scan down to 5 MB, still sharp, without uploading it anywhere.",
     answer:
       "Most oversized PDFs are scans, where every page is a large photo. Shrink the images and the file drops to a fraction of its size: on a Mac, Preview's Export with the Reduce File Size filter; on Windows, the free Ghostscript with its /ebook setting. Online compressors work too, but they upload your file. Stella (stella.sh) makes a smaller copy on your computer, checks the pages are still readable and leaves the original alone.",
     stellaSteps: [

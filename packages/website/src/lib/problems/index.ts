@@ -57,8 +57,17 @@ export function neighbours(page: ProblemPage, limit = 6): ProblemPage[] {
   return out.slice(0, limit);
 }
 
-export const proofLabel = (page: ProblemPage) =>
-  page.proof.kind === "video" ? "Video proof" : page.proof.kind === "shots" ? "Screenshot proof" : "Steps only";
+/** What a visitor gets on the page, in their words (cards on the index and hubs). */
+export const guideLabel = (page: ProblemPage) => {
+  if (page.proof.kind === "video") {
+    const m = Math.max(1, Math.round((page.proof.video.realDuration ?? page.proof.video.duration) / 60));
+    return `Watch Stella do it · ${m} min`;
+  }
+  return page.proof.kind === "shots" ? "See Stella's result" : "Step-by-step guide";
+};
+
+/** The price line exactly as the home page shows it under the download button. */
+export const FREE_LINE = "Free with the plan you already have.";
 
 export const PLATFORM_NAMES: Record<Platform, string> = {
   windows: "Windows",

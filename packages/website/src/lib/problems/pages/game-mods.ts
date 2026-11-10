@@ -17,6 +17,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Install Fabric, Sodium, Iris shaders and Mod Menu on Minecraft Java 1.21: the manual steps with matching versions, or let Stella (stella.sh) do it for you.",
     h1: "Install Sodium and Iris on Minecraft 1.21 (Fabric)",
     short: "Sodium, Iris and Mod Menu on 1.21",
+    lede: "Fabric, Sodium, Iris and Mod Menu in matching versions, ready to play.",
     answer:
       "Install the Fabric loader for your exact 1.21 version, then put Sodium, Iris, Mod Menu and Fabric API (Mod Menu needs it) into your `.minecraft/mods` folder, every file built for that same version, and start the game from the Fabric profile. Most crashes come from one file built for a different version. Stella (stella.sh) can do the whole install on your computer: it picks versions that match, downloads them from Modrinth, checks each file and sets up a Fabric profile ready to play.",
     stellaSteps: [
@@ -130,6 +131,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Exit code 1 only means Minecraft quit with an error. Find the real cause in the log (a missing or wrong mod, Java, RAM) and fix it, or let Stella (stella.sh) do it.",
     h1: "Minecraft modpack crashing with exit code 1? Find the real error",
     short: "Modpack crash, exit code 1",
+    lede: "The log already says what broke. Here's how to read it, and the fix.",
     answer:
       "Exit code 1 only says Minecraft stopped with an error; the reason is in the pack's logs/latest.log or crash-reports folder. Usually it's a missing library mod such as Fabric API, a mod built for another Minecraft version, the wrong Java, or too little RAM. Read the last error, fix that one thing and launch again. Stella (stella.sh) reads the log and every mod's version, swaps the right files in and tests the pack before handing it back.",
     stellaSteps: [
@@ -245,6 +247,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Find the Sims 4 mods that broke after a patch: lastException files, a mod conflict detector, the 50/50 method, or Stella (stella.sh) reading the logs for you.",
     h1: "Find broken Sims 4 mods after an update",
     short: "Find broken Sims 4 mods",
+    lede: "Find the mods a patch broke, update them, and get back in the game.",
     answer:
       "After a Sims 4 patch the game often switches mods off, and script mods built for the old version stop loading. Turn mods back on in Game Options, delete `localthumbcache.package`, then update or remove the mods your lastException files name; the 50/50 method finds the rest. Stella (stella.sh) does the folder work for you: it reads the exception files, checks creators' pages for updates and moves broken mods out, asking first.",
     stellaSteps: [
@@ -340,6 +343,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Cyberpunk 2077 mods broke with update 2.5? Update CET, RED4ext and redscript, read the logs, move out the mods that fail, or let Stella (stella.sh) do it on your PC.",
     h1: "Cyberpunk 2077 mods not working after update 2.5",
     short: "Cyberpunk mods after update 2.5",
+    lede: "Update the frameworks, read the logs, and move out the mods that fail.",
     answer:
       "Update 2.5 (22 October 2026) changed the game code that script mods hook into, so older Cyber Engine Tweaks, RED4ext, redscript and their plugins stop loading, and one broken script switches off all the others. Update those frameworks to their 2.5 releases first, then read the logs and move out each mod that hasn't been updated. Stella (stella.sh) can do this on your PC: it reads the logs, updates the frameworks from their official pages and sets aside the mods that still fail.",
     stellaSteps: [

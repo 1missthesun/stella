@@ -17,6 +17,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Burn subtitles into a video so they show on TikTok, Reels and Shorts: transcribe, fix the text, and render with free tools, or let Stella (stella.sh) do it.",
     h1: "Add burned-in subtitles to a video for TikTok",
     short: "Burned-in subtitles for TikTok",
+    lede: "Captions burned into the video itself, sized for a phone screen.",
     answer:
       "Burned-in subtitles are drawn into the video pictures themselves, so they show everywhere, even with captions turned off. Make a timed subtitle file from the speech, correct it, then render it onto the video with a free tool like CapCut or ffmpeg, keeping the text above TikTok's buttons. Stella (stella.sh) does it on your computer: it transcribes the clip, fits a widescreen video to TikTok's 9:16 frame, and saves a captioned copy next to the original.",
     stellaSteps: [
@@ -139,6 +140,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Remove the pauses and dead air from a talking video automatically, free: auto-editor or ffmpeg by hand, or let Stella (stella.sh) cut it for you and keep the original.",
     h1: "Cut silences out of a video automatically",
     short: "Cut silences out of a video",
+    lede: "The pauses cut out, the original kept, the edit ready to post.",
     answer:
       "To cut silences automatically, a tool finds the stretches where the sound stays below a loudness level for longer than a moment, then removes them with a little padding so speech doesn't sound clipped. The free, open-source auto-editor does this in one command, and ffmpeg can list every pause. Stella (stella.sh) does it on your own file: it cuts the dead air, tells you how much shorter the video is, and saves the edit next to the original.",
     stellaSteps: [

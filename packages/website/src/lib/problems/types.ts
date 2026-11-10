@@ -109,6 +109,8 @@ export type ProblemPage = {
   h1: string;
   /** Short label for breadcrumbs, related links and the hub list. */
   short: string;
+  /** One line under the H1: the outcome in plain words, no product name (≤90 characters). */
+  lede: string;
   /** Two or three sentences that answer it, including the do-it-yourself route. */
   answer: string;
   /** What Stella does on this problem, in order, in plain words. */

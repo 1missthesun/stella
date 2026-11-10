@@ -1,0 +1,811 @@
+/* /how index, hubs and guides. Built on the home page's vocabulary: Mona Sans
+   only (the price line comes from the home hero's own class), 820-weight
+   titles with the wide second phrase, "Questions."-style section heads, and
+   product visuals framed as windows on a soft wallpaper. No mono labels. */
+
+.page {
+  --h-ink: #0a0a0d;
+  --h-body: #4a4a55;
+  --h-soft: rgba(10, 10, 13, 0.72);
+  --h-muted: rgba(10, 10, 13, 0.5);
+  --h-line: rgba(10, 10, 13, 0.12);
+  --h-accent: #703cff;
+  --h-wide: min(1180px, 100%);
+  color: var(--h-ink);
+}
+
+/* ── Hero ─────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  padding: clamp(112px, 17svh, 190px) var(--l-margin) 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 clamp(18px, 3svh, 30px);
+  font-size: 16px;
+  font-weight: 560;
+  letter-spacing: -0.015em;
+  color: var(--h-muted);
+  transition: color 160ms ease;
+  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.back:hover {
+  color: var(--h-ink);
+}
+
+.back svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.page .title {
+  max-width: 13ch;
+  margin: 0;
+  font-size: clamp(44px, 8.4vw, 150px);
+  font-weight: 820;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  text-wrap: balance;
+  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) 40ms both;
+}
+
+.page .title[data-long] {
+  max-width: 16ch;
+  font-size: clamp(40px, 6.6vw, 118px);
+}
+
+.wide {
+  font-stretch: 125%;
+  letter-spacing: -0.07em;
+}
+
+.page .sub {
+  max-width: 40ch;
+  margin: clamp(18px, 2.8svh, 30px) 0 0;
+  font-size: clamp(19px, 1.75vw, 28px);
+  font-weight: 520;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--h-soft);
+  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) 160ms both;
+}
+
+.hero .heroCta {
+  margin-top: clamp(28px, 4.6svh, 50px);
+}
+
+/* ── Stage: the recording as a window on a wallpaper ──── */
+
+.stage {
+  position: relative;
+  width: var(--h-wide);
+  margin: clamp(56px, 9svh, 96px) auto 0;
+  padding: 0 var(--l-margin);
+  box-sizing: content-box;
+  max-width: calc(100% - 2 * var(--l-margin));
+  animation: rise 1300ms cubic-bezier(0.2, 1, 0.3, 1) 320ms both;
+}
+
+.wall {
+  position: relative;
+  padding: clamp(12px, 4.6vw, 64px);
+  border-radius: clamp(18px, 2vw, 26px);
+  background:
+    radial-gradient(70% 90% at 12% 112%, #ffb36b 0%, transparent 60%),
+    radial-gradient(60% 80% at 92% 104%, #ff6fae 0%, transparent 60%),
+    radial-gradient(80% 70% at 60% -12%, #6aa8ff 0%, transparent 70%),
+    linear-gradient(180deg, #8fb6ff, #f0b7d9);
+  box-shadow: 0 0 0 1px rgba(10, 10, 20, 0.06), 0 60px 120px -50px rgba(30, 30, 80, 0.45);
+}
+
+.wall[data-tone="calm"] {
+  background:
+    radial-gradient(70% 90% at 10% 110%, #9fe7ff 0%, transparent 60%),
+    radial-gradient(60% 80% at 92% 100%, #c8a8ff 0%, transparent 62%),
+    radial-gradient(80% 70% at 55% -10%, #a9c4ff 0%, transparent 70%),
+    linear-gradient(180deg, #c9d8ff, #f3d6f0);
+}
+
+.window {
+  position: relative;
+  overflow: hidden;
+  border-radius: clamp(8px, 1vw, 14px);
+  background: #1c1c1f;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 40px 90px -36px rgba(10, 10, 30, 0.75);
+}
+
+.video {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: pointer;
+}
+
+.play {
+  position: absolute;
+  left: clamp(10px, 1.6vw, 20px);
+  bottom: clamp(10px, 1.6vw, 20px);
+  display: grid;
+  place-items: center;
+  width: clamp(36px, 3.4vw, 46px);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0a0a0d;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 260ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.play:hover {
+  transform: scale(1.06);
+}
+
+.play svg {
+  width: 42%;
+  height: 42%;
+  fill: currentColor;
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  background: linear-gradient(90deg, #00eeff, #0e8aff 30%, #703cff 60%, #ff4ac0);
+}
+
+.caption {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  max-width: 62ch;
+  min-height: 3.2em;
+  margin: clamp(20px, 3svh, 28px) 0 0;
+  font-size: clamp(17px, 1.3vw, 20px);
+  font-weight: 520;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  color: var(--h-ink);
+}
+
+.caption time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 640;
+  color: var(--h-accent);
+}
+
+.made {
+  max-width: 70ch;
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.008em;
+  color: var(--h-muted);
+}
+
+/* Steps-only guides: the prompt itself is the visual. */
+.stageNote {
+  max-width: 62ch;
+  margin: clamp(18px, 2.6svh, 24px) 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--h-muted);
+}
+
+/* ── Sections, laid out like the home page's Questions ─ */
+
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(32px, 6vw, 120px);
+  padding: clamp(96px, 14svh, 170px) var(--l-margin) 0;
+}
+
+.sectionHead {
+  position: relative;
+}
+
+.page .h2 {
+  position: sticky;
+  top: clamp(96px, 14svh, 140px);
+  margin: 0;
+  font-size: clamp(42px, 5vw, 92px);
+  font-weight: 820;
+  line-height: 0.88;
+  letter-spacing: -0.062em;
+  text-wrap: balance;
+}
+
+.lead {
+  max-width: 34ch;
+  margin: 0;
+  font-size: clamp(21px, 1.9vw, 30px);
+  font-weight: 560;
+  line-height: 1.28;
+  letter-spacing: -0.025em;
+  color: var(--h-ink);
+}
+
+.answer {
+  max-width: 54ch;
+  margin: 0;
+  font-size: clamp(19px, 1.45vw, 23px);
+  font-weight: 480;
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+  color: #26262d;
+}
+
+.text {
+  max-width: 62ch;
+  margin: 18px 0 0;
+  font-size: clamp(16px, 1.15vw, 18.5px);
+  line-height: 1.55;
+  letter-spacing: -0.008em;
+  color: var(--h-body);
+}
+
+.answer a,
+.text a,
+.rows a,
+.lead a,
+.result a {
+  color: var(--h-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--h-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color 150ms ease;
+}
+
+.answer a:hover,
+.text a:hover,
+.rows a:hover,
+.lead a:hover,
+.result a:hover {
+  color: var(--h-accent);
+}
+
+.page code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(10, 10, 13, 0.06);
+  font-family: inherit;
+  font-size: 0.92em;
+  font-weight: 560;
+  color: var(--h-ink);
+  overflow-wrap: anywhere;
+}
+
+/* What happened */
+
+.result {
+  max-width: 50ch;
+  margin: 0;
+  font-size: clamp(20px, 1.7vw, 26px);
+  font-weight: 520;
+  line-height: 1.38;
+  letter-spacing: -0.022em;
+  color: var(--h-ink);
+}
+
+.timeline {
+  margin: clamp(30px, 4svh, 44px) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--h-line);
+}
+
+.timeline button {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 15px 0;
+  border: 0;
+  border-bottom: 1px solid var(--h-line);
+  background: none;
+  font: inherit;
+  font-size: clamp(16px, 1.1vw, 17.5px);
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  text-align: left;
+  color: var(--h-body);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.timeline button:hover {
+  color: var(--h-ink);
+}
+
+.timeline time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--h-muted);
+}
+
+.timeline button[data-current] {
+  color: var(--h-ink);
+}
+
+.timeline button[data-current] time {
+  color: var(--h-accent);
+}
+
+.figure {
+  margin: clamp(30px, 4svh, 44px) 0 0;
+}
+
+.frame {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #1c1c1f;
+  box-shadow: 0 0 0 1px var(--h-line), 0 40px 80px -40px rgba(30, 30, 80, 0.45);
+}
+
+.frame img,
+.frame video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.figure[data-tall] .frame {
+  max-width: 360px;
+}
+
+.figure figcaption {
+  margin-top: 14px;
+  max-width: 60ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--h-muted);
+}
+
+/* Numbered rows: what Stella does, and the manual way */
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--h-line);
+  counter-reset: row;
+}
+
+.rows > li {
+  position: relative;
+  padding: clamp(20px, 2.6svh, 28px) 0 clamp(20px, 2.6svh, 28px) 48px;
+  border-bottom: 1px solid var(--h-line);
+  counter-increment: row;
+  font-size: clamp(16px, 1.15vw, 18.5px);
+  line-height: 1.55;
+  letter-spacing: -0.008em;
+  color: var(--h-body);
+}
+
+.rows > li::before {
+  content: counter(row);
+  position: absolute;
+  left: 0;
+  top: clamp(20px, 2.6svh, 28px);
+  width: 28px;
+  font-size: clamp(16px, 1.15vw, 18.5px);
+  font-weight: 700;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  color: var(--h-accent);
+}
+
+.rows[data-plain] > li {
+  padding-left: 0;
+}
+
+.rows[data-plain] > li::before {
+  content: none;
+}
+
+.page .rowTitle {
+  margin: 0 0 6px;
+  font-size: clamp(18px, 1.5vw, 23px);
+  font-weight: 640;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: var(--h-ink);
+}
+
+.rows p {
+  margin: 0;
+}
+
+/* The prompt, as Stella's composer */
+
+.prompt {
+  position: relative;
+  max-width: 640px;
+  padding: clamp(20px, 2.2vw, 28px) clamp(20px, 2.2vw, 28px) clamp(16px, 1.6vw, 20px);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px var(--h-line),
+    0 30px 70px -36px rgba(40, 20, 120, 0.45);
+}
+
+.wall .prompt {
+  margin: 0 auto;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 40px 90px -40px rgba(20, 10, 60, 0.6);
+}
+
+.page .promptText {
+  margin: 0;
+  font-size: clamp(19px, 1.6vw, 24px);
+  font-weight: 540;
+  line-height: 1.38;
+  letter-spacing: -0.02em;
+  color: var(--h-ink);
+}
+
+.promptBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: clamp(18px, 2vw, 24px);
+}
+
+.promptHint {
+  font-size: 14.5px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--h-muted);
+}
+
+.copy {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #0a0a0d;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 640;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 12px 28px -14px rgba(40, 20, 120, 0.55);
+  transition: transform 260ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.copy:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: clamp(30px, 4svh, 40px) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  font-weight: 560;
+  letter-spacing: -0.012em;
+}
+
+.sources a {
+  color: var(--h-muted);
+  transition: color 160ms ease;
+}
+
+.sources a:hover {
+  color: var(--h-ink);
+}
+
+.checked {
+  margin: 14px 0 0;
+  font-size: 15px;
+  color: var(--h-muted);
+}
+
+/* ── Guide cards (index, hubs, "More guides") ─────────── */
+
+.group {
+  padding: clamp(96px, 14svh, 170px) var(--l-margin) 0;
+}
+
+.groupHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: clamp(30px, 4.4svh, 52px);
+}
+
+.groupHead .h2 {
+  position: static;
+}
+
+.groupLink {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--h-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--h-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: clamp(36px, 4vw, 56px) clamp(20px, 2.4vw, 36px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: block;
+  color: inherit;
+}
+
+.thumb {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: 18px;
+  background: #1c1c1f;
+  box-shadow: 0 0 0 1px var(--h-line), 0 30px 60px -36px rgba(30, 30, 80, 0.5);
+  transition:
+    transform 500ms cubic-bezier(0.2, 1, 0.3, 1),
+    box-shadow 500ms ease;
+}
+
+.card:hover .thumb {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 1px var(--h-line), 0 40px 70px -34px rgba(60, 30, 160, 0.55);
+}
+
+.thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0;
+  transform: scale(1.7);
+  transform-origin: 50% 2%;
+}
+
+.thumbPlay {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0a0a0d;
+  box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.5);
+  transition: transform 260ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.card:hover .thumbPlay {
+  transform: scale(1.08);
+}
+
+.thumbPlay svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.thumbWall {
+  background:
+    radial-gradient(70% 90% at 10% 110%, #9fe7ff 0%, transparent 60%),
+    radial-gradient(60% 80% at 92% 100%, #c8a8ff 0%, transparent 62%),
+    radial-gradient(80% 70% at 55% -10%, #a9c4ff 0%, transparent 70%),
+    linear-gradient(180deg, #c9d8ff, #f3d6f0);
+}
+
+.thumbPrompt {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+.thumbPrompt p {
+  margin: 0;
+  max-width: 300px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 24px 50px -24px rgba(20, 10, 60, 0.6);
+}
+
+.thumbPrompt p span {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 520;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+  color: #0a0a0d;
+}
+
+
+
+.page .cardTitle {
+  margin: 20px 0 0;
+  font-size: clamp(20px, 1.6vw, 24px);
+  font-weight: 680;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.cardLede {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: var(--h-body);
+}
+
+.cardMeta {
+  display: block;
+  margin-top: 12px;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--h-accent);
+}
+
+.niches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 34px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.niches a {
+  font-size: clamp(24px, 2.6vw, 40px);
+  font-weight: 760;
+  letter-spacing: -0.045em;
+  color: rgba(10, 10, 13, 0.32);
+  transition: color 200ms ease;
+}
+
+.niches a:hover {
+  color: var(--h-ink);
+}
+
+.end {
+  height: clamp(110px, 16svh, 200px);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+@media (max-width: 900px) {
+  .section {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .page .h2 {
+    position: static;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero {
+    padding-top: clamp(92px, 14.5svh, 130px);
+  }
+
+  .page .title,
+  .page .title[data-long] {
+    max-width: none;
+    font-size: clamp(38px, 10.6vw, 56px);
+    line-height: 0.92;
+    letter-spacing: -0.055em;
+  }
+
+  .page .sub {
+    font-size: 19px;
+  }
+
+  .stage {
+    margin-top: 44px;
+    padding: 0 12px;
+    max-width: calc(100% - 24px);
+  }
+
+  .stage > .caption,
+  .stage > .made,
+  .stage > .stageNote {
+    padding: 0 calc(var(--l-margin) - 12px);
+  }
+
+  .wall {
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .wall[data-prompt] {
+    padding: 34px 14px;
+  }
+
+  .section,
+  .group {
+    padding-top: 88px;
+  }
+
+  .page .h2 {
+    font-size: clamp(40px, 11vw, 54px);
+  }
+
+  .rows > li {
+    padding-left: 36px;
+  }
+
+  .promptBar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back,
+  .page .title,
+  .page .sub,
+  .stage {
+    animation: none;
+  }
+
+  .thumb,
+  .copy,
+  .play {
+    transition: none;
+  }
+}

@@ -12,5 +12,5 @@ export function generateStaticParams() {
 
 export default async function Image({ params }: { params: Promise<{ niche: string }> }) {
   const niche = getNiche((await params).niche)!;
-  return problemOgImage({ eyebrow: `How-to · ${niche.name}`, headline: niche.h1 });
+  return problemOgImage({ eyebrow: `${niche.name} guides`, headline: niche.h1 });
 }

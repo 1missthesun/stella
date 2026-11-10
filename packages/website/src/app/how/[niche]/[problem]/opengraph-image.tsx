@@ -16,7 +16,7 @@ export default async function Image({ params }: { params: Promise<{ niche: strin
   const page = getProblemPage(niche, problem)!;
   const proof = page.proof;
   return problemOgImage({
-    eyebrow: `How-to · ${getNiche(page.niche)?.name}`,
+    eyebrow: `${getNiche(page.niche)?.name} guide`,
     headline: page.h1,
     note:
       proof.kind === "steps-only"

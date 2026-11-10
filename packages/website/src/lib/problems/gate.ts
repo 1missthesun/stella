@@ -123,6 +123,8 @@ export function checkProblemPages(
       `description is ${page.description.length} characters (110–170)`,
     );
     need(page.short.length <= 48, "short label over 48 characters");
+    need(page.lede.length >= 20 && page.lede.length <= 90, `lede is ${page.lede.length} characters (20–90)`);
+    need(!/stella/i.test(page.lede), "lede names the product; the answer does that, with stella.sh");
 
     // The H1 is the search in the reader's words: it must share most of the
     // main phrase's meaningful words.

@@ -2,17 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ProofMoment } from "@/lib/problems/types";
-import s from "./problems.module.css";
+import h from "./how.module.css";
 
 const stamp = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
+const SEEK = "how:seek";
+const TIME = "how:time";
+
+const momentAt = (moments: ProofMoment[], t: number) => {
+  let index = 0;
+  moments.forEach((moment, i) => {
+    if (moment.at <= t + 0.05) index = i;
+  });
+  return index;
+};
+
 /**
- * A real recording of Stella doing the task, with its transcript as a list of
- * moments: clicking one jumps the video there, and the moment playing is marked.
- * Plays muted once it's on screen (unless the reader prefers reduced motion).
+ * The real recording, framed as a window on a wallpaper like the home page's
+ * product visuals. No browser video chrome: a play/pause button, a thin
+ * progress line, and the moment playing written out underneath, so the story
+ * reads on a phone where the app's own text is too small to read.
  */
-export function ProofVideo({
+export function RecordingStage({
   src,
   poster,
   captions,
@@ -20,6 +32,7 @@ export function ProofVideo({
   height,
   label,
   moments,
+  made,
 }: {
   src: string;
   poster: string;
@@ -28,14 +41,26 @@ export function ProofVideo({
   height: number;
   label: string;
   moments: ProofMoment[];
+  made: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const barRef = useRef<HTMLElement>(null);
   const [current, setCurrent] = useState(0);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const onSeek = (event: Event) => {
+      const at = (event as CustomEvent<number>).detail;
+      video.currentTime = at;
+      video.play().catch(() => {});
+      video.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    window.addEventListener(SEEK, onSeek);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return () => window.removeEventListener(SEEK, onSeek);
+    }
     let started = false;
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -50,61 +75,143 @@ export function ProofVideo({
       { threshold: 0.5 },
     );
     io.observe(video);
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      window.removeEventListener(SEEK, onSeek);
+    };
   }, []);
 
   const onTime = () => {
-    const t = ref.current?.currentTime ?? 0;
-    let index = 0;
-    moments.forEach((moment, i) => {
-      if (moment.at <= t + 0.05) index = i;
-    });
-    setCurrent(index);
-  };
-
-  const seek = (at: number) => {
     const video = ref.current;
     if (!video) return;
-    video.currentTime = at;
-    video.play().catch(() => {});
+    const t = video.currentTime;
+    barRef.current?.style.setProperty("--p", String(video.duration ? t / video.duration : 0));
+    const index = momentAt(moments, t);
+    setCurrent(index);
+    window.dispatchEvent(new CustomEvent(TIME, { detail: index }));
   };
 
+  const toggle = () => {
+    const video = ref.current;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
+  };
+
+  const moment = moments[current];
+
   return (
-    <div className={s.proofPlayer}>
-      <div className={s.videoFrame} style={{ aspectRatio: `${width} / ${height}` }}>
-        <video
-          ref={ref}
-          className={s.video}
-          src={src}
-          poster={poster}
-          width={width}
-          height={height}
-          muted
-          playsInline
-          loop
-          controls
-          preload="metadata"
-          aria-label={label}
-          onTimeUpdate={onTime}
-        >
-          <track kind="captions" src={captions} srcLang="en" label="English" default />
-        </video>
+    <>
+      <div className={h.wall}>
+        <div className={h.window} style={{ aspectRatio: `${width} / ${height}` }}>
+          <video
+            ref={ref}
+            className={h.video}
+            src={src}
+            poster={poster}
+            width={width}
+            height={height}
+            muted
+            playsInline
+            loop
+            preload="metadata"
+            aria-label={label}
+            onClick={toggle}
+            onTimeUpdate={onTime}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+          >
+            <track kind="captions" src={captions} srcLang="en" label="English" default />
+          </video>
+          <button type="button" className={h.play} onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
+            {playing ? (
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6" y="5" width="4" height="14" rx="1.2" />
+                <rect x="14" y="5" width="4" height="14" rx="1.2" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 4.6v14.8c0 .8.9 1.3 1.6.9l11.6-7.4c.6-.4.6-1.3 0-1.7L8.6 3.8C7.9 3.3 7 3.8 7 4.6z" />
+              </svg>
+            )}
+          </button>
+          <span className={h.progress} aria-hidden="true">
+            <i ref={barRef} />
+          </span>
+        </div>
       </div>
-      <ol className={s.moments} aria-label="What happens in the recording">
-        {moments.map((moment, i) => (
-          <li key={moment.at}>
-            <button
-              type="button"
-              className={s.moment}
-              data-current={i === current ? "" : undefined}
-              onClick={() => seek(moment.at)}
-            >
-              <span className={s.momentAt}>{stamp(moment.at)}</span>
-              <span>{moment.text}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
+      <p className={h.caption} aria-hidden="true">
+        <time>{stamp(moment.at)}</time>
+        <span>{moment.text}</span>
+      </p>
+      <p className={h.made}>{made}</p>
+    </>
+  );
+}
+
+/** The recording's moments as a list; each one jumps the video there. */
+export function MomentList({ moments }: { moments: ProofMoment[] }) {
+  const [current, setCurrent] = useState(0);
+  useEffect(() => {
+    const onTime = (event: Event) => setCurrent((event as CustomEvent<number>).detail);
+    window.addEventListener(TIME, onTime);
+    return () => window.removeEventListener(TIME, onTime);
+  }, []);
+  return (
+    <ol className={h.timeline} aria-label="What happens in the recording">
+      {moments.map((moment, i) => (
+        <li key={moment.at}>
+          <button
+            type="button"
+            data-current={i === current ? "" : undefined}
+            onClick={() => window.dispatchEvent(new CustomEvent(SEEK, { detail: moment.at }))}
+          >
+            <time>{stamp(moment.at)}</time>
+            <span>{moment.text}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** A file Stella made (e.g. the captioned video), framed, with the same quiet play button. */
+export function OutputVideo({ src, poster, width, height }: { src: string; poster: string; width: number; height: number }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const toggle = () => {
+    const video = ref.current;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
+  };
+  return (
+    <div className={h.frame} style={{ position: "relative" }}>
+      <video
+        ref={ref}
+        src={src}
+        poster={poster}
+        width={width}
+        height={height}
+        playsInline
+        preload="none"
+        onClick={toggle}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        style={{ cursor: "pointer" }}
+      />
+      <button type="button" className={h.play} onClick={toggle} aria-label={playing ? "Pause" : "Play the video Stella made"}>
+        {playing ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="6" y="5" width="4" height="14" rx="1.2" />
+            <rect x="14" y="5" width="4" height="14" rx="1.2" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 4.6v14.8c0 .8.9 1.3 1.6.9l11.6-7.4c.6-.4.6-1.3 0-1.7L8.6 3.8C7.9 3.3 7 3.8 7 4.6z" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 }

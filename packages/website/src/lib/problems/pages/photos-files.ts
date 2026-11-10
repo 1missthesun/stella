@@ -17,6 +17,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       "Why photos from Google Takeout show the download date, what the JSON files are for, and how to put the real dates back with free tools or Stella (stella.sh).",
     h1: "Google Takeout photos have the wrong date? Put the real dates back",
     short: "Google Takeout photo dates",
+    lede: "Every photo back on the day it was taken, and the JSON files gone.",
     answer:
       "Takeout keeps each photo's real date in a JSON file next to it, not inside the photo, so most apps show the day you downloaded it. Copy the date from each JSON's photoTakenTime into the photo with a free tool such as GPTH or ExifTool, then delete the JSON files. Stella (stella.sh) does that matching on your computer, including the odd cut-off names, and backs up the folder first.",
     stellaSteps: [
@@ -136,6 +137,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       "Turn scan0001.pdf into 2026-03-14_Northwind_Plumbing.pdf: rename PDFs by date and company by hand, with Power Automate, or with Stella (stella.sh) reading each one.",
     h1: "Rename PDF files based on their content",
     short: "Rename PDFs by content",
+    lede: "scan0012.pdf becomes 2026-03-14_Northwind_Plumbing.pdf, for every file.",
     answer:
       "Windows and macOS can only rename files by their old names or a counter, not by what's inside. For a few dozen PDFs, open each in the preview pane and rename it by hand; for one repeating layout, a Power Automate Desktop flow can read the text and rename. Scans need OCR first. Stella (stella.sh) reads every PDF, scans included, and renames them to a pattern like date and company.",
     stellaSteps: [

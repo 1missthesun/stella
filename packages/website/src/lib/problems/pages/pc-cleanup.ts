@@ -17,6 +17,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       "Sort a cluttered Downloads folder into tidy folders, find duplicates and old installers, and clear space safely, by hand or with Stella (stella.sh) waiting for your OK.",
     h1: "Organize a messy Downloads folder",
     short: "Sort a messy Downloads folder",
+    lede: "Everything sorted into folders and the duplicates found, with nothing lost.",
     answer:
       "Sort the folder by type, move documents, pictures, videos and archives into their own folders, then delete installers you've already used and the duplicate copies with “(1)” in the name. Windows can also clear old downloads automatically. Stella (stella.sh) does the sorting on your computer, finds true duplicates by their contents rather than their names, and deletes nothing until you say so.",
     stellaSteps: [
@@ -141,6 +142,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       "Free up a C drive that's full for no reason: find the hidden space users (updates, restore points, hibernation, caches) and clean safely, or use Stella (stella.sh).",
     h1: "How to free up space on C drive when it's full for no reason",
     short: "Free up space on C drive",
+    lede: "Find the hidden gigabytes and get them back, safely.",
     answer:
       "When the C drive fills up “for no reason”, the space is usually in places File Explorer doesn't show: Windows Update leftovers, restore points, the hibernation file, temp folders, old iPhone backups and game caches. Settings › System › Storage and Disk Cleanup's “Clean up system files” recover most of it, and a free tool like WizTree shows the rest. Stella (stella.sh) measures all of it on your PC, explains each item and cleans only what you approve.",
     stellaSteps: [

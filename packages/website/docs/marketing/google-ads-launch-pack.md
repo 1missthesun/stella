@@ -157,7 +157,7 @@ as `alternative`, `vs`, or `pricing`.
 
 ## Google Ads account status
 
-- Stella account: `439-929-3264` under `lolruuxi@gmail.com`.
+- Stella account: `439-929-3264` under the owner's Google account.
 - Billing: United States, Phoenix time zone, USD; advertiser verification is
   complete under FromYou, LLC.
 - `US | Search | Personal Work` is active at $57.56/day.

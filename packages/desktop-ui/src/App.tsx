@@ -18,7 +18,7 @@ const AUTO_REPAIR_SIGNATURE_KEY = "stella:auto-repair:last-signature";
 // matching channels fire-and-forget — if the renderer isn't subscribed at the
 // moment of `webContents.send(...)`, the event is silently dropped:
 //   * UserAskEventsLayer → `userAsk:opened` / `userAsk:updated` /
-//     `userAsk:closed` (an agent is blocked on an answer from Rahul; a
+//     `userAsk:closed` (an agent is blocked on an answer from the user; a
 //     dropped event leaves the ask invisible until the next window reopen)
 //   * RemoteExecutionConsentLayer → `execution:remoteExecutionRequest` (the
 //     owner gate asked this computer whether work may run here; a dropped

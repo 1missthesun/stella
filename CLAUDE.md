@@ -112,7 +112,7 @@ without asking.
   sign-in link in its `detail`) and pass it with `use_secure_value`.
   Raw sign-in tokens, saved secure values, connector tokens and engine or
   provider keys stay in the modules that own them; a change that hands one
-  to a renderer, agent, model, log, client or new host needs Rahul's
+  to a renderer, agent, model, log, client or new host needs the owner's
   explicit go-ahead.
 - **Bun 1.4.x.** CI runs 1.4.2 and `eas.json` pins 1.4.0. Some shells default
   to an older bun (mise's 1.3.14 on omarchy); Stella's own is

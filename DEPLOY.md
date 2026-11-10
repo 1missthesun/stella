@@ -425,10 +425,10 @@ Access, so it refuses admin calls with 403. The Worker checks the JWT against
 answers 503. Dev and Previews are bearer-only.
 
 Scripts send the service token from `STELLA_CF_ACCESS_CLIENT_ID` and
-`STELLA_CF_ACCESS_CLIENT_SECRET` when they are set. On Rahul's Mac they are in the
+`STELLA_CF_ACCESS_CLIENT_SECRET` when they are set. On the owner's Mac they are in the
 keychain (services `stella-prod-cf-access-client-id` and
 `stella-prod-cf-access-client-secret`, and the prod admin bearer under
-`stella-prod-admin-api-secret`, all with account `rahul`):
+`stella-prod-admin-api-secret`, all under the same keychain account, as below):
 
 ```bash
 export STELLA_CF_ACCESS_CLIENT_ID="$(security find-generic-password -s stella-prod-cf-access-client-id -a rahul -w)"
@@ -785,6 +785,28 @@ production` then `eas submit`, per platform. Apple rejects a submission that reu
 `Release track: production` — it falls back to internal when the profile says nothing.
 ASC app id `6761148311`, Apple team `7UVYHQ763X`, Android package `com.fromyou.stella`.
 
+### App Store review contact
+
+The App Store listing is pushed with `eas metadata:push` (iOS only). The listing
+text lives in `packages/mobile/store.config.json`; `eas.json` points the submit
+profiles' `metadataPath` at `packages/mobile/store.config.js`, which adds the App
+Review contact (first name, last name, phone, optionally email) at push time. That
+contact is a person, so it is **not in the repo**. It comes from, field by field:
+
+1. `STELLA_ASC_REVIEW_FIRST_NAME`, `STELLA_ASC_REVIEW_LAST_NAME`,
+   `STELLA_ASC_REVIEW_PHONE`, `STELLA_ASC_REVIEW_EMAIL` (email defaults to the
+   one in `store.config.json`), then
+2. a JSON file `{ "firstName", "lastName", "phone", "email"? }` at
+   `$STELLA_ASC_REVIEW_CONTACT_FILE`, default
+   `~/.config/stella-dev/app-store-review-contact.json` (mode 600, outside the repo).
+
+Each machine that pushes the listing needs that file (or the env vars); one without gets a clear error from
+`eas metadata:push` / `eas metadata:lint`, never a blank contact. `eas metadata:pull`
+writes the live contact back into `store.config.json`: delete
+`apple.review.{firstName,lastName,phone}` from it before committing — `store.config.js`
+refuses to push while they are there. Check the merged config with
+`bunx eas-cli metadata:lint --profile production` from `packages/mobile`.
+
 Whether a submission happened is the **App Store version's** review state, not the
 build's: a build row can read "Ready to Submit" in TestFlight while the version itself
 is "Waiting for Review", and the public-build resolver only ever reports what is already
@@ -803,7 +825,7 @@ the fastest way to run or re-read a submission.
 Two traps there. **The ASC key EAS submits with is not allowed to create a
 version**: the `stella-ai` key (`V5TBYBR59A`) can read, but `POST
 /v1/appStoreVersions` answers 403 `the API key in use does not allow this
-request`. The ADMIN key lives on the **`ruuxilol`** account (`3K28358BZB`) on the
+request`. The ADMIN key lives on the owner's personal Expo account (`3K28358BZB`) on the
 same issuer, so pick the key whose `roles` contain `ADMIN` rather than the one
 the submit profile uses. And review submission is the modern three-call flow —
 `reviewSubmissions`, then `reviewSubmissionItems`, then PATCH `submitted: true` —
@@ -828,7 +850,7 @@ curl -s https://auth.stella.sh/readyz                                          #
 curl -s https://auth.stella.sh/.well-known/stella | jq .version                # the server-* tag you just pushed
 ```
 
-Then one real cloud turn on Stella's own model, as the owner (Rahul's prod
+Then one real cloud turn on Stella's own model, as the owner (the owner's prod
 account), from any Stella agent or chat:
 
 ```js

@@ -1,6 +1,6 @@
 # iOS
 
-The iOS path builds and drives Stella on the iOS Simulator on the user's Mac with `.agents/skills/verify-stella/scripts/control-stella-ios.sh`, run on the Mac from its checkout (`/Users/rahulnanda/projects/stella-v2`; `STELLA_IOS_MAC_REPO` overrides). An agent elsewhere moves itself to the Mac for iOS work. Cloud environments cannot reach it; report that as a blocker.
+The iOS path builds and drives Stella on the iOS Simulator on the user's Mac with `.agents/skills/verify-stella/scripts/control-stella-ios.sh`, run on the Mac from its checkout (`~/projects/stella-v2`; `STELLA_IOS_MAC_REPO` overrides). An agent elsewhere moves itself to the Mac for iOS work. Cloud environments cannot reach it; report that as a blocker.
 
 ## Sub-features
 

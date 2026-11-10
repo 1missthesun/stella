@@ -44,5 +44,5 @@ not prompt-manifest compatibility entries.
 
 ## Reference
 
-- Pi docs: `/Users/rahulnanda/projects/pi-mono/packages/coding-agent/docs`
-- Pi subagent example: `/Users/rahulnanda/projects/pi-mono/packages/coding-agent/examples/extensions/subagent`
+- Pi docs: `<path-to>/pi-mono/packages/coding-agent/docs`
+- Pi subagent example: `<path-to>/pi-mono/packages/coding-agent/examples/extensions/subagent`

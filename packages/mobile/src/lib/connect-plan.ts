@@ -9,7 +9,7 @@ import { openDrawer, useDrawerOpen } from "./drawer";
  * cloud on its ChatGPT plan (cloud Claude needs a paid plan), so the offer
  * opens the chat settings panel on ChatGPT. Once ChatGPT is connected the
  * chat switches to it and the message that didn't go through comes back
- * into the composer, one tap from sending. Off until Rahul's go
+ * into the composer, one tap from sending. Off until the owner gives an explicit go-ahead
  * (`@stella/contracts/connect-plan-offer`).
  */
 export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_ENABLED;

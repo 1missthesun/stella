@@ -13,7 +13,7 @@ import type { ConnectPlanNoticeState, ConnectPlanReason } from "./connect-plan-t
 
 export type { ConnectPlanNoticeState, ConnectPlanReason } from "./connect-plan-types";
 
-/** Off until Rahul's go; see `@stella/contracts/connect-plan-offer`. */
+/** Off until the owner gives an explicit go-ahead; see `@stella/contracts/connect-plan-offer`. */
 export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_ENABLED;
 
 /**

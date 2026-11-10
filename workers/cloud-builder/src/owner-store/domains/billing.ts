@@ -896,7 +896,7 @@ export const setAdminPlan = (
     usageMode?: "default" | "unlimited";
     resetUsage?: boolean;
     spendAllowance?: boolean;
-    // A plan granted outside Stripe (Rahul's own account): detach any Stripe
+    // A plan granted outside Stripe (e.g. the owner's own account): detach any Stripe
     // subscription so its later events can't move the plan.
     complimentary?: boolean;
   },

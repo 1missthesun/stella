@@ -3,7 +3,7 @@
  * first thing Stella offers is the ChatGPT or Claude plan the person already
  * has (free to use with Stella), and plans/credit second.
  *
- * Switched OFF until Rahul's go. It gates the desktop app, the web chat and
+ * Switched OFF until the owner gives an explicit go-ahead. It gates the desktop app, the web chat and
  * the phone app (the offer card, its copy, the near-the-limit heads-up) and
  * the wording of the limit message itself, so a desktop publish, a phone OTA
  * or a backend deploy that sweeps this code in changes nothing for users.

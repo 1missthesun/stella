@@ -43,7 +43,7 @@ const BLOCKER_LABELS: Record<DeviceExecutionBlocker, string> = {
 };
 
 /** A computer's name as the top bar shows it: without the network suffix
-    macOS and routers add ("Rahuls-MacBook-Air.local"). The picker and the
+    macOS and routers add ("Someones-MacBook-Air.local"). The picker and the
     tooltip keep the full name. */
 const shortDeviceName = (name: string): string =>
   name.replace(/\.(?:local|lan|home|localdomain)$/iu, "") || name;

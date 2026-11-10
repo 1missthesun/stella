@@ -48,6 +48,12 @@ body[data-display-expanding="true"] .shell-topbar-full,
   -webkit-app-region: drag;
 }
 
+/* The tabs may run on over the empty part of the middle column, as far as
+   the centred activity mark (measured in open-tab-notch.ts). */
+.shell-topbar-full--tabs .shell-topbar-full__left {
+  margin-inline-end: calc(var(--topbar-tabs-reach, 0px) * -1);
+}
+
 .shell-topbar-full[data-platform="mac"] .shell-topbar-full__left {
   padding-left: 84px;
 }

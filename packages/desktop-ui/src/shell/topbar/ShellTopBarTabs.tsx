@@ -26,6 +26,8 @@ import { MessageSquare, Plus, X } from "@/ui/icons";
 import { displaySearchStore } from "@/features/workspace-display/display-search-store";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { NewTabMenu } from "./NewTabMenu";
+import { useTabReorder } from "./use-tab-reorder";
+import { useOpenTabNotch, useTabStripReach } from "./open-tab-notch";
 import "./shell-topbar-tabs.css";
 
 /**
@@ -48,6 +50,10 @@ export function ShellTopBarTabs() {
     cloudAppTitles.getSnapshot,
   ).titles;
   const stripRef = useRef<HTMLDivElement>(null);
+  const tabIds = tabs.map((tab) => tab.id).join("\n");
+  const onTabPointerDown = useTabReorder(stripRef, tabIds);
+  useOpenTabNotch(stripRef, tabIds);
+  useTabStripReach(stripRef);
   const chatActive = !panelOpen;
   const [menuOpen, setMenuOpenState] = useState(false);
   const setMenuOpen = (next: boolean) => {
@@ -62,7 +68,8 @@ export function ShellTopBarTabs() {
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeTabId, panelOpen]);
 
-  // Fade a tab's title only when it is actually cut off.
+  // Fade a tab's title only when it is actually cut off, and note how far
+  // the tabs have been narrowed (the close button moves; see the CSS).
   useEffect(() => {
     const strip = stripRef.current;
     if (!strip) return;
@@ -73,6 +80,13 @@ export function ShellTopBarTabs() {
         const clipped = label.scrollWidth > label.clientWidth + 1;
         if (clipped) label.dataset.clipped = "true";
         else delete label.dataset.clipped;
+      }
+      for (const tab of strip.querySelectorAll<HTMLElement>("[data-tab-id]")) {
+        const width = tab.offsetWidth;
+        if (width < 60) tab.dataset.compact = "true";
+        else delete tab.dataset.compact;
+        if (width >= 60 && width < 104) tab.dataset.tight = "true";
+        else delete tab.dataset.tight;
       }
     };
     const observer = new ResizeObserver(mark);
@@ -184,6 +198,7 @@ export function ShellTopBarTabs() {
               data-tab-id={tab.id}
               data-active={active ? "true" : undefined}
               data-unread={tab.unread ? "true" : undefined}
+              onPointerDown={(event) => onTabPointerDown(event, tab.id)}
             >
               <button
                 type="button"

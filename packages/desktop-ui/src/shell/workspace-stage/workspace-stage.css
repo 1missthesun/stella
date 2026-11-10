@@ -10,7 +10,8 @@
 .workspace-stage,
 .file-viewer[data-mode="stage"] {
   position: fixed;
-  top: calc(var(--shell-topbar-height, 38px) + 2px);
+  /* The top edge is the bar's last pixel, so the open tab runs into it. */
+  top: calc(var(--shell-topbar-height, 38px) - 1px);
   left: var(--workspace-stage-inset);
   right: var(--workspace-stage-inset);
   bottom: var(--workspace-stage-bottom, 14px);
@@ -21,25 +22,21 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--panel-surface-border, var(--border));
+  border: 1px solid transparent;
   border-radius: var(--workspace-stage-radius);
-  background: var(--background);
   box-shadow: var(--shadow-lg);
   container-type: inline-size;
   container-name: workspace-stage;
-  transition:
-    opacity 160ms ease-out,
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Fades in place: its top edge is joined to the open tab. */
+  transition: opacity 160ms ease-out;
 }
 
 .workspace-stage[data-visible="false"] {
   opacity: 0;
-  transform: translateY(6px) scale(0.995);
   pointer-events: none;
   visibility: hidden;
   transition:
     opacity 120ms ease-in,
-    transform 120ms ease-in,
     visibility 0s linear 120ms;
 }
 
@@ -91,6 +88,39 @@
 .file-viewer[data-mode="stage"] {
   z-index: 62;
   box-shadow: var(--shadow-lg);
+}
+
+.workspace-stage,
+.file-viewer[data-mode="stage"] {
+  /* The edge is painted in the border area rather than as a border, so the
+     top edge can stop under the open tab (the top bar reports where it
+     stands) and start again past it: the tab and the stage are one surface,
+     with nothing drawn across the tab's base. */
+  --stage-edge: var(--panel-surface-border, var(--border));
+  --stage-notch-left: max(
+    0px,
+    var(--topbar-open-tab-left, 0px) - var(--workspace-stage-inset)
+  );
+  --stage-notch-right: max(
+    0px,
+    var(--topbar-open-tab-right, 0px) - var(--workspace-stage-inset)
+  );
+  border-color: transparent;
+  /* The shadow falls to the sides and below only: nothing darkens the bar,
+     so the open tab and the bar around it stay one colour. */
+  clip-path: inset(0 -120px -120px -120px);
+  background:
+    linear-gradient(var(--background), var(--background)) padding-box,
+    linear-gradient(var(--stage-edge), var(--stage-edge)) 0 4px / 100% 100%
+      no-repeat border-box,
+    linear-gradient(
+        to right,
+        var(--stage-edge) var(--stage-notch-left),
+        var(--background) var(--stage-notch-left),
+        var(--background) var(--stage-notch-right),
+        var(--stage-edge) var(--stage-notch-right)
+      )
+      0 0 / 100% 4px no-repeat border-box;
 }
 
 .file-viewer[data-hidden="true"] {

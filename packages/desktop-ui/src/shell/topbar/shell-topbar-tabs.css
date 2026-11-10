@@ -9,13 +9,17 @@
 
 .topbar-tabs__strip {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 2px;
   min-width: 0;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
+  /* Room for the last tab's foot, taken back so + stays beside the tabs. */
+  padding-right: 8px;
+  margin-right: -6px;
   -webkit-app-region: no-drag;
 }
 
@@ -23,62 +27,171 @@
   display: none;
 }
 
+@property --topbar-tab-fade-from {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --topbar-tab-fade-to {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+/* A tab fills the bar's height. Its look is drawn behind the label: a soft
+   pill on hover, and for the tab on the stage an outline in the stage's own
+   colours that runs down into the stage's top edge. */
 .topbar-tabs__tab {
+  --topbar-tab-edge: var(--panel-surface-border, var(--border));
+  --topbar-tab-fill: var(--background);
+  --topbar-tab-foot: 8px;
   position: relative;
   display: flex;
   align-items: center;
   flex: 0 1 auto;
   min-width: 0;
   max-width: 180px;
-  height: 26px;
-  border-radius: 7px;
+  height: 100%;
   color: var(--text-muted, var(--text-weak));
   -webkit-app-region: no-drag;
   transition:
-    background 0.12s ease,
-    color 0.12s ease;
+    color 0.12s ease,
+    --topbar-tab-fade-from 0.12s ease,
+    --topbar-tab-fade-to 0.12s ease;
 }
 
-.topbar-tabs__tab:not(.topbar-tabs__tab--chat) {
+.topbar-tabs__tab::before {
+  content: "";
+  position: absolute;
+  inset: 6px 0;
+  border-radius: 7px;
+  background: transparent;
+  pointer-events: none;
+  transition: background 0.12s ease;
+}
+
+/* Every tab but Chat is the same width whatever its title, as in Chrome.
+   152px holds the longest built-in name in any language beside the icon and
+   the close button; a crowded strip narrows them all together, down to the
+   icon alone, before it scrolls. */
+.topbar-tabs__tab[data-tab-id] {
+  flex: 0 1 152px;
+  width: 152px;
   min-width: 40px;
+  max-width: 152px;
 }
 
-/* Chat stays reachable when many tabs make the strip scroll. */
+/* Chat is the pinned tab: sized to its name, never narrowed, and still
+   reachable when many tabs make the strip scroll. Its backing stops clear
+   of the bar's last pixel, where the stage's edge runs. */
 .topbar-tabs__tab--chat {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 3;
   flex-shrink: 0;
-  background: var(--background);
-}
-
-.topbar-tabs__tab--chat:hover {
-  background: color-mix(in oklch, var(--foreground) 5%, var(--background));
-}
-
-.topbar-tabs__tab--chat[data-active="true"] {
-  background: color-mix(in oklch, var(--foreground) 9%, var(--background));
+  /* With the strip's gap, room for the first tab's foot. */
+  margin-right: 6px;
+  background: linear-gradient(var(--background), var(--background)) top / 100%
+    calc(100% - 2px) no-repeat;
 }
 
 .topbar-tabs__tab:hover {
   color: var(--text-base);
+}
+
+.topbar-tabs__tab:hover::before {
   background: color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
 .topbar-tabs__tab[data-active="true"] {
   color: var(--text-strong);
+}
+
+.topbar-tabs__tab--chat[data-active="true"]::before {
   background: color-mix(in oklch, var(--foreground) 9%, transparent);
 }
 
+/* The tab on the stage: the stage's own fill and edge, open at the base.
+   The stage's top edge stops at this tab's feet (open-tab-notch.ts), so
+   nothing is drawn across the base and nothing here has to hide a line. */
+.topbar-tabs__tab[data-tab-id][data-active="true"] {
+  z-index: 2;
+}
+
+/* Top and sides, down to where the feet begin. */
+.topbar-tabs__tab[data-tab-id][data-active="true"]::before {
+  inset: 6px 0 calc(var(--topbar-tab-foot) + 1px);
+  border: 1px solid var(--topbar-tab-edge);
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  background: var(--topbar-tab-fill);
+  transition: none;
+}
+
+/* The base: fill between the sides, and a foot at each side whose edge
+   curves outward to meet the stage's top edge where it starts again. */
+.topbar-tabs__tab[data-tab-id][data-active="true"]::after {
+  --foot: calc(var(--topbar-tab-foot) + 1px);
+  content: "";
+  position: absolute;
+  left: calc(var(--topbar-tab-foot) * -1);
+  right: calc(var(--topbar-tab-foot) * -1);
+  bottom: 0;
+  height: var(--foot);
+  /* The fill starts under each foot's last pixel, so no gap can open
+     between them at fractional scales. */
+  padding: 0 var(--topbar-tab-foot);
+  box-sizing: border-box;
+  pointer-events: none;
+  /* Each foot is its edge drawn over its own fill, so it is opaque along
+     the curve whatever the edge colour's transparency. */
+  background:
+    radial-gradient(
+        circle at 0 0,
+        transparent calc(var(--topbar-tab-foot) - 0.4px),
+        var(--topbar-tab-edge) calc(var(--topbar-tab-foot) + 0.1px),
+        var(--topbar-tab-edge) calc(var(--topbar-tab-foot) + 0.9px),
+        transparent calc(var(--topbar-tab-foot) + 1.4px)
+      )
+      left bottom / var(--foot) var(--foot) no-repeat border-box,
+    radial-gradient(
+        circle at 100% 0,
+        transparent calc(var(--topbar-tab-foot) - 0.4px),
+        var(--topbar-tab-edge) calc(var(--topbar-tab-foot) + 0.1px),
+        var(--topbar-tab-edge) calc(var(--topbar-tab-foot) + 0.9px),
+        transparent calc(var(--topbar-tab-foot) + 1.4px)
+      )
+      right bottom / var(--foot) var(--foot) no-repeat border-box,
+    radial-gradient(
+        circle at 0 0,
+        transparent calc(var(--topbar-tab-foot) - 0.4px),
+        var(--topbar-tab-fill) calc(var(--topbar-tab-foot) + 0.1px),
+        var(--topbar-tab-fill) calc(var(--topbar-tab-foot) + 0.9px),
+        var(--topbar-tab-fill) calc(var(--topbar-tab-foot) + 1.4px)
+      )
+      left bottom / var(--foot) var(--foot) no-repeat border-box,
+    radial-gradient(
+        circle at 100% 0,
+        transparent calc(var(--topbar-tab-foot) - 0.4px),
+        var(--topbar-tab-fill) calc(var(--topbar-tab-foot) + 0.1px),
+        var(--topbar-tab-fill) calc(var(--topbar-tab-foot) + 0.9px),
+        var(--topbar-tab-fill) calc(var(--topbar-tab-foot) + 1.4px)
+      )
+      right bottom / var(--foot) var(--foot) no-repeat border-box,
+    var(--topbar-tab-fill) content-box;
+}
+
 .topbar-tabs__target {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  height: 100%;
-  padding: 0 9px;
+  height: 26px;
+  padding: 0 10px;
   border: 0;
-  border-radius: inherit;
+  border-radius: 7px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -87,10 +200,26 @@
   cursor: default;
 }
 
-.topbar-tabs__tab:not(.topbar-tabs__tab--chat):hover .topbar-tabs__target,
-.topbar-tabs__tab:not(.topbar-tabs__tab--chat)[data-active="true"]
+/* Room for the close button is always kept, so it never covers the title. */
+.topbar-tabs__tab[data-tab-id] .topbar-tabs__target {
+  flex: 1 1 auto;
+  padding-right: 26px;
+}
+
+/* Narrowed tabs give that room back to the title; their close button takes
+   the icon's place on hover instead (see below). */
+.topbar-tabs__tab[data-tab-id][data-tight="true"]
   .topbar-tabs__target {
-  padding-right: 24px;
+  padding-right: 10px;
+}
+
+.topbar-tabs__tab[data-tab-id][data-compact="true"] .topbar-tabs__target {
+  justify-content: center;
+  padding: 0;
+}
+
+.topbar-tabs__tab[data-tab-id][data-compact="true"] .topbar-tabs__label {
+  display: none;
 }
 
 .topbar-tabs__target:focus-visible {
@@ -104,6 +233,7 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.12s ease;
 }
 
 .topbar-tabs__dot {
@@ -117,51 +247,148 @@
   box-shadow: 0 0 0 1.5px var(--background);
 }
 
+/* A title that is cut off fades at its trailing edge, as Chrome's does. */
 .topbar-tabs__label {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Squeezed tabs fade their title out (as Chrome does) instead of showing a
-   lone ellipsis. */
-.topbar-tabs__tab:not(.topbar-tabs__tab--chat)
-  .topbar-tabs__label[data-clipped="true"] {
   text-overflow: clip;
+  white-space: nowrap;
   mask-image: linear-gradient(
     to right,
-    #000 calc(100% - 16px),
-    transparent calc(100% - 2px)
+    #000 calc(100% - var(--topbar-tab-fade-from)),
+    transparent calc(100% - var(--topbar-tab-fade-to))
   );
 }
 
+.topbar-tabs__tab:has(.topbar-tabs__label[data-clipped="true"]) {
+  --topbar-tab-fade-from: 16px;
+  --topbar-tab-fade-to: 2px;
+}
+
+/* The close button sits in room the tab always keeps for it, so showing it
+   never changes the tab's width. The open tab shows it all the time. */
 .topbar-tabs__close {
   position: absolute;
-  top: 50%;
-  right: 4px;
-  display: none;
+  top: 11px;
+  right: 6px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--text-weak);
-  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
   cursor: default;
+  transition: opacity 0.12s ease;
 }
 
 .topbar-tabs__tab:hover .topbar-tabs__close,
-.topbar-tabs__tab[data-active="true"] .topbar-tabs__close {
-  display: inline-flex;
+.topbar-tabs__tab:has(:focus-visible) .topbar-tabs__close,
+.topbar-tabs__tab[data-active="true"]:not([data-compact="true"], [data-tight="true"])
+  .topbar-tabs__close {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .topbar-tabs__close:hover {
   color: var(--text-strong);
   background: color-mix(in oklch, var(--foreground) 10%, transparent);
+}
+
+.topbar-tabs__close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* A narrowed tab swaps its icon for the close button on hover. */
+.topbar-tabs__tab[data-compact="true"] .topbar-tabs__close {
+  right: calc(50% - 8px);
+}
+
+.topbar-tabs__tab[data-tight="true"]
+  .topbar-tabs__close {
+  right: auto;
+  left: 9px;
+}
+
+.topbar-tabs__tab[data-compact="true"]:hover .topbar-tabs__icon,
+.topbar-tabs__tab[data-compact="true"]:has(:focus-visible) .topbar-tabs__icon,
+.topbar-tabs__tab[data-tight="true"]:hover
+  .topbar-tabs__icon,
+.topbar-tabs__tab[data-tight="true"]:has(
+    :focus-visible
+  )
+  .topbar-tabs__icon {
+  opacity: 0;
+}
+
+/* Reordering: the dragged tab follows the pointer above the others, which
+   slide aside; nothing reacts to hover until it is dropped. */
+.topbar-tabs__strip[data-reordering="true"] .topbar-tabs__tab[data-tab-id] {
+  transition:
+    color 0.12s ease,
+    transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab[data-tab-id][data-dragging="true"] {
+  z-index: 2;
+  color: var(--text-strong);
+  transition: color 0.12s ease;
+}
+
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab[data-tab-id][data-settling="true"] {
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab:not([data-active="true"])::before {
+  background: transparent;
+}
+
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab[data-dragging="true"]:not([data-active="true"])::before {
+  background: color-mix(in oklch, var(--foreground) 9%, var(--background));
+}
+
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab:not([data-active="true"])
+  .topbar-tabs__close,
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab[data-compact="true"]
+  .topbar-tabs__close,
+.topbar-tabs__strip[data-reordering="true"]
+  .topbar-tabs__tab[data-tight="true"]
+  .topbar-tabs__close {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.topbar-tabs__strip[data-reordering="true"] .topbar-tabs__icon {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-tabs__strip .topbar-tabs__tab,
+  .topbar-tabs__strip .topbar-tabs__tab::before,
+  .topbar-tabs__close,
+  .topbar-tabs__icon {
+    transition: none !important;
+  }
+
+}
+
+:root[data-reduce-motion="reduce"] .topbar-tabs__strip .topbar-tabs__tab,
+:root[data-reduce-motion="reduce"] .topbar-tabs__strip .topbar-tabs__tab::before,
+:root[data-reduce-motion="reduce"] .topbar-tabs__close,
+:root[data-reduce-motion="reduce"] .topbar-tabs__icon {
+  transition: none !important;
 }
 
 .topbar-tabs__new {
@@ -177,6 +404,8 @@
   background: transparent;
   color: var(--text-muted, var(--text-weak));
   cursor: default;
+  position: relative;
+  z-index: 1;
   -webkit-app-region: no-drag;
 }
 

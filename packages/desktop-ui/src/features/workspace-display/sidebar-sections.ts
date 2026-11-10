@@ -513,6 +513,18 @@ export const sidebarSections = {
     });
   },
 
+  /** Move a tab to `toIndex` in the strip (drag to reorder). */
+  moveTab(tabId: string, toIndex: number): void {
+    const from = snapshot.tabs.findIndex((tab) => tab.id === tabId);
+    if (from === -1) return;
+    const to = Math.max(0, Math.min(snapshot.tabs.length - 1, toIndex));
+    if (to === from) return;
+    const tabs = [...snapshot.tabs];
+    const [moved] = tabs.splice(from, 1);
+    tabs.splice(to, 0, moved!);
+    emit({ ...snapshot, tabs });
+  },
+
   closeTab(tabId: string): void {
     const index = snapshot.tabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;

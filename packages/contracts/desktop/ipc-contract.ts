@@ -238,6 +238,13 @@ import {
   IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED,
   IPC_DICTATION_TOGGLE,
   IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER,
+  IPC_DICTATION_ON_DEVICE_STATUS,
+  IPC_DICTATION_ON_DEVICE_START,
+  IPC_DICTATION_ON_DEVICE_AUDIO,
+  IPC_DICTATION_ON_DEVICE_FINISH,
+  IPC_DICTATION_ON_DEVICE_CANCEL,
+  IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE,
+  IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS,
   IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
@@ -560,6 +567,33 @@ export type RealtimeVoiceSession =
       voice: string;
       expiresAt?: number;
     };
+
+export type OnDeviceDictationUnavailableReason =
+  | "platform"
+  | "missing-helper"
+  | "unsupported"
+  | "dictation-off"
+  | "speech-denied"
+  | "speech-restricted"
+  | "no-usage-description"
+  | "failed";
+
+export type OnDeviceDictationStatus =
+  | {
+      available: true;
+      engine: "analyzer" | "sfspeech";
+      locale: string;
+      locales: string[];
+    }
+  | {
+      available: false;
+      reason: OnDeviceDictationUnavailableReason;
+      locales: string[];
+    };
+
+export type TranscriptWord = { w: string; s: number; e: number };
+
+export type OnDeviceTranscript = { text: string; words: TranscriptWord[] };
 
 export type DictationToggle = {
   startId?: string;
@@ -950,6 +984,22 @@ export type IpcInvokeContract = {
   [IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER]: Invoke<
     [payload: { requestId: string; wav: ArrayBuffer }],
     { text: string }
+  >;
+  [IPC_DICTATION_ON_DEVICE_STATUS]: Invoke<
+    [payload: { locales: string[] }],
+    OnDeviceDictationStatus
+  >;
+  [IPC_DICTATION_ON_DEVICE_START]: Invoke<
+    [payload: { sessionId: string; locales: string[] }],
+    { ok: true }
+  >;
+  [IPC_DICTATION_ON_DEVICE_FINISH]: Invoke<
+    [payload: { sessionId: string }],
+    OnDeviceTranscript
+  >;
+  [IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE]: Invoke<
+    [payload: { wav: ArrayBuffer; locales: string[] }],
+    OnDeviceTranscript
   >;
 
   [IPC_COMPANION_GET_STATE]: Invoke<[], CompanionState | null>;
@@ -1542,6 +1592,11 @@ export type IpcSendContract = {
   [IPC_VOICE_REPORT_SESSION_ERROR_STATE]: [message: string];
   [IPC_DICTATION_CANCEL_OPENROUTER]: [payload: { requestId: string }];
   [IPC_DICTATION_ACTIVE_CHANGED]: [payload: { active: boolean }];
+  [IPC_DICTATION_ON_DEVICE_AUDIO]: [
+    payload: { sessionId: string; pcm: ArrayBuffer },
+  ];
+  [IPC_DICTATION_ON_DEVICE_CANCEL]: [payload: { sessionId: string }];
+  [IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS]: [];
   [IPC_DICTATION_PLAY_SOUND]: [
     payload: { sound: "startRecording" | "stopRecording" | "cancel" },
   ];

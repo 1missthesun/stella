@@ -807,6 +807,8 @@
         "description": "Stella ini tidak menyertakan dikte. Tambahkan kunci API OpenRouter milik Anda dan Stella akan mentranskripsi dengannya. Kunci tetap di komputer ini.",
         "getKey": "Dapatkan kunci di openrouter.ai/keys",
         "inputLabel": "Kunci API OpenRouter",
+        "openSystemSettings": "Buka Pengaturan Sistem",
+        "systemDictationOff": "Atau tanpa kunci: nyalakan Dikte di Pengaturan Sistem dan Stella mentranskripsi di Mac ini.",
         "openStella": "Buka Stella dan tekan mikrofon di sana untuk menambahkan kunci OpenRouter untuk dikte.",
         "save": "Simpan dan mulai",
         "saveFailed": "Stella tidak dapat menyimpan kunci itu.",

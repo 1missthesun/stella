@@ -13,6 +13,8 @@ const DEV_APP_NAME = "Stella";
 // never pollute the installed app's com.stella.app row; only the ad-hoc dev
 // bundle diverges.
 const DEV_BUNDLE_ID = "com.stella.app.dev";
+const SPEECH_RECOGNITION_USAGE_DESCRIPTION =
+  "Stella turns your dictation into text on this Mac.";
 const MICROPHONE_USAGE_DESCRIPTION =
   "Stella uses your microphone for voice conversations.";
 
@@ -77,6 +79,12 @@ export const prepareMacDevPermissionIdentity = ({
       infoPlist,
       "NSMicrophoneUsageDescription",
       MICROPHONE_USAGE_DESCRIPTION,
+    ) || changed;
+  changed =
+    writePlistString(
+      infoPlist,
+      "NSSpeechRecognitionUsageDescription",
+      SPEECH_RECOGNITION_USAGE_DESCRIPTION,
     ) || changed;
 
   const sourceIcon = path.join(desktopDir, "build", "icon.icns");

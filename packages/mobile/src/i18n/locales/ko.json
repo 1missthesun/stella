@@ -807,6 +807,8 @@
         "description": "이 Stella에는 받아쓰기가 포함되어 있지 않습니다. 본인의 OpenRouter API 키를 추가하면 Stella가 그 키로 받아씁니다. 키는 이 컴퓨터에만 저장됩니다.",
         "getKey": "openrouter.ai/keys에서 키 받기",
         "inputLabel": "OpenRouter API 키",
+        "openSystemSettings": "시스템 설정 열기",
+        "systemDictationOff": "키 없이도 됩니다: 시스템 설정에서 받아쓰기를 켜면 Stella가 이 Mac에서 받아씁니다.",
         "openStella": "Stella를 열고 마이크를 눌러 받아쓰기용 OpenRouter 키를 추가하세요.",
         "save": "저장하고 시작",
         "saveFailed": "Stella가 키를 저장하지 못했습니다.",

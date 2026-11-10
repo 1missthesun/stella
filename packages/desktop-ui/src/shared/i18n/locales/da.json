@@ -813,6 +813,8 @@
         "description": "Denne Stella har ikke diktering med. Tilføj din egen OpenRouter API-nøgle, så transskriberer Stella med den. Nøglen bliver på denne computer.",
         "getKey": "Få en nøgle på openrouter.ai/keys",
         "inputLabel": "OpenRouter API-nøgle",
+        "openSystemSettings": "Åbn Systemindstillinger",
+        "systemDictationOff": "Eller spring nøglen over: slå Diktering til i Systemindstillinger, så transskriberer Stella på denne Mac.",
         "openStella": "Åbn Stella, og tryk på mikrofonen der for at tilføje en OpenRouter-nøgle til diktering.",
         "save": "Gem og start",
         "saveFailed": "Stella kunne ikke gemme nøglen.",

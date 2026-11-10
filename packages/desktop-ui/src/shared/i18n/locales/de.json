@@ -813,6 +813,8 @@
         "description": "Diese Stella enthält kein Diktat. Füge deinen eigenen OpenRouter-API-Schlüssel hinzu, dann transkribiert Stella damit. Der Schlüssel bleibt auf diesem Computer.",
         "getKey": "Schlüssel unter openrouter.ai/keys holen",
         "inputLabel": "OpenRouter-API-Schlüssel",
+        "openSystemSettings": "Systemeinstellungen öffnen",
+        "systemDictationOff": "Oder ohne Schlüssel: Schalte das Diktat in den Systemeinstellungen ein, dann transkribiert Stella auf diesem Mac.",
         "openStella": "Öffne Stella und tippe dort auf das Mikrofon, um einen OpenRouter-Schlüssel fürs Diktat hinzuzufügen.",
         "save": "Speichern und starten",
         "saveFailed": "Stella konnte den Schlüssel nicht speichern.",

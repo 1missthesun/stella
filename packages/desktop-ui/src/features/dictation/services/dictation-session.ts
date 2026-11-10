@@ -7,7 +7,8 @@ import {
   type SharedMicrophoneLease,
 } from "@/features/voice/services/shared-microphone";
 import { DictationStream } from "./dictation-stream";
-import { transcribeDictation } from "./dictation-transcriber";
+import { transcribeDictation, transcribeWithFallback } from "./dictation-transcriber";
+import { onDeviceDictationAvailable, OnDeviceDictationStream } from "./on-device-dictation";
 import { PcmRecording } from "./pcm-recording";
 
 type WorkletFrame = { pcm: Int16Array; rms: number };
@@ -276,6 +277,9 @@ export class DictationSession {
   private recording = new PcmRecording();
   private transcription: AbortController | null = null;
   private streaming = false;
+  private onDevice: OnDeviceDictationStream | null = null;
+  private onDeviceOpened: Promise<void> = Promise.resolve();
+  private onDeviceFallback: Promise<boolean> = Promise.resolve(false);
   private streamedSamples = 0;
   private stream: DictationStream | null = null;
   private streamOpened: Promise<void> = Promise.resolve();
@@ -298,7 +302,7 @@ export class DictationSession {
 
   async start(
     callbacks: DictationCallbacks,
-    options: { streaming?: boolean } = {},
+    options: { streaming?: boolean; onDevice?: boolean } = {},
   ): Promise<void> {
     if (this.isActive()) return;
     this.pressedAt = performance.now();
@@ -311,7 +315,13 @@ export class DictationSession {
     this.recording = new PcmRecording();
     this.meter.reset();
     this.resetStream();
-    if (this.streaming) this.openStream();
+    this.resetOnDevice();
+    if (options.onDevice) {
+      this.openOnDevice();
+    } else if (this.streaming) {
+      this.openStream();
+      this.onDeviceFallback = onDeviceDictationAvailable().catch(() => false);
+    }
 
     const listener = (frame: WorkletFrame) => this.onFrame(frame);
     this.attached = listener;
@@ -337,7 +347,12 @@ export class DictationSession {
         return;
       }
       for (const chunk of preRoll) this.capture(chunk);
-      if (this.streamFailure) throw this.streamFailure;
+      if (
+        this.streamFailure &&
+        (this.onDevice || !(await this.onDeviceFallback))
+      ) {
+        throw this.streamFailure;
+      }
       this.durationLimitTimer = setTimeout(() => {
         console.warn("[dictation] hit max segment duration, auto-stopping");
         void this.stop();
@@ -374,6 +389,8 @@ export class DictationSession {
     if (this.cancelled || samples === 0) {
       this.stream?.cancel();
       this.resetStream();
+      this.onDevice?.cancel();
+      this.resetOnDevice();
       this.setState("idle");
       return;
     }
@@ -382,9 +399,13 @@ export class DictationSession {
     const controller = new AbortController();
     this.transcription = controller;
     try {
-      const transcript = this.streaming
-        ? await this.finishStream()
-        : await transcribeDictation(recording.toWav(), controller.signal);
+      const transcript = this.onDevice
+        ? await this.finishOnDevice()
+        : this.streaming
+          ? await this.finishStream().catch((error: unknown) =>
+              transcribeWithFallback(recording.toWav(), error, controller.signal),
+            )
+          : await transcribeDictation(recording.toWav(), controller.signal);
       if (this.cancelled || !transcript) {
         this.setState("idle");
         return;
@@ -406,6 +427,7 @@ export class DictationSession {
   async cancel(): Promise<void> {
     this.cancelled = true;
     this.stream?.cancel();
+    this.onDevice?.cancel();
     if (this.state === "transcribing") {
       this.transcription?.abort();
       this.setState("idle");
@@ -485,18 +507,55 @@ export class DictationSession {
   }
 
   private async failWhileListening(error: Error): Promise<void> {
+    if (this.streaming && !this.onDevice && (await this.onDeviceFallback)) {
+      console.warn("[dictation] relay failed; this Mac will transcribe instead:", error.message);
+      return;
+    }
     console.error("[dictation] relay failed while recording:", error);
     await this.cleanup();
     this.setState("error", error.message);
   }
 
   private capture(pcm: Int16Array): void {
-    if (!this.streaming) {
-      this.recording.append(pcm);
+    if (this.onDevice) {
+      this.streamedSamples += pcm.length;
+      this.onDevice.send(pcm);
       return;
     }
+    this.recording.append(pcm);
+    if (!this.streaming) return;
     this.streamedSamples += pcm.length;
     this.ingress?.push(pcm);
+  }
+
+  private resetOnDevice(): void {
+    this.onDevice = null;
+    this.onDeviceOpened = Promise.resolve();
+    this.onDeviceFallback = Promise.resolve(false);
+  }
+
+  private openOnDevice(): void {
+    const stream = new OnDeviceDictationStream();
+    this.onDevice = stream;
+    this.streaming = true;
+    this.onDeviceOpened = stream.open().catch((error: unknown) => {
+      if (this.onDevice !== stream) return;
+      const failure = error instanceof Error ? error : new Error(String(error));
+      this.streamFailure = failure;
+      if (this.state === "listening" && !this.cancelled) void this.failWhileListening(failure);
+    });
+  }
+
+  private async finishOnDevice(): Promise<string> {
+    const stream = this.onDevice;
+    try {
+      await this.onDeviceOpened;
+      if (this.streamFailure) throw this.streamFailure;
+      if (!stream) throw new Error("Dictation stream is unavailable.");
+      return (await stream.finish()).text;
+    } finally {
+      if (this.onDevice === stream) this.resetOnDevice();
+    }
   }
 
   private async finishStream(): Promise<string> {
@@ -516,6 +575,8 @@ export class DictationSession {
   private async cleanup(): Promise<void> {
     this.stream?.cancel();
     this.resetStream();
+    this.onDevice?.cancel();
+    this.resetOnDevice();
     this.releaseCapture();
     if (this.durationLimitTimer) {
       clearTimeout(this.durationLimitTimer);

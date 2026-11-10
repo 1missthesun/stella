@@ -807,6 +807,8 @@
         "description": "此 Stella 不包含听写功能。添加你自己的 OpenRouter API 密钥，Stella 会用它进行转写。密钥只保存在这台电脑上。",
         "getKey": "在 openrouter.ai/keys 获取密钥",
         "inputLabel": "OpenRouter API 密钥",
+        "openSystemSettings": "打开系统设置",
+        "systemDictationOff": "也可以不用密钥：在系统设置中打开听写，Stella 会在这台 Mac 上转写。",
         "openStella": "打开 Stella 并在那里点按麦克风，为听写添加 OpenRouter 密钥。",
         "save": "保存并开始",
         "saveFailed": "Stella 无法保存该密钥。",

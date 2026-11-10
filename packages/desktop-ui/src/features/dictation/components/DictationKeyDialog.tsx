@@ -11,6 +11,11 @@ import {
 import { Button } from "@/ui/button";
 import { useT } from "@/shared/i18n";
 import { invalidateDictationRoute } from "@/features/dictation/services/dictation-transcriber";
+import {
+  invalidateOnDeviceDictation,
+  onDeviceDictationStatus,
+  openSystemDictationSettings,
+} from "@/features/dictation/services/on-device-dictation";
 import "./dictation-key-dialog.css";
 
 export const DICTATION_KEY_NEEDED_EVENT = "stella:dictation-key-needed";
@@ -33,12 +38,17 @@ export function DictationKeyDialog() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [systemDictationOff, setSystemDictationOff] = useState(false);
 
   useEffect(() => {
     const show = () => {
       setDraft("");
       setError(null);
+      setSystemDictationOff(false);
       setOpen(true);
+      void onDeviceDictationStatus().then((status) => {
+        setSystemDictationOff(status?.available === false && status.reason === "dictation-off");
+      });
     };
     mountedHosts += 1;
     window.addEventListener(DICTATION_KEY_NEEDED_EVENT, show);
@@ -70,6 +80,20 @@ export function DictationKeyDialog() {
     }
   };
 
+  useEffect(() => {
+    if (!open || !systemDictationOff) return;
+    const recheck = () => {
+      invalidateOnDeviceDictation();
+      void onDeviceDictationStatus().then((status) => {
+        if (!status?.available) return;
+        invalidateDictationRoute();
+        setOpen(false);
+      });
+    };
+    window.addEventListener("focus", recheck);
+    return () => window.removeEventListener("focus", recheck);
+  }, [open, systemDictationOff]);
+
   if (!open) return null;
   return (
     <Dialog open onOpenChange={(next) => (next ? null : setOpen(false))}>
@@ -81,6 +105,18 @@ export function DictationKeyDialog() {
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="dictation-key-dialog-body">
+          {systemDictationOff ? (
+            <p className="dictation-key-dialog-system">
+              <span>{t("features.dictation.keyDialog.systemDictationOff")}</span>
+              <button
+                type="button"
+                className="dictation-key-dialog-link"
+                onClick={openSystemDictationSettings}
+              >
+                {t("features.dictation.keyDialog.openSystemSettings")}
+              </button>
+            </p>
+          ) : null}
           <label className="dictation-key-dialog-field">
             <KeyRound size={13} strokeWidth={1.75} aria-hidden />
             <input

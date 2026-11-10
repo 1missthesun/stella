@@ -807,6 +807,8 @@
         "description": "Stella นี้ไม่มีการพิมพ์ด้วยเสียง เพิ่มคีย์ OpenRouter API ของคุณ แล้ว Stella จะถอดความด้วยคีย์นั้น คีย์จะอยู่ในคอมพิวเตอร์เครื่องนี้",
         "getKey": "รับคีย์ที่ openrouter.ai/keys",
         "inputLabel": "คีย์ OpenRouter API",
+        "openSystemSettings": "เปิดการตั้งค่าระบบ",
+        "systemDictationOff": "หรือไม่ต้องใช้คีย์: เปิดการป้อนตามคำบอกในการตั้งค่าระบบ แล้ว Stella จะถอดเสียงบน Mac เครื่องนี้",
         "openStella": "เปิด Stella แล้วกดไมโครโฟนที่นั่นเพื่อเพิ่มคีย์ OpenRouter สำหรับการพิมพ์ด้วยเสียง",
         "save": "บันทึกและเริ่ม",
         "saveFailed": "Stella ไม่สามารถบันทึกคีย์นั้นได้",

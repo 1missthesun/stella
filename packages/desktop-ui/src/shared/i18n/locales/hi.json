@@ -813,6 +813,8 @@
         "description": "इस Stella में डिक्टेशन शामिल नहीं है। अपनी OpenRouter API कुंजी जोड़ें और Stella उसी से ट्रांसक्राइब करेगा। कुंजी इसी कंप्यूटर पर रहती है।",
         "getKey": "openrouter.ai/keys पर कुंजी पाएँ",
         "inputLabel": "OpenRouter API कुंजी",
+        "openSystemSettings": "सिस्टम सेटिंग्स खोलें",
+        "systemDictationOff": "या बिना कुंजी के: सिस्टम सेटिंग्स में डिक्टेशन चालू करें, फिर Stella इसी Mac पर ट्रांसक्राइब करेगा।",
         "openStella": "डिक्टेशन के लिए OpenRouter कुंजी जोड़ने हेतु Stella खोलें और वहाँ माइक दबाएँ।",
         "save": "सहेजें और शुरू करें",
         "saveFailed": "Stella वह कुंजी सहेज नहीं सका।",

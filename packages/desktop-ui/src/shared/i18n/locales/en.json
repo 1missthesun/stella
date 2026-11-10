@@ -814,9 +814,11 @@
         "getKey": "Get a key at openrouter.ai/keys",
         "inputLabel": "OpenRouter API key",
         "openStella": "Open Stella and press the mic there to add an OpenRouter key for dictation.",
+        "openSystemSettings": "Open System Settings",
         "save": "Save and start",
         "saveFailed": "Stella couldn't save that key.",
         "saving": "Saving…",
+        "systemDictationOff": "Or skip the key: turn on Dictation in System Settings and Stella transcribes on this Mac.",
         "title": "Turn on dictation",
         "unavailable": "Saving keys isn't available in this window."
       },

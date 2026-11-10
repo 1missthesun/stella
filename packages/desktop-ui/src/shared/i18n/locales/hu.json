@@ -813,6 +813,8 @@
         "description": "Ez a Stella nem tartalmaz diktálást. Add meg a saját OpenRouter API-kulcsodat, és a Stella azzal ír át. A kulcs ezen a számítógépen marad.",
         "getKey": "Kulcs igénylése: openrouter.ai/keys",
         "inputLabel": "OpenRouter API-kulcs",
+        "openSystemSettings": "Rendszerbeállítások megnyitása",
+        "systemDictationOff": "Vagy kulcs nélkül: kapcsold be a Diktálást a Rendszerbeállításokban, és a Stella ezen a Macen írja le.",
         "openStella": "Nyisd meg a Stellát, és ott nyomd meg a mikrofont, hogy OpenRouter-kulcsot adj meg a diktáláshoz.",
         "save": "Mentés és indítás",
         "saveFailed": "A Stella nem tudta menteni a kulcsot.",

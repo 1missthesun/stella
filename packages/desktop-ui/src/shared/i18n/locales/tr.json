@@ -813,6 +813,8 @@
         "description": "Bu Stella dikte içermiyor. Kendi OpenRouter API anahtarınızı ekleyin, Stella onunla yazıya döksün. Anahtar bu bilgisayarda kalır.",
         "getKey": "openrouter.ai/keys adresinden anahtar alın",
         "inputLabel": "OpenRouter API anahtarı",
+        "openSystemSettings": "Sistem Ayarları'nı aç",
+        "systemDictationOff": "Ya da anahtarsız: Sistem Ayarları'nda Dikte'yi açın, Stella bu Mac'te yazıya döker.",
         "openStella": "Dikte için OpenRouter anahtarı eklemek üzere Stella'yı açın ve oradaki mikrofona basın.",
         "save": "Kaydet ve başlat",
         "saveFailed": "Stella bu anahtarı kaydedemedi.",

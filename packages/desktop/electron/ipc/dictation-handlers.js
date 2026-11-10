@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -7,6 +7,7 @@ import { getDictationSoundEffectsEnabled, loadLocalPreferences, updateLocalPrefe
 import { runNativeHelper } from "../native-helper.js";
 import { hasOpenRouterDictationKey, transcribeWithOpenRouter, } from "../services/dictation-openrouter.js";
 import { applyShortcutRegistration, } from "./shortcut-registration.js";
+import { OnDeviceDictation, SYSTEM_DICTATION_SETTINGS_URL, } from "../services/on-device-dictation.js";
 import {
   IPC_DICTATION_TOGGLE,
   IPC_DICTATION_SET_SHORTCUT,
@@ -18,6 +19,13 @@ import {
   IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED,
   IPC_DICTATION_ACTIVE_CHANGED,
   IPC_DICTATION_PLAY_SOUND,
+  IPC_DICTATION_ON_DEVICE_STATUS,
+  IPC_DICTATION_ON_DEVICE_START,
+  IPC_DICTATION_ON_DEVICE_AUDIO,
+  IPC_DICTATION_ON_DEVICE_FINISH,
+  IPC_DICTATION_ON_DEVICE_CANCEL,
+  IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE,
+  IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS,
 } from "@stella/contracts/desktop/ipc-channels";
 import {
   registerPrivilegedHandle,
@@ -360,6 +368,53 @@ export const registerDictationHandlers = (options) => {
             openRouterTranscription = null;
         }
     });
+    const onDevice = new OnDeviceDictation();
+    const watchedSenders = new Set();
+    const watchSender = (sender) => {
+        if (watchedSenders.has(sender.id))
+            return;
+        watchedSenders.add(sender.id);
+        const id = sender.id;
+        sender.once("destroyed", () => {
+            watchedSenders.delete(id);
+            onDevice.cancelOwnedBy(id);
+        });
+    };
+    const stringList = (value) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, 8) : [];
+    registerPrivilegedHandle(options, IPC_DICTATION_ON_DEVICE_STATUS, (_event, payload) => onDevice.status(stringList(payload?.locales)));
+    registerPrivilegedHandle(options, IPC_DICTATION_ON_DEVICE_START, (event, payload) => {
+        const sessionId = typeof payload?.sessionId === "string" ? payload.sessionId : "";
+        if (!sessionId)
+            throw new Error("Dictation session is missing.");
+        watchSender(event.sender);
+        onDevice.start(event.sender.id, sessionId, stringList(payload?.locales));
+        return { ok: true };
+    });
+    onPrivilegedIpc(options, IPC_DICTATION_ON_DEVICE_AUDIO, (event, payload) => {
+        const pcm = payload?.pcm;
+        if (typeof payload?.sessionId !== "string" || !(pcm instanceof ArrayBuffer || pcm instanceof Uint8Array))
+            return;
+        onDevice.push(event.sender.id, payload.sessionId, pcm);
+    });
+    registerPrivilegedHandle(options, IPC_DICTATION_ON_DEVICE_FINISH, (event, payload) => onDevice.finish(event.sender.id, String(payload?.sessionId ?? "")));
+    onPrivilegedIpc(options, IPC_DICTATION_ON_DEVICE_CANCEL, (_event, payload) => {
+        if (typeof payload?.sessionId === "string")
+            onDevice.cancel(payload.sessionId);
+    });
+    registerPrivilegedHandle(options, IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE, (_event, payload) => {
+        const wav = payload?.wav;
+        if (!(wav instanceof ArrayBuffer) && !(wav instanceof Uint8Array))
+            throw new Error("Dictation audio was empty.");
+        return onDevice.transcribeWav(wav, stringList(payload?.locales));
+    });
+    onPrivilegedIpc(options, IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS, () => {
+        if (process.platform !== "darwin")
+            return;
+        onDevice.invalidate();
+        void shell.openExternal(SYSTEM_DICTATION_SETTINGS_URL);
+    });
+    app.on("browser-window-focus", () => onDevice.invalidate());
+    app.once("will-quit", () => onDevice.dispose());
     registerPrivilegedHandle(options, IPC_DICTATION_GET_SOUND_EFFECTS_ENABLED, () => areDictationSoundsEnabled());
     registerPrivilegedHandle(options, IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED, (_event, enabled) => {
         const nextEnabled = enabled === true;

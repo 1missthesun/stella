@@ -4,8 +4,18 @@ import {
   fetchWithDeadline,
   transferBudgetMs,
 } from "@stella/contracts/request-deadline";
+import {
+  invalidateOnDeviceDictation,
+  onDeviceDictationAvailable,
+  transcribeOnDevice,
+} from "./on-device-dictation";
 
-export type DictationRoute = "streaming" | "managed" | "openrouter" | "needs-key";
+export type DictationRoute =
+  | "streaming"
+  | "managed"
+  | "openrouter"
+  | "on-device"
+  | "needs-key";
 
 type ManagedAvailability = { available: boolean; streaming: boolean };
 
@@ -67,7 +77,9 @@ export const resolveDictationRoute = async (): Promise<DictationRoute> => {
         ? "managed"
         : (await hasOpenRouterKey())
           ? "openrouter"
-          : "needs-key";
+          : (await onDeviceDictationAvailable())
+            ? "on-device"
+            : "needs-key";
   if (generation === routeGeneration) lastRoute = route;
   return route;
 };
@@ -79,6 +91,7 @@ export const prewarmDictation = (): void => {
 export const invalidateDictationRoute = (): void => {
   routeGeneration += 1;
   lastRoute = null;
+  invalidateOnDeviceDictation();
 };
 
 const transcribeManaged = async (wav: ArrayBuffer, signal?: AbortSignal): Promise<string> => {
@@ -129,11 +142,38 @@ const transcribeWithOwnKey = async (wav: ArrayBuffer, signal?: AbortSignal): Pro
   }
 };
 
+/**
+ * On a Mac, Apple's on-device recognizer stands in whenever the route the
+ * user has fails (signed out, usage limit, no service, offline, a bad key).
+ */
+export const transcribeWithFallback = async (
+  wav: ArrayBuffer,
+  error: unknown,
+  signal?: AbortSignal,
+): Promise<string> => {
+  if (signal?.aborted || !(await onDeviceDictationAvailable())) throw error;
+  console.warn("[dictation] transcribing on this Mac instead:", (error as Error)?.message);
+  return (await transcribeOnDevice(wav)).text;
+};
+
 export const transcribeDictation = async (
   wav: ArrayBuffer,
   signal?: AbortSignal,
 ): Promise<string> => {
+  try {
+    return await transcribeWithRoute(wav, signal);
+  } catch (error) {
+    if (lastRoute === "on-device") throw error;
+    return await transcribeWithFallback(wav, error, signal);
+  }
+};
+
+const transcribeWithRoute = async (
+  wav: ArrayBuffer,
+  signal?: AbortSignal,
+): Promise<string> => {
   const route = lastRoute ?? (await resolveDictationRoute());
+  if (route === "on-device") return (await transcribeOnDevice(wav)).text;
   if (route === "managed" || route === "streaming") {
     try {
       return await transcribeManaged(wav, signal);

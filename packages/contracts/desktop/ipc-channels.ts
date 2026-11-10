@@ -146,6 +146,18 @@ export const IPC_DICTATION_CANCEL_OPENROUTER =
   "dictation:cancelOpenRouter" as const;
 export const IPC_DICTATION_ACTIVE_CHANGED = "dictation:activeChanged" as const;
 export const IPC_DICTATION_PLAY_SOUND = "dictation:playSound" as const;
+export const IPC_DICTATION_ON_DEVICE_STATUS =
+  "dictation:onDeviceStatus" as const;
+export const IPC_DICTATION_ON_DEVICE_START = "dictation:onDeviceStart" as const;
+export const IPC_DICTATION_ON_DEVICE_AUDIO = "dictation:onDeviceAudio" as const;
+export const IPC_DICTATION_ON_DEVICE_FINISH =
+  "dictation:onDeviceFinish" as const;
+export const IPC_DICTATION_ON_DEVICE_CANCEL =
+  "dictation:onDeviceCancel" as const;
+export const IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE =
+  "dictation:onDeviceTranscribeFile" as const;
+export const IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS =
+  "dictation:openSystemDictationSettings" as const;
 
 export const IPC_AGENT_SEND_INPUT = "agent:sendInput" as const;
 export const IPC_PI_CHAT_REQUEST = "piChat:request" as const;

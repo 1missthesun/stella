@@ -160,7 +160,10 @@ export const useDictation = ({
       window.electronAPI?.dictation?.activeChanged({ active: true });
       const cached = cachedDictationRoute();
       const route =
-        cached === "streaming" || cached === "managed" || cached === "openrouter"
+        cached === "streaming" ||
+        cached === "managed" ||
+        cached === "openrouter" ||
+        cached === "on-device"
           ? cached
           : await resolveDictationRoute().catch(() => "needs-key" as const);
       pendingStartRef.current = null;
@@ -242,7 +245,7 @@ export const useDictation = ({
             );
             onTranscriptCommittedRef.current?.();
           },
-        }, { streaming: route === "streaming" });
+        }, { streaming: route === "streaming", onDevice: route === "on-device" });
       } catch (err) {
         const errMessage = (err as Error).message;
         setError(errMessage);

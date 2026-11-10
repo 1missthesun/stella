@@ -807,6 +807,8 @@
         "description": "この Stella には音声入力が含まれていません。ご自身の OpenRouter API キーを追加すると、Stella がそれを使って文字起こしします。キーはこのコンピュータに保存されます。",
         "getKey": "openrouter.ai/keys でキーを取得",
         "inputLabel": "OpenRouter API キー",
+        "openSystemSettings": "システム設定を開く",
+        "systemDictationOff": "キーなしでも使えます：システム設定で音声入力をオンにすると、Stella がこの Mac 上で文字起こしします。",
         "openStella": "Stella を開いてマイクを押し、音声入力用の OpenRouter キーを追加してください。",
         "save": "保存して開始",
         "saveFailed": "Stella はこのキーを保存できませんでした。",

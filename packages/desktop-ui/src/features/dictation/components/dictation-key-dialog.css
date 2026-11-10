@@ -91,3 +91,19 @@
   gap: 10px;
   margin-top: 6px;
 }
+
+.dictation-key-dialog-system {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0 0 4px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--text-base);
+}
+
+.dictation-key-dialog-system .dictation-key-dialog-link {
+  align-self: baseline;
+  color: var(--text-strong);
+}

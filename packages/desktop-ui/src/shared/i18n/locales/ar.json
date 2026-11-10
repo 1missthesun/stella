@@ -837,6 +837,8 @@
         "description": "لا يتضمن Stella هذا الإملاء. أضف مفتاح OpenRouter API الخاص بك وسيستخدمه Stella للنسخ. يبقى المفتاح على هذا الكمبيوتر.",
         "getKey": "احصل على مفتاح من openrouter.ai/keys",
         "inputLabel": "مفتاح OpenRouter API",
+        "openSystemSettings": "افتح إعدادات النظام",
+        "systemDictationOff": "أو تخطَّ المفتاح: فعّل الإملاء في إعدادات النظام وسيحوّل Stella كلامك إلى نص على هذا الـ Mac.",
         "openStella": "افتح Stella واضغط على الميكروفون هناك لإضافة مفتاح OpenRouter للإملاء.",
         "save": "حفظ والبدء",
         "saveFailed": "تعذّر على Stella حفظ هذا المفتاح.",

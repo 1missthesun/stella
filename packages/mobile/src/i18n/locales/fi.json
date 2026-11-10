@@ -813,6 +813,8 @@
         "description": "Tähän Stellaan ei sisälly sanelua. Lisää oma OpenRouter API -avaimesi, niin Stella litteroi sillä. Avain pysyy tällä tietokoneella.",
         "getKey": "Hanki avain osoitteesta openrouter.ai/keys",
         "inputLabel": "OpenRouter API -avain",
+        "openSystemSettings": "Avaa Järjestelmäasetukset",
+        "systemDictationOff": "Tai ohita avain: laita Sanelu päälle Järjestelmäasetuksissa, niin Stella litteroi tällä Macilla.",
         "openStella": "Avaa Stella ja paina siellä mikrofonia lisätäksesi OpenRouter-avaimen sanelua varten.",
         "save": "Tallenna ja aloita",
         "saveFailed": "Stella ei voinut tallentaa avainta.",

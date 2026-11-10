@@ -819,6 +819,8 @@
         "description": "Acest Stella nu include dictarea. Adaugă propria cheie API OpenRouter și Stella va transcrie cu ea. Cheia rămâne pe acest computer.",
         "getKey": "Obține o cheie de la openrouter.ai/keys",
         "inputLabel": "Cheie API OpenRouter",
+        "openSystemSettings": "Deschide Configurări sistem",
+        "systemDictationOff": "Sau fără cheie: activează Dictarea în Configurări sistem și Stella transcrie pe acest Mac.",
         "openStella": "Deschide Stella și apasă microfonul acolo pentru a adăuga o cheie OpenRouter pentru dictare.",
         "save": "Salvează și începe",
         "saveFailed": "Stella nu a putut salva cheia.",

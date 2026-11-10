@@ -807,6 +807,8 @@
         "description": "Stella này không có tính năng đọc chính tả. Thêm khóa OpenRouter API của bạn và Stella sẽ dùng nó để chép lời. Khóa được giữ trên máy tính này.",
         "getKey": "Lấy khóa tại openrouter.ai/keys",
         "inputLabel": "Khóa OpenRouter API",
+        "openSystemSettings": "Mở Cài đặt hệ thống",
+        "systemDictationOff": "Hoặc bỏ qua khóa: bật Đọc chính tả trong Cài đặt hệ thống và Stella sẽ chép lời ngay trên máy Mac này.",
         "openStella": "Mở Stella và nhấn micrô ở đó để thêm khóa OpenRouter cho đọc chính tả.",
         "save": "Lưu và bắt đầu",
         "saveFailed": "Stella không thể lưu khóa đó.",

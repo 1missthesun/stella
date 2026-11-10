@@ -819,6 +819,8 @@
         "description": "Ce Stella n'inclut pas la dictée. Ajoutez votre propre clé d'API OpenRouter et Stella transcrira avec. La clé reste sur cet ordinateur.",
         "getKey": "Obtenir une clé sur openrouter.ai/keys",
         "inputLabel": "Clé d'API OpenRouter",
+        "openSystemSettings": "Ouvrir les Réglages Système",
+        "systemDictationOff": "Ou passez-vous de clé : activez la Dictée dans les Réglages Système et Stella transcrit sur ce Mac.",
         "openStella": "Ouvrez Stella et appuyez sur le micro pour ajouter une clé OpenRouter pour la dictée.",
         "save": "Enregistrer et commencer",
         "saveFailed": "Stella n'a pas pu enregistrer cette clé.",

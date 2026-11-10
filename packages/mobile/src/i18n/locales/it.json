@@ -819,6 +819,8 @@
         "description": "Questo Stella non include la dettatura. Aggiungi la tua chiave API OpenRouter e Stella trascriverà con quella. La chiave resta su questo computer.",
         "getKey": "Ottieni una chiave su openrouter.ai/keys",
         "inputLabel": "Chiave API OpenRouter",
+        "openSystemSettings": "Apri Impostazioni di Sistema",
+        "systemDictationOff": "Oppure senza chiave: attiva la Dettatura in Impostazioni di Sistema e Stella trascrive su questo Mac.",
         "openStella": "Apri Stella e premi il microfono lì per aggiungere una chiave OpenRouter per la dettatura.",
         "save": "Salva e inizia",
         "saveFailed": "Stella non è riuscita a salvare la chiave.",

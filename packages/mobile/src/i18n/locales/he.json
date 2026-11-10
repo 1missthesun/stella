@@ -819,6 +819,8 @@
         "description": "Stella הזה לא כולל הכתבה. הוסיפו מפתח OpenRouter API משלכם ו-Stella יתמלל באמצעותו. המפתח נשאר במחשב הזה.",
         "getKey": "קבלו מפתח ב-openrouter.ai/keys",
         "inputLabel": "מפתח OpenRouter API",
+        "openSystemSettings": "פתח את הגדרות המערכת",
+        "systemDictationOff": "או בלי מפתח: הפעל הכתבה בהגדרות המערכת ו־Stella יתמלל על ה־Mac הזה.",
         "openStella": "פתחו את Stella ולחצו שם על המיקרופון כדי להוסיף מפתח OpenRouter להכתבה.",
         "save": "שמירה והתחלה",
         "saveFailed": "Stella לא הצליח לשמור את המפתח.",

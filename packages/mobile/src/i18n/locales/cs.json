@@ -825,6 +825,8 @@
         "description": "Tato instalace Stelly diktování nezahrnuje. Přidejte vlastní klíč OpenRouter API a Stella s ním bude přepisovat. Klíč zůstane v tomto počítači.",
         "getKey": "Získat klíč na openrouter.ai/keys",
         "inputLabel": "Klíč OpenRouter API",
+        "openSystemSettings": "Otevřít Nastavení systému",
+        "systemDictationOff": "Nebo klíč přeskočte: zapněte Diktování v Nastavení systému a Stella bude přepisovat přímo na tomto Macu.",
         "openStella": "Otevřete Stellu a stiskněte tam mikrofon, abyste přidali klíč OpenRouter pro diktování.",
         "save": "Uložit a začít",
         "saveFailed": "Stella nedokázala tento klíč uložit.",

@@ -31,11 +31,6 @@ const NavItem = ({
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
       preloadNavSurfaceRoute(app.id);
-      if (active && app.onActiveClick) {
-        event.preventDefault();
-        app.onActiveClick();
-        return;
-      }
       if (!active && app.resolveClickRoute) {
         const to = app.resolveClickRoute();
         if (to !== app.route) {

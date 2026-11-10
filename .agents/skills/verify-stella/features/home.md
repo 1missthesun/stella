@@ -10,16 +10,16 @@ Home is the full-body overlay over the chat column: a greeting, the main compose
 
 ## When Home shows
 
-The rule is `shell/use-chat-home-surface.ts` and `features/chat/hooks/use-idle-home-visibility.ts` in `packages/desktop-ui/src`:
+The rule is `chatHomeSurface` in `packages/desktop-ui/src/shell/use-chat-home-surface.ts`, the one place that decides:
 
-- The conversation has no messages.
-- First view after launch, until the user interacts with the chat in this session, even when the conversation has messages.
-- After an hour without activity, when nothing is streaming.
-- Not while the conversation's first snapshot is still loading, and not after the user dismissed it (persisted per window as the last chat/home surface).
+- Home is the empty state only: it shows when the conversation is known to have no messages.
+- A conversation with messages never shows it: not at launch, after a reload or restart, after any idle time, or when coming back from Settings or a top-bar tab.
+- While the messages are not known yet (launch, sign-in, slow sync, offline) the timeline shows, unless this computer last knew that same conversation to be empty (`view.chat.emptyConversation` in the durable UI state), in which case Home paints at once.
+- "Known empty" for a cloud conversation means the journal is canonical and the records on hand reach its head; `ready` arrives before the records do.
 
 ## How to get to it (user POV)
 
-- Launch Stella on an empty conversation, or relaunch over a populated one.
+- Launch Stella on an empty conversation (a fresh account).
 - Send from Home to enter the timeline.
 
 ## Driving it with control-stella
@@ -37,5 +37,5 @@ Preconditions:
 ## Gotchas
 
 - There is no top-bar Home launcher, conversation history, or New chat control.
-- Idle logic can reopen Home later. Assert the immediate transition and relevant conversation state.
+- Nothing brings Home back once the conversation has messages; a claim that needs Home needs a fresh account.
 - The workspace panel's `Home` tab (Files, Apps, Browser, Updates launcher) is a separate surface from the chat Home overlay.

@@ -1,155 +1,104 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { useIdleHomeVisibility } from "@/features/chat/hooks/use-idle-home-visibility";
+import { useCallback, useEffect, useState } from "react";
 import { uiState } from "@/platform/ui-state";
-import {
-  STELLA_SHOW_HOME_EVENT,
-} from "@/shared/lib/stella-orb-chat";
+import { viewAtom } from "@/platform/view-state/view-state";
 
-const SESSION_LEFT_CHAT_KEY = "stella_left_chat_once";
-const CHAT_HOME_SURFACE_STORAGE_KEY = "stella.chatHomeSurface";
+/**
+ * Home (a greeting above a centred composer) is the empty state of a
+ * conversation and nothing else. `chatHomeSurface` is the one place that
+ * decides. A conversation with messages never shows Home, and neither does
+ * one whose messages have not arrived yet (launch, reload, sign-in, slow
+ * sync), unless this computer last knew that same conversation to be empty.
+ */
+
+/** What is known about the conversation's messages right now. */
+export type ConversationContent = "has-messages" | "empty" | "unknown";
 
 type ChatHomeSurface = "home" | "chat";
 
-function readPersistedChatHomeSurface(): ChatHomeSurface | null {
-  if (typeof window === "undefined") return null;
-  const raw = uiState.getItem(CHAT_HOME_SURFACE_STORAGE_KEY);
-  return raw === "home" || raw === "chat" ? raw : null;
-}
+/**
+ * The conversation last known here to be empty. View state, so it is
+ * forgotten with the account it belongs to.
+ */
+const knownEmptyConversation = viewAtom<string | null>(
+  "chat.emptyConversation",
+  null,
+  (value) => typeof value === "string",
+);
 
-function writePersistedChatHomeSurface(surface: ChatHomeSurface): void {
-  if (typeof window === "undefined") return;
-  uiState.setItem(CHAT_HOME_SURFACE_STORAGE_KEY, surface);
-}
+export const chatHomeSurface = (
+  conversationId: string | null,
+  content: ConversationContent,
+  knownEmptyId: string | null,
+): ChatHomeSurface => {
+  if (content !== "unknown") return content === "empty" ? "home" : "chat";
+  // Before the conversation resolves there is only the one last shown here.
+  const wasEmpty =
+    knownEmptyId !== null &&
+    (conversationId === null || conversationId === knownEmptyId);
+  return wasEmpty ? "home" : "chat";
+};
+
+/** Read by the web shell's static first paint (`web-static-home.html`). */
+const LAST_SURFACE_KEY = "stella.chatHomeSurface";
 
 type UseChatHomeSurfaceOptions = {
-  isOnChatRoute: boolean;
-  hasMessages: boolean;
-  isInitialLoading: boolean;
-  isStreaming: boolean;
-  activeConversationId: string | null;
+  conversationId: string | null;
+  content: ConversationContent;
+  /** Messages on screen, including one being sent. */
+  hasVisibleMessages: boolean;
   hasOpenQuestion?: boolean;
 };
 
 type UseChatHomeSurfaceResult = {
   showHomeContent: boolean;
   enterChatSurfaceForInteraction: () => void;
-  resetIdleTimer: () => void;
-  dismissHome: () => void;
-  showHome: () => void;
+  leaveChatSurfaceAfterFailedSend: () => void;
 };
 
 export function useChatHomeSurface({
-  isOnChatRoute,
-  hasMessages,
-  isInitialLoading,
-  isStreaming,
-  activeConversationId,
+  conversationId,
+  content,
+  hasVisibleMessages,
   hasOpenQuestion = false,
 }: UseChatHomeSurfaceOptions): UseChatHomeSurfaceResult {
-  const [leftChatOnce, setLeftChatOnce] = useState(() => {
-    if (typeof sessionStorage === "undefined") return false;
-    return sessionStorage.getItem(SESSION_LEFT_CHAT_KEY) === "1";
-  });
-  const [
-    hasInteractedWithChatThisSession,
-    setHasInteractedWithChatThisSession,
-  ] = useState(false);
-  const [isHomeDismissed, setIsHomeDismissed] = useState(
-    () => readPersistedChatHomeSurface() === "chat",
-  );
-  const prevOnChatRouteRef = useRef(isOnChatRoute);
-  const prevConversationIdRef = useRef(activeConversationId);
-
-  const {
-    showHomeContent: idleBasedHome,
-    resetIdleTimer,
-    forceShowHome,
-  } = useIdleHomeVisibility({
-    hasMessages,
-    isStreaming,
-    onIdle: () => setIsHomeDismissed(false),
-  });
-
-  const firstStintOnChat = !leftChatOnce && isOnChatRoute;
-  // A conversation subscription re-keys before its SQLite window resolves.
-  // During that gap `hasMessages` is necessarily false, but that does not mean
-  // the selected tab is empty. Keep the chat layer visible until the first
-  // snapshot arrives so switching populated tabs never flashes Home. Once the
-  // load completes, a genuinely empty conversation still opens on Home.
-  const baseShowHomeContent = isInitialLoading
-    ? false
-    : firstStintOnChat
-      ? !hasMessages || !hasInteractedWithChatThisSession || idleBasedHome
-      : idleBasedHome;
-  const showHomeContent =
-    isHomeDismissed || hasOpenQuestion ? false : baseShowHomeContent;
-
-  useLayoutEffect(() => {
-    if (prevConversationIdRef.current === activeConversationId) return;
-    const hadConversation = Boolean(prevConversationIdRef.current);
-    prevConversationIdRef.current = activeConversationId;
-    if (hadConversation) {
-      setHasInteractedWithChatThisSession(true);
-      setIsHomeDismissed(false);
-      resetIdleTimer();
-    }
-  }, [activeConversationId, resetIdleTimer]);
+  const knownEmptyId = knownEmptyConversation.use();
+  // A send leaves Home at once, before its message is on screen.
+  const [sendingIn, setSendingIn] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOnChatRoute) return;
-    writePersistedChatHomeSurface(showHomeContent ? "home" : "chat");
-  }, [isOnChatRoute, showHomeContent]);
-
-  useEffect(() => {
-    if (prevOnChatRouteRef.current && !isOnChatRoute) {
-      if (typeof sessionStorage !== "undefined") {
-        sessionStorage.setItem(SESSION_LEFT_CHAT_KEY, "1");
-      }
-      queueMicrotask(() => {
-        setLeftChatOnce(true);
-      });
+    if (content === "has-messages") setSendingIn(null);
+    if (!conversationId || content === "unknown") return;
+    knownEmptyConversation.set((known) =>
+      content === "empty"
+        ? conversationId
+        : known === conversationId
+          ? null
+          : known,
+    );
+    const surface: ChatHomeSurface = content === "empty" ? "home" : "chat";
+    if (uiState.getItem(LAST_SURFACE_KEY) !== surface) {
+      uiState.setItem(LAST_SURFACE_KEY, surface);
     }
-    prevOnChatRouteRef.current = isOnChatRoute;
-  }, [isOnChatRoute]);
+  }, [conversationId, content]);
+
+  const surface =
+    hasVisibleMessages ||
+    hasOpenQuestion ||
+    (sendingIn !== null && sendingIn === conversationId)
+      ? "chat"
+      : chatHomeSurface(conversationId, content, knownEmptyId);
 
   const enterChatSurfaceForInteraction = useCallback(() => {
-    setHasInteractedWithChatThisSession(true);
-    setIsHomeDismissed(true);
-    writePersistedChatHomeSurface("chat");
+    setSendingIn(conversationId);
+  }, [conversationId]);
+
+  const leaveChatSurfaceAfterFailedSend = useCallback(() => {
+    setSendingIn(null);
   }, []);
-
-  const dismissHome = useCallback(() => {
-    setIsHomeDismissed(true);
-    writePersistedChatHomeSurface("chat");
-  }, []);
-
-  const showHome = useCallback(() => {
-    setIsHomeDismissed(false);
-    writePersistedChatHomeSurface("home");
-    forceShowHome();
-  }, [forceShowHome]);
-
-  useEffect(() => {
-    const handler = () => {
-      setIsHomeDismissed(false);
-      writePersistedChatHomeSurface("home");
-      forceShowHome();
-    };
-    window.addEventListener(STELLA_SHOW_HOME_EVENT, handler);
-    return () => window.removeEventListener(STELLA_SHOW_HOME_EVENT, handler);
-  }, [forceShowHome]);
 
   return {
-    showHomeContent,
+    showHomeContent: surface === "home",
     enterChatSurfaceForInteraction,
-    resetIdleTimer,
-    dismissHome,
-    showHome,
+    leaveChatSurfaceAfterFailedSend,
   };
 }

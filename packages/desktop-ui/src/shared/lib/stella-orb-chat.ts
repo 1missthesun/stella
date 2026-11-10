@@ -15,10 +15,3 @@ export function dispatchComposeText(detail: StellaComposeTextDetail) {
     }),
   );
 }
-
-export const STELLA_SHOW_HOME_EVENT = "stella:show-home";
-
-export function dispatchShowHome() {
-  window.dispatchEvent(new CustomEvent(STELLA_SHOW_HOME_EVENT));
-}
-

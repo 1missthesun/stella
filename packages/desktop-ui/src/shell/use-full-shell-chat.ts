@@ -23,7 +23,10 @@ import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
 import { useCapturedChatContext } from "./use-captured-chat-context";
 import { useTurnHandoff } from "./use-turn-handoff";
 import { useChatScrollManagement } from "./use-chat-scroll-management";
-import { useChatHomeSurface } from "./use-chat-home-surface";
+import {
+  useChatHomeSurface,
+  type ConversationContent,
+} from "./use-chat-home-surface";
 import { useConversationUserAsks } from "@/features/user-ask/user-ask-store";
 import { useAgentInputRouting } from "./use-agent-input-routing";
 import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
@@ -517,18 +520,28 @@ export function useFullShellChat({
   const hasMessages = displayMessages.length > 0;
   const conversationAsks = useConversationUserAsks(activeConversationId);
   const hasOpenQuestion = conversationAsks.length > 0;
+  // "ready" names the journal's head before its records arrive: the journal
+  // is only known once the records on hand reach that head.
+  const journalCaughtUp =
+    journalState.recordsSource === "canonical" &&
+    (journalState.records.at(-1)?.seq ?? -1) >= journalState.headSeq;
+  const messagesKnown = isPrivateChat
+    ? !localMessageFeed.isInitialLoading
+    : cloudChatShown && journalCaughtUp;
+  const conversationContent: ConversationContent =
+    persistedMessages.length > 0
+      ? "has-messages"
+      : activeConversationId !== null && messagesKnown && !hasOlderMessages
+        ? "empty"
+        : "unknown";
   const {
     showHomeContent,
     enterChatSurfaceForInteraction,
-    resetIdleTimer,
-    dismissHome,
-    showHome,
+    leaveChatSurfaceAfterFailedSend,
   } = useChatHomeSurface({
-    isOnChatRoute,
-    hasMessages,
-    isInitialLoading: isInitialLoadingMessages,
-    isStreaming,
-    activeConversationId,
+    conversationId: activeConversationId,
+    content: conversationContent,
+    hasVisibleMessages: hasMessages,
     hasOpenQuestion,
   });
   useEffect(() => {
@@ -610,7 +623,6 @@ export function useFullShellChat({
       onOptimisticStart: () => {
         if (activeConversationIdRef.current !== submittedConversationId) return;
         enterChatSurfaceForInteraction();
-        resetIdleTimer();
         if (shouldFollowSend) {
           followAfterSend();
         } else if (!isStreaming) {
@@ -634,12 +646,10 @@ export function useFullShellChat({
           }
           return;
         }
-        const shouldRestoreHome =
-          submittedFromHome && !composerMessageStore.getSnapshot();
         setMessage((current) => current || submittedMessage);
         setSelectedText((current) => current ?? submittedSelectedText);
         setChatContext((current) => current ?? submittedChatContext);
-        if (shouldRestoreHome) showHome();
+        leaveChatSurfaceAfterFailedSend();
       },
     });
     if (
@@ -662,13 +672,12 @@ export function useFullShellChat({
     composerMessageStore,
     followAfterSend,
     releaseFollow,
-    resetIdleTimer,
+    leaveChatSurfaceAfterFailedSend,
     selectedText,
     sendMessage,
     setChatContext,
     setMessage,
     setSelectedText,
-    showHome,
     showHomeContent,
   ]);
   const hasUnsentAttachments = useHasUnsentBrowserAttachments();
@@ -873,16 +882,12 @@ export function useFullShellChat({
       composer,
       scroll: chatColumnScroll,
       showHomeContent,
-      dismissHome,
-      showHome,
     }),
     [
       conversation,
       composer,
       chatColumnScroll,
       showHomeContent,
-      dismissHome,
-      showHome,
     ],
   );
   return { runtime, messages: displayMessages };

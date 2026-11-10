@@ -14,6 +14,5 @@ export type AppMetadata = {
   slot: AppSlot;
   order?: number;
   hideFromSidebar?: boolean;
-  onActiveClick?: () => void;
   resolveClickRoute?: () => string;
 };

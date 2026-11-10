@@ -1679,8 +1679,8 @@ const cmdNavHome = async () => {
   const run = requireRun();
   const before = await readShellState(run);
   if (!before.homeOpen) {
-    fail("Home is not showing. It appears on its own for an empty conversation, on the first view after launch until the user interacts, and after an hour idle; there is no Home launcher or New chat control.", 2, {
-      errorCode: "APP_NOT_READY", recovery: "Launch a fresh run (`session launch --replace`) for an empty conversation, or relaunch to see Home over a populated one.", retryable: false,
+    fail("Home is not showing. It is the empty state of a conversation and never shows once the conversation has messages; there is no Home launcher or New chat control.", 2, {
+      errorCode: "APP_NOT_READY", recovery: "Launch a fresh run (`session launch --replace`) for an empty conversation.", retryable: false,
     });
   }
   const state = await waitForState(run, (value) => value.homeOpen);

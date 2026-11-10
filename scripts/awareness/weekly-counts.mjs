@@ -34,6 +34,9 @@ const daysArg = args.indexOf("--days");
 const days = daysArg >= 0 ? Math.max(1, Math.min(60, Number(args[daysArg + 1]) || 7)) : 7;
 const COUNTS = dev ? "stella_anonymous_counts_dev" : "stella_anonymous_counts";
 const SHORT_LINKS = dev ? "stella_short_links_dev" : "stella_short_links";
+// Analytics Engine can't delete rows. The 12 prod hits before this time were
+// our own launch tests (2026-11-10 07:31–07:52 UTC), so prod counts start here.
+const SHORT_LINKS_SINCE = dev ? "1970-01-01 00:00:00" : "2026-11-10 08:00:00";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -169,6 +172,7 @@ const shortLinkHits = async () => {
     `SELECT blob1 AS source, blob2 AS country, blob3 AS referrer, SUM(_sample_interval) AS hits
      FROM ${SHORT_LINKS}
      WHERE timestamp > NOW() - INTERVAL '${days}' DAY
+       AND timestamp >= toDateTime('${SHORT_LINKS_SINCE}')
      GROUP BY source, country, referrer
      FORMAT JSON`,
   );

@@ -3127,6 +3127,13 @@
         "failedBody": "تعذّر عرض محتويات هذا المجلد.",
         "emptyTitle": "هذا المجلد فارغ",
         "truncated": "يتم عرض أول {count} فقط."
+      },
+      "viewerStrip": {
+        "fromStella": "من Stella",
+        "fromYou": "منك",
+        "position": "{index} من {count} في هذه المجموعة",
+        "previousSet": "المجموعة السابقة",
+        "nextSet": "المجموعة التالية"
       }
     },
     "displayPanel": {

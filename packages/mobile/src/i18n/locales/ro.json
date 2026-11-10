@@ -3082,6 +3082,13 @@
         "failedBody": "Conținutul acestui dosar nu a putut fi afișat.",
         "emptyTitle": "Acest dosar este gol",
         "truncated": "Sunt afișate doar primele {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "De la Stella",
+        "fromYou": "De la tine",
+        "position": "{index} din {count} în acest set",
+        "previousSet": "Setul anterior",
+        "nextSet": "Setul următor"
       }
     },
     "displayPanel": {

@@ -3067,6 +3067,13 @@
         "failedBody": "इस फ़ोल्डर की सामग्री नहीं दिखाई जा सकी।",
         "emptyTitle": "यह फ़ोल्डर खाली है",
         "truncated": "केवल पहले {count} दिखाए जा रहे हैं।"
+      },
+      "viewerStrip": {
+        "fromStella": "Stella से",
+        "fromYou": "आपकी ओर से",
+        "position": "इस सेट में {count} में से {index}",
+        "previousSet": "पिछला सेट",
+        "nextSet": "अगला सेट"
       }
     },
     "displayPanel": {

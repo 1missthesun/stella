@@ -3050,6 +3050,13 @@
         "failedBody": "Không thể hiển thị nội dung của thư mục này.",
         "emptyTitle": "Thư mục này trống",
         "truncated": "Chỉ hiển thị {count} mục đầu tiên."
+      },
+      "viewerStrip": {
+        "fromStella": "Từ Stella",
+        "fromYou": "Từ bạn",
+        "position": "{index}/{count} trong bộ này",
+        "previousSet": "Bộ trước",
+        "nextSet": "Bộ tiếp theo"
       }
     },
     "displayPanel": {

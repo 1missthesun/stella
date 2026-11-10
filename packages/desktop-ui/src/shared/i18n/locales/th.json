@@ -3050,6 +3050,13 @@
         "failedBody": "ไม่สามารถแสดงเนื้อหาของโฟลเดอร์นี้ได้",
         "emptyTitle": "โฟลเดอร์นี้ว่างเปล่า",
         "truncated": "แสดงเฉพาะ {count} รายการแรกเท่านั้น"
+      },
+      "viewerStrip": {
+        "fromStella": "จาก Stella",
+        "fromYou": "จากคุณ",
+        "position": "{index} จาก {count} ในชุดนี้",
+        "previousSet": "ชุดก่อนหน้า",
+        "nextSet": "ชุดถัดไป"
       }
     },
     "displayPanel": {

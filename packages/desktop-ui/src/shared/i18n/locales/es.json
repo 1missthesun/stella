@@ -3082,6 +3082,13 @@
         "failedBody": "No se pudo mostrar el contenido de esta carpeta.",
         "emptyTitle": "Esta carpeta está vacía",
         "truncated": "Solo se muestran los primeros {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "De Stella",
+        "fromYou": "Tuyo",
+        "position": "{index} de {count} en este grupo",
+        "previousSet": "Grupo anterior",
+        "nextSet": "Grupo siguiente"
       }
     },
     "displayPanel": {

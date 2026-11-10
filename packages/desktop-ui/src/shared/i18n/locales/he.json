@@ -3082,6 +3082,13 @@
         "failedBody": "לא ניתן להציג את תוכן התיקייה הזו.",
         "emptyTitle": "התיקייה הזו ריקה",
         "truncated": "מוצגים רק {count} הראשונים."
+      },
+      "viewerStrip": {
+        "fromStella": "מ-Stella",
+        "fromYou": "ממך",
+        "position": "{index} מתוך {count} בקבוצה זו",
+        "previousSet": "הקבוצה הקודמת",
+        "nextSet": "הקבוצה הבאה"
       }
     },
     "displayPanel": {

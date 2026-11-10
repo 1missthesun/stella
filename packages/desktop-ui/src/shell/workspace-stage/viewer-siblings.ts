@@ -62,14 +62,31 @@ const stripIdFor = (payload: DisplayTabPayload): string | null => {
 
 const EMPTY_MESSAGES: ReadonlyArray<EventRecord> = [];
 
+/** A strip item, and the set (one message's files) it belongs to. */
+export type StripEntry = FileEntry & {
+  setKey: string;
+  setOrder: number;
+  from?: "stella" | "user";
+};
+
+/** Consecutive strip items that came with the same message. */
+export type StripSet = {
+  key: string;
+  start: number;
+  /** Exclusive. */
+  end: number;
+  from?: "stella" | "user";
+  at: number;
+};
+
 /** Photos, videos, clips and canvases linked anywhere in the conversation. */
-const useConversationStripEntries = (): FileEntry[] => {
+const useConversationStripEntries = (): StripEntry[] => {
   const messages = useContext(
     ChatMessagesContext,
   ) as ReadonlyArray<EventRecord> | null;
   const events = messages ?? EMPTY_MESSAGES;
   return useMemo(() => {
-    const entries: FileEntry[] = [];
+    const entries: StripEntry[] = [];
     for (const file of deriveConversationFiles(events)) {
       if (file.payload.cloudDrivePath || file.cloudDriveFile) continue;
       const id = stripIdFor(file.payload);
@@ -82,39 +99,84 @@ const useConversationStripEntries = (): FileEntry[] => {
         filePath: file.path,
         createdAt: file.timestamp,
         payload: file.payload,
+        setKey: file.set?.key ?? id,
+        setOrder: file.set?.order ?? 0,
+        ...(file.set ? { from: file.set.from } : {}),
       });
     }
     return entries;
   }, [events]);
 };
 
+const NO_SETS: StripSet[] = [];
+
+/** Runs of items from the same message, in strip order. */
+const setsOf = (items: readonly StripEntry[]): StripSet[] => {
+  const sets: StripSet[] = [];
+  items.forEach((entry, index) => {
+    const last = sets[sets.length - 1];
+    if (last && last.key === entry.setKey) {
+      last.end = index + 1;
+      return;
+    }
+    sets.push({
+      key: entry.setKey,
+      start: index,
+      end: index + 1,
+      ...(entry.from ? { from: entry.from } : {}),
+      at: entry.createdAt,
+    });
+  });
+  return sets;
+};
+
 /**
  * Every file in this conversation, whatever its type, plus anything already
  * opened, oldest first, so the strip reads in the order the conversation
- * produced them and → moves forward in time.
+ * produced them and → moves forward in time. Files that came with the same
+ * message stay together, in the order the message lists them.
  */
 export const useViewerSiblings = (
   itemId: string,
   kind: DisplayTabKind,
-): { items: FileEntry[]; index: number } => {
+): {
+  items: StripEntry[];
+  index: number;
+  sets: StripSet[];
+  /** The set holding the current item, or null. */
+  set: StripSet | null;
+} => {
   const opened = useFileEntries();
   const linked = useConversationStripEntries();
-  return useMemo(() => {
-    if (!STRIP_KINDS.has(kind)) return { items: [], index: -1 };
-    const byId = new Map<string, FileEntry>();
+  const ordered = useMemo(() => {
+    if (!STRIP_KINDS.has(kind)) return { items: [], sets: NO_SETS };
+    const byId = new Map<string, StripEntry>();
     for (const entry of linked) {
       if (STRIP_KINDS.has(entry.kind)) byId.set(entry.id, entry);
     }
     for (const entry of opened) {
       if (STRIP_KINDS.has(entry.kind) && !byId.has(entry.id)) {
-        byId.set(entry.id, entry);
+        byId.set(entry.id, { ...entry, setKey: entry.id, setOrder: 0 });
       }
     }
     const items = [...byId.values()].sort(
-      (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+      (a, b) =>
+        a.createdAt - b.createdAt ||
+        a.setKey.localeCompare(b.setKey) ||
+        a.setOrder - b.setOrder ||
+        a.id.localeCompare(b.id),
     );
-    return { items, index: items.findIndex((entry) => entry.id === itemId) };
-  }, [itemId, kind, linked, opened]);
+    return { items, sets: setsOf(items) };
+  }, [kind, linked, opened]);
+  return useMemo(() => {
+    const index = ordered.items.findIndex((entry) => entry.id === itemId);
+    const set =
+      index === -1
+        ? null
+        : (ordered.sets.find((run) => index >= run.start && index < run.end) ??
+          null);
+    return { items: ordered.items, sets: ordered.sets, index, set };
+  }, [itemId, ordered]);
 };
 
 /** Show `entry` where `fromId` is showing: the viewer, or the active tab. */

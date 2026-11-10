@@ -3082,6 +3082,13 @@
         "failedBody": "Impossible d'afficher le contenu de ce dossier.",
         "emptyTitle": "Ce dossier est vide",
         "truncated": "Seuls les {count} premiers sont affichés."
+      },
+      "viewerStrip": {
+        "fromStella": "De Stella",
+        "fromYou": "De vous",
+        "position": "{index} sur {count} dans cet ensemble",
+        "previousSet": "Ensemble précédent",
+        "nextSet": "Ensemble suivant"
       }
     },
     "displayPanel": {

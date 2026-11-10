@@ -3067,6 +3067,13 @@
         "failedBody": "Det gick inte att visa innehållet i mappen.",
         "emptyTitle": "Den här mappen är tom",
         "truncated": "Endast de första {count} visas."
+      },
+      "viewerStrip": {
+        "fromStella": "Från Stella",
+        "fromYou": "Från dig",
+        "position": "{index} av {count} i den här gruppen",
+        "previousSet": "Föregående grupp",
+        "nextSet": "Nästa grupp"
       }
     },
     "displayPanel": {

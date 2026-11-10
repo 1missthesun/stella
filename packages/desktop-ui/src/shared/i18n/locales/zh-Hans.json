@@ -3050,6 +3050,13 @@
         "failedBody": "无法显示此文件夹的内容。",
         "emptyTitle": "此文件夹为空",
         "truncated": "仅显示前 {count} 项。"
+      },
+      "viewerStrip": {
+        "fromStella": "来自 Stella",
+        "fromYou": "来自你",
+        "position": "本组 {count} 项中的第 {index} 项",
+        "previousSet": "上一组",
+        "nextSet": "下一组"
       }
     },
     "displayPanel": {

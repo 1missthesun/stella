@@ -3067,6 +3067,13 @@
         "failedBody": "Indholdet af denne mappe kunne ikke vises.",
         "emptyTitle": "Denne mappe er tom",
         "truncated": "Kun de første {count} vises."
+      },
+      "viewerStrip": {
+        "fromStella": "Fra Stella",
+        "fromYou": "Fra dig",
+        "position": "{index} af {count} i dette sæt",
+        "previousSet": "Forrige sæt",
+        "nextSet": "Næste sæt"
       }
     },
     "displayPanel": {

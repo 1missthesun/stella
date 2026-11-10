@@ -3067,6 +3067,13 @@
         "failedBody": "This folder couldn't be listed.",
         "emptyTitle": "This folder is empty",
         "truncated": "Only the first {count} are shown."
+      },
+      "viewerStrip": {
+        "fromStella": "From Stella",
+        "fromYou": "From you",
+        "position": "{index} of {count} in this set",
+        "previousSet": "Previous set",
+        "nextSet": "Next set"
       }
     },
     "displayPanel": {

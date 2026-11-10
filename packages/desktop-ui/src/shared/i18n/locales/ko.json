@@ -3050,6 +3050,13 @@
         "failedBody": "이 폴더의 내용을 표시할 수 없습니다.",
         "emptyTitle": "이 폴더는 비어 있습니다",
         "truncated": "처음 {count}개만 표시됩니다."
+      },
+      "viewerStrip": {
+        "fromStella": "Stella가 보냄",
+        "fromYou": "내가 보냄",
+        "position": "이 묶음의 {count}개 중 {index}번째",
+        "previousSet": "이전 묶음",
+        "nextSet": "다음 묶음"
       }
     },
     "displayPanel": {

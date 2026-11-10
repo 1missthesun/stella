@@ -3097,6 +3097,13 @@
         "failedBody": "Obsah této složky nelze zobrazit.",
         "emptyTitle": "Tato složka je prázdná",
         "truncated": "Zobrazuje se jen prvních {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "Od Stelly",
+        "fromYou": "Od vás",
+        "position": "{index} z {count} v této sadě",
+        "previousSet": "Předchozí sada",
+        "nextSet": "Další sada"
       }
     },
     "displayPanel": {

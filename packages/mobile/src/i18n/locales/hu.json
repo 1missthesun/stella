@@ -3067,6 +3067,13 @@
         "failedBody": "A mappa tartalma nem jeleníthető meg.",
         "emptyTitle": "Ez a mappa üres",
         "truncated": "Csak az első {count} látható."
+      },
+      "viewerStrip": {
+        "fromStella": "Stellától",
+        "fromYou": "Tőled",
+        "position": "{index}/{count} ebben a csoportban",
+        "previousSet": "Előző csoport",
+        "nextSet": "Következő csoport"
       }
     },
     "displayPanel": {

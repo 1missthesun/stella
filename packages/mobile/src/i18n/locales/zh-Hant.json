@@ -3050,6 +3050,13 @@
         "failedBody": "無法顯示此資料夾的內容。",
         "emptyTitle": "此資料夾是空的",
         "truncated": "僅顯示前 {count} 項。"
+      },
+      "viewerStrip": {
+        "fromStella": "來自 Stella",
+        "fromYou": "來自你",
+        "position": "本組 {count} 項中的第 {index} 項",
+        "previousSet": "上一組",
+        "nextSet": "下一組"
       }
     },
     "displayPanel": {

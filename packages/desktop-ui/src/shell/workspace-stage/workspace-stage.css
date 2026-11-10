@@ -353,7 +353,8 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  /* Between sets; inside a set the items sit closer (see __set). */
+  gap: 10px;
   min-width: 0;
   max-width: 100%;
   padding: 5px;
@@ -382,6 +383,8 @@
     flex-direction: column;
     max-width: none;
     max-height: 100%;
+    /* Room under each set for the current one's caption. */
+    gap: 26px;
   }
 }
 
@@ -401,10 +404,21 @@
   color: var(--text-weak);
   font: inherit;
   cursor: default;
-  opacity: 0.55;
+  opacity: 0.88;
   transition:
     opacity 0.12s ease,
-    box-shadow 0.12s ease;
+    outline-color 0.12s ease;
+}
+
+/* A faint edge over the picture, so dark images don't melt into the
+   background and bright ones don't glare. */
+.viewer-strip__item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 14%, transparent);
+  pointer-events: none;
 }
 
 @container file-viewer (min-width: 760px) {
@@ -418,11 +432,89 @@
   opacity: 1;
 }
 
-.viewer-strip__item[data-current="true"] {
+/* A set: what came with one message. Grouped, each set sits in a soft
+   tray (a faint capsule with a hairline edge) so it reads as one object;
+   the tray you're in is a touch stronger and carries when it arrived. */
+.viewer-strip__set {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  border-radius: 13px;
+}
+
+.viewer-strip[data-grouped="true"] .viewer-strip__set {
+  padding: 5px;
+  background: color-mix(in oklch, var(--foreground) 3.5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.viewer-strip[data-grouped="true"] .viewer-strip__set[data-current="true"] {
+  background: color-mix(in oklch, var(--foreground) 8.5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 20%, transparent);
+}
+
+.viewer-strip[data-grouped="true"] .viewer-strip__set[data-current="true"]
+  .viewer-strip__item {
   opacity: 1;
-  box-shadow:
-    0 0 0 2px var(--background),
-    0 0 0 3.5px var(--text-strong);
+}
+
+.viewer-strip[data-grouped="true"]
+  .viewer-strip__set:not([data-current="true"])
+  .viewer-strip__item {
+  opacity: 0.85;
+}
+
+.viewer-strip[data-grouped="true"] .viewer-strip__set .viewer-strip__item:hover {
+  opacity: 1;
+}
+
+/* When the current set arrived, hung quietly under its tray. */
+.viewer-strip__caption {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 4px;
+  transform: translateX(-50%);
+  color: var(--text-weak);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.viewer-strip[data-grouped="true"] {
+  padding-bottom: 0;
+}
+
+.viewer-strip[data-grouped="true"] .viewer-strip__list {
+  padding-bottom: 18px;
+}
+
+@container file-viewer (min-width: 760px) {
+  .viewer-strip__set {
+    flex-direction: column;
+  }
+
+  .viewer-strip[data-grouped="true"] .viewer-strip__list {
+    padding-bottom: 20px;
+  }
+}
+
+/* The ring sits a little off the picture; its gap shows whatever is behind
+   (tray or panel), so it reads the same everywhere. */
+.viewer-strip__item[data-current="true"],
+.viewer-strip[data-grouped="true"] .viewer-strip__set .viewer-strip__item[data-current="true"] {
+  opacity: 1;
+  outline: 1.5px solid var(--text-strong);
+  outline-offset: 1.5px;
+}
+
+.viewer-strip__item[data-current="true"]::after {
+  box-shadow: none;
 }
 
 .viewer-strip__item:focus-visible {

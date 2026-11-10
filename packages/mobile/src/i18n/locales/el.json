@@ -3067,6 +3067,13 @@
         "failedBody": "Δεν ήταν δυνατή η εμφάνιση των περιεχομένων αυτού του φακέλου.",
         "emptyTitle": "Αυτός ο φάκελος είναι κενός",
         "truncated": "Εμφανίζονται μόνο τα πρώτα {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "Από τη Stella",
+        "fromYou": "Από εσάς",
+        "position": "{index} από {count} σε αυτό το σύνολο",
+        "previousSet": "Προηγούμενο σύνολο",
+        "nextSet": "Επόμενο σύνολο"
       }
     },
     "displayPanel": {

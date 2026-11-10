@@ -3050,6 +3050,13 @@
         "failedBody": "このフォルダの内容を表示できませんでした。",
         "emptyTitle": "このフォルダは空です",
         "truncated": "最初の {count} 件のみ表示しています。"
+      },
+      "viewerStrip": {
+        "fromStella": "Stella から",
+        "fromYou": "あなたから",
+        "position": "このセットの {count} 件中 {index} 件目",
+        "previousSet": "前のセット",
+        "nextSet": "次のセット"
       }
     },
     "displayPanel": {

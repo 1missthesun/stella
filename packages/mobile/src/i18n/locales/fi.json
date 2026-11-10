@@ -3067,6 +3067,13 @@
         "failedBody": "Tämän kansion sisältöä ei voitu näyttää.",
         "emptyTitle": "Tämä kansio on tyhjä",
         "truncated": "Vain ensimmäiset {count} näytetään."
+      },
+      "viewerStrip": {
+        "fromStella": "Stellalta",
+        "fromYou": "Sinulta",
+        "position": "{index}/{count} tässä joukossa",
+        "previousSet": "Edellinen joukko",
+        "nextSet": "Seuraava joukko"
       }
     },
     "displayPanel": {

@@ -3097,6 +3097,13 @@
         "failedBody": "Nie udało się wyświetlić zawartości tego folderu.",
         "emptyTitle": "Ten folder jest pusty",
         "truncated": "Wyświetlono tylko pierwsze {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "Od Stelli",
+        "fromYou": "Od ciebie",
+        "position": "{index} z {count} w tym zestawie",
+        "previousSet": "Poprzedni zestaw",
+        "nextSet": "Następny zestaw"
       }
     },
     "displayPanel": {

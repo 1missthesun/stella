@@ -3067,6 +3067,13 @@
         "failedBody": "Bu klasörün içeriği gösterilemedi.",
         "emptyTitle": "Bu klasör boş",
         "truncated": "Yalnızca ilk {count} öğe gösteriliyor."
+      },
+      "viewerStrip": {
+        "fromStella": "Stella'dan",
+        "fromYou": "Senden",
+        "position": "Bu sette {index}/{count}",
+        "previousSet": "Önceki set",
+        "nextSet": "Sonraki set"
       }
     },
     "displayPanel": {

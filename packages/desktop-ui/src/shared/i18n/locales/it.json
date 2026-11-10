@@ -3082,6 +3082,13 @@
         "failedBody": "Impossibile mostrare il contenuto di questa cartella.",
         "emptyTitle": "Questa cartella è vuota",
         "truncated": "Vengono mostrati solo i primi {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "Da Stella",
+        "fromYou": "Da te",
+        "position": "{index} di {count} in questo gruppo",
+        "previousSet": "Gruppo precedente",
+        "nextSet": "Gruppo successivo"
       }
     },
     "displayPanel": {

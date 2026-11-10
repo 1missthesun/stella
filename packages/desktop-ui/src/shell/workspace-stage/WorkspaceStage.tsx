@@ -71,6 +71,7 @@ import {
   X,
 } from "@/ui/icons";
 import { RetainedSurface } from "@/ui/retained-surface";
+import { useT } from "@/shared/i18n";
 import {
   ViewerActionsContext,
   ViewerItemContext,
@@ -584,7 +585,14 @@ function ViewerHeader({
 
 /** Arrows that appear at the media's left and right edges on hover. */
 function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
+  const t = useT();
   if (!nav || (!nav.canPrevious && !nav.canNext)) return null;
+  const previousTip = nav.sets
+    ? `${nav.previousLabel} (←) · ${t("shell.display.viewerStrip.previousSet")} (⇧←)`
+    : `${nav.previousLabel} (←)`;
+  const nextTip = nav.sets
+    ? `${nav.nextLabel} (→) · ${t("shell.display.viewerStrip.nextSet")} (⇧→)`
+    : `${nav.nextLabel} (→)`;
   return (
     <>
       <button
@@ -593,8 +601,8 @@ function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
         data-dir="previous"
         disabled={!nav.canPrevious}
         onClick={nav.previous}
-        aria-label={`${nav.previousLabel} (←)`}
-        title={`${nav.previousLabel} (←)`}
+        aria-label={previousTip}
+        title={previousTip}
       >
         <ChevronLeft size={18} strokeWidth={2} />
       </button>
@@ -604,8 +612,8 @@ function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
         data-dir="next"
         disabled={!nav.canNext}
         onClick={nav.next}
-        aria-label={`${nav.nextLabel} (→)`}
-        title={`${nav.nextLabel} (→)`}
+        aria-label={nextTip}
+        title={nextTip}
       >
         <ChevronRight size={18} strokeWidth={2} />
       </button>
@@ -615,10 +623,11 @@ function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
 
 /** Item-to-item navigation across everything the conversation made or opened. */
 const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
-  const { items, index } = useViewerSiblings(
+  const { items, index, sets } = useViewerSiblings(
     item?.id ?? "",
     item?.kind ?? "text",
   );
+  const grouped = sets.length > 1;
   return useMemo(() => {
     if (!item || index === -1 || items.length < 2) return null;
     const previous = items[index - 1];
@@ -630,8 +639,9 @@ const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
       next: () => next && showSibling(item.id, next),
       previousLabel: "Previous",
       nextLabel: "Next",
+      sets: grouped,
     };
-  }, [index, item, items]);
+  }, [grouped, index, item, items]);
 };
 
 function FileViewerFrame({
@@ -906,6 +916,28 @@ const editableIsEmpty = (target: EventTarget | null): boolean => {
   return (el.textContent ?? "").length === 0;
 };
 
+/**
+ * ⇧← / ⇧→ in the viewer: the first item of the previous or next set, or
+ * back to the start of this set when you're partway through it.
+ */
+const setJumpTarget = (
+  frame: Element | null,
+  backwards: boolean,
+): HTMLButtonElement | null => {
+  const set = frame?.querySelector<HTMLElement>(
+    ".viewer-strip__set[data-current='true']",
+  );
+  if (!set) return null;
+  const first = set.querySelector<HTMLButtonElement>(".viewer-strip__item");
+  if (backwards && first && first.dataset.current !== "true") return first;
+  const neighbour = (
+    backwards ? set.previousElementSibling : set.nextElementSibling
+  ) as HTMLElement | null;
+  return (
+    neighbour?.querySelector<HTMLButtonElement>(".viewer-strip__item") ?? null
+  );
+};
+
 const hasOpenOverlay = (): boolean =>
   Boolean(
     document.querySelector(
@@ -986,8 +1018,7 @@ export const WorkspaceStage = memo(
             viewerState.fileId &&
             !event.metaKey &&
             !event.altKey &&
-            !event.ctrlKey &&
-            !event.shiftKey
+            !event.ctrlKey
           ) {
             if (
               isEditableTarget(event.target) &&
@@ -998,6 +1029,14 @@ export const WorkspaceStage = memo(
             if (frame?.getAttribute("data-hidden") === "true") return;
             const target = event.target as HTMLElement | null;
             if (target?.closest("video, audio, [role='slider']")) return;
+            if (event.shiftKey) {
+              const jump = setJumpTarget(frame, event.key === "ArrowLeft");
+              if (jump) {
+                jump.click();
+                event.preventDefault();
+              }
+              return;
+            }
             const button = frame?.querySelector<HTMLButtonElement>(
               event.key === "ArrowLeft"
                 ? ".file-viewer__edge[data-dir='previous']"

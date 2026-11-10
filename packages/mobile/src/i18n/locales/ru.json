@@ -3097,6 +3097,13 @@
         "failedBody": "Не удалось показать содержимое этой папки.",
         "emptyTitle": "Эта папка пуста",
         "truncated": "Показаны только первые {count}."
+      },
+      "viewerStrip": {
+        "fromStella": "От Stella",
+        "fromYou": "От вас",
+        "position": "{index} из {count} в этом наборе",
+        "previousSet": "Предыдущий набор",
+        "nextSet": "Следующий набор"
       }
     },
     "displayPanel": {

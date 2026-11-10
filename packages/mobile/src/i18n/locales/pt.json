@@ -3082,6 +3082,13 @@
         "failedBody": "Não foi possível mostrar o conteúdo desta pasta.",
         "emptyTitle": "Esta pasta está vazia",
         "truncated": "Apenas os primeiros {count} são mostrados."
+      },
+      "viewerStrip": {
+        "fromStella": "De Stella",
+        "fromYou": "Seu",
+        "position": "{index} de {count} neste conjunto",
+        "previousSet": "Conjunto anterior",
+        "nextSet": "Próximo conjunto"
       }
     },
     "displayPanel": {

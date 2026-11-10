@@ -17,6 +17,16 @@ export type ConversationFileEntry = {
   timestamp: number;
   payload: DisplayTabPayload;
   cloudDriveFile?: CloudDriveConversationFile;
+  /** The message it came with: the files one message brings form a set. */
+  set?: ConversationFileSet;
+};
+
+export type ConversationFileSet = {
+  /** The message's event id. */
+  key: string;
+  from: "stella" | "user";
+  /** Position within the message, in the order it mentions them. */
+  order: number;
 };
 
 export type CloudDriveConversationFile = {
@@ -102,8 +112,18 @@ export function deriveConversationFiles(
     const eventPayload = event.payload as
       | { cloudDriveFiles?: unknown }
       | undefined;
+    let order = 0;
+    const from = event.type === "user_message" ? "user" : "stella";
+    const nextSet = (): ConversationFileSet => ({
+      key: event._id,
+      from,
+      order: order++,
+    });
     for (const file of cloudDriveFilesFrom(eventPayload?.cloudDriveFiles)) {
-      seen.set(`cloud:${file.path}`, cloudDriveEntry(file, event.timestamp));
+      seen.set(`cloud:${file.path}`, {
+        ...cloudDriveEntry(file, event.timestamp),
+        set: nextSet(),
+      });
     }
 
     for (const filePath of extractFileLinkTargets(
@@ -114,9 +134,8 @@ export function deriveConversationFiles(
       if (drivePath) {
         const key = `cloud:${drivePath}`;
         if (!seen.has(key)) {
-          seen.set(
-            key,
-            cloudDriveEntry(
+          seen.set(key, {
+            ...cloudDriveEntry(
               {
                 path: drivePath,
                 name: cloudWorldDriveName(drivePath),
@@ -125,7 +144,8 @@ export function deriveConversationFiles(
               },
               event.timestamp,
             ),
-          );
+            set: nextSet(),
+          });
         }
         continue;
       }
@@ -133,7 +153,12 @@ export function deriveConversationFiles(
         developerResourcesEnabled: true,
       });
       if (!payload || !isDisplayTabPayload(payload)) continue;
-      seen.set(filePath, { path: filePath, timestamp: event.timestamp, payload });
+      seen.set(filePath, {
+        path: filePath,
+        timestamp: event.timestamp,
+        payload,
+        set: nextSet(),
+      });
     }
   }
 

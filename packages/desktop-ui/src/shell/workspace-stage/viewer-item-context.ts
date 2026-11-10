@@ -39,6 +39,8 @@ export type ViewerNav = {
   /** e.g. "Previous page". */
   previousLabel: string;
   nextLabel: string;
+  /** The strip groups items into sets, which ⇧← ⇧→ jump between. */
+  sets?: boolean;
 };
 
 export const ViewerNavContext = createContext<

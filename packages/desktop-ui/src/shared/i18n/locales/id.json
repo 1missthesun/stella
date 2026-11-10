@@ -3050,6 +3050,13 @@
         "failedBody": "Isi folder ini tidak dapat ditampilkan.",
         "emptyTitle": "Folder ini kosong",
         "truncated": "Hanya {count} item pertama yang ditampilkan."
+      },
+      "viewerStrip": {
+        "fromStella": "Dari Stella",
+        "fromYou": "Dari Anda",
+        "position": "{index} dari {count} di set ini",
+        "previousSet": "Set sebelumnya",
+        "nextSet": "Set berikutnya"
       }
     },
     "displayPanel": {

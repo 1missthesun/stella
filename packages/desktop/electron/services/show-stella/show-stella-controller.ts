@@ -239,7 +239,6 @@ export class ShowStellaController {
     };
     this.recording = recording;
 
-    const origin = overlay.getOverlayOrigin();
     const inkEnabled = this.inkAvailable();
     const input = new ShowStellaInput({
       display: display.bounds,
@@ -248,7 +247,10 @@ export class ShowStellaController {
         process.platform === "win32"
           ? (point) => screen.screenToDipPoint(point)
           : (point) => point,
-      toOverlay: (point) => ({ x: point.x - origin.x, y: point.y - origin.y }),
+      toOverlay: (point) => {
+        const origin = overlay.getOverlayOrigin();
+        return { x: point.x - origin.x, y: point.y - origin.y };
+      },
       inkEnabled,
       onInk: (ink) => overlay.sendShowStellaInk(ink),
       onInkChanged: (hasInk) => this.setUndo(recording, hasInk),
@@ -270,8 +272,8 @@ export class ShowStellaController {
       captureId: id,
       startedAtMs,
       display: {
-        x: bounds.x - origin.x,
-        y: bounds.y - origin.y,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
       },

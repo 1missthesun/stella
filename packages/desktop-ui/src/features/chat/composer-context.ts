@@ -86,12 +86,12 @@ export const resolveComposerContextState = (
   const windowContextEnabled = Boolean(
     chatContext?.window && chatContext.windowContextEnabled !== false,
   );
-  const hasScreenshotContext = Boolean(chatContext?.regionScreenshots?.length);
-  const hasFileContext = Boolean(chatContext?.files?.length);
-  const hasPastedTextContext = Boolean(
-    chatContext?.pastedTexts?.length ||
+  const hasScreenshotContext = Boolean(
+    chatContext?.regionScreenshots?.length ||
       chatContext?.showCaptures?.some((capture) => capture.status === "ready"),
   );
+  const hasFileContext = Boolean(chatContext?.files?.length);
+  const hasPastedTextContext = Boolean(chatContext?.pastedTexts?.length);
   // The viewer's "what's open" chip rides along with a message but isn't
   // something to send on its own.
   const hasAppSelectionContext = getComposerAppSelections(chatContext).some(

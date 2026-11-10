@@ -571,18 +571,36 @@ export class OverlayWindowController {
         });
     }
     /** Show Stella: the capture bar, the red edge and live ink, never captured. */
+    /** `state.display` is in screen points; the overlay gets it in its own. */
     async startShowStella(state) {
+        const local = () => {
+            const origin = this.overlayWindow.getOverlayOrigin();
+            return {
+                ...state,
+                display: {
+                    ...state.display,
+                    x: state.display.x - origin.x,
+                    y: state.display.y - origin.y,
+                },
+            };
+        };
+        const before = local();
         await this.showSurface({
             setActive: () => {
                 this.activeShowStella = true;
             },
             channel: IPC_SHOW_STELLA_OVERLAY_STATE,
-            payload: state,
+            payload: before,
             sendBeforeShow: true,
             showOptions: { inactive: true },
             interactive: false,
             focusable: false,
         });
+        // macOS can move the window off the menu bar as it shows.
+        const after = local();
+        if (after.display.x !== before.display.x || after.display.y !== before.display.y) {
+            this.overlayWindow.send(IPC_SHOW_STELLA_OVERLAY_STATE, after);
+        }
         return this.overlayWindow.isReady();
     }
     sendShowStellaInk(ink) {

@@ -240,7 +240,15 @@ export function ShowStellaOverlay() {
   }, [recording, setInteractive]);
 
   if (state.phase === "idle") return null;
-  const display = state.phase === "recording" ? state.display : null;
+  // macOS keeps the overlay below the menu bar, so the display's top edge can
+  // sit above the window; keep the edge and bar where they can be seen.
+  const display =
+    state.phase === "recording"
+      ? (() => {
+          const top = Math.max(state.display.y, 0);
+          return { ...state.display, y: top, height: state.display.height - (top - state.display.y) };
+        })()
+      : null;
   const shift = isMac() ? "⇧" : "Shift";
 
   return (

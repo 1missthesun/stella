@@ -76,6 +76,8 @@ import {
   IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN,
   IPC_CLAUDE_ACCOUNTS_CHANGED,
   IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN,
+  IPC_CLAUDE_ACCOUNTS_INSTALL_CLI,
+  IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS,
   IPC_CLAUDE_ACCOUNTS_LIST,
   IPC_CLAUDE_ACCOUNTS_SIGN_OUT,
   IPC_CLAUDE_ACCOUNTS_START_LOGIN,
@@ -796,6 +798,8 @@ export const createElectronApi = (
       signOutClaudeLocalConfig: (configId: string) =>
         ipc.invoke(IPC_CLAUDE_ACCOUNTS_SIGN_OUT, { configId }),
       onClaudeLocalAccountsChanged: onSignal(IPC_CLAUDE_ACCOUNTS_CHANGED),
+      installClaudeCli: invoker(IPC_CLAUDE_ACCOUNTS_INSTALL_CLI),
+      onClaudeCliInstallProgress: on(IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS),
       connectChatGptCloud: (options?: {
         accountId?: string;
         clientId?: string;

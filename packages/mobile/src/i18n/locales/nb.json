@@ -1909,7 +1909,22 @@
         "signIn": "Logg på",
         "title": "Velg din AI",
         "use": "Bruk",
-        "waiting": "Fullfør påloggingen i nettleseren, og kom så tilbake hit."
+        "waiting": "Fullfør påloggingen i nettleseren, og kom så tilbake hit.",
+        "settledNone": "Ingen AI valgt ennå",
+        "settledNoneDesc": "Logg inn eller koble til et abonnement når som helst for å begynne å chatte.",
+        "fineOwnPlan": "ChatGPT og Claude Code bruker ditt eget abonnement hos OpenAI eller Anthropic. Endre dette når som helst i Innstillinger.",
+        "claudeInstall": {
+          "checking": "Gjør klar Claude Code…",
+          "downloading": "Laster ned Claude Code… {percent} %",
+          "downloadingNoTotal": "Laster ned Claude Code…",
+          "settingUp": "Setter opp Claude Code…",
+          "why": "Stella bruker Claude Code fra Anthropic for å jobbe med Claude-abonnementet ditt. Dette tar omtrent ett minutt.",
+          "offline": "Fikk ikke kontakt med Anthropic for å laste ned Claude Code. Sjekk internettforbindelsen.",
+          "unavailable": "Anthropic tilbyr ikke Claude Code for denne datamaskinen eller i din region.",
+          "failed": "Claude Code ble ikke installert.",
+          "retry": "Prøv igjen",
+          "manual": "Installer selv"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

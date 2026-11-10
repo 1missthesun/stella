@@ -53,6 +53,8 @@ import type {
   ChatGptProfilesState,
 } from "../chatgpt-siwc-types.js";
 import type {
+  ClaudeCliInstallProgress,
+  ClaudeCliInstallResult,
   ClaudeLocalAccountsState,
   ClaudeLocalConfig,
   ClaudeLocalLoginStart,
@@ -191,6 +193,8 @@ import {
   IPC_CHATGPT_SIGN_OUT,
   IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN,
   IPC_CLAUDE_ACCOUNTS_CHANGED,
+  IPC_CLAUDE_ACCOUNTS_INSTALL_CLI,
+  IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS,
   IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN,
   IPC_CLAUDE_ACCOUNTS_LIST,
   IPC_CLAUDE_ACCOUNTS_SIGN_OUT,
@@ -1274,6 +1278,7 @@ export type IpcInvokeContract = {
     { removed: boolean }
   >;
   [IPC_CLAUDE_ACCOUNTS_LIST]: Invoke<[], ClaudeLocalAccountsState>;
+  [IPC_CLAUDE_ACCOUNTS_INSTALL_CLI]: Invoke<[], ClaudeCliInstallResult>;
   [IPC_CLAUDE_ACCOUNTS_START_LOGIN]: Invoke<
     [payload: { configId?: string; email?: string }],
     ClaudeLocalLoginStart
@@ -1738,6 +1743,7 @@ export type IpcEventContract = {
   [IPC_PREFERENCES_WAKE_WORD_CHANGED]: boolean;
   [IPC_PREFERENCES_MODELS_UPDATED]: RuntimeModelCatalogSnapshot;
   [IPC_CLAUDE_ACCOUNTS_CHANGED]: void;
+  [IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS]: ClaudeCliInstallProgress;
   [IPC_CHATGPT_PROFILES_CHANGED]: void;
   [IPC_USER_ASK_OPENED]: UserAsk;
   [IPC_USER_ASK_UPDATED]: UserAsk;

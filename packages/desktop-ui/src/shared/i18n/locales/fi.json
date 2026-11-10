@@ -1909,7 +1909,22 @@
         "signIn": "Kirjaudu",
         "title": "Valitse tekoälysi",
         "use": "Käytä",
-        "waiting": "Viimeistele kirjautuminen selaimessasi ja palaa sitten tänne."
+        "waiting": "Viimeistele kirjautuminen selaimessasi ja palaa sitten tänne.",
+        "settledNone": "Tekoälyä ei ole vielä valittu",
+        "settledNoneDesc": "Kirjaudu tai yhdistä tilaus milloin tahansa aloittaaksesi.",
+        "fineOwnPlan": "ChatGPT ja Claude Code käyttävät omaa OpenAI- tai Anthropic-tilaustasi. Voit muuttaa tämän milloin tahansa asetuksista.",
+        "claudeInstall": {
+          "checking": "Valmistellaan Claude Codea…",
+          "downloading": "Ladataan Claude Codea… {percent} %",
+          "downloadingNoTotal": "Ladataan Claude Codea…",
+          "settingUp": "Otetaan Claude Code käyttöön…",
+          "why": "Stella käyttää Anthropicin Claude Codea toimiakseen Claude-tilauksesi kanssa. Tämä kestää noin minuutin.",
+          "offline": "Anthropiciin ei saatu yhteyttä Claude Coden lataamiseksi. Tarkista internetyhteytesi.",
+          "unavailable": "Anthropic ei tarjoa Claude Codea tälle tietokoneelle tai alueellesi.",
+          "failed": "Claude Codea ei asennettu.",
+          "retry": "Yritä uudelleen",
+          "manual": "Asenna itse"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

@@ -1900,7 +1900,22 @@
         "signIn": "サインイン",
         "title": "AIを選ぶ",
         "use": "使う",
-        "waiting": "ブラウザーでサインインを完了して、こちらに戻ってください。"
+        "waiting": "ブラウザーでサインインを完了して、こちらに戻ってください。",
+        "settledNone": "まだ AI が選ばれていません",
+        "settledNoneDesc": "いつでもサインインするかプランを接続すると、チャットを始められます。",
+        "fineOwnPlan": "ChatGPT と Claude Code は、OpenAI または Anthropic のご自身のサブスクリプションを使います。設定からいつでも変更できます。",
+        "claudeInstall": {
+          "checking": "Claude Code を準備しています…",
+          "downloading": "Claude Code をダウンロード中… {percent}%",
+          "downloadingNoTotal": "Claude Code をダウンロード中…",
+          "settingUp": "Claude Code をセットアップしています…",
+          "why": "Stella は Anthropic の Claude Code を使って、あなたの Claude プランと連携します。1 分ほどかかります。",
+          "offline": "Claude Code をダウンロードするために Anthropic に接続できませんでした。インターネット接続を確認してください。",
+          "unavailable": "Anthropic はこのコンピューター向け、またはお住まいの地域で Claude Code を提供していません。",
+          "failed": "Claude Code をインストールできませんでした。",
+          "retry": "もう一度試す",
+          "manual": "自分でインストール"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

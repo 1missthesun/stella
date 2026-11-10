@@ -99,6 +99,8 @@ import {
   IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN,
   IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN,
   IPC_CLAUDE_ACCOUNTS_SIGN_OUT,
+  IPC_CLAUDE_ACCOUNTS_INSTALL_CLI,
+  IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS,
   IPC_CHATGPT_PROFILES_CHANGED,
   IPC_CHATGPT_LIST_PROFILES,
   IPC_CHATGPT_SIGN_IN,
@@ -1247,6 +1249,13 @@ export const registerSystemHandlers = (options) => {
     handleIpc(IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN, (event, payload) => {
         guardClaude(event, IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN);
         return claudeAccounts.cancelLogin(asTrimmedString(payload?.loginId));
+    });
+    handleIpc(IPC_CLAUDE_ACCOUNTS_INSTALL_CLI, async (event) => {
+        guardClaude(event, IPC_CLAUDE_ACCOUNTS_INSTALL_CLI);
+        const sender = event.sender;
+        return await claudeAccounts.installCli((progress) => {
+            if (!sender.isDestroyed()) sender.send(IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS, progress);
+        });
     });
     handleIpc(IPC_CLAUDE_ACCOUNTS_SIGN_OUT, async (event, payload) => {
         guardClaude(event, IPC_CLAUDE_ACCOUNTS_SIGN_OUT);

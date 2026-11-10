@@ -18,6 +18,11 @@ import { useCloudEngines } from "@/features/cloud/cloud-engines-api";
 import { ClaudeLoginPrompt } from "@/features/claude/ClaudeLoginPrompt";
 import { useClaudeLocalAccounts } from "@/features/claude/use-claude-local-accounts";
 import { useClaudeLogin } from "@/features/claude/use-claude-login";
+import {
+  claudeInstallPercent,
+  useClaudeCliInstall,
+} from "@/features/claude/use-claude-cli-install";
+import { openExternalUrl } from "@/platform/electron/open-external";
 import { EngineConnectPrompt } from "@/features/cloud/EngineConnectPrompt";
 import { useEngineConnect } from "@/features/cloud/use-engine-connect";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
@@ -71,6 +76,8 @@ type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
 
 // Set once the card has offered its default, so a later pick of Stella survives a remount.
 const ENGINE_DEFAULT_DECIDED_KEY = "stella-onboarding-engine-default-decided";
+
+const CLAUDE_CODE_SETUP_URL = "https://code.claude.com/docs/en/setup";
 
 const hostOf = (origin: string): string => {
   try {
@@ -271,12 +278,25 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     },
   });
   const { start: startClaudeLogin } = claudeLogin;
-  const busyOption: OptionId | null = pending ?? (claudeLogin.open ? "claude" : null);
+  const cliInstall = useClaudeCliInstall();
+  const { install: installClaudeCli, reset: resetClaudeInstall } = cliInstall;
+  const installingClaude = cliInstall.state.status === "installing";
+  const busyOption: OptionId | null =
+    pending ?? (claudeLogin.open || installingClaude ? "claude" : null);
+
+  // Claude Code is missing: install it with Anthropic's installer, then go
+  // straight on to signing in to the person's Claude plan.
+  const installClaudeThenSignIn = useCallback(async () => {
+    if (!(await installClaudeCli())) return;
+    await reloadClaudeLocal();
+    void startClaudeLogin({ place: "local", configId: "default" });
+  }, [installClaudeCli, reloadClaudeLocal, startClaudeLogin]);
 
   const handleRow = useCallback(
     async (option: Option) => {
       if (busyOption) return;
       setError(null);
+      resetClaudeInstall();
       if (connected[option.id]) {
         await applyEngine(option);
         return;
@@ -291,7 +311,8 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
       }
       if (option.id === "claude") {
         if (claudeLocal.available && !claudeLocal.cliInstalled) {
-          setError(t("onboarding.chat.signin.claudeCliMissing"));
+          if (cliInstall.available) void installClaudeThenSignIn();
+          else setError(t("onboarding.chat.signin.claudeCliMissing"));
           return;
         }
         void startClaudeLogin(
@@ -327,7 +348,10 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
       claudeLocal.available,
       claudeLocal.cliInstalled,
       claudeLocal.defaultSignedOut,
+      cliInstall.available,
       connected,
+      installClaudeThenSignIn,
+      resetClaudeInstall,
       signInChatGpt,
       startClaudeLogin,
       startConnect,
@@ -360,7 +384,9 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
           })
         : selfHosted
           ? t("selfHost.onboarding.settled", { name: serverName })
-          : t("onboarding.chat.signin.settledStella");
+          : anyConnected
+            ? t("onboarding.chat.signin.settledStella")
+            : t("onboarding.chat.signin.settledNone");
     return (
       <div className="obc-card" data-settled>
         <span className="obc-card__settled-icon">
@@ -369,7 +395,9 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
         <span className="obc-card__settled-text">
           <span className="obc-card__settled-title">{label}</span>
           <span className="obc-card__settled-desc">
-            {t("onboarding.chat.signin.settledDesc")}
+            {anyConnected || selfHosted
+              ? t("onboarding.chat.signin.settledDesc")
+              : t("onboarding.chat.signin.settledNoneDesc")}
           </span>
         </span>
       </div>
@@ -517,7 +545,57 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
         </form>
       ) : null}
 
-      {claudeLogin.open ? (
+      {cliInstall.state.status === "installing" ? (
+        <div className="obc-claude-install" role="status" aria-live="polite">
+          <p className="obc-claude-install__label">
+            {cliInstall.state.progress.phase === "setting-up"
+              ? t("onboarding.chat.signin.claudeInstall.settingUp")
+              : cliInstall.state.progress.phase === "checking"
+                ? t("onboarding.chat.signin.claudeInstall.checking")
+                : claudeInstallPercent(cliInstall.state.progress) !== null
+                  ? t("onboarding.chat.signin.claudeInstall.downloading", {
+                      percent: claudeInstallPercent(cliInstall.state.progress) ?? 0,
+                    })
+                  : t("onboarding.chat.signin.claudeInstall.downloadingNoTotal")}
+          </p>
+          <span
+            className="obc-claude-install__bar"
+            data-indeterminate={
+              claudeInstallPercent(cliInstall.state.progress) === null || undefined
+            }
+          >
+            <span
+              style={{
+                width: `${
+                  cliInstall.state.progress.phase === "setting-up"
+                    ? 100
+                    : (claudeInstallPercent(cliInstall.state.progress) ?? 0)
+                }%`,
+              }}
+            />
+          </span>
+          <p className="obc-card__fine">{t("onboarding.chat.signin.claudeInstall.why")}</p>
+        </div>
+      ) : cliInstall.state.status === "error" ? (
+        <p className="obc-card__fine obc-card__fine--error" role="alert">
+          {t(`onboarding.chat.signin.claudeInstall.${cliInstall.state.kind}`)}{" "}
+          <button
+            type="button"
+            className="obc-link-btn"
+            onClick={() => void installClaudeThenSignIn()}
+          >
+            {t("onboarding.chat.signin.claudeInstall.retry")}
+          </button>
+          {" · "}
+          <button
+            type="button"
+            className="obc-link-btn"
+            onClick={() => openExternalUrl(CLAUDE_CODE_SETUP_URL)}
+          >
+            {t("onboarding.chat.signin.claudeInstall.manual")}
+          </button>
+        </p>
+      ) : claudeLogin.open ? (
         <ClaudeLoginPrompt login={claudeLogin} />
       ) : connect.flow ? (
         <EngineConnectPrompt connect={connect} />
@@ -533,7 +611,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
           {error}
         </p>
       ) : (
-        <p className="obc-card__fine">{t("onboarding.chat.signin.fine")}</p>
+        <p className="obc-card__fine">{t("onboarding.chat.signin.fineOwnPlan")}</p>
       )}
 
       <div className="obc-actions">

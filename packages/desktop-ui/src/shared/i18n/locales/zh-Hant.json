@@ -1900,7 +1900,22 @@
         "signIn": "登入",
         "title": "選擇你的 AI",
         "use": "使用",
-        "waiting": "請在瀏覽器中完成登入，然後回到這裡。"
+        "waiting": "請在瀏覽器中完成登入，然後回到這裡。",
+        "settledNone": "尚未選擇 AI",
+        "settledNoneDesc": "隨時登入或連結方案即可開始聊天。",
+        "fineOwnPlan": "ChatGPT 和 Claude Code 使用你自己在 OpenAI 或 Anthropic 的訂閱。可隨時在設定中更改。",
+        "claudeInstall": {
+          "checking": "正在準備 Claude Code…",
+          "downloading": "正在下載 Claude Code… {percent}%",
+          "downloadingNoTotal": "正在下載 Claude Code…",
+          "settingUp": "正在設定 Claude Code…",
+          "why": "Stella 透過 Anthropic 的 Claude Code 使用你的 Claude 方案。大約需要一分鐘。",
+          "offline": "無法連線到 Anthropic 下載 Claude Code。請檢查網路連線。",
+          "unavailable": "Anthropic 不為這台電腦或你所在的地區提供 Claude Code。",
+          "failed": "Claude Code 未能安裝。",
+          "retry": "重試",
+          "manual": "自行安裝"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

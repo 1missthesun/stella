@@ -13,6 +13,11 @@ import {
   buildExternalCliChildEnv,
   resolveExternalCliPath,
 } from "@stella/runtime/kernel/integrations/external-cli-resolution";
+import {
+  installClaudeCli,
+  type ClaudeCliInstallProgress,
+  type ClaudeCliInstallResult,
+} from "./claude-cli-install.js";
 import type { EngineAccountAccess } from "./engine-account-access.js";
 
 const ACCOUNTS_DIR = "claude-accounts";
@@ -99,6 +104,9 @@ export class ClaudeLocalAccounts {
   private lastFailed: { key: string; at: number } | null = null;
   private deviceId: string | null = null;
   private readonly unsubscribe: () => void;
+  private installing: Promise<ClaudeCliInstallResult> | null = null;
+  private readonly installListeners = new Set<(progress: ClaudeCliInstallProgress) => void>();
+  private readonly installAbort = new AbortController();
 
   constructor(private readonly options: ClaudeLocalAccountsOptions) {
     this.unsubscribe = options.engineAccounts.onSettingsChanged(() => {
@@ -338,8 +346,46 @@ export class ClaudeLocalAccounts {
     return { ok: true };
   }
 
+  /**
+   * Installs Claude Code with Anthropic's installer when it's missing, for
+   * someone who picks it in onboarding. One install at a time; a second
+   * caller joins the first and gets its progress from then on.
+   */
+  async installCli(
+    onProgress: (progress: ClaudeCliInstallProgress) => void,
+  ): Promise<ClaudeCliInstallResult> {
+    const existing = this.resolveCli();
+    if (existing) {
+      this.broadcastIfChanged();
+      return { status: "installed", version: null, executable: existing };
+    }
+    this.installListeners.add(onProgress);
+    try {
+      if (!this.installing) {
+        this.installing = installClaudeCli({
+          signal: this.installAbort.signal,
+          onProgress: (progress) => {
+            for (const listener of this.installListeners) listener(progress);
+          },
+        }).finally(() => {
+          this.installing = null;
+        });
+      }
+      const result = await this.installing;
+      if (result.status === "installed") {
+        this.resolveCli();
+        await this.refresh().catch(() => undefined);
+        this.broadcastIfChanged();
+      }
+      return result;
+    } finally {
+      this.installListeners.delete(onProgress);
+    }
+  }
+
   dispose(): void {
     this.unsubscribe();
+    this.installAbort.abort();
     for (const pending of [...this.logins.values()]) this.endLogin(pending, { kill: true });
   }
 

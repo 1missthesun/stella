@@ -1927,7 +1927,22 @@
         "signIn": "Přihlásit se",
         "title": "Vyberte si AI",
         "use": "Použít",
-        "waiting": "Dokonči přihlášení v prohlížeči a pak se vrať sem."
+        "waiting": "Dokonči přihlášení v prohlížeči a pak se vrať sem.",
+        "settledNone": "Zatím není vybrána žádná AI",
+        "settledNoneDesc": "Kdykoli se přihlaste nebo připojte předplatné a můžete začít chatovat.",
+        "fineOwnPlan": "ChatGPT a Claude Code používají vaše vlastní předplatné u OpenAI nebo Anthropic. Změnit to můžete kdykoli v Nastavení.",
+        "claudeInstall": {
+          "checking": "Připravuji Claude Code…",
+          "downloading": "Stahuji Claude Code… {percent} %",
+          "downloadingNoTotal": "Stahuji Claude Code…",
+          "settingUp": "Nastavuji Claude Code…",
+          "why": "Stella používá Claude Code od Anthropicu, aby mohla pracovat s vaším předplatným Claude. Trvá to asi minutu.",
+          "offline": "Nepodařilo se spojit s Anthropicem a stáhnout Claude Code. Zkontrolujte připojení k internetu.",
+          "unavailable": "Anthropic nenabízí Claude Code pro tento počítač nebo ve vaší oblasti.",
+          "failed": "Claude Code se nenainstaloval.",
+          "retry": "Zkusit znovu",
+          "manual": "Nainstalovat ručně"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

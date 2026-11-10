@@ -304,6 +304,9 @@ export const IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN =
   "claudeAccounts:cancelLogin" as const;
 export const IPC_CLAUDE_ACCOUNTS_SIGN_OUT = "claudeAccounts:signOut" as const;
 export const IPC_CLAUDE_ACCOUNTS_CHANGED = "claudeAccounts:changed" as const;
+export const IPC_CLAUDE_ACCOUNTS_INSTALL_CLI = "claudeAccounts:installCli" as const;
+export const IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS =
+  "claudeAccounts:installProgress" as const;
 export const IPC_ENGINE_ACCOUNTS_CONNECT_CHATGPT_CLOUD =
   "engineAccounts:connectChatGptCloud" as const;
 export const IPC_ENGINE_ACCOUNTS_CANCEL_CONNECT_CHATGPT_CLOUD =

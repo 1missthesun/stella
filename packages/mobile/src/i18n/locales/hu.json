@@ -1909,7 +1909,22 @@
         "signIn": "Bejelentkezés",
         "title": "Válaszd ki az MI-t",
         "use": "Használat",
-        "waiting": "Fejezd be a bejelentkezést a böngészőben, aztán gyere vissza ide."
+        "waiting": "Fejezd be a bejelentkezést a böngészőben, aztán gyere vissza ide.",
+        "settledNone": "Még nincs kiválasztva AI",
+        "settledNoneDesc": "Jelentkezz be vagy kapcsolj össze egy előfizetést bármikor, és kezdhetsz is.",
+        "fineOwnPlan": "A ChatGPT és a Claude Code a saját OpenAI- vagy Anthropic-előfizetésedet használja. Ezt bármikor módosíthatod a Beállításokban.",
+        "claudeInstall": {
+          "checking": "A Claude Code előkészítése…",
+          "downloading": "A Claude Code letöltése… {percent}%",
+          "downloadingNoTotal": "A Claude Code letöltése…",
+          "settingUp": "A Claude Code beállítása…",
+          "why": "A Stella az Anthropic Claude Code alkalmazásával dolgozik a Claude-előfizetéseddel. Ez körülbelül egy percig tart.",
+          "offline": "Nem sikerült elérni az Anthropicot a Claude Code letöltéséhez. Ellenőrizd az internetkapcsolatot.",
+          "unavailable": "Az Anthropic nem kínálja a Claude Code-ot ehhez a számítógéphez vagy a régiódban.",
+          "failed": "A Claude Code nem települt.",
+          "retry": "Próbáld újra",
+          "manual": "Telepítsd magad"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

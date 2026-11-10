@@ -1909,7 +1909,22 @@
         "signIn": "Σύνδεση",
         "title": "Επιλέξτε την ΤΝ σας",
         "use": "Χρήση",
-        "waiting": "Ολοκλήρωσε τη σύνδεση στο πρόγραμμα περιήγησής σου και μετά γύρνα εδώ."
+        "waiting": "Ολοκλήρωσε τη σύνδεση στο πρόγραμμα περιήγησής σου και μετά γύρνα εδώ.",
+        "settledNone": "Δεν έχει επιλεγεί AI ακόμα",
+        "settledNoneDesc": "Συνδεθείτε ή συνδέστε μια συνδρομή οποιαδήποτε στιγμή για να ξεκινήσετε.",
+        "fineOwnPlan": "Το ChatGPT και το Claude Code χρησιμοποιούν τη δική σας συνδρομή στην OpenAI ή στην Anthropic. Αλλάξτε το οποιαδήποτε στιγμή στις Ρυθμίσεις.",
+        "claudeInstall": {
+          "checking": "Προετοιμασία του Claude Code…",
+          "downloading": "Λήψη του Claude Code… {percent}%",
+          "downloadingNoTotal": "Λήψη του Claude Code…",
+          "settingUp": "Ρύθμιση του Claude Code…",
+          "why": "Η Stella χρησιμοποιεί το Claude Code της Anthropic για να δουλεύει με τη συνδρομή σας στο Claude. Διαρκεί περίπου ένα λεπτό.",
+          "offline": "Δεν ήταν δυνατή η σύνδεση με την Anthropic για τη λήψη του Claude Code. Ελέγξτε τη σύνδεσή σας στο διαδίκτυο.",
+          "unavailable": "Η Anthropic δεν προσφέρει το Claude Code για αυτόν τον υπολογιστή ή στην περιοχή σας.",
+          "failed": "Το Claude Code δεν εγκαταστάθηκε.",
+          "retry": "Δοκιμάστε ξανά",
+          "manual": "Εγκαταστήστε το μόνοι σας"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

@@ -1927,7 +1927,22 @@
         "signIn": "Войти",
         "title": "Выберите ИИ",
         "use": "Использовать",
-        "waiting": "Завершите вход в браузере и возвращайтесь сюда."
+        "waiting": "Завершите вход в браузере и возвращайтесь сюда.",
+        "settledNone": "ИИ пока не выбран",
+        "settledNoneDesc": "Войдите или подключите подписку в любой момент, чтобы начать общение.",
+        "fineOwnPlan": "ChatGPT и Claude Code используют вашу собственную подписку OpenAI или Anthropic. Это можно изменить в любой момент в Настройках.",
+        "claudeInstall": {
+          "checking": "Подготовка Claude Code…",
+          "downloading": "Загрузка Claude Code… {percent}%",
+          "downloadingNoTotal": "Загрузка Claude Code…",
+          "settingUp": "Настройка Claude Code…",
+          "why": "Stella использует Claude Code от Anthropic, чтобы работать с вашей подпиской Claude. Это займёт около минуты.",
+          "offline": "Не удалось связаться с Anthropic, чтобы загрузить Claude Code. Проверьте подключение к интернету.",
+          "unavailable": "Anthropic не предлагает Claude Code для этого компьютера или в вашем регионе.",
+          "failed": "Claude Code не установился.",
+          "retry": "Повторить",
+          "manual": "Установить самостоятельно"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

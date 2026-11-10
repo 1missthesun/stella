@@ -1927,7 +1927,22 @@
         "signIn": "Zaloguj się",
         "title": "Wybierz swoją AI",
         "use": "Użyj",
-        "waiting": "Dokończ logowanie w przeglądarce, a potem wróć tutaj."
+        "waiting": "Dokończ logowanie w przeglądarce, a potem wróć tutaj.",
+        "settledNone": "Nie wybrano jeszcze AI",
+        "settledNoneDesc": "Zaloguj się lub połącz plan w dowolnej chwili, aby zacząć rozmowę.",
+        "fineOwnPlan": "ChatGPT i Claude Code korzystają z Twojej własnej subskrypcji w OpenAI lub Anthropic. Możesz to zmienić w dowolnej chwili w Ustawieniach.",
+        "claudeInstall": {
+          "checking": "Przygotowuję Claude Code…",
+          "downloading": "Pobieram Claude Code… {percent}%",
+          "downloadingNoTotal": "Pobieram Claude Code…",
+          "settingUp": "Konfiguruję Claude Code…",
+          "why": "Stella używa Claude Code od Anthropic, aby działać z Twoim planem Claude. Zajmie to około minuty.",
+          "offline": "Nie udało się połączyć z Anthropic, aby pobrać Claude Code. Sprawdź połączenie z internetem.",
+          "unavailable": "Anthropic nie oferuje Claude Code na ten komputer lub w Twoim regionie.",
+          "failed": "Claude Code się nie zainstalował.",
+          "retry": "Spróbuj ponownie",
+          "manual": "Zainstaluj samodzielnie"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

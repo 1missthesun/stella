@@ -1918,7 +1918,22 @@
         "signIn": "התחבר",
         "title": "בחרו את ה-AI שלכם",
         "use": "השתמש",
-        "waiting": "סיים את ההתחברות בדפדפן, ואז חזור לכאן."
+        "waiting": "סיים את ההתחברות בדפדפן, ואז חזור לכאן.",
+        "settledNone": "עדיין לא נבחר AI",
+        "settledNoneDesc": "התחבר או חבר מינוי בכל עת כדי להתחיל לשוחח.",
+        "fineOwnPlan": "ChatGPT ו-Claude Code משתמשים במינוי שלך אצל OpenAI או Anthropic. אפשר לשנות זאת בכל עת בהגדרות.",
+        "claudeInstall": {
+          "checking": "מכין את Claude Code…",
+          "downloading": "מוריד את Claude Code… {percent}%",
+          "downloadingNoTotal": "מוריד את Claude Code…",
+          "settingUp": "מגדיר את Claude Code…",
+          "why": "Stella משתמשת ב-Claude Code של Anthropic כדי לעבוד עם המינוי שלך ל-Claude. זה לוקח בערך דקה.",
+          "offline": "לא הצלחנו להגיע ל-Anthropic כדי להוריד את Claude Code. בדוק את החיבור לאינטרנט.",
+          "unavailable": "Anthropic לא מציעה את Claude Code למחשב הזה או באזור שלך.",
+          "failed": "Claude Code לא הותקן.",
+          "retry": "נסה שוב",
+          "manual": "התקן בעצמך"
+        }
       },
       "skipSetup": "Skip setup",
       "theme": {

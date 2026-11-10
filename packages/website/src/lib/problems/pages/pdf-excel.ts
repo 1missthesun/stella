@@ -118,4 +118,121 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       { label: "OCRmyPDF", href: "https://ocrmypdf.readthedocs.io" },
     ],
   },
+  {
+    slug: "compress-pdf-too-large-to-email",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "reduce pdf file size",
+      "compress pdf",
+      "pdf too large to email",
+      "scanned pdf too large to email",
+      "pdf too large to email outlook",
+    ],
+    title: "Compress a PDF on your computer (too large to email?)",
+    description:
+      "PDF too large to email? Reduce the file size on your own computer with Preview or Ghostscript, no upload needed, or let Stella (stella.sh) make a smaller, readable copy.",
+    h1: "Reduce PDF file size when it's too large to email",
+    short: "Compress a PDF to email it",
+    answer:
+      "Most oversized PDFs are scans, where every page is a large photo. Shrink the images and the file drops to a fraction of its size: on a Mac, Preview's Export with the Reduce File Size filter; on Windows, the free Ghostscript with its /ebook setting. Online compressors work too, but they upload your file. Stella (stella.sh) makes a smaller copy on your computer, checks the pages are still readable and leaves the original alone.",
+    stellaSteps: [
+      "Finds the file (in the recording, “the tax documents one in my Downloads”) and looks at why it's big: here, 14 full-colour page scans at 300 ppi and no text layer",
+      "Tries a couple of Ghostscript settings on a copy, never on the original",
+      "Renders pages from the original and the copy and looks at them side by side to check the small print is still readable",
+      "Saves the smaller copy next to the original with “- compressed” in the name, checks it with `qpdf --check`, and removes its own temporary files",
+      "Tells you the before and after sizes, and anything worth knowing about the file, such as that it has no searchable text",
+    ],
+    prompt:
+      "This PDF is too big to email (it says the limit is 25 MB). Make it small enough without making it unreadable. It's the tax documents one in my Downloads.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "38.2 MB down to 4.96 MB (13% of the original) on the first try, in about 70 seconds. The original was untouched (same checksum). Checked afterwards: the small print looks the same in a 1:1 crop, OCR reads the same 85 words from a page of both files, and the pages are still full resolution, just compressed harder.",
+      note: "The PDF is 14 scanned-looking pages of fictitious invoices, bills and letters, made for this run. The waits are sped up 6× and 4×; the end shows the copy opened in Stella's own PDF viewer.",
+      video: {
+        src: `${PROOFS}/pdf-excel/compress-pdf-too-large-to-email/proof.mp4`,
+        poster: `${PROOFS}/pdf-excel/compress-pdf-too-large-to-email/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 70.8,
+        realDuration: 80,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 38 MB scanned PDF is in Downloads." },
+        { at: 4, text: "The prompt: too big to email, make it small enough without making it unreadable." },
+        { at: 7, text: "Stella replies that it will make a smaller copy and leave the original untouched." },
+        { at: 8, text: "Inspecting the scans, trying two Ghostscript settings and comparing pages by eye, sped up 6×." },
+        { at: 22, text: "Done: about 4.7 MB, down from 36.4 (Stella counts in MiB), original untouched, with a note that it's image-only with no searchable text." },
+        { at: 44, text: "The compressed copy opened from the chat in Stella's PDF viewer." },
+        { at: 61, text: "Paging through: the invoices and bills are still sharp." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/pdf-excel/compress-pdf-too-large-to-email/legibility.jpg`,
+          alt: "The same crop of page 4 from both files, side by side: a Kirkstall Motors invoice header and address. The original is 36.4 MiB, Stella's copy 4.7 MiB, and the text looks the same.",
+          width: 2224,
+          height: 803,
+          caption: "Our check after the run: the same 1:1 crop from the original and from Stella's copy.",
+        },
+      ],
+    },
+    manualTitle: "Shrink it yourself, without uploading it",
+    manualSteps: [
+      {
+        title: "Know the limit you're aiming for",
+        body: "Gmail allows 25 MB per email and turns bigger attachments into a Google Drive link; Outlook's own guidance says 20 MB; job and visa portals often stop at 2 to 10 MB. Attachments grow by about a third in transit, so aim well under the limit.",
+      },
+      {
+        title: "On a Mac: Preview's Export",
+        body: "Open the PDF in Preview, choose File, Export, and pick Reduce File Size in the Quartz Filter menu (newer versions also offer “Optimize images for screen”). Save under a new name and check the pages: it can blur small print, and a text-only PDF may not shrink at all.",
+      },
+      {
+        title: "On Windows (or anywhere): Ghostscript",
+        body: "Install the free Ghostscript, open Command Prompt in the PDF's folder and run `gswin64c -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -sOutputFile=small.pdf big.pdf` (`gs` on Mac and Linux). /ebook keeps images at about 150 dpi; /screen is smaller and blurrier, /printer larger and sharper.",
+      },
+      {
+        title: "Scan smaller next time",
+        body: "Most scanner apps default to colour at 300 or 600 dpi. For paperwork, 200 to 300 dpi in greyscale is plenty and makes files several times smaller from the start.",
+      },
+      {
+        title: "Still too big? Split it or send a link",
+        body: "Split the file into two emails (in Preview, drag pages out into a new document; or `qpdf --split-pages`), or upload it to OneDrive or Google Drive and send a link. Online compressors like iLovePDF and Smallpdf work, but you're uploading tax papers or IDs to their servers.",
+      },
+    ],
+    limits: [
+      "It compressed much harder than it needed to: 4.96 MB for a 25 MB limit. It's clearly readable, but say “keep as much quality as fits under 20 MB” if you'd rather have sharper pages.",
+      "It didn't offer to make the scan searchable. Ask for OCR in the same chat if you want to search or copy the text later.",
+      "Ghostscript was already installed on the test computer. On Windows, expect Stella to install it or another tool first, which hasn't been recorded yet.",
+      "To check readability, Stella looks at rendered pages, so page images go to the AI model you use in Stella. Choose your model accordingly for very sensitive documents.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why is my PDF so big?",
+        a: "Usually because each page is a high-resolution colour photo: a scan, a phone capture, or a design export full of images. Text-only PDFs are small already, which is why compressing them barely helps.",
+      },
+      {
+        q: "Will compressing a PDF make it blurry?",
+        a: "It can. Strong settings (Ghostscript's /screen, or Preview's filter on some versions) visibly soften small print. Always open the smaller copy and zoom in on the finest text before you send it.",
+      },
+      {
+        q: "Is it safe to use an online PDF compressor?",
+        a: "The big ones are reputable, but the file still leaves your computer. For tax returns, payslips, bank statements and passports, compressing locally avoids the question entirely.",
+      },
+      {
+        q: "Can Stella also rename or combine my PDFs?",
+        a: "Yes, in the same chat. It can [rename PDFs by what's in them](/how/photos-files/rename-pdf-files-based-on-content), merge several into one, or pull the numbers out of [bank statements into Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
+      },
+    ],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content"],
+    lastChecked: "2026-11-10",
+    sources: [
+      { label: "Apple: Reduce the size of a PDF in Preview", href: "https://support.apple.com/guide/preview/reduce-the-size-of-a-pdf-prvw1509/mac" },
+      { label: "Ghostscript: Optimizing PDFs", href: "https://ghostscript.com/blog/optimizing-pdfs.html" },
+      { label: "Microsoft: Reduce attachment size to send large files with Outlook", href: "https://support.microsoft.com/en-us/outlook/reduce-attachment-size-to-send-large-files-with-outlook" },
+    ],
+  },
 ];

@@ -46,11 +46,11 @@ export const NICHES: Niche[] = [
     slug: "pdf-excel",
     name: "PDFs and Excel",
     h1: "PDFs and spreadsheets, sorted.",
-    title: "PDF and Excel how-tos: statements, tables, merges",
+    title: "PDF and Excel how-tos: compress, convert, combine",
     description:
-      "How to get tables out of PDFs and into Excel: bank statements, invoices and reports, with Excel's own tools or with Stella (stella.sh) on your own files.",
+      "Shrink a PDF that's too large to email and get tables like bank statements into Excel, with free tools or with Stella (stella.sh) on your own files, no uploads.",
     intro:
-      "Getting numbers out of PDFs and into a clean spreadsheet is fiddly by hand. Each guide shows Excel's own route first, then Stella (stella.sh) doing it with a real file.",
+      "PDFs are where office jobs get fiddly: files too big to send, numbers stuck in tables you can't copy. Each guide shows the free route first, then Stella (stella.sh) doing it with a real file.",
   },
 ];
 

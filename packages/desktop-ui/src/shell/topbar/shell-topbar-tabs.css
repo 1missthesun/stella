@@ -287,7 +287,9 @@
   transition: opacity 0.12s ease;
 }
 
-.topbar-tabs__tab:hover .topbar-tabs__close,
+.topbar-tabs__tab:not([data-compact="true"]):hover .topbar-tabs__close,
+.topbar-tabs__tab[data-compact="true"][data-active="true"]:hover
+  .topbar-tabs__close,
 .topbar-tabs__tab:has(:focus-visible) .topbar-tabs__close,
 .topbar-tabs__tab[data-active="true"]:not([data-compact="true"], [data-tight="true"])
   .topbar-tabs__close {
@@ -305,7 +307,9 @@
   box-shadow: var(--focus-ring);
 }
 
-/* A narrowed tab swaps its icon for the close button on hover. */
+/* A narrowed tab swaps its icon for the close button on hover. Down at icon
+   only, just the open tab does: there the button would cover the whole
+   tab, and a click meant to open a tab would close it. */
 .topbar-tabs__tab[data-compact="true"] .topbar-tabs__close {
   right: calc(50% - 8px);
 }
@@ -316,7 +320,8 @@
   left: 9px;
 }
 
-.topbar-tabs__tab[data-compact="true"]:hover .topbar-tabs__icon,
+.topbar-tabs__tab[data-compact="true"][data-active="true"]:hover
+  .topbar-tabs__icon,
 .topbar-tabs__tab[data-compact="true"]:has(:focus-visible) .topbar-tabs__icon,
 .topbar-tabs__tab[data-tight="true"]:hover
   .topbar-tabs__icon,

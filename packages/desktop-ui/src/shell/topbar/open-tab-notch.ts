@@ -8,6 +8,8 @@ const RIGHT = "--topbar-open-tab-right";
 // lies level with it in the same colour, so the two meet without a gap at
 // any scale.
 const FOOT_REACH = 7;
+/** `--topbar-tab-foot`: how far a foot stands out from the tab. */
+const FOOT_SIZE = 8;
 const REACH_GAP = 12;
 const REACH_GROW_DELAY_MS = 500;
 
@@ -29,6 +31,17 @@ export function syncOpenTabNotch(strip: HTMLElement | null): void {
       ?.getBoundingClientRect();
     left = Math.max(tab.left - FOOT_REACH, chat?.right ?? bounds.left);
     right = Math.min(tab.right + FOOT_REACH, bounds.right);
+    // Scrolled under the pinned Chat tab, the open tab is cut at Chat's edge
+    // so its feet do not show through below Chat.
+    const hidden = chat ? chat.right - (tab.left - FOOT_SIZE) : 0;
+    const clip =
+      hidden > 0 ? `inset(0 -${FOOT_SIZE}px 0 ${hidden - FOOT_SIZE}px)` : "";
+    if (open.style.clipPath !== clip) open.style.clipPath = clip;
+  }
+  for (const tab of strip?.querySelectorAll<HTMLElement>(
+    ".topbar-tabs__tab[data-tab-id]",
+  ) ?? []) {
+    if (tab !== open && tab.style.clipPath) tab.style.clipPath = "";
   }
   if (right > left) {
     const nextLeft = `${left}px`;
@@ -43,6 +56,26 @@ export function syncOpenTabNotch(strip: HTMLElement | null): void {
     root.style.removeProperty(LEFT);
     root.style.removeProperty(RIGHT);
   }
+}
+
+/**
+ * When the strip gets narrower than its tabs, keep the open tab (with its
+ * feet) inside the part that shows, clear of the pinned Chat tab.
+ */
+function revealOpenTab(strip: HTMLElement): void {
+  if (strip.dataset.reordering === "true") return;
+  const open = strip.querySelector<HTMLElement>(OPEN_TAB);
+  if (!open) return;
+  const tab = open.getBoundingClientRect();
+  const bounds = strip.getBoundingClientRect();
+  const chat = strip
+    .querySelector<HTMLElement>(".topbar-tabs__tab--chat")
+    ?.getBoundingClientRect();
+  const leftEdge = (chat?.right ?? bounds.left) + FOOT_REACH;
+  const over = tab.right + FOOT_REACH - bounds.right;
+  const under = leftEdge - tab.left;
+  if (over > 0.5) strip.scrollLeft += Math.min(over, Math.max(0, -under));
+  else if (under > 0.5) strip.scrollLeft -= under;
 }
 
 /** Keep the notch under the open tab as the strip resizes, scrolls or is
@@ -65,7 +98,10 @@ export function useOpenTabNotch(
       frame =
         strip.dataset.reordering === "true" ? requestAnimationFrame(follow) : 0;
     };
-    const resizes = new ResizeObserver(sync);
+    const resizes = new ResizeObserver(() => {
+      revealOpenTab(strip);
+      sync();
+    });
     resizes.observe(strip);
     for (const tab of strip.children) resizes.observe(tab);
     const reorders = new MutationObserver(() => {

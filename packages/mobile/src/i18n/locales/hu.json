@@ -1786,7 +1786,8 @@
         "quickstartFailed": "Ezúttal nem tudtam végigolvasni a böngésződet. Kezdhetjük így is, és menet közben tanulok.",
         "selfmod": "És mivel a te számítógépeden élek, magamat is át tudom alakítani.",
         "signin": "Most válaszd ki, hogyan gondolkodjak. Használd a meglévő Claude- vagy ChatGPT-előfizetésed, a saját kulcsod vagy egy Stella-fiókot.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Egy gyors, nem kötelező kérdés: hogyan találtál rám?"
       },
       "progress": "Beállítás állapota",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Nagyon menő.",
         "signinDone": "Kész.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Ezt kihagyom."
       },
       "selfmod": {
         "body": "Hiányzik egy funkció, vagy valamit másképp szeretnél? Csak kérd. Átírom a saját kódomat, kipróbálhatod, és te döntöd el, megtartod-e.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Hogyan találtál rá a Stellára?",
+        "body": "Nem kötelező. A válaszod csak névtelen számlálásként kerül elküldésre, semmi olyannal, ami azonosítana.",
+        "skip": "Kihagyás",
+        "settledTitle": "Hogyan találtál rá a Stellára",
+        "settledSkipped": "Kihagyva",
+        "answers": {
+          "google": "Google-keresés",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok vagy Instagram",
+          "reddit": "Reddit",
+          "friend": "Egy barát",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "A ChatGPT vagy egy másik MI ajánlotta",
+          "other": "Egyéb"
+        }
       }
     },
     "legalFooter": "A Stella használatával elfogadod a {terms} és az {privacy} feltételeit.",
@@ -2712,6 +2731,11 @@
       "loadError": "A beállítást nem sikerült betölteni.",
       "saveError": "A mentés nem sikerült. Próbáld újra.",
       "retry": "Újra"
+    },
+    "anonymousCounts": {
+      "title": "Névtelen használati számok küldése",
+      "description": "Lehetővé teszi a telepítések és a napi használat számlálását: hogy a Stella telepítve lett, milyen MI-t választottál, hogy válaszolt, és hogy ma megnyitották. Egy ezen a gépen létrehozott véletlen azonosítót használ, soha nem az üzeneteidet, fájljaidat vagy fiókodat. Bejelentkezve és kijelentkezve is érvényes.",
+      "error": "Nem sikerült módosítani ezt a beállítást. Próbáld újra."
     }
   },
   "shell": {

@@ -1786,7 +1786,8 @@
         "quickstartFailed": "Ich konnte deinen Browser diesmal nicht fertig lesen. Wir können trotzdem loslegen, und ich lerne unterwegs.",
         "selfmod": "Und weil ich auf deinem Computer lebe, kann ich mich selbst verändern.",
         "signin": "Als Nächstes: Wähle, wie ich denke. Nutze dein Claude- oder ChatGPT-Abo, deinen eigenen Schlüssel oder ein Stella-Konto.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Kurze Frage, ganz freiwillig: Wie hast du mich gefunden?"
       },
       "progress": "Einrichtung",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Sehr cool.",
         "signinDone": "Erledigt.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Diese überspringen."
       },
       "selfmod": {
         "body": "Dir fehlt eine Funktion, oder du möchtest, dass etwas anders funktioniert? Sag es einfach. Ich schreibe meinen eigenen Code um, lasse dich es ausprobieren, und du entscheidest, ob du es behältst.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Wie hast du Stella gefunden?",
+        "body": "Freiwillig. Deine Antwort wird nur als anonyme Zählung gesendet, ohne etwas, das dich identifiziert.",
+        "skip": "Überspringen",
+        "settledTitle": "Wie du Stella gefunden hast",
+        "settledSkipped": "Übersprungen",
+        "answers": {
+          "google": "Google-Suche",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok oder Instagram",
+          "reddit": "Reddit",
+          "friend": "Über Freunde",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT oder eine andere KI hat es empfohlen",
+          "other": "Sonstiges"
+        }
       }
     },
     "legalFooter": "Mit der Nutzung von Stella stimmst du unseren {terms} und der {privacy} zu.",
@@ -2712,6 +2731,11 @@
       "loadError": "Diese Einstellung konnte nicht geladen werden.",
       "saveError": "Speichern fehlgeschlagen. Versuche es erneut.",
       "retry": "Erneut versuchen"
+    },
+    "anonymousCounts": {
+      "title": "Anonyme Nutzungszahlen senden",
+      "description": "Damit wir Installationen und tägliche Nutzung zählen können: dass Stella installiert wurde, welche Art von KI du gewählt hast, dass sie geantwortet hat und dass sie heute geöffnet wurde. Nutzt eine zufällige ID, die auf diesem Computer erzeugt wird, niemals deine Nachrichten, Dateien oder dein Konto. Gilt angemeldet wie abgemeldet.",
+      "error": "Diese Einstellung konnte nicht geändert werden. Versuch es noch einmal."
     }
   },
   "shell": {

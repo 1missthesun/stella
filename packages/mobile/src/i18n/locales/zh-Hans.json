@@ -1777,7 +1777,8 @@
         "quickstartFailed": "这次我没能读完你的浏览器。我们可以直接开始，我会边用边了解。",
         "selfmod": "因为我就住在你的电脑上，所以我可以改变自己。",
         "signin": "接下来，选择我的思考方式。使用你已有的 Claude 或 ChatGPT 套餐、你自己的密钥，或 Stella 账户。",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "问个简单的问题（可跳过）：你是怎么找到我的？"
       },
       "progress": "设置进度",
       "quickstart": {
@@ -1836,7 +1837,8 @@
         "selfmodDone": "太酷了。",
         "signinDone": "好了。",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "跳过这个。"
       },
       "selfmod": {
         "body": "缺少某个功能，或者想让某样东西换种方式运作？直接告诉我。我会重写自己的代码，让你试用，是否保留由你决定。",
@@ -1917,6 +1919,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "你是怎么知道 Stella 的？",
+        "body": "可选。你的回答只会作为匿名计数发送，不含任何能识别你的信息。",
+        "skip": "跳过",
+        "settledTitle": "你是怎么知道 Stella 的",
+        "settledSkipped": "已跳过",
+        "answers": {
+          "google": "Google 搜索",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok 或 Instagram",
+          "reddit": "Reddit",
+          "friend": "朋友推荐",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT 或其他 AI 推荐的",
+          "other": "其他"
+        }
       }
     },
     "legalFooter": "使用 Stella 即表示您同意我们的{terms}和{privacy}。",
@@ -2703,6 +2722,11 @@
       "loadError": "无法加载此设置。",
       "saveError": "保存失败，请重试。",
       "retry": "重试"
+    },
+    "anonymousCounts": {
+      "title": "发送匿名使用计数",
+      "description": "用于统计安装量和每日使用：Stella 已安装、你选择了哪类 AI、它已回复、今天被打开过。使用在这台电脑上生成的随机 ID，绝不包含你的消息、文件或账户。无论是否登录都适用。",
+      "error": "无法更改此设置。请重试。"
     }
   },
   "shell": {

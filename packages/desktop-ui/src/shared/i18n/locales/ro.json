@@ -1795,7 +1795,8 @@
         "quickstartFailed": "De data asta nu am reușit să-ți citesc tot browserul. Putem începe oricum, iar eu învăț pe parcurs.",
         "selfmod": "Și, fiindcă locuiesc pe computerul tău, mă pot schimba singură.",
         "signin": "Acum alege cum gândesc. Folosește abonamentul Claude sau ChatGPT pe care îl ai, propria cheie sau un cont Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "O întrebare rapidă, opțională: cum m-ai găsit?"
       },
       "progress": "Progresul configurării",
       "quickstart": {
@@ -1854,7 +1855,8 @@
         "selfmodDone": "Foarte tare.",
         "signinDone": "Gata.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Sar peste asta."
       },
       "selfmod": {
         "body": "Îți lipsește o funcție sau vrei ca ceva să funcționeze altfel? Cere-mi. Îmi rescriu propriul cod, te las să-l încerci, iar tu decizi dacă îl păstrezi.",
@@ -1935,6 +1937,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Cum ai găsit Stella?",
+        "body": "Opțional. Răspunsul tău este trimis doar ca o numărătoare anonimă, fără nimic care să te identifice.",
+        "skip": "Sari peste",
+        "settledTitle": "Cum ai găsit Stella",
+        "settledSkipped": "Omis",
+        "answers": {
+          "google": "Căutare Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok sau Instagram",
+          "reddit": "Reddit",
+          "friend": "Un prieten",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT sau alt AI a sugerat-o",
+          "other": "Altceva"
+        }
       }
     },
     "legalFooter": "Folosind Stella, ești de acord cu {terms} și {privacy}.",
@@ -2721,6 +2740,11 @@
       "loadError": "Setarea nu a putut fi încărcată.",
       "saveError": "Salvarea a eșuat. Încearcă din nou.",
       "retry": "Încearcă din nou"
+    },
+    "anonymousCounts": {
+      "title": "Trimite numărători anonime de utilizare",
+      "description": "Ne permite să numărăm instalările și utilizarea zilnică: că Stella a fost instalată, ce fel de AI ai ales, că a răspuns și că a fost deschisă azi. Folosește un ID aleatoriu creat pe acest computer, niciodată mesajele, fișierele sau contul tău. Se aplică fie că ești conectat, fie că nu.",
+      "error": "Setarea nu a putut fi schimbată. Încearcă din nou."
     }
   },
   "shell": {

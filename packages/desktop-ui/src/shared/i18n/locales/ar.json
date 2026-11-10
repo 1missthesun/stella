@@ -1822,7 +1822,8 @@
         "quickstartFailed": "لم أتمكن من إنهاء قراءة متصفحك هذه المرة. يمكننا أن نبدأ على أي حال، وسأتعلّم أثناء العمل.",
         "selfmod": "ولأنني أعيش على جهازك، يمكنني تغيير نفسي.",
         "signin": "الآن اختر كيف أفكر. استخدم اشتراك Claude أو ChatGPT الذي لديك، أو مفتاحك الخاص، أو حساب Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "سؤال سريع واختياري: كيف وجدتني؟"
       },
       "progress": "تقدّم الإعداد",
       "quickstart": {
@@ -1881,7 +1882,8 @@
         "selfmodDone": "رائع جدًا.",
         "signinDone": "تم.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "تخطَّ هذا."
       },
       "selfmod": {
         "body": "هل تفتقد ميزة، أو تريد أن يعمل شيء بطريقة مختلفة؟ فقط اطلب. سأعيد كتابة شيفرتي بنفسي، وأتيح لك تجربتها، وأنت تقرر هل تبقيها.",
@@ -1962,6 +1964,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "كيف وجدت Stella؟",
+        "body": "اختياري. تُرسل إجابتك فقط كعدّ مجهول الهوية، دون أي شيء يحدد هويتك.",
+        "skip": "تخطَّ",
+        "settledTitle": "كيف وجدت Stella",
+        "settledSkipped": "تم التخطي",
+        "answers": {
+          "google": "بحث Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok أو Instagram",
+          "reddit": "Reddit",
+          "friend": "صديق",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "اقترحه ChatGPT أو ذكاء اصطناعي آخر",
+          "other": "غير ذلك"
+        }
       }
     },
     "legalFooter": "باستخدامك Stella، فأنت توافق على {terms} و{privacy}.",
@@ -2748,6 +2767,11 @@
       "loadError": "تعذّر تحميل هذا الإعداد.",
       "saveError": "تعذّر الحفظ. حاول مرة أخرى.",
       "retry": "حاول مرة أخرى"
+    },
+    "anonymousCounts": {
+      "title": "إرسال أعداد استخدام مجهولة الهوية",
+      "description": "يتيح لنا عدّ عمليات التثبيت والاستخدام اليومي: أن Stella ثُبّتت، ونوع الذكاء الاصطناعي الذي اخترته، وأنها ردّت، وأنها فُتحت اليوم. يستخدم معرّفًا عشوائيًا يُنشأ على هذا الكمبيوتر، ولا يستخدم أبدًا رسائلك أو ملفاتك أو حسابك. ينطبق سواء سجّلت الدخول أم لا.",
+      "error": "تعذّر تغيير هذا الإعداد. حاول مرة أخرى."
     }
   },
   "shell": {

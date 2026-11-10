@@ -1,4 +1,19 @@
+import { ANONYMOUS_COUNTS_ENABLED } from "./telemetry/anonymous-counts.js";
+
 export type LegalDocument = "terms" | "privacy";
+
+// Present only once anonymous install counts ship (contracts `telemetry/anonymous-counts.ts`).
+const SIGNED_OUT_TELEMETRY_LINE = ANONYMOUS_COUNTS_ENABLED
+  ? "Telemetry is not sent while you are signed out, except the anonymous usage counts described in section 9."
+  : "Telemetry is not sent while you are signed out (see section 9).";
+const SIGNED_OUT_SECTION_9_LINE = ANONYMOUS_COUNTS_ENABLED
+  ? "Apart from the anonymous usage counts below, the desktop app does not send telemetry while you are signed out."
+  : "The desktop app does not send telemetry while you are signed out.";
+const ANONYMOUS_COUNTS_PARAGRAPH = ANONYMOUS_COUNTS_ENABLED
+  ? `
+
+Anonymous usage counts. Unless you turn off "Send anonymous usage counts" in Settings → Privacy (it is on by default), the desktop app sends a few counts, signed in or not: that it was started for the first time, which kind of AI you chose during setup (for example Stella, Claude Code, ChatGPT, an API key, or a local model), that it gave its first successful reply and with which kind of AI, that it was opened on a given day (at most once a day), and your answer to the optional "How did you find Stella?" question. Each count carries the app version, the operating system family, and a random identifier created on your computer, which we replace with a keyed hash before storing. Counts never include your messages, files, file paths, account identifiers, or IP address; your IP address is used only briefly to limit abuse and is not stored. Self-hosted servers do not send these counts.`
+  : "";
 
 export const LEGAL_TITLES: Record<LegalDocument, string> = { terms: "Terms of Service", privacy: "Privacy Policy" };
 export const LEGAL_LAST_UPDATED = "October 16, 2026";
@@ -171,7 +186,7 @@ Stella is privacy-first. The desktop app can run locally without an account, as 
 
 Using Stella without an account
 
-You can use the desktop app without an account. While you are signed out, Stella runs on your computer and keeps your conversations, memory, and files only on that computer. The AI runs through what you bring: your own Claude Code or ChatGPT sign-in on that computer, your own API keys (requests go directly to that provider), or local models. Those providers receive the content needed for your requests under their own terms. Nothing about your conversations is sent to FROMYOU while you are signed out; the app only downloads public app configuration, prompts, and update information from our servers. Telemetry is not sent while you are signed out (see section 9).
+You can use the desktop app without an account. While you are signed out, Stella runs on your computer and keeps your conversations, memory, and files only on that computer. The AI runs through what you bring: your own Claude Code or ChatGPT sign-in on that computer, your own API keys (requests go directly to that provider), or local models. Those providers receive the content needed for your requests under their own terms. Nothing about your conversations is sent to FROMYOU while you are signed out; the app only downloads public app configuration, prompts, and update information from our servers. ${SIGNED_OUT_TELEMETRY_LINE}
 
 Signing in is optional on the desktop and required for the mobile app. It adds Stella-managed models, the mobile app, Drive, cloud tasks and schedules, and sync across devices. Once you sign in, information goes to our hosted service for those features as described in this policy. When you sign in, Stella asks whether to keep your existing local chat on that computer or sync it to your account; it is not uploaded without your choice.
 
@@ -327,7 +342,7 @@ Some information is needed to provide the Service; declining required account in
 
 9. Telemetry, browser storage, and advertising measurement
 
-Optional telemetry records metadata such as event types, timing, tokens and cost, model or agent type, and error codes, with account or installation identifiers pseudonymized by hashing. Its defined event fields do not include chat messages, prompts, file content, tool arguments, or tool outputs. Hashing is pseudonymization, not a guarantee of anonymity. The desktop app does not send telemetry while you are signed out. If telemetry is on (the default), app start-up and crash metadata recorded while signed out waits on your computer and is sent only after you sign in; turning telemetry off removes it. Crash dumps and debug logs stay on your computer unless you choose to send them to us. Settings → Privacy lets you turn off telemetry, remove queued device telemetry, and stop applicable future device and account-level cloud telemetry reporting. In-flight events may still arrive. Necessary billing, usage, security, and operational records still continue as described above.
+Optional telemetry records metadata such as event types, timing, tokens and cost, model or agent type, and error codes, with account or installation identifiers pseudonymized by hashing. Its defined event fields do not include chat messages, prompts, file content, tool arguments, or tool outputs. Hashing is pseudonymization, not a guarantee of anonymity. ${SIGNED_OUT_SECTION_9_LINE} If telemetry is on (the default), app start-up and crash metadata recorded while signed out waits on your computer and is sent only after you sign in; turning telemetry off removes it. Crash dumps and debug logs stay on your computer unless you choose to send them to us. Settings → Privacy lets you turn off telemetry, remove queued device telemetry, and stop applicable future device and account-level cloud telemetry reporting. In-flight events may still arrive. Necessary billing, usage, security, and operational records still continue as described above.${ANONYMOUS_COUNTS_PARAGRAPH}
 
 Our apps and websites use cookies or local storage for sign-in, sessions, preferences, and necessary operation. Google Ads measurement is separate from assistant content and Google connected-account data.
 

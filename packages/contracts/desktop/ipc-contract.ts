@@ -14,6 +14,7 @@ import type {
   VoiceRuntimeSnapshot,
 } from "../index.js";
 import type { ReasoningEffortLevel } from "../reasoning-effort.js";
+import type { AnonymousCountRequest } from "../telemetry/anonymous-counts.js";
 import type {
   ShowStellaBuildResult,
   ShowStellaInk,
@@ -376,6 +377,9 @@ import {
   IPC_SYSTEM_IS_QUIET,
   IPC_APP_SET_UNREAD_BADGE,
   IPC_PREFERENCES_SET_TELEMETRY,
+  IPC_ANONYMOUS_COUNTS_GET,
+  IPC_ANONYMOUS_COUNTS_SET,
+  IPC_ANONYMOUS_COUNTS_RECORD,
   IPC_PREFERENCES_SET_WAKE_WORD,
   IPC_PREFERENCES_WAKE_WORD_CHANGED,
   IPC_PROMPT_PRESETS_DELETE,
@@ -466,6 +470,12 @@ import {
 export type DesktopTelemetryState = {
   enabled: boolean;
   accountOffPending: boolean;
+};
+
+/** `available` is false while the counts switch is off or on a self-hosted server. */
+export type DesktopAnonymousCountsState = {
+  available: boolean;
+  enabled: boolean;
 };
 
 export type IpcPoint = { x: number; y: number };
@@ -1137,6 +1147,12 @@ export type IpcInvokeContract = {
     ],
     DesktopTelemetryState
   >;
+  [IPC_ANONYMOUS_COUNTS_GET]: Invoke<[], DesktopAnonymousCountsState>;
+  [IPC_ANONYMOUS_COUNTS_SET]: Invoke<
+    [enabled: boolean],
+    DesktopAnonymousCountsState
+  >;
+  [IPC_ANONYMOUS_COUNTS_RECORD]: Invoke<[request: AnonymousCountRequest], void>;
   [IPC_PREFERENCES_GET_READ_ALOUD]: Invoke<[], boolean>;
   [IPC_PREFERENCES_SET_READ_ALOUD]: Invoke<
     [enabled: boolean],

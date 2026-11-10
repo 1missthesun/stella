@@ -58,6 +58,9 @@ const ANSWER_TEXT_KEYS: Record<
   signin: {
     done: "onboarding.chat.replies.signinDone",
   },
+  foundVia: {
+    skipped: "onboarding.chat.replies.foundViaSkipped",
+  },
   gmail: {
     done: "onboarding.chat.replies.gmailDone",
     skipped: "onboarding.chat.replies.gmailSkipped",

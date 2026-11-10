@@ -1795,7 +1795,8 @@
         "quickstartFailed": "Questa volta non sono riuscita a finire di leggere il tuo browser. Possiamo iniziare lo stesso, e imparerò strada facendo.",
         "selfmod": "E siccome vivo sul tuo computer, posso cambiare me stessa.",
         "signin": "Ora scegli come penso. Usa il piano Claude o ChatGPT che hai già, la tua chiave o un account Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Domanda veloce, facoltativa: come mi hai trovata?"
       },
       "progress": "Avanzamento della configurazione",
       "quickstart": {
@@ -1854,7 +1855,8 @@
         "selfmodDone": "Bellissimo.",
         "signinDone": "Fatto.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Salta questa."
       },
       "selfmod": {
         "body": "Ti manca una funzione, o vuoi che qualcosa funzioni in modo diverso? Chiedi e basta. Riscrivo il mio codice, tu lo provi e decidi se tenerlo.",
@@ -1935,6 +1937,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Come hai scoperto Stella?",
+        "body": "Facoltativo. La tua risposta viene inviata solo come conteggio anonimo, senza nulla che ti identifichi.",
+        "skip": "Salta",
+        "settledTitle": "Come hai scoperto Stella",
+        "settledSkipped": "Saltato",
+        "answers": {
+          "google": "Ricerca Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok o Instagram",
+          "reddit": "Reddit",
+          "friend": "Un amico",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT o un’altra IA l’ha suggerito",
+          "other": "Altro"
+        }
       }
     },
     "legalFooter": "Usando Stella accetti i nostri {terms} e la {privacy}.",
@@ -2721,6 +2740,11 @@
       "loadError": "Impossibile caricare questa impostazione.",
       "saveError": "Salvataggio non riuscito. Riprova.",
       "retry": "Riprova"
+    },
+    "anonymousCounts": {
+      "title": "Invia conteggi di utilizzo anonimi",
+      "description": "Ci permette di contare installazioni e uso quotidiano: che Stella è stata installata, quale tipo di IA hai scelto, che ha risposto e che è stata aperta oggi. Usa un ID casuale creato su questo computer, mai i tuoi messaggi, file o account. Vale sia con accesso sia senza.",
+      "error": "Impossibile modificare questa impostazione. Riprova."
     }
   },
   "shell": {

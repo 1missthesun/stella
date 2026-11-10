@@ -1786,7 +1786,8 @@
         "quickstartFailed": "I couldn't finish reading your browser this time. We can start anyway, and I'll learn as we go.",
         "selfmod": "And because I live on your computer, I can change myself.",
         "signin": "Next, choose how I think. Use the Claude or ChatGPT plan you already have, your own key, or a Stella account.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Quick question, and it's optional: how did you find me?"
       },
       "progress": "Setup progress",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Very cool.",
         "signinDone": "Done.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Skip this one."
       },
       "selfmod": {
         "body": "Missing a feature, or want something to work differently? Just ask. I'll rewrite my own code, let you try it, and you decide whether to keep it.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "How did you find Stella?",
+        "body": "Optional. Your answer is sent only as an anonymous count, with nothing that identifies you.",
+        "skip": "Skip",
+        "settledTitle": "How you found Stella",
+        "settledSkipped": "Skipped",
+        "answers": {
+          "google": "Google search",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok or Instagram",
+          "reddit": "Reddit",
+          "friend": "A friend",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT or another AI suggested it",
+          "other": "Other"
+        }
       }
     },
     "legalFooter": "By using Stella, you agree to our {terms} and {privacy}.",
@@ -2712,6 +2731,11 @@
       "loadError": "Couldn't load this setting.",
       "saveError": "Couldn't save. Try again.",
       "retry": "Try again"
+    },
+    "anonymousCounts": {
+      "title": "Send anonymous usage counts",
+      "description": "Lets us count installs and daily use: that Stella was installed, which kind of AI you chose, that it replied, and that it was opened today. Uses a random ID made on this computer, never your messages, files or account. Applies whether or not you're signed in.",
+      "error": "Couldn’t change this setting. Try again."
     }
   },
   "shell": {

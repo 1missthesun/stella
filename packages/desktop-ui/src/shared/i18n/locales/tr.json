@@ -1786,7 +1786,8 @@
         "quickstartFailed": "Bu sefer tarayıcını okumayı bitiremedim. Yine de başlayabiliriz, ben yol boyunca öğrenirim.",
         "selfmod": "Senin bilgisayarında yaşadığım için kendimi değiştirebilirim.",
         "signin": "Şimdi nasıl düşüneceğimi seç. Mevcut Claude veya ChatGPT planını, kendi anahtarını ya da bir Stella hesabını kullan.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Kısa ve isteğe bağlı bir soru: beni nasıl buldun?"
       },
       "progress": "Kurulum ilerlemesi",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Çok güzel.",
         "signinDone": "Tamam.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Bunu atla."
       },
       "selfmod": {
         "body": "Bir özellik mi eksik, ya da bir şeyin farklı çalışmasını mı istiyorsun? Sadece iste. Kendi kodumu yeniden yazarım, denemene izin veririm, tutup tutmayacağına sen karar verirsin.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Stella'yı nasıl buldun?",
+        "body": "İsteğe bağlı. Cevabın yalnızca anonim bir sayım olarak gönderilir, seni tanımlayan hiçbir şey olmadan.",
+        "skip": "Atla",
+        "settledTitle": "Stella'yı nasıl buldun",
+        "settledSkipped": "Atlandı",
+        "answers": {
+          "google": "Google araması",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok veya Instagram",
+          "reddit": "Reddit",
+          "friend": "Bir arkadaş",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT veya başka bir yapay zekâ önerdi",
+          "other": "Diğer"
+        }
       }
     },
     "legalFooter": "Stella'yı kullanarak {terms} ve {privacy} koşullarımızı kabul etmiş olursunuz.",
@@ -2712,6 +2731,11 @@
       "loadError": "Bu ayar yüklenemedi.",
       "saveError": "Kaydedilemedi. Tekrar deneyin.",
       "retry": "Tekrar dene"
+    },
+    "anonymousCounts": {
+      "title": "Anonim kullanım sayıları gönder",
+      "description": "Kurulumları ve günlük kullanımı saymamızı sağlar: Stella'nın kurulduğunu, hangi tür yapay zekâyı seçtiğini, yanıt verdiğini ve bugün açıldığını. Bu bilgisayarda oluşturulan rastgele bir kimlik kullanır; mesajların, dosyaların veya hesabın asla gönderilmez. Oturum açık olsun ya da olmasın geçerlidir.",
+      "error": "Bu ayar değiştirilemedi. Tekrar dene."
     }
   },
   "shell": {

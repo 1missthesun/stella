@@ -1804,7 +1804,8 @@
         "quickstartFailed": "Tym razem nie udało mi się dokończyć czytania Twojej przeglądarki. Możemy zacząć mimo to, a ja będę uczyć się po drodze.",
         "selfmod": "A ponieważ mieszkam na Twoim komputerze, mogę zmieniać samą siebie.",
         "signin": "Teraz wybierz, jak myślę. Użyj planu Claude lub ChatGPT, który już masz, własnego klucza albo konta Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Szybkie, opcjonalne pytanie: jak mnie znalazłeś?"
       },
       "progress": "Postęp konfiguracji",
       "quickstart": {
@@ -1863,7 +1864,8 @@
         "selfmodDone": "Bardzo fajne.",
         "signinDone": "Gotowe.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Pomiń to."
       },
       "selfmod": {
         "body": "Brakuje Ci funkcji albo chcesz, żeby coś działało inaczej? Po prostu poproś. Przepiszę własny kod, dam Ci go wypróbować, a Ty zdecydujesz, czy go zachować.",
@@ -1944,6 +1946,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Jak znalazłeś Stellę?",
+        "body": "Opcjonalne. Twoja odpowiedź jest wysyłana tylko jako anonimowe zliczenie, bez niczego, co by cię identyfikowało.",
+        "skip": "Pomiń",
+        "settledTitle": "Jak znalazłeś Stellę",
+        "settledSkipped": "Pominięto",
+        "answers": {
+          "google": "Wyszukiwarka Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok lub Instagram",
+          "reddit": "Reddit",
+          "friend": "Znajomy",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT lub inna AI to poleciła",
+          "other": "Inne"
+        }
       }
     },
     "legalFooter": "Korzystając ze Stelli, akceptujesz nasze {terms} oraz {privacy}.",
@@ -2730,6 +2749,11 @@
       "loadError": "Nie udało się wczytać tego ustawienia.",
       "saveError": "Nie udało się zapisać. Spróbuj ponownie.",
       "retry": "Spróbuj ponownie"
+    },
+    "anonymousCounts": {
+      "title": "Wysyłaj anonimowe statystyki użycia",
+      "description": "Pozwala nam liczyć instalacje i codzienne użycie: że Stella została zainstalowana, jaki rodzaj AI wybrałeś, że odpowiedziała i że została dziś otwarta. Używa losowego identyfikatora utworzonego na tym komputerze, nigdy twoich wiadomości, plików ani konta. Działa niezależnie od tego, czy jesteś zalogowany.",
+      "error": "Nie udało się zmienić tego ustawienia. Spróbuj ponownie."
     }
   },
   "shell": {

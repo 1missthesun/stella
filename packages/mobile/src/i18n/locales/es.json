@@ -1795,7 +1795,8 @@
         "quickstartFailed": "Esta vez no pude terminar de leer tu navegador. Podemos empezar igualmente, y aprenderé sobre la marcha.",
         "selfmod": "Y como vivo en tu ordenador, puedo cambiarme a mí misma.",
         "signin": "Ahora elige cómo pienso. Usa el plan de Claude o ChatGPT que ya tienes, tu propia clave o una cuenta de Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Una pregunta rápida y opcional: ¿cómo me encontraste?"
       },
       "progress": "Progreso de configuración",
       "quickstart": {
@@ -1854,7 +1855,8 @@
         "selfmodDone": "Genial.",
         "signinDone": "Hecho.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Saltar esta."
       },
       "selfmod": {
         "body": "¿Te falta una función o quieres que algo funcione de otra manera? Solo pídelo. Reescribiré mi propio código, te dejaré probarlo y tú decides si te lo quedas.",
@@ -1935,6 +1937,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "¿Cómo encontraste Stella?",
+        "body": "Opcional. Tu respuesta se envía solo como un recuento anónimo, sin nada que te identifique.",
+        "skip": "Saltar",
+        "settledTitle": "Cómo encontraste Stella",
+        "settledSkipped": "Omitido",
+        "answers": {
+          "google": "Búsqueda de Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok o Instagram",
+          "reddit": "Reddit",
+          "friend": "Un amigo",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT u otra IA lo sugirió",
+          "other": "Otro"
+        }
       }
     },
     "legalFooter": "Al usar Stella, aceptas nuestros {terms} y {privacy}.",
@@ -2721,6 +2740,11 @@
       "loadError": "No se pudo cargar este ajuste.",
       "saveError": "No se pudo guardar. Inténtalo de nuevo.",
       "retry": "Reintentar"
+    },
+    "anonymousCounts": {
+      "title": "Enviar recuentos de uso anónimos",
+      "description": "Nos permite contar instalaciones y uso diario: que Stella se instaló, qué tipo de IA elegiste, que respondió y que se abrió hoy. Usa un ID aleatorio creado en este ordenador, nunca tus mensajes, archivos ni tu cuenta. Se aplica tanto si has iniciado sesión como si no.",
+      "error": "No se pudo cambiar este ajuste. Inténtalo de nuevo."
     }
   },
   "shell": {

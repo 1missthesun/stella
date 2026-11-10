@@ -1786,7 +1786,8 @@
         "quickstartFailed": "Jag kunde inte läsa klart din webbläsare den här gången. Vi kan börja ändå, så lär jag mig under tiden.",
         "selfmod": "Och eftersom jag lever på din dator kan jag ändra mig själv.",
         "signin": "Välj nu hur jag tänker. Använd ditt Claude- eller ChatGPT-abonnemang, din egen nyckel eller ett Stella-konto.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "En snabb fråga, helt frivillig: hur hittade du mig?"
       },
       "progress": "Installationsförlopp",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Superläckert.",
         "signinDone": "Klart.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Hoppa över den här."
       },
       "selfmod": {
         "body": "Saknar du en funktion, eller vill du att något ska fungera annorlunda? Fråga bara. Jag skriver om min egen kod, du får prova den, och du bestämmer om du vill behålla den.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Hur hittade du Stella?",
+        "body": "Frivilligt. Ditt svar skickas bara som en anonym räkning, utan något som identifierar dig.",
+        "skip": "Hoppa över",
+        "settledTitle": "Hur du hittade Stella",
+        "settledSkipped": "Överhoppad",
+        "answers": {
+          "google": "Google-sökning",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok eller Instagram",
+          "reddit": "Reddit",
+          "friend": "En vän",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT eller en annan AI föreslog det",
+          "other": "Annat"
+        }
       }
     },
     "legalFooter": "Genom att använda Stella godkänner du våra {terms} och {privacy}.",
@@ -2712,6 +2731,11 @@
       "loadError": "Inställningen kunde inte läsas in.",
       "saveError": "Det gick inte att spara. Försök igen.",
       "retry": "Försök igen"
+    },
+    "anonymousCounts": {
+      "title": "Skicka anonyma användningssiffror",
+      "description": "Låter oss räkna installationer och daglig användning: att Stella installerades, vilken sorts AI du valde, att den svarade och att den öppnades i dag. Använder ett slumpmässigt ID som skapas på den här datorn, aldrig dina meddelanden, filer eller ditt konto. Gäller oavsett om du är inloggad eller inte.",
+      "error": "Det gick inte att ändra inställningen. Försök igen."
     }
   },
   "shell": {

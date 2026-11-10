@@ -1786,7 +1786,8 @@
         "quickstartFailed": "En saanut selaintasi luettua loppuun tällä kertaa. Voimme aloittaa silti, ja opin matkan varrella.",
         "selfmod": "Ja koska asun tietokoneellasi, voin muuttaa itseäni.",
         "signin": "Valitse seuraavaksi, miten ajattelen. Käytä Claude- tai ChatGPT-tilaustasi, omaa avaintasi tai Stella-tiliä.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Nopea ja vapaaehtoinen kysymys: miten löysit minut?"
       },
       "progress": "Käyttöönoton eteneminen",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Todella hienoa.",
         "signinDone": "Valmis.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Ohita tämä."
       },
       "selfmod": {
         "body": "Puuttuuko ominaisuus, vai haluatko jonkin toimivan toisin? Pyydä vain. Kirjoitan oman koodini uusiksi, annan sinun kokeilla sitä, ja sinä päätät, pidätkö muutoksen.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Miten löysit Stellan?",
+        "body": "Vapaaehtoinen. Vastauksesi lähetetään vain anonyyminä laskurina ilman mitään, mikä tunnistaisi sinut.",
+        "skip": "Ohita",
+        "settledTitle": "Miten löysit Stellan",
+        "settledSkipped": "Ohitettu",
+        "answers": {
+          "google": "Google-haku",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok tai Instagram",
+          "reddit": "Reddit",
+          "friend": "Kaveri",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT tai muu tekoäly ehdotti sitä",
+          "other": "Muu"
+        }
       }
     },
     "legalFooter": "Käyttämällä Stellaa hyväksyt {terms} ja {privacy}.",
@@ -2712,6 +2731,11 @@
       "loadError": "Asetusta ei voitu ladata.",
       "saveError": "Tallennus epäonnistui. Yritä uudelleen.",
       "retry": "Yritä uudelleen"
+    },
+    "anonymousCounts": {
+      "title": "Lähetä anonyymejä käyttömääriä",
+      "description": "Auttaa meitä laskemaan asennukset ja päivittäisen käytön: että Stella asennettiin, minkä tekoälyn valitsit, että se vastasi ja että se avattiin tänään. Käyttää tällä tietokoneella luotua satunnaista tunnusta, ei koskaan viestejäsi, tiedostojasi tai tiliäsi. Pätee, olitpa kirjautunut tai et.",
+      "error": "Asetusta ei voitu muuttaa. Yritä uudelleen."
     }
   },
   "shell": {

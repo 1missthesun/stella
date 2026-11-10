@@ -1804,7 +1804,8 @@
         "quickstartFailed": "Tentokrát jsem nestihla dočíst tvůj prohlížeč. Můžeme začít i tak a já se budu učit za pochodu.",
         "selfmod": "A protože žiju na tvém počítači, můžu měnit sama sebe.",
         "signin": "Teď vyberte, jak budu přemýšlet. Použijte předplatné Claude nebo ChatGPT, vlastní klíč nebo účet Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Rychlá a nepovinná otázka: jak jste mě našli?"
       },
       "progress": "Průběh nastavení",
       "quickstart": {
@@ -1863,7 +1864,8 @@
         "selfmodDone": "Moc pěkné.",
         "signinDone": "Hotovo.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Tuto přeskočit."
       },
       "selfmod": {
         "body": "Chybí ti funkce, nebo chceš, aby něco fungovalo jinak? Stačí říct. Přepíšu svůj vlastní kód, nechám tě to vyzkoušet a ty rozhodneš, jestli to necháš.",
@@ -1944,6 +1946,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Jak jste našli Stellu?",
+        "body": "Nepovinné. Vaše odpověď se odešle jen jako anonymní počet, bez čehokoli, co by vás identifikovalo.",
+        "skip": "Přeskočit",
+        "settledTitle": "Jak jste našli Stellu",
+        "settledSkipped": "Přeskočeno",
+        "answers": {
+          "google": "Vyhledávání Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok nebo Instagram",
+          "reddit": "Reddit",
+          "friend": "Od přítele",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "Doporučil to ChatGPT nebo jiná AI",
+          "other": "Jiné"
+        }
       }
     },
     "legalFooter": "Používáním Stelly souhlasíte s našimi {terms} a {privacy}.",
@@ -2730,6 +2749,11 @@
       "loadError": "Nastavení se nepodařilo načíst.",
       "saveError": "Uložení se nezdařilo. Zkuste to znovu.",
       "retry": "Zkusit znovu"
+    },
+    "anonymousCounts": {
+      "title": "Odesílat anonymní počty používání",
+      "description": "Umožňuje nám počítat instalace a denní používání: že byla Stella nainstalována, jaký druh AI jste zvolili, že odpověděla a že byla dnes otevřena. Používá náhodné ID vytvořené na tomto počítači, nikdy vaše zprávy, soubory ani účet. Platí bez ohledu na to, zda jste přihlášeni.",
+      "error": "Toto nastavení se nepodařilo změnit. Zkuste to znovu."
     }
   },
   "shell": {

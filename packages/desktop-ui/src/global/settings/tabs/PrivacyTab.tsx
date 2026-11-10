@@ -16,6 +16,7 @@ import { platformCapabilities } from "@/platform/capabilities";
 import { SettingsToggleCard } from "./settings-toggle-card";
 import { CloudSyncCard } from "./CloudSyncCard";
 import { TelemetrySettingsCard } from "./TelemetrySettingsCard";
+import { AnonymousCountsSettingsCard } from "./AnonymousCountsSettingsCard";
 import { GoogleConnectionCard } from "./GoogleConnectionCard";
 import { YourDataCard } from "./YourDataCard";
 
@@ -117,6 +118,7 @@ export function PrivacyTab() {
       <YourDataCard />
       <GoogleConnectionCard />
       {platformCapabilities.nativeSettings ? <TelemetrySettingsCard /> : null}
+      {platformCapabilities.nativeSettings ? <AnonymousCountsSettingsCard /> : null}
       <CloudAccountCards />
       {platformCapabilities.nativeSettings ? (
         <Suspense fallback={null}>

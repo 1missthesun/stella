@@ -1777,7 +1777,8 @@
         "quickstartFailed": "今回はブラウザーを最後まで読み取れませんでした。このまま始めても大丈夫です。進めながら覚えていきます。",
         "selfmod": "そして、あなたのコンピューターの中にいるので、私は自分自身を変えることもできます。",
         "signin": "次に、私の考え方を選んでください。お持ちのClaudeやChatGPTのプラン、ご自身のキー、またはStellaアカウントを使えます。",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "ちょっとした質問です（任意）：どうやって私を見つけましたか？"
       },
       "progress": "セットアップの進行状況",
       "quickstart": {
@@ -1836,7 +1837,8 @@
         "selfmodDone": "すごいですね。",
         "signinDone": "完了しました。",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "これはスキップ。"
       },
       "selfmod": {
         "body": "足りない機能がある、または動きを変えたいときは、頼むだけです。私が自分のコードを書き直し、あなたが試して、残すかどうかを決めます。",
@@ -1917,6 +1919,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Stella をどこで知りましたか？",
+        "body": "任意です。回答は匿名のカウントとしてのみ送信され、あなたを特定できる情報は含まれません。",
+        "skip": "スキップ",
+        "settledTitle": "Stella を知ったきっかけ",
+        "settledSkipped": "スキップしました",
+        "answers": {
+          "google": "Google 検索",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok または Instagram",
+          "reddit": "Reddit",
+          "friend": "友人から",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT などの AI に勧められた",
+          "other": "その他"
+        }
       }
     },
     "legalFooter": "Stella を利用することで、{terms}および{privacy}に同意したことになります。",
@@ -2703,6 +2722,11 @@
       "loadError": "この設定を読み込めませんでした。",
       "saveError": "保存できませんでした。もう一度お試しください。",
       "retry": "再試行"
+    },
+    "anonymousCounts": {
+      "title": "匿名の利用カウントを送信",
+      "description": "インストール数と日々の利用を数えるために使います：Stella がインストールされたこと、選んだ AI の種類、返信があったこと、今日開かれたこと。このコンピューターで作られたランダムな ID を使い、メッセージ・ファイル・アカウントは一切使いません。サインインの有無にかかわらず適用されます。",
+      "error": "この設定を変更できませんでした。もう一度お試しください。"
     }
   },
   "shell": {

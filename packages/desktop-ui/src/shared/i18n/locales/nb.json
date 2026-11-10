@@ -1786,7 +1786,8 @@
         "quickstartFailed": "Jeg fikk ikke lest ferdig nettleseren din denne gangen. Vi kan begynne likevel, så lærer jeg underveis.",
         "selfmod": "Og fordi jeg bor på datamaskinen din, kan jeg endre meg selv.",
         "signin": "Velg nå hvordan jeg tenker. Bruk Claude- eller ChatGPT-abonnementet du har, din egen nøkkel eller en Stella-konto.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Et raskt spørsmål, helt valgfritt: hvordan fant du meg?"
       },
       "progress": "Oppsettsfremdrift",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Veldig kult.",
         "signinDone": "Ferdig.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Hopp over denne."
       },
       "selfmod": {
         "body": "Mangler du en funksjon, eller vil du at noe skal fungere annerledes? Bare spør. Jeg skriver om min egen kode, lar deg prøve den, og du bestemmer om den skal beholdes.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Hvordan fant du Stella?",
+        "body": "Valgfritt. Svaret ditt sendes bare som en anonym telling, uten noe som identifiserer deg.",
+        "skip": "Hopp over",
+        "settledTitle": "Hvordan du fant Stella",
+        "settledSkipped": "Hoppet over",
+        "answers": {
+          "google": "Google-søk",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok eller Instagram",
+          "reddit": "Reddit",
+          "friend": "En venn",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT eller en annen KI foreslo det",
+          "other": "Annet"
+        }
       }
     },
     "legalFooter": "Ved å bruke Stella godtar du våre {terms} og {privacy}.",
@@ -2712,6 +2731,11 @@
       "loadError": "Kunne ikke laste inn innstillingen.",
       "saveError": "Kunne ikke lagre. Prøv igjen.",
       "retry": "Prøv igjen"
+    },
+    "anonymousCounts": {
+      "title": "Send anonyme brukstall",
+      "description": "Lar oss telle installasjoner og daglig bruk: at Stella ble installert, hvilken type KI du valgte, at den svarte, og at den ble åpnet i dag. Bruker en tilfeldig ID laget på denne datamaskinen, aldri meldingene, filene eller kontoen din. Gjelder enten du er logget inn eller ikke.",
+      "error": "Kunne ikke endre innstillingen. Prøv igjen."
     }
   },
   "shell": {

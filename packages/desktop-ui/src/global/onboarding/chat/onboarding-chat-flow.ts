@@ -1,27 +1,32 @@
 import { uiState } from "@/platform/ui-state";
+import { ANONYMOUS_COUNTS_ENABLED } from "@stella/contracts/telemetry/anonymous-counts";
 
 export type OnboardingChatStep =
   | "capabilities"
   | "selfmod"
   | "memory"
   | "signin"
+  | "foundVia"
   | "gmail"
   | "theme"
   | "extras"
   | "phone"
   | "quickstart";
 
-export const ONBOARDING_CHAT_STEPS: readonly OnboardingChatStep[] = [
-  "capabilities",
-  "selfmod",
-  "memory",
-  "signin",
-  "gmail",
-  "theme",
-  "extras",
-  "phone",
-  "quickstart",
-];
+export const ONBOARDING_CHAT_STEPS: readonly OnboardingChatStep[] = (
+  [
+    "capabilities",
+    "selfmod",
+    "memory",
+    "signin",
+    "foundVia",
+    "gmail",
+    "theme",
+    "extras",
+    "phone",
+    "quickstart",
+  ] as const
+).filter((step) => step !== "foundVia" || ANONYMOUS_COUNTS_ENABLED);
 
 export type OnboardingChatAnswer = "accepted" | "skipped" | "done";
 

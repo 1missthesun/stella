@@ -20,6 +20,8 @@ import { CapabilitiesCard } from "./cards/CapabilitiesCard";
 import { SelfModCard } from "./cards/SelfModCard";
 import { MemoryCard } from "./cards/MemoryCard";
 import { SignInCard } from "./cards/SignInCard";
+import { FoundViaCard } from "./cards/FoundViaCard";
+import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
 import { useDesktopServerState } from "@/global/self-host/self-host-store";
 import { useSelfHostedServer, useServerDiscovery } from "@/platform/backend/server-discovery";
 import { ThemeCard } from "./cards/ThemeCard";
@@ -54,6 +56,7 @@ const STEP_MOODS: Record<OnboardingChatStep, StellaCharacterState> = {
   selfmod: "idle",
   memory: "idle",
   signin: "listening",
+  foundVia: "listening",
   gmail: "idle",
   theme: "listening",
   extras: "idle",
@@ -121,7 +124,11 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     answer,
     finish,
   } = useOnboardingChat({
-    onFinished: onComplete,
+    onFinished: (handoff) => {
+      // Skipping setup never answers "Choose your AI"; count what is set now. Main keeps only the first.
+      recordAnonymousCount({ type: "engine_chosen" });
+      onComplete(handoff);
+    },
     skipGmail: !canConnectGmail,
   });
 
@@ -303,6 +310,17 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
       case "signin":
         return (
           <SignInCard
+            active={active}
+            answered={answered}
+            onAnswer={(kind) => {
+              recordAnonymousCount({ type: "engine_chosen" });
+              answer(step, kind);
+            }}
+          />
+        );
+      case "foundVia":
+        return (
+          <FoundViaCard
             active={active}
             answered={answered}
             onAnswer={(kind) => answer(step, kind)}

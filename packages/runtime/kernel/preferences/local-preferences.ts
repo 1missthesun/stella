@@ -92,6 +92,8 @@ export type LocalPreferences = {
   dictationSoundEffectsEnabled: boolean;
   telemetryEnabled: boolean;
   telemetryAccountOffPending: boolean;
+  /** "Send anonymous usage counts". null until chosen: follows telemetryEnabled. */
+  anonymousCountsEnabled: boolean | null;
   readAloudEnabled: boolean;
   companionEnabled: boolean;
   companionAnchor: { x: number; y: number } | null;
@@ -159,6 +161,7 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   dictationSoundEffectsEnabled: true,
   telemetryEnabled: true,
   telemetryAccountOffPending: false,
+  anonymousCountsEnabled: null,
   wakeWordEnabled: false,
   onboardingCompleted: false,
   wakeWordThreshold: 0.6,
@@ -262,6 +265,10 @@ const normalizeStoredPreferences = (
   dictationSoundEffectsEnabled: parsed.dictationSoundEffectsEnabled !== false,
   telemetryEnabled: parsed.telemetryEnabled !== false,
   telemetryAccountOffPending: parsed.telemetryAccountOffPending === true,
+  anonymousCountsEnabled:
+    typeof parsed.anonymousCountsEnabled === "boolean"
+      ? parsed.anonymousCountsEnabled
+      : null,
   wakeWordEnabled:
     typeof parsed.wakeWordEnabled === "boolean"
       ? parsed.wakeWordEnabled
@@ -745,6 +752,23 @@ export const getTelemetryEnabled = (stellaDataDir: string): boolean => {
     return true;
   }
 };
+
+/** Off when chosen off, or, before any choice, when telemetry was turned off. */
+export const getAnonymousCountsEnabled = (stellaDataDir: string): boolean => {
+  try {
+    const prefs = loadLocalPreferences(stellaDataDir);
+    return prefs.anonymousCountsEnabled ?? prefs.telemetryEnabled;
+  } catch {
+    return false;
+  }
+};
+
+export const setAnonymousCountsEnabled = (
+  stellaDataDir: string,
+  enabled: boolean,
+): boolean =>
+  updateLocalPreferences(stellaDataDir, { anonymousCountsEnabled: enabled })
+    .anonymousCountsEnabled === true;
 
 export type TelemetryState = {
   enabled: boolean;

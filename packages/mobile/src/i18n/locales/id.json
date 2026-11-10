@@ -1777,7 +1777,8 @@
         "quickstartFailed": "Kali ini saya tidak bisa selesai membaca browser Anda. Kita tetap bisa mulai, dan saya akan belajar seiring berjalan.",
         "selfmod": "Dan karena saya berada di komputer Anda, saya bisa mengubah diri saya sendiri.",
         "signin": "Sekarang pilih cara aku berpikir. Pakai paket Claude atau ChatGPT yang sudah kamu punya, kunci milikmu sendiri, atau akun Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Pertanyaan singkat, opsional: bagaimana kamu menemukanku?"
       },
       "progress": "Kemajuan penyiapan",
       "quickstart": {
@@ -1836,7 +1837,8 @@
         "selfmodDone": "Keren sekali.",
         "signinDone": "Selesai.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Lewati yang ini."
       },
       "selfmod": {
         "body": "Ada fitur yang kurang, atau ingin sesuatu bekerja dengan cara lain? Cukup minta. Saya akan menulis ulang kode saya sendiri, Anda mencobanya, dan Anda yang memutuskan apakah akan dipertahankan.",
@@ -1917,6 +1919,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Bagaimana kamu menemukan Stella?",
+        "body": "Opsional. Jawabanmu hanya dikirim sebagai hitungan anonim, tanpa apa pun yang mengidentifikasi kamu.",
+        "skip": "Lewati",
+        "settledTitle": "Cara kamu menemukan Stella",
+        "settledSkipped": "Dilewati",
+        "answers": {
+          "google": "Pencarian Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok atau Instagram",
+          "reddit": "Reddit",
+          "friend": "Teman",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT atau AI lain menyarankannya",
+          "other": "Lainnya"
+        }
       }
     },
     "legalFooter": "Dengan menggunakan Stella, Anda menyetujui {terms} dan {privacy} kami.",
@@ -2703,6 +2722,11 @@
       "loadError": "Pengaturan ini tidak dapat dimuat.",
       "saveError": "Gagal menyimpan. Coba lagi.",
       "retry": "Coba lagi"
+    },
+    "anonymousCounts": {
+      "title": "Kirim hitungan penggunaan anonim",
+      "description": "Memungkinkan kami menghitung instalasi dan penggunaan harian: bahwa Stella dipasang, jenis AI yang kamu pilih, bahwa ia membalas, dan bahwa ia dibuka hari ini. Menggunakan ID acak yang dibuat di komputer ini, tidak pernah pesan, file, atau akunmu. Berlaku baik saat masuk maupun tidak.",
+      "error": "Pengaturan ini tidak dapat diubah. Coba lagi."
     }
   },
   "shell": {

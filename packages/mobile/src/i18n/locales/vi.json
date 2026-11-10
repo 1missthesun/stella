@@ -1777,7 +1777,8 @@
         "quickstartFailed": "Lần này tôi không đọc xong trình duyệt của bạn. Chúng ta vẫn có thể bắt đầu, và tôi sẽ học dần.",
         "selfmod": "Và vì tôi sống trên máy tính của bạn, tôi có thể tự thay đổi chính mình.",
         "signin": "Giờ hãy chọn cách tôi suy nghĩ. Dùng gói Claude hoặc ChatGPT bạn đang có, khóa riêng của bạn hoặc tài khoản Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Một câu hỏi nhanh, không bắt buộc: bạn tìm thấy tôi bằng cách nào?"
       },
       "progress": "Tiến trình thiết lập",
       "quickstart": {
@@ -1836,7 +1837,8 @@
         "selfmodDone": "Tuyệt thật.",
         "signinDone": "Xong.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Bỏ qua câu này."
       },
       "selfmod": {
         "body": "Thiếu một tính năng, hay muốn thứ gì đó hoạt động khác đi? Cứ nói. Tôi sẽ viết lại mã của chính mình, để bạn dùng thử, và bạn quyết định có giữ lại hay không.",
@@ -1917,6 +1919,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Bạn biết đến Stella bằng cách nào?",
+        "body": "Không bắt buộc. Câu trả lời chỉ được gửi dưới dạng một lượt đếm ẩn danh, không có gì nhận diện bạn.",
+        "skip": "Bỏ qua",
+        "settledTitle": "Cách bạn biết đến Stella",
+        "settledSkipped": "Đã bỏ qua",
+        "answers": {
+          "google": "Tìm kiếm Google",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok hoặc Instagram",
+          "reddit": "Reddit",
+          "friend": "Bạn bè",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT hoặc một AI khác gợi ý",
+          "other": "Khác"
+        }
       }
     },
     "legalFooter": "Khi sử dụng Stella, bạn đồng ý với {terms} và {privacy} của chúng tôi.",
@@ -2703,6 +2722,11 @@
       "loadError": "Không tải được cài đặt này.",
       "saveError": "Không lưu được. Hãy thử lại.",
       "retry": "Thử lại"
+    },
+    "anonymousCounts": {
+      "title": "Gửi số liệu sử dụng ẩn danh",
+      "description": "Giúp chúng tôi đếm lượt cài đặt và mức dùng hằng ngày: rằng Stella đã được cài, bạn chọn loại AI nào, rằng nó đã trả lời và được mở hôm nay. Dùng một ID ngẫu nhiên tạo trên máy tính này, không bao giờ dùng tin nhắn, tệp hay tài khoản của bạn. Áp dụng dù bạn có đăng nhập hay không.",
+      "error": "Không thể thay đổi cài đặt này. Hãy thử lại."
     }
   },
   "shell": {

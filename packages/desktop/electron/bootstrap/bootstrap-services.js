@@ -32,6 +32,7 @@ import { UiStateService } from "../services/ui-state-service.js";
 import { RENDERER_ORIGIN } from "../source/origin.js";
 import { startupAppPainted } from "../observability/app-paint.js";
 import { initMainProcessTelemetry } from "../observability/main-telemetry.js";
+import { AnonymousCounts } from "../observability/anonymous-counts.js";
 import { getMainLogger } from "../observability/main-logger.js";
 export const createBootstrapServices = (options) => {
     const { config, lifecycle, state } = options;
@@ -129,6 +130,13 @@ export const createBootstrapServices = (options) => {
         environment: config.telemetryEnvironment,
         getAuthToken: () => authService.getAuthToken(),
     });
+    const anonymousCounts = new AnonymousCounts({
+        stellaDataDirPath: config.stellaDataDirPath,
+        environment: config.telemetryEnvironment,
+        isSignedIn: async () => Boolean((await authService.getAuthToken())?.trim()),
+        isSelfHosted: () => selfHostService.getState().selfHosted,
+    });
+    anonymousCounts.start();
     const userAskService = new UserAskService({
         getAllWindows: () => options.getAllWindows(),
         getStellaAppDir: () => lifecycle.getStellaDataDir(),
@@ -241,6 +249,7 @@ export const createBootstrapServices = (options) => {
         localChatHistoryService,
         securityPolicyService,
         telemetry,
+        anonymousCounts,
         uiStateService,
     };
 };

@@ -1795,7 +1795,8 @@
         "quickstartFailed": "הפעם לא הצלחתי לסיים לקרוא את הדפדפן שלך. אפשר להתחיל בכל זאת, ואני אלמד תוך כדי תנועה.",
         "selfmod": "ומכיוון שאני חיה על המחשב שלך, אני יכולה לשנות את עצמי.",
         "signin": "עכשיו בחרו איך אני חושבת. השתמשו במנוי Claude או ChatGPT שכבר יש לכם, במפתח משלכם או בחשבון Stella.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "שאלה קצרה, לא חובה: איך מצאת אותי?"
       },
       "progress": "התקדמות ההגדרה",
       "quickstart": {
@@ -1854,7 +1855,8 @@
         "selfmodDone": "מגניב מאוד.",
         "signinDone": "בוצע.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "לדלג על זו."
       },
       "selfmod": {
         "body": "חסר לך משהו, או שאתה רוצה שדבר מסוים יעבוד אחרת? פשוט בקש. אכתוב מחדש את הקוד של עצמי, תנסה אותו, ואתה מחליט אם לשמור.",
@@ -1935,6 +1937,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "איך מצאת את Stella?",
+        "body": "לא חובה. התשובה נשלחת רק כספירה אנונימית, בלי שום דבר שמזהה אותך.",
+        "skip": "דילוג",
+        "settledTitle": "איך מצאת את Stella",
+        "settledSkipped": "דילגת",
+        "answers": {
+          "google": "חיפוש בגוגל",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok או Instagram",
+          "reddit": "Reddit",
+          "friend": "חבר או חברה",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT או בינה מלאכותית אחרת הציעו",
+          "other": "אחר"
+        }
       }
     },
     "legalFooter": "השימוש ב-Stella מהווה הסכמה ל{terms} ול{privacy} שלנו.",
@@ -2721,6 +2740,11 @@
       "loadError": "לא ניתן לטעון את ההגדרה.",
       "saveError": "השמירה נכשלה. נסו שוב.",
       "retry": "נסו שוב"
+    },
+    "anonymousCounts": {
+      "title": "שליחת ספירות שימוש אנונימיות",
+      "description": "מאפשר לנו לספור התקנות ושימוש יומי: ש-Stella הותקנה, איזה סוג בינה מלאכותית בחרת, שהיא ענתה ושהיא נפתחה היום. משתמש במזהה אקראי שנוצר במחשב הזה, אף פעם לא בהודעות, בקבצים או בחשבון שלך. חל בין אם התחברת ובין אם לא.",
+      "error": "לא ניתן היה לשנות את ההגדרה. אפשר לנסות שוב."
     }
   },
   "shell": {

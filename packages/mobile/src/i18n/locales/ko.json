@@ -1777,7 +1777,8 @@
         "quickstartFailed": "이번에는 브라우저를 끝까지 읽지 못했어요. 그래도 먼저 시작해요. 하면서 배울게요.",
         "selfmod": "그리고 저는 이 컴퓨터 안에 있기 때문에 스스로를 바꿀 수 있어요.",
         "signin": "이제 제가 생각하는 방식을 고르세요. 이미 있는 Claude 또는 ChatGPT 요금제, 내 키, 또는 Stella 계정을 사용할 수 있어요.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "짧은 질문 하나, 선택 사항이에요: 저를 어떻게 알게 되셨나요?"
       },
       "progress": "설정 진행 상황",
       "quickstart": {
@@ -1836,7 +1837,8 @@
         "selfmodDone": "정말 멋지네요.",
         "signinDone": "완료했어요.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "이건 건너뛸게요."
       },
       "selfmod": {
         "body": "기능이 없거나 다르게 동작하길 원하세요? 그냥 요청하세요. 제가 제 코드를 직접 고쳐서 써 보실 수 있게 하고, 유지할지는 직접 정하세요.",
@@ -1917,6 +1919,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Stella를 어떻게 알게 되셨나요?",
+        "body": "선택 사항입니다. 답변은 익명 집계로만 전송되며, 사용자를 식별할 수 있는 정보는 포함되지 않습니다.",
+        "skip": "건너뛰기",
+        "settledTitle": "Stella를 알게 된 경로",
+        "settledSkipped": "건너뜀",
+        "answers": {
+          "google": "Google 검색",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok 또는 Instagram",
+          "reddit": "Reddit",
+          "friend": "친구 추천",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT 등 다른 AI의 추천",
+          "other": "기타"
+        }
       }
     },
     "legalFooter": "Stella를 사용하면 {terms} 및 {privacy}에 동의하게 됩니다.",
@@ -2703,6 +2722,11 @@
       "loadError": "이 설정을 불러오지 못했습니다.",
       "saveError": "저장하지 못했습니다. 다시 시도하세요.",
       "retry": "다시 시도"
+    },
+    "anonymousCounts": {
+      "title": "익명 사용 집계 보내기",
+      "description": "설치 수와 일일 사용량을 집계하는 데 쓰입니다: Stella가 설치되었는지, 어떤 종류의 AI를 골랐는지, 답변했는지, 오늘 열렸는지. 이 컴퓨터에서 만든 임의 ID를 사용하며 메시지, 파일, 계정은 절대 사용하지 않습니다. 로그인 여부와 관계없이 적용됩니다.",
+      "error": "이 설정을 변경하지 못했습니다. 다시 시도하세요."
     }
   },
   "shell": {

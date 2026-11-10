@@ -23,6 +23,8 @@ import {
 import { z } from "zod";
 import { ChatRuntimeProvider } from "@/context/chat-runtime";
 import { ChatMessageAlerts } from "@/features/chat-alerts/ChatMessageAlerts";
+import { FirstReplyCounter } from "@/features/anonymous-counts/FirstReplyCounter";
+import { ANONYMOUS_COUNTS_ENABLED } from "@stella/contracts/telemetry/anonymous-counts";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useUiState } from "@/context/ui-state";
 import { ChatColumn } from "@/app/chat/ChatColumn";
@@ -454,6 +456,9 @@ function RootLayout() {
       >
         {platformCapabilities.nativeBridges ? (
           <ChatMessageAlerts conversationId={conversationId} isOnChatRoute={isOnChatRoute} />
+        ) : null}
+        {platformCapabilities.nativeBridges && ANONYMOUS_COUNTS_ENABLED ? (
+          <FirstReplyCounter />
         ) : null}
         <RootChrome conversationId={conversationId} />
       </ChatRuntimeProvider>

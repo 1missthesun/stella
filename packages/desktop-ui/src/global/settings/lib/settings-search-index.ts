@@ -1,4 +1,5 @@
 import type { SettingsTab } from "@/global/settings/settings-tabs";
+import { ANONYMOUS_COUNTS_ENABLED } from "@stella/contracts/telemetry/anonymous-counts";
 
 export type SettingsSearchTranslate = (key: string) => string;
 export type SettingsSearchHost = "native" | "website";
@@ -57,6 +58,17 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
     descriptionKey: "settings.telemetry.description",
     keywords: ["privacy", "telemetry", "analytics", "tracking", "metrics", "anonymous"],
   },
+  ...(ANONYMOUS_COUNTS_ENABLED
+    ? [
+        {
+          tab: "privacy",
+          availability: "native",
+          titleKey: "settings.anonymousCounts.title",
+          descriptionKey: "settings.anonymousCounts.description",
+          keywords: ["privacy", "anonymous", "counts", "usage", "analytics", "install"],
+        } satisfies SettingsSearchEntryDef,
+      ]
+    : []),
   {
     tab: "privacy",
     titleKey: "settings.googleComposio.title",

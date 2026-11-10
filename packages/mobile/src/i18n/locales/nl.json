@@ -1786,7 +1786,8 @@
         "quickstartFailed": "Ik kon je browser deze keer niet helemaal uitlezen. We kunnen toch beginnen, dan leer ik gaandeweg.",
         "selfmod": "En omdat ik op jouw computer woon, kan ik mezelf aanpassen.",
         "signin": "Kies nu hoe ik denk. Gebruik je Claude- of ChatGPT-abonnement, je eigen sleutel of een Stella-account.",
-        "theme": "Now, how should I look?"
+        "theme": "Now, how should I look?",
+        "foundVia": "Korte vraag, helemaal optioneel: hoe heb je me gevonden?"
       },
       "progress": "Voortgang van de installatie",
       "quickstart": {
@@ -1845,7 +1846,8 @@
         "selfmodDone": "Heel cool.",
         "signinDone": "Klaar.",
         "themeDone": "That one.",
-        "themeSkipped": "Keep the default."
+        "themeSkipped": "Keep the default.",
+        "foundViaSkipped": "Deze overslaan."
       },
       "selfmod": {
         "body": "Mis je een functie, of wil je dat iets anders werkt? Vraag het gewoon. Ik schrijf mijn eigen code om, laat je het proberen en jij beslist of je het houdt.",
@@ -1926,6 +1928,23 @@
         "skip": "Keep the default",
         "themes": "Theme",
         "title": "Pick a look"
+      },
+      "foundVia": {
+        "title": "Hoe heb je Stella gevonden?",
+        "body": "Optioneel. Je antwoord wordt alleen als anonieme telling verstuurd, zonder iets dat jou identificeert.",
+        "skip": "Overslaan",
+        "settledTitle": "Hoe je Stella vond",
+        "settledSkipped": "Overgeslagen",
+        "answers": {
+          "google": "Google zoeken",
+          "youtube": "YouTube",
+          "tiktok_instagram": "TikTok of Instagram",
+          "reddit": "Reddit",
+          "friend": "Via een vriend",
+          "app_store": "App Store / Google Play",
+          "ai_suggested": "ChatGPT of een andere AI raadde het aan",
+          "other": "Anders"
+        }
       }
     },
     "legalFooter": "Door Stella te gebruiken ga je akkoord met onze {terms} en {privacy}.",
@@ -2712,6 +2731,11 @@
       "loadError": "Deze instelling kon niet worden geladen.",
       "saveError": "Opslaan mislukt. Probeer het opnieuw.",
       "retry": "Opnieuw proberen"
+    },
+    "anonymousCounts": {
+      "title": "Anonieme gebruikstellingen versturen",
+      "description": "Hiermee tellen we installaties en dagelijks gebruik: dat Stella is geïnstalleerd, welk soort AI je koos, dat ze antwoordde en dat ze vandaag is geopend. Gebruikt een willekeurige ID die op deze computer is gemaakt, nooit je berichten, bestanden of account. Geldt of je nu bent ingelogd of niet.",
+      "error": "Deze instelling kon niet worden gewijzigd. Probeer het opnieuw."
     }
   },
   "shell": {

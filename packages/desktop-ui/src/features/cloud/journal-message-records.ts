@@ -58,19 +58,24 @@ const lifecycleAgentIdsOnTurn = (
 };
 
 /**
- * Agents with a start card anywhere in the journal. A computer's agent has its
- * card on the agent's own thread turn, not on the turn that spawned it, and
- * that card already renders its start.
+ * Agents whose start card renders on some turn. A computer's agent has its
+ * card on the agent's own thread turn, not on the turn that spawned it; that
+ * card renders only when the turn has a message to carry it.
  */
-const startCardedAgentIds = (records: readonly JournalRecord[]): Set<string> => {
+const startCardedAgentIds = (
+  turns: ReadonlyMap<string, readonly JournalRecord[]>,
+): Set<string> => {
   const ids = new Set<string>();
-  for (const record of records) {
-    if (
-      record.kind === "card" &&
-      record.card.type === "agent-lifecycle" &&
-      record.card.event.type === "agent-started"
-    ) {
-      ids.add(record.card.event.payload.agentId);
+  for (const turnRecords of turns.values()) {
+    if (!turnRecords.some((record) => record.kind === "message")) continue;
+    for (const record of turnRecords) {
+      if (
+        record.kind === "card" &&
+        record.card.type === "agent-lifecycle" &&
+        record.card.event.type === "agent-started"
+      ) {
+        ids.add(record.card.event.payload.agentId);
+      }
     }
   }
   return ids;
@@ -296,13 +301,13 @@ export const journalRecordsToMessageRecords = (
   const recordsBySeq = new Map<number, JournalMessageRecord>();
   const agentTitles = journalAgentTitles(records);
   const reactions = journalUserReactions(records);
-  const startCarded = startCardedAgentIds(records);
   for (const record of records) {
     const turn = byTurn.get(record.turnId);
     if (turn) turn.push(record);
     else byTurn.set(record.turnId, [record]);
     if (record.kind === "message") recordsBySeq.set(record.seq, record);
   }
+  const startCarded = startCardedAgentIds(byTurn);
 
   const messages: MessageRecord[] = [];
   for (const [turnId, turnRecords] of byTurn) {

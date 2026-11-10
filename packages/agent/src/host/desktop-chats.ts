@@ -197,7 +197,7 @@ export type DesktopChatsOptions = {
   /** What this computer's catalog knows of a provider's model: its limits, modalities and price. */
   listedModel?: (provider: string, modelId: string) => LiveProviderModel | undefined;
   thinkingLevel?(): ModelThinkingLevel;
-  shellEnv?(target: { conversationId: string; cwd: string }): Record<string, string> | undefined;
+  shellEnv?(target: { conversationId: string; agentId?: string; cwd: string }): Record<string, string> | undefined;
   tools?(conversationId: string): StellaToolHost;
   journal?(conversationId: string): DesktopJournal | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;

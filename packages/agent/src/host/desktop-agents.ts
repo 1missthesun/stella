@@ -5,6 +5,7 @@ import type { EnvTarget } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { defaultAgentDirectory } from "@stella/runtime/kernel/agents/agent-directory";
 import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree";
+import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import type { RemoteAgentHost, StellaAgentsHost } from "../stella/agents.ts";
 
 export function desktopAgentsHost(
@@ -79,7 +80,7 @@ const isPidAlive = (pid: number) => {
 
 export function desktopEnvironments(
   defaultCwd: string,
-  shellEnv?: (target: { conversationId: string; cwd: string }) => Record<string, string> | undefined,
+  shellEnv?: (target: { conversationId: string; agentId?: string; cwd: string }) => Record<string, string> | undefined,
 ) {
   const envs = new Map<string, NodeExecutionEnv>();
   const terminations = new Set<Promise<void>>();
@@ -96,13 +97,20 @@ export function desktopEnvironments(
   };
   return {
     terminateCommands,
-    env: async ({ conversationId, cwd }: EnvTarget, _context: Context) => {
+    env: async ({ conversationId, cwd, read }: EnvTarget, context: Context) => {
       const directory = cwd ?? defaultCwd;
-      const key = shellEnv ? `${conversationId}\0${directory}` : directory;
+      const agentId = shellEnv
+        ? (await read.snapshot(StellaAgentDoc, conversationId, context))?.threadId
+        : undefined;
+      const key = shellEnv ? `${conversationId}\0${agentId ?? ""}\0${directory}` : directory;
       let env = envs.get(key);
       if (!env) {
         if (cwd) await mkdir(directory, { recursive: true }).catch(() => undefined);
-        const commandEnv = shellEnv?.({ conversationId: String(conversationId), cwd: directory });
+        const commandEnv = shellEnv?.({
+          conversationId: String(conversationId),
+          ...(agentId ? { agentId } : {}),
+          cwd: directory,
+        });
         env = new NodeExecutionEnv({
           cwd: directory,
           killProcessTree: killCommandTree,

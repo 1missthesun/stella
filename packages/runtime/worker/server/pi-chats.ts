@@ -299,8 +299,7 @@ export const piChatsFor = (
         const auth = await checkClaudeCodeAuth();
         return auth.status === "ok" ? undefined : auth.message;
       },
-      shellEnv: ({ conversationId, cwd }) =>
-        session.runnerCell.get()?.piTools.shellEnvironment({ conversationId, cwd }),
+      shellEnv: (target) => session.runnerCell.get()?.piTools.shellEnvironment(target),
       userReminders: ({ text, sentAt, previousUserAt, timezone }) =>
         piUserReminders(session.config.get().stellaDataDirPath, {
           text,

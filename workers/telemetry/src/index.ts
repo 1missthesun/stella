@@ -1,6 +1,7 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { bearerCredential } from "../../shared/bearer.js";
 import { verifyUserToken } from "./auth-jwt.js";
+import { handleCounts } from "./counts.js";
 import {
   MAX_BODY_BYTES,
   MAX_EVENT_AGE_MS,
@@ -29,6 +30,9 @@ type TelemetryEnv = Pick<
   | "TELEMETRY_SERVER_SECRET"
   | "EVENTS_PIPELINE"
   | "TELEMETRY_RATE_LIMITER"
+  | "COUNTS"
+  | "COUNTS_INSTALL_RATE_LIMITER"
+  | "COUNTS_IP_RATE_LIMITER"
 >;
 export type TelemetryBindings = TelemetryEnv;
 type TelemetryPipelineRecord = Cloudflare.StellaTelemetryDevStreamV1Record &
@@ -359,6 +363,7 @@ export const fetchHandler = async (
         )
       : json(405, { error: "method_not_allowed" }, requestId);
   }
+  if (path === "/v1/counts") return handleCounts(request, env);
   if (path !== "/v1/events")
     return json(404, { error: "not_found" }, requestId);
   if (request.method !== "POST") {

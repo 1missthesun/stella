@@ -44,7 +44,22 @@
       // Account-local integer namespace. Replace if already allocated.
       "namespace_id": "41001",
       "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      // Anonymous counts, keyed by the pseudonymized install ID.
+      "name": "COUNTS_INSTALL_RATE_LIMITER",
+      "namespace_id": "41003",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      // Anonymous counts, keyed by a keyed hash of the client IP (never stored).
+      "name": "COUNTS_IP_RATE_LIMITER",
+      "namespace_id": "41004",
+      "simple": { "limit": 60, "period": 60 }
     }
+  ],
+  "analytics_engine_datasets": [
+    { "binding": "COUNTS", "dataset": "stella_anonymous_counts_dev" }
   ],
   "env": {
     "production": {
@@ -74,7 +89,20 @@
           // Must differ from development.
           "namespace_id": "41002",
           "simple": { "limit": 120, "period": 60 }
+        },
+        {
+          "name": "COUNTS_INSTALL_RATE_LIMITER",
+          "namespace_id": "41005",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "COUNTS_IP_RATE_LIMITER",
+          "namespace_id": "41006",
+          "simple": { "limit": 60, "period": 60 }
         }
+      ],
+      "analytics_engine_datasets": [
+        { "binding": "COUNTS", "dataset": "stella_anonymous_counts" }
       ]
     }
   }

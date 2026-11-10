@@ -1,9 +1,10 @@
+import { PROOFS } from "../media";
 import type { ProblemPage } from "../types";
 
-export const EXCEL_PAGES: ProblemPage[] = [
+export const PDF_EXCEL_PAGES: ProblemPage[] = [
   {
     slug: "bank-statement-pdf-to-excel",
-    niche: "excel",
+    niche: "pdf-excel",
     searchPhrases: [
       "convert bank statement pdf to excel",
       "bank statement pdf to excel free",
@@ -17,19 +18,48 @@ export const EXCEL_PAGES: ProblemPage[] = [
     h1: "Convert bank statement PDFs to Excel",
     short: "Bank statement PDFs to Excel",
     answer:
-      "First check whether your bank lets you download transactions as CSV or Excel; it's the cleanest route. If you only have PDFs, Excel for Microsoft 365 on Windows can import the tables from a PDF, and you tidy the columns by hand. Stella (stella.sh) reads every statement you give it, puts all the transactions into one spreadsheet with date, description, amount and balance columns, and checks each month against the statement's own totals.",
+      "First check whether your bank lets you download transactions as CSV or Excel; it's the cleanest route. If you only have PDFs, Excel for Microsoft 365 on Windows can import the tables from a PDF, and you tidy the columns by hand. Stella (stella.sh) reads every statement you give it, puts all the transactions into one spreadsheet in date order, and checks each month against the totals printed on the statement.",
     stellaSteps: [
       "Reads each statement PDF you point it to, one month or a whole year",
-      "Pulls every transaction into one sheet: date, description, money in, money out and balance",
-      "Adds up each statement and checks it against the opening and closing balance printed on the PDF",
-      "Flags any row or month that doesn't reconcile, instead of quietly guessing",
-      "Saves an .xlsx file next to your statements that opens in Excel, Numbers or Google Sheets",
+      "Pulls every transaction into one sheet in date order; in the recording, Date, Description and Amount, with money out as negative numbers (ask for separate in and out or balance columns if you prefer)",
+      "Stores dates as real dates and amounts as numbers in your currency, so sorting, filters and SUM work straight away",
+      "Checks its work: each month's money in and out, and the running balance, against the summary printed on that statement",
+      "Saves an .xlsx file that opens in Excel, Numbers or Google Sheets",
     ],
-    prompt:
-      "Turn the bank statement PDFs in my Statements folder into one Excel file with date, description, money in, money out and balance columns. Check each month adds up to the closing balance and flag anything that doesn't.",
+    prompt: "Turn these bank statement PDFs into one Excel sheet with date, description and amount.",
     proof: {
-      kind: "steps-only",
-      reason: "The recorded run on sample statements is being prepared; until then these are the steps Stella follows.",
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "116 transactions from three monthly statements (August to October 2026) in one sheet. Checked afterwards against an answer key: every row matches, dates are real Excel dates, amounts are numbers, and each month's money in and out equals the statement's summary (August: £2,685.58 in, £2,106.68 out).",
+      note: "The statements are sample PDFs from a fictitious bank, made for this run, with selectable text (not scans). The wait is sped up 15×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/bank-statement-pdf-to-excel/proof.mp4`,
+        poster: `${PROOFS}/pdf-excel/bank-statement-pdf-to-excel/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 58.6,
+        realDuration: 124,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer, before the prompt." },
+        { at: 5, text: "The prompt is sent: one Excel sheet with date, description and amount." },
+        { at: 14, text: "Stella replies that it's gathering the statement PDFs and combining their transactions into one sheet." },
+        { at: 15, text: "Reading three statements, sped up 15×." },
+        { at: 22, text: "Done: 116 transactions from August to October 2026 in date order. Money out is negative, money in positive, and the totals and running balances match each month's summary." },
+        { at: 42, text: "The spreadsheet open in Stella: real dates, amounts formatted in pounds." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/pdf-excel/bank-statement-pdf-to-excel/sheet.png`,
+          alt: "The spreadsheet Stella made, open in Stella: Date, Description and Amount columns, starting 01 Aug 2026 DD Thames Water (£38.42), with money out in brackets.",
+          width: 760,
+          height: 500,
+          caption: "The first rows of the sheet Stella saved, opened in Stella's own viewer.",
+        },
+      ],
     },
     manualSteps: [
       {
@@ -71,14 +101,14 @@ export const EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I combine a whole year of statements into one sheet?",
-        a: "Yes. In Excel, put the PDFs in one folder and use Get Data, From Folder, then combine. Stella does the same when you point it at the folder, and checks each month's balance. If they're scattered through Downloads, [sort the Downloads folder](/how/files/organize-downloads-folder) first.",
+        a: "Yes. In Excel, put the PDFs in one folder and use Get Data, From Folder, then combine. Stella does the same when you point it at the folder, and checks each month's balance. If they're scattered through Downloads, [sort the Downloads folder](/how/pc-cleanup/organize-downloads-folder) first.",
       },
       {
         q: "Does Excel for Mac import PDFs?",
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["files/organize-downloads-folder", "video/burn-subtitles-into-video-for-tiktok"],
+    related: ["pc-cleanup/organize-downloads-folder", "video/burn-subtitles-into-video-for-tiktok"],
     lastChecked: "2026-11-10",
     sources: [
       {

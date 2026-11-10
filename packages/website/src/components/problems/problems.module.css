@@ -278,6 +278,11 @@
   margin: 28px 0 0;
 }
 
+.output[data-wide] {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
 .outputVideo {
   display: block;
   width: 100%;
@@ -798,7 +803,7 @@
     gap: 14px;
   }
 
-  .outputVideo {
+  .output:not([data-wide]) .outputVideo {
     max-width: 220px;
   }
 

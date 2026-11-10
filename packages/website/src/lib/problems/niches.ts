@@ -3,14 +3,14 @@ import type { Niche } from "./types";
 /** Hubs, in the order the index lists them. A niche needs at least one published page. */
 export const NICHES: Niche[] = [
   {
-    slug: "minecraft",
-    name: "Minecraft mods",
-    h1: "Minecraft mods, installed and working.",
-    title: "Minecraft mods: install guides and fixes",
+    slug: "game-mods",
+    name: "Game mods",
+    h1: "Game mods, installed and working.",
+    title: "Game mods: install guides and fixes after updates",
     description:
-      "Step-by-step guides for installing Minecraft Java mods with Fabric: Sodium, Iris shaders, Mod Menu and more. Do it yourself, or let Stella (stella.sh) do it.",
+      "Install mods and fix them after game updates: Minecraft (Fabric, Sodium, Iris), The Sims 4, Cyberpunk 2077. The manual steps, or Stella (stella.sh) doing it for you.",
     intro:
-      "Installing Java Edition mods by hand means matching a loader, a game version and every mod file. Each guide below shows the manual way, and Stella (stella.sh) doing it on a real computer.",
+      "Mods break when a game updates, and installing them by hand means matching versions, folders and loaders. Each guide gives the manual way, and Stella (stella.sh) doing it on a real computer where we could record it.",
   },
   {
     slug: "video",
@@ -18,25 +18,35 @@ export const NICHES: Niche[] = [
     h1: "Video edits, done on your computer.",
     title: "Video editing how-tos: subtitles, silences, exports",
     description:
-      "How to burn in subtitles, cut silences and prepare videos for TikTok, Reels and YouTube, with free tools or with Stella (stella.sh) working on your own files.",
+      "How to burn in subtitles and cut silences for TikTok, Reels and YouTube, with free tools or with Stella (stella.sh) working on your own files, with no watermark.",
     intro:
       "Most quick video jobs (captions, trimming dead air, resizing for vertical) are a few commands in free tools. Each guide gives you those, and shows Stella (stella.sh) doing it on a real file.",
   },
   {
-    slug: "files",
-    name: "Files and folders",
-    h1: "Tidy files, without the guesswork.",
-    title: "Organize files and folders on Windows and Mac",
+    slug: "pc-cleanup",
+    name: "PC cleanup",
+    h1: "Get your space back, safely.",
+    title: "PC cleanup: free up disk space and tidy folders",
     description:
-      "How to sort a messy Downloads folder, find duplicates and clear space safely on Windows or Mac, by hand or with Stella (stella.sh) asking before anything is deleted.",
+      "Find what's filling your C drive, sort a messy Downloads folder and clear space safely on Windows or Mac, by hand or with Stella (stella.sh) asking before it deletes anything.",
     intro:
-      "Cleaning up files is mostly sorting, spotting duplicates and deciding what can go. Each guide covers the manual way and shows Stella (stella.sh) doing it, asking before anything is deleted.",
+      "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and shows Stella (stella.sh) doing it, asking before anything is deleted.",
   },
   {
-    slug: "excel",
-    name: "Excel and PDFs",
+    slug: "photos-files",
+    name: "Photos and files",
+    h1: "Photos and files, put in order.",
+    title: "Photos and files: fix dates, rename, organise",
+    description:
+      "Fix Google Takeout photo dates, rename PDFs by what's inside them and organise big folders of files, with free tools or with Stella (stella.sh) on your own computer.",
+    intro:
+      "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
+  },
+  {
+    slug: "pdf-excel",
+    name: "PDFs and Excel",
     h1: "PDFs and spreadsheets, sorted.",
-    title: "Excel and PDF how-tos: statements, tables, merges",
+    title: "PDF and Excel how-tos: statements, tables, merges",
     description:
       "How to get tables out of PDFs and into Excel: bank statements, invoices and reports, with Excel's own tools or with Stella (stella.sh) on your own files.",
     intro:

@@ -123,7 +123,7 @@ function StellaDoingIt({ page }: { page: ProblemPage }) {
             {proof.note ? <span className={s.note}> {proof.note}</span> : null}
           </p>
           {proof.output ? (
-            <figure className={s.output}>
+            <figure className={s.output} data-wide={proof.output.width > proof.output.height ? "" : undefined}>
               <video
                 className={s.outputVideo}
                 src={proof.output.src}
@@ -141,6 +141,13 @@ function StellaDoingIt({ page }: { page: ProblemPage }) {
               </figcaption>
             </figure>
           ) : null}
+          {proof.shots?.map((shot) => (
+            <figure key={shot.src} className={s.shot} style={{ marginTop: 24 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- proof media lives on R2, already sized */}
+              <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} loading="lazy" />
+              {shot.caption ? <figcaption>{shot.caption}</figcaption> : null}
+            </figure>
+          ))}
         </>
       ) : proof.kind === "shots" ? (
         <>

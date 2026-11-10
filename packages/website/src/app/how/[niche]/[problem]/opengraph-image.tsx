@@ -22,6 +22,6 @@ export default async function Image({ params }: { params: Promise<{ niche: strin
       proof.kind === "steps-only"
         ? `Manual steps + Stella · checked ${formatDate(page.lastChecked)}`
         : `Shown working on ${proof.platform} · ${formatDate(proof.recordedOn)}`,
-    poster: proof.kind === "video" ? new URL(proof.video.poster, getSiteUrl()).href : proof.kind === "shots" ? new URL(proof.shots[0].src, getSiteUrl()).href : undefined,
+    poster: proof.kind === "video" ? new URL(proof.output?.poster ?? proof.video.poster, getSiteUrl()).href : proof.kind === "shots" ? new URL(proof.shots[0].src, getSiteUrl()).href : undefined,
   });
 }

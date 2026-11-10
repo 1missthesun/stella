@@ -1,17 +1,13 @@
 import { PRICE_LINE, TRIAL_LINE, plainText, softwareApplicationJsonLd } from "@/lib/answers";
 import { assertProblemPages } from "./gate";
 import { NICHES, getNiche } from "./niches";
-import { EXCEL_PAGES } from "./pages/excel";
-import { FILES_PAGES } from "./pages/files";
-import { MINECRAFT_PAGES } from "./pages/minecraft";
-import { VIDEO_PAGES } from "./pages/video";
+import { ALL_PROBLEM_PAGES } from "./pages";
 import type { Faq, Niche, Platform, ProblemPage, Proof } from "./types";
 
 export type { Niche, ProblemPage, Proof } from "./types";
 export { NICHES, getNiche };
 
-/** Every page, drafts included. Add a niche's file here. */
-const ALL_PAGES: ProblemPage[] = [...MINECRAFT_PAGES, ...VIDEO_PAGES, ...FILES_PAGES, ...EXCEL_PAGES];
+const ALL_PAGES = ALL_PROBLEM_PAGES;
 
 export const HOW_INDEX_PATH = "/how";
 

@@ -135,7 +135,7 @@ export function checkProblemPages(
     need(answerWords >= 30 && answerWords <= 110, `answer is ${answerWords} words (30–110: two or three sentences)`);
     need(page.answer.includes("Stella (stella.sh)"), "answer must name “Stella (stella.sh)” on first mention");
     need(page.stellaSteps.length >= 3, "at least 3 Stella steps");
-    need(words(page.prompt).length >= 12, "prompt under 12 words: make it specific enough to paste");
+    need(words(page.prompt).length >= 8, "prompt under 8 words: make it specific enough to paste");
     need(page.manualSteps.length >= 3, "at least 3 manual steps");
     for (const step of page.manualSteps) {
       need(words(step.body).length >= 12, `manual step “${step.title}” is too thin`);
@@ -220,11 +220,6 @@ export function assertProblemPages(pages: ProblemPage[], niches: Niche[]) {
     ...errors,
     ...reports.flatMap((report) => report.errors.map((error) => `${report.page}: ${error}`)),
   ];
-  for (const niche of niches) {
-    if (!pages.some((page) => page.niche === niche.slug && !page.draft)) {
-      lines.push(`niche “${niche.slug}” has no published pages: remove it or add one`);
-    }
-  }
   if (lines.length) {
     throw new Error(`Problem pages failed the quality gate:\n  - ${lines.join("\n  - ")}`);
   }

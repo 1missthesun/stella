@@ -4,12 +4,9 @@
 //   bun scripts/check-problem-pages.ts
 import { MAX_OVERLAP, MIN_UNIQUE_WORDS, checkProblemPages } from "../src/lib/problems/gate";
 import { NICHES } from "../src/lib/problems/niches";
-import { EXCEL_PAGES } from "../src/lib/problems/pages/excel";
-import { FILES_PAGES } from "../src/lib/problems/pages/files";
-import { MINECRAFT_PAGES } from "../src/lib/problems/pages/minecraft";
-import { VIDEO_PAGES } from "../src/lib/problems/pages/video";
+import { ALL_PROBLEM_PAGES } from "../src/lib/problems/pages";
 
-const pages = [...MINECRAFT_PAGES, ...VIDEO_PAGES, ...FILES_PAGES, ...EXCEL_PAGES];
+const pages = ALL_PROBLEM_PAGES;
 const { reports, errors } = checkProblemPages(pages, NICHES);
 console.log(`min ${MIN_UNIQUE_WORDS} words, max ${MAX_OVERLAP * 100}% shared phrasing\n`);
 for (const r of reports) {

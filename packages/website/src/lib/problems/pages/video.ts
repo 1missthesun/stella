@@ -116,7 +116,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. Transcribe in the spoken language, translate the .srt (Stella can translate it and keep the timings), then burn in the translated file the same way.",
       },
     ],
-    related: ["video/cut-silences-from-video", "files/organize-downloads-folder"],
+    related: ["video/cut-silences-from-video", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Whisper on GitHub", href: "https://github.com/openai/whisper" },
@@ -140,18 +140,56 @@ export const VIDEO_PAGES: ProblemPage[] = [
     h1: "Cut silences out of a video automatically",
     short: "Cut silences out of a video",
     answer:
-      "To cut silences automatically, a tool finds the stretches where the audio stays below a loudness threshold for longer than a moment, then removes them with a little padding so the speech doesn't sound clipped. The free open-source auto-editor does this in one command, and Premiere and Resolve can do it by hand. Stella (stella.sh) runs the same process on your file, shows how much it cut, and saves a tighter copy next to the original.",
+      "To cut silences automatically, a tool finds the stretches where the sound stays below a loudness level for longer than a moment, then removes them with a little padding so speech doesn't sound clipped. The free, open-source auto-editor does this in one command, and ffmpeg can list every pause. Stella (stella.sh) does it on your own file: it cuts the dead air, tells you how much shorter the video is, and saves the edit next to the original.",
     stellaSteps: [
-      "Measures the audio to find a silence threshold that suits your recording, instead of a one-size guess",
-      "Lists the silent stretches it found and how much time cutting them saves",
-      "Cuts them out, leaving a short pad around each sentence so words aren't clipped",
-      "Saves the shorter version next to your original, and can export a cut list for Premiere or Resolve if you want to fine-tune",
+      "Measures the pauses with ffmpeg's silence detector; in the recording it tried −38 dB, settled on −34 dB, and counted anything quieter for 0.35 s or more",
+      "Keeps a short pad either side of speech (120 ms here) so words aren't clipped, then cuts the pauses and joins what's left",
+      "Saves the edit as a new file next to the original (here `lecture_edited.mp4`), which it leaves untouched",
+      "Checks its own work: runs the detector again on the edit and plays it through before reporting",
+      "Tells you the new length and what it may have left in: short pauses and very quiet speech",
     ],
-    prompt:
-      "Cut the silences out of this video. Keep about a fifth of a second around speech so nothing sounds clipped, tell me how much you removed, and save it as a new file next to the original.",
+    prompt: "Cut out all the silent pauses from my recording lecture.mp4.",
     proof: {
-      kind: "steps-only",
-      reason: "The recorded run on a real talking-head clip is being prepared; until then these are the steps Stella follows.",
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "A 92-second lecture recording cut to 46 seconds. Checked afterwards with ffmpeg's silence detector (quieter than −35 dB for half a second or more): 12 pauses in the original, none in the edit. The original file was unchanged.",
+      note: "The lecture is a test clip made for this run: a slide and a synthetic voice with 38 seconds of pauses added. A separate transcript of the edit matched all 135 words, nothing clipped. The wait while Stella worked is sped up 10×.",
+      video: {
+        src: `${PROOFS}/video/cut-silences-from-video/proof.mp4`,
+        poster: `${PROOFS}/video/cut-silences-from-video/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 72.1,
+        realDuration: 91,
+      },
+      moments: [
+        { at: 0, text: "The prompt, typed into Stella on a Linux computer." },
+        { at: 4, text: "Sent." },
+        { at: 12, text: "Stella replies that it will remove the silent gaps and save an edited copy, leaving the original untouched." },
+        { at: 14, text: "Finding and cutting the quiet stretches, sped up 10×." },
+        { at: 22, text: "Done: the edit is 46 seconds, down from 92, with the original untouched. Stella notes that short pauses and very quiet speech may remain." },
+        { at: 34, text: "Opening the edited lecture in Stella." },
+        { at: 42, text: "Playing the edit: the recording clock in the corner jumps forward wherever a pause was cut." },
+      ],
+      output: {
+        src: `${PROOFS}/video/cut-silences-from-video/output.mp4`,
+        poster: `${PROOFS}/video/cut-silences-from-video/output-poster.jpg`,
+        width: 1280,
+        height: 720,
+        caption: "The edited lecture Stella saved, with sound: 46 seconds, down from 92. Watch the clock in the corner skip where the pauses were.",
+      },
+      shots: [
+        {
+          src: `${PROOFS}/video/cut-silences-from-video/waveform.png`,
+          alt: "Sound waveforms of the lecture before and after, on the same time scale: the original has long flat gaps between phrases, the edit has none and is half as long.",
+          width: 1640,
+          height: 440,
+          caption: "Before and after on the same time scale: the gaps are gone and the edit is half the length.",
+        },
+      ],
     },
     manualSteps: [
       {
@@ -176,7 +214,8 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
     ],
     limits: [
-      "Silence detection goes by loudness. With music or constant background noise under the voice, it can't tell pauses from speech reliably, and Stella will tell you so rather than guess.",
+      "Silence detection goes by loudness. With music or constant background noise under the voice, pauses and speech are hard to tell apart; expect to adjust, and check the result.",
+      "In the recording it also shortened the natural gaps between sentences to about a quarter of a second, so the pacing came out brisk. Ask for a longer pad (say 0.3 s) if you want the speech to breathe.",
       "It removes dead air, not filler words like “um” or retakes. Cutting those needs a transcript-based edit, which is more careful work.",
       "Rendering the new file takes as long as your computer takes; long 4K recordings on a laptop can take a while.",
       "Stella doesn't upload or post the result anywhere. It stays on your computer.",
@@ -204,7 +243,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Not automatically. For multicam edits, export a cut list from one angle into your editor and apply it there.",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "files/organize-downloads-folder"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "auto-editor", href: "https://auto-editor.com" },

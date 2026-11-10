@@ -122,6 +122,10 @@ echo "Building screen_permission (macOS)..."
 build_swift_universal "screen_permission" "src/screen_permission.swift" -framework CoreGraphics -framework Foundation
 echo "Build successful: $OUTPUT_DIR/screen_permission"
 
+echo "Building show_panel (macOS)..."
+build_swift_universal "show_panel" "src/show_panel.swift" -framework AppKit -framework CoreGraphics
+echo "Build successful: $OUTPUT_DIR/show_panel"
+
 echo "Building window_ocr (macOS)..."
 build_swift_universal "window_ocr" "src/window_ocr.swift" -framework Vision -framework AppKit -framework Foundation
 echo "Build successful: $OUTPUT_DIR/window_ocr"

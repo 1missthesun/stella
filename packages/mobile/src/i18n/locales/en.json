@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Tell me what stella apps can you make for me?"
+      "loading": "Loading apps…",
+      "emptyTitle": "No apps yet",
+      "emptyBody": "Ask Stella to build you an app. It opens here and on all your devices.",
+      "exampleHabits": "Build a habit tracker",
+      "exampleHabitsPrompt": "Build me an app to track my daily habits.",
+      "exampleIdeas": "Suggest apps for me",
+      "exampleIdeasPrompt": "What apps could you build that would help me day to day?",
+      "signedOutTitle": "Apps Stella builds for you",
+      "signedOutBody": "Sign in, then ask Stella for an app. It opens here and on all your devices.",
+      "loadErrorTitle": "Couldn't load your apps",
+      "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
+      "refreshError": "Couldn't refresh your apps.",
+      "retry": "Try again"
     },
     "chat": {
       "activityPill": {

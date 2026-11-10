@@ -1,6 +1,6 @@
 # Apps
 
-Apps is Stella's library for cloud-backed user apps. The surface can be loading, empty, populated, or unavailable.
+Apps is Stella's library for cloud-backed user apps. The surface can be signed out, loading, empty, populated, or unavailable ("Couldn't load your apps" with Try again).
 
 ## Sub-features
 
@@ -13,7 +13,7 @@ Apps is Stella's library for cloud-backed user apps. The surface can be loading,
 
 - Choose **New tab**, then **Apps**.
 - Choose an app card to open it.
-- On an empty library, choose the create-app action.
+- On an empty library, choose an example request ("Build a habit tracker", "Suggest apps for me"); it fills the composer.
 
 ## Driving it with control-stella
 
@@ -24,10 +24,12 @@ Preconditions:
 
 - **Open.** Run `node .agents/skills/verify-stella/control-stella.mjs apps open`.
 - **Observe.** Run `node .agents/skills/verify-stella/control-stella.mjs apps state`. Read the returned surface text and inspect the visible content to assess loading, empty, populated, or error behavior. The helper does not infer readiness from absent error text.
-- **Empty handoff.** Only in an empty state, run `node .agents/skills/verify-stella/control-stella.mjs apps ask`. Require a create-app draft in the real composer. Do not send it unless generation is in scope.
+- **Empty handoff.** Only in an empty state, run `node .agents/skills/verify-stella/control-stella.mjs apps ask` (clicks the first example). Require its request in the real composer. Do not send it unless generation is in scope.
+- **Loading and failure.** Hold or fail `*/owners/me/apps` with CDP `Fetch` on the full-window page target, then `Page.reload` (the list is remembered in memory until a reload). The list only loads while the window is visible.
 - **Populated library.** Inspect a named card in the sidebar, open it, and capture the selected app tab.
 
 ## Gotchas
 
 - `No apps yet` is the empty state, not the entire feature.
-- A signed-out or cloud-disabled session shows no library at all.
+- Signed out ("Use without an account") shows "Apps Stella builds for you" with Sign in. A cloud session that is not ready after 15 s shows the load-failure state.
+- Empty states pause only their looping art while the window is unfocused. To make one appear unfocused: `STELLA_VERIFY_INSPECT_MAIN=<port>` at launch, reload, then in main `w.focus(); w.blur(); w.showInactive()` (a reload alone leaves the page believing it has focus; `drive` clicks and `inspect screenshot` refocus the window).

@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Fortell meg hvilke stella-apper du kan lage for meg?"
+      "loading": "Laster inn apper…",
+      "emptyTitle": "Ingen apper ennå",
+      "emptyBody": "Be Stella lage en app til deg. Den åpnes her og på alle enhetene dine.",
+      "exampleHabits": "Lag en vanesporer",
+      "exampleHabitsPrompt": "Lag en app til meg som holder oversikt over de daglige vanene mine.",
+      "exampleIdeas": "Foreslå apper til meg",
+      "exampleIdeasPrompt": "Hvilke apper kunne du laget som ville hjulpet meg i hverdagen?",
+      "signedOutTitle": "Apper Stella lager til deg",
+      "signedOutBody": "Logg på, og be så Stella om en app. Den åpnes her og på alle enhetene dine.",
+      "loadErrorTitle": "Kunne ikke laste inn appene dine",
+      "loadErrorBody": "Stella får ikke kontakt med serverne sine akkurat nå. Sjekk tilkoblingen og prøv igjen.",
+      "refreshError": "Kunne ikke oppdatere appene dine.",
+      "retry": "Prøv igjen"
     },
     "chat": {
       "activityPill": {

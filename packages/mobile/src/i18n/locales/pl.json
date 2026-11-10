@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Powiedz mi, jakie aplikacje Stelli możesz dla mnie zrobić?"
+      "loading": "Ładowanie aplikacji…",
+      "emptyTitle": "Nie ma jeszcze aplikacji",
+      "emptyBody": "Poproś Stellę, żeby zbudowała ci aplikację. Otworzy się tutaj i na wszystkich twoich urządzeniach.",
+      "exampleHabits": "Zbuduj tracker nawyków",
+      "exampleHabitsPrompt": "Zbuduj mi aplikację do śledzenia moich codziennych nawyków.",
+      "exampleIdeas": "Zaproponuj mi aplikacje",
+      "exampleIdeasPrompt": "Jakie aplikacje mogłabyś zbudować, żeby pomagały mi na co dzień?",
+      "signedOutTitle": "Aplikacje, które Stella buduje dla ciebie",
+      "signedOutBody": "Zaloguj się i poproś Stellę o aplikację. Otworzy się tutaj i na wszystkich twoich urządzeniach.",
+      "loadErrorTitle": "Nie udało się wczytać twoich aplikacji",
+      "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
+      "refreshError": "Nie udało się odświeżyć twoich aplikacji.",
+      "retry": "Spróbuj ponownie"
     },
     "chat": {
       "activityPill": {

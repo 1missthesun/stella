@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Spune-mi ce aplicații Stella poți crea pentru mine?"
+      "loading": "Se încarcă aplicațiile…",
+      "emptyTitle": "Încă nu ai aplicații",
+      "emptyBody": "Cere-i Stellei să-ți construiască o aplicație. Se deschide aici și pe toate dispozitivele tale.",
+      "exampleHabits": "Construiește un tracker de obiceiuri",
+      "exampleHabitsPrompt": "Construiește-mi o aplicație ca să-mi urmăresc obiceiurile zilnice.",
+      "exampleIdeas": "Sugerează-mi aplicații",
+      "exampleIdeasPrompt": "Ce aplicații ai putea construi care să mă ajute în fiecare zi?",
+      "signedOutTitle": "Aplicații pe care Stella le construiește pentru tine",
+      "signedOutBody": "Conectează-te, apoi cere-i Stellei o aplicație. Se deschide aici și pe toate dispozitivele tale.",
+      "loadErrorTitle": "Nu am putut încărca aplicațiile tale",
+      "loadErrorBody": "Stella nu poate accesa serverele acum. Verifică-ți conexiunea și încearcă din nou.",
+      "refreshError": "Nu am putut reîmprospăta aplicațiile tale.",
+      "retry": "Încearcă din nou"
     },
     "chat": {
       "activityPill": {

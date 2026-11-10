@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Dimmi che app Stella puoi creare per me."
+      "loading": "Caricamento delle app…",
+      "emptyTitle": "Ancora nessuna app",
+      "emptyBody": "Chiedi a Stella di creare un’app per te. Si apre qui e su tutti i tuoi dispositivi.",
+      "exampleHabits": "Crea un tracker di abitudini",
+      "exampleHabitsPrompt": "Creami un’app per tenere traccia delle mie abitudini quotidiane.",
+      "exampleIdeas": "Suggeriscimi delle app",
+      "exampleIdeasPrompt": "Quali app potresti creare per aiutarmi nella vita di tutti i giorni?",
+      "signedOutTitle": "App che Stella crea per te",
+      "signedOutBody": "Accedi, poi chiedi un’app a Stella. Si apre qui e su tutti i tuoi dispositivi.",
+      "loadErrorTitle": "Impossibile caricare le tue app",
+      "loadErrorBody": "Stella non riesce a raggiungere i suoi server in questo momento. Controlla la connessione e riprova.",
+      "refreshError": "Impossibile aggiornare le tue app.",
+      "retry": "Riprova"
     },
     "chat": {
       "activityPill": {

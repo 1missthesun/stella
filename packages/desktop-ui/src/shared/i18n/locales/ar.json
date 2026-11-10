@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "أخبرني ما تطبيقات stella التي يمكنك إنشاؤها لي؟"
+      "loading": "جارٍ تحميل التطبيقات…",
+      "emptyTitle": "لا توجد تطبيقات بعد",
+      "emptyBody": "اطلب من Stella أن تنشئ لك تطبيقًا. سيفتح هنا وعلى جميع أجهزتك.",
+      "exampleHabits": "أنشئ متتبع عادات",
+      "exampleHabitsPrompt": "أنشئي لي تطبيقًا لتتبع عاداتي اليومية.",
+      "exampleIdeas": "اقترح تطبيقات لي",
+      "exampleIdeasPrompt": "ما التطبيقات التي يمكنك إنشاؤها لتساعدني في يومي؟",
+      "signedOutTitle": "تطبيقات تنشئها Stella لك",
+      "signedOutBody": "سجّل الدخول، ثم اطلب من Stella تطبيقًا. سيفتح هنا وعلى جميع أجهزتك.",
+      "loadErrorTitle": "تعذّر تحميل تطبيقاتك",
+      "loadErrorBody": "لا يمكن لـ Stella الوصول إلى خوادمها الآن. تحقق من اتصالك وحاول مرة أخرى.",
+      "refreshError": "تعذّر تحديث تطبيقاتك.",
+      "retry": "حاول مرة أخرى"
     },
     "chat": {
       "activityPill": {

@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "告訴我，你能幫我做哪些 Stella App？"
+      "loading": "正在載入 App…",
+      "emptyTitle": "還沒有 App",
+      "emptyBody": "請 Stella 幫你做一個 App。它會在這裡和你的所有裝置上開啟。",
+      "exampleHabits": "做一個習慣追蹤器",
+      "exampleHabitsPrompt": "幫我做一個記錄每日習慣的 App。",
+      "exampleIdeas": "推薦一些 App 給我",
+      "exampleIdeasPrompt": "你能做哪些對我日常生活有幫助的 App？",
+      "signedOutTitle": "Stella 為你做的 App",
+      "signedOutBody": "登入後，請 Stella 幫你做一個 App。它會在這裡和你的所有裝置上開啟。",
+      "loadErrorTitle": "無法載入你的 App",
+      "loadErrorBody": "Stella 目前無法連線到伺服器。請檢查網路連線後再試一次。",
+      "refreshError": "無法重新整理你的 App。",
+      "retry": "重試"
     },
     "chat": {
       "activityPill": {

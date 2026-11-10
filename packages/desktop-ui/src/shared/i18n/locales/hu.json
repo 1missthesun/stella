@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Mondd el, milyen Stella-alkalmazásokat tudsz készíteni nekem?"
+      "loading": "Alkalmazások betöltése…",
+      "emptyTitle": "Még nincsenek alkalmazások",
+      "emptyBody": "Kérd meg Stellát, hogy készítsen neked egy alkalmazást. Itt és az összes eszközödön megnyílik.",
+      "exampleHabits": "Szokáskövető készítése",
+      "exampleHabitsPrompt": "Készíts nekem egy alkalmazást a napi szokásaim követésére.",
+      "exampleIdeas": "Javasolj alkalmazásokat",
+      "exampleIdeasPrompt": "Milyen alkalmazásokat tudnál készíteni, amelyek segítenének a mindennapokban?",
+      "signedOutTitle": "Alkalmazások, amelyeket Stella készít neked",
+      "signedOutBody": "Jelentkezz be, és kérj Stellától egy alkalmazást. Itt és az összes eszközödön megnyílik.",
+      "loadErrorTitle": "Nem sikerült betölteni az alkalmazásaidat",
+      "loadErrorBody": "Stella most nem éri el a szervereit. Ellenőrizd a kapcsolatot, és próbáld újra.",
+      "refreshError": "Nem sikerült frissíteni az alkalmazásaidat.",
+      "retry": "Újra"
     },
     "chat": {
       "activityPill": {

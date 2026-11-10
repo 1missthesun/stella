@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Söyle bakalım, benim için hangi stella uygulamalarını yapabilirsin?"
+      "loading": "Uygulamalar yükleniyor…",
+      "emptyTitle": "Henüz uygulama yok",
+      "emptyBody": "Stella'dan sana bir uygulama yapmasını iste. Burada ve tüm cihazlarında açılır.",
+      "exampleHabits": "Alışkanlık takipçisi yap",
+      "exampleHabitsPrompt": "Günlük alışkanlıklarımı takip etmem için bana bir uygulama yap.",
+      "exampleIdeas": "Bana uygulama öner",
+      "exampleIdeasPrompt": "Günlük hayatımda bana yardımcı olacak hangi uygulamaları yapabilirsin?",
+      "signedOutTitle": "Stella'nın senin için yaptığı uygulamalar",
+      "signedOutBody": "Giriş yap, sonra Stella'dan bir uygulama iste. Burada ve tüm cihazlarında açılır.",
+      "loadErrorTitle": "Uygulamaların yüklenemedi",
+      "loadErrorBody": "Stella şu anda sunucularına ulaşamıyor. Bağlantını kontrol edip tekrar dene.",
+      "refreshError": "Uygulamaların yenilenemedi.",
+      "retry": "Tekrar dene"
     },
     "chat": {
       "activityPill": {

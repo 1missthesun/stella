@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Berätta vilka stella-appar du kan göra åt mig?"
+      "loading": "Läser in appar…",
+      "emptyTitle": "Inga appar än",
+      "emptyBody": "Be Stella bygga en app åt dig. Den öppnas här och på alla dina enheter.",
+      "exampleHabits": "Bygg en vanespårare",
+      "exampleHabitsPrompt": "Bygg en app åt mig som håller koll på mina dagliga vanor.",
+      "exampleIdeas": "Föreslå appar åt mig",
+      "exampleIdeasPrompt": "Vilka appar skulle du kunna bygga som hjälper mig i vardagen?",
+      "signedOutTitle": "Appar som Stella bygger åt dig",
+      "signedOutBody": "Logga in och be sedan Stella om en app. Den öppnas här och på alla dina enheter.",
+      "loadErrorTitle": "Det gick inte att läsa in dina appar",
+      "loadErrorBody": "Stella når inte sina servrar just nu. Kontrollera anslutningen och försök igen.",
+      "refreshError": "Det gick inte att uppdatera dina appar.",
+      "retry": "Försök igen"
     },
     "chat": {
       "activityPill": {

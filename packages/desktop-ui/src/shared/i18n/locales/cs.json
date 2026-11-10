@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Řekni mi, jaké aplikace Stella pro mě umíš vytvořit?"
+      "loading": "Načítání aplikací…",
+      "emptyTitle": "Zatím žádné aplikace",
+      "emptyBody": "Požádej Stellu, ať ti postaví aplikaci. Otevře se tady i na všech tvých zařízeních.",
+      "exampleHabits": "Postavit sledování návyků",
+      "exampleHabitsPrompt": "Postav mi aplikaci na sledování mých každodenních návyků.",
+      "exampleIdeas": "Navrhni mi aplikace",
+      "exampleIdeasPrompt": "Jaké aplikace bys mi mohla postavit, aby mi pomáhaly v běžném dni?",
+      "signedOutTitle": "Aplikace, které ti Stella postaví",
+      "signedOutBody": "Přihlas se a požádej Stellu o aplikaci. Otevře se tady i na všech tvých zařízeních.",
+      "loadErrorTitle": "Aplikace se nepodařilo načíst",
+      "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontroluj připojení a zkus to znovu.",
+      "refreshError": "Aplikace se nepodařilo obnovit.",
+      "retry": "Zkusit znovu"
     },
     "chat": {
       "activityPill": {

@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "告诉我，你能为我做哪些 Stella 应用？"
+      "loading": "正在加载应用…",
+      "emptyTitle": "还没有应用",
+      "emptyBody": "让 Stella 为你做一个应用。它会在这里和你的所有设备上打开。",
+      "exampleHabits": "做一个习惯追踪器",
+      "exampleHabitsPrompt": "帮我做一个记录每日习惯的应用。",
+      "exampleIdeas": "给我推荐一些应用",
+      "exampleIdeasPrompt": "你能做哪些对我日常生活有帮助的应用？",
+      "signedOutTitle": "Stella 为你做的应用",
+      "signedOutBody": "登录后，让 Stella 为你做一个应用。它会在这里和你的所有设备上打开。",
+      "loadErrorTitle": "无法加载你的应用",
+      "loadErrorBody": "Stella 目前无法连接到服务器。请检查网络连接后重试。",
+      "refreshError": "无法刷新你的应用。",
+      "retry": "重试"
     },
     "chat": {
       "activityPill": {

@@ -1823,7 +1823,9 @@ const cmdAppsState = async () => {
 const cmdAppsAsk = async () => {
   const startedAt = Date.now();
   const run = requireRun();
-  await clickQuery(run, { role: "button", name: "Ask Stella to create an app" });
+  await clickQuery(run, {
+    selector: ".apps-section__library .empty-state__action:first-child",
+  });
   await waitQuery(run, { selector: "textarea.composer-input" });
   const draft = await withCdp(run, (ws) =>
     runtimeEvaluate(

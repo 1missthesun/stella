@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Kerro, mitä stella-sovelluksia voit tehdä minulle?"
+      "loading": "Ladataan sovelluksia…",
+      "emptyTitle": "Ei vielä sovelluksia",
+      "emptyBody": "Pyydä Stellaa rakentamaan sinulle sovellus. Se avautuu täällä ja kaikilla laitteillasi.",
+      "exampleHabits": "Rakenna tapaseuranta",
+      "exampleHabitsPrompt": "Rakenna minulle sovellus päivittäisten tapojeni seurantaan.",
+      "exampleIdeas": "Ehdota minulle sovelluksia",
+      "exampleIdeasPrompt": "Millaisia sovelluksia voisit rakentaa, jotka auttaisivat minua arjessa?",
+      "signedOutTitle": "Stellan sinulle rakentamat sovellukset",
+      "signedOutBody": "Kirjaudu sisään ja pyydä Stellalta sovellus. Se avautuu täällä ja kaikilla laitteillasi.",
+      "loadErrorTitle": "Sovellusten lataus epäonnistui",
+      "loadErrorBody": "Stella ei juuri nyt saa yhteyttä palvelimiinsa. Tarkista yhteys ja yritä uudelleen.",
+      "refreshError": "Sovellusten päivitys epäonnistui.",
+      "retry": "Yritä uudelleen"
     },
     "chat": {
       "activityPill": {

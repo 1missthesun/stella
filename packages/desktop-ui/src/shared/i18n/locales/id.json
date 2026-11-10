@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Beri tahu saya, aplikasi stella apa saja yang bisa kamu buatkan untuk saya?"
+      "loading": "Memuat aplikasi…",
+      "emptyTitle": "Belum ada aplikasi",
+      "emptyBody": "Minta Stella membuatkan aplikasi untukmu. Aplikasinya terbuka di sini dan di semua perangkatmu.",
+      "exampleHabits": "Buat pelacak kebiasaan",
+      "exampleHabitsPrompt": "Buatkan saya aplikasi untuk melacak kebiasaan harian saya.",
+      "exampleIdeas": "Sarankan aplikasi untuk saya",
+      "exampleIdeasPrompt": "Aplikasi apa yang bisa kamu buat untuk membantu saya sehari-hari?",
+      "signedOutTitle": "Aplikasi yang Stella buat untukmu",
+      "signedOutBody": "Masuk, lalu minta Stella membuat aplikasi. Aplikasinya terbuka di sini dan di semua perangkatmu.",
+      "loadErrorTitle": "Tidak dapat memuat aplikasimu",
+      "loadErrorBody": "Stella tidak dapat menjangkau servernya saat ini. Periksa koneksimu dan coba lagi.",
+      "refreshError": "Tidak dapat memperbarui aplikasimu.",
+      "retry": "Coba lagi"
     },
     "chat": {
       "activityPill": {

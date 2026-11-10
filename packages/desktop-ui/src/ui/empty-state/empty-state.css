@@ -221,7 +221,6 @@
   animation: es-counter-spin 90s linear infinite;
 }
 
-.empty-state[data-still="true"],
 .empty-state[data-still="true"] * {
   animation-play-state: paused !important;
 }

@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "Cho tôi biết bạn có thể tạo những ứng dụng Stella nào cho tôi?"
+      "loading": "Đang tải ứng dụng…",
+      "emptyTitle": "Chưa có ứng dụng nào",
+      "emptyBody": "Hãy nhờ Stella tạo cho bạn một ứng dụng. Ứng dụng mở ở đây và trên mọi thiết bị của bạn.",
+      "exampleHabits": "Tạo ứng dụng theo dõi thói quen",
+      "exampleHabitsPrompt": "Tạo cho tôi một ứng dụng để theo dõi thói quen hằng ngày.",
+      "exampleIdeas": "Gợi ý ứng dụng cho tôi",
+      "exampleIdeasPrompt": "Bạn có thể tạo những ứng dụng nào giúp tôi trong cuộc sống hằng ngày?",
+      "signedOutTitle": "Ứng dụng Stella tạo cho bạn",
+      "signedOutBody": "Đăng nhập, rồi nhờ Stella tạo một ứng dụng. Ứng dụng mở ở đây và trên mọi thiết bị của bạn.",
+      "loadErrorTitle": "Không tải được ứng dụng của bạn",
+      "loadErrorBody": "Stella hiện không kết nối được với máy chủ. Hãy kiểm tra kết nối rồi thử lại.",
+      "refreshError": "Không làm mới được ứng dụng của bạn.",
+      "retry": "Thử lại"
     },
     "chat": {
       "activityPill": {

@@ -1,7 +1,19 @@
 {
   "app": {
     "apps": {
-      "createAppPrompt": "どんな Stella アプリを作れるか教えて"
+      "loading": "アプリを読み込み中…",
+      "emptyTitle": "まだアプリはありません",
+      "emptyBody": "Stella にアプリを作ってもらいましょう。ここと、すべてのデバイスで開けます。",
+      "exampleHabits": "習慣トラッカーを作る",
+      "exampleHabitsPrompt": "毎日の習慣を記録できるアプリを作って。",
+      "exampleIdeas": "おすすめのアプリを聞く",
+      "exampleIdeasPrompt": "毎日の生活で役立つアプリには、どんなものが作れる？",
+      "signedOutTitle": "Stella があなたのために作るアプリ",
+      "signedOutBody": "サインインして、Stella にアプリを頼んでみましょう。ここと、すべてのデバイスで開けます。",
+      "loadErrorTitle": "アプリを読み込めませんでした",
+      "loadErrorBody": "Stella が今サーバーに接続できません。接続を確認して、もう一度お試しください。",
+      "refreshError": "アプリを更新できませんでした。",
+      "retry": "再試行"
     },
     "chat": {
       "activityPill": {

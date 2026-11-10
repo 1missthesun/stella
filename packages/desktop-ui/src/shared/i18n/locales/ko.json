@@ -2700,8 +2700,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "최근 에이전트 메시지",
-      "recentProgress": "최근 진행 상황"
+      "recentProgress": "최근 진행 상황",
+      "recentTaskUpdates": "최근 작업 업데이트"
     },
     "appSource": {
       "failed": "변경 사항을 적용하지 못했습니다",
@@ -2750,8 +2750,8 @@
       "connected": "브라우저 연결됨",
       "connecting": "확장 프로그램 대기 중…",
       "dismiss": "닫기",
-      "emptyBody": "여기서 사이트에 한 번 로그인하면 Stella가 나와 에이전트를 위해 로그인 상태를 유지합니다.",
-      "emptyBodyConnected": "여기서 한 번 로그인하면 Stella가 기억합니다. 다른 로그인이 필요하면 에이전트가 사용자의 브라우저에서 작업합니다.",
+      "emptyBody": "여기서 사이트에 한 번 로그인하면 Stella가 나와 작업을 위해 로그인 상태를 유지합니다.",
+      "emptyBodyConnected": "여기서 한 번 로그인하면 Stella가 기억합니다. 다른 로그인이 필요하면 작업이 사용자의 브라우저에서 실행됩니다.",
       "emptyTitle": "Stella 브라우저",
       "newTab": "새 탭 열기",
       "openErrorTitle": "브라우저를 열 수 없습니다",
@@ -2759,7 +2759,8 @@
       "reconnectExtension": "확장 프로그램 다시 연결",
       "serviceMissing": "브라우저 서비스가 없습니다. 이 브라우저를 사용하려면 Stella를 다시 설치하세요.",
       "signInHint": "여기서 사이트에 한 번 로그인하면 Stella가 기억합니다.",
-      "useMyLogins": "내 브라우저의 로그인 사용"
+      "useMyLogins": "내 브라우저의 로그인 사용",
+      "taskUsingTab": "작업이 이 탭을 사용 중"
     },
     "capture": {
       "failedDescription": "스크린샷을 찍는 중 문제가 발생했습니다. 다시 시도하세요.",
@@ -2870,10 +2871,10 @@
         "changes": "변경 사항",
         "codeChanges": "코드 변경 사항",
         "desktopRequired": "코드 미리보기에는 Stella 데스크탑 앱이 필요합니다.",
-        "empty": "아직 파일 변경 사항이 없습니다. 에이전트가 코드를 편집하면 변경 사항이 여기에 표시됩니다.",
+        "empty": "아직 파일 변경 사항이 없습니다. 작업이 코드를 편집하면 변경 사항이 여기에 표시됩니다.",
         "noChanges": "변경 사항을 찾을 수 없습니다.",
         "emptyTitle": "아직 변경 사항이 없어요",
-        "emptyBody": "에이전트가 코드를 수정하면 변경 사항이 여기에 표시돼요.",
+        "emptyBody": "작업이 코드를 수정하면 변경 사항이 여기에 표시돼요.",
         "noChangesTitle": "변경 사항 없음"
       },
       "filePreview": {
@@ -3017,7 +3018,8 @@
         "apps": "앱",
         "unreadAriaLabel": "{label}, 읽지 않음 {count}개",
         "unreadTitle": "{label}(읽지 않음 {count}개)"
-      }
+      },
+      "taskSource": "작업"
     },
     "topbar": {
       "conversation": {
@@ -3166,7 +3168,7 @@
     "runsOnComputer": "이 컴퓨터에서 실행",
     "runsOnYourComputer": "내 컴퓨터에서 실행",
     "waiting": "컴퓨터를 기다리는 중",
-    "toAgent": "에이전트에게 전달",
+    "toAgent": "작업 시작",
     "toStella": "Stella에게 전달",
     "once": "찾으면 중지",
     "lastFailed": "마지막 실행 실패: {error}",

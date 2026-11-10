@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Recente agent-berichten",
-      "recentProgress": "Recente voortgang"
+      "recentProgress": "Recente voortgang",
+      "recentTaskUpdates": "Recente taakupdates"
     },
     "appSource": {
       "failed": "Kan de wijziging niet toepassen",
@@ -2759,8 +2759,8 @@
       "connected": "Browser verbonden",
       "connecting": "Wachten op extensie…",
       "dismiss": "Sluiten",
-      "emptyBody": "Log hier één keer in op een site en Stella houdt je ingelogd, voor jou en je agents.",
-      "emptyBodyConnected": "Log hier één keer in en Stella onthoudt het. Voor je andere logins werken agents in je eigen browser.",
+      "emptyBody": "Log hier één keer in op een site en Stella houdt je ingelogd, voor jou en je taken.",
+      "emptyBodyConnected": "Log hier één keer in en Stella onthoudt het. Voor je andere logins draaien taken in je eigen browser.",
       "emptyTitle": "Stella-browser",
       "newTab": "Een nieuw tabblad openen",
       "openErrorTitle": "Kan de browser niet openen",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Extensie opnieuw verbinden",
       "serviceMissing": "De browserservice ontbreekt. Installeer Stella opnieuw om deze browser te gebruiken.",
       "signInHint": "Log hier één keer in op sites. Stella onthoudt het.",
-      "useMyLogins": "Logins van mijn browser gebruiken"
+      "useMyLogins": "Logins van mijn browser gebruiken",
+      "taskUsingTab": "Een taak gebruikt dit tabblad"
     },
     "capture": {
       "failedDescription": "Er ging iets mis bij het maken van de schermafbeelding. Probeer het opnieuw.",
@@ -2883,10 +2884,10 @@
         "changes": "Wijzigingen",
         "codeChanges": "Codewijzigingen",
         "desktopRequired": "Codevoorbeeld vereist de Stella-desktopapp.",
-        "empty": "Nog geen bestandswijzigingen. Wanneer een agent code bewerkt, verschijnen de wijzigingen hier.",
+        "empty": "Nog geen bestandswijzigingen. Wanneer een taak code bewerkt, verschijnen de wijzigingen hier.",
         "noChanges": "Geen wijzigingen gevonden.",
         "emptyTitle": "Nog geen wijzigingen",
-        "emptyBody": "Als een agent code bewerkt, verschijnen de wijzigingen hier.",
+        "emptyBody": "Als een taak code bewerkt, verschijnen de wijzigingen hier.",
         "noChangesTitle": "Geen wijzigingen"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} ongelezen",
         "unreadTitle": "{label} ({count} ongelezen)"
-      }
+      },
+      "taskSource": "Taak"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Draait op deze computer",
     "runsOnYourComputer": "Draait op je computer",
     "waiting": "Wacht op je computer",
-    "toAgent": "Gaat naar een agent",
+    "toAgent": "Start een taak",
     "toStella": "Gaat naar Stella",
     "once": "Stopt zodra gevonden",
     "lastFailed": "Laatste uitvoering mislukt: {error}",

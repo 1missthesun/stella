@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Senaste agentmeddelanden",
-      "recentProgress": "Senaste framsteg"
+      "recentProgress": "Senaste framsteg",
+      "recentTaskUpdates": "Senaste uppdateringar från uppgifter"
     },
     "appSource": {
       "failed": "Det gick inte att tillämpa ändringen",
@@ -2759,8 +2759,8 @@
       "connected": "Webbläsaren är ansluten",
       "connecting": "Väntar på tillägget …",
       "dismiss": "Stäng",
-      "emptyBody": "Logga in på en webbplats här en gång så håller Stella dig inloggad, för dig och dina agenter.",
-      "emptyBodyConnected": "Logga in här en gång så kommer Stella ihåg det. För dina andra inloggningar arbetar agenter i din egen webbläsare.",
+      "emptyBody": "Logga in på en webbplats här en gång så håller Stella dig inloggad, för dig och dina uppgifter.",
+      "emptyBodyConnected": "Logga in här en gång så kommer Stella ihåg det. För dina andra inloggningar körs uppgifter i din egen webbläsare.",
       "emptyTitle": "Stella-webbläsare",
       "newTab": "Öppna en ny flik",
       "openErrorTitle": "Det gick inte att öppna webbläsaren",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Anslut tillägget igen",
       "serviceMissing": "Webbläsartjänsten saknas. Installera om Stella för att använda den här webbläsaren.",
       "signInHint": "Logga in på webbplatser här en gång. Stella kommer ihåg det.",
-      "useMyLogins": "Använd min webbläsares inloggningar"
+      "useMyLogins": "Använd min webbläsares inloggningar",
+      "taskUsingTab": "En uppgift använder den här fliken"
     },
     "capture": {
       "failedDescription": "Något gick fel när skärmbilden togs. Försök igen.",
@@ -2883,10 +2884,10 @@
         "changes": "Ändringar",
         "codeChanges": "Kodändringar",
         "desktopRequired": "Kodförhandsvisning kräver Stellas skrivbordsapp.",
-        "empty": "Inga filändringar ännu. När en agent redigerar kod visas ändringarna här.",
+        "empty": "Inga filändringar ännu. När en uppgift redigerar kod visas ändringarna här.",
         "noChanges": "Inga ändringar hittades.",
         "emptyTitle": "Inga ändringar än",
-        "emptyBody": "När en agent redigerar kod visas ändringarna här.",
+        "emptyBody": "När en uppgift redigerar kod visas ändringarna här.",
         "noChangesTitle": "Inga ändringar"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Appar",
         "unreadAriaLabel": "{label}, {count} olästa",
         "unreadTitle": "{label} ({count} olästa)"
-      }
+      },
+      "taskSource": "Uppgift"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Körs på den här datorn",
     "runsOnYourComputer": "Körs på din dator",
     "waiting": "Väntar på din dator",
-    "toAgent": "Går till en agent",
+    "toAgent": "Startar en uppgift",
     "toStella": "Går till Stella",
     "once": "Slutar när det hittas",
     "lastFailed": "Senaste körningen misslyckades: {error}",

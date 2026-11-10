@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Nylige agentmeldinger",
-      "recentProgress": "Nylig fremdrift"
+      "recentProgress": "Nylig fremdrift",
+      "recentTaskUpdates": "Nylige oppdateringer fra oppgaver"
     },
     "appSource": {
       "failed": "Kunne ikke bruke endringen",
@@ -2759,8 +2759,8 @@
       "connected": "Nettleser tilkoblet",
       "connecting": "Venter på utvidelsen …",
       "dismiss": "Lukk",
-      "emptyBody": "Logg inn på et nettsted her én gang, så holder Stella deg innlogget, for deg og agentene dine.",
-      "emptyBodyConnected": "Logg inn her én gang, så husker Stella det. For de andre innloggingene dine jobber agentene i din egen nettleser.",
+      "emptyBody": "Logg inn på et nettsted her én gang, så holder Stella deg innlogget, for deg og oppgavene dine.",
+      "emptyBodyConnected": "Logg inn her én gang, så husker Stella det. For de andre innloggingene dine kjører oppgavene i din egen nettleser.",
       "emptyTitle": "Stella-nettleser",
       "newTab": "Åpne en ny fane",
       "openErrorTitle": "Kunne ikke åpne nettleseren",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Koble til utvidelsen på nytt",
       "serviceMissing": "Nettlesertjenesten mangler. Installer Stella på nytt for å bruke denne nettleseren.",
       "signInHint": "Logg inn på nettsteder her én gang. Stella husker det.",
-      "useMyLogins": "Bruk innloggingene fra nettleseren min"
+      "useMyLogins": "Bruk innloggingene fra nettleseren min",
+      "taskUsingTab": "En oppgave bruker denne fanen"
     },
     "capture": {
       "failedDescription": "Noe gikk galt under skjermbildetakingen. Prøv igjen.",
@@ -2883,10 +2884,10 @@
         "changes": "Endringer",
         "codeChanges": "Kodeendringer",
         "desktopRequired": "Forhåndsvisning av kode krever Stella-skrivebordsappen.",
-        "empty": "Ingen filendringer ennå. Når en agent endrer kode, vises endringene her.",
+        "empty": "Ingen filendringer ennå. Når en oppgave endrer kode, vises endringene her.",
         "noChanges": "Fant ingen endringer.",
         "emptyTitle": "Ingen endringer ennå",
-        "emptyBody": "Når en agent redigerer kode, vises endringene her.",
+        "emptyBody": "Når en oppgave redigerer kode, vises endringene her.",
         "noChangesTitle": "Ingen endringer"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Apper",
         "unreadAriaLabel": "{label}, {count} uleste",
         "unreadTitle": "{label} ({count} uleste)"
-      }
+      },
+      "taskSource": "Oppgave"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Kjører på denne datamaskinen",
     "runsOnYourComputer": "Kjører på datamaskinen din",
     "waiting": "Venter på datamaskinen din",
-    "toAgent": "Går til en agent",
+    "toAgent": "Starter en oppgave",
     "toStella": "Går til Stella",
     "once": "Stopper når det er funnet",
     "lastFailed": "Siste kjøring mislyktes: {error}",

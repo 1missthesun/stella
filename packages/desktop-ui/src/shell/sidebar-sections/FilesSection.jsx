@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { DropOverlay } from "@/app/chat/DropOverlay";
+import { useT } from "@/shared/i18n";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useUiState } from "@/context/ui-state";
 import { AgentLifecycleStatusIcon } from "@/features/chat/components/AgentLifecycleStatusIcon";
@@ -121,6 +122,7 @@ const RECENCY_LABELS = {
   older: "Older",
 };
 function AgentThreadButton({ task, conversationId }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -131,7 +133,7 @@ function AgentThreadButton({ task, conversationId }) {
               conversationId,
               root: { kind: "agent", threadId: task.id },
               title:
-                task.description.trim() || task.agentType || "Agent thread",
+                task.description.trim() || t("shell.sidebar.taskSource"),
             })
           : undefined
       }
@@ -146,7 +148,9 @@ function AgentThreadButton({ task, conversationId }) {
       </span>
       <span className="files-list__title">{task.description}</span>
       <span className="files-list__meta">
-        {task.source === "claude-native" ? "Claude · read-only" : "Agent"}
+        {task.source === "claude-native"
+          ? "Claude · read-only"
+          : t("shell.sidebar.taskSource")}
       </span>
     </button>
   );

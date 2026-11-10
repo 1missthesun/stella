@@ -2700,8 +2700,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "最近のエージェントのメッセージ",
-      "recentProgress": "最近の進捗"
+      "recentProgress": "最近の進捗",
+      "recentTaskUpdates": "最近のタスクの更新"
     },
     "appSource": {
       "failed": "変更を適用できませんでした",
@@ -2750,8 +2750,8 @@
       "connected": "ブラウザに接続済み",
       "connecting": "拡張機能を待機中…",
       "dismiss": "閉じる",
-      "emptyBody": "ここでサイトに一度サインインすれば、Stella があなたとエージェントのためにサインイン状態を保ちます。",
-      "emptyBodyConnected": "ここで一度サインインすれば Stella が覚えています。ほかのログインが必要なときは、エージェントがあなたのブラウザで作業します。",
+      "emptyBody": "ここでサイトに一度サインインすれば、Stella があなたとタスクのためにサインイン状態を保ちます。",
+      "emptyBodyConnected": "ここで一度サインインすれば Stella が覚えています。ほかのログインが必要なときは、タスクがあなたのブラウザで実行されます。",
       "emptyTitle": "Stella ブラウザ",
       "newTab": "新しいタブを開く",
       "openErrorTitle": "ブラウザを開けませんでした",
@@ -2759,7 +2759,8 @@
       "reconnectExtension": "拡張機能を再接続",
       "serviceMissing": "ブラウザサービスが見つかりません。このブラウザを使うには Stella を再インストールしてください。",
       "signInHint": "ここでサイトに一度サインインすれば、Stella が覚えています。",
-      "useMyLogins": "ブラウザのログイン情報を使う"
+      "useMyLogins": "ブラウザのログイン情報を使う",
+      "taskUsingTab": "タスクがこのタブを使用中"
     },
     "capture": {
       "failedDescription": "スクリーンショットの取得中に問題が発生しました。もう一度お試しください。",
@@ -2870,10 +2871,10 @@
         "changes": "変更",
         "codeChanges": "コードの変更",
         "desktopRequired": "コードのプレビューには Stella デスクトップアプリが必要です。",
-        "empty": "ファイルの変更はまだありません。エージェントがコードを編集すると、ここに変更が表示されます。",
+        "empty": "ファイルの変更はまだありません。タスクがコードを編集すると、ここに変更が表示されます。",
         "noChanges": "変更は見つかりません。",
         "emptyTitle": "まだ変更はありません",
-        "emptyBody": "エージェントがコードを編集すると、変更がここに表示されます。",
+        "emptyBody": "タスクがコードを編集すると、変更がここに表示されます。",
         "noChangesTitle": "変更はありません"
       },
       "filePreview": {
@@ -3017,7 +3018,8 @@
         "apps": "アプリ",
         "unreadAriaLabel": "{label}、未読 {count} 件",
         "unreadTitle": "{label}（未読 {count} 件）"
-      }
+      },
+      "taskSource": "タスク"
     },
     "topbar": {
       "conversation": {
@@ -3166,7 +3168,7 @@
     "runsOnComputer": "このコンピューターで実行",
     "runsOnYourComputer": "お使いのコンピューターで実行",
     "waiting": "コンピューターを待っています",
-    "toAgent": "エージェントに送信",
+    "toAgent": "タスクを開始",
     "toStella": "Stellaに送信",
     "once": "見つかったら停止",
     "lastFailed": "前回の実行に失敗しました: {error}",

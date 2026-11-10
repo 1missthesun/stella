@@ -2716,8 +2716,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Mensajes recientes del agente",
-      "recentProgress": "Progreso reciente"
+      "recentProgress": "Progreso reciente",
+      "recentTaskUpdates": "Novedades recientes de las tareas"
     },
     "appSource": {
       "failed": "No se pudo aplicar el cambio",
@@ -2768,8 +2768,8 @@
       "connected": "Navegador conectado",
       "connecting": "Esperando la extensión…",
       "dismiss": "Cerrar",
-      "emptyBody": "Inicia sesión en un sitio aquí una vez y Stella mantendrá tu sesión, para ti y tus agentes.",
-      "emptyBodyConnected": "Inicia sesión aquí una vez y Stella lo recordará. Para tus otros inicios de sesión, los agentes trabajan en tu propio navegador.",
+      "emptyBody": "Inicia sesión en un sitio aquí una vez y Stella mantendrá tu sesión, para ti y tus tareas.",
+      "emptyBodyConnected": "Inicia sesión aquí una vez y Stella lo recordará. Para tus otros inicios de sesión, las tareas se ejecutan en tu propio navegador.",
       "emptyTitle": "Navegador de Stella",
       "newTab": "Abrir una pestaña nueva",
       "openErrorTitle": "No se pudo abrir el navegador",
@@ -2777,7 +2777,8 @@
       "reconnectExtension": "Volver a conectar la extensión",
       "serviceMissing": "Falta el servicio del navegador. Reinstala Stella para usar este navegador.",
       "signInHint": "Inicia sesión en los sitios aquí una vez. Stella lo recuerda.",
-      "useMyLogins": "Usar los inicios de sesión de mi navegador"
+      "useMyLogins": "Usar los inicios de sesión de mi navegador",
+      "taskUsingTab": "Una tarea está usando esta pestaña"
     },
     "capture": {
       "failedDescription": "Algo salió mal al hacer la captura. Inténtalo de nuevo.",
@@ -2894,10 +2895,10 @@
         "changes": "Cambios",
         "codeChanges": "Cambios de código",
         "desktopRequired": "La vista previa de código requiere la app de escritorio de Stella.",
-        "empty": "Aún no hay cambios en archivos. Cuando un agente edite código, los cambios aparecerán aquí.",
+        "empty": "Aún no hay cambios en archivos. Cuando una tarea edite código, los cambios aparecerán aquí.",
         "noChanges": "No se han encontrado cambios.",
         "emptyTitle": "Aún no hay cambios",
-        "emptyBody": "Cuando un agente edita código, los cambios aparecen aquí.",
+        "emptyBody": "Cuando una tarea edita código, los cambios aparecen aquí.",
         "noChangesTitle": "Sin cambios"
       },
       "filePreview": {
@@ -3047,7 +3048,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} sin leer",
         "unreadTitle": "{label} ({count} sin leer)"
-      }
+      },
+      "taskSource": "Tarea"
     },
     "topbar": {
       "conversation": {
@@ -3200,7 +3202,7 @@
     "runsOnComputer": "Se ejecuta en este ordenador",
     "runsOnYourComputer": "Se ejecuta en tu ordenador",
     "waiting": "Esperando a tu ordenador",
-    "toAgent": "Va a un agente",
+    "toAgent": "Inicia una tarea",
     "toStella": "Va a Stella",
     "once": "Se detiene al encontrarlo",
     "lastFailed": "La última ejecución falló: {error}",

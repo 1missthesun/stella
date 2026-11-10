@@ -2724,8 +2724,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Nedávné zprávy agenta",
-      "recentProgress": "Nedávný postup"
+      "recentProgress": "Nedávný postup",
+      "recentTaskUpdates": "Nedávné novinky z úloh"
     },
     "appSource": {
       "failed": "Změnu se nepodařilo použít",
@@ -2777,8 +2777,8 @@
       "connected": "Prohlížeč připojen",
       "connecting": "Čekání na rozšíření…",
       "dismiss": "Zavřít",
-      "emptyBody": "Přihlaste se zde k webu jednou a Stella vás nechá přihlášené, pro vás i vaše agenty.",
-      "emptyBodyConnected": "Přihlaste se tu jednou a Stella si to zapamatuje. Pro ostatní přihlášení pracují agenti ve vašem vlastním prohlížeči.",
+      "emptyBody": "Přihlaste se zde k webu jednou a Stella vás nechá přihlášené, pro vás i vaše úlohy.",
+      "emptyBodyConnected": "Přihlaste se tu jednou a Stella si to zapamatuje. Pro ostatní přihlášení běží úlohy ve vašem vlastním prohlížeči.",
       "emptyTitle": "Prohlížeč Stella",
       "newTab": "Otevřít novou kartu",
       "openErrorTitle": "Prohlížeč se nepodařilo otevřít",
@@ -2786,7 +2786,8 @@
       "reconnectExtension": "Znovu připojit rozšíření",
       "serviceMissing": "Chybí služba prohlížeče. Pro použití tohoto prohlížeče přeinstalujte Stellu.",
       "signInHint": "Přihlaste se zde ke stránkám jednou. Stella si to zapamatuje.",
-      "useMyLogins": "Použít přihlášení z mého prohlížeče"
+      "useMyLogins": "Použít přihlášení z mého prohlížeče",
+      "taskUsingTab": "Tuto kartu používá úloha"
     },
     "capture": {
       "failedDescription": "Při pořizování snímku obrazovky se něco pokazilo. Zkuste to znovu.",
@@ -2905,10 +2906,10 @@
         "changes": "Změny",
         "codeChanges": "Změny v kódu",
         "desktopRequired": "Náhled kódu vyžaduje desktopovou aplikaci Stella.",
-        "empty": "Zatím žádné změny souborů. Až agent upraví kód, změny se objeví tady.",
+        "empty": "Zatím žádné změny souborů. Až úloha upraví kód, změny se objeví tady.",
         "noChanges": "Nebyly nalezeny žádné změny.",
         "emptyTitle": "Zatím žádné změny",
-        "emptyBody": "Když agent upraví kód, změny se zobrazí tady.",
+        "emptyBody": "Když úloha upraví kód, změny se zobrazí tady.",
         "noChangesTitle": "Žádné změny"
       },
       "filePreview": {
@@ -3061,7 +3062,8 @@
         "apps": "Aplikace",
         "unreadAriaLabel": "{label}, nepřečtených: {count}",
         "unreadTitle": "{label} (nepřečtených: {count})"
-      }
+      },
+      "taskSource": "Úloha"
     },
     "topbar": {
       "conversation": {
@@ -3216,7 +3218,7 @@
     "runsOnComputer": "Běží na tomto počítači",
     "runsOnYourComputer": "Běží na vašem počítači",
     "waiting": "Čeká na váš počítač",
-    "toAgent": "Jde agentovi",
+    "toAgent": "Spustí úlohu",
     "toStella": "Jde Stelle",
     "once": "Skončí po nalezení",
     "lastFailed": "Poslední spuštění selhalo: {error}",

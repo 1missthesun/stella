@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Legutóbbi ügynöküzenetek",
-      "recentProgress": "Legutóbbi előrehaladás"
+      "recentProgress": "Legutóbbi előrehaladás",
+      "recentTaskUpdates": "Legutóbbi feladatfrissítések"
     },
     "appSource": {
       "failed": "Nem sikerült alkalmazni a módosítást",
@@ -2759,8 +2759,8 @@
       "connected": "Böngésző csatlakoztatva",
       "connecting": "Várakozás a bővítményre…",
       "dismiss": "Bezárás",
-      "emptyBody": "Jelentkezz be itt egyszer egy webhelyre, és Stella bejelentkezve tart, neked és az ügynökeidnek.",
-      "emptyBodyConnected": "Jelentkezz be itt egyszer, és a Stella megjegyzi. A többi bejelentkezésedhez az ügynökök a saját böngésződben dolgoznak.",
+      "emptyBody": "Jelentkezz be itt egyszer egy webhelyre, és Stella bejelentkezve tart, neked és a feladataidnak.",
+      "emptyBodyConnected": "Jelentkezz be itt egyszer, és a Stella megjegyzi. A többi bejelentkezésedhez a feladatok a saját böngésződben futnak.",
       "emptyTitle": "Stella böngésző",
       "newTab": "Új lap megnyitása",
       "openErrorTitle": "A böngésző nem nyitható meg",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Bővítmény újracsatlakoztatása",
       "serviceMissing": "Hiányzik a böngészőszolgáltatás. A böngésző használatához telepítsd újra a Stellát.",
       "signInHint": "Jelentkezz be itt egyszer a webhelyekre. Stella megjegyzi.",
-      "useMyLogins": "A böngészőm bejelentkezéseinek használata"
+      "useMyLogins": "A böngészőm bejelentkezéseinek használata",
+      "taskUsingTab": "Egy feladat használja ezt a lapot"
     },
     "capture": {
       "failedDescription": "Hiba történt a képernyőkép készítésekor. Próbáld újra.",
@@ -2883,10 +2884,10 @@
         "changes": "Módosítások",
         "codeChanges": "Kódmódosítások",
         "desktopRequired": "A kódelőnézethez a Stella asztali alkalmazás szükséges.",
-        "empty": "Még nincs fájlmódosítás. Amikor egy ügynök kódot szerkeszt, a módosítások itt jelennek meg.",
+        "empty": "Még nincs fájlmódosítás. Amikor egy feladat kódot szerkeszt, a módosítások itt jelennek meg.",
         "noChanges": "Nem található módosítás.",
         "emptyTitle": "Még nincsenek változások",
-        "emptyBody": "Amikor egy ügynök kódot szerkeszt, a változások itt jelennek meg.",
+        "emptyBody": "Amikor egy feladat kódot szerkeszt, a változások itt jelennek meg.",
         "noChangesTitle": "Nincsenek változások"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Alkalmazások",
         "unreadAriaLabel": "{label}, {count} olvasatlan",
         "unreadTitle": "{label} ({count} olvasatlan)"
-      }
+      },
+      "taskSource": "Feladat"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Ezen a számítógépen fut",
     "runsOnYourComputer": "A számítógépeden fut",
     "waiting": "Várakozás a számítógépedre",
-    "toAgent": "Egy ügynökhöz kerül",
+    "toAgent": "Feladatot indít",
     "toStella": "Stellához kerül",
     "once": "Leáll, ha megtalálja",
     "lastFailed": "Az utolsó futás sikertelen: {error}",

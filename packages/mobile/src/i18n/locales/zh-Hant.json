@@ -2700,8 +2700,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "最近的代理訊息",
-      "recentProgress": "最近進度"
+      "recentProgress": "最近進度",
+      "recentTaskUpdates": "最近的任務動態"
     },
     "appSource": {
       "failed": "無法套用此變更",
@@ -2750,8 +2750,8 @@
       "connected": "瀏覽器已連接",
       "connecting": "正在等待擴充功能…",
       "dismiss": "關閉",
-      "emptyBody": "在這裡登入網站一次，Stella 就會為你和你的代理保持登入狀態。",
-      "emptyBodyConnected": "在這裡登入一次，Stella 就會記住。需要你的其他登入時，代理會在你自己的瀏覽器中操作。",
+      "emptyBody": "在這裡登入網站一次，Stella 就會為你和你的任務保持登入狀態。",
+      "emptyBodyConnected": "在這裡登入一次，Stella 就會記住。需要你的其他登入時，任務會在你自己的瀏覽器中執行。",
       "emptyTitle": "Stella 瀏覽器",
       "newTab": "開啟新分頁",
       "openErrorTitle": "無法開啟瀏覽器",
@@ -2759,7 +2759,8 @@
       "reconnectExtension": "重新連接擴充功能",
       "serviceMissing": "缺少瀏覽器服務。請重新安裝 Stella 以使用此瀏覽器。",
       "signInHint": "在這裡登入網站一次，Stella 會記住。",
-      "useMyLogins": "使用我瀏覽器的登入資訊"
+      "useMyLogins": "使用我瀏覽器的登入資訊",
+      "taskUsingTab": "有任務正在使用此分頁"
     },
     "capture": {
       "failedDescription": "擷取螢幕截圖時出了問題。請再試一次。",
@@ -2870,10 +2871,10 @@
         "changes": "變更",
         "codeChanges": "程式碼變更",
         "desktopRequired": "程式碼預覽需要 Stella 桌面 App。",
-        "empty": "還沒有檔案變更。當代理編輯程式碼時，變更會出現在這裡。",
+        "empty": "還沒有檔案變更。當任務編輯程式碼時，變更會出現在這裡。",
         "noChanges": "找不到變更。",
         "emptyTitle": "尚無變更",
-        "emptyBody": "當代理程式編輯程式碼時，變更會顯示在這裡。",
+        "emptyBody": "當任務編輯程式碼時，變更會顯示在這裡。",
         "noChangesTitle": "沒有變更"
       },
       "filePreview": {
@@ -3017,7 +3018,8 @@
         "apps": "App",
         "unreadAriaLabel": "{label}，{count} 則未讀",
         "unreadTitle": "{label}（{count} 則未讀）"
-      }
+      },
+      "taskSource": "任務"
     },
     "topbar": {
       "conversation": {
@@ -3166,7 +3168,7 @@
     "runsOnComputer": "在這台電腦上執行",
     "runsOnYourComputer": "在你的電腦上執行",
     "waiting": "正在等待你的電腦",
-    "toAgent": "交給代理程式",
+    "toAgent": "啟動一項任務",
     "toStella": "交給 Stella",
     "once": "找到後停止",
     "lastFailed": "上次執行失敗：{error}",

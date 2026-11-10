@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Son aracı mesajları",
-      "recentProgress": "Son ilerleme"
+      "recentProgress": "Son ilerleme",
+      "recentTaskUpdates": "Son görev güncellemeleri"
     },
     "appSource": {
       "failed": "Değişiklik uygulanamadı",
@@ -2759,8 +2759,8 @@
       "connected": "Tarayıcı bağlandı",
       "connecting": "Uzantı bekleniyor…",
       "dismiss": "Kapat",
-      "emptyBody": "Bir siteye burada bir kez giriş yapın, Stella sizin ve ajanlarınız için oturumunuzu açık tutar.",
-      "emptyBodyConnected": "Burada bir kez oturum açın, Stella hatırlar. Diğer oturumlarınız için ajanlar kendi tarayıcınızda çalışır.",
+      "emptyBody": "Bir siteye burada bir kez giriş yapın, Stella sizin ve görevleriniz için oturumunuzu açık tutar.",
+      "emptyBodyConnected": "Burada bir kez oturum açın, Stella hatırlar. Diğer oturumlarınız için görevler kendi tarayıcınızda çalışır.",
       "emptyTitle": "Stella Tarayıcı",
       "newTab": "Yeni sekme aç",
       "openErrorTitle": "Tarayıcı açılamadı",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Uzantıyı yeniden bağla",
       "serviceMissing": "Tarayıcı hizmeti eksik. Bu tarayıcıyı kullanmak için Stella'yı yeniden yükleyin.",
       "signInHint": "Sitelere burada bir kez giriş yapın. Stella bunu hatırlar.",
-      "useMyLogins": "Tarayıcımın oturum açma bilgilerini kullan"
+      "useMyLogins": "Tarayıcımın oturum açma bilgilerini kullan",
+      "taskUsingTab": "Bu sekmeyi bir görev kullanıyor"
     },
     "capture": {
       "failedDescription": "Ekran görüntüsü alınırken bir sorun oluştu. Tekrar deneyin.",
@@ -2883,10 +2884,10 @@
         "changes": "Değişiklikler",
         "codeChanges": "Kod değişiklikleri",
         "desktopRequired": "Kod önizlemesi Stella masaüstü uygulamasını gerektirir.",
-        "empty": "Henüz dosya değişikliği yok. Bir aracı kodu düzenlediğinde değişiklikler burada görünür.",
+        "empty": "Henüz dosya değişikliği yok. Bir görev kodu düzenlediğinde değişiklikler burada görünür.",
         "noChanges": "Değişiklik bulunamadı.",
         "emptyTitle": "Henüz değişiklik yok",
-        "emptyBody": "Bir ajan kodu düzenlediğinde değişiklikler burada görünür.",
+        "emptyBody": "Bir görev kodu düzenlediğinde değişiklikler burada görünür.",
         "noChangesTitle": "Değişiklik yok"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Uygulamalar",
         "unreadAriaLabel": "{label}, {count} okunmamış",
         "unreadTitle": "{label} ({count} okunmamış)"
-      }
+      },
+      "taskSource": "Görev"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Bu bilgisayarda çalışır",
     "runsOnYourComputer": "Bilgisayarında çalışır",
     "waiting": "Bilgisayarın bekleniyor",
-    "toAgent": "Bir ajana gider",
+    "toAgent": "Bir görev başlatır",
     "toStella": "Stella'ya gider",
     "once": "Bulunca durur",
     "lastFailed": "Son çalıştırma başarısız: {error}",

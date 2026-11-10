@@ -2716,8 +2716,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "הודעות סוכן אחרונות",
-      "recentProgress": "התקדמות אחרונה"
+      "recentProgress": "התקדמות אחרונה",
+      "recentTaskUpdates": "עדכוני משימות אחרונים"
     },
     "appSource": {
       "failed": "לא ניתן היה להחיל את השינוי",
@@ -2768,8 +2768,8 @@
       "connected": "הדפדפן מחובר",
       "connecting": "ממתין להרחבה…",
       "dismiss": "סגירה",
-      "emptyBody": "התחברו לאתר כאן פעם אחת ו-Stella תשאיר אתכם מחוברים, עבורכם ועבור הסוכנים שלכם.",
-      "emptyBodyConnected": "התחברו כאן פעם אחת ו-Stella תזכור. להתחברויות האחרות שלכם, הסוכנים עובדים בדפדפן שלכם.",
+      "emptyBody": "התחברו לאתר כאן פעם אחת ו-Stella תשאיר אתכם מחוברים, עבורכם ועבור המשימות שלכם.",
+      "emptyBodyConnected": "התחברו כאן פעם אחת ו-Stella תזכור. להתחברויות האחרות שלכם, המשימות רצות בדפדפן שלכם.",
       "emptyTitle": "הדפדפן של Stella",
       "newTab": "פתיחת לשונית חדשה",
       "openErrorTitle": "לא ניתן לפתוח את הדפדפן",
@@ -2777,7 +2777,8 @@
       "reconnectExtension": "לחבר מחדש את התוסף",
       "serviceMissing": "שירות הדפדפן חסר. התקינו מחדש את Stella כדי להשתמש בדפדפן הזה.",
       "signInHint": "התחברו לאתרים כאן פעם אחת. Stella זוכרת את זה.",
-      "useMyLogins": "להשתמש בהתחברויות מהדפדפן שלי"
+      "useMyLogins": "להשתמש בהתחברויות מהדפדפן שלי",
+      "taskUsingTab": "משימה משתמשת בכרטיסייה הזו"
     },
     "capture": {
       "failedDescription": "משהו השתבש בצילום המסך. נסה שוב.",
@@ -2894,10 +2895,10 @@
         "changes": "שינויים",
         "codeChanges": "שינויי קוד",
         "desktopRequired": "התצוגה המקדימה של הקוד דורשת את אפליקציית שולחן העבודה של Stella.",
-        "empty": "אין עדיין שינויים בקבצים. כשסוכן עורך קוד, השינויים מופיעים כאן.",
+        "empty": "אין עדיין שינויים בקבצים. כשמשימה עורכת קוד, השינויים מופיעים כאן.",
         "noChanges": "לא נמצאו שינויים.",
         "emptyTitle": "עדיין אין שינויים",
-        "emptyBody": "כשסוכן עורך קוד, השינויים מופיעים כאן.",
+        "emptyBody": "כשמשימה עורכת קוד, השינויים מופיעים כאן.",
         "noChangesTitle": "אין שינויים"
       },
       "filePreview": {
@@ -3047,7 +3048,8 @@
         "apps": "אפליקציות",
         "unreadAriaLabel": "{label}, {count} שלא נקראו",
         "unreadTitle": "{label} ({count} שלא נקראו)"
-      }
+      },
+      "taskSource": "משימה"
     },
     "topbar": {
       "conversation": {
@@ -3200,7 +3202,7 @@
     "runsOnComputer": "פועל במחשב הזה",
     "runsOnYourComputer": "פועל במחשב שלך",
     "waiting": "ממתין למחשב שלך",
-    "toAgent": "עובר לסוכן",
+    "toAgent": "מתחיל משימה",
     "toStella": "עובר ל-Stella",
     "once": "נעצר כשנמצא",
     "lastFailed": "ההרצה האחרונה נכשלה: {error}",

@@ -2716,8 +2716,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Messages récents de l’agent",
-      "recentProgress": "Progression récente"
+      "recentProgress": "Progression récente",
+      "recentTaskUpdates": "Mises à jour récentes des tâches"
     },
     "appSource": {
       "failed": "Impossible d'appliquer la modification",
@@ -2768,8 +2768,8 @@
       "connected": "Navigateur connecté",
       "connecting": "En attente de l'extension…",
       "dismiss": "Fermer",
-      "emptyBody": "Connectez-vous à un site ici une seule fois et Stella vous garde connecté, pour vous et vos agents.",
-      "emptyBodyConnected": "Connectez-vous ici une fois et Stella s'en souvient. Pour vos autres connexions, les agents travaillent dans votre propre navigateur.",
+      "emptyBody": "Connectez-vous à un site ici une seule fois et Stella vous garde connecté, pour vous et vos tâches.",
+      "emptyBodyConnected": "Connectez-vous ici une fois et Stella s'en souvient. Pour vos autres connexions, les tâches s’exécutent dans votre propre navigateur.",
       "emptyTitle": "Navigateur Stella",
       "newTab": "Ouvrir un nouvel onglet",
       "openErrorTitle": "Impossible d'ouvrir le navigateur",
@@ -2777,7 +2777,8 @@
       "reconnectExtension": "Reconnecter l'extension",
       "serviceMissing": "Le service du navigateur est manquant. Réinstallez Stella pour utiliser ce navigateur.",
       "signInHint": "Connectez-vous aux sites ici une seule fois. Stella s'en souvient.",
-      "useMyLogins": "Utiliser les connexions de mon navigateur"
+      "useMyLogins": "Utiliser les connexions de mon navigateur",
+      "taskUsingTab": "Une tâche utilise cet onglet"
     },
     "capture": {
       "failedDescription": "Un problème est survenu lors de la capture d’écran. Réessayez.",
@@ -2894,10 +2895,10 @@
         "changes": "Modifications",
         "codeChanges": "Modifications de code",
         "desktopRequired": "L’aperçu de code nécessite l’app Stella pour ordinateur.",
-        "empty": "Aucune modification de fichier pour l’instant. Quand un agent modifie du code, les changements apparaissent ici.",
+        "empty": "Aucune modification de fichier pour l’instant. Quand une tâche modifie du code, les changements apparaissent ici.",
         "noChanges": "Aucune modification trouvée.",
         "emptyTitle": "Aucune modification pour l'instant",
-        "emptyBody": "Quand un agent modifie du code, les changements apparaissent ici.",
+        "emptyBody": "Quand une tâche modifie du code, les changements apparaissent ici.",
         "noChangesTitle": "Aucune modification"
       },
       "filePreview": {
@@ -3047,7 +3048,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} non lus",
         "unreadTitle": "{label} ({count} non lus)"
-      }
+      },
+      "taskSource": "Tâche"
     },
     "topbar": {
       "conversation": {
@@ -3200,7 +3202,7 @@
     "runsOnComputer": "S'exécute sur cet ordinateur",
     "runsOnYourComputer": "S’exécute sur votre ordinateur",
     "waiting": "En attente de votre ordinateur",
-    "toAgent": "Envoyé à un agent",
+    "toAgent": "Lance une tâche",
     "toStella": "Envoyé à Stella",
     "once": "S'arrête dès que trouvé",
     "lastFailed": "Échec de la dernière exécution : {error}",

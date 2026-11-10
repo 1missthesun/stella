@@ -2716,8 +2716,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Mesaje recente ale agentului",
-      "recentProgress": "Progres recent"
+      "recentProgress": "Progres recent",
+      "recentTaskUpdates": "Actualizări recente ale sarcinilor"
     },
     "appSource": {
       "failed": "Modificarea nu a putut fi aplicată",
@@ -2768,8 +2768,8 @@
       "connected": "Browser conectat",
       "connecting": "Se așteaptă extensia…",
       "dismiss": "Închide",
-      "emptyBody": "Conectează-te o dată aici la un site și Stella te menține conectat, pentru tine și agenții tăi.",
-      "emptyBodyConnected": "Autentifică-te aici o dată și Stella ține minte. Pentru celelalte autentificări, agenții lucrează în propriul tău browser.",
+      "emptyBody": "Conectează-te o dată aici la un site și Stella te menține conectat, pentru tine și sarcinile tale.",
+      "emptyBodyConnected": "Autentifică-te aici o dată și Stella ține minte. Pentru celelalte autentificări, sarcinile rulează în propriul tău browser.",
       "emptyTitle": "Browserul Stella",
       "newTab": "Deschide o filă nouă",
       "openErrorTitle": "Browserul nu a putut fi deschis",
@@ -2777,7 +2777,8 @@
       "reconnectExtension": "Reconectează extensia",
       "serviceMissing": "Serviciul de browser lipsește. Reinstalează Stella pentru a folosi acest browser.",
       "signInHint": "Conectează-te aici o singură dată la site-uri. Stella își amintește.",
-      "useMyLogins": "Folosește autentificările din browserul meu"
+      "useMyLogins": "Folosește autentificările din browserul meu",
+      "taskUsingTab": "O sarcină folosește această filă"
     },
     "capture": {
       "failedDescription": "Ceva nu a mers la realizarea capturii de ecran. Încearcă din nou.",
@@ -2894,10 +2895,10 @@
         "changes": "Modificări",
         "codeChanges": "Modificări de cod",
         "desktopRequired": "Previzualizarea codului necesită aplicația desktop Stella.",
-        "empty": "Încă nicio modificare de fișier. Când un agent editează cod, modificările apar aici.",
+        "empty": "Încă nicio modificare de fișier. Când o sarcină editează cod, modificările apar aici.",
         "noChanges": "Nicio modificare găsită.",
         "emptyTitle": "Încă nicio modificare",
-        "emptyBody": "Când un agent editează cod, modificările apar aici.",
+        "emptyBody": "Când o sarcină editează cod, modificările apar aici.",
         "noChangesTitle": "Nicio modificare"
       },
       "filePreview": {
@@ -3047,7 +3048,8 @@
         "apps": "Aplicații",
         "unreadAriaLabel": "{label}, {count} necitite",
         "unreadTitle": "{label} ({count} necitite)"
-      }
+      },
+      "taskSource": "Sarcină"
     },
     "topbar": {
       "conversation": {
@@ -3200,7 +3202,7 @@
     "runsOnComputer": "Rulează pe acest computer",
     "runsOnYourComputer": "Rulează pe computerul tău",
     "waiting": "Așteaptă computerul tău",
-    "toAgent": "Merge la un agent",
+    "toAgent": "Pornește o sarcină",
     "toStella": "Merge la Stella",
     "once": "Se oprește când găsește",
     "lastFailed": "Ultima rulare a eșuat: {error}",

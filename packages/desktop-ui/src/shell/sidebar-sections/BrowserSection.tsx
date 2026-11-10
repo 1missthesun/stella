@@ -323,6 +323,7 @@ function useOverlayOverPage(
 }
 
 export function BrowserSection() {
+  const t = useT();
   const chat = useChatRuntime();
   const activeSection = useActiveSidebarSection();
   const panelOpen = useDisplayPanelOpen();
@@ -681,8 +682,8 @@ export function BrowserSection() {
                         <img
                           className="browser-section__agent-mark"
                           src="stella-agent-cursor.png"
-                          alt="Agent working"
-                          title="Agent working"
+                          alt={t("shell.browser.taskUsingTab")}
+                          title={t("shell.browser.taskUsingTab")}
                           draggable={false}
                         />
                       ) : null}

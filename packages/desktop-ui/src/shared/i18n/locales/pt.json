@@ -2716,8 +2716,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Mensagens recentes do agente",
-      "recentProgress": "Progresso recente"
+      "recentProgress": "Progresso recente",
+      "recentTaskUpdates": "Atualizações recentes das tarefas"
     },
     "appSource": {
       "failed": "Não foi possível aplicar a alteração",
@@ -2768,8 +2768,8 @@
       "connected": "Navegador conectado",
       "connecting": "Aguardando a extensão…",
       "dismiss": "Fechar",
-      "emptyBody": "Entre em um site aqui uma vez e a Stella mantém você conectado, para você e seus agentes.",
-      "emptyBodyConnected": "Entre aqui uma vez e a Stella lembra. Para seus outros logins, os agentes trabalham no seu próprio navegador.",
+      "emptyBody": "Entre em um site aqui uma vez e a Stella mantém você conectado, para você e suas tarefas.",
+      "emptyBodyConnected": "Entre aqui uma vez e a Stella lembra. Para seus outros logins, as tarefas rodam no seu próprio navegador.",
       "emptyTitle": "Navegador da Stella",
       "newTab": "Abrir uma nova aba",
       "openErrorTitle": "Não foi possível abrir o navegador",
@@ -2777,7 +2777,8 @@
       "reconnectExtension": "Reconectar extensão",
       "serviceMissing": "O serviço do navegador está ausente. Reinstale a Stella para usar este navegador.",
       "signInHint": "Entre nos sites aqui uma vez. A Stella se lembra.",
-      "useMyLogins": "Usar os logins do meu navegador"
+      "useMyLogins": "Usar os logins do meu navegador",
+      "taskUsingTab": "Uma tarefa está usando esta aba"
     },
     "capture": {
       "failedDescription": "Algo deu errado ao fazer a captura. Tente novamente.",
@@ -2894,10 +2895,10 @@
         "changes": "Alterações",
         "codeChanges": "Alterações de código",
         "desktopRequired": "A prévia de código exige o app da Stella para computador.",
-        "empty": "Ainda não há alterações em arquivos. Quando um agente editar código, as alterações aparecem aqui.",
+        "empty": "Ainda não há alterações em arquivos. Quando uma tarefa editar código, as alterações aparecem aqui.",
         "noChanges": "Nenhuma alteração encontrada.",
         "emptyTitle": "Nenhuma alteração ainda",
-        "emptyBody": "Quando um agente edita código, as alterações aparecem aqui.",
+        "emptyBody": "Quando uma tarefa edita código, as alterações aparecem aqui.",
         "noChangesTitle": "Nenhuma alteração"
       },
       "filePreview": {
@@ -3047,7 +3048,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} não lidas",
         "unreadTitle": "{label} ({count} não lidas)"
-      }
+      },
+      "taskSource": "Tarefa"
     },
     "topbar": {
       "conversation": {
@@ -3200,7 +3202,7 @@
     "runsOnComputer": "Executado neste computador",
     "runsOnYourComputer": "É executado no seu computador",
     "waiting": "Aguardando seu computador",
-    "toAgent": "Vai para um agente",
+    "toAgent": "Inicia uma tarefa",
     "toStella": "Vai para a Stella",
     "once": "Para quando encontrar",
     "lastFailed": "A última execução falhou: {error}",

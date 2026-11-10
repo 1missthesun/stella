@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Aktuelle Agentennachrichten",
-      "recentProgress": "Aktueller Fortschritt"
+      "recentProgress": "Aktueller Fortschritt",
+      "recentTaskUpdates": "Aktuelle Neuigkeiten aus Aufgaben"
     },
     "appSource": {
       "failed": "Die Änderung konnte nicht übernommen werden",
@@ -2759,8 +2759,8 @@
       "connected": "Browser verbunden",
       "connecting": "Warten auf Erweiterung …",
       "dismiss": "Schließen",
-      "emptyBody": "Melde dich hier einmal bei einer Website an, und Stella hält dich angemeldet, für dich und deine Agenten.",
-      "emptyBodyConnected": "Melde dich hier einmal an, und Stella merkt es sich. Für deine anderen Logins arbeiten Agenten in deinem eigenen Browser.",
+      "emptyBody": "Melde dich hier einmal bei einer Website an, und Stella hält dich angemeldet, für dich und deine Aufgaben.",
+      "emptyBodyConnected": "Melde dich hier einmal an, und Stella merkt es sich. Für deine anderen Logins laufen Aufgaben in deinem eigenen Browser.",
       "emptyTitle": "Stella-Browser",
       "newTab": "Neuen Tab öffnen",
       "openErrorTitle": "Der Browser konnte nicht geöffnet werden",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Erweiterung neu verbinden",
       "serviceMissing": "Der Browserdienst fehlt. Installiere Stella neu, um diesen Browser zu nutzen.",
       "signInHint": "Melde dich hier einmal bei Websites an. Stella merkt es sich.",
-      "useMyLogins": "Logins meines Browsers verwenden"
+      "useMyLogins": "Logins meines Browsers verwenden",
+      "taskUsingTab": "Eine Aufgabe nutzt diesen Tab"
     },
     "capture": {
       "failedDescription": "Beim Erstellen des Screenshots ist etwas schiefgelaufen. Versuch es erneut.",
@@ -2883,10 +2884,10 @@
         "changes": "Änderungen",
         "codeChanges": "Code-Änderungen",
         "desktopRequired": "Die Code-Vorschau erfordert die Stella-Desktop-App.",
-        "empty": "Noch keine Dateiänderungen. Wenn ein Agent Code bearbeitet, erscheinen die Änderungen hier.",
+        "empty": "Noch keine Dateiänderungen. Wenn eine Aufgabe Code bearbeitet, erscheinen die Änderungen hier.",
         "noChanges": "Keine Änderungen gefunden.",
         "emptyTitle": "Noch keine Änderungen",
-        "emptyBody": "Wenn ein Agent Code bearbeitet, erscheinen die Änderungen hier.",
+        "emptyBody": "Wenn eine Aufgabe Code bearbeitet, erscheinen die Änderungen hier.",
         "noChangesTitle": "Keine Änderungen"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} ungelesen",
         "unreadTitle": "{label} ({count} ungelesen)"
-      }
+      },
+      "taskSource": "Aufgabe"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Läuft auf diesem Computer",
     "runsOnYourComputer": "Läuft auf deinem Computer",
     "waiting": "Wartet auf deinen Computer",
-    "toAgent": "Geht an einen Agenten",
+    "toAgent": "Startet eine Aufgabe",
     "toStella": "Geht an Stella",
     "once": "Stoppt, sobald gefunden",
     "lastFailed": "Letzte Ausführung fehlgeschlagen: {error}",

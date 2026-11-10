@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Viimeisimmät agentin viestit",
-      "recentProgress": "Viimeisin edistyminen"
+      "recentProgress": "Viimeisin edistyminen",
+      "recentTaskUpdates": "Viimeisimmät tehtäväpäivitykset"
     },
     "appSource": {
       "failed": "Muutosta ei voitu ottaa käyttöön",
@@ -2759,8 +2759,8 @@
       "connected": "Selain yhdistetty",
       "connecting": "Odotetaan laajennusta…",
       "dismiss": "Sulje",
-      "emptyBody": "Kirjaudu sivustolle täällä kerran, niin Stella pitää sinut kirjautuneena, sinulle ja agenteillesi.",
-      "emptyBodyConnected": "Kirjaudu tänne kerran, niin Stella muistaa sen. Muita kirjautumisiasi varten agentit työskentelevät omassa selaimessasi.",
+      "emptyBody": "Kirjaudu sivustolle täällä kerran, niin Stella pitää sinut kirjautuneena, sinulle ja tehtävillesi.",
+      "emptyBodyConnected": "Kirjaudu tänne kerran, niin Stella muistaa sen. Muita kirjautumisiasi varten tehtävät toimivat omassa selaimessasi.",
       "emptyTitle": "Stella-selain",
       "newTab": "Avaa uusi välilehti",
       "openErrorTitle": "Selainta ei voitu avata",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Yhdistä laajennus uudelleen",
       "serviceMissing": "Selainpalvelu puuttuu. Asenna Stella uudelleen käyttääksesi tätä selainta.",
       "signInHint": "Kirjaudu sivustoille täällä kerran. Stella muistaa sen.",
-      "useMyLogins": "Käytä selaimeni kirjautumisia"
+      "useMyLogins": "Käytä selaimeni kirjautumisia",
+      "taskUsingTab": "Tehtävä käyttää tätä välilehteä"
     },
     "capture": {
       "failedDescription": "Jokin meni pieleen kuvakaappausta otettaessa. Yritä uudelleen.",
@@ -2883,10 +2884,10 @@
         "changes": "Muutokset",
         "codeChanges": "Koodimuutokset",
         "desktopRequired": "Koodin esikatselu vaatii Stellan työpöytäsovelluksen.",
-        "empty": "Ei vielä tiedostomuutoksia. Kun agentti muokkaa koodia, muutokset näkyvät tässä.",
+        "empty": "Ei vielä tiedostomuutoksia. Kun tehtävä muokkaa koodia, muutokset näkyvät tässä.",
         "noChanges": "Muutoksia ei löytynyt.",
         "emptyTitle": "Ei vielä muutoksia",
-        "emptyBody": "Kun agentti muokkaa koodia, muutokset näkyvät tässä.",
+        "emptyBody": "Kun tehtävä muokkaa koodia, muutokset näkyvät tässä.",
         "noChangesTitle": "Ei muutoksia"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Sovellukset",
         "unreadAriaLabel": "{label}, {count} lukematonta",
         "unreadTitle": "{label} ({count} lukematonta)"
-      }
+      },
+      "taskSource": "Tehtävä"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Toimii tällä tietokoneella",
     "runsOnYourComputer": "Suoritetaan tietokoneellasi",
     "waiting": "Odottaa tietokonettasi",
-    "toAgent": "Menee agentille",
+    "toAgent": "Aloittaa tehtävän",
     "toStella": "Menee Stellalle",
     "once": "Pysähtyy, kun löytyy",
     "lastFailed": "Viimeisin suoritus epäonnistui: {error}",

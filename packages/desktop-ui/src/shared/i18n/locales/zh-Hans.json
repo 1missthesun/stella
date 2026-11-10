@@ -2700,8 +2700,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "最近的智能体消息",
-      "recentProgress": "最近进展"
+      "recentProgress": "最近进展",
+      "recentTaskUpdates": "最近的任务动态"
     },
     "appSource": {
       "failed": "无法应用此更改",
@@ -2750,8 +2750,8 @@
       "connected": "浏览器已连接",
       "connecting": "正在等待扩展…",
       "dismiss": "关闭",
-      "emptyBody": "在这里登录网站一次，Stella 就会为你和你的代理保持登录状态。",
-      "emptyBodyConnected": "在这里登录一次，Stella 就会记住。需要你的其他登录时，智能体会在你自己的浏览器中操作。",
+      "emptyBody": "在这里登录网站一次，Stella 就会为你和你的任务保持登录状态。",
+      "emptyBodyConnected": "在这里登录一次，Stella 就会记住。需要你的其他登录时，任务会在你自己的浏览器中运行。",
       "emptyTitle": "Stella 浏览器",
       "newTab": "打开新标签页",
       "openErrorTitle": "无法打开浏览器",
@@ -2759,7 +2759,8 @@
       "reconnectExtension": "重新连接扩展程序",
       "serviceMissing": "缺少浏览器服务。请重新安装 Stella 以使用此浏览器。",
       "signInHint": "在这里登录网站一次，Stella 会记住。",
-      "useMyLogins": "使用我浏览器的登录信息"
+      "useMyLogins": "使用我浏览器的登录信息",
+      "taskUsingTab": "有任务正在使用此标签页"
     },
     "capture": {
       "failedDescription": "截图时出了点问题。请重试。",
@@ -2870,10 +2871,10 @@
         "changes": "更改",
         "codeChanges": "代码更改",
         "desktopRequired": "代码预览需要 Stella 桌面应用。",
-        "empty": "还没有文件更改。当智能体编辑代码时，更改会显示在这里。",
+        "empty": "还没有文件更改。当任务编辑代码时，更改会显示在这里。",
         "noChanges": "未找到更改。",
         "emptyTitle": "暂无更改",
-        "emptyBody": "当智能体编辑代码时，更改会显示在这里。",
+        "emptyBody": "当任务编辑代码时，更改会显示在这里。",
         "noChangesTitle": "无更改"
       },
       "filePreview": {
@@ -3017,7 +3018,8 @@
         "apps": "应用",
         "unreadAriaLabel": "{label}，{count} 条未读",
         "unreadTitle": "{label}（{count} 条未读）"
-      }
+      },
+      "taskSource": "任务"
     },
     "topbar": {
       "conversation": {
@@ -3166,7 +3168,7 @@
     "runsOnComputer": "在这台电脑上运行",
     "runsOnYourComputer": "在你的电脑上运行",
     "waiting": "正在等待你的电脑",
-    "toAgent": "交给智能体",
+    "toAgent": "启动一个任务",
     "toStella": "交给 Stella",
     "once": "找到后停止",
     "lastFailed": "上次运行失败：{error}",

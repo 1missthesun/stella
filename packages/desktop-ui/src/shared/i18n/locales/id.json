@@ -2700,8 +2700,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Pesan agen terbaru",
-      "recentProgress": "Kemajuan terbaru"
+      "recentProgress": "Kemajuan terbaru",
+      "recentTaskUpdates": "Pembaruan tugas terbaru"
     },
     "appSource": {
       "failed": "Tidak dapat menerapkan perubahan",
@@ -2750,8 +2750,8 @@
       "connected": "Browser terhubung",
       "connecting": "Menunggu ekstensi…",
       "dismiss": "Tutup",
-      "emptyBody": "Masuk ke situs di sini sekali dan Stella membuat Anda tetap masuk, untuk Anda dan agen Anda.",
-      "emptyBodyConnected": "Masuk di sini sekali dan Stella akan mengingatnya. Untuk login Anda yang lain, agen bekerja di browser Anda sendiri.",
+      "emptyBody": "Masuk ke situs di sini sekali dan Stella membuat Anda tetap masuk, untuk Anda dan tugas Anda.",
+      "emptyBodyConnected": "Masuk di sini sekali dan Stella akan mengingatnya. Untuk login Anda yang lain, tugas berjalan di browser Anda sendiri.",
       "emptyTitle": "Browser Stella",
       "newTab": "Buka tab baru",
       "openErrorTitle": "Tidak dapat membuka browser",
@@ -2759,7 +2759,8 @@
       "reconnectExtension": "Hubungkan ulang ekstensi",
       "serviceMissing": "Layanan browser tidak ada. Instal ulang Stella untuk menggunakan browser ini.",
       "signInHint": "Masuk ke situs di sini sekali. Stella mengingatnya.",
-      "useMyLogins": "Gunakan login dari browser saya"
+      "useMyLogins": "Gunakan login dari browser saya",
+      "taskUsingTab": "Sebuah tugas sedang memakai tab ini"
     },
     "capture": {
       "failedDescription": "Terjadi masalah saat mengambil tangkapan layar. Coba lagi.",
@@ -2870,10 +2871,10 @@
         "changes": "Perubahan",
         "codeChanges": "Perubahan kode",
         "desktopRequired": "Pratinjau kode memerlukan aplikasi desktop Stella.",
-        "empty": "Belum ada perubahan berkas. Saat agen mengedit kode, perubahannya muncul di sini.",
+        "empty": "Belum ada perubahan berkas. Saat tugas mengedit kode, perubahannya muncul di sini.",
         "noChanges": "Tidak ada perubahan ditemukan.",
         "emptyTitle": "Belum ada perubahan",
-        "emptyBody": "Saat agen mengedit kode, perubahannya muncul di sini.",
+        "emptyBody": "Saat tugas mengedit kode, perubahannya muncul di sini.",
         "noChangesTitle": "Tidak ada perubahan"
       },
       "filePreview": {
@@ -3017,7 +3018,8 @@
         "apps": "Aplikasi",
         "unreadAriaLabel": "{label}, {count} belum dibaca",
         "unreadTitle": "{label} ({count} belum dibaca)"
-      }
+      },
+      "taskSource": "Tugas"
     },
     "topbar": {
       "conversation": {
@@ -3166,7 +3168,7 @@
     "runsOnComputer": "Berjalan di komputer ini",
     "runsOnYourComputer": "Berjalan di komputer Anda",
     "waiting": "Menunggu komputer Anda",
-    "toAgent": "Dikirim ke agen",
+    "toAgent": "Memulai tugas",
     "toStella": "Dikirim ke Stella",
     "once": "Berhenti setelah ditemukan",
     "lastFailed": "Proses terakhir gagal: {error}",

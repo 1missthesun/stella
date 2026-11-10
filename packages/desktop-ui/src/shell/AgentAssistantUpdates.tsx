@@ -17,7 +17,7 @@ export function AgentAssistantUpdates({
     <ul
       className="chat-workspace-strip__task-progress"
       aria-live="polite"
-      aria-label={t("shell.agentProgress.recentAgentMessages")}
+      aria-label={t("shell.agentProgress.recentTaskUpdates")}
     >
       {visible.map((message, index) => (
         <li

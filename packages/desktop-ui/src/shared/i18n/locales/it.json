@@ -2716,8 +2716,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Messaggi recenti dell'agente",
-      "recentProgress": "Progressi recenti"
+      "recentProgress": "Progressi recenti",
+      "recentTaskUpdates": "Aggiornamenti recenti delle attività"
     },
     "appSource": {
       "failed": "Impossibile applicare la modifica",
@@ -2768,8 +2768,8 @@
       "connected": "Browser connesso",
       "connecting": "In attesa dell'estensione…",
       "dismiss": "Chiudi",
-      "emptyBody": "Accedi a un sito qui una volta e Stella ti mantiene connesso, per te e i tuoi agenti.",
-      "emptyBodyConnected": "Accedi qui una volta e Stella lo ricorda. Per gli altri tuoi accessi, gli agenti lavorano nel tuo browser.",
+      "emptyBody": "Accedi a un sito qui una volta e Stella ti mantiene connesso, per te e le tue attività.",
+      "emptyBodyConnected": "Accedi qui una volta e Stella lo ricorda. Per gli altri tuoi accessi, le attività vengono eseguite nel tuo browser.",
       "emptyTitle": "Browser di Stella",
       "newTab": "Apri una nuova scheda",
       "openErrorTitle": "Impossibile aprire il browser",
@@ -2777,7 +2777,8 @@
       "reconnectExtension": "Ricollega l'estensione",
       "serviceMissing": "Il servizio del browser non è presente. Reinstalla Stella per usare questo browser.",
       "signInHint": "Accedi ai siti qui una volta. Stella se lo ricorda.",
-      "useMyLogins": "Usa gli accessi del mio browser"
+      "useMyLogins": "Usa gli accessi del mio browser",
+      "taskUsingTab": "Un’attività sta usando questa scheda"
     },
     "capture": {
       "failedDescription": "Qualcosa è andato storto durante lo screenshot. Riprova.",
@@ -2894,10 +2895,10 @@
         "changes": "Modifiche",
         "codeChanges": "Modifiche al codice",
         "desktopRequired": "L'anteprima del codice richiede l'app Stella per computer.",
-        "empty": "Ancora nessuna modifica ai file. Quando un agente modifica il codice, le modifiche compaiono qui.",
+        "empty": "Ancora nessuna modifica ai file. Quando un’attività modifica il codice, le modifiche compaiono qui.",
         "noChanges": "Nessuna modifica trovata.",
         "emptyTitle": "Ancora nessuna modifica",
-        "emptyBody": "Quando un agente modifica il codice, le modifiche compaiono qui.",
+        "emptyBody": "Quando un’attività modifica il codice, le modifiche compaiono qui.",
         "noChangesTitle": "Nessuna modifica"
       },
       "filePreview": {
@@ -3047,7 +3048,8 @@
         "apps": "App",
         "unreadAriaLabel": "{label}, {count} non letti",
         "unreadTitle": "{label} ({count} non letti)"
-      }
+      },
+      "taskSource": "Attività"
     },
     "topbar": {
       "conversation": {
@@ -3200,7 +3202,7 @@
     "runsOnComputer": "Eseguito su questo computer",
     "runsOnYourComputer": "Viene eseguito sul tuo computer",
     "waiting": "In attesa del tuo computer",
-    "toAgent": "Va a un agente",
+    "toAgent": "Avvia un’attività",
     "toStella": "Va a Stella",
     "once": "Si ferma quando trova",
     "lastFailed": "Ultima esecuzione non riuscita: {error}",

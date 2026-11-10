@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Recent agent messages",
-      "recentProgress": "Recent progress"
+      "recentProgress": "Recent progress",
+      "recentTaskUpdates": "Recent task updates"
     },
     "appSource": {
       "failed": "Couldn't apply the change",
@@ -2759,8 +2759,8 @@
       "connected": "Browser connected",
       "connecting": "Waiting for extension…",
       "dismiss": "Dismiss",
-      "emptyBody": "Sign in to a site here once and Stella keeps you signed in, for you and your agents.",
-      "emptyBodyConnected": "Sign in here once and Stella remembers it. For your other logins, agents work in your own browser.",
+      "emptyBody": "Sign in to a site here once and Stella keeps you signed in, for you and your tasks.",
+      "emptyBodyConnected": "Sign in here once and Stella remembers it. For your other logins, tasks run in your own browser.",
       "emptyTitle": "Stella Browser",
       "newTab": "Open a new tab",
       "openErrorTitle": "Couldn't open the browser",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Reconnect extension",
       "serviceMissing": "Browser service is missing. Reinstall Stella to use this browser.",
       "signInHint": "Sign in to sites here once. Stella remembers it.",
-      "useMyLogins": "Use my browser's logins"
+      "useMyLogins": "Use my browser's logins",
+      "taskUsingTab": "A task is using this tab"
     },
     "capture": {
       "failedDescription": "Something went wrong taking the screenshot. Try again.",
@@ -2883,10 +2884,10 @@
         "changes": "Changes",
         "codeChanges": "Code changes",
         "desktopRequired": "Code preview requires the Stella desktop app.",
-        "empty": "No file changes yet. When an agent edits code, the changes appear here.",
+        "empty": "No file changes yet. When a task edits code, the changes appear here.",
         "noChanges": "No changes found.",
         "emptyTitle": "No changes yet",
-        "emptyBody": "When an agent edits code, the changes show up here.",
+        "emptyBody": "When a task edits code, the changes show up here.",
         "noChangesTitle": "No changes"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} unread",
         "unreadTitle": "{label} ({count} unread)"
-      }
+      },
+      "taskSource": "Task"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Runs on this computer",
     "runsOnYourComputer": "Runs on your computer",
     "waiting": "Waiting for your computer",
-    "toAgent": "Goes to an agent",
+    "toAgent": "Starts a task",
     "toStella": "Goes to Stella",
     "once": "Stops once found",
     "lastFailed": "Last run failed: {error}",

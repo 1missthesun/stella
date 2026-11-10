@@ -2708,8 +2708,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Seneste agentbeskeder",
-      "recentProgress": "Seneste fremgang"
+      "recentProgress": "Seneste fremgang",
+      "recentTaskUpdates": "Seneste opdateringer fra opgaver"
     },
     "appSource": {
       "failed": "Ændringen kunne ikke anvendes",
@@ -2759,8 +2759,8 @@
       "connected": "Browser forbundet",
       "connecting": "Venter på udvidelsen …",
       "dismiss": "Luk",
-      "emptyBody": "Log ind på et websted her én gang, så holder Stella dig logget ind, for dig og dine agenter.",
-      "emptyBodyConnected": "Log ind her én gang, så husker Stella det. Til dine andre logins arbejder agenter i din egen browser.",
+      "emptyBody": "Log ind på et websted her én gang, så holder Stella dig logget ind, for dig og dine opgaver.",
+      "emptyBodyConnected": "Log ind her én gang, så husker Stella det. Til dine andre logins kører opgaver i din egen browser.",
       "emptyTitle": "Stella-browser",
       "newTab": "Åbn et nyt faneblad",
       "openErrorTitle": "Kunne ikke åbne browseren",
@@ -2768,7 +2768,8 @@
       "reconnectExtension": "Tilslut udvidelsen igen",
       "serviceMissing": "Browsertjenesten mangler. Geninstaller Stella for at bruge denne browser.",
       "signInHint": "Log ind på websteder her én gang. Stella husker det.",
-      "useMyLogins": "Brug min browsers logins"
+      "useMyLogins": "Brug min browsers logins",
+      "taskUsingTab": "En opgave bruger denne fane"
     },
     "capture": {
       "failedDescription": "Noget gik galt, da skærmbilledet blev taget. Prøv igen.",
@@ -2883,10 +2884,10 @@
         "changes": "Ændringer",
         "codeChanges": "Kodeændringer",
         "desktopRequired": "Forhåndsvisning af kode kræver Stella-computerappen.",
-        "empty": "Ingen filændringer endnu. Når en agent redigerer kode, vises ændringerne her.",
+        "empty": "Ingen filændringer endnu. Når en opgave redigerer kode, vises ændringerne her.",
         "noChanges": "Ingen ændringer fundet.",
         "emptyTitle": "Ingen ændringer endnu",
-        "emptyBody": "Når en agent redigerer kode, vises ændringerne her.",
+        "emptyBody": "Når en opgave redigerer kode, vises ændringerne her.",
         "noChangesTitle": "Ingen ændringer"
       },
       "filePreview": {
@@ -3033,7 +3034,8 @@
         "apps": "Apps",
         "unreadAriaLabel": "{label}, {count} ulæste",
         "unreadTitle": "{label} ({count} ulæste)"
-      }
+      },
+      "taskSource": "Opgave"
     },
     "topbar": {
       "conversation": {
@@ -3184,7 +3186,7 @@
     "runsOnComputer": "Kører på denne computer",
     "runsOnYourComputer": "Kører på din computer",
     "waiting": "Venter på din computer",
-    "toAgent": "Går til en agent",
+    "toAgent": "Starter en opgave",
     "toStella": "Går til Stella",
     "once": "Stopper, når det er fundet",
     "lastFailed": "Seneste kørsel mislykkedes: {error}",

@@ -2724,8 +2724,8 @@
   },
   "shell": {
     "agentProgress": {
-      "recentAgentMessages": "Ostatnie wiadomości agenta",
-      "recentProgress": "Ostatnie postępy"
+      "recentProgress": "Ostatnie postępy",
+      "recentTaskUpdates": "Najnowsze aktualizacje zadań"
     },
     "appSource": {
       "failed": "Nie udało się zastosować zmiany",
@@ -2777,8 +2777,8 @@
       "connected": "Przeglądarka połączona",
       "connecting": "Oczekiwanie na rozszerzenie…",
       "dismiss": "Zamknij",
-      "emptyBody": "Zaloguj się tutaj do witryny raz, a Stella utrzyma Twoje zalogowanie, dla Ciebie i Twoich agentów.",
-      "emptyBodyConnected": "Zaloguj się tu raz, a Stella to zapamięta. Przy innych logowaniach agenci pracują w Twojej własnej przeglądarce.",
+      "emptyBody": "Zaloguj się tutaj do witryny raz, a Stella utrzyma Twoje zalogowanie, dla Ciebie i Twoich zadań.",
+      "emptyBodyConnected": "Zaloguj się tu raz, a Stella to zapamięta. Przy innych logowaniach zadania działają w Twojej własnej przeglądarce.",
       "emptyTitle": "Przeglądarka Stella",
       "newTab": "Otwórz nową kartę",
       "openErrorTitle": "Nie udało się otworzyć przeglądarki",
@@ -2786,7 +2786,8 @@
       "reconnectExtension": "Połącz ponownie rozszerzenie",
       "serviceMissing": "Brak usługi przeglądarki. Zainstaluj ponownie Stellę, aby korzystać z tej przeglądarki.",
       "signInHint": "Zaloguj się tutaj do witryn raz. Stella to zapamięta.",
-      "useMyLogins": "Użyj logowań z mojej przeglądarki"
+      "useMyLogins": "Użyj logowań z mojej przeglądarki",
+      "taskUsingTab": "Zadanie używa tej karty"
     },
     "capture": {
       "failedDescription": "Coś poszło nie tak przy robieniu zrzutu ekranu. Spróbuj ponownie.",
@@ -2905,10 +2906,10 @@
         "changes": "Zmiany",
         "codeChanges": "Zmiany w kodzie",
         "desktopRequired": "Podgląd kodu wymaga aplikacji desktopowej Stelli.",
-        "empty": "Brak jeszcze zmian w plikach. Gdy agent zmieni kod, zmiany pojawią się tutaj.",
+        "empty": "Brak jeszcze zmian w plikach. Gdy zadanie zmieni kod, zmiany pojawią się tutaj.",
         "noChanges": "Nie znaleziono zmian.",
         "emptyTitle": "Na razie brak zmian",
-        "emptyBody": "Gdy agent edytuje kod, zmiany pojawią się tutaj.",
+        "emptyBody": "Gdy zadanie edytuje kod, zmiany pojawią się tutaj.",
         "noChangesTitle": "Brak zmian"
       },
       "filePreview": {
@@ -3061,7 +3062,8 @@
         "apps": "Aplikacje",
         "unreadAriaLabel": "{label}, nieprzeczytane: {count}",
         "unreadTitle": "{label} (nieprzeczytane: {count})"
-      }
+      },
+      "taskSource": "Zadanie"
     },
     "topbar": {
       "conversation": {
@@ -3216,7 +3218,7 @@
     "runsOnComputer": "Działa na tym komputerze",
     "runsOnYourComputer": "Działa na Twoim komputerze",
     "waiting": "Czeka na Twój komputer",
-    "toAgent": "Trafia do agenta",
+    "toAgent": "Uruchamia zadanie",
     "toStella": "Trafia do Stelli",
     "once": "Kończy się po znalezieniu",
     "lastFailed": "Ostatnie uruchomienie nie powiodło się: {error}",

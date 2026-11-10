@@ -77,8 +77,8 @@ export function sharedFaq(page: ProblemPage): Faq[] {
         `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude plan through Claude Code, and this task costs nothing extra. ${TRIAL_LINE}`,
     },
     {
-      q: "Does Stella ask before changing things on my computer?",
-      a: `Yes. Stella works on ${where} with your own files, and it asks before deleting, overwriting or installing anything. You can watch each step in the chat and stop it at any point.`,
+      q: "Can I control what Stella changes on my computer?",
+      a: `Yes. Stella works on ${where} with your own files and shows each step in the chat, so you can watch it and stop it at any point. Tell it what it may not do, as the prompts on these pages do (“don't delete anything without asking”), and it waits for your go-ahead. It also refuses commands that would wipe a whole disk, your home folder or system folders.`,
     },
   ];
 }

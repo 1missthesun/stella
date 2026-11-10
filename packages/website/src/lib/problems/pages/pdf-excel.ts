@@ -24,7 +24,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Pulls every transaction into one sheet in date order; in the recording, Date, Description and Amount, with money out as negative numbers (ask for separate in and out or balance columns if you prefer)",
       "Stores dates as real dates and amounts as numbers in your currency, so sorting, filters and SUM work straight away",
       "Checks its work: each month's money in and out, and the running balance, against the summary printed on that statement",
-      "Saves an .xlsx file that opens in Excel, Numbers or Google Sheets",
+      "Saves an .xlsx file that opens in Excel, Numbers or Google Sheets; in the recording it went to Stella's outputs folder, so say where if you want it next to the PDFs",
     ],
     prompt: "Turn these bank statement PDFs into one Excel sheet with date, description and amount.",
     proof: {

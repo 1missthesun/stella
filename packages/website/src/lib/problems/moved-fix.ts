@@ -8,6 +8,7 @@ export const MOVED_FIX_PAGES: Record<string, string> = {
   "bank-statement-to-excel": "/how/pdf-excel/bank-statement-pdf-to-excel",
   "c-drive-full": "/how/pc-cleanup/c-drive-full-for-no-reason",
   "sims-4-mods-broken": "/how/game-mods/sims-4-mods-not-working-after-update",
+  "game-mods-broken-after-patch": "/how/game-mods/cyberpunk-mods-not-working-after-2-5",
   // Retired (audit 2026-11-10): developer topics are the wrong audience, and the
   // DLSS 5 page promised a "leaked build". They redirect to the how-to index.
   "setup-dlss-5-one-click": "/how",

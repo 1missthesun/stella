@@ -28,7 +28,7 @@ export const NICHES: Niche[] = [
     h1: "Get your space back, safely.",
     title: "PC cleanup: free up disk space and tidy folders",
     description:
-      "Find what's filling your C drive, sort a messy Downloads folder and clear space safely on Windows or Mac, by hand or with Stella (stella.sh) asking before it deletes anything.",
+      "Find what's filling your C drive, sort a messy Downloads folder and clear space safely on Windows or Mac, by hand or with Stella (stella.sh) waiting for your go-ahead before it deletes anything.",
     intro:
       "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and shows Stella (stella.sh) doing it, asking before anything is deleted.",
   },

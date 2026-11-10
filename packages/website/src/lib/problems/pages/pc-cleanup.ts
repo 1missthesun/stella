@@ -14,7 +14,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "Organize a messy Downloads folder (Windows and Mac)",
     description:
-      "Sort a cluttered Downloads folder into tidy folders, find duplicates and old installers, and clear space safely, by hand or with Stella (stella.sh) asking first.",
+      "Sort a cluttered Downloads folder into tidy folders, find duplicates and old installers, and clear space safely, by hand or with Stella (stella.sh) waiting for your OK.",
     h1: "Organize a messy Downloads folder",
     short: "Sort a messy Downloads folder",
     answer:
@@ -33,7 +33,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Stella’s own models (GPT-6 Luna)",
       result:
-        "297 of 299 files sorted into 14 folders, 46 groups of identical files found and reported with nothing deleted, then, after a yes in the chat, 58 extra copies removed with one of each kept. 241 files remain, and every move and removal is in a log.",
+        "297 of 299 files sorted into 14 folders, 46 groups of identical files found and reported with nothing deleted, then, after the go-ahead typed in the chat, 58 extra copies removed with one of each kept. 241 files remain, and every move and removal is in a log.",
       note: "The Downloads folder is a test folder of 299 files made for this run. The waits are sped up.",
       video: {
         src: `${PROOFS}/pc-cleanup/organize-downloads-folder/proof.mp4`,
@@ -87,9 +87,9 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       },
     ],
     limits: [
-      "Stella never deletes without asking. It shows the list first; if you'd rather keep a safety net, ask it to move the extra copies to the Recycle Bin or Trash instead of deleting them.",
+      "In the recording Stella deleted nothing until it was told to, because the prompt said so. Its deletes are permanent, not to the Recycle Bin or Trash. If you want a safety net, say “move the extra copies to the Trash” in your go-ahead.",
       "It won't open or run installers it finds. It only reports what they are.",
-      "If Downloads syncs with OneDrive or iCloud, moving files also moves them in the cloud copy. Stella checks and tells you before it starts.",
+      "If Downloads syncs with OneDrive or iCloud, moving files also moves them in the cloud copy. Say so in the prompt if you'd rather it left synced files alone.",
       "It sorts by names and file types, so a file called `scan_0012.pdf` lands in Documents, not in the exact subfolder you'd choose. Check the report and move the odd one by hand, or tell Stella your own folder names first.",
     ],
     platforms: ["windows", "mac", "linux"],
@@ -147,7 +147,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       "Explains each big item in plain words: what it is, whether it's safe to remove, and how much you'd get back",
       "Runs Windows' own cleanups with your OK: Disk Cleanup's system files, the component store cleanup and temp folders",
       "Points out big personal folders (old iPhone backups, game libraries, videos) and offers to move them to another drive",
-      "Asks before every deletion, and before changes like turning hibernation off",
+      "Waits for your go-ahead before deleting anything or turning hibernation off, because the prompt asks for that",
     ],
     prompt:
       "My C drive is almost full and I don't know why. Find what's using the space, including hidden and system files, explain it, and only clean up what I approve.",

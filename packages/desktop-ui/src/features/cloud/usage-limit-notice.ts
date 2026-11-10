@@ -1,6 +1,7 @@
 import { stellaUsageLimitOf } from "@stella/contracts/stella-usage-limit";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
+import { presentAllowanceConnectPlan } from "@/features/chat/connect-plan/connect-plan";
 import {
   foldUsageLimitPauses,
   summarizeUsageLimitPauses,
@@ -26,6 +27,7 @@ export const presentCloudUsageLimit = (
   conversationId: string | null,
 ): boolean => {
   if (!stellaUsageLimitOf(text)) return false;
+  if (presentAllowanceConnectPlan(text, conversationId)) return true;
   presentStellaProviderError(text ?? null, { conversationId });
   return true;
 };

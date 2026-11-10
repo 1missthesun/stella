@@ -1,3 +1,5 @@
+import { CONNECT_PLAN_FREE_ALLOWANCE_MESSAGE, CONNECT_PLAN_OFFER_ENABLED } from "./connect-plan-offer.js";
+
 export const STELLA_USAGE_LIMIT_CODE = "usage_limit" as const;
 
 export type StellaUsageLimitReason = "free_allowance" | "plan_limit";
@@ -19,7 +21,9 @@ export const STELLA_USAGE_LIMIT_DESCRIPTIONS: Record<StellaUsageLimitReason, str
 };
 
 export const STELLA_USAGE_LIMIT_MESSAGES: Record<StellaUsageLimitReason, string> = {
-  free_allowance: "You've used your free Stella allowance. Choose a plan or add credit to keep going.",
+  free_allowance: CONNECT_PLAN_OFFER_ENABLED
+    ? CONNECT_PLAN_FREE_ALLOWANCE_MESSAGE
+    : "You've used your free Stella allowance. Choose a plan or add credit to keep going.",
   plan_limit: "You've reached your plan's usage limit. Add credit or upgrade to keep going, or wait until it resets.",
 };
 
@@ -67,6 +71,9 @@ export const stellaUsageLimitOf = (text: string | null | undefined): StellaUsage
 export const stellaUsageLimitText = (text: string | null | undefined): string | null => {
   const reason = stellaUsageLimitOf(text);
   if (!reason) return null;
+  // The connect-your-plan wording leads with the person's own plan, whatever
+  // an older gateway or backend still sends.
+  if (reason === "free_allowance" && CONNECT_PLAN_OFFER_ENABLED) return CONNECT_PLAN_FREE_ALLOWANCE_MESSAGE;
   const quoted = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text ?? "")?.[1];
   if (quoted) {
     const unquoted = quoted.replace(/\\(.)/g, "$1").trim();

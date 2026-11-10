@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { showToast, type ToastOptions } from "@/ui/toast";
+import type { ConnectPlanNoticeState } from "@/features/chat/connect-plan/connect-plan-types";
 
 export type ComposerNoticeKind = "sign-in" | "upgrade" | "limit" | "provider";
 
@@ -17,6 +18,8 @@ export type ComposerNotice = {
   action?: ComposerNoticeAction;
   secondaryAction?: ComposerNoticeAction;
   claudeSignIn?: { email?: string };
+  /** Renders the connect-your-plan card (features/chat/connect-plan). */
+  connectPlan?: ConnectPlanNoticeState;
 };
 
 export type ComposerNoticeInput = Omit<ComposerNotice, "id"> & {

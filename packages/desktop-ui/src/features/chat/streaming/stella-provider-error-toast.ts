@@ -21,6 +21,13 @@ import {
   presentComposerNotice,
   type ComposerNoticeKind,
 } from '@/features/chat/composer-notice-store'
+import { CONNECT_PLAN_COPY } from '@stella/contracts/connect-plan-offer'
+import {
+  connectPlanChatGptOnly,
+  connectPlanCopy,
+  connectPlanOfferEnabled,
+  openEngineConnectFallback,
+} from '@/features/chat/connect-plan/connect-plan'
 import {
   classifyStellaProviderError,
   isStellaLimitOrAuthClassification,
@@ -208,6 +215,22 @@ export const resolveStellaProviderErrorToast = (
       }
     }
     case 'free-allowance-exhausted':
+      if (connectPlanOfferEnabled()) {
+        const copy = connectPlanCopy('allowance')
+        return {
+          title: copy.title,
+          description: copy.description,
+          variant: 'error',
+          duration: 10000,
+          action: {
+            label: connectPlanChatGptOnly()
+              ? CONNECT_PLAN_COPY.connectChatGpt
+              : CONNECT_PLAN_COPY.connect,
+            onClick: openEngineConnectFallback,
+          },
+          secondaryAction: { label: CONNECT_PLAN_COPY.plans, onClick: openBilling },
+        }
+      }
       return {
         title: STELLA_USAGE_LIMIT_TITLES.free_allowance,
         description: STELLA_USAGE_LIMIT_DESCRIPTIONS.free_allowance,

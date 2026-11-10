@@ -8,6 +8,8 @@ import {
   type ComposerNoticeKind,
 } from "../lib/composer-notice";
 import { useT } from "../i18n";
+import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
+import { startConnectPlan } from "../lib/connect-plan";
 import { useServerFeatures } from "../lib/server-features";
 import { isSelfHostedLaunch } from "../lib/server-registry";
 import { useColors } from "../theme/theme-context";
@@ -44,7 +46,15 @@ export function ComposerNotice({
   const description =
     notice.kind === "server" ? t("mobile.selfHost.behindBody") : notice.description;
   const primary =
-    notice.kind === "sign-in"
+    notice.connectPlan
+      ? {
+          label: CONNECT_PLAN_COPY.connectChatGpt,
+          onPress: () => {
+            dismiss();
+            startConnectPlan(notice.conversationId);
+          },
+        }
+      : notice.kind === "sign-in"
       ? {
           label: "Sign in",
           onPress: () => {
@@ -74,6 +84,17 @@ export function ComposerNotice({
             }
           : null;
 
+  const secondary =
+    notice.connectPlan && features.billing
+      ? {
+          label: CONNECT_PLAN_COPY.plans,
+          onPress: () => {
+            dismiss();
+            router.push("/settings");
+          },
+        }
+      : null;
+
   const inline = notice.kind === "limit";
   const button = (action: { label: string; onPress: () => void }, compact: boolean) => (
     <Pressable
@@ -86,6 +107,15 @@ export function ComposerNotice({
       ]}
     >
       <Text style={styles.primaryText}>{action.label}</Text>
+    </Pressable>
+  );
+  const secondaryButton = (action: { label: string; onPress: () => void }) => (
+    <Pressable
+      accessibilityRole="button"
+      onPress={action.onPress}
+      style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
+    >
+      <Text style={styles.secondaryText}>{action.label}</Text>
     </Pressable>
   );
 
@@ -120,7 +150,12 @@ export function ComposerNotice({
       >
         <Icon name="x" size={14} color={colors.textMuted} />
       </Pressable>
-      {primary && !inline ? <View style={styles.actions}>{button(primary, false)}</View> : null}
+      {primary && !inline ? (
+        <View style={styles.actions}>
+          {secondary ? secondaryButton(secondary) : null}
+          {button(primary, false)}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -185,8 +220,23 @@ const makeStyles = (colors: Colors) =>
     },
     actions: {
       flexDirection: "row",
+      gap: 8,
       justifyContent: "flex-end",
       width: "100%",
+    },
+    secondaryButton: {
+      alignItems: "center",
+      borderColor: colors.border,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    secondaryButtonPressed: { backgroundColor: colors.muted },
+    secondaryText: {
+      color: colors.text,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13,
     },
     primaryButton: {
       alignItems: "center",

@@ -75,6 +75,7 @@ import { ComposerNotice } from "../../src/components/ComposerNotice";
 import { CloudBoundary } from "../../src/components/CloudBoundary";
 import type { ChatArtifact } from "../../src/types";
 import { useT } from "../../src/i18n";
+import { useConnectPlanResend } from "../../src/lib/connect-plan";
 
 const STATUS_POLL_MS = 20_000;
 const HANDOFF_SEND_RETRY_MS = 400;
@@ -315,6 +316,12 @@ function ChatSurface(props: {
     platform: null,
   });
   const { setDraft, addAttachments } = thread;
+  useConnectPlanResend({
+    conversationId: thread.conversationId ?? null,
+    messages: thread.messages,
+    setDraft,
+    settings: cloudModelSettings,
+  });
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {

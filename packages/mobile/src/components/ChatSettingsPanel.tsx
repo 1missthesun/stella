@@ -30,6 +30,7 @@ import { authClient } from "../lib/auth-client";
 import { useDrawerOpen, useDrawerSide } from "../lib/drawer";
 import { tapLight } from "../lib/haptics";
 import { useComputerControl } from "../lib/main-shell-store";
+import { takeChatSettingsBrainRequest } from "../lib/connect-plan";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { useT } from "../i18n";
 import type { Colors } from "../theme/colors";
@@ -61,6 +62,16 @@ export function ChatSettingsPanel({ width }: { width: number }) {
     if (active) return;
     const timer = setTimeout(() => setRoute({ name: "home" }), 350);
     return () => clearTimeout(timer);
+  }, [active]);
+
+  // The out-of-usage offer opens the panel straight on ChatGPT.
+  useEffect(() => {
+    if (!active) return;
+    const requested = takeChatSettingsBrainRequest();
+    if (requested) {
+      setForward(true);
+      setRoute({ name: "brain", id: requested, from: "home" });
+    }
   }, [active]);
 
   const go = (next: Route, ahead = true) => {

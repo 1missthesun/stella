@@ -16,6 +16,13 @@ import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { planUsageDialog } from "./plan-usage-dialog-store";
+import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
+import {
+  connectPlanChatGptOnly,
+  connectPlanCopy,
+  connectPlanOfferEnabled,
+  openConnectPlan,
+} from "@/features/chat/connect-plan/connect-plan";
 import "./BillingScreen.css";
 
 type Translate = ReturnType<typeof useT>;
@@ -336,16 +343,32 @@ function UsageSection({
             <strong>{oneTime ? t("billing.v3.usage.freeOutTitle") : t("billing.v3.usage.outTitle")}</strong>
             <span>
               {oneTime
-                ? t("billing.v3.usage.freeOutBody")
+                ? connectPlanOfferEnabled()
+                  ? connectPlanCopy("allowance").description
+                  : t("billing.v3.usage.freeOutBody")
                 : resumesAt
                   ? t("billing.v3.usage.outBody", { date: f.when(resumesAt, now) })
                   : t("billing.v3.usage.outBodyNoDate")}
             </span>
           </div>
-          {next ? (
+          {oneTime && connectPlanOfferEnabled() ? (
             <button
               type="button"
               className="billing-btn billing-btn--primary"
+              onClick={() => {
+                planUsageDialog.close();
+                openConnectPlan({ conversationId: null, reason: "allowance", choose: true });
+              }}
+            >
+              {connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect}
+            </button>
+          ) : null}
+          {next ? (
+            <button
+              type="button"
+              className={
+                oneTime && connectPlanOfferEnabled() ? "billing-btn" : "billing-btn billing-btn--primary"
+              }
               disabled={busy !== null}
               onClick={() => (plan === "free" ? onCheckout(next) : onPortal())}
             >

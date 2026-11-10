@@ -1,5 +1,6 @@
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
+import { presentAllowanceConnectPlan } from "@/features/chat/connect-plan/connect-plan";
 import { showToast } from "@/ui/toast";
 import {
   dismissUsageLimitCard,
@@ -139,7 +140,9 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     if (message?.role !== "assistant") continue;
     if (isSafeguardBlock(message)) continue;
     if (message.stopReason === "error") {
-      presentStellaProviderError(message.errorMessage ?? null, { conversationId });
+      if (!presentAllowanceConnectPlan(message.errorMessage ?? null, conversationId)) {
+        presentStellaProviderError(message.errorMessage ?? null, { conversationId });
+      }
     } else if (message.stopReason !== "aborted") {
       clearStaleNotices(conversationId, { keepVoiceFailure: true });
     }

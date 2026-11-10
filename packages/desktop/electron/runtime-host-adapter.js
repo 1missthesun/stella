@@ -237,6 +237,9 @@ export class RuntimeHostAdapter {
     createBackgroundAgent(payload) {
         return this.host.createBackgroundAgent(payload);
     }
+    messageAgent(payload) {
+        return this.host.messageAgent(payload);
+    }
     persistVoiceTranscript(args) {
         return this.host.persistVoiceTranscript(args);
     }

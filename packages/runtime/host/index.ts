@@ -1872,6 +1872,21 @@ export class StellaRuntimeHost {
       },
     );
   }
+  /** Hands a framed message to a task on this computer, resuming it when it had finished. */
+  async messageAgent(payload: {
+    threadId: string;
+    messageId: string;
+    text: string;
+  }): Promise<AgentMessageDeviceOutcome> {
+    const result = await this.requestWorker<{
+      outcome?: AgentMessageDeviceOutcome;
+    } | null>(
+      METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE,
+      { ...payload, ownerGeneration: "" },
+      { ensureWorker: true, recordActivity: true },
+    );
+    return result?.outcome ?? "refused";
+  }
   async createBackgroundAgent(payload: unknown) {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_CREATE_BACKGROUND_AGENT,
@@ -2125,16 +2140,7 @@ export class StellaRuntimeHost {
               description,
               prompt,
             }),
-          messageAgent: async ({ threadId, messageId, text }) => {
-            const result = await this.requestWorker<{
-              outcome?: AgentMessageDeviceOutcome;
-            } | null>(
-              METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE,
-              { threadId, text, messageId, ownerGeneration: "" },
-              { ensureWorker: true, recordActivity: true },
-            );
-            return result?.outcome ?? "refused";
-          },
+          messageAgent: (message) => this.messageAgent(message),
         }),
       },
       ...(showNotificationHandler

@@ -43,6 +43,7 @@ import { InAppBrowserService } from "../services/in-app-browser-service.js";
 import { InAppBrowserCdpAdapter } from "../services/in-app-browser-cdp-adapter.js";
 import { InAppBrowserBootstrapServer } from "../services/in-app-browser-bootstrap-server.js";
 import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/contracts/browser-extension";
+import { formatAgentMessage } from "@stella/contracts/agent-directory";
 import { scheduleGlobalInputHooksAfterAppReady } from "./global-input-hooks.js";
 import { randomUUID } from "crypto";
 import { startOfficePreviewBridge } from "./office-preview-bridge.js";
@@ -483,6 +484,16 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                     agentType: "general",
                 });
                 return { conversationId, threadId };
+            },
+            tellAgent: async (agentId, messageId, text) => {
+                const runner = lifecycle.getRunner();
+                if (!runner) return false;
+                const outcome = await runner.messageAgent({
+                    threadId: agentId,
+                    messageId,
+                    text: formatAgentMessage({ threadId: "stella", label: "Stella" }, text, { starter: true }),
+                });
+                return outcome !== "not_found" && outcome !== "refused";
             },
             agentRunning: async ({ conversationId, threadId }) => {
                 const runner = lifecycle.getRunner();

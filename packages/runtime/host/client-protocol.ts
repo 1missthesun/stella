@@ -9,6 +9,7 @@ export const RUNTIME_HOST_CALLS = [
   "piChat",
   "runAutomationTurn",
   "createBackgroundAgent",
+  "messageAgent",
   "persistVoiceTranscript",
   "voiceOrchestratorChat",
   "voiceOrchestratorConfig",

@@ -106,6 +106,20 @@ ${state(plan, head, {
 Keep what the change was for: take the current version's code, then carry the change onto it so it still does what it set out to do.`,
 });
 
+const REJECTED_ERROR_CHARS = 4_000;
+
+/** Sent to the task whose finished change the window could not show. */
+export const rejectedDraftNote = (name: string, error: string): string =>
+  `Stella added your finished change (\`draft/${name}\`) and the window could not show it, so Stella took it back by itself. Nothing is broken for the user; the change is simply not in, and its card says so.
+
+What went wrong:
+
+\`\`\`
+${error.trim().slice(0, REJECTED_ERROR_CHARS)}
+\`\`\`
+
+Reopen the draft (\`git worktree add "$STELLA_DRAFTS_DIR/${name}" draft/${name}\`, no \`-b\`), fix it, look at it in the preview, and finish again as the modify-stella skill says. Tell the user briefly that it needed a fix and is in now, or what stops it.`;
+
 export const undoBrief = (args: {
   sha: string;
   base: string;

@@ -64,6 +64,7 @@ import {
 } from "./update-prepare.js";
 import {
   mergeDraftName,
+  rejectedDraftNote,
   remoteMergeBrief,
   remoteMergeDraftName,
   staleDraftBrief,
@@ -99,6 +100,8 @@ type AppSourceServiceOptions = {
   reportPrepared?: (prepared: { lockHash?: string; head?: string }) => void;
   updateScratchDir: string;
   dispatchAgentBrief?: (brief: AgentBrief) => Promise<DispatchedAgent>;
+  /** Sends `text` to the task `agentId`; false when it could not be reached. */
+  tellAgent?: (agentId: string, messageId: string, text: string) => Promise<boolean>;
   /** null: the runtime can't be asked right now. */
   agentRunning?: (agent: DispatchedAgent) => Promise<boolean | null>;
 };
@@ -175,7 +178,14 @@ const EMPTY_STATE: AppSourceState = {
 type Offer = { tip: string; real: boolean; catchUp: boolean };
 
 /** The windows could not show the change, and the checkout is back where it was. */
-class RendererRejected extends Error {}
+class RendererRejected extends Error {
+  constructor(
+    message: string,
+    readonly detail: string,
+  ) {
+    super(message);
+  }
+}
 
 type ApplyPhase = "planned" | "signed" | "holding" | "installed" | "relaunching";
 
@@ -258,6 +268,7 @@ export class AppSourceService {
   private readonly onFocus = () => void this.refresh();
   private readonly rejected = new Map<string, string>();
   private readonly autoTried = new Set<string>();
+  private readonly toldTasks = new Set<string>();
   private autoTimer: NodeJS.Timeout | null = null;
   private reloadTimer: NodeJS.Timeout | null = null;
   private readonly preparer: UpdatePreparer;
@@ -597,7 +608,10 @@ export class AppSourceService {
       );
       this.rejected.delete(tip);
     } catch (error) {
-      if (error instanceof RendererRejected) this.rejected.set(tip, error.message);
+      if (error instanceof RendererRejected) {
+        this.rejected.set(tip, error.message);
+        if (source.kind === "draft") await this.tellItsTask(cwd, source.pendingDraft, tip, error.detail);
+      }
       throw error;
     }
   }
@@ -892,7 +906,10 @@ export class AppSourceService {
       const outcome = await (covered ? covered.reveal(swap) : swap());
       this.mark("reveal");
       if (outcome.mode === "failed") {
-        throw new RendererRejected("This change stopped Stella from showing, so it was taken back.");
+        throw new RendererRejected(
+          "This change stopped Stella from showing, so it was taken back.",
+          outcome.error,
+        );
       }
       this.options.log("app-source.applied", {
         files: paths.length,
@@ -940,6 +957,19 @@ export class AppSourceService {
       reloaded: failure.reloaded,
       restored: restored.mode,
     });
+  }
+
+  /** The task that made a change the window refused hears why, once per commit, so it can fix it. */
+  private async tellItsTask(cwd: string, name: string, tip: string, detail: string) {
+    if (isStellaDraft(name) || this.toldTasks.has(tip)) return;
+    this.toldTasks.add(tip);
+    const agentId = await this.agentOf(cwd, DRAFT_AGENTS_DIR, name);
+    const told = agentId
+      ? await this.options
+          .tellAgent?.(agentId, `draft-rejected:${tip}`, rejectedDraftNote(name, detail))
+          .catch(() => false)
+      : false;
+    this.options.log("app-source.rejection-sent", { draft: name, told: told === true });
   }
 
   /**

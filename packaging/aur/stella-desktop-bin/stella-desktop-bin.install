@@ -1,0 +1,9 @@
+post_install() {
+  echo "Start Stella from your app menu, or run: stella-desktop"
+  echo "On first start it downloads the rest of Stella (about 1.3 GB) into ~/.local/share/stella."
+}
+
+post_remove() {
+  echo "Stella's data and its self-updated launcher stay in ~/.local/share/stella."
+  echo "To remove them too: rm -rf ~/.local/share/stella ~/.local/share/applications/stella.desktop"
+}

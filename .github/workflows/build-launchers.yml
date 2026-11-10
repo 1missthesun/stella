@@ -381,12 +381,20 @@ jobs:
           export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
           export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
           export AWS_DEFAULT_REGION="auto"
+          files="Stella-macos.dmg Stella-macos.zip Stella.exe stella-launcher-linux-x64 stella-launcher-linux-arm64 SHA256SUMS SHA256SUMS.sig VERSION"
+          # An unchanging copy per version first: package managers (AUR
+          # stella-desktop-bin, winget FROMYOU.Stella) pin these URLs and their
+          # checksums, which the next publish to stable/ would break.
+          for file in $files; do
+            aws s3 cp "launchers/$file" "s3://${R2_BUCKET}/launcher/releases/${{ github.run_number }}/$file" \
+              --cache-control "public, max-age=31536000, immutable" --endpoint-url "$R2_ENDPOINT"
+          done
           # VERSION last: a launcher that sees it finds the binaries and sums already there.
-          for file in Stella-macos.dmg Stella-macos.zip Stella.exe stella-launcher-linux-x64 stella-launcher-linux-arm64 SHA256SUMS SHA256SUMS.sig VERSION; do
+          for file in $files; do
             aws s3 cp "launchers/$file" "s3://${R2_BUCKET}/launcher/stable/$file" \
               --cache-control "no-cache" --endpoint-url "$R2_ENDPOINT"
           done
-          echo "Published launchers to launcher/stable/ (commit $GITHUB_SHA)"
+          echo "Published launchers to launcher/stable/ and launcher/releases/${{ github.run_number }}/ (commit $GITHUB_SHA)"
 
       - name: R2 not configured
         if: env.R2_ACCESS_KEY_ID == '' || env.R2_SECRET_ACCESS_KEY == '' || env.R2_BUCKET == '' || env.R2_ENDPOINT == ''

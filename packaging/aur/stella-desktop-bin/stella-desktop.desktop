@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Stella
+GenericName=AI assistant
+Comment=The easy AI assistant for your computer
+Exec=stella-desktop
+Icon=stella-desktop
+Terminal=false
+Categories=Utility;
+Keywords=AI;assistant;ChatGPT;Claude;
+StartupWMClass=Stella
+StartupNotify=true

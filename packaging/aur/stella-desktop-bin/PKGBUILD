@@ -1,0 +1,46 @@
+# Maintainer: FROMYOU, LLC <contact@fromyou.ai>
+# Source of truth: https://github.com/1missthesun/stella/tree/master/packaging/aur
+# (bump with packaging/aur/bump.sh there, not by hand).
+
+pkgname=stella-desktop-bin
+pkgver=77
+pkgrel=1
+_commit=6d64b228d45d89352d9b196f668d7f7fddb5a5a5
+pkgdesc="Stella, the easy AI assistant for your computer. Use your ChatGPT or Claude plan (stella.sh)"
+arch=('x86_64' 'aarch64')
+url="https://stella.sh"
+license=('MIT')
+provides=('stella-desktop')
+conflicts=('stella-desktop')
+# The launcher's window is WebKitGTK; it uses git, curl and unzip to fetch
+# the app, libsecret for its signing key, and the rest is what the Electron
+# app it downloads links against.
+depends=('webkit2gtk-4.1' 'gtk3' 'glib2' 'cairo' 'openssl' 'glibc'
+         'git' 'curl' 'unzip' 'libsecret'
+         'nss' 'alsa-lib' 'libcups' 'mesa' 'at-spi2-core' 'libxkbcommon'
+         'libxcomposite' 'libxdamage' 'libxrandr')
+optdepends=('xdg-utils: open links in your browser')
+install=stella-desktop-bin.install
+options=('!strip' '!debug')
+_base="https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/releases/${pkgver}"
+_raw="https://raw.githubusercontent.com/1missthesun/stella/${_commit}"
+source=("stella-desktop-icon-${_commit:0:12}.png::${_raw}/packages/desktop/build/icon.png"
+        "LICENSE-${_commit:0:12}::${_raw}/LICENSE"
+        'stella-desktop.sh'
+        'stella-desktop.desktop')
+source_x86_64=("stella-launcher-${pkgver}-x86_64::${_base}/stella-launcher-linux-x64")
+source_aarch64=("stella-launcher-${pkgver}-aarch64::${_base}/stella-launcher-linux-arm64")
+sha256sums=('c8a003e80acb3d1d3be7b6cbd09646d6a6df882be9df7b3fa3e66566e1dd6dbc'
+            '7cff97ff5a6830846cd387cc703f67630293de498b0d6e45a4df38518f16206c'
+            'b2f5794f1c5d880e5e1fd3c3570940252e8942cbb5831319eb9bc056b8fbde22'
+            'ef601514393aa1674bb2cfc4dcea36d5b1c7d46f4d84ed704eef84cf037feb89')
+sha256sums_x86_64=('27cf9b2d442b46c535a1be292d6ed417af85e79d73fee8476ce823efb0f77ddb')
+sha256sums_aarch64=('6d4c3fb69920568ca408227347620fa27813f6f8d7c1877d8ec816fc0245ff7b')
+
+package() {
+  install -Dm755 "stella-launcher-${pkgver}-${CARCH}" "${pkgdir}/usr/lib/stella-desktop/stella-launcher"
+  install -Dm755 stella-desktop.sh "${pkgdir}/usr/bin/stella-desktop"
+  install -Dm644 stella-desktop.desktop "${pkgdir}/usr/share/applications/stella-desktop.desktop"
+  install -Dm644 "stella-desktop-icon-${_commit:0:12}.png" "${pkgdir}/usr/share/pixmaps/stella-desktop.png"
+  install -Dm644 "LICENSE-${_commit:0:12}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

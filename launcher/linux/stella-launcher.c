@@ -560,7 +560,8 @@ static const char *USAGE =
     "Environment: STELLA_LAUNCHER_ROOT (install root, for testing),\n"
     "STELLA_LAUNCHER_KEY_FILE (0600 PEM instead of the Secret Service),\n"
     "STELLA_LAUNCHER_BACKEND_URL (wins over <root>/server.json), STELLA_LAUNCHER_STABLE_SECONDS,\n"
-    "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS.\n";
+    "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS,\n"
+    "STELLA_LAUNCHER_PACKAGED=1 (a distribution package provides the menu entry and icon).\n";
 
 static void parse_options(int argc, char **argv) {
     int i;
@@ -2216,7 +2217,7 @@ static int probe_version(const char *binary);
 
 static void install_desktop_entry(void) {
     char self[PATH_MAX], *installed, *apps, *entry_path, *entry, *icon_src, *icon, *existing;
-    const char *xdg = getenv("XDG_DATA_HOME");
+    const char *xdg = getenv("XDG_DATA_HOME"), *packaged = getenv("STELLA_LAUNCHER_PACKAGED");
     ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
     if (n <= 0) return;
     self[n] = 0;
@@ -2228,7 +2229,6 @@ static void install_desktop_entry(void) {
     }
     icon_src = xasprintf("%s/packages/desktop/build/icon.png", P.app);
     icon = xasprintf("%s/stella.png", P.root);
-    if (file_exists(icon_src)) copy_file(icon_src, icon, 0644);
     apps = xdg && *xdg ? xasprintf("%s/applications", xdg)
                        : xasprintf("%s/.local/share/applications", getenv("HOME") ? getenv("HOME") : "/tmp");
     mkdirs(apps, 0755);
@@ -2246,8 +2246,18 @@ static void install_desktop_entry(void) {
         "StartupNotify=true\n",
         installed, icon);
     existing = read_file(entry_path, NULL);
-    if (!existing || strcmp(existing, entry) != 0) {
-        if (write_file_atomic(entry_path, entry, strlen(entry), 0644) == 0) LOG("install: wrote %s", entry_path);
+    if (packaged && *packaged && strcmp(packaged, "0") != 0) {
+        /* A distribution package (e.g. the AUR's stella-desktop-bin) ships the
+         * menu entry and icon, so this launcher doesn't add a second Stella to
+         * the menu, and removes the one an earlier curl install wrote. The copy
+         * above still happens: self-updates go to the per-user launcher. */
+        if (existing && strcmp(existing, entry) == 0 && unlink(entry_path) == 0)
+            LOG("install: packaged; removed %s", entry_path);
+    } else {
+        if (file_exists(icon_src)) copy_file(icon_src, icon, 0644);
+        if (!existing || strcmp(existing, entry) != 0) {
+            if (write_file_atomic(entry_path, entry, strlen(entry), 0644) == 0) LOG("install: wrote %s", entry_path);
+        }
     }
     free(existing);
     free(entry);

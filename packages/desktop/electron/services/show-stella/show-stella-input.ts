@@ -4,7 +4,8 @@ import type { ShowStellaInk } from "@stella/contracts/desktop/show-stella";
  * Turns global pointer and key events into Show Stella's timeline: ink drawn
  * while ⇧ is held, ⇧-click pins, clicks, drags, scrolls, shortcuts and the
  * cursor. Points are screen points (DIP); the timeline stores them normalized
- * to the recorded display, the way Scrawl's builder reads them.
+ * to the recorded display, the way Scrawl's builder reads them. A ⇧ still held
+ * from the shortcut was pressed before this listened, so it draws nothing.
  */
 
 const SCALE = 10_000;
@@ -128,8 +129,6 @@ export class ShowStellaInput {
   private nextId = 1;
   private lastCursorAt = -Infinity;
   private lastPoint: Point | null = null;
-  /** ⇧ is ignored until it has been let go once: the shortcut itself holds it. */
-  private shiftArmed = false;
   private drewThisHold = false;
 
   constructor(private readonly options: InputOptions) {}
@@ -192,7 +191,7 @@ export class ShowStellaInput {
     const repeat = this.pressed.has(code);
     this.pressed.add(code);
     if (SHIFT_KEYS.has(code)) {
-      if (!repeat && this.shiftArmed && !this.otherModifierHeld()) this.beginInk();
+      if (!repeat && !this.otherModifierHeld()) this.beginInk();
       return;
     }
     if (MODIFIER_KEYS.has(code) || repeat) return;
@@ -223,10 +222,6 @@ export class ShowStellaInput {
     const code = event.keycode ?? -1;
     this.pressed.delete(code);
     if (!SHIFT_KEYS.has(code)) return;
-    if (!this.shiftArmed) {
-      this.shiftArmed = true;
-      return;
-    }
     if (!this.shiftHeld()) {
       this.finishInk();
       this.drewThisHold = false;
@@ -254,7 +249,7 @@ export class ShowStellaInput {
       const last = this.press.path[this.press.path.length - 1];
       if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 4) this.press.path.push(p);
     }
-    if (!this.live && this.shiftArmed && this.shiftHeld() && !this.otherModifierHeld()) {
+    if (!this.live && this.shiftHeld() && !this.otherModifierHeld()) {
       this.beginInk();
     }
     if (this.live) {
@@ -334,7 +329,7 @@ export class ShowStellaInput {
       t: this.t(),
       p,
       button: event.button ?? 1,
-      shift: this.shiftArmed && this.shiftHeld(),
+      shift: this.shiftHeld(),
       drewBefore: this.drewThisHold,
       path: [p],
       moved: false,

@@ -106,13 +106,128 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Sodium, Iris and Mod Menu only change graphics and menus on your side, and they're allowed on most servers. Some servers ban client mods outright, so read their rules first.",
       },
     ],
-    related: ["game-mods/sims-4-mods-not-working-after-update", "game-mods/cyberpunk-mods-not-working-after-2-5"],
+    related: ["game-mods/minecraft-modpack-exit-code-1", "game-mods/sims-4-mods-not-working-after-update", "game-mods/cyberpunk-mods-not-working-after-2-5"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Fabric installer", href: "https://fabricmc.net/use/installer/" },
       { label: "Sodium on Modrinth", href: "https://modrinth.com/mod/sodium" },
       { label: "Iris on Modrinth", href: "https://modrinth.com/mod/iris" },
       { label: "Mod Menu on Modrinth", href: "https://modrinth.com/mod/modmenu" },
+    ],
+  },
+  {
+    slug: "minecraft-modpack-exit-code-1",
+    niche: "game-mods",
+    searchPhrases: [
+      "minecraft modpack crashing exit code 1",
+      "curseforge modpack crashing on startup",
+      "minecraft exit code 1 curseforge",
+      "minecraft exit code 1 fabric",
+      "how to add more ram to minecraft curseforge",
+    ],
+    title: "Minecraft modpack crashing with exit code 1? Fix it",
+    description:
+      "Exit code 1 only means Minecraft quit with an error. Find the real cause in the log (a missing or wrong mod, Java, RAM) and fix it, or let Stella (stella.sh) do it.",
+    h1: "Minecraft modpack crashing with exit code 1? Find the real error",
+    short: "Modpack crash, exit code 1",
+    answer:
+      "Exit code 1 only says Minecraft stopped with an error; the reason is in the pack's logs/latest.log or crash-reports folder. Usually it's a missing library mod such as Fabric API, a mod built for another Minecraft version, the wrong Java, or too little RAM. Read the last error, fix that one thing and launch again. Stella (stella.sh) reads the log and every mod's version, swaps the right files in and tests the pack before handing it back.",
+    stellaSteps: [
+      "Reads `logs/latest.log` and the newest crash report, then opens each mod jar to see which Minecraft version and libraries it needs",
+      "Names the cause in plain words; in the recording, Fabric API was missing and Lithium was built for Minecraft 1.20.1 instead of 1.21.1",
+      "Downloads the matching versions from Modrinth and checks each file's SHA-512 against the one Modrinth lists",
+      "Moves the wrong jar into a dated `backups` folder instead of deleting it, and leaves the world and settings alone",
+      "Starts a copy of the server as a test and reads its log until it says Done, then removes the test copy",
+    ],
+    prompt:
+      "My modpack crashes on startup with exit code 1, can you find what's wrong and fix it? It's the server in Desktop/Fabric Friends SMP.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "Both causes found and fixed on the first try, with no follow-up: Stella added Fabric API 0.116.18 and swapped Lithium 0.11.4 (built for 1.20.1) for 0.15.4 for 1.21.1, keeping the old jar in a backup folder. Started afterwards with the pack's own start script, the server loaded 50 mods and reached “Done”.",
+      note: "The pack is a small Fabric 1.21.1 server made for this run from real mods, with Fabric API left out and the wrong Lithium on purpose. Stella took 1 minute 52 seconds; the wait is sped up 10×.",
+      video: {
+        src: `${PROOFS}/game-mods/minecraft-modpack-exit-code-1/proof.mp4`,
+        poster: `${PROOFS}/game-mods/minecraft-modpack-exit-code-1/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 48.8,
+        realDuration: 154,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. The modpack server crashed earlier with exit code 1." },
+        { at: 8, text: "The prompt is sent, with the folder the server is in." },
+        { at: 13, text: "Stella replies that it's checking the server logs and mod files, and will keep the originals before changing anything." },
+        { at: 14, text: "Reading the log and each mod, downloading the right versions and test-starting a copy, sped up 10×." },
+        { at: 28, text: "Done: Fabric API was missing and Lithium was built for Minecraft 1.20.1. Both fixed, a test copy reached “Done”, and the old Lithium jar is in a backup folder." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/game-mods/minecraft-modpack-exit-code-1/log.png`,
+          alt: "Server log lines before and after. Before: Incompatible mods found, AppleSkin requires fabric-api which is missing, Lithium 0.11.4 requires Minecraft 1.20.1. After: Loading 50 mods, Starting minecraft server version 1.21.1, Done.",
+          width: 1400,
+          height: 570,
+          caption: "The crash before, and our own start of the fixed server after the run.",
+        },
+      ],
+    },
+    manualTitle: "Fix it yourself",
+    manualSteps: [
+      {
+        title: "Open the pack's own folder",
+        body: "In the CurseForge app, open My Modpacks, click the pack's ⋮ menu and choose Open Folder. For a server, it's the folder with start.bat or start.sh. Everything you need is in `logs` and `crash-reports` inside it.",
+      },
+      {
+        title: "Read the last real error",
+        body: "Open `logs/latest.log` (or the newest file in `crash-reports`) in Notepad or TextEdit and search for ERROR, “requires” or “Caused by”. Fabric spells it out (“Mod AppleSkin requires any version of fabric-api, which is missing!”); Forge buries it near the bottom of a long stack trace.",
+      },
+      {
+        title: "Add or swap the mod it names",
+        body: "Download the missing library (Fabric API, Architectury, Cloth Config…) or the right version of the named mod from CurseForge or Modrinth. Pick the file for your exact Minecraft version and loader, put it in `mods`, and move the old one out rather than deleting it.",
+      },
+      {
+        title: "Check Java and memory",
+        body: "Minecraft 1.20.5 and newer need Java 21; 1.18 to 1.20.4 need Java 17. In CurseForge, Settings, Minecraft, Java Settings sets memory for every pack, and a pack's Profile Options can override it. Most packs want 6 to 8 GB, never more than two-thirds of your RAM.",
+      },
+      {
+        title: "Launch again, one change at a time",
+        body: "Start the pack after each fix and read the new log; fixing one error often reveals the next. If a pack updated itself and broke, CurseForge's ⋮ menu can switch it back to the previous version.",
+      },
+    ],
+    limits: [
+      "The recording is a Fabric server on Linux, where the log named both problems. A CurseForge client on Windows works the same way in the files, but Stella hasn't been recorded doing it there, and it doesn't sign in to your Minecraft account or launch the game for you.",
+      "Forge and NeoForge crashes (mixin conflicts, client-only mods on a server, out-of-memory) are harder to read, and may take a few rounds of launch, read, fix.",
+      "Stella doesn't say how to start the server again unless you ask; it's the same start.bat or start.sh as before.",
+      "If the crash is in your graphics driver (an `hs_err_pid` file, or exit code -1073741819), mods aren't the cause; update the driver first.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What does exit code 1 mean in Minecraft?",
+        a: "Only that Java exited with an error. It's the same code for a missing mod, a wrong Java version or a bad setting, which is why the log matters more than the number.",
+      },
+      {
+        q: "Will more RAM fix exit code 1?",
+        a: "Only when the log says the game ran out of memory. Too much RAM can cause stutters of its own, so read the error before raising the slider.",
+      },
+      {
+        q: "What about MCDoctor and other crash log readers?",
+        a: "MCDoctor.ai reads a pasted log and explains it, with a few free analyses a month. That helps you understand the crash; you still download and swap the mods yourself. Stella does both on your computer, and it's free with the ChatGPT or Claude plan you already have.",
+      },
+      {
+        q: "I'm starting from a plain game. Where do I begin?",
+        a: "Install a loader first, then add mods made for the same Minecraft version. The guide to [install Fabric, Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) walks through it, and Stella can do it in the same chat.",
+      },
+    ],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/sims-4-mods-not-working-after-update"],
+    lastChecked: "2026-11-10",
+    sources: [
+      { label: "Minecraft Wiki: Java Edition system requirements and Java versions", href: "https://minecraft.wiki/w/Tutorial:Update_Java" },
+      { label: "Fabric API on Modrinth", href: "https://modrinth.com/mod/fabric-api" },
+      { label: "MCDoctor.ai", href: "https://mcdoctor.ai" },
     ],
   },
   {

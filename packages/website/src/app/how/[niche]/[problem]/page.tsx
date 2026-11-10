@@ -173,7 +173,9 @@ function StellaDoingIt({ page }: { page: ProblemPage }) {
       <h3 className={s.h3}>What Stella does</h3>
       <ol className={s.stellaSteps}>
         {page.stellaSteps.map((step) => (
-          <li key={step}>{step}</li>
+          <li key={step}>
+            <LinkedText text={step} />
+          </li>
         ))}
       </ol>
     </section>

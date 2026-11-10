@@ -79,7 +79,7 @@ export function useShowStellaSends(
       for (let attempt = 0; attempt < SEND_ATTEMPTS && !ok; attempt += 1) {
         if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, SEND_RETRY_MS));
         ok = await sendRef
-          .current(request.note, { showCaptures: [request.capture] })
+          .current(request.note, { window: null, showCaptures: [request.capture] })
           .catch(() => false);
       }
       await showStella.sent({ requestId: request.requestId, ok }).catch(() => undefined);

@@ -27,6 +27,10 @@ const AI_AGENTS = [
 
 export default function robots(): MetadataRoute.Robots {
   const base = getSiteUrl();
+  // Preview builds (scripts/deploy-problem-preview.sh) keep every crawler out.
+  if (process.env.NEXT_PUBLIC_STELLA_NOINDEX === "1") {
+    return { rules: [{ userAgent: "*", disallow: "/" }] };
+  }
   return {
     rules: [
       { userAgent: "*", allow: "/", disallow: PRIVATE },

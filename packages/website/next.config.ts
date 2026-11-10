@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "path";
 import { loadEnv } from "vite";
 import { MOVED_ANSWER_SLUGS } from "./src/lib/moved-answers";
+import { MOVED_FIX_PAGES } from "./src/lib/problems/moved-fix";
 
 const desktopPublicEnv = loadEnv(
   process.env.NODE_ENV || "production",
@@ -66,12 +67,20 @@ const nextConfig: NextConfig = {
         { source: `/ai/${from}`, destination: `/ai/${to}`, permanent: true },
         { source: `/ai/${from}.md`, destination: `/ai/${to}.md`, permanent: true },
       ]),
+      ...Object.entries(MOVED_FIX_PAGES).map(([from, to]) => ({
+        source: `/fix/${from}`,
+        destination: to,
+        permanent: true,
+      })),
     ];
   },
   async rewrites() {
     return [
       // Markdown twins of the /ai answer pages.
       { source: "/ai/:slug([a-z0-9-]+).md", destination: "/ai-md/:slug" },
+      // Markdown twins of the /how problem pages and their niche hubs.
+      { source: "/how/:niche([a-z0-9-]+)/:problem([a-z0-9-]+).md", destination: "/how-md/:niche/:problem" },
+      { source: "/how/:niche([a-z0-9-]+).md", destination: "/how-md/:niche" },
       ...(stellaBackendUrl
         ? [
             {

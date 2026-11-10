@@ -6,6 +6,7 @@ import {
   TERMS_OF_SERVICE,
 } from "@/lib/legal-text";
 import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PLAN_CATALOG, PLAN_ORDER, planPriceLabel } from "@/lib/plans";
+import { howLlmsFull, howLlmsSections } from "@/lib/problems/markdown";
 import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
@@ -458,6 +459,12 @@ export function renderLlmsTxt(): string {
       lines.push(`- [${answerTitle(page)}](${abs(`/ai/${page.slug}.md`)}): ${page.metaDescription}`);
     }
   }
+  lines.push(
+    "",
+    "## How-to guides",
+    `- [All how-to guides](${abs("/how.md")}): Specific problems answered properly: the manual steps, and Stella doing it on a real computer.`,
+    ...howLlmsSections(),
+  );
   lines.push("", "## Optional", `- [Everything in one file](${abs("/llms-full.txt")}): The pages and answers above, in full.`);
   return `${lines.join("\n")}\n`;
 }
@@ -471,5 +478,6 @@ export function renderLlmsFull(): string {
   }
   parts.push("# Stella compared and explained", "");
   for (const page of ANSWER_PAGES) parts.push(renderAnswerPage(page));
+  parts.push(...howLlmsFull());
   return `${parts.join("\n").trimEnd()}\n`;
 }

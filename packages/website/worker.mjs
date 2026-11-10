@@ -182,7 +182,7 @@ const optimizedImage = async (request, env, ctx) => {
   return cacheable;
 };
 
-const worker = {
+const handle = {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     const shortLink = request.method === "GET" || request.method === "HEAD" ? shortLinkSource(pathname) : null;
@@ -207,6 +207,16 @@ const worker = {
       changes["Referrer-Policy"] = "strict-origin-when-cross-origin";
     }
     return withHeaders(response, changes, ["X-Powered-By"]);
+  },
+};
+
+// Preview Workers (wrangler.problem-preview.jsonc sets NOINDEX) keep every
+// response out of search, redirects and images included.
+const worker = {
+  async fetch(request, env, ctx) {
+    const response = await handle.fetch(request, env, ctx);
+    if (env?.NOINDEX !== "1" || response.status === 101) return response;
+    return withHeaders(response, { "X-Robots-Tag": "noindex, nofollow" });
   },
 };
 

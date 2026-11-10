@@ -9,6 +9,7 @@ import { InView } from "@/components/landing/in-view";
 import { PageShell } from "@/components/landing/page-shell";
 import pg from "@/components/landing/page.module.css";
 import { FIX_PAGES } from "@/lib/fix-pages";
+import { MOVED_FIX_PAGES } from "@/lib/problems/moved-fix";
 import f from "./fix.module.css";
 
 export const metadata: Metadata = {
@@ -49,7 +50,7 @@ export default function FixIndexPage() {
             <Link
               key={page.slug}
               className={f.card}
-              href={`/fix/${page.slug}`}
+              href={MOVED_FIX_PAGES[page.slug] ?? `/fix/${page.slug}`}
               style={{ ["--i" as string]: Math.min(i, 8) }}
             >
               <span className={f.cardTag}>{page.eyebrow.replace(/^Fix it with Stella\s*·\s*/, "")}</span>

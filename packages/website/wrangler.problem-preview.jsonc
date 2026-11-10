@@ -1,0 +1,29 @@
+// Unrouted, noindex preview of the problem pages (/how) on the problem-pages
+// branch. Its own Worker on workers.dev only: no routes, no custom domains,
+// never stella-website-dev or stella-website-prod. Deploy with
+// scripts/deploy-problem-preview.sh.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stella-website-problem-preview",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-30",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "images": { "binding": "IMAGES" },
+  "observability": { "enabled": true, "redact_query_string": true },
+  "analytics_engine_datasets": [
+    { "binding": "SHORT_LINKS", "dataset": "stella_short_links_preview" }
+  ],
+  "vars": {
+    "CSP_BACKEND_ORIGINS": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev https://auth-dev.stella.sh",
+    // worker.mjs adds X-Robots-Tag: noindex to every response when set.
+    "NOINDEX": "1"
+  }
+}

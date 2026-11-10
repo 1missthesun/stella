@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { ANSWER_PAGES } from "@/lib/answers";
 import { FIX_PAGES } from "@/lib/fix-pages";
+import { MOVED_FIX_PAGES } from "@/lib/problems/moved-fix";
+import { nichePath, problemPath, publishedNiches, publishedProblemPages } from "@/lib/problems";
 import { getSiteUrl } from "@/lib/site-url";
 
 type Route = {
@@ -40,7 +42,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.6,
     },
-    ...FIX_PAGES.map((page) => ({
+    ...FIX_PAGES.filter((page) => !MOVED_FIX_PAGES[page.slug]).map((page) => ({
       url: new URL(`/fix/${page.slug}`, base).href,
       lastModified: now,
       changeFrequency: "weekly" as const,
@@ -55,6 +57,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
+  const howEntries: MetadataRoute.Sitemap = [
+    { url: new URL("/how", base).href, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    ...publishedNiches().map((niche) => ({
+      url: new URL(nichePath(niche), base).href,
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
+    ...publishedProblemPages().map((page) => ({
+      url: new URL(problemPath(page), base).href,
+      lastModified: new Date(`${page.lastChecked}T12:00:00Z`),
+      changeFrequency: "monthly" as const,
+      priority: 0.8,
+    })),
+  ];
+
   const docsEntries: MetadataRoute.Sitemap = [
     {
       url: new URL("/docs/media", base).href,
@@ -64,5 +82,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  return [...pages, ...answerEntries, ...fixEntries, ...docsEntries];
+  return [...pages, ...answerEntries, ...howEntries, ...fixEntries, ...docsEntries];
 }

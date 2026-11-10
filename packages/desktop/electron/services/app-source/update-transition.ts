@@ -208,6 +208,9 @@ const THAW_SCRIPT = "window.__stellaUpdateThaw?.()";
 const PAINTED_SCRIPT =
   "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))";
 
+const RESTORED_SCRIPT = "Promise.resolve(window.__stellaViewRestored?.()).then(() => true)";
+const RESTORE_TIMEOUT_MS = 4_000;
+
 const LIVE_SCRIPT = `(() => {
   const splash = document.getElementById("stella-launch");
   if (splash?.dataset.exiting === "true") splash.remove();
@@ -611,6 +614,7 @@ export class UpdateTransition {
       if (isLive) break;
       await delay(60);
     }
+    await timeout(contents.executeJavaScript(RESTORED_SCRIPT), RESTORE_TIMEOUT_MS, "Restoring the view").catch(() => {});
     await timeout(contents.executeJavaScript(PAINTED_SCRIPT), 1_000, "Waiting for paint").catch(() => {});
   }
 

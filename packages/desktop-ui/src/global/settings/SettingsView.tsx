@@ -16,8 +16,10 @@ import { SettingsSearchResults } from "@/global/settings/SettingsSearchResults";
 import { AudioTab } from "@/global/settings/AudioTab";
 import {
   availableSettingsTabs,
+  SETTINGS_TAB_KEYS,
   type SettingsTab,
 } from "@/global/settings/settings-tabs";
+import { useViewState } from "@/platform/view-state/view-state";
 import { AccountTab } from "./tabs/AccountTab";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { ShortcutsTab } from "./tabs/ShortcutsTab";
@@ -60,7 +62,11 @@ export const SettingsScreen = ({
   onSignOut,
   embedded = false,
 }: SettingsScreenProps) => {
-  const [selectedTab, setSelectedTab] = useState<SettingsTab>("general");
+  const [selectedTab, setSelectedTab] = useViewState<SettingsTab>(
+    "settings.tab",
+    "general",
+    (value) => (SETTINGS_TAB_KEYS as readonly unknown[]).includes(value),
+  );
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocument | null>(
     null,
   );

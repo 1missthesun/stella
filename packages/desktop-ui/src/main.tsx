@@ -10,11 +10,9 @@ import "./shared/lib/interface-preferences";
 import { applyLowPowerDocumentFlag } from "./shared/lib/device-perf";
 import "./shared/lib/native-font-smoothing";
 import { installRendererErrorReporting } from "./platform/diagnostics/report-error";
-import { App } from "./App.tsx";
-import { AppProviders } from "./context/AppProviders";
-import { BackendAuthProvider } from "./global/auth/BackendAuthProvider";
+import { AppRoot } from "./app-root";
 import { prefetchAuthSessionBeforeRender } from "./global/auth/services/auth-session";
-import { ErrorBoundary } from "./shell/ErrorBoundary";
+import { startDomState } from "./platform/view-state/dom-state";
 
 applyLowPowerDocumentFlag();
 installRendererErrorReporting();
@@ -30,14 +28,5 @@ if (import.meta.env.VITE_STELLA_WEB_BUILD === "1") {
 
 document.documentElement.dataset.stellaWindow = "full";
 
-const appTree = (
-  <ErrorBoundary>
-    <BackendAuthProvider enableRuntimeEffects>
-      <AppProviders>
-        <App />
-      </AppProviders>
-    </BackendAuthProvider>
-  </ErrorBoundary>
-);
-
-createRoot(document.getElementById("root")!).render(appTree);
+createRoot(document.getElementById("root")!).render(<AppRoot />);
+startDomState();

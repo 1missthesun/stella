@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
+import { viewAtom } from "@/platform/view-state/view-state";
 import type { DisplayTab, DisplayTabSpec, OpenTabOptions } from "./types";
 
 type DisplayTabsState = {
@@ -71,10 +72,11 @@ const writePersistedExpanded = (expanded: boolean) => {
   if (expanded) uiState.setItem(STORAGE_KEY_EXPANDED, "1");
   else uiState.removeItem(STORAGE_KEY_EXPANDED);
 };
+const panelOpenView = viewAtom("workspace.panelOpen", false);
 const EMPTY_SNAPSHOT: DisplayTabsState = {
   tabs: [],
   activeTabId: null,
-  panelOpen: false,
+  panelOpen: panelOpenView.get(),
   panelExpanded: readPersistedExpanded(),
   panelWidth: readPersistedWidth(),
 };
@@ -131,6 +133,7 @@ const emit = (
     for (const listener of tabListListeners) listener();
   }
   if (options.layoutChanged) {
+    panelOpenView.set(next.panelOpen);
     layoutSnapshot = {
       panelOpen: next.panelOpen,
       panelExpanded: next.panelExpanded,

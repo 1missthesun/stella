@@ -201,6 +201,10 @@ export const uiState = {
     adapter.clear();
   },
 
+  flush(): void {
+    flushPending();
+  },
+
   keys(): string[] {
     return [...memory.keys()];
   },

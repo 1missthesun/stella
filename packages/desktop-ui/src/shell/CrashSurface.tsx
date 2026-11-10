@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect } from "react";
+import { discardViewState } from "@/platform/view-state/view-state";
 import "./error-boundary.css";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 export function CrashSurface({ error, componentStack }: Props) {
   useLayoutEffect(() => {
     document.getElementById("stella-launch")?.remove();
+    discardViewState();
   }, []);
 
   const handleReload = useCallback(() => {

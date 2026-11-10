@@ -308,7 +308,10 @@ export const ChatColumn = memo(function ChatColumn({
             right edge of the entire chat surface — past the workspace
             strip — instead of sitting at the inside edge of the
             centered chat column. */}
-          <div className="chat-viewport-region">
+          <div
+            className="chat-viewport-region"
+            data-view-scope={conversationId ?? undefined}
+          >
             <div
               style={{
                 height: "100%",

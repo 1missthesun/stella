@@ -1,36 +1,17 @@
-import { useSyncExternalStore } from "react";
+import { viewAtom } from "@/platform/view-state/view-state";
 
-let open = false;
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((listener) => listener());
+const open = viewAtom("settings.open", false);
 
 export const settingsDialog = {
   open() {
-    if (open) return;
-    open = true;
-    emit();
+    open.set(true);
   },
   close() {
-    if (!open) return;
-    open = false;
-    emit();
+    open.set(false);
   },
   setOpen(next: boolean) {
-    if (next) this.open();
-    else this.close();
+    open.set(next);
   },
 };
 
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};
-
-export const useSettingsDialogOpen = () =>
-  useSyncExternalStore(
-    subscribe,
-    () => open,
-    () => false,
-  );
+export const useSettingsDialogOpen = () => open.use();

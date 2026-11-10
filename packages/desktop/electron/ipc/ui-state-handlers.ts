@@ -7,6 +7,7 @@ import {
 import { UiStateStore } from "@stella/runtime/kernel/ui-state/store";
 import {
   sanitizeUiStateChanges,
+  VIEW_STATE_KEY_PREFIX,
   type UiStateChanges,
 } from "@stella/contracts/ui-state";
 import {
@@ -29,6 +30,12 @@ export type UiStateKvHandlersOptions = {
     channel: string,
   ) => boolean;
 };
+
+/** Where a window is (`view.` keys) is that window's own: other windows are not told. */
+const sharedAcrossWindows = (changes: UiStateChanges): UiStateChanges =>
+  Object.fromEntries(
+    Object.entries(changes).filter(([key]) => !key.startsWith(VIEW_STATE_KEY_PREFIX)),
+  );
 
 export const registerUiStateKvHandlers = (
   options: UiStateKvHandlersOptions,
@@ -65,7 +72,7 @@ export const registerUiStateKvHandlers = (
     if (!options.assertPrivilegedSender(event, IPC_UI_STATE_KV_APPLY)) return;
     const changes = sanitizeUiStateChanges(rawChanges);
     if (!changes) return;
-    broadcast(store.apply(changes), event.sender.id);
+    broadcast(sharedAcrossWindows(store.apply(changes)), event.sender.id);
   });
 
   onIpc(IPC_UI_STATE_KV_CLEAR, (event) => {

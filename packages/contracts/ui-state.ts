@@ -1,5 +1,7 @@
 export const UI_STATE_FILE_NAME = "ui-state.json";
 
+export const VIEW_STATE_KEY_PREFIX = "view.";
+
 export type UiStateSnapshot = Record<string, string>;
 
 export type UiStateChanges = Record<string, string | null>;

@@ -115,7 +115,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
       },
     ],
-    related: ["pc-cleanup/c-drive-full-for-no-reason", "pdf-excel/bank-statement-pdf-to-excel"],
+    related: ["pc-cleanup/c-drive-full-for-no-reason", "photos-files/fix-google-takeout-photo-dates", "pdf-excel/bank-statement-pdf-to-excel"],
     lastChecked: "2026-11-10",
     sources: [
       {

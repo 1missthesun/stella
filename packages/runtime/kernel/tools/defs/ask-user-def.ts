@@ -23,10 +23,10 @@ export const ASK_USER_TOOL_LABEL = "Ask the user";
 export const ASK_USER_TOOL_WORKING_TEXT = "Asking";
 
 export const ASK_USER_TOOL_DESCRIPTION =
-  "Show the user a card with up to four multiple-choice questions. It interrupts them and can push to their phone, so it is for go-aheads (spending money, deleting their data, sending or posting as them, deploying or releasing), things that need their hands or consent (sign-in, 2FA, an approval), and real forks where a wrong guess is costly to redo; otherwise decide and say what you chose. A go-ahead already given covers the rest of that task. Open-ended questions go in plain prose, not a card. Questions appear one at a time on every device; the user picks, types an answer, or skips. Without blocking, each question proceeds with its default_choice when the timeout passes, and a later answer still reaches you; keep working on what doesn't depend on it. The chat shows the user's answers, so don't repeat them back.";
+  "Show the user a card with up to four multiple-choice questions. It interrupts them and can push to their phone, so it is for go-aheads (spending money; deleting, overwriting or bulk-renaming or moving their files; changing their network or system setup; sending or posting as them; deploying or releasing), things that need their hands or consent (sign-in, 2FA, an approval), and real forks where a wrong guess is costly to redo; otherwise decide and say what you chose. A go-ahead already given covers the rest of that task. Open-ended questions go in plain prose, not a card. Questions appear one at a time on every device; the user picks, types an answer, or skips. Without blocking, each question proceeds with its default_choice when the timeout passes, and a later answer still reaches you; keep working on what doesn't depend on it. The chat shows the user's answers, so don't repeat them back.";
 
 export const ASK_USER_TOOL_PROMPT_SNIPPET =
-  "Ask the user for a go-ahead or consent (`ask_user`) only at a real gate; otherwise decide and say what you chose. Give each question a default_choice and use a timeout unless the action is hard to undo";
+  "Ask the user for a go-ahead or consent (`ask_user`) only at a real gate; otherwise decide and say what you chose. Give each question a default_choice and use a timeout unless the action is hard to undo; a go-ahead's default leaves everything as it is";
 
 export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
@@ -50,7 +50,8 @@ export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
           },
           detail: {
             type: "string",
-            description: "Optional context shown under it.",
+            description:
+              "Context shown under it. The user sees the card but not your other messages, so for a go-ahead say here what will change: counts, a few examples, where things go.",
           },
           options: {
             type: "array",
@@ -74,7 +75,7 @@ export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
           default_choice: {
             type: "string",
             description:
-              "Option id used when the timeout passes. Required unless blocking.",
+              "Option id used when the timeout passes. Required unless blocking. For a go-ahead, the option that changes nothing.",
           },
         },
         required: ["question", "options"],

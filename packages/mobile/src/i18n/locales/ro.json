@@ -32,10 +32,8 @@
       "addMenu": {
         "add": "Adaugă",
         "attachFiles": "Atașează fișiere…",
-        "capture": "Captură",
-        "context": "Context",
-        "recent": "Recente",
-        "showStella": "Arată-i Stellei"
+        "capture": "Captură de ecran",
+        "showStella": "Înregistrează ecranul"
       },
       "agentCompletion": {
         "openNamedThread": "Deschide sarcina: {title}",
@@ -108,7 +106,7 @@
         "showCapture": {
           "title": "Înregistrare ecran · {duration}",
           "preparing": "Se pregătește…",
-          "failed": "Înregistrarea nu a putut fi pregătită",
+          "failed": "Această înregistrare nu a putut fi pregătită",
           "saveVideo": "Salvează videoclipul în Drive",
           "remove": "Elimină înregistrarea",
           "alt": "Momente din înregistrarea ecranului"
@@ -874,7 +872,8 @@
         "send": "Trimite",
         "open": "Deschide în Stella",
         "discard": "Renunță"
-      }
+      },
+      "tagline": "Vorbește și desenează ca să-i arăți Stellei ce vrei să spui."
     }
   },
   "global": {

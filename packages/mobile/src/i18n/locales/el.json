@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Προσθήκη",
         "attachFiles": "Επισύναψη αρχείων…",
-        "capture": "Λήψη",
-        "context": "Πλαίσιο",
-        "recent": "Πρόσφατα",
-        "showStella": "Δείξε στη Stella"
+        "capture": "Στιγμιότυπο οθόνης",
+        "showStella": "Εγγραφή οθόνης"
       },
       "agentCompletion": {
         "openNamedThread": "Άνοιγμα εργασίας: {title}",
@@ -867,7 +865,8 @@
         "send": "Αποστολή",
         "open": "Άνοιγμα στη Stella",
         "discard": "Απόρριψη"
-      }
+      },
+      "tagline": "Μίλα και σχεδίασε για να δείξεις στη Stella τι εννοείς."
     }
   },
   "global": {

@@ -194,7 +194,7 @@ export class ShowStellaController {
     if (!supportedPlatform() || !resolveNativeHelperPath(HELPER)) return "";
     for (const shortcut of [SHORTCUT, FALLBACK_SHORTCUT]) {
       const result = applyShortcutRegistration({
-        label: "Show Stella",
+        label: "Record screen",
         requestedShortcut: shortcut,
         currentShortcut: this.activeShortcut,
         callback: () => void this.toggle(),
@@ -395,7 +395,7 @@ export class ShowStellaController {
       const shortcut = this.activeShortcut;
       this.activeShortcut = "";
       applyShortcutRegistration({
-        label: "Show Stella",
+        label: "Record screen",
         requestedShortcut: shortcut,
         currentShortcut: "",
         callback: () => void this.toggle(),
@@ -803,7 +803,7 @@ export class ShowStellaController {
     }
     const helper = resolveNativeHelperPath(HELPER);
     try {
-      if (!helper) throw new Error("Show Stella isn't installed on this computer.");
+      if (!helper) throw new Error("Screen recording isn't installed on this computer.");
       await fs.writeFile(path.join(pending.dir, "transcript.json"), JSON.stringify(transcript), {
         mode: 0o600,
       });

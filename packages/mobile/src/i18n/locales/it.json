@@ -32,10 +32,8 @@
       "addMenu": {
         "add": "Aggiungi",
         "attachFiles": "Allega file…",
-        "capture": "Cattura",
-        "context": "Contesto",
-        "recent": "Recenti",
-        "showStella": "Mostra a Stella"
+        "capture": "Screenshot",
+        "showStella": "Registra schermo"
       },
       "agentCompletion": {
         "openNamedThread": "Apri attività: {title}",
@@ -111,7 +109,7 @@
           "failed": "Impossibile preparare questa registrazione",
           "saveVideo": "Salva il video su Drive",
           "remove": "Rimuovi registrazione",
-          "alt": "Momenti della tua registrazione dello schermo"
+          "alt": "Momenti dalla tua registrazione dello schermo"
         }
       },
       "contextRow": {
@@ -874,7 +872,8 @@
         "send": "Invia",
         "open": "Apri in Stella",
         "discard": "Scarta"
-      }
+      },
+      "tagline": "Parla e disegna per mostrare a Stella cosa intendi."
     }
   },
   "global": {

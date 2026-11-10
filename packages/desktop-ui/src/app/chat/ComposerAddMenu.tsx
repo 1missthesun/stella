@@ -1,23 +1,17 @@
 import { memo, useCallback, useRef, useState } from "react";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { Camera, File, Paperclip, Video } from "@/ui/icons";
+import { Camera, Paperclip, Record } from "@/ui/icons";
 import { toggleShowStella, useShowStellaStatus } from "@/features/show-stella/use-show-stella";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { ComposerAddButton } from "@/features/chat/ComposerPrimitives";
 import { getElectronApi } from "@/platform/electron/electron";
-import {
-  applyProcessedAttachments,
-  attachFilesToContext,
-} from "@/features/chat/lib/file-attach";
-import { useRecentFiles } from "@/features/chat/hooks/use-recent-files";
-import type { ChatContext, ChatContextFile } from "@/shared/types/electron";
-import type { ComposerContextSuggestion } from "./ComposerContextRow";
+import { attachFilesToContext } from "@/features/chat/lib/file-attach";
+import type { ChatContext } from "@/shared/types/electron";
 import { useT } from "@/shared/i18n";
 import "./composer-add-menu.css";
 
@@ -25,56 +19,20 @@ type ComposerAddMenuProps = {
   setChatContext: Dispatch<SetStateAction<ChatContext | null>>;
   className?: string;
   title?: string;
-  contextSuggestions?: ComposerContextSuggestion[];
-  onSelectContextSuggestion?: (suggestion: ComposerContextSuggestion) => void;
-  /** Region capture lands in the main window's composer, so surfaces with their own attachments turn it off. */
+  /** Screenshots and recordings land in the main window's composer, so surfaces with their own attachments turn them off. */
   allowCapture?: boolean;
 };
-
-const FILE_NAME_MAX_DISPLAY = 28;
-
-export const getContextSuggestionLabel = (
-  suggestion: ComposerContextSuggestion,
-): string => {
-  const chip = suggestion.chip;
-  return chip.kind === "tab"
-    ? chip.title
-      ? `${chip.browser} — ${chip.title}`
-      : `${chip.browser} — ${chip.host}`
-    : chip.windowTitle
-      ? `${chip.name} — ${chip.windowTitle}`
-      : chip.name;
-};
-
-function truncateFileName(
-  name: string,
-  max: number = FILE_NAME_MAX_DISPLAY,
-): string {
-  if (name.length <= max) return name;
-  const dotIndex = name.lastIndexOf(".");
-  if (dotIndex >= 0 && dotIndex >= max - 4) {
-    const ext = name.slice(dotIndex);
-    const headBudget = max - 1 - ext.length;
-    if (headBudget > 0) {
-      return `${name.slice(0, headBudget)}…${ext}`;
-    }
-  }
-  return `${name.slice(0, max - 1)}…`;
-}
 
 export const ComposerAddMenu = memo(function ComposerAddMenu({
   setChatContext,
   className,
   title,
-  contextSuggestions = [],
-  onSelectContextSuggestion,
   allowCapture = true,
 }: ComposerAddMenuProps) {
   const t = useT();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { recentFiles, recordRecentFiles } = useRecentFiles();
-  const showStella = useShowStellaStatus();
+  const recordScreen = useShowStellaStatus();
 
   const handleAttachFiles = useCallback(() => {
     fileInputRef.current?.click();
@@ -87,12 +45,10 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
         event.target.value = "";
         return;
       }
-      const files = Array.from(list);
-      const processed = await attachFilesToContext(files, setChatContext);
-      recordRecentFiles(processed.files);
+      await attachFilesToContext(Array.from(list), setChatContext);
       event.target.value = "";
     },
-    [recordRecentFiles, setChatContext],
+    [setChatContext],
   );
 
   const handleCapture = useCallback(async () => {
@@ -104,16 +60,6 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
       console.warn("[composer-add-menu] capture failed:", error);
     }
   }, []);
-
-  const handleRecentClick = useCallback(
-    (file: ChatContextFile) => {
-      applyProcessedAttachments(
-        { screenshots: [], files: [file] },
-        setChatContext,
-      );
-    },
-    [setChatContext],
-  );
 
   return (
     <>
@@ -130,56 +76,12 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
           sideOffset={6}
           className="composer-add-menu"
         >
-          {recentFiles.length > 0 && (
-            <>
-              <DropdownMenuLabel>
-                {t("app.chat.addMenu.recent")}
-              </DropdownMenuLabel>
-              {recentFiles.map((file) => (
-                <DropdownMenuItem
-                  key={`${file.name}::${file.size}`}
-                  className="composer-add-menu__recent-item"
-                  onSelect={() => handleRecentClick(file)}
-                >
-                  <span data-slot="dropdown-menu-item-icon">
-                    <FileGlyphIcon />
-                  </span>
-                  <span
-                    className="composer-add-menu__recent-name"
-                    title={file.name}
-                  >
-                    {truncateFileName(file.name)}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </>
-          )}
-          {contextSuggestions.length > 0 ? (
-            <>
-              <DropdownMenuLabel>
-                {t("app.chat.addMenu.context")}
-              </DropdownMenuLabel>
-              {contextSuggestions.map((suggestion) => {
-                const label = getContextSuggestionLabel(suggestion);
-                return (
-                  <DropdownMenuItem
-                    key={suggestion.key}
-                    onSelect={() => onSelectContextSuggestion?.(suggestion)}
-                  >
-                    <span data-slot="dropdown-menu-item-icon">
-                      <ContextSuggestionIcon suggestion={suggestion} />
-                    </span>
-                    <span
-                      className="composer-add-menu__context-name"
-                      title={label}
-                    >
-                      {label}
-                    </span>
-                  </DropdownMenuItem>
-                );
-              })}
-            </>
-          ) : null}
+          <DropdownMenuItem onSelect={handleAttachFiles}>
+            <span data-slot="dropdown-menu-item-icon">
+              <Paperclip size={16} strokeWidth={1.75} />
+            </span>
+            {t("app.chat.addMenu.attachFiles")}
+          </DropdownMenuItem>
           {allowCapture ? (
             <DropdownMenuItem onSelect={handleCapture}>
               <span data-slot="dropdown-menu-item-icon">
@@ -188,25 +90,22 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
               {t("app.chat.addMenu.capture")}
             </DropdownMenuItem>
           ) : null}
-          {allowCapture && showStella?.available ? (
-            <DropdownMenuItem onSelect={() => void toggleShowStella()}>
+          {allowCapture && recordScreen?.available ? (
+            <DropdownMenuItem
+              title={t("features.showStella.tagline")}
+              onSelect={() => void toggleShowStella()}
+            >
               <span data-slot="dropdown-menu-item-icon">
-                <Video size={16} strokeWidth={1.75} />
+                <Record size={16} strokeWidth={1.75} />
               </span>
               {t("app.chat.addMenu.showStella")}
-              {showStella.shortcut ? (
+              {recordScreen.shortcut ? (
                 <span className="composer-add-menu__shortcut">
-                  {formatShortcut(showStella.shortcut)}
+                  {formatShortcut(recordScreen.shortcut)}
                 </span>
               ) : null}
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onSelect={handleAttachFiles}>
-            <span data-slot="dropdown-menu-item-icon">
-              <Paperclip size={16} strokeWidth={1.75} />
-            </span>
-            {t("app.chat.addMenu.attachFiles")}
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <input
@@ -219,35 +118,6 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
     </>
   );
 });
-
-function FileGlyphIcon() {
-  return <File size={16} strokeWidth={1.75} aria-hidden />;
-}
-
-function ContextSuggestionIcon({
-  suggestion,
-}: {
-  suggestion: ComposerContextSuggestion;
-}) {
-  const chip = suggestion.chip;
-  const label = chip.kind === "tab" ? chip.browser : chip.name;
-  if (chip.iconDataUrl) {
-    return (
-      <img
-        src={chip.iconDataUrl}
-        alt=""
-        aria-hidden="true"
-        className="composer-add-menu__context-icon"
-        draggable={false}
-      />
-    );
-  }
-  return (
-    <span className="composer-add-menu__context-fallback" aria-hidden="true">
-      {label.slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
 
 const formatShortcut = (accelerator: string): string => {
   const mac = getElectronApi()?.platform === "darwin";

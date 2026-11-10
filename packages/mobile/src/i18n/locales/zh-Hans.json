@@ -30,10 +30,8 @@
       "addMenu": {
         "add": "添加",
         "attachFiles": "附加文件…",
-        "capture": "截取",
-        "context": "上下文",
-        "recent": "最近",
-        "showStella": "展示给 Stella"
+        "capture": "截图",
+        "showStella": "录制屏幕"
       },
       "agentCompletion": {
         "openNamedThread": "打开任务：{title}",
@@ -105,7 +103,7 @@
           "failed": "无法准备此录制",
           "saveVideo": "将视频保存到 Drive",
           "remove": "移除录制",
-          "alt": "你的屏幕录制中的时刻"
+          "alt": "屏幕录制中的片段"
         }
       },
       "contextRow": {
@@ -860,7 +858,8 @@
         "send": "发送",
         "open": "在 Stella 中打开",
         "discard": "放弃"
-      }
+      },
+      "tagline": "边说边画，让 Stella 明白你的意思。"
     }
   },
   "global": {

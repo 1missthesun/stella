@@ -33,10 +33,8 @@
       "addMenu": {
         "add": "Добавить",
         "attachFiles": "Прикрепить файлы…",
-        "capture": "Снимок",
-        "context": "Контекст",
-        "recent": "Недавние",
-        "showStella": "Показать Stella"
+        "capture": "Снимок экрана",
+        "showStella": "Запись экрана"
       },
       "agentCompletion": {
         "openNamedThread": "Открыть задачу: {title}",
@@ -881,7 +879,8 @@
         "send": "Отправить",
         "open": "Открыть в Stella",
         "discard": "Отменить"
-      }
+      },
+      "tagline": "Говорите и рисуйте, чтобы показать Stella, что вы имеете в виду."
     }
   },
   "global": {

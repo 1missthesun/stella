@@ -39,7 +39,6 @@
     "./electron/ipc/ui-handlers.js": "./electron/ipc/ui-handlers.js",
     "./electron/ipc/voice-handlers.js": "./electron/ipc/voice-handlers.js",
     "./electron/native-helper.js": "./electron/native-helper.js",
-    "./electron/recent-apps.js": "./electron/recent-apps.js",
     "./electron/runtime-host-adapter.js": "./electron/runtime-host-adapter.js",
     "./electron/services/capture-service.js": "./electron/services/capture-service.js",
     "./electron/services/in-app-browser-auth-policy.js": "./electron/services/in-app-browser-auth-policy.js",

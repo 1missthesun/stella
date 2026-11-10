@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Lisää",
         "attachFiles": "Liitä tiedostoja…",
-        "capture": "Kaappaa",
-        "context": "Konteksti",
-        "recent": "Viimeisimmät",
-        "showStella": "Näytä Stellalle"
+        "capture": "Kuvakaappaus",
+        "showStella": "Tallenna näyttö"
       },
       "agentCompletion": {
         "openNamedThread": "Avaa tehtävä: {title}",
@@ -103,12 +101,12 @@
         "windowPreviewAlt": "Ikkunan sisällön esikatselu",
         "windowScreenshotAlt": "Ikkunan kuvakaappaus: {label}",
         "showCapture": {
-          "title": "Näytön tallennus · {duration}",
+          "title": "Näyttötallenne · {duration}",
           "preparing": "Valmistellaan…",
-          "failed": "Tallennusta ei voitu valmistella",
+          "failed": "Tallennetta ei voitu valmistella",
           "saveVideo": "Tallenna video Driveen",
-          "remove": "Poista tallennus",
-          "alt": "Hetkiä näytön tallennuksestasi"
+          "remove": "Poista tallenne",
+          "alt": "Hetkiä näyttötallenteestasi"
         }
       },
       "contextRow": {
@@ -867,7 +865,8 @@
         "send": "Lähetä",
         "open": "Avaa Stellassa",
         "discard": "Hylkää"
-      }
+      },
+      "tagline": "Puhu ja piirrä, niin Stella näkee mitä tarkoitat."
     }
   },
   "global": {

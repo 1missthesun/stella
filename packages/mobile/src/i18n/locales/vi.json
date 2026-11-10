@@ -30,10 +30,8 @@
       "addMenu": {
         "add": "Thêm",
         "attachFiles": "Đính kèm tệp…",
-        "capture": "Chụp",
-        "context": "Ngữ cảnh",
-        "recent": "Gần đây",
-        "showStella": "Cho Stella xem"
+        "capture": "Ảnh chụp màn hình",
+        "showStella": "Ghi màn hình"
       },
       "agentCompletion": {
         "openNamedThread": "Mở tác vụ: {title}",
@@ -100,12 +98,12 @@
         "windowPreviewAlt": "Xem trước nội dung cửa sổ",
         "windowScreenshotAlt": "Ảnh chụp cửa sổ {label}",
         "showCapture": {
-          "title": "Quay màn hình · {duration}",
+          "title": "Bản ghi màn hình · {duration}",
           "preparing": "Đang chuẩn bị…",
           "failed": "Không thể chuẩn bị bản ghi này",
           "saveVideo": "Lưu video vào Drive",
           "remove": "Xóa bản ghi",
-          "alt": "Khoảnh khắc từ bản quay màn hình của bạn"
+          "alt": "Những khoảnh khắc từ bản ghi màn hình của bạn"
         }
       },
       "contextRow": {
@@ -860,7 +858,8 @@
         "send": "Gửi",
         "open": "Mở trong Stella",
         "discard": "Hủy"
-      }
+      },
+      "tagline": "Nói và vẽ để cho Stella thấy ý bạn."
     }
   },
   "global": {

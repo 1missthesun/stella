@@ -40,6 +40,16 @@
   pointer-events: none;
 }
 
+.show-stella-bar__rec,
+.show-stella-review__rec {
+  flex: none;
+  color: #e5372b;
+}
+
+.show-stella-bar__rec {
+  margin-right: -6px;
+}
+
 .show-stella-bar__time {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
@@ -168,6 +178,9 @@
 }
 
 .show-stella-review__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;

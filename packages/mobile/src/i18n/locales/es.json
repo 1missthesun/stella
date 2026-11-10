@@ -32,10 +32,8 @@
       "addMenu": {
         "add": "Añadir",
         "attachFiles": "Adjuntar archivos…",
-        "capture": "Capturar",
-        "context": "Contexto",
-        "recent": "Recientes",
-        "showStella": "Mostrar a Stella"
+        "capture": "Captura de pantalla",
+        "showStella": "Grabar pantalla"
       },
       "agentCompletion": {
         "openNamedThread": "Abrir tarea: {title}",
@@ -874,7 +872,8 @@
         "send": "Enviar",
         "open": "Abrir en Stella",
         "discard": "Descartar"
-      }
+      },
+      "tagline": "Habla y dibuja para mostrarle a Stella lo que quieres decir."
     }
   },
   "global": {

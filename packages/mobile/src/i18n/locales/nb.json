@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Legg til",
         "attachFiles": "Legg ved filer…",
-        "capture": "Ta opptak",
-        "context": "Kontekst",
-        "recent": "Nylige",
-        "showStella": "Vis Stella"
+        "capture": "Skjermbilde",
+        "showStella": "Ta opp skjermen"
       },
       "agentCompletion": {
         "openNamedThread": "Åpne oppgave: {title}",
@@ -105,7 +103,7 @@
         "showCapture": {
           "title": "Skjermopptak · {duration}",
           "preparing": "Forbereder…",
-          "failed": "Opptaket kunne ikke forberedes",
+          "failed": "Opptaket kunne ikke klargjøres",
           "saveVideo": "Lagre video i Drive",
           "remove": "Fjern opptak",
           "alt": "Øyeblikk fra skjermopptaket ditt"
@@ -867,7 +865,8 @@
         "send": "Send",
         "open": "Åpne i Stella",
         "discard": "Forkast"
-      }
+      },
+      "tagline": "Snakk og tegn for å vise Stella hva du mener."
     }
   },
   "global": {

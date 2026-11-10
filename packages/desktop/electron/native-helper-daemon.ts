@@ -217,20 +217,11 @@ const windowInfoDaemon = new LineDelimitedHelperDaemon(
   'window_info',
   new Set<NodeJS.Platform>(['win32', 'darwin']),
 )
-const recentAppsDaemon = new LineDelimitedHelperDaemon(
-  'recent_apps',
-  new Set<NodeJS.Platform>(['win32']),
-)
 
 export const requestWindowInfoDaemon = (
   tokens: string[],
 ): Promise<string | undefined> => windowInfoDaemon.request(tokens)
 
-export const requestRecentAppsDaemon = (
-  tokens: string[],
-): Promise<string | undefined> => recentAppsDaemon.request(tokens)
-
 export const stopNativeHelperDaemons = (): void => {
   windowInfoDaemon.stop()
-  recentAppsDaemon.stop()
 }

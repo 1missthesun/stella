@@ -22,6 +22,7 @@ import {
   FileText,
   Music,
   TextQuote,
+  Record,
   Video,
   X,
   Eye,
@@ -738,11 +739,14 @@ export function ShowCaptureChip({
           </button>
         ) : (
           <span className="show-capture-tile__sheet show-capture-tile__sheet--empty">
-            <Video size={18} strokeWidth={1.75} />
+            <Record size={18} strokeWidth={1.75} />
           </span>
         )}
         <span className="show-capture-tile__text">
-          <span className="show-capture-tile__title">{title}</span>
+          <span className="show-capture-tile__title">
+            <Record className="show-capture-tile__rec" size={12} strokeWidth={1.75} aria-hidden="true" />
+            {title}
+          </span>
           {detail ? <span className="show-capture-tile__said">{detail}</span> : null}
           {capture.status === "ready" && capture.video ? (
             <label className="show-capture-tile__drive">

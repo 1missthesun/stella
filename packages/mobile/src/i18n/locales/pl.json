@@ -33,10 +33,8 @@
       "addMenu": {
         "add": "Dodaj",
         "attachFiles": "Załącz pliki…",
-        "capture": "Zrzut",
-        "context": "Kontekst",
-        "recent": "Ostatnie",
-        "showStella": "Pokaż Stelli"
+        "capture": "Zrzut ekranu",
+        "showStella": "Nagraj ekran"
       },
       "agentCompletion": {
         "openNamedThread": "Otwórz zadanie: {title}",
@@ -881,7 +879,8 @@
         "send": "Wyślij",
         "open": "Otwórz w Stelli",
         "discard": "Odrzuć"
-      }
+      },
+      "tagline": "Mów i rysuj, aby pokazać Stelli, o co ci chodzi."
     }
   },
   "global": {

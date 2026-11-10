@@ -44,6 +44,10 @@ export const CircleDot = createIcon("circle-dot", <>
     <circle cx="12" cy="12" r="8.25"/>
     <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>
   </>);
+export const Record = createIcon("record", <>
+    <circle cx="12" cy="12" r="8.25"/>
+    <circle cx="12" cy="12" r="4.25" fill="currentColor" stroke="none"/>
+  </>);
 export const AlertCircle = createIcon("alert-circle", <>
     <circle cx="12" cy="12" r="8.25"/>
     <path d="M12 7.75v5M12 16.25h.01"/>

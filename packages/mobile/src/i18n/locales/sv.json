@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Lägg till",
         "attachFiles": "Bifoga filer…",
-        "capture": "Fånga",
-        "context": "Kontext",
-        "recent": "Senaste",
-        "showStella": "Visa Stella"
+        "capture": "Skärmbild",
+        "showStella": "Spela in skärmen"
       },
       "agentCompletion": {
         "openNamedThread": "Öppna uppgift: {title}",
@@ -867,7 +865,8 @@
         "send": "Skicka",
         "open": "Öppna i Stella",
         "discard": "Kasta"
-      }
+      },
+      "tagline": "Prata och rita för att visa Stella vad du menar."
     }
   },
   "global": {

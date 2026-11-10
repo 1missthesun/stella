@@ -9,7 +9,6 @@ import { registerCloudHomeSyncHandlers } from "../ipc/cloud-home-sync-handlers.j
 import { registerMemorySyncHandlers } from "../ipc/memory-sync-handlers.js";
 import { registerMeetingCaptureHandlers } from "../ipc/meeting-capture-handlers.js";
 import { registerDisplayHandlers } from "../ipc/display-handlers.js";
-import { registerHomeHandlers } from "../ipc/home-handlers.js";
 import { registerLocalChatHandlers } from "../ipc/local-chat-handlers.js";
 import { registerNativeIntegrationHandlers } from "../ipc/native-integration-handlers.js";
 import { registerOnboardingHandlers } from "../ipc/onboarding-handlers.js";
@@ -249,9 +248,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     registerCaptureHandlers({
         captureService: services.captureService,
         windowManager: state.windowManager,
-        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
-    });
-    registerHomeHandlers({
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerCloudHomeSyncHandlers({

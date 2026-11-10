@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Ekle",
         "attachFiles": "Dosya ekle…",
-        "capture": "Yakala",
-        "context": "Bağlam",
-        "recent": "Son kullanılanlar",
-        "showStella": "Stella'ya göster"
+        "capture": "Ekran görüntüsü",
+        "showStella": "Ekranı kaydet"
       },
       "agentCompletion": {
         "openNamedThread": "Görevi aç: {title}",
@@ -108,7 +106,7 @@
           "failed": "Bu kayıt hazırlanamadı",
           "saveVideo": "Videoyu Drive'a kaydet",
           "remove": "Kaydı kaldır",
-          "alt": "Ekran kaydınızdan anlar"
+          "alt": "Ekran kaydından anlar"
         }
       },
       "contextRow": {
@@ -867,7 +865,8 @@
         "send": "Gönder",
         "open": "Stella'da aç",
         "discard": "Vazgeç"
-      }
+      },
+      "tagline": "Ne demek istediğini Stella'ya göstermek için konuş ve çiz."
     }
   },
   "global": {

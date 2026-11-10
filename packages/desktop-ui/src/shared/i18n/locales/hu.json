@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Hozzáadás",
         "attachFiles": "Fájlok csatolása…",
-        "capture": "Rögzítés",
-        "context": "Kontextus",
-        "recent": "Legutóbbi",
-        "showStella": "Megmutatom Stellának"
+        "capture": "Képernyőkép",
+        "showStella": "Képernyő rögzítése"
       },
       "agentCompletion": {
         "openNamedThread": "Feladat megnyitása: {title}",
@@ -867,7 +865,8 @@
         "send": "Küldés",
         "open": "Megnyitás a Stellában",
         "discard": "Elvetés"
-      }
+      },
+      "tagline": "Beszélj és rajzolj, hogy megmutasd Stellának, mire gondolsz."
     }
   },
   "global": {

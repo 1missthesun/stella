@@ -3,7 +3,7 @@ import type {
   ShowStellaReviewAction,
   ShowStellaReviewState,
 } from "@stella/contracts/desktop/show-stella";
-import { ArrowUp, X } from "@/ui/icons";
+import { ArrowUp, Record, X } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 
 /** A finish card nobody touches goes to the composer after this. */
@@ -86,6 +86,7 @@ export function ShowStellaReviewCard({
         </div>
         <div className="show-stella-review__meta">
           <span className="show-stella-review__title">
+            <Record className="show-stella-review__rec" size={13} strokeWidth={1.75} aria-hidden="true" />
             {t("app.chat.contextChips.showCapture.title", { duration: clock(state.durationMs) })}
           </span>
           {state.status === "preparing" && (

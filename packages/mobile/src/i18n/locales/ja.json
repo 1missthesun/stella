@@ -30,10 +30,8 @@
       "addMenu": {
         "add": "追加",
         "attachFiles": "ファイルを添付…",
-        "capture": "キャプチャ",
-        "context": "コンテキスト",
-        "recent": "最近",
-        "showStella": "Stellaに見せる"
+        "capture": "スクリーンショット",
+        "showStella": "画面を録画"
       },
       "agentCompletion": {
         "openNamedThread": "タスクを開く: {title}",
@@ -102,10 +100,10 @@
         "showCapture": {
           "title": "画面収録 · {duration}",
           "preparing": "準備中…",
-          "failed": "この収録を準備できませんでした",
+          "failed": "この録画を準備できませんでした",
           "saveVideo": "ビデオをDriveに保存",
-          "remove": "収録を削除",
-          "alt": "画面収録の場面"
+          "remove": "録画を削除",
+          "alt": "画面録画のハイライト"
         }
       },
       "contextRow": {
@@ -860,7 +858,8 @@
         "send": "送信",
         "open": "Stellaで開く",
         "discard": "破棄"
-      }
+      },
+      "tagline": "話しながら描いて、伝えたいことをStellaに見せましょう。"
     }
   },
   "global": {

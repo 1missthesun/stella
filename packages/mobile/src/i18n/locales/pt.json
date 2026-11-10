@@ -32,10 +32,8 @@
       "addMenu": {
         "add": "Adicionar",
         "attachFiles": "Anexar arquivos…",
-        "capture": "Capturar",
-        "context": "Contexto",
-        "recent": "Recentes",
-        "showStella": "Mostrar à Stella"
+        "capture": "Captura de ecrã",
+        "showStella": "Gravar ecrã"
       },
       "agentCompletion": {
         "openNamedThread": "Abrir tarefa: {title}",
@@ -106,12 +104,12 @@
         "windowPreviewAlt": "Prévia do conteúdo da janela",
         "windowScreenshotAlt": "Captura da janela do {label}",
         "showCapture": {
-          "title": "Gravação de tela · {duration}",
+          "title": "Gravação de ecrã · {duration}",
           "preparing": "Preparando…",
           "failed": "Não foi possível preparar esta gravação",
           "saveVideo": "Salvar vídeo no Drive",
           "remove": "Remover gravação",
-          "alt": "Momentos da sua gravação de tela"
+          "alt": "Momentos da sua gravação de ecrã"
         }
       },
       "contextRow": {
@@ -874,7 +872,8 @@
         "send": "Enviar",
         "open": "Abrir na Stella",
         "discard": "Descartar"
-      }
+      },
+      "tagline": "Fale e desenhe para mostrar à Stella o que quer dizer."
     }
   },
   "global": {

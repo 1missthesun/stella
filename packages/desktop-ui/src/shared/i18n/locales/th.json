@@ -30,10 +30,8 @@
       "addMenu": {
         "add": "เพิ่ม",
         "attachFiles": "แนบไฟล์…",
-        "capture": "จับภาพ",
-        "context": "บริบท",
-        "recent": "ล่าสุด",
-        "showStella": "แสดงให้ Stella ดู"
+        "capture": "ภาพหน้าจอ",
+        "showStella": "บันทึกหน้าจอ"
       },
       "agentCompletion": {
         "openNamedThread": "เปิดงาน: {title}",
@@ -100,7 +98,7 @@
         "windowPreviewAlt": "ตัวอย่างเนื้อหาหน้าต่าง",
         "windowScreenshotAlt": "ภาพหน้าจอหน้าต่าง {label}",
         "showCapture": {
-          "title": "บันทึกหน้าจอ · {duration}",
+          "title": "การบันทึกหน้าจอ · {duration}",
           "preparing": "กำลังเตรียม…",
           "failed": "ไม่สามารถเตรียมการบันทึกนี้ได้",
           "saveVideo": "บันทึกวิดีโอลงใน Drive",
@@ -860,7 +858,8 @@
         "send": "ส่ง",
         "open": "เปิดใน Stella",
         "discard": "ทิ้ง"
-      }
+      },
+      "tagline": "พูดและวาดเพื่อให้ Stella เห็นสิ่งที่คุณหมายถึง"
     }
   },
   "global": {

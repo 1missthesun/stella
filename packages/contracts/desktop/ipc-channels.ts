@@ -383,11 +383,6 @@ export const IPC_BROWSER_EXTENSION_SET_ROUTING =
 export const IPC_BROWSER_EXTENSION_CLIENTS_CHANGED =
   "browserExtension:clientsChanged" as const;
 
-export const IPC_HOME_LIST_RECENT_APPS = "home:listRecentApps" as const;
-export const IPC_HOME_GET_ACTIVE_BROWSER_TAB =
-  "home:getActiveBrowserTab" as const;
-export const IPC_HOME_CAPTURE_APP_WINDOW = "home:captureAppWindow" as const;
-
 export const IPC_MEDIA_SAVE_OUTPUT = "media:saveOutput" as const;
 export const IPC_MEDIA_COPY_IMAGE = "media:copyImage" as const;
 export const IPC_MEDIA_COPY_ATTACHMENT = "media:copyAttachment" as const;

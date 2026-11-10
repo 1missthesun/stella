@@ -1,10 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ChatContext } from "@/shared/types/electron";
-import {
-  ComposerContextRow,
-  useComposerContextSuggestions,
-} from "./ComposerContextRow";
+import { ComposerContextRow } from "./ComposerContextRow";
 import { ComposerLeadRow } from "./ComposerLeadRow";
 import { type AssistantReplyPeekProps } from "./AssistantReplyPeek";
 import { ComposerAddMenu } from "./ComposerAddMenu";
@@ -235,11 +232,6 @@ function ComposerImpl({
   const toggleRealtimeVoice = useCallback(() => {
     window.electronAPI?.voice?.toggleRtc?.();
   }, []);
-  const contextSuggestions = useComposerContextSuggestions(
-    suggestionsActive,
-    chatContext,
-    setChatContext,
-  );
 
   return (
     <div className="composer">
@@ -279,8 +271,6 @@ function ComposerImpl({
               className="composer-add-button"
               title={t("app.chat.composer.add")}
               setChatContext={setChatContext}
-              contextSuggestions={contextSuggestions.suggestions}
-              onSelectContextSuggestion={contextSuggestions.selectSuggestion}
             />
 
             <>
@@ -354,10 +344,6 @@ function ComposerImpl({
                     className="composer-add-button composer-add-button--toolbar"
                     title={t("app.chat.composer.add")}
                     setChatContext={setChatContext}
-                    contextSuggestions={contextSuggestions.suggestions}
-                    onSelectContextSuggestion={
-                      contextSuggestions.selectSuggestion
-                    }
                   />
                 </div>
 

@@ -35,10 +35,8 @@
       "addMenu": {
         "add": "إضافة",
         "attachFiles": "أرفق ملفات…",
-        "capture": "التقاط",
-        "context": "السياق",
-        "recent": "الأخيرة",
-        "showStella": "أرِ Stella"
+        "capture": "لقطة شاشة",
+        "showStella": "تسجيل الشاشة"
       },
       "agentCompletion": {
         "openNamedThread": "افتح المهمة: {title}",
@@ -117,10 +115,10 @@
         "showCapture": {
           "title": "تسجيل الشاشة · {duration}",
           "preparing": "جارٍ التحضير…",
-          "failed": "تعذّر تحضير هذا التسجيل",
+          "failed": "تعذّر تجهيز هذا التسجيل",
           "saveVideo": "حفظ الفيديو في Drive",
           "remove": "إزالة التسجيل",
-          "alt": "لقطات من تسجيل شاشتك"
+          "alt": "لحظات من تسجيل شاشتك"
         }
       },
       "contextRow": {
@@ -895,7 +893,8 @@
         "send": "إرسال",
         "open": "فتح في Stella",
         "discard": "تجاهل"
-      }
+      },
+      "tagline": "تحدّث وارسم لتُري Stella ما تقصده."
     }
   },
   "global": {

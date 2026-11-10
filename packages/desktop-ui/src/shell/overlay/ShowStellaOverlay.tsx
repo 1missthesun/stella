@@ -5,6 +5,7 @@ import type {
 } from "@stella/contracts/desktop/show-stella";
 import { ShowStellaRecorder } from "@/features/show-stella/show-stella-recorder";
 import { ShowStellaReviewCard } from "./ShowStellaReviewCard";
+import { Record } from "@/ui/icons";
 import { viewAtom } from "@/platform/view-state/view-state";
 import { useT } from "@/shared/i18n";
 import "./show-stella-overlay.css";
@@ -355,6 +356,7 @@ export function ShowStellaOverlay() {
             syncInteractive();
           }}
         >
+          <Record className="show-stella-bar__rec" size={14} strokeWidth={1.75} aria-hidden="true" />
           <span className="show-stella-bar__time">{clock(now - state.startedAtMs)}</span>
           <span
             className={

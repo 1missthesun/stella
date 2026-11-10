@@ -184,9 +184,6 @@ import {
   IPC_EXECUTION_REMOTE_REQUEST,
   IPC_EXECUTION_TARGET_SET,
   IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED,
-  IPC_HOME_CAPTURE_APP_WINDOW,
-  IPC_HOME_GET_ACTIVE_BROWSER_TAB,
-  IPC_HOME_LIST_RECENT_APPS,
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
   IPC_LLM_CREDENTIALS_CANCEL_OAUTH,
@@ -885,15 +882,6 @@ export const createElectronApi = (
       getExtensionClients: invoker(IPC_BROWSER_EXTENSION_GET_CLIENTS),
       setExtensionRouting: invoker(IPC_BROWSER_EXTENSION_SET_ROUTING),
       onExtensionClients: on(IPC_BROWSER_EXTENSION_CLIENTS_CHANGED),
-    },
-
-    home: {
-      listRecentApps: (limit?: number) =>
-        ipc.invoke(IPC_HOME_LIST_RECENT_APPS, { limit }),
-      getActiveBrowserTab: (bundleId: string) =>
-        ipc.invoke(IPC_HOME_GET_ACTIVE_BROWSER_TAB, { bundleId }),
-      captureAppWindow: (target: { pid: number }) =>
-        ipc.invoke(IPC_HOME_CAPTURE_APP_WINDOW, { pid: target.pid }),
     },
 
     media: {

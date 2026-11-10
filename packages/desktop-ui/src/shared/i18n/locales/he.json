@@ -32,10 +32,8 @@
       "addMenu": {
         "add": "הוסף",
         "attachFiles": "צרף קבצים…",
-        "capture": "צילום",
-        "context": "הקשר",
-        "recent": "אחרונים",
-        "showStella": "להראות ל-Stella"
+        "capture": "צילום מסך",
+        "showStella": "הקלטת מסך"
       },
       "agentCompletion": {
         "openNamedThread": "פתיחת המשימה: {title}",
@@ -874,7 +872,8 @@
         "send": "שליחה",
         "open": "פתיחה ב-Stella",
         "discard": "ביטול"
-      }
+      },
+      "tagline": "דברו וציירו כדי להראות ל-Stella למה אתם מתכוונים."
     }
   },
   "global": {

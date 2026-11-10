@@ -14,16 +14,12 @@ import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import type { ChatColumnScroll } from "@/features/chat/chat-column-types";
 import { useChatScrollManagement } from "@/shell/use-chat-scroll-management";
-import {
-  ComposerContextRow,
-  useComposerContextSuggestions,
-} from "@/app/chat/ComposerContextRow";
+import { ComposerContextRow } from "@/app/chat/ComposerContextRow";
 import { ComposerLeadRow } from "@/app/chat/ComposerLeadRow";
 import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
 import { ComposerNotice } from "@/app/chat/ComposerNotice";
 import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
 import { ComposerAddMenu } from "@/app/chat/ComposerAddMenu";
-import type { ComposerContextSuggestion } from "@/app/chat/ComposerContextRow";
 import {
   ComposerMicButton,
   ComposerSubmitButton,
@@ -181,24 +177,6 @@ function AccountScopedChatPanelTab({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEscapeToStop({ active: showStop, stop: requestStop, inputRef });
 
-  const [surfaceActive, setSurfaceActive] = useState(
-    () =>
-      typeof document === "undefined" ||
-      (!document.hidden && document.hasFocus()),
-  );
-  useEffect(() => {
-    const sync = () =>
-      setSurfaceActive(!document.hidden && document.hasFocus());
-    document.addEventListener("visibilitychange", sync);
-    window.addEventListener("focus", sync);
-    window.addEventListener("blur", sync);
-    return () => {
-      document.removeEventListener("visibilitychange", sync);
-      window.removeEventListener("focus", sync);
-      window.removeEventListener("blur", sync);
-    };
-  }, []);
-
   const sidebarScroll = useChatScrollManagement({
     hasOlderEvents: hasOlderMessages,
     isLoadingOlder,
@@ -286,11 +264,6 @@ function AccountScopedChatPanelTab({
 
   const { chatContext, setChatContext, selectedText, setSelectedText } =
     useCapturedChatContext();
-  const contextSuggestions = useComposerContextSuggestions(
-    surfaceActive,
-    chatContext,
-    setChatContext,
-  );
   const {
     screenshot: previewScreenshot,
     previewIndex: previewScreenshotIndex,
@@ -457,10 +430,6 @@ function AccountScopedChatPanelTab({
                     chatContext={chatContext}
                     selectedText={selectedText}
                     setChatContext={setChatContext}
-                    contextSuggestions={contextSuggestions.suggestions}
-                    onSelectContextSuggestion={
-                      contextSuggestions.selectSuggestion
-                    }
                     showStop={showStop}
                     requestStop={requestStop}
                     onSend={sendCurrentMessage}
@@ -495,8 +464,6 @@ type SidebarComposerFormProps = {
   chatContext: ChatContext | null;
   selectedText: string | null;
   setChatContext: Dispatch<SetStateAction<ChatContext | null>>;
-  contextSuggestions: ComposerContextSuggestion[];
-  onSelectContextSuggestion: (suggestion: ComposerContextSuggestion) => void;
   showStop: boolean;
   requestStop: () => void;
   onSend: () => void;
@@ -512,8 +479,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
   chatContext,
   selectedText,
   setChatContext,
-  contextSuggestions,
-  onSelectContextSuggestion,
   showStop,
   requestStop,
   onSend: sendCurrentMessage,
@@ -582,8 +547,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
         className="composer-add-button"
         title={t("shell.chatSidebar.add")}
         setChatContext={setChatContext}
-        contextSuggestions={contextSuggestions}
-        onSelectContextSuggestion={onSelectContextSuggestion}
       />
 
       <>
@@ -626,8 +589,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
               className="composer-add-button composer-add-button--toolbar"
               title={t("shell.chatSidebar.add")}
               setChatContext={setChatContext}
-              contextSuggestions={contextSuggestions}
-              onSelectContextSuggestion={onSelectContextSuggestion}
             />
           </div>
 

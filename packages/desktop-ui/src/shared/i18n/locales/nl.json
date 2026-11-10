@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Toevoegen",
         "attachFiles": "Bestanden bijvoegen…",
-        "capture": "Vastleggen",
-        "context": "Context",
-        "recent": "Recent",
-        "showStella": "Laat Stella zien"
+        "capture": "Schermafbeelding",
+        "showStella": "Scherm opnemen"
       },
       "agentCompletion": {
         "openNamedThread": "Taak openen: {title}",
@@ -867,7 +865,8 @@
         "send": "Versturen",
         "open": "Openen in Stella",
         "discard": "Verwerpen"
-      }
+      },
+      "tagline": "Praat en teken om Stella te laten zien wat je bedoelt."
     }
   },
   "global": {

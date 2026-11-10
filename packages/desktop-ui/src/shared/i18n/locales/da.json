@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Tilføj",
         "attachFiles": "Vedhæft filer…",
-        "capture": "Optag",
-        "context": "Kontekst",
-        "recent": "Seneste",
-        "showStella": "Vis Stella"
+        "capture": "Skærmbillede",
+        "showStella": "Optag skærm"
       },
       "agentCompletion": {
         "openNamedThread": "Åbn opgave: {title}",
@@ -105,7 +103,7 @@
         "showCapture": {
           "title": "Skærmoptagelse · {duration}",
           "preparing": "Forbereder…",
-          "failed": "Optagelsen kunne ikke forberedes",
+          "failed": "Optagelsen kunne ikke klargøres",
           "saveVideo": "Gem video i Drive",
           "remove": "Fjern optagelse",
           "alt": "Øjeblikke fra din skærmoptagelse"
@@ -867,7 +865,8 @@
         "send": "Send",
         "open": "Åbn i Stella",
         "discard": "Kassér"
-      }
+      },
+      "tagline": "Tal og tegn for at vise Stella, hvad du mener."
     }
   },
   "global": {

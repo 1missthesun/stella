@@ -30,10 +30,8 @@
       "addMenu": {
         "add": "Tambah",
         "attachFiles": "Lampirkan berkas…",
-        "capture": "Tangkap",
-        "context": "Konteks",
-        "recent": "Terbaru",
-        "showStella": "Tunjukkan ke Stella"
+        "capture": "Tangkapan layar",
+        "showStella": "Rekam layar"
       },
       "agentCompletion": {
         "openNamedThread": "Buka tugas: {title}",
@@ -860,7 +858,8 @@
         "send": "Kirim",
         "open": "Buka di Stella",
         "discard": "Buang"
-      }
+      },
+      "tagline": "Bicara dan menggambarlah untuk menunjukkan maksud Anda kepada Stella."
     }
   },
   "global": {

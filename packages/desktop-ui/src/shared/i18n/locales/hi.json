@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "जोड़ें",
         "attachFiles": "फ़ाइलें संलग्न करें…",
-        "capture": "कैप्चर",
-        "context": "संदर्भ",
-        "recent": "हाल के",
-        "showStella": "Stella को दिखाएँ"
+        "capture": "स्क्रीनशॉट",
+        "showStella": "स्क्रीन रिकॉर्ड करें"
       },
       "agentCompletion": {
         "openNamedThread": "कार्य खोलें: {title}",
@@ -867,7 +865,8 @@
         "send": "भेजें",
         "open": "Stella में खोलें",
         "discard": "हटाएँ"
-      }
+      },
+      "tagline": "बोलें और ड्रॉ करें ताकि Stella समझ सके कि आपका क्या मतलब है।"
     }
   },
   "global": {

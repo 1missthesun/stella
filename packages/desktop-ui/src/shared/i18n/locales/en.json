@@ -31,10 +31,8 @@
       "addMenu": {
         "add": "Add",
         "attachFiles": "Attach files…",
-        "capture": "Capture",
-        "context": "Context",
-        "recent": "Recent",
-        "showStella": "Show Stella"
+        "capture": "Screenshot",
+        "showStella": "Record screen"
       },
       "agentCompletion": {
         "openNamedThread": "Open task: {title}",
@@ -103,12 +101,12 @@
         "windowPreviewAlt": "Window content preview",
         "windowScreenshotAlt": "{label} window screenshot",
         "showCapture": {
-          "title": "Screen capture · {duration}",
+          "title": "Screen recording · {duration}",
           "preparing": "Preparing…",
-          "failed": "This capture couldn't be prepared",
+          "failed": "This recording couldn't be prepared",
           "saveVideo": "Save video to Drive",
-          "remove": "Remove capture",
-          "alt": "Moments from your screen capture"
+          "remove": "Remove recording",
+          "alt": "Moments from your screen recording"
         }
       },
       "contextRow": {
@@ -867,7 +865,8 @@
         "send": "Send",
         "open": "Open in Stella",
         "discard": "Discard"
-      }
+      },
+      "tagline": "Talk and draw to show Stella what you mean."
     }
   },
   "global": {

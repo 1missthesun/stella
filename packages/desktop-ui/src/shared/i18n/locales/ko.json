@@ -30,10 +30,8 @@
       "addMenu": {
         "add": "추가",
         "attachFiles": "파일 첨부…",
-        "capture": "캡처",
-        "context": "컨텍스트",
-        "recent": "최근",
-        "showStella": "Stella에게 보여주기"
+        "capture": "스크린샷",
+        "showStella": "화면 녹화"
       },
       "agentCompletion": {
         "openNamedThread": "작업 열기: {title}",
@@ -102,10 +100,10 @@
         "showCapture": {
           "title": "화면 녹화 · {duration}",
           "preparing": "준비 중…",
-          "failed": "이 녹화를 준비하지 못했습니다",
+          "failed": "이 녹화를 준비할 수 없습니다",
           "saveVideo": "동영상을 Drive에 저장",
-          "remove": "녹화 제거",
-          "alt": "화면 녹화의 장면"
+          "remove": "녹화 삭제",
+          "alt": "화면 녹화의 주요 순간"
         }
       },
       "contextRow": {
@@ -860,7 +858,8 @@
         "send": "보내기",
         "open": "Stella에서 열기",
         "discard": "취소"
-      }
+      },
+      "tagline": "말하고 그려서 Stella에게 의도를 보여 주세요."
     }
   },
   "global": {

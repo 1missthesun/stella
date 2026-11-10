@@ -119,10 +119,6 @@ import type {
   CompanionVisibility,
 } from "./companion.js";
 import type { ExternalOpener } from "./external-openers.js";
-import type {
-  GetActiveBrowserTabResult,
-  ListRecentAppsResult,
-} from "./home.js";
 import type { MemorySyncEraseResult, MemorySyncStatus } from "./memory-sync.js";
 import type {
   OnboardingSynthesisRequest,
@@ -303,9 +299,6 @@ import {
   IPC_EXECUTION_REMOTE_REQUEST,
   IPC_EXECUTION_TARGET_SET,
   IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED,
-  IPC_HOME_CAPTURE_APP_WINDOW,
-  IPC_HOME_GET_ACTIVE_BROWSER_TAB,
-  IPC_HOME_LIST_RECENT_APPS,
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
   IPC_LLM_CREDENTIALS_CANCEL_OAUTH,
@@ -730,14 +723,6 @@ export type ConnectorConnectUpdate = {
     | "timeout"
     | "error";
   message?: string;
-};
-
-export type AppWindowCapture = {
-  capture: {
-    title: string;
-    axTree?: string | null;
-    screenshot: CapturedScreenshot;
-  } | null;
 };
 
 export type MeetingStatus = {
@@ -1442,19 +1427,6 @@ export type IpcInvokeContract = {
   [IPC_BROWSER_EXTENSION_SET_ROUTING]: Invoke<
     [payload: BrowserExtensionRouting],
     BrowserExtensionClientsState
-  >;
-
-  [IPC_HOME_LIST_RECENT_APPS]: Invoke<
-    [payload: { limit?: number }],
-    ListRecentAppsResult
-  >;
-  [IPC_HOME_GET_ACTIVE_BROWSER_TAB]: Invoke<
-    [payload: { bundleId: string }],
-    GetActiveBrowserTabResult
-  >;
-  [IPC_HOME_CAPTURE_APP_WINDOW]: Invoke<
-    [payload: { pid: number }],
-    AppWindowCapture
   >;
 
   [IPC_MEDIA_SAVE_OUTPUT]: Invoke<

@@ -8,6 +8,7 @@ import { LandingHeader } from "@/components/landing/landing-header";
 import l from "@/components/landing/landing.module.css";
 import { LinkedText } from "@/components/landing/linked-text";
 import f from "@/components/landing/faq.module.css";
+import { HeroMascot } from "@/components/problems/hero-mascot";
 import h from "@/components/problems/how.module.css";
 import { BackLink, GuideGrid, HeroCta, HowTitle, PromptCard } from "@/components/problems/how-ui";
 import { MomentList, OutputVideo, RecordingStage } from "@/components/problems/proof-video";
@@ -189,7 +190,8 @@ export default async function ProblemPageRoute({ params }: Params) {
       <LandingHeader />
       <main>
         <article className={h.page} data-tone="light" data-bg="#ffffff">
-          <header className={h.hero}>
+          <header className={h.hero} data-mascot="">
+            <HeroMascot />
             <BackLink href={nichePath(niche)}>{niche.name}</BackLink>
             <HowTitle text={page.h1} />
             <p className={h.sub}>{page.lede}</p>

@@ -84,6 +84,28 @@
   margin-top: clamp(28px, 4.6svh, 50px);
 }
 
+/* The home mascot on the empty right of the first screen, wide desktops only. */
+.heroMascot {
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .hero[data-mascot] {
+    --mascot: clamp(300px, 29vw, 470px);
+    padding-right: calc(var(--l-margin) + var(--mascot) + 24px);
+  }
+
+  .heroMascot {
+    display: block;
+    position: absolute;
+    right: calc(var(--l-margin) + 1vw);
+    top: calc(clamp(112px, 17svh, 190px) - 24px);
+    width: var(--mascot);
+    aspect-ratio: 1;
+    pointer-events: none;
+  }
+}
+
 /* ── Stage: the recording as a window on a wallpaper ──── */
 
 .stage {
@@ -605,6 +627,11 @@
   object-position: 50% 0;
   transform: scale(1.7);
   transform-origin: 50% 2%;
+}
+
+/* Stills from the zoomed cuts are already cropped to the reply and result. */
+.thumb img[data-cut] {
+  transform: none;
 }
 
 .thumbPlay {

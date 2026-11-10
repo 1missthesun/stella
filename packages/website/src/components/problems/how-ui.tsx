@@ -60,10 +60,16 @@ export function PromptCard({ text }: { text: string }) {
 function Thumb({ page }: { page: ProblemPage }) {
   const proof = page.proof;
   if (proof.kind === "video") {
+    const still = proof.video.cuts?.thumb;
     return (
       <div className={h.thumb}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- proof media lives on R2, already sized */}
-        <img src={proof.video.poster} alt="" loading="lazy" width={proof.video.width} height={proof.video.height} />
+        {still ? (
+          // eslint-disable-next-line @next/next/no-img-element -- proof media lives on R2, already sized
+          <img src={still.src} alt="" loading="lazy" width={still.width} height={still.height} data-cut="" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- proof media lives on R2, already sized
+          <img src={proof.video.poster} alt="" loading="lazy" width={proof.video.width} height={proof.video.height} />
+        )}
         <span className={h.thumbPlay} aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M7 4.6v14.8c0 .8.9 1.3 1.6.9l11.6-7.4c.6-.4.6-1.3 0-1.7L8.6 3.8C7.9 3.3 7 3.8 7 4.6z" />

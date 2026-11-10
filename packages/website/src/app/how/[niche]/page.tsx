@@ -6,6 +6,7 @@ import { Finale, LandingFooter } from "@/components/landing/closing";
 import { landingFontVars } from "@/components/landing/fonts";
 import { LandingHeader } from "@/components/landing/landing-header";
 import l from "@/components/landing/landing.module.css";
+import { HeroMascot } from "@/components/problems/hero-mascot";
 import h from "@/components/problems/how.module.css";
 import { BackLink, GuideGrid, HeroCta, HowTitle } from "@/components/problems/how-ui";
 import {
@@ -83,7 +84,8 @@ export default async function NicheHub({ params }: Params) {
       <LandingHeader />
       <main>
         <div className={h.page} data-tone="light" data-bg="#ffffff">
-          <header className={h.hero}>
+          <header className={h.hero} data-mascot="">
+            <HeroMascot />
             <BackLink href={HOW_INDEX_PATH}>All guides</BackLink>
             <HowTitle text={niche.h1} />
             <p className={h.sub}>{niche.intro.split(/(?<=\.) /)[0]}</p>

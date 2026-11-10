@@ -73,7 +73,7 @@ export type VideoProof = ProofBase & {
      * result so the app's text is readable: 16:10 for wide screens, square
      * for phones. The page plays these instead of the full window.
      */
-    cuts?: { wide: VideoCut; square: VideoCut };
+    cuts?: { wide: VideoCut; square: VideoCut; thumb: { src: string; width: number; height: number } };
   };
   /** Timestamped transcript of the run. Also rendered as text for search and screen readers. */
   moments: ProofMoment[];

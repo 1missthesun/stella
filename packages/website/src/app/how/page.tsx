@@ -5,6 +5,7 @@ import { Finale, LandingFooter } from "@/components/landing/closing";
 import { landingFontVars } from "@/components/landing/fonts";
 import { LandingHeader } from "@/components/landing/landing-header";
 import l from "@/components/landing/landing.module.css";
+import { HeroMascot } from "@/components/problems/hero-mascot";
 import h from "@/components/problems/how.module.css";
 import { GuideGrid, HeroCta, HowTitle } from "@/components/problems/how-ui";
 import { HOW_INDEX_PATH, nichePages, nichePath, problemPath, publishedNiches, publishedProblemPages } from "@/lib/problems";
@@ -64,7 +65,8 @@ export default function HowIndex() {
       <LandingHeader />
       <main>
         <div className={h.page} data-tone="light" data-bg="#ffffff">
-          <header className={h.hero}>
+          <header className={h.hero} data-mascot="">
+            <HeroMascot />
             <HowTitle text="Stuck? Here’s how." />
             <p className={h.sub}>The free way to fix it yourself, and a real recording of Stella doing it for you.</p>
             <HeroCta />

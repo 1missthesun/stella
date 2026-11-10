@@ -643,7 +643,13 @@
       "uploading": "अपलोड हो रहा है"
     },
     "stoppedReply": "Stella यह उत्तर शुरू नहीं कर सकी",
-    "tryAgainHint": "कृपया फिर से कोशिश करें।"
+    "tryAgainHint": "कृपया फिर से कोशिश करें।",
+    "heldSend": {
+      "title": "आपका संदेश इंतज़ार कर रहा है",
+      "description": "Stella में साइन इन करें, या अपना ChatGPT या Claude प्लान जोड़ें। ऐसा करते ही यह भेज दिया जाएगा।",
+      "signIn": "साइन इन करें",
+      "connect": "अपना AI चुनें"
+    }
   },
   "cloudBrowser": {
     "actions": {

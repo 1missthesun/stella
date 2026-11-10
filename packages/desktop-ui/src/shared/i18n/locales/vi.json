@@ -638,7 +638,13 @@
       "uploading": "Đang tải lên"
     },
     "stoppedReply": "Stella không thể bắt đầu phản hồi này",
-    "tryAgainHint": "Vui lòng thử lại."
+    "tryAgainHint": "Vui lòng thử lại.",
+    "heldSend": {
+      "title": "Tin nhắn của bạn đang chờ",
+      "description": "Đăng nhập Stella, hoặc kết nối gói ChatGPT hay Claude của bạn. Tin nhắn sẽ được gửi ngay khi bạn làm xong.",
+      "signIn": "Đăng nhập",
+      "connect": "Chọn AI của bạn"
+    }
   },
   "cloudBrowser": {
     "actions": {

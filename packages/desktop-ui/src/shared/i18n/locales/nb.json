@@ -643,7 +643,13 @@
       "uploading": "Laster opp"
     },
     "stoppedReply": "Stella klarte ikke å starte dette svaret",
-    "tryAgainHint": "Prøv igjen."
+    "tryAgainHint": "Prøv igjen.",
+    "heldSend": {
+      "title": "Meldingen din venter",
+      "description": "Logg inn på Stella, eller koble til ChatGPT- eller Claude-abonnementet ditt. Den sendes så snart du gjør det.",
+      "signIn": "Logg inn",
+      "connect": "Velg AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

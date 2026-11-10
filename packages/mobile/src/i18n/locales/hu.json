@@ -643,7 +643,13 @@
       "uploading": "Feltöltés"
     },
     "stoppedReply": "A Stella nem tudta elindítani ezt a választ",
-    "tryAgainHint": "Próbáld újra."
+    "tryAgainHint": "Próbáld újra.",
+    "heldSend": {
+      "title": "Az üzeneted várakozik",
+      "description": "Jelentkezz be a Stellába, vagy kapcsold össze a ChatGPT- vagy Claude-előfizetésedet. Amint megteszed, elküldjük.",
+      "signIn": "Bejelentkezés",
+      "connect": "Válaszd ki az AI-t"
+    }
   },
   "cloudBrowser": {
     "actions": {

@@ -643,7 +643,13 @@
       "uploading": "Μεταφόρτωση"
     },
     "stoppedReply": "Η Stella δεν μπόρεσε να ξεκινήσει αυτή την απάντηση",
-    "tryAgainHint": "Δοκιμάστε ξανά."
+    "tryAgainHint": "Δοκιμάστε ξανά.",
+    "heldSend": {
+      "title": "Το μήνυμά σας περιμένει",
+      "description": "Συνδεθείτε στη Stella ή συνδέστε τη συνδρομή σας στο ChatGPT ή στο Claude. Θα σταλεί μόλις το κάνετε.",
+      "signIn": "Σύνδεση",
+      "connect": "Επιλέξτε AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

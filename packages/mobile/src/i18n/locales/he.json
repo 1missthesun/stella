@@ -648,7 +648,13 @@
       "uploading": "מעלה"
     },
     "stoppedReply": "Stella לא הצליחה להתחיל את התגובה הזו",
-    "tryAgainHint": "אנא נסו שוב."
+    "tryAgainHint": "אנא נסו שוב.",
+    "heldSend": {
+      "title": "ההודעה שלך ממתינה",
+      "description": "התחבר ל-Stella, או חבר את המינוי שלך ל-ChatGPT או ל-Claude. היא תישלח ברגע שתעשה זאת.",
+      "signIn": "התחברות",
+      "connect": "בחר AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

@@ -653,7 +653,13 @@
       "uploading": "Загрузка"
     },
     "stoppedReply": "Stella не смогла начать этот ответ",
-    "tryAgainHint": "Попробуйте ещё раз."
+    "tryAgainHint": "Попробуйте ещё раз.",
+    "heldSend": {
+      "title": "Ваше сообщение ждёт",
+      "description": "Войдите в Stella или подключите свою подписку ChatGPT или Claude. Сообщение отправится, как только вы это сделаете.",
+      "signIn": "Войти",
+      "connect": "Выбрать ИИ"
+    }
   },
   "cloudBrowser": {
     "actions": {

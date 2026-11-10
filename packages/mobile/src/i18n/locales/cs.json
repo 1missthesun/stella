@@ -653,7 +653,13 @@
       "uploading": "Nahrávání"
     },
     "stoppedReply": "Stella nemohla zahájit tuto odpověď",
-    "tryAgainHint": "Zkuste to znovu."
+    "tryAgainHint": "Zkuste to znovu.",
+    "heldSend": {
+      "title": "Vaše zpráva čeká",
+      "description": "Přihlaste se do Stelly nebo připojte své předplatné ChatGPT či Claude. Odešle se, jakmile to uděláte.",
+      "signIn": "Přihlásit se",
+      "connect": "Vyberte AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

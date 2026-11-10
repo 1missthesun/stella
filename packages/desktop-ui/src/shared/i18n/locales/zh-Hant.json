@@ -638,7 +638,13 @@
       "uploading": "正在上傳"
     },
     "stoppedReply": "Stella 無法開始此次回覆",
-    "tryAgainHint": "請重試。"
+    "tryAgainHint": "請重試。",
+    "heldSend": {
+      "title": "你的訊息正在等待傳送",
+      "description": "登入 Stella，或連結你的 ChatGPT 或 Claude 方案。完成後會立即傳送。",
+      "signIn": "登入",
+      "connect": "選擇你的 AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

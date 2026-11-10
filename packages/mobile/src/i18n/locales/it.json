@@ -648,7 +648,13 @@
       "uploading": "Caricamento"
     },
     "stoppedReply": "Stella non è riuscita ad avviare questa risposta",
-    "tryAgainHint": "Riprova."
+    "tryAgainHint": "Riprova.",
+    "heldSend": {
+      "title": "Il tuo messaggio è in attesa",
+      "description": "Accedi a Stella o collega il tuo abbonamento ChatGPT o Claude. Verrà inviato appena lo fai.",
+      "signIn": "Accedi",
+      "connect": "Scegli la tua IA"
+    }
   },
   "cloudBrowser": {
     "actions": {

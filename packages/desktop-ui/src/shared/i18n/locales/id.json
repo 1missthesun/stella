@@ -638,7 +638,13 @@
       "uploading": "Mengunggah"
     },
     "stoppedReply": "Stella tidak dapat memulai balasan ini",
-    "tryAgainHint": "Silakan coba lagi."
+    "tryAgainHint": "Silakan coba lagi.",
+    "heldSend": {
+      "title": "Pesan Anda sedang menunggu",
+      "description": "Masuk ke Stella, atau hubungkan paket ChatGPT atau Claude Anda. Pesan akan terkirim begitu Anda melakukannya.",
+      "signIn": "Masuk",
+      "connect": "Pilih AI Anda"
+    }
   },
   "cloudBrowser": {
     "actions": {

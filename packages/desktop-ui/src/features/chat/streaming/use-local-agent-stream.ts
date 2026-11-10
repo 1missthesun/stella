@@ -6,6 +6,11 @@ import {
   resolveStellaProviderErrorToast,
 } from "./stella-provider-error-toast";
 import { abortPiChat, submitPiChat } from "@/features/chat/pi/pi-chat-store";
+import {
+  isRetryingHeldSend,
+  needsEngineToSend,
+  presentHeldSendNotice,
+} from "@/features/chat/held-send";
 import { chatSendContext } from "@stella/contracts/pi-chat";
 import type { ChatContext } from "@/shared/types/electron";
 import type { AttachmentRef } from "./chat-types";
@@ -57,6 +62,8 @@ export type LocalAgentStartArgs = {
   userMessageTimestamp?: number;
   onUserMessageAccepted?: (userMessageId: string) => void;
   onStartFailed?: () => void;
+  /** Nothing can answer yet: the message waits for a sign-in or an engine. */
+  onNeedsEngine?: () => void;
 };
 
 type LocalAgentStreamOptions = {
@@ -142,8 +149,14 @@ export function useLocalAgentStream({
           );
         }
         const reason = message || null;
-        if (isStellaLimitOrAuthReason(reason)) {
+        if (needsEngineToSend(reason)) {
+          presentHeldSendNotice(activeConversationId);
+          args.onNeedsEngine?.();
+        } else if (isStellaLimitOrAuthReason(reason)) {
           showToast(resolveStellaProviderErrorToast(reason));
+        } else if (isRetryingHeldSend()) {
+          // A waiting message tried while the chat is still switching over
+          // (just signed in); it tries again by itself in a moment.
         } else {
           const toast = resolveAgentNotReadyToast(reason);
           showToast({

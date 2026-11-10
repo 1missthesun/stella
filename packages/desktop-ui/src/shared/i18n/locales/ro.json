@@ -648,7 +648,13 @@
       "uploading": "Se încarcă"
     },
     "stoppedReply": "Stella nu a putut începe acest răspuns",
-    "tryAgainHint": "Încearcă din nou."
+    "tryAgainHint": "Încearcă din nou.",
+    "heldSend": {
+      "title": "Mesajul tău așteaptă",
+      "description": "Conectează-te la Stella sau conectează abonamentul tău ChatGPT ori Claude. Se trimite imediat ce faci asta.",
+      "signIn": "Conectează-te",
+      "connect": "Alege AI-ul"
+    }
   },
   "cloudBrowser": {
     "actions": {

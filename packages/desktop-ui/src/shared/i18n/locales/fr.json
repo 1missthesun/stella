@@ -648,7 +648,13 @@
       "uploading": "Envoi en cours"
     },
     "stoppedReply": "Stella n'a pas pu démarrer cette réponse",
-    "tryAgainHint": "Veuillez réessayer."
+    "tryAgainHint": "Veuillez réessayer.",
+    "heldSend": {
+      "title": "Votre message attend",
+      "description": "Connectez-vous à Stella ou reliez votre abonnement ChatGPT ou Claude. Il partira dès que ce sera fait.",
+      "signIn": "Se connecter",
+      "connect": "Choisir votre IA"
+    }
   },
   "cloudBrowser": {
     "actions": {

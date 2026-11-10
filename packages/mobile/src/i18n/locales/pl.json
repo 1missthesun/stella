@@ -653,7 +653,13 @@
       "uploading": "Przesyłanie"
     },
     "stoppedReply": "Stella nie mogła rozpocząć tej odpowiedzi",
-    "tryAgainHint": "Spróbuj ponownie."
+    "tryAgainHint": "Spróbuj ponownie.",
+    "heldSend": {
+      "title": "Twoja wiadomość czeka",
+      "description": "Zaloguj się do Stelli albo połącz swój plan ChatGPT lub Claude. Wyślemy ją, gdy tylko to zrobisz.",
+      "signIn": "Zaloguj się",
+      "connect": "Wybierz AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

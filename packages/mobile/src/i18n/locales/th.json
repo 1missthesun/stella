@@ -638,7 +638,13 @@
       "uploading": "กำลังอัปโหลด"
     },
     "stoppedReply": "Stella ไม่สามารถเริ่มการตอบกลับนี้ได้",
-    "tryAgainHint": "โปรดลองอีกครั้ง"
+    "tryAgainHint": "โปรดลองอีกครั้ง",
+    "heldSend": {
+      "title": "ข้อความของคุณกำลังรออยู่",
+      "description": "ลงชื่อเข้าใช้ Stella หรือเชื่อมต่อแพ็กเกจ ChatGPT หรือ Claude ของคุณ ข้อความจะถูกส่งทันทีที่คุณทำ",
+      "signIn": "ลงชื่อเข้าใช้",
+      "connect": "เลือก AI ของคุณ"
+    }
   },
   "cloudBrowser": {
     "actions": {

@@ -643,7 +643,13 @@
       "uploading": "Yükleniyor"
     },
     "stoppedReply": "Stella bu yanıtı başlatamadı",
-    "tryAgainHint": "Lütfen tekrar deneyin."
+    "tryAgainHint": "Lütfen tekrar deneyin.",
+    "heldSend": {
+      "title": "Mesajın bekliyor",
+      "description": "Stella'ya giriş yap ya da ChatGPT veya Claude planını bağla. Bunu yaptığın anda gönderilir.",
+      "signIn": "Giriş yap",
+      "connect": "Yapay zekânı seç"
+    }
   },
   "cloudBrowser": {
     "actions": {

@@ -643,7 +643,13 @@
       "uploading": "Lähetetään"
     },
     "stoppedReply": "Stella ei pystynyt aloittamaan tätä vastausta",
-    "tryAgainHint": "Yritä uudelleen."
+    "tryAgainHint": "Yritä uudelleen.",
+    "heldSend": {
+      "title": "Viestisi odottaa",
+      "description": "Kirjaudu Stellaan tai yhdistä ChatGPT- tai Claude-tilauksesi. Se lähtee heti, kun teet sen.",
+      "signIn": "Kirjaudu",
+      "connect": "Valitse tekoäly"
+    }
   },
   "cloudBrowser": {
     "actions": {

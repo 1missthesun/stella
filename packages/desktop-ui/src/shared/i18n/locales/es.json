@@ -648,7 +648,13 @@
       "uploading": "Subiendo"
     },
     "stoppedReply": "Stella no pudo iniciar esta respuesta",
-    "tryAgainHint": "Inténtalo de nuevo."
+    "tryAgainHint": "Inténtalo de nuevo.",
+    "heldSend": {
+      "title": "Tu mensaje está esperando",
+      "description": "Inicia sesión en Stella o conecta tu plan de ChatGPT o Claude. Se enviará en cuanto lo hagas.",
+      "signIn": "Iniciar sesión",
+      "connect": "Elige tu IA"
+    }
   },
   "cloudBrowser": {
     "actions": {

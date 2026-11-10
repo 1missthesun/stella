@@ -643,7 +643,13 @@
       "uploading": "Uploading"
     },
     "stoppedReply": "Stella couldn't start this reply",
-    "tryAgainHint": "Please try again."
+    "tryAgainHint": "Please try again.",
+    "heldSend": {
+      "title": "Your message is waiting",
+      "description": "Sign in to Stella, or connect your ChatGPT or Claude plan. It sends as soon as you do.",
+      "signIn": "Sign in",
+      "connect": "Choose your AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

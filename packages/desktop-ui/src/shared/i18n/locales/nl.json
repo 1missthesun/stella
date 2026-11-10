@@ -643,7 +643,13 @@
       "uploading": "Uploaden"
     },
     "stoppedReply": "Stella kon dit antwoord niet starten",
-    "tryAgainHint": "Probeer het opnieuw."
+    "tryAgainHint": "Probeer het opnieuw.",
+    "heldSend": {
+      "title": "Je bericht wacht",
+      "description": "Log in bij Stella of koppel je ChatGPT- of Claude-abonnement. Het wordt verstuurd zodra je dat doet.",
+      "signIn": "Inloggen",
+      "connect": "Kies je AI"
+    }
   },
   "cloudBrowser": {
     "actions": {

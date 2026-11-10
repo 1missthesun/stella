@@ -19,6 +19,13 @@ import { acceptedUserMessageIds } from "../lib/accepted-user-message-ids";
 import { onPiChatEvents } from "@/features/chat/pi/pi-chat-store";
 import { showToast } from "@/ui/toast";
 import { expandShowCaptures } from "@/features/show-stella/use-show-stella";
+import {
+  clearHeldSend,
+  dismissHeldSendNotice,
+  holdSend,
+  retryHeldSend,
+} from "@/features/chat/held-send";
+import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 
 type UseStreamingChatOptions = {
   conversationId: string | null;
@@ -213,6 +220,28 @@ export function useStreamingChatCore({
     if (optimisticEvents.length > 0) acknowledgeMessages(persistedMessages);
   }, [acknowledgeMessages, optimisticEvents, persistedMessages]);
 
+  const sendMessageRef = useRef<(sent: SendMessageArgs) => Promise<boolean>>(
+    async () => false,
+  );
+
+  // A first message that waited for a sign-in or an engine goes out as soon
+  // as one arrives.
+  const { hasConnectedAccount } = useAuthSessionState();
+  const signedInRef = useRef(hasConnectedAccount);
+  useEffect(() => {
+    const was = signedInRef.current;
+    signedInRef.current = hasConnectedAccount;
+    if (hasConnectedAccount && !was) {
+      void retryHeldSend({ attempts: 8, spacingMs: 1500 });
+    }
+  }, [hasConnectedAccount]);
+  useEffect(() => {
+    const onEngineChange = () => void retryHeldSend({ attempts: 2 });
+    window.addEventListener("stella:local-model-preferences-changed", onEngineChange);
+    return () =>
+      window.removeEventListener("stella:local-model-preferences-changed", onEngineChange);
+  }, []);
+
   const sendMessage = useCallback(
     async (sent: SendMessageArgs) => {
       const options: SendMessageArgs = {
@@ -281,6 +310,7 @@ export function useStreamingChatCore({
       options.onClear();
       options.onOptimisticStart?.();
 
+      let needsEngine = false;
       try {
         const deviceId = await getOrCreateDeviceId();
         const accepted = await startStream({
@@ -297,7 +327,19 @@ export function useStreamingChatCore({
           onUserMessageAccepted: (acceptedId: string) =>
             reconcileAcceptedUserMessage(optimisticUserMessageId, acceptedId),
           userMessageTimestamp: messageTimestamp,
+          onNeedsEngine: () => {
+            needsEngine = true;
+          },
         });
+        if (!accepted && needsEngine) {
+          holdSend({
+            conversationId: resolvedConversationId,
+            retry: () => sendMessageRef.current(sent),
+          });
+        } else {
+          clearHeldSend();
+          if (accepted) dismissHeldSendNotice();
+        }
         if (!accepted) {
           clearOptimisticMessage(optimisticUserMessageId);
           options.onRestore?.();
@@ -336,6 +378,10 @@ export function useStreamingChatCore({
       setPendingUserMessageId,
     ],
   );
+
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
 
   return {
     optimisticEvents,

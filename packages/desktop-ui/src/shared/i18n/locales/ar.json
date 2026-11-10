@@ -663,7 +663,13 @@
       "uploading": "جارٍ الرفع"
     },
     "stoppedReply": "لم تستطع Stella بدء هذا الرد",
-    "tryAgainHint": "يرجى المحاولة مرة أخرى."
+    "tryAgainHint": "يرجى المحاولة مرة أخرى.",
+    "heldSend": {
+      "title": "رسالتك في الانتظار",
+      "description": "سجّل الدخول إلى Stella، أو اربط اشتراكك في ChatGPT أو Claude. ستُرسل فور قيامك بذلك.",
+      "signIn": "تسجيل الدخول",
+      "connect": "اختر الذكاء الاصطناعي"
+    }
   },
   "cloudBrowser": {
     "actions": {

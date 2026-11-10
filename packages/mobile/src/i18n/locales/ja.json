@@ -638,7 +638,13 @@
       "uploading": "アップロード中"
     },
     "stoppedReply": "Stella はこの返信を開始できませんでした",
-    "tryAgainHint": "もう一度お試しください。"
+    "tryAgainHint": "もう一度お試しください。",
+    "heldSend": {
+      "title": "メッセージは送信待ちです",
+      "description": "Stella にサインインするか、ChatGPT または Claude のプランを接続してください。接続するとすぐに送信されます。",
+      "signIn": "サインイン",
+      "connect": "AI を選択"
+    }
   },
   "cloudBrowser": {
     "actions": {

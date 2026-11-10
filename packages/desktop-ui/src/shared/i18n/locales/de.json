@@ -643,7 +643,13 @@
       "uploading": "Wird hochgeladen"
     },
     "stoppedReply": "Stella konnte diese Antwort nicht starten",
-    "tryAgainHint": "Bitte versuch es erneut."
+    "tryAgainHint": "Bitte versuch es erneut.",
+    "heldSend": {
+      "title": "Deine Nachricht wartet",
+      "description": "Melde dich bei Stella an oder verbinde dein ChatGPT- oder Claude-Abo. Sie wird gesendet, sobald du das tust.",
+      "signIn": "Anmelden",
+      "connect": "KI auswählen"
+    }
   },
   "cloudBrowser": {
     "actions": {

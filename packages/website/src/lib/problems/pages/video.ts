@@ -1,4 +1,4 @@
-import { PROOFS } from "../media";
+import { PROOFS, webCuts } from "../media";
 import type { ProblemPage } from "../types";
 
 export const VIDEO_PAGES: ProblemPage[] = [
@@ -40,6 +40,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       note: "Trimmed: a two-minute wait before the message sent (the new test account was still signing in) is cut, and the waits are sped up.",
       video: {
         src: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/proof.mp4`,
+        cuts: webCuts("video/burn-subtitles-into-video-for-tiktok"),
         poster: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/poster.jpg`,
         width: 1280,
         height: 800,
@@ -161,6 +162,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       note: "The lecture is a test clip made for this run: a slide and a synthetic voice with 38 seconds of pauses added. A separate transcript of the edit matched all 135 words, nothing clipped. The wait while Stella worked is sped up 10×.",
       video: {
         src: `${PROOFS}/video/cut-silences-from-video/proof.mp4`,
+        cuts: webCuts("video/cut-silences-from-video"),
         poster: `${PROOFS}/video/cut-silences-from-video/poster.jpg`,
         width: 1280,
         height: 800,

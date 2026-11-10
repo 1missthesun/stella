@@ -1,4 +1,4 @@
-import { PROOFS } from "../media";
+import { PROOFS, webCuts } from "../media";
 import type { ProblemPage } from "../types";
 
 export const PDF_EXCEL_PAGES: ProblemPage[] = [
@@ -38,6 +38,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       note: "The statements are sample PDFs from a fictitious bank, made for this run, with selectable text (not scans). The wait is sped up 15×.",
       video: {
         src: `${PROOFS}/pdf-excel/bank-statement-pdf-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/bank-statement-pdf-to-excel"),
         poster: `${PROOFS}/pdf-excel/bank-statement-pdf-to-excel/poster.jpg`,
         width: 1280,
         height: 800,
@@ -156,6 +157,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       note: "The PDF is 14 scanned-looking pages of fictitious invoices, bills and letters, made for this run. The waits are sped up 6× and 4×; the end shows the copy opened in Stella's own PDF viewer.",
       video: {
         src: `${PROOFS}/pdf-excel/compress-pdf-too-large-to-email/proof.mp4`,
+        cuts: webCuts("pdf-excel/compress-pdf-too-large-to-email"),
         poster: `${PROOFS}/pdf-excel/compress-pdf-too-large-to-email/poster.jpg`,
         width: 1280,
         height: 800,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ProofMoment } from "@/lib/problems/types";
+import type { ProofMoment, VideoCut } from "@/lib/problems/types";
 import h from "./how.module.css";
 
 const stamp = (seconds: number) =>
@@ -9,6 +9,21 @@ const stamp = (seconds: number) =>
 
 const SEEK = "how:seek";
 const TIME = "how:time";
+
+const PHONE = "(max-width: 700px)";
+
+/** Which cut fits this screen: null until mounted, so the server never guesses. */
+function usePhone() {
+  const [phone, setPhone] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE);
+    const update = () => setPhone(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return phone;
+}
 
 const momentAt = (moments: ProofMoment[], t: number) => {
   let index = 0;
@@ -33,6 +48,7 @@ export function RecordingStage({
   label,
   moments,
   made,
+  cuts,
 }: {
   src: string;
   poster: string;
@@ -42,7 +58,13 @@ export function RecordingStage({
   label: string;
   moments: ProofMoment[];
   made: string;
+  /** Cropped cuts of the same footage; without them the full window plays everywhere. */
+  cuts?: { wide: VideoCut; square: VideoCut };
 }) {
+  const phone = usePhone();
+  const file = cuts ? (phone === null ? null : phone ? cuts.square : cuts.wide) : { src, poster, width, height };
+  const fileSrc = file?.src;
+  const wideShape = cuts ? cuts.wide : { width, height };
   const ref = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLElement>(null);
   const [current, setCurrent] = useState(0);
@@ -50,7 +72,7 @@ export function RecordingStage({
 
   useEffect(() => {
     const video = ref.current;
-    if (!video) return;
+    if (!video || !fileSrc) return;
     const onSeek = (event: Event) => {
       const at = (event as CustomEvent<number>).detail;
       video.currentTime = at;
@@ -79,7 +101,7 @@ export function RecordingStage({
       io.disconnect();
       window.removeEventListener(SEEK, onSeek);
     };
-  }, []);
+  }, [fileSrc]);
 
   const onTime = () => {
     const video = ref.current;
@@ -103,14 +125,18 @@ export function RecordingStage({
   return (
     <>
       <div className={h.wall}>
-        <div className={h.window} style={{ aspectRatio: `${width} / ${height}` }}>
+        <div
+          className={h.window}
+          data-square={cuts ? "" : undefined}
+          style={{ aspectRatio: `${wideShape.width} / ${wideShape.height}` }}
+        >
           <video
             ref={ref}
             className={h.video}
-            src={src}
-            poster={poster}
-            width={width}
-            height={height}
+            src={file?.src}
+            poster={file?.poster}
+            width={file?.width ?? wideShape.width}
+            height={file?.height ?? wideShape.height}
             muted
             playsInline
             loop

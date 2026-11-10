@@ -1,4 +1,4 @@
-import { PROOFS } from "../media";
+import { PROOFS, webCuts } from "../media";
 import type { ProblemPage } from "../types";
 
 export const PC_CLEANUP_PAGES: ProblemPage[] = [
@@ -14,17 +14,17 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "Organize a messy Downloads folder (Windows and Mac)",
     description:
-      "Sort a cluttered Downloads folder into tidy folders, find duplicates and old installers, and clear space safely, by hand or with Stella (stella.sh) waiting for your OK.",
+      "Sort a cluttered Downloads folder, find duplicates and old installers, and clear space safely, by hand or with Stella (stella.sh) told to ask before deleting.",
     h1: "Organize a messy Downloads folder",
     short: "Sort a messy Downloads folder",
     lede: "Everything sorted into folders and the duplicates found, with nothing lost.",
     answer:
-      "Sort the folder by type, move documents, pictures, videos and archives into their own folders, then delete installers you've already used and the duplicate copies with “(1)” in the name. Windows can also clear old downloads automatically. Stella (stella.sh) does the sorting on your computer, finds true duplicates by their contents rather than their names, and deletes nothing until you say so.",
+      "Sort the folder by type, move documents, pictures, videos and archives into their own folders, then delete installers you've already used and the duplicate copies with “(1)” in the name. Windows can also clear old downloads automatically. Stella (stella.sh) does the sorting on your computer, finds true duplicates by their contents rather than their names, and, because the prompt says so, deletes nothing until you tell it to.",
     stellaSteps: [
       "Sorts every file into a handful of folders by name and type: Documents (split into Finance, Personal, Travel and so on), Images, Installers, Archives, Audio & Video",
       "Leaves anything unclear where it is; in the recording, two half-finished downloads stayed in Downloads for you to check",
       "Finds true duplicates by comparing contents (SHA-256), and flags files with similar names but different contents as possible revisions, not duplicates",
-      "Writes a report and a log of every move, and deletes nothing until you say so",
+      "Writes a report and a log of every move; in the recording it deleted nothing until it was told to go ahead, as the prompt asks",
       "When you approve, removes only the exact extra copies, checking each one again just before, and logs every removed path next to the copy it kept",
     ],
     prompt: "My Downloads folder is a mess, sort it into folders and find duplicates, but don't delete anything without asking.",
@@ -38,6 +38,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       note: "The Downloads folder is a test folder of 299 files made for this run. The waits are sped up.",
       video: {
         src: `${PROOFS}/pc-cleanup/organize-downloads-folder/proof.mp4`,
+        cuts: webCuts("pc-cleanup/organize-downloads-folder"),
         poster: `${PROOFS}/pc-cleanup/organize-downloads-folder/poster.jpg`,
         width: 1280,
         height: 800,
@@ -144,11 +145,11 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     short: "Free up space on C drive",
     lede: "Find the hidden gigabytes and get them back, safely.",
     answer:
-      "When the C drive fills up “for no reason”, the space is usually in places File Explorer doesn't show: Windows Update leftovers, restore points, the hibernation file, temp folders, old iPhone backups and game caches. Settings › System › Storage and Disk Cleanup's “Clean up system files” recover most of it, and a free tool like WizTree shows the rest. Stella (stella.sh) measures all of it on your PC, explains each item and cleans only what you approve.",
+      "When the C drive fills up “for no reason”, the space is usually in places File Explorer doesn't show: Windows Update leftovers, restore points, the hibernation file, temp folders, old iPhone backups and game caches. Settings › System › Storage and Disk Cleanup's “Clean up system files” recover most of it, and a free tool like WizTree shows the rest. Stella (stella.sh) measures all of it on your PC, explains each item and, because the prompt asks it to, cleans only what you approve.",
     stellaSteps: [
       "Measures every large folder on C, hidden and system areas included, with PowerShell",
       "Explains each big item in plain words: what it is, whether it's safe to remove, and how much you'd get back",
-      "Runs Windows' own cleanups with your OK: Disk Cleanup's system files, the component store cleanup and temp folders",
+      "Runs Windows' own cleanups: Disk Cleanup's system files, the component store cleanup and temp folders",
       "Points out big personal folders (old iPhone backups, game libraries, videos) and offers to move them to another drive",
       "Waits for your go-ahead before deleting anything or turning hibernation off, because the prompt asks for that",
     ],

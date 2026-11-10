@@ -1,4 +1,4 @@
-import { PROOFS } from "../media";
+import { PROOFS, webCuts } from "../media";
 import type { ProblemPage } from "../types";
 
 export const GAME_MOD_PAGES: ProblemPage[] = [
@@ -38,6 +38,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       note: "Stella didn’t sign in or launch the game, because the test computer had no Minecraft account. The recording shows the chat; the work happened in the background.",
       video: {
         src: `${PROOFS}/minecraft/install-sodium-iris-fabric-1-21/proof.mp4`,
+        cuts: webCuts("minecraft/install-sodium-iris-fabric-1-21"),
         poster: `${PROOFS}/minecraft/install-sodium-iris-fabric-1-21/poster.jpg`,
         width: 1280,
         height: 800,
@@ -153,6 +154,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       note: "The pack is a small Fabric 1.21.1 server made for this run from real mods, with Fabric API left out and the wrong Lithium on purpose. Stella took 1 minute 52 seconds; the wait is sped up 10×.",
       video: {
         src: `${PROOFS}/game-mods/minecraft-modpack-exit-code-1/proof.mp4`,
+        cuts: webCuts("game-mods/minecraft-modpack-exit-code-1"),
         poster: `${PROOFS}/game-mods/minecraft-modpack-exit-code-1/poster.jpg`,
         width: 1280,
         height: 800,
@@ -249,16 +251,16 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     short: "Find broken Sims 4 mods",
     lede: "Find the mods a patch broke, update them, and get back in the game.",
     answer:
-      "After a Sims 4 patch the game often switches mods off, and script mods built for the old version stop loading. Turn mods back on in Game Options, delete `localthumbcache.package`, then update or remove the mods your lastException files name; the 50/50 method finds the rest. Stella (stella.sh) does the folder work for you: it reads the exception files, checks creators' pages for updates and moves broken mods out, asking first.",
+      "After a Sims 4 patch the game often switches mods off, and script mods built for the old version stop loading. Turn mods back on in Game Options, delete `localthumbcache.package`, then update or remove the mods your lastException files name; the 50/50 method finds the rest. Stella (stella.sh) does the folder work for you: it reads the exception files, checks creators' pages for updates, shows you the list and moves broken mods out when you say yes, because the prompt asks it to.",
     stellaSteps: [
       "Finds your Mods folder and the lastException files the game wrote when something failed",
       "Reads them and names the mods they point at, in plain words, instead of a wall of error text",
       "Opens each named mod's creator page in your browser to see whether a version for the new patch is out, and downloads it from there",
-      "Moves outdated or broken mods into a separate “Mods (disabled)” folder, asking first, and deletes the thumbnail cache",
+      "Shows you the list, then moves outdated or broken mods into a separate “Mods (disabled)” folder once you say yes, because the prompt asks for that, and deletes the thumbnail cache",
       "If nothing is named, runs the 50/50 split with you: it moves half the mods out, you test, and it narrows it down",
     ],
     prompt:
-      "My Sims 4 mods stopped working after the latest update. Find the broken ones from my lastException files, check the creators' pages for updates, and move anything outdated into a disabled folder.",
+      "My Sims 4 mods stopped working after the latest update. Find the broken ones from my lastException files, check the creators' pages for updates, and move anything outdated into a disabled folder. Show me the list and ask before moving anything.",
     proof: {
       kind: "steps-only",
       reason: "We haven't recorded this one yet: it needs a Windows or Mac computer with The Sims 4 and a real broken Mods folder.",
@@ -348,7 +350,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Update 2.5 (22 October 2026) changed the game code that script mods hook into, so older Cyber Engine Tweaks, RED4ext, redscript and their plugins stop loading, and one broken script switches off all the others. Update those frameworks to their 2.5 releases first, then read the logs and move out each mod that hasn't been updated. Stella (stella.sh) can do this on your PC: it reads the logs, updates the frameworks from their official pages and sets aside the mods that still fail.",
     stellaSteps: [
       "Finds your game folder and lists which frameworks you have (CET, RED4ext, redscript, ArchiveXL, TweakXL, Codeware) and their versions",
-      "Compares them with the latest 2.5-ready releases on their GitHub and Nexus pages, and updates them with your OK",
+      "Compares them with the latest 2.5-ready releases on their GitHub and Nexus pages, and updates them from those official pages",
       "Reads `r6\\logs\\redscript.log` and the newest file in `red4ext\\logs` to find the mods that fail to load",
       "Moves those mods into a quarantine folder outside the game, with a note of where each came from, so they're easy to put back",
       "Has you start the game, then reads the logs again until redscript reports “Output successfully saved”",

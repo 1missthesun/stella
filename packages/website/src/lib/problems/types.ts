@@ -8,6 +8,9 @@
  * [label](href) links. Keep them plain and specific.
  */
 
+/** One cropped web cut of a recording. */
+export type VideoCut = { src: string; poster: string; width: number; height: number };
+
 export type Platform = "windows" | "mac" | "linux";
 
 export type Source = { label: string; href: string };
@@ -65,6 +68,12 @@ export type VideoProof = ProofBase & {
     speed?: number;
     /** How long the run really took, in seconds, when sped up. */
     realDuration?: number;
+    /**
+     * The same footage with the same timing, cropped in on the chat and the
+     * result so the app's text is readable: 16:10 for wide screens, square
+     * for phones. The page plays these instead of the full window.
+     */
+    cuts?: { wide: VideoCut; square: VideoCut };
   };
   /** Timestamped transcript of the run. Also rendered as text for search and screen readers. */
   moments: ProofMoment[];

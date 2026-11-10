@@ -106,6 +106,7 @@ function Stage({ page }: { page: ProblemPage }) {
           label={`Screen recording of Stella: ${page.h1}`}
           moments={proof.moments}
           made={madeLine(page)}
+          cuts={proof.video.cuts}
         />
       </div>
     );

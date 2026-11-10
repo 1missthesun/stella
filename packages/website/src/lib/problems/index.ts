@@ -87,7 +87,7 @@ export function sharedFaq(page: ProblemPage): Faq[] {
     },
     {
       q: "Can I control what Stella changes on my computer?",
-      a: `Yes. Stella works on ${where} with your own files and shows each step in the chat, so you can watch it and stop it at any point. Tell it what it may not do, as the prompts on these pages do (“don't delete anything without asking”), and it waits for your go-ahead. It also refuses commands that would wipe a whole disk, your home folder or system folders.`,
+      a: `Yes. Stella works on ${where} with your own files and shows each step in the chat, so you can watch it and stop it at any point. Tell it what it may not do, as the prompts on these pages do (“don't delete anything without asking”). In the Downloads recording it deleted nothing until it was told to go ahead. It also refuses commands that would wipe a whole disk, your home folder or system folders.`,
     },
   ];
 }

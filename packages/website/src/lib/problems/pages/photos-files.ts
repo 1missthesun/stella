@@ -1,4 +1,4 @@
-import { PROOFS } from "../media";
+import { PROOFS, webCuts } from "../media";
 import type { ProblemPage } from "../types";
 
 export const PHOTOS_FILES_PAGES: ProblemPage[] = [
@@ -39,6 +39,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       note: "The Takeout folder is a test export made for this run, with the naming quirks of real exports (cut-off names, numbered copies, edited copies, an album). Stella worked about 3½ minutes, then under a minute on the follow-up; those waits are sped up 15× and 10×.",
       video: {
         src: `${PROOFS}/photos-files/fix-google-takeout-photo-dates/proof.mp4`,
+        cuts: webCuts("photos-files/fix-google-takeout-photo-dates"),
         poster: `${PROOFS}/photos-files/fix-google-takeout-photo-dates/poster.jpg`,
         width: 1280,
         height: 800,
@@ -159,6 +160,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       note: "The 26 documents are fictitious invoices, bills, payslips, letters and receipts made for this run, named scan0001.pdf and so on. The wait is sped up 6×.",
       video: {
         src: `${PROOFS}/photos-files/rename-pdf-files-based-on-content/proof.mp4`,
+        cuts: webCuts("photos-files/rename-pdf-files-based-on-content"),
         poster: `${PROOFS}/photos-files/rename-pdf-files-based-on-content/poster.jpg`,
         width: 1280,
         height: 800,

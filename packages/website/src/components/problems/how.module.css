@@ -129,7 +129,8 @@
 .video {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   cursor: pointer;
 }
 
@@ -771,6 +772,11 @@
   .wall {
     padding: 10px;
     border-radius: 18px;
+  }
+
+  /* Phones play the square cut of the chat and the result. */
+  .window[data-square] {
+    aspect-ratio: 1 / 1 !important;
   }
 
   .wall[data-prompt] {

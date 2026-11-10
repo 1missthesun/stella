@@ -96,6 +96,7 @@ jobs:
             plutil -replace CFBundleDisplayName -string Stella "$plist"
             plutil -replace CFBundleIdentifier -string com.stella.app "$plist"
             plutil -replace NSMicrophoneUsageDescription -string "Stella uses your microphone for voice conversations." "$plist"
+            plutil -replace NSSpeechRecognitionUsageDescription -string "Stella turns your dictation into text on this Mac." "$plist"
             cp packages/desktop/build/icon.icns "$app/Contents/Resources/electron.icns"
             codesign --force --deep --timestamp --keychain "$keychain_path" --sign "$identity" "$app"
             codesign --verify --deep --strict --verbose=2 -R="$requirement" "$app"

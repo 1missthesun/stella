@@ -193,6 +193,21 @@ let dark = NSColor(srgbRed: 0x16 / 255, green: 0x16 / 255, blue: 0x1a / 255, alp
 func uiFont(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont { .systemFont(ofSize: size, weight: weight) }
 
 /// The contact sheet, filling its box from the top-left like `object-fit: cover`.
+/// The record glyph shown with Record screen everywhere: a ring around a filled dot.
+final class RecordGlyph: NSView {
+  override var intrinsicContentSize: NSSize { NSSize(width: 13, height: 13) }
+  override func draw(_ dirtyRect: NSRect) {
+    let red = NSColor(srgbRed: 0.898, green: 0.216, blue: 0.169, alpha: 1)
+    red.set()
+    let ring = NSBezierPath(ovalIn: bounds.insetBy(dx: 1.4, dy: 1.4))
+    ring.lineWidth = 1.2
+    ring.stroke()
+    let dot = bounds.width * 0.36
+    NSBezierPath(ovalIn: NSRect(
+      x: bounds.midX - dot / 2, y: bounds.midY - dot / 2, width: dot, height: dot)).fill()
+  }
+}
+
 final class ThumbView: NSView {
   var image: NSImage? { didSet { needsDisplay = true } }
   override var isFlipped: Bool { true }
@@ -283,6 +298,7 @@ final class Card: NSObject, NSTextFieldDelegate {
   static let width: CGFloat = 360
   let panel = StellaPanel(frame: NSRect(x: 0, y: 0, width: Card.width, height: 150))
   let thumb = ThumbView()
+  let glyph = RecordGlyph()
   let title = NSTextField(labelWithString: "")
   let status = NSTextField(labelWithString: "")
   let note = NoteField()
@@ -350,7 +366,7 @@ final class Card: NSObject, NSTextFieldDelegate {
       self?.reportEngaged()
     }
 
-    for view in [thumb, title, status, discard!, noteBox, note, open!, send!] as [NSView] {
+    for view in [thumb, glyph, title, status, discard!, noteBox, note, open!, send!] as [NSView] {
       view.translatesAutoresizingMaskIntoConstraints = false
       if view === note { noteBox.addSubview(view) } else { root.addSubview(view) }
     }
@@ -361,10 +377,14 @@ final class Card: NSObject, NSTextFieldDelegate {
       thumb.heightAnchor.constraint(equalToConstant: 56),
       discard.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
       discard.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
-      title.leadingAnchor.constraint(equalTo: thumb.trailingAnchor, constant: 10),
+      glyph.leadingAnchor.constraint(equalTo: thumb.trailingAnchor, constant: 10),
+      glyph.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      glyph.widthAnchor.constraint(equalToConstant: 13),
+      glyph.heightAnchor.constraint(equalToConstant: 13),
+      title.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 6),
       title.trailingAnchor.constraint(lessThanOrEqualTo: discard.leadingAnchor, constant: -8),
       title.bottomAnchor.constraint(equalTo: thumb.centerYAnchor, constant: -1),
-      status.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+      status.leadingAnchor.constraint(equalTo: glyph.leadingAnchor),
       status.trailingAnchor.constraint(lessThanOrEqualTo: discard.leadingAnchor, constant: -8),
       status.topAnchor.constraint(equalTo: thumb.centerYAnchor, constant: 2),
       noteBox.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),

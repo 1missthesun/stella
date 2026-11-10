@@ -764,7 +764,7 @@ pub fn summary_markdown_with(
         }
     }
     let mut out = format!(
-        "[Show Stella capture {} · {target} · {}]\n",
+        "[Screen recording {} · {target} · {}]\n",
         format_clock(bundle.duration_ms),
         bundle_dir.display()
     );

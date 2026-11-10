@@ -1,7 +1,9 @@
 .hero {
   --h: max(100svh, 680px);
   --hero-top: clamp(92px, 14.5svh, 170px);
-  --title: clamp(50px, 14.6vw, 290px);
+  /* Height-capped so the subtitle and button clear the window that peeks up
+     from the next section on short laptop screens. */
+  --title: clamp(50px, min(14.6vw, 23svh), 290px);
   --cta-gap: clamp(30px, 5svh, 56px);
   --cta-h: 64px;
   position: relative;
@@ -119,6 +121,22 @@
   animation-delay: 110ms;
 }
 
+.sub {
+  max-width: 48ch;
+  margin: clamp(16px, 2.6svh, 30px) 0 0;
+  font-size: clamp(18px, 1.75vw, 28px);
+  font-weight: 520;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: rgba(10, 10, 13, 0.72);
+  transition: color 900ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) 180ms both;
+}
+
+:global([data-scene="dark"]) .sub {
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .cta {
   display: flex;
   align-items: center;
@@ -164,23 +182,48 @@
   .hero {
     --title: 17.4vw;
     --h: max(92svh, 640px);
+    --cta-gap: clamp(22px, 3.4svh, 34px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The copy is in flow here and the mascot takes whatever height is left
+     under it, so a wrapped subtitle or the phone's extra line never pushes
+     the mascot over the button. */
+  .copy {
+    position: relative;
+    inset: auto;
+    order: 0;
+    margin: var(--hero-top) var(--l-margin) 0;
+  }
+
+  .sub {
+    margin-top: 18px;
+    font-size: 18px;
   }
 
   .mascot {
-    right: 50%;
-    top: calc(var(--hero-top) + var(--title) * 1.68 + var(--cta-gap) + var(--cta-h) + 6px);
-    width: min(64vw, calc(var(--h) - var(--hero-top) - var(--title) * 1.68 - var(--cta-gap) - var(--cta-h) - 24px));
-    margin-right: calc(min(64vw, calc(var(--h) - var(--hero-top) - var(--title) * 1.68 - var(--cta-gap) - var(--cta-h) - 24px)) / -2);
+    position: relative;
+    inset: auto;
+    order: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    width: auto;
+    max-width: 64vw;
+    margin: 14px auto 24px;
+    align-self: center;
   }
 
   .cta {
     flex-wrap: wrap;
+    row-gap: 14px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .aurora,
   .titleLine,
+  .sub,
   .cta,
   .mascotIn {
     animation: none;

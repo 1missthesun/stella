@@ -8,6 +8,8 @@ import { useT } from "@/shared/i18n";
 
 /** A finish card nobody touches goes to the composer after this. */
 const KEEP_AFTER_MS = 20_000;
+/** A pointer merely resting on the card holds it this long after it's ready, at most. */
+const HOVER_HOLD_MAX_MS = 60_000;
 const CARD_WIDTH = 360;
 const CARD_TOP = 14;
 
@@ -37,7 +39,9 @@ export function ShowStellaReviewCard({
   onHoverRef.current = onHover;
   const madeFocusable = useRef(false);
   const ready = state.status !== "preparing";
-  const engaged = hovered || focused || note.trim().length > 0;
+  const typing = focused || note.trim().length > 0;
+  const readyAt = useRef<number | null>(null);
+  if (ready && readyAt.current === null) readyAt.current = Date.now();
 
   const answer = (action: ShowStellaReviewAction) => {
     if (answered.current) return;
@@ -46,15 +50,21 @@ export function ShowStellaReviewCard({
     void window.electronAPI?.showStella?.review(action);
   };
 
+  // Untouched, the card goes to the composer a little after it's ready. A
+  // pointer resting on it only delays that, up to a minute; a note being
+  // written keeps it.
   useEffect(() => {
-    if (!ready || engaged) return;
+    if (!ready || typing) return;
+    const wait = hovered
+      ? Math.max(KEEP_AFTER_MS, (readyAt.current ?? Date.now()) + HOVER_HOLD_MAX_MS - Date.now())
+      : KEEP_AFTER_MS;
     const timer = setTimeout(
       () => answer({ captureId: state.captureId, action: "keep" }),
-      KEEP_AFTER_MS,
+      wait,
     );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- answer only reads refs and props
-  }, [ready, engaged, state.captureId]);
+  }, [ready, typing, hovered, state.captureId]);
 
   useEffect(() => () => onHoverRef.current(false), []);
 

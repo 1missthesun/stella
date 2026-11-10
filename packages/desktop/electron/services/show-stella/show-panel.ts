@@ -21,7 +21,7 @@ export type PanelEvent =
   | { event: "ready" }
   | { event: "hit"; id: string }
   | { event: "card"; action: "send" | "open" | "discard"; note: string }
-  | { event: "engaged"; on: boolean };
+  | { event: "engaged"; on: boolean; typing?: boolean };
 
 /**
  * Show Stella's clickable surfaces on macOS (the ⇧ catch layer, the bar's

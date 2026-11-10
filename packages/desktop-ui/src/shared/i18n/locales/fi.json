@@ -63,7 +63,20 @@
       "composer": {
         "add": "Lisää",
         "dictationError": "Sanelu: {error}",
-        "stop": "Pysäytä"
+        "stop": "Pysäytä",
+        "placeholder": {
+          "capturing": "Kaapataan näyttöä…",
+          "recording": "Kysy tallenteesta…",
+          "screenshot": "Kysy kuvakaappauksesta…",
+          "file": "Kysy tiedostosta…",
+          "pastedText": "Kysy liitetystä tekstistä…",
+          "selectedArea": "Kysy valitusta alueesta…",
+          "open": "Kysy siitä, mikä on auki…",
+          "activity": "Kysy tästä toiminnasta…",
+          "window": "Kysy tästä ikkunasta…",
+          "selection": "Kysy valinnasta…",
+          "default": "Tee mitä tahansa"
+        }
       },
       "connectorConnect": {
         "cancel": "Peruuta",
@@ -2801,7 +2814,8 @@
         "upToDateTitle": "Kaikki on ajan tasalla",
         "upToDateBody": "Stellan uudet versiot näkyvät tässä."
       },
-      "updating": "Päivitetään…"
+      "updating": "Päivitetään…",
+      "afterRecording": "Tallenteesi jälkeen"
     },
     "audioPlayer": {
       "pause": "Keskeytä",

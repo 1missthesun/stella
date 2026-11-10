@@ -66,7 +66,20 @@
       "composer": {
         "add": "Adaugă",
         "dictationError": "Dictare: {error}",
-        "stop": "Oprește"
+        "stop": "Oprește",
+        "placeholder": {
+          "capturing": "Se capturează ecranul…",
+          "recording": "Întreabă despre înregistrare…",
+          "screenshot": "Întreabă despre captura de ecran…",
+          "file": "Întreabă despre fișier…",
+          "pastedText": "Întreabă despre textul lipit…",
+          "selectedArea": "Întreabă despre zona selectată…",
+          "open": "Întreabă despre ce e deschis…",
+          "activity": "Întreabă despre această activitate…",
+          "window": "Întreabă despre această fereastră…",
+          "selection": "Întreabă despre selecție…",
+          "default": "Fă orice"
+        }
       },
       "connectorConnect": {
         "cancel": "Anulează",
@@ -2811,7 +2824,8 @@
         "upToDateTitle": "Ești la zi",
         "upToDateBody": "Versiunile noi ale Stella apar aici."
       },
-      "updating": "Se actualizează…"
+      "updating": "Se actualizează…",
+      "afterRecording": "După înregistrare"
     },
     "audioPlayer": {
       "pause": "Pauză",

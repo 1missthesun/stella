@@ -4,6 +4,8 @@ import { VIEWER_SELECTION_SURFACE } from "@/features/workspace-display/file-view
 
 type ComposerContextState = {
   hasScreenshotContext: boolean;
+  /** A screen recording is attached (ready or still being prepared). */
+  hasRecordingContext: boolean;
   hasFileContext: boolean;
   hasPastedTextContext: boolean;
   hasAppSelectionContext: boolean;
@@ -90,6 +92,7 @@ export const resolveComposerContextState = (
     chatContext?.regionScreenshots?.length ||
       chatContext?.showCaptures?.some((capture) => capture.status === "ready"),
   );
+  const hasRecordingContext = Boolean(chatContext?.showCaptures?.length);
   const hasFileContext = Boolean(chatContext?.files?.length);
   const hasPastedTextContext = Boolean(chatContext?.pastedTexts?.length);
   // The viewer's "what's open" chip rides along with a message but isn't
@@ -118,6 +121,7 @@ export const resolveComposerContextState = (
 
   return {
     hasScreenshotContext,
+    hasRecordingContext,
     hasFileContext,
     hasPastedTextContext,
     hasAppSelectionContext,
@@ -137,37 +141,26 @@ export const resolveComposerContextState = (
   };
 };
 
-const resolveComposerPlaceholder = ({
+const PLACEHOLDER = "app.chat.composer.placeholder";
+
+/** The catalog key of the composer's placeholder for what's attached. */
+const resolveComposerPlaceholderKey = ({
   contextState,
 }: ComposerPlaceholderOptions): string => {
-  if (contextState.hasPendingCaptureContext) {
-    return "Capturing screen...";
-  }
-  if (contextState.hasScreenshotContext) {
-    return "Ask about the capture...";
-  }
-  if (contextState.hasFileContext) {
-    return "Ask about the file...";
-  }
-  if (contextState.hasPastedTextContext) {
-    return "Ask about the pasted text...";
-  }
-  if (contextState.hasAppSelectionContext) {
-    return "Ask about the selected area...";
-  }
-  if (contextState.hasViewerContext) {
-    return "Ask about what's open...";
-  }
-  if (contextState.hasActivityContext) {
-    return "Ask about this activity...";
-  }
-  if (contextState.hasWindowContext) {
-    return "Ask about this window...";
-  }
-  if (contextState.hasSelectedTextContext) {
-    return "Ask about the selection...";
-  }
-  return "Do anything";
+  const key = (() => {
+    if (contextState.hasPendingCaptureContext) return "capturing";
+    if (contextState.hasRecordingContext) return "recording";
+    if (contextState.hasScreenshotContext) return "screenshot";
+    if (contextState.hasFileContext) return "file";
+    if (contextState.hasPastedTextContext) return "pastedText";
+    if (contextState.hasAppSelectionContext) return "selectedArea";
+    if (contextState.hasViewerContext) return "open";
+    if (contextState.hasActivityContext) return "activity";
+    if (contextState.hasWindowContext) return "window";
+    if (contextState.hasSelectedTextContext) return "selection";
+    return "default";
+  })();
+  return `${PLACEHOLDER}.${key}`;
 };
 
 export const deriveComposerState = ({
@@ -188,7 +181,7 @@ export const deriveComposerState = ({
 
   return {
     contextState,
-    placeholder: resolveComposerPlaceholder({ contextState }),
+    placeholderKey: resolveComposerPlaceholderKey({ contextState }),
     trimmedMessage,
     hasMessage,
     canSubmit,

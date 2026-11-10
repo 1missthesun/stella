@@ -60,7 +60,20 @@
       "composer": {
         "add": "Tambah",
         "dictationError": "Dikte: {error}",
-        "stop": "Berhenti"
+        "stop": "Berhenti",
+        "placeholder": {
+          "capturing": "Menangkap layar…",
+          "recording": "Tanyakan tentang rekaman…",
+          "screenshot": "Tanyakan tentang tangkapan layar…",
+          "file": "Tanyakan tentang file…",
+          "pastedText": "Tanyakan tentang teks yang ditempel…",
+          "selectedArea": "Tanyakan tentang area yang dipilih…",
+          "open": "Tanyakan tentang yang sedang terbuka…",
+          "activity": "Tanyakan tentang aktivitas ini…",
+          "window": "Tanyakan tentang jendela ini…",
+          "selection": "Tanyakan tentang pilihan…",
+          "default": "Lakukan apa saja"
+        }
       },
       "connectorConnect": {
         "cancel": "Batal",
@@ -2791,7 +2804,8 @@
         "upToDateTitle": "Semua sudah terbaru",
         "upToDateBody": "Versi baru Stella muncul di sini."
       },
-      "updating": "Memperbarui…"
+      "updating": "Memperbarui…",
+      "afterRecording": "Setelah rekaman Anda"
     },
     "audioPlayer": {
       "pause": "Jeda",

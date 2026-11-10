@@ -63,7 +63,20 @@
       "composer": {
         "add": "Ekle",
         "dictationError": "Dikte: {error}",
-        "stop": "Durdur"
+        "stop": "Durdur",
+        "placeholder": {
+          "capturing": "Ekran yakalanıyor…",
+          "recording": "Kayıt hakkında sor…",
+          "screenshot": "Ekran görüntüsü hakkında sor…",
+          "file": "Dosya hakkında sor…",
+          "pastedText": "Yapıştırılan metin hakkında sor…",
+          "selectedArea": "Seçili alan hakkında sor…",
+          "open": "Açık olanlar hakkında sor…",
+          "activity": "Bu etkinlik hakkında sor…",
+          "window": "Bu pencere hakkında sor…",
+          "selection": "Seçim hakkında sor…",
+          "default": "Her şeyi yap"
+        }
       },
       "connectorConnect": {
         "cancel": "İptal",
@@ -2801,7 +2814,8 @@
         "upToDateTitle": "Her şey güncel",
         "upToDateBody": "Stella'nın yeni sürümleri burada görünür."
       },
-      "updating": "Güncelleniyor…"
+      "updating": "Güncelleniyor…",
+      "afterRecording": "Kaydınızdan sonra"
     },
     "audioPlayer": {
       "pause": "Duraklat",

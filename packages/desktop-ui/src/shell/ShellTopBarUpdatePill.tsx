@@ -22,7 +22,9 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
     pending === offer.key ||
     state.merging !== undefined;
   const label = updating
-    ? t("shell.appSource.updating")
+    ? state.heldForRecording
+      ? t("shell.appSource.afterRecording")
+      : t("shell.appSource.updating")
     : t("shell.appSource.update");
 
   return (

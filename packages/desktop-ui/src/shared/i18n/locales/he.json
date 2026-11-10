@@ -66,7 +66,20 @@
       "composer": {
         "add": "הוסף",
         "dictationError": "הכתבה: {error}",
-        "stop": "עצור"
+        "stop": "עצור",
+        "placeholder": {
+          "capturing": "מצלם את המסך…",
+          "recording": "שאלו על ההקלטה…",
+          "screenshot": "שאלו על צילום המסך…",
+          "file": "שאלו על הקובץ…",
+          "pastedText": "שאלו על הטקסט שהודבק…",
+          "selectedArea": "שאלו על האזור שנבחר…",
+          "open": "שאלו על מה שפתוח…",
+          "activity": "שאלו על הפעילות הזו…",
+          "window": "שאלו על החלון הזה…",
+          "selection": "שאלו על הבחירה…",
+          "default": "עשו כל דבר"
+        }
       },
       "connectorConnect": {
         "cancel": "ביטול",
@@ -2811,7 +2824,8 @@
         "upToDateTitle": "הכול מעודכן",
         "upToDateBody": "גרסאות חדשות של Stella יופיעו כאן."
       },
-      "updating": "מעדכן…"
+      "updating": "מעדכן…",
+      "afterRecording": "אחרי ההקלטה"
     },
     "audioPlayer": {
       "pause": "השהה",

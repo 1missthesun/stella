@@ -60,7 +60,20 @@
       "composer": {
         "add": "追加",
         "dictationError": "音声入力: {error}",
-        "stop": "停止"
+        "stop": "停止",
+        "placeholder": {
+          "capturing": "画面をキャプチャ中…",
+          "recording": "録画について質問…",
+          "screenshot": "スクリーンショットについて質問…",
+          "file": "ファイルについて質問…",
+          "pastedText": "貼り付けたテキストについて質問…",
+          "selectedArea": "選択した範囲について質問…",
+          "open": "開いているものについて質問…",
+          "activity": "このアクティビティについて質問…",
+          "window": "このウインドウについて質問…",
+          "selection": "選択部分について質問…",
+          "default": "なんでもどうぞ"
+        }
       },
       "connectorConnect": {
         "cancel": "キャンセル",
@@ -2791,7 +2804,8 @@
         "upToDateTitle": "最新の状態です",
         "upToDateBody": "Stellaの新しいバージョンがここに表示されます。"
       },
-      "updating": "アップデート中…"
+      "updating": "アップデート中…",
+      "afterRecording": "録画の終了後"
     },
     "audioPlayer": {
       "pause": "一時停止",

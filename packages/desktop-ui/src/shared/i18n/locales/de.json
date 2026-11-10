@@ -63,7 +63,20 @@
       "composer": {
         "add": "Hinzufügen",
         "dictationError": "Diktat: {error}",
-        "stop": "Stopp"
+        "stop": "Stopp",
+        "placeholder": {
+          "capturing": "Bildschirm wird erfasst…",
+          "recording": "Frag zur Aufnahme…",
+          "screenshot": "Frag zum Bildschirmfoto…",
+          "file": "Frag zur Datei…",
+          "pastedText": "Frag zum eingefügten Text…",
+          "selectedArea": "Frag zum ausgewählten Bereich…",
+          "open": "Frag zu dem, was geöffnet ist…",
+          "activity": "Frag zu dieser Aktivität…",
+          "window": "Frag zu diesem Fenster…",
+          "selection": "Frag zur Auswahl…",
+          "default": "Mach irgendwas"
+        }
       },
       "connectorConnect": {
         "cancel": "Abbrechen",
@@ -2801,7 +2814,8 @@
         "upToDateTitle": "Alles ist aktuell",
         "upToDateBody": "Neue Versionen von Stella erscheinen hier."
       },
-      "updating": "Wird aktualisiert…"
+      "updating": "Wird aktualisiert…",
+      "afterRecording": "Nach deiner Aufnahme"
     },
     "audioPlayer": {
       "pause": "Pause",

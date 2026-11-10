@@ -69,7 +69,20 @@
       "composer": {
         "add": "Добавить",
         "dictationError": "Диктовка: {error}",
-        "stop": "Стоп"
+        "stop": "Стоп",
+        "placeholder": {
+          "capturing": "Захват экрана…",
+          "recording": "Спросите о записи…",
+          "screenshot": "Спросите о снимке экрана…",
+          "file": "Спросите о файле…",
+          "pastedText": "Спросите о вставленном тексте…",
+          "selectedArea": "Спросите о выделенной области…",
+          "open": "Спросите о том, что открыто…",
+          "activity": "Спросите об этом действии…",
+          "window": "Спросите об этом окне…",
+          "selection": "Спросите о выделении…",
+          "default": "Делайте что угодно"
+        }
       },
       "connectorConnect": {
         "cancel": "Отмена",
@@ -2821,7 +2834,8 @@
         "upToDateTitle": "Всё обновлено",
         "upToDateBody": "Новые версии Stella появляются здесь."
       },
-      "updating": "Обновление…"
+      "updating": "Обновление…",
+      "afterRecording": "После записи"
     },
     "audioPlayer": {
       "pause": "Пауза",

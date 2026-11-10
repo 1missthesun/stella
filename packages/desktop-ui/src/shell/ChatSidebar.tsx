@@ -580,7 +580,7 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
           onPaste={(event) => {
             handleComposerPaste(event, setChatContext);
           }}
-          placeholder={composerState.placeholder}
+          placeholder={t(composerState.placeholderKey)}
         />
 
         <div className="composer-toolbar">

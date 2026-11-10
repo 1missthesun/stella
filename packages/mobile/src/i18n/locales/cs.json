@@ -69,7 +69,20 @@
       "composer": {
         "add": "Přidat",
         "dictationError": "Diktování: {error}",
-        "stop": "Zastavit"
+        "stop": "Zastavit",
+        "placeholder": {
+          "capturing": "Zachytávám obrazovku…",
+          "recording": "Zeptejte se na záznam…",
+          "screenshot": "Zeptejte se na snímek obrazovky…",
+          "file": "Zeptejte se na soubor…",
+          "pastedText": "Zeptejte se na vložený text…",
+          "selectedArea": "Zeptejte se na vybranou oblast…",
+          "open": "Zeptejte se na to, co je otevřené…",
+          "activity": "Zeptejte se na tuto aktivitu…",
+          "window": "Zeptejte se na toto okno…",
+          "selection": "Zeptejte se na výběr…",
+          "default": "Udělejte cokoli"
+        }
       },
       "connectorConnect": {
         "cancel": "Zrušit",
@@ -2821,7 +2834,8 @@
         "upToDateTitle": "Máte nejnovější verzi",
         "upToDateBody": "Nové verze Stelly se zobrazí tady."
       },
-      "updating": "Aktualizace…"
+      "updating": "Aktualizace…",
+      "afterRecording": "Po dokončení záznamu"
     },
     "audioPlayer": {
       "pause": "Pozastavit",

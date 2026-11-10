@@ -460,6 +460,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 if (!window || window.isDestroyed() || !window.isVisible() || !window.isFocused()) return null;
                 return (await state.rendererSource?.quietFor()) ?? null;
             },
+            recordingOpen: () => Boolean(state.showStella?.isActive()),
             isUserAway: () => {
                 if (state.showStella?.isActive()) return false;
                 const window = state.windowManager?.getFullWindow() ?? null;

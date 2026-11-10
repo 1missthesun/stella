@@ -69,7 +69,20 @@
       "composer": {
         "add": "Dodaj",
         "dictationError": "Dyktowanie: {error}",
-        "stop": "Zatrzymaj"
+        "stop": "Zatrzymaj",
+        "placeholder": {
+          "capturing": "Przechwytywanie ekranu…",
+          "recording": "Zapytaj o nagranie…",
+          "screenshot": "Zapytaj o zrzut ekranu…",
+          "file": "Zapytaj o plik…",
+          "pastedText": "Zapytaj o wklejony tekst…",
+          "selectedArea": "Zapytaj o zaznaczony obszar…",
+          "open": "Zapytaj o to, co jest otwarte…",
+          "activity": "Zapytaj o tę aktywność…",
+          "window": "Zapytaj o to okno…",
+          "selection": "Zapytaj o zaznaczenie…",
+          "default": "Zrób cokolwiek"
+        }
       },
       "connectorConnect": {
         "cancel": "Anuluj",
@@ -2821,7 +2834,8 @@
         "upToDateTitle": "Masz najnowszą wersję",
         "upToDateBody": "Nowe wersje Stelli pojawią się tutaj."
       },
-      "updating": "Aktualizowanie…"
+      "updating": "Aktualizowanie…",
+      "afterRecording": "Po nagraniu"
     },
     "audioPlayer": {
       "pause": "Wstrzymaj",

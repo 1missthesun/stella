@@ -63,7 +63,20 @@
       "composer": {
         "add": "Toevoegen",
         "dictationError": "Dictee: {error}",
-        "stop": "Stoppen"
+        "stop": "Stoppen",
+        "placeholder": {
+          "capturing": "Scherm vastleggen…",
+          "recording": "Vraag over de opname…",
+          "screenshot": "Vraag over de schermafbeelding…",
+          "file": "Vraag over het bestand…",
+          "pastedText": "Vraag over de geplakte tekst…",
+          "selectedArea": "Vraag over het geselecteerde gebied…",
+          "open": "Vraag over wat er open staat…",
+          "activity": "Vraag over deze activiteit…",
+          "window": "Vraag over dit venster…",
+          "selection": "Vraag over de selectie…",
+          "default": "Doe wat je wilt"
+        }
       },
       "connectorConnect": {
         "cancel": "Annuleren",
@@ -2801,7 +2814,8 @@
         "upToDateTitle": "Je bent helemaal bij",
         "upToDateBody": "Nieuwe versies van Stella verschijnen hier."
       },
-      "updating": "Bijwerken…"
+      "updating": "Bijwerken…",
+      "afterRecording": "Na je opname"
     },
     "audioPlayer": {
       "pause": "Pauzeren",

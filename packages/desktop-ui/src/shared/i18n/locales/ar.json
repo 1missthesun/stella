@@ -75,7 +75,20 @@
       "composer": {
         "add": "إضافة",
         "dictationError": "الإملاء: {error}",
-        "stop": "إيقاف"
+        "stop": "إيقاف",
+        "placeholder": {
+          "capturing": "جارٍ التقاط الشاشة…",
+          "recording": "اسأل عن التسجيل…",
+          "screenshot": "اسأل عن لقطة الشاشة…",
+          "file": "اسأل عن الملف…",
+          "pastedText": "اسأل عن النص الملصق…",
+          "selectedArea": "اسأل عن المنطقة المحددة…",
+          "open": "اسأل عمّا هو مفتوح…",
+          "activity": "اسأل عن هذا النشاط…",
+          "window": "اسأل عن هذه النافذة…",
+          "selection": "اسأل عن التحديد…",
+          "default": "افعل أي شيء"
+        }
       },
       "connectorConnect": {
         "cancel": "إلغاء",
@@ -2841,7 +2854,8 @@
         "upToDateTitle": "كل شيء محدّث",
         "upToDateBody": "تظهر الإصدارات الجديدة من Stella هنا."
       },
-      "updating": "جارٍ التحديث…"
+      "updating": "جارٍ التحديث…",
+      "afterRecording": "بعد انتهاء التسجيل"
     },
     "audioPlayer": {
       "pause": "إيقاف مؤقت",

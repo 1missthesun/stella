@@ -60,7 +60,20 @@
       "composer": {
         "add": "추가",
         "dictationError": "받아쓰기: {error}",
-        "stop": "중지"
+        "stop": "중지",
+        "placeholder": {
+          "capturing": "화면 캡처 중…",
+          "recording": "녹화에 대해 질문하기…",
+          "screenshot": "스크린샷에 대해 질문하기…",
+          "file": "파일에 대해 질문하기…",
+          "pastedText": "붙여넣은 텍스트에 대해 질문하기…",
+          "selectedArea": "선택한 영역에 대해 질문하기…",
+          "open": "열려 있는 항목에 대해 질문하기…",
+          "activity": "이 활동에 대해 질문하기…",
+          "window": "이 창에 대해 질문하기…",
+          "selection": "선택 항목에 대해 질문하기…",
+          "default": "무엇이든 해 보세요"
+        }
       },
       "connectorConnect": {
         "cancel": "취소",
@@ -2791,7 +2804,8 @@
         "upToDateTitle": "최신 상태예요",
         "upToDateBody": "Stella의 새 버전이 여기에 표시돼요."
       },
-      "updating": "업데이트 중…"
+      "updating": "업데이트 중…",
+      "afterRecording": "녹화가 끝나면"
     },
     "audioPlayer": {
       "pause": "일시정지",

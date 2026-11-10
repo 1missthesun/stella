@@ -60,7 +60,20 @@
       "composer": {
         "add": "添加",
         "dictationError": "听写：{error}",
-        "stop": "停止"
+        "stop": "停止",
+        "placeholder": {
+          "capturing": "正在截取屏幕…",
+          "recording": "询问这段录制…",
+          "screenshot": "询问这张截图…",
+          "file": "询问这个文件…",
+          "pastedText": "询问粘贴的文字…",
+          "selectedArea": "询问所选区域…",
+          "open": "询问打开的内容…",
+          "activity": "询问这项活动…",
+          "window": "询问这个窗口…",
+          "selection": "询问所选内容…",
+          "default": "做任何事"
+        }
       },
       "connectorConnect": {
         "cancel": "取消",
@@ -2791,7 +2804,8 @@
         "upToDateTitle": "已是最新版本",
         "upToDateBody": "Stella 的新版本会显示在这里。"
       },
-      "updating": "正在更新…"
+      "updating": "正在更新…",
+      "afterRecording": "录制结束后"
     },
     "audioPlayer": {
       "pause": "暂停",

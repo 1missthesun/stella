@@ -63,7 +63,20 @@
       "composer": {
         "add": "Tilføj",
         "dictationError": "Diktering: {error}",
-        "stop": "Stop"
+        "stop": "Stop",
+        "placeholder": {
+          "capturing": "Optager skærmen…",
+          "recording": "Spørg om optagelsen…",
+          "screenshot": "Spørg om skærmbilledet…",
+          "file": "Spørg om filen…",
+          "pastedText": "Spørg om den indsatte tekst…",
+          "selectedArea": "Spørg om det valgte område…",
+          "open": "Spørg om det, der er åbent…",
+          "activity": "Spørg om denne aktivitet…",
+          "window": "Spørg om dette vindue…",
+          "selection": "Spørg om markeringen…",
+          "default": "Gør hvad som helst"
+        }
       },
       "connectorConnect": {
         "cancel": "Annuller",
@@ -2801,7 +2814,8 @@
         "upToDateTitle": "Du er opdateret",
         "upToDateBody": "Nye versioner af Stella vises her."
       },
-      "updating": "Opdaterer…"
+      "updating": "Opdaterer…",
+      "afterRecording": "Efter din optagelse"
     },
     "audioPlayer": {
       "pause": "Pause",

@@ -63,7 +63,20 @@
       "composer": {
         "add": "Hozzáadás",
         "dictationError": "Diktálás: {error}",
-        "stop": "Leállítás"
+        "stop": "Leállítás",
+        "placeholder": {
+          "capturing": "Képernyő rögzítése…",
+          "recording": "Kérdezz a felvételről…",
+          "screenshot": "Kérdezz a képernyőképről…",
+          "file": "Kérdezz a fájlról…",
+          "pastedText": "Kérdezz a beillesztett szövegről…",
+          "selectedArea": "Kérdezz a kijelölt területről…",
+          "open": "Kérdezz arról, ami meg van nyitva…",
+          "activity": "Kérdezz erről a tevékenységről…",
+          "window": "Kérdezz erről az ablakról…",
+          "selection": "Kérdezz a kijelölésről…",
+          "default": "Bármit megtehetsz"
+        }
       },
       "connectorConnect": {
         "cancel": "Mégse",
@@ -2801,7 +2814,8 @@
         "upToDateTitle": "Minden naprakész",
         "upToDateBody": "A Stella új verziói itt jelennek meg."
       },
-      "updating": "Frissítés…"
+      "updating": "Frissítés…",
+      "afterRecording": "A felvétel után"
     },
     "audioPlayer": {
       "pause": "Szünet",

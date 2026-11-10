@@ -58,6 +58,8 @@ export type AppSourceState = {
   waiting: AppSourceWaiting[];
   skipped: AppSourceWaiting[];
   busy: boolean;
+  /** An update the user asked for waits until their screen recording and its finish card are done. */
+  heldForRecording?: boolean;
 };
 
 export type AppSourceActionResult =

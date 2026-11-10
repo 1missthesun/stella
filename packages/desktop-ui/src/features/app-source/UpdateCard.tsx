@@ -8,6 +8,8 @@ import {
 } from "react";
 import { springEasing } from "@stella/contracts/desktop/spring";
 import { AlertCircle, RefreshCw } from "@/ui/icons";
+import { useT } from "@/shared/i18n";
+import { useAppSourceState } from "./app-source-store";
 import "./update-card.css";
 
 export type UpdateCardTone = "update" | "done" | "attention";
@@ -181,7 +183,11 @@ export const UpdateCard = ({
   busy?: boolean;
   disabled?: boolean;
   placement?: "message" | "composer";
-}) => (
+}) => {
+  const t = useT();
+  const held = useAppSourceState()?.heldForRecording === true;
+  const shownDetail = busy && held ? t("shell.appSource.afterRecording") : detail;
+  return (
   <div
     className={`app-update-card app-update-card--${placement}`}
     data-tone={tone}
@@ -196,14 +202,15 @@ export const UpdateCard = ({
       <div className="app-update-card__title" title={title}>
         {title}
       </div>
-      {detail === undefined ? null : (
+      {shownDetail === undefined ? null : (
         <div className="app-update-card__detail">
-          <Swap value={detail} variant="text">
-            {detail}
+          <Swap value={shownDetail} variant="text">
+            {shownDetail}
           </Swap>
         </div>
       )}
     </div>
     {action ? <UpdateButton action={action} busy={busy} disabled={disabled} /> : null}
   </div>
-);
+  );
+};

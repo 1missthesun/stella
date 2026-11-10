@@ -58,6 +58,8 @@ const SAID_PREVIEW_CHARS = 140;
 const REVIEW_SAFETY_MS = 3 * 60_000;
 /** An untouched finish card goes to the composer this long after it's ready. */
 const KEEP_AFTER_MS = 20_000;
+/** A pointer merely resting on the card holds it this long after it's ready, at most. */
+const HOVER_HOLD_MAX_MS = 60_000;
 const CARD_TOP = 14;
 /** A send the main window hasn't taken by then goes to the composer instead. */
 const SEND_TIMEOUT_MS = 2 * 60_000;
@@ -125,6 +127,10 @@ type Review = {
   timer: NodeJS.Timeout | null;
   /** The native card: someone is hovering, typing, or has a note. */
   engaged: boolean;
+  /** The native card's note has focus or text: it stays until answered (or the safety timer). */
+  typing: boolean;
+  /** When the capture was ready on the card. */
+  readyAt: number | null;
   keepTimer: NodeJS.Timeout | null;
 };
 
@@ -163,6 +169,8 @@ const runBuilder = (helper: string, dir: string): Promise<string> =>
 export class ShowStellaController {
   private recording: Recording | null = null;
   private readonly pending = new Map<string, Pending>();
+  /** Stops and builds in flight: the recording is between the bar and its card. */
+  private finishing = 0;
   private activeShortcut = "";
   private lastStartAt = 0;
   private pruned = false;
@@ -186,7 +194,7 @@ export class ShowStellaController {
    * reload would end the overlay's recording or close the card.
    */
   isActive(): boolean {
-    return Boolean(this.recording || this.reviewing);
+    return Boolean(this.recording || this.reviewing || this.finishing > 0 || this.pending.size > 0);
   }
 
   registerShortcut(): string {
@@ -412,6 +420,15 @@ export class ShowStellaController {
 
   /** Stops the recording; `discard` throws it away (Esc). */
   async stop(discard: boolean): Promise<void> {
+    this.finishing += 1;
+    try {
+      await this.stopRecording(discard);
+    } finally {
+      this.finishing -= 1;
+    }
+  }
+
+  private async stopRecording(discard: boolean): Promise<void> {
     const recording = this.recording;
     if (!recording || recording.phase === "stopping") return;
     recording.phase = "stopping";
@@ -489,6 +506,8 @@ export class ShowStellaController {
         capture: null,
         timer: null,
         engaged: false,
+        typing: false,
+        readyAt: null,
         keepTimer: null,
       };
       if (this.panel && this.cardStrings) overlay.endShowStella();
@@ -629,6 +648,8 @@ export class ShowStellaController {
       case "engaged":
         if (!review) return;
         review.engaged = event.on;
+        // A helper without the typing flag counts any engagement as typing.
+        review.typing = event.typing ?? event.on;
         this.scheduleKeep(review);
         return;
       default:
@@ -636,14 +657,22 @@ export class ShowStellaController {
     }
   }
 
-  /** An untouched native card goes to the composer a little after it's ready. */
+  /**
+   * An untouched native card goes to the composer a little after it's ready.
+   * A pointer resting on it only delays that, up to a minute; a note being
+   * written keeps it until it's answered or the safety timer.
+   */
   private scheduleKeep(review: Review): void {
     if (review.keepTimer) clearTimeout(review.keepTimer);
     review.keepTimer = null;
-    if (!review.capture || review.engaged) return;
+    if (!review.capture || review.typing) return;
+    review.readyAt ??= Date.now();
+    const wait = review.engaged
+      ? Math.max(KEEP_AFTER_MS, review.readyAt + HOVER_HOLD_MAX_MS - Date.now())
+      : KEEP_AFTER_MS;
     review.keepTimer = setTimeout(() => {
       void this.review({ captureId: review.id, action: "keep" });
-    }, KEEP_AFTER_MS);
+    }, wait);
   }
 
   setReviewFocusable(focusable: boolean): void {
@@ -792,6 +821,18 @@ export class ShowStellaController {
   }
 
   async build(captureId: string, transcript: ShowStellaTranscript): Promise<ShowStellaBuildResult> {
+    this.finishing += 1;
+    try {
+      return await this.buildCapture(captureId, transcript);
+    } finally {
+      this.finishing -= 1;
+    }
+  }
+
+  private async buildCapture(
+    captureId: string,
+    transcript: ShowStellaTranscript,
+  ): Promise<ShowStellaBuildResult> {
     const pending = this.pending.get(captureId);
     if (!pending || !ID_PATTERN.test(captureId)) {
       return { ok: false, captureId, error: "This capture is no longer waiting." };

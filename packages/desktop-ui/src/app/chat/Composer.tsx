@@ -143,7 +143,7 @@ function ComposerImpl({
     conversationId,
     requireConversationId: true,
   });
-  const { placeholder } = composerState;
+  const placeholder = t(composerState.placeholderKey);
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = canSubmit || dictationInFlight;
   useEscapeToStop({

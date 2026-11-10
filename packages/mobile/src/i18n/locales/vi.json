@@ -60,7 +60,20 @@
       "composer": {
         "add": "Thêm",
         "dictationError": "Đọc chính tả: {error}",
-        "stop": "Dừng"
+        "stop": "Dừng",
+        "placeholder": {
+          "capturing": "Đang chụp màn hình…",
+          "recording": "Hỏi về bản ghi…",
+          "screenshot": "Hỏi về ảnh chụp màn hình…",
+          "file": "Hỏi về tệp…",
+          "pastedText": "Hỏi về văn bản đã dán…",
+          "selectedArea": "Hỏi về vùng đã chọn…",
+          "open": "Hỏi về những gì đang mở…",
+          "activity": "Hỏi về hoạt động này…",
+          "window": "Hỏi về cửa sổ này…",
+          "selection": "Hỏi về phần đã chọn…",
+          "default": "Làm bất cứ điều gì"
+        }
       },
       "connectorConnect": {
         "cancel": "Hủy",
@@ -2791,7 +2804,8 @@
         "upToDateTitle": "Bạn đang dùng bản mới nhất",
         "upToDateBody": "Các phiên bản mới của Stella sẽ hiện ở đây."
       },
-      "updating": "Đang cập nhật…"
+      "updating": "Đang cập nhật…",
+      "afterRecording": "Sau khi ghi xong"
     },
     "audioPlayer": {
       "pause": "Tạm dừng",

@@ -86,6 +86,8 @@ type AppSourceServiceOptions = {
   userQuietFor?: () => Promise<number | null>;
   /** The user is not looking at Stella or has left the computer. */
   isUserAway?: () => boolean;
+  /** A screen recording or its finish card is open; a reload would end it. */
+  recordingOpen?: () => boolean;
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
@@ -201,6 +203,9 @@ const deviceName = () =>
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
+/** Longest an update waits for a screen recording: past its 10-minute cap, building and its card. */
+const RECORDING_HOLD_MAX_MS = 20 * 60_000;
+
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms).unref?.());
 
@@ -234,6 +239,7 @@ export class AppSourceService {
   private publishedState = JSON.stringify(EMPTY_STATE);
   private queue: Promise<unknown> = Promise.resolve();
   private busy = false;
+  private heldForRecording = false;
   private refreshing: Promise<void> | null = null;
   private refreshAgain = false;
   private syncing = false;
@@ -762,6 +768,7 @@ export class AppSourceService {
     const requestedAt = performance.now();
     const result = this.queue.then(async (): Promise<AppSourceActionResult> => {
       this.timeline = { startedAt: requestedAt, last: requestedAt, steps: [] };
+      await this.waitForRecording();
       this.mark("queued");
       this.setBusy(true);
       this.preparer.pause();
@@ -1085,6 +1092,23 @@ export class AppSourceService {
     };
   }
 
+  /**
+   * An update waits while a screen recording or its finish card is open:
+   * swapping or reloading the windows would end the recording.
+   */
+  private async waitForRecording() {
+    if (!this.options.recordingOpen?.()) return;
+    this.heldForRecording = true;
+    this.publish({ ...this.state, heldForRecording: true });
+    this.options.log("app-source.held-for-recording", {});
+    // Bounded, so a recording that never settles can't hold updates forever.
+    const until = Date.now() + RECORDING_HOLD_MAX_MS;
+    while (!this.disposed && Date.now() < until && this.options.recordingOpen?.()) await delay(500);
+    this.heldForRecording = false;
+    const { heldForRecording: _held, ...rest } = this.state;
+    this.publish(rest);
+  }
+
   private setBusy(busy: boolean) {
     this.busy = busy;
     this.publish({ ...this.state, busy });
@@ -1109,7 +1133,11 @@ export class AppSourceService {
         this.refreshAgain = false;
         try {
           const next = await this.readState();
-          this.publish({ ...next, busy: this.busy });
+          this.publish({
+            ...next,
+            busy: this.busy,
+            ...(this.heldForRecording ? { heldForRecording: true } : {}),
+          });
           this.considerAutoApply(this.state);
         } catch (error) {
           this.options.log("app-source.refresh-failed", {

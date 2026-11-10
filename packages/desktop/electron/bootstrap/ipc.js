@@ -454,11 +454,13 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             requestRuntimeRestart: () => state.stellaHostRunner?.requestRuntimeRestart(),
             applyRendererChanges: (paths, options) => state.rendererSource?.applyChanges(paths, options),
             userQuietFor: async () => {
+                if (state.showStella?.isActive()) return 0;
                 const window = state.windowManager?.getFullWindow() ?? null;
                 if (!window || window.isDestroyed() || !window.isVisible() || !window.isFocused()) return null;
                 return (await state.rendererSource?.quietFor()) ?? null;
             },
             isUserAway: () => {
+                if (state.showStella?.isActive()) return false;
                 const window = state.windowManager?.getFullWindow() ?? null;
                 return !window || window.isDestroyed() || !window.isVisible() || window.isMinimized() ||
                     powerMonitor.getSystemIdleTime() >= USER_AWAY_SECONDS;
@@ -579,6 +581,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             return Boolean(overlay && event.sender === overlay);
         },
     });
+    state.showStella = showStella;
     app.on("will-quit", () => showStella.dispose());
     registerCompanionHandlers({
         getCompanionController: () => state.companionController ?? null,

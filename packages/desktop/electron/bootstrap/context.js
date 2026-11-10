@@ -70,6 +70,7 @@ export const createBootstrapContext = (config) => {
         overlayController: null,
         companionController: null,
         meetingCaptureController: null,
+        showStella: null,
         processRuntime,
         scheduleUpdateUnsubscribe: null,
         globalInputHooksStarted: false,

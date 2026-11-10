@@ -10,8 +10,12 @@ import { transcribeCapture } from "./capture-transcript";
 
 const api = () => window.electronAPI?.showStella;
 
-/** Recordings and sends this window has taken, so a re-sent one isn't done twice. */
-const taken = new Set<string>();
+/**
+ * Recordings and sends this window has taken, so a re-sent one isn't done
+ * twice. Kept on the page, not the module, so an in-place swap keeps it.
+ */
+const taken: Set<string> = ((globalThis as { __stellaShowStellaTaken?: Set<string> })
+  .__stellaShowStellaTaken ??= new Set<string>());
 
 const prepare = async (captureId: string, hasAudio: boolean) => {
   const showStella = api();
@@ -142,8 +146,8 @@ export const expandShowCaptures = (context: ChatContext | null | undefined): Cha
         height: capture.contactSheet.height,
       })),
     ],
-    pastedTexts: [
-      ...(rest.pastedTexts ?? []),
+    captureSummaries: [
+      ...(rest.captureSummaries ?? []),
       ...ready.map((capture) => capture.summary ?? "").filter(Boolean),
     ],
     files: [

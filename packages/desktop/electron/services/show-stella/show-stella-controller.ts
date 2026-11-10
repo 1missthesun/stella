@@ -176,10 +176,18 @@ export class ShowStellaController {
   /** Sends waiting for the main window to take them. */
   private readonly outbox = new Map<
     string,
-    { request: ShowStellaSendRequest; timer: NodeJS.Timeout }
+    { request: ShowStellaSendRequest; timer: NodeJS.Timeout; handedOver: boolean }
   >();
 
   constructor(private readonly options: ShowStellaControllerOptions) {}
+
+  /**
+   * A capture is recording or its finish card is open. Updates wait: a
+   * reload would end the overlay's recording or close the card.
+   */
+  isActive(): boolean {
+    return Boolean(this.recording || this.reviewing);
+  }
 
   registerShortcut(): string {
     // Without the builder there is nothing to make a capture with; leave the keys to other apps.
@@ -536,7 +544,14 @@ export class ShowStellaController {
           durationMs: pending.durationMs,
           hasAudio: pending.hasAudio,
         })),
-      sends: [...this.outbox.values()].map((entry) => entry.request),
+      // A send goes to one page once; one a reloaded page lost falls back to
+      // the composer at its timeout instead of being sent twice.
+      sends: [...this.outbox.values()]
+        .filter((entry) => !entry.handedOver)
+        .map((entry) => {
+          entry.handedOver = true;
+          return entry.request;
+        }),
     };
   }
 
@@ -678,9 +693,11 @@ export class ShowStellaController {
       note: note.trim(),
     };
     const timer = setTimeout(() => this.sent(request.requestId, false), SEND_TIMEOUT_MS);
-    this.outbox.set(request.requestId, { request, timer });
+    const entry = { request, timer, handedOver: false };
+    this.outbox.set(request.requestId, entry);
     const full = this.options.getFullWindow() ?? this.options.ensureFullWindow();
     if (full && !full.isDestroyed() && !full.webContents.isLoading()) {
+      entry.handedOver = true;
       full.webContents.send(IPC_SHOW_STELLA_SEND, request);
     }
   }

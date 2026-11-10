@@ -96,6 +96,8 @@ export type ChatContext = {
   files?: ChatContextFile[];
   pastedTexts?: string[];
   showCaptures?: ShowCaptureAttachment[];
+  /** What sent Show Stella captures hold (moments and words): read by the task, never shown as chips. */
+  captureSummaries?: string[];
   capturePending?: boolean;
   windowScreenshot?: {
     dataUrl: string;

@@ -30,6 +30,7 @@ import { registerWebsiteHandlers } from "../ipc/website-handlers.js";
 import { registerSystemHandlers, setPreventComputerSleep, } from "../ipc/system-handlers.js";
 import { registerExternalOpenerHandlers } from "../ipc/external-opener-handlers.js";
 import { registerUiHandlers } from "../ipc/ui-handlers.js";
+import { registerChatAlertHandlers } from "../ipc/chat-alert-handlers.js";
 import { registerUiStateKvHandlers } from "../ipc/ui-state-handlers.js";
 import { registerVoiceHandlers } from "../ipc/voice-handlers.js";
 import { registerDictationHandlers } from "../ipc/dictation-handlers.js";
@@ -304,6 +305,12 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         ensureGlobalInputHooksOnMac: () => {
             scheduleGlobalInputHooksAfterAppReady(context);
         },
+    });
+    registerChatAlertHandlers({
+        getStellaDataDir: lifecycle.getStellaDataDir,
+        getFullWindow: () => state.windowManager?.getFullWindow() ?? null,
+        getUserAskPolicy: () => services.userAskService.getPolicy(),
+        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerScheduleHandlers({
         getStellaHostRunner: lifecycle.getRunner,

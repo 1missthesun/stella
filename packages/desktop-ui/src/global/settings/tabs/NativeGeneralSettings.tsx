@@ -17,6 +17,7 @@ import type { LockedComputerUseStatus } from "@/shared/types/electron";
 import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/contracts/browser-extension";
 import { getSettingsErrorMessage } from "./shared";
 import { SettingsToggleCard } from "./settings-toggle-card";
+import { MessageSoundCard } from "./MessageSoundCard";
 import { BrowserExtensionClients } from "./BrowserExtensionClients";
 import { OnboardingReplayCard } from "@/global/onboarding/chat/OnboardingReplayCard";
 
@@ -41,15 +42,6 @@ export function NativeDesktopGeneralSettings() {
   const [preventSleepError, setPreventSleepError] = useState<string | null>(
     null,
   );
-  const [soundNotificationsEnabled, setSoundNotificationsEnabled] =
-    useState(true);
-  const [soundNotificationsLoaded, setSoundNotificationsLoaded] =
-    useState(false);
-  const [isSavingSoundNotifications, setIsSavingSoundNotifications] =
-    useState(false);
-  const [soundNotificationsError, setSoundNotificationsError] = useState<
-    string | null
-  >(null);
   const [isResettingCustomizations, setIsResettingCustomizations] =
     useState(false);
   const [resetCustomizationsStatus, setResetCustomizationsStatus] = useState<{
@@ -75,35 +67,6 @@ export function NativeDesktopGeneralSettings() {
         }
       } finally {
         if (!cancelled) setPreventSleepLoaded(true);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const enabled =
-          await window.electronAPI?.system?.getSoundNotificationsEnabled?.();
-        if (!cancelled) {
-          setSoundNotificationsEnabled(enabled !== false);
-          setSoundNotificationsError(null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setSoundNotificationsError(
-            getSettingsErrorMessage(
-              error,
-              t("settings.errors.loadSoundNotifications"),
-            ),
-          );
-        }
-      } finally {
-        if (!cancelled) setSoundNotificationsLoaded(true);
       }
     };
     void load();
@@ -181,37 +144,6 @@ export function NativeDesktopGeneralSettings() {
     }
   }, [t]);
 
-  const handleSoundNotificationsChange = useCallback(
-    async (checked: boolean) => {
-      const systemApi = window.electronAPI?.system;
-      if (!systemApi?.setSoundNotificationsEnabled) {
-        setSoundNotificationsError(
-          t("settings.errors.soundNotificationsUnavailable"),
-        );
-        return;
-      }
-
-      const previous = soundNotificationsEnabled;
-      setSoundNotificationsEnabled(checked);
-      setSoundNotificationsError(null);
-      setIsSavingSoundNotifications(true);
-      try {
-        const result = await systemApi.setSoundNotificationsEnabled(checked);
-        setSoundNotificationsEnabled(result.enabled);
-      } catch (error) {
-        setSoundNotificationsEnabled(previous);
-        setSoundNotificationsError(
-          getSettingsErrorMessage(
-            error,
-            t("settings.errors.saveSoundNotifications"),
-          ),
-        );
-      } finally {
-        setIsSavingSoundNotifications(false);
-      }
-    },
-    [soundNotificationsEnabled, t],
-  );
 
   return (
     <>
@@ -225,14 +157,7 @@ export function NativeDesktopGeneralSettings() {
           onChange={(checked) => setNativeFontSmoothingEnabled(checked)}
         />
       ) : null}
-      <SettingsToggleCard
-        titleKey="settings.notifications.title"
-        description={t("settings.notifications.description")}
-        error={soundNotificationsError}
-        checked={soundNotificationsEnabled}
-        disabled={!soundNotificationsLoaded || isSavingSoundNotifications}
-        onChange={(checked) => void handleSoundNotificationsChange(checked)}
-      />
+      <MessageSoundCard />
       <SettingsToggleCard
         titleKey="settings.power.title"
         description={t("settings.power.description")}

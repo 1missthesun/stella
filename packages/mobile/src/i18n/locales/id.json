@@ -2263,7 +2263,6 @@
       "loadMemory": "Gagal memuat pengaturan memori.",
       "loadPermissions": "Gagal memuat status izin desktop.",
       "loadPower": "Gagal memuat pengaturan daya.",
-      "loadSoundNotifications": "Gagal memuat pengaturan notifikasi suara.",
       "lockedComputerUseUnavailable": "Penggunaan komputer saat terkunci tidak tersedia di jendela ini.",
       "memoryUnavailable": "Pengaturan memori tidak tersedia di jendela ini.",
       "microphoneDeniedReopen": "Akses mikrofon sebelumnya ditolak. Aktifkan di Pengaturan Sistem, lalu buka kembali Stella.",
@@ -2276,8 +2275,7 @@
       "saveMemory": "Gagal memperbarui pengaturan memori.",
       "savePermission": "Gagal memperbarui izin {kind}.",
       "savePower": "Gagal memperbarui pengaturan daya.",
-      "saveSoundNotifications": "Gagal memperbarui pengaturan notifikasi suara.",
-      "soundNotificationsUnavailable": "Pengaturan notifikasi suara tidak tersedia di jendela ini."
+      "saveMessageSound": "Gagal memperbarui pengaturan suara pesan."
     },
     "escalation": {
       "ceiling": {
@@ -2436,9 +2434,18 @@
       "description": "Anti-aliasing skala abu-abu, seperti aplikasi macOS asli.",
       "title": "Penghalusan font asli"
     },
-    "notifications": {
-      "description": "Memutar suara saat Stella menyelesaikan sebuah proses agen.",
-      "title": "Notifikasi suara"
+    "messageSound": {
+      "description": "Putar suara saat Stella mengirimimu pesan ketika kamu tidak sedang melihat obrolan.",
+      "preview": "Putar contoh",
+      "sound": "Suara",
+      "sounds": {
+        "bloop": "Blup",
+        "chime": "Lonceng",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Kerlip"
+      },
+      "title": "Suara pesan"
     },
     "onboardingReplay": {
       "action": "Replay",

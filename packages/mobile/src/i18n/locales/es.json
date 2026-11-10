@@ -2279,7 +2279,6 @@
       "loadMemory": "No se pudo cargar el ajuste de memoria.",
       "loadPermissions": "No se pudo cargar el estado de permisos del escritorio.",
       "loadPower": "No se pudo cargar el ajuste de energía.",
-      "loadSoundNotifications": "No se pudo cargar el ajuste de notificaciones de sonido.",
       "lockedComputerUseUnavailable": "El uso con el ordenador bloqueado no está disponible en esta ventana.",
       "memoryUnavailable": "Los ajustes de memoria no están disponibles en esta ventana.",
       "microphoneDeniedReopen": "El acceso al micrófono se denegó antes. Actívalo en los Ajustes del sistema y luego reabre Stella.",
@@ -2292,8 +2291,7 @@
       "saveMemory": "No se pudo actualizar el ajuste de memoria.",
       "savePermission": "No se pudo actualizar el permiso de {kind}.",
       "savePower": "No se pudo actualizar el ajuste de energía.",
-      "saveSoundNotifications": "No se pudo actualizar el ajuste de notificaciones de sonido.",
-      "soundNotificationsUnavailable": "Los ajustes de notificaciones de sonido no están disponibles en esta ventana."
+      "saveMessageSound": "No se pudo actualizar el ajuste del sonido de mensajes."
     },
     "escalation": {
       "ceiling": {
@@ -2452,9 +2450,18 @@
       "description": "Suavizado en escala de grises, como las apps nativas de macOS.",
       "title": "Suavizado de fuentes nativo"
     },
-    "notifications": {
-      "description": "Reproduce un sonido cuando Stella termina una tarea de un agente.",
-      "title": "Notificaciones de sonido"
+    "messageSound": {
+      "description": "Reproduce un sonido cuando Stella te envía un mensaje mientras no estás mirando el chat.",
+      "preview": "Reproducir muestra",
+      "sound": "Sonido",
+      "sounds": {
+        "bloop": "Blup",
+        "chime": "Campanilla",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Destello"
+      },
+      "title": "Sonido de mensajes"
     },
     "onboardingReplay": {
       "action": "Replay",

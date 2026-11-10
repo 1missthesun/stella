@@ -2263,7 +2263,6 @@
       "loadMemory": "メモリ設定を読み込めませんでした。",
       "loadPermissions": "デスクトップのアクセス権の状態を読み込めませんでした。",
       "loadPower": "電源設定を読み込めませんでした。",
-      "loadSoundNotifications": "サウンド通知の設定を読み込めませんでした。",
       "lockedComputerUseUnavailable": "このウィンドウではロック中のコンピュータ操作を利用できません。",
       "memoryUnavailable": "このウィンドウではメモリ設定を利用できません。",
       "microphoneDeniedReopen": "以前にマイクのアクセスが拒否されました。システム設定でオンにしてから、Stella を開き直してください。",
@@ -2276,8 +2275,7 @@
       "saveMemory": "メモリ設定を更新できませんでした。",
       "savePermission": "{kind} のアクセス権を更新できませんでした。",
       "savePower": "電源設定を更新できませんでした。",
-      "saveSoundNotifications": "サウンド通知の設定を更新できませんでした。",
-      "soundNotificationsUnavailable": "このウィンドウではサウンド通知の設定を利用できません。"
+      "saveMessageSound": "メッセージ音の設定を更新できませんでした。"
     },
     "escalation": {
       "ceiling": {
@@ -2436,9 +2434,18 @@
       "description": "ネイティブの macOS アプリと同じグレースケールのアンチエイリアス。",
       "title": "ネイティブのフォントスムージング"
     },
-    "notifications": {
-      "description": "Stella がエージェントの実行を終えたときにサウンドを再生します。",
-      "title": "サウンド通知"
+    "messageSound": {
+      "description": "チャットを見ていないときに Stella からメッセージが届くと、サウンドを再生します。",
+      "preview": "試聴",
+      "sound": "サウンド",
+      "sounds": {
+        "bloop": "ブループ",
+        "chime": "チャイム",
+        "marimba": "マリンバ",
+        "pop": "ポップ",
+        "twinkle": "きらめき"
+      },
+      "title": "メッセージ音"
     },
     "onboardingReplay": {
       "action": "Replay",

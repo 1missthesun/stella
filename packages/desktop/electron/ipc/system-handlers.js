@@ -9,7 +9,7 @@ import { visibleDialogParent } from "../windows/dialog-parent.js";
 import { noteAppPainted } from "../observability/app-paint.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
-import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, getTelemetryState, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, setOnboardingCompleted, updateLocalModelPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getTelemetryState, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, setOnboardingCompleted, updateLocalModelPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { coerceAgentRuntimeEngine } from "@stella/contracts/agent-engine";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
@@ -64,13 +64,11 @@ import {
   IPC_PREFERENCES_GET_ONBOARDING_COMPLETED,
   IPC_PREFERENCES_GET_PREVENT_SLEEP,
   IPC_PREFERENCES_GET_LOCKED_COMPUTER_USE,
-  IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS,
   IPC_PREFERENCES_GET_TELEMETRY,
   IPC_PREFERENCES_SET_MODELS,
   IPC_PREFERENCES_SET_ONBOARDING_COMPLETED,
   IPC_PREFERENCES_SET_PREVENT_SLEEP,
   IPC_PREFERENCES_SET_LOCKED_COMPUTER_USE,
-  IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS,
   IPC_PREFERENCES_SET_TELEMETRY,
   IPC_PREFERENCES_GET_READ_ALOUD,
   IPC_PREFERENCES_READ_ALOUD_CHANGED,
@@ -760,26 +758,6 @@ export const registerSystemHandlers = (options) => {
                 status.message ||
                 "OK",
         };
-    });
-    handleIpc(IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS, (event) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS)) {
-            throw new Error("Blocked untrusted preferences:getSoundNotifications request.");
-        }
-        const stellaAppDir = options.getStellaAppDir();
-        if (!stellaAppDir)
-            return true;
-        return getSoundNotificationsEnabled(stellaAppDir);
-    });
-    handleIpc(IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS, (event, enabled) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS)) {
-            throw new Error("Blocked untrusted preferences:setSoundNotifications request.");
-        }
-        const nextEnabled = enabled === true;
-        const stellaAppDir = options.getStellaAppDir();
-        if (stellaAppDir) {
-            updateLocalPreferences(stellaAppDir, { soundNotificationsEnabled: nextEnabled });
-        }
-        return { enabled: nextEnabled };
     });
     handleIpc(IPC_PREFERENCES_GET_TELEMETRY, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_GET_TELEMETRY)) {

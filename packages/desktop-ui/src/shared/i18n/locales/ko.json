@@ -2263,7 +2263,6 @@
       "loadMemory": "메모리 설정을 불러오지 못했습니다.",
       "loadPermissions": "데스크탑 권한 상태를 불러오지 못했습니다.",
       "loadPower": "전원 설정을 불러오지 못했습니다.",
-      "loadSoundNotifications": "소리 알림 설정을 불러오지 못했습니다.",
       "lockedComputerUseUnavailable": "이 창에서는 잠금 상태에서 컴퓨터 사용을 사용할 수 없습니다.",
       "memoryUnavailable": "이 창에서는 메모리 설정을 사용할 수 없습니다.",
       "microphoneDeniedReopen": "이전에 마이크 접근이 거부되었습니다. 시스템 설정에서 켠 다음 Stella를 다시 여세요.",
@@ -2276,8 +2275,7 @@
       "saveMemory": "메모리 설정을 업데이트하지 못했습니다.",
       "savePermission": "{kind} 권한을 업데이트하지 못했습니다.",
       "savePower": "전원 설정을 업데이트하지 못했습니다.",
-      "saveSoundNotifications": "소리 알림 설정을 업데이트하지 못했습니다.",
-      "soundNotificationsUnavailable": "이 창에서는 소리 알림 설정을 사용할 수 없습니다."
+      "saveMessageSound": "메시지 소리 설정을 업데이트하지 못했습니다."
     },
     "escalation": {
       "ceiling": {
@@ -2436,9 +2434,18 @@
       "description": "기본 macOS 앱처럼 그레이스케일 안티앨리어싱을 사용합니다.",
       "title": "네이티브 글꼴 매끄럽게 처리"
     },
-    "notifications": {
-      "description": "Stella가 에이전트 실행을 마치면 소리를 재생합니다.",
-      "title": "소리 알림"
+    "messageSound": {
+      "description": "채팅을 보고 있지 않을 때 Stella가 메시지를 보내면 소리를 재생합니다.",
+      "preview": "미리 듣기",
+      "sound": "소리",
+      "sounds": {
+        "bloop": "블룹",
+        "chime": "차임",
+        "marimba": "마림바",
+        "pop": "팝",
+        "twinkle": "반짝임"
+      },
+      "title": "메시지 소리"
     },
     "onboardingReplay": {
       "action": "Replay",

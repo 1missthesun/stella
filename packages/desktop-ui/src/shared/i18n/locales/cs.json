@@ -2287,7 +2287,6 @@
       "loadMemory": "Nepodařilo se načíst nastavení paměti.",
       "loadPermissions": "Nepodařilo se načíst stav oprávnění plochy.",
       "loadPower": "Nepodařilo se načíst nastavení napájení.",
-      "loadSoundNotifications": "Nepodařilo se načíst nastavení zvukových upozornění.",
       "lockedComputerUseUnavailable": "Použití při zamčeném počítači není v tomto okně dostupné.",
       "memoryUnavailable": "Nastavení paměti nejsou v tomto okně dostupná.",
       "microphoneDeniedReopen": "Přístup k mikrofonu byl dříve odepřen. Zapněte ho v Nastavení systému a poté Stellu znovu otevřete.",
@@ -2300,8 +2299,7 @@
       "saveMemory": "Nepodařilo se aktualizovat nastavení paměti.",
       "savePermission": "Nepodařilo se aktualizovat oprávnění {kind}.",
       "savePower": "Nepodařilo se aktualizovat nastavení napájení.",
-      "saveSoundNotifications": "Nepodařilo se aktualizovat nastavení zvukových upozornění.",
-      "soundNotificationsUnavailable": "Nastavení zvukových upozornění nejsou v tomto okně dostupná."
+      "saveMessageSound": "Nastavení zvuku zpráv se nepodařilo uložit."
     },
     "escalation": {
       "ceiling": {
@@ -2460,9 +2458,18 @@
       "description": "Vyhlazování ve stupních šedi jako v nativních aplikacích macOS.",
       "title": "Nativní vyhlazování písma"
     },
-    "notifications": {
-      "description": "Přehraje zvuk, když Stella dokončí běh agenta.",
-      "title": "Zvuková upozornění"
+    "messageSound": {
+      "description": "Přehrát zvuk, když vám Stella pošle zprávu a vy se zrovna nedíváte do chatu.",
+      "preview": "Přehrát ukázku",
+      "sound": "Zvuk",
+      "sounds": {
+        "bloop": "Bublinka",
+        "chime": "Zvonkohra",
+        "marimba": "Marimba",
+        "pop": "Lupnutí",
+        "twinkle": "Třpyt"
+      },
+      "title": "Zvuk zpráv"
     },
     "onboardingReplay": {
       "action": "Replay",

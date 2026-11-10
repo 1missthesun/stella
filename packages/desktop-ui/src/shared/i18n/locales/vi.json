@@ -2263,7 +2263,6 @@
       "loadMemory": "Không tải được cài đặt bộ nhớ.",
       "loadPermissions": "Không tải được trạng thái quyền trên máy tính để bàn.",
       "loadPower": "Không tải được cài đặt nguồn.",
-      "loadSoundNotifications": "Không tải được cài đặt thông báo âm thanh.",
       "lockedComputerUseUnavailable": "Sử dụng máy tính khi đã khóa không khả dụng trong cửa sổ này.",
       "memoryUnavailable": "Cài đặt bộ nhớ không khả dụng trong cửa sổ này.",
       "microphoneDeniedReopen": "Quyền truy cập micrô đã bị từ chối trước đó. Bật trong Cài đặt hệ thống, rồi mở lại Stella.",
@@ -2276,8 +2275,7 @@
       "saveMemory": "Không cập nhật được cài đặt bộ nhớ.",
       "savePermission": "Không cập nhật được quyền {kind}.",
       "savePower": "Không cập nhật được cài đặt nguồn.",
-      "saveSoundNotifications": "Không cập nhật được cài đặt thông báo âm thanh.",
-      "soundNotificationsUnavailable": "Cài đặt thông báo âm thanh không khả dụng trong cửa sổ này."
+      "saveMessageSound": "Không thể cập nhật cài đặt âm báo tin nhắn."
     },
     "escalation": {
       "ceiling": {
@@ -2436,9 +2434,18 @@
       "description": "Khử răng cưa thang xám, như ứng dụng macOS gốc.",
       "title": "Làm mịn phông chữ gốc"
     },
-    "notifications": {
-      "description": "Phát âm thanh khi Stella hoàn thành một lần chạy tác nhân.",
-      "title": "Thông báo âm thanh"
+    "messageSound": {
+      "description": "Phát âm thanh khi Stella gửi tin nhắn cho bạn lúc bạn không xem cuộc trò chuyện.",
+      "preview": "Nghe thử",
+      "sound": "Âm thanh",
+      "sounds": {
+        "bloop": "Bloop",
+        "chime": "Chuông",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Lấp lánh"
+      },
+      "title": "Âm báo tin nhắn"
     },
     "onboardingReplay": {
       "action": "Replay",

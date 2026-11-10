@@ -2279,7 +2279,6 @@
       "loadMemory": "Nu s-a putut încărca setarea de memorie.",
       "loadPermissions": "Nu s-a putut încărca starea permisiunilor desktopului.",
       "loadPower": "Nu s-a putut încărca setarea de alimentare.",
-      "loadSoundNotifications": "Nu s-a putut încărca setarea notificărilor sonore.",
       "lockedComputerUseUnavailable": "Utilizarea cu computerul blocat nu este disponibilă în această fereastră.",
       "memoryUnavailable": "Setările de memorie nu sunt disponibile în această fereastră.",
       "microphoneDeniedReopen": "Accesul la microfon a fost refuzat anterior. Activează-l în Setări de sistem, apoi redeschide Stella.",
@@ -2292,8 +2291,7 @@
       "saveMemory": "Nu s-a putut actualiza setarea de memorie.",
       "savePermission": "Nu s-a putut actualiza permisiunea {kind}.",
       "savePower": "Nu s-a putut actualiza setarea de alimentare.",
-      "saveSoundNotifications": "Nu s-a putut actualiza setarea notificărilor sonore.",
-      "soundNotificationsUnavailable": "Setările notificărilor sonore nu sunt disponibile în această fereastră."
+      "saveMessageSound": "Setarea sunetului pentru mesaje nu a putut fi actualizată."
     },
     "escalation": {
       "ceiling": {
@@ -2452,9 +2450,18 @@
       "description": "Netezire în tonuri de gri, ca în aplicațiile native macOS.",
       "title": "Netezire nativă a fonturilor"
     },
-    "notifications": {
-      "description": "Redă un sunet când Stella termină rularea unui agent.",
-      "title": "Notificări sonore"
+    "messageSound": {
+      "description": "Redă un sunet când Stella îți trimite un mesaj în timp ce nu te uiți la chat.",
+      "preview": "Redă o mostră",
+      "sound": "Sunet",
+      "sounds": {
+        "bloop": "Blup",
+        "chime": "Clopoțel",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Sclipire"
+      },
+      "title": "Sunet pentru mesaje"
     },
     "onboardingReplay": {
       "action": "Replay",

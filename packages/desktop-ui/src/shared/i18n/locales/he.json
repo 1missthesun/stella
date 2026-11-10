@@ -2279,7 +2279,6 @@
       "loadMemory": "טעינת הגדרת הזיכרון נכשלה.",
       "loadPermissions": "טעינת סטטוס ההרשאות של שולחן העבודה נכשלה.",
       "loadPower": "טעינת הגדרת החשמל נכשלה.",
-      "loadSoundNotifications": "טעינת הגדרת ההתראות הקוליות נכשלה.",
       "lockedComputerUseUnavailable": "שימוש במחשב נעול אינו זמין בחלון זה.",
       "memoryUnavailable": "הגדרות הזיכרון אינן זמינות בחלון זה.",
       "microphoneDeniedReopen": "גישת המיקרופון נדחתה קודם לכן. הפעל אותה בהגדרות המערכת, ואז פתח מחדש את Stella.",
@@ -2292,8 +2291,7 @@
       "saveMemory": "עדכון הגדרת הזיכרון נכשל.",
       "savePermission": "עדכון הרשאת {kind} נכשל.",
       "savePower": "עדכון הגדרת החשמל נכשל.",
-      "saveSoundNotifications": "עדכון הגדרת ההתראות הקוליות נכשל.",
-      "soundNotificationsUnavailable": "הגדרות ההתראות הקוליות אינן זמינות בחלון זה."
+      "saveMessageSound": "עדכון הגדרת צליל ההודעות נכשל."
     },
     "escalation": {
       "ceiling": {
@@ -2452,9 +2450,18 @@
       "description": "החלקת קצוות בגווני אפור, כמו באפליקציות macOS מקוריות.",
       "title": "החלקת גופנים מובנית"
     },
-    "notifications": {
-      "description": "השמעת צליל כאשר Stella מסיימת הרצת סוכן.",
-      "title": "התראות קוליות"
+    "messageSound": {
+      "description": "השמעת צליל כש-Stella שולחת לך הודעה בזמן שאינך מסתכל על הצ'אט.",
+      "preview": "השמעת דוגמה",
+      "sound": "צליל",
+      "sounds": {
+        "bloop": "בלופ",
+        "chime": "צלצול",
+        "marimba": "מרימבה",
+        "pop": "פופ",
+        "twinkle": "נצנוץ"
+      },
+      "title": "צליל הודעות"
     },
     "onboardingReplay": {
       "action": "Replay",

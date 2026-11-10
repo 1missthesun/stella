@@ -200,10 +200,12 @@ export const IPC_PREFERENCES_GET_LOCKED_COMPUTER_USE =
   "preferences:getLockedComputerUse" as const;
 export const IPC_PREFERENCES_SET_LOCKED_COMPUTER_USE =
   "preferences:setLockedComputerUse" as const;
-export const IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS =
-  "preferences:getSoundNotifications" as const;
-export const IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS =
-  "preferences:setSoundNotifications" as const;
+export const IPC_PREFERENCES_GET_MESSAGE_SOUND =
+  "preferences:getMessageSound" as const;
+export const IPC_PREFERENCES_SET_MESSAGE_SOUND =
+  "preferences:setMessageSound" as const;
+export const IPC_SYSTEM_IS_QUIET = "system:isQuiet" as const;
+export const IPC_APP_SET_UNREAD_BADGE = "app:setUnreadBadge" as const;
 export const IPC_PREFERENCES_GET_TELEMETRY =
   "preferences:getTelemetry" as const;
 export const IPC_PREFERENCES_SET_TELEMETRY =

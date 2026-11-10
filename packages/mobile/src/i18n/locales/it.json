@@ -2279,7 +2279,6 @@
       "loadMemory": "Impossibile caricare l'impostazione di memoria.",
       "loadPermissions": "Impossibile caricare lo stato delle autorizzazioni del desktop.",
       "loadPower": "Impossibile caricare l'impostazione di alimentazione.",
-      "loadSoundNotifications": "Impossibile caricare l'impostazione delle notifiche sonore.",
       "lockedComputerUseUnavailable": "L'uso a computer bloccato non è disponibile in questa finestra.",
       "memoryUnavailable": "Le impostazioni di memoria non sono disponibili in questa finestra.",
       "microphoneDeniedReopen": "L'accesso al microfono è stato negato in precedenza. Attivalo nelle Impostazioni di sistema, poi riapri Stella.",
@@ -2292,8 +2291,7 @@
       "saveMemory": "Impossibile aggiornare l'impostazione di memoria.",
       "savePermission": "Impossibile aggiornare l'autorizzazione {kind}.",
       "savePower": "Impossibile aggiornare l'impostazione di alimentazione.",
-      "saveSoundNotifications": "Impossibile aggiornare l'impostazione delle notifiche sonore.",
-      "soundNotificationsUnavailable": "Le impostazioni delle notifiche sonore non sono disponibili in questa finestra."
+      "saveMessageSound": "Impossibile aggiornare l'impostazione del suono dei messaggi."
     },
     "escalation": {
       "ceiling": {
@@ -2452,9 +2450,18 @@
       "description": "Antialiasing in scala di grigi, come le app macOS native.",
       "title": "Smussatura caratteri nativa"
     },
-    "notifications": {
-      "description": "Riproduce un suono quando Stella termina l'esecuzione di un agente.",
-      "title": "Notifiche sonore"
+    "messageSound": {
+      "description": "Riproduci un suono quando Stella ti invia un messaggio mentre non stai guardando la chat.",
+      "preview": "Ascolta un esempio",
+      "sound": "Suono",
+      "sounds": {
+        "bloop": "Blop",
+        "chime": "Campanello",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Scintillio"
+      },
+      "title": "Suono dei messaggi"
     },
     "onboardingReplay": {
       "action": "Replay",

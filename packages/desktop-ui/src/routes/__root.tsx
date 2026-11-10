@@ -22,6 +22,7 @@ import {
 } from "react";
 import { z } from "zod";
 import { ChatRuntimeProvider } from "@/context/chat-runtime";
+import { ChatMessageAlerts } from "@/features/chat-alerts/ChatMessageAlerts";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useUiState } from "@/context/ui-state";
 import { ChatColumn } from "@/app/chat/ChatColumn";
@@ -451,6 +452,9 @@ function RootLayout() {
         activeConversationId={conversationId}
         isOnChatRoute={isOnChatRoute}
       >
+        {platformCapabilities.nativeBridges ? (
+          <ChatMessageAlerts conversationId={conversationId} isOnChatRoute={isOnChatRoute} />
+        ) : null}
         <RootChrome conversationId={conversationId} />
       </ChatRuntimeProvider>
     </>

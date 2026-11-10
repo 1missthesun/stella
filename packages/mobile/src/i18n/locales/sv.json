@@ -2271,7 +2271,6 @@
       "loadMemory": "Det gick inte att läsa in minnesinställningen.",
       "loadPermissions": "Det gick inte att läsa in behörighetsstatus för skrivbordet.",
       "loadPower": "Det gick inte att läsa in ströminställningen.",
-      "loadSoundNotifications": "Det gick inte att läsa in inställningen för ljudaviseringar.",
       "lockedComputerUseUnavailable": "Datoranvändning vid låst skärm är inte tillgänglig i det här fönstret.",
       "memoryUnavailable": "Minnesinställningar är inte tillgängliga i det här fönstret.",
       "microphoneDeniedReopen": "Mikrofonåtkomst nekades tidigare. Aktivera den i Systeminställningar och öppna sedan Stella igen.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Det gick inte att uppdatera minnesinställningen.",
       "savePermission": "Det gick inte att uppdatera behörigheten {kind}.",
       "savePower": "Det gick inte att uppdatera ströminställningen.",
-      "saveSoundNotifications": "Det gick inte att uppdatera inställningen för ljudaviseringar.",
-      "soundNotificationsUnavailable": "Inställningar för ljudaviseringar är inte tillgängliga i det här fönstret."
+      "saveMessageSound": "Det gick inte att uppdatera inställningen för meddelandeljud."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Kantutjämning i gråskala, som i inbyggda macOS-appar.",
       "title": "Inbyggd teckenutjämning"
     },
-    "notifications": {
-      "description": "Spelar upp ett ljud när Stella slutför en agentkörning.",
-      "title": "Ljudaviseringar"
+    "messageSound": {
+      "description": "Spela upp ett ljud när Stella skickar ett meddelande medan du inte tittar på chatten.",
+      "preview": "Spela upp prov",
+      "sound": "Ljud",
+      "sounds": {
+        "bloop": "Blopp",
+        "chime": "Klockspel",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Glitter"
+      },
+      "title": "Meddelandeljud"
     },
     "onboardingReplay": {
       "action": "Replay",

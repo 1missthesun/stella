@@ -2271,7 +2271,6 @@
       "loadMemory": "Bellek ayarı yüklenemedi.",
       "loadPermissions": "Masaüstü izin durumu yüklenemedi.",
       "loadPower": "Güç ayarı yüklenemedi.",
-      "loadSoundNotifications": "Ses bildirimi ayarı yüklenemedi.",
       "lockedComputerUseUnavailable": "Kilitliyken bilgisayar kullanımı bu pencerede kullanılamıyor.",
       "memoryUnavailable": "Bellek ayarları bu pencerede kullanılamıyor.",
       "microphoneDeniedReopen": "Mikrofon erişimi daha önce reddedildi. Sistem Ayarları'ndan açın, ardından Stella'yı yeniden açın.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Bellek ayarı güncellenemedi.",
       "savePermission": "{kind} izni güncellenemedi.",
       "savePower": "Güç ayarı güncellenemedi.",
-      "saveSoundNotifications": "Ses bildirimi ayarı güncellenemedi.",
-      "soundNotificationsUnavailable": "Ses bildirimi ayarları bu pencerede kullanılamıyor."
+      "saveMessageSound": "Mesaj sesi ayarı güncellenemedi."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Yerel macOS uygulamalarındaki gibi gri tonlamalı kenar yumuşatma.",
       "title": "Yerel yazı tipi yumuşatma"
     },
-    "notifications": {
-      "description": "Stella bir aracı çalıştırmasını tamamladığında bir ses çalar.",
-      "title": "Ses bildirimleri"
+    "messageSound": {
+      "description": "Sohbete bakmıyorken Stella sana mesaj gönderdiğinde bir ses çal.",
+      "preview": "Örneği çal",
+      "sound": "Ses",
+      "sounds": {
+        "bloop": "Blup",
+        "chime": "Çan",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Pırıltı"
+      },
+      "title": "Mesaj sesi"
     },
     "onboardingReplay": {
       "action": "Replay",

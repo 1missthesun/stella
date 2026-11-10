@@ -36,6 +36,12 @@ import {
   normalizeUserAskEscalationPolicy,
   type UserAskEscalationPolicy,
 } from "@stella/contracts/user-ask";
+import {
+  DEFAULT_MESSAGE_SOUND,
+  normalizeMessageSound,
+  type MessageSound,
+  type MessageSoundPreferences,
+} from "@stella/contracts/message-sound";
 
 type AgentEngine = AgentRuntimeEngine;
 export const DEFAULT_CLAUDE_CODE_MODEL = "default";
@@ -81,7 +87,8 @@ export type LocalPreferences = {
   voiceRtcShortcut: string;
   preventComputerSleep: boolean;
   lockedComputerUseEnabled: boolean;
-  soundNotificationsEnabled: boolean;
+  messageSoundEnabled: boolean;
+  messageSound: MessageSound;
   dictationSoundEffectsEnabled: boolean;
   telemetryEnabled: boolean;
   telemetryAccountOffPending: boolean;
@@ -147,7 +154,8 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   voiceRtcShortcut: "CommandOrControl+Shift+D",
   preventComputerSleep: false,
   lockedComputerUseEnabled: false,
-  soundNotificationsEnabled: true,
+  messageSoundEnabled: true,
+  messageSound: DEFAULT_MESSAGE_SOUND,
   dictationSoundEffectsEnabled: true,
   telemetryEnabled: true,
   telemetryAccountOffPending: false,
@@ -244,7 +252,10 @@ const normalizeStoredPreferences = (
       : DEFAULT_PREFERENCES.voiceRtcShortcut,
   preventComputerSleep: parsed.preventComputerSleep === true,
   lockedComputerUseEnabled: parsed.lockedComputerUseEnabled === true,
-  soundNotificationsEnabled: parsed.soundNotificationsEnabled !== false,
+  messageSoundEnabled:
+    (parsed.messageSoundEnabled ??
+      (parsed as { soundNotificationsEnabled?: unknown }).soundNotificationsEnabled) !== false,
+  messageSound: normalizeMessageSound(parsed.messageSound),
   dictationSoundEffectsEnabled: parsed.dictationSoundEffectsEnabled !== false,
   telemetryEnabled: parsed.telemetryEnabled !== false,
   telemetryAccountOffPending: parsed.telemetryAccountOffPending === true,
@@ -714,10 +725,11 @@ export const getPreventComputerSleep = (stellaDataDir: string): boolean => {
   return loadLocalPreferences(stellaDataDir).preventComputerSleep;
 };
 
-export const getSoundNotificationsEnabled = (
+export const getMessageSoundPreferences = (
   stellaDataDir: string,
-): boolean => {
-  return loadLocalPreferences(stellaDataDir).soundNotificationsEnabled;
+): MessageSoundPreferences => {
+  const prefs = loadLocalPreferences(stellaDataDir);
+  return { enabled: prefs.messageSoundEnabled, sound: prefs.messageSound };
 };
 
 export const getTelemetryEnabled = (stellaDataDir: string): boolean => {

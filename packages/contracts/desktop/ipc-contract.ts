@@ -69,6 +69,7 @@ import type {
   LocalModelUsagePage,
 } from "../local-chat.js";
 import type { RealtimeVoicePreferences } from "../local-preferences.js";
+import type { MessageSoundPreferences, UnreadBadge } from "../message-sound.js";
 import type { RuntimeModelCatalogSnapshot } from "../model-catalog.js";
 import type { PiChatEventsPayload, PiChatRequest } from "../pi-chat.js";
 import type {
@@ -327,7 +328,7 @@ import {
   IPC_PREFERENCES_GET_ONBOARDING_COMPLETED,
   IPC_PREFERENCES_GET_PREVENT_SLEEP,
   IPC_PREFERENCES_GET_READ_ALOUD,
-  IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS,
+  IPC_PREFERENCES_GET_MESSAGE_SOUND,
   IPC_PREFERENCES_GET_TELEMETRY,
   IPC_PREFERENCES_GET_WAKE_WORD,
   IPC_PREFERENCES_LIST_CLAUDE_CODE_MODELS,
@@ -339,7 +340,9 @@ import {
   IPC_PREFERENCES_SET_ONBOARDING_COMPLETED,
   IPC_PREFERENCES_SET_PREVENT_SLEEP,
   IPC_PREFERENCES_SET_READ_ALOUD,
-  IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS,
+  IPC_PREFERENCES_SET_MESSAGE_SOUND,
+  IPC_SYSTEM_IS_QUIET,
+  IPC_APP_SET_UNREAD_BADGE,
   IPC_PREFERENCES_SET_TELEMETRY,
   IPC_PREFERENCES_SET_WAKE_WORD,
   IPC_PREFERENCES_WAKE_WORD_CHANGED,
@@ -1030,11 +1033,12 @@ export type IpcInvokeContract = {
     [enabled: boolean],
     LockedComputerUseStatus
   >;
-  [IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS]: Invoke<[], boolean>;
-  [IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS]: Invoke<
-    [enabled: boolean],
-    { enabled: boolean }
+  [IPC_PREFERENCES_GET_MESSAGE_SOUND]: Invoke<[], MessageSoundPreferences>;
+  [IPC_PREFERENCES_SET_MESSAGE_SOUND]: Invoke<
+    [patch: Partial<MessageSoundPreferences>],
+    MessageSoundPreferences
   >;
+  [IPC_SYSTEM_IS_QUIET]: Invoke<[], boolean>;
   [IPC_PREFERENCES_GET_TELEMETRY]: Invoke<[], DesktopTelemetryState>;
   [IPC_PREFERENCES_SET_TELEMETRY]: Invoke<
     [
@@ -1541,6 +1545,7 @@ export type IpcSendContract = {
   [IPC_DICTATION_PLAY_SOUND]: [
     payload: { sound: "startRecording" | "stopRecording" | "cancel" },
   ];
+  [IPC_APP_SET_UNREAD_BADGE]: [badge: UnreadBadge];
   [IPC_COMPANION_HELLO]: [];
   [IPC_COMPANION_HOVER]: [hovered: boolean];
   [IPC_COMPANION_PANEL_STATUS]: [status: CompanionPanelStatus];

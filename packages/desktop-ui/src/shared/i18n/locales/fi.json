@@ -2271,7 +2271,6 @@
       "loadMemory": "Muistiasetuksen lataaminen epäonnistui.",
       "loadPermissions": "Työpöydän käyttöoikeustilan lataaminen epäonnistui.",
       "loadPower": "Virranhallinta-asetuksen lataaminen epäonnistui.",
-      "loadSoundNotifications": "Ääni-ilmoitusasetuksen lataaminen epäonnistui.",
       "lockedComputerUseUnavailable": "Käyttö lukitulla tietokoneella ei ole käytettävissä tässä ikkunassa.",
       "memoryUnavailable": "Muistiasetukset eivät ole käytettävissä tässä ikkunassa.",
       "microphoneDeniedReopen": "Mikrofonin käyttö evättiin aiemmin. Ota se käyttöön Järjestelmäasetuksissa ja avaa Stella uudelleen.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Muistiasetuksen päivitys epäonnistui.",
       "savePermission": "Käyttöoikeuden {kind} päivitys epäonnistui.",
       "savePower": "Virranhallinta-asetuksen päivitys epäonnistui.",
-      "saveSoundNotifications": "Ääni-ilmoitusasetuksen päivitys epäonnistui.",
-      "soundNotificationsUnavailable": "Ääni-ilmoitusasetukset eivät ole käytettävissä tässä ikkunassa."
+      "saveMessageSound": "Viestin ääniasetusta ei voitu päivittää."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Harmaasävyreunanpehmennys kuten natiiveissa macOS-sovelluksissa.",
       "title": "Natiivi fonttien pehmennys"
     },
-    "notifications": {
-      "description": "Toistaa äänen, kun Stella saa agentin ajon valmiiksi.",
-      "title": "Ääni-ilmoitukset"
+    "messageSound": {
+      "description": "Toista ääni, kun Stella lähettää sinulle viestin etkä ole katsomassa keskustelua.",
+      "preview": "Toista näyte",
+      "sound": "Ääni",
+      "sounds": {
+        "bloop": "Bloop",
+        "chime": "Kilahdus",
+        "marimba": "Marimba",
+        "pop": "Poksahdus",
+        "twinkle": "Tuike"
+      },
+      "title": "Viestin ääni"
     },
     "onboardingReplay": {
       "action": "Replay",

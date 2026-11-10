@@ -2271,7 +2271,6 @@
       "loadMemory": "Kunne ikke indlæse hukommelsesindstillingen.",
       "loadPermissions": "Kunne ikke indlæse tilladelsesstatus for skrivebordet.",
       "loadPower": "Kunne ikke indlæse strømindstillingen.",
-      "loadSoundNotifications": "Kunne ikke indlæse indstillingen for lydnotifikationer.",
       "lockedComputerUseUnavailable": "Brug ved låst computer er ikke tilgængelig i dette vindue.",
       "memoryUnavailable": "Hukommelsesindstillinger er ikke tilgængelige i dette vindue.",
       "microphoneDeniedReopen": "Mikrofonadgang blev afvist tidligere. Slå den til i Systemindstillinger, og åbn Stella igen.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Kunne ikke opdatere hukommelsesindstillingen.",
       "savePermission": "Kunne ikke opdatere tilladelsen {kind}.",
       "savePower": "Kunne ikke opdatere strømindstillingen.",
-      "saveSoundNotifications": "Kunne ikke opdatere indstillingen for lydnotifikationer.",
-      "soundNotificationsUnavailable": "Indstillinger for lydnotifikationer er ikke tilgængelige i dette vindue."
+      "saveMessageSound": "Indstillingen for beskedlyd kunne ikke opdateres."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Kantudglatning i gråtoner som i native macOS-apps.",
       "title": "Indbygget skriftudjævning"
     },
-    "notifications": {
-      "description": "Afspiller en lyd, når Stella afslutter en agentkørsel.",
-      "title": "Lydnotifikationer"
+    "messageSound": {
+      "description": "Afspil en lyd, når Stella sender dig en besked, mens du ikke kigger på chatten.",
+      "preview": "Afspil prøve",
+      "sound": "Lyd",
+      "sounds": {
+        "bloop": "Blob",
+        "chime": "Klokkespil",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Glimt"
+      },
+      "title": "Beskedlyd"
     },
     "onboardingReplay": {
       "action": "Replay",

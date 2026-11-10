@@ -2263,7 +2263,6 @@
       "loadMemory": "加载记忆设置失败。",
       "loadPermissions": "加载桌面权限状态失败。",
       "loadPower": "加载电源设置失败。",
-      "loadSoundNotifications": "加载声音通知设置失败。",
       "lockedComputerUseUnavailable": "此窗口中无法使用锁屏时使用电脑。",
       "memoryUnavailable": "此窗口中无法使用记忆设置。",
       "microphoneDeniedReopen": "之前麦克风访问被拒绝。请在系统设置中开启，然后重新打开 Stella。",
@@ -2276,8 +2275,7 @@
       "saveMemory": "更新记忆设置失败。",
       "savePermission": "更新「{kind}」权限失败。",
       "savePower": "更新电源设置失败。",
-      "saveSoundNotifications": "更新声音通知设置失败。",
-      "soundNotificationsUnavailable": "此窗口中无法使用声音通知设置。"
+      "saveMessageSound": "无法更新消息提示音设置。"
     },
     "escalation": {
       "ceiling": {
@@ -2436,9 +2434,18 @@
       "description": "灰度抗锯齿，与原生 macOS 应用一致。",
       "title": "原生字体平滑"
     },
-    "notifications": {
-      "description": "当 Stella 完成一次智能体运行时播放声音。",
-      "title": "声音通知"
+    "messageSound": {
+      "description": "当你没有在看聊天时，Stella 发来消息会播放提示音。",
+      "preview": "试听",
+      "sound": "提示音",
+      "sounds": {
+        "bloop": "咕噜",
+        "chime": "风铃",
+        "marimba": "马林巴",
+        "pop": "啵",
+        "twinkle": "闪烁"
+      },
+      "title": "消息提示音"
     },
     "onboardingReplay": {
       "action": "Replay",

@@ -4,7 +4,6 @@ import { closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
 import { clearSupersededDeviceId as clearStoredSupersededDeviceId, getOrCreateDeviceIdentity, getOrCreateDeviceSigner, } from "@stella/runtime/kernel/home/device";
-import { getSoundNotificationsEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
 import { deleteConnectorAccessTokens, loadConnectorTokenPayload, saveConnectorTokenPayload, } from "@stella/runtime/kernel/connectors/oauth";
 import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-home";
 import { createStellaHostRunner, } from "../stella-host-runner.js";
@@ -259,19 +258,14 @@ export const createHostRunnerHandlers = (context, options) => ({
     displayUpdate: (payload) => {
         broadcastToWindows(context, IPC_DISPLAY_UPDATE, payload);
     },
-    showNotification: ({ title, body, sound }) => {
-        const stellaAppDir = context.state.stellaAppDir;
-        const soundEnabled = stellaAppDir
-            ? getSoundNotificationsEnabled(stellaAppDir)
-            : true;
+    showNotification: ({ title, body }) => {
         showStellaNotification(context, {
             id: `stella-runtime-${Date.now()}`,
             groupId: "stella-runtime",
             groupTitle: "Stella",
             title,
             body,
-            sound: soundEnabled ? sound : undefined,
-            silent: !soundEnabled,
+            silent: true,
         });
     },
     requestDesktopPermission: async (kind) => requestMacPermission(kind),

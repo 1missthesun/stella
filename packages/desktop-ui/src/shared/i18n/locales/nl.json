@@ -2271,7 +2271,6 @@
       "loadMemory": "Geheugeninstelling laden mislukt.",
       "loadPermissions": "Machtigingsstatus van bureaublad laden mislukt.",
       "loadPower": "Energie-instelling laden mislukt.",
-      "loadSoundNotifications": "Instelling voor geluidsmeldingen laden mislukt.",
       "lockedComputerUseUnavailable": "Gebruik bij vergrendelde computer is niet beschikbaar in dit venster.",
       "memoryUnavailable": "Geheugeninstellingen zijn niet beschikbaar in dit venster.",
       "microphoneDeniedReopen": "Microfoontoegang is eerder geweigerd. Schakel deze in via Systeeminstellingen en open Stella opnieuw.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Geheugeninstelling bijwerken mislukt.",
       "savePermission": "Machtiging {kind} bijwerken mislukt.",
       "savePower": "Energie-instelling bijwerken mislukt.",
-      "saveSoundNotifications": "Instelling voor geluidsmeldingen bijwerken mislukt.",
-      "soundNotificationsUnavailable": "Instellingen voor geluidsmeldingen zijn niet beschikbaar in dit venster."
+      "saveMessageSound": "Instelling voor berichtgeluid kon niet worden bijgewerkt."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Anti-aliasing in grijstinten, zoals native macOS-apps.",
       "title": "Native lettertype-afronding"
     },
-    "notifications": {
-      "description": "Speelt een geluid af wanneer Stella een agent-taak voltooit.",
-      "title": "Geluidsmeldingen"
+    "messageSound": {
+      "description": "Speel een geluid af wanneer Stella je een bericht stuurt terwijl je niet naar de chat kijkt.",
+      "preview": "Voorbeeld afspelen",
+      "sound": "Geluid",
+      "sounds": {
+        "bloop": "Bloep",
+        "chime": "Klokje",
+        "marimba": "Marimba",
+        "pop": "Plop",
+        "twinkle": "Fonkeling"
+      },
+      "title": "Berichtgeluid"
     },
     "onboardingReplay": {
       "action": "Replay",

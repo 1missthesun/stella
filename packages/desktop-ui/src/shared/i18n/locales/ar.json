@@ -2303,7 +2303,6 @@
       "loadMemory": "تعذّر تحميل إعداد الذاكرة.",
       "loadPermissions": "تعذّر تحميل حالة أذونات سطح المكتب.",
       "loadPower": "تعذّر تحميل إعداد الطاقة.",
-      "loadSoundNotifications": "تعذّر تحميل إعداد الإشعارات الصوتية.",
       "lockedComputerUseUnavailable": "استخدام الكمبيوتر عند القفل غير متاح في هذه النافذة.",
       "memoryUnavailable": "إعدادات الذاكرة غير متاحة في هذه النافذة.",
       "microphoneDeniedReopen": "تم رفض الوصول إلى الميكروفون سابقًا. فعّله في إعدادات النظام، ثم أعد فتح Stella.",
@@ -2316,8 +2315,7 @@
       "saveMemory": "تعذّر تحديث إعداد الذاكرة.",
       "savePermission": "تعذّر تحديث إذن {kind}.",
       "savePower": "تعذّر تحديث إعداد الطاقة.",
-      "saveSoundNotifications": "تعذّر تحديث إعداد الإشعارات الصوتية.",
-      "soundNotificationsUnavailable": "إعدادات الإشعارات الصوتية غير متاحة في هذه النافذة."
+      "saveMessageSound": "تعذّر تحديث إعداد صوت الرسائل."
     },
     "escalation": {
       "ceiling": {
@@ -2476,9 +2474,18 @@
       "description": "تنعيم بتدرج الرمادي، مثل تطبيقات macOS الأصلية.",
       "title": "تنعيم الخطوط الأصلي"
     },
-    "notifications": {
-      "description": "تشغيل صوت عندما تُنهي Stella تشغيل وكيل.",
-      "title": "إشعارات صوتية"
+    "messageSound": {
+      "description": "تشغيل صوت عندما ترسل لك Stella رسالة وأنت لا تنظر إلى المحادثة.",
+      "preview": "تشغيل عيّنة",
+      "sound": "الصوت",
+      "sounds": {
+        "bloop": "بلوب",
+        "chime": "رنين",
+        "marimba": "ماريمبا",
+        "pop": "فرقعة",
+        "twinkle": "تلألؤ"
+      },
+      "title": "صوت الرسائل"
     },
     "onboardingReplay": {
       "action": "Replay",

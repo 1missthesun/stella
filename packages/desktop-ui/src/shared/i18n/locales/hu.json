@@ -2271,7 +2271,6 @@
       "loadMemory": "Nem sikerült betölteni a memóriabeállítást.",
       "loadPermissions": "Nem sikerült betölteni az asztali engedélyek állapotát.",
       "loadPower": "Nem sikerült betölteni az energiabeállítást.",
-      "loadSoundNotifications": "Nem sikerült betölteni a hangértesítések beállítását.",
       "lockedComputerUseUnavailable": "A zárolt állapotú számítógép-használat nem érhető el ebben az ablakban.",
       "memoryUnavailable": "A memóriabeállítások nem érhetők el ebben az ablakban.",
       "microphoneDeniedReopen": "A mikrofon-hozzáférést korábban elutasították. Kapcsold be a Rendszerbeállításokban, majd nyisd meg újra a Stellát.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Nem sikerült frissíteni a memóriabeállítást.",
       "savePermission": "Nem sikerült frissíteni a(z) {kind} engedélyt.",
       "savePower": "Nem sikerült frissíteni az energiabeállítást.",
-      "saveSoundNotifications": "Nem sikerült frissíteni a hangértesítések beállítását.",
-      "soundNotificationsUnavailable": "A hangértesítések beállításai nem érhetők el ebben az ablakban."
+      "saveMessageSound": "Az üzenethang beállítását nem sikerült frissíteni."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Szürkeárnyalatos élsimítás, mint a natív macOS-alkalmazásokban.",
       "title": "Natív betűsimítás"
     },
-    "notifications": {
-      "description": "Hangot játszik le, amikor a Stella befejez egy ügynökfuttatást.",
-      "title": "Hangértesítések"
+    "messageSound": {
+      "description": "Hang lejátszása, amikor Stella üzenetet küld, miközben nem a csevegést nézed.",
+      "preview": "Minta lejátszása",
+      "sound": "Hang",
+      "sounds": {
+        "bloop": "Blop",
+        "chime": "Csengettyű",
+        "marimba": "Marimba",
+        "pop": "Pukkanás",
+        "twinkle": "Csillogás"
+      },
+      "title": "Üzenethang"
     },
     "onboardingReplay": {
       "action": "Replay",

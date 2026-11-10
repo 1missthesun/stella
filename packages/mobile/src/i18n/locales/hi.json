@@ -2271,7 +2271,6 @@
       "loadMemory": "मेमोरी सेटिंग लोड करने में विफल।",
       "loadPermissions": "डेस्कटॉप अनुमति स्थिति लोड करने में विफल।",
       "loadPower": "पावर सेटिंग लोड करने में विफल।",
-      "loadSoundNotifications": "ध्वनि सूचना सेटिंग लोड करने में विफल।",
       "lockedComputerUseUnavailable": "इस विंडो में लॉक होने पर कंप्यूटर उपयोग उपलब्ध नहीं है।",
       "memoryUnavailable": "इस विंडो में मेमोरी सेटिंग्स उपलब्ध नहीं हैं।",
       "microphoneDeniedReopen": "माइक्रोफ़ोन एक्सेस पहले अस्वीकृत किया गया था। इसे सिस्टम सेटिंग्स में चालू करें, फिर Stella दोबारा खोलें।",
@@ -2284,8 +2283,7 @@
       "saveMemory": "मेमोरी सेटिंग अपडेट करने में विफल।",
       "savePermission": "{kind} अनुमति अपडेट करने में विफल।",
       "savePower": "पावर सेटिंग अपडेट करने में विफल।",
-      "saveSoundNotifications": "ध्वनि सूचना सेटिंग अपडेट करने में विफल।",
-      "soundNotificationsUnavailable": "इस विंडो में ध्वनि सूचना सेटिंग्स उपलब्ध नहीं हैं।"
+      "saveMessageSound": "संदेश ध्वनि सेटिंग अपडेट नहीं हो सकी।"
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "ग्रेस्केल एंटी-एलियासिंग, नेटिव macOS ऐप्स जैसी।",
       "title": "नेटिव फ़ॉन्ट स्मूदिंग"
     },
-    "notifications": {
-      "description": "जब Stella किसी एजेंट का रन पूरा करती है तो एक ध्वनि बजाएँ।",
-      "title": "ध्वनि सूचनाएँ"
+    "messageSound": {
+      "description": "जब आप चैट नहीं देख रहे हों और Stella आपको संदेश भेजे, तब एक ध्वनि बजाएँ।",
+      "preview": "नमूना चलाएँ",
+      "sound": "ध्वनि",
+      "sounds": {
+        "bloop": "ब्लूप",
+        "chime": "घंटी",
+        "marimba": "मरिम्बा",
+        "pop": "पॉप",
+        "twinkle": "झिलमिल"
+      },
+      "title": "संदेश ध्वनि"
     },
     "onboardingReplay": {
       "action": "Replay",

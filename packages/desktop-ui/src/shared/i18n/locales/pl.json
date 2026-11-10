@@ -2287,7 +2287,6 @@
       "loadMemory": "Nie udało się wczytać ustawienia pamięci.",
       "loadPermissions": "Nie udało się wczytać statusu uprawnień pulpitu.",
       "loadPower": "Nie udało się wczytać ustawienia zasilania.",
-      "loadSoundNotifications": "Nie udało się wczytać ustawienia powiadomień dźwiękowych.",
       "lockedComputerUseUnavailable": "Użycie przy zablokowanym komputerze jest niedostępne w tym oknie.",
       "memoryUnavailable": "Ustawienia pamięci są niedostępne w tym oknie.",
       "microphoneDeniedReopen": "Dostęp do mikrofonu został wcześniej odrzucony. Włącz go w Ustawieniach systemowych, a następnie otwórz Stellę ponownie.",
@@ -2300,8 +2299,7 @@
       "saveMemory": "Nie udało się zaktualizować ustawienia pamięci.",
       "savePermission": "Nie udało się zaktualizować uprawnienia {kind}.",
       "savePower": "Nie udało się zaktualizować ustawienia zasilania.",
-      "saveSoundNotifications": "Nie udało się zaktualizować ustawienia powiadomień dźwiękowych.",
-      "soundNotificationsUnavailable": "Ustawienia powiadomień dźwiękowych są niedostępne w tym oknie."
+      "saveMessageSound": "Nie udało się zaktualizować ustawienia dźwięku wiadomości."
     },
     "escalation": {
       "ceiling": {
@@ -2460,9 +2458,18 @@
       "description": "Wygładzanie w skali szarości, jak w natywnych aplikacjach macOS.",
       "title": "Natywne wygładzanie czcionek"
     },
-    "notifications": {
-      "description": "Odtwarza dźwięk, gdy Stella kończy działanie agenta.",
-      "title": "Powiadomienia dźwiękowe"
+    "messageSound": {
+      "description": "Odtwarzaj dźwięk, gdy Stella wyśle Ci wiadomość, a Ty nie patrzysz na czat.",
+      "preview": "Odtwórz próbkę",
+      "sound": "Dźwięk",
+      "sounds": {
+        "bloop": "Bulp",
+        "chime": "Dzwonek",
+        "marimba": "Marimba",
+        "pop": "Pyk",
+        "twinkle": "Migotanie"
+      },
+      "title": "Dźwięk wiadomości"
     },
     "onboardingReplay": {
       "action": "Replay",

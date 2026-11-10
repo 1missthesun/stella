@@ -2279,7 +2279,6 @@
       "loadMemory": "Échec du chargement du réglage de mémoire.",
       "loadPermissions": "Échec du chargement de l'état des autorisations du bureau.",
       "loadPower": "Échec du chargement du réglage d'alimentation.",
-      "loadSoundNotifications": "Échec du chargement du réglage des notifications sonores.",
       "lockedComputerUseUnavailable": "L'utilisation de l'ordinateur verrouillé n'est pas disponible dans cette fenêtre.",
       "memoryUnavailable": "Les réglages de mémoire ne sont pas disponibles dans cette fenêtre.",
       "microphoneDeniedReopen": "L'accès au microphone a été refusé auparavant. Activez-le dans les Réglages système, puis rouvrez Stella.",
@@ -2292,8 +2291,7 @@
       "saveMemory": "Échec de la mise à jour du réglage de mémoire.",
       "savePermission": "Échec de la mise à jour de l'autorisation {kind}.",
       "savePower": "Échec de la mise à jour du réglage d'alimentation.",
-      "saveSoundNotifications": "Échec de la mise à jour du réglage des notifications sonores.",
-      "soundNotificationsUnavailable": "Les réglages des notifications sonores ne sont pas disponibles dans cette fenêtre."
+      "saveMessageSound": "Impossible de mettre à jour le réglage du son des messages."
     },
     "escalation": {
       "ceiling": {
@@ -2452,9 +2450,18 @@
       "description": "Lissage en niveaux de gris, comme les apps macOS natives.",
       "title": "Lissage des polices natif"
     },
-    "notifications": {
-      "description": "Joue un son lorsque Stella termine l'exécution d'un agent.",
-      "title": "Notifications sonores"
+    "messageSound": {
+      "description": "Jouer un son quand Stella vous envoie un message alors que vous ne regardez pas la conversation.",
+      "preview": "Écouter un extrait",
+      "sound": "Son",
+      "sounds": {
+        "bloop": "Bloup",
+        "chime": "Carillon",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Scintillement"
+      },
+      "title": "Son des messages"
     },
     "onboardingReplay": {
       "action": "Replay",

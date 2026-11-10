@@ -500,7 +500,6 @@ export const piChatsFor = (
           .request(METHOD_NAMES.HOST_NOTIFICATION_SHOW, {
             title: agent.description.trim() || "Task complete",
             body: "",
-            sound: "Glass",
           })
           .catch((error) => console.debug("[pi-chat] agent notification failed", error));
       },

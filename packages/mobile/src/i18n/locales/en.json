@@ -2271,7 +2271,6 @@
       "loadMemory": "Failed to load memory setting.",
       "loadPermissions": "Failed to load desktop permission status.",
       "loadPower": "Failed to load power setting.",
-      "loadSoundNotifications": "Failed to load sound notification setting.",
       "lockedComputerUseUnavailable": "Locked computer use is unavailable in this window.",
       "memoryUnavailable": "Memory settings are unavailable in this window.",
       "microphoneDeniedReopen": "Microphone access was denied earlier. Turn it on in System Settings — Stella updates automatically.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Failed to update memory setting.",
       "savePermission": "Failed to update {kind} permission.",
       "savePower": "Failed to update power setting.",
-      "saveSoundNotifications": "Failed to update sound notification setting.",
-      "soundNotificationsUnavailable": "Sound notification settings are unavailable in this window."
+      "saveMessageSound": "Failed to update the message sound setting."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Grayscale anti-aliasing, like native macOS apps.",
       "title": "Native font smoothing"
     },
-    "notifications": {
-      "description": "Play a sound when Stella finishes an agent run.",
-      "title": "Sound notifications"
+    "messageSound": {
+      "description": "Play a sound when Stella sends you a message while you're not looking at the chat.",
+      "preview": "Play sample",
+      "sound": "Sound",
+      "sounds": {
+        "bloop": "Bloop",
+        "chime": "Chime",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Twinkle"
+      },
+      "title": "Message sound"
     },
     "onboardingReplay": {
       "action": "Replay",

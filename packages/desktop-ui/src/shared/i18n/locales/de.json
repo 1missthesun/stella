@@ -2271,7 +2271,6 @@
       "loadMemory": "Erinnerungseinstellung konnte nicht geladen werden.",
       "loadPermissions": "Berechtigungsstatus des Desktops konnte nicht geladen werden.",
       "loadPower": "Energieeinstellung konnte nicht geladen werden.",
-      "loadSoundNotifications": "Einstellung für Tonbenachrichtigungen konnte nicht geladen werden.",
       "lockedComputerUseUnavailable": "Nutzung bei gesperrtem Computer ist in diesem Fenster nicht verfügbar.",
       "memoryUnavailable": "Erinnerungseinstellungen sind in diesem Fenster nicht verfügbar.",
       "microphoneDeniedReopen": "Der Mikrofonzugriff wurde zuvor abgelehnt. Aktiviere ihn in den Systemeinstellungen und öffne Stella dann neu.",
@@ -2284,8 +2283,7 @@
       "saveMemory": "Erinnerungseinstellung konnte nicht aktualisiert werden.",
       "savePermission": "Berechtigung „{kind}“ konnte nicht aktualisiert werden.",
       "savePower": "Energieeinstellung konnte nicht aktualisiert werden.",
-      "saveSoundNotifications": "Einstellung für Tonbenachrichtigungen konnte nicht aktualisiert werden.",
-      "soundNotificationsUnavailable": "Einstellungen für Tonbenachrichtigungen sind in diesem Fenster nicht verfügbar."
+      "saveMessageSound": "Einstellung für den Nachrichtenton konnte nicht aktualisiert werden."
     },
     "escalation": {
       "ceiling": {
@@ -2444,9 +2442,18 @@
       "description": "Graustufen-Kantenglättung wie bei nativen macOS-Apps.",
       "title": "Native Schriftglättung"
     },
-    "notifications": {
-      "description": "Spielt einen Ton ab, wenn Stella einen Agentenlauf beendet.",
-      "title": "Tonbenachrichtigungen"
+    "messageSound": {
+      "description": "Spielt einen Ton ab, wenn Stella dir eine Nachricht schickt, während du nicht in den Chat schaust.",
+      "preview": "Probe abspielen",
+      "sound": "Ton",
+      "sounds": {
+        "bloop": "Blubb",
+        "chime": "Glockenspiel",
+        "marimba": "Marimba",
+        "pop": "Plopp",
+        "twinkle": "Funkeln"
+      },
+      "title": "Nachrichtenton"
     },
     "onboardingReplay": {
       "action": "Replay",

@@ -2279,7 +2279,6 @@
       "loadMemory": "Falha ao carregar a configuração de memória.",
       "loadPermissions": "Falha ao carregar o status das permissões do desktop.",
       "loadPower": "Falha ao carregar a configuração de energia.",
-      "loadSoundNotifications": "Falha ao carregar a configuração de notificações sonoras.",
       "lockedComputerUseUnavailable": "O uso com o computador bloqueado não está disponível nesta janela.",
       "memoryUnavailable": "As configurações de memória não estão disponíveis nesta janela.",
       "microphoneDeniedReopen": "O acesso ao microfone foi negado antes. Ative-o nos Ajustes do sistema e reabra a Stella.",
@@ -2292,8 +2291,7 @@
       "saveMemory": "Falha ao atualizar a configuração de memória.",
       "savePermission": "Falha ao atualizar a permissão de {kind}.",
       "savePower": "Falha ao atualizar a configuração de energia.",
-      "saveSoundNotifications": "Falha ao atualizar a configuração de notificações sonoras.",
-      "soundNotificationsUnavailable": "As configurações de notificações sonoras não estão disponíveis nesta janela."
+      "saveMessageSound": "Não foi possível atualizar a configuração do som de mensagens."
     },
     "escalation": {
       "ceiling": {
@@ -2452,9 +2450,18 @@
       "description": "Suavização em tons de cinza, como apps nativos do macOS.",
       "title": "Suavização de fontes nativa"
     },
-    "notifications": {
-      "description": "Toca um som quando a Stella termina a execução de um agente.",
-      "title": "Notificações sonoras"
+    "messageSound": {
+      "description": "Toca um som quando a Stella te envia uma mensagem enquanto você não está olhando o chat.",
+      "preview": "Ouvir amostra",
+      "sound": "Som",
+      "sounds": {
+        "bloop": "Blup",
+        "chime": "Sininho",
+        "marimba": "Marimba",
+        "pop": "Pop",
+        "twinkle": "Brilho"
+      },
+      "title": "Som de mensagens"
     },
     "onboardingReplay": {
       "action": "Replay",

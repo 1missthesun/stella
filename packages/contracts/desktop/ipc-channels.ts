@@ -220,6 +220,9 @@ export const IPC_SHELL_SAVE_FILE_AS = "shell:saveFileAs" as const;
 export const IPC_SHELL_LIST_OPENERS = "shell:listExternalOpeners" as const;
 export const IPC_SHELL_OPEN_WITH = "shell:openWithExternal" as const;
 export const IPC_SHELL_OPEN_PATH = "shell:openPath" as const;
+export const IPC_CONTEXT_MENU_COLLECT = "contextMenu:collect" as const;
+export const IPC_CONTEXT_MENU_ITEMS = "contextMenu:items" as const;
+export const IPC_CONTEXT_MENU_SELECT = "contextMenu:select" as const;
 export const IPC_PREFERENCES_GET_MODELS =
   "preferences:getLocalModelPreferences" as const;
 export const IPC_PREFERENCES_SET_MODELS =

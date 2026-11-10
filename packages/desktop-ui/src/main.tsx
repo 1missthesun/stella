@@ -11,12 +11,14 @@ import { applyLowPowerDocumentFlag } from "./shared/lib/device-perf";
 import "./shared/lib/native-font-smoothing";
 import { installRendererErrorReporting } from "./platform/diagnostics/report-error";
 import { AppRoot } from "./app-root";
+import { installContextMenus } from "./platform/context-menu/context-menu";
 import { prefetchAuthSessionBeforeRender } from "./global/auth/services/auth-session";
 import { startDomState } from "./platform/view-state/dom-state";
 import { mountApp } from "./platform/swap/app-mount";
 
 applyLowPowerDocumentFlag();
 installRendererErrorReporting();
+installContextMenus();
 prefetchAuthSessionBeforeRender();
 if (import.meta.env.VITE_STELLA_WEB_BUILD === "1") {
   void import("./platform/web-renderer-switch").then((module) =>

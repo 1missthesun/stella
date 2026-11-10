@@ -346,6 +346,8 @@
   min-width: 0;
   min-height: 0;
   padding: 2px 10px 8px;
+  /* A right-click here is about the thumbnail, not the caption's words. */
+  user-select: none;
 }
 
 .viewer-strip__list {

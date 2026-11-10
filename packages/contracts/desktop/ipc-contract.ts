@@ -128,6 +128,11 @@ import type {
   OnboardingSynthesisResponse,
 } from "./onboarding.js";
 import type { UiState } from "./ui.js";
+import type {
+  ContextMenuCollectReply,
+  ContextMenuCollectRequest,
+  ContextMenuSelection,
+} from "./context-menu.js";
 import {
   IPC_PI_CHAT_EVENTS,
   IPC_PI_CHAT_REQUEST,
@@ -226,6 +231,9 @@ import {
   IPC_COMPANION_SET_EXPANDED,
   IPC_COMPANION_SET_VISIBLE,
   IPC_COMPANION_SHOW_CONTEXT_MENU,
+  IPC_CONTEXT_MENU_COLLECT,
+  IPC_CONTEXT_MENU_ITEMS,
+  IPC_CONTEXT_MENU_SELECT,
   IPC_COMPANION_STATE,
   IPC_COMPANION_STOP,
   IPC_COMPANION_STOP_REQUESTED,
@@ -1679,6 +1687,7 @@ export type IpcSendContract = {
   [IPC_COMPANION_PUBLISH_STATE]: [state: CompanionState];
   [IPC_SHELL_OPEN_EXTERNAL]: [url: string];
   [IPC_SHELL_SHOW_IN_FOLDER]: [filePath: string];
+  [IPC_CONTEXT_MENU_ITEMS]: [reply: ContextMenuCollectReply];
   [IPC_DIAGNOSTICS_REPORT_ERROR]: [
     payload: {
       message?: string;
@@ -1756,6 +1765,8 @@ export type IpcEventContract = {
   [IPC_SCHEDULE_UPDATED]: void;
   [IPC_DISPLAY_CANVAS_HTML_CHANGED]: void;
   [IPC_LOCAL_CHAT_UPDATED]: LocalChatUpdatedPayload | null;
+  [IPC_CONTEXT_MENU_COLLECT]: ContextMenuCollectRequest;
+  [IPC_CONTEXT_MENU_SELECT]: ContextMenuSelection;
 };
 
 export type IpcInvokeChannel = keyof IpcInvokeContract;

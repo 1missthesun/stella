@@ -2,6 +2,7 @@ import type { EvidenceCard } from "@stella/contracts/chat-evidence";
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 import { Archive, FileSpreadsheet, FileText, Folder, Globe } from "@/ui/icons";
 import { openLocalPathOrExplain } from "@/features/chat/lib/open-local-path";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
 
 const GlyphFor = ({ card }: { card: EvidenceCard }) => {
   if (card.kind === "table") return <FileSpreadsheet size={13} />;
@@ -26,6 +27,12 @@ export const AttachmentPill = ({ card }: { card: EvidenceCard }) => (
       const target = card.sourcePaths[0];
       if (target) openLocalPathOrExplain(target);
     }}
+    onContextMenu={contextMenu(async () => {
+      const target = card.sourcePaths[0];
+      return target
+        ? await fileMenu(target, { open: () => openLocalPathOrExplain(target) })()
+        : null;
+    })}
   >
     <span className="attachment-pill__glyph" aria-hidden="true">
       <GlyphFor card={card} />

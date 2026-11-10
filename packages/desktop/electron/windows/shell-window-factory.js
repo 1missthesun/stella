@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { loadWindow } from './window-load.js';
+import { installContextMenu } from '../services/context-menu-service.js';
 const shouldOpenDevTools = process.env.STELLA_OPEN_DEVTOOLS === '1';
 const loadShellMainWindow = (window, options) => {
     loadWindow(window, { mode: options.mode });
@@ -8,6 +9,7 @@ const loadShellMainWindow = (window, options) => {
 export const createShellWindow = (options) => {
     const window = options.createWindow();
     options.setupExternalLinkHandlers(window);
+    installContextMenu(window.webContents, { askRenderer: true });
     if (shouldOpenDevTools) {
         window.webContents.openDevTools();
     }

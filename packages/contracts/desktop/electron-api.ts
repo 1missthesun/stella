@@ -108,6 +108,9 @@ import {
   IPC_COMPANION_SET_EXPANDED,
   IPC_COMPANION_SET_VISIBLE,
   IPC_COMPANION_SHOW_CONTEXT_MENU,
+  IPC_CONTEXT_MENU_COLLECT,
+  IPC_CONTEXT_MENU_ITEMS,
+  IPC_CONTEXT_MENU_SELECT,
   IPC_COMPANION_STATE,
   IPC_COMPANION_STOP,
   IPC_COMPANION_STOP_REQUESTED,
@@ -892,6 +895,12 @@ export const createElectronApi = (
       getExtensionClients: invoker(IPC_BROWSER_EXTENSION_GET_CLIENTS),
       setExtensionRouting: invoker(IPC_BROWSER_EXTENSION_SET_ROUTING),
       onExtensionClients: on(IPC_BROWSER_EXTENSION_CLIENTS_CHANGED),
+    },
+
+    contextMenu: {
+      onCollect: on(IPC_CONTEXT_MENU_COLLECT),
+      reply: sender(IPC_CONTEXT_MENU_ITEMS),
+      onSelect: on(IPC_CONTEXT_MENU_SELECT),
     },
 
     media: {

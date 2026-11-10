@@ -11,9 +11,10 @@ import {
 import type { ConversationFileEntry } from "@/features/workspace-display/derive-conversation-files";
 import { getDisplayPayloadTitle } from "@stella/contracts/desktop/display-payload";
 import { OpenWithMenu } from "./OpenWithMenu";
-import { useT, useTPlural } from "@/shared/i18n";
+import { translateNow, useT, useTPlural } from "@/shared/i18n";
 import { useOpenConversationFile } from "@/features/cloud/use-cloud-drive-open";
 import "./agent-activity-row.css";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
 
 const PILL_CAP = 5;
 
@@ -36,6 +37,11 @@ const FilePillView = ({
       className="agent-activity-files__pill"
       title={entry.path}
       onClick={(event) => event.stopPropagation()}
+      onContextMenu={contextMenu(
+        localFilePath
+          ? fileMenu(localFilePath, { open: onOpen })
+          : () => [[{ label: translateNow("contextMenu.open"), run: onOpen }]],
+      )}
     >
       <button
         type="button"

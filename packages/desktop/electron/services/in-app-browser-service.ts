@@ -49,6 +49,7 @@ import {
   type ManagedTab,
 } from "./in-app-browser/tab-registry.js";
 import { OffscreenTabs } from "./in-app-browser/offscreen-tabs.js";
+import { installContextMenu } from "./context-menu-service.js";
 
 export type InAppBrowserPreview = {
   view: WebContentsView;
@@ -1055,6 +1056,27 @@ export class InAppBrowserService {
 
   private bindTab(tab: ManagedTab) {
     const contents = tab.view.webContents;
+    if (tab.ownerId === MANUAL_OWNER_ID && !tab.preview) {
+      installContextMenu(contents, {
+        askRenderer: false,
+        browser: {
+          window: () => this.options.getWindow(),
+          openInNewTab: (url) => {
+            void this.createTab({ url, ownerId: tab.ownerId }).catch((error) => {
+              this.setError(errorMessage(error), tab.ownerId);
+            });
+          },
+          search: (text) => {
+            void this.createTab({
+              url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
+              ownerId: tab.ownerId,
+            }).catch((error) => {
+              this.setError(errorMessage(error), tab.ownerId);
+            });
+          },
+        },
+      });
+    }
     const refresh = () => this.syncState();
     contents.on("did-start-loading", () => {
       tab.loading = true;

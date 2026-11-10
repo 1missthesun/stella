@@ -10,6 +10,8 @@ import { cloudDriveEntry } from "@/features/workspace-display/derive-conversatio
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { buildPayloadFromBarePath } from "@/features/chat/lib/derive-turn-resource";
 import { WaveformTile } from "./WaveformTile";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
+import { translateNow } from "@/shared/i18n";
 
 const VISUAL_KINDS: ReadonlySet<EvidenceCard["kind"]> = new Set([
   "image",
@@ -74,6 +76,21 @@ export const MediaTile = ({
       className="media-tile"
       data-kind={card.kind}
       style={{ width: `${EVIDENCE_TILE_WIDTH[card.kind]}px` }}
+      onContextMenu={contextMenu(
+        async () => {
+          const target = card.sourcePaths[card.sourcePaths.length - 1];
+          if (!target) return null;
+          const open = () => openCardSource(card);
+          if (driveLinkPath(target)) {
+            return [[{ label: translateNow("contextMenu.open"), run: open }]];
+          }
+          return await fileMenu(target, {
+            open,
+            image: card.kind === "image" || card.kind === "stack",
+          })();
+        },
+        { claims: ["image"] },
+      )}
     >
       <div className="media-tile__frame">
         <button

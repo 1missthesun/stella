@@ -67,6 +67,8 @@ import { useReplyHandoffArrival } from "@/app/chat/reply-handoff";
 import { useMessageReply } from "@/app/chat/message-reply-context";
 import { truncateChipLabel } from "@/features/chat/composer-context";
 import { primaryCopyAttachment } from "@/app/chat/message-copy-attachment";
+import { messageMenu } from "@/app/chat/message-context-menu";
+import { contextMenu } from "@/platform/context-menu";
 import {
   ContextPill,
   FileAttachmentChip,
@@ -536,6 +538,15 @@ export const UserMessageRow = memo(
         style={entranceStyle(entrance.delayMs)}
         onAnimationEnd={entrance.onAnimationEnd}
         data-chat-row-id={row.id}
+        onContextMenu={contextMenu(
+          messageMenu({
+            text,
+            messageKey: row.id,
+            copyAttachment,
+            onReply: reply,
+            sendFailed: Boolean(row.sendFailed),
+          }),
+        )}
       >
         {chips.length > 0 && <UserContextChips chips={chips} />}
         <AttachmentTileRow
@@ -747,6 +758,18 @@ export const AssistantMessageRow = memo(
         data-chat-row-id={row.id}
         data-scroll-follow-key={row.id}
         data-react-key={row.id}
+        onContextMenu={contextMenu(
+          messageMenu({
+            text: hasBody ? text : "",
+            messageKey: row.id,
+            renderedText: () =>
+              rowRef.current?.querySelector<HTMLElement>(
+                ".assistant-message-text .markdown",
+              )?.innerText ?? null,
+            onReply: row.isIntraTurn ? null : reply,
+            readAloud: !row.isIntraTurn,
+          }),
+        )}
       >
         <div className="event-item assistant">
           {hasVoiceSession && row.voiceSession && (

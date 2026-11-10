@@ -18,6 +18,7 @@ import type { IconComponent } from "@/ui/icons";
 import { draftOf, sameTiming, scheduleOf, type EveryUnit, type TimingDraft } from "./schedule-editing";
 import "./updates-section.css";
 import "./schedule-section.css";
+import { contextMenu } from "@/platform/context-menu";
 
 type Translate = ReturnType<typeof useT>;
 
@@ -376,6 +377,28 @@ function ScheduleItem({
       data-paused={job.enabled ? undefined : "true"}
       data-busy={busy || undefined}
       data-focused={focusedAt !== null || undefined}
+      onContextMenu={contextMenu(() => [
+        [
+          {
+            label: job.enabled ? t("schedule.pause") : t("schedule.resume"),
+            enabled: !busy,
+            run: () => act(() => api.update(job.id, { enabled: !job.enabled })),
+          },
+          {
+            label: t("schedule.edit.title"),
+            enabled: !busy,
+            run: editing ? onEditDone : onEdit,
+          },
+        ],
+        [
+          {
+            // Arms the row's own confirm, as clicking its bin does.
+            label: t("schedule.delete"),
+            enabled: !busy,
+            run: () => setConfirmDelete(true),
+          },
+        ],
+      ])}
     >
       <div className="schedule-section__row">
         <span className="schedule-section__glyph" aria-hidden="true">

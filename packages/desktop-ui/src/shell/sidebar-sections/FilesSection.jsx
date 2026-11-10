@@ -66,6 +66,8 @@ import {
   unrestorableFileMessage,
 } from "./file-tab-restore";
 import "./files-section.css";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
+import { translateNow } from "@/shared/i18n";
 export const WORK_PAGE_SIZE = 50;
 export const WORK_PAGE_END_THRESHOLD_PX = 160;
 const DRIVE_LIST_LIMIT = 200;
@@ -533,7 +535,32 @@ export function WorkList({
                         />
                       </li>
                     ) : (
-                      <li key={item.id} className="files-list__item">
+                      <li
+                        key={item.id}
+                        className="files-list__item"
+                        onContextMenu={contextMenu(async () => {
+                          const open = () =>
+                            openDisplayPayloadTab(item.entry.payload);
+                          const own =
+                            item.entry.source === "drive" || !item.entry.filePath
+                              ? [[{ label: translateNow("contextMenu.open"), run: open }]]
+                              : await fileMenu(item.entry.filePath, {
+                                  open,
+                                  image: item.entry.kind === "image",
+                                })();
+                          return item.entry.source === "drive"
+                            ? own
+                            : [
+                                ...own,
+                                [
+                                  {
+                                    label: translateNow("contextMenu.removeFromList"),
+                                    run: () => forgetEntry(item.entry),
+                                  },
+                                ],
+                              ];
+                        })}
+                      >
                         <button
                           type="button"
                           className="files-list__open"

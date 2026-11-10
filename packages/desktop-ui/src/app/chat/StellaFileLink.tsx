@@ -12,7 +12,8 @@ import {
 import { useOpenConversationFile } from "@/features/cloud/use-cloud-drive-open";
 import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
 import { basenameOf } from "@/features/workspace-display/path-to-viewer";
-import { useT } from "@/shared/i18n";
+import { translateNow, useT } from "@/shared/i18n";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
 
 type StellaFileLinkProps = {
   path?: unknown;
@@ -51,6 +52,10 @@ const CloudDriveFileLink = ({
       className="markdown-stella-file"
       title={drivePath}
       onClick={open}
+      onContextMenu={contextMenu(
+        () => [[{ label: translateNow("contextMenu.open"), run: open }]],
+        { claims: ["link"] },
+      )}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -134,6 +139,9 @@ const LocalStellaFileLink = ({
       }
       onClick={open}
       onKeyDown={handleKeyDown}
+      onContextMenu={contextMenu(fileMenu(filePath, { open }), {
+        claims: ["link"],
+      })}
     >
       {display}
     </a>

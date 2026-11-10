@@ -9,7 +9,7 @@ import {
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 import type { ChatContext, ChatContextFile } from "@/shared/types/electron";
 import { cn } from "@/shared/lib/utils";
-import { useT } from "@/shared/i18n";
+import { translateNow, useT } from "@/shared/i18n";
 import {
   AppWindowMac,
   Archive,
@@ -52,6 +52,7 @@ import {
   truncateChipLabel,
 } from "@/features/chat/composer-context";
 import "./composer-context.css";
+import { contextMenu, copyImage, fileMenu } from "@/platform/context-menu";
 
 type SetChatContext = Dispatch<SetStateAction<ChatContext | null>>;
 
@@ -447,7 +448,24 @@ export function ImageAttachmentChip({
 }: ImageAttachmentChipProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   return (
-    <span className="attachment-tile-shell composer-chip-shell">
+    <span
+      className="attachment-tile-shell composer-chip-shell"
+      onContextMenu={contextMenu(
+        () => [
+          [{ label: translateNow("contextMenu.open"), run: () => setPreviewOpen(true) }],
+          [
+            {
+              label: translateNow("contextMenu.copyImage"),
+              run: () => copyImage({ src: fullImageUrl }),
+            },
+          ],
+          ...(onRemove
+            ? [[{ label: translateNow("contextMenu.remove"), run: onRemove }]]
+            : []),
+        ],
+        { claims: ["image"] },
+      )}
+    >
       <button
         type="button"
         className={cn("attachment-tile attachment-tile--image", chipClassName)}
@@ -591,7 +609,20 @@ export function FileAttachmentChip({
   const canOpen = Boolean(path);
   const displayName = fileDisplayName(name);
   return (
-    <span className="attachment-tile-shell composer-chip-shell">
+    <span
+      className="attachment-tile-shell composer-chip-shell"
+      onContextMenu={contextMenu(async () => [
+        ...(path
+          ? await fileMenu(path, {
+              open: () => void getElectronApi()?.system?.openPath?.(path),
+              addToChat: null,
+            })()
+          : []),
+        ...(onRemove
+          ? [[{ label: translateNow("contextMenu.remove"), run: onRemove }]]
+          : []),
+      ])}
+    >
       <button
         type="button"
         className={cn("attachment-tile attachment-tile--file", chipClassName)}

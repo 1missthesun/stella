@@ -110,6 +110,10 @@ const subscribe = (listener: () => void): (() => void) => {
 
 const getSnapshot = (): ManualReadAloudState => state;
 
+/** The read-aloud status of `key` right now, outside React. */
+export const manualReadAloudStatus = (key: string): ManualReadAloudStatus =>
+  state.key === key ? state.status : "idle";
+
 export function useManualReadAloudStatus(key: string): ManualReadAloudStatus {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return snapshot.key === key ? snapshot.status : "idle";

@@ -1,3 +1,5 @@
+import { contextMenu } from "@/platform/context-menu";
+import { translateNow } from "@/shared/i18n";
 import { AppWindowMac, LoaderCircle } from "@/ui/icons";
 import { openCloudAppPanel } from "./open-cloud-app-panel";
 import type { CloudAppsState } from "./use-cloud-apps";
@@ -34,7 +36,18 @@ export function CloudAppsLibrary({ state }: { state: CloudAppsState }) {
       </div>
       <ul className="apps-section__grid cloud-apps-library__grid">
         {state.apps.map((app) => (
-          <li key={app.appId} className="apps-section__card">
+          <li
+            key={app.appId}
+            className="apps-section__card"
+            onContextMenu={contextMenu(() => [
+              [
+                {
+                  label: translateNow("contextMenu.open"),
+                  run: () => openCloudAppPanel(app),
+                },
+              ],
+            ])}
+          >
             <button
               type="button"
               className="apps-section__card-open"

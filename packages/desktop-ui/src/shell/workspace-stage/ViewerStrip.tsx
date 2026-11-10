@@ -6,7 +6,8 @@ import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
 import { useMediaStream } from "@/shared/hooks/use-media-stream-url";
 import { Play } from "@/ui/icons";
 import { formatTimestampHeader } from "@/features/chat/lib/message-time-labels";
-import { useLocale, useT } from "@/shared/i18n";
+import { translateNow, useLocale, useT } from "@/shared/i18n";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
 import {
   showSibling,
   useViewerSiblings,
@@ -113,6 +114,15 @@ function StripItem({
       onClick={() => {
         if (!current) showSibling(fromId, entry);
       }}
+      onContextMenu={contextMenu(
+        async () => {
+          const open = () => showSibling(fromId, entry);
+          const path = imagePath ?? videoPath ?? entry.filePath;
+          if (!path) return [[{ label: translateNow("contextMenu.open"), run: open }]];
+          return await fileMenu(path, { open, image: Boolean(imagePath) })();
+        },
+        { claims: ["image"] },
+      )}
     >
       {imagePath ? (
         near ? (

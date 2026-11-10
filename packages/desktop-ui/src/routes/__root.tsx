@@ -100,6 +100,7 @@ import "@/shell/error-boundary.css";
 import { platformCapabilities } from "@/platform/capabilities";
 import { dismissLaunchSplash } from "@/shell/launch-splash";
 import { usePendingDiscoveryWelcome } from "@/global/onboarding/chat/pending-handoff";
+import { ContextMenuHost } from "@/platform/context-menu/ContextMenuHost";
 
 function CloudStartupFailure({
   message,
@@ -724,6 +725,8 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
       <SettingsDialogHost />
 
       <FeedbackDialogHost />
+
+      <ContextMenuHost />
 
       <PlanUsageDialogHost />
 

@@ -16,6 +16,7 @@ import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload
 import { imageGenerationFailureKey } from "@/app/media/media-error-copy";
 import { useT } from "@/shared/i18n";
 import "./inline-generated-image-card.css";
+import { contextMenu, fileMenu } from "@/platform/context-menu";
 
 export type InlineGeneratedImagePayload = Extract<DisplayPayload, { kind: "media" }>;
 
@@ -364,6 +365,10 @@ export const InlineGeneratedImageCardFrame = ({
       type="button"
       className={buttonClassName}
       onClick={handleClick}
+      onContextMenu={contextMenu(
+        primaryPath ? fileMenu(primaryPath, { open: handleClick, image: true }) : () => null,
+        { claims: ["image"] },
+      )}
       title={
         jobFailed
           ? t("app.chat.generatedImage.generationFailed")

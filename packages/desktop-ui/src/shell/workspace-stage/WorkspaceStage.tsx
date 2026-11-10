@@ -71,7 +71,14 @@ import {
   X,
 } from "@/ui/icons";
 import { RetainedSurface } from "@/ui/retained-surface";
-import { useT } from "@/shared/i18n";
+import { translateNow, useT } from "@/shared/i18n";
+import {
+  contextMenu,
+  fileMenu,
+  linkMenu,
+  type MenuBuilder,
+  type MenuSection,
+} from "@/platform/context-menu";
 import {
   ViewerActionsContext,
   ViewerItemContext,
@@ -356,12 +363,15 @@ function ViewerHeader({
   stage,
   actions,
   onPointerDown,
+  menuRef,
 }: {
   item: DisplayTab;
   meta: string | null;
   stage: boolean;
   actions: ViewerItemActions | null;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  /** Set to the right-click menu for what's open. */
+  menuRef: { current: MenuBuilder | null };
 }) {
   const path = payloadPath(item.payload);
   const filePath = localFilePath(item.payload);
@@ -434,6 +444,52 @@ function ViewerHeader({
 
   const remove = actions?.remove;
   const hasMenu = Boolean(actions?.copy || path || remove);
+
+  menuRef.current = async ({ target }) => {
+    // A thumbnail in the strip has its own menu.
+    if (target.closest(".viewer-strip")) return null;
+    const sections: MenuSection[] = [];
+    if (actions?.copy) {
+      sections.push([
+        {
+          label: actions.copyLabel ?? translateNow("contextMenu.copy"),
+          run: copyBody,
+        },
+      ]);
+    }
+    if (item.payload?.kind === "url" && path) {
+      sections.push(linkMenu(path).slice(1));
+    } else if (filePath) {
+      sections.push(
+        ...(await fileMenu(filePath, {
+          addToChat: attachment
+            ? {
+                label: attachment.added
+                  ? translateNow("contextMenu.removeFromChat")
+                  : translateNow("contextMenu.addToChat"),
+                run: attachment.toggle,
+              }
+            : null,
+        })()),
+      );
+      sections.push([
+        { label: translateNow("contextMenu.copyPublicLink"), run: share },
+      ]);
+    }
+    sections.push([
+      {
+        label: stage
+          ? translateNow("contextMenu.shrinkViewer")
+          : translateNow("contextMenu.expandViewer"),
+        run: () => fileViewer.toggleMode(),
+      },
+      {
+        label: translateNow("contextMenu.closeViewer"),
+        run: () => fileViewer.close(),
+      },
+    ]);
+    return sections;
+  };
 
   return (
     <header
@@ -662,6 +718,7 @@ function FileViewerFrame({
   const [bodyActions, setBodyActions] = useState<ViewerItemActions | null>(
     null,
   );
+  const menuRef = useRef<MenuBuilder | null>(null);
 
   // Body actions clear themselves when the body unmounts (a parent effect
   // here would run after the new body registered its own).
@@ -766,6 +823,10 @@ function FileViewerFrame({
       aria-label={item.title}
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
+      onContextMenu={contextMenu(
+        (context) => menuRef.current?.(context) ?? null,
+        { claims: bodyActions?.copy ? ["image"] : [] },
+      )}
       style={
         stage
           ? undefined
@@ -783,6 +844,7 @@ function FileViewerFrame({
         stage={stage}
         actions={bodyActions}
         onPointerDown={handleHeaderPointerDown}
+        menuRef={menuRef}
       />
       <div className="file-viewer__main">
       <div className="file-viewer__body">

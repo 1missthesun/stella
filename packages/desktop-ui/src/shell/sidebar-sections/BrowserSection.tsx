@@ -9,7 +9,7 @@ import type {
 import { uiState } from "@/platform/ui-state";
 import type { ElectronBrowserViewApi } from "@/shared/types/electron";
 import { useChatRuntime } from "@/context/use-chat-runtime";
-import { useT } from "@/shared/i18n";
+import { translateNow, useT } from "@/shared/i18n";
 import { useActiveSidebarSection } from "@/features/workspace-display/sidebar-sections";
 import { useDisplayPanelOpen } from "@/features/workspace-display/tab-store";
 import {
@@ -24,6 +24,8 @@ import {
 } from "@/ui/icons";
 import { useTabStripCloseFreeze } from "@/shared/hooks/use-tab-strip-close-freeze";
 import "./browser-section.css";
+import { contextMenu, copyText } from "@/platform/context-menu";
+import { normalizedHttpUrl } from "@/features/chat/lib/stella-web-links";
 
 const MANUAL_OWNER_ID = "stella:manual";
 const SIGN_IN_HINT_DISMISSED_KEY = "stella-browser-sign-in-hint-dismissed";
@@ -649,6 +651,55 @@ export function BrowserSection() {
                     data-tab-id={tab.id}
                     data-active={active || undefined}
                     data-agent-active={tab.agentActive || undefined}
+                    onContextMenu={contextMenu(() => {
+                      const url = normalizedHttpUrl(tab.url ?? "");
+                      const others = state.tabs.filter(
+                        (entry) => entry.id !== tab.id,
+                      );
+                      const close = (entry: typeof tab) =>
+                        void browserViewApi()?.closeTab({
+                          tabId: entry.id,
+                          ownerId: entry.ownerId,
+                        });
+                      return [
+                        [
+                          {
+                            label: translateNow("contextMenu.reload"),
+                            run: () =>
+                              browserViewApi()?.reload({
+                                tabId: tab.id,
+                                ownerId: tab.ownerId,
+                              }),
+                          },
+                        ],
+                        ...(url
+                          ? [
+                              [
+                                {
+                                  label: translateNow("contextMenu.openInYourBrowser"),
+                                  run: () =>
+                                    window.electronAPI?.system?.openExternal?.(url),
+                                },
+                                {
+                                  label: translateNow("contextMenu.copyLink"),
+                                  run: () => copyText(url),
+                                },
+                              ],
+                            ]
+                          : []),
+                        [
+                          {
+                            label: translateNow("contextMenu.closeTab"),
+                            run: () => close(tab),
+                          },
+                          {
+                            label: translateNow("contextMenu.closeOtherTabs"),
+                            enabled: others.length > 0,
+                            run: () => others.forEach(close),
+                          },
+                        ],
+                      ];
+                    })}
                   >
                     <button
                       type="button"

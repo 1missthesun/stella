@@ -68,17 +68,25 @@
   transform: none;
 }
 
-.chapter {
+.claim {
+  max-width: 34ch;
+  margin: clamp(22px, 3.4svh, 36px) auto 0;
+  padding: 0 var(--l-margin);
+  text-align: center;
+  font-size: clamp(18px, 1.6vw, 24px);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.player {
   --frame-w: min(1180px, 90vw);
-  --frame-h: min(760px, 71svh);
+  --frame-h: min(720px, 64svh);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: clamp(96px, 15svh, 180px);
-}
-
-.chapter:first-of-type {
-  padding-top: clamp(72px, 11svh, 140px);
+  padding-top: clamp(64px, 10svh, 120px);
 }
 
 .quote {
@@ -92,29 +100,32 @@
   letter-spacing: -0.055em;
 }
 
-.word,
-.coda .word {
+.word {
   display: inline-block;
   margin-right: 0.22em;
   opacity: 0;
-  filter: blur(12px);
-  transform: translate3d(0, 0.14em, 0);
-  transition:
-    opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    filter 800ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    transform 900ms cubic-bezier(0.2, 0.9, 0.2, 1);
-  transition-delay: calc(var(--i) * 70ms);
 }
 
 .word:last-child {
   margin-right: 0;
 }
 
-.chapter:not([data-phase="idle"]) .word,
-.coda[data-in="1"] .word {
-  opacity: 1;
-  filter: none;
-  transform: none;
+.player:not([data-phase="idle"]) .word {
+  animation: word-in 900ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+@keyframes word-in {
+  from {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translate3d(0, 0.14em, 0);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
 }
 
 .frame {
@@ -128,7 +139,7 @@
     transform 1100ms cubic-bezier(0.2, 1, 0.3, 1);
 }
 
-.chapter:not([data-phase="idle"]) .frame {
+.player:not([data-phase="idle"]) .frame {
   opacity: 1;
   transform: none;
 }
@@ -148,8 +159,8 @@
   pointer-events: none;
 }
 
-.chapter[data-phase="swap"] .glow,
-.chapter[data-phase="done"] .glow {
+.player[data-phase="swap"] .glow,
+.player[data-phase="done"] .glow {
   opacity: 0.75;
 }
 
@@ -166,7 +177,7 @@
    underneath, pulls back into focus. Slowed to 1100ms with a short hold at
    peak blur; blur in is ease-in cubic,
    blur out ease-out cubic, so the whole pass reads as one ease-in-out. */
-.chapter[data-phase="swap"] .skinBox {
+.player[data-phase="swap"] .skinBox {
   animation: focus-in 1100ms linear both;
 }
 
@@ -174,36 +185,100 @@
   z-index: 2;
 }
 
-.chapter[data-phase="swap"] .from {
+.player[data-phase="swap"] .from {
   animation: focus-out 1100ms linear both;
 }
 
-.coda {
-  margin: clamp(110px, 17svh, 200px) 0 0;
-  padding: 0 var(--l-margin);
-  text-align: center;
-  font-family: var(--l-sans);
-  font-size: clamp(40px, 7vw, 132px);
-  font-weight: 800;
-  font-stretch: 125%;
-  line-height: 0.9;
-  letter-spacing: -0.07em;
-  background: linear-gradient(90deg, #7ae8ff, #8fb5ff 30%, #b89cff 60%, #ff8fd6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.frame {
+  cursor: default;
 }
 
-.coda .word {
-  padding: 0.1em 0.12em 0.24em;
-  margin: -0.1em calc(0.22em - 0.12em) -0.24em -0.12em;
-  background: inherit;
-  -webkit-background-clip: text;
-  background-clip: text;
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: clamp(22px, 3.4svh, 36px);
 }
 
-.coda .word:last-child {
-  margin-right: -0.12em;
+.dots {
+  display: flex;
+  gap: 8px;
+}
+
+.dot {
+  position: relative;
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dot::before,
+.fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+}
+
+.dot::before {
+  content: "";
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 200ms ease;
+}
+
+.dot:hover::before,
+.dot:focus-visible::before {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.dot[aria-current="true"]::before {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.fill {
+  background: #fff;
+  transform-origin: 0 50%;
+  animation-name: fill;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.player[data-paused="1"] .fill {
+  animation-play-state: paused;
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.pause {
+  min-width: 64px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--l-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.pause:hover,
+.pause:focus-visible {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #fff;
 }
 
 @keyframes focus-out {
@@ -245,12 +320,19 @@
     height: min(600px, 68svh);
   }
 
-  .chapter {
+  .player {
     --frame-w: 92vw;
-    --frame-h: min(600px, 68svh);
+    --frame-h: min(560px, 62svh);
   }
 
+  /* Two lines held for every example so the window doesn't jump between
+     a one-line and a two-line quote. */
   .quote {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-end;
+    justify-content: center;
+    min-height: 1.9em;
     font-size: clamp(30px, 9.4vw, 60px);
   }
 
@@ -261,10 +343,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .title span,
-  .word,
   .frame,
   .glow {
     transition: none !important;
+  }
+
+  .player .word {
+    animation: none !important;
   }
 
   .title span,
@@ -275,11 +360,11 @@
     transform: none;
   }
 
-  .chapter[data-phase="swap"] .skinBox {
+  .player[data-phase="swap"] .skinBox {
     animation: none;
   }
 
-  .chapter[data-phase="swap"] .from {
+  .player[data-phase="swap"] .from {
     animation: crossfade 1100ms cubic-bezier(0.45, 0, 0.55, 1) both;
   }
 }

@@ -62,10 +62,7 @@
       "userGeneratedContent": true
     },
     "review": {
-      "firstName": "Rahul",
-      "lastName": "Nanda",
       "email": "contact@fromyou.ai",
-      "phone": "+1 571 278 2333",
       "demoRequired": false,
       "notes": "Sign-in is optional. Complete onboarding to start chatting.\n\nComputer mode requires pairing with the Stella desktop app using a code. Chat responses come from the AI assistant; there is no public feed or chat between users."
     }

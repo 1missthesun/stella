@@ -41,7 +41,8 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "6761148311"
+        "ascAppId": "6761148311",
+        "metadataPath": "./store.config.js"
       },
       "android": {
         "track": "production",
@@ -50,7 +51,8 @@
     },
     "preview": {
       "ios": {
-        "ascAppId": "6761148311"
+        "ascAppId": "6761148311",
+        "metadataPath": "./store.config.js"
       }
     }
   }

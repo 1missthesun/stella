@@ -7,7 +7,10 @@ import type { ChatContext } from "@stella/contracts";
  * a restart does not drop it. Only what they put there themselves is kept:
  * a captured window or its text describes a moment that has passed.
  */
-export type ComposerAttachments = Pick<ChatContext, "regionScreenshots" | "files" | "pastedTexts">;
+export type ComposerAttachments = Pick<
+  ChatContext,
+  "regionScreenshots" | "files" | "pastedTexts" | "showCaptures"
+>;
 
 const FILE_NAME = "composer-attachments.json";
 const WRITE_DELAY_MS = 300;
@@ -16,8 +19,17 @@ const MAX_BYTES = 32 * 1024 * 1024;
 export const composerAttachmentsOf = (context: ChatContext | null): ComposerAttachments | null => {
   if (!context) return null;
   const { regionScreenshots, files, pastedTexts } = context;
-  if (!regionScreenshots?.length && !files?.length && !pastedTexts?.length) return null;
-  return { regionScreenshots: regionScreenshots ?? [], files: files ?? [], pastedTexts: pastedTexts ?? [] };
+  // A capture still being prepared would never finish after a restart.
+  const showCaptures = context.showCaptures?.filter((capture) => capture.status === "ready");
+  if (!regionScreenshots?.length && !files?.length && !pastedTexts?.length && !showCaptures?.length) {
+    return null;
+  }
+  return {
+    regionScreenshots: regionScreenshots ?? [],
+    files: files ?? [],
+    pastedTexts: pastedTexts ?? [],
+    ...(showCaptures?.length ? { showCaptures } : {}),
+  };
 };
 
 const sameAttachments = (a: ComposerAttachments | null, b: ComposerAttachments | null) =>
@@ -26,7 +38,8 @@ const sameAttachments = (a: ComposerAttachments | null, b: ComposerAttachments |
     b !== null &&
     a.regionScreenshots === b.regionScreenshots &&
     a.files === b.files &&
-    a.pastedTexts === b.pastedTexts);
+    a.pastedTexts === b.pastedTexts &&
+    JSON.stringify(a.showCaptures ?? null) === JSON.stringify(b.showCaptures ?? null));
 
 export const createComposerAttachmentsStore = (dataDir: string, log: (message: string) => void) => {
   const file = path.join(dataDir, FILE_NAME);

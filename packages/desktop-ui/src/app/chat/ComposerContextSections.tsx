@@ -7,6 +7,7 @@ import {
   PastedTextChip,
   PendingCaptureChip,
   ScreenshotContextChip,
+  ShowCaptureChip,
   SelectedTextChip,
   WindowContextChip,
 } from "./ComposerContextChips";
@@ -79,6 +80,12 @@ export function ComposerAttachmentTilesSection({
   setChatContext,
 }: SharedContextProps) {
   const items: AttachmentTileItem[] = [];
+  (chatContext?.showCaptures ?? []).forEach((capture) => {
+    items.push({
+      key: `show-capture-${capture.id}`,
+      node: <ShowCaptureChip capture={capture} setChatContext={setChatContext} />,
+    });
+  });
   (chatContext?.regionScreenshots ?? []).forEach((screenshot, index) => {
     items.push({
       key: `screenshot-${index}`,

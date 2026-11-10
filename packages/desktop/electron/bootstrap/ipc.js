@@ -34,6 +34,7 @@ import { registerChatAlertHandlers } from "../ipc/chat-alert-handlers.js";
 import { registerUiStateKvHandlers } from "../ipc/ui-state-handlers.js";
 import { registerVoiceHandlers } from "../ipc/voice-handlers.js";
 import { registerDictationHandlers } from "../ipc/dictation-handlers.js";
+import { registerShowStellaHandlers } from "../ipc/show-stella-handlers.js";
 import { registerCompanionHandlers } from "../ipc/companion-handlers.js";
 import { clearPendingRemoteExecutionRequest, getAllWindows, pendingRemoteExecutionRequest, } from "./context.js";
 import { startStellaBrowserBridge, } from "./aux-runtime.js";
@@ -564,6 +565,20 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         },
     });
     services.globalInputHook.setDictationTapHandlers(dictationTap);
+    const showStella = registerShowStellaHandlers({
+        getStellaDataDir: lifecycle.getStellaDataDir,
+        getOverlay: () => state.overlayController ?? null,
+        getFullWindow: () => state.windowManager?.getFullWindow() ?? null,
+        showFullWindow: () => state.windowManager?.showWindow(),
+        input: services.globalInputHook,
+        captureService: services.captureService,
+        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
+        isOverlaySender: (event) => {
+            const overlay = state.overlayController?.getWebContents();
+            return Boolean(overlay && event.sender === overlay);
+        },
+    });
+    app.on("will-quit", () => showStella.dispose());
     registerCompanionHandlers({
         getCompanionController: () => state.companionController ?? null,
         windowManager: state.windowManager,

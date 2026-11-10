@@ -21,7 +21,8 @@
         "attachFiles": "Attach files…",
         "capture": "Capture",
         "context": "Context",
-        "recent": "Recent"
+        "recent": "Recent",
+        "showStella": "Show Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Open {title} agent thread",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — capturing window…",
         "windowClickToEnlarge": "{label} — click to enlarge",
         "windowPreviewAlt": "Window content preview",
-        "windowScreenshotAlt": "{label} window screenshot"
+        "windowScreenshotAlt": "{label} window screenshot",
+        "showCapture": {
+          "title": "Screen capture · {duration}",
+          "preparing": "Preparing…",
+          "failed": "This capture couldn't be prepared",
+          "saveVideo": "Save video to Drive",
+          "remove": "Remove capture",
+          "alt": "Moments from your screen capture"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Add {detail} (current window) as context",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Voice needs setup",
       "signInTitle": "Sign in to use voice"
+    },
+    "showStella": {
+      "done": "Done",
+      "hint": "Hold {shift} to draw · {shift}-click to pin · Esc to discard",
+      "hintNoInk": "Esc to discard"
     }
   },
   "global": {

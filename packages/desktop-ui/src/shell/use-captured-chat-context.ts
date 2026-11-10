@@ -36,6 +36,7 @@ export function normalizeChatContext(
   const hasScreenshots = Boolean(normalized.regionScreenshots?.length)
   const hasFiles = Boolean(normalized.files?.length)
   const hasPastedTexts = Boolean(normalized.pastedTexts?.length)
+  const hasShowCaptures = Boolean(normalized.showCaptures?.length)
   const hasPendingCapture = Boolean(normalized.capturePending)
   const hasWindowScreenshot = Boolean(normalized.windowScreenshot)
   const hasWindowAxTree = Boolean(normalized.windowAxTree?.trim())
@@ -49,6 +50,7 @@ export function normalizeChatContext(
     !hasScreenshots &&
     !hasFiles &&
     !hasPastedTexts &&
+    !hasShowCaptures &&
     !hasPendingCapture &&
     !hasWindowScreenshot &&
     !hasWindowAxTree

@@ -6,6 +6,7 @@ import {
   type Dispatch,
 } from "react";
 import { RegionCapture } from "./RegionCapture";
+import { ShowStellaOverlay } from "./ShowStellaOverlay";
 import "./overlays.css";
 
 type WindowBounds = { x: number; y: number; width: number; height: number };
@@ -154,6 +155,8 @@ export function OverlayRoot() {
           }}
         />
       )}
+
+      <ShowStellaOverlay />
 
       {state.regionCaptureActive && (
         <div

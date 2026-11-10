@@ -20,7 +20,8 @@
         "attachFiles": "附加文件…",
         "capture": "截取",
         "context": "上下文",
-        "recent": "最近"
+        "recent": "最近",
+        "showStella": "展示给 Stella"
       },
       "agentCompletion": {
         "openNamedThread": "打开 {title} 智能体线程",
@@ -85,7 +86,15 @@
         "windowCapturing": "{label} — 正在截取窗口…",
         "windowClickToEnlarge": "{label} — 点击以放大",
         "windowPreviewAlt": "窗口内容预览",
-        "windowScreenshotAlt": "{label} 窗口截图"
+        "windowScreenshotAlt": "{label} 窗口截图",
+        "showCapture": {
+          "title": "屏幕录制 · {duration}",
+          "preparing": "正在准备…",
+          "failed": "无法准备此录制",
+          "saveVideo": "将视频保存到 Drive",
+          "remove": "移除录制",
+          "alt": "你的屏幕录制中的时刻"
+        }
       },
       "contextRow": {
         "addActiveWindow": "将 {detail}（当前窗口）添加为上下文",
@@ -827,6 +836,11 @@
     "voice": {
       "needsSetupTitle": "语音需要设置",
       "signInTitle": "登录以使用语音"
+    },
+    "showStella": {
+      "done": "完成",
+      "hint": "按住 {shift} 绘制 · {shift}+点击放置图钉 · Esc 放弃",
+      "hintNoInk": "Esc 放弃"
     }
   },
   "global": {

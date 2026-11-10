@@ -73,6 +73,7 @@ export const hasAttachedComposerChips = (
     return true;
   if (chatContext.files && chatContext.files.length > 0) return true;
   if (chatContext.pastedTexts && chatContext.pastedTexts.length > 0) return true;
+  if (chatContext.showCaptures && chatContext.showCaptures.length > 0) return true;
   if (chatContext.capturePending) return true;
   return false;
 };
@@ -87,7 +88,10 @@ export const resolveComposerContextState = (
   );
   const hasScreenshotContext = Boolean(chatContext?.regionScreenshots?.length);
   const hasFileContext = Boolean(chatContext?.files?.length);
-  const hasPastedTextContext = Boolean(chatContext?.pastedTexts?.length);
+  const hasPastedTextContext = Boolean(
+    chatContext?.pastedTexts?.length ||
+      chatContext?.showCaptures?.some((capture) => capture.status === "ready"),
+  );
   // The viewer's "what's open" chip rides along with a message but isn't
   // something to send on its own.
   const hasAppSelectionContext = getComposerAppSelections(chatContext).some(

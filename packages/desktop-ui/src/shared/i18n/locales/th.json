@@ -20,7 +20,8 @@
         "attachFiles": "แนบไฟล์…",
         "capture": "จับภาพ",
         "context": "บริบท",
-        "recent": "ล่าสุด"
+        "recent": "ล่าสุด",
+        "showStella": "แสดงให้ Stella ดู"
       },
       "agentCompletion": {
         "openNamedThread": "เปิดเธรดเอเจนต์ {title}",
@@ -85,7 +86,15 @@
         "windowCapturing": "{label} — กำลังจับภาพหน้าต่าง…",
         "windowClickToEnlarge": "{label} — คลิกเพื่อขยาย",
         "windowPreviewAlt": "ตัวอย่างเนื้อหาหน้าต่าง",
-        "windowScreenshotAlt": "ภาพหน้าจอหน้าต่าง {label}"
+        "windowScreenshotAlt": "ภาพหน้าจอหน้าต่าง {label}",
+        "showCapture": {
+          "title": "บันทึกหน้าจอ · {duration}",
+          "preparing": "กำลังเตรียม…",
+          "failed": "ไม่สามารถเตรียมการบันทึกนี้ได้",
+          "saveVideo": "บันทึกวิดีโอลงใน Drive",
+          "remove": "ลบการบันทึก",
+          "alt": "ช่วงเวลาจากการบันทึกหน้าจอของคุณ"
+        }
       },
       "contextRow": {
         "addActiveWindow": "เพิ่ม {detail} (หน้าต่างปัจจุบัน) เป็นบริบท",
@@ -827,6 +836,11 @@
     "voice": {
       "needsSetupTitle": "เสียงต้องตั้งค่าก่อน",
       "signInTitle": "ลงชื่อเข้าใช้เพื่อใช้เสียง"
+    },
+    "showStella": {
+      "done": "เสร็จ",
+      "hint": "กด {shift} ค้างไว้เพื่อวาด · {shift}+คลิกเพื่อปักหมุด · Esc เพื่อทิ้ง",
+      "hintNoInk": "Esc เพื่อทิ้ง"
     }
   },
   "global": {

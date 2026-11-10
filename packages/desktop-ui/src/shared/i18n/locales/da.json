@@ -21,7 +21,8 @@
         "attachFiles": "Vedhæft filer…",
         "capture": "Optag",
         "context": "Kontekst",
-        "recent": "Seneste"
+        "recent": "Seneste",
+        "showStella": "Vis Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Åbn agenttråden {title}",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — optager vindue…",
         "windowClickToEnlarge": "{label} — klik for at forstørre",
         "windowPreviewAlt": "Forhåndsvisning af vinduesindhold",
-        "windowScreenshotAlt": "Skærmbillede af vinduet {label}"
+        "windowScreenshotAlt": "Skærmbillede af vinduet {label}",
+        "showCapture": {
+          "title": "Skærmoptagelse · {duration}",
+          "preparing": "Forbereder…",
+          "failed": "Optagelsen kunne ikke forberedes",
+          "saveVideo": "Gem video i Drive",
+          "remove": "Fjern optagelse",
+          "alt": "Øjeblikke fra din skærmoptagelse"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Tilføj {detail} (aktuelt vindue) som kontekst",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Stemme kræver opsætning",
       "signInTitle": "Log ind for at bruge stemme"
+    },
+    "showStella": {
+      "done": "Færdig",
+      "hint": "Hold {shift} for at tegne · {shift}-klik for en nål · Esc for at kassere",
+      "hintNoInk": "Esc for at kassere"
     }
   },
   "global": {

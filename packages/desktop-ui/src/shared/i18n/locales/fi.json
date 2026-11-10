@@ -21,7 +21,8 @@
         "attachFiles": "Liitä tiedostoja…",
         "capture": "Kaappaa",
         "context": "Konteksti",
-        "recent": "Viimeisimmät"
+        "recent": "Viimeisimmät",
+        "showStella": "Näytä Stellalle"
       },
       "agentCompletion": {
         "openNamedThread": "Avaa agenttisäie: {title}",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — kaapataan ikkunaa…",
         "windowClickToEnlarge": "{label} — suurenna napsauttamalla",
         "windowPreviewAlt": "Ikkunan sisällön esikatselu",
-        "windowScreenshotAlt": "Ikkunan kuvakaappaus: {label}"
+        "windowScreenshotAlt": "Ikkunan kuvakaappaus: {label}",
+        "showCapture": {
+          "title": "Näytön tallennus · {duration}",
+          "preparing": "Valmistellaan…",
+          "failed": "Tallennusta ei voitu valmistella",
+          "saveVideo": "Tallenna video Driveen",
+          "remove": "Poista tallennus",
+          "alt": "Hetkiä näytön tallennuksestasi"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Lisää kontekstiksi: {detail} (nykyinen ikkuna)",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Ääni vaatii määrityksen",
       "signInTitle": "Kirjaudu sisään käyttääksesi ääntä"
+    },
+    "showStella": {
+      "done": "Valmis",
+      "hint": "Piirrä pitämällä {shift} pohjassa · {shift}+napsautus lisää nastan · Esc hylkää",
+      "hintNoInk": "Esc hylkää"
     }
   },
   "global": {

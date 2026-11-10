@@ -21,7 +21,8 @@
         "attachFiles": "Επισύναψη αρχείων…",
         "capture": "Λήψη",
         "context": "Πλαίσιο",
-        "recent": "Πρόσφατα"
+        "recent": "Πρόσφατα",
+        "showStella": "Δείξε στη Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Άνοιγμα νήματος πράκτορα {title}",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — λήψη παραθύρου…",
         "windowClickToEnlarge": "{label} — κάντε κλικ για μεγέθυνση",
         "windowPreviewAlt": "Προεπισκόπηση περιεχομένου παραθύρου",
-        "windowScreenshotAlt": "Στιγμιότυπο παραθύρου {label}"
+        "windowScreenshotAlt": "Στιγμιότυπο παραθύρου {label}",
+        "showCapture": {
+          "title": "Εγγραφή οθόνης · {duration}",
+          "preparing": "Προετοιμασία…",
+          "failed": "Δεν ήταν δυνατή η προετοιμασία αυτής της εγγραφής",
+          "saveVideo": "Αποθήκευση βίντεο στο Drive",
+          "remove": "Αφαίρεση εγγραφής",
+          "alt": "Στιγμές από την εγγραφή της οθόνης σου"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Προσθήκη του {detail} (τρέχον παράθυρο) ως πλαίσιο",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Η φωνή χρειάζεται ρύθμιση",
       "signInTitle": "Συνδεθείτε για να χρησιμοποιήσετε τη φωνή"
+    },
+    "showStella": {
+      "done": "Τέλος",
+      "hint": "Κράτα το {shift} για σχεδίαση · {shift}+κλικ για πινέζα · Esc για απόρριψη",
+      "hintNoInk": "Esc για απόρριψη"
     }
   },
   "global": {

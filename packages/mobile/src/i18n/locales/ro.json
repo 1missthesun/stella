@@ -22,7 +22,8 @@
         "attachFiles": "Atașează fișiere…",
         "capture": "Captură",
         "context": "Context",
-        "recent": "Recente"
+        "recent": "Recente",
+        "showStella": "Arată-i Stellei"
       },
       "agentCompletion": {
         "openNamedThread": "Deschide firul agentului {title}",
@@ -91,7 +92,15 @@
         "windowCapturing": "{label} — se capturează fereastra…",
         "windowClickToEnlarge": "{label} — dă clic pentru a mări",
         "windowPreviewAlt": "Previzualizarea conținutului ferestrei",
-        "windowScreenshotAlt": "Captură de ecran a ferestrei {label}"
+        "windowScreenshotAlt": "Captură de ecran a ferestrei {label}",
+        "showCapture": {
+          "title": "Înregistrare ecran · {duration}",
+          "preparing": "Se pregătește…",
+          "failed": "Înregistrarea nu a putut fi pregătită",
+          "saveVideo": "Salvează videoclipul în Drive",
+          "remove": "Elimină înregistrarea",
+          "alt": "Momente din înregistrarea ecranului"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Adaugă {detail} (fereastra curentă) drept context",
@@ -839,6 +848,11 @@
     "voice": {
       "needsSetupTitle": "Vocea are nevoie de configurare",
       "signInTitle": "Conectează-te pentru a folosi vocea"
+    },
+    "showStella": {
+      "done": "Gata",
+      "hint": "Ține apăsat {shift} pentru a desena · {shift}+clic pentru un pin · Esc pentru a renunța",
+      "hintNoInk": "Esc pentru a renunța"
     }
   },
   "global": {

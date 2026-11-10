@@ -20,7 +20,8 @@
         "attachFiles": "ファイルを添付…",
         "capture": "キャプチャ",
         "context": "コンテキスト",
-        "recent": "最近"
+        "recent": "最近",
+        "showStella": "Stellaに見せる"
       },
       "agentCompletion": {
         "openNamedThread": "{title} のエージェントスレッドを開く",
@@ -85,7 +86,15 @@
         "windowCapturing": "{label} — ウィンドウをキャプチャ中…",
         "windowClickToEnlarge": "{label} — クリックして拡大",
         "windowPreviewAlt": "ウィンドウ内容のプレビュー",
-        "windowScreenshotAlt": "{label} のウィンドウのスクリーンショット"
+        "windowScreenshotAlt": "{label} のウィンドウのスクリーンショット",
+        "showCapture": {
+          "title": "画面収録 · {duration}",
+          "preparing": "準備中…",
+          "failed": "この収録を準備できませんでした",
+          "saveVideo": "ビデオをDriveに保存",
+          "remove": "収録を削除",
+          "alt": "画面収録の場面"
+        }
       },
       "contextRow": {
         "addActiveWindow": "{detail}（現在のウィンドウ）をコンテキストとして追加",
@@ -827,6 +836,11 @@
     "voice": {
       "needsSetupTitle": "音声の設定が必要です",
       "signInTitle": "音声を使うにはサインインしてください"
+    },
+    "showStella": {
+      "done": "完了",
+      "hint": "{shift}を押しながらで描画 · {shift}+クリックでピン · Escで破棄",
+      "hintNoInk": "Escで破棄"
     }
   },
   "global": {

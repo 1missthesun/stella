@@ -15,6 +15,15 @@ import type {
 } from "../index.js";
 import type { ReasoningEffortLevel } from "../reasoning-effort.js";
 import type {
+  ShowStellaBuildResult,
+  ShowStellaInk,
+  ShowStellaOverlayState,
+  ShowStellaRecorded,
+  ShowStellaRecorderResult,
+  ShowStellaStatus,
+  ShowStellaTranscript,
+} from "./show-stella.js";
+import type {
   AccountHint,
   AccountSessionSummary,
   SignOutOptions,
@@ -245,6 +254,20 @@ import {
   IPC_DICTATION_ON_DEVICE_CANCEL,
   IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE,
   IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS,
+  IPC_SHOW_STELLA_STATUS,
+  IPC_SHOW_STELLA_TOGGLE,
+  IPC_SHOW_STELLA_READ_AUDIO,
+  IPC_SHOW_STELLA_BUILD,
+  IPC_SHOW_STELLA_RECORDED,
+  IPC_SHOW_STELLA_OVERLAY_STATE,
+  IPC_SHOW_STELLA_INK,
+  IPC_SHOW_STELLA_STOP_RECORDER,
+  IPC_SHOW_STELLA_FRAME,
+  IPC_SHOW_STELLA_VIDEO_CHUNK,
+  IPC_SHOW_STELLA_RECORDER_STARTED,
+  IPC_SHOW_STELLA_RECORDER_STOPPED,
+  IPC_SHOW_STELLA_RECORDER_FAILED,
+  IPC_SHOW_STELLA_DONE,
   IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
@@ -1001,6 +1024,20 @@ export type IpcInvokeContract = {
     [payload: { wav: ArrayBuffer; locales: string[] }],
     OnDeviceTranscript
   >;
+  [IPC_SHOW_STELLA_STATUS]: Invoke<[], ShowStellaStatus>;
+  [IPC_SHOW_STELLA_TOGGLE]: Invoke<[], { ok: boolean }>;
+  [IPC_SHOW_STELLA_READ_AUDIO]: Invoke<
+    [payload: { captureId: string }],
+    ArrayBuffer | null
+  >;
+  [IPC_SHOW_STELLA_BUILD]: Invoke<
+    [payload: { captureId: string; transcript: ShowStellaTranscript }],
+    ShowStellaBuildResult
+  >;
+  [IPC_SHOW_STELLA_RECORDER_STOPPED]: Invoke<
+    [payload: ShowStellaRecorderResult],
+    { ok: true }
+  >;
 
   [IPC_COMPANION_GET_STATE]: Invoke<[], CompanionState | null>;
   [IPC_COMPANION_GET_VISIBLE]: Invoke<[], CompanionVisibility>;
@@ -1596,6 +1633,19 @@ export type IpcSendContract = {
     payload: { sessionId: string; pcm: ArrayBuffer },
   ];
   [IPC_DICTATION_ON_DEVICE_CANCEL]: [payload: { sessionId: string }];
+  [IPC_SHOW_STELLA_FRAME]: [
+    payload: { captureId: string; t: number; jpeg: ArrayBuffer },
+  ];
+  [IPC_SHOW_STELLA_VIDEO_CHUNK]: [
+    payload: { captureId: string; chunk: ArrayBuffer; mimeType: string },
+  ];
+  [IPC_SHOW_STELLA_RECORDER_STARTED]: [
+    payload: { captureId: string; atMs: number },
+  ];
+  [IPC_SHOW_STELLA_RECORDER_FAILED]: [
+    payload: { captureId: string; message: string },
+  ];
+  [IPC_SHOW_STELLA_DONE]: [];
   [IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS]: [];
   [IPC_DICTATION_PLAY_SOUND]: [
     payload: { sound: "startRecording" | "stopRecording" | "cancel" },
@@ -1651,6 +1701,10 @@ export type IpcEventContract = {
   [IPC_CAPTURE_REGION_FAILED]: void;
   [IPC_OVERLAY_START_REGION_CAPTURE]: { mode?: "capture" | "window-attach" };
   [IPC_OVERLAY_END_REGION_CAPTURE]: void;
+  [IPC_SHOW_STELLA_RECORDED]: ShowStellaRecorded;
+  [IPC_SHOW_STELLA_OVERLAY_STATE]: ShowStellaOverlayState;
+  [IPC_SHOW_STELLA_INK]: ShowStellaInk;
+  [IPC_SHOW_STELLA_STOP_RECORDER]: { captureId: string };
   [IPC_OVERLAY_WINDOW_HIGHLIGHT]:
     | (IpcRect & { tone?: WindowHighlightTone })
     | null;

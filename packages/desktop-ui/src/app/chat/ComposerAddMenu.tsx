@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, useState } from "react";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { Camera, File, Paperclip } from "@/ui/icons";
+import { Camera, File, Paperclip, Video } from "@/ui/icons";
+import { toggleShowStella, useShowStellaStatus } from "@/features/show-stella/use-show-stella";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +74,7 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const { recentFiles, recordRecentFiles } = useRecentFiles();
+  const showStella = useShowStellaStatus();
 
   const handleAttachFiles = useCallback(() => {
     fileInputRef.current?.click();
@@ -186,6 +188,19 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
               {t("app.chat.addMenu.capture")}
             </DropdownMenuItem>
           ) : null}
+          {allowCapture && showStella?.available ? (
+            <DropdownMenuItem onSelect={() => void toggleShowStella()}>
+              <span data-slot="dropdown-menu-item-icon">
+                <Video size={16} strokeWidth={1.75} />
+              </span>
+              {t("app.chat.addMenu.showStella")}
+              {showStella.shortcut ? (
+                <span className="composer-add-menu__shortcut">
+                  {formatShortcut(showStella.shortcut)}
+                </span>
+              ) : null}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={handleAttachFiles}>
             <span data-slot="dropdown-menu-item-icon">
               <Paperclip size={16} strokeWidth={1.75} />
@@ -233,3 +248,20 @@ function ContextSuggestionIcon({
     </span>
   );
 }
+
+const formatShortcut = (accelerator: string): string => {
+  const mac = getElectronApi()?.platform === "darwin";
+  if (!mac) return accelerator.replace(/Control/g, "Ctrl");
+  const symbols: Record<string, string> = {
+    Control: "⌃",
+    Alt: "⌥",
+    Shift: "⇧",
+    Command: "⌘",
+    CommandOrControl: "⌘",
+  };
+  const parts = accelerator.split("+");
+  const order = ["Control", "Alt", "Shift", "Command", "CommandOrControl"];
+  const mods = parts.filter((part) => part in symbols).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const keys = parts.filter((part) => !(part in symbols));
+  return `${mods.map((part) => symbols[part]).join("")}${keys.join("")}`;
+};

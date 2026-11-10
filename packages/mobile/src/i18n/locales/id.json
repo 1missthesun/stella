@@ -20,7 +20,8 @@
         "attachFiles": "Lampirkan berkas…",
         "capture": "Tangkap",
         "context": "Konteks",
-        "recent": "Terbaru"
+        "recent": "Terbaru",
+        "showStella": "Tunjukkan ke Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Buka utas agen {title}",
@@ -85,7 +86,15 @@
         "windowCapturing": "{label} — menangkap jendela…",
         "windowClickToEnlarge": "{label} — klik untuk memperbesar",
         "windowPreviewAlt": "Pratinjau konten jendela",
-        "windowScreenshotAlt": "Tangkapan layar jendela {label}"
+        "windowScreenshotAlt": "Tangkapan layar jendela {label}",
+        "showCapture": {
+          "title": "Rekaman layar · {duration}",
+          "preparing": "Menyiapkan…",
+          "failed": "Rekaman ini tidak dapat disiapkan",
+          "saveVideo": "Simpan video ke Drive",
+          "remove": "Hapus rekaman",
+          "alt": "Momen dari rekaman layar Anda"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Tambahkan {detail} (jendela saat ini) sebagai konteks",
@@ -827,6 +836,11 @@
     "voice": {
       "needsSetupTitle": "Suara perlu disiapkan",
       "signInTitle": "Masuk untuk memakai suara"
+    },
+    "showStella": {
+      "done": "Selesai",
+      "hint": "Tahan {shift} untuk menggambar · {shift}-klik untuk pin · Esc untuk membuang",
+      "hintNoInk": "Esc untuk membuang"
     }
   },
   "global": {

@@ -21,7 +21,8 @@
         "attachFiles": "Dosya ekle…",
         "capture": "Yakala",
         "context": "Bağlam",
-        "recent": "Son kullanılanlar"
+        "recent": "Son kullanılanlar",
+        "showStella": "Stella'ya göster"
       },
       "agentCompletion": {
         "openNamedThread": "{title} aracı iş parçacığını aç",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — pencere yakalanıyor…",
         "windowClickToEnlarge": "{label} — büyütmek için tıklayın",
         "windowPreviewAlt": "Pencere içeriği önizlemesi",
-        "windowScreenshotAlt": "{label} pencere ekran görüntüsü"
+        "windowScreenshotAlt": "{label} pencere ekran görüntüsü",
+        "showCapture": {
+          "title": "Ekran kaydı · {duration}",
+          "preparing": "Hazırlanıyor…",
+          "failed": "Bu kayıt hazırlanamadı",
+          "saveVideo": "Videoyu Drive'a kaydet",
+          "remove": "Kaydı kaldır",
+          "alt": "Ekran kaydınızdan anlar"
+        }
       },
       "contextRow": {
         "addActiveWindow": "{detail} ögesini (geçerli pencere) bağlam olarak ekle",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Ses kurulum gerektiriyor",
       "signInTitle": "Sesi kullanmak için giriş yapın"
+    },
+    "showStella": {
+      "done": "Bitti",
+      "hint": "Çizmek için {shift} basılı tutun · İğne için {shift}+tıklayın · Vazgeçmek için Esc",
+      "hintNoInk": "Vazgeçmek için Esc"
     }
   },
   "global": {

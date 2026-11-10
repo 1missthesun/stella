@@ -20,7 +20,8 @@
         "attachFiles": "파일 첨부…",
         "capture": "캡처",
         "context": "컨텍스트",
-        "recent": "최근"
+        "recent": "최근",
+        "showStella": "Stella에게 보여주기"
       },
       "agentCompletion": {
         "openNamedThread": "{title} 에이전트 스레드 열기",
@@ -85,7 +86,15 @@
         "windowCapturing": "{label} — 창 캡처 중…",
         "windowClickToEnlarge": "{label} — 클릭해 확대",
         "windowPreviewAlt": "창 내용 미리보기",
-        "windowScreenshotAlt": "{label} 창 스크린샷"
+        "windowScreenshotAlt": "{label} 창 스크린샷",
+        "showCapture": {
+          "title": "화면 녹화 · {duration}",
+          "preparing": "준비 중…",
+          "failed": "이 녹화를 준비하지 못했습니다",
+          "saveVideo": "동영상을 Drive에 저장",
+          "remove": "녹화 제거",
+          "alt": "화면 녹화의 장면"
+        }
       },
       "contextRow": {
         "addActiveWindow": "{detail}(현재 창)을 컨텍스트로 추가",
@@ -827,6 +836,11 @@
     "voice": {
       "needsSetupTitle": "음성 설정이 필요합니다",
       "signInTitle": "음성을 사용하려면 로그인하세요"
+    },
+    "showStella": {
+      "done": "완료",
+      "hint": "{shift}를 누른 채 그리기 · {shift}+클릭으로 핀 · Esc로 취소",
+      "hintNoInk": "Esc로 취소"
     }
   },
   "global": {

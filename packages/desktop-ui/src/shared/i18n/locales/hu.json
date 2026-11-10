@@ -21,7 +21,8 @@
         "attachFiles": "Fájlok csatolása…",
         "capture": "Rögzítés",
         "context": "Kontextus",
-        "recent": "Legutóbbi"
+        "recent": "Legutóbbi",
+        "showStella": "Megmutatom Stellának"
       },
       "agentCompletion": {
         "openNamedThread": "Ügynökszál megnyitása: {title}",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — ablak rögzítése…",
         "windowClickToEnlarge": "{label} — kattints a nagyításhoz",
         "windowPreviewAlt": "Ablaktartalom előnézete",
-        "windowScreenshotAlt": "Ablak képernyőképe: {label}"
+        "windowScreenshotAlt": "Ablak képernyőképe: {label}",
+        "showCapture": {
+          "title": "Képernyőfelvétel · {duration}",
+          "preparing": "Előkészítés…",
+          "failed": "Ezt a felvételt nem sikerült előkészíteni",
+          "saveVideo": "Videó mentése a Drive-ra",
+          "remove": "Felvétel eltávolítása",
+          "alt": "Pillanatok a képernyőfelvételedből"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Hozzáadás kontextusként: {detail} (aktuális ablak)",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "A hangot be kell állítani",
       "signInTitle": "Jelentkezz be a hang használatához"
+    },
+    "showStella": {
+      "done": "Kész",
+      "hint": "Rajzoláshoz tartsd lenyomva: {shift} · {shift}+kattintás: tű · Esc: elvetés",
+      "hintNoInk": "Esc: elvetés"
     }
   },
   "global": {

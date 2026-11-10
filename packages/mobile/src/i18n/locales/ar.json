@@ -25,7 +25,8 @@
         "attachFiles": "أرفق ملفات…",
         "capture": "التقاط",
         "context": "السياق",
-        "recent": "الأخيرة"
+        "recent": "الأخيرة",
+        "showStella": "أرِ Stella"
       },
       "agentCompletion": {
         "openNamedThread": "افتح مسار وكيل {title}",
@@ -100,7 +101,15 @@
         "windowCapturing": "{label} — جارٍ التقاط النافذة…",
         "windowClickToEnlarge": "{label} — انقر للتكبير",
         "windowPreviewAlt": "معاينة محتوى النافذة",
-        "windowScreenshotAlt": "لقطة شاشة لنافذة {label}"
+        "windowScreenshotAlt": "لقطة شاشة لنافذة {label}",
+        "showCapture": {
+          "title": "تسجيل الشاشة · {duration}",
+          "preparing": "جارٍ التحضير…",
+          "failed": "تعذّر تحضير هذا التسجيل",
+          "saveVideo": "حفظ الفيديو في Drive",
+          "remove": "إزالة التسجيل",
+          "alt": "لقطات من تسجيل شاشتك"
+        }
       },
       "contextRow": {
         "addActiveWindow": "أضف {detail} (النافذة الحالية) كسياق",
@@ -857,6 +866,11 @@
     "voice": {
       "needsSetupTitle": "يحتاج الصوت إلى إعداد",
       "signInTitle": "سجّل الدخول لاستخدام الصوت"
+    },
+    "showStella": {
+      "done": "تم",
+      "hint": "اضغط مطولاً على {shift} للرسم · {shift} مع النقر لوضع دبوس · Esc للتجاهل",
+      "hintNoInk": "Esc للتجاهل"
     }
   },
   "global": {

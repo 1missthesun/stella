@@ -21,7 +21,8 @@
         "attachFiles": "फ़ाइलें संलग्न करें…",
         "capture": "कैप्चर",
         "context": "संदर्भ",
-        "recent": "हाल के"
+        "recent": "हाल के",
+        "showStella": "Stella को दिखाएँ"
       },
       "agentCompletion": {
         "openNamedThread": "{title} एजेंट थ्रेड खोलें",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — विंडो कैप्चर हो रही है…",
         "windowClickToEnlarge": "{label} — बड़ा करने के लिए क्लिक करें",
         "windowPreviewAlt": "विंडो सामग्री पूर्वावलोकन",
-        "windowScreenshotAlt": "{label} विंडो स्क्रीनशॉट"
+        "windowScreenshotAlt": "{label} विंडो स्क्रीनशॉट",
+        "showCapture": {
+          "title": "स्क्रीन रिकॉर्डिंग · {duration}",
+          "preparing": "तैयार हो रहा है…",
+          "failed": "यह रिकॉर्डिंग तैयार नहीं हो सकी",
+          "saveVideo": "वीडियो Drive में सहेजें",
+          "remove": "रिकॉर्डिंग हटाएँ",
+          "alt": "आपकी स्क्रीन रिकॉर्डिंग के पल"
+        }
       },
       "contextRow": {
         "addActiveWindow": "{detail} (मौजूदा विंडो) संदर्भ के रूप में जोड़ें",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "आवाज़ के लिए सेटअप ज़रूरी है",
       "signInTitle": "आवाज़ उपयोग करने के लिए साइन इन करें"
+    },
+    "showStella": {
+      "done": "हो गया",
+      "hint": "ड्रॉ करने के लिए {shift} दबाए रखें · पिन के लिए {shift}-क्लिक · हटाने के लिए Esc",
+      "hintNoInk": "हटाने के लिए Esc"
     }
   },
   "global": {

@@ -23,7 +23,8 @@
         "attachFiles": "Załącz pliki…",
         "capture": "Zrzut",
         "context": "Kontekst",
-        "recent": "Ostatnie"
+        "recent": "Ostatnie",
+        "showStella": "Pokaż Stelli"
       },
       "agentCompletion": {
         "openNamedThread": "Otwórz wątek agenta {title}",
@@ -94,7 +95,15 @@
         "windowCapturing": "{label} — przechwytywanie okna…",
         "windowClickToEnlarge": "{label} — kliknij, aby powiększyć",
         "windowPreviewAlt": "Podgląd zawartości okna",
-        "windowScreenshotAlt": "Zrzut okna {label}"
+        "windowScreenshotAlt": "Zrzut okna {label}",
+        "showCapture": {
+          "title": "Nagranie ekranu · {duration}",
+          "preparing": "Przygotowywanie…",
+          "failed": "Nie udało się przygotować tego nagrania",
+          "saveVideo": "Zapisz wideo na Drive",
+          "remove": "Usuń nagranie",
+          "alt": "Momenty z nagrania ekranu"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Dodaj {detail} (bieżące okno) jako kontekst",
@@ -845,6 +854,11 @@
     "voice": {
       "needsSetupTitle": "Głos wymaga konfiguracji",
       "signInTitle": "Zaloguj się, aby używać głosu"
+    },
+    "showStella": {
+      "done": "Gotowe",
+      "hint": "Przytrzymaj {shift}, aby rysować · {shift}+klik, aby dodać pinezkę · Esc, aby odrzucić",
+      "hintNoInk": "Esc, aby odrzucić"
     }
   },
   "global": {

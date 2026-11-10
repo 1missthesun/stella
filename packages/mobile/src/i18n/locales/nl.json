@@ -21,7 +21,8 @@
         "attachFiles": "Bestanden bijvoegen…",
         "capture": "Vastleggen",
         "context": "Context",
-        "recent": "Recent"
+        "recent": "Recent",
+        "showStella": "Laat Stella zien"
       },
       "agentCompletion": {
         "openNamedThread": "Agent-thread {title} openen",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — venster vastleggen…",
         "windowClickToEnlarge": "{label} — klik om te vergroten",
         "windowPreviewAlt": "Voorbeeld van vensterinhoud",
-        "windowScreenshotAlt": "Schermafbeelding van venster {label}"
+        "windowScreenshotAlt": "Schermafbeelding van venster {label}",
+        "showCapture": {
+          "title": "Schermopname · {duration}",
+          "preparing": "Voorbereiden…",
+          "failed": "Deze opname kon niet worden voorbereid",
+          "saveVideo": "Video opslaan in Drive",
+          "remove": "Opname verwijderen",
+          "alt": "Momenten uit je schermopname"
+        }
       },
       "contextRow": {
         "addActiveWindow": "{detail} (huidig venster) als context toevoegen",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Stem moet nog worden ingesteld",
       "signInTitle": "Log in om stem te gebruiken"
+    },
+    "showStella": {
+      "done": "Klaar",
+      "hint": "Houd {shift} ingedrukt om te tekenen · {shift}-klik voor een speld · Esc om te verwerpen",
+      "hintNoInk": "Esc om te verwerpen"
     }
   },
   "global": {

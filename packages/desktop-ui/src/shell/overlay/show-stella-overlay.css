@@ -1,0 +1,93 @@
+.show-stella-ink {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.show-stella-edge {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(229, 55, 43, 0.6);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.show-stella-bar {
+  position: absolute;
+  z-index: 5;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 34px;
+  padding: 0 4px 0 14px;
+  border-radius: 10px;
+  background: rgba(22, 22, 26, 0.94);
+  color: #f4f2ec;
+  font: 500 12.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  pointer-events: auto;
+  user-select: none;
+  white-space: nowrap;
+  animation: show-stella-bar-in 160ms ease-out both;
+}
+
+.show-stella-bar__time {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+}
+
+.show-stella-bar__hint {
+  color: #a9a7a0;
+  max-width: 420px;
+  overflow: hidden;
+  transition:
+    max-width 320ms ease,
+    opacity 240ms ease;
+}
+
+.show-stella-bar__hint--gone {
+  max-width: 0;
+  opacity: 0;
+  margin-left: -12px;
+}
+
+.show-stella-bar__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: #f4f2ec;
+  color: #16161a;
+  font: 600 12.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+
+.show-stella-bar__done:hover {
+  background: #ffffff;
+}
+
+.show-stella-bar__stop {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #e5372b;
+}
+
+@keyframes show-stella-bar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

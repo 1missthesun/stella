@@ -23,7 +23,8 @@
         "attachFiles": "Připojit soubory…",
         "capture": "Snímek",
         "context": "Kontext",
-        "recent": "Nedávné"
+        "recent": "Nedávné",
+        "showStella": "Ukázat Stelle"
       },
       "agentCompletion": {
         "openNamedThread": "Otevřít vlákno agenta {title}",
@@ -94,7 +95,15 @@
         "windowCapturing": "{label} — snímání okna…",
         "windowClickToEnlarge": "{label} — kliknutím zvětšíte",
         "windowPreviewAlt": "Náhled obsahu okna",
-        "windowScreenshotAlt": "Snímek okna {label}"
+        "windowScreenshotAlt": "Snímek okna {label}",
+        "showCapture": {
+          "title": "Záznam obrazovky · {duration}",
+          "preparing": "Připravuje se…",
+          "failed": "Tento záznam se nepodařilo připravit",
+          "saveVideo": "Uložit video na Drive",
+          "remove": "Odebrat záznam",
+          "alt": "Okamžiky z vašeho záznamu obrazovky"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Přidat {detail} (aktuální okno) jako kontext",
@@ -845,6 +854,11 @@
     "voice": {
       "needsSetupTitle": "Hlas vyžaduje nastavení",
       "signInTitle": "Pro hlas se přihlaste"
+    },
+    "showStella": {
+      "done": "Hotovo",
+      "hint": "Podržte {shift} a kreslete · {shift}+klik vloží špendlík · Esc zahodí",
+      "hintNoInk": "Esc zahodí"
     }
   },
   "global": {

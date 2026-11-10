@@ -20,7 +20,8 @@
         "attachFiles": "Đính kèm tệp…",
         "capture": "Chụp",
         "context": "Ngữ cảnh",
-        "recent": "Gần đây"
+        "recent": "Gần đây",
+        "showStella": "Cho Stella xem"
       },
       "agentCompletion": {
         "openNamedThread": "Mở luồng tác nhân {title}",
@@ -85,7 +86,15 @@
         "windowCapturing": "{label} — đang chụp cửa sổ…",
         "windowClickToEnlarge": "{label} — nhấp để phóng to",
         "windowPreviewAlt": "Xem trước nội dung cửa sổ",
-        "windowScreenshotAlt": "Ảnh chụp cửa sổ {label}"
+        "windowScreenshotAlt": "Ảnh chụp cửa sổ {label}",
+        "showCapture": {
+          "title": "Quay màn hình · {duration}",
+          "preparing": "Đang chuẩn bị…",
+          "failed": "Không thể chuẩn bị bản ghi này",
+          "saveVideo": "Lưu video vào Drive",
+          "remove": "Xóa bản ghi",
+          "alt": "Khoảnh khắc từ bản quay màn hình của bạn"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Thêm {detail} (cửa sổ hiện tại) làm ngữ cảnh",
@@ -827,6 +836,11 @@
     "voice": {
       "needsSetupTitle": "Giọng nói cần được thiết lập",
       "signInTitle": "Đăng nhập để dùng giọng nói"
+    },
+    "showStella": {
+      "done": "Xong",
+      "hint": "Giữ {shift} để vẽ · {shift}+nhấp để ghim · Esc để hủy",
+      "hintNoInk": "Esc để hủy"
     }
   },
   "global": {

@@ -18,6 +18,7 @@ import { useLocalAgentStream } from "../streaming/use-local-agent-stream";
 import { acceptedUserMessageIds } from "../lib/accepted-user-message-ids";
 import { onPiChatEvents } from "@/features/chat/pi/pi-chat-store";
 import { showToast } from "@/ui/toast";
+import { expandShowCaptures } from "@/features/show-stella/use-show-stella";
 
 type UseStreamingChatOptions = {
   conversationId: string | null;
@@ -213,7 +214,11 @@ export function useStreamingChatCore({
   }, [acknowledgeMessages, optimisticEvents, persistedMessages]);
 
   const sendMessage = useCallback(
-    async (options: SendMessageArgs) => {
+    async (sent: SendMessageArgs) => {
+      const options: SendMessageArgs = {
+        ...sent,
+        chatContext: expandShowCaptures(sent.chatContext),
+      };
       const resolvedConversationId = activeConversationId;
       const cleanedText = options.text.trim();
       const contextState = resolveComposerContextState(

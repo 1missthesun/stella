@@ -9,6 +9,9 @@ import {
   IPC_OVERLAY_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_START_REGION_CAPTURE,
   IPC_OVERLAY_END_REGION_CAPTURE,
+  IPC_SHOW_STELLA_OVERLAY_STATE,
+  IPC_SHOW_STELLA_INK,
+  IPC_SHOW_STELLA_STOP_RECORDER,
 } from "@stella/contracts/desktop/ipc-channels";
 import {
   onIpc,
@@ -370,6 +373,7 @@ export class OverlayWindowController {
     destroyed = false;
     activeRegionCapture = false;
     activeWindowHighlight = false;
+    activeShowStella = false;
     windowHighlightRequestId = 0;
     idleDestroyTimer = null;
     handleOverlaySetInteractive = (_event, interactive) => {
@@ -452,7 +456,8 @@ export class OverlayWindowController {
     }
     get isAnyActive() {
         return (this.activeRegionCapture ||
-            this.activeWindowHighlight);
+            this.activeWindowHighlight ||
+            this.activeShowStella);
     }
     async setWindowHighlight(bounds, tone = 'default') {
         if (!bounds) {
@@ -564,6 +569,47 @@ export class OverlayWindowController {
             restoreIgnoreMouseEvents: true,
             focusable: false,
         });
+    }
+    /** Show Stella: the capture bar, the red edge and live ink, never captured. */
+    async startShowStella(state) {
+        await this.showSurface({
+            setActive: () => {
+                this.activeShowStella = true;
+            },
+            channel: IPC_SHOW_STELLA_OVERLAY_STATE,
+            payload: state,
+            sendBeforeShow: true,
+            showOptions: { inactive: true },
+            interactive: false,
+            focusable: false,
+        });
+        return this.overlayWindow.isReady();
+    }
+    sendShowStellaInk(ink) {
+        if (this.activeShowStella)
+            this.overlayWindow.send(IPC_SHOW_STELLA_INK, ink);
+    }
+    stopShowStellaRecorder(captureId) {
+        this.overlayWindow.send(IPC_SHOW_STELLA_STOP_RECORDER, { captureId });
+    }
+    showStellaFinishing(captureId) {
+        this.overlayWindow.send(IPC_SHOW_STELLA_OVERLAY_STATE, { phase: 'finishing', captureId });
+    }
+    endShowStella() {
+        if (!this.activeShowStella)
+            return;
+        this.hideSurface({
+            setInactive: () => {
+                this.activeShowStella = false;
+            },
+            channel: IPC_SHOW_STELLA_OVERLAY_STATE,
+            payload: { phase: 'idle' },
+            restoreIgnoreMouseEvents: true,
+            focusable: false,
+        });
+    }
+    getWebContents() {
+        return this.overlayWindow.getWindow()?.webContents ?? null;
     }
     send(channel, ...args) {
         this.overlayWindow.send(channel, ...args);

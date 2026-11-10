@@ -22,7 +22,8 @@
         "attachFiles": "Joindre des fichiers…",
         "capture": "Capturer",
         "context": "Contexte",
-        "recent": "Récent"
+        "recent": "Récent",
+        "showStella": "Montrer à Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Ouvrir le fil d’agent {title}",
@@ -91,7 +92,15 @@
         "windowCapturing": "{label} — capture de la fenêtre…",
         "windowClickToEnlarge": "{label} — cliquez pour agrandir",
         "windowPreviewAlt": "Aperçu du contenu de la fenêtre",
-        "windowScreenshotAlt": "Capture de la fenêtre {label}"
+        "windowScreenshotAlt": "Capture de la fenêtre {label}",
+        "showCapture": {
+          "title": "Enregistrement d’écran · {duration}",
+          "preparing": "Préparation…",
+          "failed": "Impossible de préparer cet enregistrement",
+          "saveVideo": "Enregistrer la vidéo dans Drive",
+          "remove": "Retirer l’enregistrement",
+          "alt": "Moments de votre enregistrement d’écran"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Ajouter {detail} (fenêtre actuelle) comme contexte",
@@ -839,6 +848,11 @@
     "voice": {
       "needsSetupTitle": "La voix doit être configurée",
       "signInTitle": "Connectez-vous pour utiliser la voix"
+    },
+    "showStella": {
+      "done": "Terminé",
+      "hint": "Maintenez {shift} pour dessiner · {shift}-clic pour une épingle · Échap pour annuler",
+      "hintNoInk": "Échap pour annuler"
     }
   },
   "global": {

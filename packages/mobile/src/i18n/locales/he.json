@@ -22,7 +22,8 @@
         "attachFiles": "צרף קבצים…",
         "capture": "צילום",
         "context": "הקשר",
-        "recent": "אחרונים"
+        "recent": "אחרונים",
+        "showStella": "להראות ל-Stella"
       },
       "agentCompletion": {
         "openNamedThread": "פתח את שרשור הסוכן {title}",
@@ -91,7 +92,15 @@
         "windowCapturing": "{label} — מצלם את החלון…",
         "windowClickToEnlarge": "{label} — לחץ כדי להגדיל",
         "windowPreviewAlt": "תצוגה מקדימה של תוכן החלון",
-        "windowScreenshotAlt": "צילום מסך של חלון {label}"
+        "windowScreenshotAlt": "צילום מסך של חלון {label}",
+        "showCapture": {
+          "title": "הקלטת מסך · {duration}",
+          "preparing": "בהכנה…",
+          "failed": "לא ניתן היה להכין את ההקלטה",
+          "saveVideo": "שמירת הסרטון ב-Drive",
+          "remove": "הסרת ההקלטה",
+          "alt": "רגעים מהקלטת המסך שלך"
+        }
       },
       "contextRow": {
         "addActiveWindow": "הוסף את {detail} (החלון הנוכחי) כהקשר",
@@ -839,6 +848,11 @@
     "voice": {
       "needsSetupTitle": "הקול דורש הגדרה",
       "signInTitle": "התחבר כדי להשתמש בקול"
+    },
+    "showStella": {
+      "done": "סיום",
+      "hint": "החזקת {shift} לציור · {shift}+לחיצה לנעץ · Esc לביטול",
+      "hintNoInk": "Esc לביטול"
     }
   },
   "global": {

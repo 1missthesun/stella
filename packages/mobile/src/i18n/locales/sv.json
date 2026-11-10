@@ -21,7 +21,8 @@
         "attachFiles": "Bifoga filer…",
         "capture": "Fånga",
         "context": "Kontext",
-        "recent": "Senaste"
+        "recent": "Senaste",
+        "showStella": "Visa Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Öppna agenttråden {title}",
@@ -88,7 +89,15 @@
         "windowCapturing": "{label} — fångar fönster…",
         "windowClickToEnlarge": "{label} — klicka för att förstora",
         "windowPreviewAlt": "Förhandsvisning av fönsterinnehåll",
-        "windowScreenshotAlt": "Skärmbild av fönstret {label}"
+        "windowScreenshotAlt": "Skärmbild av fönstret {label}",
+        "showCapture": {
+          "title": "Skärminspelning · {duration}",
+          "preparing": "Förbereder…",
+          "failed": "Inspelningen kunde inte förberedas",
+          "saveVideo": "Spara video i Drive",
+          "remove": "Ta bort inspelning",
+          "alt": "Ögonblick från din skärminspelning"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Lägg till {detail} (aktuellt fönster) som kontext",
@@ -833,6 +842,11 @@
     "voice": {
       "needsSetupTitle": "Röst behöver konfigureras",
       "signInTitle": "Logga in för att använda röst"
+    },
+    "showStella": {
+      "done": "Klar",
+      "hint": "Håll {shift} för att rita · {shift}-klicka för en nål · Esc för att kasta",
+      "hintNoInk": "Esc för att kasta"
     }
   },
   "global": {

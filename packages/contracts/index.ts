@@ -11,6 +11,30 @@ export type WindowBounds = {
   height: number;
 };
 
+/** A Show Stella capture waiting in the composer. */
+export type ShowCaptureAttachment = {
+  id: string;
+  status: "preparing" | "ready" | "failed";
+  durationMs: number;
+  /** The capture's folder on this computer. */
+  dir: string;
+  contactSheet?: {
+    path: string;
+    previewUrl: string;
+    width: number;
+    height: number;
+  };
+  /** What a task reads: the numbered moments and what was said at each. */
+  summary?: string;
+  moments?: number;
+  /** The start of what was said, for the card. */
+  said?: string;
+  video?: { path: string; name: string; size: number; mimeType: string };
+  /** Opt-in: the recording goes with the message, into the user's Drive. */
+  saveVideoToDrive?: boolean;
+  error?: string;
+};
+
 export type ChatContextFile = {
   name: string;
   size: number;
@@ -71,6 +95,7 @@ export type ChatContext = {
   }[];
   files?: ChatContextFile[];
   pastedTexts?: string[];
+  showCaptures?: ShowCaptureAttachment[];
   capturePending?: boolean;
   windowScreenshot?: {
     dataUrl: string;

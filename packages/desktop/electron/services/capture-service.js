@@ -51,12 +51,30 @@ export class CaptureService {
         }
         this.lastBroadcastChatContextVersion = this.chatContextVersion;
     }
+    /**
+     * Adds or updates a Show Stella capture card in the composer. An update to
+     * a card the user already removed is dropped unless `add` is set.
+     */
+    upsertShowCapture(capture, { add = false } = {}) {
+        const ctx = this.getChatContextSnapshot() ?? this.emptyContext();
+        const list = ctx.showCaptures ?? [];
+        const index = list.findIndex((entry) => entry.id === capture.id);
+        if (index < 0 && !add)
+            return false;
+        const next = index < 0
+            ? [...list, capture]
+            : list.map((entry) => (entry.id === capture.id ? { ...entry, ...capture } : entry));
+        this.setPendingChatContext({ ...ctx, showCaptures: next });
+        this.broadcastChatContext();
+        return true;
+    }
     clearTransientContext() {
         const current = this.pendingChatContext;
-        if (current?.regionScreenshots?.length) {
+        if (current?.regionScreenshots?.length || current?.showCaptures?.length) {
             this.setPendingChatContext({
                 ...this.emptyContext(),
-                regionScreenshots: current.regionScreenshots,
+                regionScreenshots: current.regionScreenshots ?? [],
+                ...(current.showCaptures?.length ? { showCaptures: current.showCaptures } : {}),
             });
         }
         else {

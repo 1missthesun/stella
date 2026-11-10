@@ -33,6 +33,8 @@ import { PastedTextTile } from "./AttachmentTiles";
 import { useHoverPreview } from "./use-hover-preview";
 import { ImageLightbox } from "@/ui/image-lightbox";
 import { getElectronApi } from "@/platform/electron/electron";
+import { viewAtom } from "@/platform/view-state/view-state";
+import type { ShowCaptureAttachment } from "@stella/contracts";
 import {
   describePastedText,
   PASTED_TEXT_PREVIEW_MAX_CHARS,
@@ -669,5 +671,103 @@ export function PastedTextChip({
         />
       }
     />
+  );
+}
+
+const openShowCapture = viewAtom("showStella.openCapture", "");
+
+const captureClock = (ms: number) => {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
+
+export function ShowCaptureChip({
+  capture,
+  setChatContext,
+}: {
+  capture: ShowCaptureAttachment;
+  setChatContext: SetChatContext;
+}) {
+  const t = useT();
+  const openId = openShowCapture.use();
+  const title = t("app.chat.contextChips.showCapture.title", {
+    duration: captureClock(capture.durationMs),
+  });
+  const remove = () => {
+    if (openShowCapture.get() === capture.id) openShowCapture.set("");
+    setChatContext((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        showCaptures: (prev.showCaptures ?? []).filter((entry) => entry.id !== capture.id),
+      };
+    });
+  };
+  const setSaveVideo = (save: boolean) =>
+    setChatContext((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        showCaptures: (prev.showCaptures ?? []).map((entry) =>
+          entry.id === capture.id ? { ...entry, saveVideoToDrive: save } : entry,
+        ),
+      };
+    });
+  const sheet = capture.status === "ready" ? capture.contactSheet : undefined;
+  const detail =
+    capture.status === "preparing"
+      ? t("app.chat.contextChips.showCapture.preparing")
+      : capture.status === "failed"
+        ? t("app.chat.contextChips.showCapture.failed")
+        : (capture.said ?? "");
+  return (
+    <span className="attachment-tile-shell composer-chip-shell">
+      <span
+        className="attachment-tile show-capture-tile"
+        data-status={capture.status}
+        title={capture.status === "failed" ? capture.error : undefined}
+      >
+        {sheet ? (
+          <button
+            type="button"
+            className="show-capture-tile__sheet"
+            title={t("app.chat.contextChips.screenshotEnlargeTitle")}
+            onClick={() => openShowCapture.set(capture.id)}
+          >
+            <img src={sheet.previewUrl} alt={t("app.chat.contextChips.showCapture.alt")} />
+          </button>
+        ) : (
+          <span className="show-capture-tile__sheet show-capture-tile__sheet--empty">
+            <Video size={18} strokeWidth={1.75} />
+          </span>
+        )}
+        <span className="show-capture-tile__text">
+          <span className="show-capture-tile__title">{title}</span>
+          {detail ? <span className="show-capture-tile__said">{detail}</span> : null}
+          {capture.status === "ready" && capture.video ? (
+            <label className="show-capture-tile__drive">
+              <input
+                type="checkbox"
+                checked={capture.saveVideoToDrive === true}
+                onChange={(event) => setSaveVideo(event.target.checked)}
+              />
+              {t("app.chat.contextChips.showCapture.saveVideo")}
+            </label>
+          ) : null}
+        </span>
+      </span>
+      <ChipRemoveButton
+        label={t("app.chat.contextChips.showCapture.remove")}
+        onRemove={remove}
+      />
+      {sheet ? (
+        <ImageLightbox
+          open={openId === capture.id}
+          onOpenChange={(open) => openShowCapture.set(open ? capture.id : "")}
+          src={sheet.previewUrl}
+          alt={t("app.chat.contextChips.showCapture.alt")}
+        />
+      ) : null}
+    </span>
   );
 }

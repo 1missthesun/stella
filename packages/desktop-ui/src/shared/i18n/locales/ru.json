@@ -23,7 +23,8 @@
         "attachFiles": "Прикрепить файлы…",
         "capture": "Снимок",
         "context": "Контекст",
-        "recent": "Недавние"
+        "recent": "Недавние",
+        "showStella": "Показать Stella"
       },
       "agentCompletion": {
         "openNamedThread": "Открыть поток агента {title}",
@@ -94,7 +95,15 @@
         "windowCapturing": "{label} — снимок окна…",
         "windowClickToEnlarge": "{label} — нажмите, чтобы увеличить",
         "windowPreviewAlt": "Предпросмотр содержимого окна",
-        "windowScreenshotAlt": "Снимок окна {label}"
+        "windowScreenshotAlt": "Снимок окна {label}",
+        "showCapture": {
+          "title": "Запись экрана · {duration}",
+          "preparing": "Подготовка…",
+          "failed": "Не удалось подготовить эту запись",
+          "saveVideo": "Сохранить видео в Drive",
+          "remove": "Удалить запись",
+          "alt": "Моменты из записи экрана"
+        }
       },
       "contextRow": {
         "addActiveWindow": "Добавить {detail} (текущее окно) как контекст",
@@ -845,6 +854,11 @@
     "voice": {
       "needsSetupTitle": "Голос требует настройки",
       "signInTitle": "Войдите, чтобы использовать голос"
+    },
+    "showStella": {
+      "done": "Готово",
+      "hint": "Удерживайте {shift}, чтобы рисовать · {shift}+клик — метка · Esc — отменить",
+      "hintNoInk": "Esc — отменить"
     }
   },
   "global": {

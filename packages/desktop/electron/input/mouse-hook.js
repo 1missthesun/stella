@@ -10,6 +10,7 @@ const LEFT_ALT = 56;
 const RIGHT_ALT = 3640;
 const ALT_KEYCODES = new Set([LEFT_ALT, RIGHT_ALT]);
 const ALT_TAP_MAX_MS = 400;
+const CAPTURE_EVENT_TYPES = ['mousemove', 'mousedown', 'mouseup', 'wheel', 'keydown', 'keyup'];
 export class MouseHookManager {
     started = false;
     disposed = false;
@@ -18,13 +19,65 @@ export class MouseHookManager {
     pressedKeycodes = new Set();
     altDownAt = null;
     handlers = null;
+    captureListener = null;
+    captureHookStarted = false;
     setDictationTapHandlers(handlers) {
         this.handlers = handlers;
     }
+    /**
+     * Every pointer and key event, for Show Stella's timeline. Starts the hook
+     * when nothing else has; returns false when it can't run.
+     */
+    subscribeCapture(listener) {
+        if (this.disposed)
+            return false;
+        const uiohook = getUiohook();
+        this.captureListener = listener;
+        for (const type of CAPTURE_EVENT_TYPES) {
+            uiohook.on(type, this.captureHandlers[type]);
+        }
+        if (!this.uiohookStarted) {
+            try {
+                uiohook.start();
+                this.uiohookStarted = true;
+                this.captureHookStarted = true;
+            }
+            catch (error) {
+                console.error('[mouse-hook] Failed to start input hook for capture:', error.message);
+                this.unsubscribeCapture();
+                return false;
+            }
+        }
+        return true;
+    }
+    unsubscribeCapture() {
+        if (!this.captureListener && !this.captureHookStarted)
+            return;
+        this.captureListener = null;
+        const uiohook = getUiohook();
+        for (const type of CAPTURE_EVENT_TYPES) {
+            uiohook.off(type, this.captureHandlers[type]);
+        }
+        if (this.captureHookStarted && !this.started) {
+            try {
+                uiohook.stop();
+            }
+            catch (error) {
+                console.warn('[mouse-hook] Failed to stop input hook:', error.message);
+            }
+            this.uiohookStarted = false;
+        }
+        this.captureHookStarted = false;
+    }
+    captureHandlers = Object.fromEntries(CAPTURE_EVENT_TYPES.map((type) => [
+        type,
+        (event) => this.captureListener?.(type, event),
+    ]));
     start() {
         if (this.started || this.disposed)
             return;
         this.started = true;
+        this.captureHookStarted = false;
         try {
             this.attachUiohookListeners();
             if (!this.uiohookStarted) {
@@ -40,6 +93,13 @@ export class MouseHookManager {
         if (!this.started && !this.uiohookStarted && !this.uiohookListenersAttached)
             return;
         this.started = false;
+        if (this.captureListener) {
+            this.altDownAt = null;
+            this.pressedKeycodes.clear();
+            this.detachUiohookListeners();
+            this.captureHookStarted = this.uiohookStarted;
+            return;
+        }
         this.altDownAt = null;
         this.pressedKeycodes.clear();
         this.detachUiohookListeners();
@@ -55,6 +115,7 @@ export class MouseHookManager {
     }
     dispose() {
         this.disposed = true;
+        this.unsubscribeCapture();
         this.stop();
     }
     isHookRunning() {

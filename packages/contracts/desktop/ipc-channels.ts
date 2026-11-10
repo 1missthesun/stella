@@ -159,6 +159,24 @@ export const IPC_DICTATION_ON_DEVICE_TRANSCRIBE_FILE =
 export const IPC_DICTATION_OPEN_SYSTEM_DICTATION_SETTINGS =
   "dictation:openSystemDictationSettings" as const;
 
+export const IPC_SHOW_STELLA_STATUS = "showStella:status" as const;
+export const IPC_SHOW_STELLA_TOGGLE = "showStella:toggle" as const;
+export const IPC_SHOW_STELLA_READ_AUDIO = "showStella:readAudio" as const;
+export const IPC_SHOW_STELLA_BUILD = "showStella:build" as const;
+export const IPC_SHOW_STELLA_RECORDED = "showStella:recorded" as const;
+export const IPC_SHOW_STELLA_OVERLAY_STATE = "showStella:overlayState" as const;
+export const IPC_SHOW_STELLA_INK = "showStella:ink" as const;
+export const IPC_SHOW_STELLA_STOP_RECORDER = "showStella:stopRecorder" as const;
+export const IPC_SHOW_STELLA_FRAME = "showStella:frame" as const;
+export const IPC_SHOW_STELLA_VIDEO_CHUNK = "showStella:videoChunk" as const;
+export const IPC_SHOW_STELLA_RECORDER_STARTED =
+  "showStella:recorderStarted" as const;
+export const IPC_SHOW_STELLA_RECORDER_STOPPED =
+  "showStella:recorderStopped" as const;
+export const IPC_SHOW_STELLA_RECORDER_FAILED =
+  "showStella:recorderFailed" as const;
+export const IPC_SHOW_STELLA_DONE = "showStella:done" as const;
+
 export const IPC_AGENT_SEND_INPUT = "agent:sendInput" as const;
 export const IPC_PI_CHAT_REQUEST = "piChat:request" as const;
 export const IPC_PI_CHAT_EVENTS = "piChat:events" as const;

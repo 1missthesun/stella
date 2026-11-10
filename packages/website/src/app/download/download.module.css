@@ -10,7 +10,7 @@
 
 .listTitle {
   margin: 0 0 14px;
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -55,7 +55,7 @@
 }
 
 .yours {
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.06em;

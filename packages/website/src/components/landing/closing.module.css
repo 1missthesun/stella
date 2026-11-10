@@ -59,7 +59,7 @@
   border-radius: 12px;
   background: linear-gradient(90deg, #00b8ff, #5243ff 50%, #ff4ac0);
   color: #fff;
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: clamp(11px, 1.1vw, 16px);
   white-space: nowrap;
   box-shadow: 0 24px 50px -16px rgba(82, 67, 255, 0.7);
@@ -118,7 +118,7 @@
 .license {
   position: relative;
   margin-top: 16px;
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 12px;
   letter-spacing: 0.08em;
   color: rgba(10, 10, 13, 0.5);
@@ -186,8 +186,10 @@
 }
 
 .free {
-  font-family: var(--l-mono);
-  font-size: 13px;
+  font-family: var(--l-sans), system-ui, sans-serif;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.7);
 }
 
@@ -196,7 +198,7 @@
   display: flex;
   gap: 26px;
   margin-top: 28px;
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -240,7 +242,7 @@
 
 .footCols h3 {
   margin: 0 0 12px;
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;

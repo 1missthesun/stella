@@ -258,7 +258,7 @@
 }
 
 .musicMeta span {
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.55);
 }
@@ -374,7 +374,7 @@
   position: absolute;
   right: 22px;
   bottom: 26px;
-  font-family: var(--l-mono);
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;

@@ -136,7 +136,7 @@
 
 .label {
   margin: 18px 0 0;
-  font-family: var(--l-mono), monospace;
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 13px;
   letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.45);
@@ -576,7 +576,7 @@
 }
 
 .sleep span {
-  font-family: var(--l-mono), monospace;
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -717,7 +717,7 @@
 }
 
 .rows b {
-  font-family: var(--l-mono), monospace;
+  font-family: var(--l-sans), system-ui, sans-serif;
   font-weight: 500;
   font-size: 11.5px;
   color: var(--w-sub);

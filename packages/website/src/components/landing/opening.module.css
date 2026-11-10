@@ -147,9 +147,10 @@
 }
 
 .free {
-  font-family: var(--l-mono);
-  font-size: 13px;
-  letter-spacing: 0.02em;
+  font-family: var(--l-sans), system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: rgba(10, 10, 13, 0.55);
   transition: color 900ms ease;
 }

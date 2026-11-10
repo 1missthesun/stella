@@ -6,7 +6,7 @@ import {
 } from "@stella/contracts/stella-usage-limit";
 import {
   CONNECT_PLAN_COPY,
-  CONNECT_PLAN_OFFER_ENABLED,
+  CONNECT_PLAN_OFFER_MOBILE_ENABLED,
 } from "@stella/contracts/connect-plan-offer";
 
 export type ComposerNoticeKind =
@@ -191,7 +191,7 @@ export function classifyComposerNotice(
   const usageLimit = includesAny(normalized, FREE_ALLOWANCE_MATCHERS)
     ? "free_allowance"
     : stellaUsageLimitOf(normalized);
-  if (usageLimit === "free_allowance" && CONNECT_PLAN_OFFER_ENABLED) {
+  if (usageLimit === "free_allowance" && CONNECT_PLAN_OFFER_MOBILE_ENABLED) {
     return {
       kind: "upgrade",
       title: CONNECT_PLAN_COPY.outTitle,

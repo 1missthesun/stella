@@ -11,7 +11,7 @@
  * the privacy text leaves out the counts paragraph. Turn it on only after the
  * telemetry worker's `/v1/counts` route is deployed.
  */
-export const ANONYMOUS_COUNTS_ENABLED: boolean = false;
+export const ANONYMOUS_COUNTS_ENABLED: boolean = true;
 
 export const ANONYMOUS_COUNTS_SCHEMA_VERSION = 1 as const;
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { CONNECT_PLAN_OFFER_ENABLED } from "@stella/contracts/connect-plan-offer";
+import { CONNECT_PLAN_OFFER_MOBILE_ENABLED } from "@stella/contracts/connect-plan-offer";
 import type { ChatMessage } from "../types";
 import { openDrawer, useDrawerOpen } from "./drawer";
 
@@ -12,7 +12,7 @@ import { openDrawer, useDrawerOpen } from "./drawer";
  * into the composer, one tap from sending. Off until the owner gives an explicit go-ahead
  * (`@stella/contracts/connect-plan-offer`).
  */
-export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_ENABLED;
+export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_MOBILE_ENABLED;
 
 type Pending = { conversationId: string | null };
 

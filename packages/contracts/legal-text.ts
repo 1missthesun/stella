@@ -16,7 +16,7 @@ Anonymous usage counts. Unless you turn off "Send anonymous usage counts" in Set
   : "";
 
 export const LEGAL_TITLES: Record<LegalDocument, string> = { terms: "Terms of Service", privacy: "Privacy Policy" };
-export const LEGAL_LAST_UPDATED = "October 16, 2026";
+export const LEGAL_LAST_UPDATED = "November 10, 2026";
 export const PRIVACY_LAST_UPDATED = LEGAL_LAST_UPDATED;
 
 export const TERMS_OF_SERVICE = `Stella — FROMYOU, LLC

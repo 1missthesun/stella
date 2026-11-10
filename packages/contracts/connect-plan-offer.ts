@@ -3,12 +3,18 @@
  * first thing Stella offers is the ChatGPT or Claude plan the person already
  * has (free to use with Stella), and plans/credit second.
  *
- * Switched OFF until the owner gives an explicit go-ahead. It gates the desktop app, the web chat and
- * the phone app (the offer card, its copy, the near-the-limit heads-up) and
- * the wording of the limit message itself, so a desktop publish, a phone OTA
- * or a backend deploy that sweeps this code in changes nothing for users.
+ * Two switches:
+ * - `CONNECT_PLAN_OFFER_ENABLED` (on): the desktop app and the web chat (the
+ *   offer card, its copy, the near-the-limit heads-up) and the wording of the
+ *   limit message the gateway and backend send.
+ * - `CONNECT_PLAN_OFFER_MOBILE_ENABLED` (off): the phone app's offer card.
+ *   Turn it on once the card has been run for real on a phone or simulator.
+ *   While it's off the phone shows its usual "choose a plan" notice.
  */
-export const CONNECT_PLAN_OFFER_ENABLED = false;
+export const CONNECT_PLAN_OFFER_ENABLED: boolean = true;
+
+/** The phone app's offer card; see above. */
+export const CONNECT_PLAN_OFFER_MOBILE_ENABLED: boolean = false;
 
 /** Copy for the offer. Hosts pick the line that matches what can connect there. */
 export const CONNECT_PLAN_COPY = {

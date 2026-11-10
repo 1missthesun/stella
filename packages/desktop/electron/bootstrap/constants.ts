@@ -19,6 +19,7 @@ export const HARD_RESET_MUTABLE_HOME_PATHS = [
   "local-scheduler.json",
   "preferences.json",
   "ui-state.json",
+  "composer-attachments.json",
   "browser-extension-routing.json",
   "stella.sqlite",
   "stella.sqlite-shm",

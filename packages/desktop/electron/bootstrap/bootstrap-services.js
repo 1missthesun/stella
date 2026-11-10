@@ -5,6 +5,7 @@ import { SelfHostService } from "../services/self-host-service.js";
 import { redeemConnectClaim } from "../services/connect-claim-service.js";
 import { isLauncherPresent, relaunchApp } from "../launcher-client.js";
 import { CaptureService } from "../services/capture-service.js";
+import { createComposerAttachmentsStore } from "../services/composer-attachments-store.js";
 import { MouseHookManager } from "../input/mouse-hook.js";
 import { UserAskService } from "../services/user-ask-service.js";
 import { ConnectorCredentialService } from "../services/connector-credential-service.js";
@@ -206,6 +207,7 @@ export const createBootstrapServices = (options) => {
         getAuthToken: () => authService.getAuthToken(),
         getBackendUrl: () => authService.getBackendUrl(),
     });
+    const composerAttachments = createComposerAttachmentsStore(config.stellaDataDirPath, (message) => getMainLogger()?.process("capture.attachments", { message }));
     const captureService = new CaptureService({
         window: {
             getAllWindows: () => options.getAllWindows(),
@@ -218,7 +220,9 @@ export const createBootstrapServices = (options) => {
             getOverlayBounds: () => state.overlayController?.getWindow()?.getBounds() ?? null,
         },
         updateUiState: (partial) => uiStateService.update(partial),
+        attachments: composerAttachments,
     });
+    void captureService.restoreAttachments();
     const globalInputHook = new MouseHookManager();
     return {
         authService,

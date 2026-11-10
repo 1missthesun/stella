@@ -57,18 +57,17 @@ import {
 } from "@/features/chat/lib/reply-file-events";
 import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
+import { viewAtom } from "@/platform/view-state/view-state";
+import {
+  composerTabMemory,
+  type TabComposerMemory,
+} from "./composer-tab-memory";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
 import type { EventRecord } from "@stella/contracts/local-chat";
 import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
-import type { ChatContext } from "@/shared/types/electron";
 
-type TabComposerMemory = {
-  message: string;
-  chatContext: ChatContext | null;
-  selectedText: string | null;
-};
-const MAX_RETAINED_TAB_STATE = 20;
+const composerOwner = viewAtom("composer.owner", "");
 const NO_NEWER_CLOUD_MESSAGES = () => false;
 const EMPTY_EVENTS: EventRecord[] = [];
 const NO_STREAMING_ASSISTANTS: StreamingAssistantOverlay[] = [];
@@ -92,19 +91,6 @@ const useOwnDeviceId = (enabled: boolean) => {
   return enabled ? deviceId : null;
 };
 const hasNonWhitespaceText = (text: string) => text.trim().length > 0;
-const setBoundedTabMemory = <T>(
-  memory: Map<string, T>,
-  conversationId: string,
-  value: T,
-) => {
-  memory.delete(conversationId);
-  memory.set(conversationId, value);
-  while (memory.size > MAX_RETAINED_TAB_STATE) {
-    const oldestConversationId = memory.keys().next().value;
-    if (typeof oldestConversationId !== "string") break;
-    memory.delete(oldestConversationId);
-  }
-};
 export function useFullShellChat({
   activeConversationId,
   isOnChatRoute,
@@ -115,7 +101,10 @@ export function useFullShellChat({
   const { cloudFeaturesEnabled, cloudChatPaused, storageMode } = useChatStore();
   const cloudChatShown = cloudFeaturesEnabled || cloudChatPaused;
   const tPlural = useTPlural();
-  const { accountScope } = useCloudConversationSession();
+  const {
+    accountScope,
+    sessionGate: { sessionIsLoading },
+  } = useCloudConversationSession();
   const { store: composerMessageStore, setMessage } =
     useComposerMessageStore();
   const hasComposerText = useComposerMessageSelector(
@@ -125,33 +114,37 @@ export function useFullShellChat({
   const [composerFocusRequestId, setComposerFocusRequestId] = useState(0);
   const { chatContext, setChatContext, selectedText, setSelectedText } =
     useCapturedChatContext();
-  const composerMemoryByConversationRef = useRef(
-    new Map<string, TabComposerMemory>(),
-  );
   const activeConversationIdRef = useRef(activeConversationId);
   activeConversationIdRef.current = activeConversationId;
   const previousComposerConversationIdRef = useRef<string | null>(
     activeConversationId,
   );
   const pendingAutoSendTextRef = useRef<string | null>(null);
-  // Auth scope is a hard renderer privacy boundary. Clear composer content,
-  // attachment handles, and per-tab memories in a layout effect so no frame
-  // can paint the previous owner's unsent text during identity bootstrap.
-  // Keyed on the scope it last cleared for: Fast Refresh re-runs every effect
-  // of an edited component, and an applied renderer change must not wipe the
-  // same owner's unsent text.
-  const clearedForScopeRef = useRef<string | null>(null);
+  // Auth scope is a hard renderer privacy boundary. Composer content,
+  // attachment handles and per-tab memories belong to the scope they were
+  // written under and are cleared in a layout effect when it changes, so no
+  // frame paints the previous owner's unsent text. The owner is remembered
+  // with the content: a reload, a restart or an interface change arriving
+  // under the same owner keeps it.
   useLayoutEffect(() => {
+    if (sessionIsLoading) return;
     const scope = `${accountScope}\0${storageMode}`;
-    if (clearedForScopeRef.current === scope) return;
-    clearedForScopeRef.current = scope;
-    composerMemoryByConversationRef.current.clear();
+    if (composerOwner.get() === scope) return;
+    composerOwner.set(scope);
+    composerTabMemory.clear();
     previousComposerConversationIdRef.current = null;
     setMessage("");
     setChatContext(null);
     setSelectedText(null);
     cloudAttachmentsStore.clear();
-  }, [accountScope, storageMode, setChatContext, setMessage, setSelectedText]);
+  }, [
+    accountScope,
+    sessionIsLoading,
+    storageMode,
+    setChatContext,
+    setMessage,
+    setSelectedText,
+  ]);
   useEffect(() => {
     const previousConversationId = previousComposerConversationIdRef.current;
     if (previousConversationId === activeConversationId) return;
@@ -160,29 +153,27 @@ export function useFullShellChat({
         .getSnapshot()
         .tabs.some((tab) => tab.conversationId === previousConversationId);
       if (remainsOpen) {
-        setBoundedTabMemory(
-          composerMemoryByConversationRef.current,
-          previousConversationId,
-          {
-            message: composerMessageStore.getSnapshot(),
-            chatContext,
-            selectedText,
-          },
-        );
+        composerTabMemory.set(previousConversationId, {
+          message: composerMessageStore.getSnapshot(),
+          chatContext,
+          selectedText,
+        });
       }
     }
     if (activeConversationId) {
-      const remembered =
-        composerMemoryByConversationRef.current.get(activeConversationId);
+      const remembered = composerTabMemory.take(activeConversationId);
       const pendingDraft = remembered?.message
         ? null
         : takePendingComposerDraft();
       pendingAutoSendTextRef.current = pendingDraft?.send
         ? pendingDraft.text
         : null;
-      setMessage(remembered?.message ?? pendingDraft?.text ?? "");
-      setChatContext(remembered?.chatContext ?? null);
-      setSelectedText(remembered?.selectedText ?? null);
+      const cameFromAnother = previousConversationId !== null;
+      if (cameFromAnother || remembered || pendingDraft) {
+        setMessage(remembered?.message ?? pendingDraft?.text ?? "");
+        setChatContext(remembered?.chatContext ?? null);
+        setSelectedText(remembered?.selectedText ?? null);
+      }
     }
     previousComposerConversationIdRef.current = activeConversationId;
   }, [
@@ -200,11 +191,7 @@ export function useFullShellChat({
         const openIds = new Set(
           conversationTabs.getSnapshot().tabs.map((tab) => tab.conversationId),
         );
-        for (const conversationId of composerMemoryByConversationRef.current.keys()) {
-          if (!openIds.has(conversationId)) {
-            composerMemoryByConversationRef.current.delete(conversationId);
-          }
-        }
+        composerTabMemory.keepOnly(openIds);
       }),
     [],
   );
@@ -598,9 +585,7 @@ export function useFullShellChat({
       onClear: () => {
         if (activeConversationIdRef.current !== submittedConversationId) {
           if (submittedConversationId) {
-            setBoundedTabMemory(
-              composerMemoryByConversationRef.current,
-              submittedConversationId,
+            composerTabMemory.set(submittedConversationId,
               {
                 message: "",
                 selectedText: null,
@@ -628,12 +613,10 @@ export function useFullShellChat({
         if (activeConversationIdRef.current !== submittedConversationId) {
           if (submittedConversationId) {
             const remembered: Partial<TabComposerMemory> =
-              composerMemoryByConversationRef.current.get(
+              composerTabMemory.get(
                 submittedConversationId,
               ) ?? {};
-            setBoundedTabMemory(
-              composerMemoryByConversationRef.current,
-              submittedConversationId,
+            composerTabMemory.set(submittedConversationId,
               {
                 message: remembered.message || submittedMessage,
                 selectedText: remembered.selectedText ?? submittedSelectedText,

@@ -34,6 +34,13 @@ export class CaptureService {
     setPendingChatContext(next) {
         this.pendingChatContext = next;
         this.chatContextVersion += 1;
+        this.options.attachments?.keep(next);
+    }
+    async restoreAttachments() {
+        const kept = await this.options.attachments?.read();
+        if (!kept || this.pendingChatContext) return;
+        this.setPendingChatContext({ ...this.emptyContext(), ...kept });
+        this.broadcastChatContext();
     }
     broadcastChatContext() {
         for (const window of this.options.window.getAllWindows()) {

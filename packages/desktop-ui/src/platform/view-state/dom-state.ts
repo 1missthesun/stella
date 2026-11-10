@@ -91,14 +91,22 @@ const atPath = (path: string): Element | null => {
 const scopeOf = (element: Element) =>
   element.closest<HTMLElement>("[data-view-scope]")?.dataset.viewScope ?? null;
 
+const KEYED = "key|";
+
+/**
+ * `data-view-key` names a field whose place in the page or placeholder
+ * changes with what is around it. Fields sharing a key show the same value.
+ */
 const fieldMark = (field: TextField) =>
-  [
-    field.tagName.toLowerCase(),
-    field instanceof HTMLInputElement ? field.type : "",
-    field.name,
-    field.placeholder,
-    field.getAttribute("aria-label") ?? "",
-  ].join("|");
+  field.dataset.viewKey
+    ? `${KEYED}${field.dataset.viewKey}`
+    : [
+        field.tagName.toLowerCase(),
+        field instanceof HTMLInputElement ? field.type : "",
+        field.name,
+        field.placeholder,
+        field.getAttribute("aria-label") ?? "",
+      ].join("|");
 
 const scrollMark = (element: Element) =>
   `${element.tagName.toLowerCase()}|${element.classList[0] ?? ""}`;
@@ -115,7 +123,7 @@ const mayHoldSecret = (field: TextField) =>
 const recordable = (field: TextField) =>
   !field.closest(OFF) && !field.readOnly && !field.disabled && !mayHoldSecret(field);
 
-/** The element saved at `path`, or the only one on the page with the same mark. */
+/** The element saved at `path`, or the only one on the page with the same mark (the first, for a keyed one). */
 const find = <T extends Element>(
   entry: { path: string; mark: string; scope: string | null },
   markOf: (element: T) => string,
@@ -128,7 +136,7 @@ const find = <T extends Element>(
   let only: T | null = null;
   for (const candidate of candidates()) {
     if (!matches(candidate)) continue;
-    if (only) return null;
+    if (only) return entry.mark.startsWith(KEYED) ? only : null;
     only = candidate;
   }
   return only;

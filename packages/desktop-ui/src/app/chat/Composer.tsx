@@ -287,6 +287,7 @@ function ComposerImpl({
               <ComposerModelMentionTextarea
                 ref={textareaRef}
                 className="composer-input"
+                data-view-key="composer"
                 placeholder={placeholder}
                 value={message}
                 aria-autocomplete="list"

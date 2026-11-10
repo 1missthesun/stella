@@ -71,7 +71,7 @@ If an interface change does not load or throws while rendering, Stella takes it 
 A reload, a restart or a change arriving must not cost the user anything they would notice. Scroll positions, text in inputs, focus and the caret are kept for every element without any code. For state of your own:
 
 - `useViewState("settings.tab", "general")` from `@/platform/view-state/view-state` is `useState` that survives reloads and restarts; `viewAtom(key, initial)` is the same for a store outside React. Use them for what is open, selected, expanded or half-entered. Values are JSON.
-- `data-view-scope={id}` on a container keeps what is inside it apart per id (the chat does this per conversation). `data-view-state="off"` leaves an element out; passwords and secrets are never recorded.
+- `data-view-scope={id}` on a container keeps what is inside it apart per id (the chat does this per conversation). `data-view-state="off"` leaves an element out; passwords and secrets are never recorded. `data-view-key="<name>"` names a text field whose place in the page or placeholder changes with what is around it (the composer has one).
 
 For a change to appear in place, the modules that load again must hold no state of their own. Keep module-level variables, filled maps and code that runs on load out of component files: put real state in a store module of its own or in the view state. A module whose only state is a cache, a count of what is mounted, or a registration the newer copy should replace says so with a `// @reloadable <why>` comment. Nothing breaks when a module does hold state: that change takes the reload instead.
 

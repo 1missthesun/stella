@@ -2369,6 +2369,10 @@
       },
       "cancelSignIn": "Hủy đăng nhập",
       "closeSearch": "Đóng tìm kiếm",
+      "customModel": {
+        "hint": "Không có trong danh sách? Nhập bất kỳ id mô hình {provider} nào để sử dụng.",
+        "modelIdAriaLabel": "Id mô hình {provider}"
+      },
       "empty": {
         "noMatch": "Không có mô hình nào khớp.",
         "none": "Chưa có mô hình nào khả dụng."

@@ -1,6 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { getAllModels } from "@stella/contracts/model-catalog";
+import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
 import type { StellaGatewayAccess, StellaModelSpec } from "@stella/agent/provider/stella";
 import { getModelProviders, getModels } from "./model-catalog.js";
 import { mergeModelHeaders, modelRuntime } from "./model-runtime.js";
@@ -18,7 +19,6 @@ import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
 import {
   findRegistryModel,
   getEngineNativeStellaModelAlternative,
-  isOpenEndedGatewayProvider,
   parseModelReference,
   uniqueModelCandidates,
 } from "./model-routing-matching.js";
@@ -229,45 +229,6 @@ const getDirectProviderCandidates = (
 };
 
 /**
- * Pass-through gateways whose model-id space is owned by the gateway, not our
- * static registry. The gateway accepts arbitrary `<vendor>/<model>` ids as-is
- * and normalizes transport/quirks, so we can synthesize a routable model from
- * the gateway's registry template when the dynamic provider catalog hasn't
- * populated the exact id yet. This keeps the picker and runtime resolver from
- * disagreeing while a catalog refresh is pending. The gateway remains the
- * authority — a bogus id fails loudly upstream, not here.
- *
- * Direct vendor providers (Anthropic, OpenAI, …) are intentionally excluded:
- * their id formats are quirk-specific (dashes, date suffixes) and encoded
- * precisely in the static registry, so synthesizing one risks a malformed id.
- *
- * Build a routable model for `modelId` by cloning the gateway's registry
- * template — which carries the `api`, `baseUrl`, `headers`, and `compat`
- * needed to actually make the request, none of which catalog metadata alone
- * provides.
- * Cost metadata falls back to the template's values; the request still
- * succeeds and the gateway validates the id.
- *
- * Output/context limits are intentionally NOT inherited: the template is an
- * arbitrary registry entry whose `maxTokens` may be tiny (e.g. 4096), and
- * `buildBaseOptions` turns `model.maxTokens` into a hard `max_tokens` cap on
- * every request. For a reasoning model that cap can be consumed entirely by
- * thinking, truncating the run before any visible text is produced. Setting
- * `maxTokens: 0` makes `buildBaseOptions` omit the cap (the gateway enforces
- * the real limit), and a generous `contextWindow` floor keeps downstream
- * compaction/overflow from truncating based on the cloned window.
- *
- * Input modalities are also NOT inherited: the template is an arbitrary
- * registry entry that may be text-only (the real first OpenRouter entry,
- * ai21/jamba-large-1.7, is), and `transformMessages` replaces unsupported
- * historical images with a placeholder when `model.input` lacks "image".
- * That would drop user-attached photos on vision-capable models resolved
- * through this path.
- * Declare image support and let the gateway be the authority: a genuinely
- * text-only model rejects the request loudly upstream instead of Stella
- * silently discarding the user's attachments.
- */
-/**
  * Recover a gateway model's real context window from the full model catalog.
  *
  * Gateway ids (`<vendor>/<model>`) that aren't in the gateway provider's own
@@ -300,32 +261,22 @@ const resolveCatalogContextWindow = (modelId: string): number | undefined => {
   return best > 0 ? Math.floor(best) : undefined;
 };
 
-const synthesizeGatewayModelFromTemplate = (
+/**
+ * A model the catalog doesn't list yet (newer than this build, or typed by
+ * hand) still runs: the provider is the authority on its own ids, so a bogus
+ * one fails loudly upstream instead of being refused here.
+ */
+const modelForUnlistedReference = (
   registryProvider: string,
   modelId: string,
 ): Model<Api> | null => {
-  if (!isOpenEndedGatewayProvider(registryProvider) && registryProvider !== "chatgpt") {
-    return null;
-  }
-  const template = getModels(registryProvider)[0];
-  if (!template) return null;
-  return {
-    ...template,
-    id: modelId,
-    name: modelId,
-    input: ["text", "image"],
-    maxTokens: registryProvider === "chatgpt" ? template.maxTokens : 0,
-    // Prefer the model's real catalog window (a large-context model reached
-    // through a gateway must not be pinned to the small floor — that spuriously
-    // compacts/over-flows a conversation the real model holds). Fall back to a
-    // NaN-safe conservative floor only when the model is genuinely unknown to
-    // the catalog; the gateway enforces the true limit upstream regardless.
-    contextWindow: Math.max(
-      resolveCatalogContextWindow(modelId) ??
-        (Number.isFinite(template.contextWindow) ? template.contextWindow : 0),
-      200_000,
-    ),
-  };
+  const contextWindow = resolveCatalogContextWindow(modelId);
+  return (
+    modelForUnlistedId(getModels(registryProvider), modelId, {
+      id: modelId,
+      ...(contextWindow ? { contextWindow } : {}),
+    }) ?? null
+  );
 };
 
 type DirectProviderRouteResult =
@@ -369,10 +320,7 @@ const resolveDirectProviderRoute = (args: {
 
   const directModel =
     findRegistryModel(directProvider.registryProvider, requestedCandidates) ??
-    synthesizeGatewayModelFromTemplate(
-      directProvider.registryProvider,
-      args.modelId,
-    );
+    modelForUnlistedReference(directProvider.registryProvider, args.modelId);
   if (!directModel) {
     return { kind: "unknown-model" };
   }

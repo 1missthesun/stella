@@ -2385,6 +2385,10 @@
       },
       "cancelSignIn": "Anulează conectarea",
       "closeSearch": "Închide căutarea",
+      "customModel": {
+        "hint": "Nu apare în listă? Tastează orice id de model {provider} pentru a-l folosi.",
+        "modelIdAriaLabel": "Id de model {provider}"
+      },
       "empty": {
         "noMatch": "Niciun model nu corespunde.",
         "none": "Niciun model disponibil deocamdată."

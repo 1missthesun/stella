@@ -2369,6 +2369,10 @@
       },
       "cancelSignIn": "Batalkan proses masuk",
       "closeSearch": "Tutup pencarian",
+      "customModel": {
+        "hint": "Tidak ada di daftar? Ketik id model {provider} apa pun untuk menggunakannya.",
+        "modelIdAriaLabel": "Id model {provider}"
+      },
       "empty": {
         "noMatch": "Tidak ada model yang cocok.",
         "none": "Belum ada model yang tersedia."

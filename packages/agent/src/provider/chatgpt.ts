@@ -2,6 +2,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { createProvider, type Provider } from "@earendil-works/pi-ai/models";
 import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
+import { siblingModel } from "@stella/contracts/provider-live-models";
 
 export const CHATGPT_PROVIDER_ID = "chatgpt";
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
@@ -15,15 +16,15 @@ export type ChatGptTransport = {
 
 /**
  * A plan model by its ChatGPT slug: pi-ai's entry for the OpenAI model, or,
- * for one pi-ai doesn't know yet, one shaped like OpenAI's newest reasoning
- * model.
+ * for one pi-ai doesn't know yet, one shaped like its nearest sibling, else
+ * like OpenAI's newest reasoning model.
  */
 export const chatGptModel = (modelId: string): Model<"openai-responses"> | undefined => {
   const openai = (Object.values(OPENAI_MODELS) as Model<Api>[]).filter(
     (model): model is Model<"openai-responses"> => model.api === "openai-responses",
   );
   const known = openai.find((model) => model.id === modelId || model.id === modelId.replace(/\./g, "-"));
-  const template = known ?? openai.filter((model) => model.reasoning).at(-1);
+  const template = known ?? siblingModel(openai, modelId) ?? openai.filter((model) => model.reasoning).at(-1);
   if (!template) return undefined;
   return {
     ...template,

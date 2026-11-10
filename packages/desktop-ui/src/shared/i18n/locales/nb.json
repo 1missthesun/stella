@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Avbryt pålogging",
       "closeSearch": "Lukk søk",
+      "customModel": {
+        "hint": "Ikke på listen? Skriv inn en hvilken som helst {provider}-modell-ID for å bruke den.",
+        "modelIdAriaLabel": "{provider}-modell-ID"
+      },
       "empty": {
         "noMatch": "Ingen modeller samsvarer.",
         "none": "Ingen modeller tilgjengelig ennå."

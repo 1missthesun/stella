@@ -143,6 +143,7 @@ import type { StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import { desktopExecution, type DesktopBrain, type DesktopDevices, type DesktopExecution } from "./desktop-execution.ts";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import type { LiveProviderModel } from "@stella/contracts/provider-live-models";
 import { journalMirror, journalTurnGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
 import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
@@ -193,6 +194,8 @@ export type DesktopChatsOptions = {
   stellaModel?(): string | undefined;
   credentials?: StellaCredentialAccess;
   resolveDirectModel?: DirectModelResolver;
+  /** What this computer's catalog knows of a provider's model: its limits, modalities and price. */
+  listedModel?: (provider: string, modelId: string) => LiveProviderModel | undefined;
   thinkingLevel?(): ModelThinkingLevel;
   shellEnv?(target: { conversationId: string; cwd: string }): Record<string, string> | undefined;
   tools?(conversationId: string): StellaToolHost;
@@ -810,7 +813,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   const accountModels = new Map<string, NonNullable<ReturnType<typeof accountProviderModel>>[]>();
   const ensureAccountModel = async (provider: string, modelId: string): Promise<ModelRef> => {
     const { access, gatewayOrigin } = await ensureGateway();
-    const model = accountProviderModel(provider, modelId);
+    const model = accountProviderModel(provider, modelId, options.listedModel?.(provider, modelId));
     if (!model) throw new Error(`${provider}/${modelId} isn't a model Stella can run on your account's key.`);
     const entries = accountModels.get(provider) ?? [];
     if (!entries.some((entry) => entry.id === model.id)) {

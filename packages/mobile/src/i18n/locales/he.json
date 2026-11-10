@@ -2385,6 +2385,10 @@
       },
       "cancelSignIn": "בטל התחברות",
       "closeSearch": "סגור חיפוש",
+      "customModel": {
+        "hint": "לא מופיע ברשימה? הקלידו כל מזהה מודל של {provider} כדי להשתמש בו.",
+        "modelIdAriaLabel": "מזהה מודל של {provider}"
+      },
       "empty": {
         "noMatch": "אין מודלים תואמים.",
         "none": "אין עדיין מודלים זמינים."

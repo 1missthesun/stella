@@ -4,6 +4,12 @@ import { getLoadedModelRegistry } from "@stella/contracts/model-registry";
 import { STELLA_RELAY_PROVIDERS } from "@stella/contracts/stella-api";
 import { isRetiredAssistantProvider } from "@stella/contracts/provider-display";
 import {
+  fetchLiveProviderModels,
+  hasLiveProviderModelList,
+  unlistedLiveModels,
+  type LiveProviderModel,
+} from "@stella/contracts/provider-live-models";
+import {
   ModelConfig,
   getRemoteCatalogModelValidationErrors,
   isRemoteCatalogModel,
@@ -15,6 +21,10 @@ import {
   type ModelsJsonProvider,
 } from "./model-config.js";
 import type { Api, Model } from "@earendil-works/pi-ai";
+import {
+  getAccessibleLocalLlmApiKey,
+  getAccessibleLocalLlmOAuthApiKey,
+} from "./storage/local-llm-credential-access.js";
 import {
   ensurePrivateDirSync,
   writePrivateFileSync,
@@ -56,6 +66,11 @@ type StoredCatalogs = Record<string, StoredCatalogEntry>;
 type RuntimeCatalogEntry = {
   models: Model<Api>[];
   checkedAt?: number;
+};
+
+type LiveCatalogEntry = {
+  models: LiveProviderModel[];
+  checkedAt: number;
 };
 
 export type RuntimeProviderDefinition = {
@@ -339,6 +354,7 @@ export class ModelRuntime {
   private builtinsLoaded = false;
   private readonly dynamicCatalogs = new Map<string, RuntimeCatalogEntry>();
   private readonly storedCatalogs = new Map<string, StoredCatalogEntry>();
+  private readonly liveCatalogs = new Map<string, LiveCatalogEntry>();
   private readonly extensionProviders = new Map<
     string,
     RuntimeProviderDefinition
@@ -352,6 +368,8 @@ export class ModelRuntime {
   private config = ModelConfig.empty();
   private modelsPath?: string;
   private storePath?: string;
+  private livePath?: string;
+  private stellaDataDir?: string;
   private refreshPromise?: Promise<void>;
   private refreshIsForce = false;
   private readonly providerRefreshes = new Map<
@@ -398,10 +416,13 @@ export class ModelRuntime {
     const revisionBeforeInitialization = this.revision;
     this.modelsPath = path.join(options.stellaDataDir, "models.json");
     this.storePath = path.join(options.stellaDataDir, "models-store.json");
+    this.livePath = path.join(options.stellaDataDir, "models-live.json");
+    this.stellaDataDir = options.stellaDataDir;
     this.catalogBaseUrl = options.catalogBaseUrl ?? DEFAULT_CATALOG_BASE_URL;
     this.catalogRequestTimeoutMs =
       options.catalogRequestTimeoutMs ?? REMOTE_CATALOG_TIMEOUT_MS;
     this.readStoredCatalogs();
+    this.readLiveCatalogs();
     await this.reloadConfig();
     await this.refresh({ allowNetwork: options.allowNetwork ?? true });
     if (this.revision === revisionBeforeInitialization) {
@@ -437,6 +458,91 @@ export class ModelRuntime {
     if (this.refreshedAt === null && checkedAts.length > 0) {
       this.refreshedAt = Math.max(...checkedAts);
     }
+  }
+
+  private readLiveCatalogs(): void {
+    if (!this.livePath) return;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this.livePath, "utf8")) as Record<
+        string,
+        LiveCatalogEntry
+      >;
+      for (const [providerId, entry] of Object.entries(parsed)) {
+        if (!hasLiveProviderModelList(providerId)) continue;
+        if (!entry || !Array.isArray(entry.models)) continue;
+        this.liveCatalogs.set(providerId, {
+          models: entry.models.filter(
+            (model) => typeof model?.id === "string" && model.id.length > 0,
+          ),
+          checkedAt: Number(entry.checkedAt) || 0,
+        });
+      }
+    } catch {
+      this.liveCatalogs.clear();
+    }
+  }
+
+  private writeLiveCatalogs(): void {
+    if (!this.livePath) return;
+    ensurePrivateDirSync(path.dirname(this.livePath));
+    writePrivateFileSync(
+      this.livePath,
+      JSON.stringify(Object.fromEntries(this.liveCatalogs)),
+    );
+  }
+
+  private async liveListApiKey(providerId: string): Promise<string | undefined> {
+    if (!this.stellaDataDir) return undefined;
+    try {
+      return (
+        (await getAccessibleLocalLlmApiKey(this.stellaDataDir, providerId))?.trim() ||
+        (await getAccessibleLocalLlmOAuthApiKey(this.stellaDataDir, providerId))?.trim() ||
+        this.getRuntimeManagedApiKey(providerId)
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Reads each provider's own model list. A provider that is unreachable or
+   * rejects the key keeps the list it had: the picker never loses models
+   * because a list request failed.
+   */
+  private async refreshLiveCatalogs(options: {
+    force?: boolean;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    let changed = false;
+    await Promise.all(
+      [...this.builtins.keys()]
+        .filter(hasLiveProviderModelList)
+        .map(async (providerId) => {
+          const checkedAt = this.liveCatalogs.get(providerId)?.checkedAt;
+          if (
+            !options.force &&
+            checkedAt !== undefined &&
+            Date.now() - checkedAt < REMOTE_CATALOG_REFRESH_INTERVAL_MS
+          ) {
+            return;
+          }
+          if (this.config.getProvider(providerId)?.baseUrl) return;
+          try {
+            const models = await fetchLiveProviderModels(providerId, {
+              apiKey: await this.liveListApiKey(providerId),
+              signal: options.signal,
+            });
+            if (!models || options.signal?.aborted) return;
+            this.liveCatalogs.set(providerId, { models, checkedAt: Date.now() });
+            changed = true;
+          } catch (error) {
+            console.warn(
+              `[stella:model-runtime] ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }),
+    );
+    if (changed) this.writeLiveCatalogs();
   }
 
   private writeStoredCatalogs(): void {
@@ -484,6 +590,13 @@ export class ModelRuntime {
         for (const dynamic of this.dynamicCatalogs.get(providerId)?.models ??
           []) {
           models.set(dynamic.id, dynamic);
+        }
+        for (const listed of unlistedLiveModels(
+          providerId,
+          [...models.values()],
+          this.liveCatalogs.get(providerId)?.models ?? [],
+        )) {
+          models.set(listed.id, listed);
         }
         for (const managed of this.managedProviderModels.get(providerId) ??
           []) {
@@ -844,10 +957,10 @@ export class ModelRuntime {
         const providerIds = Array.from(
           new Set([...this.builtins.keys(), ...STELLA_RELAY_PROVIDERS]),
         ).filter((providerId) => providerId !== "local");
-        const { failures, fetchedCount } = await this.refreshProviders(
-          providerIds,
-          options,
-        );
+        const [{ failures, fetchedCount }] = await Promise.all([
+          this.refreshProviders(providerIds, options),
+          this.refreshLiveCatalogs(options),
+        ]);
         if (options.signal?.aborted) return;
         const successCount = providerIds.length - failures.length;
         this.catalogError =
@@ -855,7 +968,7 @@ export class ModelRuntime {
             ? `Model catalog refresh failed for ${failures.join("; ")}`
             : undefined;
         if (successCount === 0 && failures.length > 0) {
-          this.publishCatalogChangeIfNeeded();
+          this.recompose();
           throw new Error(this.catalogError);
         }
         if (successCount > 0 && fetchedCount > 0) {

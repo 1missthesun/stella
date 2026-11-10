@@ -6,6 +6,7 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { createProvider, type MutableModels, type Provider } from "@earendil-works/pi-ai/models";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ModelRef } from "@earendil-works/pi-durable";
+import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
 import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "./chatgpt.ts";
 import { STELLA_PROVIDER_ID } from "./stella.ts";
 
@@ -188,14 +189,12 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
         if (models.getModel(provider, candidate)) return { provider, modelId: candidate };
       }
     }
-    // A model pi-ai's catalog doesn't list (older, or newer than this build)
-    // runs on its provider's API, shaped like the provider's latest model.
     const provider = upstreamProviders().find((entry) => entry.id === family[0]);
-    const template = provider?.getModels().at(-1);
-    if (!provider || !template) {
+    const unlistedModel = provider ? modelForUnlistedId(provider.getModels(), pick.modelId) : undefined;
+    if (!provider || !unlistedModel) {
       return { error: `${pick.provider}/${pick.modelId} isn't a model Stella can run with your key.` };
     }
-    const extra = [...(unlisted.get(provider.id) ?? []), { ...template, id: pick.modelId, name: pick.modelId }];
+    const extra = [...(unlisted.get(provider.id) ?? []), unlistedModel];
     unlisted.set(provider.id, extra);
     models.setProvider({
       ...provider,

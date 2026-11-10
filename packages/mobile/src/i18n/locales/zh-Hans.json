@@ -2369,6 +2369,10 @@
       },
       "cancelSignIn": "取消登录",
       "closeSearch": "关闭搜索",
+      "customModel": {
+        "hint": "没有列出？输入任意 {provider} 模型 ID 即可使用。",
+        "modelIdAriaLabel": "{provider} 模型 ID"
+      },
       "empty": {
         "noMatch": "没有匹配的模型。",
         "none": "暂无可用模型。"

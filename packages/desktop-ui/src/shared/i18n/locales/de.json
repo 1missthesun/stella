@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Anmeldung abbrechen",
       "closeSearch": "Suche schließen",
+      "customModel": {
+        "hint": "Nicht aufgeführt? Tippe eine beliebige {provider}-Modell-ID ein, um sie zu nutzen.",
+        "modelIdAriaLabel": "{provider}-Modell-ID"
+      },
       "empty": {
         "noMatch": "Keine passenden Modelle.",
         "none": "Noch keine Modelle verfügbar."

@@ -278,7 +278,8 @@ export const piChatsFor = (
     import("../../kernel/integrations/claude-code-agent-runtime.js"),
     import("./claude-code-engine.js").then(({ claudeCodeEngineFor }) => claudeCodeEngineFor(session)),
     import("@stella/agent/host/desktop-execution"),
-  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }]) =>
+    import("../../kernel/model-runtime.js"),
+  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }, { modelRuntime }]) =>
     desktopChats({
       dataDir: session.config.get().stellaDataDirPath,
       deviceId: session.config.deviceId,
@@ -313,6 +314,8 @@ export const piChatsFor = (
       },
       resolveDirectModel: (reference) =>
         resolveDirectLlmRoute({ stellaAppDir: session.config.get().stellaDataDirPath, modelName: reference }),
+      listedModel: (provider, modelId) =>
+        modelRuntime.getModel(provider, modelId) ?? modelRuntime.getModel(provider, modelId.replace(/\./g, "-")),
       thinkingLevel: () => getReasoningEffort(session.config.get().stellaDataDirPath, "orchestrator"),
       refreshAuthToken: async () => {
         const result = (await hostBus.request(

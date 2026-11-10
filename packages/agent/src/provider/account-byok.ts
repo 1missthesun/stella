@@ -15,6 +15,7 @@ import { OPENROUTER_MODELS } from "@earendil-works/pi-ai/providers/openrouter.mo
 import { VERCEL_AI_GATEWAY_MODELS } from "@earendil-works/pi-ai/providers/vercel-ai-gateway.models";
 import { XAI_MODELS } from "@earendil-works/pi-ai/providers/xai.models";
 import { ZAI_MODELS } from "@earendil-works/pi-ai/providers/zai.models";
+import { modelForUnlistedId, type LiveProviderModel } from "@stella/contracts/provider-live-models";
 import {
   GATEWAY_BYOK_HEADER_PREFIX,
   GATEWAY_BYOK_PLACEHOLDER_KEY,
@@ -69,12 +70,18 @@ export const accountProviderModels = (providerId: string): Model<Api>[] =>
     return ready ? [ready] : [];
   });
 
-export const accountProviderModel = (providerId: string, modelId: string): Model<Api> | undefined => {
+/**
+ * The model an account key runs `modelId` as. One this build doesn't list
+ * (released since, or typed by hand) is shaped like its nearest sibling, with
+ * the limits and price in `listed` when the provider published them.
+ */
+export const accountProviderModel = (
+  providerId: string,
+  modelId: string,
+  listed?: LiveProviderModel,
+): Model<Api> | undefined => {
   const models = accountProviderModels(providerId);
-  const known = models.find((model) => model.id === modelId);
-  if (known) return known;
-  const template = models.at(-1);
-  return template ? { ...template, id: modelId, name: modelId } : undefined;
+  return models.find((model) => model.id === modelId) ?? modelForUnlistedId(models, modelId, listed);
 };
 
 export const accountProviderBaseUrls = (providerId: string): string[] => [

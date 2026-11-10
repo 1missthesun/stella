@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Cancel sign-in",
       "closeSearch": "Close search",
+      "customModel": {
+        "hint": "Not listed? Type any {provider} model id to use it.",
+        "modelIdAriaLabel": "{provider} model id"
+      },
       "empty": {
         "noMatch": "No models match.",
         "none": "No models available yet."

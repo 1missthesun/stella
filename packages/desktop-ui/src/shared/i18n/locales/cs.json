@@ -2393,6 +2393,10 @@
       },
       "cancelSignIn": "Zrušit přihlášení",
       "closeSearch": "Zavřít hledání",
+      "customModel": {
+        "hint": "Není v seznamu? Zadejte libovolné ID modelu {provider} a použijte ho.",
+        "modelIdAriaLabel": "ID modelu {provider}"
+      },
       "empty": {
         "noMatch": "Žádné modely neodpovídají.",
         "none": "Zatím nejsou dostupné žádné modely."

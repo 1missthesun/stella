@@ -2385,6 +2385,10 @@
       },
       "cancelSignIn": "Cancelar entrada",
       "closeSearch": "Fechar busca",
+      "customModel": {
+        "hint": "Não está na lista? Digite qualquer id de modelo de {provider} para usá-lo.",
+        "modelIdAriaLabel": "Id de modelo de {provider}"
+      },
       "empty": {
         "noMatch": "Nenhum modelo corresponde.",
         "none": "Ainda não há modelos disponíveis."

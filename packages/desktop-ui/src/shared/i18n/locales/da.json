@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Annuller login",
       "closeSearch": "Luk søgning",
+      "customModel": {
+        "hint": "Ikke på listen? Skriv et vilkårligt {provider}-model-id for at bruge det.",
+        "modelIdAriaLabel": "{provider}-model-id"
+      },
       "empty": {
         "noMatch": "Ingen modeller matcher.",
         "none": "Ingen modeller tilgængelige endnu."

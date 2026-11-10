@@ -2409,6 +2409,10 @@
       },
       "cancelSignIn": "إلغاء تسجيل الدخول",
       "closeSearch": "إغلاق البحث",
+      "customModel": {
+        "hint": "غير مدرج؟ اكتب أي معرّف نموذج من {provider} لاستخدامه.",
+        "modelIdAriaLabel": "معرّف نموذج {provider}"
+      },
       "empty": {
         "noMatch": "لا توجد نماذج مطابقة.",
         "none": "لا توجد نماذج متاحة بعد."

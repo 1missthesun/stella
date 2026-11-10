@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Bejelentkezés megszakítása",
       "closeSearch": "Keresés bezárása",
+      "customModel": {
+        "hint": "Nincs a listán? Írd be bármelyik {provider}-modell azonosítóját a használatához.",
+        "modelIdAriaLabel": "{provider}-modell azonosítója"
+      },
       "empty": {
         "noMatch": "Nincs találat a modellek között.",
         "none": "Még nincs elérhető modell."

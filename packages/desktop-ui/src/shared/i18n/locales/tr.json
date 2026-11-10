@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Girişi iptal et",
       "closeSearch": "Aramayı kapat",
+      "customModel": {
+        "hint": "Listede yok mu? Kullanmak için herhangi bir {provider} model kimliği yazın.",
+        "modelIdAriaLabel": "{provider} model kimliği"
+      },
       "empty": {
         "noMatch": "Eşleşen model yok.",
         "none": "Henüz kullanılabilir model yok."

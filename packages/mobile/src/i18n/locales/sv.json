@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Avbryt inloggning",
       "closeSearch": "Stäng sökning",
+      "customModel": {
+        "hint": "Finns den inte i listan? Skriv ett valfritt {provider}-modell-id för att använda det.",
+        "modelIdAriaLabel": "{provider}-modell-id"
+      },
       "empty": {
         "noMatch": "Inga modeller matchar.",
         "none": "Inga modeller tillgängliga ännu."

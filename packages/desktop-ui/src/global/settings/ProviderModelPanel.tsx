@@ -41,7 +41,6 @@ const REASONING_OPTIONS: ReadonlyArray<{
 }));
 const STELLA_PROVIDER_KEY = "stella";
 const LOCAL_PROVIDER_KEY = "local";
-const OPENROUTER_PROVIDER_KEY = "openrouter";
 const DEFAULT_TARGET = "__default__";
 const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434/v1";
 export type ProviderTab = {
@@ -212,7 +211,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
     const [oauthProvider, setOauthProvider] = useState<string | null>(null);
     const oauthAttemptRef = useRef<{ provider: string; cancelled: boolean } | null>(null);
     const [authError, setAuthError] = useState<string | null>(null);
-    const [openRouterCustomId, setOpenRouterCustomId] = useState("");
+    const [customModelId, setCustomModelId] = useState("");
     const [localBaseUrl, setLocalBaseUrl] = useState(DEFAULT_LOCAL_BASE_URL);
     const [localModelId, setLocalModelId] = useState("");
     const sections = useMemo(() => {
@@ -228,16 +227,17 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             let visibleModels = tab.key === STELLA_PROVIDER_KEY
                 ? dedupeStellaModels(sorted, value)
                 : sorted;
-            if (tab.key === OPENROUTER_PROVIDER_KEY &&
-                value.startsWith(`${OPENROUTER_PROVIDER_KEY}/`) &&
+            if (tab.key !== STELLA_PROVIDER_KEY &&
+                tab.key !== LOCAL_PROVIDER_KEY &&
+                value.startsWith(`${tab.key}/`) &&
                 !tab.models.some((model) => model.id === value) &&
                 (!trimmed ||
                     value.toLowerCase().includes(trimmed.toLowerCase()))) {
-                const customSlug = value.slice(`${OPENROUTER_PROVIDER_KEY}/`.length);
+                const customSlug = value.slice(tab.key.length + 1);
                 const customModel: CatalogModel = {
                     id: value,
                     name: customSlug,
-                    provider: OPENROUTER_PROVIDER_KEY,
+                    provider: tab.key,
                     providerName: tab.label,
                     modelId: customSlug,
                     source: "local",
@@ -438,15 +438,12 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             }
         }
     }, [cancelPendingOAuth, credentials, t]);
-    const handleSubmitOpenRouter = useCallback(() => {
-        const trimmed = openRouterCustomId.trim();
+    const handleSubmitCustomModel = useCallback((provider: string) => {
+        const trimmed = customModelId.trim();
         if (!trimmed)
             return;
-        const fullId = trimmed.startsWith("openrouter/")
-            ? trimmed
-            : `openrouter/${trimmed}`;
-        onSelect(fullId);
-    }, [onSelect, openRouterCustomId]);
+        onSelect(trimmed.startsWith(`${provider}/`) ? trimmed : `${provider}/${trimmed}`);
+    }, [onSelect, customModelId]);
     const handleSubmitLocal = useCallback(() => {
         const modelId = localModelId.trim();
         if (!modelId)
@@ -507,7 +504,8 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         const armed = signOutArmed === tab.key;
         const isSigningOut = signingOut === tab.key;
         const expanded = expandedProvider === tab.key;
-        const hasCustomInputs = isLocal || isOpenRouter;
+        const acceptsModelId = !isStella && !isLocal;
+        const hasCustomInputs = isLocal || acceptsModelId;
         const keyToAccount = savesToAccount && accountCatalog.has(tab.key);
         const authDescription = supportsOAuth && supportsApiKey
             ? t(keyToAccount ? "settings.modelPicker.authHint.bothAccount" : "settings.modelPicker.authHint.both")
@@ -519,6 +517,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             isStella,
             isLocal,
             isOpenRouter,
+            acceptsModelId,
             llmEntry,
             requiresAuth,
             supportsApiKey,
@@ -608,7 +607,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
     const renderSearch = renderSearchBar;
     const renderSection = (tab: ProviderTab, models: CatalogModel[]) => {
         const section = getSectionContext(tab);
-        const { isStella, isLocal, isOpenRouter, llmEntry, requiresAuth, supportsApiKey, supportsOAuth, sectionDisabled, expanded, authDescription, } = section;
+        const { isStella, isLocal, isOpenRouter, acceptsModelId, llmEntry, requiresAuth, supportsApiKey, supportsOAuth, sectionDisabled, expanded, authDescription, } = section;
         const restrictThisStella = isStella && restrictStellaPicks;
         const resolveDefaultToModel = isStella &&
             (hideDefaultRow ||
@@ -712,18 +711,20 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
               </div>
             </div>) : null}
 
-          {isOpenRouter && expanded ? (<div className="model-picker-connect">
+          {acceptsModelId && !requiresAuth && expanded ? (<div className="model-picker-connect">
               <p className="model-picker-connect-hint">
-                {t("settings.modelPicker.openRouter.hintBefore")}{" "}
-                <code>vendor/model</code>{" "}
-                {t("settings.modelPicker.openRouter.hintAfter")}
+                {isOpenRouter ? (<>
+                    {t("settings.modelPicker.openRouter.hintBefore")}{" "}
+                    <code>vendor/model</code>{" "}
+                    {t("settings.modelPicker.openRouter.hintAfter")}
+                  </>) : t("settings.modelPicker.customModel.hint", { provider: tab.label })}
               </p>
               <div className="model-picker-connect-field">
-                <input placeholder="anthropic/claude-opus-4.7" value={openRouterCustomId} onChange={(e) => setOpenRouterCustomId(e.target.value)} onKeyDown={(e) => {
+                <input placeholder={isOpenRouter ? "anthropic/claude-opus-4.7" : (models.at(-1)?.modelId ?? "")} value={customModelId} onChange={(e) => setCustomModelId(e.target.value)} onKeyDown={(e) => {
                     if (e.key === "Enter")
-                        handleSubmitOpenRouter();
-                }} disabled={sectionDisabled} aria-label={t("settings.modelPicker.openRouter.modelIdAriaLabel")} spellCheck={false} autoComplete="off"/>
-                <button type="button" className="model-picker-connect-go" onClick={handleSubmitOpenRouter} disabled={!openRouterCustomId.trim() || sectionDisabled}>
+                        handleSubmitCustomModel(tab.key);
+                }} disabled={sectionDisabled} aria-label={t("settings.modelPicker.customModel.modelIdAriaLabel", { provider: tab.label })} spellCheck={false} autoComplete="off"/>
+                <button type="button" className="model-picker-connect-go" onClick={() => handleSubmitCustomModel(tab.key)} disabled={!customModelId.trim() || sectionDisabled}>
                   {t("settings.modelPicker.use")}
                 </button>
               </div>

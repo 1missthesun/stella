@@ -23,6 +23,13 @@ import {
   type ProviderSettings,
 } from "@stella/contracts/backend/providers";
 import type { ProviderAccessResult } from "@stella/contracts/gateway/usage";
+import {
+  fetchLiveProviderModels,
+  hasLiveProviderModelList,
+  liveProviderModelListNeedsKey,
+  unlistedLiveModels,
+  type LiveProviderModel,
+} from "@stella/contracts/provider-live-models";
 import { empty, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { ownerKekFor, ownerKeks, type OwnerKekTag } from "../../secret-rotation.js";
@@ -807,6 +814,39 @@ const toProviderModel = (model: Model<Api>): ProviderModel => ({
   ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
 });
 
+const LIVE_MODEL_LIST_TTL_MS = 10 * 60_000;
+const LIVE_MODEL_LIST_CACHE_ENTRIES = 512;
+const liveModelLists = new Map<string, { at: number; models: LiveProviderModel[] }>();
+
+/** A provider that is unreachable or rejects the key adds nothing: the bundled list still answers. */
+const liveModels = async (ctx: OwnerContext, provider: string, row: CredentialRow): Promise<LiveProviderModel[]> => {
+  if (!hasLiveProviderModelList(provider)) return [];
+  const needsKey = liveProviderModelListNeedsKey(provider);
+  if (needsKey && row.method !== "api_key") return [];
+  const cacheKey = needsKey ? `${ctx.ownerId}|${provider}|${row.updated_at}` : provider;
+  const cached = liveModelLists.get(cacheKey);
+  if (cached && Date.now() - cached.at < LIVE_MODEL_LIST_TTL_MS) return cached.models;
+  try {
+    const access = needsKey ? await resolveAccess(ctx, provider) : null;
+    const models =
+      (await fetchLiveProviderModels(provider, {
+        ...(access && "apiKey" in access && access.apiKey ? { apiKey: access.apiKey } : {}),
+      })) ?? [];
+    if (liveModelLists.size >= LIVE_MODEL_LIST_CACHE_ENTRIES) liveModelLists.clear();
+    liveModelLists.set(cacheKey, { at: Date.now(), models });
+    return models;
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: "provider_live_models_failed",
+        provider,
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return cached?.models ?? [];
+  }
+};
+
 const listModels = async (
   ctx: OwnerContext,
   args: ProviderCalls["providers.listModels"]["args"],
@@ -815,6 +855,7 @@ const listModels = async (
   const row = rowOf(ctx.db, provider);
   if (!row) throw new RpcError("NOT_FOUND", "Connect this provider first.");
   let models = accountProviderModels(provider);
+  models = [...models, ...unlistedLiveModels(provider, models, await liveModels(ctx, provider, row))];
   if (row.method === "oauth") {
     const stored = await decrypt(ctx, provider, row.payload).catch(() => null);
     const available = stored && stored.type === "oauth" ? stored.availableModelIds : undefined;

@@ -2369,6 +2369,10 @@
       },
       "cancelSignIn": "サインインをキャンセル",
       "closeSearch": "検索を閉じる",
+      "customModel": {
+        "hint": "一覧にない場合は、{provider} のモデル ID を入力すると使用できます。",
+        "modelIdAriaLabel": "{provider} のモデル ID"
+      },
       "empty": {
         "noMatch": "一致するモデルはありません。",
         "none": "利用できるモデルはまだありません。"

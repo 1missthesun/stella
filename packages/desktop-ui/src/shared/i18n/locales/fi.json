@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Peruuta kirjautuminen",
       "closeSearch": "Sulje haku",
+      "customModel": {
+        "hint": "Eikö löydy listasta? Kirjoita mikä tahansa {provider}-mallin tunnus käyttääksesi sitä.",
+        "modelIdAriaLabel": "{provider}-mallin tunnus"
+      },
       "empty": {
         "noMatch": "Yksikään malli ei vastaa hakua.",
         "none": "Ei vielä saatavilla olevia malleja."

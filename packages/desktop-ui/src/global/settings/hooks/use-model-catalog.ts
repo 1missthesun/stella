@@ -4,8 +4,10 @@ import { normalizeBillingPlan } from "@stella/contracts/billing-plans";
 import { useCallback, useMemo } from "react";
 import { isWebsiteHost } from "@/platform/capabilities";
 import { useDesktopAuthSession, getAuthSessionSnapshot } from "@/global/auth/services/auth-session";
+import { backendClient } from "@/platform/backend/backend-client";
 import { fetchStellaModels } from "@/platform/backend/stella-models";
 import {
+  getProviderDisplayName,
   groupCatalogModelsByProvider,
   listLocalCatalogModels,
   mergeCatalogModels,
@@ -73,6 +75,38 @@ const managedGatewayStore = createResourceStore<"default", ManagedRuntimeCatalog
     });
     if (!data) throw new Error("Model catalog IPC bridge is unavailable.");
     return normalizeRuntimeCatalogSnapshot(data);
+  },
+});
+
+const ACCOUNT_MODELS_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+
+const accountModelsStore = createResourceStore<string, CatalogModel[]>({
+  staleMs: ACCOUNT_MODELS_REFRESH_INTERVAL_MS,
+  fetcher: async (key) => {
+    const providers = key.slice(key.lastIndexOf("|") + 1).split(",").filter(Boolean);
+    const lists = await Promise.all(
+      providers.map((provider) =>
+        backendClient
+          .call("providers.listModels", { provider })
+          .then(({ models }) =>
+            models.map(
+              (model): CatalogModel => ({
+                id: `${provider}/${model.id}`,
+                modelId: model.id,
+                name: model.name || model.id,
+                provider,
+                providerName: getProviderDisplayName(provider),
+                source: "local",
+                contextWindow: model.contextWindow,
+                input: model.supportsImages ? ["text", "image"] : ["text"],
+                reasoning: model.reasoning,
+              }),
+            ),
+          )
+          .catch(() => []),
+      ),
+    );
+    return lists.flat();
   },
 });
 
@@ -150,14 +184,34 @@ export function useModelCatalog() {
   const stellaQuery = useResourceStore(stellaCatalogStore, stellaCacheKey);
   const managedQuery = useResourceStore(managedGatewayStore, isWebsiteHost() ? null : "default");
 
+  const accountProviders = useBackendValue(
+    "providers.get",
+    hasConnectedAccount ? {} : "skip",
+  );
+  const accountModelsKey = useMemo(() => {
+    const connected = (accountProviders?.providers ?? [])
+      .filter((provider) => provider.connection?.status === "ok")
+      .map((provider) => provider.id)
+      .sort();
+    return connected.length > 0
+      ? `${sessionCacheScope}|${connected.join(",")}`
+      : null;
+  }, [accountProviders, sessionCacheScope]);
+  const accountQuery = useResourceStore(accountModelsStore, accountModelsKey);
+
   const stellaPayload = stellaQuery.data ?? EMPTY_STELLA;
   const managedPayload = managedQuery.data ?? EMPTY_MANAGED;
 
   const localModels = useMemo(() => isWebsiteHost() ? [] : listLocalCatalogModels(), []);
   const stellaModels = stellaPayload.models;
+  const accountModels = accountQuery.data;
   const directModels = useMemo(
-    () => mergeCatalogModels(localModels, managedPayload.directModels),
-    [managedPayload.directModels, localModels],
+    () =>
+      mergeCatalogModels(
+        mergeCatalogModels(localModels, managedPayload.directModels),
+        accountModels ?? [],
+      ),
+    [accountModels, managedPayload.directModels, localModels],
   );
   const mergedModels = useMemo(
     () => mergeCatalogModels(stellaModels, directModels),
@@ -176,8 +230,9 @@ export function useModelCatalog() {
     await Promise.all([
       stellaQuery.refresh(),
       managedQuery.refresh(),
+      accountQuery.refresh(),
     ]);
-  }, [managedQuery, stellaQuery]);
+  }, [accountQuery, managedQuery, stellaQuery]);
 
   const errorMessage =
     managedPayload.configError ??

@@ -2393,6 +2393,10 @@
       },
       "cancelSignIn": "Anuluj logowanie",
       "closeSearch": "Zamknij wyszukiwanie",
+      "customModel": {
+        "hint": "Nie ma na liście? Wpisz dowolny identyfikator modelu {provider}, aby go użyć.",
+        "modelIdAriaLabel": "Identyfikator modelu {provider}"
+      },
       "empty": {
         "noMatch": "Brak pasujących modeli.",
         "none": "Brak jeszcze dostępnych modeli."

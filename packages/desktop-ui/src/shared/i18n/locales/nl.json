@@ -2377,6 +2377,10 @@
       },
       "cancelSignIn": "Inloggen annuleren",
       "closeSearch": "Zoeken sluiten",
+      "customModel": {
+        "hint": "Staat het er niet bij? Typ een willekeurig {provider}-model-id om het te gebruiken.",
+        "modelIdAriaLabel": "{provider}-model-id"
+      },
       "empty": {
         "noMatch": "Geen modellen gevonden.",
         "none": "Nog geen modellen beschikbaar."

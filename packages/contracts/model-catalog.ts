@@ -13,7 +13,7 @@ export type CatalogModel<TApi extends CatalogApi = CatalogApi> = {
   reasoning: boolean;
   thinkingLevelMap?: Partial<
     Record<
-      "off" | "minimal" | "low" | "medium" | "high" | "xhigh",
+      "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
       string | null
     >
   >;

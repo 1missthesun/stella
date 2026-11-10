@@ -86,6 +86,7 @@ enum ElectronIdentity {
     static let bundleId = "com.stella.app"
     static let appName = "Stella"
     static let microphoneUsage = "Stella uses your microphone for voice conversations."
+    static let speechRecognitionUsage = "Stella turns your dictation into text on this Mac."
     static let plistPatch: KeyValuePairs<String, String> = [
         // Electron decides app.isPackaged from the executable name; launcher runs are source runs.
         "CFBundleExecutable": "Electron",
@@ -93,6 +94,7 @@ enum ElectronIdentity {
         "CFBundleDisplayName": appName,
         "CFBundleIdentifier": bundleId,
         "NSMicrophoneUsageDescription": microphoneUsage,
+        "NSSpeechRecognitionUsageDescription": speechRecognitionUsage,
     ]
     static var plistPatchDigest: String {
         let canonical = plistPatch.map { "\($0.key)=\($0.value)" }.joined(separator: "\n")

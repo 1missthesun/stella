@@ -23,6 +23,7 @@
 
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { Buffer } from "node:buffer";
+import { Effect } from "effect";
 import {
   base64EncodedLength,
   DURABLE_OBJECT_READ_IMAGE_CAPS,
@@ -79,19 +80,15 @@ export const ownerConversationImagesPrefix = async (ownerId: string): Promise<st
 export const conversationImagesPrefix = async (scope: ConversationImageScope): Promise<string> =>
   `${await ownerConversationImagesPrefix(scope.ownerId)}${scope.conversationId}/`;
 
-const withTimeout = async <T>(work: Promise<T>, label: string): Promise<T> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out.`)), R2_TIMEOUT_MS);
+const withTimeout = <T>(work: Promise<T>, label: string): Promise<T> =>
+  Effect.runPromise(
+    Effect.tryPromise({ try: () => work, catch: (error) => error }).pipe(
+      Effect.timeoutOrElse({
+        duration: R2_TIMEOUT_MS,
+        orElse: () => Effect.fail(new Error(`${label} timed out.`)),
       }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-};
+    ),
+  );
 
 type Block = { type: string };
 const refOf = (part: Block): string | undefined => {

@@ -206,20 +206,26 @@ const startIpcSocketTransport = async (
   const server: Server = createServer((socket: Socket) => {
     sockets.add(socket);
     socket.setNoDelay(true);
+    const handshakeDeadline = Effect.runFork(
+      Effect.andThen(
+        Effect.sleep(HANDSHAKE_TIMEOUT_MS),
+        Effect.sync(() => socket.destroy()),
+      ),
+    );
     socket.once("close", () => {
+      handshakeDeadline.interruptUnsafe();
       sockets.delete(socket);
     });
     socket.on("error", () => {
       // Connection-level errors (e.g. host crashed) just close the socket;
       // peer.dispose runs via the readline 'close' handler downstream.
     });
-    socket.setTimeout(HANDSHAKE_TIMEOUT_MS, () => socket.destroy());
 
     let buffered = "";
     let nonces: RuntimeAuthNonces | null = null;
     const attachSocket = (initialInput: string) => {
       socket.off("data", onHandshakeData);
-      socket.setTimeout(0);
+      handshakeDeadline.interruptUnsafe();
       socket.pause();
       const input = new PassThrough();
       if (initialInput) {

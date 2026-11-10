@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { reportGoogleAdsDownload } from "@/components/google-ads-tag";
 import { INSTALL_COMMAND } from "@/lib/downloads";
 
@@ -46,28 +46,41 @@ function LinuxIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+function PlayIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+    >
+      <path d="M6 3.6v16.8c0 .8.9 1.3 1.6.9l13.3-8.4c.6-.4.6-1.3 0-1.7L7.6 2.8C6.9 2.3 6 2.8 6 3.6z" />
+    </svg>
+  );
+}
+
 const DOWNLOADS = {
-  macArm64: "/download/mac-arm64",
-  macX64: "/download/mac-x64",
+  mac: "/download/mac",
   windows: "/download/windows",
   linux: "/download/linux",
   linuxArm64: "/download/linux-arm64",
 } as const;
 
-type Platform = "macArm64" | "macX64" | "windows" | "linux";
+export const APP_STORE_URL = "https://apps.apple.com/us/app/stella-your-ai/id6761148311";
+export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fromyou.stella";
+const DOWNLOAD_PAGE_PATH = "/download";
 
-const ariaLabels: Record<Platform, string> = {
-  macArm64: "Download for Mac",
-  macX64: "Download for Mac",
+/**
+ * "unknown" is the server render and anything we can't place: it links to
+ * /download, which lists every build, so nothing is downloaded on a guess.
+ */
+export type Platform = "unknown" | "mac" | "windows" | "linux" | "ios" | "android";
+
+const ariaLabels: Record<"mac" | "windows" | "linux", string> = {
+  mac: "Download for Mac",
   windows: "Download for Windows",
   linux: "Install Stella for Linux",
-};
-
-type NavigatorUAData = {
-  platform?: string;
-  getHighEntropyValues?: (
-    hints: string[],
-  ) => Promise<{ architecture?: string; platform?: string }>;
 };
 
 function subscribeNoop() {
@@ -75,24 +88,68 @@ function subscribeNoop() {
 }
 
 function detectPlatform(): Platform {
-  if (typeof navigator === "undefined") return "macArm64";
+  if (typeof navigator === "undefined") return "unknown";
   const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("mac")) return "macArm64";
-  if (
-    ua.includes("linux") &&
-    !ua.includes("android") &&
-    !ua.includes("cros")
-  ) {
-    return "linux";
+  if (/iphone|ipad|ipod/.test(ua)) return "ios";
+  if (ua.includes("android")) return "android";
+  if (ua.includes("mac")) {
+    // iPadOS Safari asks for the desktop site with a Mac user agent; only the
+    // touch screen tells it apart from a Mac.
+    return navigator.maxTouchPoints > 0 ? "ios" : "mac";
   }
-  return "windows";
+  if (ua.includes("windows")) return "windows";
+  if (ua.includes("linux") || ua.includes("cros") || ua.includes("x11")) return "linux";
+  return "unknown";
 }
 
 export function usePlatform(): Platform {
   return useSyncExternalStore<Platform>(
     subscribeNoop,
     detectPlatform,
-    () => "macArm64",
+    () => "unknown",
+  );
+}
+
+export function isPhonePlatform(platform: Platform): platform is "ios" | "android" {
+  return platform === "ios" || platform === "android";
+}
+
+/** On a phone: get the desktop link onto the computer without downloading anything here. */
+export function SendToComputer({ className }: { className?: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function send() {
+    const url = `${window.location.origin}${DOWNLOAD_PAGE_PATH}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "Stella for your computer",
+          text: "Download Stella on your computer:",
+          url,
+        });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    setTimeout(() => setState("idle"), 2500);
+  }
+
+  return (
+    <p className={["download-handoff", className].filter(Boolean).join(" ")}>
+      <span>
+        For your computer: <strong>stella.sh/download</strong>
+      </span>
+      <button type="button" className="download-handoff__send" onClick={send}>
+        {state === "copied" ? "Link copied" : state === "failed" ? "Copy failed" : "Send link"}
+      </button>
+    </p>
   );
 }
 
@@ -159,43 +216,34 @@ export function LinuxInstallOptions({
 export function DownloadButton() {
   const platform = usePlatform();
 
-  const [macArchitecture, setMacArchitecture] = useState<"arm64" | "x64">(
-    "arm64",
-  );
-  const resolvedPlatform: Platform =
-    platform === "macArm64" && macArchitecture === "x64" ? "macX64" : platform;
-
-  useEffect(() => {
-    if (typeof navigator === "undefined" || platform !== "macArm64") {
-      return;
-    }
-
-    const userAgentData = (navigator as Navigator & { userAgentData?: NavigatorUAData })
-      .userAgentData;
-
-    userAgentData
-      ?.getHighEntropyValues?.(["architecture", "platform"])
-      .then((hints) => {
-        const hintPlatform = hints.platform ?? userAgentData.platform ?? "";
-        const isMac = hintPlatform.toLowerCase().includes("mac");
-        const isIntel = hints.architecture?.toLowerCase() === "x86";
-
-        if (isMac && isIntel) {
-          setMacArchitecture("x64");
-        }
-      })
-      .catch(() => {});
-  }, [platform]);
-
-  function handleClick(
-    e: React.MouseEvent,
-    url: (typeof DOWNLOADS)[keyof typeof DOWNLOADS] = DOWNLOADS[resolvedPlatform],
-  ) {
-    e.preventDefault();
-    reportGoogleAdsDownload(url);
+  if (isPhonePlatform(platform)) {
+    const ios = platform === "ios";
+    return (
+      <>
+        <a
+          className="button button--primary button--download"
+          href={ios ? APP_STORE_URL : PLAY_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={ios ? "Get Stella on the App Store" : "Get Stella on Google Play"}
+        >
+          Get the app
+          {ios ? <AppleIcon size={18} /> : <PlayIcon size={18} />}
+        </a>
+        <SendToComputer />
+      </>
+    );
   }
 
-  if (resolvedPlatform === "linux") {
+  if (platform === "unknown") {
+    return (
+      <a className="button button--primary button--download" href={DOWNLOAD_PAGE_PATH}>
+        Download Stella
+      </a>
+    );
+  }
+
+  if (platform === "linux") {
     return (
       <details className="download-menu">
         <summary
@@ -216,21 +264,22 @@ export function DownloadButton() {
     );
   }
 
-  const PlatformIcon =
-    resolvedPlatform === "windows"
-      ? WindowsIcon
-      : AppleIcon;
+  const url = DOWNLOADS[platform];
+  const PlatformIcon = platform === "windows" ? WindowsIcon : AppleIcon;
 
   return (
-    <button
+    <a
       className="button button--primary button--download"
-      onClick={handleClick}
-      type="button"
-      aria-label={ariaLabels[resolvedPlatform]}
-      title={ariaLabels[resolvedPlatform]}
+      href={url}
+      onClick={(event) => {
+        event.preventDefault();
+        reportGoogleAdsDownload(url);
+      }}
+      aria-label={ariaLabels[platform]}
+      title={ariaLabels[platform]}
     >
       Download Stella
       <PlatformIcon size={18} />
-    </button>
+    </a>
   );
 }

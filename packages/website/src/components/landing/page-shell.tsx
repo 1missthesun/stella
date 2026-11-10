@@ -9,10 +9,12 @@ export function PageShell({
   children,
   closing,
   className,
+  getHref,
 }: {
   children: ReactNode;
   closing?: ReactNode;
   className?: string;
+  getHref?: string;
 }) {
   return (
     <div
@@ -21,7 +23,7 @@ export function PageShell({
       data-native-scroll=""
     >
       <Backdrop />
-      <LandingHeader getHref={closing ? "#get" : "/#get"} />
+      <LandingHeader getHref={getHref ?? (closing ? "#get" : "/#get")} />
       <main>
         {children}
         {closing}

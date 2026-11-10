@@ -771,6 +771,51 @@ html[data-embedded="true"] .site-header {
   line-height: 1.4;
 }
 
+/* Phones get the app; this line gets the desktop download onto their computer.
+   It always takes its own row after the row's other items ("Free.", links). */
+.download-handoff {
+  order: 10;
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  color: inherit;
+}
+
+.download-handoff > span {
+  opacity: 0.68;
+}
+
+.download-handoff strong {
+  font-weight: 640;
+  white-space: nowrap;
+}
+
+.download-handoff__send {
+  padding: 6px 13px;
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.download-handoff__send:hover,
+.download-handoff__send:focus-visible {
+  border-color: currentColor;
+}
+
+:has(> .download-handoff) {
+  flex-wrap: wrap;
+}
+
 @media (max-width: 720px) {
   .download-menu__options {
     min-width: min(19rem, calc(100vw - 44px));

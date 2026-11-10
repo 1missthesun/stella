@@ -1,0 +1,134 @@
+.hero {
+  padding-bottom: clamp(40px, 6svh, 72px);
+}
+
+.list {
+  width: min(760px, calc(100% - 2 * var(--l-margin)));
+  margin: 0 auto;
+  padding-bottom: clamp(80px, 12svh, 140px);
+}
+
+.listTitle {
+  margin: 0 0 14px;
+  font-family: var(--l-mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(10, 10, 13, 0.5);
+}
+
+.list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(10, 10, 13, 0.1);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(10, 10, 13, 0.1);
+  scroll-margin-top: 96px;
+}
+
+.label {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 3px;
+}
+
+.label strong {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+}
+
+.label > span {
+  font-size: 14px;
+  color: rgba(10, 10, 13, 0.56);
+}
+
+.yours {
+  font-family: var(--l-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--l-accent);
+}
+
+.actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border: 1px solid rgba(10, 10, 13, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 620;
+  color: #0a0a0d;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+
+.action:hover,
+.action:focus-visible {
+  border-color: rgba(10, 10, 13, 0.45);
+}
+
+.row[data-current] .action {
+  border-color: #0a0a0d;
+  background: #0a0a0d;
+  color: #fff;
+}
+
+.later {
+  font-size: 14px;
+  color: rgba(10, 10, 13, 0.45);
+}
+
+.command {
+  display: flex;
+  flex-basis: 100%;
+  gap: 8px;
+  align-items: center;
+}
+
+.command code {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 9px 12px;
+  border: 1px solid rgba(10, 10, 13, 0.12);
+  border-radius: 8px;
+  font-family: var(--l-mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.after {
+  margin: 22px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(10, 10, 13, 0.6);
+}
+
+.hero :global(.download-handoff) {
+  justify-content: center;
+}
+
+.page > footer {
+  background: #060609;
+}

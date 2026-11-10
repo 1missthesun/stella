@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, type ReactNode } from "react";
-import { DownloadButton } from "@/components/download-button";
+import { APP_STORE_URL, DownloadButton, PLAY_STORE_URL } from "@/components/download-button";
 import { FooterLegalLinks } from "@/components/footer-legal-links";
 import { homeFooterGroups } from "@/components/site-footer-groups";
 import { StellaMark } from "@/components/stella-mark";
@@ -120,14 +120,14 @@ export function Finale({
       </div>
       {after ? <div className={o.after}>{after}</div> : null}
       <div className={o.stores}>
-        <a href="https://apps.apple.com/us/app/stella-your-ai/id6761148311" target="_blank" rel="noopener noreferrer">
+        <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
           iPhone
         </a>
-        <a href="https://play.google.com/store/apps/details?id=com.fromyou.stella" target="_blank" rel="noopener noreferrer">
+        <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
           Android
         </a>
         <Link href="/chat">Web</Link>
-        <Link href="/download/linux">Linux</Link>
+        <Link href="/download">All downloads</Link>
       </div>
     </section>
   );

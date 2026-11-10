@@ -33,10 +33,11 @@ export const homeFooterGroups: FooterGroup[] = [
     items: [
       { label: "What's New", href: "/learn-more/whats-new" },
       chromeExtensionLink,
-      { label: "Install for macOS", href: "/install.sh" },
-      { label: "Install for Windows", href: "/install.ps1" },
-      { label: "Install for Linux", href: "/download/linux" },
-      { label: "Install for Arch / Omarchy", href: "/download/arch" },
+      { label: "Download", href: "/download" },
+      { label: "iPhone app", href: "https://apps.apple.com/us/app/stella-your-ai/id6761148311", external: true },
+      { label: "Android app", href: "https://play.google.com/store/apps/details?id=com.fromyou.stella", external: true },
+      { label: "Install for Linux", href: "/download#linux" },
+      { label: "Install for Arch / Omarchy", href: "/download#linux" },
     ],
   },
   {

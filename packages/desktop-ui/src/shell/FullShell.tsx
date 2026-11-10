@@ -15,7 +15,8 @@ import {
 import { setPendingComposerDraft } from "@/global/onboarding/chat/pending-handoff";
 import type { OnboardingChatHandoff } from "@/global/onboarding/chat/use-onboarding-chat";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
-import { router } from "@/router";
+import { routerFor } from "@/router";
+import { routeTree } from "@/routeTree.gen";
 import { ShiftingGradient } from "./background/ShiftingGradient";
 import { AskStellaSelectionChip } from "./selection/AskStellaSelectionChip";
 import "./full-shell.layout.css";
@@ -27,17 +28,8 @@ import {
 } from "./launch-splash";
 import { reportFirstAppPaint } from "./app-paint";
 
-const onboardingChunkPromise: { current: Promise<unknown> | null } = {
-  current: null,
-};
-const loadOnboardingChunk = () => {
-  if (!onboardingChunkPromise.current) {
-    onboardingChunkPromise.current = import(
-      "@/global/onboarding/chat/OnboardingChat"
-    );
-  }
-  return onboardingChunkPromise.current;
-};
+const loadOnboardingChunk = () =>
+  import("@/global/onboarding/chat/OnboardingChat");
 
 const OnboardingChatView = lazy(() =>
   import("@/global/onboarding/chat/OnboardingChat").then((module) => ({
@@ -109,7 +101,7 @@ function ShellChrome({
 
 const HostedChatSurface = () => (
   <>
-    <RouterProvider router={router} />
+    <RouterProvider router={routerFor(routeTree)} />
     <AskStellaSelectionChip />
   </>
 );

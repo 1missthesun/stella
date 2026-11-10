@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { viewAtom } from "@/platform/view-state/view-state";
 import {
   EVIDENCE_TILE_WIDTH,
   isEvidenceMediaKind,
@@ -101,25 +102,24 @@ const useRowWidth = (
 // Expanded grids stay bounded; past this many tiles a "Show all" step reveals the rest.
 const EXPANDED_TILE_CAP = 48;
 
-// A user's own expand/collapse choice per message, kept for the session so it
-// survives the row scrolling out of the virtualized list and back.
-const chosenExpansion = new Map<string, boolean>();
-const expansionListeners = new Set<() => void>();
-let expansionVersion = 0;
-const subscribeExpansion = (listener: () => void) => {
-  expansionListeners.add(listener);
-  return () => {
-    expansionListeners.delete(listener);
-  };
-};
+const REMEMBERED_EXPANSIONS = 200;
+const chosenExpansion = viewAtom<Record<string, boolean>>(
+  "chat.attachmentsExpanded",
+  {},
+);
 const chooseExpansion = (key: string, expanded: boolean) => {
-  chosenExpansion.set(key, expanded);
-  expansionVersion += 1;
-  for (const listener of expansionListeners) listener();
+  chosenExpansion.set((chosen) =>
+    Object.fromEntries(
+      [
+        ...Object.entries(chosen).filter(([known]) => known !== key),
+        [key, expanded] as const,
+      ].slice(-REMEMBERED_EXPANSIONS),
+    ),
+  );
 };
 const useExpanded = (key: string | undefined, fallback: boolean): boolean => {
-  useSyncExternalStore(subscribeExpansion, () => expansionVersion);
-  return (key ? chosenExpansion.get(key) : undefined) ?? fallback;
+  const chosen = chosenExpansion.use();
+  return (key ? chosen[key] : undefined) ?? fallback;
 };
 
 const ToggleTile = ({

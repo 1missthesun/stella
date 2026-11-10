@@ -14,6 +14,7 @@ const DOM_KEY = "dom";
 const CAPTURE_DELAY_MS = 400;
 const RESTORE_DEADLINE_MS = 3_000;
 const RESTORE_MISSING_GRACE_MS = 1_200;
+const RESTORE_STILL_MS = 200;
 const RESTORE_QUIET_MS = 300;
 const RESTORE_TICK_MS = 50;
 const AT_EDGE_PX = 2;
@@ -245,6 +246,7 @@ const placeField = (entry: Field): Placement => {
   return field.value === entry.value ? "placed" : "waiting";
 };
 
+/** A field that cannot take focus yet (inert, disabled) is asked again on each pass, never waited for. */
 const placeFocus = (entry: Focus): Placement => {
   const element = find(entry, fieldMark, allFields);
   if (!element) return "missing";
@@ -261,7 +263,12 @@ const placeFocus = (entry: Focus): Placement => {
       // Some input types have no selection.
     }
   }
-  return document.activeElement === element ? "placed" : "waiting";
+  return "placed";
+};
+
+const appShown = () => {
+  const splash = document.getElementById("stella-launch");
+  return !splash || splash.dataset.exiting === "true";
 };
 
 let settle: (() => void) | null = null;
@@ -290,12 +297,19 @@ export const restoreDomState = (state: unknown = readViewState(DOM_KEY)): Promis
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let quietSince: number | null = null;
+    const quietMs = state.scroll.length > 0 ? RESTORE_QUIET_MS : 0;
+    let changedAt = startedAt;
+    const changes = new MutationObserver(() => {
+      changedAt = performance.now();
+    });
+    changes.observe(document.body, { childList: true, subtree: true });
     const interrupted = () => finish();
     const interruptions = ["wheel", "pointerdown", "keydown", "touchstart"] as const;
     const finish = () => {
       if (settle !== finish) return;
       settle = null;
       cancelAnimationFrame(frame);
+      changes.disconnect();
       if (timer !== null) clearTimeout(timer);
       for (const name of interruptions) window.removeEventListener(name, interrupted, true);
       restoring = false;
@@ -310,17 +324,23 @@ export const restoreDomState = (state: unknown = readViewState(DOM_KEY)): Promis
         ...state.scroll.map(placeScroll),
         ...(state.focus ? [placeFocus(state.focus)] : []),
       ];
-      const missingAllowed = elapsed >= RESTORE_MISSING_GRACE_MS;
+      const missingAllowed =
+        appShown() &&
+        (elapsed >= RESTORE_MISSING_GRACE_MS || performance.now() - changedAt >= RESTORE_STILL_MS);
       const inPlace = placements.every(
         (placement) => placement === "placed" || (placement === "missing" && missingAllowed),
       );
       if (inPlace) {
         quietSince ??= elapsed;
-        if (elapsed - quietSince >= RESTORE_QUIET_MS) return finish();
+        if (elapsed - quietSince >= quietMs) return finish();
       } else {
         quietSince = null;
       }
       if (elapsed >= RESTORE_DEADLINE_MS) return finish();
+      if (inPlace) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
       timer = setTimeout(() => {
         frame = requestAnimationFrame(tick);
       }, RESTORE_TICK_MS);

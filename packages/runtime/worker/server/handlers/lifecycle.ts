@@ -84,8 +84,10 @@ export const lifecycleHandlers: WorkerRpcHandlers = {
         Boolean(params) &&
         typeof params === "object" &&
         (params as { forceRefresh?: unknown }).forceRefresh === true;
-      return yield* fromPromise(() =>
-        modelRuntime.getSnapshotForListing({ forceRefresh }),
+      return ModelCatalog.toCatalogWire(
+        yield* fromPromise(() =>
+          modelRuntime.getSnapshotForListing({ forceRefresh }),
+        ),
       );
     }),
 };

@@ -1,9 +1,34 @@
 import { Context, Effect, Layer } from "effect";
+import type { RuntimeModelCatalogSnapshot } from "@stella/contracts/model-catalog";
 import { NOTIFICATION_NAMES } from "@stella/contracts/protocol";
+import type { ModelRuntimeSnapshot } from "../../kernel/model-runtime.js";
 import { getFileLogger } from "../../observability/file-logger.js";
 import { forkDelayed, type WorkerTimerHandle } from "../effect-runtime.js";
 import * as HostBus from "./host-bus.js";
 import type { RuntimeRunner } from "./types.js";
+
+/**
+ * The catalog as the host receives it: the picker's fields only. A composed
+ * model also carries transport details (compat, prices, thinking maps) that
+ * would double what every boot pushes to each window.
+ */
+export const toCatalogWire = ({
+  models,
+  ...rest
+}: ModelRuntimeSnapshot): RuntimeModelCatalogSnapshot => ({
+  ...rest,
+  models: models.map((model) => ({
+    id: model.id,
+    name: model.name,
+    provider: model.provider,
+    api: model.api,
+    baseUrl: model.baseUrl,
+    reasoning: model.reasoning,
+    input: model.input,
+    contextWindow: model.contextWindow,
+    maxTokens: model.maxTokens,
+  })),
+});
 
 export interface Interface {
   readonly ensureSubscription: () => Promise<
@@ -34,7 +59,10 @@ export const layer = Layer.effect(
       ));
       if (!disposed) {
         unsubscribe ??= loaded.modelRuntime.onCatalogChanged((snapshot) => {
-          hostBus.notify(NOTIFICATION_NAMES.MODEL_CATALOG_UPDATED, snapshot);
+          hostBus.notify(
+            NOTIFICATION_NAMES.MODEL_CATALOG_UPDATED,
+            toCatalogWire(snapshot),
+          );
         });
       }
       return loaded.modelRuntime;

@@ -71,7 +71,7 @@ export const EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I combine a whole year of statements into one sheet?",
-        a: "Yes. In Excel, put the PDFs in one folder and use Get Data, From Folder, then combine. Stella does the same when you point it at the folder, and checks each month's balance.",
+        a: "Yes. In Excel, put the PDFs in one folder and use Get Data, From Folder, then combine. Stella does the same when you point it at the folder, and checks each month's balance. If they're scattered through Downloads, [sort the Downloads folder](/how/files/organize-downloads-folder) first.",
       },
       {
         q: "Does Excel for Mac import PDFs?",

@@ -76,7 +76,9 @@ export function sharedFaq(page: ProblemPage): Faq[] {
   return [
     {
       q: "Is Stella free for this?",
-      a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude plan through Claude Code, and this task costs nothing extra. ${TRIAL_LINE}`,
+      a:
+        page.costNote ??
+        `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude plan through Claude Code, and this task costs nothing extra. ${TRIAL_LINE}`,
     },
     {
       q: "Does Stella ask before changing things on my computer?",

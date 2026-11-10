@@ -244,6 +244,20 @@
   color: var(--p-body);
 }
 
+.result code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(10, 10, 13, 0.06);
+  font-family: var(--l-mono);
+  font-size: 0.78em;
+  color: var(--p-ink);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  color: var(--p-muted);
+}
+
 .result strong,
 .stepsOnly strong {
   color: var(--p-ink);
@@ -254,6 +268,47 @@
   padding: 16px 18px;
   border: 1px dashed rgba(10, 10, 13, 0.28);
   border-radius: 10px;
+}
+
+.output {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: end;
+  margin: 28px 0 0;
+}
+
+.outputVideo {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: #0a0a0d;
+  box-shadow: 0 0 0 1px var(--p-line);
+}
+
+.output figcaption {
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--p-body);
+}
+
+.output figcaption code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(10, 10, 13, 0.06);
+  font-family: var(--l-mono);
+  font-size: 0.8em;
+}
+
+.outputLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--l-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-muted);
 }
 
 .shots {
@@ -736,6 +791,15 @@
   .manual li {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .output {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .outputVideo {
+    max-width: 220px;
   }
 
   .item a {

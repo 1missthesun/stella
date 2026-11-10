@@ -66,10 +66,15 @@ const platformList = (page: ProblemPage) =>
 function ProofMeta({ page }: { page: ProblemPage }) {
   const proof = page.proof;
   if (proof.kind === "steps-only") return null;
+  const real = proof.kind === "video" && proof.video.realDuration ? formatDuration(proof.video.realDuration) : null;
   const speed =
-    proof.kind === "video" && proof.video.speed && proof.video.speed > 1
-      ? `Sped up ${proof.video.speed}×${proof.video.realDuration ? ` (the run took ${formatDuration(proof.video.realDuration)})` : ""}`
-      : null;
+    proof.kind !== "video"
+      ? null
+      : proof.video.speed && proof.video.speed > 1
+        ? `Sped up ${proof.video.speed}×${real ? ` (the run took ${real})` : ""}`
+        : real
+          ? `Waits sped up (the run took ${real})`
+          : null;
   return (
     <dl className={s.proofMeta}>
       <div>
@@ -114,9 +119,28 @@ function StellaDoingIt({ page }: { page: ProblemPage }) {
           />
           <ProofMeta page={page} />
           <p className={s.result}>
-            <strong>Result.</strong> {proof.result}
-            {proof.note ? ` ${proof.note}` : null}
+            <strong>Result.</strong> <LinkedText text={proof.result} />
+            {proof.note ? <span className={s.note}> {proof.note}</span> : null}
           </p>
+          {proof.output ? (
+            <figure className={s.output}>
+              <video
+                className={s.outputVideo}
+                src={proof.output.src}
+                poster={proof.output.poster}
+                width={proof.output.width}
+                height={proof.output.height}
+                controls
+                playsInline
+                preload="none"
+                style={{ aspectRatio: `${proof.output.width} / ${proof.output.height}` }}
+              />
+              <figcaption>
+                <span className={s.outputLabel}>The file Stella made</span>
+                <LinkedText text={proof.output.caption} />
+              </figcaption>
+            </figure>
+          ) : null}
         </>
       ) : proof.kind === "shots" ? (
         <>
@@ -131,7 +155,7 @@ function StellaDoingIt({ page }: { page: ProblemPage }) {
           </div>
           <ProofMeta page={page} />
           <p className={s.result}>
-            <strong>Result.</strong> {proof.result}
+            <strong>Result.</strong> <LinkedText text={proof.result} />
           </p>
         </>
       ) : (
@@ -203,7 +227,7 @@ export default async function ProblemPageRoute({ params }: Params) {
                   <p className={s.promptText}>{page.prompt}</p>
                   <CopyPromptButton text={page.prompt} className={s.copy} />
                 </div>
-                <p className={s.hint}>Open Stella, paste it into the chat, and point it at your file or folder if it asks.</p>
+                <p className={s.hint}>Open Stella, paste it into the chat and press Enter. If your files are somewhere unusual, say where.</p>
               </section>
 
               <section className={s.block} aria-labelledby="diy-title" id="diy">

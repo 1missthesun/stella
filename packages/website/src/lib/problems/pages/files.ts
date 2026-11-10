@@ -74,6 +74,10 @@ export const FILES_PAGES: ProblemPage[] = [
         a: "No. Apps don't run from files in Downloads. The only catch is a browser's download list, whose links stop working once a file moves.",
       },
       {
+        q: "What should I do with all the bank statements in Downloads?",
+        a: "Move them into one Statements folder first. If you need the numbers, [turn the statement PDFs into one Excel sheet](/how/excel/bank-statement-pdf-to-excel); then the PDFs can go to an archive folder or your cloud storage.",
+      },
+      {
         q: "Can I sort Downloads automatically every week?",
         a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
       },

@@ -6,4 +6,10 @@
 export const MOVED_FIX_PAGES: Record<string, string> = {
   "organize-downloads-folder": "/how/files/organize-downloads-folder",
   "bank-statement-to-excel": "/how/excel/bank-statement-pdf-to-excel",
+  // Retired (audit 2026-11-10): developer topics are the wrong audience, and the
+  // DLSS 5 page promised a "leaked build". They redirect to the how-to index.
+  "setup-dlss-5-one-click": "/how",
+  "docker-wont-start": "/how",
+  "git-disaster-recovery": "/how",
+  "externally-managed-environment": "/how",
 };

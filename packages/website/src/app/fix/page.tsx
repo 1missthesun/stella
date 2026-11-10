@@ -33,8 +33,8 @@ export default function FixIndexPage() {
         </p>
         <div className={pg.cta}>
           <DownloadButton />
-          <Link className={pg.secondary} href="/pricing">
-            See pricing
+          <Link className={pg.secondary} href="/how">
+            Step-by-step guides
             <ArrowRight size={16} />
           </Link>
         </div>
@@ -46,7 +46,7 @@ export default function FixIndexPage() {
 
       <section className={f.index} data-tone="light" data-bg="#f1f1f4" aria-label="Problems Stella fixes">
         <InView className={f.grid} threshold={0.02}>
-          {FIX_PAGES.map((page, i) => (
+          {FIX_PAGES.filter((page) => MOVED_FIX_PAGES[page.slug] !== "/how").map((page, i) => (
             <Link
               key={page.slug}
               className={f.card}

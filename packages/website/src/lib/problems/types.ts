@@ -68,6 +68,15 @@ export type VideoProof = ProofBase & {
   };
   /** Timestamped transcript of the run. Also rendered as text for search and screen readers. */
   moments: ProofMoment[];
+  /** The file Stella made, when it's a video worth showing on its own (the before/after). */
+  output?: {
+    src: string;
+    poster: string;
+    width: number;
+    height: number;
+    /** What it is and where the input came from, e.g. its licence. */
+    caption: string;
+  };
   shots?: ProofShot[];
 };
 
@@ -113,6 +122,11 @@ export type ProblemPage = {
   manualTitle?: string;
   /** What Stella won't or can't do here. */
   limits: string[];
+  /**
+   * Replaces the shared "Is Stella free for this?" answer when part of the job
+   * needs a paid Stella plan (e.g. Stella's own transcription or media models).
+   */
+  costNote?: string;
   /** Where Stella can do this. Linux-only gaps belong in `limits` too. */
   platforms: Platform[];
   faq: Faq[];

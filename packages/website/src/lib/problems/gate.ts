@@ -49,6 +49,7 @@ export function uniqueText(page: ProblemPage): string {
     page.answer,
     ...page.stellaSteps,
     page.prompt,
+    page.costNote ?? "",
     ...page.manualSteps.flatMap((step) => [step.title, step.body]),
     ...page.limits,
     ...page.faq.flatMap((item) => [item.q, item.a]),
@@ -168,6 +169,7 @@ export function checkProblemPages(
         need(proof.video.poster, "video needs a poster");
         need(!proof.video.captions || /\.vtt$/.test(proof.video.captions), "captions must be WebVTT");
         need(proof.moments.length >= 3, "video needs at least 3 transcript moments");
+        if (proof.output) need(/\.mp4$/.test(proof.output.src) && proof.output.poster, "output video needs an MP4 and a poster");
         need(
           proof.moments.every((m, i, all) => m.at >= 0 && m.at <= proof.video.duration && (i === 0 || m.at > all[i - 1].at)),
           "transcript moments must be in order and inside the video",

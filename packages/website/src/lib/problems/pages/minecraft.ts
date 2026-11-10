@@ -1,3 +1,4 @@
+import { PROOFS } from "../media";
 import type { ProblemPage } from "../types";
 
 export const MINECRAFT_PAGES: ProblemPage[] = [
@@ -17,19 +18,39 @@ export const MINECRAFT_PAGES: ProblemPage[] = [
     h1: "Install Sodium and Iris on Minecraft 1.21 (Fabric)",
     short: "Sodium, Iris and Mod Menu on 1.21",
     answer:
-      "Install the Fabric loader for your exact 1.21 version, then put Sodium, Iris, Mod Menu and Fabric API (Mod Menu needs it) into your `.minecraft/mods` folder, every file built for that same version, and start the game from the Fabric profile. Most crashes come from one file built for a different version. Stella (stella.sh) can do the whole thing on your computer: it picks versions that match, downloads them from Modrinth, installs Fabric and checks the game starts.",
+      "Install the Fabric loader for your exact 1.21 version, then put Sodium, Iris, Mod Menu and Fabric API (Mod Menu needs it) into your `.minecraft/mods` folder, every file built for that same version, and start the game from the Fabric profile. Most crashes come from one file built for a different version. Stella (stella.sh) can do the whole install on your computer: it picks versions that match, downloads them from Modrinth, checks each file and sets up a Fabric profile ready to play.",
     stellaSteps: [
-      "Finds your Minecraft folder and checks which 1.21 versions you've already played",
-      "Picks the newest 1.21 release that Sodium, Iris, Mod Menu and Fabric API all support",
-      "Downloads the Fabric installer and the four mods from their official pages, nothing from re-upload sites",
-      "Installs the Fabric loader and moves the mods into your mods folder, setting aside anything that would clash",
-      "Reads the launch log to confirm the game loads with all four mods, and tells you where shader packs go",
+      "Looks for Minecraft, the launcher and Java; on a computer without them it installs the official Minecraft Launcher and Java 21 first",
+      "Picks one game version (1.21.1 in the recording) that Sodium, Iris, Mod Menu and Fabric API all support",
+      "Downloads the mods, plus the libraries they depend on, from Modrinth, and checks every file against Modrinth's published checksums",
+      "Runs Fabric's official installer and creates a named profile, leaving your other profiles and worlds alone",
+      "Stops before signing in: you open the launcher, sign in with your Microsoft account, pick the profile and press Play",
     ],
-    prompt:
-      "Install Fabric for Minecraft 1.21 with Sodium, Iris and Mod Menu. Use versions that all match, download only from Modrinth or the official sites, and check the game starts.",
+    prompt: "Install Fabric for Minecraft 1.21.1 and add Sodium, Iris and Mod Menu so my game runs faster.",
     proof: {
-      kind: "steps-only",
-      reason: "The recorded run of this install is being prepared; until then these are the steps Stella follows.",
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "A launcher profile named “Fabric 1.21.1 - Sodium + Iris” (Fabric Loader 0.20.1), with `sodium-fabric-0.8.13+mc1.21.1.jar`, `iris-fabric-1.8.14-beta.1+mc1.21.1.jar`, `modmenu-11.0.5.jar`, `fabric-api-0.116.18+1.21.1.jar` and `placeholder-api-2.4.2+1.21.jar` (a Mod Menu dependency) in the mods folder, each checked against Modrinth’s SHA-512. The computer had no launcher or Java, so Stella installed the official Minecraft Launcher and Temurin Java 21 too.",
+      note: "Stella didn’t sign in or launch the game, because the test computer had no Minecraft account. The recording shows the chat; the work happened in the background.",
+      video: {
+        src: `${PROOFS}/minecraft/install-sodium-iris-fabric-1-21/proof.mp4`,
+        poster: `${PROOFS}/minecraft/install-sodium-iris-fabric-1-21/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 49.1,
+        realDuration: 424,
+      },
+      moments: [
+        { at: 0, text: "The prompt, typed into Stella on a Linux computer." },
+        { at: 8, text: "Sent. Stella starts the install as a task and keeps the chat free." },
+        { at: 13, text: "Stella says it’s setting up a Fabric 1.21.1 profile, checking each mod matches, and leaving existing profiles and worlds alone." },
+        { at: 21, text: "No Minecraft Launcher or Java on this computer, so Stella installs the official launcher and Java 21 first." },
+        { at: 24, text: "About five minutes of background work, sped up 30×: downloads, checksum checks and the Fabric installer." },
+        { at: 36, text: "Done: the “Fabric 1.21.1 - Sodium + Iris” profile with Sodium, Iris, Mod Menu and their dependencies. Signing in and pressing Play are left to you." },
+      ],
     },
     manualTitle: "Do it yourself (about 15 minutes)",
     manualSteps: [
@@ -62,7 +83,8 @@ export const MINECRAFT_PAGES: ProblemPage[] = [
       "Java Edition only. Bedrock (the Microsoft Store and console version) uses add-ons, not Fabric mods.",
       "Stella only downloads from Modrinth, CurseForge and the projects' own sites. It won't fetch mods or cracked launchers from re-upload sites.",
       "It won't touch server anti-cheat or install mods a server bans. Check a server's rules before joining with mods.",
-      "On Linux, Stella can't click inside the Minecraft Launcher. It installs Fabric from the terminal instead, and you press Play yourself.",
+      "On Linux, Stella can't click inside the Minecraft Launcher. It installs Fabric with the official installer from the terminal instead, and you press Play yourself.",
+      "It won't sign in to your Microsoft account for you. Signing in and pressing Play stay with you.",
       "Shaders cost real graphics power. On a weak or older laptop GPU, Stella can pick lighter settings, but it can't make shaders run smoothly on hardware that can't handle them.",
     ],
     platforms: ["windows", "mac", "linux"],

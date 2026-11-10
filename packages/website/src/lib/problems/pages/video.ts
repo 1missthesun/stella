@@ -1,3 +1,4 @@
+import { PROOFS } from "../media";
 import type { ProblemPage } from "../types";
 
 export const VIDEO_PAGES: ProblemPage[] = [
@@ -17,18 +18,51 @@ export const VIDEO_PAGES: ProblemPage[] = [
     h1: "Add burned-in subtitles to a video for TikTok",
     short: "Burned-in subtitles for TikTok",
     answer:
-      "Burned-in subtitles are drawn into the video pictures themselves, so they show everywhere, even with captions turned off. Make a subtitle file (.srt) from the speech, correct it, then render it onto the video with a free tool like CapCut or ffmpeg, keeping the text above TikTok's buttons. Stella (stella.sh) does all three on your computer: it transcribes your clip, lets you check the words, and saves a new captioned copy next to the original.",
+      "Burned-in subtitles are drawn into the video pictures themselves, so they show everywhere, even with captions turned off. Make a timed subtitle file from the speech, correct it, then render it onto the video with a free tool like CapCut or ffmpeg, keeping the text above TikTok's buttons. Stella (stella.sh) does it on your computer: it transcribes the clip, fits a widescreen video to TikTok's 9:16 frame, and saves a captioned copy next to the original.",
     stellaSteps: [
-      "Transcribes the speech in your video into a timed subtitle file",
-      "Shows you the subtitle text so you can fix names and misheard words before anything is rendered",
-      "Burns the captions in with ffmpeg: large, bold, centred, and kept clear of TikTok's buttons and caption area",
-      "Saves a new file next to the original (your source video is never overwritten) and the .srt too, for other edits",
+      "Transcribes the speech with word-level timings (in the recording, with Stella's own transcription, which comes with paid plans)",
+      "Checks the sound and picture line up; in the recording it found the audio started half a second late and corrected for it",
+      "Asks how to fit a widescreen clip into TikTok's 9:16 frame: crop to portrait, or keep the full frame on a blurred background",
+      "Writes a subtitle file and burns it in with ffmpeg: white bold text with a dark outline, two lines at most, above TikTok's caption area",
+      "Saves a new 1080×1920 video next to the original, which it leaves untouched",
     ],
-    prompt:
-      "Add burned-in subtitles to this video for TikTok: transcribe it, show me the text to check, then render big bold captions in the lower third, clear of TikTok's buttons. Keep my original file.",
+    prompt: "Add subtitles to interview.mp4 and burn them in so I can post it on TikTok.",
+    costNote:
+      "Partly. Stella itself is free with the ChatGPT or Claude plan you already have, and so are the ffmpeg steps. The transcription in the recording used Stella's own transcription model, which comes with paid Stella plans (from Plus, $20 a month); new accounts get a small free trial of Stella's own models. On the free path, give Stella a subtitle file, or ask it to set up the free, open-source Whisper on your computer and transcribe with that.",
     proof: {
-      kind: "steps-only",
-      reason: "The recorded run on a real clip is being prepared; until then these are the steps Stella follows.",
+      kind: "video",
+      recordedOn: "2026-11-10",
+      platform: "Linux (Omarchy)",
+      model: "Stella’s own models (GPT-6 Luna)",
+      result:
+        "A 1080×1920 copy of a 39-second widescreen interview, cropped to portrait with 15 burned-in caption lines. Transcribed again independently afterwards, every caption starts within 0.14 s of the speech. The original file was unchanged.",
+      note: "Trimmed: a two-minute wait before the message sent (the new test account was still signing in) is cut, and the waits are sped up.",
+      video: {
+        src: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/proof.mp4`,
+        poster: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 83.6,
+        realDuration: 347,
+      },
+      moments: [
+        { at: 0, text: "The prompt, typed into Stella on a Linux computer." },
+        { at: 5, text: "Sent. Stella replies that it will transcribe the interview, add TikTok-friendly subtitles and export a copy without changing the original." },
+        { at: 10, text: "Transcribing and timing the captions, sped up 20×." },
+        { at: 17, text: "Stella asks how to fit the 16:9 interview into TikTok's 9:16 frame: crop to portrait, or keep the full frame on a blurred background." },
+        { at: 27, text: "“Crop to portrait” is picked." },
+        { at: 31, text: "Cropping, scaling and burning in the captions, sped up 20×." },
+        { at: 39, text: "Done: timed English subtitles and a TikTok-ready portrait version with bold, outlined text. The original is unchanged." },
+        { at: 56, text: "The finished video playing in Stella, captions burned in." },
+      ],
+      output: {
+        src: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/output.mp4`,
+        poster: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/output-poster.jpg`,
+        width: 720,
+        height: 1280,
+        caption:
+          "The portrait copy Stella exported, shown here at 720p with sound. The source is a public-domain NASA interview clip, 1920×1080. The captions are clean but small by TikTok standards; ask for a bigger size or a highlight colour if you want them louder.",
+      },
     },
     manualSteps: [
       {
@@ -54,7 +88,8 @@ export const VIDEO_PAGES: ProblemPage[] = [
     ],
     limits: [
       "Stella doesn't post to TikTok or any other account for you. You upload the finished file yourself.",
-      "Transcription is good but not perfect, especially over loud music, heavy accents or several people talking at once. Always read the text before it's burned in.",
+      "Its own transcription comes with paid Stella plans. On the free path (your ChatGPT or Claude plan) it can't use it, so hand it a subtitle file or have it set up Whisper on your computer, which this recording doesn't show.",
+      "Transcription is good but not perfect, especially over loud music, heavy accents or several people talking at once. Add “show me the text before you burn it in” to the prompt to check the words first.",
       "Rendering takes as long as your computer takes. A one-minute clip is quick; an hour-long video on an older laptop can take a while.",
       "Animated word-by-word caption templates are CapCut's strength. Stella makes clean, readable captions, not CapCut's full template library.",
     ],
@@ -71,6 +106,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "Where should captions go on a TikTok video?",
         a: "In the lower-middle of the frame, above the description text and left of the like, comment and share buttons. Keep a clear margin of about 15% at the bottom and on the right.",
+      },
+      {
+        q: "Should I cut the pauses before or after adding subtitles?",
+        a: "Before. Cutting moves every line's timing, so captions made first drift out of sync. [Cut the silences out of the video](/how/video/cut-silences-from-video) first, then caption the shorter file.",
       },
       {
         q: "Can I add subtitles in another language?",
@@ -155,6 +194,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "Can it cut silences in a podcast or audio-only file?",
         a: "Yes. The same method works on MP3 and WAV files; auto-editor and ffmpeg both take audio, and Stella can do it on audio as well as video.",
+      },
+      {
+        q: "Can I add captions after cutting the silences?",
+        a: "Yes, and that's the right order: cut first, then caption, so the timings match the final edit. See [burned-in subtitles for TikTok](/how/video/burn-subtitles-into-video-for-tiktok) for the next step.",
       },
       {
         q: "Will it sync the cuts across several camera angles?",

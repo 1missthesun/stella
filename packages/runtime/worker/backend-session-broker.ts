@@ -13,7 +13,7 @@ import {
   type AccountMcpHttpResult,
   type AccountMcpOperation,
 } from "../kernel/cli/account-mcp-request.js";
-import { jwtStatus } from "./backend-connector-action-broker.js";
+import { jwtStatus } from "./jwt-status.js";
 
 type SiteAuth = { baseUrl: string; authToken: string };
 type HttpResult = { status: number; body: unknown };

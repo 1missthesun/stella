@@ -363,9 +363,9 @@
       "ceiling": 13022600.05
     },
     "bundle.bootReachableBytes": {
-      "value": 2001045,
+      "value": 1664903,
       "kind": "bytes",
-      "ceiling": 2102121.25
+      "ceiling": 1749172.15
     },
     "boot.source.warm.bootRpc.linesOut": {
       "value": 4,
@@ -478,9 +478,9 @@
       "ceiling": 0
     },
     "bundle.bootReachableFiles": {
-      "value": 34,
+      "value": 40,
       "kind": "count",
-      "ceiling": 37.7
+      "ceiling": 44
     },
     "history.1000.openMs": {
       "value": 498.98,

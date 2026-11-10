@@ -1,10 +1,11 @@
 import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { Context, Effect, Layer } from "effect";
-import { METHOD_NAMES, type HostRuntimeAuthRefreshResult } from "@stella/contracts/protocol";
-import { sweepStaleConnectorBridgeProcesses } from "../../../kernel/connectors/process-registry.js";
 import {
-  setConnectorTokenStoreBroker,
-} from "../../../kernel/connectors/oauth.js";
+  METHOD_NAMES,
+  type HostRuntimeAuthRefreshResult,
+} from "@stella/contracts/protocol";
+import { sweepStaleConnectorBridgeProcesses } from "../../../kernel/connectors/process-registry.js";
+import { setConnectorTokenStoreBroker } from "../../../kernel/connectors/oauth.js";
 import type {
   ConnectorTokenStoreRequest,
   ConnectorTokenStoreResult,
@@ -20,11 +21,6 @@ import {
 } from "../../runtime-paths.js";
 import { parseCliBridgeEndpoint } from "../../../kernel/connectors/cli-bridge-endpoint.js";
 import {
-  createBackendConnectorActionBroker,
-  createBackendConnectionsBroker,
-  createBackendConnectorActionsBroker,
-} from "../../backend-connector-action-broker.js";
-import {
   createBackendAccountMcpBroker,
   createBackendMediaBroker,
   createBackendXApiBroker,
@@ -32,6 +28,34 @@ import {
 import * as HostBus from "../host-bus.js";
 import * as SessionConfig from "./config.js";
 import * as RunnerCell from "./runner-cell.js";
+
+type ConnectorBrokers =
+  typeof import("../../backend-connector-action-broker.js");
+
+let connectorBrokers: Promise<ConnectorBrokers> | undefined;
+
+/**
+ * A connector broker made on its first call: the module holds the action
+ * schema validator and the connector catalog, which no boot needs.
+ */
+const lazyConnectorBroker = <Args extends unknown[], Result>(
+  make: (brokers: ConnectorBrokers) => (...args: Args) => Promise<Result>,
+): ((...args: Args) => Promise<Result>) => {
+  let broker: ((...args: Args) => Promise<Result>) | undefined;
+  return async (...args) => {
+    if (!broker) {
+      connectorBrokers ??=
+        import("../../backend-connector-action-broker.js").catch(
+          (error: unknown) => {
+            connectorBrokers = undefined;
+            throw error;
+          },
+        );
+      broker = make(await connectorBrokers);
+    }
+    return await broker(...args);
+  };
+};
 
 export interface Interface {
   readonly socketPath: string | undefined;
@@ -88,52 +112,58 @@ export const layer = Layer.effect(
       return baseUrl && authToken ? { baseUrl, authToken } : null;
     };
 
-    const runBackendConnectorAction = createBackendConnectorActionBroker({
-      stellaDataDir: init.stellaDataDirPath,
-      getSiteAuth: () => {
-        const baseUrl = config.get().backendUrl?.trim();
-        const authToken = config.get().authToken?.trim();
-        return baseUrl && authToken ? { baseUrl, authToken } : null;
-      },
-      refreshSiteAuth: async () => {
-        try {
-          return await refreshSiteAuth();
-        } catch {
-          return null;
-        }
-      },
-    });
+    const runBackendConnectorAction = lazyConnectorBroker((brokers) =>
+      brokers.createBackendConnectorActionBroker({
+        stellaDataDir: init.stellaDataDirPath,
+        getSiteAuth: () => {
+          const baseUrl = config.get().backendUrl?.trim();
+          const authToken = config.get().authToken?.trim();
+          return baseUrl && authToken ? { baseUrl, authToken } : null;
+        },
+        refreshSiteAuth: async () => {
+          try {
+            return await refreshSiteAuth();
+          } catch {
+            return null;
+          }
+        },
+      }),
+    );
 
-    const listBackendConnections = createBackendConnectionsBroker({
-      getSiteAuth: () => {
-        const baseUrl = config.get().backendUrl?.trim();
-        const authToken = config.get().authToken?.trim();
-        return baseUrl && authToken ? { baseUrl, authToken } : null;
-      },
-      refreshSiteAuth: async () => {
-        try {
-          return await refreshSiteAuth();
-        } catch {
-          return null;
-        }
-      },
-    });
+    const listBackendConnections = lazyConnectorBroker((brokers) =>
+      brokers.createBackendConnectionsBroker({
+        getSiteAuth: () => {
+          const baseUrl = config.get().backendUrl?.trim();
+          const authToken = config.get().authToken?.trim();
+          return baseUrl && authToken ? { baseUrl, authToken } : null;
+        },
+        refreshSiteAuth: async () => {
+          try {
+            return await refreshSiteAuth();
+          } catch {
+            return null;
+          }
+        },
+      }),
+    );
 
-    const listBackendConnectorActions = createBackendConnectorActionsBroker({
-      stellaDataDir: init.stellaDataDirPath,
-      getSiteAuth: () => {
-        const baseUrl = config.get().backendUrl?.trim();
-        const authToken = config.get().authToken?.trim();
-        return baseUrl && authToken ? { baseUrl, authToken } : null;
-      },
-      refreshSiteAuth: async () => {
-        try {
-          return await refreshSiteAuth();
-        } catch {
-          return null;
-        }
-      },
-    });
+    const listBackendConnectorActions = lazyConnectorBroker((brokers) =>
+      brokers.createBackendConnectorActionsBroker({
+        stellaDataDir: init.stellaDataDirPath,
+        getSiteAuth: () => {
+          const baseUrl = config.get().backendUrl?.trim();
+          const authToken = config.get().authToken?.trim();
+          return baseUrl && authToken ? { baseUrl, authToken } : null;
+        },
+        refreshSiteAuth: async () => {
+          try {
+            return await refreshSiteAuth();
+          } catch {
+            return null;
+          }
+        },
+      }),
+    );
 
     const liveSession = {
       getSiteAuth: () => {

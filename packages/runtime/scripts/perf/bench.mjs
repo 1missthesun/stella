@@ -120,14 +120,16 @@ const copyDir = (from, to) => {
   restampCatalogStore(to);
 };
 const restampCatalogStore = (dataDir) => {
-  const storePath = path.join(dataDir, "models-store.json");
-  if (!fs.existsSync(storePath)) return;
-  const stored = JSON.parse(fs.readFileSync(storePath, "utf8"));
   const now = Date.now();
-  for (const entry of Object.values(stored)) {
-    if (entry && typeof entry.checkedAt === "number") entry.checkedAt = now;
+  for (const name of ["models-store.json", "models-live.json"]) {
+    const storePath = path.join(dataDir, name);
+    if (!fs.existsSync(storePath)) continue;
+    const stored = JSON.parse(fs.readFileSync(storePath, "utf8"));
+    for (const entry of Object.values(stored)) {
+      if (entry && typeof entry.checkedAt === "number") entry.checkedAt = now;
+    }
+    fs.writeFileSync(storePath, JSON.stringify(stored, null, 2));
   }
-  fs.writeFileSync(storePath, JSON.stringify(stored, null, 2));
 };
 let runCounter = 0;
 const newRunDir = (label) => {

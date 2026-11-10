@@ -37,7 +37,10 @@ Every worker the bench spawns gets:
   imports it):
   - **Network guard.** `fetch` never leaves the machine. The pi.dev model
     catalog refresh gets a 404 (the runtime records an empty refresh and
-    moves on); anything else throws and is counted (`fetch.blocked`).
+    moves on) and the keyless provider model lists (OpenRouter, Vercel AI
+    Gateway, OpenCode) an empty list, which the runtime keeps for its refresh
+    interval; both count as `fetch.catalogRequests`. Anything else throws and
+    is counted (`fetch.blocked`).
   - **Scripted model** (`STELLA_PERF_FAKE_PROVIDER=1`, source entry only).
     The network guard answers OpenAI-compatible chat completions at
     `http://perf-scripted.invalid/v1` in process. The bench pins
@@ -59,7 +62,7 @@ Every worker the bench spawns gets:
     never touches the real browser-bridge session.
 - A copy of a seeded "returning user" data dir (schema migrated, catalog
   refresh stamped, one prior conversation). Every copy restamps the catalog
-  store's `checkedAt` to now: templates are cached across invocations and the
+  store's and the live model lists' `checkedAt` to now: templates are cached across invocations and the
   runtime refetches every provider once those stamps pass its 4 h refresh
   interval, so a template's age would otherwise decide the boot counts.
 

@@ -40,6 +40,11 @@ if (env.STELLA_PERF_MODULE_CENSUS === "1") {
 const fetchStats = { catalog404: 0, blocked: 0, blockedUrls: [] as string[] };
 const fakeStats = { calls: 0, toolCalls: 0, lastToolNames: [] as string[], lastSystemPromptChars: 0, lastMessageCount: 0 };
 const SCRIPTED_BASE_URL = "http://perf-scripted.invalid/v1";
+const KEYLESS_LIVE_MODEL_LISTS = new Set([
+  "https://openrouter.ai/api/v1/models",
+  "https://ai-gateway.vercel.sh/v1/models",
+  "https://opencode.ai/zen/v1/models",
+]);
 const scriptedModel = env.STELLA_PERF_FAKE_PROVIDER === "1" ? createScriptedModel() : null;
 const guardedFetch = async (input: unknown, init?: RequestInit): Promise<Response> => {
   const url =
@@ -51,6 +56,10 @@ const guardedFetch = async (input: unknown, init?: RequestInit): Promise<Respons
   if (url.startsWith("https://pi.dev/api/models/providers/")) {
     fetchStats.catalog404 += 1;
     return new Response("not found", { status: 404 });
+  }
+  if (KEYLESS_LIVE_MODEL_LISTS.has(url)) {
+    fetchStats.catalog404 += 1;
+    return Response.json({ data: [] });
   }
   if (scriptedModel && url === `${SCRIPTED_BASE_URL}/chat/completions`) {
     const body =

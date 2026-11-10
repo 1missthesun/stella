@@ -36,8 +36,8 @@
         "showStella": "Tunjukkan ke Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Buka utas agen {title}",
-        "openThread": "Buka utas agen",
+        "openNamedThread": "Buka tugas: {title}",
+        "openThread": "Buka tugas",
         "showLess": "Tampilkan lebih sedikit",
         "showMore": {
           "other": "+{count} lagi"
@@ -47,10 +47,10 @@
         "unavailable": "Detail model tidak tersedia"
       },
       "backgroundWork": {
-        "agentThread": "Utas agen",
+        "agentThread": "Tugas",
         "followUp": "Tindak lanjut",
-        "openNamedThread": "Buka utas agen {title}",
-        "openThread": "Buka utas agen",
+        "openNamedThread": "Buka tugas: {title}",
+        "openThread": "Buka tugas",
         "taskCount": {
           "other": "{count} tugas"
         },
@@ -743,7 +743,9 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "other": "{count} tugas sedang berjalan"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1674,7 +1676,7 @@
       "unnamedComputer": "Komputer · {id}",
       "waitingBadge": "Menunggumu",
       "remember": "Ingat di komputer yang meminta",
-      "rememberOn": "Disimpan sebagai “{label}”. Agen akan memakainya lagi tanpa bertanya kepada Anda.",
+      "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda.",
       "rememberOff": "Dipakai sekali, lalu dihapus.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan."
     }
@@ -1848,7 +1850,7 @@
             "title": "Minta"
           },
           "preview": {
-            "body": "Sebuah agen membuatnya dan membuka pratinjau langsung.",
+            "body": "Sebuah tugas membuatnya dan membuka pratinjau langsung.",
             "title": "Pratinjau"
           },
           "update": {
@@ -2581,7 +2583,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dikte",
-        "voice": "Agen suara"
+        "voice": "Percakapan suara"
       },
       "capturing": "Tekan tombol…",
       "change": "Ubah",
@@ -2598,7 +2600,7 @@
       "off": "Nonaktif",
       "targets": {
         "dictation": "dikte",
-        "voice": "agen suara"
+        "voice": "percakapan suara"
       },
       "title": "Pintasan",
       "toasts": {
@@ -2610,13 +2612,13 @@
         "updatedTitle": "Pintasan {action} diperbarui"
       },
       "voiceAgent": {
-        "description": "Memulai atau menghentikan agen suara langsung Stella."
+        "description": "Memulai atau menghentikan percakapan suara langsung dengan Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Prompt aktif",
       "agentLabel": "Prompt untuk",
-      "agentSublabel": "Pilih agen mana yang promptnya ingin diubah.",
+      "agentSublabel": "Pilih prompt mana yang ingin diubah.",
       "agents": {
         "assistant": "Asisten",
         "worker": "Pekerja"
@@ -2679,7 +2681,7 @@
     },
     "secureValues": {
       "title": "Nilai pribadi tersimpan",
-      "description": "Nilai dari permintaan pribadi yang Anda pilih untuk diingat, disimpan di penyimpanan aman komputer ini sampai Anda menghapusnya. Agen memakainya tanpa pernah membacanya.",
+      "description": "Nilai dari permintaan pribadi yang Anda pilih untuk diingat, disimpan di penyimpanan aman komputer ini sampai Anda menghapusnya. Stella memakainya tanpa pernah membacanya.",
       "empty": "Tidak ada nilai pribadi yang tersimpan di komputer ini.",
       "saved": "Disimpan {saved}",
       "delete": "Delete",
@@ -2794,7 +2796,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Utas agen hanya-baca",
+        "badge": "Tugas hanya-baca",
         "claudeAriaLabel": "Percakapan subagen Claude hanya-baca",
         "claudeBadge": "Subagen Claude hanya-baca",
         "empty": "Belum ada pesan di utas ini.",
@@ -2811,7 +2813,7 @@
         },
         "retrying": "Mencoba lagi…",
         "role": {
-          "assistant": "Agen",
+          "assistant": "Tugas",
           "checkpoint": "Titik pemeriksaan utas",
           "lifecycle": "Aktivitas",
           "reasoning": "Penalaran",
@@ -2832,7 +2834,7 @@
         "toolInput": "Masukan",
         "toolOutput": "Keluaran",
         "toolRunning": "Menunggu alat ini selesai…",
-        "unavailable": "Riwayat utas agen tidak tersedia."
+        "unavailable": "Riwayat tugas ini tidak tersedia."
       },
       "canvas": {
         "loadFailed": "Tidak dapat memuat kanvas ini.",
@@ -3152,7 +3154,7 @@
       "decline": "Decline",
       "remember": "Ingat di komputer ini",
       "rememberRelayed": "Ingat di komputer yang meminta",
-      "rememberOn": "Disimpan sebagai “{label}”. Agen akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di Pengaturan.",
+      "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di Pengaturan.",
       "rememberOff": "Dipakai sekali, lalu dihapus.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
       "note": "Tambahkan catatan (opsional)",

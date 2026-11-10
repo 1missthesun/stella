@@ -38,8 +38,8 @@
         "showStella": "Mostra a Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Apri il thread dell'agente {title}",
-        "openThread": "Apri il thread dell'agente",
+        "openNamedThread": "Apri attività: {title}",
+        "openThread": "Apri attività",
         "showLess": "Mostra meno",
         "showMore": {
           "many": "+{count} altri",
@@ -51,10 +51,10 @@
         "unavailable": "Dettagli del modello non disponibili"
       },
       "backgroundWork": {
-        "agentThread": "Thread dell'agente",
+        "agentThread": "Attività",
         "followUp": "Follow-up",
-        "openNamedThread": "Apri il thread dell'agente {title}",
-        "openThread": "Apri il thread dell'agente",
+        "openNamedThread": "Apri attività: {title}",
+        "openThread": "Apri attività",
         "taskCount": {
           "many": "{count} attività",
           "one": "{count} attività",
@@ -753,7 +753,11 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "many": "{count} attività in corso",
+        "one": "{count} attività in corso",
+        "other": "{count} attività in corso"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1690,7 +1694,7 @@
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Sta aspettando te",
       "remember": "Ricorda sul computer che l’ha chiesto",
-      "rememberOn": "Salvato come «{label}». Gli agenti lo riutilizzano senza chiedertelo di nuovo.",
+      "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo.",
       "rememberOff": "Usato una volta, poi eliminato.",
       "replacing": "Il valore salvato per «{label}» non ha funzionato. Inserisci quello giusto; sostituirà quello salvato."
     }
@@ -1864,7 +1868,7 @@
             "title": "Chiedi"
           },
           "preview": {
-            "body": "Un agente la crea e apre un'anteprima dal vivo.",
+            "body": "Un’attività la crea e apre un'anteprima dal vivo.",
             "title": "Anteprima"
           },
           "update": {
@@ -2597,7 +2601,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dettatura",
-        "voice": "Agente vocale"
+        "voice": "Conversazioni vocali"
       },
       "capturing": "Premi i tasti…",
       "change": "Cambia",
@@ -2614,7 +2618,7 @@
       "off": "Disattivato",
       "targets": {
         "dictation": "la dettatura",
-        "voice": "l'agente vocale"
+        "voice": "una conversazione vocale"
       },
       "title": "Scorciatoie",
       "toasts": {
@@ -2626,13 +2630,13 @@
         "updatedTitle": "Scorciatoia {action} aggiornata"
       },
       "voiceAgent": {
-        "description": "Avvia o ferma l'agente vocale dal vivo di Stella."
+        "description": "Avvia o interrompe una conversazione vocale dal vivo con Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Prompt attivo",
       "agentLabel": "Prompt per",
-      "agentSublabel": "Scegli di quale agente cambiare il prompt.",
+      "agentSublabel": "Scegli quale prompt modificare.",
       "agents": {
         "assistant": "Assistente",
         "worker": "Esecutore"
@@ -2695,7 +2699,7 @@
     },
     "secureValues": {
       "title": "Valori privati salvati",
-      "description": "Valori di richieste private che hai scelto di ricordare, conservati nell’archivio sicuro di questo computer finché non li elimini. Gli agenti li usano senza mai leggerli.",
+      "description": "Valori di richieste private che hai scelto di ricordare, conservati nell’archivio sicuro di questo computer finché non li elimini. Stella li usa senza mai leggerli.",
       "empty": "Nessun valore privato salvato su questo computer.",
       "saved": "Salvato {saved}",
       "delete": "Delete",
@@ -2812,7 +2816,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Thread dell'agente in sola lettura",
+        "badge": "Attività in sola lettura",
         "claudeAriaLabel": "Conversazione in sola lettura del subagente Claude",
         "claudeBadge": "Subagente Claude in sola lettura",
         "empty": "Ancora nessun messaggio in questo thread.",
@@ -2834,7 +2838,7 @@
         },
         "retrying": "Nuovo tentativo…",
         "role": {
-          "assistant": "Agente",
+          "assistant": "Attività",
           "checkpoint": "Checkpoint del thread",
           "lifecycle": "Attività",
           "reasoning": "Ragionamento",
@@ -2856,7 +2860,7 @@
         "toolInput": "Input",
         "toolOutput": "Output",
         "toolRunning": "In attesa che questo strumento termini…",
-        "unavailable": "La cronologia del thread dell'agente non è disponibile."
+        "unavailable": "La cronologia di questa attività non è disponibile."
       },
       "canvas": {
         "loadFailed": "Impossibile caricare questo canvas.",
@@ -3186,7 +3190,7 @@
       "decline": "Decline",
       "remember": "Ricorda su questo computer",
       "rememberRelayed": "Ricorda sul computer che l’ha chiesto",
-      "rememberOn": "Salvato come «{label}». Gli agenti lo riutilizzano senza chiedertelo di nuovo; puoi eliminarlo quando vuoi nelle Impostazioni.",
+      "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo; puoi eliminarlo quando vuoi nelle Impostazioni.",
       "rememberOff": "Usato una volta, poi eliminato.",
       "replacing": "Il valore salvato per «{label}» non ha funzionato. Inserisci quello giusto; sostituirà quello salvato.",
       "note": "Aggiungi una nota (facoltativa)",

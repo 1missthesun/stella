@@ -39,8 +39,8 @@
         "showStella": "Pokaż Stelli"
       },
       "agentCompletion": {
-        "openNamedThread": "Otwórz wątek agenta {title}",
-        "openThread": "Otwórz wątek agenta",
+        "openNamedThread": "Otwórz zadanie: {title}",
+        "openThread": "Otwórz zadanie",
         "showLess": "Pokaż mniej",
         "showMore": {
           "few": "+{count} więcej",
@@ -53,10 +53,10 @@
         "unavailable": "Szczegóły modelu niedostępne"
       },
       "backgroundWork": {
-        "agentThread": "Wątek agenta",
+        "agentThread": "Zadanie",
         "followUp": "Kontynuacja",
-        "openNamedThread": "Otwórz wątek agenta {title}",
-        "openThread": "Otwórz wątek agenta",
+        "openNamedThread": "Otwórz zadanie: {title}",
+        "openThread": "Otwórz zadanie",
         "taskCount": {
           "few": "{count} zadania",
           "many": "{count} zadań",
@@ -758,7 +758,12 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "few": "{count} zadania w toku",
+        "many": "{count} zadań w toku",
+        "one": "{count} zadanie w toku",
+        "other": "{count} zadania w toku"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1698,7 +1703,7 @@
       "unnamedComputer": "Komputer · {id}",
       "waitingBadge": "Czeka na ciebie",
       "remember": "Zapamiętaj na komputerze, który pytał",
-      "rememberOn": "Zapisano jako „{label}”. Agenci użyją tego ponownie bez pytania.",
+      "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania.",
       "rememberOff": "Użyto raz, a potem usunięto.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną."
     }
@@ -1872,7 +1877,7 @@
             "title": "Poproś"
           },
           "preview": {
-            "body": "Agent to zbuduje i otworzy podgląd na żywo.",
+            "body": "Zadanie to zbuduje i otworzy podgląd na żywo.",
             "title": "Podgląd"
           },
           "update": {
@@ -2605,7 +2610,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dyktowanie",
-        "voice": "Agent głosowy"
+        "voice": "Rozmowy głosowe"
       },
       "capturing": "Naciśnij klawisze…",
       "change": "Zmień",
@@ -2622,7 +2627,7 @@
       "off": "Wył.",
       "targets": {
         "dictation": "dyktowanie",
-        "voice": "agenta głosowego"
+        "voice": "rozmowę głosową"
       },
       "title": "Skróty",
       "toasts": {
@@ -2634,13 +2639,13 @@
         "updatedTitle": "Zaktualizowano skrót {action}"
       },
       "voiceAgent": {
-        "description": "Uruchamia lub zatrzymuje agenta głosowego Stelli na żywo."
+        "description": "Rozpoczyna lub kończy rozmowę głosową na żywo ze Stellą."
       }
     },
     "systemPrompt": {
       "activeLabel": "Aktywny prompt",
       "agentLabel": "Prompt dla",
-      "agentSublabel": "Wybierz, którego agenta prompt zmienić.",
+      "agentSublabel": "Wybierz, który prompt chcesz zmienić.",
       "agents": {
         "assistant": "Asystent",
         "worker": "Wykonawca"
@@ -2703,7 +2708,7 @@
     },
     "secureValues": {
       "title": "Zapisane wartości prywatne",
-      "description": "Wartości z prywatnych próśb, które postanowiłeś zapamiętać. Są przechowywane w bezpiecznym magazynie tego komputera, dopóki ich nie usuniesz. Agenci używają ich, nigdy ich nie odczytując.",
+      "description": "Wartości z prywatnych próśb, które postanowiłeś zapamiętać. Są przechowywane w bezpiecznym magazynie tego komputera, dopóki ich nie usuniesz. Stella używa ich, nigdy ich nie odczytując.",
       "empty": "Na tym komputerze nie ma zapisanych wartości prywatnych.",
       "saved": "Zapisano {saved}",
       "delete": "Delete",
@@ -2821,7 +2826,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Wątek agenta tylko do odczytu",
+        "badge": "Zadanie tylko do odczytu",
         "claudeAriaLabel": "Rozmowa subagenta Claude tylko do odczytu",
         "claudeBadge": "Subagent Claude tylko do odczytu",
         "empty": "Brak jeszcze wiadomości w tym wątku.",
@@ -2845,7 +2850,7 @@
         },
         "retrying": "Ponawianie…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Zadanie",
           "checkpoint": "Punkt kontrolny wątku",
           "lifecycle": "Aktywność",
           "reasoning": "Rozumowanie",
@@ -2867,7 +2872,7 @@
         "toolInput": "Wejście",
         "toolOutput": "Wyjście",
         "toolRunning": "Czekanie na zakończenie tego narzędzia…",
-        "unavailable": "Historia wątku agenta jest niedostępna."
+        "unavailable": "Historia tego zadania jest niedostępna."
       },
       "canvas": {
         "loadFailed": "Nie udało się wczytać tej kanwy.",
@@ -3202,7 +3207,7 @@
       "decline": "Decline",
       "remember": "Zapamiętaj na tym komputerze",
       "rememberRelayed": "Zapamiętaj na komputerze, który pytał",
-      "rememberOn": "Zapisano jako „{label}”. Agenci użyją tego ponownie bez pytania; możesz to w każdej chwili usunąć w Ustawieniach.",
+      "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania; możesz to w każdej chwili usunąć w Ustawieniach.",
       "rememberOff": "Użyto raz, a potem usunięto.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
       "note": "Dodaj notatkę (opcjonalnie)",

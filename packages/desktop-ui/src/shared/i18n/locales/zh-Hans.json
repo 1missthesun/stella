@@ -36,8 +36,8 @@
         "showStella": "展示给 Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "打开 {title} 智能体线程",
-        "openThread": "打开智能体线程",
+        "openNamedThread": "打开任务：{title}",
+        "openThread": "打开任务",
         "showLess": "收起",
         "showMore": {
           "other": "+{count} 更多"
@@ -47,10 +47,10 @@
         "unavailable": "模型详情不可用"
       },
       "backgroundWork": {
-        "agentThread": "智能体线程",
+        "agentThread": "任务",
         "followUp": "后续",
-        "openNamedThread": "打开 {title} 智能体线程",
-        "openThread": "打开智能体线程",
+        "openNamedThread": "打开任务：{title}",
+        "openThread": "打开任务",
         "taskCount": {
           "other": "{count} 个任务"
         },
@@ -743,7 +743,9 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "other": "{count} 个任务进行中"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1674,7 +1676,7 @@
       "unnamedComputer": "电脑 · {id}",
       "waitingBadge": "正在等你",
       "remember": "在提问的那台电脑上记住",
-      "rememberOn": "已保存为「{label}」。智能体之后会直接复用，不再问你。",
+      "rememberOn": "已保存为「{label}」。Stella 之后会直接复用，不再问你。",
       "rememberOff": "仅使用一次，然后删除。",
       "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。"
     }
@@ -1848,7 +1850,7 @@
             "title": "提出"
           },
           "preview": {
-            "body": "由智能体构建，并打开实时预览。",
+            "body": "由任务构建，并打开实时预览。",
             "title": "预览"
           },
           "update": {
@@ -2581,7 +2583,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "听写",
-        "voice": "语音智能体"
+        "voice": "语音对话"
       },
       "capturing": "请按下按键…",
       "change": "更改",
@@ -2598,7 +2600,7 @@
       "off": "关闭",
       "targets": {
         "dictation": "听写",
-        "voice": "语音智能体"
+        "voice": "语音对话"
       },
       "title": "快捷键",
       "toasts": {
@@ -2610,13 +2612,13 @@
         "updatedTitle": "已更新「{action}」快捷键"
       },
       "voiceAgent": {
-        "description": "启动或停止 Stella 的实时语音智能体。"
+        "description": "开始或结束与 Stella 的实时语音对话。"
       }
     },
     "systemPrompt": {
       "activeLabel": "当前提示词",
       "agentLabel": "提示词对象",
-      "agentSublabel": "选择要修改哪个智能体的提示词。",
+      "agentSublabel": "选择要修改的提示词。",
       "agents": {
         "assistant": "助手",
         "worker": "执行者"
@@ -2679,7 +2681,7 @@
     },
     "secureValues": {
       "title": "已保存的私密值",
-      "description": "你在私密请求中选择记住的值，保存在这台电脑的安全存储中，直到你删除为止。智能体使用它们，但从不读取。",
+      "description": "你在私密请求中选择记住的值，保存在这台电脑的安全存储中，直到你删除为止。Stella 使用它们，但从不读取。",
       "empty": "这台电脑上没有保存私密值。",
       "saved": "保存于 {saved}",
       "delete": "Delete",
@@ -2794,7 +2796,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "只读智能体线程",
+        "badge": "只读任务",
         "claudeAriaLabel": "Claude 子智能体只读对话",
         "claudeBadge": "只读 Claude 子智能体",
         "empty": "此线程中还没有消息。",
@@ -2811,7 +2813,7 @@
         },
         "retrying": "正在重试…",
         "role": {
-          "assistant": "智能体",
+          "assistant": "任务",
           "checkpoint": "线程检查点",
           "lifecycle": "活动",
           "reasoning": "推理",
@@ -2832,7 +2834,7 @@
         "toolInput": "输入",
         "toolOutput": "输出",
         "toolRunning": "正在等待此工具完成…",
-        "unavailable": "智能体线程历史不可用。"
+        "unavailable": "此任务的历史记录不可用。"
       },
       "canvas": {
         "loadFailed": "无法加载此画布。",
@@ -3152,7 +3154,7 @@
       "decline": "Decline",
       "remember": "在这台电脑上记住",
       "rememberRelayed": "在提问的那台电脑上记住",
-      "rememberOn": "已保存为「{label}」。智能体之后会直接复用，不再问你；你可以随时在设置中删除。",
+      "rememberOn": "已保存为「{label}」。Stella 之后会直接复用，不再问你；你可以随时在设置中删除。",
       "rememberOff": "仅使用一次，然后删除。",
       "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。",
       "note": "添加备注（可选）",

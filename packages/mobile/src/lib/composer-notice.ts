@@ -165,11 +165,11 @@ export function classifyComposerNotice(
   if (!normalized) return null;
   const status = statusCodeOf(normalized);
 
-  if (normalized.includes("sign in to stella to use cloud agents")) {
+  if (normalized.includes("sign in to stella to use cloud tasks")) {
     return {
       kind: "sign-in",
-      title: "Sign in to run agents",
-      description: "Sign in to Stella before running cloud agents.",
+      title: "Sign in to run tasks",
+      description: "Sign in to Stella before running cloud tasks.",
     };
   }
 

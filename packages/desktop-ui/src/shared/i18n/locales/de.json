@@ -37,8 +37,8 @@
         "showStella": "Stella zeigen"
       },
       "agentCompletion": {
-        "openNamedThread": "Agenten-Thread {title} öffnen",
-        "openThread": "Agenten-Thread öffnen",
+        "openNamedThread": "Aufgabe öffnen: {title}",
+        "openThread": "Aufgabe öffnen",
         "showLess": "Weniger anzeigen",
         "showMore": {
           "one": "+{count} weitere",
@@ -49,10 +49,10 @@
         "unavailable": "Modelldetails nicht verfügbar"
       },
       "backgroundWork": {
-        "agentThread": "Agenten-Thread",
+        "agentThread": "Aufgabe",
         "followUp": "Nachfassen",
-        "openNamedThread": "Agenten-Thread {title} öffnen",
-        "openThread": "Agenten-Thread öffnen",
+        "openNamedThread": "Aufgabe öffnen: {title}",
+        "openThread": "Aufgabe öffnen",
         "taskCount": {
           "one": "{count} Aufgabe",
           "other": "{count} Aufgaben"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} Aufgabe läuft",
+        "other": "{count} Aufgaben laufen"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Wartet auf dich",
       "remember": "Auf dem anfragenden Computer merken",
-      "rememberOn": "Gespeichert als „{label}“. Agenten verwenden den Wert wieder, ohne dich erneut zu fragen.",
+      "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen.",
       "rememberOff": "Einmal verwendet, dann gelöscht.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten."
     }
@@ -1856,7 +1859,7 @@
             "title": "Fragen"
           },
           "preview": {
-            "body": "Ein Agent baut es und öffnet eine Live-Vorschau.",
+            "body": "Eine Aufgabe baut es und öffnet eine Live-Vorschau.",
             "title": "Vorschau"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Diktat",
-        "voice": "Sprachagent"
+        "voice": "Sprachunterhaltungen"
       },
       "capturing": "Tasten drücken…",
       "change": "Ändern",
@@ -2606,7 +2609,7 @@
       "off": "Aus",
       "targets": {
         "dictation": "das Diktat",
-        "voice": "den Sprachagenten"
+        "voice": "ein Sprachgespräch"
       },
       "title": "Tastenkürzel",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "Tastenkürzel für {action} aktualisiert"
       },
       "voiceAgent": {
-        "description": "Startet oder stoppt Stellas Live-Sprachagenten."
+        "description": "Startet oder beendet ein Live-Sprachgespräch mit Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Aktiver Prompt",
       "agentLabel": "Prompt für",
-      "agentSublabel": "Wähle, wessen Prompt du ändern möchtest.",
+      "agentSublabel": "Wähle, welchen Prompt du ändern möchtest.",
       "agents": {
         "assistant": "Assistent",
         "worker": "Worker"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Gespeicherte private Werte",
-      "description": "Werte aus privaten Anfragen, die du dir merken lassen wolltest. Sie bleiben im sicheren Speicher dieses Computers, bis du sie löschst. Agenten verwenden sie, ohne sie je zu lesen.",
+      "description": "Werte aus privaten Anfragen, die du dir merken lassen wolltest. Sie bleiben im sicheren Speicher dieses Computers, bis du sie löschst. Stella verwendet sie, ohne sie je zu lesen.",
       "empty": "Auf diesem Computer sind keine privaten Werte gespeichert.",
       "saved": "Gespeichert {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Schreibgeschützter Agenten-Thread",
+        "badge": "Schreibgeschützte Aufgabe",
         "claudeAriaLabel": "Schreibgeschützte Unterhaltung des Claude-Subagenten",
         "claudeBadge": "Schreibgeschützter Claude-Subagent",
         "empty": "Noch keine Nachrichten in diesem Thread.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Wird erneut versucht…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Aufgabe",
           "checkpoint": "Thread-Prüfpunkt",
           "lifecycle": "Aktivität",
           "reasoning": "Denkprozess",
@@ -2845,7 +2848,7 @@
         "toolInput": "Eingabe",
         "toolOutput": "Ausgabe",
         "toolRunning": "Warten auf den Abschluss dieses Werkzeugs…",
-        "unavailable": "Der Verlauf des Agenten-Threads ist nicht verfügbar."
+        "unavailable": "Der Verlauf dieser Aufgabe ist nicht verfügbar."
       },
       "canvas": {
         "loadFailed": "Dieses Canvas konnte nicht geladen werden.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Auf diesem Computer merken",
       "rememberRelayed": "Auf dem anfragenden Computer merken",
-      "rememberOn": "Gespeichert als „{label}“. Agenten verwenden den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit in den Einstellungen löschen.",
+      "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit in den Einstellungen löschen.",
       "rememberOff": "Einmal verwendet, dann gelöscht.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
       "note": "Notiz hinzufügen (optional)",

@@ -1834,7 +1834,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ended = {
           kind: "canceled",
           attempt: entry.attemptGeneration ?? 1,
-          body: "No longer running: Stella lost track of this agent when it stopped.",
+          body: "No longer running: Stella lost track of this task when it stopped.",
         };
       }
       if (!ended) continue;

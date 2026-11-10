@@ -38,8 +38,8 @@
         "showStella": "Mostrar a Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Abrir el hilo del agente {title}",
-        "openThread": "Abrir el hilo del agente",
+        "openNamedThread": "Abrir tarea: {title}",
+        "openThread": "Abrir tarea",
         "showLess": "Mostrar menos",
         "showMore": {
           "many": "+{count} más",
@@ -51,10 +51,10 @@
         "unavailable": "Detalles del modelo no disponibles"
       },
       "backgroundWork": {
-        "agentThread": "Hilo del agente",
+        "agentThread": "Tarea",
         "followUp": "Seguimiento",
-        "openNamedThread": "Abrir el hilo del agente {title}",
-        "openThread": "Abrir el hilo del agente",
+        "openNamedThread": "Abrir tarea: {title}",
+        "openThread": "Abrir tarea",
         "taskCount": {
           "many": "{count} tareas",
           "one": "{count} tarea",
@@ -753,7 +753,11 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "many": "{count} tareas en curso",
+        "one": "{count} tarea en curso",
+        "other": "{count} tareas en curso"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1690,7 +1694,7 @@
       "unnamedComputer": "Ordenador · {id}",
       "waitingBadge": "Te está esperando",
       "remember": "Recordar en el ordenador que lo pide",
-      "rememberOn": "Guardado como «{label}». Los agentes lo reutilizan sin volver a preguntarte.",
+      "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte.",
       "rememberOff": "Se usa una vez y se borra.",
       "replacing": "El valor guardado para «{label}» no funcionó. Introduce el correcto; sustituirá al guardado."
     }
@@ -1864,7 +1868,7 @@
             "title": "Pedir"
           },
           "preview": {
-            "body": "Un agente lo construye y abre una vista previa en vivo.",
+            "body": "Una tarea lo construye y abre una vista previa en vivo.",
             "title": "Vista previa"
           },
           "update": {
@@ -2597,7 +2601,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dictado",
-        "voice": "Agente de voz"
+        "voice": "Conversaciones por voz"
       },
       "capturing": "Pulsa teclas…",
       "change": "Cambiar",
@@ -2614,7 +2618,7 @@
       "off": "Desactivado",
       "targets": {
         "dictation": "el dictado",
-        "voice": "el agente de voz"
+        "voice": "una conversación de voz"
       },
       "title": "Atajos",
       "toasts": {
@@ -2626,13 +2630,13 @@
         "updatedTitle": "Atajo de {action} actualizado"
       },
       "voiceAgent": {
-        "description": "Inicia o detiene el agente de voz en directo de Stella."
+        "description": "Inicia o detiene una conversación de voz en directo con Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Prompt activo",
       "agentLabel": "Prompt para",
-      "agentSublabel": "Elige el prompt de qué agente cambiar.",
+      "agentSublabel": "Elige qué prompt quieres cambiar.",
       "agents": {
         "assistant": "Asistente",
         "worker": "Trabajador"
@@ -2695,7 +2699,7 @@
     },
     "secureValues": {
       "title": "Valores privados guardados",
-      "description": "Valores de solicitudes privadas que decidiste recordar, guardados en el almacén seguro de este ordenador hasta que los borres. Los agentes los usan sin leerlos nunca.",
+      "description": "Valores de solicitudes privadas que decidiste recordar, guardados en el almacén seguro de este ordenador hasta que los borres. Stella los usa sin leerlos nunca.",
       "empty": "No hay valores privados guardados en este ordenador.",
       "saved": "Guardado {saved}",
       "delete": "Delete",
@@ -2812,7 +2816,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Hilo del agente de solo lectura",
+        "badge": "Tarea de solo lectura",
         "claudeAriaLabel": "Conversación de solo lectura del subagente de Claude",
         "claudeBadge": "Subagente de Claude de solo lectura",
         "empty": "Aún no hay mensajes en este hilo.",
@@ -2834,7 +2838,7 @@
         },
         "retrying": "Reintentando…",
         "role": {
-          "assistant": "Agente",
+          "assistant": "Tarea",
           "checkpoint": "Punto de control del hilo",
           "lifecycle": "Actividad",
           "reasoning": "Razonamiento",
@@ -2856,7 +2860,7 @@
         "toolInput": "Entrada",
         "toolOutput": "Salida",
         "toolRunning": "Esperando a que esta herramienta termine…",
-        "unavailable": "El historial del hilo del agente no está disponible."
+        "unavailable": "El historial de esta tarea no está disponible."
       },
       "canvas": {
         "loadFailed": "No se pudo cargar este lienzo.",
@@ -3186,7 +3190,7 @@
       "decline": "Decline",
       "remember": "Recordar en este ordenador",
       "rememberRelayed": "Recordar en el ordenador que lo pide",
-      "rememberOn": "Guardado como «{label}». Los agentes lo reutilizan sin volver a preguntarte; puedes borrarlo cuando quieras en Ajustes.",
+      "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte; puedes borrarlo cuando quieras en Ajustes.",
       "rememberOff": "Se usa una vez y se borra.",
       "replacing": "El valor guardado para «{label}» no funcionó. Introduce el correcto; sustituirá al guardado.",
       "note": "Añade una nota (opcional)",

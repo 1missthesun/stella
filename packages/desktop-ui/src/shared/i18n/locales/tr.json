@@ -37,8 +37,8 @@
         "showStella": "Stella'ya göster"
       },
       "agentCompletion": {
-        "openNamedThread": "{title} aracı iş parçacığını aç",
-        "openThread": "Aracı iş parçacığını aç",
+        "openNamedThread": "Görevi aç: {title}",
+        "openThread": "Görevi aç",
         "showLess": "Daha az göster",
         "showMore": {
           "one": "+{count} daha",
@@ -49,10 +49,10 @@
         "unavailable": "Model ayrıntıları kullanılamıyor"
       },
       "backgroundWork": {
-        "agentThread": "Aracı iş parçacığı",
+        "agentThread": "Görev",
         "followUp": "Takip",
-        "openNamedThread": "{title} aracı iş parçacığını aç",
-        "openThread": "Aracı iş parçacığını aç",
+        "openNamedThread": "Görevi aç: {title}",
+        "openThread": "Görevi aç",
         "taskCount": {
           "one": "{count} görev",
           "other": "{count} görev"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} görev sürüyor",
+        "other": "{count} görev sürüyor"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Bilgisayar · {id}",
       "waitingBadge": "Seni bekliyor",
       "remember": "Soran bilgisayarda hatırla",
-      "rememberOn": "“{label}” olarak kaydedildi. Ajanlar size tekrar sormadan yeniden kullanır.",
+      "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır.",
       "rememberOff": "Bir kez kullanılır, sonra silinir.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır."
     }
@@ -1856,7 +1859,7 @@
             "title": "İste"
           },
           "preview": {
-            "body": "Bir ajan onu oluşturur ve canlı bir önizleme açar.",
+            "body": "Bir görev onu oluşturur ve canlı bir önizleme açar.",
             "title": "Önizle"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dikte",
-        "voice": "Ses aracısı"
+        "voice": "Sesli görüşmeler"
       },
       "capturing": "Tuşlara basın…",
       "change": "Değiştir",
@@ -2606,7 +2609,7 @@
       "off": "Kapalı",
       "targets": {
         "dictation": "dikteyi",
-        "voice": "ses aracısını"
+        "voice": "sesli konuşmayı"
       },
       "title": "Kısayollar",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "{action} kısayolu güncellendi"
       },
       "voiceAgent": {
-        "description": "Stella'nın canlı ses aracısını başlatır veya durdurur."
+        "description": "Stella ile canlı sesli konuşmayı başlatır veya durdurur."
       }
     },
     "systemPrompt": {
       "activeLabel": "Etkin istem",
       "agentLabel": "İstem hedefi",
-      "agentSublabel": "Hangi ajanın istemini değiştireceğinizi seçin.",
+      "agentSublabel": "Hangi istemi değiştireceğinizi seçin.",
       "agents": {
         "assistant": "Asistan",
         "worker": "Çalışan"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Kayıtlı gizli değerler",
-      "description": "Gizli isteklerden hatırlanmasını seçtiğiniz değerler; siz silene kadar bu bilgisayarın güvenli deposunda saklanır. Ajanlar bunları hiç okumadan kullanır.",
+      "description": "Gizli isteklerden hatırlanmasını seçtiğiniz değerler; siz silene kadar bu bilgisayarın güvenli deposunda saklanır. Stella bunları hiç okumadan kullanır.",
       "empty": "Bu bilgisayarda kayıtlı gizli değer yok.",
       "saved": "Kaydedildi: {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Salt okunur aracı iş parçacığı",
+        "badge": "Salt okunur görev",
         "claudeAriaLabel": "Salt okunur Claude alt aracı sohbeti",
         "claudeBadge": "Salt okunur Claude alt aracısı",
         "empty": "Bu iş parçacığında henüz mesaj yok.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Yeniden deneniyor…",
         "role": {
-          "assistant": "Aracı",
+          "assistant": "Görev",
           "checkpoint": "İş parçacığı kontrol noktası",
           "lifecycle": "Etkinlik",
           "reasoning": "Akıl yürütme",
@@ -2845,7 +2848,7 @@
         "toolInput": "Giriş",
         "toolOutput": "Çıkış",
         "toolRunning": "Bu aracın bitmesi bekleniyor…",
-        "unavailable": "Aracı iş parçacığı geçmişi kullanılamıyor."
+        "unavailable": "Bu görevin geçmişi kullanılamıyor."
       },
       "canvas": {
         "loadFailed": "Bu tuval yüklenemedi.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Bu bilgisayarda hatırla",
       "rememberRelayed": "Soran bilgisayarda hatırla",
-      "rememberOn": "“{label}” olarak kaydedildi. Ajanlar size tekrar sormadan yeniden kullanır; istediğiniz zaman Ayarlar’dan silebilirsiniz.",
+      "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır; istediğiniz zaman Ayarlar’dan silebilirsiniz.",
       "rememberOff": "Bir kez kullanılır, sonra silinir.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
       "note": "Not ekle (isteğe bağlı)",

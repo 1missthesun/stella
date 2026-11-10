@@ -38,8 +38,8 @@
         "showStella": "Mostrar à Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Abrir a thread do agente {title}",
-        "openThread": "Abrir a thread do agente",
+        "openNamedThread": "Abrir tarefa: {title}",
+        "openThread": "Abrir tarefa",
         "showLess": "Mostrar menos",
         "showMore": {
           "many": "+{count} a mais",
@@ -51,10 +51,10 @@
         "unavailable": "Detalhes do modelo indisponíveis"
       },
       "backgroundWork": {
-        "agentThread": "Thread do agente",
+        "agentThread": "Tarefa",
         "followUp": "Acompanhamento",
-        "openNamedThread": "Abrir a thread do agente {title}",
-        "openThread": "Abrir a thread do agente",
+        "openNamedThread": "Abrir tarefa: {title}",
+        "openThread": "Abrir tarefa",
         "taskCount": {
           "many": "{count} tarefas",
           "one": "{count} tarefa",
@@ -753,7 +753,11 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "many": "{count} tarefas em andamento",
+        "one": "{count} tarefa em andamento",
+        "other": "{count} tarefas em andamento"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1690,7 +1694,7 @@
       "unnamedComputer": "Computador · {id}",
       "waitingBadge": "Está à tua espera",
       "remember": "Memorizar no computador que pediu",
-      "rememberOn": "Guardado como “{label}”. Os agentes reutilizam-no sem voltar a perguntar.",
+      "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar.",
       "rememberOff": "Usado uma vez e depois apagado.",
       "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado."
     }
@@ -1864,7 +1868,7 @@
             "title": "Peça"
           },
           "preview": {
-            "body": "Um agente cria e abre uma prévia ao vivo.",
+            "body": "Uma tarefa cria e abre uma prévia ao vivo.",
             "title": "Prévia"
           },
           "update": {
@@ -2597,7 +2601,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Ditado",
-        "voice": "Agente de voz"
+        "voice": "Conversas por voz"
       },
       "capturing": "Pressione as teclas…",
       "change": "Alterar",
@@ -2614,7 +2618,7 @@
       "off": "Desativado",
       "targets": {
         "dictation": "o ditado",
-        "voice": "o agente de voz"
+        "voice": "uma conversa por voz"
       },
       "title": "Atalhos",
       "toasts": {
@@ -2626,13 +2630,13 @@
         "updatedTitle": "Atalho de {action} atualizado"
       },
       "voiceAgent": {
-        "description": "Inicia ou para o agente de voz ao vivo da Stella."
+        "description": "Inicia ou termina uma conversa por voz ao vivo com a Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Prompt ativo",
       "agentLabel": "Prompt para",
-      "agentSublabel": "Escolha o prompt de qual agente alterar.",
+      "agentSublabel": "Escolha qual prompt alterar.",
       "agents": {
         "assistant": "Assistente",
         "worker": "Trabalhador"
@@ -2695,7 +2699,7 @@
     },
     "secureValues": {
       "title": "Valores privados guardados",
-      "description": "Valores de pedidos privados que escolheu memorizar, guardados no armazenamento seguro deste computador até os apagar. Os agentes usam-nos sem nunca os ler.",
+      "description": "Valores de pedidos privados que escolheu memorizar, guardados no armazenamento seguro deste computador até os apagar. A Stella usa-os sem nunca os ler.",
       "empty": "Não há valores privados guardados neste computador.",
       "saved": "Guardado {saved}",
       "delete": "Delete",
@@ -2812,7 +2816,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Thread do agente somente leitura",
+        "badge": "Tarefa somente leitura",
         "claudeAriaLabel": "Conversa somente leitura do subagente do Claude",
         "claudeBadge": "Subagente do Claude somente leitura",
         "empty": "Ainda não há mensagens nesta thread.",
@@ -2834,7 +2838,7 @@
         },
         "retrying": "Tentando de novo…",
         "role": {
-          "assistant": "Agente",
+          "assistant": "Tarefa",
           "checkpoint": "Ponto de verificação da thread",
           "lifecycle": "Atividade",
           "reasoning": "Raciocínio",
@@ -2856,7 +2860,7 @@
         "toolInput": "Entrada",
         "toolOutput": "Saída",
         "toolRunning": "Aguardando esta ferramenta terminar…",
-        "unavailable": "O histórico da thread do agente está indisponível."
+        "unavailable": "O histórico desta tarefa não está disponível."
       },
       "canvas": {
         "loadFailed": "Não foi possível carregar este canvas.",
@@ -3186,7 +3190,7 @@
       "decline": "Decline",
       "remember": "Memorizar neste computador",
       "rememberRelayed": "Memorizar no computador que pediu",
-      "rememberOn": "Guardado como “{label}”. Os agentes reutilizam-no sem voltar a perguntar; pode apagá-lo a qualquer momento nas Definições.",
+      "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar; pode apagá-lo a qualquer momento nas Definições.",
       "rememberOff": "Usado uma vez e depois apagado.",
       "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
       "note": "Adicione uma nota (opcional)",

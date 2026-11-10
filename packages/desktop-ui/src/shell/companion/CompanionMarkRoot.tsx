@@ -1,7 +1,7 @@
 import { useMemo, useRef, type CSSProperties } from "react";
 import { COMPANION_MARK_SIZE } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
-import { useT } from "@/shared/i18n";
+import { useT, useTPlural } from "@/shared/i18n";
 import {
   StellaCharacter,
   type StellaCharacterState,
@@ -21,6 +21,7 @@ import "./companion.css";
 
 export function CompanionMarkRoot() {
   const t = useT();
+  const tPlural = useTPlural();
   const api = window.electronAPI?.companion;
   const state = useCompanionState();
   const { layout, activity } = useCompanionWindow();
@@ -102,8 +103,8 @@ export function CompanionMarkRoot() {
         {runningCount > 0 ? (
           <span
             className="companion-badge"
-            title={t("companion.badge.running", { count: runningCount })}
-            aria-label={t("companion.badge.running", { count: runningCount })}
+            title={tPlural("companion.badge.running", runningCount)}
+            aria-label={tPlural("companion.badge.running", runningCount)}
           >
             {runningCount > 99 ? "99+" : runningCount}
           </span>

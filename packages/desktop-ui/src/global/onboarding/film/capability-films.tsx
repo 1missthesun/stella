@@ -521,7 +521,7 @@ function WorkFilm({ has, typed, typing }: { has: Has; typed: string; typing: boo
         typed={typed}
         typing={typing}
         prompt="Update the Q3 sheet and turn it into a board deck"
-        working="Starting two agents…"
+        working="Starting two tasks…"
         receipts={[
           { cue: "work-1", icon: FileSpreadsheet, label: "Q3-revenue.xlsx · 214 cells updated" },
           { cue: "work-2", icon: Presentation, label: "Board deck.pptx · 14 slides" },

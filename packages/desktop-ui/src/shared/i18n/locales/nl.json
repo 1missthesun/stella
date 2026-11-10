@@ -37,8 +37,8 @@
         "showStella": "Laat Stella zien"
       },
       "agentCompletion": {
-        "openNamedThread": "Agent-thread {title} openen",
-        "openThread": "Agent-thread openen",
+        "openNamedThread": "Taak openen: {title}",
+        "openThread": "Taak openen",
         "showLess": "Minder tonen",
         "showMore": {
           "one": "+{count} meer",
@@ -49,10 +49,10 @@
         "unavailable": "Modelgegevens niet beschikbaar"
       },
       "backgroundWork": {
-        "agentThread": "Agent-thread",
+        "agentThread": "Taak",
         "followUp": "Vervolg",
-        "openNamedThread": "Agent-thread {title} openen",
-        "openThread": "Agent-thread openen",
+        "openNamedThread": "Taak openen: {title}",
+        "openThread": "Taak openen",
         "taskCount": {
           "one": "{count} taak",
           "other": "{count} taken"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} taak bezig",
+        "other": "{count} taken bezig"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Wacht op je",
       "remember": "Onthouden op de computer die het vroeg",
-      "rememberOn": "Bewaard als ‘{label}’. Agents gebruiken het opnieuw zonder het je nog eens te vragen.",
+      "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen.",
       "rememberOff": "Eén keer gebruikt en daarna verwijderd.",
       "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde."
     }
@@ -1856,7 +1859,7 @@
             "title": "Vraag"
           },
           "preview": {
-            "body": "Een agent bouwt het en opent een live voorbeeld.",
+            "body": "Een taak bouwt het en opent een live voorbeeld.",
             "title": "Voorbeeld"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dictee",
-        "voice": "Spraakagent"
+        "voice": "Spraakgesprekken"
       },
       "capturing": "Druk op toetsen…",
       "change": "Wijzigen",
@@ -2606,7 +2609,7 @@
       "off": "Uit",
       "targets": {
         "dictation": "dictee",
-        "voice": "de spraakagent"
+        "voice": "een spraakgesprek"
       },
       "title": "Sneltoetsen",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "Sneltoets voor {action} bijgewerkt"
       },
       "voiceAgent": {
-        "description": "Start of stopt de live spraakagent van Stella."
+        "description": "Start of stopt een live spraakgesprek met Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Actieve prompt",
       "agentLabel": "Prompt voor",
-      "agentSublabel": "Kies van welke agent je de prompt wilt wijzigen.",
+      "agentSublabel": "Kies welke prompt je wilt wijzigen.",
       "agents": {
         "assistant": "Assistent",
         "worker": "Uitvoerder"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Bewaarde privéwaarden",
-      "description": "Waarden uit privéverzoeken die je wilde laten onthouden, bewaard in de beveiligde opslag van deze computer tot je ze verwijdert. Agents gebruiken ze zonder ze ooit te lezen.",
+      "description": "Waarden uit privéverzoeken die je wilde laten onthouden, bewaard in de beveiligde opslag van deze computer tot je ze verwijdert. Stella gebruikt ze zonder ze ooit te lezen.",
       "empty": "Er zijn geen privéwaarden bewaard op deze computer.",
       "saved": "Bewaard {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Alleen-lezen agent-thread",
+        "badge": "Alleen-lezen taak",
         "claudeAriaLabel": "Alleen-lezen gesprek van Claude-subagent",
         "claudeBadge": "Alleen-lezen Claude-subagent",
         "empty": "Nog geen berichten in deze thread.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Opnieuw proberen…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Taak",
           "checkpoint": "Controlepunt in de thread",
           "lifecycle": "Activiteit",
           "reasoning": "Redeneren",
@@ -2845,7 +2848,7 @@
         "toolInput": "Invoer",
         "toolOutput": "Uitvoer",
         "toolRunning": "Wachten tot deze tool klaar is…",
-        "unavailable": "Geschiedenis van de agent-thread is niet beschikbaar."
+        "unavailable": "De geschiedenis van deze taak is niet beschikbaar."
       },
       "canvas": {
         "loadFailed": "Kon dit canvas niet laden.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Onthouden op deze computer",
       "rememberRelayed": "Onthouden op de computer die het vroeg",
-      "rememberOn": "Bewaard als ‘{label}’. Agents gebruiken het opnieuw zonder het je nog eens te vragen; je kunt het altijd verwijderen in Instellingen.",
+      "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen; je kunt het altijd verwijderen in Instellingen.",
       "rememberOff": "Eén keer gebruikt en daarna verwijderd.",
       "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde.",
       "note": "Notitie toevoegen (optioneel)",

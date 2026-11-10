@@ -37,8 +37,8 @@
         "showStella": "Show Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Open {title} agent thread",
-        "openThread": "Open agent thread",
+        "openNamedThread": "Open task: {title}",
+        "openThread": "Open task",
         "showLess": "Show less",
         "showMore": {
           "one": "+{count} more",
@@ -49,10 +49,10 @@
         "unavailable": "Model details unavailable"
       },
       "backgroundWork": {
-        "agentThread": "Agent thread",
+        "agentThread": "Task",
         "followUp": "Follow-up",
-        "openNamedThread": "Open {title} agent thread",
-        "openThread": "Open agent thread",
+        "openNamedThread": "Open task: {title}",
+        "openThread": "Open task",
         "taskCount": {
           "one": "{count} task",
           "other": "{count} tasks"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} task in progress",
+        "other": "{count} tasks in progress"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Waiting on you",
       "remember": "Remember on the computer that asked",
-      "rememberOn": "Saved as “{label}”. Agents reuse it without asking you again.",
+      "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again.",
       "rememberOff": "Used once, then deleted.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one."
     }
@@ -1856,7 +1859,7 @@
             "title": "Ask"
           },
           "preview": {
-            "body": "An agent builds it and opens a live preview.",
+            "body": "A task builds it and opens a live preview.",
             "title": "Preview"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dictation",
-        "voice": "Voice agent"
+        "voice": "Voice conversations"
       },
       "capturing": "Press keys…",
       "change": "Change",
@@ -2606,7 +2609,7 @@
       "off": "Off",
       "targets": {
         "dictation": "dictation",
-        "voice": "the voice agent"
+        "voice": "a voice conversation"
       },
       "title": "Shortcuts",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "{action} shortcut updated"
       },
       "voiceAgent": {
-        "description": "Starts or stops Stella's live voice agent."
+        "description": "Starts or stops a live voice conversation with Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Active prompt",
       "agentLabel": "Prompt for",
-      "agentSublabel": "Choose which agent's prompt to change.",
+      "agentSublabel": "Choose which prompt to change.",
       "agents": {
         "assistant": "Assistant",
         "worker": "Worker"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Saved private values",
-      "description": "Values you chose to remember from private requests, kept in this computer’s secure store until you delete them. Agents use them without ever reading them.",
+      "description": "Values you chose to remember from private requests, kept in this computer’s secure store until you delete them. Stella uses them without ever reading them.",
       "empty": "No private values are saved on this computer.",
       "saved": "Saved {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Read-only agent thread",
+        "badge": "Read-only task",
         "claudeAriaLabel": "Claude subagent read-only conversation",
         "claudeBadge": "Read-only Claude subagent",
         "empty": "No messages in this thread yet.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Retrying…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Task",
           "checkpoint": "Thread checkpoint",
           "lifecycle": "Activity",
           "reasoning": "Reasoning",
@@ -2845,7 +2848,7 @@
         "toolInput": "Input",
         "toolOutput": "Output",
         "toolRunning": "Waiting for this tool to finish…",
-        "unavailable": "Agent thread history is unavailable."
+        "unavailable": "This task’s history is unavailable."
       },
       "canvas": {
         "loadFailed": "Couldn't load this canvas.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Remember on this computer",
       "rememberRelayed": "Remember on the computer that asked",
-      "rememberOn": "Saved as “{label}”. Agents reuse it without asking you again; delete it any time in Settings.",
+      "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again; delete it any time in Settings.",
       "rememberOff": "Used once, then deleted.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
       "note": "Add a note (optional)",

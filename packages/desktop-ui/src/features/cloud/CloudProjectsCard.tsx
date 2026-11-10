@@ -109,7 +109,7 @@ function CloudProjectsCardImpl() {
                   .join(", ")}.`
               : github && !github.appConfigured
                 ? "GitHub projects aren't configured on this deployment yet."
-                : "Give cloud agents access to your repositories."}
+                : "Give cloud tasks access to your repositories."}
           </div>
         </div>
         <div className="settings-row-control">

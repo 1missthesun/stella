@@ -420,7 +420,7 @@ export function getCompactActivityStatusText(
   const stopped =
     summary.canceledCount > 0 ? ` · ${summary.canceledCount} stopped` : ''
   if (prioritizeFailure && summary.failureTask) {
-    const name = summary.failureTask.description.trim() || 'Agent'
+    const name = summary.failureTask.description.trim() || 'Task'
     return `${summary.errorCount} failed — ${name} · ${tally}${stopped}`
   }
   const failed = summary.errorCount > 0 ? ` · ${summary.errorCount} failed` : ''

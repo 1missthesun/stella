@@ -38,8 +38,8 @@
         "showStella": "להראות ל-Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "פתח את שרשור הסוכן {title}",
-        "openThread": "פתח את שרשור הסוכן",
+        "openNamedThread": "פתיחת המשימה: {title}",
+        "openThread": "פתיחת המשימה",
         "showLess": "הצג פחות",
         "showMore": {
           "one": "+{count} נוספים",
@@ -51,10 +51,10 @@
         "unavailable": "פרטי המודל אינם זמינים"
       },
       "backgroundWork": {
-        "agentThread": "שרשור סוכן",
+        "agentThread": "משימה",
         "followUp": "המשך",
-        "openNamedThread": "פתח את שרשור הסוכן {title}",
-        "openThread": "פתח את שרשור הסוכן",
+        "openNamedThread": "פתיחת המשימה: {title}",
+        "openThread": "פתיחת המשימה",
         "taskCount": {
           "one": "משימה {count}",
           "other": "{count} משימות",
@@ -753,7 +753,11 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "משימה {count} בתהליך",
+        "other": "{count} משימות בתהליך",
+        "two": "{count} משימות בתהליך"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1690,7 +1694,7 @@
       "unnamedComputer": "מחשב · {id}",
       "waitingBadge": "ממתינה לך",
       "remember": "לזכור במחשב ששאל",
-      "rememberOn": "נשמר בשם “{label}”. סוכנים ישתמשו בו שוב בלי לשאול אותך.",
+      "rememberOn": "נשמר בשם “{label}”. Stella תשתמש בו שוב בלי לשאול אותך.",
       "rememberOff": "בשימוש פעם אחת ואז נמחק.",
       "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור."
     }
@@ -1864,7 +1868,7 @@
             "title": "בקש"
           },
           "preview": {
-            "body": "סוכן בונה אותו ופותח תצוגה מקדימה חיה.",
+            "body": "משימה בונה אותו ופותחת תצוגה מקדימה חיה.",
             "title": "תצוגה מקדימה"
           },
           "update": {
@@ -2597,7 +2601,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "הכתבה",
-        "voice": "סוכן קולי"
+        "voice": "שיחות קוליות"
       },
       "capturing": "הקש על מקשים…",
       "change": "שנה",
@@ -2614,7 +2618,7 @@
       "off": "כבוי",
       "targets": {
         "dictation": "הכתבה",
-        "voice": "הסוכן הקולי"
+        "voice": "שיחה קולית"
       },
       "title": "קיצורים",
       "toasts": {
@@ -2626,13 +2630,13 @@
         "updatedTitle": "קיצור {action} עודכן"
       },
       "voiceAgent": {
-        "description": "מפעיל או עוצר את הסוכן הקולי החי של Stella."
+        "description": "מתחיל או עוצר שיחה קולית חיה עם Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "הנחיה פעילה",
       "agentLabel": "הנחיה עבור",
-      "agentSublabel": "בחרו איזו הנחיה של סוכן לשנות.",
+      "agentSublabel": "בחרו איזו הנחיה לשנות.",
       "agents": {
         "assistant": "עוזר",
         "worker": "מבצע"
@@ -2695,7 +2699,7 @@
     },
     "secureValues": {
       "title": "ערכים פרטיים שמורים",
-      "description": "ערכים מבקשות פרטיות שבחרת לזכור, שמורים באחסון המאובטח של המחשב הזה עד שתמחק אותם. סוכנים משתמשים בהם בלי לקרוא אותם אף פעם.",
+      "description": "ערכים מבקשות פרטיות שבחרת לזכור, שמורים באחסון המאובטח של המחשב הזה עד שתמחק אותם. Stella משתמשת בהם בלי לקרוא אותם אף פעם.",
       "empty": "אין ערכים פרטיים שמורים במחשב הזה.",
       "saved": "נשמר {saved}",
       "delete": "Delete",
@@ -2812,7 +2816,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "שרשור סוכן לקריאה בלבד",
+        "badge": "משימה לקריאה בלבד",
         "claudeAriaLabel": "שיחת תת-סוכן Claude לקריאה בלבד",
         "claudeBadge": "תת-סוכן Claude לקריאה בלבד",
         "empty": "אין עדיין הודעות בשרשור הזה.",
@@ -2834,7 +2838,7 @@
         },
         "retrying": "מנסה שוב…",
         "role": {
-          "assistant": "סוכן",
+          "assistant": "משימה",
           "checkpoint": "נקודת שמירה בשרשור",
           "lifecycle": "פעילות",
           "reasoning": "חשיבה",
@@ -2856,7 +2860,7 @@
         "toolInput": "קלט",
         "toolOutput": "פלט",
         "toolRunning": "ממתין לסיום הכלי הזה…",
-        "unavailable": "היסטוריית שרשור הסוכן אינה זמינה."
+        "unavailable": "ההיסטוריה של המשימה הזו אינה זמינה."
       },
       "canvas": {
         "loadFailed": "לא ניתן היה לטעון את הקנבס הזה.",
@@ -3186,7 +3190,7 @@
       "decline": "Decline",
       "remember": "לזכור במחשב הזה",
       "rememberRelayed": "לזכור במחשב ששאל",
-      "rememberOn": "נשמר בשם “{label}”. סוכנים ישתמשו בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת בהגדרות.",
+      "rememberOn": "נשמר בשם “{label}”. Stella תשתמש בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת בהגדרות.",
       "rememberOff": "בשימוש פעם אחת ואז נמחק.",
       "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור.",
       "note": "הוסף הערה (אופציונלי)",

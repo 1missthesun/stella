@@ -38,8 +38,8 @@
         "showStella": "Montrer à Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Ouvrir le fil d’agent {title}",
-        "openThread": "Ouvrir le fil d’agent",
+        "openNamedThread": "Ouvrir la tâche : {title}",
+        "openThread": "Ouvrir la tâche",
         "showLess": "Afficher moins",
         "showMore": {
           "many": "+{count} de plus",
@@ -51,10 +51,10 @@
         "unavailable": "Détails du modèle indisponibles"
       },
       "backgroundWork": {
-        "agentThread": "Fil d’agent",
+        "agentThread": "Tâche",
         "followUp": "Suivi",
-        "openNamedThread": "Ouvrir le fil d’agent {title}",
-        "openThread": "Ouvrir le fil d’agent",
+        "openNamedThread": "Ouvrir la tâche : {title}",
+        "openThread": "Ouvrir la tâche",
         "taskCount": {
           "many": "{count} tâches",
           "one": "{count} tâche",
@@ -753,7 +753,11 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "many": "{count} tâches en cours",
+        "one": "{count} tâche en cours",
+        "other": "{count} tâches en cours"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1690,7 +1694,7 @@
       "unnamedComputer": "Ordinateur · {id}",
       "waitingBadge": "Attend ta réponse",
       "remember": "Mémoriser sur l’ordinateur qui l’a demandé",
-      "rememberOn": "Enregistré sous « {label} ». Les agents le réutilisent sans vous le redemander.",
+      "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander.",
       "rememberOff": "Utilisé une fois, puis supprimé.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée."
     }
@@ -1864,7 +1868,7 @@
             "title": "Demander"
           },
           "preview": {
-            "body": "Un agent le construit et ouvre un aperçu en direct.",
+            "body": "Une tâche le construit et ouvre un aperçu en direct.",
             "title": "Aperçu"
           },
           "update": {
@@ -2597,7 +2601,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dictée",
-        "voice": "Agent vocal"
+        "voice": "Conversations vocales"
       },
       "capturing": "Appuyez sur des touches…",
       "change": "Modifier",
@@ -2614,7 +2618,7 @@
       "off": "Désactivé",
       "targets": {
         "dictation": "la dictée",
-        "voice": "l'agent vocal"
+        "voice": "une conversation vocale"
       },
       "title": "Raccourcis",
       "toasts": {
@@ -2626,13 +2630,13 @@
         "updatedTitle": "Raccourci {action} mis à jour"
       },
       "voiceAgent": {
-        "description": "Démarre ou arrête l'agent vocal en direct de Stella."
+        "description": "Démarre ou arrête une conversation vocale en direct avec Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Prompt actif",
       "agentLabel": "Prompt pour",
-      "agentSublabel": "Choisissez l'agent dont vous voulez changer le prompt.",
+      "agentSublabel": "Choisissez le prompt à modifier.",
       "agents": {
         "assistant": "Assistant",
         "worker": "Exécutant"
@@ -2695,7 +2699,7 @@
     },
     "secureValues": {
       "title": "Valeurs privées enregistrées",
-      "description": "Les valeurs de demandes privées que vous avez choisi de mémoriser, conservées dans le stockage sécurisé de cet ordinateur jusqu’à ce que vous les supprimiez. Les agents les utilisent sans jamais les lire.",
+      "description": "Les valeurs de demandes privées que vous avez choisi de mémoriser, conservées dans le stockage sécurisé de cet ordinateur jusqu’à ce que vous les supprimiez. Stella les utilise sans jamais les lire.",
       "empty": "Aucune valeur privée n’est enregistrée sur cet ordinateur.",
       "saved": "Enregistrée {saved}",
       "delete": "Delete",
@@ -2812,7 +2816,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Fil d’agent en lecture seule",
+        "badge": "Tâche en lecture seule",
         "claudeAriaLabel": "Conversation en lecture seule du sous-agent Claude",
         "claudeBadge": "Sous-agent Claude en lecture seule",
         "empty": "Aucun message dans ce fil pour l’instant.",
@@ -2834,7 +2838,7 @@
         },
         "retrying": "Nouvelle tentative…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Tâche",
           "checkpoint": "Point de contrôle du fil",
           "lifecycle": "Activité",
           "reasoning": "Raisonnement",
@@ -2856,7 +2860,7 @@
         "toolInput": "Entrée",
         "toolOutput": "Sortie",
         "toolRunning": "En attente de la fin de cet outil…",
-        "unavailable": "L’historique du fil d’agent est indisponible."
+        "unavailable": "L’historique de cette tâche n’est pas disponible."
       },
       "canvas": {
         "loadFailed": "Impossible de charger ce canvas.",
@@ -3186,7 +3190,7 @@
       "decline": "Decline",
       "remember": "Mémoriser sur cet ordinateur",
       "rememberRelayed": "Mémoriser sur l’ordinateur qui l’a demandé",
-      "rememberOn": "Enregistré sous « {label} ». Les agents le réutilisent sans vous le redemander ; supprimez-le quand vous voulez dans les Réglages.",
+      "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander ; supprimez-le quand vous voulez dans les Réglages.",
       "rememberOff": "Utilisé une fois, puis supprimé.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
       "note": "Ajouter une note (facultatif)",

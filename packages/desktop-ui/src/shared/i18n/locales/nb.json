@@ -37,8 +37,8 @@
         "showStella": "Vis Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "Åpne agenttråden {title}",
-        "openThread": "Åpne agenttråd",
+        "openNamedThread": "Åpne oppgave: {title}",
+        "openThread": "Åpne oppgave",
         "showLess": "Vis mindre",
         "showMore": {
           "one": "+{count} til",
@@ -49,10 +49,10 @@
         "unavailable": "Modelldetaljer utilgjengelige"
       },
       "backgroundWork": {
-        "agentThread": "Agenttråd",
+        "agentThread": "Oppgave",
         "followUp": "Oppfølging",
-        "openNamedThread": "Åpne agenttråden {title}",
-        "openThread": "Åpne agenttråd",
+        "openNamedThread": "Åpne oppgave: {title}",
+        "openThread": "Åpne oppgave",
         "taskCount": {
           "one": "{count} oppgave",
           "other": "{count} oppgaver"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} oppgave pågår",
+        "other": "{count} oppgaver pågår"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Datamaskin · {id}",
       "waitingBadge": "Venter på deg",
       "remember": "Husk på datamaskinen som spurte",
-      "rememberOn": "Lagret som «{label}». Agenter bruker den igjen uten å spørre deg på nytt.",
+      "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt.",
       "rememberOff": "Brukt én gang og deretter slettet.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede."
     }
@@ -1856,7 +1859,7 @@
             "title": "Spør"
           },
           "preview": {
-            "body": "En agent bygger den og åpner en levende forhåndsvisning.",
+            "body": "En oppgave bygger den og åpner en levende forhåndsvisning.",
             "title": "Forhåndsvis"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Diktering",
-        "voice": "Stemmeagent"
+        "voice": "Talesamtaler"
       },
       "capturing": "Trykk på taster…",
       "change": "Endre",
@@ -2606,7 +2609,7 @@
       "off": "Av",
       "targets": {
         "dictation": "diktering",
-        "voice": "stemmeagenten"
+        "voice": "en talesamtale"
       },
       "title": "Snarveier",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "Snarvei for {action} oppdatert"
       },
       "voiceAgent": {
-        "description": "Starter eller stopper Stellas direkte stemmeagent."
+        "description": "Starter eller stopper en direkte talesamtale med Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Aktiv prompt",
       "agentLabel": "Prompt for",
-      "agentSublabel": "Velg hvilken agents prompt du vil endre.",
+      "agentSublabel": "Velg hvilken prompt du vil endre.",
       "agents": {
         "assistant": "Assistent",
         "worker": "Arbeider"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Lagrede private verdier",
-      "description": "Verdier fra private forespørsler som du valgte å huske. De oppbevares i den sikre lagringen på denne datamaskinen til du sletter dem. Agenter bruker dem uten noen gang å lese dem.",
+      "description": "Verdier fra private forespørsler som du valgte å huske. De oppbevares i den sikre lagringen på denne datamaskinen til du sletter dem. Stella bruker dem uten noen gang å lese dem.",
       "empty": "Ingen private verdier er lagret på denne datamaskinen.",
       "saved": "Lagret {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Skrivebeskyttet agenttråd",
+        "badge": "Skrivebeskyttet oppgave",
         "claudeAriaLabel": "Skrivebeskyttet samtale med Claude-underagent",
         "claudeBadge": "Skrivebeskyttet Claude-underagent",
         "empty": "Ingen meldinger i denne tråden ennå.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Prøver igjen…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Oppgave",
           "checkpoint": "Kontrollpunkt i tråden",
           "lifecycle": "Aktivitet",
           "reasoning": "Resonnering",
@@ -2845,7 +2848,7 @@
         "toolInput": "Inndata",
         "toolOutput": "Utdata",
         "toolRunning": "Venter på at dette verktøyet skal bli ferdig…",
-        "unavailable": "Historikken for agenttråden er ikke tilgjengelig."
+        "unavailable": "Historikken for denne oppgaven er ikke tilgjengelig."
       },
       "canvas": {
         "loadFailed": "Kunne ikke laste inn dette canvaset.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Husk på denne datamaskinen",
       "rememberRelayed": "Husk på datamaskinen som spurte",
-      "rememberOn": "Lagret som «{label}». Agenter bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i Innstillinger.",
+      "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i Innstillinger.",
       "rememberOff": "Brukt én gang og deretter slettet.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
       "note": "Legg til et notat (valgfritt)",

@@ -37,8 +37,8 @@
         "showStella": "Näytä Stellalle"
       },
       "agentCompletion": {
-        "openNamedThread": "Avaa agenttisäie: {title}",
-        "openThread": "Avaa agenttisäie",
+        "openNamedThread": "Avaa tehtävä: {title}",
+        "openThread": "Avaa tehtävä",
         "showLess": "Näytä vähemmän",
         "showMore": {
           "one": "+{count} lisää",
@@ -49,10 +49,10 @@
         "unavailable": "Mallin tiedot eivät ole saatavilla"
       },
       "backgroundWork": {
-        "agentThread": "Agenttisäie",
+        "agentThread": "Tehtävä",
         "followUp": "Jatkokysymys",
-        "openNamedThread": "Avaa agenttisäie: {title}",
-        "openThread": "Avaa agenttisäie",
+        "openNamedThread": "Avaa tehtävä: {title}",
+        "openThread": "Avaa tehtävä",
         "taskCount": {
           "one": "{count} tehtävä",
           "other": "{count} tehtävää"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} tehtävä käynnissä",
+        "other": "{count} tehtävää käynnissä"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Tietokone · {id}",
       "waitingBadge": "Odottaa sinua",
       "remember": "Muista kysyneellä tietokoneella",
-      "rememberOn": "Tallennettu nimellä ”{label}”. Agentit käyttävät sitä uudelleen kysymättä sinulta.",
+      "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta.",
       "rememberOff": "Käytetään kerran ja poistetaan sitten.",
       "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun."
     }
@@ -1856,7 +1859,7 @@
             "title": "Pyydä"
           },
           "preview": {
-            "body": "Agentti rakentaa sen ja avaa suoran esikatselun.",
+            "body": "Tehtävä rakentaa sen ja avaa suoran esikatselun.",
             "title": "Esikatsele"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Sanelu",
-        "voice": "Ääniagentti"
+        "voice": "Puhekeskustelut"
       },
       "capturing": "Paina näppäimiä…",
       "change": "Muuta",
@@ -2606,7 +2609,7 @@
       "off": "Pois",
       "targets": {
         "dictation": "sanelu",
-        "voice": "ääniagentti"
+        "voice": "äänikeskustelun"
       },
       "title": "Pikanäppäimet",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "{action}-pikanäppäin päivitetty"
       },
       "voiceAgent": {
-        "description": "Käynnistää tai pysäyttää Stellan reaaliaikaisen ääniagentin."
+        "description": "Aloittaa tai lopettaa suoran äänikeskustelun Stellan kanssa."
       }
     },
     "systemPrompt": {
       "activeLabel": "Aktiivinen kehote",
       "agentLabel": "Kenen kehote",
-      "agentSublabel": "Valitse minkä agentin kehotetta muutat.",
+      "agentSublabel": "Valitse, mitä kehotetta muutat.",
       "agents": {
         "assistant": "Avustaja",
         "worker": "Työntekijä"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Tallennetut yksityiset arvot",
-      "description": "Yksityisten pyyntöjen arvot, jotka valitsit muistettaviksi. Ne säilytetään tämän tietokoneen suojatussa tallennustilassa, kunnes poistat ne. Agentit käyttävät niitä lukematta niitä koskaan.",
+      "description": "Yksityisten pyyntöjen arvot, jotka valitsit muistettaviksi. Ne säilytetään tämän tietokoneen suojatussa tallennustilassa, kunnes poistat ne. Stella käyttää niitä lukematta niitä koskaan.",
       "empty": "Tällä tietokoneella ei ole tallennettuja yksityisiä arvoja.",
       "saved": "Tallennettu {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Agenttisäie, vain luku",
+        "badge": "Vain luku -tehtävä",
         "claudeAriaLabel": "Claude-aliagentin keskustelu, vain luku",
         "claudeBadge": "Claude-aliagentti, vain luku",
         "empty": "Tässä säikeessä ei ole vielä viestejä.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Yritetään uudelleen…",
         "role": {
-          "assistant": "Agentti",
+          "assistant": "Tehtävä",
           "checkpoint": "Säikeen tarkistuspiste",
           "lifecycle": "Toiminta",
           "reasoning": "Päättely",
@@ -2845,7 +2848,7 @@
         "toolInput": "Syöte",
         "toolOutput": "Tuloste",
         "toolRunning": "Odotetaan, että tämä työkalu valmistuu…",
-        "unavailable": "Agenttisäikeen historia ei ole käytettävissä."
+        "unavailable": "Tämän tehtävän historia ei ole saatavilla."
       },
       "canvas": {
         "loadFailed": "Tätä kanvasta ei voitu ladata.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Muista tällä tietokoneella",
       "rememberRelayed": "Muista kysyneellä tietokoneella",
-      "rememberOn": "Tallennettu nimellä ”{label}”. Agentit käyttävät sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa asetuksista.",
+      "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa asetuksista.",
       "rememberOff": "Käytetään kerran ja poistetaan sitten.",
       "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun.",
       "note": "Lisää huomautus (valinnainen)",

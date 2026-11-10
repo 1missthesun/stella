@@ -32,7 +32,7 @@ export const useOpenConversationFile = (
         showToast({
           title: "File isn’t stored in Drive",
           description:
-            "This output stayed in the agent workspace and has no reusable cloud file to open.",
+            "This output stayed in the task’s workspace and has no reusable cloud file to open.",
           variant: "error",
         });
         return false;

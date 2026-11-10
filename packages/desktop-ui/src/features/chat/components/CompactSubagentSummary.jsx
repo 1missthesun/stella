@@ -48,7 +48,7 @@ const compactTaskState = (task) => {
 };
 
 const compactTaskTooltip = (task) => {
-  const label = task.description.trim() || "Agent";
+  const label = task.description.trim() || "Task";
   const detail = (
     selectLatestAgentAssistantMessage(task.assistantMessages) ?? ""
   ).replace(/\s+/g, " ");

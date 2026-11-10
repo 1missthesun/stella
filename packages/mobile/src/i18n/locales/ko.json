@@ -36,8 +36,8 @@
         "showStella": "Stella에게 보여주기"
       },
       "agentCompletion": {
-        "openNamedThread": "{title} 에이전트 스레드 열기",
-        "openThread": "에이전트 스레드 열기",
+        "openNamedThread": "작업 열기: {title}",
+        "openThread": "작업 열기",
         "showLess": "간략히 보기",
         "showMore": {
           "other": "+{count}개 더"
@@ -47,10 +47,10 @@
         "unavailable": "모델 세부 정보를 사용할 수 없음"
       },
       "backgroundWork": {
-        "agentThread": "에이전트 스레드",
+        "agentThread": "작업",
         "followUp": "후속 작업",
-        "openNamedThread": "{title} 에이전트 스레드 열기",
-        "openThread": "에이전트 스레드 열기",
+        "openNamedThread": "작업 열기: {title}",
+        "openThread": "작업 열기",
         "taskCount": {
           "other": "작업 {count}개"
         },
@@ -743,7 +743,9 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "other": "작업 {count}개 진행 중"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1674,7 +1676,7 @@
       "unnamedComputer": "컴퓨터 · {id}",
       "waitingBadge": "기다리고 있어요",
       "remember": "요청한 컴퓨터에 기억하기",
-      "rememberOn": "“{label}”(으)로 저장했어요. 에이전트가 다시 묻지 않고 재사용해요.",
+      "rememberOn": "“{label}”(으)로 저장했어요. Stella가 다시 묻지 않고 재사용해요.",
       "rememberOff": "한 번 사용한 뒤 삭제돼요.",
       "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요."
     }
@@ -1848,7 +1850,7 @@
             "title": "요청"
           },
           "preview": {
-            "body": "에이전트가 만들어서 실시간 미리보기를 열어 줘요.",
+            "body": "작업이 만들어서 실시간 미리보기를 열어 줘요.",
             "title": "미리보기"
           },
           "update": {
@@ -2581,7 +2583,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "받아쓰기",
-        "voice": "음성 에이전트"
+        "voice": "음성 대화"
       },
       "capturing": "키를 누르세요…",
       "change": "변경",
@@ -2598,7 +2600,7 @@
       "off": "끔",
       "targets": {
         "dictation": "받아쓰기",
-        "voice": "음성 에이전트"
+        "voice": "음성 대화"
       },
       "title": "단축키",
       "toasts": {
@@ -2610,13 +2612,13 @@
         "updatedTitle": "{action} 단축키가 업데이트됨"
       },
       "voiceAgent": {
-        "description": "Stella의 실시간 음성 에이전트를 시작하거나 중지합니다."
+        "description": "Stella와의 실시간 음성 대화를 시작하거나 멈춰요."
       }
     },
     "systemPrompt": {
       "activeLabel": "활성 프롬프트",
       "agentLabel": "프롬프트 대상",
-      "agentSublabel": "어느 에이전트의 프롬프트를 변경할지 선택하세요.",
+      "agentSublabel": "변경할 프롬프트를 선택하세요.",
       "agents": {
         "assistant": "어시스턴트",
         "worker": "작업자"
@@ -2679,7 +2681,7 @@
     },
     "secureValues": {
       "title": "저장된 비공개 값",
-      "description": "비공개 요청에서 기억하기로 선택한 값으로, 삭제할 때까지 이 컴퓨터의 보안 저장소에 보관돼요. 에이전트는 값을 읽지 않고 사용해요.",
+      "description": "비공개 요청에서 기억하기로 선택한 값으로, 삭제할 때까지 이 컴퓨터의 보안 저장소에 보관돼요. Stella는 값을 읽지 않고 사용해요.",
       "empty": "이 컴퓨터에 저장된 비공개 값이 없어요.",
       "saved": "저장: {saved}",
       "delete": "Delete",
@@ -2794,7 +2796,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "읽기 전용 에이전트 스레드",
+        "badge": "읽기 전용 작업",
         "claudeAriaLabel": "Claude 하위 에이전트 읽기 전용 대화",
         "claudeBadge": "읽기 전용 Claude 하위 에이전트",
         "empty": "이 스레드에는 아직 메시지가 없습니다.",
@@ -2811,7 +2813,7 @@
         },
         "retrying": "다시 시도하는 중…",
         "role": {
-          "assistant": "에이전트",
+          "assistant": "작업",
           "checkpoint": "스레드 체크포인트",
           "lifecycle": "활동",
           "reasoning": "추론",
@@ -2832,7 +2834,7 @@
         "toolInput": "입력",
         "toolOutput": "출력",
         "toolRunning": "이 도구가 끝나기를 기다리는 중…",
-        "unavailable": "에이전트 스레드 기록을 사용할 수 없습니다."
+        "unavailable": "이 작업의 기록을 볼 수 없어요."
       },
       "canvas": {
         "loadFailed": "이 캔버스를 불러오지 못했습니다.",
@@ -3152,7 +3154,7 @@
       "decline": "Decline",
       "remember": "이 컴퓨터에 기억하기",
       "rememberRelayed": "요청한 컴퓨터에 기억하기",
-      "rememberOn": "“{label}”(으)로 저장했어요. 에이전트가 다시 묻지 않고 재사용해요. 설정에서 언제든지 삭제할 수 있어요.",
+      "rememberOn": "“{label}”(으)로 저장했어요. Stella가 다시 묻지 않고 재사용해요. 설정에서 언제든지 삭제할 수 있어요.",
       "rememberOff": "한 번 사용한 뒤 삭제돼요.",
       "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요.",
       "note": "메모 추가 (선택)",

@@ -41,8 +41,8 @@
         "showStella": "أرِ Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "افتح مسار وكيل {title}",
-        "openThread": "افتح مسار الوكيل",
+        "openNamedThread": "افتح المهمة: {title}",
+        "openThread": "افتح المهمة",
         "showLess": "عرض أقل",
         "showMore": {
           "few": "+{count} أخرى",
@@ -57,10 +57,10 @@
         "unavailable": "تفاصيل النموذج غير متاحة"
       },
       "backgroundWork": {
-        "agentThread": "مسار الوكيل",
+        "agentThread": "مهمة",
         "followUp": "متابعة",
-        "openNamedThread": "افتح مسار وكيل {title}",
-        "openThread": "افتح مسار الوكيل",
+        "openNamedThread": "افتح المهمة: {title}",
+        "openThread": "افتح المهمة",
         "taskCount": {
           "few": "{count} مهام",
           "many": "{count} مهمة",
@@ -768,7 +768,14 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "few": "{count} مهام قيد التنفيذ",
+        "many": "{count} مهمة قيد التنفيذ",
+        "one": "{count} مهمة قيد التنفيذ",
+        "other": "{count} مهمة قيد التنفيذ",
+        "two": "{count} مهمتان قيد التنفيذ",
+        "zero": "{count} مهمة قيد التنفيذ"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1714,7 +1721,7 @@
       "unnamedComputer": "كمبيوتر · {id}",
       "waitingBadge": "في انتظارك",
       "remember": "تذكّر على الكمبيوتر الذي طلبه",
-      "rememberOn": "حُفظ باسم «{label}». يعيد الوكلاء استخدامه دون أن يسألوك مرة أخرى.",
+      "rememberOn": "حُفظ باسم «{label}». ستعيد Stella استخدامه دون أن تسألك مرة أخرى.",
       "rememberOff": "يُستخدم مرة واحدة ثم يُحذف.",
       "replacing": "لم تنجح القيمة المحفوظة لـ«{label}». أدخل القيمة الصحيحة؛ وستحل محل المحفوظة."
     }
@@ -1888,7 +1895,7 @@
             "title": "اطلب"
           },
           "preview": {
-            "body": "يبنيه وكيل ويفتح معاينة مباشرة.",
+            "body": "تبنيه مهمة وتفتح معاينة مباشرة.",
             "title": "معاينة"
           },
           "update": {
@@ -2621,7 +2628,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "الإملاء",
-        "voice": "وكيل الصوت"
+        "voice": "المحادثات الصوتية"
       },
       "capturing": "اضغط على المفاتيح…",
       "change": "تغيير",
@@ -2638,7 +2645,7 @@
       "off": "إيقاف",
       "targets": {
         "dictation": "الإملاء",
-        "voice": "وكيل الصوت"
+        "voice": "محادثة صوتية"
       },
       "title": "الاختصارات",
       "toasts": {
@@ -2650,13 +2657,13 @@
         "updatedTitle": "تم تحديث اختصار {action}"
       },
       "voiceAgent": {
-        "description": "يبدأ أو يوقف وكيل Stella الصوتي المباشر."
+        "description": "يبدأ محادثة صوتية مباشرة مع Stella أو يوقفها."
       }
     },
     "systemPrompt": {
       "activeLabel": "الموجّه النشط",
       "agentLabel": "الموجّه لـ",
-      "agentSublabel": "اختر الوكيل الذي تريد تغيير موجّهه.",
+      "agentSublabel": "اختر الموجّه الذي تريد تغييره.",
       "agents": {
         "assistant": "المساعد",
         "worker": "المنفّذ"
@@ -2719,7 +2726,7 @@
     },
     "secureValues": {
       "title": "القيم الخاصة المحفوظة",
-      "description": "قيم من طلبات خاصة اخترت تذكّرها، محفوظة في المخزن الآمن لهذا الكمبيوتر حتى تحذفها. يستخدمها الوكلاء دون أن يقرؤوها أبدًا.",
+      "description": "قيم من طلبات خاصة اخترت تذكّرها، محفوظة في المخزن الآمن لهذا الكمبيوتر حتى تحذفها. تستخدمها Stella دون أن تقرأها أبدًا.",
       "empty": "لا توجد قيم خاصة محفوظة على هذا الكمبيوتر.",
       "saved": "حُفظت {saved}",
       "delete": "Delete",
@@ -2839,7 +2846,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "مسار وكيل للقراءة فقط",
+        "badge": "مهمة للقراءة فقط",
         "claudeAriaLabel": "محادثة وكيل Claude الفرعي للقراءة فقط",
         "claudeBadge": "وكيل Claude فرعي للقراءة فقط",
         "empty": "لا رسائل في هذا المسار بعد.",
@@ -2867,7 +2874,7 @@
         },
         "retrying": "جارٍ إعادة المحاولة…",
         "role": {
-          "assistant": "الوكيل",
+          "assistant": "مهمة",
           "checkpoint": "نقطة تحقّق في المسار",
           "lifecycle": "النشاط",
           "reasoning": "التفكير",
@@ -2889,7 +2896,7 @@
         "toolInput": "الإدخال",
         "toolOutput": "الإخراج",
         "toolRunning": "في انتظار انتهاء هذه الأداة…",
-        "unavailable": "سجلّ مسار الوكيل غير متاح."
+        "unavailable": "سجل هذه المهمة غير متاح."
       },
       "canvas": {
         "loadFailed": "تعذّر تحميل هذه اللوحة.",
@@ -3234,7 +3241,7 @@
       "decline": "Decline",
       "remember": "تذكّر على هذا الكمبيوتر",
       "rememberRelayed": "تذكّر على الكمبيوتر الذي طلبه",
-      "rememberOn": "حُفظ باسم «{label}». يعيد الوكلاء استخدامه دون أن يسألوك مرة أخرى؛ ويمكنك حذفه في أي وقت من الإعدادات.",
+      "rememberOn": "حُفظ باسم «{label}». ستعيد Stella استخدامه دون أن تسألك مرة أخرى؛ ويمكنك حذفه في أي وقت من الإعدادات.",
       "rememberOff": "يُستخدم مرة واحدة ثم يُحذف.",
       "replacing": "لم تنجح القيمة المحفوظة لـ«{label}». أدخل القيمة الصحيحة؛ وستحل محل المحفوظة.",
       "note": "أضف ملاحظة (اختياري)",

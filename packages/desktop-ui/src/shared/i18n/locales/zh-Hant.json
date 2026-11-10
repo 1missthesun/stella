@@ -36,8 +36,8 @@
         "showStella": "展示給 Stella"
       },
       "agentCompletion": {
-        "openNamedThread": "開啟 {title} 代理執行緒",
-        "openThread": "開啟代理執行緒",
+        "openNamedThread": "開啟任務：{title}",
+        "openThread": "開啟任務",
         "showLess": "顯示較少",
         "showMore": {
           "other": "+{count} 更多"
@@ -47,10 +47,10 @@
         "unavailable": "模型詳細資料無法取得"
       },
       "backgroundWork": {
-        "agentThread": "代理執行緒",
+        "agentThread": "任務",
         "followUp": "後續",
-        "openNamedThread": "開啟 {title} 代理執行緒",
-        "openThread": "開啟代理執行緒",
+        "openNamedThread": "開啟任務：{title}",
+        "openThread": "開啟任務",
         "taskCount": {
           "other": "{count} 項工作"
         },
@@ -743,7 +743,9 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "other": "{count} 項工作進行中"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1674,7 +1676,7 @@
       "unnamedComputer": "電腦 · {id}",
       "waitingBadge": "正在等你",
       "remember": "在提問的那台電腦上記住",
-      "rememberOn": "已儲存為「{label}」。代理程式之後會直接重複使用，不再詢問你。",
+      "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你。",
       "rememberOff": "僅使用一次，然後刪除。",
       "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。"
     }
@@ -1848,7 +1850,7 @@
             "title": "提出"
           },
           "preview": {
-            "body": "由代理程式建置，並開啟即時預覽。",
+            "body": "由任務建置，並開啟即時預覽。",
             "title": "預覽"
           },
           "update": {
@@ -2581,7 +2583,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "聽寫",
-        "voice": "語音代理"
+        "voice": "語音對話"
       },
       "capturing": "請按下按鍵…",
       "change": "變更",
@@ -2598,7 +2600,7 @@
       "off": "關閉",
       "targets": {
         "dictation": "聽寫",
-        "voice": "語音代理"
+        "voice": "語音對話"
       },
       "title": "捷徑",
       "toasts": {
@@ -2610,13 +2612,13 @@
         "updatedTitle": "已更新「{action}」捷徑"
       },
       "voiceAgent": {
-        "description": "啟動或停止 Stella 的即時語音代理。"
+        "description": "開始或結束與 Stella 的即時語音對話。"
       }
     },
     "systemPrompt": {
       "activeLabel": "目前提示詞",
       "agentLabel": "提示詞對象",
-      "agentSublabel": "選擇要修改哪個代理的提示詞。",
+      "agentSublabel": "選擇要修改的提示詞。",
       "agents": {
         "assistant": "助理",
         "worker": "執行者"
@@ -2679,7 +2681,7 @@
     },
     "secureValues": {
       "title": "已儲存的私密值",
-      "description": "你在私密請求中選擇記住的值，保存在這台電腦的安全儲存區中，直到你刪除為止。代理程式會使用它們，但從不讀取。",
+      "description": "你在私密請求中選擇記住的值，保存在這台電腦的安全儲存區中，直到你刪除為止。Stella 會使用它們，但從不讀取。",
       "empty": "這台電腦上沒有儲存私密值。",
       "saved": "儲存於 {saved}",
       "delete": "Delete",
@@ -2794,7 +2796,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "唯讀代理執行緒",
+        "badge": "唯讀任務",
         "claudeAriaLabel": "Claude 子代理唯讀對話",
         "claudeBadge": "唯讀 Claude 子代理",
         "empty": "此執行緒中還沒有訊息。",
@@ -2811,7 +2813,7 @@
         },
         "retrying": "正在重試…",
         "role": {
-          "assistant": "代理",
+          "assistant": "任務",
           "checkpoint": "執行緒檢查點",
           "lifecycle": "活動",
           "reasoning": "推理",
@@ -2832,7 +2834,7 @@
         "toolInput": "輸入",
         "toolOutput": "輸出",
         "toolRunning": "正在等待這個工具完成…",
-        "unavailable": "無法取得代理執行緒的歷史記錄。"
+        "unavailable": "無法取得此任務的歷史記錄。"
       },
       "canvas": {
         "loadFailed": "無法載入此畫布。",
@@ -3152,7 +3154,7 @@
       "decline": "Decline",
       "remember": "在這台電腦上記住",
       "rememberRelayed": "在提問的那台電腦上記住",
-      "rememberOn": "已儲存為「{label}」。代理程式之後會直接重複使用，不再詢問你；你可以隨時在設定中刪除。",
+      "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你；你可以隨時在設定中刪除。",
       "rememberOff": "僅使用一次，然後刪除。",
       "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
       "note": "新增備註（選填）",

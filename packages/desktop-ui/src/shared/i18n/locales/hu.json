@@ -37,8 +37,8 @@
         "showStella": "Megmutatom Stellának"
       },
       "agentCompletion": {
-        "openNamedThread": "Ügynökszál megnyitása: {title}",
-        "openThread": "Ügynökszál megnyitása",
+        "openNamedThread": "Feladat megnyitása: {title}",
+        "openThread": "Feladat megnyitása",
         "showLess": "Kevesebb",
         "showMore": {
           "one": "+{count} további",
@@ -49,10 +49,10 @@
         "unavailable": "A modell adatai nem érhetők el"
       },
       "backgroundWork": {
-        "agentThread": "Ügynökszál",
+        "agentThread": "Feladat",
         "followUp": "Folytatás",
-        "openNamedThread": "Ügynökszál megnyitása: {title}",
-        "openThread": "Ügynökszál megnyitása",
+        "openNamedThread": "Feladat megnyitása: {title}",
+        "openThread": "Feladat megnyitása",
         "taskCount": {
           "one": "{count} feladat",
           "other": "{count} feladat"
@@ -748,7 +748,10 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "one": "{count} feladat folyamatban",
+        "other": "{count} feladat folyamatban"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1682,7 +1685,7 @@
       "unnamedComputer": "Számítógép · {id}",
       "waitingBadge": "Rád vár",
       "remember": "Megjegyzés a kérdező számítógépen",
-      "rememberOn": "Mentve „{label}” néven. Az ügynökök újra felhasználják anélkül, hogy újra megkérdeznének.",
+      "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne.",
       "rememberOff": "Egyszer használva, majd törölve.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet."
     }
@@ -1856,7 +1859,7 @@
             "title": "Kérés"
           },
           "preview": {
-            "body": "Egy ügynök megépíti, és megnyit egy élő előnézetet.",
+            "body": "Egy feladat megépíti, és megnyit egy élő előnézetet.",
             "title": "Előnézet"
           },
           "update": {
@@ -2589,7 +2592,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Diktálás",
-        "voice": "Hangügynök"
+        "voice": "Beszélgetés hanggal"
       },
       "capturing": "Nyomj le billentyűket…",
       "change": "Módosítás",
@@ -2606,7 +2609,7 @@
       "off": "Ki",
       "targets": {
         "dictation": "a diktálást",
-        "voice": "a hangügynököt"
+        "voice": "egy hangos beszélgetést"
       },
       "title": "Gyorsbillentyűk",
       "toasts": {
@@ -2618,13 +2621,13 @@
         "updatedTitle": "A(z) {action} gyorsbillentyű frissítve"
       },
       "voiceAgent": {
-        "description": "Elindítja vagy leállítja a Stella élő hangügynökét."
+        "description": "Élő hangos beszélgetést indít vagy állít le Stellával."
       }
     },
     "systemPrompt": {
       "activeLabel": "Aktív prompt",
       "agentLabel": "Prompt ehhez",
-      "agentSublabel": "Válaszd ki, melyik ügynök promptját módosítod.",
+      "agentSublabel": "Válaszd ki, melyik promptot módosítod.",
       "agents": {
         "assistant": "Asszisztens",
         "worker": "Végrehajtó"
@@ -2687,7 +2690,7 @@
     },
     "secureValues": {
       "title": "Mentett privát értékek",
-      "description": "Privát kérésekből származó értékek, amelyeket megjegyeztetni választottál. A számítógép biztonságos tárolójában maradnak, amíg nem törlöd őket. Az ügynökök úgy használják őket, hogy sosem olvassák el.",
+      "description": "Privát kérésekből származó értékek, amelyeket megjegyeztetni választottál. A számítógép biztonságos tárolójában maradnak, amíg nem törlöd őket. Stella úgy használja őket, hogy sosem olvassa el.",
       "empty": "Ezen a számítógépen nincs mentett privát érték.",
       "saved": "Mentve: {saved}",
       "delete": "Delete",
@@ -2803,7 +2806,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Csak olvasható ügynökszál",
+        "badge": "Csak olvasható feladat",
         "claudeAriaLabel": "Claude alügynök csak olvasható beszélgetés",
         "claudeBadge": "Csak olvasható Claude alügynök",
         "empty": "Még nincs üzenet ebben a szálban.",
@@ -2823,7 +2826,7 @@
         },
         "retrying": "Újrapróbálkozás…",
         "role": {
-          "assistant": "Ügynök",
+          "assistant": "Feladat",
           "checkpoint": "A szál ellenőrzőpontja",
           "lifecycle": "Tevékenység",
           "reasoning": "Gondolkodás",
@@ -2845,7 +2848,7 @@
         "toolInput": "Bemenet",
         "toolOutput": "Kimenet",
         "toolRunning": "Várakozás az eszköz befejezésére…",
-        "unavailable": "Az ügynökszál előzményei nem érhetők el."
+        "unavailable": "A feladat előzményei nem érhetők el."
       },
       "canvas": {
         "loadFailed": "Nem sikerült betölteni ezt a vásznat.",
@@ -3170,7 +3173,7 @@
       "decline": "Decline",
       "remember": "Megjegyzés ezen a számítógépen",
       "rememberRelayed": "Megjegyzés a kérdező számítógépen",
-      "rememberOn": "Mentve „{label}” néven. Az ügynökök újra felhasználják anélkül, hogy újra megkérdeznének; bármikor törölheted a Beállításokban.",
+      "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne; bármikor törölheted a Beállításokban.",
       "rememberOff": "Egyszer használva, majd törölve.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
       "note": "Megjegyzés hozzáadása (nem kötelező)",

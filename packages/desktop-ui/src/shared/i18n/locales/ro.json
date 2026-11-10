@@ -38,8 +38,8 @@
         "showStella": "Arată-i Stellei"
       },
       "agentCompletion": {
-        "openNamedThread": "Deschide firul agentului {title}",
-        "openThread": "Deschide firul agentului",
+        "openNamedThread": "Deschide sarcina: {title}",
+        "openThread": "Deschide sarcina",
         "showLess": "Arată mai puțin",
         "showMore": {
           "few": "+{count} în plus",
@@ -51,10 +51,10 @@
         "unavailable": "Detaliile modelului nu sunt disponibile"
       },
       "backgroundWork": {
-        "agentThread": "Firul agentului",
+        "agentThread": "Sarcină",
         "followUp": "Continuare",
-        "openNamedThread": "Deschide firul agentului {title}",
-        "openThread": "Deschide firul agentului",
+        "openNamedThread": "Deschide sarcina: {title}",
+        "openThread": "Deschide sarcina",
         "taskCount": {
           "few": "{count} sarcini",
           "one": "{count} sarcină",
@@ -753,7 +753,11 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "few": "{count} sarcini în curs",
+        "one": "{count} sarcină în curs",
+        "other": "{count} de sarcini în curs"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1690,7 +1694,7 @@
       "unnamedComputer": "Calculator · {id}",
       "waitingBadge": "Te așteaptă",
       "remember": "Ține minte pe computerul care a cerut",
-      "rememberOn": "Salvat ca „{label}”. Agenții îl refolosesc fără să te mai întrebe.",
+      "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe.",
       "rememberOff": "Folosit o dată, apoi șters.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată."
     }
@@ -1864,7 +1868,7 @@
             "title": "Cere"
           },
           "preview": {
-            "body": "Un agent o construiește și deschide o previzualizare live.",
+            "body": "O sarcină o construiește și deschide o previzualizare live.",
             "title": "Previzualizează"
           },
           "update": {
@@ -2597,7 +2601,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Dictare",
-        "voice": "Agent vocal"
+        "voice": "Conversații vocale"
       },
       "capturing": "Apasă tastele…",
       "change": "Modifică",
@@ -2614,7 +2618,7 @@
       "off": "Dezactivat",
       "targets": {
         "dictation": "dictarea",
-        "voice": "agentul vocal"
+        "voice": "o conversație vocală"
       },
       "title": "Scurtături",
       "toasts": {
@@ -2626,13 +2630,13 @@
         "updatedTitle": "Scurtătura {action} a fost actualizată"
       },
       "voiceAgent": {
-        "description": "Pornește sau oprește agentul vocal live al Stellei."
+        "description": "Pornește sau oprește o conversație vocală live cu Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Prompt activ",
       "agentLabel": "Prompt pentru",
-      "agentSublabel": "Alege promptul cărui agent să îl modifici.",
+      "agentSublabel": "Alege ce prompt vrei să schimbi.",
       "agents": {
         "assistant": "Asistent",
         "worker": "Executant"
@@ -2695,7 +2699,7 @@
     },
     "secureValues": {
       "title": "Valori private salvate",
-      "description": "Valori din cereri private pe care ai ales să le ții minte, păstrate în spațiul de stocare securizat al acestui computer până le ștergi. Agenții le folosesc fără să le citească vreodată.",
+      "description": "Valori din cereri private pe care ai ales să le ții minte, păstrate în spațiul de stocare securizat al acestui computer până le ștergi. Stella le folosește fără să le citească vreodată.",
       "empty": "Nu există valori private salvate pe acest computer.",
       "saved": "Salvat {saved}",
       "delete": "Delete",
@@ -2812,7 +2816,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Fir de agent doar în citire",
+        "badge": "Sarcină doar în citire",
         "claudeAriaLabel": "Conversație doar în citire cu subagentul Claude",
         "claudeBadge": "Subagent Claude doar în citire",
         "empty": "Încă niciun mesaj în acest fir.",
@@ -2834,7 +2838,7 @@
         },
         "retrying": "Se reîncearcă…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Sarcină",
           "checkpoint": "Punct de control al firului",
           "lifecycle": "Activitate",
           "reasoning": "Raționare",
@@ -2856,7 +2860,7 @@
         "toolInput": "Intrare",
         "toolOutput": "Ieșire",
         "toolRunning": "Se așteaptă finalizarea acestui instrument…",
-        "unavailable": "Istoricul firului agentului nu este disponibil."
+        "unavailable": "Istoricul acestei sarcini nu este disponibil."
       },
       "canvas": {
         "loadFailed": "Acest canvas nu a putut fi încărcat.",
@@ -3186,7 +3190,7 @@
       "decline": "Decline",
       "remember": "Ține minte pe acest computer",
       "rememberRelayed": "Ține minte pe computerul care a cerut",
-      "rememberOn": "Salvat ca „{label}”. Agenții îl refolosesc fără să te mai întrebe; îl poți șterge oricând din Setări.",
+      "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe; îl poți șterge oricând din Setări.",
       "rememberOff": "Folosit o dată, apoi șters.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
       "note": "Adaugă o notă (opțional)",

@@ -36,8 +36,8 @@
         "showStella": "Cho Stella xem"
       },
       "agentCompletion": {
-        "openNamedThread": "Mở luồng tác nhân {title}",
-        "openThread": "Mở luồng tác nhân",
+        "openNamedThread": "Mở tác vụ: {title}",
+        "openThread": "Mở tác vụ",
         "showLess": "Thu gọn",
         "showMore": {
           "other": "+{count} nữa"
@@ -47,10 +47,10 @@
         "unavailable": "Không có thông tin chi tiết về mô hình"
       },
       "backgroundWork": {
-        "agentThread": "Luồng tác nhân",
+        "agentThread": "Tác vụ",
         "followUp": "Tiếp nối",
-        "openNamedThread": "Mở luồng tác nhân {title}",
-        "openThread": "Mở luồng tác nhân",
+        "openNamedThread": "Mở tác vụ: {title}",
+        "openThread": "Mở tác vụ",
         "taskCount": {
           "other": "{count} tác vụ"
         },
@@ -743,7 +743,9 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "other": "{count} tác vụ đang chạy"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1674,7 +1676,7 @@
       "unnamedComputer": "Máy tính · {id}",
       "waitingBadge": "Đang chờ bạn",
       "remember": "Ghi nhớ trên máy tính đã hỏi",
-      "rememberOn": "Đã lưu thành “{label}”. Các tác tử sẽ dùng lại mà không hỏi lại bạn.",
+      "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn.",
       "rememberOff": "Dùng một lần rồi xóa.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu."
     }
@@ -1848,7 +1850,7 @@
             "title": "Nhờ"
           },
           "preview": {
-            "body": "Một tác tử xây dựng nó và mở bản xem trước trực tiếp.",
+            "body": "Một tác vụ xây dựng nó và mở bản xem trước trực tiếp.",
             "title": "Xem trước"
           },
           "update": {
@@ -2581,7 +2583,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Đọc chính tả",
-        "voice": "Tác nhân giọng nói"
+        "voice": "Trò chuyện bằng giọng nói"
       },
       "capturing": "Nhấn phím…",
       "change": "Thay đổi",
@@ -2598,7 +2600,7 @@
       "off": "Tắt",
       "targets": {
         "dictation": "đọc chính tả",
-        "voice": "tác nhân giọng nói"
+        "voice": "cuộc trò chuyện bằng giọng nói"
       },
       "title": "Phím tắt",
       "toasts": {
@@ -2610,13 +2612,13 @@
         "updatedTitle": "Đã cập nhật phím tắt {action}"
       },
       "voiceAgent": {
-        "description": "Bắt đầu hoặc dừng tác nhân giọng nói trực tiếp của Stella."
+        "description": "Bắt đầu hoặc dừng cuộc trò chuyện bằng giọng nói trực tiếp với Stella."
       }
     },
     "systemPrompt": {
       "activeLabel": "Lời nhắc đang dùng",
       "agentLabel": "Lời nhắc cho",
-      "agentSublabel": "Chọn tác nhân bạn muốn đổi lời nhắc.",
+      "agentSublabel": "Chọn lời nhắc muốn thay đổi.",
       "agents": {
         "assistant": "Trợ lý",
         "worker": "Người thực thi"
@@ -2679,7 +2681,7 @@
     },
     "secureValues": {
       "title": "Giá trị riêng tư đã lưu",
-      "description": "Các giá trị từ yêu cầu riêng tư mà bạn chọn ghi nhớ, được giữ trong kho bảo mật của máy tính này cho đến khi bạn xóa. Các tác tử dùng chúng mà không bao giờ đọc chúng.",
+      "description": "Các giá trị từ yêu cầu riêng tư mà bạn chọn ghi nhớ, được giữ trong kho bảo mật của máy tính này cho đến khi bạn xóa. Stella dùng chúng mà không bao giờ đọc chúng.",
       "empty": "Không có giá trị riêng tư nào được lưu trên máy tính này.",
       "saved": "Đã lưu {saved}",
       "delete": "Delete",
@@ -2794,7 +2796,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Luồng tác nhân chỉ đọc",
+        "badge": "Tác vụ chỉ đọc",
         "claudeAriaLabel": "Cuộc hội thoại chỉ đọc của tác nhân phụ Claude",
         "claudeBadge": "Tác nhân phụ Claude chỉ đọc",
         "empty": "Chưa có tin nhắn nào trong luồng này.",
@@ -2811,7 +2813,7 @@
         },
         "retrying": "Đang thử lại…",
         "role": {
-          "assistant": "Tác nhân",
+          "assistant": "Tác vụ",
           "checkpoint": "Điểm kiểm tra luồng",
           "lifecycle": "Hoạt động",
           "reasoning": "Suy luận",
@@ -2832,7 +2834,7 @@
         "toolInput": "Đầu vào",
         "toolOutput": "Đầu ra",
         "toolRunning": "Đang chờ công cụ này hoàn tất…",
-        "unavailable": "Không có lịch sử luồng tác nhân."
+        "unavailable": "Không có lịch sử của tác vụ này."
       },
       "canvas": {
         "loadFailed": "Không tải được canvas này.",
@@ -3152,7 +3154,7 @@
       "decline": "Decline",
       "remember": "Ghi nhớ trên máy tính này",
       "rememberRelayed": "Ghi nhớ trên máy tính đã hỏi",
-      "rememberOn": "Đã lưu thành “{label}”. Các tác tử sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong Cài đặt.",
+      "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong Cài đặt.",
       "rememberOff": "Dùng một lần rồi xóa.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
       "note": "Thêm ghi chú (không bắt buộc)",

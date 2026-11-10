@@ -36,8 +36,8 @@
         "showStella": "Stellaに見せる"
       },
       "agentCompletion": {
-        "openNamedThread": "{title} のエージェントスレッドを開く",
-        "openThread": "エージェントスレッドを開く",
+        "openNamedThread": "タスクを開く: {title}",
+        "openThread": "タスクを開く",
         "showLess": "表示を減らす",
         "showMore": {
           "other": "他 {count} 件"
@@ -47,10 +47,10 @@
         "unavailable": "モデルの詳細を利用できません"
       },
       "backgroundWork": {
-        "agentThread": "エージェントスレッド",
+        "agentThread": "タスク",
         "followUp": "フォローアップ",
-        "openNamedThread": "{title} のエージェントスレッドを開く",
-        "openThread": "エージェントスレッドを開く",
+        "openNamedThread": "タスクを開く: {title}",
+        "openThread": "タスクを開く",
         "taskCount": {
           "other": "{count} 件のタスク"
         },
@@ -743,7 +743,9 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "other": "{count} 件のタスクを実行中"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1674,7 +1676,7 @@
       "unnamedComputer": "コンピュータ · {id}",
       "waitingBadge": "あなたを待っています",
       "remember": "要求元のコンピュータに記憶する",
-      "rememberOn": "「{label}」として保存しました。エージェントは次回からあなたに尋ねずに再利用します。",
+      "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。",
       "rememberOff": "一度だけ使用し、その後削除します。",
       "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。"
     }
@@ -1848,7 +1850,7 @@
             "title": "頼む"
           },
           "preview": {
-            "body": "エージェントが作成し、ライブプレビューを開きます。",
+            "body": "タスクが作成し、ライブプレビューを開きます。",
             "title": "プレビュー"
           },
           "update": {
@@ -2581,7 +2583,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "音声入力",
-        "voice": "音声エージェント"
+        "voice": "音声での会話"
       },
       "capturing": "キーを押してください…",
       "change": "変更",
@@ -2598,7 +2600,7 @@
       "off": "オフ",
       "targets": {
         "dictation": "音声入力",
-        "voice": "音声エージェント"
+        "voice": "音声会話"
       },
       "title": "ショートカット",
       "toasts": {
@@ -2610,13 +2612,13 @@
         "updatedTitle": "{action} のショートカットを更新しました"
       },
       "voiceAgent": {
-        "description": "Stella のライブ音声エージェントを開始または停止します。"
+        "description": "Stella とのライブ音声会話を開始または終了します。"
       }
     },
     "systemPrompt": {
       "activeLabel": "使用中のプロンプト",
       "agentLabel": "対象エージェント",
-      "agentSublabel": "どのエージェントのプロンプトを変更するか選びます。",
+      "agentSublabel": "変更するプロンプトを選んでください。",
       "agents": {
         "assistant": "アシスタント",
         "worker": "ワーカー"
@@ -2679,7 +2681,7 @@
     },
     "secureValues": {
       "title": "保存済みのプライベートな値",
-      "description": "プライベートなリクエストで記憶することを選んだ値です。削除するまでこのコンピュータの安全なストアに保管されます。エージェントは値を読むことなく使用します。",
+      "description": "プライベートなリクエストで記憶することを選んだ値です。削除するまでこのコンピュータの安全なストアに保管されます。Stella は値を読むことなく使用します。",
       "empty": "このコンピュータに保存されたプライベートな値はありません。",
       "saved": "保存日時 {saved}",
       "delete": "Delete",
@@ -2794,7 +2796,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "読み取り専用のエージェントスレッド",
+        "badge": "読み取り専用のタスク",
         "claudeAriaLabel": "Claude サブエージェントの読み取り専用の会話",
         "claudeBadge": "読み取り専用の Claude サブエージェント",
         "empty": "このスレッドにはまだメッセージがありません。",
@@ -2811,7 +2813,7 @@
         },
         "retrying": "再試行中…",
         "role": {
-          "assistant": "エージェント",
+          "assistant": "タスク",
           "checkpoint": "スレッドのチェックポイント",
           "lifecycle": "アクティビティ",
           "reasoning": "推論",
@@ -2832,7 +2834,7 @@
         "toolInput": "入力",
         "toolOutput": "出力",
         "toolRunning": "このツールの完了を待っています…",
-        "unavailable": "エージェントスレッドの履歴を利用できません。"
+        "unavailable": "このタスクの履歴は利用できません。"
       },
       "canvas": {
         "loadFailed": "このキャンバスを読み込めませんでした。",
@@ -3152,7 +3154,7 @@
       "decline": "Decline",
       "remember": "このコンピュータに記憶する",
       "rememberRelayed": "要求元のコンピュータに記憶する",
-      "rememberOn": "「{label}」として保存しました。エージェントは次回からあなたに尋ねずに再利用します。設定からいつでも削除できます。",
+      "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。設定からいつでも削除できます。",
       "rememberOff": "一度だけ使用し、その後削除します。",
       "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。",
       "note": "メモを追加（任意）",

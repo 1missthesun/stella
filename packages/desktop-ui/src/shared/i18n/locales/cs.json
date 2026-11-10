@@ -39,8 +39,8 @@
         "showStella": "Ukázat Stelle"
       },
       "agentCompletion": {
-        "openNamedThread": "Otevřít vlákno agenta {title}",
-        "openThread": "Otevřít vlákno agenta",
+        "openNamedThread": "Otevřít úlohu: {title}",
+        "openThread": "Otevřít úlohu",
         "showLess": "Zobrazit méně",
         "showMore": {
           "few": "+{count} další",
@@ -53,10 +53,10 @@
         "unavailable": "Podrobnosti o modelu nejsou dostupné"
       },
       "backgroundWork": {
-        "agentThread": "Vlákno agenta",
+        "agentThread": "Úloha",
         "followUp": "Navázání",
-        "openNamedThread": "Otevřít vlákno agenta {title}",
-        "openThread": "Otevřít vlákno agenta",
+        "openNamedThread": "Otevřít úlohu: {title}",
+        "openThread": "Otevřít úlohu",
         "taskCount": {
           "few": "{count} úlohy",
           "many": "{count} úlohy",
@@ -758,7 +758,12 @@
       "voiceStop": "End voice conversation"
     },
     "badge": {
-      "running": "{count} agents working"
+      "running": {
+        "few": "probíhají {count} úlohy",
+        "many": "probíhá {count} úlohy",
+        "one": "probíhá {count} úloha",
+        "other": "probíhá {count} úloh"
+      }
     },
     "bubble": {
       "openStella": "Open in Stella",
@@ -1698,7 +1703,7 @@
       "unnamedComputer": "Počítač · {id}",
       "waitingBadge": "Čeká na tebe",
       "remember": "Zapamatovat na počítači, který se ptal",
-      "rememberOn": "Uloženo jako „{label}“. Agenti to znovu použijí, aniž by se vás znovu ptali.",
+      "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala.",
       "rememberOff": "Použito jednou, pak smazáno.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou."
     }
@@ -1872,7 +1877,7 @@
             "title": "Zeptej se"
           },
           "preview": {
-            "body": "Agent to vytvoří a otevře živý náhled.",
+            "body": "Úloha to vytvoří a otevře živý náhled.",
             "title": "Náhled"
           },
           "update": {
@@ -2605,7 +2610,7 @@
     "shortcuts": {
       "actions": {
         "dictation": "Diktování",
-        "voice": "Hlasový agent"
+        "voice": "Hlasové konverzace"
       },
       "capturing": "Stiskněte klávesy…",
       "change": "Změnit",
@@ -2622,7 +2627,7 @@
       "off": "Vypnuto",
       "targets": {
         "dictation": "diktování",
-        "voice": "hlasového agenta"
+        "voice": "hlasový rozhovor"
       },
       "title": "Zkratky",
       "toasts": {
@@ -2634,13 +2639,13 @@
         "updatedTitle": "Zkratka {action} aktualizována"
       },
       "voiceAgent": {
-        "description": "Spustí nebo zastaví živého hlasového agenta Stelly."
+        "description": "Spustí nebo ukončí živý hlasový rozhovor se Stellou."
       }
     },
     "systemPrompt": {
       "activeLabel": "Aktivní prompt",
       "agentLabel": "Prompt pro",
-      "agentSublabel": "Vyberte, kterému agentovi chcete změnit prompt.",
+      "agentSublabel": "Vyberte, který prompt chcete změnit.",
       "agents": {
         "assistant": "Asistent",
         "worker": "Pracovník"
@@ -2703,7 +2708,7 @@
     },
     "secureValues": {
       "title": "Uložené soukromé hodnoty",
-      "description": "Hodnoty ze soukromých žádostí, které jste se rozhodli zapamatovat. Jsou uložené v zabezpečeném úložišti tohoto počítače, dokud je nesmažete. Agenti je používají, aniž by je kdy četli.",
+      "description": "Hodnoty ze soukromých žádostí, které jste se rozhodli zapamatovat. Jsou uložené v zabezpečeném úložišti tohoto počítače, dokud je nesmažete. Stella je používá, aniž by je kdy četla.",
       "empty": "Na tomto počítači nejsou uložené žádné soukromé hodnoty.",
       "saved": "Uloženo {saved}",
       "delete": "Delete",
@@ -2821,7 +2826,7 @@
     },
     "display": {
       "agentThread": {
-        "badge": "Vlákno agenta jen pro čtení",
+        "badge": "Úloha jen pro čtení",
         "claudeAriaLabel": "Konverzace subagenta Claude jen pro čtení",
         "claudeBadge": "Subagent Claude jen pro čtení",
         "empty": "V tomto vlákně zatím nejsou žádné zprávy.",
@@ -2845,7 +2850,7 @@
         },
         "retrying": "Opakování…",
         "role": {
-          "assistant": "Agent",
+          "assistant": "Úloha",
           "checkpoint": "Kontrolní bod vlákna",
           "lifecycle": "Aktivita",
           "reasoning": "Uvažování",
@@ -2867,7 +2872,7 @@
         "toolInput": "Vstup",
         "toolOutput": "Výstup",
         "toolRunning": "Čeká se na dokončení tohoto nástroje…",
-        "unavailable": "Historie vlákna agenta není dostupná."
+        "unavailable": "Historie této úlohy není k dispozici."
       },
       "canvas": {
         "loadFailed": "Toto plátno se nepodařilo načíst.",
@@ -3202,7 +3207,7 @@
       "decline": "Decline",
       "remember": "Zapamatovat na tomto počítači",
       "rememberRelayed": "Zapamatovat na počítači, který se ptal",
-      "rememberOn": "Uloženo jako „{label}“. Agenti to znovu použijí, aniž by se vás znovu ptali; kdykoli to můžete smazat v Nastavení.",
+      "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala; kdykoli to můžete smazat v Nastavení.",
       "rememberOff": "Použito jednou, pak smazáno.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
       "note": "Přidat poznámku (nepovinné)",

@@ -39,7 +39,7 @@ const FALLBACK_MESSAGES: Record<DispatchErrorCode, string> = {
   generation_stale: "This request started before the account data was reset.",
   capability_unavailable:
     "No computer with what this needs is online right now.",
-  sign_in_required: "Sign in to Stella to use cloud agents.",
+  sign_in_required: "Sign in to Stella to use cloud tasks.",
   subscription_required: CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
   owner_suspended: "This account can't use Stella's cloud right now.",
   internal: "That didn't send. Try again.",

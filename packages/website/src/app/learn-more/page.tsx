@@ -207,8 +207,8 @@ export default function LearnMore() {
             <Me d={150}>Clean up my Downloads folder?</Me>
             <Her d={550}>Done. 214 files sorted into 9 folders, and 3.2 GB of old installers moved to the Bin.</Her>
             <Stamp d={1000}>Today 7:42 PM</Stamp>
-            <Me d={1150}>Find us a table for four on Friday around 8</Me>
-            <Her d={1600}>Booked Lucia for 8pm Friday. It&apos;s in your calendar, and I let Sam and Priya know.</Her>
+            <Me d={1150}>Total last month&apos;s receipts for my expense report</Me>
+            <Her d={1600}>Done. 23 receipts, $1,486.20, in Expenses October.xlsx. Two had no date, so I flagged them.</Her>
           </MockChat>
         </MockStage>
       </section>

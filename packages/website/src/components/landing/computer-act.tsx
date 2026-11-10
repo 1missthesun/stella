@@ -20,8 +20,8 @@ const PATH: Key[] = [
   { u: 1.3, x: 450, y: 125 },
   { u: 1.6, x: 706, y: 304 },
   { u: 1.75, x: 706, y: 304 },
-  { u: 2.0, x: 352, y: 392 },
-  { u: 2.12, x: 352, y: 392 },
+  { u: 2.0, x: 392, y: 392 },
+  { u: 2.12, x: 392, y: 392 },
   { u: 2.3, x: 460, y: 574 },
   { u: 2.42, x: 460, y: 574 },
   { u: 2.72, x: 1015, y: 446 },
@@ -30,7 +30,9 @@ const PATH: Key[] = [
 ];
 
 const CLICKS = [0.9, 1.65, 2.06, 2.36, 2.8];
-const QUERY = "flights to lisbon, may 14";
+const SLOT_DAYS = ["Thu", "Fri", "Sat", "Mon", "Tue", "Wed"];
+const SLOT_HOURS = ["9:00", "10:00", "11:00", "12:00", "1:00", "2:00"];
+const QUERY = "oil change near me";
 
 function pathAt(u: number) {
   if (u <= PATH[0].u) return PATH[0];
@@ -48,7 +50,7 @@ function pathAt(u: number) {
 function stageAt(u: number) {
   if (u < 1.3) return "search";
   if (u < 1.68) return "results";
-  if (u < 2.08) return "seats";
+  if (u < 2.08) return "times";
   if (u < 2.38) return "confirm";
   if (u < 2.8) return "drag";
   return "done";
@@ -188,7 +190,7 @@ export function ComputerAct() {
                   <i />
                   <i />
                 </span>
-                <span className={c.tab}>Skyway: cheap flights</span>
+                <span className={c.tab}>Pitstop: book a service</span>
                 <span className={c.tabGhost}>Inbox (3)</span>
               </div>
               <div className={c.urlbar}>
@@ -200,10 +202,10 @@ export function ComputerAct() {
               </div>
               <div className={c.page}>
                 <div className={c.siteHead}>
-                  <b>skyway</b>
-                  <span>SFO &#8594; LIS</span>
-                  <span>Thu, May 14</span>
-                  <span>1 adult</span>
+                  <b>pitstop</b>
+                  <span>Oil change</span>
+                  <span>This week</span>
+                  <span>Within 3 mi</span>
                 </div>
                 <div className={c.empty}>
                   <span className={c.globe} />
@@ -212,62 +214,71 @@ export function ComputerAct() {
                   <div className={c.row} data-best="1">
                     <span className={c.air} style={{ background: "#e23c3c" }} />
                     <span className={c.times}>
-                      <b>14:05 &#8594; 08:20</b>
-                      <small>TAP · Nonstop · 10h 15m</small>
+                      <b>Northside Auto</b>
+                      <small>4.9 &#9733; · 0.8 mi · Open today</small>
                     </span>
-                    <span className={c.price}>$412</span>
+                    <span className={c.price}>$59</span>
                     <span className={c.select}>Select</span>
                   </div>
                   <div className={c.row}>
-                    <span className={c.air} style={{ background: "#c8102e" }} />
+                    <span className={c.air} style={{ background: "#f0a020" }} />
                     <span className={c.times}>
-                      <b>06:30 &#8594; 05:10</b>
-                      <small>Iberia · 1 stop · 13h 40m</small>
+                      <b>Mission Tire &amp; Lube</b>
+                      <small>4.6 &#9733; · 1.9 mi · Next opening Mon</small>
                     </span>
-                    <span className={c.price}>$467</span>
+                    <span className={c.price}>$64</span>
                     <span className={c.select}>Select</span>
                   </div>
                   <div className={c.row}>
                     <span className={c.air} style={{ background: "#1d4fd8" }} />
                     <span className={c.times}>
-                      <b>09:10 &#8594; 11:55</b>
-                      <small>United · 1 stop · 17h 45m</small>
+                      <b>Bayview Quick Lube</b>
+                      <small>4.2 &#9733; · 3.1 mi · Open today</small>
                     </span>
-                    <span className={c.price}>$538</span>
+                    <span className={c.price}>$79</span>
                     <span className={c.select}>Select</span>
                   </div>
                 </div>
-                <div className={c.seats}>
-                  <p>Choose a seat</p>
-                  <div className={c.seatGrid}>
+                <div className={c.slots}>
+                  <p>Pick a time</p>
+                  <div className={c.slotDays}>
+                    {SLOT_DAYS.map((day) => (
+                      <span key={day}>{day}</span>
+                    ))}
+                  </div>
+                  <div className={c.slotHours}>
+                    {SLOT_HOURS.map((hour) => (
+                      <span key={hour}>{hour}</span>
+                    ))}
+                  </div>
+                  <div className={c.slotGrid}>
                     {Array.from({ length: 36 }, (_, i) => {
-                      const row = 12 + Math.floor(i / 6);
+                      const row = Math.floor(i / 6);
                       const col = i % 6;
-                      const taken = [1, 4, 8, 9, 15, 20, 22, 27, 31, 34].includes(i);
+                      const taken = [1, 4, 6, 8, 9, 15, 20, 22, 27, 31, 34].includes(i);
                       return (
                         <span
                           key={i}
-                          className={c.seat}
-                          style={{ gridColumn: col < 3 ? col + 1 : col + 2 }}
+                          className={c.slot}
                           data-taken={taken ? "1" : "0"}
-                          data-pick={row === 14 && col === 0 ? "1" : "0"}
+                          data-pick={row === 2 && col === 0 ? "1" : "0"}
                         />
                       );
                     })}
                   </div>
-                  <span className={c.confirm}>Confirm &amp; pay $412</span>
+                  <span className={c.confirm}>Book Thu 11:00 · $59</span>
                 </div>
                 <div className={c.booked}>
                   <span className={c.tick} />
-                  <b>You&apos;re going to Lisbon.</b>
-                  <small>TAP 14:05 · Seat 14A · $412</small>
+                  <b>Oil change at 11.</b>
+                  <small>Northside Auto · Thu 11:00 · $59</small>
                 </div>
               </div>
             </div>
 
             <div ref={chipRef} className={c.chip}>
-              <b>TAP 14:05</b>
-              <span>SFO &#8594; LIS · Seat 14A</span>
+              <b>Oil change · 11:00</b>
+              <span>Northside Auto · 0.8 mi</span>
             </div>
 
             <div className={c.calendar}>
@@ -298,8 +309,8 @@ export function ComputerAct() {
                   Lunch w/ Jo
                 </span>
                 <span className={c.newEv}>
-                  <b>Fly to Lisbon</b>
-                  <small>14:05 · TAP · 14A</small>
+                  <b>Oil change</b>
+                  <small>11:00</small>
                 </span>
               </div>
             </div>
@@ -308,7 +319,7 @@ export function ComputerAct() {
               <StellaCharacter size={30} className={c.toastMark} eyeColor="#ffffff" />
               <span>
                 <b>Stella</b>
-                Booked. Seat 14A, $412. It&apos;s in your calendar.
+                Booked Northside Auto for 11 today, $59. It&apos;s in your calendar.
               </span>
             </div>
 

@@ -161,14 +161,14 @@ export function DevicesAct() {
                   </div>
                   <div className={d.thread}>
                     <Bubble me cue="m1">
-                      Plan our Lisbon trip in May
+                      Plan Mia&apos;s birthday party
                     </Bubble>
                     <p className={d.typing} data-cue="type">
                       <i />
                       <i />
                       <i />
                     </p>
-                    <Bubble cue="m2">Flights and two hotels are in Trip.doc. Hold the 9th?</Bubble>
+                    <Bubble cue="m2">Three venues and a guest list are in Party.doc. Hold the 9th?</Bubble>
                   </div>
                   <div className={d.compose}>
                     <span>Do anything</span>
@@ -287,8 +287,8 @@ export function DevicesAct() {
                   </div>
                   <div className={d.phoneThread}>
                     <span className={d.pill}>Continued from MacBook</span>
-                    <p className={d.me}>Plan our Lisbon trip in May</p>
-                    <p className={d.her}>Flights and two hotels are in Trip.doc. Hold the 9th?</p>
+                    <p className={d.me}>Plan Mia&apos;s birthday party</p>
+                    <p className={d.her}>Three venues and a guest list are in Party.doc. Hold the 9th?</p>
                     <Bubble me cue="m3">
                       Yes. And clear some space on my home PC
                     </Bubble>

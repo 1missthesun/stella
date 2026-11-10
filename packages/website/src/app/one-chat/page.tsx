@@ -56,21 +56,21 @@ export default function OneChatPage() {
           </h2>
           <p>
             Most chatbots want a fresh thread for every question, so your history ends up scattered and the
-            context goes with it. In Stella there&apos;s just one conversation. The trip you planned last week,
+            context goes with it. In Stella there&apos;s just one conversation. The party you planned last week,
             the email from this morning, the thing you&apos;re about to ask — same place, same Stella.
           </p>
         </div>
         <MockStage>
           <MockChat>
             <Stamp d={0}>Last week</Stamp>
-            <Me d={150}>plan my trip</Me>
-            <Her d={500}>Lisbon, 12 to 16 May. Flights and hotel are in your calendar.</Her>
+            <Me d={150}>plan Mia&apos;s birthday party</Me>
+            <Her d={500}>Sunday 17 May at the park. The guest list and shopping list are in Party.doc.</Her>
             <Stamp d={900}>This morning</Stamp>
-            <Me d={1050}>draft the emails</Me>
-            <Her d={1400}>Three drafts are waiting in Gmail.</Her>
+            <Me d={1050}>draft the invites</Me>
+            <Her d={1400}>Twelve invites are drafted in Gmail.</Her>
             <Stamp d={1800}>Now</Stamp>
-            <Me d={1950}>actually, make it Thursday</Me>
-            <Her d={2400}>Moved to Thursday. The drafts say Thursday too.</Her>
+            <Me d={1950}>actually, make it Saturday</Me>
+            <Her d={2400}>Moved to Saturday. The drafts say Saturday too.</Her>
           </MockChat>
         </MockStage>
       </section>
@@ -89,11 +89,11 @@ export default function OneChatPage() {
         </div>
         <MockStage dark>
           <MockChat theme={DARK} status="In progress" typed="…and you keep typing" typedAt={1400}>
-            <Me d={0}>Find flights, draft the emails and book a table</Me>
-            <Task label="research flights" d={350} />
-            <Task label="draft emails" d={550} />
-            <Task label="book a table" d={750} doneAt={1900} />
-            <Her d={2900}>Booked a table for four at 8.</Her>
+            <Me d={0}>Total my receipts, draft the invites and order the cake</Me>
+            <Task label="total receipts" d={350} />
+            <Task label="draft invites" d={550} />
+            <Task label="order the cake" d={750} doneAt={1900} />
+            <Her d={2900}>Cake ordered. Pickup Saturday at 10.</Her>
           </MockChat>
         </MockStage>
       </section>

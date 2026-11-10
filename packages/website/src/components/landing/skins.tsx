@@ -90,8 +90,8 @@ export function StellaSkin({ theme, backdrop }: { theme?: WindowThemeKey; backdr
         <p className={s.me}>Clean up my Downloads folder?</p>
         <p className={s.her}>Done. 214 files sorted into 9 folders, and 3.2 GB of old installers moved to the Bin.</p>
         <p className={s.stamp}>Today 7:42 PM</p>
-        <p className={s.me}>Find us a table for four on Friday around 8</p>
-        <p className={s.her}>Booked Lucia for 8pm Friday. It&apos;s in your calendar, and I let Sam and Priya know.</p>
+        <p className={s.me}>Total last month&apos;s receipts for my expense report</p>
+        <p className={s.her}>Done. 23 receipts, $1,486.20, in Expenses October.xlsx. Two had no date, so I flagged them.</p>
         <p className={s.me}>Perfect. Can you move my 9am to Monday?</p>
         <p className={s.her}>Done. Dr. Okafor confirmed Monday at 9.</p>
         <Composer />

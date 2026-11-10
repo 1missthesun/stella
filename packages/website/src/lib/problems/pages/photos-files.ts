@@ -113,7 +113,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. MetadataFixer is a paid app built for exactly this, and GPTH is free and open source. Stella is free with the ChatGPT or Claude plan you already have, and does the same matching. It also handles the next job, like sorting the photos by year or [tidying the Downloads folder](/how/pc-cleanup/organize-downloads-folder) they arrived in.",
       },
     ],
-    related: ["pc-cleanup/organize-downloads-folder", "pc-cleanup/c-drive-full-for-no-reason"],
+    related: ["pc-cleanup/organize-downloads-folder", "pc-cleanup/free-up-space-on-c-drive"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Google: Download your Google Photos data (Takeout)", href: "https://support.google.com/accounts/answer/3024190" },

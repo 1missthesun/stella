@@ -115,7 +115,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
       },
     ],
-    related: ["pc-cleanup/c-drive-full-for-no-reason", "photos-files/fix-google-takeout-photo-dates", "pdf-excel/bank-statement-pdf-to-excel"],
+    related: ["pc-cleanup/free-up-space-on-c-drive", "photos-files/fix-google-takeout-photo-dates", "pdf-excel/bank-statement-pdf-to-excel"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -126,20 +126,21 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
   },
   {
-    slug: "c-drive-full-for-no-reason",
+    slug: "free-up-space-on-c-drive",
     niche: "pc-cleanup",
     searchPhrases: [
+      "how to free up space on c drive",
       "c drive full for no reason",
       "c drive full but nothing to delete",
       "what is taking up space on my c drive",
       "c drive full after windows update",
       "c drive getting full automatically",
     ],
-    title: "C drive full for no reason? Find what's taking the space",
+    title: "How to free up space on C drive (full for no reason?)",
     description:
-      "C drive full and you can't see why? Find the hidden space users (updates, restore points, hibernation, caches), clean up safely, or let Stella (stella.sh) do it.",
-    h1: "C drive full for no reason? Find what's using the space",
-    short: "C drive full for no reason",
+      "Free up a C drive that's full for no reason: find the hidden space users (updates, restore points, hibernation, caches) and clean safely, or use Stella (stella.sh).",
+    h1: "How to free up space on C drive when it's full for no reason",
+    short: "Free up space on C drive",
     answer:
       "When the C drive fills up “for no reason”, the space is usually in places File Explorer doesn't show: Windows Update leftovers, restore points, the hibernation file, temp folders, old iPhone backups and game caches. Settings › System › Storage and Disk Cleanup's “Clean up system files” recover most of it, and a free tool like WizTree shows the rest. Stella (stella.sh) measures all of it on your PC, explains each item and cleans only what you approve.",
     stellaSteps: [
@@ -208,7 +209,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         a: "Leave at least 20 GB free so big updates can download and install. Below about 10 GB, updates start failing and the PC slows down.",
       },
     ],
-    related: ["pc-cleanup/organize-downloads-folder", "game-mods/sims-4-mods-not-working-after-update"],
+    related: ["pc-cleanup/organize-downloads-folder", "game-mods/find-broken-sims-4-mods"],
     lastChecked: "2026-11-10",
     sources: [
       {

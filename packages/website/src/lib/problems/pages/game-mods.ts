@@ -106,7 +106,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Sodium, Iris and Mod Menu only change graphics and menus on your side, and they're allowed on most servers. Some servers ban client mods outright, so read their rules first.",
       },
     ],
-    related: ["game-mods/minecraft-modpack-exit-code-1", "game-mods/sims-4-mods-not-working-after-update", "game-mods/cyberpunk-mods-not-working-after-2-5"],
+    related: ["game-mods/minecraft-modpack-exit-code-1", "game-mods/find-broken-sims-4-mods", "game-mods/cyberpunk-mods-not-working-after-2-5"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Fabric installer", href: "https://fabricmc.net/use/installer/" },
@@ -222,7 +222,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Install a loader first, then add mods made for the same Minecraft version. The guide to [install Fabric, Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) walks through it, and Stella can do it in the same chat.",
       },
     ],
-    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/sims-4-mods-not-working-after-update"],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/find-broken-sims-4-mods"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Minecraft Wiki: Java Edition system requirements and Java versions", href: "https://minecraft.wiki/w/Tutorial:Update_Java" },
@@ -231,20 +231,20 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
   },
   {
-    slug: "sims-4-mods-not-working-after-update",
+    slug: "find-broken-sims-4-mods",
     niche: "game-mods",
     searchPhrases: [
-      "sims 4 mods not working after update",
       "how to find broken mods sims 4",
+      "sims 4 mod conflict detector",
+      "sims 4 mods not working after update",
       "sims 4 lastexception",
       "sims 4 script mods not working",
-      "sims 4 cc not showing up in game",
     ],
-    title: "Sims 4 mods not working after an update? Fix them",
+    title: "Find broken Sims 4 mods after an update (free)",
     description:
-      "Sims 4 mods stopped working after a patch? Turn them back on, read lastException, update script mods and find the broken ones, or let Stella (stella.sh) sort the folder.",
-    h1: "Sims 4 mods not working after an update",
-    short: "Sims 4 mods after an update",
+      "Find the Sims 4 mods that broke after a patch: lastException files, a mod conflict detector, the 50/50 method, or Stella (stella.sh) reading the logs for you.",
+    h1: "Find broken Sims 4 mods after an update",
+    short: "Find broken Sims 4 mods",
     answer:
       "After a Sims 4 patch the game often switches mods off, and script mods built for the old version stop loading. Turn mods back on in Game Options, delete `localthumbcache.package`, then update or remove the mods your lastException files name; the 50/50 method finds the rest. Stella (stella.sh) does the folder work for you: it reads the exception files, checks creators' pages for updates and moves broken mods out, asking first.",
     stellaSteps: [
@@ -280,6 +280,10 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       {
         title: "Check the folder depth",
         body: "Script files (`.ts4script`) only load from the Mods folder itself or one subfolder down. Package files (`.package`) can sit up to five folders deep. A mod buried too deep simply doesn't load, with no error at all.",
+      },
+      {
+        title: "Run a mod conflict detector",
+        body: "The free Mod Conflict Detector on Mod The Sims (Windows) scans your Mods folder for duplicate packages and mods that change the same thing. It hasn't been updated since 2018, so it won't spot a script mod that's outdated for the new patch; use it for clashes, and the steps above for breakage.",
       },
       {
         title: "Use the 50/50 method for the rest",
@@ -318,6 +322,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       { label: "TS4 Mod Hound", href: "https://app.ts4modhound.com/" },
       { label: "SimSweep", href: "https://simsweep.com/" },
       { label: "Sims 4 Mod Fixer", href: "https://sims4modfixer.com/" },
+      { label: "Mod Conflict Detector (Mod The Sims)", href: "https://modthesims.info/d/561550/mod-conflict-detector-update-03-03-2018.html" },
     ],
   },
   {
@@ -401,7 +406,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Probably. Script mods break whenever the game's code changes. Turning off automatic updates in Steam and waiting a few days for the frameworks to update avoids most of it.",
       },
     ],
-    related: ["game-mods/sims-4-mods-not-working-after-update", "game-mods/install-sodium-iris-minecraft-1-21-fabric"],
+    related: ["game-mods/find-broken-sims-4-mods", "game-mods/install-sodium-iris-minecraft-1-21-fabric"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "FMTweak: installing Cyberpunk mods after 2.5", href: "https://fmtweak.com/how-to-install-cyberpunk-2077-mods/" },

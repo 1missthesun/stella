@@ -6,6 +6,7 @@ import {
   cancelAnimation,
   makeMutable,
   runOnJS,
+  useSharedValue,
   withSpring,
   type WithSpringConfig,
 } from "react-native-reanimated";
@@ -317,6 +318,7 @@ export function useDrawerOpenPan({
   held: boolean;
 }) {
   const { travel, endTravel } = useDrawerMetrics();
+  const downX = useSharedValue(0);
   return useMemo(() => {
     const owner = nextOwner++;
     const offset: number | [number, number] =
@@ -325,13 +327,18 @@ export function useDrawerOpenPan({
       .enabled((start || end) && !open && !held)
       .activeOffsetX(offset)
       .failOffsetY([-14, 14])
-      .onTouchesDown((_e, manager) => {
+      .onTouchesDown((e, manager) => {
+        const touch = e.changedTouches[0];
+        if (touch) downX.value = touch.absoluteX;
         if (dragOwner.value === owner) manager.end();
       })
       .onStart((e) => {
         let sign = drawerSign.value;
         if (drawerProgress.value <= 0.001) {
-          sign = e.translationX > 0 ? 1 : -1;
+          // Android's pan reports translation from where it activated, so
+          // it is 0 here; the direction comes from the touch-down point.
+          const moved = e.absoluteX - downX.value || e.translationX;
+          sign = moved > 0 ? 1 : -1;
           if (sign === 1 ? !start : !end) return;
         }
         grab(owner, sign, e, sign === 1 ? travel : endTravel);
@@ -339,7 +346,7 @@ export function useDrawerOpenPan({
       })
       .onUpdate((e) => track(owner, e))
       .onFinalize((e) => release(owner, e.velocityX));
-  }, [start, end, open, held, travel, endTravel]);
+  }, [start, end, open, held, travel, endTravel, downX]);
 }
 
 export function useDrawerClosePan(

@@ -23,6 +23,8 @@ import {
   type AgentControlExecutor,
   type AgentControlOutcome,
   type AgentControlResult,
+  type AgentMoveReason,
+  AGENT_MOVE_REASON_TEXT,
   type AgentThreadCalls,
   type AgentThreadControl,
   type AgentThreadSummary,
@@ -81,6 +83,8 @@ import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./a
 import { boundReportText, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
+import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
+import { relocatedAgentBrief } from "@stella/agent/stella/execution";
 import { AGENT_LOG_CLOUD_HOLDER, agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
 import { array, boolean, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -1357,7 +1361,12 @@ type HandoffResult = AgentThreadCalls["agentThreads.handoff"]["result"];
 
 type MoveFrom = { kind: "device"; deviceId: string } | { kind: "cloud" };
 
-type MoveInput = Omit<HandoffArgs, "fromDeviceId"> & { from: MoveFrom };
+type MoveInput = Omit<HandoffArgs, "fromDeviceId"> & {
+  from: MoveFrom;
+  notRunning?: "continue";
+  source?: string;
+  detail?: Record<string, unknown>;
+};
 
 const CLOUD_DESTINATION = "cloud";
 
@@ -1403,7 +1412,7 @@ const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffRe
   if (!holds) {
     throw new RpcError("CONFLICT", "This agent doesn't run where the move was asked from.", { reason: "not_holder" });
   }
-  if (!ACTIVE_STATUSES.has(thread.status)) {
+  if (!ACTIVE_STATUSES.has(thread.status) && args.notRunning !== "continue") {
     throw new RpcError("CONFLICT", `This agent is ${thread.status}, so it doesn't move.`, { reason: "thread_not_running" });
   }
   const fromLabel = args.from.kind === "device" ? (labels.get(args.from.deviceId) ?? args.from.deviceId) : "Stella's cloud";
@@ -1476,8 +1485,12 @@ const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffRe
     clientMsgId: args.handoffId,
     fingerprint,
     prompt: args.prompt,
-    source: args.from.kind === "device" ? `device:${args.from.deviceId}` : "cloud:agent",
-    detail: { executor: toCloud ? "cloud" : "device", moved: { from: fromKey, to: toCloud ? CLOUD_DESTINATION : args.targetDeviceId } },
+    source: args.source ?? (args.from.kind === "device" ? `device:${args.from.deviceId}` : "cloud:agent"),
+    detail: {
+      executor: toCloud ? "cloud" : "device",
+      moved: { from: fromKey, to: toCloud ? CLOUD_DESTINATION : args.targetDeviceId },
+      ...args.detail,
+    },
     sql: `UPDATE agent_threads SET attempt_generation = ?, status = 'running', result_json = NULL, error_message = NULL,
             origin_delivery_ack_at = NULL, updated_at = ? WHERE thread_id = ?`,
   });
@@ -1488,6 +1501,209 @@ const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffRe
 const handoffThread = async (ctx: OwnerContext, args: HandoffArgs): Promise<HandoffResult> => {
   const { fromDeviceId, ...rest } = args;
   return await moveThread(ctx, { ...rest, from: { kind: "device", deviceId: fromDeviceId } });
+};
+
+type MoveArgs = AgentThreadCalls["agentThreads.move"]["args"];
+type MoveResult = AgentThreadCalls["agentThreads.move"]["result"];
+type MoveFacts = Pick<MoveResult, "from" | "history" | "stoppedThere" | "cwd">;
+type MoveReceipt = MoveFacts & Pick<MoveResult, "where" | "to">;
+
+const MOVED_TURN_CANCEL_JOB = "agentThreads.cancelMovedTurn";
+
+const moveReplay = (ctx: OwnerContext, args: MoveArgs): MoveResult | null => {
+  const turn = ctx.db.one<TurnRow>("SELECT * FROM agent_turns WHERE client_msg_id = ?", args.moveId);
+  if (!turn) return null;
+  const event = ctx.db.one<{ detail: string | null }>(
+    "SELECT detail FROM agent_events WHERE turn_id = ? AND kind IN ('attempt_started', 'resumed') ORDER BY seq ASC LIMIT 1",
+    turn.turn_id,
+  );
+  const detail = event?.detail ? (JSON.parse(event.detail) as { outside?: MoveReceipt }) : undefined;
+  const thread = turn.thread_id ? readThread(ctx.db, turn.thread_id) : null;
+  if (!detail?.outside || !thread || thread.owner_generation !== args.ownerGeneration || thread.thread_id !== turn.thread_id) {
+    throw new RpcError("CONFLICT", "That request id was already used for a different agent request.");
+  }
+  return {
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    attemptGeneration: turn.attempt_generation ?? thread.attempt_generation,
+    threadUpdatedAt: turn.created_at,
+    status: "running",
+    ...detail.outside,
+  };
+};
+
+const unavailableBecause = (
+  device: DeviceDestination | undefined,
+  thread: ThreadRow,
+): AgentMoveReason | null => {
+  if (!device) return "gone";
+  if (!device.online) return "offline";
+  if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) return "declined";
+  if (device.availability && !device.availability.ready) return "not_ready";
+  if (thread.hold_reason !== null) return "usage_limit";
+  return null;
+};
+
+const executionForCloudMove = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  fallback: CloudExecutionSelection | undefined,
+): Promise<CloudExecutionSelection> => {
+  const candidates: CloudExecutionSelection[] = [];
+  if (thread.requested_model && fallback) {
+    try {
+      candidates.push(resolveCloudSpawnExecution(thread.requested_model, fallback));
+    } catch {
+      candidates.length = 0;
+    }
+  }
+  if (fallback) candidates.push(fallback);
+  const snapshot = candidates.some((execution) => execution.engine !== "stella") ? await ctx.host.snapshot() : null;
+  const usable = candidates.find((execution) => execution.engine === "stella" || snapshotAllowsExecution(snapshot!, execution));
+  if (usable) return usable;
+  if (candidates[0]) throw new RpcError("CONFLICT", executionUnavailableMessage(candidates[0]));
+  throw new RpcError("BAD_REQUEST", "A move to the cloud needs what the agent runs on there.");
+};
+
+const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveResult> => {
+  if (!CONTROL_REQUEST_ID_PATTERN.test(args.moveId)) {
+    throw new RpcError("BAD_REQUEST", "That move could not be sent. Try again.");
+  }
+  const replay = moveReplay(ctx, args);
+  if (replay) return replay;
+  await assertGeneration(ctx, args.ownerGeneration);
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "agentThreads.move",
+    { count: 30, windowMs: 10 * 60_000 },
+    "Too many moves. Wait a moment and try again.",
+  );
+  const requested = args.threadId.trim();
+  const thread = readConversationThread(ctx.db, args.conversationId, requested);
+  if (!thread || thread.owner_generation !== args.ownerGeneration || !conversationControls(thread, args)) {
+    throw new RpcError("NOT_FOUND", `No agent you started has the thread_id ${requested}.`, { reason: "move_target_not_found" });
+  }
+  if (args.requesterThreadId && !startedBy(ctx.db, thread, args.requesterThreadId)) {
+    throw new RpcError("FORBIDDEN", `${requested} is not an agent you started, so you can't move it.`, {
+      reason: "move_target_not_started_by_requester",
+    });
+  }
+  const executor = threadExecutor(thread);
+  if (executor.kind === "cloud" || executor.kind === "harness") {
+    throw new RpcError(
+      "CONFLICT",
+      `${requested} runs in Stella's cloud, which is always available, so nothing moved. To have it carry on somewhere else, ask it with send_message to move itself with switch_destination.`,
+      { reason: "move_from_cloud" },
+    );
+  }
+  if (executor.kind === "local" || !executor.deviceId) {
+    throw new RpcError(
+      "CONFLICT",
+      `${requested} runs inside Stella on the computer that started it and moves only from there, so nothing moved. Ask it with send_message to move itself with switch_destination.`,
+      { reason: "thread_local_to_device" },
+    );
+  }
+  const devices = await ctx.host.deviceDestinations();
+  const fromDeviceId = resolveCurrentDeviceId(ctx.db, executor.deviceId);
+  const presence = devices.find((device) => device.deviceId === fromDeviceId);
+  const name = presence?.label?.trim() || "its computer";
+  const why = unavailableBecause(presence, thread);
+  if (!why) {
+    throw new RpcError(
+      "CONFLICT",
+      `${name} is online and can carry ${requested} on itself, so nothing moved. To move it anyway, ask it with send_message to move itself with switch_destination; it saves its work first.`,
+      { reason: "device_online" },
+    );
+  }
+  const synced = ctx.db.one<{ entries: number; synced_at: number | null }>(
+    "SELECT COUNT(*) AS entries, MAX(created_at) AS synced_at FROM agent_log_records WHERE thread_id = ?",
+    thread.thread_id,
+  );
+  const cwd = ctx.db.one<{ cwd: string | null }>("SELECT cwd FROM agent_log_holders WHERE thread_id = ?", thread.thread_id)?.cwd;
+  const running = ctx.db.one<TurnRow>(
+    `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
+       AND status IN ('running', 'waiting_for_user') ORDER BY created_at DESC LIMIT 1`,
+    thread.thread_id,
+    thread.attempt_generation,
+  );
+  const facts: MoveFacts = {
+    from: { name, why, ...(presence?.lastSeenAt !== undefined ? { lastSeenAt: presence.lastSeenAt } : {}) },
+    history: { entries: synced?.entries ?? 0, ...(synced?.synced_at ? { syncedAt: synced.synced_at } : {}) },
+    stoppedThere: running !== null,
+    ...(cwd ? { cwd } : {}),
+  };
+  const toCloud = args.targetDeviceId.trim().toLowerCase() === CLOUD_DESTINATION;
+  const target = toCloud ? undefined : findDeviceDestination(devices, args.targetDeviceId.trim());
+  if (!toCloud && !target) {
+    throw new RpcError("NOT_FOUND", `No connected device has the id or name ${args.targetDeviceId.trim()}. Nothing moved.`, {
+      reason: "device_not_found",
+    });
+  }
+  const receipt: MoveReceipt = {
+    ...facts,
+    where: target ? `on ${target.label?.trim() || target.deviceId}` : "in Stella's cloud",
+    to: target ? { kind: "device", deviceId: target.deviceId } : { kind: "cloud" },
+  };
+  const execution = toCloud ? await executionForCloudMove(ctx, thread, args.execution) : undefined;
+  const moved = await moveThread(ctx, {
+    ownerGeneration: args.ownerGeneration,
+    handoffId: args.moveId,
+    threadId: thread.thread_id,
+    conversationId: args.conversationId,
+    targetDeviceId: target?.deviceId ?? CLOUD_DESTINATION,
+    prompt: relocatedAgentBrief({
+      from: name,
+      why: AGENT_MOVE_REASON_TEXT[why],
+      entries: facts.history.entries,
+      ...(facts.cwd ? { cwd: facts.cwd } : {}),
+      message: args.prompt,
+    }),
+    ...(execution ? { execution } : {}),
+    from: { kind: "device", deviceId: executor.deviceId },
+    notRunning: "continue",
+    source: `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`,
+    detail: { via: "agentThreads.move", requester: args.requesterThreadId ?? args.conversationId, outside: receipt },
+  });
+  supersedeHeldStops(ctx, thread.thread_id, args.moveId);
+  if (running) {
+    ctx.jobs.cancel(`dispatch:${running.turn_id}`);
+    ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", running.turn_id);
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId: thread.thread_id,
+        turnId: running.turn_id,
+        kind: endedKind,
+        outcome: "canceled",
+        source: `owner:move:${args.moveId}`,
+        detail: { movedTo: moved.where, why },
+        now: ctx.now,
+      },
+      () =>
+        ctx.db.run(
+          "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ? AND status IN ('running', 'waiting_for_user')",
+          ctx.now,
+          running.turn_id,
+        ),
+    );
+    ctx.jobs.schedule(
+      MOVED_TURN_CANCEL_JOB,
+      ctx.now,
+      { turnId: running.turn_id, cancelRequestId: args.moveId },
+      { id: `moved-cancel:${running.turn_id}` },
+    );
+  }
+  console.log(JSON.stringify({ event: "agent_thread_moved_from_outside", threadId: thread.thread_id, why, to: moved.where }));
+  return { ...moved, ...receipt };
+};
+
+const cancelMovedTurn = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const { turnId, cancelRequestId } = payload as { turnId?: unknown; cancelRequestId?: unknown };
+  if (typeof turnId !== "string" || typeof cancelRequestId !== "string") return;
+  const dispatchId = readTurn(ctx.db, turnId)?.dispatch_id;
+  if (!dispatchId) return;
+  await ctx.host.cancelDeviceAgentTurn({ dispatchId, cancelRequestId, reason: AGENT_STOP_WIRE_REASON });
 };
 
 
@@ -4156,6 +4372,16 @@ const cloudHandoffParser = object({
   model: optional(string({ max: 256 })),
   cwd: optional(string({ max: 4_096 })),
 });
+const moveParser = object({
+  ownerGeneration: generation,
+  moveId: id(),
+  conversationId: id(),
+  threadId: id(256),
+  targetDeviceId: id(256),
+  prompt: string({ max: AGENT_PROMPT_MAX_CHARS }),
+  requesterThreadId: optional(id(256)),
+  execution: optional(executionParser),
+});
 const origin = { originDeviceId: id(256), originConversationId: id(256) };
 const senderParser = object({ threadId: id(256), label: string({ max: 2_000 }) });
 const messageParser = object({
@@ -4418,6 +4644,11 @@ export const agentThreadsDomain = {
       }),
       handler: handoffThread,
     },
+    "agentThreads.move": {
+      scope: "owner",
+      parse: moveParser,
+      handler: moveFromOutside,
+    },
     "agentThreads.cancel": {
       scope: "owner",
       parse: object({
@@ -4597,6 +4828,7 @@ export const agentThreadsDomain = {
         })(raw),
       ),
     "agentThreads.message": async (ctx, raw) => await messageAgent(ctx, messageParser(raw)),
+    "agentThreads.move": async (ctx, raw) => await moveFromOutside(ctx, moveParser(raw)),
     "agentThreads.stop": async (ctx, raw) => await stopAgent(ctx, stopParser(raw)),
     "agentThreads.pause": async (ctx, raw) => await legacyPauseAgent(ctx, pauseParser(raw)),
     "agentThreads.flushDeviceMessages": flushDeviceCommands,
@@ -4657,6 +4889,10 @@ export const agentThreadsDomain = {
     [COMMAND_JOB]: {
       maxAttempts: 3,
       run: async (ctx, payload) => await runCommand(ctx, payload as { messageId?: unknown }),
+    },
+    [MOVED_TURN_CANCEL_JOB]: {
+      maxAttempts: 20,
+      run: async (ctx, payload) => await cancelMovedTurn(ctx, payload),
     },
     [LIVENESS_JOB]: {
       maxAttempts: 20,

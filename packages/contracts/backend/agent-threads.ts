@@ -7,6 +7,7 @@ import type {
   AgentMessageSender,
 } from "../agent-directory.js";
 import { agentAttemptOutcomeOf, type AgentAttemptOutcome, type AgentStatus } from "../agent-status.js";
+import { deviceLastSeenText } from "../device-offline.js";
 
 export type AgentMessageDelivery = {
   outcome: "steered" | "resumed" | "queued" | "held";
@@ -54,6 +55,36 @@ export const agentStopText = (raw: AgentStopResult): string => {
   ]
     .filter(Boolean)
     .join(" ");
+};
+
+export const AGENT_MOVE_REASON_TEXT: Record<AgentMoveReason, string> = {
+  offline: "is offline",
+  not_ready: "isn't ready to take work",
+  declined: "doesn't take work from other devices",
+  usage_limit: "hit a usage limit",
+  gone: "is no longer connected to Stella",
+};
+
+const utcMinute = (at: number): string => `${new Date(at).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+
+export const agentMoveText = (result: AgentMoveResult, now = Date.now()): string => {
+  const from = result.from.name;
+  const destination = result.to.kind === "cloud" ? "Stella's cloud" : result.where.replace(/^on /, "");
+  return [
+    `Moved ${result.threadId} ${result.where}, because ${from} ${AGENT_MOVE_REASON_TEXT[result.from.why]}${deviceLastSeenText(result.from.lastSeenAt, now)}. It continues there with your message as its instruction, and its report comes back to you as usual.`,
+    result.history.entries > 0
+      ? `Traveled: its conversation history as last synced to Stella's cloud (${result.history.entries} entries${result.history.syncedAt ? `, the last at ${utcMinute(result.history.syncedAt)}` : ""}).`
+      : "Traveled: none of its history. Nothing of it had synced to Stella's cloud, so it starts there from your message alone.",
+    `Did not travel: files only on ${from} (uncommitted work in its folder), processes it had running there, and any steps it took on ${from} after that last sync.`,
+    result.cwd
+      ? result.to.kind === "cloud"
+        ? `Its folder was ${result.cwd} on ${from}; Stella's cloud doesn't have it.`
+        : `Its folder was ${result.cwd} on ${from}; ${destination} may not have that path, and if it does, it holds that computer's own files.`
+      : "",
+    result.stoppedThere ? `Its run on ${from} is canceled, so ${from} won't carry it on when it comes back.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 };
 
 export type AgentControlCommand =
@@ -132,6 +163,18 @@ export type AgentThreadControl = {
 
 type Origin = { originDeviceId: string; originConversationId: string };
 
+/** Why a computer could not carry an agent on, so another place took it over. */
+export type AgentMoveReason = "offline" | "not_ready" | "declined" | "usage_limit" | "gone";
+
+export type AgentMoveResult = AgentThreadControl & {
+  where: string;
+  to: { kind: "cloud" } | { kind: "device"; deviceId: string };
+  from: { name: string; why: AgentMoveReason; lastSeenAt?: number };
+  history: { entries: number; syncedAt?: number };
+  stoppedThere: boolean;
+  cwd?: string;
+};
+
 export type AgentThreadCalls = {
   "agentThreads.spawnFromDesktop": {
     args: Origin & {
@@ -209,6 +252,19 @@ export type AgentThreadCalls = {
       execution?: CloudExecutionSelection;
     };
     result: AgentThreadControl & { where: string };
+  };
+  "agentThreads.move": {
+    args: {
+      ownerGeneration: string;
+      moveId: string;
+      conversationId: string;
+      threadId: string;
+      targetDeviceId: string;
+      prompt: string;
+      requesterThreadId?: string;
+      execution?: CloudExecutionSelection;
+    };
+    result: AgentMoveResult;
   };
   "agentThreads.cancel": {
     args: Origin & {

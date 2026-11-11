@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   edge: { width: FADE },
-  middle: { flex: 1, backgroundColor: SOLID },
+  middle: { flex: 1, marginHorizontal: -1, backgroundColor: SOLID },
   solid: {
     position: "absolute",
     left: 0,

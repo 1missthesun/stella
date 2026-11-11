@@ -58,7 +58,6 @@ export type ChatRowEnv = {
   latestUserMessageId: string | null;
   placingReplyId: string | null;
   activeMenuMessageId: string | null;
-  selectingMessageId: string | null;
   seenMessageIds: Set<string>;
   onActiveAssistantLayout: (event: LayoutChangeEvent) => void;
   onLatestUserLayout: (id: string, event: LayoutChangeEvent) => void;
@@ -97,8 +96,6 @@ export function createChatRowEnvStore(initial: ChatRowEnv): ChatRowEnvStore {
 type RowView = {
   timeHeader: number | undefined;
   menuActive: boolean;
-  isSelecting: boolean;
-  anySelecting: boolean;
   contextRef: ReplyRef | undefined;
   contextStatus: ReplyAgentStatus | undefined;
   receiptLabel: string | null;
@@ -148,8 +145,6 @@ const selectRowView = (
   return {
     timeHeader: env.timeHeaders.get(id),
     menuActive: id === env.activeMenuMessageId,
-    isSelecting: id === env.selectingMessageId,
-    anySelecting: env.selectingMessageId != null,
     contextRef,
     contextStatus:
       contextRef?.kind === "agent"
@@ -265,8 +260,6 @@ function ChatMessageListRow({
         styles={env.rowStyles}
         colors={env.colors}
         menuActive={view.menuActive}
-        isSelecting={view.isSelecting}
-        anySelecting={view.anySelecting}
         actions={env.actions}
         contextRef={view.contextRef}
         contextStatus={view.contextStatus}

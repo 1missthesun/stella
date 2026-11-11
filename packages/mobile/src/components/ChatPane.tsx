@@ -1,5 +1,6 @@
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { agentIdsOf, type AgentLabelRow } from "@stella/contracts/agent-labels";
+import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import {
   isPlacementThreadId,
   placementAliases,
@@ -23,7 +24,6 @@ import {
 import { useIsFocused } from "expo-router";
 import {
   Alert,
-  type GestureResponderEvent,
   Keyboard,
   LayoutChangeEvent,
   LayoutAnimation,
@@ -116,6 +116,7 @@ import {
 } from "./chat/ConversationSummary";
 import type { CatchUpLink } from "@stella/contracts/backend/catch-ups";
 import { CATCH_UP_ENABLED, CATCH_UP_MIN_NEW_MESSAGES } from "@stella/contracts/catch-up";
+import { selectableMarkdownText } from "../lib/selectable-message-text";
 import {
   type AnchorRect,
   type PlusMenuOption,
@@ -1436,15 +1437,6 @@ export function ChatPane({
   const [messageMenu, setMessageMenu] = useState<MessageMenuRequest | null>(
     null,
   );
-  const [selectingMessageId, setSelectingMessageId] = useState<string | null>(
-    null,
-  );
-  const startSelectingMessage = useCallback((id: string) => {
-    setSelectingMessageId(id);
-  }, []);
-  const stopSelectingMessage = useCallback(() => {
-    setSelectingMessageId(null);
-  }, []);
   const dismissMessageMenu = useCallback(() => {
     setMessageMenu(null);
   }, []);
@@ -1495,10 +1487,8 @@ export function ChatPane({
         id: "select",
         label: "Select",
         icon: "select",
-        onSelect: () => {
-          tapLight();
-          startSelectingMessage(message.id);
-        },
+        selectsText: true,
+        onSelect: tapLight,
       },
       {
         id: "share",
@@ -1513,32 +1503,17 @@ export function ChatPane({
         ? [speakAloudMenuAction(text, message.id)]
         : []),
     ];
-  }, [messageMenu, quoteMessage, startSelectingMessage]);
+  }, [messageMenu, quoteMessage]);
+  const messageMenuSelectableText = useMemo(() => {
+    if (!messageMenu) return "";
+    const { role, text } = messageMenu.message;
+    return role === "assistant"
+      ? selectableMarkdownText(presentAssistantText(text))
+      : text.trim();
+  }, [messageMenu]);
 
-  const selectingMessageIdRef = useRef<string | null>(null);
-  selectingMessageIdRef.current = selectingMessageId;
-  const viewportTouchRef = useRef<{ x: number; y: number; at: number } | null>(
-    null,
-  );
-  const handleViewportTouchStart = useCallback((e: GestureResponderEvent) => {
-    if (selectingMessageIdRef.current == null) return;
-    const { pageX, pageY } = e.nativeEvent;
-    viewportTouchRef.current = { x: pageX, y: pageY, at: Date.now() };
-  }, []);
-  const handleViewportTouchEnd = useCallback(
-    (e: GestureResponderEvent) => {
-      const start = viewportTouchRef.current;
-      viewportTouchRef.current = null;
-      if (!start || selectingMessageIdRef.current == null) return;
-      const { pageX, pageY } = e.nativeEvent;
-      const moved = Math.hypot(pageX - start.x, pageY - start.y);
-      if (moved < 8 && Date.now() - start.at < 350) stopSelectingMessage();
-    },
-    [stopSelectingMessage],
-  );
   const handleListScrollBeginDrag = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (selectingMessageIdRef.current != null) stopSelectingMessage();
       pendingSendNudgeRef.current = null;
       scroll.onScrollBeginDrag();
       historyPaging.beginDrag(conversationId);
@@ -1549,7 +1524,6 @@ export function ChatPane({
       historyPaging,
       requestHistoryNearPosition,
       scroll.onScrollBeginDrag,
-      stopSelectingMessage,
     ],
   );
   const handleListScrollEndDrag = useCallback(
@@ -1619,26 +1593,20 @@ export function ChatPane({
       onOpenArtifact,
       onOpenStellaFile,
       onOpenMessageMenu: setMessageMenu,
-      onEndSelecting: stopSelectingMessage,
-      onAskStella: quoteMessage,
       onOpenAgentActivity: onOpenActivity,
       onOpenReply: setReplyFocus,
     }),
     [
       onOpenArtifact,
       onOpenStellaFile,
-      stopSelectingMessage,
-      quoteMessage,
       onOpenActivity,
     ],
   );
   const menuCloneRowActions = useMemo<MessageRowActions>(
     () => ({
       onOpenMessageMenu: setMessageMenu,
-      onEndSelecting: stopSelectingMessage,
-      onAskStella: quoteMessage,
     }),
-    [stopSelectingMessage, quoteMessage],
+    [],
   );
   const rowEnv = useMemo<ChatRowEnv>(
     () => ({
@@ -1661,7 +1629,6 @@ export function ChatPane({
       latestUserMessageId,
       placingReplyId,
       activeMenuMessageId,
-      selectingMessageId,
       seenMessageIds: seenMessageIdsRef.current,
       onActiveAssistantLayout,
       onLatestUserLayout,
@@ -1684,7 +1651,6 @@ export function ChatPane({
       latestUserMessageId,
       placingReplyId,
       activeMenuMessageId,
-      selectingMessageId,
       onActiveAssistantLayout,
       onLatestUserLayout,
     ],
@@ -1850,12 +1816,11 @@ export function ChatPane({
   );
   const onComposerFocus = useCallback(() => {
     prewarmDictation();
-    if (selectingMessageIdRef.current != null) stopSelectingMessage();
     if (askActiveRef.current && !askCollapsedRef.current) {
       LayoutAnimation.configureNext(LAYOUT_SPRING);
       setAskCollapsed(true);
     }
-  }, [prewarmDictation, stopSelectingMessage]);
+  }, [prewarmDictation]);
   const interventionRoom =
     paneHeight > 0
       ? paneHeight - topInset - ASK_TOP_GAP - keyboardExtra
@@ -1925,8 +1890,6 @@ export function ChatPane({
       >
         <View
           style={styles.viewport}
-          onTouchStart={handleViewportTouchStart}
-          onTouchEnd={handleViewportTouchEnd}
         >
           {historyLoading ? (
             <View style={emptyStateStyle} />
@@ -2002,8 +1965,6 @@ export function ChatPane({
                   styles={rowStyles}
                   colors={colors}
                   menuActive={false}
-                  isSelecting={false}
-                  anySelecting={false}
                   actions={rowActions}
                   carriedQuotes={quoteCarry.carried.get(item.id)}
                   quotesForwarded={quoteCarry.forwarded.has(item.id)}
@@ -2177,14 +2138,14 @@ export function ChatPane({
                 styles={rowStyles}
                 colors={colors}
                 menuActive={false}
-                isSelecting={false}
-                anySelecting={false}
                 actions={menuCloneRowActions}
                 menuClone
               />
             }
+            selectableText={messageMenuSelectableText}
             actions={messageMenuActions}
             colors={colors}
+            onReplyWithText={quoteMessage}
             onDismiss={dismissMessageMenu}
           />
         ) : null}

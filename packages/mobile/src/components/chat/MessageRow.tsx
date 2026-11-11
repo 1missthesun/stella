@@ -23,7 +23,6 @@ import {
 } from "react-native";
 import { Text } from "../Text";
 import { Image } from "expo-image";
-import { extractPlainText } from "react-native-nitro-markdown";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { driveLinkPath, driveLinkTarget } from "@stella/contracts/cloud-world-paths";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
@@ -39,7 +38,6 @@ import {
 } from "../ReplyPreview";
 import { Icon } from "../Icon";
 import { AssistantMarkdown } from "../AssistantMarkdown";
-import { AssistantTextSelection } from "../AssistantTextSelection";
 import { MESSAGE_PRESS_SCALE } from "../MessageContextMenu";
 import { MessageEvidenceStrip } from "../evidence/MessageEvidenceStrip";
 import { AppPreviewCard } from "../AppPreviewCard";
@@ -105,8 +103,6 @@ export type MessageRowActions = {
   ) => void;
   onOpenStellaFile?: (path: string, gallery?: readonly string[]) => void;
   onOpenMessageMenu: (request: MessageMenuRequest) => void;
-  onEndSelecting: () => void;
-  onAskStella: (text: string) => void;
   onOpenAgentActivity?: () => void;
   onOpenReply?: (ref: ReplyRef) => void;
 };
@@ -675,14 +671,10 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   colors,
   animate,
   menuActive,
-  isSelecting,
-  anySelecting,
   actions: {
     onOpenArtifact,
     onOpenStellaFile,
     onOpenMessageMenu,
-    onEndSelecting,
-    onAskStella,
     onOpenReply,
   },
   contextRef,
@@ -700,8 +692,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   colors: Colors;
   animate: boolean;
   menuActive: boolean;
-  isSelecting: boolean;
-  anySelecting: boolean;
   actions: MessageRowActions;
   contextRef?: ReplyRef;
   contextStatus?: ReplyAgentStatus;
@@ -993,15 +983,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
                 </Text>
               </View>
             ) : null}
-            {!hasBubbleBody ? null : isSelecting && showText ? (
-              <View style={styles.userBubble}>
-                <AssistantTextSelection
-                  text={item.text}
-                  colors={{ ...colors, text: colors.userBubbleText }}
-                  onDismiss={onEndSelecting}
-                />
-              </View>
-            ) : (
+            {!hasBubbleBody ? null : (
               <View
                 ref={bubbleRef}
                 collapsable={false}
@@ -1015,7 +997,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
                     onLongPress={openMenu}
                     onPressIn={pressIn}
                     onPressOut={pressOut}
-                    onPress={anySelecting ? onEndSelecting : undefined}
                     delayLongPress={MESSAGE_LONG_PRESS_MS}
                     accessibilityHint="Long press for message actions"
                     style={styles.userBubble}
@@ -1171,16 +1152,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         </View>
       ))}
       {item.scheduleNotice ? <ScheduleNoticeCard card={item.scheduleNotice} colors={colors} /> : null}
-      {hasText && isSelecting ? (
-        <View style={[styles.assistantBubble, styles.assistantSelectBubble]}>
-          <AssistantTextSelection
-            text={extractPlainText(item.text).trim()}
-            colors={{ ...colors, text: colors.assistantBubbleText }}
-            onAskStella={onAskStella}
-            onDismiss={onEndSelecting}
-          />
-        </View>
-      ) : hasText ? (
+      {hasText ? (
         <View
           ref={bubbleRef}
           collapsable={false}
@@ -1196,7 +1168,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
               onLongPress={openMenu}
               onPressIn={pressIn}
               onPressOut={pressOut}
-              onPress={anySelecting ? onEndSelecting : undefined}
               delayLongPress={MESSAGE_LONG_PRESS_MS}
               accessibilityHint="Long press for message actions"
             >
@@ -1377,10 +1348,6 @@ export const makeMessageRowStyles = (colors: Colors) =>
     },
     assistantBubbleSlot: { alignSelf: "flex-start", maxWidth: "100%" },
     assistantBubbleSlotFill: { alignSelf: "stretch" },
-    assistantSelectBubble: {
-      backgroundColor: colors.assistantBubbleFillBottom,
-      paddingBottom: 10,
-    },
     assistantBlockBubble: { alignSelf: "stretch" },
     scheduleReceipt: {
       color: colors.text,

@@ -9,8 +9,10 @@ import {
   type AgentControlCommand,
   type AgentControlResult,
   type AgentMessageDelivery,
+  type AgentMoveResult,
   type AgentStopResult,
 } from "@stella/contracts/backend/agent-threads";
+import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 
 export const AGENT_MESSAGE_FRAMED_MAX_CHARS = AGENT_MESSAGE_MAX_CHARS + 1_024;
 
@@ -62,6 +64,23 @@ export const stopAgentThread = async (
     ownerGeneration: caller.ownerGeneration,
     ...input,
   })) as AgentStopResult;
+
+export const moveAgentThread = async (
+  caller: AgentMessagingCaller,
+  input: {
+    conversationId: string;
+    moveId: string;
+    threadId: string;
+    targetDeviceId: string;
+    prompt: string;
+    requesterThreadId?: string;
+    execution: CloudExecutionSelection;
+  },
+): Promise<AgentMoveResult> =>
+  (await caller.ownerInternal("agentThreads.move", {
+    ownerGeneration: caller.ownerGeneration,
+    ...input,
+  })) as AgentMoveResult;
 
 export const controlAgentThread = async (
   caller: AgentMessagingCaller,

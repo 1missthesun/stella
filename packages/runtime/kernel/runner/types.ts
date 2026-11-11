@@ -354,6 +354,9 @@ export type RunnerPublicApi = {
     handoff: (
       args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,
     ) => Promise<AgentThreadCalls["agentThreads.handoff"]["result"]>;
+    move: (
+      args: Omit<AgentThreadCalls["agentThreads.move"]["args"], "ownerGeneration" | "execution">,
+    ) => Promise<AgentThreadCalls["agentThreads.move"]["result"]>;
   };
   usageLimits: {
     note: (

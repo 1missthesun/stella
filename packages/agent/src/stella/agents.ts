@@ -34,7 +34,13 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import { agentStopText, type AgentMessageDelivery, type AgentStopResult } from "@stella/contracts/backend/agent-threads";
+import {
+  agentMoveText,
+  agentStopText,
+  type AgentMessageDelivery,
+  type AgentMoveResult,
+  type AgentStopResult,
+} from "@stella/contracts/backend/agent-threads";
 import type { AgentWorkspaceSize } from "@stella/contracts/turn-plane/turn-start";
 import {
   AGENT_STOPPED_REASON,
@@ -401,6 +407,10 @@ export type AgentDirectoryHost = {
     context: Context,
   ): Promise<AgentMessageDelivery | undefined>;
   stop?(args: { key: string; threadId: string; requesterThreadId?: string }, context: Context): Promise<AgentStopResult>;
+  move?(
+    args: { key: string; threadId: string; to: string; message: string; requesterThreadId?: string },
+    context: Context,
+  ): Promise<AgentMoveResult>;
 };
 
 const slug = (text: string): string =>
@@ -1475,14 +1485,18 @@ export function stellaAgents(host: StellaAgentsHost) {
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers or stops it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on.',
+      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers or stops it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on. With destination, an agent you started whose computer is offline or unavailable continues there instead, with its history.',
     parameters: Type.Object({
       thread_id: Type.String({ description: 'A thread_id from agent_status, or "stella".' }),
       message: Type.String({ description: "The message. To your own agent, only what is new." }),
+      destination: Type.Optional(
+        Type.String({ description: 'Optional: "cloud" or a device_id. The agent continues there, with this message as its instruction.' }),
+      ),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
       const threadId = args.thread_id.trim();
+      if (args.destination?.trim()) return await moveElsewhere(api, threadId, args.message, args.destination, context);
       const conversation = await host.directory?.conversationId(context).catch(() => undefined);
       if (threadId.toLowerCase() === STELLA_MESSAGE_TARGET || threadId === conversation) {
         return await messageStella(api, args.message, context);
@@ -1521,6 +1535,58 @@ export function stellaAgents(host: StellaAgentsHost) {
       return deliveredResult({ threadId, outcome: running ? "steered" : "resumed" });
     },
   });
+
+  const moveElsewhere = async (
+    api: ToolExecutionApi,
+    threadId: string,
+    message: string,
+    destination: string,
+    context: Context,
+  ) => {
+    assertMessageSize(message);
+    const conversation = await host.directory?.conversationId(context).catch(() => undefined);
+    if (threadId.toLowerCase() === STELLA_MESSAGE_TARGET || threadId === conversation) {
+      throw new Error("Only an agent you started moves; Stella doesn't.");
+    }
+    const target = parseSpawnDestination(destination);
+    if (target.kind === "here") throw new Error('destination is "cloud" or a device_id.');
+    const callKey = String(api.taskId);
+    const known = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.agents[threadId];
+    if (!known) throw new Error(`${threadId} is not an agent you started, so you can't move it. agent_status lists the ones you started.`);
+    if (!known.remote && !known.away) {
+      throw new Error(
+        `${threadId} runs on ${describePlacement(host.rootPlacement)} with you, so it can't be offline, and nothing moved. To have it carry on somewhere else, ask it with send_message to move itself with switch_destination.`,
+      );
+    }
+    const move = host.directory?.move;
+    if (!move) throw new Error("This conversation can't move agents; it is stored only on this computer.");
+    const self = await roleOf(api, api.conversationId, context);
+    const framed = formatAgentMessage(senderOf(self, conversation ?? STELLA_MESSAGE_TARGET), message, { starter: true });
+    const moved = await move(
+      {
+        key: `move:${callKey}`,
+        threadId,
+        to: target.kind === "cloud" ? AGENT_MOVE_CLOUD : target.deviceId,
+        message: [...(known.held ?? []), framed].join("\n\n"),
+        ...(self.agentType !== "orchestrator" && self.threadId ? { requesterThreadId: self.threadId } : {}),
+      },
+      context,
+    );
+    await api.commit(async (tx) => {
+      const state = await tx.doc(StellaAgentsDoc, api.conversationId);
+      if (state.calls[callKey]) return;
+      const agent = state.agents[threadId];
+      if (!agent) return;
+      agent.placement = moved.to.kind === "cloud" ? { kind: "cloud" } : { kind: "device", deviceId: moved.to.deviceId };
+      delete agent.engine;
+      delete agent.held;
+      delete agent.stopped;
+      delete agent.paused;
+      state.calls[callKey] = { threadId, reporter: -1 };
+      noteRemote(state, threadId, { kind: "messaged" });
+    }, context);
+    return { content: [{ type: "text" as const, text: agentMoveText(moved) }] };
+  };
 
   const expectRemoteReport = (
     on: { commit: Harness["commit"] },

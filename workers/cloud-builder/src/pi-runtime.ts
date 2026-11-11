@@ -93,7 +93,7 @@ import type {
   AgentDirectorySessionRow,
   AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
+import type { AgentMessageDelivery, AgentMoveResult, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import {
   STELLA_HARNESS_TOOL_NAMES,
   type StellaToolHost,
@@ -368,6 +368,10 @@ export type PiRuntimeOptions = {
       authority: PiAuthority,
       args: { controlRequestId: string; threadId: string; requesterThreadId?: string },
     ): Promise<AgentStopResult>;
+    move?(
+      authority: PiAuthority,
+      args: { moveId: string; threadId: string; targetDeviceId: string; prompt: string; requesterThreadId?: string },
+    ): Promise<AgentMoveResult>;
   };
   moveBrain?(authority: PiAuthority, host: Extract<PiBrainHost, { host: "device" }>, brief: string): Promise<void>;
   heartbeat(): void;
@@ -1191,6 +1195,20 @@ export class PiConversationRuntime {
           ...(requesterThreadId ? { requesterThreadId } : {}),
         });
       },
+      ...(threads.move
+        ? {
+            move: async ({ key, threadId, to, message, requesterThreadId }) => {
+              const { authority } = await this.#agentState();
+              return await threads.move!(authority, {
+                moveId: `pi-move:${authority.conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128),
+                threadId,
+                targetDeviceId: to,
+                prompt: message,
+                ...(requesterThreadId ? { requesterThreadId } : {}),
+              });
+            },
+          }
+        : {}),
     };
   }
 

@@ -402,6 +402,11 @@ export const piChatsFor = (
           if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to send Stella a note from an agent.");
           await runner.agentThreads.note(args);
         },
+        move: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to move agents to the cloud or your other computers.");
+          return await runner.agentThreads.move(args);
+        },
       },
       usageLimits: {
         note: async (args) => {

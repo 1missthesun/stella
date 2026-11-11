@@ -520,6 +520,21 @@ export const createStellaHostRunner = (
           "Stella's cloud did not answer within 20s, so the note may not have reached Stella. Put what it needs in your final report.",
         );
       },
+      move: async (args) =>
+        await withinAgentControlTimeout(
+          (async () => {
+            const execution =
+              args.targetDeviceId.trim().toLowerCase() === "cloud"
+                ? await context.piCloudAgentThreads.execution(undefined)
+                : undefined;
+            return await context.backend.require().call("agentThreads.move", {
+              ...args,
+              ...(execution ? { execution } : {}),
+              ownerGeneration: await context.cloudOwnerGeneration(),
+            });
+          })(),
+          "Stella's cloud did not answer within 20s, so the move may not have happened. Check agent_status before trying again.",
+        ),
       handoff: async (args) => {
         const execution =
           args.targetDeviceId === "cloud" ? await context.piCloudAgentThreads.execution(args.model) : undefined;

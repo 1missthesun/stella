@@ -176,6 +176,7 @@ const EXECUTION_CONTEXT_TTL_MS = 1_000;
 const PROVIDER_RETRY_MS = 5_000;
 const DIRECTORY_TIMEOUT_MS = 5_000;
 const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
+const AGENT_MOVE_TIMEOUT_MS = 25_000;
 const AGENT_REPORT_REQUEST_PREFIX = "agent-report:";
 const PROMPT_SCAN_PAGE = 200;
 // The cloud journal takes at most 256 rows and 4 MB per append.
@@ -231,6 +232,9 @@ export type DesktopChatsOptions = {
     message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
     stop(args: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string }): Promise<AgentStopResult>;
     note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string }): Promise<void>;
+    move?(
+      args: Omit<AgentThreadCalls["agentThreads.move"]["args"], "ownerGeneration" | "execution">,
+    ): Promise<AgentThreadCalls["agentThreads.move"]["result"]>;
   };
   agentStarted?(agent: {
     conversationId: string;
@@ -1166,6 +1170,25 @@ export function desktopChats(options: DesktopChatsOptions) {
           "Stella's cloud did not answer, so the stop may not have reached the agent. Check agent_status.",
         );
       },
+      ...(cloud?.move
+        ? {
+            move: async ({ key, threadId, to, message, requesterThreadId }) => {
+              const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${key}`).digest("hex").slice(0, 48);
+              return await within(
+                cloud.move!({
+                  conversationId,
+                  threadId,
+                  moveId: `pi-move:${id}`,
+                  targetDeviceId: to,
+                  prompt: message,
+                  ...(requesterThreadId ? { requesterThreadId } : {}),
+                }),
+                AGENT_MOVE_TIMEOUT_MS,
+                "Stella's cloud did not answer, so the move may not have happened. Check agent_status before trying again.",
+              );
+            },
+          }
+        : {}),
     };
   };
 

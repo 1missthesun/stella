@@ -2,11 +2,8 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -25,6 +22,7 @@ import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { fadeHex } from "../../theme/oklch";
 import { WaveformCard } from "./WaveformCard";
+import { SideScroller } from "../SideScroller";
 
 const ROW_GAP = 8;
 const MOUNT_MARGIN = 220;
@@ -147,20 +145,16 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
     [media],
   );
 
-  const onScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, layoutMeasurement } = event.nativeEvent;
-      const start = contentOffset.x - MOUNT_MARGIN;
-      const end = contentOffset.x + layoutMeasurement.width + MOUNT_MARGIN;
-      setRange((current) =>
-        Math.abs(current.start - start) < MOUNT_MARGIN / 2 &&
-        Math.abs(current.end - end) < MOUNT_MARGIN / 2
-          ? current
-          : { start, end },
-      );
-    },
-    [],
-  );
+  const onScrollX = useCallback((x: number, viewportWidth: number) => {
+    const start = x - MOUNT_MARGIN;
+    const end = x + viewportWidth + MOUNT_MARGIN;
+    setRange((current) =>
+      Math.abs(current.start - start) < MOUNT_MARGIN / 2 &&
+      Math.abs(current.end - end) < MOUNT_MARGIN / 2
+        ? current
+        : { start, end },
+    );
+  }, []);
 
   const [rowHeight, setRowHeight] = useState<number | null>(null);
   const onRowContentSize = useCallback((_width: number, height: number) => {
@@ -177,17 +171,12 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
   return (
     <View style={[styles.strip, style]}>
       {showMedia ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
-          alwaysBounceVertical={false}
-          directionalLockEnabled
+        <SideScroller
           style={rowHeight === null ? undefined : { height: rowHeight }}
           contentContainerStyle={styles.row}
           onContentSizeChange={onRowContentSize}
-          onScroll={onScroll}
-          scrollEventThrottle={96}
+          onScrollX={onScrollX}
+          scrollXStep={MOUNT_MARGIN / 4}
           accessibilityLabel="Attached media"
         >
           {media.map((card, index) => {
@@ -238,7 +227,9 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
             );
             const framed =
               card.kind === "audio" || !onOpen || !primary ? (
-                <View style={[styles.frame, { borderColor: colors.borderWeak }]}>
+                <View
+                  style={[styles.frame, { borderColor: colors.borderWeak }]}
+                >
                   {body}
                 </View>
               ) : (
@@ -250,7 +241,10 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
                   }
                   style={({ pressed }) => [
                     styles.frame,
-                    { borderColor: colors.borderWeak, opacity: pressed ? 0.78 : 1 },
+                    {
+                      borderColor: colors.borderWeak,
+                      opacity: pressed ? 0.78 : 1,
+                    },
                   ]}
                 >
                   {body}
@@ -271,7 +265,7 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
               </View>
             );
           })}
-        </ScrollView>
+        </SideScroller>
       ) : null}
       {showPills ? (
         <View style={[styles.pills, !showMedia && styles.pillsFirst]}>
@@ -298,7 +292,10 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
                   color={fadeHex(colors.assistantBubbleText, 0.8)}
                 />
                 <Text
-                  style={[styles.pillTitle, { color: colors.assistantBubbleText }]}
+                  style={[
+                    styles.pillTitle,
+                    { color: colors.assistantBubbleText },
+                  ]}
                   numberOfLines={1}
                   maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
                 >
@@ -328,7 +325,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
     marginTop: 5,
   },
-  frame: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  frame: {
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
   overflow: { fontFamily: fonts.sans.regular, fontSize: 11, marginTop: 6 },
   pending: { borderRadius: 14 },
   pill: {

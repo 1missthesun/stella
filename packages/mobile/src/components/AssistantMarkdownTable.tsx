@@ -1,7 +1,6 @@
 import { useMemo, useState, type ComponentType } from "react";
 import {
   Platform,
-  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
@@ -21,6 +20,7 @@ import type { Colors } from "../theme/colors";
 import { SelectableMarkdownText, nativeMarkdownSelectionAvailable } from "./SelectableMarkdownText";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
+import { SideScroller } from "./SideScroller";
 
 type AssistantMarkdownTableProps = {
   node: MarkdownNode;
@@ -107,16 +107,7 @@ export function AssistantMarkdownTable({
       style={styles.container}
       onLayout={(event) => setViewportWidth(event.nativeEvent.layout.width)}
     >
-      <ScrollView
-        horizontal
-        nestedScrollEnabled
-        directionalLockEnabled
-        bounces={false}
-        alwaysBounceHorizontal={false}
-        decelerationRate="normal"
-        showsHorizontalScrollIndicator
-        style={styles.scroller}
-      >
+      <SideScroller showsIndicator style={styles.scroller}>
         <View style={{ width: tableWidth }}>
           <View style={styles.headerRow}>
             {data.headers.map((cell, columnIndex) => (
@@ -177,7 +168,7 @@ export function AssistantMarkdownTable({
             </View>
           ))}
         </View>
-      </ScrollView>
+      </SideScroller>
     </View>
   );
 }
@@ -190,7 +181,6 @@ const makeStyles = (colors: Colors) =>
       width: "100%",
     },
     scroller: {
-      flexGrow: 0,
       width: "100%",
     },
     headerRow: {

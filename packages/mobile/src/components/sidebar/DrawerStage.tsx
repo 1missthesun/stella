@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import {
@@ -16,7 +17,11 @@ import {
   useWindowDimensions,
   type ScrollViewProps,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  Gesture,
+  GestureDetector,
+  type GestureType,
+} from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -153,6 +158,13 @@ export function DrawerStage({
     open,
     held,
   });
+  const [swipeToOpen, setSwipeToOpen] = useState<GestureType | null>(null);
+  useEffect(() => {
+    if (openPan.handlerTag <= 0) return;
+    setSwipeToOpen((current) =>
+      current?.handlerTag === openPan.handlerTag ? current : openPan,
+    );
+  }, [openPan]);
   const closePan = useDrawerClosePan(side);
   const catcher = useMemo(
     () =>
@@ -166,66 +178,79 @@ export function DrawerStage({
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: floor }]}>
-      <DrawerPanel side="start" open={open && side === "start"} live={live}>
-        {panel}
-      </DrawerPanel>
-      {end ? (
-        <DrawerPanel side="end" open={open && side === "end"} live={live}>
-          {end.panel}
+    <DrawerSwipe.Provider value={swipeToOpen}>
+      <View style={[styles.root, { backgroundColor: floor }]}>
+        <DrawerPanel side="start" open={open && side === "start"} live={live}>
+          {panel}
         </DrawerPanel>
-      ) : null}
+        {end ? (
+          <DrawerPanel side="end" open={open && side === "end"} live={live}>
+            {end.panel}
+          </DrawerPanel>
+        ) : null}
 
-      <GestureDetector gesture={openPan}>
-        <Animated.View
-          style={[styles.stage, { backgroundColor: floor }, stage]}
-          accessibilityElementsHidden={open}
-          importantForAccessibility={open ? "no-hide-descendants" : "auto"}
-        >
-          <Animated.View style={[styles.clip, clip]}>
-            {children}
-            {live ? (
-              <>
-                {BLUR ? (
-                  <AnimatedBlur
+        <GestureDetector gesture={openPan}>
+          <Animated.View
+            style={[styles.stage, { backgroundColor: floor }, stage]}
+            accessibilityElementsHidden={open}
+            importantForAccessibility={open ? "no-hide-descendants" : "auto"}
+          >
+            <Animated.View style={[styles.clip, clip]}>
+              {children}
+              {live ? (
+                <>
+                  {BLUR ? (
+                    <AnimatedBlur
+                      pointerEvents="none"
+                      tint={isDark ? "dark" : "light"}
+                      animatedProps={pageBlur}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : null}
+                  <Animated.View
                     pointerEvents="none"
-                    tint={isDark ? "dark" : "light"}
-                    animatedProps={pageBlur}
-                    style={StyleSheet.absoluteFill}
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { backgroundColor: floor },
+                      fade,
+                    ]}
                   />
-                ) : null}
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { backgroundColor: floor },
-                    fade,
-                  ]}
+                </>
+              ) : null}
+            </Animated.View>
+            {open ? (
+              <GestureDetector gesture={catcher}>
+                <View
+                  style={StyleSheet.absoluteFill}
+                  accessible={false}
+                  importantForAccessibility="no"
+                  testID="mobile-nav-close"
                 />
-              </>
+              </GestureDetector>
             ) : null}
           </Animated.View>
-          {open ? (
-            <GestureDetector gesture={catcher}>
-              <View
-                style={StyleSheet.absoluteFill}
-                accessible={false}
-                importantForAccessibility="no"
-                testID="mobile-nav-close"
-              />
-            </GestureDetector>
-          ) : null}
-        </Animated.View>
-      </GestureDetector>
+        </GestureDetector>
 
-      {live && side === "start" && enabled ? (
-        <FloatingChevron {...chevron} side="start" open={open} />
-      ) : null}
-      {live && side === "end" && end && endEnabled ? (
-        <FloatingChevron {...end.chevron} side="end" open={open} />
-      ) : null}
-    </View>
+        {live && side === "start" && enabled ? (
+          <FloatingChevron {...chevron} side="start" open={open} />
+        ) : null}
+        {live && side === "end" && end && endEnabled ? (
+          <FloatingChevron {...end.chevron} side="end" open={open} />
+        ) : null}
+      </View>
+    </DrawerSwipe.Provider>
   );
+}
+
+const DrawerSwipe = createContext<GestureType | null>(null);
+
+/**
+ * The page's swipe-to-open-a-sidebar gesture, once it is attached (its
+ * handler tag is what a blocking relation resolves to). Content that scrolls
+ * sideways makes this gesture wait for its own native scroll to fail.
+ */
+export function useDrawerSwipeGesture(): GestureType | null {
+  return useContext(DrawerSwipe);
 }
 
 function DrawerPanel({

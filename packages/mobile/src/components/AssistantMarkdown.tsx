@@ -1,10 +1,11 @@
 import { memo, useCallback, useMemo, type ReactNode } from "react";
-import { Alert, Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, Platform, StyleSheet, View } from "react-native";
 import {
   Markdown,
   List,
   ListItem,
   TaskListItem,
+  getTextContent,
   type MarkdownNode,
   type CustomRenderers,
   type CustomRendererProps,
@@ -21,6 +22,8 @@ import { fonts } from "../theme/fonts";
 import type { Colors } from "../theme/colors";
 import { SelectableMarkdownText, nativeMarkdownSelectionAvailable } from "./SelectableMarkdownText";
 import { AssistantMarkdownTable } from "./AssistantMarkdownTable";
+import { SideScroller } from "./SideScroller";
+import { Text } from "./Text";
 import { useT } from "../i18n";
 
 const BASE_FONT_SIZE = 17;
@@ -119,7 +122,8 @@ function buildNodeStyles(colors: Colors): NodeStyleOverrides {
       borderColor: codeBorder,
       borderWidth: 1,
       borderRadius: 8,
-      padding: 12,
+      overflow: "hidden",
+      paddingVertical: 12,
       marginVertical: 8,
     },
     blockquote: {
@@ -150,6 +154,18 @@ function buildNodeStyles(colors: Colors): NodeStyleOverrides {
 const containsImage = (node: MarkdownNode): boolean => node.type === "image" || Boolean(node.children?.some(containsImage));
 
 const PARSER_OPTIONS = { gfm: true, math: false, html: false } as const;
+const codeStyles = StyleSheet.create({
+  content: { paddingHorizontal: 12 },
+  selectable: { minWidth: 100 },
+  selectableText: { fontFamily: fonts.mono.regular, fontSize: 16 },
+  text: {
+    fontFamily: fonts.mono.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    ...(Platform.OS === "android" && { includeFontPadding: false }),
+  },
+});
+
 const containerStyle = StyleSheet.create({
   wrapper: { width: "100%" },
   hug: {},
@@ -245,16 +261,22 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
               textStyle={{ fontFamily: fonts.sans.semiBold, color: colors.textStrong, fontSize: [22, 20, 18, 17, 15, 14][(level ?? 1) - 1] }} />
           </View>
         ),
-        code_block: ({ node }: CustomRendererProps) => (
-          <View style={nodeStyles.code_block}>
-            <ScrollView horizontal bounces={false} showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: 100 }}>
-                <SelectableMarkdownText onAskStella={onAskStella} node={node} colors={colors} textStyle={{ fontFamily: fonts.mono.regular, fontSize: 16 }} />
-              </View>
-            </ScrollView>
-          </View>
-        ),
       } : {}),
+      code_block: ({ node }: CustomRendererProps) => (
+        <View style={nodeStyles.code_block}>
+          <SideScroller contentContainerStyle={codeStyles.content}>
+            {selectable && nativeMarkdownSelectionAvailable ? (
+              <View style={codeStyles.selectable}>
+                <SelectableMarkdownText onAskStella={onAskStella} node={node} colors={colors} textStyle={codeStyles.selectableText} />
+              </View>
+            ) : (
+              <Text style={[codeStyles.text, { color: colors.text }]} selectable>
+                {getTextContent(node)}
+              </Text>
+            )}
+          </SideScroller>
+        </View>
+      ),
       table: ({ node, Renderer }: CustomRendererProps) => (
         <AssistantMarkdownTable
           node={node}

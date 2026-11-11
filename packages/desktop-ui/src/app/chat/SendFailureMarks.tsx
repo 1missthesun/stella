@@ -3,6 +3,7 @@ import {
   useBrowserAttachmentUploads,
 } from "@/features/cloud/browser-chat-attachments";
 import { cloudSendRecovery } from "@/features/cloud/cloud-send-recovery";
+import { useEffect, useState } from "react";
 import "./send-failure-marks.css";
 
 export const isBrowserUploadId = (id: string | undefined): id is string =>
@@ -54,6 +55,47 @@ export function SendFailedMark({
       >
         Remove
       </button>
+    </div>
+  );
+}
+
+/** A just-sent message usually reaches the shared chat in well under this. */
+const PENDING_MARK_DELAY_MS = 3_000;
+
+const PENDING_COPY = {
+  sending: {
+    label: "Sending…",
+    title: "Saved on this computer. It goes to Stella as soon as she's back.",
+  },
+  unsynced: {
+    label: "Not synced yet",
+    title:
+      "Saved on this computer. It's added to this chat on your other devices once Stella reconnects.",
+  },
+} as const;
+
+export function SendPendingMark({
+  state,
+  sinceMs,
+}: {
+  state: "sending" | "unsynced";
+  sinceMs: number | null;
+}) {
+  const [shown, setShown] = useState(
+    () => sinceMs === null || Date.now() - sinceMs >= PENDING_MARK_DELAY_MS,
+  );
+  useEffect(() => {
+    if (shown) return;
+    const wait = PENDING_MARK_DELAY_MS - (Date.now() - (sinceMs ?? 0));
+    const timer = window.setTimeout(() => setShown(true), Math.max(0, wait));
+    return () => window.clearTimeout(timer);
+  }, [shown, sinceMs]);
+  if (!shown) return null;
+  const copy = PENDING_COPY[state];
+  return (
+    <div className="send-pending-mark" title={copy.title} role="status">
+      <span className="send-pending-mark__dot" aria-hidden="true" />
+      <span>{copy.label}</span>
     </div>
   );
 }

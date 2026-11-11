@@ -3,6 +3,7 @@ import { presentStellaProviderError } from "@/features/chat/streaming/stella-pro
 import { dismissClaudeLoginHeld, presentClaudeLoginHeld } from "@/features/claude/claude-login-notice";
 import { presentAllowanceConnectPlan } from "@/features/chat/connect-plan/connect-plan";
 import { showToast } from "@/ui/toast";
+import { desktopSendOutbox, runtimeUnavailable } from "./desktop-send-outbox";
 import {
   dismissUsageLimitCard,
   presentUsageLimitPaused,
@@ -224,9 +225,46 @@ export const submitPiChat = async (
   const chat = api();
   if (!chat) throw new Error("Stella's runtime is not available.");
   clearStaleNotices(conversationId);
-  const result = await chat.request({ op: "submit", conversationId, requestId, text, ...(send ? { send } : {}) });
-  return (result as Partial<PiChatPlacedResult> | undefined)?.placed;
+  const kept = desktopSendOutbox.keep({
+    conversationId,
+    requestId,
+    text,
+    ...(send ? { send } : {}),
+    createdAtMs: Date.now(),
+  });
+  if (kept && desktopSendOutbox.behind(conversationId, requestId)) {
+    void desktopSendOutbox.flush(conversationId);
+    return undefined;
+  }
+  desktopSendOutbox.claim(requestId);
+  try {
+    const result = await chat.request({ op: "submit", conversationId, requestId, text, ...(send ? { send } : {}) });
+    desktopSendOutbox.taken(requestId);
+    queueMicrotask(() => void desktopSendOutbox.flush(conversationId));
+    return (result as Partial<PiChatPlacedResult> | undefined)?.placed;
+  } catch (error) {
+    if (kept && runtimeUnavailable(error)) {
+      desktopSendOutbox.later();
+      return undefined;
+    }
+    desktopSendOutbox.taken(requestId);
+    throw error;
+  } finally {
+    desktopSendOutbox.release(requestId);
+  }
 };
+
+desktopSendOutbox.setDeliver(async (entry) => {
+  const chat = api();
+  if (!chat) throw new Error("Stella's runtime is not available.");
+  await chat.request({
+    op: "submit",
+    conversationId: entry.conversationId,
+    requestId: entry.requestId,
+    text: entry.text,
+    ...(entry.send ? { send: entry.send } : {}),
+  });
+});
 
 export const submitPiWelcome = async (conversationId: string, message: string): Promise<void> => {
   const chat = api();

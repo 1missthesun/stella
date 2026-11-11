@@ -39,6 +39,7 @@ import { MessageAttachments } from "@/app/chat/evidence/MessageAttachments";
 import {
   isBrowserUploadId,
   SendFailedMark,
+  SendPendingMark,
   UploadFailedMark,
 } from "@/app/chat/SendFailureMarks";
 import {
@@ -596,6 +597,11 @@ export const UserMessageRow = memo(
         )}
         {row.sendFailed ? (
           <SendFailedMark clientMsgId={row.id} reason={row.sendFailed} />
+        ) : row.sendPending ? (
+          <SendPendingMark
+            state={row.sendPending}
+            sinceMs={row.timestampMs ?? null}
+          />
         ) : null}
       </div>
     );

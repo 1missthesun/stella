@@ -343,6 +343,7 @@ const userRowEqual = (a: UserRowViewModel, b: UserRowViewModel): boolean =>
   (a.reactionAt ?? null) === (b.reactionAt ?? null) &&
   Boolean(a.hidden) === Boolean(b.hidden) &&
   (a.sendFailed ?? null) === (b.sendFailed ?? null) &&
+  (a.sendPending ?? null) === (b.sendPending ?? null) &&
   (a.spawnedThreadIds ?? []).join(" ") === (b.spawnedThreadIds ?? []).join(" ") &&
   (a.spawnedDescriptions ?? []).join("\u001f") === (b.spawnedDescriptions ?? []).join("\u001f") &&
   attachmentsEqual(a.attachments, b.attachments) &&

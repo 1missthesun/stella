@@ -201,7 +201,11 @@ export const piPendingRows = (args: {
       journaled.get(turn.entryId) ??
       (canonicalUsers.has(turn.userMessageId) ? { userMessageId: turn.userMessageId, settled: false } : undefined);
     if (!journal) {
-      messages.push(message);
+      messages.push(
+        message.type === "user_message"
+          ? { ...message, payload: { ...message.payload, sendPending: "unsynced" } }
+          : message,
+      );
       continue;
     }
     if (message.type === "user_message") continue;

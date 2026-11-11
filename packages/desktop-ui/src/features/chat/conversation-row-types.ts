@@ -33,6 +33,8 @@ export type UserRowViewModel = {
   attachments: Attachment[];
   /** Why a message from this device didn't send; the row offers retry. */
   sendFailed?: string;
+  /** Sent here but not in the shared chat yet: waiting for the runtime, or for the cloud. */
+  sendPending?: "sending" | "unsynced";
   channelEnvelope?: ChannelEnvelope;
   hidden?: boolean;
   spawnedThreadIds?: string[];

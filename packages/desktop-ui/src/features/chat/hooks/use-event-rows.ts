@@ -66,6 +66,14 @@ const sendFailureOf = (payload: unknown): string | undefined => {
   return typeof value === "string" && value ? value : undefined;
 };
 
+const sendPendingOf = (payload: unknown): "sending" | "unsynced" | undefined => {
+  const value =
+    payload && typeof payload === "object"
+      ? Reflect.get(payload, "sendPending")
+      : undefined;
+  return value === "sending" || value === "unsynced" ? value : undefined;
+};
+
 const getMessagePayload = (
   event?: EventRecord | MessageRecord,
 ): MessagePayload | null => {
@@ -699,7 +707,9 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           attachments: getAttachments(message),
           ...(sendFailureOf(message.payload)
             ? { sendFailed: sendFailureOf(message.payload)! }
-            : {}),
+            : sendPendingOf(message.payload)
+              ? { sendPending: sendPendingOf(message.payload)! }
+              : {}),
           ...(getChannelEnvelope(message)
             ? { channelEnvelope: getChannelEnvelope(message) }
             : {}),

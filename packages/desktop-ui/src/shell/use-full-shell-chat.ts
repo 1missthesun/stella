@@ -42,6 +42,7 @@ import { useTPlural } from "@/shared/i18n";
 import { useCloudChatBridge } from "@/features/cloud/use-cloud-chat-bridge";
 import { useHasUnsentBrowserAttachments } from "@/features/cloud/browser-chat-attachments";
 import { usePiChat } from "@/features/chat/pi/use-pi-chat";
+import { useDesktopSendOutbox } from "@/features/chat/pi/use-desktop-send-outbox";
 import { remoteTurnRunning } from "@/features/chat/pi/remote-turn-running";
 import {
   turnActivity,
@@ -342,9 +343,15 @@ export function useFullShellChat({
     [cloudChat.files, piAgentEvents, replyFiles],
   );
   const tasks = cloudChat.tasks;
+  const desktopOptimisticEvents = useDesktopSendOutbox({
+    conversationId: activeConversationId,
+    enabled: !cloudChat.isWebShell,
+    optimistic: localOptimisticEvents,
+    persisted: persistedMessages,
+  });
   const optimisticEvents = cloudChat.isWebShell
     ? cloudChat.optimisticEvents
-    : localOptimisticEvents;
+    : desktopOptimisticEvents;
   const runtimeStatusText = piChat.runtimeStatusText;
   const isCompacting = piChat.isCompacting;
   const latestCompletedTool = piChat.latestCompletedTool;

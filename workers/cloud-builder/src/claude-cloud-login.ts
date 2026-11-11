@@ -186,8 +186,10 @@ backup)
       jq -c --arg key "$(basename "$dir")" --argjson now "$(($(date +%s) * 1000))" '
         (.claudeAiOauth // {}) as $o
         | {key:$key, endsAt:($o.refreshTokenExpiresAt // null),
-           ended:(($o.refreshToken // "") == "" or $o.loginEnded != null
-             or (($o.refreshTokenExpiresAt // ($now + 1)) <= $now))}' "$dir/.credentials.json" 2>/dev/null
+           ended:($o.loginEnded != null
+             or (($o.refreshTokenExpiresAt // ($now + 1)) <= $now)
+             or (($o.refreshToken // "") == ""
+               and (($o.accessToken // "") == "" or ($o.expiresAt // 0) <= $now)))}' "$dir/.credentials.json" 2>/dev/null
     done | jq -cs . 2>/dev/null)
   rm -rf -- "$merged"
   code=$(curl -s -D "$headers" -o /dev/null -w '%{http_code}' --max-time 60 -T "$archive" "$URL")

@@ -33,11 +33,20 @@ export const readStoredClaudeLogin = (credentialsJson: string | null | undefined
     typeof oauth.refreshTokenExpiresAt === "number" && Number.isFinite(oauth.refreshTokenExpiresAt)
       ? oauth.refreshTokenExpiresAt
       : undefined;
+  const refreshes = typeof oauth.refreshToken === "string" && oauth.refreshToken.length > 0;
+  // A token from `claude setup-token` has no refresh token and lasts until
+  // its own expiry; a login Claude Code ended loses its refresh token too,
+  // and is told apart by its access token having run out.
+  const longLived =
+    !refreshes &&
+    expiresAt === undefined &&
+    typeof oauth.accessToken === "string" &&
+    oauth.accessToken.length > 0 &&
+    typeof oauth.expiresAt === "number" &&
+    oauth.expiresAt > now;
   const alive =
-    typeof oauth.refreshToken === "string" &&
-    oauth.refreshToken.length > 0 &&
     oauth.loginEnded === undefined &&
-    (expiresAt === undefined || expiresAt > now);
+    (longLived || (refreshes && (expiresAt === undefined || expiresAt > now)));
   return { present: true, alive, ...(expiresAt !== undefined ? { expiresAt } : {}) };
 };
 

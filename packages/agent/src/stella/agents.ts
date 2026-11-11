@@ -680,6 +680,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (carried === undefined) {
           await runtime.commit(async (tx) => {
             const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
+            if (agent && wasStopped(agent) && (reporter.input.report || reporter.input.note)) {
+              agent.held = [...(agent.held ?? []), message];
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            }
             const held = [...(agent?.held ?? [])];
             if (agent) {
               delete agent.held;

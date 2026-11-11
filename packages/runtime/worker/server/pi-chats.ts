@@ -610,24 +610,39 @@ export const resumePiChats = async (
   const chats = await piChatsFor(session, hostBus);
   const at = Date.now();
   const resumed = await chats.resumeActive();
-  await tellTasksOfStoppedShells(session, chats).catch((error: unknown) =>
-    console.warn("[pi-chat] telling tasks of stopped background commands failed", error),
-  );
-  if (resumed.length === 0) return;
-  // The note says how each task stands once the desktop has reconciled its
-  // placed tasks with the server (one stopped meanwhile stays stopped).
+  // After the desktop has reconciled its placed tasks with the server (one
+  // stopped meanwhile stays stopped) and its sign-in has reached the models:
+  // tasks hear which of their background commands stopped, and the note says
+  // how each task stands.
   void placementReconciled(RESTART_NOTE_WAIT_MS)
+    .then(() => signedIn(session, SIGN_IN_WAIT_MS))
     .then(() =>
-      chats.noteRestart(
-        resumed,
-        { name: os.hostname().trim().slice(0, 96) || "this computer", deviceId: session.config.deviceId },
-        at,
+      tellTasksOfStoppedShells(session, chats).catch((error: unknown) =>
+        console.warn("[pi-chat] telling tasks of stopped background commands failed", error),
       ),
+    )
+    .then(() =>
+      resumed.length === 0
+        ? undefined
+        : chats.noteRestart(
+            resumed,
+            { name: os.hostname().trim().slice(0, 96) || "this computer", deviceId: session.config.deviceId },
+            at,
+          ),
     )
     .catch((error: unknown) => console.warn("[pi-chat] restart note failed", error));
 };
 
 const RESTART_NOTE_WAIT_MS = 60_000;
+/** Stella's sign-in reaches the worker some time after a start (up to a minute or more). */
+const SIGN_IN_WAIT_MS = 10 * 60_000;
+
+const signedIn = async (session: OpenSession, maxMs: number): Promise<void> => {
+  const until = Date.now() + maxMs;
+  while (!session.runnerCell.get()?.getStellaSiteAuth() && Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+};
 
 /**
  * A command a task left running in the background is not restarted: running

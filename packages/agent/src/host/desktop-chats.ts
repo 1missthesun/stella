@@ -169,6 +169,12 @@ const LINKED_FILE_ENTRIES = 500;
 /** How long a turn waits for other devices' turns to be imported before it starts. */
 const JOURNAL_CATCH_UP_MS = 3_000;
 const IDLE_CHECK_MS = 30_000;
+/** How long a send waits for the models of tasks a restart left running (a model gone for good doesn't block the chat). */
+const MODELS_READY_WAIT_MS = 30_000;
+/** A task placed here (or resumed after a restart) waits this long for Stella's sign-in to reach its models. */
+const PLACED_MODELS_WAIT_MS = 120_000;
+const NOTE_APPEND_ATTEMPTS = 20;
+const NOTE_APPEND_RETRY_MS = 15_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
@@ -2112,10 +2118,19 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
+  /**
+   * Anything that submits to, stops or aborts in a chat's harness starts it,
+   * which also picks up the tasks a restart left running there: their models
+   * must be registered first, or their next step fails with no_model.
+   */
+  const modelsSettled = (chat: Chat, ms = MODELS_READY_WAIT_MS): Promise<void> =>
+    within(chat.modelsReady, ms, "models not ready").catch(() => undefined);
+
   const ready = async (conversationId: string): Promise<Chat> => {
     const chat = await open(conversationId);
     await chat.localLog?.importNow().catch((error: unknown) => options.report(error));
     await ensureModel((await chat.root.agent(context)).model);
+    await modelsSettled(chat);
     chat.refreshTools();
     await markActive(conversationId, true);
     return chat;
@@ -2341,6 +2356,10 @@ export function desktopChats(options: DesktopChatsOptions) {
         if (!("runsOn" in choice)) throw new Error(`"${model}" runs on Claude Code, not on Stella's own agents.`);
         runsOn = choice.runsOn;
       }
+      // Work placed here only comes while this computer is signed in to the
+      // account; just after a start, that sign-in may not have reached the
+      // models yet. Wait for it rather than fail the task.
+      await modelsSettled(await open(conversationId), PLACED_MODELS_WAIT_MS);
       const chat = await ready(conversationId);
       const engineModel = runsOn?.model ?? (await chat.root.agent(context)).model;
       if (onClaudeCode(engineModel)) {
@@ -2381,6 +2400,9 @@ export function desktopChats(options: DesktopChatsOptions) {
       .map((record) => ({ threadId: record.threadId, description: record.description }));
   };
 
+  /** Stops of tasks canceled while this computer was off, per chat, still waiting for its models. */
+  const stopsLanding = new Map<string, Set<Promise<unknown>>>();
+
   const cancelPlacedAgent = async (agentKey: string, runKey: string, stopped?: boolean): Promise<boolean> => {
     const placed = placedRuns.get(agentKey);
     if (placed) {
@@ -2399,7 +2421,15 @@ export function desktopChats(options: DesktopChatsOptions) {
         state?.calls[`placed:${agentKey}`]?.threadId ??
         Object.entries(state?.agents ?? {}).find(([, agent]) => agent.placedAs === agentKey)?.[0];
       if (!threadId || state?.agents[threadId]?.remote) continue;
-      const ended = await chat.stopAgent(threadId, context);
+      // However long its sign-in takes: until then nothing in this chat runs,
+      // and stopping first would start the other tasks without their models.
+      // The restart note waits for these stops to land.
+      const stop = chat.modelsReady
+        .catch(() => undefined)
+        .then(() => chat.stopAgent(threadId, context));
+      const pending = stopsLanding.get(conversationId) ?? new Set<Promise<unknown>>();
+      stopsLanding.set(conversationId, pending.add(stop));
+      const ended = await stop.finally(() => pending.delete(stop));
       for (const local of ended?.local ?? []) claudeCodeEngine?.abort(conversationId, { threadId: local });
       return true;
     }
@@ -2542,8 +2572,22 @@ export function desktopChats(options: DesktopChatsOptions) {
       for (const { conversationId, agents } of resumed) {
         try {
           const chat = await open(conversationId);
-          const now = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record]));
-          const text = restartNoteText(computer, at, agents.map((agent) => ({ ...agent, now: now.get(agent.threadId) })));
+          // Say how each task stands once the ones stopped meanwhile are stopped.
+          await chat.modelsReady.catch(() => undefined);
+          await Promise.allSettled([...(stopsLanding.get(conversationId) ?? [])]);
+          const records = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record]));
+          const doc = await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context);
+          // "Stayed stopped" only for a task someone stopped; one that ended
+          // short on its own (a failed step) couldn't continue.
+          const now = (threadId: string) => {
+            const record = records.get(threadId);
+            if (!record || record.status === "running") return record;
+            const agent = doc?.agents[threadId];
+            if (agent?.stopped || agent?.paused) return { status: "completed", stopped: true as const };
+            if (record.status === "completed" && !record.stopped) return record;
+            return { status: "error", error: record.error ?? "It ended without finishing after the restart." };
+          };
+          const text = restartNoteText(computer, at, agents.map((agent) => ({ ...agent, now: now(agent.threadId) })));
           const appendId = `restart-${at}-${createHash("sha256").update(`${conversationId}\0${computer.deviceId ?? computer.name}`).digest("hex").slice(0, 12)}`;
           const message = { role: "user" as const, content: [{ type: "text" as const, text }], timestamp: at };
           if (conversationId.startsWith("local_")) {
@@ -2563,7 +2607,16 @@ export function desktopChats(options: DesktopChatsOptions) {
           }
           const journal = options.journal?.(conversationId);
           if (!journal?.appendNote) continue;
-          await journal.appendNote({ appendId, payloadJson: JSON.stringify(message) });
+          // Just after a start, the cloud connection may still be on its way.
+          for (let attempt = 1; ; attempt += 1) {
+            try {
+              await journal.appendNote({ appendId, payloadJson: JSON.stringify(message) });
+              break;
+            } catch (error) {
+              if (attempt >= NOTE_APPEND_ATTEMPTS) throw error;
+              await new Promise((resolve) => setTimeout(resolve, NOTE_APPEND_RETRY_MS));
+            }
+          }
         } catch (error) {
           options.report(error);
         }
@@ -2575,6 +2628,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           return submit(request.conversationId, request.requestId, request.text);
         case "abort": {
           const chat = await open(request.conversationId);
+          await modelsSettled(chat);
           claudeCodeEngine?.abort(request.conversationId);
           await stopStella(chat.harness, chat.root, context);
           return { ok: true };

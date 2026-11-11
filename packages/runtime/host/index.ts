@@ -1082,6 +1082,13 @@ export class StellaRuntimeHost {
     try {
       await bridge.start();
       this.hostExecutionPlacementRetryAttempt = 0;
+      // Tasks placed here are resumed or ended now; the worker's restart note
+      // for Stella waits for this to say how each one stands.
+      void this.requestWorker(METHOD_NAMES.INTERNAL_WORKER_PLACEMENT_RECONCILED, undefined, {
+        ensureWorker: true,
+        recordActivity: false,
+        retryOnceOnDisconnect: false,
+      }).catch(() => undefined);
     } catch (error) {
       if (this.hostExecutionPlacementBridge === bridge) {
         this.hostExecutionPlacementBridge = null;

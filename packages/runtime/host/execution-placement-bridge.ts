@@ -66,6 +66,8 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MIN_TOKEN_REFRESH_DELAY_MS = 30_000;
 const HTTP_TIMEOUT_MS = 15_000;
 const CANCELLATION_RPC_TIMEOUT_MS = 60_000;
+const AGENT_RUN_ATTEMPTS = 4;
+const AGENT_RUN_RETRY_MS = 3_000;
 const DISPATCH_WATCH_POLL_MS = 750;
 const DEVICE_PRESENCE_SILENCE_MS = 3 * DEVICE_PRESENCE_PING_INTERVAL_MS + 2_000;
 
@@ -412,6 +414,19 @@ export class ExecutionPlacementBridge {
 
   private isLiveEpoch(epoch: number) {
     return this.started && !this.stopped && epoch === this.lifecycleEpoch;
+  }
+
+  /**
+   * A task's run is durable on this computer: a restart pauses it and the
+   * same dispatch resumes it (runExecution is idempotent per dispatch), so
+   * its row outlives the bridge instead of being canceled.
+   */
+  private resumable(row: ExecutionPlacementInboxRow | null | undefined) {
+    return (
+      row?.kind === "agent" &&
+      !row.cancelRpcPending &&
+      ["claimed", "accepted", "running"].includes(row.state)
+    );
   }
 
   private async ownerGateRequest(
@@ -1229,14 +1244,14 @@ export class ExecutionPlacementBridge {
 
     const now = this.now();
     for (const row of this.inbox.listAllUnfinished()) {
+      // A task keeps its dispatch across a restart: the runtime pauses it
+      // (its work is durable) and the next start resumes it from here.
+      if (row.kind === "agent" && !row.cancelRpcPending) continue;
       if (["claimed", "accepted", "running"].includes(row.state)) {
         this.inbox.stageCancellation(row.dispatchId, {
           outcome: "canceled",
           errorCode: "LOCAL_EXECUTION_BRIDGE_STOPPED",
-          errorMessage:
-            row.kind === "agent"
-              ? "Stella restarted on the computer running this task (for example to install an update) before it finished. Its work so far is kept there: message the task to continue it."
-              : "Stella restarted on the computer running this before it finished.",
+          errorMessage: "Stella restarted on the computer running this before it finished.",
           orphanOnAck:
             row.ownerGeneration !== this.ownerGeneration ||
             row.presenceSessionId !== this.presenceSessionId,
@@ -1252,7 +1267,13 @@ export class ExecutionPlacementBridge {
     );
     const cancellationsAcknowledged = cancellationResults.every(Boolean);
     if (cancellationsAcknowledged) {
-      await Promise.allSettled([...this.executionTasks.values()]);
+      // Tasks run on until the runtime pauses them; waiting here would hold
+      // the quit for as long as the task works.
+      await Promise.allSettled(
+        [...this.executionTasks.entries()]
+          .filter(([dispatchId]) => !this.resumable(this.inbox.get(dispatchId)))
+          .map(([, task]) => task),
+      );
     }
     await Promise.allSettled(this.leases.cancellationsInFlight());
 
@@ -1291,7 +1312,9 @@ export class ExecutionPlacementBridge {
       try {
         remote = await this.getDispatchStatus(row.dispatchId);
         remoteCanceled =
-          remote?.state === "cancel_pending" || remote?.state === "canceled";
+          remote?.state === "cancel_pending" ||
+          remote?.state === "canceled" ||
+          Boolean(remote?.cancelRequestId);
       } catch (error) {
         this.log(
           "warn",
@@ -1299,6 +1322,8 @@ export class ExecutionPlacementBridge {
           error,
         );
       }
+      // A task resumes (reconcileInbox), unless it was stopped meanwhile.
+      if (row.kind === "agent" && !remoteCanceled) continue;
       this.inbox.stageCancellation(row.dispatchId, {
         outcome: remoteCanceled ? "canceled" : "failed",
         ...(remoteCanceled
@@ -1428,6 +1453,13 @@ export class ExecutionPlacementBridge {
         );
         continue;
       }
+      if (
+        row.kind === "agent" &&
+        row.state === "running" &&
+        !this.executing.has(row.dispatchId)
+      ) {
+        await this.resumeAgentRow(row);
+      }
       try {
         await this.renew(row);
         this.leases.clearRenewalFailure(row.dispatchId);
@@ -1435,7 +1467,12 @@ export class ExecutionPlacementBridge {
         identityRefreshNeeded = true;
         const leaseLost = this.leases.noteRenewalFailure(row.dispatchId, now);
         this.log("warn", "Execution placement lease renewal failed.", error);
-        if (isOwnerLifecycleFenceError(error) || leaseLost) {
+        // A task outlives a lost connection: the server holds its dispatch
+        // for reconciliation, and the task reports once it reconnects.
+        if (
+          isOwnerLifecycleFenceError(error) ||
+          (leaseLost && row.kind !== "agent")
+        ) {
           await this.cancelForLostLease(row);
         }
       }
@@ -1450,6 +1487,30 @@ export class ExecutionPlacementBridge {
         ),
       );
     }
+  }
+
+  private async resumeAgentRow(row: ExecutionPlacementInboxRow) {
+    let remote: DispatchSummary | null = null;
+    try {
+      remote = await this.getDispatchStatus(row.dispatchId);
+    } catch (error) {
+      this.log("warn", "Execution placement task resume was deferred.", error);
+      return;
+    }
+    if (!remote || remote.placement === "cloud" || isTerminalState(remote.state)) {
+      this.inbox.stageCancellation(row.dispatchId, {
+        outcome: "canceled",
+        errorCode: !remote || remote.placement === "cloud"
+          ? "LOCAL_EXECUTION_NO_LONGER_OWNED"
+          : "LOCAL_EXECUTION_REMOTE_TERMINAL",
+        errorMessage: "The server no longer assigned this task to the desktop.",
+        orphanOnAck: true,
+        now: this.now(),
+      });
+      await this.retryCancellation(row.dispatchId);
+      return;
+    }
+    this.launchLocal(row, remote.cancelRequestId ? { ...remote, state: "cancel_pending" } : remote);
   }
 
   private async cancelForLostLease(row: ExecutionPlacementInboxRow) {
@@ -1790,10 +1851,14 @@ export class ExecutionPlacementBridge {
         }
         continue;
       }
-      if (remote.state === "cancel_pending") {
-        await this.launchLocal(row, remote);
+      // A dispatch stopped (or moved elsewhere) while this computer was away
+      // keeps its cancel request in reconciliation; it ends here, unrun.
+      if (remote.state === "cancel_pending" || remote.cancelRequestId) {
+        await this.launchLocal(row, { ...remote, state: "cancel_pending" });
       } else if (row.state === "terminal_pending") {
         void this.flushTerminal(row).catch(() => undefined);
+      } else if (row.state === "running" && row.kind === "agent") {
+        this.launchLocal(row, remote);
       } else if (row.state === "running") {
         this.inbox.stageCancellation(row.dispatchId, {
           outcome: "failed",
@@ -1859,6 +1924,7 @@ export class ExecutionPlacementBridge {
         remote = accepted;
         row = this.inbox.get(row.dispatchId)!;
         if (!this.isLiveEpoch(epoch)) {
+          if (this.resumable(row)) return;
           this.inbox.stageCancellation(row.dispatchId, {
             outcome: "canceled",
             errorCode: "LOCAL_EXECUTION_BRIDGE_STOPPED",
@@ -1889,6 +1955,7 @@ export class ExecutionPlacementBridge {
       void this.publishAvailability().catch(() => undefined);
       row = this.inbox.get(row.dispatchId)!;
       if (!this.isLiveEpoch(epoch)) {
+        if (this.resumable(row)) return;
         this.inbox.stageCancellation(row.dispatchId, {
           outcome: "canceled",
           errorCode: "LOCAL_EXECUTION_BRIDGE_STOPPED",
@@ -1918,11 +1985,8 @@ export class ExecutionPlacementBridge {
         );
         return;
       }
-      const result = await this.options.runExecution({
-        dispatch: remote,
-        payload,
-        ownerGeneration: row.ownerGeneration,
-      });
+      const result = await this.runLocally(row, remote, payload, epoch);
+      if (result === null) return;
       const cancellation = this.inbox.get(row.dispatchId);
       if (
         cancellation?.cancelRpcPending ||
@@ -1961,6 +2025,9 @@ export class ExecutionPlacementBridge {
       );
     } catch (error) {
       const current = this.inbox.get(row.dispatchId);
+      if (row.kind === "agent" && !this.isLiveEpoch(epoch) && this.resumable(current)) {
+        return;
+      }
       if (
         current?.state === "claimed" &&
         !current.cancelRpcPending &&
@@ -1991,6 +2058,43 @@ export class ExecutionPlacementBridge {
           now: this.now(),
         });
         await this.retryCancellation(row.dispatchId);
+      }
+    }
+  }
+
+  /**
+   * Runs the dispatch here. A task's run is idempotent per dispatch, so when
+   * the runtime goes away mid-run (restart, crash) it runs again and joins
+   * the same durable work; null means the bridge stopped and the next start
+   * resumes it, so nothing is settled now.
+   */
+  private async runLocally(
+    row: ExecutionPlacementInboxRow,
+    remote: DispatchSummary,
+    payload: Record<string, unknown>,
+    epoch: number,
+  ): Promise<ExecutionPlacementRunResult | null> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        const result = await this.options.runExecution({
+          dispatch: remote,
+          payload,
+          ownerGeneration: row.ownerGeneration,
+        });
+        if (row.kind === "agent" && !this.isLiveEpoch(epoch)) return null;
+        return result;
+      } catch (error) {
+        if (row.kind !== "agent") throw error;
+        if (!this.isLiveEpoch(epoch)) return null;
+        if (this.inbox.get(row.dispatchId)?.cancelRpcPending) throw error;
+        if (attempt >= AGENT_RUN_ATTEMPTS) throw error;
+        this.log(
+          "warn",
+          `Execution placement task ${row.dispatchId} lost its local run (attempt ${attempt}/${AGENT_RUN_ATTEMPTS}); resuming it.`,
+          error,
+        );
+        await new Promise((resolve) => setTimeout(resolve, AGENT_RUN_RETRY_MS * attempt));
+        if (!this.isLiveEpoch(epoch)) return null;
       }
     }
   }

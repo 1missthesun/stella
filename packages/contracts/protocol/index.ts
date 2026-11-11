@@ -102,6 +102,7 @@ export const METHOD_NAMES = {
     "internal.worker.cancelPlacementAutomation",
   INTERNAL_WORKER_RUN_BLOCKING_AGENT: "internal.worker.runBlockingAgent",
   INTERNAL_WORKER_CANCEL_BLOCKING_AGENT: "internal.worker.cancelBlockingAgent",
+  INTERNAL_WORKER_PLACEMENT_RECONCILED: "internal.worker.placementReconciled",
   INTERNAL_WORKER_STEER_BLOCKING_AGENT: "internal.worker.steerBlockingAgent",
   INTERNAL_WORKER_DELIVER_AGENT_MESSAGE: "internal.worker.deliverAgentMessage",
   INTERNAL_WORKER_STOP_LOCAL_AGENT: "internal.worker.stopLocalAgent",

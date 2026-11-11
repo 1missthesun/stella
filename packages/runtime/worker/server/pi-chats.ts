@@ -1,7 +1,7 @@
 import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PiChatRequest, PiChatUsageRequest } from "@stella/contracts/pi-chat";
@@ -267,7 +267,21 @@ export const closePiChats = async (session: OpenSession): Promise<void> => {
  * Quitting: seal the chats before anything is killed, so a command or engine stopped by the quit isn't recorded as the
  * task's outcome and the task resumes after the restart. `stop` kills the session's shells.
  */
+const pausedShellsFile = (session: OpenSession) =>
+  path.join(session.config.get().stellaDataDirPath, "agent", "stopped-shells.json");
+
 export const quitPiChats = async (session: OpenSession, stop: () => Promise<unknown> | undefined): Promise<void> => {
+  // Tasks resume after the restart, but the background commands they started
+  // die with the app; remember them so each task is told when it resumes.
+  try {
+    const shells = session.runnerCell.get()?.runningTaskShells() ?? [];
+    if (shells.length > 0) {
+      mkdirSync(path.dirname(pausedShellsFile(session)), { recursive: true });
+      writeFileSync(pausedShellsFile(session), JSON.stringify({ stoppedAt: Date.now(), shells }));
+    }
+  } catch (error) {
+    console.warn("[pi-chat] remembering stopped background commands failed", error);
+  }
   const chats = chatsBySession.get(session);
   chatsBySession.delete(session);
   loadedBySession.delete(session);
@@ -299,6 +313,7 @@ export const piChatsFor = (
   ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }, { modelRuntime }]) =>
     desktopChats({
       dataDir: session.config.get().stellaDataDirPath,
+      placementSettled: () => placementReconciled(RESTART_NOTE_WAIT_MS),
       deviceId: session.config.deviceId,
       workspace: os.homedir(),
       siteAuth: () => session.runnerCell.get()?.getStellaSiteAuth() ?? null,
@@ -592,7 +607,81 @@ export const resumePiChats = async (
   } catch {
     return;
   }
-  await (await piChatsFor(session, hostBus)).resumeActive();
+  const chats = await piChatsFor(session, hostBus);
+  const at = Date.now();
+  const resumed = await chats.resumeActive();
+  await tellTasksOfStoppedShells(session, chats).catch((error: unknown) =>
+    console.warn("[pi-chat] telling tasks of stopped background commands failed", error),
+  );
+  if (resumed.length === 0) return;
+  // The note says how each task stands once the desktop has reconciled its
+  // placed tasks with the server (one stopped meanwhile stays stopped).
+  void placementReconciled(RESTART_NOTE_WAIT_MS)
+    .then(() =>
+      chats.noteRestart(
+        resumed,
+        { name: os.hostname().trim().slice(0, 96) || "this computer", deviceId: session.config.deviceId },
+        at,
+      ),
+    )
+    .catch((error: unknown) => console.warn("[pi-chat] restart note failed", error));
+};
+
+const RESTART_NOTE_WAIT_MS = 60_000;
+
+/**
+ * A command a task left running in the background is not restarted: running
+ * it again could repeat what it already did. The task hears which ones
+ * stopped, with Stella's restart, and starts again what it still needs.
+ */
+const tellTasksOfStoppedShells = async (
+  session: OpenSession,
+  chats: Awaited<ReturnType<typeof piChatsFor>>,
+): Promise<void> => {
+  const file = pausedShellsFile(session);
+  if (!existsSync(file)) return;
+  const saved = JSON.parse(readFileSync(file, "utf8")) as {
+    stoppedAt?: number;
+    shells?: Array<{ sessionId: string; command: string; cwd: string; startedAt: number; agentId: string }>;
+  };
+  rmSync(file, { force: true });
+  const byAgent = new Map<string, NonNullable<typeof saved.shells>>();
+  for (const shell of saved.shells ?? []) byAgent.set(shell.agentId, [...(byAgent.get(shell.agentId) ?? []), shell]);
+  for (const [agentId, shells] of byAgent) {
+    const text = [
+      "Stella restarted on this computer (an update, restart or quit) while you were working; you have picked up where you were.",
+      "These background commands you had started were stopped by the restart and are not running now:",
+      ...shells.map((shell) => `- \`${shell.command}\` (cwd: ${shell.cwd}, session ${shell.sessionId})`),
+      "Start again any you still need; their earlier sessions and output are gone.",
+    ].join("\n");
+    await chats
+      .deliverAgentMessage(agentId, text, `restart-shells:${saved.stoppedAt ?? 0}:${agentId}`)
+      .catch((error: unknown) => console.warn("[pi-chat] telling a task of its stopped commands failed", error));
+  }
+};
+// One per worker process: the desktop's placement bridge reconciled the
+// tasks placed here since this worker started.
+const reconciled = { done: false, wake: new Set<() => void>() };
+
+/** The desktop reports that its placement bridge has reconciled the tasks placed here after a start. */
+export const markPlacementReconciled = (): void => {
+  reconciled.done = true;
+  for (const wake of reconciled.wake) wake();
+  reconciled.wake.clear();
+};
+
+const placementReconciled = (maxMs: number): Promise<void> => {
+  const state = reconciled;
+  if (state.done) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, maxMs);
+    function done() {
+      clearTimeout(timer);
+      state.wake.delete(done);
+      resolve();
+    }
+    state.wake.add(done);
+  });
 };
 
 const piAgentStanding = async (
@@ -761,7 +850,7 @@ export const cancelPiPlacedAgent = async (
 ): Promise<boolean> => {
   persistPiCancel(session, "agent", cancel.runKey, cancel.reason);
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
-  chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentStopReason(cancel.reason));
+  await chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentStopReason(cancel.reason));
   return true;
 };
 

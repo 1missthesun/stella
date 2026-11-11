@@ -145,7 +145,8 @@ import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import { desktopExecution, type DesktopBrain, type DesktopDevices, type DesktopExecution } from "./desktop-execution.ts";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import type { LiveProviderModel } from "@stella/contracts/provider-live-models";
-import { journalMirror, journalTurnGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
+import { journalMirror, journalTurnGate, placedTaskGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
+import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
@@ -184,8 +185,38 @@ const IMPORT_BATCH_ROWS = 200;
 const IMPORT_BATCH_BYTES = 3 * 1024 * 1024;
 const IMPORT_RECORD_MAX_BYTES = 1024 * 1024;
 
+export type ResumedTask = { threadId: string; description: string };
+export type ResumedChat = { conversationId: string; agents: ResumedTask[] };
+
+/** The hidden note a restart leaves for Stella: what was running on that computer and how it stands now. */
+export const restartNoteText = (
+  computer: { name: string; deviceId?: string },
+  at: number,
+  agents: ReadonlyArray<ResumedTask & { now?: { status: string; stopped?: true; error?: string } }>,
+): string => {
+  const where = computer.deviceId ? `${computer.name} (device_id: ${computer.deviceId})` : computer.name;
+  const line = (agent: ResumedTask) => `- ${agent.description} (thread_id: ${agent.threadId})`;
+  const continuing = agents.filter((agent) => !agent.now || agent.now.status === "running");
+  const finished = agents.filter((agent) => agent.now?.status === "completed" && !agent.now.stopped);
+  const stopped = agents.filter((agent) => agent.now?.stopped);
+  const failed = agents.filter((agent) => agent.now?.status === "error" && !agent.now.stopped);
+  return [
+    "[Computer restarted]",
+    `Stella restarted on ${where} at ${new Date(at).toISOString()} (an update, restart, quit or crash). The tasks below were running there and picked up where they were by themselves, with their context; a step that was mid-way when it stopped was either redone (when safe) or reported to the task as interrupted.`,
+    ...(continuing.length ? ["Continuing:", ...continuing.map(line)] : []),
+    ...(finished.length ? ["Resumed and since finished (their reports come as usual):", ...finished.map(line)] : []),
+    ...(stopped.length ? ["Stayed stopped (stopped while that computer was off):", ...stopped.map(line)] : []),
+    ...(failed.length
+      ? ["Could not continue:", ...failed.map((agent) => `${line(agent)}: ${agent.now?.error?.trim() || "it failed after the restart"}`)]
+      : []),
+    "This is for your awareness only: nothing needs doing and no reply is expected. Mention it to the user only if it matters to what they ask.",
+  ].join("\n");
+};
+
 export type DesktopChatsOptions = {
   dataDir: string;
+  /** Resolves once the desktop has reconciled the tasks placed here with the server after this start. */
+  placementSettled?(): Promise<void>;
   deviceId?: string;
   workspace: string;
   siteAuth(): { baseUrl: string; authToken: string } | null;
@@ -325,6 +356,8 @@ type Chat = {
   runPlacedAgent: OpenStellaHarness["runPlacedAgent"];
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
   mirror?: JournalMirror;
+  /** Resolves once the models of the work this chat had running are registered (and that work resumed). */
+  modelsReady: Promise<void>;
   journalAdvanced?(): void;
   localLog?: LocalLogMirror;
   execution: DesktopExecution;
@@ -1449,6 +1482,16 @@ export function desktopChats(options: DesktopChatsOptions) {
             ...(options.tools ? { tools: options.tools(conversationId) } : {}),
             extensions: [
               journalTurnGate(standing, () => resumedRun),
+              ...(options.placementSettled
+                ? [
+                    placedTaskGate(options.placementSettled, async (api, gateContext) => {
+                      const role = await api.snapshot(StellaAgentDoc, api.conversationId, gateContext);
+                      if (!role?.threadId || role.parentConversationId === undefined) return false;
+                      const parent = await api.snapshot(StellaAgentsDoc, role.parentConversationId as ConversationId, gateContext);
+                      return parent?.agents[role.threadId]?.placedAs !== undefined;
+                    }),
+                  ]
+                : []),
               ...(agentLog ? [agentLog.extension()] : []),
               ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : []),
             ],
@@ -1480,14 +1523,21 @@ export function desktopChats(options: DesktopChatsOptions) {
         if (rootModel && accountProviderOfRegistryId(rootModel.provider)) accountRefs.push(rootModel);
         else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) restoreOwnModel(rootModel);
         else aliases.add(aliasOf(rootModel));
-        if (aliases.size === 0 && accountRefs.length === 0) void harness.resume();
-        else
-          void Promise.all([
-            ...[...aliases].map((alias) => waitForProvider(alias)),
-            ...accountRefs.map((ref) => ensureModel(ref).catch((error: unknown) => options.report(error))),
-          ]).then(() => harness.resume());
+        // Work left running resumes once its models are registered. Anything
+        // that submits to the harness starts its scheduler too, so the journal
+        // import (which writes what was said elsewhere, a restart note among
+        // it) waits for the same point: earlier, a resumed task's next request
+        // finds no model and fails.
+        const modelsReady: Promise<void> =
+          aliases.size === 0 && accountRefs.length === 0
+            ? Promise.resolve()
+            : Promise.all([
+                ...[...aliases].map((alias) => waitForProvider(alias)),
+                ...accountRefs.map((ref) => ensureModel(ref).catch((error: unknown) => options.report(error))),
+              ]).then(() => undefined);
+        void modelsReady.then(() => harness.resume());
         const journal = options.journal?.(conversationId);
-        const mirror = journal
+        const ungatedMirror = journal
           ? await journalMirror({
               harness,
               root,
@@ -1508,6 +1558,9 @@ export function desktopChats(options: DesktopChatsOptions) {
               resumed,
               context,
             })
+          : undefined;
+        const mirror: JournalMirror | undefined = ungatedMirror
+          ? { ...ungatedMirror, importNow: () => modelsReady.then(() => ungatedMirror.importNow()) }
           : undefined;
         void (mirror ? mirror.standing : Promise.resolve(true)).then(settleStanding);
         void mirror?.importNow().catch((error: unknown) => options.report(error));
@@ -1585,6 +1638,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         opened = {
           harness,
           root,
+          modelsReady,
           safeguardStream,
           refreshTools,
           startAgent,
@@ -2317,10 +2371,38 @@ export function desktopChats(options: DesktopChatsOptions) {
     return await (await open(conversationId)).steerPlacedAgent(message, context);
   };
 
-  const cancelPlacedAgent = (agentKey: string, runKey: string, stopped?: boolean): boolean => {
+  /** Tasks this computer runs for the chat (its own and those placed here) that are working now. */
+  const tasksRunningHere = async (chat: Chat): Promise<ResumedTask[]> => {
+    const state = await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context);
+    const here = new Set(Object.entries(state?.agents ?? {}).filter(([, agent]) => !agent.remote).map(([threadId]) => threadId));
+    if (here.size === 0) return [];
+    return (await chat.agentRecords(context))
+      .filter((record) => here.has(record.threadId) && record.status === "running")
+      .map((record) => ({ threadId: record.threadId, description: record.description }));
+  };
+
+  const cancelPlacedAgent = async (agentKey: string, runKey: string, stopped?: boolean): Promise<boolean> => {
     const placed = placedRuns.get(agentKey);
-    if (placed?.runKey !== runKey) return false;
-    placed.cancel.abort(stopped ? PLACED_AGENT_STOPPED : undefined);
+    if (placed) {
+      if (placed.runKey !== runKey) return false;
+      placed.cancel.abort(stopped ? PLACED_AGENT_STOPPED : undefined);
+      return true;
+    }
+    // No run of it is live here: a restart paused it, and reopening its chat
+    // resumed its work on its own. A canceled dispatch must still end it.
+    const candidates = new Set([...(placedIn.has(agentKey) ? [placedIn.get(agentKey)!] : []), ...chats.keys(), ...(await activeSet())]);
+    for (const conversationId of candidates) {
+      const chat = await open(conversationId).catch(() => undefined);
+      if (!chat) continue;
+      const state = await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context).catch(() => undefined);
+      const threadId =
+        state?.calls[`placed:${agentKey}`]?.threadId ??
+        Object.entries(state?.agents ?? {}).find(([, agent]) => agent.placedAs === agentKey)?.[0];
+      if (!threadId || state?.agents[threadId]?.remote) continue;
+      const ended = await chat.stopAgent(threadId, context);
+      for (const local of ended?.local ?? []) claudeCodeEngine?.abort(conversationId, { threadId: local });
+      return true;
+    }
     return true;
   };
 
@@ -2431,9 +2513,60 @@ export function desktopChats(options: DesktopChatsOptions) {
       }
       return false;
     },
-    async resumeActive(): Promise<void> {
+    /**
+     * Reopens the chats that had work running when Stella last stopped, which
+     * resumes it, and says which tasks were running then (they are resuming).
+     */
+    async resumeActive(): Promise<ResumedChat[]> {
+      const resumed: ResumedChat[] = [];
       for (const conversationId of await activeSet()) {
-        await open(conversationId).catch((error: unknown) => options.report(error));
+        const chat = await open(conversationId).catch((error: unknown) => {
+          options.report(error);
+          return undefined;
+        });
+        if (!chat) continue;
+        const agents = await tasksRunningHere(chat).catch((error: unknown) => {
+          options.report(error);
+          return [];
+        });
+        if (agents.length > 0) resumed.push({ conversationId, agents });
+      }
+      return resumed;
+    },
+    /**
+     * Tells Stella, in one hidden note per chat, that this computer's Stella
+     * restarted and which of its tasks continued. The note runs no turn: she
+     * reads it with her next one, wherever she runs.
+     */
+    async noteRestart(resumed: readonly ResumedChat[], computer: { name: string; deviceId?: string }, at: number): Promise<void> {
+      for (const { conversationId, agents } of resumed) {
+        try {
+          const chat = await open(conversationId);
+          const now = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record]));
+          const text = restartNoteText(computer, at, agents.map((agent) => ({ ...agent, now: now.get(agent.threadId) })));
+          const appendId = `restart-${at}-${createHash("sha256").update(`${conversationId}\0${computer.deviceId ?? computer.name}`).digest("hex").slice(0, 12)}`;
+          const message = { role: "user" as const, content: [{ type: "text" as const, text }], timestamp: at };
+          if (conversationId.startsWith("local_")) {
+            await chat.modelsReady;
+            await chat.root.submit(
+              {
+                type: "write",
+                requestId: appendId,
+                entry: {
+                  kind: "pi.user",
+                  model: [{ ...message, content: [{ type: "text", text, stella: { hidden: true } } as TextContent] }],
+                },
+              },
+              context,
+            );
+            continue;
+          }
+          const journal = options.journal?.(conversationId);
+          if (!journal?.appendNote) continue;
+          await journal.appendNote({ appendId, payloadJson: JSON.stringify(message) });
+        } catch (error) {
+          options.report(error);
+        }
       }
     },
     async request(request: PiChatRequest): Promise<unknown> {

@@ -12,6 +12,8 @@ export {
   cleanupShellSessions,
   createShellState,
   listRunningShellSessionsOwnedBy,
+  listRunningTaskShells,
+  type RunningTaskShell,
   readShellExitSnapshot,
   shutdownManagedShells,
   waitForShellExit,

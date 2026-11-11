@@ -18,6 +18,7 @@ import {
 import * as HostBus from "../host-bus.js";
 import {
   cancelPiPlacedAgent,
+  markPlacementReconciled,
   cancelPiPlacement,
   piChatsFor,
   piDeliverAgentMessage,
@@ -214,6 +215,12 @@ export const runsHandlers: WorkerRpcHandlers = {
         piStopAgent(session, hostBus, threadId),
       );
       return { outcome: stopped === "not_found" ? "not_found" : "stopped" };
+    }),
+
+  [METHOD_NAMES.INTERNAL_WORKER_PLACEMENT_RECONCILED]: () =>
+    Effect.sync(() => {
+      markPlacementReconciled();
+      return { ok: true };
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_CANCEL_BLOCKING_AGENT]: (params) =>

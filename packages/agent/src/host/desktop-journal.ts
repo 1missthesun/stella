@@ -108,6 +108,8 @@ export type DesktopJournal = {
   finishOutcome?(localTurnId: string): { s: "pending" } | { s: "delivered" } | { s: "dead"; reason: string };
   tools?(update: { localTurnId: string; leaseToken: string; tools: JournalTool[] }): void;
   appendVoice(append: { appendId: string; role: "user" | "assistant"; payloadJson: string; hidden: boolean }): Promise<void>;
+  /** A hidden note for Stella that runs no turn; every place she runs reads it with her next turn. */
+  appendNote?(append: { appendId: string; payloadJson: string }): Promise<void>;
   appendHistory?(append: {
     appendId: string;
     records: Array<{ role: "user" | "assistant"; payloadJson: string }>;
@@ -240,6 +242,32 @@ export const journalTurnGate = (standing: Promise<boolean>, resumedRun: () => Ta
     hooks: [
       hook(GenerationTask, { beforeRequest: (_request, api, context) => proceed(api, context) }),
       hook(ToolTask, { beforeTool: (_call, api, context) => proceed(api, context) }),
+    ],
+  });
+};
+
+/**
+ * A task placed on this computer by another one resumes as soon as its chat
+ * reopens after a restart, before the desktop has asked the server whether it
+ * was stopped or moved meanwhile. Its tools wait for that answer (once per
+ * start), so a stopped task never takes another step here.
+ */
+export const placedTaskGate = (
+  settled: () => Promise<void>,
+  placed: (api: HookApi, context: Context) => Promise<boolean>,
+): Extension => {
+  let done = false;
+  return defineExtension({
+    name: "stella-placed-task-gate",
+    hooks: [
+      hook(ToolTask, {
+        beforeTool: async (_call, api, context) => {
+          if (done || api.conversationId === ROOT_CONVERSATION_ID) return undefined;
+          if (!(await placed(api, context))) return undefined;
+          await Promise.race([settled().then(() => (done = true)), abortOf(context.abortSignal)]);
+          return undefined;
+        },
+      }),
     ],
   });
 };

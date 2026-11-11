@@ -323,6 +323,14 @@ export const cloudJournalFor = (
         source: "import",
       });
     },
+    appendNote: async ({ appendId, payloadJson }) => {
+      await runner().cloudJournal.append({
+        conversationId,
+        appendId,
+        records: [{ kind: "message", role: "user", payloadJson, hidden: true }],
+        source: "note",
+      });
+    },
     appendVoice: async (said) => {
       await runner().cloudJournal.append({
         conversationId,

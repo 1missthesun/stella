@@ -196,6 +196,7 @@ export type RunnerContext = {
     listRunningShellSessionsOwnedBy: (
       access: import("../tools/shell.js").ShellSessionAccess,
     ) => string[];
+    listRunningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
     killAllShells: () => Promise<void>;
     killShell: (sessionId: string) => Promise<void> | void;
     shutdown: () => Promise<void>;
@@ -292,6 +293,8 @@ export type RunnerPublicApi = {
     import("@stella/contracts/execution-context").ExecutionContextSnapshot | undefined
   >;
   killAllShells: () => Promise<void>;
+  /** Background commands tasks started that are still running. */
+  runningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
   piTools: import("./pi-tools.js").RunnerPiTools;
   agentHealthCheck: () => AgentHealth;
   warmModelCatalog: () => Promise<void>;

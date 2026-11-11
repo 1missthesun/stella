@@ -25,6 +25,7 @@ import {
   buildAgentShellEnvironment,
   createShellState,
   listRunningShellSessionsOwnedBy,
+  listRunningTaskShells,
   readShellExitSnapshot,
   shutdownManagedShells,
   waitForShellExit,
@@ -674,6 +675,7 @@ export const createToolHost = ({
     },
     listRunningShellSessionsOwnedBy: (access: ShellSessionAccess) =>
       listRunningShellSessionsOwnedBy(shellState, access),
+    listRunningTaskShells: () => listRunningTaskShells(shellState),
     watchShellExit: (sessionId: string, listener: () => void) =>
       watchShellExit(shellState, sessionId, listener),
     readShellExitSnapshot: (sessionId: string) =>

@@ -347,6 +347,32 @@ export const listRunningShellSessionsOwnedBy = (
   return owned;
 };
 
+/** Background commands a task started that are still running (what a quit would stop). */
+export type RunningTaskShell = {
+  sessionId: string;
+  command: string;
+  cwd: string;
+  startedAt: number;
+  conversationId: string;
+  agentId: string;
+};
+
+export const listRunningTaskShells = (state: ShellState): RunningTaskShell[] => {
+  const running: RunningTaskShell[] = [];
+  for (const shell of state.shells.values()) {
+    if (!shell.running || !shell.owner?.agentId) continue;
+    running.push({
+      sessionId: shell.id,
+      command: shell.command,
+      cwd: shell.cwd,
+      startedAt: shell.startedAt,
+      conversationId: shell.owner.conversationId,
+      agentId: shell.owner.agentId,
+    });
+  }
+  return running;
+};
+
 export const setShellOwner = (
   record: Pick<ShellRecord, "id">,
   context?: ToolContext,

@@ -124,8 +124,8 @@ export type CloudJournalAppendRequest = {
   ownerGeneration?: string;
   appendId: string;
   records: CloudJournalAppendRecord[];
-  /** What the history is: a voice transcript (default) or local history imported once. */
-  source?: "voice" | "import";
+  /** What the history is: a voice transcript (default), local history imported once, or a hidden note for Stella. */
+  source?: "voice" | "import" | "note";
 };
 
 export type CloudTranscriptWriterOptions = {
@@ -233,7 +233,7 @@ type JournalAppendPayload = {
   deviceId: string;
   expectedOwnerGeneration: string;
   localTurnId: string;
-  source: "voice" | "import";
+  source: "voice" | "import" | "note";
   records: CloudJournalAppendRecord[];
 };
 
@@ -302,6 +302,14 @@ const journalOutboxId = (
   appendId: string,
 ): string =>
   `cloud-journal:${JSON.stringify([deviceId, conversationId, appendId])}`;
+
+const isJournalNote = (payloadJson: string): boolean => {
+  try {
+    return (JSON.parse(payloadJson) as { source?: unknown }).source === "note";
+  } catch {
+    return false;
+  }
+};
 
 const parseBeginAck = (value: unknown): CloudTranscriptBeginAck | null => {
   if (!value || typeof value !== "object") return null;
@@ -1384,7 +1392,11 @@ export const createCloudTranscriptWriter = (
             appendId: entry.appendId,
             reason: result.reason,
           });
-          deadConversations.set(entry.conversationId, entry.appendId);
+          // A hidden note stands alone (a backend without notes refuses it);
+          // only ordered appends hold back the ones queued after them.
+          if (!isJournalNote(entry.payloadJson)) {
+            deadConversations.set(entry.conversationId, entry.appendId);
+          }
           continue;
         }
         blockedConversations.add(entry.conversationId);

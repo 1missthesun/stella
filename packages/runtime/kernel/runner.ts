@@ -380,6 +380,7 @@ export const createStellaHostRunner = (
       context.state.authToken?.trim() ? pushedDevices(context.backend.client()) : undefined,
     loadExecutionContext: async () => await context.loadExecutionContext?.(),
     killAllShells: () => context.toolHost.killAllShells(),
+    runningTaskShells: () => context.toolHost.listRunningTaskShells(),
     piTools: createRunnerPiTools(context),
     agentHealthCheck,
     warmModelCatalog,

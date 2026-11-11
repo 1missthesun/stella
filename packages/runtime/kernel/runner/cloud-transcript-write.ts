@@ -1432,9 +1432,29 @@ export const createCloudTranscriptWriter = (
       if (stopped) {
         return Promise.reject(new Error("Cloud transcript writer is stopped."));
       }
+      const id = outboxId(
+        "begin",
+        options.deviceId,
+        request.conversationId,
+        request.localTurnId,
+      );
+      const stored = options.store.getCloudTranscriptOutbox(id);
+      if (stored?.deadLetteredAt != null) {
+        return Promise.reject(
+          new CloudTranscriptTurnRefusedError(
+            "The cloud transcript request was rejected as malformed.",
+            "dead_lettered",
+          ),
+        );
+      }
+      // A begin written before a restart is the same message: the next
+      // runtime sends that one instead of a fresh copy of it.
+      const adopted = stored?.kind === "begin" ? stored : undefined;
       let ownerGeneration: string;
       try {
-        ownerGeneration = normalizeOwnerGeneration(request.ownerGeneration);
+        ownerGeneration = normalizeOwnerGeneration(
+          adopted?.ownerGeneration ?? request.ownerGeneration,
+        );
       } catch (error) {
         return Promise.reject(error);
       }
@@ -1449,17 +1469,6 @@ export const createCloudTranscriptWriter = (
           ? { brain: options.brainLeases.claim(request.conversationId) }
           : {}),
       };
-      const id = outboxId(
-        "begin",
-        options.deviceId,
-        request.conversationId,
-        request.localTurnId,
-      );
-      const adopted = request.adoptExisting
-        ? options.store
-            .listCloudTranscriptOutbox()
-            .find((entry) => entry.id === id && entry.kind === "begin")
-        : undefined;
       if (request.adoptExisting && !adopted && !activeBegins.has(id)) {
         return Promise.reject(
           new CloudTranscriptTurnRefusedError(

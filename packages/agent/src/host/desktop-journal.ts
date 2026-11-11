@@ -205,6 +205,7 @@ const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "tool_executio
 const LEASE_SILENCE = "lease_renewal_silence";
 const FINISH_FAILED = "finish:";
 const CONFIRM_RETRY_MS = 10_000;
+const UNSENT_RETRY_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
 
 const REFUSED_STOP_WAIT_MS = 30_000;
 
@@ -295,6 +296,21 @@ export async function journalMirror(args: {
   let again = false;
   let stopped = false;
   const relayed = new Set<string>();
+  const unsent = new Map<string, { attempts: number; said: string }>();
+  let unsentRetry: ReturnType<typeof setTimeout> | undefined;
+
+  const retryUnsent = (localTurnId: string, error: unknown) => {
+    const said = error instanceof Error ? error.message : String(error);
+    const prior = unsent.get(localTurnId);
+    if (prior?.said !== said) report(error);
+    const attempts = (prior?.attempts ?? 0) + 1;
+    unsent.clear();
+    unsent.set(localTurnId, { attempts, said });
+    if (stopped) return;
+    clearTimeout(unsentRetry);
+    unsentRetry = setTimeout(sync, UNSENT_RETRY_MS[Math.min(attempts, UNSENT_RETRY_MS.length) - 1]);
+    unsentRetry.unref?.();
+  };
 
   const relayTyped = async (outgoing: RelayedMessage): Promise<void> => {
     const relay = journal.relay;
@@ -749,6 +765,7 @@ export async function journalMirror(args: {
                 : localTurnId;
               const typed = journaled.hidden ? undefined : relayedMessage(relayId, message as PiUserMessage);
               await apply([[localTurnId, { e: "begin" }]]);
+              let unreachable: unknown;
               const ack = await journal
                 .begin({
                   localTurnId,
@@ -761,6 +778,10 @@ export async function journalMirror(args: {
                   onLeaseLost: leaseLost(localTurnId),
                 })
                 .catch(async (error: unknown) => {
+                  if ((error as { refused?: unknown } | null)?.refused !== true) {
+                    unreachable = error;
+                    return undefined;
+                  }
                   report(error);
                   if ((error as { code?: unknown } | null)?.code === PI_BRAIN_ELSEWHERE_CODE) {
                     if (typed && journal.relay) {
@@ -778,6 +799,18 @@ export async function journalMirror(args: {
                   events.push([localTurnId, { e: "refused", reason: typeof reason === "string" ? reason : "begin_failed" }]);
                   return undefined;
                 });
+              if (unreachable !== undefined) {
+                // The cloud can't be asked yet (the runtime is still starting,
+                // signed out, offline): the prompt stays the next entry to
+                // mirror, here and after a restart, until it is journaled.
+                await apply(events.splice(0), (current) => {
+                  current.syncId = syncId;
+                  current.mirrored = mirrored;
+                });
+                retryUnsent(localTurnId, unreachable);
+                return;
+              }
+              unsent.delete(localTurnId);
               if (ack) {
                 events.push([localTurnId, { e: "begun", leaseToken: ack.leaseToken, ownerGeneration: ack.ownerGeneration, holder }]);
               }
@@ -877,6 +910,7 @@ export async function journalMirror(args: {
     sync,
     async stop() {
       stopped = true;
+      clearTimeout(unsentRetry);
       await stream.stop().catch(() => undefined);
     },
   };

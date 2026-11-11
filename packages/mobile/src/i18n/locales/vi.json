@@ -1916,19 +1916,7 @@
         "waiting": "Hãy đăng nhập xong trong trình duyệt, rồi quay lại đây.",
         "settledNone": "Chưa chọn AI nào",
         "settledNoneDesc": "Đăng nhập hoặc kết nối một gói bất cứ lúc nào để bắt đầu trò chuyện.",
-        "fineOwnPlan": "ChatGPT và Claude Code dùng gói đăng ký của chính bạn với OpenAI hoặc Anthropic. Đổi bất cứ lúc nào trong Cài đặt.",
-        "claudeInstall": {
-          "checking": "Đang chuẩn bị Claude Code…",
-          "downloading": "Đang tải Claude Code… {percent}%",
-          "downloadingNoTotal": "Đang tải Claude Code…",
-          "settingUp": "Đang thiết lập Claude Code…",
-          "why": "Stella dùng Claude Code của Anthropic để làm việc với gói Claude của bạn. Mất khoảng một phút.",
-          "offline": "Không kết nối được tới Anthropic để tải Claude Code. Hãy kiểm tra kết nối internet.",
-          "unavailable": "Anthropic không cung cấp Claude Code cho máy tính này hoặc ở khu vực của bạn.",
-          "failed": "Không cài được Claude Code.",
-          "retry": "Thử lại",
-          "manual": "Tự cài đặt"
-        }
+        "fineOwnPlan": "ChatGPT và Claude Code dùng gói đăng ký của chính bạn với OpenAI hoặc Anthropic. Đổi bất cứ lúc nào trong Cài đặt."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3443,5 +3431,21 @@
     "retrySend": "Thử gửi lại",
     "removeMessage": "Xóa tin nhắn",
     "failed": "Không thực hiện được."
+  },
+  "claudeInstall": {
+    "checking": "Đang chuẩn bị Claude Code…",
+    "downloading": "Đang tải Claude Code… {percent}%",
+    "downloadingNoTotal": "Đang tải Claude Code…",
+    "settingUp": "Đang thiết lập Claude Code…",
+    "why": "Stella dùng Claude Code của Anthropic để làm việc với gói Claude của bạn. Mất khoảng một phút.",
+    "offline": "Không kết nối được tới Anthropic để tải Claude Code. Hãy kiểm tra kết nối internet.",
+    "unavailable": "Anthropic không cung cấp Claude Code cho máy tính này hoặc ở khu vực của bạn.",
+    "failed": "Không cài được Claude Code.",
+    "retry": "Thử lại",
+    "manual": "Tự cài đặt",
+    "install": "Cài đặt Claude Code",
+    "ownPlan": "Claude Code chạy bằng gói đăng ký Claude Pro hoặc Max của chính bạn.",
+    "chatTitle": "Chưa cài Claude Code",
+    "chatDescription": "Cài đặt tại đây, rồi đăng nhập gói Claude của bạn và gửi lại tin nhắn."
   }
 }

@@ -10,6 +10,7 @@ import {
   type Capability,
 } from '@/global/billing/capabilities'
 import { i18nFallback } from '@/shared/i18n/I18nProvider'
+import { translateNow } from '@/shared/i18n/active-translator'
 import { showToast, type ToastOptions } from '@/ui/toast'
 import { planUsageDialog } from '@/global/billing/plan-usage-dialog-store'
 import { detectLlmRouteFailureKind } from "@stella/contracts/llm-route-failure"
@@ -164,6 +165,13 @@ export const resolveStellaProviderErrorToast = (
         duration: 10000,
       }
     }
+    case 'claude-code-not-installed':
+      return {
+        title: translateNow('claudeInstall.chatTitle'),
+        description: translateNow('claudeInstall.chatDescription'),
+        variant: 'error',
+        duration: 10000,
+      }
     case 'claude-code-usage-limit':
       return {
         title: 'Claude usage limit reached',
@@ -353,6 +361,7 @@ const COMPOSER_NOTICE_KIND_BY_ERROR: Partial<
   'sign-in-required': 'sign-in',
   'account-auth': 'sign-in',
   'claude-code-login': 'sign-in',
+  'claude-code-not-installed': 'sign-in',
   'claude-code-usage-limit': 'limit',
   billing: 'upgrade',
   'free-allowance-exhausted': 'upgrade',
@@ -403,7 +412,9 @@ export const presentStellaProviderError = (
       secondaryAction: toast.secondaryAction,
       ...(classification.kind === 'claude-code-login'
         ? { claudeSignIn: { email: claudeLoginEmailOf(classification.message) } }
-        : {}),
+        : classification.kind === 'claude-code-not-installed'
+          ? { claudeSignIn: {} }
+          : {}),
     },
     toast,
   )

@@ -1925,19 +1925,7 @@
         "waiting": "Oturum açmayı tarayıcında tamamla, sonra buraya dön.",
         "settledNone": "Henüz yapay zekâ seçilmedi",
         "settledNoneDesc": "Sohbete başlamak için istediğin zaman giriş yap ya da bir plan bağla.",
-        "fineOwnPlan": "ChatGPT ve Claude Code, OpenAI veya Anthropic'teki kendi aboneliğini kullanır. Bunu istediğin zaman Ayarlar'dan değiştirebilirsin.",
-        "claudeInstall": {
-          "checking": "Claude Code hazırlanıyor…",
-          "downloading": "Claude Code indiriliyor… %{percent}",
-          "downloadingNoTotal": "Claude Code indiriliyor…",
-          "settingUp": "Claude Code kuruluyor…",
-          "why": "Stella, Claude planınla çalışmak için Anthropic'in Claude Code uygulamasını kullanır. Yaklaşık bir dakika sürer.",
-          "offline": "Claude Code'u indirmek için Anthropic'e ulaşılamadı. İnternet bağlantını kontrol et.",
-          "unavailable": "Anthropic bu bilgisayar için veya bölgende Claude Code sunmuyor.",
-          "failed": "Claude Code kurulamadı.",
-          "retry": "Tekrar dene",
-          "manual": "Kendin kur"
-        }
+        "fineOwnPlan": "ChatGPT ve Claude Code, OpenAI veya Anthropic'teki kendi aboneliğini kullanır. Bunu istediğin zaman Ayarlar'dan değiştirebilirsin."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3465,5 +3453,21 @@
     "retrySend": "Göndermeyi yeniden dene",
     "removeMessage": "Mesajı kaldır",
     "failed": "Bu işe yaramadı."
+  },
+  "claudeInstall": {
+    "checking": "Claude Code hazırlanıyor…",
+    "downloading": "Claude Code indiriliyor… %{percent}",
+    "downloadingNoTotal": "Claude Code indiriliyor…",
+    "settingUp": "Claude Code kuruluyor…",
+    "why": "Stella, Claude planınla çalışmak için Anthropic'in Claude Code uygulamasını kullanır. Yaklaşık bir dakika sürer.",
+    "offline": "Claude Code'u indirmek için Anthropic'e ulaşılamadı. İnternet bağlantını kontrol et.",
+    "unavailable": "Anthropic bu bilgisayar için veya bölgende Claude Code sunmuyor.",
+    "failed": "Claude Code kurulamadı.",
+    "retry": "Tekrar dene",
+    "manual": "Kendin kur",
+    "install": "Claude Code'u kur",
+    "ownPlan": "Claude Code, kendi Claude Pro veya Max aboneliğinle çalışır.",
+    "chatTitle": "Claude Code yüklü değil",
+    "chatDescription": "Burada kur, ardından Claude planına giriş yap ve mesajını yeniden gönder."
   }
 }

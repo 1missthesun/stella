@@ -248,6 +248,8 @@ const markedError = (error: unknown): string => {
   const message = errorText(error);
   if (code === "CLAUDE_CODE_AUTH_REAUTH_REQUIRED") return `[claude-code/login-required] ${message}`;
   if (code === "CLAUDE_CODE_USAGE_LIMIT") return `[claude-code/usage-limit] ${message}`;
+  // The runtime couldn't find the claude executable on this computer.
+  if (/Claude Code CLI executable was not found/i.test(message)) return `[claude-code/not-installed] ${message}`;
   if (code === "CLAUDE_CODE_SAFEGUARD_BLOCK" || isSafeguardBlockText(message)) return markSafeguardBlock("claude-code", message);
   return message;
 };

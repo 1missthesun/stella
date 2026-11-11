@@ -1943,19 +1943,7 @@
         "waiting": "Dokończ logowanie w przeglądarce, a potem wróć tutaj.",
         "settledNone": "Nie wybrano jeszcze AI",
         "settledNoneDesc": "Zaloguj się lub połącz plan w dowolnej chwili, aby zacząć rozmowę.",
-        "fineOwnPlan": "ChatGPT i Claude Code korzystają z Twojej własnej subskrypcji w OpenAI lub Anthropic. Możesz to zmienić w dowolnej chwili w Ustawieniach.",
-        "claudeInstall": {
-          "checking": "Przygotowuję Claude Code…",
-          "downloading": "Pobieram Claude Code… {percent}%",
-          "downloadingNoTotal": "Pobieram Claude Code…",
-          "settingUp": "Konfiguruję Claude Code…",
-          "why": "Stella używa Claude Code od Anthropic, aby działać z Twoim planem Claude. Zajmie to około minuty.",
-          "offline": "Nie udało się połączyć z Anthropic, aby pobrać Claude Code. Sprawdź połączenie z internetem.",
-          "unavailable": "Anthropic nie oferuje Claude Code na ten komputer lub w Twoim regionie.",
-          "failed": "Claude Code się nie zainstalował.",
-          "retry": "Spróbuj ponownie",
-          "manual": "Zainstaluj samodzielnie"
-        }
+        "fineOwnPlan": "ChatGPT i Claude Code korzystają z Twojej własnej subskrypcji w OpenAI lub Anthropic. Możesz to zmienić w dowolnej chwili w Ustawieniach."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3505,5 +3493,21 @@
     "retrySend": "Spróbuj wysłać ponownie",
     "removeMessage": "Usuń wiadomość",
     "failed": "To się nie udało."
+  },
+  "claudeInstall": {
+    "checking": "Przygotowuję Claude Code…",
+    "downloading": "Pobieram Claude Code… {percent}%",
+    "downloadingNoTotal": "Pobieram Claude Code…",
+    "settingUp": "Konfiguruję Claude Code…",
+    "why": "Stella używa Claude Code od Anthropic, aby działać z Twoim planem Claude. Zajmie to około minuty.",
+    "offline": "Nie udało się połączyć z Anthropic, aby pobrać Claude Code. Sprawdź połączenie z internetem.",
+    "unavailable": "Anthropic nie oferuje Claude Code na ten komputer lub w Twoim regionie.",
+    "failed": "Claude Code się nie zainstalował.",
+    "retry": "Spróbuj ponownie",
+    "manual": "Zainstaluj samodzielnie",
+    "install": "Zainstaluj Claude Code",
+    "ownPlan": "Claude Code działa na Twojej własnej subskrypcji Claude Pro lub Max.",
+    "chatTitle": "Claude Code nie jest zainstalowany",
+    "chatDescription": "Zainstaluj go tutaj, zaloguj się do swojego planu Claude i wyślij wiadomość ponownie."
   }
 }

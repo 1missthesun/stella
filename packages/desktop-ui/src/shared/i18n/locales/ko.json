@@ -1916,19 +1916,7 @@
         "waiting": "브라우저에서 로그인을 마친 뒤 여기로 돌아오세요.",
         "settledNone": "아직 선택한 AI가 없습니다",
         "settledNoneDesc": "언제든 로그인하거나 요금제를 연결하면 채팅을 시작할 수 있습니다.",
-        "fineOwnPlan": "ChatGPT와 Claude Code는 OpenAI 또는 Anthropic의 본인 구독을 사용합니다. 설정에서 언제든 바꿀 수 있습니다.",
-        "claudeInstall": {
-          "checking": "Claude Code 준비 중…",
-          "downloading": "Claude Code 다운로드 중… {percent}%",
-          "downloadingNoTotal": "Claude Code 다운로드 중…",
-          "settingUp": "Claude Code 설정 중…",
-          "why": "Stella는 Anthropic의 Claude Code를 사용해 Claude 요금제와 함께 작동합니다. 1분 정도 걸립니다.",
-          "offline": "Claude Code를 다운로드하려고 Anthropic에 연결하지 못했습니다. 인터넷 연결을 확인하세요.",
-          "unavailable": "Anthropic은 이 컴퓨터용 또는 사용자 지역에서 Claude Code를 제공하지 않습니다.",
-          "failed": "Claude Code가 설치되지 않았습니다.",
-          "retry": "다시 시도",
-          "manual": "직접 설치"
-        }
+        "fineOwnPlan": "ChatGPT와 Claude Code는 OpenAI 또는 Anthropic의 본인 구독을 사용합니다. 설정에서 언제든 바꿀 수 있습니다."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3443,5 +3431,21 @@
     "retrySend": "다시 보내기",
     "removeMessage": "메시지 제거",
     "failed": "작업하지 못했습니다."
+  },
+  "claudeInstall": {
+    "checking": "Claude Code 준비 중…",
+    "downloading": "Claude Code 다운로드 중… {percent}%",
+    "downloadingNoTotal": "Claude Code 다운로드 중…",
+    "settingUp": "Claude Code 설정 중…",
+    "why": "Stella는 Anthropic의 Claude Code를 사용해 Claude 요금제와 함께 작동합니다. 1분 정도 걸립니다.",
+    "offline": "Claude Code를 다운로드하려고 Anthropic에 연결하지 못했습니다. 인터넷 연결을 확인하세요.",
+    "unavailable": "Anthropic은 이 컴퓨터용 또는 사용자 지역에서 Claude Code를 제공하지 않습니다.",
+    "failed": "Claude Code가 설치되지 않았습니다.",
+    "retry": "다시 시도",
+    "manual": "직접 설치",
+    "install": "Claude Code 설치",
+    "ownPlan": "Claude Code는 본인의 Claude Pro 또는 Max 구독으로 작동합니다.",
+    "chatTitle": "Claude Code가 설치되어 있지 않음",
+    "chatDescription": "여기서 설치한 다음 Claude 요금제에 로그인하고 메시지를 다시 보내세요."
   }
 }

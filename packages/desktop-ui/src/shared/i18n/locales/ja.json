@@ -1916,19 +1916,7 @@
         "waiting": "ブラウザーでサインインを完了して、こちらに戻ってください。",
         "settledNone": "まだ AI が選ばれていません",
         "settledNoneDesc": "いつでもサインインするかプランを接続すると、チャットを始められます。",
-        "fineOwnPlan": "ChatGPT と Claude Code は、OpenAI または Anthropic のご自身のサブスクリプションを使います。設定からいつでも変更できます。",
-        "claudeInstall": {
-          "checking": "Claude Code を準備しています…",
-          "downloading": "Claude Code をダウンロード中… {percent}%",
-          "downloadingNoTotal": "Claude Code をダウンロード中…",
-          "settingUp": "Claude Code をセットアップしています…",
-          "why": "Stella は Anthropic の Claude Code を使って、あなたの Claude プランと連携します。1 分ほどかかります。",
-          "offline": "Claude Code をダウンロードするために Anthropic に接続できませんでした。インターネット接続を確認してください。",
-          "unavailable": "Anthropic はこのコンピューター向け、またはお住まいの地域で Claude Code を提供していません。",
-          "failed": "Claude Code をインストールできませんでした。",
-          "retry": "もう一度試す",
-          "manual": "自分でインストール"
-        }
+        "fineOwnPlan": "ChatGPT と Claude Code は、OpenAI または Anthropic のご自身のサブスクリプションを使います。設定からいつでも変更できます。"
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3443,5 +3431,21 @@
     "retrySend": "送信を再試行",
     "removeMessage": "メッセージを削除",
     "failed": "うまくいきませんでした。"
+  },
+  "claudeInstall": {
+    "checking": "Claude Code を準備しています…",
+    "downloading": "Claude Code をダウンロード中… {percent}%",
+    "downloadingNoTotal": "Claude Code をダウンロード中…",
+    "settingUp": "Claude Code をセットアップしています…",
+    "why": "Stella は Anthropic の Claude Code を使って、あなたの Claude プランと連携します。1 分ほどかかります。",
+    "offline": "Claude Code をダウンロードするために Anthropic に接続できませんでした。インターネット接続を確認してください。",
+    "unavailable": "Anthropic はこのコンピューター向け、またはお住まいの地域で Claude Code を提供していません。",
+    "failed": "Claude Code をインストールできませんでした。",
+    "retry": "もう一度試す",
+    "manual": "自分でインストール",
+    "install": "Claude Code をインストール",
+    "ownPlan": "Claude Code は、ご自身の Claude Pro または Max のサブスクリプションで動作します。",
+    "chatTitle": "Claude Code がインストールされていません",
+    "chatDescription": "ここでインストールし、Claude のプランにサインインしてから、メッセージをもう一度送信してください。"
   }
 }

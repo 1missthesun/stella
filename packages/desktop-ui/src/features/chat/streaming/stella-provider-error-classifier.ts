@@ -12,6 +12,7 @@ export type StellaProviderErrorKind =
   | 'chatgpt-auth'
   | 'chatgpt-usage-limit'
   | 'claude-code-login'
+  | 'claude-code-not-installed'
   | 'claude-code-usage-limit'
   | 'content-blocked'
   | 'context-limit'
@@ -127,6 +128,7 @@ const providerCredentialMatchers = [
 
 const claudeCodeLoginRequiredMatcher = '[claude-code/login-required]'
 const claudeCodeUsageLimitMatcher = '[claude-code/usage-limit]'
+const claudeCodeNotInstalledMatcher = '[claude-code/not-installed]'
 
 const modelRestrictionMatchers = [
   'unsupported stella model selection',
@@ -314,6 +316,9 @@ export const classifyStellaProviderError = (
   if (normalized.includes(claudeCodeUsageLimitMatcher)) {
     return { kind: 'claude-code-usage-limit', message }
   }
+  if (normalized.includes(claudeCodeNotInstalledMatcher)) {
+    return { kind: 'claude-code-not-installed', message }
+  }
   // Stella's own usage limit, worded by the backend or the gateway: never
   // "try again", always the upgrade notice.
   const usageLimit = stellaUsageLimitOf(normalized)
@@ -415,6 +420,7 @@ const LIMIT_OR_AUTH_KINDS = new Set<StellaProviderErrorKind>([
   'chatgpt-auth',
   'chatgpt-usage-limit',
   'claude-code-login',
+  'claude-code-not-installed',
   'claude-code-usage-limit',
   'free-allowance-exhausted',
   'provider-access',

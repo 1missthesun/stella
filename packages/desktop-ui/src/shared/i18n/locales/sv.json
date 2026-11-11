@@ -1925,19 +1925,7 @@
         "waiting": "Slutför inloggningen i webbläsaren och kom sedan tillbaka hit.",
         "settledNone": "Ingen AI vald än",
         "settledNoneDesc": "Logga in eller anslut ett abonnemang när som helst för att börja chatta.",
-        "fineOwnPlan": "ChatGPT och Claude Code använder ditt eget abonnemang hos OpenAI eller Anthropic. Ändra det när som helst i Inställningar.",
-        "claudeInstall": {
-          "checking": "Gör i ordning Claude Code…",
-          "downloading": "Laddar ned Claude Code… {percent} %",
-          "downloadingNoTotal": "Laddar ned Claude Code…",
-          "settingUp": "Konfigurerar Claude Code…",
-          "why": "Stella använder Claude Code från Anthropic för att arbeta med ditt Claude-abonnemang. Det tar ungefär en minut.",
-          "offline": "Kunde inte nå Anthropic för att ladda ned Claude Code. Kontrollera internetanslutningen.",
-          "unavailable": "Anthropic erbjuder inte Claude Code för den här datorn eller i din region.",
-          "failed": "Claude Code installerades inte.",
-          "retry": "Försök igen",
-          "manual": "Installera själv"
-        }
+        "fineOwnPlan": "ChatGPT och Claude Code använder ditt eget abonnemang hos OpenAI eller Anthropic. Ändra det när som helst i Inställningar."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3465,5 +3453,21 @@
     "retrySend": "Försök skicka igen",
     "removeMessage": "Ta bort meddelande",
     "failed": "Det gick inte."
+  },
+  "claudeInstall": {
+    "checking": "Gör i ordning Claude Code…",
+    "downloading": "Laddar ned Claude Code… {percent} %",
+    "downloadingNoTotal": "Laddar ned Claude Code…",
+    "settingUp": "Konfigurerar Claude Code…",
+    "why": "Stella använder Claude Code från Anthropic för att arbeta med ditt Claude-abonnemang. Det tar ungefär en minut.",
+    "offline": "Kunde inte nå Anthropic för att ladda ned Claude Code. Kontrollera internetanslutningen.",
+    "unavailable": "Anthropic erbjuder inte Claude Code för den här datorn eller i din region.",
+    "failed": "Claude Code installerades inte.",
+    "retry": "Försök igen",
+    "manual": "Installera själv",
+    "install": "Installera Claude Code",
+    "ownPlan": "Claude Code körs på ditt eget Claude Pro- eller Max-abonnemang.",
+    "chatTitle": "Claude Code är inte installerat",
+    "chatDescription": "Installera det här, logga sedan in på ditt Claude-abonnemang och skicka meddelandet igen."
   }
 }

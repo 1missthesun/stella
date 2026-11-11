@@ -1916,19 +1916,7 @@
         "waiting": "请在浏览器中完成登录，然后回到这里。",
         "settledNone": "尚未选择 AI",
         "settledNoneDesc": "随时登录或连接套餐即可开始聊天。",
-        "fineOwnPlan": "ChatGPT 和 Claude Code 使用你自己在 OpenAI 或 Anthropic 的订阅。可随时在设置中更改。",
-        "claudeInstall": {
-          "checking": "正在准备 Claude Code…",
-          "downloading": "正在下载 Claude Code… {percent}%",
-          "downloadingNoTotal": "正在下载 Claude Code…",
-          "settingUp": "正在设置 Claude Code…",
-          "why": "Stella 通过 Anthropic 的 Claude Code 使用你的 Claude 套餐。大约需要一分钟。",
-          "offline": "无法连接 Anthropic 下载 Claude Code。请检查网络连接。",
-          "unavailable": "Anthropic 不为这台电脑或你所在的地区提供 Claude Code。",
-          "failed": "Claude Code 未能安装。",
-          "retry": "重试",
-          "manual": "自行安装"
-        }
+        "fineOwnPlan": "ChatGPT 和 Claude Code 使用你自己在 OpenAI 或 Anthropic 的订阅。可随时在设置中更改。"
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3443,5 +3431,21 @@
     "retrySend": "重新发送",
     "removeMessage": "移除消息",
     "failed": "操作未成功。"
+  },
+  "claudeInstall": {
+    "checking": "正在准备 Claude Code…",
+    "downloading": "正在下载 Claude Code… {percent}%",
+    "downloadingNoTotal": "正在下载 Claude Code…",
+    "settingUp": "正在设置 Claude Code…",
+    "why": "Stella 通过 Anthropic 的 Claude Code 使用你的 Claude 套餐。大约需要一分钟。",
+    "offline": "无法连接 Anthropic 下载 Claude Code。请检查网络连接。",
+    "unavailable": "Anthropic 不为这台电脑或你所在的地区提供 Claude Code。",
+    "failed": "Claude Code 未能安装。",
+    "retry": "重试",
+    "manual": "自行安装",
+    "install": "安装 Claude Code",
+    "ownPlan": "Claude Code 使用你自己的 Claude Pro 或 Max 订阅运行。",
+    "chatTitle": "未安装 Claude Code",
+    "chatDescription": "在这里安装，然后登录你的 Claude 套餐并重新发送消息。"
   }
 }

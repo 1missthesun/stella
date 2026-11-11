@@ -1934,19 +1934,7 @@
         "waiting": "Termină autentificarea în browser, apoi revino aici.",
         "settledNone": "Niciun AI ales încă",
         "settledNoneDesc": "Conectează-te sau adaugă un abonament oricând ca să începi să conversezi.",
-        "fineOwnPlan": "ChatGPT și Claude Code folosesc propriul tău abonament la OpenAI sau Anthropic. Poți schimba asta oricând din Setări.",
-        "claudeInstall": {
-          "checking": "Se pregătește Claude Code…",
-          "downloading": "Se descarcă Claude Code… {percent}%",
-          "downloadingNoTotal": "Se descarcă Claude Code…",
-          "settingUp": "Se configurează Claude Code…",
-          "why": "Stella folosește Claude Code, de la Anthropic, ca să lucreze cu abonamentul tău Claude. Durează aproximativ un minut.",
-          "offline": "Nu am putut contacta Anthropic pentru a descărca Claude Code. Verifică conexiunea la internet.",
-          "unavailable": "Anthropic nu oferă Claude Code pentru acest computer sau în regiunea ta.",
-          "failed": "Claude Code nu s-a instalat.",
-          "retry": "Încearcă din nou",
-          "manual": "Instalează-l singur"
-        }
+        "fineOwnPlan": "ChatGPT și Claude Code folosesc propriul tău abonament la OpenAI sau Anthropic. Poți schimba asta oricând din Setări."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3485,5 +3473,21 @@
     "retrySend": "Reîncearcă trimiterea",
     "removeMessage": "Elimină mesajul",
     "failed": "Nu a funcționat."
+  },
+  "claudeInstall": {
+    "checking": "Se pregătește Claude Code…",
+    "downloading": "Se descarcă Claude Code… {percent}%",
+    "downloadingNoTotal": "Se descarcă Claude Code…",
+    "settingUp": "Se configurează Claude Code…",
+    "why": "Stella folosește Claude Code, de la Anthropic, ca să lucreze cu abonamentul tău Claude. Durează aproximativ un minut.",
+    "offline": "Nu am putut contacta Anthropic pentru a descărca Claude Code. Verifică conexiunea la internet.",
+    "unavailable": "Anthropic nu oferă Claude Code pentru acest computer sau în regiunea ta.",
+    "failed": "Claude Code nu s-a instalat.",
+    "retry": "Încearcă din nou",
+    "manual": "Instalează-l singur",
+    "install": "Instalează Claude Code",
+    "ownPlan": "Claude Code funcționează cu propriul tău abonament Claude Pro sau Max.",
+    "chatTitle": "Claude Code nu este instalat",
+    "chatDescription": "Instalează-l aici, apoi conectează-te la abonamentul Claude și trimite din nou mesajul."
   }
 }

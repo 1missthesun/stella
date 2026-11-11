@@ -1916,19 +1916,7 @@
         "waiting": "Selesaikan proses masuk di browser Anda, lalu kembali ke sini.",
         "settledNone": "Belum ada AI yang dipilih",
         "settledNoneDesc": "Masuk atau hubungkan paket kapan saja untuk mulai mengobrol.",
-        "fineOwnPlan": "ChatGPT dan Claude Code memakai langganan Anda sendiri di OpenAI atau Anthropic. Ubah kapan saja di Pengaturan.",
-        "claudeInstall": {
-          "checking": "Menyiapkan Claude Code…",
-          "downloading": "Mengunduh Claude Code… {percent}%",
-          "downloadingNoTotal": "Mengunduh Claude Code…",
-          "settingUp": "Memasang Claude Code…",
-          "why": "Stella memakai Claude Code dari Anthropic untuk bekerja dengan paket Claude Anda. Ini butuh sekitar satu menit.",
-          "offline": "Tidak dapat menghubungi Anthropic untuk mengunduh Claude Code. Periksa koneksi internet Anda.",
-          "unavailable": "Anthropic tidak menyediakan Claude Code untuk komputer ini atau di wilayah Anda.",
-          "failed": "Claude Code tidak terpasang.",
-          "retry": "Coba lagi",
-          "manual": "Pasang sendiri"
-        }
+        "fineOwnPlan": "ChatGPT dan Claude Code memakai langganan Anda sendiri di OpenAI atau Anthropic. Ubah kapan saja di Pengaturan."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3443,5 +3431,21 @@
     "retrySend": "Coba kirim lagi",
     "removeMessage": "Hapus pesan",
     "failed": "Itu tidak berhasil."
+  },
+  "claudeInstall": {
+    "checking": "Menyiapkan Claude Code…",
+    "downloading": "Mengunduh Claude Code… {percent}%",
+    "downloadingNoTotal": "Mengunduh Claude Code…",
+    "settingUp": "Memasang Claude Code…",
+    "why": "Stella memakai Claude Code dari Anthropic untuk bekerja dengan paket Claude Anda. Ini butuh sekitar satu menit.",
+    "offline": "Tidak dapat menghubungi Anthropic untuk mengunduh Claude Code. Periksa koneksi internet Anda.",
+    "unavailable": "Anthropic tidak menyediakan Claude Code untuk komputer ini atau di wilayah Anda.",
+    "failed": "Claude Code tidak terpasang.",
+    "retry": "Coba lagi",
+    "manual": "Pasang sendiri",
+    "install": "Pasang Claude Code",
+    "ownPlan": "Claude Code berjalan dengan langganan Claude Pro atau Max milik Anda sendiri.",
+    "chatTitle": "Claude Code belum terpasang",
+    "chatDescription": "Pasang di sini, lalu masuk ke paket Claude Anda dan kirim pesan Anda lagi."
   }
 }

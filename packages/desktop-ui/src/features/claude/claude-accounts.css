@@ -89,6 +89,11 @@
   color: var(--text-weak);
 }
 
+.claude-place__install:not(:empty) {
+  margin-top: 8px;
+  max-width: 420px;
+}
+
 .claude-place__warn {
   margin-top: 3px;
   font-size: var(--font-size-xs);

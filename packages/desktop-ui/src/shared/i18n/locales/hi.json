@@ -1925,19 +1925,7 @@
         "waiting": "अपने ब्राउज़र में साइन इन पूरा करें, फिर यहाँ लौट आइए।",
         "settledNone": "अभी तक कोई AI नहीं चुना गया",
         "settledNoneDesc": "चैट शुरू करने के लिए कभी भी साइन इन करें या प्लान जोड़ें।",
-        "fineOwnPlan": "ChatGPT और Claude Code, OpenAI या Anthropic के साथ आपकी अपनी सदस्यता का उपयोग करते हैं। इसे सेटिंग्स में कभी भी बदलें।",
-        "claudeInstall": {
-          "checking": "Claude Code तैयार किया जा रहा है…",
-          "downloading": "Claude Code डाउनलोड हो रहा है… {percent}%",
-          "downloadingNoTotal": "Claude Code डाउनलोड हो रहा है…",
-          "settingUp": "Claude Code सेट अप हो रहा है…",
-          "why": "Stella आपके Claude प्लान के साथ काम करने के लिए Anthropic के Claude Code का उपयोग करता है। इसमें लगभग एक मिनट लगता है।",
-          "offline": "Claude Code डाउनलोड करने के लिए Anthropic तक नहीं पहुँच सके। अपना इंटरनेट कनेक्शन जाँचें।",
-          "unavailable": "Anthropic इस कंप्यूटर के लिए या आपके क्षेत्र में Claude Code उपलब्ध नहीं कराता।",
-          "failed": "Claude Code इंस्टॉल नहीं हुआ।",
-          "retry": "फिर से कोशिश करें",
-          "manual": "खुद इंस्टॉल करें"
-        }
+        "fineOwnPlan": "ChatGPT और Claude Code, OpenAI या Anthropic के साथ आपकी अपनी सदस्यता का उपयोग करते हैं। इसे सेटिंग्स में कभी भी बदलें।"
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3465,5 +3453,21 @@
     "retrySend": "फिर से भेजने का प्रयास करें",
     "removeMessage": "संदेश हटाएँ",
     "failed": "यह काम नहीं किया।"
+  },
+  "claudeInstall": {
+    "checking": "Claude Code तैयार किया जा रहा है…",
+    "downloading": "Claude Code डाउनलोड हो रहा है… {percent}%",
+    "downloadingNoTotal": "Claude Code डाउनलोड हो रहा है…",
+    "settingUp": "Claude Code सेट अप हो रहा है…",
+    "why": "Stella आपके Claude प्लान के साथ काम करने के लिए Anthropic के Claude Code का उपयोग करता है। इसमें लगभग एक मिनट लगता है।",
+    "offline": "Claude Code डाउनलोड करने के लिए Anthropic तक नहीं पहुँच सके। अपना इंटरनेट कनेक्शन जाँचें।",
+    "unavailable": "Anthropic इस कंप्यूटर के लिए या आपके क्षेत्र में Claude Code उपलब्ध नहीं कराता।",
+    "failed": "Claude Code इंस्टॉल नहीं हुआ।",
+    "retry": "फिर से कोशिश करें",
+    "manual": "खुद इंस्टॉल करें",
+    "install": "Claude Code इंस्टॉल करें",
+    "ownPlan": "Claude Code आपकी अपनी Claude Pro या Max सदस्यता पर चलता है।",
+    "chatTitle": "Claude Code इंस्टॉल नहीं है",
+    "chatDescription": "इसे यहीं इंस्टॉल करें, फिर अपने Claude प्लान में साइन इन करें और अपना संदेश फिर से भेजें।"
   }
 }

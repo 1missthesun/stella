@@ -465,6 +465,9 @@ export const piTerminalNotice = (message: {
         notice:
           (isSafeguardBlock(message) ? SAFEGUARD_TERMINAL_NOTICE : null) ??
           stellaUsageLimitText(message.errorMessage) ??
+          (message.errorMessage?.trimStart().startsWith("[claude-code/not-installed]")
+            ? "Stella couldn't answer: Claude Code isn't installed on this computer."
+            : null) ??
           `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
       }
     : message.stopReason === "aborted"

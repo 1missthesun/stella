@@ -1925,19 +1925,7 @@
         "waiting": "Finish signing in, then come back here.",
         "settledNone": "No AI chosen yet",
         "settledNoneDesc": "Sign in or connect a plan any time to start chatting.",
-        "fineOwnPlan": "ChatGPT and Claude Code use your own subscription with OpenAI or Anthropic. Change this any time in Settings.",
-        "claudeInstall": {
-          "checking": "Getting Claude Code ready…",
-          "downloading": "Downloading Claude Code… {percent}%",
-          "downloadingNoTotal": "Downloading Claude Code…",
-          "settingUp": "Setting up Claude Code…",
-          "why": "Stella uses Claude Code, from Anthropic, to work with your Claude plan. This takes about a minute.",
-          "offline": "Couldn't reach Anthropic to download Claude Code. Check your internet connection.",
-          "unavailable": "Anthropic doesn't offer Claude Code for this computer or in your region.",
-          "failed": "Claude Code didn't install.",
-          "retry": "Try again",
-          "manual": "Install it yourself"
-        }
+        "fineOwnPlan": "ChatGPT and Claude Code use your own subscription with OpenAI or Anthropic. Change this any time in Settings."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3465,5 +3453,21 @@
     "retrySend": "Retry sending",
     "removeMessage": "Remove message",
     "failed": "That didn’t work."
+  },
+  "claudeInstall": {
+    "checking": "Getting Claude Code ready…",
+    "downloading": "Downloading Claude Code… {percent}%",
+    "downloadingNoTotal": "Downloading Claude Code…",
+    "settingUp": "Setting up Claude Code…",
+    "why": "Stella uses Claude Code, from Anthropic, to work with your Claude plan. This takes about a minute.",
+    "offline": "Couldn't reach Anthropic to download Claude Code. Check your internet connection.",
+    "unavailable": "Anthropic doesn't offer Claude Code for this computer or in your region.",
+    "failed": "Claude Code didn't install.",
+    "retry": "Try again",
+    "manual": "Install it yourself",
+    "install": "Install Claude Code",
+    "ownPlan": "Claude Code runs on your own Claude Pro or Max subscription.",
+    "chatTitle": "Claude Code isn't installed",
+    "chatDescription": "Install it here, then sign in to your Claude plan and send your message again."
   }
 }

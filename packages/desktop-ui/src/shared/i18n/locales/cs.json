@@ -1943,19 +1943,7 @@
         "waiting": "Dokonči přihlášení v prohlížeči a pak se vrať sem.",
         "settledNone": "Zatím není vybrána žádná AI",
         "settledNoneDesc": "Kdykoli se přihlaste nebo připojte předplatné a můžete začít chatovat.",
-        "fineOwnPlan": "ChatGPT a Claude Code používají vaše vlastní předplatné u OpenAI nebo Anthropic. Změnit to můžete kdykoli v Nastavení.",
-        "claudeInstall": {
-          "checking": "Připravuji Claude Code…",
-          "downloading": "Stahuji Claude Code… {percent} %",
-          "downloadingNoTotal": "Stahuji Claude Code…",
-          "settingUp": "Nastavuji Claude Code…",
-          "why": "Stella používá Claude Code od Anthropicu, aby mohla pracovat s vaším předplatným Claude. Trvá to asi minutu.",
-          "offline": "Nepodařilo se spojit s Anthropicem a stáhnout Claude Code. Zkontrolujte připojení k internetu.",
-          "unavailable": "Anthropic nenabízí Claude Code pro tento počítač nebo ve vaší oblasti.",
-          "failed": "Claude Code se nenainstaloval.",
-          "retry": "Zkusit znovu",
-          "manual": "Nainstalovat ručně"
-        }
+        "fineOwnPlan": "ChatGPT a Claude Code používají vaše vlastní předplatné u OpenAI nebo Anthropic. Změnit to můžete kdykoli v Nastavení."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3505,5 +3493,21 @@
     "retrySend": "Zkusit znovu odeslat",
     "removeMessage": "Odebrat zprávu",
     "failed": "To se nepovedlo."
+  },
+  "claudeInstall": {
+    "checking": "Připravuji Claude Code…",
+    "downloading": "Stahuji Claude Code… {percent} %",
+    "downloadingNoTotal": "Stahuji Claude Code…",
+    "settingUp": "Nastavuji Claude Code…",
+    "why": "Stella používá Claude Code od Anthropicu, aby mohla pracovat s vaším předplatným Claude. Trvá to asi minutu.",
+    "offline": "Nepodařilo se spojit s Anthropicem a stáhnout Claude Code. Zkontrolujte připojení k internetu.",
+    "unavailable": "Anthropic nenabízí Claude Code pro tento počítač nebo ve vaší oblasti.",
+    "failed": "Claude Code se nenainstaloval.",
+    "retry": "Zkusit znovu",
+    "manual": "Nainstalovat ručně",
+    "install": "Nainstalovat Claude Code",
+    "ownPlan": "Claude Code běží na vašem vlastním předplatném Claude Pro nebo Max.",
+    "chatTitle": "Claude Code není nainstalovaný",
+    "chatDescription": "Nainstalujte ho tady, pak se přihlaste ke svému předplatnému Claude a pošlete zprávu znovu."
   }
 }

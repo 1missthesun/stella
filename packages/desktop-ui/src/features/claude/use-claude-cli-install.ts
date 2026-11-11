@@ -62,3 +62,30 @@ export const claudeInstallPercent = (progress: ClaudeCliInstallProgress): number
   progress.phase === "downloading" && progress.total
     ? Math.min(99, Math.floor((progress.received / progress.total) * 100))
     : null;
+
+/**
+ * Installs Claude Code, then goes straight on to signing in to the person's
+ * Claude plan, the same way from onboarding, Settings and the chat.
+ */
+export function useClaudeInstallThenSignIn({
+  reload,
+  signIn,
+}: {
+  reload: () => Promise<void>;
+  signIn: () => void;
+}) {
+  const { available, state, install, reset } = useClaudeCliInstall();
+  const reloadRef = useRef(reload);
+  const signInRef = useRef(signIn);
+  useEffect(() => {
+    reloadRef.current = reload;
+    signInRef.current = signIn;
+  });
+  const run = useCallback(async (): Promise<boolean> => {
+    if (!(await install())) return false;
+    await reloadRef.current();
+    signInRef.current();
+    return true;
+  }, [install]);
+  return { available, state, run, reset, installing: state.status === "installing" };
+}

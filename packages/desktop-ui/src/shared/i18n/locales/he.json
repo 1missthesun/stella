@@ -1934,19 +1934,7 @@
         "waiting": "סיים את ההתחברות בדפדפן, ואז חזור לכאן.",
         "settledNone": "עדיין לא נבחר AI",
         "settledNoneDesc": "התחבר או חבר מינוי בכל עת כדי להתחיל לשוחח.",
-        "fineOwnPlan": "ChatGPT ו-Claude Code משתמשים במינוי שלך אצל OpenAI או Anthropic. אפשר לשנות זאת בכל עת בהגדרות.",
-        "claudeInstall": {
-          "checking": "מכין את Claude Code…",
-          "downloading": "מוריד את Claude Code… {percent}%",
-          "downloadingNoTotal": "מוריד את Claude Code…",
-          "settingUp": "מגדיר את Claude Code…",
-          "why": "Stella משתמשת ב-Claude Code של Anthropic כדי לעבוד עם המינוי שלך ל-Claude. זה לוקח בערך דקה.",
-          "offline": "לא הצלחנו להגיע ל-Anthropic כדי להוריד את Claude Code. בדוק את החיבור לאינטרנט.",
-          "unavailable": "Anthropic לא מציעה את Claude Code למחשב הזה או באזור שלך.",
-          "failed": "Claude Code לא הותקן.",
-          "retry": "נסה שוב",
-          "manual": "התקן בעצמך"
-        }
+        "fineOwnPlan": "ChatGPT ו-Claude Code משתמשים במינוי שלך אצל OpenAI או Anthropic. אפשר לשנות זאת בכל עת בהגדרות."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3485,5 +3473,21 @@
     "retrySend": "נסה לשלוח שוב",
     "removeMessage": "הסר הודעה",
     "failed": "זה לא עבד."
+  },
+  "claudeInstall": {
+    "checking": "מכין את Claude Code…",
+    "downloading": "מוריד את Claude Code… {percent}%",
+    "downloadingNoTotal": "מוריד את Claude Code…",
+    "settingUp": "מגדיר את Claude Code…",
+    "why": "Stella משתמשת ב-Claude Code של Anthropic כדי לעבוד עם המינוי שלך ל-Claude. זה לוקח בערך דקה.",
+    "offline": "לא הצלחנו להגיע ל-Anthropic כדי להוריד את Claude Code. בדוק את החיבור לאינטרנט.",
+    "unavailable": "Anthropic לא מציעה את Claude Code למחשב הזה או באזור שלך.",
+    "failed": "Claude Code לא הותקן.",
+    "retry": "נסה שוב",
+    "manual": "התקן בעצמך",
+    "install": "התקנת Claude Code",
+    "ownPlan": "Claude Code פועל עם המינוי שלך ל-Claude Pro או Max.",
+    "chatTitle": "Claude Code לא מותקן",
+    "chatDescription": "התקן אותו כאן, התחבר למינוי Claude שלך ושלח את ההודעה שוב."
   }
 }

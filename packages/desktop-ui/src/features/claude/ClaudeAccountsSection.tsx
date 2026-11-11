@@ -33,6 +33,8 @@ import {
 } from "./ClaudeSyncNotice";
 import { useClaudeLocalAccounts } from "./use-claude-local-accounts";
 import { useClaudeLogin, type ClaudeLoginTarget } from "./use-claude-login";
+import { useClaudeInstallThenSignIn } from "./use-claude-cli-install";
+import { ClaudeCliInstallStatus } from "./ClaudeCliInstallStatus";
 import "./claude-accounts.css";
 
 const K = "settings.engineAccounts";
@@ -125,6 +127,14 @@ export function ClaudeAccountsSection({
 
   const startLogin = (target: ClaudeLoginTarget) => void login.start(target);
   const canSignInHere = local.available && local.cliInstalled;
+  // Claude Code isn't on this computer: install it here, then sign in.
+  const install = useClaudeInstallThenSignIn({
+    reload: reloadLocal,
+    signIn: () => void login.start({ place: "local", configId: "default" }),
+  });
+  const offerInstall =
+    local.available && local.loaded && !local.cliInstalled && install.available;
+  const installHere = () => void install.run();
   const accounts = (settings?.connections ?? []).filter(
     (row): row is EngineConnection => row.provider === "anthropic",
   );
@@ -286,13 +296,19 @@ export function ClaudeAccountsSection({
   const otherOnline = places.filter(
     (place) => place.kind === "device" && place.online && place.cliInstalled !== false,
   );
-  const addTargets: Array<{ key: string; label: string; target: ClaudeLoginTarget | null }> = [
+  const addTargets: Array<{
+    key: string;
+    label: string;
+    target: ClaudeLoginTarget | null;
+    run?: () => void;
+  }> = [
     ...(local.available
       ? [
           {
             key: "this",
             label: t(`${K}.addOnComputer`),
             target: canSignInHere ? ({ place: "local" } as const) : null,
+            ...(offerInstall ? { run: installHere } : {}),
           },
         ]
       : []),
@@ -313,7 +329,7 @@ export function ClaudeAccountsSection({
             type="button"
             variant="ghost"
             className="pill-btn"
-            disabled={disabled || login.open}
+            disabled={disabled || login.open || install.installing}
           >
             {t(`${K}.addClaude`)}
           </Button>
@@ -322,8 +338,10 @@ export function ClaudeAccountsSection({
           {addTargets.map((entry) => (
             <DropdownMenuItem
               key={entry.key}
-              disabled={!entry.target}
-              onSelect={() => entry.target && startLogin(entry.target)}
+              disabled={!entry.target && !entry.run}
+              onSelect={() =>
+                entry.target ? startLogin(entry.target) : entry.run?.()
+              }
             >
               {entry.label}
             </DropdownMenuItem>
@@ -335,8 +353,15 @@ export function ClaudeAccountsSection({
         type="button"
         variant="ghost"
         className="pill-btn"
-        disabled={disabled || login.open || !addTargets[0]?.target}
-        onClick={() => addTargets[0]?.target && startLogin(addTargets[0].target)}
+        disabled={
+          disabled ||
+          login.open ||
+          install.installing ||
+          (!addTargets[0]?.target && !addTargets[0]?.run)
+        }
+        onClick={() =>
+          addTargets[0]?.target ? startLogin(addTargets[0].target) : addTargets[0]?.run?.()
+        }
       >
         {t(`${K}.addClaude`)}
       </Button>
@@ -532,6 +557,16 @@ export function ClaudeAccountsSection({
                     </div>
                   ) : null}
                   {status ? <div className="claude-place__status">{status}</div> : null}
+                  {notInstalled && place.kind === "this" && offerInstall ? (
+                    <>
+                      {install.state.status === "idle" ? (
+                        <div className="claude-place__note">{t("claudeInstall.ownPlan")}</div>
+                      ) : null}
+                      <div className="claude-place__install">
+                        <ClaudeCliInstallStatus state={install.state} onRetry={installHere} />
+                      </div>
+                    </>
+                  ) : null}
                   {showOwn ? (
                     <div className="claude-place__note">
                       {t(`${C}.ownLoginNote`, { email: place.ownLoginEmail! })}
@@ -545,6 +580,21 @@ export function ClaudeAccountsSection({
                     </div>
                   ) : null}
                 </div>
+                {notInstalled &&
+                place.kind === "this" &&
+                offerInstall &&
+                !install.installing &&
+                install.state.status !== "error" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="pill-btn"
+                    disabled={disabled || login.open}
+                    onClick={installHere}
+                  >
+                    {t("claudeInstall.install")}
+                  </Button>
+                ) : null}
                 {needsSignIn && target ? (
                   <Button
                     type="button"

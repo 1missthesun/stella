@@ -1961,19 +1961,7 @@
         "waiting": "أكمل تسجيل الدخول في متصفحك، ثم عد إلى هنا.",
         "settledNone": "لم يتم اختيار ذكاء اصطناعي بعد",
         "settledNoneDesc": "سجّل الدخول أو اربط اشتراكًا في أي وقت لتبدأ المحادثة.",
-        "fineOwnPlan": "يستخدم ChatGPT وClaude Code اشتراكك الخاص لدى OpenAI أو Anthropic. يمكنك تغيير ذلك في أي وقت من الإعدادات.",
-        "claudeInstall": {
-          "checking": "جارٍ تجهيز Claude Code…",
-          "downloading": "جارٍ تنزيل Claude Code… {percent}%",
-          "downloadingNoTotal": "جارٍ تنزيل Claude Code…",
-          "settingUp": "جارٍ إعداد Claude Code…",
-          "why": "يستخدم Stella تطبيق Claude Code من Anthropic للعمل مع اشتراكك في Claude. يستغرق ذلك دقيقة تقريبًا.",
-          "offline": "تعذّر الوصول إلى Anthropic لتنزيل Claude Code. تحقّق من اتصالك بالإنترنت.",
-          "unavailable": "لا توفّر Anthropic تطبيق Claude Code لهذا الكمبيوتر أو في منطقتك.",
-          "failed": "لم يتم تثبيت Claude Code.",
-          "retry": "حاول مرة أخرى",
-          "manual": "ثبّته بنفسك"
-        }
+        "fineOwnPlan": "يستخدم ChatGPT وClaude Code اشتراكك الخاص لدى OpenAI أو Anthropic. يمكنك تغيير ذلك في أي وقت من الإعدادات."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3545,5 +3533,21 @@
     "retrySend": "إعادة محاولة الإرسال",
     "removeMessage": "إزالة الرسالة",
     "failed": "لم ينجح ذلك."
+  },
+  "claudeInstall": {
+    "checking": "جارٍ تجهيز Claude Code…",
+    "downloading": "جارٍ تنزيل Claude Code… {percent}%",
+    "downloadingNoTotal": "جارٍ تنزيل Claude Code…",
+    "settingUp": "جارٍ إعداد Claude Code…",
+    "why": "يستخدم Stella تطبيق Claude Code من Anthropic للعمل مع اشتراكك في Claude. يستغرق ذلك دقيقة تقريبًا.",
+    "offline": "تعذّر الوصول إلى Anthropic لتنزيل Claude Code. تحقّق من اتصالك بالإنترنت.",
+    "unavailable": "لا توفّر Anthropic تطبيق Claude Code لهذا الكمبيوتر أو في منطقتك.",
+    "failed": "لم يتم تثبيت Claude Code.",
+    "retry": "حاول مرة أخرى",
+    "manual": "ثبّته بنفسك",
+    "install": "تثبيت Claude Code",
+    "ownPlan": "يعمل Claude Code باشتراكك الخاص في Claude Pro أو Max.",
+    "chatTitle": "Claude Code غير مثبّت",
+    "chatDescription": "ثبّته هنا، ثم سجّل الدخول إلى اشتراكك في Claude وأرسل رسالتك مرة أخرى."
   }
 }

@@ -1925,19 +1925,7 @@
         "waiting": "Schließe die Anmeldung in deinem Browser ab und komm dann hierher zurück.",
         "settledNone": "Noch keine KI ausgewählt",
         "settledNoneDesc": "Melde dich jederzeit an oder verbinde ein Abo, um loszulegen.",
-        "fineOwnPlan": "ChatGPT und Claude Code nutzen dein eigenes Abo bei OpenAI oder Anthropic. Du kannst das jederzeit in den Einstellungen ändern.",
-        "claudeInstall": {
-          "checking": "Claude Code wird vorbereitet…",
-          "downloading": "Claude Code wird geladen… {percent} %",
-          "downloadingNoTotal": "Claude Code wird geladen…",
-          "settingUp": "Claude Code wird eingerichtet…",
-          "why": "Stella nutzt Claude Code von Anthropic, um mit deinem Claude-Abo zu arbeiten. Das dauert etwa eine Minute.",
-          "offline": "Anthropic war nicht erreichbar, um Claude Code zu laden. Prüfe deine Internetverbindung.",
-          "unavailable": "Anthropic bietet Claude Code für diesen Computer oder in deiner Region nicht an.",
-          "failed": "Claude Code wurde nicht installiert.",
-          "retry": "Erneut versuchen",
-          "manual": "Selbst installieren"
-        }
+        "fineOwnPlan": "ChatGPT und Claude Code nutzen dein eigenes Abo bei OpenAI oder Anthropic. Du kannst das jederzeit in den Einstellungen ändern."
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3465,5 +3453,21 @@
     "retrySend": "Erneut senden",
     "removeMessage": "Nachricht entfernen",
     "failed": "Das hat nicht geklappt."
+  },
+  "claudeInstall": {
+    "checking": "Claude Code wird vorbereitet…",
+    "downloading": "Claude Code wird geladen… {percent} %",
+    "downloadingNoTotal": "Claude Code wird geladen…",
+    "settingUp": "Claude Code wird eingerichtet…",
+    "why": "Stella nutzt Claude Code von Anthropic, um mit deinem Claude-Abo zu arbeiten. Das dauert etwa eine Minute.",
+    "offline": "Anthropic war nicht erreichbar, um Claude Code zu laden. Prüfe deine Internetverbindung.",
+    "unavailable": "Anthropic bietet Claude Code für diesen Computer oder in deiner Region nicht an.",
+    "failed": "Claude Code wurde nicht installiert.",
+    "retry": "Erneut versuchen",
+    "manual": "Selbst installieren",
+    "install": "Claude Code installieren",
+    "ownPlan": "Claude Code läuft über dein eigenes Claude-Pro- oder Max-Abo.",
+    "chatTitle": "Claude Code ist nicht installiert",
+    "chatDescription": "Installiere es hier, melde dich dann bei deinem Claude-Abo an und sende deine Nachricht erneut."
   }
 }

@@ -1,0 +1,76 @@
+.claude-install {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.claude-install__label {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.claude-install__bar {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+}
+
+.claude-install__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 240ms ease-out;
+}
+
+.claude-install__bar[data-indeterminate] > span {
+  width: 30% !important;
+  animation: claudeInstallSweep 1.4s ease-in-out infinite;
+}
+
+@keyframes claudeInstallSweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+.claude-install__why,
+.claude-install__error {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  color: var(--text-weaker);
+}
+
+.claude-install__error {
+  color: var(--danger);
+}
+
+.claude-install__link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claude-install__bar[data-indeterminate] > span {
+    animation: none;
+    width: 100% !important;
+    opacity: 0.4;
+  }
+}

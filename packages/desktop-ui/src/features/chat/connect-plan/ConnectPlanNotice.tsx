@@ -15,6 +15,8 @@ import type { ComposerNotice } from "@/features/chat/composer-notice-store";
 import { announceChatGptPlanUse } from "@/features/chatgpt/ChatGptBrand";
 import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
 import { ClaudeLoginPrompt } from "@/features/claude/ClaudeLoginPrompt";
+import { ClaudeCliInstallStatus } from "@/features/claude/ClaudeCliInstallStatus";
+import { useClaudeInstallThenSignIn } from "@/features/claude/use-claude-cli-install";
 import { useClaudeLocalAccounts } from "@/features/claude/use-claude-local-accounts";
 import { useClaudeLogin } from "@/features/claude/use-claude-login";
 import { cloudEnginesApi, useCloudEngines } from "@/features/cloud/cloud-engines-api";
@@ -177,14 +179,22 @@ export function ConnectPlanNotice({
     },
   });
 
+  // Claude Code isn't on this computer: install it, then sign in.
+  const claudeInstall = useClaudeInstallThenSignIn({
+    reload: reloadClaudeLocal,
+    signIn: () => void claudeLogin.start({ place: "local", configId: "default" }),
+  });
+  const { run: installClaude, reset: resetClaudeInstall } = claudeInstall;
+
   const cloudChatGptConnected = (engines?.connections ?? []).some(
     (row) => row.provider === "chatgpt" && isEngineConnectionUsable(row),
   );
 
   const run = useCallback(
     async (option: OptionId) => {
-      if (pending || claudeLogin.open) return;
+      if (pending || claudeLogin.open || claudeInstall.installing) return;
       setError(null);
+      resetClaudeInstall();
       if (option === "apikey") {
         setKeyFormOpen((open) => !open);
         return;
@@ -196,7 +206,8 @@ export function ConnectPlanNotice({
           return;
         }
         if (claudeLocal.loaded && !claudeLocal.cliInstalled) {
-          setError(COPY.claudeCliMissing);
+          if (claudeInstall.available) void installClaude();
+          else setError(COPY.claudeCliMissing);
           return;
         }
         void claudeLogin.start({
@@ -236,6 +247,10 @@ export function ConnectPlanNotice({
       claudeLocal.loaded,
       claudeLocal.signedIn,
       claudeLogin,
+      claudeInstall.available,
+      claudeInstall.installing,
+      installClaude,
+      resetClaudeInstall,
       cloudChatGptConnected,
       connect,
       done,
@@ -290,7 +305,8 @@ export function ConnectPlanNotice({
         ? COPY.chooseBody
         : COPY.chooseBodyNoResend
       : notice.description;
-  const busy = pending !== null || claudeLogin.open || connect.flow !== null;
+  const busy =
+    pending !== null || claudeLogin.open || claudeInstall.installing || connect.flow !== null;
   const showPlans = state.reason !== "no-engine";
 
   return (
@@ -346,7 +362,8 @@ export function ConnectPlanNotice({
         <div className="connect-plan__options" role="group" aria-label={COPY.chooseTitle}>
           {options.map((option) => {
             const isPending =
-              pending === option.id || (option.id === "claude" && claudeLogin.open);
+              pending === option.id ||
+              (option.id === "claude" && (claudeLogin.open || claudeInstall.installing));
             return (
               <button
                 key={option.id}
@@ -423,7 +440,11 @@ export function ConnectPlanNotice({
         </form>
       ) : null}
 
-      {claudeLogin.open ? (
+      {claudeInstall.state.status === "installing" || claudeInstall.state.status === "error" ? (
+        <div className="connect-plan__flow">
+          <ClaudeCliInstallStatus state={claudeInstall.state} onRetry={() => void installClaude()} />
+        </div>
+      ) : claudeLogin.open ? (
         <div className="connect-plan__flow">
           <ClaudeLoginPrompt login={claudeLogin} />
         </div>

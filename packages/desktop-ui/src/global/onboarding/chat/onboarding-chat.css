@@ -1318,62 +1318,6 @@
   color: var(--danger);
 }
 
-.obc-card__fine--error .obc-link-btn {
-  font-size: inherit;
-}
-
-.obc-claude-install {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.obc-claude-install__label {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-}
-
-.obc-claude-install__bar {
-  position: relative;
-  display: block;
-  height: 4px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: color-mix(in oklch, var(--foreground) 10%, transparent);
-}
-
-.obc-claude-install__bar > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--primary);
-  transition: width 240ms ease-out;
-}
-
-.obc-claude-install__bar[data-indeterminate] > span {
-  width: 30% !important;
-  animation: obcInstallSweep 1.4s ease-in-out infinite;
-}
-
-@keyframes obcInstallSweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(340%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .obc-claude-install__bar[data-indeterminate] > span {
-    animation: none;
-    width: 100% !important;
-    opacity: 0.4;
-  }
-}
-
 .obc-quickstart__eyebrow {
   align-self: flex-start;
   padding: 3px 9px;

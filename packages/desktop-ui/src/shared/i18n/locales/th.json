@@ -1916,19 +1916,7 @@
         "waiting": "ลงชื่อเข้าใช้ให้เสร็จในเบราว์เซอร์ แล้วกลับมาที่นี่",
         "settledNone": "ยังไม่ได้เลือก AI",
         "settledNoneDesc": "ลงชื่อเข้าใช้หรือเชื่อมต่อแพ็กเกจได้ทุกเมื่อเพื่อเริ่มแชท",
-        "fineOwnPlan": "ChatGPT และ Claude Code ใช้การสมัครสมาชิกของคุณเองกับ OpenAI หรือ Anthropic เปลี่ยนได้ทุกเมื่อในการตั้งค่า",
-        "claudeInstall": {
-          "checking": "กำลังเตรียม Claude Code…",
-          "downloading": "กำลังดาวน์โหลด Claude Code… {percent}%",
-          "downloadingNoTotal": "กำลังดาวน์โหลด Claude Code…",
-          "settingUp": "กำลังตั้งค่า Claude Code…",
-          "why": "Stella ใช้ Claude Code ของ Anthropic เพื่อทำงานกับแพ็กเกจ Claude ของคุณ ใช้เวลาประมาณหนึ่งนาที",
-          "offline": "ไม่สามารถเชื่อมต่อ Anthropic เพื่อดาวน์โหลด Claude Code ได้ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ",
-          "unavailable": "Anthropic ไม่มี Claude Code สำหรับคอมพิวเตอร์เครื่องนี้หรือในภูมิภาคของคุณ",
-          "failed": "ติดตั้ง Claude Code ไม่สำเร็จ",
-          "retry": "ลองอีกครั้ง",
-          "manual": "ติดตั้งเอง"
-        }
+        "fineOwnPlan": "ChatGPT และ Claude Code ใช้การสมัครสมาชิกของคุณเองกับ OpenAI หรือ Anthropic เปลี่ยนได้ทุกเมื่อในการตั้งค่า"
       },
       "skipSetup": "Skip setup",
       "theme": {
@@ -3443,5 +3431,21 @@
     "retrySend": "ลองส่งอีกครั้ง",
     "removeMessage": "นำข้อความออก",
     "failed": "ทำไม่สำเร็จ"
+  },
+  "claudeInstall": {
+    "checking": "กำลังเตรียม Claude Code…",
+    "downloading": "กำลังดาวน์โหลด Claude Code… {percent}%",
+    "downloadingNoTotal": "กำลังดาวน์โหลด Claude Code…",
+    "settingUp": "กำลังตั้งค่า Claude Code…",
+    "why": "Stella ใช้ Claude Code ของ Anthropic เพื่อทำงานกับแพ็กเกจ Claude ของคุณ ใช้เวลาประมาณหนึ่งนาที",
+    "offline": "ไม่สามารถเชื่อมต่อ Anthropic เพื่อดาวน์โหลด Claude Code ได้ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ",
+    "unavailable": "Anthropic ไม่มี Claude Code สำหรับคอมพิวเตอร์เครื่องนี้หรือในภูมิภาคของคุณ",
+    "failed": "ติดตั้ง Claude Code ไม่สำเร็จ",
+    "retry": "ลองอีกครั้ง",
+    "manual": "ติดตั้งเอง",
+    "install": "ติดตั้ง Claude Code",
+    "ownPlan": "Claude Code ทำงานด้วยการสมัครสมาชิก Claude Pro หรือ Max ของคุณเอง",
+    "chatTitle": "ยังไม่ได้ติดตั้ง Claude Code",
+    "chatDescription": "ติดตั้งที่นี่ แล้วลงชื่อเข้าใช้แพ็กเกจ Claude ของคุณและส่งข้อความอีกครั้ง"
   }
 }

@@ -585,6 +585,14 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       attachment.connectionId,
     );
     this.ownerStore().wrote(["device_presence"]);
+    this.noteDeviceLost(attachment.deviceId);
+  }
+
+  /** Stella hears of tasks waiting on this computer if it stays away (device-offline domain). */
+  protected noteDeviceLost(deviceId: string): void {
+    void this.ownerStore()
+      .internalCall("deviceOffline.lost", { deviceId })
+      .catch(() => undefined);
   }
 
   protected presenceRow(deviceId: string): DevicePresenceState | undefined {

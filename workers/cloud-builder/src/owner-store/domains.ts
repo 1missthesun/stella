@@ -32,6 +32,7 @@ import { agentLogsDomain } from "./domains/agent-logs.js";
 import { emailDigestDomain } from "./domains/email-digest.js";
 import { mcpServersDomain } from "./domains/mcp-servers.js";
 import { catchUpsDomain } from "./domains/catch-ups.js";
+import { deviceOfflineDomain } from "./domains/device-offline.js";
 import { RATE_LIMIT_MIGRATION } from "./rate-limit.js";
 import { createOwnerRegistry, type OwnerDomain } from "./registry.js";
 
@@ -77,6 +78,7 @@ export const ownerDomains: OwnerDomain[] = [
   agentLogsDomain,
   mcpServersDomain,
   catchUpsDomain,
+  deviceOfflineDomain,
 ];
 
 export const ownerRegistry = createOwnerRegistry(ownerDomains);

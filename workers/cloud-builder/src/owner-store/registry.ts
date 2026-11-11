@@ -118,6 +118,13 @@ export type OwnerHost = {
   }>;
   homeChanged(ownerGeneration: string, revision: number): Promise<void>;
   changeMemoryPolicy(change: MemoryPolicyChange): Promise<void>;
+  /** Writes a hidden note into a conversation's journal without running a turn; Stella reads it with her next one. */
+  appendConversationNote(input: {
+    conversationId: string;
+    ownerGeneration: string;
+    noteId: string;
+    text: string;
+  }): Promise<void>;
   startAgentMessageTurn(input: {
     ownerGeneration: string;
     conversationId: string;

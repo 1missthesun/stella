@@ -253,6 +253,46 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
     return parseAgentReportTarget(await response.json().catch(() => null));
   },
 
+  async appendConversationNote(input) {
+    const response = await deps.env.ORCHESTRATOR_SESSIONS.getByName(input.conversationId).fetch(
+      `${ORCHESTRATOR_INTERNAL_ORIGIN}/journal`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [HEADER_OWNER]: deps.ownerId(),
+          [HEADER_TURN_AUTH_KIND]: "service",
+          [HEADER_CONVERSATION_ID]: input.conversationId,
+        },
+        body: JSON.stringify({
+          deviceId: "stella-cloud",
+          expectedOwnerGeneration: input.ownerGeneration,
+          localTurnId: input.noteId,
+          source: "note",
+          records: [
+            {
+              kind: "message",
+              role: "user",
+              hidden: true,
+              payloadJson: JSON.stringify({ role: "user", content: [{ type: "text", text: input.text }], timestamp: Date.now() }),
+            },
+          ],
+        }),
+      },
+    );
+    if (response.ok || response.status === 404 || response.status === 410) {
+      await response.body?.cancel().catch(() => undefined);
+      return;
+    }
+    const body = (await response.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
+    if (body?.code === "idempotency_conflict" || body?.code === "owner_generation_stale") return;
+    throw new RpcError(
+      "UNAVAILABLE",
+      `The conversation did not take the note (${response.status}${typeof body?.code === "string" ? ` ${body.code}` : ""}).`,
+      { retryable: true },
+    );
+  },
+
   async startAgentMessageTurn(input) {
     const response = await startOrchestratorTurn(deps, input, {
       protocol: TURN_PLANE_PROTOCOL,

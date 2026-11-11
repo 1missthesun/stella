@@ -1186,6 +1186,9 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           row.state === "cloud_committed" ||
           row.state === "cancel_pending")
       ) {
+        if (row.kind === "agent" && row.executor_device_id && row.state !== "cloud_committed") {
+          this.noteDeviceLost(row.executor_device_id);
+        }
         await this.transitionDispatch(
           row,
           "reconciliation_required",
@@ -1214,7 +1217,9 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
                 lease_expires_at: null,
                 error_code: "RECONCILIATION_EXPIRED",
                 error_message:
-                  "The device running this never reported how it ended.",
+                  row.kind === "agent"
+                    ? "The computer running this task went offline and didn't come back within an hour, so it stopped waiting for it. Its work so far is kept on that computer: message the task to continue it once that computer is back, or carry it on elsewhere now with send_message and a destination."
+                    : "The device running this never reported how it ended.",
               },
           now,
         );

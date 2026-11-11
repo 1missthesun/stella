@@ -80,7 +80,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       !expectedOwnerGeneration ||
       !localTurnId ||
       !LOCAL_TURN_ID_PATTERN.test(localTurnId) ||
-      (body.source !== "voice" && body.source !== "import") ||
+      (body.source !== "voice" && body.source !== "import" && body.source !== "note") ||
       !Array.isArray(records) ||
       records.length === 0
     ) {
@@ -117,7 +117,10 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       );
     }
     const parsedRecords = parseVoiceJournalRecords(records);
-    if (!parsedRecords) {
+    if (
+      !parsedRecords ||
+      (body.source === "note" && parsedRecords.some((record) => record.role !== "user" || !record.hidden))
+    ) {
       return json({ code: "bad_request", message: "Malformed request." }, 400);
     }
     let totalBytes = 0;
@@ -133,8 +136,10 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       );
     }
     // "voice": a desktop voice transcript; "import": chat history made on
-    // the computer before it synced (signed out), copied in once.
-    const source: "voice" | "import" = body.source;
+    // the computer before it synced (signed out), copied in once; "note": a
+    // hidden note for Stella that runs no turn (a computer restarted and
+    // resumed its tasks), read with her next turn wherever she runs.
+    const source: "voice" | "import" | "note" = body.source;
     const receiptKey = `${source}:${deviceId}:${localTurnId}`;
     const turnId = `${source}:${deviceId}:${localTurnId}`;
     const appendLease: OwnerFencedTurn = {

@@ -71,7 +71,7 @@ export const agentMoveText = (result: AgentMoveResult, now = Date.now()): string
   const from = result.from.name;
   const destination = result.to.kind === "cloud" ? "Stella's cloud" : result.where.replace(/^on /, "");
   return [
-    `Moved ${result.threadId} ${result.where}, because ${from} ${AGENT_MOVE_REASON_TEXT[result.from.why]}${deviceLastSeenText(result.from.lastSeenAt, now)}. It continues there with your message as its instruction, and its report comes back to you as usual.`,
+    `Moved ${result.threadId} to ${destination}, because ${from} ${AGENT_MOVE_REASON_TEXT[result.from.why]}${deviceLastSeenText(result.from.lastSeenAt, now)}. It continues there with your message as its instruction, and its report comes back to you as usual.`,
     result.history.entries > 0
       ? `Traveled: its conversation history as last synced to Stella's cloud (${result.history.entries} entries${result.history.syncedAt ? `, the last at ${utcMinute(result.history.syncedAt)}` : ""}).`
       : "Traveled: none of its history. Nothing of it had synced to Stella's cloud, so it starts there from your message alone.",

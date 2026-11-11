@@ -3509,5 +3509,20 @@
     "ownPlan": "Claude Code działa na Twojej własnej subskrypcji Claude Pro lub Max.",
     "chatTitle": "Claude Code nie jest zainstalowany",
     "chatDescription": "Zainstaluj go tutaj, zaloguj się do swojego planu Claude i wyślij wiadomość ponownie."
+  },
+  "claudeLogin": {
+    "heldTitle": "Czekamy, aż zalogujesz się do Claude",
+    "heldDescription": "Twoje logowanie do Claude na tym komputerze wygasło. Twoja wiadomość jest zachowana i zostanie wysłana, gdy tylko się zalogujesz.",
+    "endedTitle": "Twoje logowanie do Claude wygasło",
+    "endedDescription": "Zaloguj się ponownie, aby Stella mogła dalej odpowiadać w ramach Twojego planu Claude.",
+    "endedDescriptionEmail": "Zaloguj się ponownie na {email}, aby Stella mogła dalej odpowiadać w ramach Twojego planu Claude.",
+    "endingTitle": "Twoje logowanie do Claude wkrótce wygaśnie",
+    "endingDescription": "Zaloguj się ponownie przed {date}, aby odpowiedzi Claude dalej działały.",
+    "cloudEndingTitle": "Twoje logowanie do Claude w Twojej chmurze wkrótce wygaśnie",
+    "cloudEndedTitle": "Twoje logowanie do Claude w Twojej chmurze wygasło",
+    "signIn": "Zaloguj się",
+    "signedInContinuing": "Zalogowano do Claude. Stella właśnie odpowiada.",
+    "signedInAsResend": "Zalogowano do Claude jako {email}. Wyślij wiadomość ponownie, aby kontynuować.",
+    "signedInResend": "Zalogowano do Claude. Wyślij wiadomość ponownie, aby kontynuować."
   }
 }

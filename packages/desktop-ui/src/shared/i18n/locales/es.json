@@ -3489,5 +3489,20 @@
     "ownPlan": "Claude Code funciona con tu propia suscripción a Claude Pro o Max.",
     "chatTitle": "Claude Code no está instalado",
     "chatDescription": "Instálalo aquí, inicia sesión en tu plan de Claude y vuelve a enviar tu mensaje."
+  },
+  "claudeLogin": {
+    "heldTitle": "Esperando a que inicies sesión en Claude",
+    "heldDescription": "Tu sesión de Claude en este ordenador ha terminado. Tu mensaje se guarda y se enviará en cuanto inicies sesión.",
+    "endedTitle": "Tu sesión de Claude ha terminado",
+    "endedDescription": "Vuelve a iniciar sesión para que Stella siga respondiendo con tu plan de Claude.",
+    "endedDescriptionEmail": "Vuelve a iniciar sesión en {email} para que Stella siga respondiendo con tu plan de Claude.",
+    "endingTitle": "Tu sesión de Claude termina pronto",
+    "endingDescription": "Vuelve a iniciar sesión antes del {date} para que las respuestas de Claude sigan funcionando.",
+    "cloudEndingTitle": "Tu sesión de Claude en tu nube termina pronto",
+    "cloudEndedTitle": "Tu sesión de Claude en tu nube ha terminado",
+    "signIn": "Iniciar sesión",
+    "signedInContinuing": "Sesión iniciada en Claude. Stella está respondiendo.",
+    "signedInAsResend": "Sesión iniciada en Claude como {email}. Vuelve a enviar tu mensaje para continuar.",
+    "signedInResend": "Sesión iniciada en Claude. Vuelve a enviar tu mensaje para continuar."
   }
 }

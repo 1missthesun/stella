@@ -3509,5 +3509,20 @@
     "ownPlan": "Claude Code работает на вашей собственной подписке Claude Pro или Max.",
     "chatTitle": "Claude Code не установлен",
     "chatDescription": "Установите его здесь, затем войдите в свою подписку Claude и отправьте сообщение ещё раз."
+  },
+  "claudeLogin": {
+    "heldTitle": "Ожидаем, когда вы войдёте в Claude",
+    "heldDescription": "Ваш вход в Claude на этом компьютере истёк. Ваше сообщение сохранено и уйдёт, как только вы войдёте.",
+    "endedTitle": "Ваш вход в Claude истёк",
+    "endedDescription": "Войдите снова, чтобы Stella и дальше отвечала по вашему плану Claude.",
+    "endedDescriptionEmail": "Войдите снова в {email}, чтобы Stella и дальше отвечала по вашему плану Claude.",
+    "endingTitle": "Ваш вход в Claude скоро истечёт",
+    "endingDescription": "Войдите снова до {date}, чтобы ответы Claude продолжали работать.",
+    "cloudEndingTitle": "Ваш вход в Claude в вашем облаке скоро закончится",
+    "cloudEndedTitle": "Ваш вход в Claude в вашем облаке закончился",
+    "signIn": "Войти",
+    "signedInContinuing": "Вы вошли в Claude. Stella уже отвечает.",
+    "signedInAsResend": "Вы вошли в Claude как {email}. Отправьте сообщение ещё раз, чтобы продолжить.",
+    "signedInResend": "Вы вошли в Claude. Отправьте сообщение ещё раз, чтобы продолжить."
   }
 }

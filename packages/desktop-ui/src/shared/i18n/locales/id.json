@@ -3447,5 +3447,20 @@
     "ownPlan": "Claude Code berjalan dengan langganan Claude Pro atau Max milik Anda sendiri.",
     "chatTitle": "Claude Code belum terpasang",
     "chatDescription": "Pasang di sini, lalu masuk ke paket Claude Anda dan kirim pesan Anda lagi."
+  },
+  "claudeLogin": {
+    "heldTitle": "Menunggu Anda masuk ke Claude",
+    "heldDescription": "Sesi masuk Claude Anda di komputer ini telah berakhir. Pesan Anda disimpan dan akan terkirim begitu Anda masuk.",
+    "endedTitle": "Sesi masuk Claude Anda telah berakhir",
+    "endedDescription": "Masuk lagi agar Stella bisa terus menjawab dengan paket Claude Anda.",
+    "endedDescriptionEmail": "Masuk lagi ke {email} agar Stella bisa terus menjawab dengan paket Claude Anda.",
+    "endingTitle": "Sesi masuk Claude Anda segera berakhir",
+    "endingDescription": "Masuk lagi sebelum {date} agar balasan Claude tetap berfungsi.",
+    "cloudEndingTitle": "Login Claude di cloud Anda segera berakhir",
+    "cloudEndedTitle": "Login Claude di cloud Anda telah berakhir",
+    "signIn": "Masuk",
+    "signedInContinuing": "Sudah masuk ke Claude. Stella sedang menjawab.",
+    "signedInAsResend": "Sudah masuk ke Claude sebagai {email}. Kirim ulang pesan Anda untuk melanjutkan.",
+    "signedInResend": "Sudah masuk ke Claude. Kirim ulang pesan Anda untuk melanjutkan."
   }
 }

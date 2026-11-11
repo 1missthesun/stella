@@ -3469,5 +3469,20 @@
     "ownPlan": "A Claude Code a saját Claude Pro- vagy Max-előfizetéseddel működik.",
     "chatTitle": "A Claude Code nincs telepítve",
     "chatDescription": "Telepítsd itt, jelentkezz be a Claude-előfizetésedbe, majd küldd el újra az üzenetet."
+  },
+  "claudeLogin": {
+    "heldTitle": "Várakozás a Claude-bejelentkezésedre",
+    "heldDescription": "A Claude-bejelentkezésed ezen a számítógépen lejárt. Az üzeneted megmarad, és azonnal elmegy, amint bejelentkezel.",
+    "endedTitle": "A Claude-bejelentkezésed lejárt",
+    "endedDescription": "Jelentkezz be újra, hogy Stella továbbra is a Claude-előfizetéseddel válaszolhasson.",
+    "endedDescriptionEmail": "Jelentkezz be újra ezzel: {email}, hogy Stella továbbra is a Claude-előfizetéseddel válaszolhasson.",
+    "endingTitle": "A Claude-bejelentkezésed hamarosan lejár",
+    "endingDescription": "Jelentkezz be újra ez előtt: {date}, hogy a Claude-válaszok továbbra is működjenek.",
+    "cloudEndingTitle": "A Claude-bejelentkezésed a felhődben hamarosan lejár",
+    "cloudEndedTitle": "A Claude-bejelentkezésed a felhődben lejárt",
+    "signIn": "Bejelentkezés",
+    "signedInContinuing": "Bejelentkeztél a Claude-ba. Stella most válaszol.",
+    "signedInAsResend": "Bejelentkeztél a Claude-ba ezzel: {email}. A folytatáshoz küldd el újra az üzeneted.",
+    "signedInResend": "Bejelentkeztél a Claude-ba. A folytatáshoz küldd el újra az üzeneted."
   }
 }

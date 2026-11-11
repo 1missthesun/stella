@@ -1313,7 +1313,7 @@ export class StellaRuntimeHost {
     if (Date.now() - known.at >= 60_000 && !known.pending) {
       known.pending = (async () => {
         const answer = (await this.options.hostHandlers
-          .requestLlmCredentials?.({ operation: "claude-config" })
+          .requestLlmCredentials?.({ operation: "claude-config", cached: true })
           .catch(() => undefined)) as { ok?: boolean; signedIn?: boolean } | undefined;
         this.claudeCodeLogin = { signedIn: answer?.ok === true && answer.signedIn === true, at: Date.now() };
       })();

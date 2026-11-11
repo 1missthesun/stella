@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code läuft über dein eigenes Claude-Pro- oder Max-Abo.",
     "chatTitle": "Claude Code ist nicht installiert",
     "chatDescription": "Installiere es hier, melde dich dann bei deinem Claude-Abo an und sende deine Nachricht erneut."
+  },
+  "claudeLogin": {
+    "heldTitle": "Warten auf deine Anmeldung bei Claude",
+    "heldDescription": "Deine Claude-Anmeldung auf diesem Computer ist abgelaufen. Deine Nachricht bleibt erhalten und wird gesendet, sobald du dich anmeldest.",
+    "endedTitle": "Deine Claude-Anmeldung ist abgelaufen",
+    "endedDescription": "Melde dich erneut an, damit Stella weiter mit deinem Claude-Abo antworten kann.",
+    "endedDescriptionEmail": "Melde dich erneut bei {email} an, damit Stella weiter mit deinem Claude-Abo antworten kann.",
+    "endingTitle": "Deine Claude-Anmeldung läuft bald ab",
+    "endingDescription": "Melde dich vor {date} erneut an, damit deine Claude-Antworten weiter funktionieren.",
+    "cloudEndingTitle": "Deine Claude-Anmeldung in deiner Cloud endet bald",
+    "cloudEndedTitle": "Deine Claude-Anmeldung in deiner Cloud ist abgelaufen",
+    "signIn": "Anmelden",
+    "signedInContinuing": "Bei Claude angemeldet. Stella antwortet jetzt.",
+    "signedInAsResend": "Bei Claude als {email} angemeldet. Sende deine Nachricht erneut, um fortzufahren.",
+    "signedInResend": "Bei Claude angemeldet. Sende deine Nachricht erneut, um fortzufahren."
   }
 }

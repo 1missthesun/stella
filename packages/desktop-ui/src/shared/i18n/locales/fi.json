@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code toimii omalla Claude Pro- tai Max-tilauksellasi.",
     "chatTitle": "Claude Codea ei ole asennettu",
     "chatDescription": "Asenna se tästä, kirjaudu Claude-tilaukseesi ja lähetä viestisi uudelleen."
+  },
+  "claudeLogin": {
+    "heldTitle": "Odotetaan, että kirjaudut Claudeen",
+    "heldDescription": "Claude-kirjautumisesi tällä tietokoneella on päättynyt. Viestisi säilyy ja lähtee heti, kun kirjaudut.",
+    "endedTitle": "Claude-kirjautumisesi on päättynyt",
+    "endedDescription": "Kirjaudu uudelleen, jotta Stella voi jatkaa vastaamista Claude-tilauksellasi.",
+    "endedDescriptionEmail": "Kirjaudu uudelleen tilille {email}, jotta Stella voi jatkaa vastaamista Claude-tilauksellasi.",
+    "endingTitle": "Claude-kirjautumisesi päättyy pian",
+    "endingDescription": "Kirjaudu uudelleen ennen {date}, jotta Claude-vastaukset toimivat edelleen.",
+    "cloudEndingTitle": "Claude-kirjautumisesi pilvessäsi päättyy pian",
+    "cloudEndedTitle": "Claude-kirjautumisesi pilvessäsi on päättynyt",
+    "signIn": "Kirjaudu",
+    "signedInContinuing": "Kirjauduttu Claudeen. Stella vastaa nyt.",
+    "signedInAsResend": "Kirjauduttu Claudeen tilillä {email}. Jatka lähettämällä viestisi uudelleen.",
+    "signedInResend": "Kirjauduttu Claudeen. Jatka lähettämällä viestisi uudelleen."
   }
 }

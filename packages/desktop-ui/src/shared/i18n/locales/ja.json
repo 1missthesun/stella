@@ -3447,5 +3447,20 @@
     "ownPlan": "Claude Code は、ご自身の Claude Pro または Max のサブスクリプションで動作します。",
     "chatTitle": "Claude Code がインストールされていません",
     "chatDescription": "ここでインストールし、Claude のプランにサインインしてから、メッセージをもう一度送信してください。"
+  },
+  "claudeLogin": {
+    "heldTitle": "Claude へのサインインを待っています",
+    "heldDescription": "このコンピュータでの Claude のサインインが終了しました。メッセージは保存されており、サインインするとすぐに送信されます。",
+    "endedTitle": "Claude のサインインが終了しました",
+    "endedDescription": "Stella が Claude プランで応答を続けられるよう、もう一度サインインしてください。",
+    "endedDescriptionEmail": "Stella が Claude プランで応答を続けられるよう、{email} にもう一度サインインしてください。",
+    "endingTitle": "Claude のサインインがまもなく終了します",
+    "endingDescription": "Claude の返信が引き続き動作するよう、{date} までにもう一度サインインしてください。",
+    "cloudEndingTitle": "クラウドの Claude のサインインがまもなく終了します",
+    "cloudEndedTitle": "クラウドの Claude のサインインが終了しました",
+    "signIn": "サインイン",
+    "signedInContinuing": "Claude にサインインしました。Stella が応答しています。",
+    "signedInAsResend": "{email} として Claude にサインインしました。続けるにはメッセージをもう一度送信してください。",
+    "signedInResend": "Claude にサインインしました。続けるにはメッセージをもう一度送信してください。"
   }
 }

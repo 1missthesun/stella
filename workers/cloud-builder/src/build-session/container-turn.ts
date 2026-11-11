@@ -66,6 +66,7 @@ import {
   backupClaudeCloudLogins,
   restoreClaudeCloudLogins,
   seedTestClaudeLogin,
+  type ClaudeCloudLoginHealth,
 } from "../claude-cloud-login.js";
 import { TEST_CLAUDE_EMAIL, testClaudeConfigured } from "../test-claude.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
@@ -1855,9 +1856,12 @@ export const runAgentAttempt = async (
       .exec(`rm -rf ${attemptPaths.directory}`)
       .catch(() => undefined);
     if (turn.execution?.engine === "anthropic") {
-      await backupClaudeCloudLogins(host.env, turn.ownerId, sandbox).catch(
-        () => false,
-      );
+      const logins = await backupClaudeCloudLogins(host.env, turn.ownerId, sandbox, {
+        merge: true,
+      }).catch(() => null);
+      if (logins?.length) {
+        await noteClaudeCloudLogins(host.env, turn, logins).catch(() => undefined);
+      }
     }
     await host.ctx.storage.transaction(async (txn) => {
       const current = await txn.get<TurnBrokerRecord>(brokerRecordKey);
@@ -1960,6 +1964,19 @@ export const runAgentAttempt = async (
     coldContainerStartMs,
     restoreMs,
   };
+};
+
+/** Records when each cloud Claude login ends, for the sign-in notice. */
+const noteClaudeCloudLogins = async (
+  env: Env,
+  turn: TurnRequest,
+  logins: readonly ClaudeCloudLoginHealth[],
+): Promise<void> => {
+  await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
+    name: "engines.noteClaudeCloudLogins",
+    args: { logins },
+    ownerGeneration: turn.ownerGeneration,
+  });
 };
 
 const claudeCloudAccountFor = async (

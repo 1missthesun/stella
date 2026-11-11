@@ -3489,5 +3489,20 @@
     "ownPlan": "Claude Code פועל עם המינוי שלך ל-Claude Pro או Max.",
     "chatTitle": "Claude Code לא מותקן",
     "chatDescription": "התקן אותו כאן, התחבר למינוי Claude שלך ושלח את ההודעה שוב."
+  },
+  "claudeLogin": {
+    "heldTitle": "ממתין שתתחבר ל-Claude",
+    "heldDescription": "החיבור שלך ל-Claude במחשב הזה הסתיים. ההודעה שלך נשמרת ותישלח ברגע שתתחבר.",
+    "endedTitle": "החיבור שלך ל-Claude הסתיים",
+    "endedDescription": "התחבר שוב כדי ש-Stella תמשיך לענות עם תוכנית Claude שלך.",
+    "endedDescriptionEmail": "התחבר שוב ל-{email} כדי ש-Stella תמשיך לענות עם תוכנית Claude שלך.",
+    "endingTitle": "החיבור שלך ל-Claude מסתיים בקרוב",
+    "endingDescription": "התחבר שוב לפני {date} כדי שהתשובות של Claude ימשיכו לעבוד.",
+    "cloudEndingTitle": "ההתחברות שלכם ל-Claude בענן שלכם תסתיים בקרוב",
+    "cloudEndedTitle": "ההתחברות שלכם ל-Claude בענן שלכם הסתיימה",
+    "signIn": "התחברות",
+    "signedInContinuing": "התחברת ל-Claude. Stella עונה עכשיו.",
+    "signedInAsResend": "התחברת ל-Claude בתור {email}. שלח את ההודעה שוב כדי להמשיך.",
+    "signedInResend": "התחברת ל-Claude. שלח את ההודעה שוב כדי להמשיך."
   }
 }

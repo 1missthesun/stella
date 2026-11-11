@@ -102,7 +102,9 @@ export type ClaudeCodeToolOutcome = { content: (TextContent | ImageContent)[]; i
 export type ClaudeCodeStatus =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
   | { state: "usage-limit"; text: string; until?: number; monthly?: true }
-  | { state: "usage-limit-end"; text: string; resumed: boolean };
+  | { state: "usage-limit-end"; text: string; resumed: boolean }
+  | { state: "login-required"; text: string; email?: string }
+  | { state: "login-required-end"; text: string; resumed: boolean };
 
 export type ClaudeCodeBackgroundWake = {
   id: string;

@@ -16,7 +16,14 @@ export type LocalLlmCredentialAccessBroker = {
     provider: string,
     options?: LocalLlmOAuthApiKeyAccessOptions,
   ): Promise<string | null>;
-  getClaudeCodeConfig?(): Promise<ClaudeCodeConfigAccess>;
+  getClaudeCodeConfig?(options?: ClaudeCodeConfigRequest): Promise<ClaudeCodeConfigAccess>;
+};
+
+export type ClaudeCodeConfigRequest = {
+  recheck?: boolean;
+  cached?: boolean;
+  /** Anthropic refused the login in this config directory (null: Claude Code's own). */
+  rejectedConfigDir?: string | null;
 };
 
 export type ClaudeCodeConfigAccess = {
@@ -66,11 +73,13 @@ export const getAccessibleLocalLlmApiKey = async (
     : null;
 };
 
-export const getClaudeCodeConfig = async (): Promise<ClaudeCodeConfigAccess> => {
+export const getClaudeCodeConfig = async (
+  options?: ClaudeCodeConfigRequest,
+): Promise<ClaudeCodeConfigAccess> => {
   const fallback: ClaudeCodeConfigAccess = { configDir: null, signedIn: true };
   if (!broker?.getClaudeCodeConfig) return fallback;
   try {
-    return await broker.getClaudeCodeConfig();
+    return await broker.getClaudeCodeConfig(options);
   } catch {
     return fallback;
   }

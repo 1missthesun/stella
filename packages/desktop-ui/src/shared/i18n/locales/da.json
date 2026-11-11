@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code kører på dit eget Claude Pro- eller Max-abonnement.",
     "chatTitle": "Claude Code er ikke installeret",
     "chatDescription": "Installer det her, log derefter ind på dit Claude-abonnement, og send din besked igen."
+  },
+  "claudeLogin": {
+    "heldTitle": "Venter på, at du logger ind på Claude",
+    "heldDescription": "Dit Claude-login på denne computer er udløbet. Din besked er gemt og sendes, så snart du logger ind.",
+    "endedTitle": "Dit Claude-login er udløbet",
+    "endedDescription": "Log ind igen, så Stella kan blive ved med at svare med din Claude-plan.",
+    "endedDescriptionEmail": "Log ind på {email} igen, så Stella kan blive ved med at svare med din Claude-plan.",
+    "endingTitle": "Dit Claude-login udløber snart",
+    "endingDescription": "Log ind igen før {date}, så dine Claude-svar bliver ved med at virke.",
+    "cloudEndingTitle": "Dit Claude-login i din cloud udløber snart",
+    "cloudEndedTitle": "Dit Claude-login i din cloud er udløbet",
+    "signIn": "Log ind",
+    "signedInContinuing": "Logget ind på Claude. Stella svarer nu.",
+    "signedInAsResend": "Logget ind på Claude som {email}. Send din besked igen for at fortsætte.",
+    "signedInResend": "Logget ind på Claude. Send din besked igen for at fortsætte."
   }
 }

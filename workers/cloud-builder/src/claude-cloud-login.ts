@@ -122,23 +122,82 @@ logout)
   json '{ok:true}'
   ;;
 backup)
-  # An opaque archive of the whole accounts directory, streamed by curl from
-  # this container straight to the owner's backup object (presigned URL in
-  # URL). Nothing reads what is inside.
+  # An archive of the whole accounts directory, streamed by curl from this
+  # container straight to the owner's backup object (presigned URL in URL).
+  # Only the login fields used to compare two copies and to say when each
+  # login ends are read; no token is ever printed.
   [ -d "$accounts" ] || { json '{ok:true,skipped:true}'; exit 0; }
+  parent=$(dirname "$accounts")
+  name=$(basename "$accounts")
   # The stored object is then this container's own copy: its ETag is kept
   # beside the logins, so the next restore here downloads nothing.
-  archive=$(dirname "$accounts")/.claude-accounts-backup.tgz
-  marker=$(dirname "$accounts")/.claude-accounts-etag
-  headers=$(dirname "$accounts")/.claude-accounts-backup.headers
+  archive=$parent/.claude-accounts-backup.tgz
+  marker=$parent/.claude-accounts-etag
+  headers=$parent/.claude-accounts-backup.headers
+  merged=$parent/.claude-accounts-merge
   rm -f -- "$archive" "$marker" "$headers"
-  tar -C "$(dirname "$accounts")" -czf "$archive" "$(basename "$accounts")" || { rm -f -- "$archive"; fail "Couldn't pack the Claude Code logins."; }
+  rm -rf -- "$merged" "$merged.tgz"
+  source_root=$parent
+  if [ "${"$"}{MERGE:-}" = 1 ]; then
+    # An agent's container only refreshes logins; it never signs in or out.
+    # Other containers of the same owner refresh too, so storing this copy
+    # whole could put back a refresh token Anthropic already replaced. The
+    # stored backup decides which logins exist; each one keeps whichever
+    # credential is fresher, and this container takes the fresher one too.
+    code=$(curl -s -o "$merged.tgz" -w '%{http_code}' --max-time 60 "$GET_URL")
+    if [ "$code" = 200 ]; then
+      mkdir "$merged" && chmod 700 "$merged" \
+        && tar -xzpf "$merged.tgz" --same-owner --no-overwrite-dir -C "$merged" \
+        && [ -d "$merged/$name" ] && [ ! -L "$merged/$name" ] \
+        || { rm -rf -- "$merged" "$merged.tgz"; fail "Couldn't read the stored Claude Code logins."; }
+      rm -f -- "$merged.tgz"
+      for theirs_dir in "$merged/$name"/*; do
+        [ -d "$theirs_dir" ] && [ ! -L "$theirs_dir" ] || continue
+        theirs=$theirs_dir/.credentials.json
+        mine=$accounts/$(basename "$theirs_dir")/.credentials.json
+        [ -f "$mine" ] && [ ! -L "$mine" ] && [ -f "$theirs" ] && [ ! -L "$theirs" ] || continue
+        newer=$(jq -rn --slurpfile a "$mine" --slurpfile b "$theirs" '
+          def rank: (.claudeAiOauth // {}) | [
+            ((.refreshToken // "") != "" and .loginEnded == null),
+            (.refreshTokenExpiresAt // 0),
+            (.expiresAt // 0)
+          ];
+          if ($a[0] | rank) > ($b[0] | rank) then "mine"
+          elif ($a[0] | rank) < ($b[0] | rank) then "theirs"
+          else "same" end' 2>/dev/null)
+        if [ "$newer" = mine ]; then
+          cp -p -- "$mine" "$theirs"
+        elif [ "$newer" = theirs ]; then
+          cp -p -- "$theirs" "$mine.tmp" && mv -f -- "$mine.tmp" "$mine"
+        fi
+      done
+      source_root=$merged
+    elif [ "$code" != 404 ]; then
+      rm -f -- "$merged.tgz"
+      fail "Couldn't read the stored Claude Code logins ($code)."
+    fi
+    rm -f -- "$merged.tgz"
+  fi
+  tar -C "$source_root" -czf "$archive" "$name" || { rm -rf -- "$archive" "$merged"; fail "Couldn't pack the Claude Code logins."; }
+  # When each stored login ends: the key, the end time and whether Claude
+  # Code already found it ended. Nothing else from the credential.
+  health=$(for dir in "$source_root/$name"/*; do
+      [ -f "$dir/.credentials.json" ] && [ ! -L "$dir/.credentials.json" ] || continue
+      jq -c --arg key "$(basename "$dir")" --argjson now "$(($(date +%s) * 1000))" '
+        (.claudeAiOauth // {}) as $o
+        | {key:$key, endsAt:($o.refreshTokenExpiresAt // null),
+           ended:(($o.refreshToken // "") == "" or $o.loginEnded != null
+             or (($o.refreshTokenExpiresAt // ($now + 1)) <= $now))}' "$dir/.credentials.json" 2>/dev/null
+    done | jq -cs . 2>/dev/null)
+  rm -rf -- "$merged"
   code=$(curl -s -D "$headers" -o /dev/null -w '%{http_code}' --max-time 60 -T "$archive" "$URL")
   stored=$(tr -d '\r"' <"$headers" 2>/dev/null | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tail -n 1)
   rm -f -- "$archive" "$headers"
   [ "$code" = 200 ] || fail "Couldn't store the Claude Code login backup ($code)."
-  if [ -n "$stored" ]; then printf '%s\n' "$stored" >"$marker"; fi
-  json '{ok:true}'
+  # A merged backup can differ from this container's set of logins, so only
+  # an unmerged one marks this copy as the stored one.
+  if [ -n "$stored" ] && [ "$source_root" = "$parent" ]; then printf '%s\n' "$stored" >"$marker"; fi
+  json --argjson logins "${"$"}{health:-[]}" '{ok:true,logins:$logins}'
   ;;
 restore)
   # The stored backup is the owner's logins; whatever this container's disk
@@ -303,29 +362,53 @@ const loginBackupUrl = async (
   });
 };
 
+/** When one stored cloud login ends, keyed by its account directory. */
+export type ClaudeCloudLoginHealth = { key: string; endsAt: number | null; ended: boolean };
+
+const loginHealthOf = (value: unknown): ClaudeCloudLoginHealth[] =>
+  Array.isArray(value)
+    ? value.flatMap((entry): ClaudeCloudLoginHealth[] => {
+        if (!entry || typeof entry !== "object") return [];
+        const row = entry as Record<string, unknown>;
+        if (typeof row.key !== "string" || !isCloudClaudeAccountKey(row.key)) return [];
+        const endsAt =
+          typeof row.endsAt === "number" && Number.isFinite(row.endsAt) ? row.endsAt : null;
+        return [{ key: row.key, endsAt, ended: row.ended === true }];
+      })
+    : [];
+
 /**
  * Store the owner's Claude Code logins from one container (the sign-in
  * container after a sign-in or a sign-out, an agent's after every Claude
- * turn, since the CLI may have rotated its refresh token there).
+ * turn, since the CLI may have rotated its refresh token there). An agent's
+ * container passes `merge`: it never adds or removes a login, and another
+ * container may have refreshed one since, so each login keeps whichever copy
+ * is fresher. Returns when each stored login ends, or null when nothing was
+ * stored.
  */
 export const backupClaudeCloudLogins = async (
   env: Cloudflare.Env,
   ownerId: string,
   container?: SandboxHandle,
-): Promise<boolean> => {
+  options: { merge?: boolean } = {},
+): Promise<ClaudeCloudLoginHealth[] | null> => {
   const url = await loginBackupUrl(env, ownerId, "PUT");
-  if (!url) return false;
+  if (!url) return null;
+  const getUrl = options.merge ? await loginBackupUrl(env, ownerId, "GET") : null;
+  if (options.merge && !getUrl) return null;
   const result = await runScript(env, ownerId, ["backup"], {
     url,
     timeoutMs: 120_000,
+    ...(getUrl ? { extraEnv: { MERGE: "1", GET_URL: getUrl } } : {}),
     ...(container ? { container } : {}),
   });
   if (!result.ok) {
     console.error(
       JSON.stringify({ level: "error", event: "claude_cloud_login_backup_failed", message: result.error }),
     );
+    return null;
   }
-  return result.ok;
+  return result.skipped === true ? [] : loginHealthOf(result.logins);
 };
 
 export const restoreClaudeCloudLogins = async (
@@ -381,7 +464,7 @@ export const claudeLoginProbe = async (
   action: "plant" | "inspect" | "backup" | "restore" | "replace",
 ): Promise<unknown> => {
   const key = await claudeCloudAccountKey(CLAUDE_LOGIN_PROBE_EMAIL);
-  if (action === "backup") return { ok: await backupClaudeCloudLogins(env, ownerId) };
+  if (action === "backup") return { ok: (await backupClaudeCloudLogins(env, ownerId)) !== null };
   if (action === "restore") return { ok: await restoreClaudeCloudLogins(env, ownerId) };
   if (action === "replace") {
     await (await claudeLoginContainer(env, ownerId)).destroy();
@@ -471,7 +554,7 @@ export const finishClaudeCloudLogin = async (
   loginId: string,
   code: string,
 ): Promise<
-  | { ok: true; email: string; plan?: string; key: string }
+  | { ok: true; email: string; plan?: string; key: string; logins: ClaudeCloudLoginHealth[] | null }
   | { ok: false; error: string }
 > => {
   if (!LOGIN_ID.test(loginId)) return { ok: false, error: "This sign-in expired. Start again." };
@@ -486,8 +569,8 @@ export const finishClaudeCloudLogin = async (
     return { ok: false, error: "Claude Code signed in but didn't say which account." };
   }
   const plan = typeof result.plan === "string" && result.plan ? result.plan : undefined;
-  await backupClaudeCloudLogins(env, ownerId);
-  return { ok: true, email, key, ...(plan ? { plan } : {}) };
+  const logins = await backupClaudeCloudLogins(env, ownerId);
+  return { ok: true, email, key, logins, ...(plan ? { plan } : {}) };
 };
 
 export const cancelClaudeCloudLogin = async (

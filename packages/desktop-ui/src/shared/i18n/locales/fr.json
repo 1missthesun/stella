@@ -3489,5 +3489,20 @@
     "ownPlan": "Claude Code fonctionne avec votre propre abonnement Claude Pro ou Max.",
     "chatTitle": "Claude Code n’est pas installé",
     "chatDescription": "Installez-le ici, connectez-vous à votre abonnement Claude, puis renvoyez votre message."
+  },
+  "claudeLogin": {
+    "heldTitle": "En attente de votre connexion à Claude",
+    "heldDescription": "Votre connexion à Claude sur cet ordinateur a expiré. Votre message est conservé et partira dès que vous vous connecterez.",
+    "endedTitle": "Votre connexion à Claude a expiré",
+    "endedDescription": "Reconnectez-vous pour que Stella continue de répondre avec votre forfait Claude.",
+    "endedDescriptionEmail": "Reconnectez-vous à {email} pour que Stella continue de répondre avec votre forfait Claude.",
+    "endingTitle": "Votre connexion à Claude expire bientôt",
+    "endingDescription": "Reconnectez-vous avant le {date} pour que les réponses de Claude continuent de fonctionner.",
+    "cloudEndingTitle": "Votre connexion à Claude dans votre cloud expire bientôt",
+    "cloudEndedTitle": "Votre connexion à Claude dans votre cloud a expiré",
+    "signIn": "Se connecter",
+    "signedInContinuing": "Connecté à Claude. Stella répond maintenant.",
+    "signedInAsResend": "Connecté à Claude en tant que {email}. Renvoyez votre message pour continuer.",
+    "signedInResend": "Connecté à Claude. Renvoyez votre message pour continuer."
   }
 }

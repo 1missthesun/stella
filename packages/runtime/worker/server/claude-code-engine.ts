@@ -15,7 +15,6 @@ import { resolveAgentWorkingDirectory } from "../../kernel/agent-runtime/shared.
 import { getClaudeCodeRuntimeEffortLevel } from "../../kernel/integrations/claude-code-agent-runtime.js";
 import { readClaudeCodeContextWindows, readClaudeCodeResolvedModels } from "../../kernel/integrations/claude-code-resolved-models.js";
 import {
-  checkClaudeCodeAuth,
   claudeCodeResumableSessionId,
   closeClaudeCodeSessionWhenIdle,
   wakeClaudeCodeUsageLimitHolds,
@@ -208,14 +207,6 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
   };
 
   return {
-    preflight: async () => {
-      const auth = await checkClaudeCodeAuth();
-      if (auth.status !== "reauth_required") return;
-      const failure = new Error(auth.message) as Error & { code?: string; status?: number };
-      failure.code = "CLAUDE_CODE_AUTH_REAUTH_REQUIRED";
-      failure.status = 401;
-      throw failure;
-    },
     resume: async (ref, { held, lastReply }) => {
       const cwd = cwdOf(ref);
       const live = claudeCodeResumableSessionId(ref.sessionKey, cwd);
@@ -269,6 +260,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         ...(ref.role === "worker" ? { autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } : {}),
         abortSignal: spec.signal,
         holdOnUsageLimit: true,
+        holdOnLoginRequired: true,
         executeTool: async (toolCallId, toolName, toolArgs, signal) =>
           toToolResult(await spec.executeTool(toolCallId, toolName, toolArgs, signal)),
         onNativeToolEnd: ({ toolCallId, result, isError }) => spec.onNativeToolEnd({ toolUseId: toolCallId, result, isError }),

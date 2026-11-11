@@ -3489,5 +3489,20 @@
     "ownPlan": "Claude Code funcționează cu propriul tău abonament Claude Pro sau Max.",
     "chatTitle": "Claude Code nu este instalat",
     "chatDescription": "Instalează-l aici, apoi conectează-te la abonamentul Claude și trimite din nou mesajul."
+  },
+  "claudeLogin": {
+    "heldTitle": "Se așteaptă să te conectezi la Claude",
+    "heldDescription": "Conectarea ta la Claude pe acest computer a expirat. Mesajul tău este păstrat și pleacă imediat ce te conectezi.",
+    "endedTitle": "Conectarea ta la Claude a expirat",
+    "endedDescription": "Conectează-te din nou ca Stella să poată răspunde în continuare cu planul tău Claude.",
+    "endedDescriptionEmail": "Conectează-te din nou la {email} ca Stella să poată răspunde în continuare cu planul tău Claude.",
+    "endingTitle": "Conectarea ta la Claude expiră în curând",
+    "endingDescription": "Conectează-te din nou înainte de {date} ca răspunsurile Claude să funcționeze în continuare.",
+    "cloudEndingTitle": "Conectarea ta la Claude în cloudul tău expiră în curând",
+    "cloudEndedTitle": "Conectarea ta la Claude în cloudul tău a expirat",
+    "signIn": "Conectează-te",
+    "signedInContinuing": "Conectat la Claude. Stella răspunde acum.",
+    "signedInAsResend": "Conectat la Claude ca {email}. Trimite din nou mesajul pentru a continua.",
+    "signedInResend": "Conectat la Claude. Trimite din nou mesajul pentru a continua."
   }
 }

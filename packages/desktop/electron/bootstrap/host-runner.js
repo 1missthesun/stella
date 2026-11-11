@@ -212,7 +212,14 @@ export const createHostRunnerHandlers = (context, options) => ({
             };
         }
         if (request.operation === "claude-config") {
-            const config = await context.services.claudeLocalAccounts.configForTurn();
+            const accounts = context.services.claudeLocalAccounts;
+            if (request.rejectedConfigDir !== undefined) {
+                accounts.noteRejected(request.rejectedConfigDir ?? null);
+            }
+            const config = await accounts.configForTurn({
+                recheck: request.recheck === true,
+                cached: request.cached === true,
+            });
             return { ok: true, ...config };
         }
         const forceRefresh = request.forceRefresh === true;

@@ -76,7 +76,9 @@ type ClaudeToolUseTruncation = {
 type ClaudeCodeStatusChange =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
   | { state: "usage-limit"; text: string; until?: number; monthly?: true }
-  | { state: "usage-limit-end"; text: string; resumed: boolean };
+  | { state: "usage-limit-end"; text: string; resumed: boolean }
+  | { state: "login-required"; text: string; email?: string }
+  | { state: "login-required-end"; text: string; resumed: boolean };
 type ClaudeCodeImage = { mimeType: string; data: string };
 type ClaudeCodeUsage = {
   inputTokens: number | undefined;
@@ -126,6 +128,11 @@ export type ClaudeCodeTurnRequest = {
   autoCompactWindowTokens?: number;
   abortSignal?: AbortSignal;
   holdOnUsageLimit?: boolean;
+  /**
+   * Wait for a Claude sign-in instead of failing when no login here can
+   * answer: the person's message stays and goes out once they sign in.
+   */
+  holdOnLoginRequired?: boolean;
   executeTool: (
     toolCallId: string,
     toolName: string,
@@ -298,6 +305,8 @@ type ClaudeCodeSession = {
   /** The current CLI process started a background shell (Bash run_in_background). */
   backgroundShellStarted?: boolean;
   claudeLoginEmail?: string;
+  /** The config directory the current CLI process signs in with (null: Claude Code's own). */
+  claudeLoginConfigDir?: string | null;
   thinkingStripped?: boolean;
 };
 type ClaudeCodeError = Error & { code?: string; status?: number };
@@ -545,20 +554,38 @@ export class ClaudeCodeCompactionLoopError extends Error {
     this.mcpCalls = mcpCalls;
   }
 }
-const claudeLoginLabel = (email: string | undefined) =>
+/**
+ * The one sentence a person sees when no Claude login here can answer: what
+ * happened and what to do, never the CLI's own wording or commands.
+ */
+export const claudeLoginEndedText = (email: string | undefined) =>
   email
-    ? `the Claude Code login for ${email}`
-    : "the Claude Code login on this computer";
+    ? `Your Claude sign-in for ${email} on this computer has ended. Sign in again in Settings › Account to continue.`
+    : "Your Claude sign-in on this computer has ended. Sign in again in Settings › Account to continue.";
+const CLAUDE_LOGIN_HOLD_TEXT = "Waiting for you to sign in to Claude again. Your message is kept and goes out once you do.";
 export const checkClaudeCodeAuth = async () => {
   const config = await getClaudeCodeConfig();
   if (config.signedIn) return { status: "ok" };
-  return {
-    status: "reauth_required",
-    message: config.email
-      ? `Claude Code isn't signed in to ${config.email} on this computer. Sign in to ${config.email} on this computer in Settings › Account, or pick another Claude account there.`
-      : "Claude Code isn't signed in on this computer. Sign in to Claude in Settings › Account.",
-  };
+  return { status: "reauth_required", message: claudeLoginEndedText(config.email) };
 };
+/**
+ * The CLI's wording for a login that is over (time limit, refresh refused,
+ * revoked, signed out), as opposed to a one-off 401.
+ */
+const isEndedClaudeLogin = (error: unknown) =>
+  /time limit|could not be refreshed|refresh token|token revoked|token_revoked|token_expired|login expired|not logged in|please run \/login/i.test(
+    error instanceof Error ? error.message : String(error ?? ""),
+  );
+/** Another Claude Code process held the login's refresh lock; it clears by itself. */
+const isClaudeRefreshLockBusy = (error: unknown) =>
+  /another Claude Code process is (?:refreshing|holding the refresh lock)/i.test(
+    error instanceof Error ? error.message : String(error ?? ""),
+  );
+const CLAUDE_REFRESH_LOCK_WAIT_MS = 15_000;
+const CLAUDE_REFRESH_LOCK_RETRIES = 2;
+const CLAUDE_LOGIN_POLL_MS = 10_000;
+const MAX_LOGIN_REFUSALS_PER_STEP = 6;
+const CLAUDE_LOGIN_HOLD_MAX_MS = 12 * 60 * 60 * 1000;
 
 export const claudeCodeSubscriptionLimitOf = (
   error: unknown,
@@ -657,9 +684,11 @@ const buildSideEffectReconciliationPrompt = (
 const buildResultRetryPrompt = () =>
   "Your previous reply produced no result text. Provide your complete final answer to the pending request now.";
 const withClaudeLoginRejected = (error: unknown, email: string | undefined) => {
-  const failure: ClaudeCodeError = new Error(
-    `${withPeriod(normalizeErrorMessage(error))} Anthropic rejected ${claudeLoginLabel(email)}. Sign in again in Settings › Account.`,
-  );
+  console.warn("[claude-code] Anthropic refused the Claude login", {
+    ...(email ? { email } : {}),
+    detail: normalizeErrorMessage(error).slice(0, 400),
+  });
+  const failure: ClaudeCodeError = new Error(claudeLoginEndedText(email));
   failure.code = "CLAUDE_CODE_AUTH_REAUTH_REQUIRED";
   failure.status = 401;
   return failure;
@@ -1131,7 +1160,6 @@ type ClaudeNativeToolUseCorrelator = ReturnType<
 >;
 const asNumber = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
-const withPeriod = (text: string) => (/[.!?]$/u.test(text) ? text : `${text}.`);
 const normalizeErrorMessage = (error: unknown) => {
   if (error instanceof Error && error.message.trim())
     return error.message.trim();
@@ -2167,6 +2195,10 @@ class ClaudeCodeSessionRuntime {
     let currentPromptImages = promptImages;
     const failedAttemptMcpCalls: McpCallRecord[] = [];
     let usageLimitHolds = 0;
+    let loginRechecks = 0;
+    let loginRefusals = 0;
+    let refreshLockWaits = 0;
+    await this.awaitClaudeLogin(request);
 
     for (;;) {
       try {
@@ -2209,7 +2241,53 @@ class ClaudeCodeSessionRuntime {
           continue;
         }
         if (claudeCodeAuthFailureOf(error)) {
-          throw withClaudeLoginRejected(error, session.claudeLoginEmail);
+          // The login this step ran on was refused. Read the logins again
+          // (another one here may answer, or another process renewed this
+          // one) and try once more; when none can answer, wait for a
+          // sign-in rather than lose the reply.
+          const usedDir = session.claudeLoginConfigDir ?? null;
+          const ended = isEndedClaudeLogin(error) || loginRechecks > 0;
+          loginRechecks += 1;
+          loginRefusals += 1;
+          // Logins that read as signed in but keep being refused: stop
+          // rather than loop.
+          if (loginRefusals > MAX_LOGIN_REFUSALS_PER_STEP) {
+            throw withClaudeLoginRejected(error, session.claudeLoginEmail);
+          }
+          const backgroundStopped = session.backgroundShellStarted === true;
+          this.resetStreamingProcess(request.sessionKey, session);
+          const next = await getClaudeCodeConfig({
+            recheck: true,
+            ...(ended ? { rejectedConfigDir: usedDir } : {}),
+          });
+          if (!next.signedIn || loginRechecks > 1) {
+            if (!request.holdOnLoginRequired) {
+              throw withClaudeLoginRejected(error, session.claudeLoginEmail ?? next.email);
+            }
+            console.warn("[claude-code] waiting for a Claude sign-in", {
+              detail: normalizeErrorMessage(error).slice(0, 400),
+            });
+            await this.awaitClaudeLogin(request, { email: session.claudeLoginEmail ?? next.email, force: true });
+            loginRechecks = 0;
+          }
+          if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
+          if (failedAttemptMcpCalls.length > 0) {
+            currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
+            currentPromptImages = [];
+          }
+          if (backgroundStopped) currentPrompt = `${USAGE_LIMIT_BACKGROUND_NOTE}\n\n${currentPrompt}`;
+          continue;
+        }
+        if (isClaudeRefreshLockBusy(error) && refreshLockWaits < CLAUDE_REFRESH_LOCK_RETRIES) {
+          refreshLockWaits += 1;
+          this.resetStreamingProcess(request.sessionKey, session);
+          await waitUntil(Date.now() + CLAUDE_REFRESH_LOCK_WAIT_MS, request.abortSignal, new Promise<void>(() => {}));
+          if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
+          if (failedAttemptMcpCalls.length > 0) {
+            currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
+            currentPromptImages = [];
+          }
+          continue;
         }
 
         if (error instanceof ClaudeCodeSafeguardBlockError) {
@@ -2245,6 +2323,53 @@ class ClaudeCodeSessionRuntime {
           : buildResultRetryPrompt();
         currentPromptImages = [];
       }
+    }
+  }
+  /**
+   * Returns once a Claude login here can answer. When none can, a turn that
+   * may wait shows that it needs a sign-in and waits for one (checking the
+   * logins every few seconds, so a sign-in in Settings or the notice ends
+   * the wait); any other turn fails with the one plain sentence.
+   */
+  async awaitClaudeLogin(
+    request: ClaudeCodeTurnRequest,
+    options: { email?: string; force?: boolean } = {},
+  ) {
+    let config = await getClaudeCodeConfig();
+    if (config.signedIn && !options.force) return;
+    if (!request.holdOnLoginRequired) {
+      throw withClaudeLoginRejected("Claude Code isn't signed in on this computer.", options.email ?? config.email);
+    }
+    const email = options.email ?? config.email;
+    request.onStatusChange?.({
+      state: "login-required",
+      text: CLAUDE_LOGIN_HOLD_TEXT,
+      ...(email ? { email } : {}),
+    });
+    const deadline = Date.now() + CLAUDE_LOGIN_HOLD_MAX_MS;
+    let resumed = false;
+    try {
+      for (;;) {
+        await waitUntil(
+          Math.min(deadline, Date.now() + CLAUDE_LOGIN_POLL_MS),
+          request.abortSignal,
+          new Promise<void>(() => {}),
+        );
+        config = await getClaudeCodeConfig({ cached: true });
+        if (config.signedIn) {
+          resumed = true;
+          return;
+        }
+        if (Date.now() >= deadline) {
+          throw withClaudeLoginRejected("Waited for a Claude sign-in.", email);
+        }
+      }
+    } finally {
+      request.onStatusChange?.({
+        state: "login-required-end",
+        text: resumed ? "Signed in to Claude. Continuing." : "",
+        resumed,
+      });
     }
   }
   async holdForUsageLimit(
@@ -2724,6 +2849,7 @@ class ClaudeCodeSessionRuntime {
       CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS,
     );
     session.claudeLoginEmail = claudeConfig.email;
+    session.claudeLoginConfigDir = claudeConfigDir;
     delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
     delete childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE;
     if (

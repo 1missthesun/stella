@@ -7,7 +7,15 @@ export const ENGINE_PROVIDERS = ["anthropic", "chatgpt"] as const;
 export type EngineProvider = (typeof ENGINE_PROVIDERS)[number];
 
 export type ClaudeLoginPlace =
-  | { kind: "cloud"; active?: boolean; updatedAt: number }
+  | {
+      kind: "cloud";
+      active?: boolean;
+      /** When Anthropic ends this login (epoch ms), as the cloud last read it. */
+      loginEndsAt?: number;
+      /** Claude Code found this login ended: it needs signing in again. */
+      loginEnded?: boolean;
+      updatedAt: number;
+    }
   | {
       kind: "device";
       deviceId: string;

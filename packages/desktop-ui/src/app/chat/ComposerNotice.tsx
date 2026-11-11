@@ -12,6 +12,7 @@ import { useT } from "@/shared/i18n";
 import { ClaudeSignInNotice } from "@/features/claude/ClaudeSignInNotice";
 import { ConnectPlanNotice } from "@/features/chat/connect-plan/ConnectPlanNotice";
 import { useConnectPlanHeadsUp } from "@/features/chat/connect-plan/use-connect-plan-heads-up";
+import { useClaudeLoginHeadsUp } from "@/features/claude/use-claude-login-heads-up";
 import "./composer-notice.css";
 
 const KIND_ICON: Record<ComposerNoticeKind, typeof LogIn> = {
@@ -34,6 +35,7 @@ export const ComposerNotice = ({
   useEffect(() => registerComposerNoticeSurface(), []);
 
   useConnectPlanHeadsUp(conversationId ?? null);
+  useClaudeLoginHeadsUp();
 
   if (!notice) return null;
 

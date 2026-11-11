@@ -39,6 +39,8 @@ export function useClaudeLocalAccounts() {
     configs,
     activeConfigId: state?.activeConfigId ?? null,
     activeReason: state?.activeReason,
+    attention: state?.attention,
+    chosenEmail: state?.chosenEmail,
     signedIn: configs.some((config) => config.loggedIn),
     defaultSignedOut: configs.some((config) => config.isDefault && !config.loggedIn),
     signOut: async (configId: string) => {

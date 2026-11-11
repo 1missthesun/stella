@@ -1,5 +1,6 @@
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
+import { dismissClaudeLoginHeld, presentClaudeLoginHeld } from "@/features/claude/claude-login-notice";
 import { presentAllowanceConnectPlan } from "@/features/chat/connect-plan/connect-plan";
 import { showToast } from "@/ui/toast";
 import {
@@ -123,6 +124,14 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     }
     if (event.type === "engine_status" && (event.state === "usage-limit" || event.state === "usage-limit-end")) {
       presentUsageLimit(conversationId, event);
+      continue;
+    }
+    if (event.type === "engine_status" && event.state === "login-required") {
+      presentClaudeLoginHeld(conversationId, event.email);
+      continue;
+    }
+    if (event.type === "engine_status" && event.state === "login-required-end") {
+      dismissClaudeLoginHeld(conversationId);
       continue;
     }
     if (event.type === "engine_status" && event.state === "model-fallback") {

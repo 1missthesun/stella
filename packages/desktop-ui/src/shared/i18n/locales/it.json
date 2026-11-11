@@ -3489,5 +3489,20 @@
     "ownPlan": "Claude Code funziona con il tuo abbonamento Claude Pro o Max.",
     "chatTitle": "Claude Code non è installato",
     "chatDescription": "Installalo qui, poi accedi al tuo abbonamento Claude e invia di nuovo il messaggio."
+  },
+  "claudeLogin": {
+    "heldTitle": "In attesa che tu acceda a Claude",
+    "heldDescription": "Il tuo accesso a Claude su questo computer è scaduto. Il tuo messaggio è conservato e verrà inviato appena accedi.",
+    "endedTitle": "Il tuo accesso a Claude è scaduto",
+    "endedDescription": "Accedi di nuovo perché Stella continui a rispondere con il tuo piano Claude.",
+    "endedDescriptionEmail": "Accedi di nuovo a {email} perché Stella continui a rispondere con il tuo piano Claude.",
+    "endingTitle": "Il tuo accesso a Claude scade a breve",
+    "endingDescription": "Accedi di nuovo prima di {date} perché le risposte di Claude continuino a funzionare.",
+    "cloudEndingTitle": "Il tuo accesso a Claude nel tuo cloud scade presto",
+    "cloudEndedTitle": "Il tuo accesso a Claude nel tuo cloud è scaduto",
+    "signIn": "Accedi",
+    "signedInContinuing": "Accesso a Claude eseguito. Stella sta rispondendo.",
+    "signedInAsResend": "Accesso a Claude eseguito come {email}. Invia di nuovo il messaggio per continuare.",
+    "signedInResend": "Accesso a Claude eseguito. Invia di nuovo il messaggio per continuare."
   }
 }

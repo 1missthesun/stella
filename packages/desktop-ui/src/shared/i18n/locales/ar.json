@@ -3549,5 +3549,20 @@
     "ownPlan": "يعمل Claude Code باشتراكك الخاص في Claude Pro أو Max.",
     "chatTitle": "Claude Code غير مثبّت",
     "chatDescription": "ثبّته هنا، ثم سجّل الدخول إلى اشتراكك في Claude وأرسل رسالتك مرة أخرى."
+  },
+  "claudeLogin": {
+    "heldTitle": "في انتظار تسجيل دخولك إلى Claude",
+    "heldDescription": "انتهى تسجيل دخولك إلى Claude على هذا الكمبيوتر. رسالتك محفوظة وستُرسل فور تسجيل دخولك.",
+    "endedTitle": "انتهى تسجيل دخولك إلى Claude",
+    "endedDescription": "سجّل الدخول مرة أخرى ليواصل Stella الرد باستخدام خطة Claude الخاصة بك.",
+    "endedDescriptionEmail": "سجّل الدخول إلى {email} مرة أخرى ليواصل Stella الرد باستخدام خطة Claude الخاصة بك.",
+    "endingTitle": "سينتهي تسجيل دخولك إلى Claude قريبًا",
+    "endingDescription": "سجّل الدخول مرة أخرى قبل {date} لتستمر ردود Claude في العمل.",
+    "cloudEndingTitle": "سينتهي تسجيل دخولك إلى Claude في سحابتك قريبًا",
+    "cloudEndedTitle": "انتهى تسجيل دخولك إلى Claude في سحابتك",
+    "signIn": "تسجيل الدخول",
+    "signedInContinuing": "تم تسجيل الدخول إلى Claude. يجيب Stella الآن.",
+    "signedInAsResend": "تم تسجيل الدخول إلى Claude باسم {email}. أرسل رسالتك مرة أخرى للمتابعة.",
+    "signedInResend": "تم تسجيل الدخول إلى Claude. أرسل رسالتك مرة أخرى للمتابعة."
   }
 }

@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code आपकी अपनी Claude Pro या Max सदस्यता पर चलता है।",
     "chatTitle": "Claude Code इंस्टॉल नहीं है",
     "chatDescription": "इसे यहीं इंस्टॉल करें, फिर अपने Claude प्लान में साइन इन करें और अपना संदेश फिर से भेजें।"
+  },
+  "claudeLogin": {
+    "heldTitle": "आपके Claude में साइन इन करने की प्रतीक्षा है",
+    "heldDescription": "इस कंप्यूटर पर आपका Claude साइन-इन समाप्त हो गया है। आपका संदेश सुरक्षित है और साइन इन करते ही भेज दिया जाएगा।",
+    "endedTitle": "आपका Claude साइन-इन समाप्त हो गया है",
+    "endedDescription": "फिर से साइन इन करें ताकि Stella आपके Claude प्लान से जवाब देती रहे।",
+    "endedDescriptionEmail": "{email} में फिर से साइन इन करें ताकि Stella आपके Claude प्लान से जवाब देती रहे।",
+    "endingTitle": "आपका Claude साइन-इन जल्द समाप्त होगा",
+    "endingDescription": "{date} से पहले फिर से साइन इन करें ताकि Claude के जवाब काम करते रहें।",
+    "cloudEndingTitle": "आपके क्लाउड में Claude साइन-इन जल्द खत्म होगा",
+    "cloudEndedTitle": "आपके क्लाउड में Claude साइन-इन खत्म हो गया है",
+    "signIn": "साइन इन करें",
+    "signedInContinuing": "Claude में साइन इन हो गया। Stella अब जवाब दे रही है।",
+    "signedInAsResend": "Claude में {email} के रूप में साइन इन हो गया। जारी रखने के लिए अपना संदेश फिर से भेजें।",
+    "signedInResend": "Claude में साइन इन हो गया। जारी रखने के लिए अपना संदेश फिर से भेजें।"
   }
 }

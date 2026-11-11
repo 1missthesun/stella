@@ -3509,5 +3509,20 @@
     "ownPlan": "Claude Code běží na vašem vlastním předplatném Claude Pro nebo Max.",
     "chatTitle": "Claude Code není nainstalovaný",
     "chatDescription": "Nainstalujte ho tady, pak se přihlaste ke svému předplatnému Claude a pošlete zprávu znovu."
+  },
+  "claudeLogin": {
+    "heldTitle": "Čeká se, až se přihlásíte ke Claude",
+    "heldDescription": "Vaše přihlášení ke Claude na tomto počítači skončilo. Vaše zpráva je uložená a odešle se, jakmile se přihlásíte.",
+    "endedTitle": "Vaše přihlášení ke Claude skončilo",
+    "endedDescription": "Přihlaste se znovu, aby Stella mohla dál odpovídat s vaším plánem Claude.",
+    "endedDescriptionEmail": "Přihlaste se znovu k {email}, aby Stella mohla dál odpovídat s vaším plánem Claude.",
+    "endingTitle": "Vaše přihlášení ke Claude brzy skončí",
+    "endingDescription": "Přihlaste se znovu před {date}, aby odpovědi Claude dál fungovaly.",
+    "cloudEndingTitle": "Vaše přihlášení ke Claude ve vašem cloudu brzy vyprší",
+    "cloudEndedTitle": "Vaše přihlášení ke Claude ve vašem cloudu vypršelo",
+    "signIn": "Přihlásit se",
+    "signedInContinuing": "Přihlášeno ke Claude. Stella právě odpovídá.",
+    "signedInAsResend": "Přihlášeno ke Claude jako {email}. Pokračujte odesláním zprávy znovu.",
+    "signedInResend": "Přihlášeno ke Claude. Pokračujte odesláním zprávy znovu."
   }
 }

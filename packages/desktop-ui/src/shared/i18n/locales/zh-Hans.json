@@ -3447,5 +3447,20 @@
     "ownPlan": "Claude Code 使用你自己的 Claude Pro 或 Max 订阅运行。",
     "chatTitle": "未安装 Claude Code",
     "chatDescription": "在这里安装，然后登录你的 Claude 套餐并重新发送消息。"
+  },
+  "claudeLogin": {
+    "heldTitle": "正在等待你登录 Claude",
+    "heldDescription": "你在这台电脑上的 Claude 登录已失效。你的消息已保留，登录后会立即发送。",
+    "endedTitle": "你的 Claude 登录已失效",
+    "endedDescription": "请重新登录，以便 Stella 继续使用你的 Claude 套餐回复。",
+    "endedDescriptionEmail": "请重新登录 {email}，以便 Stella 继续使用你的 Claude 套餐回复。",
+    "endingTitle": "你的 Claude 登录即将失效",
+    "endingDescription": "请在 {date} 之前重新登录，以便 Claude 回复继续正常工作。",
+    "cloudEndingTitle": "你云端的 Claude 登录即将到期",
+    "cloudEndedTitle": "你云端的 Claude 登录已到期",
+    "signIn": "登录",
+    "signedInContinuing": "已登录 Claude。Stella 正在回复。",
+    "signedInAsResend": "已以 {email} 登录 Claude。请重新发送消息以继续。",
+    "signedInResend": "已登录 Claude。请重新发送消息以继续。"
   }
 }

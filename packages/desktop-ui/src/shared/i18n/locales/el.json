@@ -3469,5 +3469,20 @@
     "ownPlan": "Το Claude Code λειτουργεί με τη δική σας συνδρομή Claude Pro ή Max.",
     "chatTitle": "Το Claude Code δεν είναι εγκατεστημένο",
     "chatDescription": "Εγκαταστήστε το εδώ, συνδεθείτε στη συνδρομή σας στο Claude και στείλτε ξανά το μήνυμά σας."
+  },
+  "claudeLogin": {
+    "heldTitle": "Αναμονή για τη σύνδεσή σας στο Claude",
+    "heldDescription": "Η σύνδεσή σας στο Claude σε αυτόν τον υπολογιστή έληξε. Το μήνυμά σας διατηρείται και θα σταλεί μόλις συνδεθείτε.",
+    "endedTitle": "Η σύνδεσή σας στο Claude έληξε",
+    "endedDescription": "Συνδεθείτε ξανά για να συνεχίσει η Stella να απαντά με το πρόγραμμα Claude σας.",
+    "endedDescriptionEmail": "Συνδεθείτε ξανά στο {email} για να συνεχίσει η Stella να απαντά με το πρόγραμμα Claude σας.",
+    "endingTitle": "Η σύνδεσή σας στο Claude λήγει σύντομα",
+    "endingDescription": "Συνδεθείτε ξανά πριν από {date} για να συνεχίσουν να λειτουργούν οι απαντήσεις του Claude.",
+    "cloudEndingTitle": "Η σύνδεσή σας στο Claude στο cloud σας λήγει σύντομα",
+    "cloudEndedTitle": "Η σύνδεσή σας στο Claude στο cloud σας έληξε",
+    "signIn": "Σύνδεση",
+    "signedInContinuing": "Συνδεθήκατε στο Claude. Η Stella απαντά τώρα.",
+    "signedInAsResend": "Συνδεθήκατε στο Claude ως {email}. Στείλτε ξανά το μήνυμά σας για να συνεχίσετε.",
+    "signedInResend": "Συνδεθήκατε στο Claude. Στείλτε ξανά το μήνυμά σας για να συνεχίσετε."
   }
 }

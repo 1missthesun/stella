@@ -49,7 +49,7 @@ const stripClaudeCodeMark = (message: string) =>
   message.replace(/^\s*\[claude-code\/[a-z-]+\]\s*/i, '').trim()
 
 const claudeLoginEmailOf = (message: string): string | undefined =>
-  /(?:login for|signed in to|Sign in to)\s+([^\s@]+@[^\s@]+?)(?=[.,;)]?(?:\s|$))/i.exec(
+  /(?:login for|sign-in for|signed in to|Sign in to)\s+([^\s@]+@[^\s@]+?)(?=[.,;)]?(?:\s|$))/i.exec(
     message,
   )?.[1]
 
@@ -157,10 +157,10 @@ export const resolveStellaProviderErrorToast = (
     case 'claude-code-login': {
       const email = claudeLoginEmailOf(message)
       return {
-        title: 'Claude Code needs login',
+        title: translateNow('claudeLogin.endedTitle'),
         description: email
-          ? `Claude Code needs to sign in to ${email} on this computer before Stella can use it.`
-          : 'Claude Code needs to sign in on this computer before Stella can use it.',
+          ? translateNow('claudeLogin.endedDescriptionEmail', { email })
+          : translateNow('claudeLogin.endedDescription'),
         variant: 'error',
         duration: 10000,
       }

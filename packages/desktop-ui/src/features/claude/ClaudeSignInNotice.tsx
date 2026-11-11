@@ -5,6 +5,7 @@ import { useT } from "@/shared/i18n";
 import type { ComposerNotice } from "@/features/chat/composer-notice-store";
 import { ClaudeLoginPrompt } from "./ClaudeLoginPrompt";
 import { useClaudeLocalAccounts } from "./use-claude-local-accounts";
+import { rememberClaudeHeadsUpDismissed } from "./use-claude-login-heads-up";
 import { useClaudeLogin, type ClaudeLoginTarget } from "./use-claude-login";
 import { useClaudeInstallThenSignIn } from "./use-claude-cli-install";
 import { ClaudeCliInstallStatus } from "./ClaudeCliInstallStatus";
@@ -24,22 +25,28 @@ export function ClaudeSignInNotice({
 }) {
   const t = useT();
   const local = useClaudeLocalAccounts();
+  const continues = notice.claudeSignIn?.continues === true;
   const login = useClaudeLogin({
     onSignedIn: (result) => {
       onDismiss();
       showToast({
-        title: result.email
-          ? `Signed in to Claude as ${result.email}. Send your message again to continue.`
-          : "Signed in to Claude. Send your message again to continue.",
+        title: continues
+          ? t("claudeLogin.signedInContinuing")
+          : result.email
+            ? t("claudeLogin.signedInAsResend", { email: result.email })
+            : t("claudeLogin.signedInResend"),
       });
       void local.reload();
     },
   });
   const email = notice.claudeSignIn?.email;
-  const missingCli = local.available && local.loaded && !local.cliInstalled;
-  const canSignIn = local.available && (!local.loaded || local.cliInstalled);
+  // The cloud's login is signed in through the cloud: nothing needed here.
+  const cloud = notice.claudeSignIn?.place === "cloud";
+  const missingCli = !cloud && local.available && local.loaded && !local.cliInstalled;
+  const canSignIn = cloud || (local.available && (!local.loaded || local.cliInstalled));
 
   const target = (): ClaudeLoginTarget => {
+    if (cloud) return email ? { place: "cloud", email } : { place: "cloud" };
     if (email) {
       const config = local.configs.find((entry) => !entry.isDefault && sameEmail(entry.email, email));
       return config ? { place: "local", configId: config.configId, email } : { place: "local", email };
@@ -98,7 +105,7 @@ export function ClaudeSignInNotice({
             className="pill-btn pill-btn--primary composer-notice__primary"
             onClick={() => void login.start(target())}
           >
-            Sign in
+            {t("claudeLogin.signIn")}
           </Button>
         </div>
       )}
@@ -108,6 +115,8 @@ export function ClaudeSignInNotice({
         aria-label={t("common.close")}
         onClick={() => {
           login.cancel();
+          const dismissKey = notice.claudeSignIn?.dismissKey;
+          if (dismissKey) rememberClaudeHeadsUpDismissed(dismissKey);
           onDismiss();
         }}
       >

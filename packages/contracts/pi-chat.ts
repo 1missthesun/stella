@@ -142,6 +142,9 @@ export type PiChatEvent =
       paused?: import("./claude-usage-limit.js").UsageLimitSummary;
     }
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
+  /** No Claude login here can answer: the reply waits for a sign-in (email: the login to renew). */
+  | { type: "engine_status"; state: "login-required"; text: string; email?: string }
+  | { type: "engine_status"; state: "login-required-end"; text: string; resumed: boolean }
   /** The chat's unresolved safety block, or null once nothing is blocked. */
   | { type: "safeguard"; notice: SafeguardNotice | null }
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
@@ -436,6 +439,8 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
       if (event.state === "running") {
         return { ...state, compacting: false, engineStatus: event.text === ENGINE_WORKING_TEXT ? undefined : event.text };
       }
+      if (event.state === "login-required") return { ...state, compacting: false, engineStatus: event.text };
+      if (event.state === "login-required-end") return { ...state, engineStatus: undefined };
       return state;
     default:
       return state;
@@ -467,6 +472,11 @@ export const piTerminalNotice = (message: {
           stellaUsageLimitText(message.errorMessage) ??
           (message.errorMessage?.trimStart().startsWith("[claude-code/not-installed]")
             ? "Stella couldn't answer: Claude Code isn't installed on this computer."
+            : null) ??
+          // A Claude login that needs signing in again says so in one
+          // sentence (written by the engine), with nothing stacked on it.
+          (message.errorMessage?.trimStart().startsWith("[claude-code/login-required]")
+            ? message.errorMessage.replace(ENGINE_ERROR_MARK, "").trim()
             : null) ??
           `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
       }

@@ -65,9 +65,14 @@ export const layer = Layer.effect(
           });
           return value.ok && "value" in value ? value.value : null;
         },
-        getClaudeCodeConfig: async () => {
+        getClaudeCodeConfig: async (options) => {
           const result = await requestHostLlmCredentials({
             operation: "claude-config",
+            ...(options?.recheck ? { recheck: true } : {}),
+            ...(options?.cached ? { cached: true } : {}),
+            ...(options?.rejectedConfigDir !== undefined
+              ? { rejectedConfigDir: options.rejectedConfigDir }
+              : {}),
           });
           if (!result.ok || !("signedIn" in result)) {
             return { configDir: null, signedIn: true };

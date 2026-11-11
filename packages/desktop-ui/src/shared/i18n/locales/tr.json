@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code, kendi Claude Pro veya Max aboneliğinle çalışır.",
     "chatTitle": "Claude Code yüklü değil",
     "chatDescription": "Burada kur, ardından Claude planına giriş yap ve mesajını yeniden gönder."
+  },
+  "claudeLogin": {
+    "heldTitle": "Claude'da oturum açmanız bekleniyor",
+    "heldDescription": "Bu bilgisayardaki Claude oturumunuz sona erdi. Mesajınız saklanıyor ve oturum açar açmaz gönderilecek.",
+    "endedTitle": "Claude oturumunuz sona erdi",
+    "endedDescription": "Stella'nın Claude planınızla yanıt vermeye devam edebilmesi için yeniden oturum açın.",
+    "endedDescriptionEmail": "Stella'nın Claude planınızla yanıt vermeye devam edebilmesi için {email} hesabında yeniden oturum açın.",
+    "endingTitle": "Claude oturumunuz yakında sona erecek",
+    "endingDescription": "Claude yanıtlarının çalışmaya devam etmesi için {date} tarihinden önce yeniden oturum açın.",
+    "cloudEndingTitle": "Bulutundaki Claude oturumun yakında sona eriyor",
+    "cloudEndedTitle": "Bulutundaki Claude oturumun sona erdi",
+    "signIn": "Oturum aç",
+    "signedInContinuing": "Claude'da oturum açıldı. Stella şimdi yanıtlıyor.",
+    "signedInAsResend": "Claude'da {email} olarak oturum açıldı. Devam etmek için mesajınızı yeniden gönderin.",
+    "signedInResend": "Claude'da oturum açıldı. Devam etmek için mesajınızı yeniden gönderin."
   }
 }

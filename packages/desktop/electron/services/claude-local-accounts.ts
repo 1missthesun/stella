@@ -1,14 +1,17 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
-import { hostname } from "node:os";
+import { homedir, hostname } from "node:os";
 import path from "node:path";
-import type {
-  ClaudeLocalAccountsState,
-  ClaudeLocalConfig,
-  ClaudeLocalLoginStart,
+import {
+  CLAUDE_LOGIN_WARN_BEFORE_MS,
+  type ClaudeLocalAccountsState,
+  type ClaudeLocalConfig,
+  type ClaudeLocalLoginStart,
+  type ClaudeLoginAttention,
 } from "@stella/contracts/claude-local-accounts";
 import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backend/engines";
+import { readStoredClaudeLogin, type StoredClaudeLogin } from "@stella/contracts/claude-login";
 import {
   buildExternalCliChildEnv,
   resolveExternalCliPath,
@@ -29,6 +32,13 @@ const LOGOUT_TIMEOUT_MS = 30_000;
 const FOCUS_REFRESH_MIN_INTERVAL_MS = 30_000;
 const REPORT_SETTLE_MS = 15_000;
 const REPORT_RETRY_MIN_INTERVAL_MS = 60_000;
+// Logins are checked at start and then on this beat, so one that is about to
+// end is noticed days before, not by a reply that fails.
+const FIRST_CHECK_DELAY_MS = 20_000;
+const PERIODIC_CHECK_MS = 30 * 60_000;
+// A turn waiting for a sign-in asks often; it re-reads the logins at most
+// this often while none can answer.
+const SIGNED_OUT_RECHECK_MS = 60_000;
 
 const STRIPPED_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"];
 
@@ -36,6 +46,58 @@ type ConfigStatus = ClaudeLocalConfig & {
   dir: string | null;
   known: boolean;
   createdAt: number;
+};
+
+/**
+ * The login stored in a config directory, read from Claude Code's own file
+ * without any secret leaving this function. Used when `claude auth status`
+ * reports a different credential (a token in Claude Code's settings) than
+ * the login Stella's turns run on. macOS keeps the login in the keychain,
+ * where the status is read instead.
+ */
+/** Claude Code's own default: `CLAUDE_CONFIG_DIR` when set, else ~/.claude. */
+const defaultConfigDir = (): string | null => process.env.CLAUDE_CONFIG_DIR?.trim() || null;
+
+const readStoredLogin = (dir: string | null): StoredClaudeLogin & { plan?: string } => {
+  let raw: string | null = null;
+  try {
+    raw = fs.readFileSync(
+      path.join(dir ?? defaultConfigDir() ?? path.join(homedir(), ".claude"), ".credentials.json"),
+      "utf8",
+    );
+  } catch {
+    return { present: false, alive: false };
+  }
+  const stored = readStoredClaudeLogin(raw);
+  let plan: string | undefined;
+  try {
+    plan = text((JSON.parse(raw) as { claudeAiOauth?: { subscriptionType?: unknown } }).claudeAiOauth?.subscriptionType);
+  } catch {
+    plan = undefined;
+  }
+  return { ...stored, ...(plan ? { plan } : {}) };
+};
+
+/** The account a config directory last signed in to, even after it ended. */
+const storedEmail = (dir: string | null): string | undefined => {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(
+        path.join(dir ?? defaultConfigDir() ?? homedir(), ".claude.json"),
+        "utf8",
+      ),
+    ) as { oauthAccount?: { emailAddress?: unknown } };
+    return text(parsed.oauthAccount?.emailAddress);
+  } catch {
+    return undefined;
+  }
+};
+
+const epochMs = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 type PendingLogin = {
@@ -107,6 +169,14 @@ export class ClaudeLocalAccounts {
   private installing: Promise<ClaudeCliInstallResult> | null = null;
   private readonly installListeners = new Set<(progress: ClaudeCliInstallProgress) => void>();
   private readonly installAbort = new AbortController();
+  /**
+   * Logins Anthropic refused in a turn although their status read fine,
+   * keyed by config, with the expiry they had then: they stay out of use
+   * until they are signed in again (the expiry changes) or a sign-in here
+   * finishes.
+   */
+  private readonly rejected = new Map<string, number | null>();
+  private readonly timers: ReturnType<typeof setTimeout>[] = [];
 
   constructor(private readonly options: ClaudeLocalAccountsOptions) {
     this.unsubscribe = options.engineAccounts.onSettingsChanged(() => {
@@ -114,6 +184,12 @@ export class ClaudeLocalAccounts {
       void this.reportIfChanged();
     });
     void this.loadDeviceId().then(() => this.broadcastIfChanged());
+    const check = () => void this.refresh().catch(() => undefined);
+    const first = setTimeout(check, FIRST_CHECK_DELAY_MS);
+    const periodic = setInterval(check, PERIODIC_CHECK_MS);
+    first.unref?.();
+    periodic.unref?.();
+    this.timers.push(first, periodic);
   }
 
   private get accountsDir(): string {
@@ -121,7 +197,11 @@ export class ClaudeLocalAccounts {
   }
 
   async list(): Promise<ClaudeLocalAccountsState> {
-    await this.refresh();
+    // Every window surface that shows Claude logins asks on mount; a fresh
+    // read is shared rather than run once per surface.
+    if (!this.configs || Date.now() - this.lastRefreshAt >= FOCUS_REFRESH_MIN_INTERVAL_MS) {
+      await this.refresh();
+    }
     return this.state();
   }
 
@@ -130,31 +210,100 @@ export class ClaudeLocalAccounts {
     void this.refresh().catch(() => undefined);
   }
 
-  async configForTurn(): Promise<ClaudeCodeConfigForTurn> {
-    if (!this.configs) await this.refresh().catch(() => undefined);
+  /**
+   * The login a Claude Code turn runs on. `recheck` reads every login again
+   * first (a turn whose login Anthropic just refused); `cached` answers from
+   * what is known, re-reading in the background at most once a minute while
+   * nothing can answer (a turn waiting for a sign-in asks often).
+   */
+  async configForTurn(
+    options: { recheck?: boolean; cached?: boolean } = {},
+  ): Promise<ClaudeCodeConfigForTurn> {
+    if (!this.configs || options.recheck) await this.refresh().catch(() => undefined);
     let resolved = this.resolveForTurn();
     if (!resolved.signedIn) {
-      await this.refresh().catch(() => undefined);
-      resolved = this.resolveForTurn();
+      if (options.cached) {
+        if (Date.now() - this.lastRefreshAt >= SIGNED_OUT_RECHECK_MS) {
+          void this.refresh().catch(() => undefined);
+        }
+        return resolved;
+      }
+      if (!options.recheck) {
+        await this.refresh().catch(() => undefined);
+        resolved = this.resolveForTurn();
+      }
     }
     return resolved;
+  }
+
+  /**
+   * Anthropic refused the login a turn ran on (`configDir` as the turn had
+   * it). It stays out of use until it is signed in again, and Stella shows
+   * that it needs a sign-in.
+   */
+  noteRejected(configDir: string | null): void {
+    const config = (this.configs ?? []).find((entry) => entry.dir === configDir);
+    if (!config) return;
+    this.rejected.set(config.configId, config.loginExpiresAt ?? null);
+    this.configs = (this.configs ?? []).map((entry) =>
+      entry === config ? { ...entry, loggedIn: false, ended: true } : entry,
+    );
+    this.broadcastIfChanged();
+    void this.reportIfChanged();
   }
 
   state(): ClaudeLocalAccountsState {
     const active = this.activeConfig();
     const chosenEmail = this.chosenAccount()?.email;
+    const attention = this.attention(active);
     return {
       cliInstalled: this.cliInstalled,
-      configs: (this.configs ?? []).map(({ configId, isDefault, loggedIn, email, plan }) => ({
-        configId,
-        isDefault,
-        loggedIn,
-        ...(email ? { email } : {}),
-        ...(plan ? { plan } : {}),
-      })),
+      configs: (this.configs ?? []).map(
+        ({ configId, isDefault, loggedIn, email, plan, loginExpiresAt, ended }) => ({
+          configId,
+          isDefault,
+          loggedIn,
+          ...(email ? { email } : {}),
+          ...(plan ? { plan } : {}),
+          ...(loginExpiresAt !== undefined ? { loginExpiresAt } : {}),
+          ...(ended ? { ended: true } : {}),
+        }),
+      ),
       activeConfigId: active?.configId ?? null,
       ...(active ? { activeReason: this.reasonFor(active) } : {}),
       ...(chosenEmail ? { chosenEmail } : {}),
+      ...(attention ? { attention } : {}),
+    };
+  }
+
+  /**
+   * The login Stella answers with here when it ends within a few days, or
+   * the login that ended when nothing else here can answer. A computer that
+   * never had a Claude login needs no reminder.
+   */
+  private attention(active: ConfigStatus | null): ClaudeLoginAttention | undefined {
+    if (!this.cliInstalled) return undefined;
+    if (active) {
+      const expiresAt = active.loginExpiresAt;
+      if (expiresAt === undefined || expiresAt - Date.now() > CLAUDE_LOGIN_WARN_BEFORE_MS) return undefined;
+      return {
+        state: "ending",
+        configId: active.configId,
+        ...(active.email ? { email: active.email } : {}),
+        expiresAt,
+      };
+    }
+    const ended = (this.configs ?? []).filter((config) => config.ended);
+    if (ended.length === 0) return undefined;
+    const wanted = lower(this.chosenAccount()?.email);
+    const config =
+      (wanted ? ended.find((entry) => lower(entry.email) === wanted) : undefined) ??
+      ended.find((entry) => entry.isDefault) ??
+      ended[0]!;
+    return {
+      state: "ended",
+      configId: config.configId,
+      ...(config.email ? { email: config.email } : {}),
     };
   }
 
@@ -384,6 +533,7 @@ export class ClaudeLocalAccounts {
   }
 
   dispose(): void {
+    for (const timer of this.timers) clearTimeout(timer);
     this.unsubscribe();
     this.installAbort.abort();
     for (const pending of [...this.logins.values()]) this.endLogin(pending, { kill: true });
@@ -444,21 +594,53 @@ export class ClaudeLocalAccounts {
     const base = { configId, isDefault: dir === null, dir, createdAt };
     // `claude auth status` exits 1 while signed out; its JSON is still printed.
     const { stdout } = await this.runCli(executable, dir, ["auth", "status", "--json"], STATUS_TIMEOUT_MS);
+    let status: Record<string, unknown>;
     try {
-      const status = JSON.parse(stdout) as Record<string, unknown>;
-      const loggedIn = status.loggedIn === true;
-      const email = loggedIn ? text(status.email) : undefined;
-      const plan = loggedIn ? text(status.subscriptionType) : undefined;
-      return {
-        ...base,
-        loggedIn,
-        known: true,
-        ...(email ? { email } : {}),
-        ...(plan ? { plan } : {}),
-      };
+      status = JSON.parse(stdout) as Record<string, unknown>;
     } catch {
       return { ...base, loggedIn: false, known: false };
     }
+    // Stella's turns run on the claude.ai login stored here. The status
+    // describes a different credential when Claude Code's settings carry a
+    // token (it then reports "oauth_token" with no account), and it keeps
+    // saying signed in after the login's time limit until a request fails;
+    // the stored login and its expiry are what count.
+    let loggedIn: boolean;
+    let email: string | undefined;
+    let plan: string | undefined;
+    let loginExpiresAt: number | undefined;
+    let present: boolean;
+    if (status.authMethod === "claude.ai") {
+      loggedIn = status.loggedIn === true;
+      present = true;
+      email = text(status.email);
+      plan = text(status.subscriptionType);
+      loginExpiresAt = epochMs(status.loginExpiresAt);
+    } else {
+      const stored = readStoredLogin(dir);
+      loggedIn = stored.alive;
+      present = stored.present;
+      email = storedEmail(dir);
+      plan = stored.plan;
+      loginExpiresAt = stored.expiresAt;
+    }
+    if (loggedIn && loginExpiresAt !== undefined && loginExpiresAt <= Date.now()) loggedIn = false;
+    if (this.rejected.has(configId)) {
+      if (loggedIn && this.rejected.get(configId) === (loginExpiresAt ?? null)) loggedIn = false;
+      else if (loggedIn) this.rejected.delete(configId);
+    }
+    // A login that was here and no longer works has ended; a directory that
+    // never finished signing in has not.
+    const ended = !loggedIn && (present || Boolean(storedEmail(dir)) || this.rejected.has(configId));
+    return {
+      ...base,
+      loggedIn,
+      known: true,
+      ...(email ? { email } : {}),
+      ...(plan && loggedIn ? { plan } : {}),
+      ...(loginExpiresAt !== undefined ? { loginExpiresAt } : {}),
+      ...(ended ? { ended: true } : {}),
+    };
   }
 
   private extraConfigDirs(): Array<{ configId: string; dir: string; createdAt: number }> {
@@ -617,6 +799,7 @@ export class ClaudeLocalAccounts {
       );
     }
     this.endLogin(pending, { kill: false, succeeded: true });
+    this.rejected.delete(pending.configId);
     await this.refresh();
     const signedIn = this.configs?.find((config) => config.configId === pending.configId);
     if (!signedIn?.loggedIn) {

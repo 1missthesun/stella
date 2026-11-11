@@ -94,7 +94,7 @@ export const runClaudeDigest = async (input: {
   }
   if (report.ok !== true) return { kind: "failed", message: flat(String(report.error ?? "Claude Code didn't run."), 300) };
   if (report.rotated === true) {
-    await backupClaudeCloudLogins(input.env, input.ownerId, container).catch(() => false);
+    await backupClaudeCloudLogins(input.env, input.ownerId, container, { merge: true }).catch(() => null);
   }
   let result: Record<string, unknown> | null = null;
   try {

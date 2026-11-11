@@ -5,7 +5,10 @@ import type {
   EngineSettings,
 } from "@stella/contracts/backend/engines";
 import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
-import type { ClaudeLocalConfig } from "@stella/contracts/claude-local-accounts";
+import {
+  CLAUDE_LOGIN_WARN_BEFORE_MS,
+  type ClaudeLocalConfig,
+} from "@stella/contracts/claude-local-accounts";
 import { Button } from "@/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +18,7 @@ import {
 } from "@/ui/dropdown-menu";
 import { CloudIcon, Globe, Monitor } from "@/ui/icons";
 import { showToast } from "@/ui/toast";
-import { useT } from "@/shared/i18n";
+import { useLocale, useT } from "@/shared/i18n";
 import { getDeviceIdOrNull } from "@/platform/electron/device-id";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { cloudEnginesApi } from "@/features/cloud/cloud-engines-api";
@@ -56,6 +59,8 @@ type PlaceView = {
   ownLoginEmail?: string;
   missingChosen: boolean;
   reported: boolean;
+  /** The login in use there ends soon, or has ended. */
+  loginEnd?: { state: "ending" | "ended"; endsAt?: number; email?: string };
 };
 
 export function ClaudeAccountsSection({
@@ -69,6 +74,7 @@ export function ClaudeAccountsSection({
 }) {
   const t = useT();
   const local = useClaudeLocalAccounts();
+  const locale = useLocale();
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { reload: reloadLocal } = local;
@@ -176,6 +182,34 @@ export function ClaudeAccountsSection({
     );
   };
 
+  const cloudLoginEnd = (place: ClaudePlaceStatus): PlaceView["loginEnd"] => {
+    if (place.kind !== "cloud" || !place.inUse) return undefined;
+    const login = accounts
+      .find((row) => row.accountId === place.inUse?.accountId)
+      ?.places?.find((entry) => entry.kind === "cloud");
+    if (!login || login.kind !== "cloud") return undefined;
+    const email = place.inUse.email;
+    const now = Date.now();
+    if (login.loginEnded || (login.loginEndsAt !== undefined && login.loginEndsAt <= now)) {
+      return { state: "ended", ...(email ? { email } : {}) };
+    }
+    if (login.loginEndsAt !== undefined && login.loginEndsAt - now <= CLAUDE_LOGIN_WARN_BEFORE_MS) {
+      return { state: "ending", endsAt: login.loginEndsAt, ...(email ? { email } : {}) };
+    }
+    return undefined;
+  };
+
+  const formatEnd = (at: number | undefined): string =>
+    at === undefined
+      ? ""
+      : new Intl.DateTimeFormat(locale, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(new Date(at));
+
   const placeFromOverview = (place: ClaudePlaceStatus): PlaceView => ({
     key: place.kind === "cloud" ? "cloud" : `device:${place.deviceId}`,
     kind:
@@ -197,6 +231,7 @@ export function ClaudeAccountsSection({
     ...(place.ownLogin?.email ? { ownLoginEmail: place.ownLogin.email } : {}),
     missingChosen: place.missingChosen,
     reported: true,
+    ...(cloudLoginEnd(place) ? { loginEnd: cloudLoginEnd(place) } : {}),
   });
 
   const places: PlaceView[] = [];
@@ -227,6 +262,15 @@ export function ClaudeAccountsSection({
       ...(own?.email ? { ownLoginEmail: own.email } : {}),
       missingChosen: Boolean(chosen && !localFor(chosen.email)),
       reported: local.loaded,
+      ...(local.attention
+        ? {
+            loginEnd: {
+              state: local.attention.state,
+              ...(local.attention.expiresAt !== undefined ? { endsAt: local.attention.expiresAt } : {}),
+              ...(local.attention.email ? { email: local.attention.email } : {}),
+            },
+          }
+        : {}),
     });
   }
   if (cloudAvailable) {
@@ -512,7 +556,7 @@ export function ClaudeAccountsSection({
           {places.map((place) => {
             const target = signInTarget(
               place,
-              place.missingChosen ? chosen?.email : undefined,
+              place.missingChosen ? chosen?.email : place.loginEnd?.email,
             );
             const notInstalled = place.cliInstalled === false;
             const signedIn = place.signedIn;
@@ -530,7 +574,7 @@ export function ClaudeAccountsSection({
             const needsSignIn =
               place.online &&
               !notInstalled &&
-              (place.missingChosen || (!signedIn && place.reported));
+              (place.missingChosen || (!signedIn && place.reported) || Boolean(place.loginEnd));
             const showOwn =
               place.kind !== "cloud" &&
               place.ownLoginEmail &&
@@ -557,6 +601,15 @@ export function ClaudeAccountsSection({
                     </div>
                   ) : null}
                   {status ? <div className="claude-place__status">{status}</div> : null}
+                  {place.loginEnd ? (
+                    <div className="claude-place__warn" data-claude-login-end={place.loginEnd.state}>
+                      {place.loginEnd.state === "ending"
+                        ? t("claudeLogin.endingDescription", { date: formatEnd(place.loginEnd.endsAt) })
+                        : place.loginEnd.email
+                          ? t("claudeLogin.endedDescriptionEmail", { email: place.loginEnd.email })
+                          : t("claudeLogin.endedDescription")}
+                    </div>
+                  ) : null}
                   {notInstalled && place.kind === "this" && offerInstall ? (
                     <>
                       {install.state.status === "idle" ? (

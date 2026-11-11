@@ -194,6 +194,12 @@ export type HostLlmCredentialsRequest =
     }
   | {
       operation: "claude-config";
+      /** Read every login again first: Anthropic just refused the one in use. */
+      recheck?: boolean;
+      /** Answer from what is known (a turn waiting for a sign-in asks often). */
+      cached?: boolean;
+      /** The login in this config directory was refused by Anthropic in a turn. */
+      rejectedConfigDir?: string | null;
     };
 
 export type HostLlmCredentialsResult =

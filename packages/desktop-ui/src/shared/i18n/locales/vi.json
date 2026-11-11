@@ -3447,5 +3447,20 @@
     "ownPlan": "Claude Code chạy bằng gói đăng ký Claude Pro hoặc Max của chính bạn.",
     "chatTitle": "Chưa cài Claude Code",
     "chatDescription": "Cài đặt tại đây, rồi đăng nhập gói Claude của bạn và gửi lại tin nhắn."
+  },
+  "claudeLogin": {
+    "heldTitle": "Đang chờ bạn đăng nhập Claude",
+    "heldDescription": "Phiên đăng nhập Claude trên máy tính này đã hết hạn. Tin nhắn của bạn được giữ lại và sẽ gửi ngay khi bạn đăng nhập.",
+    "endedTitle": "Phiên đăng nhập Claude của bạn đã hết hạn",
+    "endedDescription": "Hãy đăng nhập lại để Stella tiếp tục trả lời bằng gói Claude của bạn.",
+    "endedDescriptionEmail": "Hãy đăng nhập lại vào {email} để Stella tiếp tục trả lời bằng gói Claude của bạn.",
+    "endingTitle": "Phiên đăng nhập Claude của bạn sắp hết hạn",
+    "endingDescription": "Hãy đăng nhập lại trước {date} để các câu trả lời của Claude tiếp tục hoạt động.",
+    "cloudEndingTitle": "Phiên đăng nhập Claude trên đám mây của bạn sắp hết hạn",
+    "cloudEndedTitle": "Phiên đăng nhập Claude trên đám mây của bạn đã hết hạn",
+    "signIn": "Đăng nhập",
+    "signedInContinuing": "Đã đăng nhập Claude. Stella đang trả lời.",
+    "signedInAsResend": "Đã đăng nhập Claude bằng {email}. Gửi lại tin nhắn để tiếp tục.",
+    "signedInResend": "Đã đăng nhập Claude. Gửi lại tin nhắn để tiếp tục."
   }
 }

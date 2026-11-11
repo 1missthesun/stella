@@ -3489,5 +3489,20 @@
     "ownPlan": "O Claude Code funciona com sua própria assinatura do Claude Pro ou Max.",
     "chatTitle": "O Claude Code não está instalado",
     "chatDescription": "Instale aqui, depois entre no seu plano do Claude e envie sua mensagem de novo."
+  },
+  "claudeLogin": {
+    "heldTitle": "Aguardando você entrar no Claude",
+    "heldDescription": "Seu login do Claude neste computador expirou. Sua mensagem está guardada e será enviada assim que você entrar.",
+    "endedTitle": "Seu login do Claude expirou",
+    "endedDescription": "Entre novamente para que a Stella continue respondendo com seu plano do Claude.",
+    "endedDescriptionEmail": "Entre novamente em {email} para que a Stella continue respondendo com seu plano do Claude.",
+    "endingTitle": "Seu login do Claude expira em breve",
+    "endingDescription": "Entre novamente antes de {date} para que as respostas do Claude continuem funcionando.",
+    "cloudEndingTitle": "Seu login do Claude na sua nuvem termina em breve",
+    "cloudEndedTitle": "Seu login do Claude na sua nuvem terminou",
+    "signIn": "Entrar",
+    "signedInContinuing": "Conectado ao Claude. A Stella está respondendo agora.",
+    "signedInAsResend": "Conectado ao Claude como {email}. Envie sua mensagem novamente para continuar.",
+    "signedInResend": "Conectado ao Claude. Envie sua mensagem novamente para continuar."
   }
 }

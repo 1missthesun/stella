@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code runs on your own Claude Pro or Max subscription.",
     "chatTitle": "Claude Code isn't installed",
     "chatDescription": "Install it here, then sign in to your Claude plan and send your message again."
+  },
+  "claudeLogin": {
+    "heldTitle": "Waiting for you to sign in to Claude",
+    "heldDescription": "Your Claude sign-in on this computer has ended. Your message is kept and goes out as soon as you sign in.",
+    "endedTitle": "Your Claude sign-in has ended",
+    "endedDescription": "Sign in again so Stella can keep answering with your Claude plan.",
+    "endedDescriptionEmail": "Sign in to {email} again so Stella can keep answering with your Claude plan.",
+    "endingTitle": "Your Claude sign-in ends soon",
+    "endingDescription": "Sign in again before {date} so your Claude replies keep working.",
+    "cloudEndingTitle": "Your Claude sign-in in your cloud ends soon",
+    "cloudEndedTitle": "Your Claude sign-in in your cloud has ended",
+    "signIn": "Sign in",
+    "signedInContinuing": "Signed in to Claude. Stella is answering now.",
+    "signedInAsResend": "Signed in to Claude as {email}. Send your message again to continue.",
+    "signedInResend": "Signed in to Claude. Send your message again to continue."
   }
 }

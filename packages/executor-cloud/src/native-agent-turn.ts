@@ -29,6 +29,11 @@ import {
 } from "@stella/contracts/cloud-native-state";
 import { isClaudeSessionId } from "@stella/contracts/backend/claude-sessions";
 import {
+  cloudClaudeLoginEndedText,
+  isClaudeLoginFailureText,
+  readStoredClaudeLogin,
+} from "@stella/contracts/claude-login";
+import {
   claudeCliCanResume,
   claudeCliVersion,
   claudeSessionProjectDir,
@@ -723,14 +728,15 @@ export const runCloudClaude = async (options: {
     await mkdir(profile.cwd, { recursive: true, mode: 0o700 });
   }
   const accountDirectory = cloudClaudeAccountDirectory(options.claudeAccount);
-  const signedIn = await stat(path.join(accountDirectory, ".credentials.json")).then(
-    (details) => details.isFile(),
-    () => false,
+  // A login past its time limit (or one Anthropic already refused) can't
+  // answer: say so in one sentence instead of starting Claude Code on it.
+  const stored = readStoredClaudeLogin(
+    await readFile(path.join(accountDirectory, ".credentials.json"), "utf8").catch(() => null),
   );
-  if (!signedIn) {
+  if (!stored.alive) {
     return {
       finalText: "",
-      error: `Claude isn't signed in to ${options.claudeAccount.email} in your cloud anymore. Sign in again under Settings > Account > Claude.`,
+      error: cloudClaudeLoginEndedText(options.claudeAccount.email),
       usage: { inputTokens: 0, outputTokens: 0, llmCalls: 0 },
       sessionId: "",
       steered: [],
@@ -1415,6 +1421,10 @@ export const runNativeAgentTurn = async (options: {
   ) {
     record = createNativeTranscript({ prompt: options.prompt, inputPrompt, execution: options.execution });
     result = await run();
+  }
+  if (result.error && isClaudeLoginFailureText(result.error)) {
+    console.warn(`[cloud-claude] Anthropic refused the Claude login: ${result.error.slice(0, 400)}`);
+    result = { ...result, error: cloudClaudeLoginEndedText(options.claudeAccount.email) };
   }
   const recorded =
     options.profile.role === "agent"

@@ -63,7 +63,9 @@ import {
   newClaudeCloudLoginId,
   signOutClaudeCloudAccount,
   startClaudeCloudLogin,
+  type ClaudeCloudLoginHealth,
 } from "../../claude-cloud-login.js";
+import { isCloudClaudeAccountKey } from "@stella/contracts/cloud-native-state";
 import { TEST_CLAUDE_EMAIL } from "../../test-claude.js";
 import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -238,6 +240,19 @@ export const ENGINE_CLAUDE_ONE_CHOICE_MIGRATION = {
        cli_installed INTEGER,
        updated_at INTEGER NOT NULL
      )`,
+  ],
+};
+
+/**
+ * When each cloud login ends (Anthropic ends a claude.ai login a fixed time
+ * after signing in), read from the cloud's stored logins after each sign-in
+ * and each Claude turn.
+ */
+export const ENGINE_CLAUDE_LOGIN_END_MIGRATION = {
+  id: "engines.9-claude-login-end",
+  statements: [
+    "ALTER TABLE engine_claude_places ADD COLUMN login_ends_at INTEGER",
+    "ALTER TABLE engine_claude_places ADD COLUMN login_ended INTEGER NOT NULL DEFAULT 0",
   ],
 };
 
@@ -759,9 +774,63 @@ type PlaceRow = {
   device_name: string | null;
   is_default: number;
   updated_at: number;
+  login_ends_at: number | null;
+  login_ended: number;
 };
 
-const PLACE_COLUMNS = "account_id, place, device_name, is_default, updated_at";
+const PLACE_COLUMNS = "account_id, place, device_name, is_default, updated_at, login_ends_at, login_ended";
+
+const loginEndOf = (row: { login_ends_at: number | null; login_ended: number }) => ({
+  ...(row.login_ends_at !== null ? { loginEndsAt: row.login_ends_at } : {}),
+  ...(row.login_ended === 1 ? { loginEnded: true } : {}),
+});
+
+/**
+ * Records when each cloud login ends, as the cloud's stored logins say
+ * (keyed by account directory). Logins the cloud no longer holds are left
+ * as they are: signing out removes their row.
+ */
+const noteClaudeCloudLogins = async (
+  ctx: OwnerContext,
+  logins: readonly ClaudeCloudLoginHealth[],
+): Promise<void> => {
+  if (logins.length === 0) return;
+  const byKey = new Map(logins.map((login) => [login.key, login]));
+  const rows = ctx.db.all<{ account_id: string; email: string | null }>(
+    `SELECT a.account_id AS account_id, a.email AS email
+       FROM engine_claude_places p JOIN engine_accounts a ON a.account_id = p.account_id
+       WHERE p.place = ? AND a.provider = 'anthropic'`,
+    CLOUD_PLACE,
+  );
+  for (const row of rows) {
+    if (!row.email) continue;
+    const login = byKey.get(await claudeCloudAccountKey(row.email));
+    if (!login) continue;
+    ctx.db.run(
+      `UPDATE engine_claude_places SET login_ends_at = ?, login_ended = ?
+         WHERE account_id = ? AND place = ?`,
+      login.endsAt,
+      login.ended ? 1 : 0,
+      row.account_id,
+      CLOUD_PLACE,
+    );
+  }
+};
+
+const parseCloudLoginHealth = (raw: unknown): ClaudeCloudLoginHealth[] => {
+  const logins = raw && typeof raw === "object" ? (raw as { logins?: unknown }).logins : undefined;
+  if (!Array.isArray(logins)) throw badRequest("Invalid sign-in report.");
+  return logins.slice(0, MAX_ACCOUNTS_PER_PROVIDER * 2).flatMap((entry): ClaudeCloudLoginHealth[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const login = entry as Record<string, unknown>;
+    if (typeof login.key !== "string" || !isCloudClaudeAccountKey(login.key)) return [];
+    const endsAt =
+      typeof login.endsAt === "number" && Number.isSafeInteger(login.endsAt) && login.endsAt > 0
+        ? login.endsAt
+        : null;
+    return [{ key: login.key, endsAt, ended: login.ended === true }];
+  });
+};
 
 const chosenClaudeAccount = (db: OwnerDbReader): string | null =>
   db.one<{ account_id: string }>(
@@ -896,7 +965,12 @@ const placesOf = (
     )
     .map((row): ClaudeLoginPlace =>
       row.place === CLOUD_PLACE
-        ? { kind: "cloud", active: active.get(row.place) === accountId, updatedAt: row.updated_at }
+        ? {
+            kind: "cloud",
+            active: active.get(row.place) === accountId,
+            ...loginEndOf(row),
+            updatedAt: row.updated_at,
+          }
         : {
             kind: "device",
             deviceId: row.place.slice("device:".length),
@@ -1035,6 +1109,13 @@ const finishClaudeCloud = async (
     CLOUD_PLACE,
     Date.now(),
   );
+  // A fresh sign-in replaces whatever ended before it.
+  ctx.db.run(
+    "UPDATE engine_claude_places SET login_ends_at = NULL, login_ended = 0 WHERE account_id = ? AND place = ?",
+    accountId,
+    CLOUD_PLACE,
+  );
+  if (finished.logins) await noteClaudeCloudLogins(ctx, finished.logins);
   return { accountId, email: finished.email };
 };
 
@@ -1745,6 +1826,7 @@ export const enginesDomain = {
     ENGINE_PROVIDER_SELECTION_MIGRATION,
     ENGINE_CLAUDE_PER_PLACE_MIGRATION,
     ENGINE_CLAUDE_ONE_CHOICE_MIGRATION,
+    ENGINE_CLAUDE_LOGIN_END_MIGRATION,
   ],
   views: {
     "engines.get": {
@@ -1893,6 +1975,10 @@ export const enginesDomain = {
   },
   internal: {
     "engines.claudeCloudAccount": (ctx) => claudeCloudAccount(ctx),
+    "engines.noteClaudeCloudLogins": async (ctx, raw) => {
+      await noteClaudeCloudLogins(ctx, parseCloudLoginHealth(raw));
+      return null;
+    },
   },
   purge: async (ctx) => {
     await deleteClaudeCloudLoginBackup(ctx.env, ctx.ownerId);

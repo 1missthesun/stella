@@ -707,6 +707,42 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     return { woken, cloud };
   };
+  // Replies and tasks waiting for a Claude sign-in, by chat: the chat shows
+  // one notice with Sign in while any of them waits, also when it is opened
+  // later.
+  const loginHolds = new Map<string, Map<string, { text: string; email?: string }>>();
+  const loginHoldEvent = (conversationId: string): PiChatEvent | undefined => {
+    const first = loginHolds.get(conversationId)?.values().next().value;
+    return first
+      ? { type: "engine_status", state: "login-required", text: first.text, ...(first.email ? { email: first.email } : {}) }
+      : undefined;
+  };
+  const noteLoginHold = (
+    conversationId: string,
+    key: string,
+    status: Extract<ClaudeCodeStatus, { state: "login-required" | "login-required-end" }>,
+  ) => {
+    let holds = loginHolds.get(conversationId);
+    if (status.state === "login-required") {
+      if (!holds) loginHolds.set(conversationId, (holds = new Map()));
+      holds.set(key, { text: status.text, ...(status.email ? { email: status.email } : {}) });
+    } else {
+      holds?.delete(key);
+      if (holds?.size === 0) loginHolds.delete(conversationId);
+    }
+    const event: PiChatEvent | undefined =
+      loginHoldEvent(conversationId) ??
+      (status.state === "login-required-end"
+        ? { type: "engine_status", state: "login-required-end", text: status.text, resumed: status.resumed }
+        : undefined);
+    if (!event) return;
+    void chats
+      .get(conversationId)
+      ?.then((chat) => {
+        if (chat.watchers > 0) options.emit({ conversationId, events: [event] });
+      })
+      .catch(() => undefined);
+  };
   const usageLimitPaused = (conversationId: string, threadId: string): boolean =>
     heldThreads.has(threadId) || (usageLimitPauses.get(conversationId)?.held.has(threadId) ?? false);
   const claudeCodeEngine = options.claudeCodeEngine;
@@ -716,6 +752,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     claudeCodeEngine.onStatus((session, status) => {
       if (status.state === "usage-limit" || status.state === "usage-limit-end") {
         noteUsageLimit(session.conversationId, session.threadId, status);
+        return;
+      }
+      if (status.state === "login-required" || status.state === "login-required-end") {
+        noteLoginHold(session.conversationId, session.sessionKey, status);
         return;
       }
       if (session.threadId) return;
@@ -1592,6 +1632,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     const [snapshot] = eventsForClients([stream.snapshot as unknown as PiChatEvent]) as [PiChatWatchResult["snapshot"]];
     const held = usageLimitEvent(conversationId);
     if (held) options.emit({ conversationId, events: [held] });
+    const waiting = loginHoldEvent(conversationId);
+    if (waiting) options.emit({ conversationId, events: [waiting] });
     emitSafeguard(conversationId, await readSafeguardFold(chat.harness, chat.root.id, context));
     return {
       snapshot: { ...snapshot, entries: mergePiEntries(entries, snapshot.entries) },

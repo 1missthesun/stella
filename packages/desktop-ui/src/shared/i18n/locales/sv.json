@@ -3469,5 +3469,20 @@
     "ownPlan": "Claude Code körs på ditt eget Claude Pro- eller Max-abonnemang.",
     "chatTitle": "Claude Code är inte installerat",
     "chatDescription": "Installera det här, logga sedan in på ditt Claude-abonnemang och skicka meddelandet igen."
+  },
+  "claudeLogin": {
+    "heldTitle": "Väntar på att du loggar in på Claude",
+    "heldDescription": "Din Claude-inloggning på den här datorn har gått ut. Ditt meddelande sparas och skickas så snart du loggar in.",
+    "endedTitle": "Din Claude-inloggning har gått ut",
+    "endedDescription": "Logga in igen så att Stella kan fortsätta svara med din Claude-plan.",
+    "endedDescriptionEmail": "Logga in på {email} igen så att Stella kan fortsätta svara med din Claude-plan.",
+    "endingTitle": "Din Claude-inloggning går snart ut",
+    "endingDescription": "Logga in igen före {date} så att Claude-svaren fortsätter att fungera.",
+    "cloudEndingTitle": "Din Claude-inloggning i ditt moln upphör snart",
+    "cloudEndedTitle": "Din Claude-inloggning i ditt moln har upphört",
+    "signIn": "Logga in",
+    "signedInContinuing": "Inloggad på Claude. Stella svarar nu.",
+    "signedInAsResend": "Inloggad på Claude som {email}. Skicka ditt meddelande igen för att fortsätta.",
+    "signedInResend": "Inloggad på Claude. Skicka ditt meddelande igen för att fortsätta."
   }
 }

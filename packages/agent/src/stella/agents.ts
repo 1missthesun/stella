@@ -1485,7 +1485,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers or stops it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on. With destination, an agent you started whose computer is offline or unavailable continues there instead, with its history.',
+      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on. With destination, an agent you started whose computer is offline or unavailable continues there instead, with its history.',
     parameters: Type.Object({
       thread_id: Type.String({ description: 'A thread_id from agent_status, or "stella".' }),
       message: Type.String({ description: "The message. To your own agent, only what is new." }),
@@ -2032,7 +2032,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const stopAgent = defineTool({
     name: "stop_agent",
     description:
-      "Stop a stuck or unresponsive agent at once, with every agent it started, wherever they run. Nothing is deleted; a later send_message resumes it. To have an agent stop normally, send_message it: it stops itself and tells the agents it started.",
+      "Pause or stop an agent at once, with every agent it started, wherever they run. Nothing is lost and it sends no report; a later send_message resumes it where it was.",
     parameters: Type.Object({
       thread_id: Type.String({ description: "The agent's thread_id." }),
     }),

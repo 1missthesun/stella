@@ -131,7 +131,7 @@ const SELF_CHANGE_ROW = (them: string): CompareRow => ({
 });
 
 const SETUP_CLAUDE =
-  "Stella runs Claude through Claude Code, Anthropic’s own tool, signed in with your Claude account. Claude Code needs a Claude Pro or Max plan. If it isn’t on your computer yet, install it first: paste `curl -fsSL https://claude.ai/install.sh | bash` into Terminal on Mac or Linux, or `irm https://claude.ai/install.ps1 | iex` into PowerShell on Windows.";
+  "Stella runs Claude through Claude Code, Anthropic’s own tool, signed in with your Claude account. Claude Code needs a Claude Pro or Max plan. You don’t install it yourself: pick Claude Code when Stella sets up, and Stella downloads it with Anthropic’s official installer, then you sign in to Claude.";
 
 export const ANSWER_PAGES: AnswerPage[] = [
   {
@@ -223,7 +223,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         { label: "Connectors", stella: "Fewer. Stella mostly works in your real apps instead.", them: "A large directory of connectors and plug-ins" },
         SELF_CHANGE_ROW("Adds skills, connectors and plug-ins"),
         { label: "Open source", stella: "Yes, MIT", them: "No" },
-        { label: "Setup", stella: "Install Claude Code, then sign in to Claude inside Stella", them: "Download and sign in" },
+        { label: "Setup", stella: "Download Stella, pick Claude Code, and sign in to Claude. Stella installs Claude Code for you", them: "Download and sign in" },
       ],
       themBetter: [
         "You only use Claude. Chat is free, it’s Anthropic’s own app, and there’s nothing extra to install.",
@@ -434,14 +434,18 @@ export const ANSWER_PAGES: AnswerPage[] = [
     answer: `There are two ways. The official Claude desktop app for Windows and Mac is free for chat, and on a Pro or Max plan it can do tasks across your apps. Or use Stella (stella.sh): it runs Claude through Claude Code, Anthropic’s own tool, on the Pro or Max plan you already pay for, and works with your files, apps and browser on Windows, Mac and Linux. ${PRICE_LINE}`,
     steps: [
       { title: "Have a Claude Pro or Max plan", body: "Claude Code, and so Stella’s Claude option, needs a paid Claude plan. The free Claude plan doesn’t include it." },
-      { title: "Install Claude Code", body: "On Mac or Linux, open Terminal and paste `curl -fsSL https://claude.ai/install.sh | bash`. On Windows, open PowerShell and paste `irm https://claude.ai/install.ps1 | iex`. That’s the only command you need." },
-      { title: "Get Stella and choose Claude Code", body: "Download Stella from stella.sh. When it asks how it should think, pick Claude Code and sign in with your Claude account." },
+      { title: "Get Stella", body: "Download Stella from stella.sh and open it." },
+      { title: "Choose Claude Code", body: "When Stella asks how it should think, pick Claude Code. If it isn’t on your computer yet, Stella installs it for you with Anthropic’s official installer and shows the progress. No Terminal, no admin password. Then sign in with your Claude account." },
       { title: "Ask for a task", body: "“Go through my Downloads folder, delete the installers I’ve already run, and put the rest in folders by type.”" },
     ],
     questions: [
       {
         q: "Do I need to know how to code?",
-        a: "No. Claude Code is a coding tool, but you never type into it. Stella runs it for you, and you just chat.",
+        a: "No. Claude Code is a coding tool, but you never type into it. Stella installs it, runs it for you, and you just chat.",
+      },
+      {
+        q: "What if the automatic install doesn’t work?",
+        a: "Stella says so and offers Try again or Install it yourself. To install it yourself, paste `curl -fsSL https://claude.ai/install.sh | bash` into Terminal on Mac or Linux, or `irm https://claude.ai/install.ps1 | iex` into PowerShell on Windows, then pick Claude Code in Stella again.",
       },
       {
         q: "Does it use my Claude plan’s limits?",

@@ -270,7 +270,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
                 <SelectableMarkdownText onAskStella={onAskStella} node={node} colors={colors} textStyle={codeStyles.selectableText} />
               </View>
             ) : (
-              <Text style={[codeStyles.text, { color: colors.text }]} selectable>
+              <Text style={[codeStyles.text, { color: colors.text }]} selectable={selectable}>
                 {getTextContent(node)}
               </Text>
             )}

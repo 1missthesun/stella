@@ -207,6 +207,34 @@ function StopButton({
   );
 }
 
+type MicHitArea = { top: number; bottom: number; left: number; right: number };
+
+// The mic's tap area reaches past its 32pt circle into the space around it,
+// up to halfway to a neighbouring button and never into the text itself.
+// It is real layout (padding offset by negative margin), not hitSlop:
+// Android only routes touches outside a parent to children that overflow it.
+const PILL_MIC_VERTICAL_REACH = 12;
+const PILL_MIC_LEADING_REACH = 12;
+const PILL_EDGE_REACH = 8;
+const CLUSTER_GAP_SHARE = 3;
+const TOOLBAR_MIC_TOP_REACH = 4;
+const TOOLBAR_MIC_BOTTOM_REACH = 6;
+const TOOLBAR_GAP_SHARE = 4;
+const OPEN_SPACE_REACH = 16;
+
+function micHitAreaStyle({ top, bottom, left, right }: MicHitArea) {
+  return {
+    marginBottom: -bottom,
+    marginLeft: -left,
+    marginRight: -right,
+    marginTop: -top,
+    paddingBottom: bottom,
+    paddingLeft: left,
+    paddingRight: right,
+    paddingTop: top,
+  };
+}
+
 export const Composer = memo(function Composer({
   colors,
   inputRef,
@@ -350,26 +378,42 @@ export const Composer = memo(function Composer({
       </View>
     ) : null;
 
-  const micButton = serverFeatures.dictation ? (
-    <Pressable
-      onPress={() => void onToggleVoice()}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: isTranscribing }}
-      accessibilityLabel={
-        isListening ? "Stop voice input" : "Start voice input"
-      }
-      disabled={isTranscribing}
-      style={[styles.micButton, isListening && styles.micButtonActive]}
-      hitSlop={4}
-    >
-      <Icon
-        name={isListening ? "mic-off" : "mic"}
-        size={20}
-        color={isListening ? colors.accentForeground : colors.textMuted}
-        filled={isListening}
-      />
-    </Pressable>
-  ) : null;
+  const renderMicButton = (hitArea: MicHitArea) =>
+    serverFeatures.dictation ? (
+      <Pressable
+        onPress={() => void onToggleVoice()}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isTranscribing }}
+        accessibilityLabel={
+          isListening ? "Stop voice input" : "Start voice input"
+        }
+        disabled={isTranscribing}
+        style={micHitAreaStyle(hitArea)}
+      >
+        <View style={[styles.micButton, isListening && styles.micButtonActive]}>
+          <Icon
+            name={isListening ? "mic-off" : "mic"}
+            size={20}
+            color={isListening ? colors.accentForeground : colors.textMuted}
+            filled={isListening}
+          />
+        </View>
+      </Pressable>
+    ) : null;
+  const pillHasButtonAfterMic =
+    showRealtimeVoice || (streaming && onStop != null);
+  const pillMicButton = renderMicButton({
+    top: PILL_MIC_VERTICAL_REACH,
+    bottom: PILL_MIC_VERTICAL_REACH,
+    left: PILL_MIC_LEADING_REACH,
+    right: pillHasButtonAfterMic ? CLUSTER_GAP_SHARE : PILL_EDGE_REACH,
+  });
+  const toolbarMicButton = renderMicButton({
+    top: TOOLBAR_MIC_TOP_REACH,
+    bottom: TOOLBAR_MIC_BOTTOM_REACH,
+    left: modelPicker?.pinned ? TOOLBAR_GAP_SHARE : OPEN_SPACE_REACH,
+    right: TOOLBAR_GAP_SHARE,
+  });
 
   const realtimeVoiceButton = showRealtimeVoice ? (
     <Pressable
@@ -572,7 +616,7 @@ export const Composer = memo(function Composer({
                   />
                 ) : streaming && onStop ? (
                   <View style={styles.pillTrailingCluster}>
-                    {micButton}
+                    {pillMicButton}
                     {realtimeVoiceButton}
                     <StopButton
                       onPress={onStop}
@@ -582,7 +626,7 @@ export const Composer = memo(function Composer({
                   </View>
                 ) : (
                   <View style={styles.pillTrailingCluster}>
-                    {micButton}
+                    {pillMicButton}
                     {realtimeVoiceButton}
                   </View>
                 )}
@@ -622,7 +666,7 @@ export const Composer = memo(function Composer({
                         </Pressable>
                       </View>
                     ) : null}
-                    {micButton}
+                    {toolbarMicButton}
                     {realtimeVoiceButton}
                     {streaming && onStop && !hasText ? (
                       <StopButton

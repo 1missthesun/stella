@@ -43,7 +43,7 @@ await browser.use("external", { browser: "Brave" }); // a label, id, browser or 
 In the user's browser you are a guest in their window:
 
 - Work only in tabs you opened. Never read, use or close their other tabs.
-- Keep to one tab and reuse it. Turn cleanup closes your unmarked tabs.
+- Keep to one tab and reuse it. Your tabs close a few minutes after your task ends; `tab.leaveForUser()` keeps one open for the user.
 - Don't call `tab.show()` there unless the user asked to see the page: it brings their browser window to the front.
 
 When the extension is not connected, the first command in the user's browser fails with "Extension not connected" and Stella offers the user a card to connect it. If it stays unconnected, continue in Stella's browser. For a step that needs the user's account there, open its sign-in page in a Stella browser tab, `show()` it, and ask the user to sign in once in Stella's Browser panel; Stella keeps that login. Never ask for or type their password yourself. Continue once they confirm.
@@ -207,14 +207,15 @@ Call `show()` once the page is worth looking at, not on every step, and not for 
 
 ## Finalize Owned Tabs
 
-Mark a retained tab as soon as its final disposition is known. Automatic close-tabs turn cleanup preserves marked tabs and closes unmarked task-owned tabs:
+Your tabs belong to your task. A few minutes after it ends (finished, stopped or failed), its tabs close, except tabs left for the user and tabs the user has looked at or taken over, which are released to them and stay open.
+
+Whenever your report points the user at a tab ("it's open in your browser", a page to review, a form to finish, a sign-in to complete), leave it for them before you report:
 
 ```js
-await tab.markHandoff();
-await reportTab.markDeliverable();
+await tab.leaveForUser();
 ```
 
-Marks are scoped to the current owner turn. `markHandoff()` is for a tab the user should continue in; `markDeliverable()` is for a completed result worth retaining.
+Stella never closes that tab. You can keep using it until you finish; when your other tabs close, it moves out of the Stella group instead and is the user's from then on. As a safety net, a tab whose address or title your final report mentions is kept the same way, but don't rely on that. `markHandoff()` and `markDeliverable()` do the same as `leaveForUser()`.
 
 `browser.tabs.finalize()` remains the explicit authoritative cleanup operation. List only tabs intentionally retained; unlisted task-owned tabs are closed even if previously marked.
 
@@ -226,6 +227,8 @@ await browser.tabs.finalize([
 ```
 
 Entries may be a `Tab`, tab ID, or `{ tab, status }`/`{ tabId, status }`. Status must be `"handoff"` or `"deliverable"`; a bare tab defaults to `"deliverable"`. Use `await browser.tabs.finalize([])` when no task-owned tab should remain.
+
+When you are resumed after your tabs closed, they come back by URL at your first browser command, in the same order with the same tab selected. Only their pages reload: scroll position, form input and other in-page state are gone, and handles you kept from before point at closed tabs. Get fresh ones with `browser.tabs.list()` or `browser.tabs.selected()`, then check the page before continuing.
 
 ## Frozen Browser API
 
@@ -251,7 +254,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `goto(url, { waitUntil?, timeout? })`                                 | Navigate the tab.                        |
 | `back({ timeout? })`, `forward({ timeout? })`, `reload({ timeout? })` | History navigation.                      |
 | `close()`                                                             | Close this tab.                          |
-| `markHandoff()`, `markDeliverable()`                                  | Retain during automatic turn cleanup.    |
+| `leaveForUser()`, `markHandoff()`, `markDeliverable()`                | Keep open for the user; never closed.    |
 | `show()`                                                              | Bring this tab forward for the user.     |
 | `url()`, `title()`                                                    | Async methods, not strings: `(await tab.url()).includes(…)`. |
 | `snapshot(options?)`                                                  | Structural observation.                  |

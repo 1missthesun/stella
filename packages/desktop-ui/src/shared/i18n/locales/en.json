@@ -3676,6 +3676,12 @@
       "show": "Show",
       "hide": "Hide",
       "draft": "Draft"
+    },
+    "notify": {
+      "briefing": "Your email briefing is ready",
+      "urgent": "Urgent email from {from}",
+      "asked": "Email you asked about",
+      "open": "Open"
     }
   }
 }

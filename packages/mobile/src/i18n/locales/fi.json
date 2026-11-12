@@ -3676,6 +3676,12 @@
       "show": "Näytä",
       "hide": "Piilota",
       "draft": "Luonnos"
+    },
+    "notify": {
+      "briefing": "Sähköpostikoosteesi on valmis",
+      "urgent": "Kiireellinen sähköposti lähettäjältä {from}",
+      "asked": "Sähköposti, jota kysyit",
+      "open": "Avaa"
     }
   }
 }

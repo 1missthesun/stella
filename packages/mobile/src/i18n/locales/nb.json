@@ -3676,6 +3676,12 @@
       "show": "Vis",
       "hide": "Skjul",
       "draft": "Utkast"
+    },
+    "notify": {
+      "briefing": "E-postoversikten din er klar",
+      "urgent": "Haster: e-post fra {from}",
+      "asked": "E-post du spurte om",
+      "open": "Åpne"
     }
   }
 }

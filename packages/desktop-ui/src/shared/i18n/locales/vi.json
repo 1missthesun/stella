@@ -3640,6 +3640,12 @@
       "show": "Hiện",
       "hide": "Ẩn",
       "draft": "Bản nháp"
+    },
+    "notify": {
+      "briefing": "Bản tóm tắt email của bạn đã sẵn sàng",
+      "urgent": "Email khẩn từ {from}",
+      "asked": "Email bạn đã hỏi",
+      "open": "Mở"
     }
   }
 }

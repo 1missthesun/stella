@@ -3710,6 +3710,12 @@
       "show": "Afficher",
       "hide": "Masquer",
       "draft": "Brouillon"
+    },
+    "notify": {
+      "briefing": "Votre synthèse d’e-mails est prête",
+      "urgent": "E-mail urgent de {from}",
+      "asked": "E-mail que vous avez demandé",
+      "open": "Ouvrir"
     }
   }
 }

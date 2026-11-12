@@ -3640,6 +3640,12 @@
       "show": "Tampilkan",
       "hide": "Sembunyikan",
       "draft": "Draf"
+    },
+    "notify": {
+      "briefing": "Ringkasan email kamu sudah siap",
+      "urgent": "Email mendesak dari {from}",
+      "asked": "Email yang kamu tanyakan",
+      "open": "Buka"
     }
   }
 }

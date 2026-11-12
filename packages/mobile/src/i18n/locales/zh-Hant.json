@@ -3640,6 +3640,12 @@
       "show": "顯示",
       "hide": "隱藏",
       "draft": "草稿"
+    },
+    "notify": {
+      "briefing": "你的郵件簡報已就緒",
+      "urgent": "來自 {from} 的緊急郵件",
+      "asked": "你問過的郵件",
+      "open": "開啟"
     }
   }
 }

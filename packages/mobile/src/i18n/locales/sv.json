@@ -3676,6 +3676,12 @@
       "show": "Visa",
       "hide": "Dölj",
       "draft": "Utkast"
+    },
+    "notify": {
+      "briefing": "Din mejlsammanfattning är klar",
+      "urgent": "Brådskande mejl från {from}",
+      "asked": "Mejl du frågade om",
+      "open": "Öppna"
     }
   }
 }

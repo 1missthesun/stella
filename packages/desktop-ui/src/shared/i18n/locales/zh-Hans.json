@@ -3640,6 +3640,12 @@
       "show": "显示",
       "hide": "隐藏",
       "draft": "草稿"
+    },
+    "notify": {
+      "briefing": "你的邮件简报已就绪",
+      "urgent": "来自 {from} 的紧急邮件",
+      "asked": "你问过的邮件",
+      "open": "打开"
     }
   }
 }

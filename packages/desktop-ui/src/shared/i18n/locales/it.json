@@ -3710,6 +3710,12 @@
       "show": "Mostra",
       "hide": "Nascondi",
       "draft": "Bozza"
+    },
+    "notify": {
+      "briefing": "Il tuo riepilogo email è pronto",
+      "urgent": "Email urgente da {from}",
+      "asked": "Email che hai chiesto",
+      "open": "Apri"
     }
   }
 }

@@ -3744,6 +3744,12 @@
       "show": "Pokaż",
       "hide": "Ukryj",
       "draft": "Wersja robocza"
+    },
+    "notify": {
+      "briefing": "Twoje podsumowanie poczty jest gotowe",
+      "urgent": "Pilny e-mail od {from}",
+      "asked": "E-mail, o który pytałeś",
+      "open": "Otwórz"
     }
   }
 }

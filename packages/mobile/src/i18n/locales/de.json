@@ -3676,6 +3676,12 @@
       "show": "Anzeigen",
       "hide": "Ausblenden",
       "draft": "Entwurf"
+    },
+    "notify": {
+      "briefing": "Deine E-Mail-Übersicht ist da",
+      "urgent": "Dringende E-Mail von {from}",
+      "asked": "E-Mail, nach der du gefragt hast",
+      "open": "Öffnen"
     }
   }
 }

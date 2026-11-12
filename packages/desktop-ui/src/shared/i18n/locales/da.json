@@ -3676,6 +3676,12 @@
       "show": "Vis",
       "hide": "Skjul",
       "draft": "Kladde"
+    },
+    "notify": {
+      "briefing": "Dit mailoverblik er klar",
+      "urgent": "Vigtig e-mail fra {from}",
+      "asked": "E-mail, du spurgte om",
+      "open": "Åbn"
     }
   }
 }

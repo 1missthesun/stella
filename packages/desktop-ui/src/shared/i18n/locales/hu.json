@@ -3676,6 +3676,12 @@
       "show": "Mutasd",
       "hide": "Elrejtés",
       "draft": "Piszkozat"
+    },
+    "notify": {
+      "briefing": "Elkészült az e-mail-összefoglalód",
+      "urgent": "Sürgős e-mail tőle: {from}",
+      "asked": "E-mail, amire rákérdeztél",
+      "open": "Megnyitás"
     }
   }
 }

@@ -3710,6 +3710,12 @@
       "show": "Mostrar",
       "hide": "Ocultar",
       "draft": "Borrador"
+    },
+    "notify": {
+      "briefing": "Tu resumen de correo está listo",
+      "urgent": "Correo urgente de {from}",
+      "asked": "Correo por el que preguntaste",
+      "open": "Abrir"
     }
   }
 }

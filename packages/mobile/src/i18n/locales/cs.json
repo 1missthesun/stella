@@ -3744,6 +3744,12 @@
       "show": "Zobrazit",
       "hide": "Skrýt",
       "draft": "Koncept"
+    },
+    "notify": {
+      "briefing": "Přehled pošty je připravený",
+      "urgent": "Naléhavý e-mail od {from}",
+      "asked": "E-mail, na který jste se ptali",
+      "open": "Otevřít"
     }
   }
 }

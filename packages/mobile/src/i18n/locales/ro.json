@@ -3710,6 +3710,12 @@
       "show": "Arată",
       "hide": "Ascunde",
       "draft": "Ciornă"
+    },
+    "notify": {
+      "briefing": "Rezumatul e-mailurilor e gata",
+      "urgent": "E-mail urgent de la {from}",
+      "asked": "E-mail despre care ai întrebat",
+      "open": "Deschide"
     }
   }
 }

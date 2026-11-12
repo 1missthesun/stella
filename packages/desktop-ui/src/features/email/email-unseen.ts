@@ -42,3 +42,6 @@ export function useEmailUnseenCount(): number {
     return count;
   }, [items, seen]);
 }
+
+/** When the Email section was last looked at on this computer. */
+export const useEmailSeenAt = (): number => useSyncExternalStore(subscribe, () => seenAt);

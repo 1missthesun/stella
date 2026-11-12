@@ -3676,6 +3676,12 @@
       "show": "Tonen",
       "hide": "Verbergen",
       "draft": "Concept"
+    },
+    "notify": {
+      "briefing": "Je e-mailoverzicht staat klaar",
+      "urgent": "Dringende e-mail van {from}",
+      "asked": "E-mail waar je om vroeg",
+      "open": "Openen"
     }
   }
 }

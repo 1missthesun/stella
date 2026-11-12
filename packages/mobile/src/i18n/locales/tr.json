@@ -3676,6 +3676,12 @@
       "show": "Göster",
       "hide": "Gizle",
       "draft": "Taslak"
+    },
+    "notify": {
+      "briefing": "E-posta özetin hazır",
+      "urgent": "{from} kişisinden acil e-posta",
+      "asked": "Sorduğun e-posta",
+      "open": "Aç"
     }
   }
 }

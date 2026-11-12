@@ -503,6 +503,19 @@ export const isPiAgentText = (text: string): boolean => {
   );
 };
 
+/** Opens a task's note asking Stella before it asks the user; the turn it starts stays out of the chat. */
+export const PI_ASK_FIRST_PREFIX = "Before asking the user, I'm checking with you.";
+
+const ASK_FIRST_NOTE_RE = /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n([\s\S]*)\n<\/agent-message>$/;
+
+export const isPiAskFirstText = (text: string): boolean =>
+  ASK_FIRST_NOTE_RE.exec(text.trim())?.[1]?.startsWith(PI_ASK_FIRST_PREFIX) === true;
+
+export const isPiAskFirstInput = (message: PiUserMessage): boolean =>
+  typeof message.content === "string"
+    ? isPiAskFirstText(message.content)
+    : message.content.some((part) => part.type === "text" && isPiAskFirstText(part.text));
+
 export const isPiAgentInput = (message: PiUserMessage): boolean =>
   typeof message.content === "string"
     ? isPiAgentText(message.content)

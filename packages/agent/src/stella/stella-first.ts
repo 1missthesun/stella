@@ -1,5 +1,6 @@
 import type { Context } from "@earendil-works/chord";
 import type { ConversationId, ToolExecutionApi, ToolRegistration, Tx, Wrap } from "@earendil-works/pi-durable";
+import { PI_ASK_FIRST_PREFIX } from "@stella/contracts/pi-chat";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 /**
@@ -68,9 +69,10 @@ const describeSecureCard = (args: Record<string, unknown>): string => {
 const noteFor = (tool: string, args: Record<string, unknown>): string =>
   [
     tool === ASK_USER
-      ? `Before asking the user, I'm checking with you. I'd ask them:\n${describeQuestions(args)}`
-      : `Before asking the user, I'm checking with you. I'd show them ${describeSecureCard(args)}.`,
-    `I'm waiting for your reply with send_message. If what you know settles it (a standing rule, memory, an earlier answer, or how to go on without it), tell me and the user sees nothing. If only the user can give it, say so and it goes to them. With no reply in ${STELLA_FIRST_WAIT_MS / 1000} seconds it goes to them anyway.`,
+      ? `${PI_ASK_FIRST_PREFIX} I'd ask them:\n${describeQuestions(args)}`
+      : `${PI_ASK_FIRST_PREFIX} I'd show them ${describeSecureCard(args)}.`,
+    `I'm waiting for your reply with send_message. If what you know settles it (a standing rule, memory, an earlier answer, or how to go on without it), tell me. If only the user can give it, say so and it goes to them. With no reply in ${STELLA_FIRST_WAIT_MS / 1000} seconds it goes to them anyway.`,
+    "This exchange stays between us: the user doesn't see it, so send_message is your whole reply and you write nothing to them about it.",
   ].join("\n\n");
 
 const repliedText = (tool: string, reply: string): string =>
@@ -100,6 +102,13 @@ export const takeStellaReply = async (tx: Tx, conversationId: ConversationId, me
   if (!role.askingStella || role.askingStella.reply !== undefined) return false;
   role.askingStella.reply = message;
   return true;
+};
+
+/** True when `message` would land as the answer to the agent's waiting ask, which the user never sees. */
+export const answersAsk = async (api: ToolExecutionApi, conversationId: ConversationId, message: string, context: Context): Promise<boolean> => {
+  if (!message.includes(FROM_STELLA)) return false;
+  const asking = (await api.snapshot(StellaAgentDoc, conversationId, context))?.askingStella;
+  return !!asking && asking.reply === undefined;
 };
 
 const setAsking = (api: ToolExecutionApi, key: string | undefined, context: Context) =>

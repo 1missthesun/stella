@@ -4,7 +4,7 @@ import type {
   EventRecord,
   MessageRecord,
 } from "@stella/contracts/local-chat";
-import { isPiAgentText } from "@stella/contracts/pi-chat";
+import { isPiAgentText, isPiAskFirstText } from "@stella/contracts/pi-chat";
 import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import { parseEmailCard } from "@stella/contracts/email-card";
@@ -315,6 +315,8 @@ export const journalRecordsToMessageRecords = (
     const events: EventRecord[] = [];
     let userMessageId: string | undefined;
     let turnUserRecord: JournalMessageRecord | undefined;
+    // A task asking Stella before it asks the user: her side of it stays out of the chat.
+    let quiet = false;
     const mirrored = mirroredLifecycleEvents(turnId, turnRecords, startCarded);
     const promptAhead = turnRecords.some(
       (record) => record.kind === "message" && record.role === "user",
@@ -387,6 +389,7 @@ export const journalRecordsToMessageRecords = (
         // stored before it was flagged), whose reply still shows.
         const blank = message.blank;
         const unshown = blank || isPiAgentText(userText);
+        quiet = isPiAskFirstText(userText);
         const reaction = reactions.get(record.seq);
         events.push({
           _id: userMessageId,
@@ -405,6 +408,7 @@ export const journalRecordsToMessageRecords = (
         events.push(...beforePrompt.splice(0));
         continue;
       }
+      if (quiet) continue;
 
       if (record.role === "assistant") {
         const { text, refs } = splitMessageReplyRefs(record.payload);

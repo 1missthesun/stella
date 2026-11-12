@@ -1,6 +1,7 @@
 import { legacyReportStatus } from "@stella/contracts/agent-status";
 import {
   isPiAgentInput,
+  isPiAskFirstInput,
   isPiScheduledInput,
   PI_REPORT_RE,
   piMessageText,
@@ -77,6 +78,8 @@ const createPiFeed = (args: {
       if (PI_REPORT_RE.test(text)) {
         hiddenTurn = false;
         update = reportUpdate(entry, text);
+      } else if (isPiAskFirstInput(user)) {
+        hiddenTurn = true;
       } else if (isPiAgentInput(user) || isPiScheduledInput(user)) {
         hiddenTurn = false;
       } else {

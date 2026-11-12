@@ -72,7 +72,7 @@ import {
   type StellaExecutionHost,
 } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
-import { stellaFirstWraps, takeStellaReply, type StellaFirstHost } from "./stella-first.ts";
+import { answersAsk, stellaFirstWraps, takeStellaReply, type StellaFirstHost } from "./stella-first.ts";
 import {
   describePlacement,
   parseSpawnDestination,
@@ -625,12 +625,14 @@ const senderOf = (self: StellaAgentRole, stellaThreadId: string): AgentMessageSe
     ? { threadId: stellaThreadId, label: "Stella" }
     : { threadId: self.threadId, label: self.description ?? "An agent" };
 
-const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDelivery["outcome"]; note?: string }) => ({
+const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDelivery["outcome"] | "answered"; note?: string }) => ({
   content: [
     {
       type: "text" as const,
       text: `Delivered to ${delivery.threadId}. ${
-        delivery.outcome === "steered"
+        delivery.outcome === "answered"
+          ? "It was waiting on your answer to its question and has it now. The user sees none of this, so there is nothing to tell them: unless you were in the middle of answering them, end your turn here without writing anything."
+          : delivery.outcome === "steered"
           ? "It is working and reads your message before its next step."
           : delivery.outcome === "resumed"
             ? "It was idle, so your message started its next run; its report goes to whoever started it."
@@ -1542,6 +1544,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       if (known.away) return await messageAway(api, api.conversationId, threadId, framed, `message:${api.taskId}`, context);
       const running = (await api.snapshot(LiveDoc, known.conversationId as ConversationId, context))?.run !== undefined;
+      const answering = running && (await answersAsk(api, known.conversationId as ConversationId, framed, context));
       await api.commit(async (tx) => {
         const state = await tx.doc(StellaAgentsDoc, api.conversationId);
         if (state.calls[String(api.taskId)]) return;
@@ -1554,7 +1557,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
         state.calls[String(api.taskId)] = { threadId, reporter };
       }, context);
-      return deliveredResult({ threadId, outcome: running ? "steered" : "resumed" });
+      return deliveredResult({ threadId, outcome: answering ? "answered" : running ? "steered" : "resumed" });
     },
   });
 
@@ -1855,6 +1858,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       const agentConversationId = target.record.conversationId as ConversationId;
       const running = (await api.snapshot(LiveDoc, agentConversationId, context))?.run !== undefined;
+      const answering = running && (await answersAsk(api, agentConversationId, text, context));
       await api.commit(async (tx) => {
         const state = await tx.doc(StellaAgentsDoc, target.parentConversationId);
         if (state.calls[key]) return;
@@ -1872,7 +1876,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }, context);
       return deliveredResult({
         threadId,
-        outcome: running ? "steered" : "resumed",
+        outcome: answering ? "answered" : running ? "steered" : "resumed",
       });
     }
     const delivery = await whileDeviceOffline(

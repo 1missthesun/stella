@@ -1,5 +1,6 @@
 import {
   isPiAgentInput,
+  isPiAskFirstInput,
   piTerminalNotice,
   isPiScheduledInput,
   piJournalUserMessage,
@@ -68,7 +69,7 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds">
         ...journaled.message,
         ...(typeof origin === "string" && origin ? { originUserMessageId: origin } : {}),
       };
-      const automation = hidden && !isPiAgentInput(message) && !isPiScheduledInput(message);
+      const automation = hidden && (isPiAskFirstInput(message) || (!isPiAgentInput(message) && !isPiScheduledInput(message)));
       turn = {
         userMessageId: clientMsgId ?? `cloud:${turnId}:message:${entry.id}`,
         entryId: entry.id,

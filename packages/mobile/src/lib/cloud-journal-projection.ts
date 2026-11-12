@@ -25,7 +25,7 @@ import {
   storedJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
 import { isMapRouteArtifact } from "@stella/contracts/map-artifact";
-import { isPiAgentText } from "@stella/contracts/pi-chat";
+import { isPiAgentText, isPiAskFirstText } from "@stella/contracts/pi-chat";
 import type { ToolStep } from "./tool-activity";
 import {
   type JournalMessageRecord,
@@ -321,6 +321,8 @@ const projectTurn = (
   if (out.length > 0) return out;
   let userMessageId = `cloud:${turnId}:user`;
   let turnUserRecord: JournalMessageRecord | undefined;
+  // A task asking Stella before it asks the user: her side of it stays out of the chat.
+  let quiet = false;
   let terminal: Extract<JournalRecord, { kind: "turn" }> | undefined;
   const toolResults = new Map<
     string,
@@ -351,6 +353,7 @@ const projectTurn = (
       turnUserRecord = record;
       userMessageId = projectedMessageId(record);
       const message = journalUserMessage(record.payload);
+      quiet = isPiAskFirstText(message.text);
       if (record.hidden || message.blank || isPiAgentText(message.text)) {
         continue;
       }
@@ -367,7 +370,7 @@ const projectTurn = (
       });
       continue;
     }
-    if (record.role !== "assistant" || record.hidden) continue;
+    if (record.role !== "assistant" || record.hidden || quiet) continue;
     const spawnedThreadIds: string[] = [];
     const spawnedDescriptions: string[] = [];
     const tools: ToolStep[] = toolCalls(record).flatMap((call) => {

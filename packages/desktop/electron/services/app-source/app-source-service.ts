@@ -320,6 +320,8 @@ export class AppSourceService {
   private readonly claimTried = new Map<string, number>();
   private readonly reported = new Set<string>();
   private fetchingResult: string | null = null;
+  /** A shared merge result checked here and found to carry changes this checkout lacks. */
+  private resultUnusable: string | null = null;
   private wantTimer: NodeJS.Timeout | null = null;
   /** The version whose merge is prepared and can be applied at once. */
   private versionReady: string | null = null;
@@ -1483,7 +1485,12 @@ export class AppSourceService {
     this.offeredKeys = offered.map((offer) => offer.key);
     const skipped = skippedNow;
     await this.pruneWanted(cwd, head, intent, drafts, worktrees);
-    const arrived = intent.arrived;
+    // Only while it is still the latest thing that happened here: after any
+    // later change, its Undo would no longer mean "back to before this update".
+    const arrived =
+      intent.arrived && (intent.arrived.revert ?? intent.arrived.sha) === head
+        ? intent.arrived
+        : null;
     return {
       ...(arrived && Date.now() - arrived.at < WANTED_MAX_AGE_MS
         ? {
@@ -1544,10 +1551,16 @@ export class AppSourceService {
     worktrees: Awaited<ReturnType<typeof listWorktrees>>,
   ) {
     const kept: Wanted[] = [];
+    let arrived: Extract<Wanted, { kind: "version" }> | null = null;
     for (const entry of intent.wanted) {
       if (Date.now() - entry.at >= WANTED_MAX_AGE_MS) continue;
       if (entry.kind === "version") {
-        if (await isAncestor(cwd, entry.version, head)) continue;
+        if (await isAncestor(cwd, entry.version, head)) {
+          // It came in another way (catching up with the computer that
+          // merged it); still say so, as if it came in by itself.
+          arrived = entry;
+          continue;
+        }
       } else {
         const ref = `${DRAFT_REF_PREFIX}${entry.name}`;
         const exists = (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])).code === 0;
@@ -1561,6 +1574,14 @@ export class AppSourceService {
     if (kept.length !== intent.wanted.length) {
       await this.saveIntent((current) => {
         current.wanted = kept;
+        if (arrived && current.arrived?.version !== arrived.version) {
+          current.arrived = {
+            sha: head,
+            version: arrived.version,
+            from: arrived.from?.device ?? null,
+            at: Date.now(),
+          };
+        }
       });
     }
   }
@@ -1580,6 +1601,8 @@ export class AppSourceService {
         void this.fetchResult(version, result.sha);
       } else if (await this.usableResult(cwd, head, result.sha, version)) {
         return { ref: result.sha, tip: result.sha };
+      } else {
+        this.resultUnusable = result.sha;
       }
     }
     const ref = (await this.mergedElsewhere(cwd, version)) ?? UPSTREAM_REF;
@@ -1645,6 +1668,13 @@ export class AppSourceService {
       record?.plan?.kind === "conflict" && !record.to && record.resolve !== undefined && record.resolve !== "none";
     if (!rerereFailed || !this.options.modelResolve) return "rerere";
     if (this.waitingOnOther(version)) return "rerere";
+    // Another computer with these same changes already asked a model and it
+    // was not sure; asking again here would spend the same for the same answer.
+    const update = this.update?.version === version ? this.update : null;
+    const me = this.options.getDeviceId?.();
+    if (update?.unresolved && update.preparer && update.preparer.deviceId !== me && update.preparer.base === head) {
+      return "rerere";
+    }
     const intent = await this.loadIntent();
     if (intent.wanted.some((entry) => entry.kind === "version" && entry.version === version)) {
       return "model";
@@ -1895,6 +1925,8 @@ export class AppSourceService {
           action = () => this.exclusive((cwd) => this.takeUpstream(cwd, entry));
         } else if (!entry.task && this.versionNeedsTask(entry)) {
           action = async () => {
+            // Things may have moved while waiting for a quiet moment.
+            if (!this.versionNeedsTask(entry)) return { ok: true };
             await this.want({ ...entry, task: true });
             return await this.exclusive((cwd) => this.takeUpstream(cwd, entry));
           };
@@ -1949,7 +1981,11 @@ export class AppSourceService {
   private versionNeedsTask(entry: Extract<Wanted, { kind: "version" }>) {
     if (this.versionConflicts?.why !== "unsure" || this.waitingOnOther(entry.version)) return false;
     const update = this.update?.version === entry.version ? this.update : null;
-    if (entry.from && !update?.result && Date.now() - entry.at < MERGE_WAIT_MS) return false;
+    const waited = Date.now() - entry.at >= MERGE_WAIT_MS;
+    if (entry.from && !update?.result && !waited) return false;
+    // A merge from another computer is on its way: fetch and check it first,
+    // and merge here only when it carries changes this checkout lacks.
+    if (update?.result && this.resultUnusable !== update.result.sha && !waited) return false;
     return true;
   }
 

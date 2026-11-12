@@ -116,6 +116,11 @@
   min-width: 0;
 }
 
+/* Without a title the actions share the first row with the close button: keep clear of it. */
+[data-component="toast"]:not(:has([data-slot="toast-title"])):has([data-slot="toast-actions"]) [data-slot="toast-content"] {
+  padding-right: 28px;
+}
+
 [data-component="toast"] [data-slot="toast-actions"] {
   display: flex;
   align-items: baseline;

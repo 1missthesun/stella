@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from "react";
-import { plainText, senderOf } from "@stella/contracts/email-brief";
+import type { EmailMatter } from "@stella/contracts/backend/email";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { useNotificationSource, type NotificationInput } from "@/features/notifications/notification-store";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n } from "@/shared/i18n";
 import { useStaleEmailChipCleanup } from "./EmailDigest";
 import { sidebarSections, useSidebarOpenTabs } from "@/features/workspace-display/sidebar-sections";
-import { openEmailDigest } from "./email-digest-store";
+import { openEmailToday } from "./email-digest-store";
 import { useEmailFeatureState } from "./email-feature";
 import { useEmailSeenAt } from "./email-unseen";
 
@@ -49,58 +49,56 @@ export function EmailNotifications() {
 function EmailBriefingNotifications() {
   const { t, tPlural } = useI18n();
   const { hasConnectedAccount } = useAuthSessionState();
-  const view = useBackendView("email.digests", hasConnectedAccount ? {} : "skip");
+  const view = useBackendView("email.today", hasConnectedAccount ? {} : "skip");
   const seenAt = useEmailSeenAt();
-  const digests = view.value?.digests;
+  const today = view.value;
   const items = useMemo((): NotificationInput[] => {
-    const unseen = (digests ?? []).filter((digest) => digest.createdAt > seenAt && digest.items.length > 0);
+    if (!today) return [];
+    const open = new Map(today.open.map((matter) => [matter.matterId, matter]));
+    const openIn = (ids: string[]): EmailMatter[] => ids.flatMap((id) => (open.has(id) ? [open.get(id)!] : []));
     const out: NotificationInput[] = [];
-    const briefing = unseen.find((digest) => digest.kind === "summary");
-    if (briefing) {
-      const first = briefing.items[0]!;
+    const more = (count: number) => (count > 0 ? tPlural("email.notify.more", count) : undefined);
+    // Each entry says in one sentence what the email wants.
+    const summary = today.alerts.find((alert) => alert.kind === "summary" && alert.at > seenAt && openIn(alert.matterIds).length > 0);
+    if (summary) {
+      const matters = openIn(summary.matterIds);
       out.push({
-        id: `email:${briefing.digestId}`,
+        id: `email:${summary.briefingId}`,
         kind: "email",
-        title: t("email.notify.briefing"),
-        detail: clip(briefing.brief ? plainText(briefing.brief.lead) : first.line ?? first.subject),
-        createdAt: briefing.createdAt,
-        actions: [{ label: t("email.notify.open"), primary: true, run: () => openEmailDigest(briefing.digestId) }],
+        title: clip(matters[0]!.wants),
+        detail: more(matters.length - 1),
+        createdAt: summary.at,
+        actions: [{ label: t("email.notify.open"), primary: true, run: openEmailToday }],
       });
     }
-    // Newest first; the group is named after its oldest entry so it keeps one id while it grows.
-    const flagged = unseen.filter((digest) => digest.kind !== "summary");
+    // Urgent mail and mail you asked about: one entry that grows, named after its oldest alert.
+    const flagged = today.alerts.filter((alert) => alert.kind !== "summary" && alert.at > seenAt && openIn(alert.matterIds).length > 0);
     if (flagged.length > 0) {
-      const newest = flagged[0]!;
-      const oldest = flagged[flagged.length - 1]!;
-      const mails = flagged.flatMap((digest) => digest.items);
-      const urgent = flagged.filter((digest) => digest.kind === "urgent").length;
-      const title =
-        flagged.length === 1
-          ? newest.kind === "urgent"
-            ? t("email.notify.urgent", { from: senderOf(mails[0]!.from) })
-            : t("email.notify.asked")
-          : urgent === flagged.length
-            ? tPlural("email.row.urgentEmails", flagged.length)
-            : urgent === 0
-              ? tPlural("email.row.askedEmails", flagged.length)
-              : `${tPlural("email.row.urgentEmails", urgent)} · ${tPlural("email.row.askedEmails", flagged.length - urgent)}`;
-      const detail =
-        flagged.length === 1
-          ? mails[0]!.line ?? mails[0]!.subject
-          : [...new Set(mails.map((mail) => senderOf(mail.from)))].join(", ");
-      const id = `email:flagged:${oldest.digestId}`;
+      const matters = flagged.flatMap((alert) => openIn(alert.matterIds));
+      const id = `email:flagged:${flagged[flagged.length - 1]!.briefingId}`;
       out.push({
         id,
         kind: "email",
-        title,
-        detail: clip(detail),
-        createdAt: newest.createdAt,
+        title: clip(matters[0]!.wants),
+        detail: more(matters.length - 1),
+        createdAt: flagged[0]!.at,
         toast: urgentToastAllowed(id),
-        actions: [{ label: t("email.notify.open"), primary: true, run: () => openEmailDigest(newest.digestId) }],
+        actions: [{ label: t("email.notify.open"), primary: true, run: openEmailToday }],
+      });
+    }
+    for (const matter of today.open) {
+      if (!matter.returnedAt || matter.returnedAt <= seenAt) continue;
+      out.push({
+        id: `email:back:${matter.matterId}:${matter.returnedAt}`,
+        kind: "email",
+        title: clip(matter.wants),
+        detail: t("email.notify.back"),
+        createdAt: matter.returnedAt,
+        actions: [{ label: t("email.notify.open"), primary: true, run: openEmailToday }],
       });
     }
     return out;
-  }, [digests, seenAt, t, tPlural]);
+  }, [today, seenAt, t, tPlural]);
   useNotificationSource("email", items);
   return null;
 }

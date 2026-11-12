@@ -1,5 +1,7 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { useEmailFeedItems } from "./email-items";
+import { useBackendView } from "@/platform/backend/use-backend-view";
+import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
+import { useEmailFeature } from "./email-feature";
 
 // When the Email section was last looked at on this computer. Sorted mail that
 // arrived after it is "unseen" and badges the Email entry; the chat itself only
@@ -29,18 +31,16 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** Sorted mail worth showing that arrived since the Email section was last open. */
+/** Items on Today that arrived (or came back from Later) since the Email section was last open. */
 export function useEmailUnseenCount(): number {
-  const { items } = useEmailFeedItems();
+  const { hasConnectedAccount } = useAuthSessionState();
+  const on = useEmailFeature();
+  const open = useBackendView("email.today", hasConnectedAccount && on ? {} : "skip").value?.open;
   const seen = useSyncExternalStore(subscribe, () => seenAt);
-  return useMemo(() => {
-    if (!items) return 0;
-    let count = 0;
-    for (const item of items.values()) {
-      if (item.bucket !== "noise" && item.state !== "dismissed" && item.receivedAt > seen) count += 1;
-    }
-    return count;
-  }, [items, seen]);
+  return useMemo(
+    () => (open ?? []).filter((matter) => Math.max(matter.arrivedAt, matter.returnedAt ?? 0) > seen).length,
+    [open, seen],
+  );
 }
 
 /** When the Email section was last looked at on this computer. */

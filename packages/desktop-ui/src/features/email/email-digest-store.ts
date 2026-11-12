@@ -23,9 +23,9 @@ export const selectEmailDigest = (digestId: string | null): void => {
   emit();
 };
 
-/** Opens the Email tab in the viewer on one digest, as the chat's email row does. */
-export const openEmailDigest = (digestId: string): void => {
-  selectEmailDigest(digestId);
+/** Opens the Email tab on Today, as the bell's entries do. */
+export const openEmailToday = (): void => {
+  selectEmailDigest(null);
   sidebarSections.openSectionTab("email");
 };
 

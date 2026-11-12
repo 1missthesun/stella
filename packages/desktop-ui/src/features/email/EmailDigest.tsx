@@ -1,21 +1,9 @@
-import {
-  Fragment,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type {
-  EmailBrief,
-  EmailBriefBlock,
   EmailBriefTone,
-  EmailDigest,
   EmailFocusAction,
   EmailFound,
-  EmailItem,
+  EmailMatter,
   EmailSearchResult,
   EmailTargets,
   EmailThread,
@@ -31,7 +19,7 @@ import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n } from "@/shared/i18n";
 import { STELLA_SEND_MESSAGE_EVENT } from "@/shared/lib/stella-send-message";
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, MoreHorizontal, Paperclip, Search, Settings, X } from "@/ui/icons";
+import { ArrowLeft, ChevronDown, ExternalLink, MoreHorizontal, Paperclip, Search, Settings, X } from "@/ui/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,19 +27,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
-import {
-  blockSnapshot,
-  briefOf,
-  briefingSnapshot,
-  foundSnapshot,
-  plainText,
-  reflowText,
-  senderOf,
-  snippetPoint,
-  threadSnapshot,
-} from "./email-brief";
-import { correctEmail, dismissEmail, emailTime, openGmailThread } from "./email-items";
-import { selectEmailDigest, useSelectedEmailDigest } from "./email-digest-store";
+import { foundSnapshot, reflowText, snippetPoint, threadSnapshot } from "./email-brief";
+import { emailTime, openGmailThread } from "./email-items";
+import { useSelectedEmailDigest } from "./email-digest-store";
+import { HistoryView, Md, TodayView, matterSnapshot, todaySnapshot, type TodayActions } from "./EmailToday";
 import "./email-digest.css";
 
 /**
@@ -59,26 +38,10 @@ import "./email-digest.css";
  * before it names the exact emails, so Stella acts on the right ones and the
  * answer comes back in the chat like any other.
  */
-const askStella = async (targets: EmailTargets, action: EmailFocusAction, text: string): Promise<void> => {
-  await backendClient.call("email.focus", { ...targets, action }).catch(() => undefined);
+const askStella = async (targets: EmailTargets, action: EmailFocusAction, text: string, matterId?: string): Promise<void> => {
+  await backendClient.call("email.focus", { ...targets, action, ...(matterId ? { matterId } : {}) }).catch(() => undefined);
   window.dispatchEvent(new CustomEvent(STELLA_SEND_MESSAGE_EVENT, { detail: { text } }));
 };
-
-/** The briefing's light markdown: bold and nothing else, rendered inline. */
-function Md({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/gu);
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.startsWith("**") && part.endsWith("**") && part.length > 4 ? (
-          <strong key={index}>{part.slice(2, -2)}</strong>
-        ) : (
-          <Fragment key={index}>{part}</Fragment>
-        ),
-      )}
-    </>
-  );
-}
 
 // Composer context -------------------------------------------------------------
 
@@ -339,189 +302,6 @@ function Block({
   );
 }
 
-// The briefing ---------------------------------------------------------------
-
-type Picked = { kind: "block"; key: string } | null;
-
-function Briefing({
-  digest,
-  waiting,
-  showAccount,
-  now,
-  picked,
-  onPick,
-  onRead,
-  onTell,
-}: {
-  digest: EmailDigest;
-  waiting: EmailItem[];
-  showAccount: boolean;
-  now: number;
-  picked: Picked;
-  onPick: (key: string | null) => void;
-  onRead: (item: EmailItem) => void;
-  onTell: (key: string) => void;
-}) {
-  const { t, tPlural, locale } = useI18n();
-  const brief = useBrief(digest);
-  const byId = useMemo(() => new Map([...digest.items, ...waiting].map((item) => [item.itemId, item])), [digest.items, waiting]);
-  const waitingBlocks: EmailBriefBlock[] = waiting.map((item) => ({
-    itemIds: [item.itemId],
-    title: `**${senderOf(item.from)}** · ${item.subject}`,
-    points: item.line ? [item.line] : [],
-  }));
-
-  const actionsFor = (block: EmailBriefBlock, items: EmailItem[]): BlockActions => {
-    const newest = [...items].sort((a, b) => b.receivedAt - a.receivedAt)[0]!;
-    const ids = { itemIds: items.map((item) => item.itemId) };
-    const from = senderOf(newest.from);
-    const sorted = items.every((item) => item.bucket === "worth_knowing") ? "worth_knowing" : "needs_you";
-    return {
-      ...(block.suggestion ? { suggestion: block.suggestion } : {}),
-      runSuggestion: (text) => askStella(ids, "suggest", text),
-      reply: () => askStella(ids, "reply", t("email.digest.askReply", { from, subject: newest.subject })),
-      handle: () => askStella(ids, "handle", t("email.digest.askHandle", { from, subject: newest.subject })),
-      read: () => onRead(newest),
-      archive: async (archived) => {
-        await backendClient.call("email.archive", { ...ids, archived });
-      },
-      archived: items.every((item) => item.archived),
-      tell: () => onTell(blockKey(block)),
-      gmail: () => openGmailThread(newest.threadId, newest.account),
-      move: {
-        label: sorted === "needs_you" ? t("email.section.moveToWorthKnowing") : t("email.section.moveToNeedsYou"),
-        run: () => Promise.all(items.map((item) => correctEmail(item.itemId, sorted === "needs_you" ? "worth_knowing" : "needs_you"))),
-      },
-      notImportant: () => Promise.all(items.map((item) => dismissEmail(item.itemId))),
-    };
-  };
-
-  const renderBlock = (block: EmailBriefBlock, tone: EmailBriefTone) => {
-    const items = block.itemIds.flatMap((id) => {
-      const item = byId.get(id);
-      return item ? [item] : [];
-    });
-    if (items.length === 0) return null;
-    const newest = Math.max(...items.map((item) => item.receivedAt));
-    const key = blockKey(block);
-    const foot = [
-      items.length > 1 ? tPlural("email.brief.emails", items.length) : null,
-      emailTime(locale, newest, now),
-      showAccount ? items[0]!.account : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    return (
-      <Block
-        key={key}
-        tone={tone}
-        title={block.title}
-        points={block.points}
-        foot={foot}
-        selected={picked?.key === key}
-        quiet={items.every((item) => item.state === "dismissed")}
-        actions={actionsFor(block, items)}
-        onSelect={() => onPick(picked?.key === key ? null : key)}
-        testId="email-brief-block"
-      />
-    );
-  };
-
-  return (
-    <article className="email-brief__doc" data-testid="email-digest">
-      <p className="email-brief__lead">
-        <Md text={brief.lead} />
-      </p>
-      {digest.ruleText ? <p className="email-brief__rule">“{digest.ruleText}”</p> : null}
-      {brief.sections.map((section, index) => (
-        <section key={`${section.heading}-${index}`} className="email-brief__section" data-tone={section.tone}>
-          <h2 className="email-brief__heading">
-            {section.tone === "urgent" ? <span className="email-brief__dot" aria-hidden="true" /> : null}
-            {section.heading}
-          </h2>
-          <ul className="email-brief__blocks">{section.blocks.map((block) => renderBlock(block, section.tone))}</ul>
-        </section>
-      ))}
-      {waitingBlocks.length > 0 ? (
-        <section className="email-brief__section" data-tone="fyi">
-          <h2 className="email-brief__heading">{t("email.brief.waiting")}</h2>
-          <ul className="email-brief__blocks">{waitingBlocks.map((block) => renderBlock(block, "fyi"))}</ul>
-        </section>
-      ) : null}
-      <Skipped key={digest.digestId} items={digest.skipped} line={brief.skipped} now={now} />
-    </article>
-  );
-}
-
-const blockKey = (block: EmailBriefBlock): string => block.itemIds.join("+");
-
-function useBrief(digest: EmailDigest): EmailBrief {
-  const { t, tPlural } = useI18n();
-  const need = digest.items.filter((item) => item.bucket === "urgent" || item.bucket === "needs_you").length;
-  const worth = digest.items.length - need;
-  const lead = [need > 0 ? tPlural("email.card.needYou", need) : null, worth > 0 ? tPlural("email.card.worthKnowing", worth) : null]
-    .filter(Boolean)
-    .join(" · ");
-  return briefOf(digest, {
-    needsYou: t("email.section.needsYou"),
-    worthKnowing: t("email.section.worthKnowing"),
-    urgent: t("email.section.urgent"),
-    lead,
-  });
-}
-
-function Skipped({ items, line, now }: { items: EmailItem[]; line?: string; now: number }) {
-  const { t, tPlural, locale } = useI18n();
-  const [open, setOpen] = useState(false);
-  const [mattered, setMattered] = useState<ReadonlySet<string>>(new Set());
-  const [failed, setFailed] = useState(false);
-  if (items.length === 0) return null;
-  const matter = (item: EmailItem) => {
-    setFailed(false);
-    void correctEmail(item.itemId, "needs_you")
-      .then(() => setMattered((current) => new Set([...current, item.itemId])))
-      .catch(() => setFailed(true));
-  };
-  return (
-    <section className="email-brief__skipped">
-      <button type="button" className="email-brief__skipped-line" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <span className="email-brief__skipped-text">
-          <strong>{tPlural("email.digest.skipped", items.length)}</strong>
-          {line ? <span>{line.replace(/^\s*\d+\s*(emails?)?\s*[:·-]?\s*/iu, "")}</span> : null}
-        </span>
-        <span className="email-brief__skipped-toggle">{open ? t("email.brief.hide") : t("email.brief.show")}</span>
-      </button>
-      {open ? (
-        <>
-          <p className="email-brief__hint">{t("email.digest.skippedHint")}</p>
-          <ul className="email-brief__skipped-list">
-            {items.map((item) => {
-              const done = mattered.has(item.itemId) || (item.corrected && item.bucket !== "noise");
-              return (
-                <li key={item.itemId} className="email-brief__skipped-row" data-testid="email-skipped-item">
-                  <span className="email-brief__skipped-mail">
-                    <span className="email-brief__skipped-from">{senderOf(item.from)}</span>
-                    <span className="email-brief__skipped-subject">{item.subject}</span>
-                  </span>
-                  <span className="email-brief__time">{emailTime(locale, item.receivedAt, now)}</span>
-                  {done ? (
-                    <span className="email-brief__matter-done">{t("email.digest.matteredDone")}</span>
-                  ) : (
-                    <button type="button" className="email-brief__matter" onClick={() => matter(item)}>
-                      {t("email.digest.mattered")}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {failed ? <p className="email-brief__notice">{t("email.failed")}</p> : null}
-        </>
-      ) : null}
-    </section>
-  );
-}
-
 // Search -------------------------------------------------------------------------
 
 function SearchResults({
@@ -681,49 +461,31 @@ function Reader({
 
 // The panel ------------------------------------------------------------------------
 
-const dayLabel = (
-  t: (key: string, params?: Record<string, string | number>) => string,
-  locale: string,
-  at: number,
-  now: number,
-): string => {
-  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(at);
-  const day = new Date(at);
-  const today = new Date(now);
-  if (day.toDateString() === today.toDateString()) return t("email.brief.today", { time });
-  const yesterday = new Date(now - 86_400_000);
-  if (day.toDateString() === yesterday.toDateString()) return t("email.brief.yesterday", { time });
-  return new Intl.DateTimeFormat(locale, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(at);
-};
-
-
 /**
- * The Email tab: one briefing at a time, written like a good answer (a lead,
- * then short sections of points with one control each), a strip across every
- * briefing of the week, search across the mailbox, and emails read in place.
- * Whatever is on screen rides along with the next chat message.
+ * The Email tab: one living Today list (what is open now, each item with its
+ * step prepared), History with the log of what Stella read and did, search
+ * across the mailbox, and emails read in place. Whatever is on screen rides
+ * along with the next chat message.
  */
 export function EmailDigestPanel({
   active,
   enabled,
-  waiting,
   showAccount,
   settings,
 }: {
   active: boolean;
   enabled: boolean;
-  /** Mail sorted since the newest briefing, not in one yet. */
-  waiting: EmailItem[];
   showAccount: boolean;
   settings: ReactNode;
 }) {
-  const { t, tPlural, locale } = useI18n();
+  const { t, tPlural } = useI18n();
   const now = useNow();
-  const view = useBackendView("email.digests", enabled ? {} : "skip");
-  const { digestId, openedAt } = useSelectedEmailDigest();
+  const view = useBackendView("email.today", enabled ? {} : "skip");
+  const { openedAt } = useSelectedEmailDigest();
   const topRef = useRef<HTMLDivElement>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
-  const [picked, setPicked] = useState<Picked>(null);
+  const [mode, setMode] = useState<"today" | "history">("today");
+  const history = useBackendView("email.history", enabled && mode === "history" ? {} : "skip");
+  const [picked, setPicked] = useState<EmailMatter | null>(null);
   const [pickedAt, setPickedAt] = useState(0);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState<
@@ -734,15 +496,12 @@ export function EmailDigestPanel({
   const [thread, setThread] = useState<EmailThread | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  const digests = view.value?.digests ?? [];
-  const index = Math.max(0, digests.findIndex((digest) => digest.digestId === digestId));
-  const shown = digests[index] ?? null;
-  const newest = index === 0;
-  const accounts = showAccount || Boolean(view.value?.multipleAccounts);
-  const brief = useBrief(shown ?? { digestId: "", kind: "summary", createdAt: 0, items: [], skipped: [] });
+  const today = view.value;
+  const accounts = showAccount || Boolean(today?.multipleAccounts);
+  const pickedNow = picked && today?.open.some((matter) => matter.matterId === picked.matterId) ? picked : null;
 
-  const pick = (key: string | null) => {
-    setPicked(key ? { kind: "block", key } : null);
+  const pick = (matter: EmailMatter | null) => {
+    setPicked(matter);
     setPickedAt(Date.now());
   };
 
@@ -751,14 +510,9 @@ export function EmailDigestPanel({
     setReading(null);
     setSearch(null);
     setShowSettings(false);
+    setMode("today");
     if (openedAt) topRef.current?.scrollIntoView({ block: "start" });
   }, [openedAt]);
-
-  useEffect(() => {
-    stripRef.current?.querySelector("[data-on]")?.scrollIntoView({ block: "nearest", inline: "center" });
-  }, [shown?.digestId, digests.length]);
-
-  const when = shown ? dayLabel(t, locale, shown.createdAt, now) : "";
 
   const chip = useMemo((): Chip | null => {
     if (reading && thread) return { key: `thread:${thread.threadId}`, label: t("email.brief.chip", { title: thread.subject }), snapshot: threadSnapshot(thread) };
@@ -770,23 +524,23 @@ export function EmailDigestPanel({
         snapshot: foundSnapshot(foundPick),
       };
     }
-    if (!shown) return null;
-    const block = picked ? brief.sections.flatMap((section) => section.blocks).find((entry) => blockKey(entry) === picked.key) : undefined;
-    if (block) return { key: `block:${picked!.key}`, label: t("email.brief.chip", { title: plainText(block.title) }), snapshot: blockSnapshot(shown, block) };
-    return {
-      key: `brief:${shown.digestId}`,
-      label: t("email.brief.chip", { title: t("email.brief.chipBriefing", { time: emailTime(locale, shown.createdAt, now) }) }),
-      snapshot: briefingSnapshot(shown, brief, when),
-    };
+    if (!today || mode !== "today") return null;
+    if (pickedNow) return { key: `matter:${pickedNow.matterId}`, label: t("email.brief.chip", { title: pickedNow.headline }), snapshot: matterSnapshot(pickedNow) };
+    if (today.open.length === 0) return null;
+    return { key: "today", label: t("email.brief.chip", { title: t("email.today.title") }), snapshot: todaySnapshot(today) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reading, thread, search, foundPick, shown, picked, brief, when, locale]);
+  }, [reading, thread, search, foundPick, today, pickedNow, mode]);
 
   const focusComposer = useEmailChip(active && !showSettings, chip, pickedAt);
 
-  const go = (step: number) => {
-    const next = digests[index + step];
-    if (!next) return;
-    selectEmailDigest(next.digestId);
+  const actions: TodayActions = {
+    ask: (matter, action, text) => askStella({ itemIds: matter.itemIds }, action, text, matter.matterId),
+    tell: (matter) => {
+      pick(matter);
+      focusComposer();
+    },
+    read: (matter) => setReading({ itemId: matter.itemIds[matter.itemIds.length - 1]! }),
+    pick,
   };
 
   const submitSearch = (event: FormEvent) => {
@@ -809,14 +563,7 @@ export function EmailDigestPanel({
       );
   };
 
-  if (!view.value) return <div ref={topRef} aria-busy={view.status !== "error"} />;
-
-  const ordered = [...digests].reverse();
-  const subtitle = shown
-    ? shown.sinceAt
-      ? tPlural("email.brief.newSince", shown.items.length, { time: emailTime(locale, shown.sinceAt, now) })
-      : tPlural("email.row.new", shown.items.length)
-    : "";
+  if (!today) return <div ref={topRef} aria-busy={view.status !== "error"} />;
 
   let body: ReactNode;
   if (showSettings) body = <div className="email-brief__settings">{settings}</div>;
@@ -856,52 +603,26 @@ export function EmailDigestPanel({
         }}
       />
     );
-  else if (shown)
-    body = (
-      <Briefing
-        key={shown.digestId}
-        digest={shown}
-        waiting={newest ? waiting : []}
-        showAccount={accounts}
-        now={now}
-        picked={picked}
-        onPick={pick}
-        onRead={(item) => setReading({ itemId: item.itemId })}
-        onTell={(key) => {
-          pick(key);
-          focusComposer();
-        }}
-      />
-    );
-  else body = <p className="email-brief__lead email-brief__lead--quiet">{t("email.brief.empty")}</p>;
+  else if (mode === "history")
+    body = <HistoryView history={history.value} now={now} onRead={(matter) => actions.read(matter)} />;
+  else body = <TodayView today={today} now={now} showAccount={accounts} picked={pickedNow?.matterId ?? null} actions={actions} />;
+
+  const title = mode === "history" ? t("email.today.history") : t("email.today.title");
+  const subtitle =
+    mode === "history"
+      ? ""
+      : [
+          today.open.length > 0 ? tPlural("email.today.open", today.open.length) : null,
+          today.readToday.total > 0 ? tPlural("email.today.readToday", today.readToday.total, { leftOut: today.readToday.leftOut }) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
 
   return (
     <div ref={topRef} className="email-brief">
       <header className="email-brief__bar">
-        <div className="email-brief__nav">
-          <button
-            type="button"
-            className="email-brief__icon-btn"
-            aria-label={t("email.brief.earlier")}
-            disabled={index >= digests.length - 1 || Boolean(search) || Boolean(reading)}
-            onClick={() => go(1)}
-            data-testid="email-brief-earlier"
-          >
-            <ChevronLeft size={16} strokeWidth={1.9} />
-          </button>
-          <button
-            type="button"
-            className="email-brief__icon-btn"
-            aria-label={t("email.brief.later")}
-            disabled={index === 0 || Boolean(search) || Boolean(reading)}
-            onClick={() => go(-1)}
-            data-testid="email-brief-later"
-          >
-            <ChevronRight size={16} strokeWidth={1.9} />
-          </button>
-        </div>
         <div className="email-brief__when">
-          <span className="email-brief__when-title">{shown ? when : t("email.title")}</span>
+          <span className="email-brief__when-title">{title}</span>
           {subtitle ? <span className="email-brief__when-sub">{subtitle}</span> : null}
         </div>
         <form className="email-brief__search" onSubmit={submitSearch} role="search">
@@ -924,7 +645,7 @@ export function EmailDigestPanel({
             <button
               type="button"
               className="email-brief__search-clear"
-              aria-label={t("email.brief.backToBrief")}
+              aria-label={t("email.today.backToToday")}
               onClick={() => {
                 setQuery("");
                 setSearch(null);
@@ -937,6 +658,20 @@ export function EmailDigestPanel({
         </form>
         <button
           type="button"
+          className="email-brief__text-btn"
+          aria-pressed={mode === "history"}
+          onClick={() => {
+            setSearch(null);
+            setReading(null);
+            setShowSettings(false);
+            setMode((current) => (current === "history" ? "today" : "history"));
+          }}
+          data-testid="email-history-toggle"
+        >
+          {mode === "history" ? t("email.today.title") : t("email.today.history")}
+        </button>
+        <button
+          type="button"
           className="email-brief__icon-btn"
           aria-label={t("email.digest.settings")}
           aria-pressed={showSettings}
@@ -946,32 +681,6 @@ export function EmailDigestPanel({
           <Settings size={16} strokeWidth={1.9} />
         </button>
       </header>
-      {ordered.length > 1 ? (
-        <div ref={stripRef} className="email-brief__strip" role="tablist" aria-label={t("email.brief.all")}>
-          {ordered.map((digest) => {
-            const on = digest === shown && !search && !reading && !showSettings;
-            return (
-              <button
-                key={digest.digestId}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                data-on={digest === shown || undefined}
-                className="email-brief__stop"
-                onClick={() => {
-                  setSearch(null);
-                  setReading(null);
-                  setShowSettings(false);
-                  selectEmailDigest(digest.digestId);
-                }}
-              >
-                <span>{emailTime(locale, digest.createdAt, now)}</span>
-                <span className="email-brief__stop-count">{digest.items.length}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
       {body}
     </div>
   );

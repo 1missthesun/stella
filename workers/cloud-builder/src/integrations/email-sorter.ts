@@ -499,7 +499,7 @@ export const writeMatters = async (
       "points: 0-2 bullets of at most 14 words with facts not already in the headline (amounts, dates, asks). Bold sparingly.",
       `reply: only when the obvious next step is replying. body: the reply. ${REPLY_RULES} label: at most 7 words saying what tapping does, starting with \"Send reply\" (\"Send reply approving the quote\", \"Send reply confirming Thursday\").`,
       "action: only when the next step is something else Stella can do for them (add to calendar, pay, file, track a delivery). label: at most 6 words saying what will happen (\"Add the flight to your calendar\"). ask: the full instruction in their voice. Never both reply and action; neither for fyi that needs nothing.",
-      "later: when to bring it back if they put it off. at: local time \"YYYY-MM-DD HH:MM\", a sensible moment before any deadline (morning of the day before it's due), else 09:00 tomorrow. why: at most 5 words (\"the day before it's due\").",
+      "later: when to bring it back if they put it off. at: local time \"YYYY-MM-DD HH:MM\": for urgent, within a few hours; before a deadline, the morning of the day before it's due; around an event, shortly before it; else 09:00 tomorrow. why: at most 5 words saying why that time (\"the day before it's due\", \"before your flight\"), never a summary of the email.",
       "Plain words, no emoji. Answer only by calling write_today.",
     ].join("\n"),
     prompt,

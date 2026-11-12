@@ -22,12 +22,6 @@
   padding: 2px 0 10px;
 }
 
-.email-brief__nav {
-  display: flex;
-  gap: 4px;
-  flex: none;
-}
-
 .email-brief__icon-btn {
   display: grid;
   place-items: center;
@@ -56,7 +50,6 @@
 
 .email-brief__icon-btn:focus-visible,
 .email-brief__control:focus-visible,
-.email-brief__stop:focus-visible,
 .email-brief__back:focus-visible,
 .email-brief__skipped-line:focus-visible {
   outline: none;
@@ -129,63 +122,6 @@
   background: none;
   color: var(--text-weak);
   cursor: pointer;
-}
-
-/* Every briefing of the week, oldest to newest */
-.email-brief__strip {
-  display: flex;
-  gap: 2px;
-  margin: 0 0 4px;
-  border-bottom: 1px solid var(--border-weak);
-  overflow-x: auto;
-  scrollbar-width: none;
-  mask-image: linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent);
-}
-
-.email-brief__strip::-webkit-scrollbar {
-  display: none;
-}
-
-.email-brief__stop {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  padding: 8px 11px 10px;
-  border: 0;
-  background: none;
-  color: var(--text-weak);
-  font: inherit;
-  font-size: var(--font-size-sm, 13px);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.email-brief__stop:hover {
-  color: var(--text-strong);
-}
-
-.email-brief__stop[aria-selected="true"] {
-  color: var(--text-strong);
-  font-weight: var(--weight-semibold, 600);
-}
-
-.email-brief__stop[aria-selected="true"]::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--brief-accent);
-}
-
-.email-brief__stop-count {
-  color: var(--text-weaker, var(--text-weak));
-  font-weight: var(--weight-regular, 400);
 }
 
 .email-brief__dot {
@@ -607,4 +543,364 @@
 
 .email-brief__settings {
   padding-top: 18px;
+}
+
+/* Today: one living list. Items are set like paragraphs: the outcome, a quiet
+   line on where it came from, a few facts, then a row of precise controls. */
+.email-brief__text-btn {
+  flex: none;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: var(--font-size-sm, 13px);
+  font-weight: var(--weight-medium, 500);
+  cursor: pointer;
+}
+
+.email-brief__text-btn:hover,
+.email-brief__text-btn[aria-pressed="true"] {
+  color: var(--text-strong);
+}
+
+.email-today__items {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.email-today__item[data-busy] {
+  opacity: 0.7;
+}
+
+.email-today:has(.email-today__item[data-selected]) .email-today__item:not([data-selected]) {
+  opacity: 0.45;
+  transition: opacity 140ms ease;
+}
+
+.email-today__headline {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: var(--weight-semibold, 600);
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}
+
+.email-today__meta {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-today__back {
+  color: var(--text-base, var(--text-strong));
+  font-weight: var(--weight-medium, 500);
+}
+
+.email-today__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 10px;
+}
+
+.email-today__controls .email-brief__control--primary {
+  margin-right: 6px;
+  user-select: none;
+  touch-action: none;
+}
+
+.email-brief__control--primary[data-listening] {
+  background: color-mix(in oklch, var(--brief-accent) 80%, black);
+}
+
+.email-today__quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: var(--font-size-sm, 13px);
+  font-weight: var(--weight-medium, 500);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.email-today__quiet:hover:not(:disabled) {
+  background: var(--brief-hover);
+  color: var(--text-strong);
+}
+
+.email-today__quiet:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.email-today__mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: var(--font-size-sm, 13px);
+  user-select: none;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.email-today__mic:hover {
+  background: var(--brief-hover);
+  color: var(--text-strong);
+}
+
+.email-today__mic[data-listening] {
+  color: var(--brief-accent);
+}
+
+.email-today__quiet:focus-visible,
+.email-today__mic:focus-visible,
+.email-brief__text-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.email-today__later-item {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.email-today__pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.email-today__pick-input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-weak);
+  border-radius: 9px;
+  background: none;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: var(--font-size-sm, 13px);
+}
+
+/* The prepared reply, open for review */
+.email-today__reply {
+  margin-top: 12px;
+}
+
+.email-today__reply-to {
+  margin: 0 0 6px;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+}
+
+.email-today__reply-text {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-weak);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.email-today__reply-text:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.email-today__reply-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 10px;
+}
+
+.email-today__reply-row .email-today__mic {
+  margin-left: auto;
+}
+
+.email-today__reply-note {
+  margin: 8px 0 0;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+}
+
+/* Later and done today, folded */
+.email-today__after {
+  margin-top: 30px;
+}
+
+.email-today__folded {
+  padding: 10px 0;
+  border-top: 1px solid var(--border-weak);
+}
+
+/* Left out, by sender */
+.email-today__leftout {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-weak);
+}
+
+.email-today__leftout .email-brief__heading {
+  margin-bottom: 2px;
+}
+
+.email-today__leftout .email-brief__hint {
+  margin: 0 0 8px;
+}
+
+.email-today__senders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.email-today__sender {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border-weak);
+}
+
+.email-today__sender:first-child {
+  border-top: 0;
+}
+
+.email-today__sender-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.email-today__sender-name {
+  color: var(--text-strong);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: var(--weight-medium, 500);
+}
+
+.email-today__sender-sub {
+  overflow: hidden;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-today__sender-done {
+  padding: 0 8px;
+  color: var(--text-weak);
+  font-size: var(--font-size-sm, 13px);
+}
+
+/* History and the log */
+.email-history__hint {
+  margin: 0 0 6px;
+}
+
+.email-history__day {
+  padding: 18px 0 6px;
+}
+
+.email-history__day + .email-history__day {
+  border-top: 1px solid var(--border-weak);
+}
+
+.email-history__title {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: var(--weight-semibold, 600);
+}
+
+.email-history__day > .email-brief__foot {
+  margin-top: 2px;
+}
+
+.email-history__sub {
+  margin: 16px 0 6px;
+}
+
+.email-history__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.email-history__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: var(--font-size-sm, 13px);
+}
+
+.email-history__row .email-brief__time {
+  width: 62px;
+}
+
+.email-history__what {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.email-history__what:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.email-history__what--plain {
+  color: var(--text-base, var(--text-strong));
+  cursor: default;
+}
+
+.email-history__status {
+  flex: none;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+}
+
+.email-brief__control:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

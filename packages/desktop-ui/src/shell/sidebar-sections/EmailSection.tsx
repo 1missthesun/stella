@@ -209,15 +209,11 @@ function Footer({ feed }: { feed: EmailFeed }) {
 
 function SortedMail({ feed, active }: { feed: EmailFeed; active: boolean }) {
   const showAccount = feed.status.accounts.length > 1;
-  const waiting = feed.items.filter(
-    (item) => item.state === "waiting" && item.bucket !== "noise",
-  );
   return (
     <div className="email-section sidebar-section__scroll" data-testid="email-section">
       <EmailDigestPanel
         active={active}
         enabled
-        waiting={waiting}
         showAccount={showAccount}
         settings={
           <div className="email-section__settings">

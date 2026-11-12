@@ -299,6 +299,7 @@ const validateJournalRecord = (
             "source",
             "notice",
             "wallClockMs",
+            "safeguard",
           ]
         : kind === "card"
           ? ["kind", "seq", "turnId", "createdAtMs", "card"]
@@ -348,6 +349,9 @@ const validateJournalRecord = (
       (!Number.isFinite(value.wallClockMs) || (value.wallClockMs as number) < 0)
     ) {
       throw new TypeError(`records[${index}].wallClockMs is invalid.`);
+    }
+    if (value.safeguard !== undefined && !isObject(value.safeguard)) {
+      throw new TypeError(`records[${index}].safeguard is invalid.`);
     }
   } else if (kind === "card") {
     if (!isObject(value.card) || typeof value.card.type !== "string") {

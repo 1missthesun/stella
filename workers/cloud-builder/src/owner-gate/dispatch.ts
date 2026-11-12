@@ -1201,6 +1201,29 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         );
         continue;
       }
+      if (
+        leaseLapsed &&
+        row.state === "reconciliation_required" &&
+        row.kind === "agent" &&
+        row.executor_device_id &&
+        !row.cancel_request_id
+      ) {
+        // A task waits for its computer however long that is away (a laptop
+        // asleep overnight): its work is kept there and continues when the
+        // computer is back. Stella heard of the absence after 10 minutes.
+        await this.transitionDispatch(
+          row,
+          "reconciliation_required",
+          {
+            payload_json: null,
+            payload_expires_at: null,
+            lease_expires_at: now + DISPATCH_RECONCILE_MAX_MS,
+          },
+          now,
+          { notifyExecutor: false },
+        );
+        continue;
+      }
       if (leaseLapsed && row.state === "reconciliation_required") {
         const ended = await this.transitionDispatch(
           row,
@@ -1216,10 +1239,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
                 payload_expires_at: null,
                 lease_expires_at: null,
                 error_code: "RECONCILIATION_EXPIRED",
-                error_message:
-                  row.kind === "agent"
-                    ? "The computer running this task went offline and didn't come back within an hour, so it stopped waiting for it. Its work so far is kept on that computer: message the task to continue it once that computer is back, or carry it on elsewhere now with send_message and a destination."
-                    : "The device running this never reported how it ended.",
+                error_message: "The device running this never reported how it ended.",
               },
           now,
         );

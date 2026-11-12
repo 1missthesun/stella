@@ -55,10 +55,14 @@ const source = path.join(app, "packages", "desktop", "electron", "services", "ap
 // Never fs.rmSync here: on Windows it follows a junction a failed run left
 // behind into the checkout's packages. Links first, then the async rm.
 const clearScratchBase = async () => {
-  for (const name of fs.existsSync(scratchBase) ? fs.readdirSync(scratchBase) : []) {
-    await m?.removeModuleLinks(path.join(scratchBase, name));
+  if (m) {
+    for (const name of fs.existsSync(scratchBase) ? fs.readdirSync(scratchBase) : []) {
+      await m.removeModuleLinks(path.join(scratchBase, name));
+    }
+    await m.removeTree(scratchBase);
+  } else {
+    await fs.promises.rm(scratchBase, { recursive: true, force: true });
   }
-  await fs.promises.rm(scratchBase, { recursive: true, force: true });
 };
 let m = null;
 await clearScratchBase().catch(() => undefined);
@@ -290,15 +294,18 @@ if (withDraft) {
     deps = { mode: "failed", error: String(error?.message ?? error).slice(-800) };
   }
   const linked = m.isDirectoryLink(path.join(draft, "node_modules"));
-  await m.removeModuleLinks(draft);
-  await git(["worktree", "remove", "--force", draft]).catch(() => undefined);
-  if (fs.existsSync(draft)) await fs.promises.rm(draft, { recursive: true, force: true });
-  await git(["worktree", "prune"]);
+  let removeError;
+  await m.removeWorktree(app, draft).catch((error) => {
+    removeError = String(error?.message ?? error).slice(0, 800);
+  });
+  const listed = (await git(["worktree", "list", "--porcelain"])).replaceAll("\\", "/").includes(draft.replaceAll("\\", "/"));
   const state = intact();
-  report("draft prepared and removed", deps.mode !== "failed" && !fs.existsSync(draft) && state.intact, {
+  report("draft prepared and removed", deps.mode !== "failed" && !removeError && !fs.existsSync(draft) && !listed && state.intact, {
     deps,
     linked,
+    ...(removeError ? { removeError } : {}),
     draftLeft: fs.existsSync(draft),
+    worktreeListed: listed,
     ms: Date.now() - startedAt,
     ...state,
   });

@@ -35,7 +35,7 @@ import {
   listWorktrees,
   run,
 } from "./git.js";
-import { removeModuleLinks } from "./dir-links.js";
+import { removeWorktree } from "./dir-links.js";
 import { DRAFT_AGENTS_DIR, installCheckoutGuard } from "./checkout-guard.js";
 import { ReleaseChannel } from "./release-channel.js";
 import {
@@ -749,8 +749,7 @@ export class AppSourceService {
           ? await this.agentRunning(current.agent)
           : false;
       if (running !== false) return { background: true };
-      await removeModuleLinks(draft.path);
-      await git(cwd, ["worktree", "remove", "--force", draft.path]);
+      await removeWorktree(cwd, draft.path);
       this.options.log("app-source.orphaned-draft-dropped", { draft: name });
       draft = await this.draftOf(cwd, name);
     }

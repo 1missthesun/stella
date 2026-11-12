@@ -36,13 +36,17 @@ $cmd = Join-Path $Out "check.cmd"
 $lines = @(
   "@echo off",
   "set ELECTRON_RUN_AS_NODE=1",
+  "rem The install belongs to the runner's account, not this token's user.",
+  "set GIT_CONFIG_COUNT=1",
+  "set GIT_CONFIG_KEY_0=safe.directory",
+  "set GIT_CONFIG_VALUE_0=*",
   "set `"TEMP=$env:RUNNER_TEMP\links-temp`"",
   "set `"TMP=$env:RUNNER_TEMP\links-temp`""
 )
 if ($git) { $lines += "set `"STELLA_GIT_BIN=$($git.FullName)`""; $lines += "set `"PATH=$(Split-Path $git.FullName);%PATH%`"" }
 if ($bun) { $lines += "set `"STELLA_BUN_PATH=$($bun.FullName)`"" }
 $lines += "`"$electron`" `"$app\packages\desktop\scripts\check-update-links.mjs`" --app `"$app`" --scratch `"$scratch`" --draft --apply > `"$log`" 2>&1"
-$lines += "echo %ERRORLEVEL%> `"$done`""
+$lines += "> `"$done`" echo %ERRORLEVEL%"
 New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\links-temp" | Out-Null
 Set-Content -Path $cmd -Value $lines -Encoding ascii
 

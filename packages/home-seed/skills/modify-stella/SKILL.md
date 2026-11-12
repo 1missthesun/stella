@@ -53,7 +53,7 @@ Finish only after the check above passed (for UI changes, after you saw the chan
 
 1. Commit everything as one normal commit with a plain, descriptive message (no tags or trailers). If git has no identity, add `-c user.name=Stella -c user.email=stella@localhost`.
 2. Rebase onto the checkout's current branch so the draft is a fast-forward: `git rebase "$(git -C "$STELLA_APP_DIR" branch --show-current)"`. Resolve any conflicts yourself, then typecheck again.
-3. Remove the worktree: `git -C "$STELLA_APP_DIR" worktree remove "$STELLA_DRAFTS_DIR/<name>"`. The `draft/<name>` branch stays; that is the finished draft.
+3. Remove the worktree: `bun "$STELLA_APP_DIR/packages/desktop/scripts/remove-draft.ts" "$STELLA_DRAFTS_DIR/<name>"` (not `git worktree remove`: on Windows it follows the links in the draft's packages). The `draft/<name>` branch stays; that is the finished draft.
 4. Tell the user. A draft whose every changed file is under `packages/desktop-ui/src` is added by Stella as soon as the worktree is gone and the user's hands are off the app (no typing, clicking or scrolling for a moment), so say it is in and that Undo is on the card. Any other draft waits: say it is ready and that they apply it with the Update button. Never apply a draft yourself.
 
 Removing the worktree is what marks a draft finished, so remove it only when the whole change is in the commit.

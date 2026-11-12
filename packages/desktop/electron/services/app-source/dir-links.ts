@@ -1,5 +1,6 @@
 import fs, { promises as fsp } from "node:fs";
 import path from "node:path";
+import { git, gitRaw } from "./git.js";
 
 /**
  * Directory links from a scratch copy into the app checkout (its
@@ -94,8 +95,84 @@ export const removeModuleLinks = async (dir: string) => {
   }
 };
 
+const removeFile = async (file: string) => {
+  try {
+    await fsp.unlink(file);
+  } catch (error) {
+    // A read-only file (git and bun write some) needs its attribute cleared on Windows.
+    if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+    await fsp.chmod(file, 0o666);
+    await fsp.unlink(file);
+  }
+};
+
+const removeWalk = async (entry: string): Promise<void> => {
+  const stat = await fsp.lstat(entry).catch(() => null);
+  if (!stat) return;
+  if (stat.isSymbolicLink()) {
+    await removeDirectoryLink(entry).catch(() => removeFile(entry));
+    return;
+  }
+  if (!stat.isDirectory()) {
+    await removeFile(entry);
+    return;
+  }
+  for (const name of await fsp.readdir(entry)) await removeWalk(path.join(entry, name));
+  await fsp.rmdir(entry);
+};
+
+/**
+ * Removes a folder and everything in it, never following a link out of it.
+ * On Windows it walks the tree itself: `git worktree remove` follows
+ * junctions (and gives up on a draft's own bun install, ~2,500 of them),
+ * and Electron's fs treats a `.asar` file (Electron's default_app.asar in a
+ * draft's packages) as a folder and fails on it unless asar is off.
+ */
+export const removeTree = async (dir: string) => {
+  if (process.platform !== "win32") {
+    await fsp.rm(dir, { recursive: true, force: true });
+    return;
+  }
+  const electron = process as { noAsar?: boolean };
+  const noAsar = electron.noAsar;
+  electron.noAsar = true;
+  try {
+    await removeWalk(dir);
+  } finally {
+    electron.noAsar = noAsar;
+  }
+};
+
 /** Removes a scratch copy without ever following one of its links. */
 export const removeScratchDir = async (dir: string) => {
   await removeModuleLinks(dir);
-  await fsp.rm(dir, { recursive: true, force: true });
+  await removeTree(dir);
+};
+
+/**
+ * Removes a git worktree (a draft, a scratch merge) of the checkout at `cwd`:
+ * its links first, then the folder. On Windows the folder is removed by
+ * `removeTree`, never by `git worktree remove`, which follows junctions and
+ * can't delete a draft's own bun install; git then forgets it (`prune`).
+ * `keepChanges` refuses, like `git worktree remove` without --force, when the
+ * worktree has uncommitted or untracked files.
+ */
+export const removeWorktree = async (cwd: string, dir: string, options: { keepChanges?: boolean } = {}) => {
+  if (options.keepChanges && fs.existsSync(dir)) {
+    // A linked node_modules shows as untracked (a link isn't the ignored folder).
+    const changes = (await git(dir, ["status", "--porcelain"]))
+      .split("\n")
+      .filter((line) => line.trim() && !/^\?\? (.*\/)?node_modules\/?$/.test(line));
+    if (changes.length > 0) {
+      throw new Error(`${dir} has changes that aren't committed:\n${changes.slice(0, 20).join("\n")}`);
+    }
+  }
+  await removeModuleLinks(dir);
+  if (process.platform === "win32") {
+    await removeTree(dir);
+  } else {
+    await gitRaw(cwd, ["worktree", "remove", "--force", dir]);
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+  await gitRaw(cwd, ["worktree", "prune"]);
 };

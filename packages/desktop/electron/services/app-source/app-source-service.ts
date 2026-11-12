@@ -1397,8 +1397,14 @@ export class AppSourceService {
     const wantedVersion =
       version !== null &&
       intent.wanted.some((entry) => entry.kind === "version" && entry.version === version);
+    // Named by the newest change it brings, not by the other computer's tip:
+    // that tip also moves when the other computer only takes a version, and a
+    // change skipped or dismissed here must not come back for that.
+    const forkChange =
+      forkRef && forkOffer?.real ? await this.forkChange(cwd, head, forkOffer.tip) : null;
+    const forkKey = forkChange ? `other:${forkChange.sha}` : null;
     const forkShown =
-      forkRef && forkOffer?.real
+      forkRef && forkOffer?.real && forkKey
         ? await preparedFor(
             {
               tip: forkOffer.tip,
@@ -1406,7 +1412,7 @@ export class AppSourceService {
               subject: `${REMOTE_MERGE_SUBJECT} ${forkOffer.tip.slice(0, 12)}`,
               trustIdenticalTree: false,
             },
-            [`other:${forkOffer.tip}`],
+            [forkKey],
           )
         : false;
     void this.preparer.want(jobs);
@@ -1442,11 +1448,9 @@ export class AppSourceService {
         ...(conflicts && !updateDraft && merging !== "upstream" && !wantedVersion ? { conflicts } : {}),
       });
     }
-    if (forkRef && forkOffer?.real && forkShown) {
-      const [summary, device] = await Promise.all([
-        this.forkSummary(cwd, head, forkOffer.tip),
-        this.forkDevice(cwd),
-      ]);
+    if (forkRef && forkOffer?.real && forkShown && forkChange && forkKey) {
+      const summary = forkChange.subject;
+      const device = await this.forkDevice(cwd);
       const forkDraft = readyShown.find(
         (draft) => draft.name === remoteMergeDraftName(forkOffer.tip),
       );
@@ -1454,7 +1458,7 @@ export class AppSourceService {
         forkDraft?.agentId ?? (pending?.from === "remote" ? pending.agent?.threadId : undefined);
       offered.push({
         kind: "other-computer",
-        key: `other:${forkOffer.tip}`,
+        key: forkKey,
         adding:
           merging === "remote" ||
           (forkDraft !== undefined &&
@@ -2272,17 +2276,19 @@ export class AppSourceService {
     return (await this.mergedTree(cwd, onto, tip)) === withPublished;
   }
 
-  private async forkSummary(cwd: string, head: string, tip: string) {
+  /** The newest change of the user's own that the other computer's `tip` brings. */
+  private async forkChange(cwd: string, head: string, tip: string) {
     const out = await git(cwd, [
       "log",
       "--no-merges",
       "-n1",
-      "--format=%s",
+      "--format=%H%x00%s",
       tip,
       `^${head}`,
       ...(this.upstreamTracked ? [`^${UPSTREAM_REF}`] : []),
     ]);
-    return out.trim();
+    const [sha = "", subject = ""] = out.trim().split("\0");
+    return { sha: sha || tip, subject: subject.trim() };
   }
 
   private async forkDevice(cwd: string) {

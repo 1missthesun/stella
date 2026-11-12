@@ -307,6 +307,8 @@ export type EmailMatter = {
   laterSuggestion: { at: number; why: string };
   /** It came back from Later (or a new email in its thread brought it back) at this time. */
   returnedAt?: number;
+  /** A reply was saved as a Gmail draft at this time; the item stays open until it is sent or done. */
+  draftedAt?: number;
   settledAt?: number;
   settledHow?: EmailSettledHow;
   prepared?: EmailPrepared;
@@ -324,6 +326,8 @@ export type EmailNoiseSender = {
   /** How Unsubscribe works: Stella does it (one-click or by email), or it opens the sender's page. */
   unsubscribe?: "stella" | "link";
   unsubscribed?: boolean;
+  /** A person, not a mailing list: shown apart from newsletters, under People. */
+  person?: true;
 };
 
 export type EmailToday = {

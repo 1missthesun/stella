@@ -2020,7 +2020,9 @@ const sendReply = async (ctx: OwnerContext, args: EmailCalls["email.sendReply"][
     messageId: row.message_id,
     body: args.body,
   });
-  settleAs(ctx, readMatter(ctx.db, row.matter_id) ?? row, args.mode === "send" ? "replied" : "drafted");
+  if (args.mode === "send") settleAs(ctx, readMatter(ctx.db, row.matter_id) ?? row, "replied");
+  // A draft isn't an answer yet: the item stays where it is, marked, until it is sent or done.
+  else addLog(ctx, { kind: "drafted", who: row.from_name, subject: row.headline, matterId: row.matter_id });
   return result;
 };
 
@@ -2071,6 +2073,22 @@ const unsubscribeOf = (row: ItemRow): GmailUnsubscribe | null => {
   }
 };
 
+/** Reasons the sorter gives mail a person wrote to the user, as opposed to a service or a list. */
+const PERSON_REASONS = new Set(["personal", "work", "waiting_on_you"]);
+/** Mailbox names machines and teams send from, never one person. */
+const ROLE_MAILBOX = /^(?:no-?reply|do-?not-?reply|notifications?|alerts?|updates?|news(?:letter)?s?|digest|marketing|info|support|billing|mailer-daemon|bounces?|team)\b/iu;
+
+/**
+ * A person, not a list or a service: no List-Unsubscribe header, and either mail
+ * the sorter read as personal, someone the user writes to, or mail Stella kept
+ * (the user left it out) from an address that isn't a role mailbox.
+ */
+const isPerson = (db: OwnerDbReader, address: string, rows: ItemRow[]): boolean =>
+  rows.every((row) => !row.unsubscribe) &&
+  (rows.some((row) => PERSON_REASONS.has(row.reason)) ||
+    wroteTo(db, address) > 0 ||
+    (rows.every((row) => row.first_bucket !== "noise") && !ROLE_MAILBOX.test(address.split("@")[0] ?? "")));
+
 const noiseSenders = (db: OwnerDbReader, now: number): EmailNoiseSender[] => {
   const groups = new Map<string, ItemRow[]>();
   for (const row of noiseRows(db, now)) {
@@ -2086,6 +2104,7 @@ const noiseSenders = (db: OwnerDbReader, now: number): EmailNoiseSender[] => {
       const ways = rows.map(unsubscribeOf).filter((entry): entry is GmailUnsubscribe => entry !== null);
       const stella = ways.some((way) => (way.oneClick && way.url) || way.mailto);
       const link = ways.some((way) => way.url);
+      const person = isPerson(db, address, rows);
       return {
         address,
         name: rows[0]!.from_name || address,
@@ -2095,6 +2114,7 @@ const noiseSenders = (db: OwnerDbReader, now: number): EmailNoiseSender[] => {
         itemIds: rows.map((row) => row.item_id),
         ...(stella ? { unsubscribe: "stella" as const } : link ? { unsubscribe: "link" as const } : {}),
         ...(unsubscribed.has(address) ? { unsubscribed: true } : {}),
+        ...(person ? { person: true as const } : {}),
       };
     })
     .sort((a, b) => b.count - a.count || b.latestAt - a.latestAt)
@@ -2214,11 +2234,32 @@ const planNow = (ctx: Reader): string => {
   }
 };
 
+/** Marks each matter with the last reply saved as a draft since it arrived (or came back). */
+const withDrafts = (db: OwnerDbReader, matters: EmailMatter[]): EmailMatter[] => {
+  if (matters.length === 0) return matters;
+  const ids = matters.map((matter) => matter.matterId);
+  const drafted = new Map(
+    db
+      .all<{ matter_id: string; at: number }>(
+        `SELECT matter_id, MAX(at) AS at FROM email_log WHERE kind = 'drafted' AND matter_id IN (${placeholders(ids)}) GROUP BY matter_id`,
+        ...ids,
+      )
+      .map((row) => [row.matter_id, row.at] as const),
+  );
+  return matters.map((matter) => {
+    const at = drafted.get(matter.matterId);
+    return at && at >= Math.max(matter.arrivedAt, matter.returnedAt ?? 0) ? { ...matter, draftedAt: at } : matter;
+  });
+};
+
 const readToday = (ctx: Reader): EmailToday => {
   const state = stateOf(ctx.db);
   const zone = ownerZone(ctx.db) ?? "UTC";
   const midnight = startOfDay(ctx.now, zone);
-  const open = openRows(ctx.db, ctx.now).map((row) => toMatter(row, ctx.now));
+  const open = withDrafts(
+    ctx.db,
+    openRows(ctx.db, ctx.now).map((row) => toMatter(row, ctx.now)),
+  );
   const later = ctx.db
     .all<MatterRow>("SELECT * FROM email_matters WHERE status = 'later' AND snooze_until > ? ORDER BY snooze_until LIMIT 100", ctx.now)
     .map((row) => toMatter(row, ctx.now));

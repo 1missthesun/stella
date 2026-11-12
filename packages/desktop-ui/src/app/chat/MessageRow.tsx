@@ -478,10 +478,12 @@ export const UserMessageRow = memo(
         ),
       });
     }
+    // Email chips are stored by label only; their "Email · …" prefix gives them the mail icon.
+    const emailPrefix = t("email.brief.chip", { title: "" });
     appSelectionLabels.forEach((label, index) => {
       chips.push({
         key: `app-selection-${index}`,
-        node: <ContextPill kind="app-selection" label={label} />,
+        node: <ContextPill kind={label.startsWith(emailPrefix) ? "email" : "app-selection"} label={label} />,
       });
     });
     if (activityLabel) {

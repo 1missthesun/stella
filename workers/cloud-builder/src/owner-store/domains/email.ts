@@ -83,6 +83,8 @@ import { array, boolean, empty, literal, number, object, optional, string } from
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { InternalDef, JobDef, OwnerContext, OwnerDbReader, OwnerDomain, OwnerViewContext } from "../registry.js";
+import { BillingConfigError } from "../../billing/plans.js";
+import { billingAccess } from "./billing.js";
 import { readMainConversationId } from "./conversations.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
 import { stellaGmailTokens, stellaGoogleAccounts, stellaGoogleAvailable } from "./google-accounts.js";
@@ -2199,6 +2201,19 @@ const settleArchived = async (ctx: OwnerContext): Promise<void> => {
   }
 };
 
+/**
+ * The owner's plan as their turns see it now, so the page follows an upgrade or a lapse at once
+ * instead of at the next sync; the plan remembered at the last sync when billing can't say.
+ */
+const planNow = (ctx: Reader): string => {
+  try {
+    return billingAccess({ db: ctx.db, env: ctx.env as Cloudflare.Env, now: ctx.now }).plan;
+  } catch (error) {
+    if (error instanceof BillingConfigError) return stateOf(ctx.db)?.plan ?? "free";
+    throw error;
+  }
+};
+
 const readToday = (ctx: Reader): EmailToday => {
   const state = stateOf(ctx.db);
   const zone = ownerZone(ctx.db) ?? "UTC";
@@ -2241,7 +2256,7 @@ const readToday = (ctx: Reader): EmailToday => {
     alerts,
     multipleAccounts: (ctx.db.one<{ count: number }>("SELECT COUNT(*) AS count FROM email_accounts")?.count ?? 0) > 1,
     ...(checked ? { lastCheckedAt: checked } : {}),
-    access: accessInfo(ctx, state?.plan ?? "free", zone),
+    access: accessInfo(ctx, planNow(ctx), zone),
   };
 };
 
@@ -2455,7 +2470,7 @@ const readFeed = (ctx: Reader): EmailFeed => {
       ctx.now - FEED_WINDOW_MS,
     )?.count ?? 0;
   return {
-    status: statusOf(ctx, stateOf(ctx.db)?.plan ?? "free", zone),
+    status: statusOf(ctx, planNow(ctx), zone),
     note: stateOf(ctx.db)?.note ?? "",
     rules: rulesOf(ctx.db).map(toRule),
     items,

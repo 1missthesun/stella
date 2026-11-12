@@ -264,6 +264,7 @@ export const startTestBrowser = async ({ runDir, extension, display, softwareGl 
     "--disable-sync",
     "--password-store=basic",
     "--use-mock-keychain",
+    "--remote-debugging-port=0",
     ...(process.platform === "linux" ? ["--ozone-platform=x11"] : []),
     ...(softwareGl ? ["--disable-gpu"] : []),
     "about:blank",

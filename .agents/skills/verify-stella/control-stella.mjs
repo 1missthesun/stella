@@ -1106,6 +1106,14 @@ const launchWarnings = (run) => {
 };
 
 const startRunTestBrowser = async (run) => {
+  run.browserExtension = {
+    ...run.browserExtension,
+    ...prepareTestExtension({
+      runDir: run.runDir,
+      socketDir: run.browserExtension.socketDir,
+      extPort: run.browserExtension.extPort,
+    }),
+  };
   const browser = await startTestBrowser({
     runDir: run.runDir,
     extension: run.browserExtension,

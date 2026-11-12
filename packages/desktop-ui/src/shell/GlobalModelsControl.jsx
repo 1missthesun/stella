@@ -18,7 +18,6 @@ import {
 } from "@/ui/popover";
 import { Switch } from "@/ui/switch";
 import { SlidersHorizontal } from "@/ui/icons";
-import { GlobalExecutionTargetControl } from "./GlobalExecutionTargetControl";
 import "./global-models-control.css";
 
 const AgentModelPicker = lazy(() =>
@@ -29,7 +28,7 @@ const AgentModelPicker = lazy(() =>
 
 /**
  * @param {{ visible?: boolean, placement?: "footer" | "topbar" }} props
- *   `placement="topbar"` renders the compact pair in the top bar, where it
+ *   `placement="topbar"` renders the Models button in the top bar, where it
  *   moved when the right sidebar went away. `visible` follows the shell's
  *   authoritative right-side Activity-workspace visibility. When the right
  *   region isn't displaying, the control renders nothing so it never leaves an
@@ -114,7 +113,6 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
           </PopoverBody>
         </PopoverContent>
       </Popover>
-      <GlobalExecutionTargetControl />
     </div>
   );
 }

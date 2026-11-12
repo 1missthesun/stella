@@ -25,6 +25,7 @@ import { ShellTopBarUpdatePill } from "@/shell/ShellTopBarUpdatePill";
 import { WindowControls } from "@/shell/WindowControls";
 import { ShellTopBarTabs } from "@/shell/topbar/ShellTopBarTabs";
 import { GlobalModelsControl } from "@/shell/GlobalModelsControl";
+import { GlobalExecutionTargetControl } from "@/shell/GlobalExecutionTargetControl";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import "./shell-topbar-full.css";
 
@@ -54,8 +55,9 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: Shell
 
       <div className="shell-topbar-full__right">
         <ShellTopBarUpdatePill />
-        <GlobalModelsControl placement="topbar" />
+        <GlobalExecutionTargetControl />
         <NotificationBell />
+        <GlobalModelsControl placement="topbar" />
         <ShellTopBarAccount onSignIn={onSignIn} />
         {!hasConnectedAccount ? (
           <SettingsMenuButton className="shell-topbar-account-settings" />

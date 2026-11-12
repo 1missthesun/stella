@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   buildExternalCliChildEnv,
-  resolveExternalCliPath,
+  findExternalCliPath,
 } from "./external-cli-resolution.js";
 
 const UPDATE_TIMEOUT_MS = 20 * 60_000;
@@ -145,12 +145,8 @@ export const updateClaudeCli = async (
   options: { env?: NodeJS.ProcessEnv; signal?: AbortSignal } = {},
 ): Promise<ClaudeCliUpdateOutcome> => {
   const env = options.env ?? process.env;
-  let executable: string;
-  try {
-    executable = resolveExternalCliPath("claude", { env });
-  } catch {
-    return { status: "not_installed" };
-  }
+  const executable = findExternalCliPath("claude", { env });
+  if (!executable) return { status: "not_installed" };
   const from = await readClaudeCliVersion(executable, env);
   const by = claudeCliUpdatesTurnedOffBy(env);
   if (by) return { status: "turned_off", by, version: from };
@@ -159,15 +155,8 @@ export const updateClaudeCli = async (
     timeoutMs: UPDATE_TIMEOUT_MS,
     signal: options.signal,
   });
-  let version = from;
-  try {
-    version = await readClaudeCliVersion(
-      resolveExternalCliPath("claude", { env }),
-      env,
-    );
-  } catch {
-    version = from;
-  }
+  const updated = findExternalCliPath("claude", { env });
+  const version = updated ? await readClaudeCliVersion(updated, env) : from;
   if (version && version !== from) {
     return { status: "updated", from, version, output: result.output };
   }

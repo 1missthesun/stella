@@ -374,7 +374,7 @@ export const borrowClaudeLogin = ({ claudeConfigDir, oauthToken }) => {
   }
   let status = null;
   try {
-    const claude = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" }).trim().split("\n")[0];
+    const claude = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" }).trim().split(/\r?\n/)[0];
     const env = { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir };
     for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"]) delete env[name];
     const out = execFileSync(claude, ["auth", "status", "--json"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"], timeout: 20_000 });

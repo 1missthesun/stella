@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveExternalCliPath } from "@stella/runtime/kernel/integrations/external-cli-resolution";
+import { findExternalCliPath } from "@stella/runtime/kernel/integrations/external-cli-resolution";
 import { readClaudeCliVersion } from "@stella/runtime/kernel/integrations/claude-cli-update";
 import type {
   ClaudeCliInstallProgress,
@@ -225,12 +225,7 @@ export const installClaudeCli = async (
   }
 
   if (options.signal?.aborted) return { status: "failed", detail: "Canceled." };
-  let executable: string | null = null;
-  try {
-    executable = resolveExternalCliPath("claude", { env });
-  } catch {
-    executable = null;
-  }
+  const executable = findExternalCliPath("claude", { env });
   if (result.exitCode === 0 && executable) {
     return {
       status: "installed",

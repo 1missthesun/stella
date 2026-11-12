@@ -14,7 +14,7 @@ import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backe
 import { readStoredClaudeLogin, type StoredClaudeLogin } from "@stella/contracts/claude-login";
 import {
   buildExternalCliChildEnv,
-  resolveExternalCliPath,
+  findExternalCliPath,
 } from "@stella/runtime/kernel/integrations/external-cli-resolution";
 import {
   installClaudeCli,
@@ -126,6 +126,8 @@ export type ClaudeLocalAccountsOptions = {
   engineAccounts: EngineAccountAccess;
   loadDeviceId: () => Promise<string | null>;
   onChanged: () => void;
+  /** Claude Code turned up where it wasn't (installed by Stella or by hand). */
+  onCliFound?: () => void;
 };
 
 // eslint-disable-next-line no-control-regex
@@ -540,14 +542,11 @@ export class ClaudeLocalAccounts {
   }
 
   private resolveCli(): string | null {
-    try {
-      const executable = resolveExternalCliPath("claude");
-      this.cliInstalled = true;
-      return executable;
-    } catch {
-      this.cliInstalled = false;
-      return null;
-    }
+    const executable = findExternalCliPath("claude");
+    const wasInstalled = this.cliInstalled;
+    this.cliInstalled = executable !== null;
+    if (executable && !wasInstalled) this.options.onCliFound?.();
+    return executable;
   }
 
   private childEnv(executable: string, dir: string | null): NodeJS.ProcessEnv {

@@ -8,7 +8,7 @@ import {
   claudeProjectSlot,
   isClaudeSessionFilePath,
 } from "@stella/contracts/backend/claude-sessions";
-import { resolveExternalCliPath } from "./external-cli-resolution.js";
+import { findExternalCliPath } from "./external-cli-resolution.js";
 
 const MAX_SIDECAR_DEPTH = 4;
 const REPLY_HASH_LIMIT = 400;
@@ -89,9 +89,9 @@ export const listClaudeSessionFiles = async (
  * the launcher's target (native installs) or the file itself (npm, package
  * managers), so anything learned from the binary is keyed by this.
  */
-export const claudeCliIdentity = (): string | null => {
+const identityOf = (executable: string): string | null => {
   try {
-    const realPath = realpathSync(resolveExternalCliPath("claude"));
+    const realPath = realpathSync(executable);
     const stat = statSync(realPath);
     return `${realPath}:${stat.mtimeMs}:${stat.size}`;
   } catch {
@@ -99,13 +99,19 @@ export const claudeCliIdentity = (): string | null => {
   }
 };
 
+export const claudeCliIdentity = (): string | null => {
+  const executable = findExternalCliPath("claude");
+  return executable ? identityOf(executable) : null;
+};
+
 const perCliBinary = <T>(read: (executable: string) => Promise<T>, missing: T) => {
   let cached: { identity: string; value: Promise<T> } | null = null;
   return (): Promise<T> => {
-    const identity = claudeCliIdentity();
-    if (!identity) return Promise.resolve(missing);
+    const executable = findExternalCliPath("claude");
+    const identity = executable ? identityOf(executable) : null;
+    if (!executable || !identity) return Promise.resolve(missing);
     if (cached?.identity !== identity) {
-      cached = { identity, value: read(resolveExternalCliPath("claude")) };
+      cached = { identity, value: read(executable) };
     }
     return cached.value;
   };

@@ -39,25 +39,35 @@ const resolveHomeDir = (
   return home ? path.resolve(home) : undefined;
 };
 
-const executableExtensions = (env: NodeJS.ProcessEnv): string[] => {
-  if (process.platform !== "win32") return [""];
-  const extensions = (env.PATHEXT ?? env.PathExt ?? ".EXE;.CMD;.BAT;.COM")
-    .split(";")
-    .map((extension) => extension.trim())
-    .filter(Boolean);
-  return ["", ...extensions];
+const pathExtValue = (env: NodeJS.ProcessEnv): string | undefined => {
+  const key = Object.keys(env).find((name) => name.toLowerCase() === "pathext");
+  return key ? env[key] : undefined;
 };
 
+// Lower case, so the path reads as the file is named (`claude.exe`, not
+// `claude.EXE`); Windows file names don't distinguish case.
+const executableExtensions = (env: NodeJS.ProcessEnv): string[] =>
+  (pathExtValue(env) ?? ".EXE;.CMD;.BAT;.COM")
+    .split(";")
+    .map((extension) => extension.trim().toLowerCase())
+    .filter(Boolean);
+
+// Windows runs a bare name only with one of PATHEXT's extensions, as `where`
+// finds it. A file with no extension beside them is a shell script npm
+// writes for Git Bash and can't be started, so it counts only when someone
+// named that exact file.
 const executableCandidates = (
   basePath: string,
   env: NodeJS.ProcessEnv,
+  options: { exactName: boolean },
 ): string[] => {
   if (process.platform !== "win32" || path.extname(basePath)) {
     return [basePath];
   }
-  return executableExtensions(env).map((extension) =>
-    extension ? `${basePath}${extension}` : basePath,
+  const withExtensions = executableExtensions(env).map(
+    (extension) => `${basePath}${extension}`,
   );
+  return options.exactName ? [...withExtensions, basePath] : withExtensions;
 };
 
 const isExecutableFile = (candidate: string): boolean => {
@@ -75,12 +85,40 @@ const isExecutableFile = (candidate: string): boolean => {
 const firstExecutable = (
   basePath: string,
   env: NodeJS.ProcessEnv,
+  options: { exactName: boolean } = { exactName: false },
 ): string | null => {
-  for (const candidate of executableCandidates(basePath, env)) {
+  for (const candidate of executableCandidates(basePath, env, options)) {
     const absoluteCandidate = path.resolve(candidate);
     if (isExecutableFile(absoluteCandidate)) return absoluteCandidate;
   }
   return null;
+};
+
+const SHIM_TARGET_PATTERN = /"%~?dp0%?\\?([^"%]+?\.exe)"/gi;
+
+/**
+ * The program an npm or pnpm `.cmd` shim starts, when that is an `.exe`
+ * (Claude Code's npm package installs `bin/claude.exe`). Node won't start a
+ * `.cmd` without a shell, and quoting a turn's arguments through cmd.exe
+ * isn't safe, so Stella runs the program the shim would.
+ */
+const unwrapWindowsShim = (executable: string): string => {
+  if (process.platform !== "win32" || !/\.(cmd|bat)$/i.test(executable)) {
+    return executable;
+  }
+  let script: string;
+  try {
+    script = fs.readFileSync(executable, "utf8");
+  } catch {
+    return executable;
+  }
+  for (const match of script.matchAll(SHIM_TARGET_PATTERN)) {
+    const relativeTarget = match[1]!;
+    if (/^node\.exe$/i.test(path.basename(relativeTarget))) continue;
+    const target = path.resolve(path.dirname(executable), relativeTarget);
+    if (isExecutableFile(target)) return target;
+  }
+  return executable;
 };
 
 const pathValue = (env: NodeJS.ProcessEnv): string => {
@@ -291,8 +329,8 @@ export const resolveExternalCliPath = (
     const configuredPath = env[envName]?.trim();
     if (!configuredPath) continue;
     const expandedPath = expandConfiguredPath(configuredPath, homeDir, cwd);
-    const executable = firstExecutable(expandedPath, env);
-    if (executable) return executable;
+    const executable = firstExecutable(expandedPath, env, { exactName: true });
+    if (executable) return unwrapWindowsShim(executable);
     throw new Error(
       `${config.displayName} path from ${envName} is not an executable file: ` +
         `"${expandedPath}". Update or unset ${envName}.`,
@@ -306,7 +344,7 @@ export const resolveExternalCliPath = (
   const wellKnownSet = new Set(wellKnownDirectories);
   const firstPathHit = pathHits[0];
   if (firstPathHit && !wellKnownSet.has(path.dirname(firstPathHit))) {
-    return firstPathHit;
+    return unwrapWindowsShim(firstPathHit);
   }
   const discovered = [
     ...pathHits,
@@ -317,7 +355,8 @@ export const resolveExternalCliPath = (
   ];
   const seenRealPaths = new Set<string>();
   const candidates: ExecutableCandidate[] = [];
-  for (const executable of discovered) {
+  for (const found of discovered) {
+    const executable = unwrapWindowsShim(found);
     const realPath = realPathOf(executable);
     if (seenRealPaths.has(realPath)) continue;
     seenRealPaths.add(realPath);
@@ -335,6 +374,22 @@ export const resolveExternalCliPath = (
       `Install ${cli}, add it to PATH, or set ${stellaOverride} ` +
       `(or ${genericOverride}) to its absolute executable path.`,
   );
+};
+
+/**
+ * Where the CLI is, or null when it isn't installed (or the configured path
+ * doesn't point at it). Everything that asks whether Claude Code is installed
+ * uses this, so it finds the same binary a turn runs.
+ */
+export const findExternalCliPath = (
+  cli: ExternalCli,
+  options: ResolveExternalCliOptions = {},
+): string | null => {
+  try {
+    return resolveExternalCliPath(cli, options);
+  } catch {
+    return null;
+  }
 };
 
 export const buildExternalCliChildEnv = (

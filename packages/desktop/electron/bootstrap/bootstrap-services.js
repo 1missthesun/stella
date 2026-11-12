@@ -152,6 +152,7 @@ export const createBootstrapServices = (options) => {
         getBackendUrl: () => authService.getBackendUrl(),
         getAuthToken: () => authService.getAuthToken(),
     });
+    const claudeCliUpdater = new ClaudeCliUpdater(config.stellaDataDirPath);
     const claudeLocalAccounts = new ClaudeLocalAccounts({
         stellaDataDir: config.stellaDataDirPath,
         engineAccounts: engineAccountAccess,
@@ -163,8 +164,8 @@ export const createBootstrapServices = (options) => {
                 }
             }
         },
+        onCliFound: () => claudeCliUpdater.noteCliFound(),
     });
-    const claudeCliUpdater = new ClaudeCliUpdater(config.stellaDataDirPath);
     claudeCliUpdater.start();
     const memorySync = new MemorySyncService({
         stellaDataDir: config.stellaDataDirPath,

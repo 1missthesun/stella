@@ -11,6 +11,7 @@ import { getFileLogger } from "@stella/runtime/observability/file-logger";
 const STATE_FILE = "claude-cli-updates.json";
 const CHECK_INTERVAL_MS = 12 * 60 * 60_000;
 const RETRY_INTERVAL_MS = 60 * 60_000;
+const NOT_INSTALLED_INTERVAL_MS = 15 * 60_000;
 const AFTER_START_MS = 90_000;
 const RESTART_QUIET_MS = 10 * 60_000;
 const DUE_POLL_MS = 15 * 60_000;
@@ -20,6 +21,15 @@ type UpdaterState = {
   status?: ClaudeCliUpdateOutcome["status"];
   version?: string | null;
 };
+
+// Until Claude Code is installed a check only looks for it, so it looks
+// often: onboarding installs it minutes after the first check.
+const intervalAfter = (status: UpdaterState["status"]): number =>
+  status === "failed"
+    ? RETRY_INTERVAL_MS
+    : status === "not_installed"
+      ? NOT_INSTALLED_INTERVAL_MS
+      : CHECK_INTERVAL_MS;
 
 /**
  * Keeps the Claude Code CLI current for someone who never opens it in a
@@ -33,6 +43,8 @@ export class ClaudeCliUpdater {
   private readonly abort = new AbortController();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
+  private started = false;
+  private lastStatus: UpdaterState["status"] | null = null;
   private dueAt = Date.now() + AFTER_START_MS;
   private readonly onResume = () => this.arm();
 
@@ -44,12 +56,24 @@ export class ClaudeCliUpdater {
     if (process.env.STELLA_CLAUDE_CLI_UPDATES?.trim().toLowerCase() === "off") {
       return;
     }
-    const last = this.readState().checkedAt ?? 0;
+    const stored = this.readState();
+    const last = stored.checkedAt ?? 0;
     const sinceLast = Date.now() - last;
     if (sinceLast >= 0 && sinceLast < RESTART_QUIET_MS) {
-      this.dueAt = last + CHECK_INTERVAL_MS;
+      this.dueAt = last + intervalAfter(stored.status);
     }
+    this.started = true;
     powerMonitor.on("resume", this.onResume);
+    this.arm();
+  }
+
+  /**
+   * Claude Code was found where the last check found none: check now, so
+   * it's on the schedule (and its version recorded) from the start.
+   */
+  noteCliFound(): void {
+    if (!this.started || this.lastStatus !== "not_installed") return;
+    this.dueAt = Date.now();
     this.arm();
   }
 
@@ -89,6 +113,7 @@ export class ClaudeCliUpdater {
     }
     this.running = false;
     if (this.abort.signal.aborted) return;
+    this.lastStatus = outcome.status;
     const version = "version" in outcome ? outcome.version : null;
     const previous = this.readState();
     if (version && previous.version && version !== previous.version) {
@@ -105,9 +130,7 @@ export class ClaudeCliUpdater {
     } else if (outcome.status !== previous.status || outcome.status === "updated") {
       logger?.process(`claude-cli.update-${outcome.status}`, { ...outcome });
     }
-    this.dueAt =
-      Date.now() +
-      (outcome.status === "failed" ? RETRY_INTERVAL_MS : CHECK_INTERVAL_MS);
+    this.dueAt = Date.now() + intervalAfter(outcome.status);
     this.arm();
   }
 

@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Kan de wijziging niet toepassen",
+      "failure": {
+        "details": "Details",
+        "nothing": "Er is niets nieuws om toe te passen.",
+        "unavailable": "Wijzigingen aan Stella kunnen hier niet worden toegepast.",
+        "notReady": "Stella is hier nog niet klaar voor. Probeer het zo opnieuw.",
+        "inProgress": "Een taak werkt nog aan deze wijziging. Probeer het opnieuw als die klaar is.",
+        "gone": "Die wijziging is niet meer beschikbaar.",
+        "wouldNotStart": "Stella zou met deze wijziging niet starten, dus die is niet toegepast.",
+        "takenBack": "Door deze wijziging werd Stella niet meer getoond, dus die is teruggedraaid.",
+        "unexpected": "Er ging iets mis bij het toepassen op deze computer. Probeer het opnieuw of vraag Stella om ernaar te kijken."
+      },
       "files": {
         "one": "{count} bestand",
         "other": "{count} bestanden"

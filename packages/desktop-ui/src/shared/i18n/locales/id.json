@@ -2773,6 +2773,17 @@
     },
     "appSource": {
       "failed": "Tidak dapat menerapkan perubahan",
+      "failure": {
+        "details": "Detail",
+        "nothing": "Tidak ada yang baru untuk diterapkan.",
+        "unavailable": "Perubahan pada Stella tidak dapat diterapkan di sini.",
+        "notReady": "Stella belum siap untuk ini. Coba lagi sebentar lagi.",
+        "inProgress": "Sebuah tugas masih mengerjakan perubahan ini. Coba lagi setelah selesai.",
+        "gone": "Perubahan itu sudah tidak tersedia.",
+        "wouldNotStart": "Stella tidak akan bisa dimulai dengan perubahan ini, jadi perubahan ini tidak diterapkan.",
+        "takenBack": "Perubahan ini membuat Stella tidak tampil, jadi perubahan ini dibatalkan.",
+        "unexpected": "Terjadi masalah saat menerapkannya di komputer ini. Coba lagi, atau minta Stella untuk memeriksanya."
+      },
       "files": {
         "other": "{count} file"
       },

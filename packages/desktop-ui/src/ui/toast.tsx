@@ -11,11 +11,18 @@ interface Toast {
   id: string;
   title?: string;
   description?: string;
+  detail?: ToastDetail;
   variant?: "default" | "success" | "error" | "loading";
   duration?: number;
   action?: ToastAction;
   secondaryAction?: ToastAction;
 }
+
+/** Technical text kept behind a disclosure (its label, then the text). */
+type ToastDetail = {
+  label: string;
+  text: string;
+};
 
 type ToastAction = {
   label: string;
@@ -25,6 +32,8 @@ type ToastAction = {
 export interface ToastOptions {
   title?: string;
   description?: string;
+  /** Shown folded; a toast with one stays until it is closed. */
+  detail?: ToastDetail;
   variant?: "default" | "success" | "error" | "loading";
   duration?: number;
   action?: ToastAction;
@@ -81,7 +90,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       toastKeysRef.current.set(dedupeKey, id);
     }
 
-    if (options.duration !== 0) {
+    if (options.duration !== 0 && !options.detail) {
       const timeout = options.duration || 4000;
       const timeoutId = window.setTimeout(() => {
         toastKeysRef.current.delete(dedupeKey);
@@ -198,6 +207,12 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
               </div>
             )}
           </div>
+        )}
+        {toast.detail && (
+          <details data-slot="toast-detail">
+            <summary>{toast.detail.label}</summary>
+            <pre>{toast.detail.text}</pre>
+          </details>
         )}
       </div>
       <button data-slot="toast-close-button" onClick={onClose} type="button">

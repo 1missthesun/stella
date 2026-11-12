@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Ændringen kunne ikke anvendes",
+      "failure": {
+        "details": "Detaljer",
+        "nothing": "Der er ikke noget nyt at anvende.",
+        "unavailable": "Ændringer af Stella kan ikke anvendes her.",
+        "notReady": "Stella er ikke klar til det endnu. Prøv igen om et øjeblik.",
+        "inProgress": "En opgave arbejder stadig på denne ændring. Prøv igen, når den er færdig.",
+        "gone": "Den ændring er ikke længere tilgængelig.",
+        "wouldNotStart": "Stella ville ikke starte med denne ændring, så den blev ikke anvendt.",
+        "takenBack": "Denne ændring forhindrede Stella i at blive vist, så den blev trukket tilbage.",
+        "unexpected": "Noget gik galt, da den skulle anvendes på denne computer. Prøv igen, eller bed Stella om at se på det."
+      },
       "files": {
         "one": "{count} fil",
         "other": "{count} filer"

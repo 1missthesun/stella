@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Die Änderung konnte nicht übernommen werden",
+      "failure": {
+        "details": "Details",
+        "nothing": "Es gibt nichts Neues zu übernehmen.",
+        "unavailable": "Änderungen an Stella können hier nicht übernommen werden.",
+        "notReady": "Stella ist dafür noch nicht bereit. Versuch es gleich noch einmal.",
+        "inProgress": "Eine Aufgabe arbeitet noch an dieser Änderung. Versuch es noch einmal, wenn sie fertig ist.",
+        "gone": "Diese Änderung ist nicht mehr verfügbar.",
+        "wouldNotStart": "Mit dieser Änderung würde Stella nicht starten, deshalb wurde sie nicht übernommen.",
+        "takenBack": "Durch diese Änderung wurde Stella nicht mehr angezeigt, deshalb wurde sie zurückgenommen.",
+        "unexpected": "Beim Übernehmen auf diesem Computer ist etwas schiefgelaufen. Versuch es noch einmal oder bitte Stella, sich das anzusehen."
+      },
       "files": {
         "one": "{count} Datei",
         "other": "{count} Dateien"

@@ -15,6 +15,7 @@ import {
 } from "@stella/contracts/backend/app-source";
 import type {
   AppSourceActionResult,
+  AppSourceFailure,
   AppSourceCommit,
   AppSourceConflicts,
   AppSourceDraftOffer,
@@ -209,6 +210,16 @@ const EMPTY_STATE: AppSourceState = {
 
 type Offer = { tip: string; real: boolean; catchUp: boolean };
 
+/** A failure Stella means to tell the user, by kind (the window words it). */
+class PlainFailure extends Error {
+  constructor(
+    readonly reason: AppSourceFailure,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 /** The windows could not show the change, and the checkout is back where it was. */
 class RendererRejected extends Error {
   constructor(
@@ -235,6 +246,13 @@ const accountDeviceName = () => hostname().trim().slice(0, 96);
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
+
+const failureOf = (error: unknown): { reason: AppSourceFailure; detail?: string } =>
+  error instanceof PlainFailure
+    ? { reason: error.reason }
+    : error instanceof RendererRejected
+      ? { reason: "taken-back", detail: error.detail }
+      : { reason: "unexpected", detail: errorMessage(error) };
 
 /** Longest an update waits for a screen recording: past its 10-minute cap, building and its card. */
 const RECORDING_HOLD_MAX_MS = 20 * 60_000;
@@ -411,14 +429,14 @@ export class AppSourceService {
   }
 
   private async takeDraft(cwd: string, name: string, after?: (to: string) => Promise<void>) {
-    if (!isDraftName(name)) throw new Error("Unknown draft.");
+    if (!isDraftName(name)) throw new PlainFailure("gone", "Unknown draft.");
     const ref = `${DRAFT_REF_PREFIX}${name}`;
     const [worktrees, subject] = await Promise.all([
       listWorktrees(cwd),
       git(cwd, ["log", "-1", "--format=%s", `${ref}^{commit}`]),
     ]);
     if (worktrees.some((tree) => tree.branch === ref)) {
-      throw new Error(`The draft "${name}" is still being worked on.`);
+      throw new PlainFailure("in-progress", `The draft "${name}" is still being worked on.`);
     }
     return await this.take(cwd, {
       kind: "draft",
@@ -511,11 +529,11 @@ export class AppSourceService {
   undo(sha: string) {
     return this.exclusive(async (cwd) => {
       if (!/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha)) {
-        throw new Error("Unknown change.");
+        throw new PlainFailure("gone", "Unknown change.");
       }
       const head = await git(cwd, ["rev-parse", "HEAD"]);
       if (!(await isAncestor(cwd, sha, head))) {
-        throw new Error("That change is not part of the current version.");
+        throw new PlainFailure("gone", "That change is not part of the current version.");
       }
       const row = (await this.readRecent(cwd, await this.recentLog(cwd))).find(
         (entry) => entry.commit.sha === sha,
@@ -581,7 +599,7 @@ export class AppSourceService {
   applyRemote() {
     return this.exclusive(async (cwd) => {
       if (!this.forkBranch)
-        throw new Error("No changes from your other computers.");
+        throw new PlainFailure("nothing", "No changes from your other computers.");
       const ref = `${FORK_REF_PREFIX}${this.forkBranch}`;
       const tip = await git(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]);
       return await this.take(cwd, {
@@ -608,10 +626,10 @@ export class AppSourceService {
    */
   applyUpstream(targets: string[] | null = null) {
     return this.exclusive(async (cwd) => {
-      if (!this.upstreamTracked) throw new Error("No update is available.");
+      if (!this.upstreamTracked) throw new PlainFailure("nothing", "No update is available.");
       const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
       const head = await git(cwd, ["rev-parse", "HEAD"]);
-      if (await isAncestor(cwd, version, head)) throw new Error("No update is available.");
+      if (await isAncestor(cwd, version, head)) throw new PlainFailure("nothing", "No update is available.");
       await this.announceApply(version, targets);
       const target = await this.updateTarget(cwd, head, version);
       const prepared = await this.preparer.recordFor(head, target.tip);
@@ -649,7 +667,7 @@ export class AppSourceService {
         : {}),
       ...(plan.kind === "conflict" ? { conflicts: plan.conflicts.length } : {}),
     });
-    if (plan.kind === "none") throw new Error(source.emptyMessage);
+    if (plan.kind === "none") throw new PlainFailure("nothing", source.emptyMessage);
     let to = plan.kind === "fast-forward" ? plan.tip : "";
     if (plan.kind === "conflict" && !prepared?.to) {
       return await this.dispatchMerge(cwd, source, source.brief(plan, head));
@@ -720,7 +738,7 @@ export class AppSourceService {
   ): Promise<{ background: true }> {
     const dispatch = this.options.dispatchAgentBrief;
     if (!dispatch) {
-      throw new Error("Stella isn't ready to make that change yet.");
+      throw new PlainFailure("not-ready", "Stella isn't ready to make that change yet.");
     }
     const name = source.pendingDraft;
     let draft = await this.draftOf(cwd, name);
@@ -842,7 +860,7 @@ export class AppSourceService {
   ): Promise<{ background: true }> {
     const dispatch = this.options.dispatchAgentBrief;
     if (!dispatch) {
-      throw new Error("Stella isn't ready to undo that yet.");
+      throw new PlainFailure("not-ready", "Stella isn't ready to undo that yet.");
     }
     await dispatch(undoBrief(args));
     this.options.log("app-source.brief-dispatched", {
@@ -877,7 +895,7 @@ export class AppSourceService {
           message: errorMessage(error),
         });
         this.logTimeline("failed");
-        return { ok: false, error: errorMessage(error) };
+        return { ok: false, error: errorMessage(error), ...failureOf(error) };
       } finally {
         this.timeline = null;
         this.setBusy(false);
@@ -933,7 +951,7 @@ export class AppSourceService {
       this.mark("build");
       if (!built.ok) {
         this.options.log("app-source.apply-build-failed", { to: to.slice(0, 12), output: built.output });
-        throw new Error("This version of Stella would not start, so it wasn't applied.");
+        throw new PlainFailure("would-not-start", "This version of Stella would not start, so it wasn't applied.");
       }
     }
     const visible =
@@ -2009,7 +2027,7 @@ export class AppSourceService {
   }
 
   private async takeUpstream(cwd: string, wanted?: Wanted) {
-    if (!this.upstreamTracked) throw new Error("No update is available.");
+    if (!this.upstreamTracked) throw new PlainFailure("nothing", "No update is available.");
     const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
     const head = await git(cwd, ["rev-parse", "HEAD"]);
     const target = await this.updateTarget(cwd, head, version);

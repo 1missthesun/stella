@@ -2773,6 +2773,17 @@
     },
     "appSource": {
       "failed": "Không thể áp dụng thay đổi",
+      "failure": {
+        "details": "Chi tiết",
+        "nothing": "Không có gì mới để áp dụng.",
+        "unavailable": "Không thể áp dụng thay đổi cho Stella ở đây.",
+        "notReady": "Stella chưa sẵn sàng cho việc này. Hãy thử lại sau giây lát.",
+        "inProgress": "Một tác vụ vẫn đang xử lý thay đổi này. Hãy thử lại khi xong.",
+        "gone": "Thay đổi đó không còn nữa.",
+        "wouldNotStart": "Stella sẽ không khởi động được với thay đổi này, nên nó không được áp dụng.",
+        "takenBack": "Thay đổi này khiến Stella không hiển thị, nên đã được hoàn tác.",
+        "unexpected": "Đã xảy ra lỗi khi áp dụng trên máy tính này. Hãy thử lại hoặc nhờ Stella kiểm tra."
+      },
       "files": {
         "other": "{count} tệp"
       },

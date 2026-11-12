@@ -92,9 +92,31 @@ export type AppSourceState = {
   };
 };
 
+/**
+ * Why an action failed, for the sentence the window shows. "unexpected" is
+ * anything Stella didn't mean to say to the user (a file system or git
+ * error): the window says so plainly and keeps `detail` behind a disclosure.
+ */
+export type AppSourceFailure =
+  | "nothing"
+  | "unavailable"
+  | "not-ready"
+  | "in-progress"
+  | "gone"
+  | "would-not-start"
+  | "taken-back"
+  | "unexpected";
+
 export type AppSourceActionResult =
   | {
       ok: true;
       background?: boolean;
     }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      /** The main process's own words (English), kept for logs. */
+      error: string;
+      reason?: AppSourceFailure;
+      /** Technical detail, shown only behind a disclosure. */
+      detail?: string;
+    };

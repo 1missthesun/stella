@@ -17,6 +17,7 @@ import {
 const unavailable: AppSourceActionResult = {
   ok: false,
   error: "Updates are not available here.",
+  reason: "unavailable",
 };
 
 export const registerAppSourceHandlers = (

@@ -2800,6 +2800,17 @@
     },
     "appSource": {
       "failed": "Nie udało się zastosować zmiany",
+      "failure": {
+        "details": "Szczegóły",
+        "nothing": "Nie ma nic nowego do zastosowania.",
+        "unavailable": "Zmian w Stelli nie można tu zastosować.",
+        "notReady": "Stella nie jest jeszcze na to gotowa. Spróbuj ponownie za chwilę.",
+        "inProgress": "Zadanie wciąż pracuje nad tą zmianą. Spróbuj ponownie, gdy skończy.",
+        "gone": "Ta zmiana nie jest już dostępna.",
+        "wouldNotStart": "Stella nie uruchomiłaby się z tą zmianą, więc nie została zastosowana.",
+        "takenBack": "Ta zmiana sprawiała, że Stella się nie wyświetlała, więc została cofnięta.",
+        "unexpected": "Coś poszło nie tak podczas stosowania jej na tym komputerze. Spróbuj ponownie lub poproś Stellę, żeby to sprawdziła."
+      },
       "files": {
         "few": "{count} pliki",
         "many": "{count} plików",

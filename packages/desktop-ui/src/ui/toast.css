@@ -220,3 +220,38 @@
     transform: translateY(0);
   }
 }
+
+/* Technical detail, folded under the plain sentence. */
+[data-component="toast"] [data-slot="toast-detail"] {
+  margin-top: 4px;
+  color: var(--text-weak, var(--muted-foreground));
+  font-size: var(--font-size-sm, 12px);
+}
+
+[data-component="toast"] [data-slot="toast-detail"] summary {
+  width: fit-content;
+  cursor: default;
+  font-weight: var(--weight-medium);
+}
+
+[data-component="toast"] [data-slot="toast-detail"] summary:hover {
+  color: var(--text-base, var(--foreground));
+}
+
+[data-component="toast"] [data-slot="toast-detail"] summary:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+[data-component="toast"] [data-slot="toast-detail"] pre {
+  margin: 6px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  user-select: text;
+}

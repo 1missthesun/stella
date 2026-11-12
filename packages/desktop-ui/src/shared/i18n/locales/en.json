@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Couldn't apply the change",
+      "failure": {
+        "details": "Details",
+        "nothing": "There's nothing new to apply.",
+        "unavailable": "Changes to Stella can't be applied here.",
+        "notReady": "Stella isn't ready for this yet. Try again in a moment.",
+        "inProgress": "A task is still working on this change. Try again when it's done.",
+        "gone": "That change isn't available anymore.",
+        "wouldNotStart": "Stella wouldn't start with this change, so it wasn't applied.",
+        "takenBack": "This change stopped Stella from showing, so it was taken back.",
+        "unexpected": "Something went wrong while applying it on this computer. Try again, or ask Stella to look into it."
+      },
       "files": {
         "one": "{count} file",
         "other": "{count} files"

@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Det gick inte att tillämpa ändringen",
+      "failure": {
+        "details": "Detaljer",
+        "nothing": "Det finns inget nytt att tillämpa.",
+        "unavailable": "Ändringar i Stella kan inte tillämpas här.",
+        "notReady": "Stella är inte redo för det här än. Försök igen om en stund.",
+        "inProgress": "En uppgift arbetar fortfarande med den här ändringen. Försök igen när den är klar.",
+        "gone": "Den ändringen är inte längre tillgänglig.",
+        "wouldNotStart": "Stella skulle inte starta med den här ändringen, så den tillämpades inte.",
+        "takenBack": "Den här ändringen hindrade Stella från att visas, så den togs tillbaka.",
+        "unexpected": "Något gick fel när den skulle tillämpas på den här datorn. Försök igen, eller be Stella titta på det."
+      },
       "files": {
         "one": "{count} fil",
         "other": "{count} filer"

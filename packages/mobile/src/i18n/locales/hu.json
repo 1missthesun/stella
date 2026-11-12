@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Nem sikerült alkalmazni a módosítást",
+      "failure": {
+        "details": "Részletek",
+        "nothing": "Nincs semmi új, amit alkalmazni lehetne.",
+        "unavailable": "A Stella módosításai itt nem alkalmazhatók.",
+        "notReady": "A Stella még nem áll készen erre. Próbáld újra egy pillanat múlva.",
+        "inProgress": "Egy feladat még dolgozik ezen a módosításon. Próbáld újra, ha végzett.",
+        "gone": "Ez a módosítás már nem érhető el.",
+        "wouldNotStart": "A Stella nem indulna el ezzel a módosítással, ezért nem lett alkalmazva.",
+        "takenBack": "Ez a módosítás miatt a Stella nem jelent meg, ezért visszavonásra került.",
+        "unexpected": "Hiba történt az alkalmazásakor ezen a számítógépen. Próbáld újra, vagy kérd meg a Stellát, hogy nézzen utána."
+      },
       "files": {
         "one": "{count} fájl",
         "other": "{count} fájl"

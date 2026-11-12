@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Değişiklik uygulanamadı",
+      "failure": {
+        "details": "Ayrıntılar",
+        "nothing": "Uygulanacak yeni bir şey yok.",
+        "unavailable": "Stella'daki değişiklikler burada uygulanamaz.",
+        "notReady": "Stella henüz buna hazır değil. Birazdan tekrar dene.",
+        "inProgress": "Bir görev bu değişiklik üzerinde hâlâ çalışıyor. Bittiğinde tekrar dene.",
+        "gone": "Bu değişiklik artık kullanılamıyor.",
+        "wouldNotStart": "Stella bu değişiklikle açılmayacaktı, bu yüzden uygulanmadı.",
+        "takenBack": "Bu değişiklik Stella'nın görünmesini engelledi, bu yüzden geri alındı.",
+        "unexpected": "Bu bilgisayarda uygulanırken bir sorun oluştu. Tekrar dene ya da Stella'dan buna bakmasını iste."
+      },
       "files": {
         "one": "{count} dosya",
         "other": "{count} dosya"

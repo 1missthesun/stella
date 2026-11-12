@@ -2800,6 +2800,17 @@
     },
     "appSource": {
       "failed": "Změnu se nepodařilo použít",
+      "failure": {
+        "details": "Podrobnosti",
+        "nothing": "Není co nového použít.",
+        "unavailable": "Změny Stelly tady použít nejdou.",
+        "notReady": "Stella na to ještě není připravená. Zkus to za chvíli znovu.",
+        "inProgress": "Na této změně ještě pracuje úloha. Zkus to znovu, až skončí.",
+        "gone": "Tahle změna už není k dispozici.",
+        "wouldNotStart": "Stella by se s touto změnou nespustila, takže nebyla použita.",
+        "takenBack": "Kvůli této změně se Stella nezobrazovala, takže byla vrácena zpět.",
+        "unexpected": "Při použití na tomto počítači se něco pokazilo. Zkus to znovu nebo požádej Stellu, ať se na to podívá."
+      },
       "files": {
         "few": "{count} soubory",
         "many": "{count} souboru",

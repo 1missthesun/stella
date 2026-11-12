@@ -2791,6 +2791,17 @@
     },
     "appSource": {
       "failed": "Impossible d'appliquer la modification",
+      "failure": {
+        "details": "Détails",
+        "nothing": "Il n'y a rien de nouveau à appliquer.",
+        "unavailable": "Les modifications de Stella ne peuvent pas être appliquées ici.",
+        "notReady": "Stella n'est pas encore prête pour ça. Réessaie dans un instant.",
+        "inProgress": "Une tâche travaille encore sur cette modification. Réessaie quand elle aura terminé.",
+        "gone": "Cette modification n'est plus disponible.",
+        "wouldNotStart": "Stella ne démarrerait pas avec cette modification, elle n'a donc pas été appliquée.",
+        "takenBack": "Cette modification empêchait Stella de s'afficher, elle a donc été annulée.",
+        "unexpected": "Un problème est survenu en l'appliquant sur cet ordinateur. Réessaie, ou demande à Stella de s'en occuper."
+      },
       "files": {
         "many": "{count} fichiers",
         "one": "{count} fichier",

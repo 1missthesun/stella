@@ -2791,6 +2791,17 @@
     },
     "appSource": {
       "failed": "Impossibile applicare la modifica",
+      "failure": {
+        "details": "Dettagli",
+        "nothing": "Non c'è niente di nuovo da applicare.",
+        "unavailable": "Le modifiche a Stella non si possono applicare qui.",
+        "notReady": "Stella non è ancora pronta per questo. Riprova tra un momento.",
+        "inProgress": "Un'attività sta ancora lavorando a questa modifica. Riprova quando ha finito.",
+        "gone": "Quella modifica non è più disponibile.",
+        "wouldNotStart": "Con questa modifica Stella non si avvierebbe, quindi non è stata applicata.",
+        "takenBack": "Questa modifica impediva a Stella di comparire, quindi è stata annullata.",
+        "unexpected": "Qualcosa è andato storto applicandola su questo computer. Riprova, oppure chiedi a Stella di dare un'occhiata."
+      },
       "files": {
         "many": "{count} file",
         "one": "{count} file",

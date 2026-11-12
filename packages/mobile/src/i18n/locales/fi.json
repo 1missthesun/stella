@@ -2782,6 +2782,17 @@
     },
     "appSource": {
       "failed": "Muutosta ei voitu ottaa käyttöön",
+      "failure": {
+        "details": "Tiedot",
+        "nothing": "Ei mitään uutta otettavaksi käyttöön.",
+        "unavailable": "Stellan muutoksia ei voi ottaa käyttöön täällä.",
+        "notReady": "Stella ei ole vielä valmis tähän. Yritä hetken päästä uudelleen.",
+        "inProgress": "Tehtävä työstää vielä tätä muutosta. Yritä uudelleen, kun se on valmis.",
+        "gone": "Tämä muutos ei ole enää saatavilla.",
+        "wouldNotStart": "Stella ei käynnistyisi tämän muutoksen kanssa, joten sitä ei otettu käyttöön.",
+        "takenBack": "Tämä muutos esti Stellaa näkymästä, joten se peruttiin.",
+        "unexpected": "Jokin meni pieleen, kun muutosta otettiin käyttöön tällä tietokoneella. Yritä uudelleen tai pyydä Stellaa selvittämään asia."
+      },
       "files": {
         "one": "{count} tiedosto",
         "other": "{count} tiedostoa"

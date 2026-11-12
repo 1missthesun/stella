@@ -2773,6 +2773,17 @@
     },
     "appSource": {
       "failed": "無法套用此變更",
+      "failure": {
+        "details": "詳細資訊",
+        "nothing": "沒有可套用的新內容。",
+        "unavailable": "這裡無法套用對 Stella 的變更。",
+        "notReady": "Stella 還沒準備好。請稍後再試。",
+        "inProgress": "有任務仍在處理這項變更。等它完成後再試。",
+        "gone": "這項變更已無法使用。",
+        "wouldNotStart": "套用這項變更後 Stella 將無法啟動，所以沒有套用。",
+        "takenBack": "這項變更導致 Stella 無法顯示，所以已撤回。",
+        "unexpected": "在這台電腦上套用時出了問題。請重試，或請 Stella 查看一下。"
+      },
       "files": {
         "other": "{count} 個檔案"
       },

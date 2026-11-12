@@ -2791,6 +2791,17 @@
     },
     "appSource": {
       "failed": "Modificarea nu a putut fi aplicată",
+      "failure": {
+        "details": "Detalii",
+        "nothing": "Nu e nimic nou de aplicat.",
+        "unavailable": "Modificările la Stella nu pot fi aplicate aici.",
+        "notReady": "Stella nu e încă pregătită pentru asta. Încearcă din nou într-o clipă.",
+        "inProgress": "O sarcină încă lucrează la această modificare. Încearcă din nou după ce termină.",
+        "gone": "Modificarea nu mai este disponibilă.",
+        "wouldNotStart": "Stella nu ar porni cu această modificare, așa că nu a fost aplicată.",
+        "takenBack": "Această modificare împiedica afișarea Stellei, așa că a fost anulată.",
+        "unexpected": "Ceva n-a mers la aplicarea ei pe acest computer. Încearcă din nou sau roagă-o pe Stella să verifice."
+      },
       "files": {
         "few": "{count} fișiere",
         "one": "{count} fișier",

@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import type {
   AppSourceActionResult,
   AppSourceDraftOffer,
+  AppSourceFailure,
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
 import { showToast } from "@/ui/toast";
@@ -62,6 +63,23 @@ export const describeChange = (t: ReturnType<typeof useT>, subject: string): str
   return depth % 2 === 1 ? t("shell.appSource.updates.removed", { change }) : change;
 };
 
+const FAILURE_KEYS = {
+  nothing: "shell.appSource.failure.nothing",
+  unavailable: "shell.appSource.failure.unavailable",
+  "not-ready": "shell.appSource.failure.notReady",
+  "in-progress": "shell.appSource.failure.inProgress",
+  gone: "shell.appSource.failure.gone",
+  "would-not-start": "shell.appSource.failure.wouldNotStart",
+  "taken-back": "shell.appSource.failure.takenBack",
+  unexpected: "shell.appSource.failure.unexpected",
+} as const satisfies Record<AppSourceFailure, string>;
+
+/** What went wrong in a plain sentence; the main process's own words only when it gave no kind. */
+const failureSentence = (
+  t: ReturnType<typeof useT>,
+  result: Extract<AppSourceActionResult, { ok: false }>,
+) => (result.reason ? t(FAILURE_KEYS[result.reason]) : result.error);
+
 export const useAppSourceAction = () => {
   const t = useT();
   const pending = usePendingAppSourceAction();
@@ -73,7 +91,10 @@ export const useAppSourceAction = () => {
     if (result.ok) return;
     showToast({
       title: t("shell.appSource.failed"),
-      description: result.error,
+      description: failureSentence(t, result),
+      ...(result.detail
+        ? { detail: { label: t("shell.appSource.failure.details"), text: result.detail } }
+        : {}),
       variant: "error",
     });
   };

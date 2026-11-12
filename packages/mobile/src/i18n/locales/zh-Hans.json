@@ -2773,6 +2773,17 @@
     },
     "appSource": {
       "failed": "无法应用此更改",
+      "failure": {
+        "details": "详细信息",
+        "nothing": "没有可应用的新内容。",
+        "unavailable": "这里无法应用对 Stella 的更改。",
+        "notReady": "Stella 还没准备好。请稍后再试。",
+        "inProgress": "有任务仍在处理这项更改。等它完成后再试。",
+        "gone": "这项更改已不可用。",
+        "wouldNotStart": "应用这项更改后 Stella 将无法启动，所以没有应用。",
+        "takenBack": "这项更改导致 Stella 无法显示，所以已撤回。",
+        "unexpected": "在这台电脑上应用时出了问题。请重试，或让 Stella 查看一下。"
+      },
       "files": {
         "other": "{count} 个文件"
       },

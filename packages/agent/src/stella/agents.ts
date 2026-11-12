@@ -1152,14 +1152,14 @@ export function stellaAgents(host: StellaAgentsHost) {
   const spawnAgent = defineTool({
     name: "spawn_agent",
     description:
-      "Start a background agent. Its only context is your brief: it can't see this conversation. Returns its thread_id at once; its final report arrives later as [Agent completed].",
+      "Start a background agent. It sees your brief and the user's standing rules, never this conversation. Returns its thread_id at once; its final report arrives later as [Agent completed].",
     parameters: Type.Object({
       description: Type.String({
         description: "The agent's name: its area (\"Finance\") or, for a one-off, the work. Distinguishing words first.",
       }),
       prompt: Type.String({
         description:
-          "The brief: the request and what the agent can't know.",
+          "The brief: the request and what the agent can't know. The user's standing rules are already in its context, so a brief that repeats one adds nothing.",
       }),
       model: Type.Optional(
         Type.String({

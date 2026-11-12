@@ -110,7 +110,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["pc-cleanup/organize-downloads-folder", "video/burn-subtitles-into-video-for-tiktok"],
+    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "video/burn-subtitles-into-video-for-tiktok"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -237,6 +237,123 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       { label: "Apple: Reduce the size of a PDF in Preview", href: "https://support.apple.com/guide/preview/reduce-the-size-of-a-pdf-prvw1509/mac" },
       { label: "Ghostscript: Optimizing PDFs", href: "https://ghostscript.com/blog/optimizing-pdfs.html" },
       { label: "Microsoft: Reduce attachment size to send large files with Outlook", href: "https://support.microsoft.com/en-us/outlook/reduce-attachment-size-to-send-large-files-with-outlook" },
+    ],
+  },
+
+  {
+    slug: "combine-excel-files-into-one-sheet",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "combine multiple excel files into one",
+      "merge excel files",
+      "combine excel files into one sheet",
+      "combine multiple csv files into one",
+      "merge excel files with different column order",
+    ],
+    title: "Combine multiple Excel files into one sheet (free)",
+    description:
+      "Merge a folder of Excel and CSV files into one sheet, even when the columns are in a different order: Power Query's From Folder, or Stella (stella.sh), checked.",
+    h1: "Combine multiple Excel files into one sheet",
+    short: "Combine Excel files into one",
+    lede: "One sheet with every row, the columns lined up, and one header row.",
+    answer:
+      "In Excel for Windows or Mac, put the files in one folder and use Data, Get Data, From File, From Folder, then Combine; Power Query stacks them and matches columns by name. Copying and pasting works for two or three files but misaligns columns that are in a different order. Stella (stella.sh) merges a whole folder of Excel and CSV files into one new sheet, matches columns by name and checks the totals.",
+    stellaSteps: [
+      "Opens every workbook and CSV in the folder and works out where each one's header row is, even below a title line",
+      "Matches columns by their names, so a file with its columns in a different order still lands in the right place",
+      "Reads dates and amounts as real dates and numbers, including day-first dates like 02/05/2026 in a CSV",
+      "Writes one new .xlsx next to the originals, with a Source File column so you can filter by where each row came from",
+      "Checks its own work (row counts, duplicate IDs, missing values, quantity × price = total) and tells you what it found",
+    ],
+    prompt: "Combine all these Excel files into one sheet. They're in Documents/Store orders.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-12",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Ten files (eight .xlsx, two .csv) combined into one sheet of 277 orders in about 90 seconds. Checked afterwards against an answer key: exactly one header row, no blank or repeated header rows, and every field of every row matches its source, including the file with its columns in a different order, the one with a title row above the header, and the CSVs' UK dates. The ten originals were unchanged.",
+      note: "The order files are fictitious, made for this run. The wait is sped up 10×; the end shows the combined sheet in Stella's own spreadsheet viewer.",
+      video: {
+        src: `${PROOFS}/pdf-excel/combine-excel-files-into-one-sheet/proof.mp4`,
+        cuts: webCuts("pdf-excel/combine-excel-files-into-one-sheet"),
+        poster: `${PROOFS}/pdf-excel/combine-excel-files-into-one-sheet/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 51.3,
+        realDuration: 92,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Ten order files, eight Excel and two CSV, are in Documents/Store orders." },
+        { at: 3, text: "The prompt: combine all these Excel files into one sheet." },
+        { at: 9, text: "Stella replies: a new file in the same folder, with a column for which file each row came from, and the originals left unchanged." },
+        { at: 11, text: "Reading every workbook, merging by column name and checking the result, sped up 10×." },
+        { at: 20, text: "Done: 277 orders in one sheet. It notes the two CSVs, which months each store covers, and that the data checked out." },
+        { at: 35, text: "The combined sheet open in Stella: real dates, prices with two decimals, one header row." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/pdf-excel/combine-excel-files-into-one-sheet/sheet.png`,
+          alt: "The combined sheet in Stella's spreadsheet viewer: columns Order ID, Date, Store, Customer, Product, Qty, Unit Price and Total, starting with SO-10405 on 01/01/2026 from the Leeds store.",
+          width: 710,
+          height: 392,
+          caption: "The first rows of the combined sheet, sorted by date.",
+        },
+      ],
+    },
+    manualTitle: "Combine them yourself",
+    manualSteps: [
+      {
+        title: "Put the files in one folder",
+        body: "Move every file you want combined into one folder, and nothing else. Power Query takes everything it finds there, so a stray summary workbook or an old copy ends up in your data.",
+      },
+      {
+        title: "Use Get Data, From Folder",
+        body: "In Excel, choose Data, Get Data, From File, From Folder, pick the folder, then Combine, Combine & Transform Data. Choose the sheet to use from the first file; Power Query applies the same steps to every file and stacks them, matching columns by their header names.",
+      },
+      {
+        title: "Fix title rows and mixed files",
+        body: "If a file has a title line above the headers, it shows up as junk rows: in Power Query, edit the Transform Sample File query to Remove Top Rows and Use First Row as Headers, which then applies to every file. Sheets with different names, or CSVs mixed with workbooks, need one query per kind, then Append Queries.",
+      },
+      {
+        title: "Check dates and totals",
+        body: "Set the date column's type with Using Locale (for example English, United Kingdom) so 02/05 isn't read as 5 February. Then Close & Load, and compare the row count and a SUM of the totals with the source files before you trust it.",
+      },
+      {
+        title: "Only two or three files? Copy and paste",
+        body: "Open each file, check its columns are in the same order as the first, and paste the rows under each other without the header row. Use Paste Special, Values if the source has formulas.",
+      },
+    ],
+    limits: [
+      "It saved a new sheet rather than a Power Query connection, so it won't refresh when you add files next month. Ask Stella again with the new files, or build the From Folder query above if you need a live link.",
+      "It didn't tell the user about the file with its columns in a different order or the one with a title row; it handled both correctly but silently. Ask for a summary of what it fixed if you want to see that.",
+      "The recording ran on Linux without Excel, using Stella's own spreadsheet tool. The result is an ordinary .xlsx that opens in Excel, Numbers or Google Sheets.",
+      "The rows go to the AI model you use in Stella while it reads and checks them. For confidential sheets, choose your model accordingly.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Excel combine files with different column orders?",
+        a: "Yes, Power Query's From Folder matches columns by header name, not position. It breaks when the names differ (Qty vs Quantity); rename them in the files or in the query first. Stella matches them by name too and tells you if a name doesn't fit.",
+      },
+      {
+        q: "How do I combine CSV files into one?",
+        a: "The same From Folder route works for CSVs. For a quick join of identical CSVs, `copy *.csv all.csv` in Windows Command Prompt works, but it repeats the header row once per file, so delete those afterwards.",
+      },
+      {
+        q: "Will merging change my original files?",
+        a: "Not with Power Query, and not in the recording: Stella wrote a new file next to them, and all ten originals were byte-for-byte unchanged afterwards.",
+      },
+      {
+        q: "Can it also make a summary or chart?",
+        a: "Yes, in the same chat, for example totals by store and month on a second sheet. The same approach turns [bank statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel).",
+      },
+    ],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/compress-pdf-too-large-to-email"],
+    lastChecked: "2026-11-12",
+    sources: [
+      { label: "Microsoft: Import data from a folder with multiple files (Power Query)", href: "https://support.microsoft.com/en-us/office/import-data-from-a-folder-with-multiple-files-power-query-94b8023c-2e66-4f6b-8c78-6a00041c90e4" },
+      { label: "Microsoft: Append queries (Power Query)", href: "https://support.microsoft.com/en-us/excel/append-queries-power-query" },
     ],
   },
 ];

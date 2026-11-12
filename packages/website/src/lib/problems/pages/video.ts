@@ -118,7 +118,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. Transcribe in the spoken language, translate the .srt (Stella can translate it and keep the timings), then burn in the translated file the same way.",
       },
     ],
-    related: ["video/cut-silences-from-video", "pc-cleanup/organize-downloads-folder"],
+    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Whisper on GitHub", href: "https://github.com/openai/whisper" },
@@ -247,11 +247,141 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Not automatically. For multicam edits, export a cut list from one angle into your editor and apply it there.",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "pc-cleanup/organize-downloads-folder"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "auto-editor", href: "https://auto-editor.com" },
       { label: "ffmpeg silencedetect filter", href: "https://ffmpeg.org/ffmpeg-filters.html#silencedetect" },
+    ],
+  },
+
+  {
+    slug: "compress-video-for-discord",
+    niche: "video",
+    searchPhrases: [
+      "compress video for discord",
+      "compress video to 10mb",
+      "make video smaller for discord",
+      "discord file too large video",
+      "compress video without losing quality",
+    ],
+    title: "Compress a video for Discord (under 10 MB or 20 MB)",
+    description:
+      "Video too big for Discord? Shrink it under the free upload limit on your own computer with HandBrake or ffmpeg, or let Stella (stella.sh) do it and keep it sharp.",
+    h1: "Compress a video for Discord",
+    short: "Compress a video for Discord",
+    lede: "A 231 MB clip down to 9.2 MB, still sharp, and it plays right in the chat.",
+    answer:
+      "Discord's free upload limit is 20 MB (it was 10 MB until August 2026). To fit, pick a video bitrate from the length (about 8,000 kilobits per minute for 10 MB), drop to 720p, and encode with H.264 so it previews inline; HandBrake does it in a window, ffmpeg from the command line. Stella (stella.sh) does it on your computer, aims just under the size you name and checks a frame.",
+    stellaSteps: [
+      "Finds the video you mean (in the recording, “the rocket launch one in my Videos folder”) and reads its length, resolution and sound",
+      "Works out the bitrate that fits the size you asked for, here a two-pass encode aimed at about 9.5 MB",
+      "Drops to 720p rather than starving 1080p of bits, and uses H.264 and AAC so Discord plays it right in the chat",
+      "Grabs a frame from the middle and looks at it to check the picture still holds up",
+      "Saves the copy next to the original with “(Discord)” in the name and leaves the original untouched",
+    ],
+    prompt:
+      "Make this video small enough to send on Discord (under 10 MB). It's the rocket launch one in my Videos folder.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-12",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 78-second 1080p clip, 231.3 MB, became a 9.2 MB (9,223,425 bytes) 720p MP4 in 45 seconds, the full length kept. Checked afterwards: it decodes start to end with no errors, H.264 and AAC, SSIM 0.994 against the original at the same size, and frames side by side look the same. The original was byte-for-byte unchanged.",
+      note: "The clip is NASA's public-domain footage of the Artemis I launch, cut to 78 seconds at 1080p and about 24 Mbit/s for this run; its audio track is silent, which Stella noticed. Waits are sped up 6× and 4×, and the dark first part of playback 4×.",
+      video: {
+        src: `${PROOFS}/video/compress-video-for-discord/proof.mp4`,
+        cuts: webCuts("video/compress-video-for-discord"),
+        poster: `${PROOFS}/video/compress-video-for-discord/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 70,
+        realDuration: 45,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 231 MB, 78-second 1080p launch video is in Videos." },
+        { at: 3, text: "The prompt: make it small enough to send on Discord, under 10 MB." },
+        { at: 9, text: "Stella replies that it's compressing it and won't touch the original." },
+        { at: 11, text: "Reading the video, then a two-pass encode at 720p, sped up 6×." },
+        { at: 18, text: "Done: 9.2 MB, 720p instead of 1080p, the full 1:18, plays in Discord. The original had no sound, so no audio was lost." },
+        { at: 34, text: "The compressed copy opened in Stella's player." },
+        { at: 40, text: "Playing; the dark first seconds sped up 4×." },
+        { at: 46, text: "Ignition and liftoff at normal speed, from the 9.2 MB file." },
+      ],
+      output: {
+        src: `${PROOFS}/video/compress-video-for-discord/output.mp4`,
+        poster: `${PROOFS}/video/compress-video-for-discord/output-poster.jpg`,
+        width: 1280,
+        height: 720,
+        caption:
+          "The exact 9.2 MB file Stella made, unedited. Source: NASA, Artemis I launch from the causeway (public domain).",
+      },
+      shots: [
+        {
+          src: `${PROOFS}/video/compress-video-for-discord/crop.jpg`,
+          alt: "The same 1:1 crop of the rocket's flame and the launch tower at 40 seconds: on the left the original scaled to 720p, on the right the 9.2 MB Discord copy. The copy is very slightly softer, with no blocks.",
+          width: 976,
+          height: 331,
+          caption: "Our check after the run: the hardest frame (flame and smoke), original and copy at 1:1.",
+        },
+      ],
+    },
+    manualTitle: "Compress it yourself",
+    manualSteps: [
+      {
+        title: "Work out the bitrate",
+        body: "Size in megabits is the limit × 8: 10 MB is 80 megabits, 20 MB is 160. Divide by the length in seconds and leave 10% spare for the container and sound: for a 78-second clip under 10 MB that's about 900 kbit/s of video with 64 kbit/s audio. Longer clips get less; past two or three minutes, trim it or send a link.",
+      },
+      {
+        title: "In HandBrake (free, Windows and Mac)",
+        body: "Open the video, choose the Fast 720p30 preset, and on the Video tab pick H.264, Avg Bitrate with your number, and tick 2-Pass Encoding. Set the audio to AAC at 64 or 96 kbit/s. Start, check the file size, and lower the bitrate a little if it comes out over.",
+      },
+      {
+        title: "With ffmpeg",
+        body: "Run `ffmpeg -i in.mp4 -vf scale=-2:720 -c:v libx264 -b:v 900k -pass 1 -an -f null NUL` (use `/dev/null` on Mac), then `ffmpeg -i in.mp4 -vf scale=-2:720 -c:v libx264 -b:v 900k -pass 2 -c:a aac -b:a 64k -movflags +faststart out.mp4`. Two passes land much closer to the target size than one.",
+      },
+      {
+        title: "Keep it previewable",
+        body: "Use H.264 video and AAC audio in an MP4. Discord shows those inline on every device; HEVC, AV1 or MKV files may just appear as a download. Avoid odd frame rates and keep 8-bit colour (yuv420p).",
+      },
+      {
+        title: "Still too big? Trim, crop or link",
+        body: "Cut the clip to the part that matters, drop to 480p for fast-moving game footage, or upload it to YouTube (unlisted), Google Drive or Streamable and paste the link. Nitro raises the limit to 500 MB, Nitro Basic to 50 MB.",
+      },
+    ],
+    limits: [
+      "This was slow-moving launch footage. Fast game clips with lots of motion look worse at the same size; expect Stella to drop to 480p or suggest trimming, which hasn't been recorded yet.",
+      "It aimed for 10 MB because the prompt said so. Discord's free limit has been 20 MB since August 2026, so say “under 20 MB” if that's your limit and you'd like a sharper file.",
+      "ffmpeg was already installed on the Linux computer in the recording. On a Windows PC, Stella has to install it first, which hasn't been recorded yet.",
+      "Stella looks at one frame to check the quality, so that frame goes to the AI model you use in Stella. The video itself stays on your computer.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What is Discord's file size limit?",
+        a: "20 MB per file on a free account since August 2026 (it was 10 MB from 2024), 50 MB with Nitro Basic and 500 MB with Nitro. Check what the upload box says on your account; Discord has been testing different limits.",
+      },
+      {
+        q: "Can I compress a video without losing quality?",
+        a: "Not to a tenth of its size, but you can lose quality you won't notice. Lower the resolution to 720p first and use two-pass H.264. In the recording the copy measured SSIM 0.994 against the original, and frames side by side look the same.",
+      },
+      {
+        q: "Are online video compressors safe?",
+        a: "The well-known ones are, but your video is uploaded to their servers, and free tiers often limit length or add a watermark. Doing it on your computer avoids all three.",
+      },
+      {
+        q: "Can Stella also cut or caption the clip?",
+        a: "Yes, in the same chat: trim it to the best part, [cut out silent pauses](/how/video/cut-silences-from-video) or [burn in subtitles](/how/video/burn-subtitles-into-video-for-tiktok) before it's compressed.",
+      },
+    ],
+    related: ["video/cut-silences-from-video", "video/burn-subtitles-into-video-for-tiktok"],
+    lastChecked: "2026-11-12",
+    sources: [
+      { label: "HandBrake", href: "https://handbrake.fr" },
+      { label: "FFmpeg documentation", href: "https://ffmpeg.org/ffmpeg.html" },
+      { label: "Dexerto: Discord raises free upload limit to 20MB (August 2026)", href: "https://www.dexerto.com/entertainment/discord-raises-free-upload-limit-to-20mb-after-lowering-it-two-years-ago-3398251/" },
+      { label: "NASA: Artemis I Launch from NASA Causeway (source footage)", href: "https://images.nasa.gov/details/GX010506" },
     ],
   },
 ];

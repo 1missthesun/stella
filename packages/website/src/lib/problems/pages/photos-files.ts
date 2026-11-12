@@ -115,7 +115,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. MetadataFixer is a paid app built for exactly this, and GPTH is free and open source. Stella is free with the ChatGPT or Claude plan you already have, and does the same matching. It also handles the next job, like sorting the photos by year or [tidying the Downloads folder](/how/pc-cleanup/organize-downloads-folder) they arrived in.",
       },
     ],
-    related: ["pc-cleanup/organize-downloads-folder", "photos-files/rename-pdf-files-based-on-content"],
+    related: ["photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder", "photos-files/rename-pdf-files-based-on-content"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Google: Download your Google Photos data (Takeout)", href: "https://support.google.com/accounts/answer/3024190" },
@@ -239,6 +239,239 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       { label: "Microsoft: Extract text from PDF (Power Automate Desktop)", href: "https://learn.microsoft.com/en-us/power-automate/desktop-flows/actions-reference/pdf" },
       { label: "OCRmyPDF", href: "https://ocrmypdf.readthedocs.io" },
       { label: "renamer.ai pricing", href: "https://renamer.ai/pricing" },
+    ],
+  },
+
+  {
+    slug: "convert-heic-to-jpg",
+    niche: "photos-files",
+    searchPhrases: [
+      "heic to jpg",
+      "convert heic to jpg windows",
+      "heic to jpg batch converter windows",
+      "convert iphone photos to jpg",
+      "heic to jpg bulk free",
+    ],
+    title: "Convert HEIC to JPG in bulk on Windows (keep the dates)",
+    description:
+      "Convert a folder of iPhone HEIC photos to JPG so they open on any Windows PC, keeping the date taken: free Microsoft add-ons, a batch converter, or Stella (stella.sh).",
+    h1: "Convert HEIC photos to JPG in bulk",
+    short: "HEIC to JPG in bulk",
+    lede: "Every iPhone photo as a JPG that opens anywhere, with the date taken kept.",
+    answer:
+      "HEIC is the iPhone's photo format, and many Windows PCs and apps can't open it. To only view them, install Microsoft's HEIF and HEVC extensions; to share or edit them anywhere, convert to JPG with a batch tool such as XnConvert and keep the metadata. Stella (stella.sh) converts a whole folder on your computer, subfolders included, keeps the date taken and leaves the originals in place.",
+    stellaSteps: [
+      "Finds every HEIC file in the folder you name, including subfolders and odd extensions like a lowercase `.heic`",
+      "Checks what the photos hold first: size, rotation, date taken and location, so it knows what has to carry over",
+      "Converts each one to a full-size JPG next to the original with the same name; in the recording it used ImageMagick at quality 92, writing each file under a temporary name first",
+      "Skips any photo that already has a JPG, and leaves videos and screenshots alone",
+      "Checks every new JPG opens and has its date taken, then tells you how many it converted and where they are",
+    ],
+    prompt:
+      "Convert all my iPhone HEIC photos to JPG so they open on my Windows PC. They're in Pictures/iPhone Photos.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-12",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "All 30 HEIC photos converted to full-size JPGs in under two minutes, including four in a subfolder and one with a lowercase extension. Checked afterwards against an answer key: every JPG opens, has the same size and orientation, and keeps the exact date taken (and the camera make and model); the 30 originals, a Live Photo video and two screenshots are byte-for-byte unchanged.",
+      note: "The photos are generated images saved as real iPhone-style HEIC files with dates taken from March to October 2026, made for this run. The 99-second wait is sped up 12×. The computer's name is blurred in the file manager at the end.",
+      video: {
+        src: `${PROOFS}/photos-files/convert-heic-to-jpg/proof.mp4`,
+        cuts: webCuts("photos-files/convert-heic-to-jpg"),
+        poster: `${PROOFS}/photos-files/convert-heic-to-jpg/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 46.3,
+        realDuration: 111,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 30 iPhone HEIC photos are in Pictures/iPhone Photos, four of them in a subfolder." },
+        { at: 3, text: "The prompt: convert them all to JPG so they open on a Windows PC." },
+        { at: 11, text: "Stella replies that the JPGs will go next to the originals and the HEIC files stay where they are." },
+        { at: 13, text: "Checking the photos' dates and rotation, then converting all 30, sped up 12×." },
+        { at: 23, text: "Done: 30 converted, none failed, full resolution with the date taken kept. The video clip and two screenshots were left alone." },
+        { at: 38, text: "The folder opened from the chat: each HEIC photo with its new JPG beside it." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "Only need to view them? Add Microsoft's extensions",
+        body: "In the Microsoft Store, install HEIF Image Extensions (free) and HEVC Video Extensions ($0.99). The Photos app and File Explorer thumbnails then show HEIC files. That's enough for viewing on your own PC, but people you send them to still need the same add-ons.",
+      },
+      {
+        title: "Convert one photo in Photos or Paint",
+        body: "With the extensions installed, open the photo in Photos, choose the three dots, Save as, and pick JPG; or open it in Paint and use Save as, JPEG picture. Fine for a handful, slow for a camera roll.",
+      },
+      {
+        title: "Convert a whole folder with XnConvert",
+        body: "Install the free XnConvert, drag the folder into the Input tab (tick to include subfolders), set Output format to JPG at quality 90 or higher, and check the option to keep metadata is on (in the Output tab's settings) so the date taken survives. Send the output to a new folder so nothing is overwritten.",
+      },
+      {
+        title: "Or from the command line",
+        body: "With ImageMagick installed, run `magick mogrify -format jpg -quality 92 *.HEIC` in the folder. It writes a JPG beside each photo and copies the EXIF data. Run it again in each subfolder, and check that lowercase `.heic` files were caught too.",
+      },
+      {
+        title: "Stop it happening next time",
+        body: "On the iPhone, Settings, Camera, Formats, Most Compatible makes new photos JPG. Or keep HEIC on the phone and set Settings, Apps, Photos, Transfer to Mac or PC to Automatic, which converts to JPG when you copy photos to a computer over a cable.",
+      },
+    ],
+    limits: [
+      "The JPGs take more space: about 38 MB for 30 photos that were 17 MB as HEIC. That's normal for JPG at high quality, and the originals are kept, so the folder roughly triples. Ask Stella to move the HEIC files to the Trash afterwards if you want the space back.",
+      "The new files' “Date modified” is the day the photos were copied to the computer, not the day they were taken. Photos apps and Windows' “Date taken” column read the date inside the photo, which is kept; ask Stella to set the file dates too if you sort by Date modified.",
+      "The recording is on Linux, where the HEIC converter was already installed. On a Windows PC, Stella has to install a converter first, which hasn't been recorded yet.",
+      "Live Photos come as a photo plus a short video. Stella converts the photo and leaves the .MOV alone; the movement part doesn't become a JPG.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Does converting HEIC to JPG lose quality?",
+        a: "A little in theory, not visibly at quality 90 or above. In the recording, each JPG measured 46 to 51 dB PSNR against its HEIC, well beyond what eyes can see. The bigger loss is HEIC-only extras like depth data for Portrait mode.",
+      },
+      {
+        q: "Why won't Windows open my HEIC photos?",
+        a: "Windows needs two add-ons from the Microsoft Store to read them: HEIF Image Extensions and HEVC Video Extensions. Some PCs come with them; many don't, and the HEVC one costs $0.99.",
+      },
+      {
+        q: "Do online HEIC converters keep the date taken?",
+        a: "Some do and some strip all metadata, and you're uploading your photos to someone else's server. Check one converted file's Properties, Details tab before trusting a whole batch.",
+      },
+      {
+        q: "Can Stella also sort the photos into folders by date?",
+        a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
+      },
+    ],
+    related: ["photos-files/find-duplicate-photos", "photos-files/fix-google-takeout-photo-dates"],
+    lastChecked: "2026-11-12",
+    sources: [
+      { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
+      { label: "XnConvert", href: "https://www.xnview.com/en/xnconvert/" },
+      { label: "ImageMagick: mogrify", href: "https://imagemagick.org/script/mogrify.php" },
+    ],
+  },
+  {
+    slug: "find-duplicate-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "find duplicate photos",
+      "duplicate photo finder windows free",
+      "find duplicate photos including resized",
+      "remove duplicate photos from pc",
+      "find similar photos different size",
+    ],
+    title: "Find duplicate photos, including resized copies (free)",
+    description:
+      "Find duplicate photos on your PC, including resized WhatsApp copies and re-saved versions, and check before deleting: dupeGuru, Apple Photos, or Stella (stella.sh).",
+    h1: "Find duplicate photos, including resized copies",
+    short: "Find duplicate photos",
+    lede: "Every copy found, the originals kept, and nothing deleted until you say so.",
+    answer:
+      "Exact copies are easy to find by comparing file contents, but resized or re-saved copies (the ones WhatsApp and old phone backups make) need a tool that compares the pictures themselves, such as the free dupeGuru in Picture mode. Review every group before deleting. Stella (stella.sh) finds both kinds on your computer, shows each group side by side with the copy it would keep, and deletes nothing until you reply.",
+    stellaSteps: [
+      "Scans the folder you name, subfolders included, and tells you up front that nothing will be deleted",
+      "Finds exact copies by their file contents, then resized, re-saved and converted copies by comparing the pictures themselves",
+      "Looks at the borderline pairs: in the recording it checked two similar sunset shots and kept both as different photos, and flagged a file named “edited” for you to decide",
+      "Makes a review page with each group side by side, the copy it would keep (always the full-size original) and the space you'd get back",
+      "Waits for your answer, then moves the copies to the Trash, where Restore puts them back",
+    ],
+    prompt:
+      "Find duplicate photos in my Pictures folder, including resized copies, and show me before deleting anything.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-12",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "All 14 copies among 38 photos found, against an answer key written before the run: 6 exact copies, 5 resized ones down to 800 pixels wide, a lower-quality re-save, a half-size PNG and a copy with its camera data stripped. None of the 12 look-alike pairs (two shots of the same scene) was flagged. Nothing changed until the reply; then the 14 copies went to the Trash and all 24 originals were byte-for-byte unchanged.",
+      note: "The photos are generated images made for this run, with copies spread over Old phone backup and WhatsApp Images folders. The first wait is sped up 12×, scrolling the review 2× and the clean-up 6×.",
+      video: {
+        src: `${PROOFS}/photos-files/find-duplicate-photos/proof.mp4`,
+        cuts: webCuts("photos-files/find-duplicate-photos"),
+        poster: `${PROOFS}/photos-files/find-duplicate-photos/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 79.9,
+        realDuration: 103,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Pictures holds 38 photos: originals, exact copies and smaller WhatsApp-style copies." },
+        { at: 3, text: "The prompt: find duplicates, including resized copies, and show me before deleting anything." },
+        { at: 9, text: "Stella replies that nothing will be deleted and a side-by-side review comes first." },
+        { at: 11, text: "Comparing every photo, then checking the borderline pairs by eye, sped up 12×." },
+        { at: 21, text: "The answer: 13 duplicates (12.9 MB), one “edited” copy for you to decide, two similar sunset shots kept. Nothing touched yet; it asks before moving them to the Trash." },
+        { at: 39, text: "The review page, opened in Stella: each group side by side with the copy to keep." },
+        { at: 47, text: "Scrolling through the groups, sped up 2×." },
+        { at: 61, text: "The reply: delete the copies, keep the originals." },
+        { at: 65, text: "Moving the 14 copies to the Trash, sped up 6×." },
+        { at: 70, text: "Done: 24 originals left, 14 copies in the Trash, all restorable." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/photos-files/find-duplicate-photos/review.jpg`,
+          alt: "Stella's review page: 13 sure duplicates, 12.9 MB would be freed, 1 to check. The first group shows IMG_2105.jpg from Camera Roll marked Keep next to IMG_2105_edited.jpg from Old phone backup marked Remove?, with a note that no visible edit was found.",
+          width: 760,
+          height: 800,
+          caption: "The review page Stella made before deleting anything.",
+        },
+      ],
+    },
+    manualTitle: "Find them yourself",
+    manualSteps: [
+      {
+        title: "Back up first",
+        body: "Copy the folder to an external drive or cloud storage before deleting anything. Duplicate finders are good, not perfect, and a photo deleted outside the Recycle Bin or Trash is hard to get back.",
+      },
+      {
+        title: "Exact copies: any duplicate finder",
+        body: "Free tools like dupeGuru (Standard mode) or Czkawka compare file contents, so they only match byte-identical files: the `IMG_1234 (1).jpg` kind. They're fast and safe, but miss every resized or re-saved copy.",
+      },
+      {
+        title: "Resized copies: dupeGuru Picture mode",
+        body: "Switch dupeGuru to Picture mode, add your Pictures folder, and scan. It compares the images themselves, so a 1600-pixel WhatsApp copy matches its 12-megapixel original. Start with the default filter hardness; raise it if different shots get grouped together.",
+      },
+      {
+        title: "Review every group, then delete to the Trash",
+        body: "Sort each group by size and keep the biggest, which is usually the original. Look at any pair with different names or dates before you mark it. In dupeGuru, use Send Marked to Trash (it goes to the Recycle Bin on Windows) rather than a permanent delete, so a mistake can be undone.",
+      },
+      {
+        title: "Photos in Apple Photos? Use its Duplicates album",
+        body: "On a Mac or iPhone, open Photos, then the Duplicates album under Utilities, and use Merge. It combines each group into the best-quality version and keeps the details. It only covers photos inside the Photos library, not loose folders.",
+      },
+    ],
+    limits: [
+      "Stella asked first here because the prompt said “show me before deleting anything”. Keep that sentence in your prompt; the recording doesn't show what it does without it.",
+      "The review page was saved in your Pictures folder. Stella moved it to the Trash with the copies afterwards without mentioning it.",
+      "It compares photos, not videos. Duplicate videos need a separate ask, and comparing them takes longer.",
+      "Comparing pictures took a Python image library that Stella installed in its own folder first; on this Linux computer Python was already there. A Windows run hasn't been recorded yet.",
+      "To check borderline pairs, Stella looks at small previews, so a few thumbnails go to the AI model you use in Stella. The full photos stay on your computer.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Will it delete a different photo that just looks similar?",
+        a: "Not in the recording. Twelve pairs of near-identical shots (two boat photos, two sunsets) were planted as traps; none was flagged, and the closest pair was listed separately as “similar, not duplicates”.",
+      },
+      {
+        q: "Which copy does it keep?",
+        a: "The full-size original: the largest version with the camera data, in your camera or holiday folder. Copies from WhatsApp, backups or edits are the ones it proposes to remove, and you can swap any group before replying.",
+      },
+      {
+        q: "Can I get deleted duplicates back?",
+        a: "Yes, when they go to the Trash or Recycle Bin, which is what Stella did here: Restore puts each one back in its original folder. Emptying the Trash makes it permanent.",
+      },
+      {
+        q: "Are duplicate photo cleaner apps safe?",
+        a: "The open-source ones (dupeGuru, Czkawka) are. Be wary of “PC cleaner” apps that scan for free and then charge to delete. Whatever you use, review the groups and send deletions to the Trash.",
+      },
+    ],
+    related: ["photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder"],
+    lastChecked: "2026-11-12",
+    sources: [
+      { label: "dupeGuru", href: "https://dupeguru.voltaicideas.net" },
+      { label: "Apple: Merge duplicate photos and videos on iPhone", href: "https://support.apple.com/guide/iphone/merge-duplicate-photos-and-videos-iph1978d9c23/ios" },
+      { label: "Czkawka", href: "https://github.com/qarmin/czkawka" },
     ],
   },
 ];

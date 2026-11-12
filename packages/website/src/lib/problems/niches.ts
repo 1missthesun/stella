@@ -16,9 +16,9 @@ export const NICHES: Niche[] = [
     slug: "video",
     name: "Video editing",
     h1: "Video edits, done on your computer.",
-    title: "Video editing how-tos: subtitles, silences, exports",
+    title: "Video editing how-tos: subtitles, silences, file size",
     description:
-      "How to burn in subtitles and cut silences for TikTok, Reels and YouTube, with free tools or with Stella (stella.sh) working on your own files, with no watermark.",
+      "Burn in subtitles, cut silences and shrink a video for Discord, with free tools or with Stella (stella.sh) working on your own files, no watermark or upload.",
     intro:
       "Most quick video jobs (captions, trimming dead air, resizing for vertical) are a few commands in free tools. Each guide gives you those, and shows Stella (stella.sh) doing it on a real file.",
   },
@@ -36,9 +36,9 @@ export const NICHES: Niche[] = [
     slug: "photos-files",
     name: "Photos and files",
     h1: "Photos and files, put in order.",
-    title: "Photos and files: fix dates, rename, organise",
+    title: "Photos and files: convert, de-duplicate, fix dates, rename",
     description:
-      "Fix Google Takeout photo dates, rename PDFs by what's inside them and organise big folders of files, with free tools or with Stella (stella.sh) on your own computer.",
+      "Convert iPhone HEIC photos to JPG, find duplicate photos, fix Google Takeout dates and rename PDFs by content, with free tools or Stella (stella.sh) on your computer.",
     intro:
       "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
   },
@@ -48,7 +48,7 @@ export const NICHES: Niche[] = [
     h1: "PDFs and spreadsheets, sorted.",
     title: "PDF and Excel how-tos: compress, convert, combine",
     description:
-      "Shrink a PDF that's too large to email and get tables like bank statements into Excel, with free tools or with Stella (stella.sh) on your own files, no uploads.",
+      "Shrink a PDF that's too large to email, get bank statements into Excel and combine Excel files into one sheet, with free tools or Stella (stella.sh), no uploads.",
     intro:
       "PDFs are where office jobs get fiddly: files too big to send, numbers stuck in tables you can't copy. Each guide shows the free route first, then Stella (stella.sh) doing it with a real file.",
   },

@@ -403,6 +403,7 @@ export type PiToolActivity = {
 };
 
 export type PiAgentGuard = {
+  memoryEnabled?: boolean;
   fetch(request: Request): Promise<Response>;
   release(): Promise<void>;
 };
@@ -550,6 +551,7 @@ export class PiConversationRuntime {
   #binding: PiTurnBinding | undefined;
   #turnTools: { binding: PiTurnBinding; tools: Promise<readonly CloudCodeSourceAgentTool[]> } | undefined;
   #state: PiAgentState | undefined;
+  #memoryEnabled: boolean | undefined;
   readonly #threadAgents = new Map<string, ThreadAgent>();
   #modelKey: string | undefined;
   readonly #runs = new Map<string, ActiveRun[]>();
@@ -810,7 +812,7 @@ export class PiConversationRuntime {
       memory: async () => (await turn()).memory,
       rules: async () => {
         const state = await this.#agentState();
-        if (!state.memoryEnabled || !this.#options.rules) return undefined;
+        if (!(this.#memoryEnabled ?? state.memoryEnabled) || !this.#options.rules) return undefined;
         return (await this.#options.rules(state.authority)) ?? undefined;
       },
       skillsCatalog: async () => this.#binding?.sources.skillsCatalog ?? (await this.#agentState()).skillsCatalog,
@@ -1064,6 +1066,7 @@ export class PiConversationRuntime {
           await this.#gate(authority).release({ turnId }).catch(() => undefined);
           throw error;
         });
+        if (guard?.memoryEnabled !== undefined) this.#memoryEnabled = guard.memoryEnabled;
         const active: ActiveRun = {
           run,
           authority,
@@ -1794,6 +1797,7 @@ export class PiConversationRuntime {
     }
     await this.#setModels(state);
     (await this.#opening?.catch(() => undefined))?.refreshTools();
+    this.#memoryEnabled = binding.sources.memory.enabled;
     this.#binding = binding;
     this.#notify("root");
     return () => {

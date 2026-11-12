@@ -208,6 +208,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       const gateway = this.env.MODEL_GATEWAY;
       if (!gateway) throw new Error("Model gateway is not configured.");
       return {
+        memoryEnabled: memory.preference.memoryEnabled,
         fetch: async (request) => {
           const current = await currentGrant();
           const active = this.localOwnerModelGrants.begin(

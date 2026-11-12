@@ -90,6 +90,7 @@ import { MobileActivityNotificationsBridge } from "@/global/mobile/MobileActivit
 import { ScheduleZoneReporter } from "@/features/schedule/use-schedule-zone";
 import { useDictationToggleBridge } from "@/shell/root-chrome/use-dictation-toggle-bridge";
 import { CompanionBridge } from "@/shell/companion/use-companion-bridge";
+import { AppSourceNotifications } from "@/features/app-source/AppSourceNotifications";
 import { useDisplayPayloadRouting } from "@/shell/root-chrome/use-display-payload-routing";
 import { useLastLocationRestore } from "@/shell/root-chrome/use-last-location-restore";
 import { usePersistLastLocation } from "@/shell/root-chrome/use-persist-last-location";
@@ -683,6 +684,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
     <>
       {/* A leaf, so its timeline subscription never re-renders this chrome. */}
       <CompanionBridge conversationId={conversationId} />
+      <AppSourceNotifications conversationId={conversationId} />
       <ScheduleZoneReporter />
       {platformCapabilities.phoneAccess ? (
         <MobileActivityNotificationsBridge />

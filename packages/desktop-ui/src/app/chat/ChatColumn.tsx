@@ -9,7 +9,6 @@ import {
 } from "react";
 import { ChevronDown } from "@/ui/icons";
 import { ConnectorConnectCard } from "./ConnectorConnectCard";
-import { AppSourceOffers } from "@/features/app-source/AppSourceCards";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import { ComposerNotice } from "./ComposerNotice";
@@ -271,7 +270,6 @@ export const ChatColumn = memo(function ChatColumn({
     () => (
       <>
         {extraTail}
-        <AppSourceOffers conversationId={conversationId} />
         <UsageLimitChatCard conversationId={conversationId} />
         <SafeguardChatCard conversationId={conversationId} replying={replying} />
         <WaitingMessages />
@@ -403,10 +401,7 @@ export const ChatColumn = memo(function ChatColumn({
               inert={showHomeContent ? undefined : true}
             >
               {showHomeContent ? (
-                <>
-                  <AppSourceOffers conversationId={conversationId} placement="composer" />
-                  <ComposerNotice conversationId={conversationId} />
-                </>
+                <ComposerNotice conversationId={conversationId} />
               ) : null}
               {renderComposer("home", null)}
             </div>

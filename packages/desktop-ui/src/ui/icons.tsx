@@ -66,6 +66,7 @@ export const Maximize2 = createIcon("maximize-2", <path d="M14 4.5h5.5V10M19.25 
 export const Link = createIcon("link", <path d="M10.6 13.4a3.6 3.6 0 0 0 5.1 0l3.05-3.05a3.6 3.6 0 0 0-5.1-5.1l-1.15 1.15M13.4 10.6a3.6 3.6 0 0 0-5.1 0l-3.05 3.05a3.6 3.6 0 0 0 5.1 5.1l1.15-1.15"/>);
 export const Share = createIcon("share", <path d="M12 14.5V4.25M8.25 8 12 4.25 15.75 8M9 10.75H7.25a2.5 2.5 0 0 0-2.5 2.5v4.5a2.5 2.5 0 0 0 2.5 2.5h9.5a2.5 2.5 0 0 0 2.5-2.5v-4.5a2.5 2.5 0 0 0-2.5-2.5H15"/>);
 export const ExternalLink = createIcon("external-link", <path d="M19.75 13.25v3.5a3 3 0 0 1-3 3H7.25a3 3 0 0 1-3-3V7.25a3 3 0 0 1 3-3h3.5M14.5 4.25h5.25V9.5M19.25 4.75 12.5 11.5"/>);
+export const Bell = createIcon("bell", <><path d="M6.4 16.5c.55-.8.85-1.76.85-2.74V10.5a4.75 4.75 0 0 1 9.5 0v3.26c0 .98.3 1.94.85 2.74l.4.5H6Z"/><path d="M10.2 19.75a2 2 0 0 0 3.6 0"/></>);
 export const Mail = createIcon("mail", <><rect x="3.75" y="5.75" width="16.5" height="12.5" rx="2.75"/><path d="M4.6 7.4 12 12.9l7.4-5.5"/></>);
 export const RefreshCw = createIcon("refresh-cw", <path d="M20.25 12A8.25 8.25 0 1 1 12 3.75c2.83 0 5.33 1.42 6.82 3.58M19.5 3.5v4h-4"/>);
 export const RotateCcw = createIcon("rotate-ccw", <path d="M3.75 12A8.25 8.25 0 1 0 12 3.75c-2.83 0-5.33 1.42-6.82 3.58M4.5 3.5v4h4"/>);

@@ -1,8 +1,9 @@
 /* Top-right under the window header, clear of the composer and the cards
-   docked above it (usage limit, notices). */
+   docked above it (usage limit, notices), and below a notification's toast
+   under the bell. */
 [data-component="toast-region"] {
   position: fixed;
-  top: 48px;
+  top: calc(48px + var(--notification-toast-space, 0px));
   right: 16px;
   z-index: var(--layer-toast);
   display: flex;

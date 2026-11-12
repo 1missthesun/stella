@@ -8,6 +8,7 @@ const UNSAFE_OWNER_IDS = new Set(["__proto__", "prototype", "constructor"]);
 let ownerTabState = createRecord();
 let ownerLeaseState = createRecord();
 let ownerLeaseHighWater = createRecord();
+let tabViewedAt = createRecord();
 let stateLoaded = false;
 let ensureAgentWindowPromise = null;
 let ensureStellaGroupPromise = null;
@@ -18,6 +19,8 @@ const STELLA_GROUP_TITLE = "Stella";
 const STELLA_GROUP_COLOR = "pink";
 const DEFAULT_OWNER_ID = "default";
 const STALE_TAB_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+const VIEW_DWELL_MS = 2_000;
+const AGENT_ACTIVATION_WINDOW_MS = 1_500;
 
 async function updateGroupStyle(groupId) {
   try {
@@ -153,6 +156,17 @@ function sanitizeOwnerLeaseHighWater(raw) {
   return next;
 }
 
+function sanitizeTabViewedAt(raw) {
+  const next = createRecord();
+  if (!raw || typeof raw !== "object") return next;
+  for (const [tabId, viewedAt] of Object.entries(raw)) {
+    if (Number.isInteger(Number(tabId)) && Number.isFinite(viewedAt)) {
+      next[tabId] = viewedAt;
+    }
+  }
+  return next;
+}
+
 function getOwnerState(ownerId) {
   const normalized = normalizeOwnerId(ownerId);
   if (!Object.hasOwn(ownerTabState, normalized)) {
@@ -200,6 +214,7 @@ function resetAgentState({ clearLeases = false } = {}) {
   agentWindowId = null;
   stellaGroupId = null;
   ownerTabState = createRecord();
+  tabViewedAt = createRecord();
   if (clearLeases) {
     ownerLeaseState = createRecord();
     ownerLeaseHighWater = createRecord();
@@ -216,16 +231,19 @@ async function loadState() {
       "ownerTabState",
       "ownerLeaseState",
       "ownerLeaseHighWater",
+      "tabViewedAt",
     ]);
     if (data.agentWindowId != null) agentWindowId = data.agentWindowId;
     if (data.stellaGroupId != null) stellaGroupId = data.stellaGroupId;
     ownerTabState = sanitizeOwnerTabState(data.ownerTabState);
     ownerLeaseState = sanitizeOwnerLeaseState(data.ownerLeaseState);
     ownerLeaseHighWater = sanitizeOwnerLeaseHighWater(data.ownerLeaseHighWater);
+    tabViewedAt = sanitizeTabViewedAt(data.tabViewedAt);
   } catch {
     ownerTabState = createRecord();
     ownerLeaseState = createRecord();
     ownerLeaseHighWater = createRecord();
+    tabViewedAt = createRecord();
   }
   stateLoaded = true;
 }
@@ -238,6 +256,7 @@ async function saveState() {
       ownerTabState,
       ownerLeaseState,
       ownerLeaseHighWater,
+      tabViewedAt,
     });
   } catch {}
 }
@@ -358,6 +377,23 @@ export async function handleMarkTab(command) {
     success: true,
     data: { tabId, status: command.status },
   };
+}
+
+function forgetOwnedTab(ownerId, tabId) {
+  const state = ownerTabState[ownerId];
+  if (!state) return;
+  state.tabIds = state.tabIds.filter((candidate) => candidate !== tabId);
+  delete state.lastTouchedAtByTabId?.[String(tabId)];
+  delete tabViewedAt[String(tabId)];
+  if (state.activeTabId === tabId) {
+    state.activeTabId = state.tabIds[0] ?? null;
+  }
+  clearTabRefMap(ownerId, tabId);
+  clearCdpEvents(tabId);
+  if (state.tabIds.length === 0) {
+    deleteOwnerState(ownerId);
+    clearOwnerRefMaps(ownerId);
+  }
 }
 
 async function recoverExistingGroup({ windowId } = {}) {
@@ -608,13 +644,12 @@ async function createOwnerTab(ownerId, url = "about:blank") {
     throw new Error("Failed to create browser tab");
   }
 
-  await addToStellaGroup(tab.id);
-
   const state = getOwnerState(ownerId);
   state.tabIds.push(tab.id);
   state.activeTabId = tab.id;
   touchOwnerTab(ownerId, tab.id);
   await saveState();
+  await addToStellaGroup(tab.id);
   return tab;
 }
 
@@ -966,6 +1001,12 @@ export async function finalizeOwnerTabs(command, keep = command?.keep ?? []) {
         keptTabIds.add(tabId);
       }
     }
+    for (const tab of tabs) {
+      if (!keptTabIds.has(tab.id) && (await isTakenOver(ownerId, tab))) {
+        keepEntries.push({ tabId: tab.id, status: "handoff" });
+        keptTabIds.add(tab.id);
+      }
+    }
   }
   const releasedTabIds = keepEntries.map((entry) => entry.tabId);
   const releasedSet = new Set(releasedTabIds);
@@ -974,29 +1015,12 @@ export async function finalizeOwnerTabs(command, keep = command?.keep ?? []) {
     .filter((tabId) => !releasedSet.has(tabId));
 
   const failures = [];
-  const forgetOwnedTab = (tabId) => {
-    const state = ownerTabState[ownerId];
-    if (!state) return;
-
-    state.tabIds = state.tabIds.filter((candidate) => candidate !== tabId);
-    delete state.lastTouchedAtByTabId?.[String(tabId)];
-    if (state.activeTabId === tabId) {
-      state.activeTabId = state.tabIds[0] ?? null;
-    }
-
-    clearTabRefMap(ownerId, tabId);
-    clearCdpEvents(tabId);
-    if (state.tabIds.length === 0) {
-      deleteOwnerState(ownerId);
-      clearOwnerRefMaps(ownerId);
-    }
-  };
 
   for (const tabId of closedTabIds) {
     try {
       await assertCurrentOwnerLease(command);
       await chrome.tabs.remove(tabId);
-      forgetOwnedTab(tabId);
+      forgetOwnedTab(ownerId, tabId);
     } catch (error) {
       failures.push({ tabId, operation: "close", error });
     }
@@ -1006,7 +1030,7 @@ export async function finalizeOwnerTabs(command, keep = command?.keep ?? []) {
     try {
       await assertCurrentOwnerLease(command);
       await chrome.tabs.ungroup([tabId]);
-      forgetOwnedTab(tabId);
+      forgetOwnedTab(ownerId, tabId);
     } catch (error) {
       failures.push({ tabId, operation: "release", error });
     }
@@ -1039,6 +1063,102 @@ export async function finalizeOwnerTabs(command, keep = command?.keep ?? []) {
     releasedTabIds,
     kept: keepEntries,
   };
+}
+
+async function isTabInView(tabId, windowId) {
+  try {
+    const window = await chrome.windows.get(windowId);
+    if (!window.focused) return false;
+    const [active] = await chrome.tabs.query({ windowId, active: true });
+    return active?.id === tabId;
+  } catch {
+    return false;
+  }
+}
+
+function agentTouchedAt(ownerId, tabId) {
+  return Number(
+    ownerTabState[ownerId]?.lastTouchedAtByTabId?.[String(tabId)] ?? 0,
+  );
+}
+
+/**
+ * The person has taken a tab over when they looked at it after its task last
+ * used it, or are looking at it now. Such tabs are released, never closed.
+ */
+async function isTakenOver(ownerId, tab) {
+  const viewedAt = Number(tabViewedAt[String(tab.id)] ?? 0);
+  if (viewedAt > agentTouchedAt(ownerId, tab.id)) return true;
+  return tab.active === true && (await isTabInView(tab.id, tab.windowId));
+}
+
+async function noteTabInView(tabId, windowId) {
+  await loadState();
+  const ownerId = getTabOwnerId(tabId);
+  if (!ownerId) return;
+  const since = Date.now();
+  if (since - agentTouchedAt(ownerId, tabId) < AGENT_ACTIVATION_WINDOW_MS) {
+    return;
+  }
+  setTimeout(() => {
+    void (async () => {
+      const currentOwnerId = getTabOwnerId(tabId);
+      if (!currentOwnerId) return;
+      if (agentTouchedAt(currentOwnerId, tabId) > since) return;
+      if (!(await isTabInView(tabId, windowId))) return;
+      tabViewedAt[String(tabId)] = since;
+      await saveState();
+    })().catch(() => {});
+  }, VIEW_DWELL_MS);
+}
+
+chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
+  void noteTabInView(tabId, windowId).catch(() => {});
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  void chrome.tabs
+    .query({ windowId, active: true })
+    .then(([tab]) => (tab?.id ? noteTabInView(tab.id, windowId) : undefined))
+    .catch(() => {});
+});
+
+/**
+ * Tabs left in a Stella group that no task owns (Chrome restarted, or the
+ * extension was reloaded) are closed; one showing in its window is released.
+ */
+export async function closeStrayStellaTabs() {
+  await loadState();
+  await awaitPendingTabAdoptions();
+  const owned = getOwnedTabIds();
+  let groups = [];
+  try {
+    groups = await chrome.tabGroups.query({ title: STELLA_GROUP_TITLE });
+  } catch {}
+  const closing = [];
+  const releasing = [];
+  for (const group of groups) {
+    let tabs = [];
+    try {
+      tabs = await chrome.tabs.query({ groupId: group.id });
+    } catch {}
+    for (const tab of tabs) {
+      if (!Number.isInteger(tab.id) || owned.has(tab.id)) continue;
+      (tab.active ? releasing : closing).push(tab.id);
+    }
+  }
+  if (releasing.length > 0) {
+    try {
+      await chrome.tabs.ungroup(releasing);
+    } catch {}
+  }
+  if (closing.length > 0) {
+    try {
+      await chrome.tabs.remove(closing);
+    } catch {}
+  }
+  return { closed: closing.length, released: releasing.length };
 }
 
 export async function closeAgentWindow() {
@@ -1075,11 +1195,6 @@ export async function handleTabList(command) {
   const tabs = await getOwnerTabs(ownerId, { ensureWindow: true });
   const state = getOwnerState(ownerId);
   const activeIndex = tabs.findIndex((tab) => tab.id === state.activeTabId);
-
-  if (state.activeTabId != null) {
-    touchOwnerTab(ownerId, state.activeTabId);
-    await saveState();
-  }
 
   return {
     id: command.id,
@@ -1206,6 +1321,10 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     await loadState();
 
     let changed = false;
+    if (tabViewedAt[String(tabId)] !== undefined) {
+      delete tabViewedAt[String(tabId)];
+      changed = true;
+    }
     for (const [ownerId, state] of Object.entries(ownerTabState)) {
       if (!state.tabIds.includes(tabId)) continue;
 

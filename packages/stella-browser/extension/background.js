@@ -18,6 +18,7 @@ import {
   finalizeOwnerTabs,
   cleanupStaleGroups,
   cleanupStaleTabs,
+  closeStrayStellaTabs,
   getOwnerTabIds,
 } from "./commands/tabs.js";
 import {
@@ -390,9 +391,12 @@ cleanupStaleGroups();
 cleanupStaleTabs();
 
 chrome.alarms.create("stale-tabs", { periodInMinutes: 60 });
+chrome.alarms.create("stray-tabs", { delayInMinutes: 1, periodInMinutes: 60 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "stale-tabs") {
     void cleanupStaleTabs();
+  } else if (alarm.name === "stray-tabs") {
+    void closeStrayStellaTabs().catch(() => {});
   }
 });
 

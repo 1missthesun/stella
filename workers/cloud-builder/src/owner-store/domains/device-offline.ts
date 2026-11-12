@@ -60,6 +60,11 @@ const check = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   if (typeof deviceId !== "string" || !deviceId) return;
   const device = (await ctx.host.deviceDestinations()).find((candidate) => candidate.deviceId === deviceId);
   if (!device || device.online) return;
+  // The check was set by an earlier drop; this absence began later.
+  if (device.lastSeenAt && ctx.now - device.lastSeenAt < DEVICE_OFFLINE_NOTE_AFTER_MS) {
+    ctx.jobs.schedule(DEVICE_OFFLINE_JOB, device.lastSeenAt + DEVICE_OFFLINE_NOTE_AFTER_MS, { deviceId }, { id: jobId(deviceId) });
+    return;
+  }
   const threads = ctx.db.all<WaitingThread>(
     `SELECT thread_id, description, COALESCE(origin_conversation_id, conversation_id) AS conversation, owner_generation
        FROM agent_threads

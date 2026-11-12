@@ -499,10 +499,10 @@ const sortOne = async (
 
 // Surfacing -------------------------------------------------------------------
 
-const cardItem = (row: ItemRow, n: number, multiAccount: boolean): EmailCardItem => ({
+const cardItem = (row: ItemRow, n: number): EmailCardItem => ({
   n,
   itemId: row.item_id,
-  ...(multiAccount ? { account: row.account } : {}),
+  account: row.account,
   from: row.from_name,
   subject: row.subject,
   line: row.line ?? "",
@@ -512,9 +512,6 @@ const cardItem = (row: ItemRow, n: number, multiAccount: boolean): EmailCardItem
   threadId: row.thread_id,
   receivedAt: row.received_at,
 });
-
-const multipleAccounts = (db: OwnerDbReader): boolean =>
-  (db.one<{ count: number }>("SELECT COUNT(*) AS count FROM email_accounts")?.count ?? 0) > 1;
 
 const postCard = async (ctx: OwnerContext, snapshot: OwnerSnapshot, card: EmailCard): Promise<string | null> => {
   const conversationId = readMainConversationId(ctx.db);
@@ -602,7 +599,7 @@ const surfaceNow = async (
     type: EMAIL_CARD_TYPE,
     cardId,
     kind: rule ? "rule" : "urgent",
-    items: [cardItem(fresh, 1, multipleAccounts(ctx.db))],
+    items: [cardItem(fresh, 1)],
     ...(rule ? { ruleText: rule.text } : {}),
   };
   const conversationId = await postCard(ctx, snapshot, card);
@@ -701,6 +698,7 @@ const processMessage = async (
     return;
   }
   if (!isIncoming(mail.labelIds) || mail.fromAddress === account) return;
+  if (mail.receivedAt < ctx.now - 2 * DAY) return;
   const { verdict, sortedBy } = await sortOne(ctx, snapshot, zone, account, get, mail);
   let bucket = verdict.bucket;
   const rule = verdict.ruleId
@@ -807,6 +805,15 @@ const indexWatch = async (ctx: OwnerContext, address: string, on: boolean): Prom
   } else {
     await db.prepare("DELETE FROM gmail_watch WHERE address = ? AND owner_id = ?").bind(address, ctx.ownerId).run();
   }
+};
+
+/** Gmail's stop ends push for the whole inbox, so another owner watching the same address keeps it. */
+const watchedElsewhere = async (ctx: OwnerContext, address: string): Promise<boolean> => {
+  const row = await ctx.env.DB?.prepare("SELECT 1 AS present FROM gmail_watch WHERE address = ? AND owner_id != ? LIMIT 1")
+    .bind(address, ctx.ownerId)
+    .first<{ present: number }>()
+    .catch(() => null);
+  return Boolean(row);
 };
 
 const watchAccount = async (ctx: OwnerContext, account: LiveAccount): Promise<void> => {
@@ -1018,13 +1025,12 @@ const postSummary = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
       }
     });
   }
-  const multi = multipleAccounts(ctx.db);
   const cardId = `ec-${crypto.randomUUID()}`;
   const card: EmailCard = {
     type: EMAIL_CARD_TYPE,
     cardId,
     kind: "summary",
-    items: chosen.map((row, index) => cardItem(row, index + 1, multi)),
+    items: chosen.map((row, index) => cardItem(row, index + 1)),
     ...(noiseCount > 0 ? { noiseCount } : {}),
   };
   if (!(await postCard(ctx, snapshot, card))) return false;
@@ -1219,8 +1225,8 @@ const setEnabled = async (ctx: OwnerContext, args: { enabled: boolean }): Promis
   if (!args.enabled) {
     const accounts = await liveAccounts(ctx).catch(() => []);
     for (const account of accounts) {
-      await gmailStopWatch(await account.get()).catch(() => undefined);
       await indexWatch(ctx, account.email, false).catch(() => undefined);
+      if (!(await watchedElsewhere(ctx, account.email))) await gmailStopWatch(await account.get()).catch(() => undefined);
     }
     for (const job of [TICK_JOB, SUMMARY_JOB, NOTE_JOB]) ctx.jobs.cancel(job);
     ctx.db.run("UPDATE email_state SET enabled = 0, updated_at = ? WHERE id = 1", ctx.now);

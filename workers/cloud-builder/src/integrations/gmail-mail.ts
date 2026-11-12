@@ -64,7 +64,7 @@ export const gmailStopWatch = async (get: Fetcher): Promise<void> => {
 };
 
 export type GmailHistory = {
-  /** Messages added since the cursor, oldest first, with the labels they had then. */
+  /** Messages added (or moved into the inbox) since the cursor, oldest first, with the labels they had then. */
   added: { id: string; labelIds: string[] }[];
   historyId: string;
   /** The cursor was too old for Gmail to answer from; start again from now. */
@@ -78,13 +78,18 @@ export const gmailHistorySince = async (get: Fetcher, startHistoryId: string): P
   let historyId = startHistoryId;
   try {
     for (let page = 0; page < HISTORY_PAGES; page += 1) {
-      const params = new URLSearchParams({ startHistoryId, historyTypes: "messageAdded", maxResults: "200" });
+      const params = new URLSearchParams({ startHistoryId, maxResults: "200" });
+      params.append("historyTypes", "messageAdded");
+      params.append("historyTypes", "labelAdded");
       if (pageToken) params.set("pageToken", pageToken);
       const answer = (await get(`${GMAIL_API}/history?${params.toString()}`)) as JsonObject;
       historyId = str(answer.historyId) || historyId;
       for (const entry of Array.isArray(answer.history) ? answer.history : []) {
         if (!isRecord(entry)) continue;
-        for (const addedEntry of Array.isArray(entry.messagesAdded) ? entry.messagesAdded : []) {
+        const movedIn = (Array.isArray(entry.labelsAdded) ? entry.labelsAdded : []).filter(
+          (labelEntry) => isRecord(labelEntry) && Array.isArray(labelEntry.labelIds) && labelEntry.labelIds.includes("INBOX"),
+        );
+        for (const addedEntry of [...(Array.isArray(entry.messagesAdded) ? entry.messagesAdded : []), ...movedIn]) {
           const message = isRecord(addedEntry) && isRecord(addedEntry.message) ? addedEntry.message : null;
           const id = message ? str(message.id) : "";
           if (!id || seen.has(id)) continue;

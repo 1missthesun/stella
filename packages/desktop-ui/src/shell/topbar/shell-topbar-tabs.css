@@ -195,9 +195,15 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: var(--font-size-xs, 12px);
+  font-size: var(--font-size-sm, 12px);
   font-weight: var(--weight-medium, 500);
   cursor: default;
+}
+
+/* `.app button` resets every button's weight; the tabs say theirs again so
+   they keep the bar's one text style. */
+.topbar-tabs .topbar-tabs__target {
+  font-weight: var(--weight-medium, 500);
 }
 
 /* Room for the close button is always kept, so it never covers the title. */
@@ -406,7 +412,9 @@
   padding: 0;
   border: 0;
   border-radius: 7px;
-  background: transparent;
+  /* Opaque like the pinned Chat tab, so a strip that scrolls is cut cleanly
+     at the + rather than showing a tab's icon through it. */
+  background: var(--background);
   color: var(--text-muted, var(--text-weak));
   cursor: default;
   position: relative;
@@ -416,7 +424,7 @@
 
 .topbar-tabs__new:hover {
   color: var(--text-strong);
-  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  background: color-mix(in oklch, var(--foreground) 7%, var(--background));
 }
 
 .topbar-tabs__new:focus-visible {
@@ -426,5 +434,5 @@
 
 .topbar-tabs__new[data-active="true"] {
   color: var(--text-strong);
-  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+  background: color-mix(in oklch, var(--foreground) 9%, var(--background));
 }

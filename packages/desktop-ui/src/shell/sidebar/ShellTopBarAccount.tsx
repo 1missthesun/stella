@@ -75,7 +75,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
           aria-label={t("sidebar.signIn")}
         >
           <span className="shell-topbar-account-signin-icon">
-            <LogIn size={14} />
+            <LogIn size={17} strokeWidth={1.55} />
           </span>
           <span className="shell-topbar-account-signin-label">
             {t("sidebar.signIn")}

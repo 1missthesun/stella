@@ -186,11 +186,6 @@
   justify-content: center;
 }
 
-.shell-topbar-account-signin-icon svg {
-  width: 15px;
-  height: 15px;
-}
-
 .shell-topbar-account-settings {
   position: relative;
   display: inline-flex;

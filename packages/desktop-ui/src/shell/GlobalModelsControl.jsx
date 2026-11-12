@@ -75,7 +75,7 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
             onMouseEnter={preloadModelsPicker}
             onFocus={preloadModelsPicker}
           >
-            <SlidersHorizontal size={15} strokeWidth={1.75} />
+            <SlidersHorizontal size={18} strokeWidth={1.5} />
             Models
           </button>
         </PopoverTrigger>

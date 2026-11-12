@@ -158,10 +158,10 @@ export function ShellTopBarTabs() {
     if (tab.kind === "files" && tab.location) {
       const item = displayItems.find((d) => d.id === tab.location);
       const kind = item?.kind ?? tab.file?.kind;
-      if (kind) return <DisplayTabIcon kind={kind} size={14} />;
+      if (kind) return <DisplayTabIcon kind={kind} size={18} />;
     }
     const { Icon } = SIDEBAR_SECTION_META[tab.kind];
-    return <Icon size={14} strokeWidth={1.75} />;
+    return <Icon size={18} strokeWidth={1.5} />;
   };
 
   const emailTabOpen = tabs.some((tab) => tab.kind === "email");
@@ -187,7 +187,7 @@ export function ShellTopBarTabs() {
             title="Chat (⌘1)"
           >
             <span className="topbar-tabs__icon" aria-hidden="true">
-              <MessageSquare size={14} strokeWidth={1.75} />
+              <MessageSquare size={18} strokeWidth={1.5} />
             </span>
             <span className="topbar-tabs__label">Chat</span>
           </button>
@@ -249,7 +249,7 @@ export function ShellTopBarTabs() {
             title="Open (⌘T)"
           >
             <span className="topbar-tabs__icon" aria-hidden="true">
-              <Plus size={15} strokeWidth={1.9} />
+              <Plus size={18} strokeWidth={1.5} />
               {!emailTabOpen && emailUnseen > 0 ? <span className="topbar-tabs__dot" /> : null}
             </span>
           </button>

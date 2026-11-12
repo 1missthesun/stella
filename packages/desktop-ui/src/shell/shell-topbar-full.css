@@ -70,9 +70,10 @@ body[data-display-expanding="true"] .shell-topbar-full,
 }
 
 /* One rhythm for every control on the right, taken from the tabs: 26px tall,
-   7px corners, their text style, a 5% fill on hover and 9% while open; 4px
-   apart, icons of one optical size (15px; the narrower bell 16px), and
-   square when there is no word. */
+   7px corners, their 12px text, a 5% fill on hover and 9% while open; 4px
+   apart, and square when there is no word. Icons across the bar are drawn
+   the gear's size: the gear 15px (it fills its box), the others 18px at a
+   1.5 stroke, the narrower bell 19px, so every line renders ~1.1px. */
 .shell-topbar-full
   .shell-topbar-full__right
   :is(
@@ -88,8 +89,8 @@ body[data-display-expanding="true"] .shell-topbar-full,
   background: transparent;
   color: var(--text-muted, var(--text-weak));
   font-family: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-medium);
   line-height: 1;
 }
 

@@ -149,7 +149,7 @@ export function GlobalExecutionTargetControl() {
           aria-label={`Run on ${label}`}
           aria-pressed={open}
         >
-          <TriggerIcon size={15} strokeWidth={1.75} />
+          <TriggerIcon size={18} strokeWidth={1.5} />
         </button>
       </PopoverTrigger>
       <PopoverContent

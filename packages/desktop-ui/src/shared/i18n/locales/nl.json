@@ -3674,7 +3674,8 @@
       "waiting": "Sinds dit overzicht",
       "empty": "Nog geen overzicht. Als nieuwe e-mail belangrijk is, verschijnt die hier.",
       "show": "Tonen",
-      "hide": "Verbergen"
+      "hide": "Verbergen",
+      "draft": "Concept"
     }
   }
 }

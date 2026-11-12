@@ -3674,7 +3674,8 @@
       "waiting": "Ezen összefoglaló óta",
       "empty": "Még nincs összefoglaló. Ha egy új levél fontos, itt jelenik meg.",
       "show": "Mutasd",
-      "hide": "Elrejtés"
+      "hide": "Elrejtés",
+      "draft": "Piszkozat"
     }
   }
 }

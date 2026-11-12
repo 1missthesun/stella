@@ -138,6 +138,8 @@ export type EmailMessage = {
   receivedAt: number;
   text: string;
   attachments: string[];
+  /** An unsent draft (such as a reply Stella saved). */
+  draft?: boolean;
 };
 
 export type EmailThread = {

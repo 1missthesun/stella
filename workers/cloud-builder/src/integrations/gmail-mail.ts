@@ -280,6 +280,7 @@ export type GmailThreadMessage = {
   receivedAt: number;
   text: string;
   attachments: string[];
+  draft: boolean;
 };
 
 /** A whole thread for reading in place: each message's plain text without the quoted history. */
@@ -313,6 +314,7 @@ export const gmailReadThread = async (get: Fetcher, threadId: string): Promise<G
         .trim()
         .slice(0, THREAD_TEXT_CHARS),
       attachments: body.attachments.map((entry) => str(entry.filename)).filter(Boolean),
+      draft: Array.isArray(message.labelIds) && message.labelIds.map(String).includes("DRAFT"),
     };
   });
 };

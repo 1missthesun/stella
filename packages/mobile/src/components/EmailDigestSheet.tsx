@@ -46,6 +46,7 @@ export function EmailDigestSheet({ bottomReserve = 0 }: { bottomReserve?: number
               digestId={digestId}
               onSelect={selectEmailDigest}
               onAsked={closeEmailDigest}
+              composerContext={open}
             />
           ) : null}
         </ScrollView>

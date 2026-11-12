@@ -3674,7 +3674,8 @@
       "waiting": "Tämän koosteen jälkeen",
       "empty": "Ei vielä koostetta. Kun uusi sähköposti on tärkeä, se näkyy täällä.",
       "show": "Näytä",
-      "hide": "Piilota"
+      "hide": "Piilota",
+      "draft": "Luonnos"
     }
   }
 }

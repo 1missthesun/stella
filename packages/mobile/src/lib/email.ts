@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
-import type { EmailBucket, EmailFocusAction, EmailItem } from "@stella/contracts/backend/email";
+import type { EmailBucket, EmailFocusAction, EmailItem, EmailTargets } from "@stella/contracts/backend/email";
 import { authClient } from "./auth-client";
 import { getBackendClient, useBackendView } from "./backend";
 
@@ -156,23 +156,23 @@ const askQueue: string[] = [];
 const askListeners = new Set<() => void>();
 
 /**
- * Hands one email to Stella as a plain chat message. A hidden note written
- * just before it names the exact email, so Stella acts on the right one and
- * the answer comes back in the chat like any other. The chat screen sends it.
+ * Hands emails to Stella as a plain chat message. A hidden note written just
+ * before it names the exact emails, so Stella acts on the right ones and the
+ * answer comes back in the chat like any other. The chat screen sends it.
  */
 export const askStellaAboutEmail = async (
-  item: EmailItem,
+  targets: EmailTargets,
   action: EmailFocusAction,
   text: string,
 ): Promise<void> => {
   await getBackendClient()
-    .call("email.focus", { itemId: item.itemId, action })
+    .call("email.focus", { ...targets, action })
     .catch(() => undefined);
   askQueue.push(text);
   for (const listener of askListeners) listener();
 };
 
-/** The chat screen sends what digest actions asked, as soon as it can. */
+/** The chat screen sends what briefing actions asked, as soon as it can. */
 export const useEmailAsks = (send: ((text: string) => unknown) | undefined, ready: boolean): void => {
   const sendRef = useRef(send);
   sendRef.current = send;
@@ -192,5 +192,50 @@ export const useEmailAsks = (send: ((text: string) => unknown) | undefined, read
   }, [ready]);
 };
 
-export const archiveEmail = (itemId: string, archived: boolean) =>
-  getBackendClient().call("email.archive", { itemId, archived });
+export const archiveEmail = (targets: EmailTargets, archived: boolean) =>
+  getBackendClient().call("email.archive", { ...targets, archived });
+
+// What the open briefing puts in front of the composer ------------------------
+
+/**
+ * While the briefing sheet is open, what's on screen (the briefing, a picked
+ * point, a found email or an open thread) shows as a chip on the composer. A
+ * message typed with it goes to Stella through the same hidden note the
+ * briefing's actions use, so "tell them Thursday works" needs no more words.
+ */
+export type EmailComposerContext = { key: string; label: string; targets: EmailTargets };
+
+let composerContext: EmailComposerContext | null = null;
+let removedKey: string | null = null;
+const contextListeners = new Set<() => void>();
+const emitContext = () => {
+  for (const listener of contextListeners) listener();
+};
+
+export const setEmailComposerContext = (next: EmailComposerContext | null, picked = false): void => {
+  if (picked) removedKey = null;
+  const shown = next && next.key !== removedKey ? next : null;
+  if (shown?.key === composerContext?.key && shown?.label === composerContext?.label) return;
+  composerContext = shown;
+  emitContext();
+};
+
+/** The user took the chip off; it stays off until something else is picked. */
+export const removeEmailComposerContext = (): void => {
+  removedKey = composerContext?.key ?? null;
+  composerContext = null;
+  emitContext();
+};
+
+export const getEmailComposerContext = (): EmailComposerContext | null => composerContext;
+
+export const useEmailComposerContext = (): EmailComposerContext | null =>
+  useSyncExternalStore(
+    (listener) => {
+      contextListeners.add(listener);
+      return () => {
+        contextListeners.delete(listener);
+      };
+    },
+    () => composerContext,
+  );

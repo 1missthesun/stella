@@ -3708,7 +3708,8 @@
       "waiting": "De la acest rezumat",
       "empty": "Încă niciun rezumat. Când un e-mail nou contează, apare aici.",
       "show": "Arată",
-      "hide": "Ascunde"
+      "hide": "Ascunde",
+      "draft": "Ciornă"
     }
   }
 }

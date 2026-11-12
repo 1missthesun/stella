@@ -3708,7 +3708,8 @@
       "waiting": "Da questo riepilogo",
       "empty": "Ancora nessun riepilogo. Quando una nuova email conta, compare qui.",
       "show": "Mostra",
-      "hide": "Nascondi"
+      "hide": "Nascondi",
+      "draft": "Bozza"
     }
   }
 }

@@ -518,7 +518,7 @@ function SearchResults({
               return (
                 <Block
                   key={key}
-                  tone={mail.unread && mail.inInbox ? "needs_you" : "fyi"}
+                  tone="fyi"
                   title={`**${mail.from}** · ${mail.subject}`}
                   points={mail.snippet ? [mail.snippet] : []}
                   foot={[emailTime(locale, mail.receivedAt, now), mail.account].join(" · ")}
@@ -612,6 +612,7 @@ function Reader({
               <header className="email-reader__head">
                 <span className="email-reader__from" title={message.fromAddress}>
                   {message.from}
+                  {message.draft ? <span className="email-reader__draft">{t("email.brief.draft")}</span> : null}
                 </span>
                 <span className="email-brief__time">{emailTime(locale, message.receivedAt, now)}</span>
               </header>

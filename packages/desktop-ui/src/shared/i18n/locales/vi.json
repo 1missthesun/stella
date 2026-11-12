@@ -3638,7 +3638,8 @@
       "waiting": "Từ bản tóm tắt này",
       "empty": "Chưa có bản tóm tắt. Khi có email mới quan trọng, nó sẽ hiện ở đây.",
       "show": "Hiện",
-      "hide": "Ẩn"
+      "hide": "Ẩn",
+      "draft": "Bản nháp"
     }
   }
 }

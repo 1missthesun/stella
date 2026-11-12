@@ -1768,6 +1768,7 @@ const readThread = async (
       receivedAt: message.receivedAt,
       text: message.text,
       attachments: message.attachments,
+      ...(message.draft ? { draft: true } : {}),
     })),
   };
 };

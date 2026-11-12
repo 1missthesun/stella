@@ -3742,7 +3742,8 @@
       "waiting": "Od tego podsumowania",
       "empty": "Jeszcze brak podsumowania. Gdy nowa poczta będzie ważna, pojawi się tutaj.",
       "show": "Pokaż",
-      "hide": "Ukryj"
+      "hide": "Ukryj",
+      "draft": "Wersja robocza"
     }
   }
 }

@@ -3674,7 +3674,8 @@
       "waiting": "Bu özetten beri",
       "empty": "Henüz özet yok. Yeni bir e-posta önemli olduğunda burada görünür.",
       "show": "Göster",
-      "hide": "Gizle"
+      "hide": "Gizle",
+      "draft": "Taslak"
     }
   }
 }

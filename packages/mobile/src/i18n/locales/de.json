@@ -3674,7 +3674,8 @@
       "waiting": "Seit dieser Übersicht",
       "empty": "Noch keine Übersicht. Wenn neue E-Mails wichtig sind, erscheinen sie hier.",
       "show": "Anzeigen",
-      "hide": "Ausblenden"
+      "hide": "Ausblenden",
+      "draft": "Entwurf"
     }
   }
 }

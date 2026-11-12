@@ -3638,7 +3638,8 @@
       "waiting": "Sejak ringkasan ini",
       "empty": "Belum ada ringkasan. Saat email baru penting, akan muncul di sini.",
       "show": "Tampilkan",
-      "hide": "Sembunyikan"
+      "hide": "Sembunyikan",
+      "draft": "Draf"
     }
   }
 }

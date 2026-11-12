@@ -3742,7 +3742,8 @@
       "waiting": "Od tohoto přehledu",
       "empty": "Zatím žádný přehled. Když bude nová pošta důležitá, objeví se tady.",
       "show": "Zobrazit",
-      "hide": "Skrýt"
+      "hide": "Skrýt",
+      "draft": "Koncept"
     }
   }
 }

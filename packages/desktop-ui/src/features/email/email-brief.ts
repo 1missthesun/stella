@@ -7,40 +7,8 @@ import type {
   EmailThread,
 } from "@stella/contracts/backend/email";
 
-/** Plain text of the briefing's light markdown, for labels and Stella's context. */
-export const plainText = (markdown: string): string => markdown.replace(/\*\*|__/gu, "").replace(/(^|\s)\*(\S[^*]*)\*/gu, "$1$2");
-
-export const senderOf = (from: string): string =>
-  from.replace(/\s*<[^>]*>\s*$/u, "").replace(/^"|"$/gu, "") || from;
-
-/**
- * The briefing a digest shows. Summaries carry one the model wrote; urgent
- * and instruction rows, and older summaries, are laid out from their items.
- */
-export const briefOf = (digest: EmailDigest, words: { needsYou: string; worthKnowing: string; urgent: string; lead: string }): EmailBrief => {
-  if (digest.brief) return digest.brief;
-  const block = (item: EmailItem): EmailBriefBlock => ({
-    itemIds: [item.itemId],
-    title: `**${senderOf(item.from)}** · ${item.subject}`,
-    points: item.line ? [item.line] : [],
-  });
-  const urgent = digest.items.filter((item) => item.bucket === "urgent");
-  const needs = digest.items.filter((item) => item.bucket === "needs_you");
-  const rest = digest.items.filter((item) => item.bucket !== "urgent" && item.bucket !== "needs_you");
-  const first = digest.items[0];
-  const lead =
-    digest.kind !== "summary" && first
-      ? `**${senderOf(first.from)}**: ${first.line ?? first.subject}`
-      : words.lead;
-  return {
-    lead,
-    sections: [
-      ...(urgent.length ? [{ heading: words.urgent, tone: "urgent" as const, blocks: urgent.map(block) }] : []),
-      ...(needs.length ? [{ heading: words.needsYou, tone: "needs_you" as const, blocks: needs.map(block) }] : []),
-      ...(rest.length ? [{ heading: words.worthKnowing, tone: "fyi" as const, blocks: rest.map(block) }] : []),
-    ],
-  };
-};
+export { briefOf, plainText, senderOf } from "@stella/contracts/email-brief";
+import { plainText, senderOf } from "@stella/contracts/email-brief";
 
 const mailLine = (item: { from: string; fromAddress: string; subject: string; account: string; messageId: string; threadId: string }) =>
   `from ${item.from} <${item.fromAddress}>, subject "${item.subject}" (account ${item.account}, message_id ${item.messageId}, thread_id ${item.threadId})`;

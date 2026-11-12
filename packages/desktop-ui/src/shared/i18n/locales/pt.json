@@ -3708,7 +3708,8 @@
       "waiting": "Desde este resumo",
       "empty": "Ainda não há resumo. Quando um e-mail novo importar, ele aparece aqui.",
       "show": "Mostrar",
-      "hide": "Ocultar"
+      "hide": "Ocultar",
+      "draft": "Rascunho"
     }
   }
 }

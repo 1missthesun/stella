@@ -3708,7 +3708,8 @@
       "waiting": "Depuis cette synthèse",
       "empty": "Pas encore de synthèse. Quand un nouvel e-mail compte, il apparaît ici.",
       "show": "Afficher",
-      "hide": "Masquer"
+      "hide": "Masquer",
+      "draft": "Brouillon"
     }
   }
 }

@@ -3674,7 +3674,8 @@
       "waiting": "Siden denne oversikten",
       "empty": "Ingen oversikt ennå. Når ny e-post er viktig, vises den her.",
       "show": "Vis",
-      "hide": "Skjul"
+      "hide": "Skjul",
+      "draft": "Utkast"
     }
   }
 }

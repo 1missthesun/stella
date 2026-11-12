@@ -3674,7 +3674,8 @@
       "waiting": "Siden dette overblik",
       "empty": "Intet overblik endnu. Når ny mail betyder noget, vises den her.",
       "show": "Vis",
-      "hide": "Skjul"
+      "hide": "Skjul",
+      "draft": "Kladde"
     }
   }
 }

@@ -3674,7 +3674,8 @@
       "waiting": "Since this briefing",
       "empty": "No briefing yet. When new mail matters, it shows up here.",
       "show": "Show",
-      "hide": "Hide"
+      "hide": "Hide",
+      "draft": "Draft"
     }
   }
 }

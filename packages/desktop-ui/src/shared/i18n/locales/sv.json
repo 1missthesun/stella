@@ -3674,7 +3674,8 @@
       "waiting": "Sedan den här sammanfattningen",
       "empty": "Ingen sammanfattning än. När ny mejl spelar roll visas den här.",
       "show": "Visa",
-      "hide": "Dölj"
+      "hide": "Dölj",
+      "draft": "Utkast"
     }
   }
 }

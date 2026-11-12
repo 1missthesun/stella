@@ -68,7 +68,7 @@ import {
 } from "../../src/components/MainScreenSurface";
 import { ArtifactViewer } from "../../src/components/ArtifactViewer";
 import { EmailDigestSheet } from "../../src/components/EmailDigestSheet";
-import { useEmailAsks } from "../../src/lib/email";
+import { askStellaAboutEmail, getEmailComposerContext, useEmailAsks } from "../../src/lib/email";
 import { CloudBrowserInterventionCard } from "../../src/components/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "../../src/components/CloudConnectorConnectCard";
 import { UserAskCard } from "../../src/components/UserAskCard";
@@ -492,6 +492,21 @@ function ChatSurface(props: {
   const sendReady = thread.composerGate.kind === "ready";
   // What an email digest action asked goes out as an ordinary message here.
   useEmailAsks(thread.sendPrompt, sendReady);
+  // With the email briefing open, a typed message is about what it shows: the
+  // hidden note naming those emails goes first, then the message as typed.
+  const threadSend = thread.send;
+  const threadDraft = thread.draftStore;
+  const plainMessage = thread.attachments.length === 0 && thread.quotes.length === 0;
+  const sendWithEmailContext = useCallback(() => {
+    const context = getEmailComposerContext();
+    const text = threadDraft.get().trim();
+    if (context && text && plainMessage) {
+      threadDraft.set("");
+      void askStellaAboutEmail(context.targets, "tell", text);
+      return null;
+    }
+    return threadSend();
+  }, [plainMessage, threadDraft, threadSend]);
   const handoffSentRef = useRef(false);
   useEffect(() => {
     if (!handoffDraft?.send || handoffSentRef.current || !sendReady) return;
@@ -603,7 +618,7 @@ function ChatSurface(props: {
           draftStore: thread.draftStore,
           modelPicker: composerModelPicker,
           sendReady,
-          onSubmit: thread.send,
+          onSubmit: sendWithEmailContext,
           onStop: thread.stop,
           placeholder: t("mobile.chat.composerPlaceholder"),
           intervention: composerIntervention,

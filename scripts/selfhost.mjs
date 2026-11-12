@@ -36,7 +36,7 @@ Options
   --account-id <id>           Cloudflare account to use when your login has several
   --subdomain <name>          workers.dev subdomain to register if the account has none
   --openrouter-key-file <f>   Optional OpenRouter key (or env OPENROUTER_API_KEY): read-aloud,
-                              dictation and Stella's managed models
+                              dictation, Email sorting and summaries, and Stella's managed models
   --cloud-agent-hours <n>     Cloud agent container hours per month (default 40, 0 = no cap)
   --cloud-agent-concurrency <n>  Cloud containers running at once (default 3, 0 = no cap)
   --ref <git ref>             update: deploy this ref instead of origin/master

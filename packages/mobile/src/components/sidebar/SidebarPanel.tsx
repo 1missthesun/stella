@@ -20,6 +20,7 @@ import { Icon } from "../Icon";
 import { StellaMarkHero } from "../stella-mark/StellaMarkHero";
 import { DrawerScrollView } from "./DrawerStage";
 import { Rise, SIDEBAR_PLACES, SidebarPlaceRow } from "./SidebarNav";
+import { useEmailUnseenCount } from "../../lib/email";
 
 const AVATAR = 52;
 const BRAND_MARK = 40;
@@ -51,6 +52,7 @@ export function SidebarPanel({
   const name = user?.name?.trim() ?? "";
   const image = user?.image ?? null;
   const accountLabel = t("mobile.nav.account");
+  const emailUnseen = useEmailUnseenCount();
   const metas: Partial<Record<MainTabId, string>> = {
     files: fileCount > 0 ? String(fileCount) : undefined,
   };
@@ -96,6 +98,7 @@ export function SidebarPanel({
               place={place}
               active={activeTab === place}
               meta={metas[place]}
+              {...(place === "email" && emailUnseen > 0 ? { badge: emailUnseen } : {})}
               onSelect={onSelectTab}
             />
           </Rise>

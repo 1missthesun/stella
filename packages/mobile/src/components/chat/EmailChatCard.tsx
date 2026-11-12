@@ -1,7 +1,8 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { EMAIL_REASON_WORDS, type EmailCard, type EmailCardItem } from "@stella/contracts/email-card";
 import { Text } from "../Text";
+import { Icon } from "../Icon";
 import { useT, useTPlural } from "../../i18n";
 import {
   chooseAction,
@@ -16,9 +17,7 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { fadeHex } from "../../theme/oklch";
-import { ScheduleCardShell, makeChatCardButtonStyles } from "./ScheduleCardShell";
 
-const COLLAPSED_ROWS = 3;
 
 type Settled = "moved" | "dismissed";
 
@@ -35,90 +34,117 @@ function useItemSettled(itemId: string): [Settled | null, (next: Settled) => voi
   return [local ?? fromFeed, setLocal];
 }
 
+/**
+ * Email in the chat is one quiet line: urgent mail says who and the point, a
+ * summary says how many need you; the summary's numbered list opens in place.
+ */
+function Line({
+  colors,
+  label,
+  from,
+  text,
+  trailing,
+  chevron,
+  expanded,
+  onPress,
+  onLongPress,
+  accessibilityLabel,
+  children,
+}: {
+  colors: Colors;
+  label?: string;
+  from?: string;
+  text: string;
+  trailing?: ReactNode;
+  chevron?: boolean;
+  expanded?: boolean;
+  onPress?: () => void;
+  onLongPress?: () => void;
+  accessibilityLabel: string;
+  children?: ReactNode;
+}) {
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={[styles.lineWrap, expanded && styles.lineWrapOpen]} testID="email-card">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={chevron ? { expanded: Boolean(expanded) } : undefined}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={({ pressed }) => [styles.lineBar, pressed && styles.rowPressed]}
+      >
+        <Icon name="mail" size={14} color={colors.textMuted} />
+        <Text style={styles.lineText} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+          {label ? <Text style={styles.lineLabel}>{label} </Text> : null}
+          {from ? <Text style={styles.lineFrom}>{from} </Text> : null}
+          {text}
+        </Text>
+        {chevron ? <Icon name={expanded ? "chevron-down" : "chevron-right"} size={14} color={colors.textMuted} /> : null}
+        {trailing}
+      </Pressable>
+      {expanded ? children : null}
+    </View>
+  );
+}
+
 function UrgentCard({ item, colors }: { item: EmailCardItem; colors: Colors }) {
   const t = useT();
-  const styles = useMemo(() => ({ ...makeChatCardButtonStyles(colors), ...makeStyles(colors) }), [colors]);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { showAccounts } = useEmailFeedItems();
   const [settled, settle] = useItemSettled(item.itemId);
-  const [busy, setBusy] = useState(false);
-  const status = [item.line || EMAIL_REASON_WORDS[item.reason], showAccounts ? item.account : null]
+  const point = [item.line || EMAIL_REASON_WORDS[item.reason], showAccounts ? item.account : null]
     .filter(Boolean)
     .join(" · ");
-  const headline = `${senderName(item.from)} · ${item.subject}`;
-
-  const notUrgent = () => {
-    tapMedium();
-    setBusy(true);
-    void correctEmail(item.itemId, "needs_you")
-      .then(() => settle("moved"))
-      .catch(() => Alert.alert(t("email.failed")))
-      .finally(() => setBusy(false));
+  const open = () => {
+    tapLight();
+    openGmailThread(item.threadId, item.account);
   };
-
-  // Urgent mail must be readable at a glance: the sender, subject and line wrap, and the two
-  // buttons sit on their own row under them instead of squeezing the text to a few words.
-  const actions = settled ? (
-    <Text style={styles.settled} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-      {settled === "moved" ? t("email.card.movedToSummary") : t("email.card.wontShow")}
-    </Text>
-  ) : (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        hitSlop={10}
-        disabled={busy}
-        onPress={notUrgent}
-        style={({ pressed }) => [styles.button, (pressed || busy) && styles.dimmed]}
-      >
-        <Text style={styles.label} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {t("email.notUrgent")}
-        </Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        hitSlop={10}
-        onPress={() => {
-          tapLight();
-          openGmailThread(item.threadId, item.account);
-        }}
-        style={({ pressed }) => [styles.button, styles.primary, pressed && styles.dimmed]}
-      >
-        <Text style={[styles.label, styles.primaryLabel]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {t("common.open")}
-        </Text>
-      </Pressable>
-    </>
-  );
-
+  const more = () => {
+    if (settled) return;
+    tapMedium();
+    chooseAction(
+      senderName(item.from),
+      [{ label: t("email.section.openInGmail") }, { label: t("email.notUrgent") }],
+      t("common.cancel"),
+      (index) => {
+        if (index === 0) open();
+        else
+          void correctEmail(item.itemId, "needs_you")
+            .then(() => settle("moved"))
+            .catch(() => Alert.alert(t("email.failed")));
+      },
+    );
+  };
   return (
-    <ScheduleCardShell
+    <Line
       colors={colors}
-      icon="mail"
-      headline={headline}
-      status={settled ? "" : status}
-      actions={actions}
-      wrap
-      testID="email-card"
-      accessibilityLabel={`${headline}, ${status}`}
+      label={settled ? undefined : t("email.section.urgent")}
+      from={senderName(item.from)}
+      text={settled ? (settled === "moved" ? t("email.card.movedToSummary") : t("email.card.wontShow")) : point}
+      accessibilityLabel={`${senderName(item.from)}, ${item.subject}, ${point}`}
+      onPress={open}
+      onLongPress={more}
+      trailing={
+        settled ? null : (
+          <Text style={styles.lineOpen} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            {t("common.open")}
+          </Text>
+        )
+      }
     />
   );
 }
 
 function RuleCard({ card, item, colors }: { card: EmailCard; item: EmailCardItem; colors: Colors }) {
-  const t = useT();
   const { showAccounts } = useEmailFeedItems();
-  const status = [senderName(item.from), item.line || item.subject, showAccounts ? item.account : null]
-    .filter(Boolean)
-    .join(" · ");
+  const what = [item.line || item.subject, showAccounts ? item.account : null].filter(Boolean).join(" · ");
   return (
-    <ScheduleCardShell
+    <Line
       colors={colors}
-      icon="mail"
-      headline={card.ruleText ?? senderName(item.from)}
-      status={status}
-      testID="email-card"
-      accessibilityLabel={`${card.ruleText ?? ""}, ${status}`}
-      accessibilityHint={t("email.section.openInGmail")}
+      from={senderName(item.from)}
+      text={what}
+      accessibilityLabel={`${card.ruleText ?? ""}, ${senderName(item.from)}, ${what}`}
       onPress={() => {
         tapLight();
         openGmailThread(item.threadId, item.account);
@@ -195,49 +221,37 @@ function SummaryRow({
 }
 
 function SummaryCard({ card, colors }: { card: EmailCard; colors: Colors }) {
-  const t = useT();
   const tPlural = useTPlural();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { showAccounts } = useEmailFeedItems();
   const [expanded, setExpanded] = useState(false);
   const needYou = card.items.filter((item) => item.bucket === "urgent" || item.bucket === "needs_you").length;
   const worth = card.items.length - needYou;
-  const headline = [
+  const text = [
     needYou > 0 ? tPlural("email.card.needYou", needYou) : null,
     worth > 0 ? tPlural("email.card.worthKnowing", worth) : null,
+    card.noiseCount ? tPlural("email.card.skipped", card.noiseCount) : null,
   ]
     .filter(Boolean)
     .join(" · ");
-  const shown = expanded ? card.items : card.items.slice(0, COLLAPSED_ROWS);
   return (
-    <ScheduleCardShell
+    <Line
       colors={colors}
-      icon="mail"
-      headline={headline}
-      status={card.noiseCount ? tPlural("email.card.skipped", card.noiseCount) : ""}
-      testID="email-card"
+      text={text}
+      chevron
+      expanded={expanded}
+      accessibilityLabel={text}
+      onPress={() => {
+        tapLight();
+        setExpanded((open) => !open);
+      }}
     >
       <View style={styles.rows}>
-        {shown.map((item) => (
+        {card.items.map((item) => (
           <SummaryRow key={item.itemId} item={item} showAccount={showAccounts} styles={styles} />
         ))}
       </View>
-      {card.items.length > COLLAPSED_ROWS ? (
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => {
-            tapLight();
-            setExpanded((open) => !open);
-          }}
-          style={styles.more}
-        >
-          <Text style={styles.moreLabel} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {expanded ? t("email.card.showLess") : t("email.card.showAll", { count: card.items.length })}
-          </Text>
-        </Pressable>
-      ) : null}
-    </ScheduleCardShell>
+    </Line>
   );
 }
 
@@ -257,7 +271,40 @@ const makeStyles = (colors: Colors) =>
       fontFamily: fonts.sans.medium,
       fontSize: 14,
     },
-    rows: { marginTop: 6 },
+    lineWrap: {
+      alignSelf: "flex-start",
+      borderCurve: "continuous",
+      borderRadius: 14,
+      maxWidth: "100%",
+    },
+    lineWrapOpen: {
+      alignSelf: "stretch",
+      backgroundColor: colors.assistantBubbleFillTop,
+      paddingBottom: 6,
+      paddingHorizontal: 12,
+    },
+    lineBar: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 7,
+      paddingVertical: 6,
+    },
+    lineText: {
+      color: colors.textMuted,
+      flexShrink: 1,
+      fontFamily: fonts.sans.regular,
+      fontSize: 14,
+      letterSpacing: -0.15,
+    },
+    lineLabel: { color: colors.accent, fontFamily: fonts.sans.medium },
+    lineFrom: { color: colors.assistantBubbleText, fontFamily: fonts.sans.medium },
+    lineOpen: {
+      color: colors.accent,
+      flexShrink: 0,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14,
+    },
+    rows: { marginTop: 0 },
     row: {
       borderTopColor: fadeHex(colors.text, 0.1),
       borderTopWidth: StyleSheet.hairlineWidth,

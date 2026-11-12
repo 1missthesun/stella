@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { markEmailSeen } from "@/features/email/email-unseen";
 import type { EmailBucket, EmailFeed, EmailItem, EmailRule } from "@stella/contracts/backend/email";
 import { useNow } from "@/features/app-source/AppSourceCards";
 import {
@@ -372,6 +373,10 @@ export function EmailSection({ active }: { active: boolean }) {
 
   const value = feed.value;
   const hasAccounts = (value?.status.gmailConnected?.length ?? 0) > 0;
+  // Looking at the section clears the unseen badge, including mail that arrives while it is open.
+  useEffect(() => {
+    if (active && value) markEmailSeen();
+  }, [active, value]);
   useEffect(() => {
     if (hasAccounts) setConnecting(false);
   }, [hasAccounts]);

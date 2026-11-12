@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
 import type { EmailBucket, EmailItem } from "@stella/contracts/backend/email";
 import { authClient } from "./auth-client";
@@ -77,3 +78,51 @@ export const chooseAction = (
     { text: cancelLabel, style: "cancel" as const },
   ]);
 };
+
+// When the Email page was last looked at on this phone. Sorted mail that arrived
+// after it is "unseen" and badges the Email entry; the chat only ever shows the
+// newest email line.
+const SEEN_KEY = "stella.email.seenAt";
+let seenAt = Number.POSITIVE_INFINITY;
+const seenListeners = new Set<() => void>();
+const setSeen = (at: number) => {
+  seenAt = at;
+  for (const listener of seenListeners) listener();
+};
+void AsyncStorage.getItem(SEEN_KEY)
+  .then((raw) => {
+    const stored = Number(raw);
+    if (Number.isFinite(stored) && stored > 0) setSeen(stored);
+    else {
+      // First run on this phone: count from now, not from the whole week.
+      const now = Date.now();
+      setSeen(now);
+      void AsyncStorage.setItem(SEEN_KEY, String(now));
+    }
+  })
+  .catch(() => setSeen(Date.now()));
+
+export const markEmailSeen = (): void => {
+  const now = Date.now();
+  setSeen(now);
+  void AsyncStorage.setItem(SEEN_KEY, String(now)).catch(() => undefined);
+};
+
+const subscribeSeen = (listener: () => void) => {
+  seenListeners.add(listener);
+  return () => seenListeners.delete(listener);
+};
+
+/** Sorted mail worth showing that arrived since the Email page was last open. */
+export function useEmailUnseenCount(): number {
+  const { items } = useEmailFeedItems();
+  const seen = useSyncExternalStore(subscribeSeen, () => seenAt);
+  return useMemo(() => {
+    if (!items) return 0;
+    let count = 0;
+    for (const item of items.values()) {
+      if (item.bucket !== "noise" && item.state !== "dismissed" && item.receivedAt > seen) count += 1;
+    }
+    return count;
+  }, [items, seen]);
+}

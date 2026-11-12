@@ -28,6 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { NewTabMenu } from "./NewTabMenu";
 import { useTabReorder } from "./use-tab-reorder";
 import { useOpenTabNotch, useTabStripReach } from "./open-tab-notch";
+import { useEmailUnseenCount } from "@/features/email/email-unseen";
 import "./shell-topbar-tabs.css";
 
 /**
@@ -56,6 +57,7 @@ export function ShellTopBarTabs() {
   useTabStripReach(stripRef);
   const chatActive = !panelOpen;
   const [menuOpen, setMenuOpenState] = useState(false);
+  const emailUnseen = useEmailUnseenCount();
   const setMenuOpen = (next: boolean) => {
     setMenuOpenState(next);
     if (!next) displaySearchStore.close();
@@ -162,6 +164,8 @@ export function ShellTopBarTabs() {
     return <Icon size={14} strokeWidth={1.75} />;
   };
 
+  const emailTabOpen = tabs.some((tab) => tab.kind === "email");
+
   return (
     <div className="topbar-tabs">
       <div
@@ -216,7 +220,9 @@ export function ShellTopBarTabs() {
               >
                 <span className="topbar-tabs__icon" aria-hidden="true">
                   {renderIcon(tab)}
-                  {tab.unread ? <span className="topbar-tabs__dot" /> : null}
+                  {tab.unread || (tab.kind === "email" && !active && emailUnseen > 0) ? (
+                    <span className="topbar-tabs__dot" />
+                  ) : null}
                 </span>
                 <span className="topbar-tabs__label">{title}</span>
               </button>
@@ -242,7 +248,10 @@ export function ShellTopBarTabs() {
             aria-label="Open"
             title="Open (⌘T)"
           >
-            <Plus size={15} strokeWidth={1.9} aria-hidden="true" />
+            <span className="topbar-tabs__icon" aria-hidden="true">
+              <Plus size={15} strokeWidth={1.9} />
+              {!emailTabOpen && emailUnseen > 0 ? <span className="topbar-tabs__dot" /> : null}
+            </span>
           </button>
         </PopoverTrigger>
         <PopoverContent

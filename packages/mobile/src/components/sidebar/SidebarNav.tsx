@@ -73,11 +73,14 @@ export function SidebarPlaceRow({
   place,
   active,
   meta,
+  badge,
   onSelect,
 }: {
   place: SidebarPlace;
   active: boolean;
   meta?: string;
+  /** New items since the place was last opened (Email). */
+  badge?: number;
   onSelect: (next: MainTabId) => void;
 }) {
   const colors = useColors();
@@ -88,7 +91,7 @@ export function SidebarPlaceRow({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={meta ? `${label}, ${meta}` : label}
+      accessibilityLabel={[label, badge ? String(badge) : null, meta].filter(Boolean).join(", ")}
       onPress={() => onSelect(place)}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       testID={`mobile-sidebar-nav-${place}`}
@@ -101,6 +104,13 @@ export function SidebarPlaceRow({
         >
           {label}
         </Text>
+        {badge ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+              {badge > 99 ? "99+" : badge}
+            </Text>
+          </View>
+        ) : null}
         {active ? <View style={styles.current} /> : null}
       </View>
       {meta ? (
@@ -126,6 +136,20 @@ const makeStyles = (colors: Colors) =>
     pressed: {
       opacity: 0.55,
       transform: [{ scale: 0.98 }],
+    },
+    badge: {
+      alignItems: "center",
+      backgroundColor: colors.accent,
+      borderRadius: 999,
+      height: 20,
+      justifyContent: "center",
+      minWidth: 20,
+      paddingHorizontal: 6,
+    },
+    badgeText: {
+      color: colors.accentForeground,
+      fontFamily: fonts.sans.bold,
+      fontSize: 12,
     },
     labelLine: {
       alignItems: "center",

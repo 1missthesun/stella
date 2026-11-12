@@ -22,6 +22,7 @@ import {
   emailTime,
   openGmailThread,
   senderName,
+  markEmailSeen,
 } from "../lib/email";
 import { tapLight, tapMedium } from "../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
@@ -485,6 +486,11 @@ export function EmailPage() {
   useEffect(() => {
     if (connected) setWaiting(false);
   }, [connected]);
+
+  // Looking at the page clears the unseen badge, including mail that arrives while it is open.
+  useEffect(() => {
+    if (value) markEmailSeen();
+  }, [value]);
 
   const connect = useCallback(async () => {
     setConnectFailed(false);

@@ -1,6 +1,6 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
-import { EMAIL_CARD_TYPE } from "@stella/contracts/email-card";
+import { EMAIL_CARD_TYPE, foldedEmailCards } from "@stella/contracts/email-card";
 import {
   parseSafeguardCard,
   safeguardCardLabel,
@@ -684,12 +684,23 @@ export const projectCloudConversationMessages = (args: {
   const dropped = displayed === index.turns ? undefined : index.turns[0];
   const turns: ProjectedTurn[] = displayed.map((turn) =>
     projectionOf(turn, index, args.conversationId, reactions));
-  return projectMobileLifecycle(turns, index, args.conversationId ?? "", (turnId) => {
+  const messages = projectMobileLifecycle(turns, index, args.conversationId ?? "", (turnId) => {
     const turn = index.turn(turnId);
     return turn && turn !== dropped
       ? (turn.memo as { projection?: TurnProjection }).projection
       : undefined;
   });
+  // Email cards never stack up: older ones fold away (see foldedEmailCards).
+  const folded = foldedEmailCards(
+    messages.map((message) =>
+      message.emailCard
+        ? { kind: "email" as const, cardId: message.emailCard.cardId }
+        : { kind: message.role === "user" ? ("user" as const) : ("other" as const) },
+    ),
+  );
+  return folded.size > 0
+    ? messages.filter((message) => !(message.emailCard && folded.has(message.emailCard.cardId)))
+    : messages;
 };
 
 type TurnPhases = { last?: string; firstAt: number; failed: boolean };

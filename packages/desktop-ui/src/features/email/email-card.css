@@ -149,3 +149,130 @@
   font-size: var(--font-size-base, 13px);
   line-height: 18px;
 }
+
+/* One quiet line per email moment in the chat (see EmailChatCard). */
+.email-line {
+  width: fit-content;
+  max-width: 85%;
+  min-width: 0;
+  border-radius: var(--radius-2xl, 14px);
+  color: var(--text-weak);
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+}
+
+.email-line[data-expanded] {
+  width: min(100%, 560px);
+  padding-bottom: 6px;
+  background: var(--chat-assistant-bubble-fill);
+}
+
+.email-line__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--chat-assistant-bubble-fill) 70%, transparent);
+}
+
+.email-line[data-expanded] .email-line__bar {
+  background: none;
+}
+
+.email-line__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+}
+
+button.email-line__main {
+  cursor: pointer;
+}
+
+button.email-line__main:hover .email-line__text {
+  color: var(--chat-assistant-bubble-text);
+}
+
+button.email-line__main:focus-visible {
+  outline: none;
+  border-radius: 6px;
+  box-shadow: var(--focus-ring);
+}
+
+.email-line__icon {
+  flex: none;
+}
+
+.email-line__label {
+  flex: none;
+  color: var(--interactive);
+  font-weight: var(--weight-medium, 500);
+}
+
+.email-line__from {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  color: var(--chat-assistant-bubble-text);
+  font-weight: var(--weight-medium, 500);
+  text-overflow: ellipsis;
+}
+
+.email-line__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.email-line__muted {
+  color: var(--text-weak);
+}
+
+.email-line[data-kind="summary"] .email-line__text {
+  color: var(--chat-assistant-bubble-text);
+}
+
+.email-line__chevron {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.email-line[data-expanded] .email-line__chevron {
+  transform: rotate(180deg);
+}
+
+.email-line__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.email-line__hover-action {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.email-line:hover .email-line__hover-action,
+.email-line__hover-action:focus-visible {
+  opacity: 1;
+}
+
+.email-line__settled {
+  color: var(--text-weak);
+}
+
+.email-line__rows {
+  margin: 0 12px 0 30px;
+}

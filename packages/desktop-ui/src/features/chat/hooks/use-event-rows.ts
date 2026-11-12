@@ -21,7 +21,7 @@ import { isOrchestratorReservedBuiltinAgentId } from "@stella/contracts/agent-ru
 import { isOfficePreviewRef } from "@stella/contracts/office-preview";
 import { parseReminderMark } from "@stella/contracts/reminders";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
-import { parseEmailCard } from "@stella/contracts/email-card";
+import { foldedEmailCards, parseEmailCard } from "@stella/contracts/email-card";
 import {
   collectTurnSourceDiffPayloads,
   deriveTurnInlineImagePayloads,
@@ -1030,8 +1030,23 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         ? computed.filter((_, index) => !droppedRowIndices.has(index))
         : computed;
 
+    // Email cards never stack up: older ones fold away (see foldedEmailCards).
+    const emailFolded = foldedEmailCards(
+      deduped.map((row) =>
+        row.kind === "assistant" && row.emailCard
+          ? { kind: "email" as const, cardId: row.emailCard.cardId }
+          : { kind: row.kind === "user" ? ("user" as const) : ("other" as const) },
+      ),
+    );
+    const visible =
+      emailFolded.size > 0
+        ? deduped.filter(
+            (row) => !(row.kind === "assistant" && row.emailCard && emailFolded.has(row.emailCard.cardId)),
+          )
+        : deduped;
+
     return withReplyContext(
-      coalesceVoiceSessionRows(coalesceInlineImageRows(deduped)),
+      coalesceVoiceSessionRows(coalesceInlineImageRows(visible)),
       { agentTitles, agentParents },
     );
   }, [agentParents, agentTitles, developerResourcePreviewsEnabled, displayMessages, lifecycleIndex]);

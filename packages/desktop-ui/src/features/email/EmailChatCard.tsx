@@ -1,7 +1,7 @@
 import { memo, useState, type ReactNode } from "react";
 import { EMAIL_REASON_WORDS, type EmailCard, type EmailCardItem } from "@stella/contracts/email-card";
 import { useI18n } from "@/shared/i18n";
-import { Mail } from "@/ui/icons";
+import { ChevronDown, Mail } from "@/ui/icons";
 import {
   correctEmail,
   dismissEmail,
@@ -11,8 +11,6 @@ import {
 } from "./email-items";
 import "@/features/schedule/schedule-card.css";
 import "./email-card.css";
-
-const COLLAPSED_ROWS = 3;
 
 type Settled = "moved" | "dismissed";
 
@@ -43,40 +41,53 @@ function useRun() {
   return { busy, failed, run };
 }
 
-function Shell({
+/**
+ * Email in the chat is one quiet line: urgent mail says who and the point, a
+ * summary says how many need you; the summary's numbered list opens in place.
+ */
+function Line({
   kind,
-  headline,
-  status,
-  trailing,
+  label,
+  from,
+  text,
+  title,
+  actions,
+  expanded,
+  onToggle,
   children,
 }: {
   kind: EmailCard["kind"];
-  headline: string;
-  status: ReactNode;
-  trailing?: ReactNode;
+  label?: string;
+  from?: string;
+  text: ReactNode;
+  title?: string;
+  actions?: ReactNode;
+  expanded?: boolean;
+  onToggle?: () => void;
   children?: ReactNode;
 }) {
+  const body = (
+    <>
+      <Mail size={14} strokeWidth={1.9} className="email-line__icon" aria-hidden="true" />
+      {label ? <span className="email-line__label">{label}</span> : null}
+      {from ? <span className="email-line__from">{from}</span> : null}
+      <span className="email-line__text">{text}</span>
+      {onToggle ? <ChevronDown size={14} strokeWidth={1.9} className="email-line__chevron" aria-hidden="true" /> : null}
+    </>
+  );
   return (
-    <div
-      className={`schedule-card email-card${children ? " email-card--list" : ""}`}
-      data-kind={kind}
-      data-testid="email-card"
-    >
-      <span className="schedule-card__tile" aria-hidden="true">
-        <Mail size={16} strokeWidth={1.9} />
-      </span>
-      <span className="schedule-card__body">
-        <span className="schedule-card__headline" title={headline}>
-          {headline}
-        </span>
-        {status || trailing ? (
-          <span className="schedule-card__meta">
-            <span className="schedule-card__status">{status}</span>
-            {trailing}
-          </span>
-        ) : null}
-        {children}
-      </span>
+    <div className="email-line" data-kind={kind} data-expanded={expanded || undefined} data-testid="email-card">
+      <div className="email-line__bar" title={title}>
+        {onToggle ? (
+          <button type="button" className="email-line__main" aria-expanded={expanded} onClick={onToggle}>
+            {body}
+          </button>
+        ) : (
+          <span className="email-line__main">{body}</span>
+        )}
+        {actions ? <span className="email-line__actions">{actions}</span> : null}
+      </div>
+      {expanded ? children : null}
     </div>
   );
 }
@@ -89,19 +100,19 @@ function UrgentCard({ card, item }: { card: EmailCard; item: EmailCardItem }) {
   const line = [item.line || EMAIL_REASON_WORDS[item.reason], showAccounts ? item.account : null]
     .filter(Boolean)
     .join(" · ");
-  const trailing = settled ? (
-    <span className="schedule-card__settled">
+  const actions = settled ? (
+    <span className="email-line__settled">
       {settled === "moved" ? t("email.card.movedToSummary") : t("email.card.wontShow")}
     </span>
   ) : (
-    <span className="schedule-card__actions">
+    <>
       <button
         type="button"
-        className="schedule-card__button"
+        className="schedule-card__button email-line__hover-action"
         disabled={busy}
         onClick={() => run(() => correctEmail(item.itemId, "needs_you"), () => settle("moved"))}
       >
-        {t("email.notUrgent")}
+        {failed ? t("email.failed") : t("email.notUrgent")}
       </button>
       <button
         type="button"
@@ -110,14 +121,16 @@ function UrgentCard({ card, item }: { card: EmailCard; item: EmailCardItem }) {
       >
         {t("common.open")}
       </button>
-    </span>
+    </>
   );
   return (
-    <Shell
+    <Line
       kind={card.kind}
-      headline={`${senderName(item.from)} · ${item.subject}`}
-      status={<span title={line}>{failed ? t("email.failed") : line}</span>}
-      trailing={trailing}
+      label={settled ? undefined : t("email.section.urgent")}
+      from={senderName(item.from)}
+      text={line}
+      title={`${item.from}\n${item.subject}\n${line}`}
+      actions={actions}
     />
   );
 }
@@ -127,24 +140,19 @@ function RuleCard({ card, item }: { card: EmailCard; item: EmailCardItem }) {
   const { showAccounts } = useEmailFeedItems();
   const what = [item.line || item.subject, showAccounts ? item.account : null].filter(Boolean).join(" · ");
   return (
-    <Shell
+    <Line
       kind={card.kind}
-      headline={card.ruleText ?? senderName(item.from)}
-      status={
-        <span title={`${item.from}\n${item.subject}${item.line ? `\n${item.line}` : ""}`}>
-          <span className="email-card__from">{senderName(item.from)}</span> {what}
-        </span>
-      }
-      trailing={
-        <span className="schedule-card__actions">
-          <button
-            type="button"
-            className="schedule-card__button schedule-card__button--primary"
-            onClick={() => openGmailThread(item.threadId, item.account)}
-          >
-            {t("common.open")}
-          </button>
-        </span>
+      from={senderName(item.from)}
+      text={what}
+      title={`${card.ruleText ?? ""}\n\n${item.from}\n${item.subject}`}
+      actions={
+        <button
+          type="button"
+          className="schedule-card__button schedule-card__button--primary"
+          onClick={() => openGmailThread(item.threadId, item.account)}
+        >
+          {t("common.open")}
+        </button>
       }
     />
   );
@@ -193,39 +201,38 @@ function SummaryRow({ item }: { item: EmailCardItem }) {
 }
 
 function SummaryCard({ card }: { card: EmailCard }) {
-  const { t, tPlural } = useI18n();
+  const { tPlural } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const needYou = card.items.filter((item) => item.bucket === "urgent" || item.bucket === "needs_you").length;
   const worth = card.items.length - needYou;
-  const headline = [
+  const counts = [
     needYou > 0 ? tPlural("email.card.needYou", needYou) : null,
     worth > 0 ? tPlural("email.card.worthKnowing", worth) : null,
   ]
     .filter(Boolean)
     .join(" · ");
-  const shown = expanded ? card.items : card.items.slice(0, COLLAPSED_ROWS);
-  const hidden = card.items.length - COLLAPSED_ROWS;
+  const senders = [...new Set(card.items.map((item) => senderName(item.from)))].slice(0, 3).join(", ");
   return (
-    <Shell
+    <Line
       kind={card.kind}
-      headline={headline}
-      status={card.noiseCount ? tPlural("email.card.skipped", card.noiseCount) : null}
+      text={
+        <>
+          {counts}
+          {senders ? <span className="email-line__muted"> · {senders}</span> : null}
+          {card.noiseCount ? (
+            <span className="email-line__muted"> · {tPlural("email.card.skipped", card.noiseCount)}</span>
+          ) : null}
+        </>
+      }
+      expanded={expanded}
+      onToggle={() => setExpanded((open) => !open)}
     >
-      <ol className="email-card__rows">
-        {shown.map((item) => (
+      <ol className="email-card__rows email-line__rows">
+        {card.items.map((item) => (
           <SummaryRow key={item.itemId} item={item} />
         ))}
       </ol>
-      {hidden > 0 ? (
-        <button
-          type="button"
-          className="schedule-card__button email-card__more"
-          onClick={() => setExpanded((open) => !open)}
-        >
-          {expanded ? t("email.card.showLess") : t("email.card.showAll", { count: card.items.length })}
-        </button>
-      ) : null}
-    </Shell>
+    </Line>
   );
 }
 

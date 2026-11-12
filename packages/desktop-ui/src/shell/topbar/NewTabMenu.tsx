@@ -7,6 +7,7 @@ import {
   SIDEBAR_SECTION_META,
 } from "@/shell/sidebar-sections/section-meta";
 import { Trash2, type IconComponent } from "@/ui/icons";
+import { useEmailUnseenCount } from "@/features/email/email-unseen";
 import "./new-tab-menu.css";
 
 type Place = {
@@ -14,10 +15,12 @@ type Place = {
   label: string;
   Icon: IconComponent;
   open: () => void;
+  count?: number;
 };
 
 function PlaceTiles({ onPick }: { onPick: () => void }) {
   const fromSource = useAppSourceState() !== null;
+  const emailUnseen = useEmailUnseenCount();
   const places: Place[] = [
     ...HOME_LAUNCHER_SECTIONS.filter(
       (section) => section !== "updates" || fromSource,
@@ -26,12 +29,13 @@ function PlaceTiles({ onPick }: { onPick: () => void }) {
       label: SIDEBAR_SECTION_META[section].label,
       Icon: SIDEBAR_SECTION_META[section].Icon,
       open: () => sidebarSections.openSectionTab(section),
+      ...(section === "email" && emailUnseen > 0 ? { count: emailUnseen } : {}),
     })),
     { key: "trash", label: "Trash", Icon: Trash2, open: openTrashDisplayTab },
   ];
   return (
     <ul className="new-tab-menu__places">
-      {places.map(({ key, label, Icon, open }) => (
+      {places.map(({ key, label, Icon, open, count }) => (
         <li key={key}>
           <button
             type="button"
@@ -45,6 +49,11 @@ function PlaceTiles({ onPick }: { onPick: () => void }) {
               <Icon size={18} strokeWidth={1.6} />
             </span>
             <span className="new-tab-menu__place-label">{label}</span>
+            {count ? (
+              <span className="new-tab-menu__place-count" aria-label={`${count} new`}>
+                {count > 99 ? "99+" : count}
+              </span>
+            ) : null}
           </button>
         </li>
       ))}

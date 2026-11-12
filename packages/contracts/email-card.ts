@@ -137,6 +137,29 @@ export const emailCardNoteText = (card: EmailCard): string => {
     heading,
     ...lines,
     ...(card.noiseCount ? [`${card.noiseCount} other emails were left out as noise.`] : []),
-    "If the user refers to one of these (\"the second one\"), act on that email with the email tool (read, reply, draft), using its account and message_id. Don't comment on this note unless the user asks about their email.",
+    "If the user refers to one of these (\"the second one\"), act on that email with the email tool (read, reply, draft), using its account and message_id. This list is now the one the user sees: its numbers replace those of earlier email cards, which the chat folds away. Don't comment on this note unless the user asks about their email.",
   ].join("\n");
+};
+
+/** One row of a conversation, as far as folding email cards is concerned. */
+export type EmailFoldEntry = { kind: "email"; cardId: string } | { kind: "user" } | { kind: "other" };
+
+/**
+ * Email cards never stack up in the chat: only the newest stays, plus any card the
+ * user answered right after it (so "reply to the second one" never points at
+ * nothing when scrolling back). Returns the card ids to fold away; their notes
+ * stay in Stella's context and the Email section keeps the history.
+ */
+export const foldedEmailCards = (entries: readonly EmailFoldEntry[]): Set<string> => {
+  const folded = new Set<string>();
+  let lastEmail = -1;
+  entries.forEach((entry, index) => {
+    if (entry.kind === "email") lastEmail = index;
+  });
+  entries.forEach((entry, index) => {
+    if (entry.kind !== "email" || index === lastEmail) return;
+    const next = entries.slice(index + 1).find((later) => later.kind !== "email");
+    if (next?.kind !== "user") folded.add(entry.cardId);
+  });
+  return folded;
 };

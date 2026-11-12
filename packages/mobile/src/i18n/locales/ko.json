@@ -3145,6 +3145,30 @@
       "viewFiles": {
         "other": "파일 {count}개 보기"
       }
+    },
+    "notifications": {
+      "title": "알림",
+      "bellNew": "알림, 새 알림 {count}개",
+      "clear": "모두 지우기",
+      "empty": "새 알림 없음",
+      "dismiss": "닫기",
+      "later": "나중에 보기",
+      "justNow": "방금",
+      "undone": "실행 취소됨",
+      "updatedFrom": "{device}에서 업데이트됨",
+      "updatedHere": "준비되자마자 추가됨",
+      "fallbackModel": {
+        "title": "대체 모델로 전환됨",
+        "description": "선택한 모델을 사용할 수 없어 Stella가 다른 모델을 사용했습니다."
+      },
+      "loadFailed": {
+        "activity": "활동을 불러올 수 없음",
+        "chatActivity": "채팅 활동을 불러올 수 없음",
+        "files": "파일 기록을 불러올 수 없음",
+        "retrying": "Stella가 잠시 후 다시 시도합니다.",
+        "stopped": "재시도를 멈췄습니다. 다시 시도하려면 이 채팅을 다시 여세요."
+      },
+      "modelNotOnPlan": "요금제에서 사용할 수 없는 모델"
     }
   },
   "sidebar": {

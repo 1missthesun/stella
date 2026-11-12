@@ -3164,6 +3164,30 @@
         "one": "Näytä {count} tiedosto",
         "other": "Näytä {count} tiedostoa"
       }
+    },
+    "notifications": {
+      "title": "Ilmoitukset",
+      "bellNew": "Ilmoitukset, uusia: {count}",
+      "clear": "Tyhjennä kaikki",
+      "empty": "Ei mitään uutta",
+      "dismiss": "Hylkää",
+      "later": "Säilytä myöhemmäksi",
+      "justNow": "Juuri nyt",
+      "undone": "Kumottu",
+      "updatedFrom": "Päivitetty laitteelta {device}",
+      "updatedHere": "Lisätty, kun se oli valmis",
+      "fallbackModel": {
+        "title": "Vaihdettiin varamalliin",
+        "description": "Valitsemasi malli ei ollut käytettävissä, joten Stella käytti toista."
+      },
+      "loadFailed": {
+        "activity": "Toimintaa ei voitu ladata",
+        "chatActivity": "Keskustelun toimintaa ei voitu ladata",
+        "files": "Tiedostohistoriaa ei voitu ladata",
+        "retrying": "Stella yrittää hetken kuluttua uudelleen.",
+        "stopped": "Yrittäminen lopetettiin. Avaa tämä keskustelu uudelleen yrittääksesi uudelleen."
+      },
+      "modelNotOnPlan": "Malli ei ole käytettävissä tilauksessasi"
     }
   },
   "sidebar": {

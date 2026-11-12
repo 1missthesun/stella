@@ -3181,6 +3181,30 @@
         "one": "Vedi {count} file",
         "other": "Vedi {count} file"
       }
+    },
+    "notifications": {
+      "title": "Notifiche",
+      "bellNew": "Notifiche, {count} nuove",
+      "clear": "Cancella tutto",
+      "empty": "Niente di nuovo",
+      "dismiss": "Ignora",
+      "later": "Tieni per dopo",
+      "justNow": "Proprio ora",
+      "undone": "Annullato",
+      "updatedFrom": "Aggiornato da {device}",
+      "updatedHere": "Aggiunto appena è stato pronto",
+      "fallbackModel": {
+        "title": "Passato a un modello di riserva",
+        "description": "Il modello che hai scelto non era disponibile, quindi Stella ne ha usato un altro."
+      },
+      "loadFailed": {
+        "activity": "Impossibile caricare l’attività",
+        "chatActivity": "Impossibile caricare l’attività della chat",
+        "files": "Impossibile caricare la cronologia dei file",
+        "retrying": "Stella riproverà tra un momento.",
+        "stopped": "Tentativi interrotti. Riapri questa chat per riprovare."
+      },
+      "modelNotOnPlan": "Modello non disponibile nel tuo piano"
     }
   },
   "sidebar": {

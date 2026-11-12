@@ -3198,6 +3198,30 @@
         "one": "Zobacz {count} plik",
         "other": "Zobacz {count} pliku"
       }
+    },
+    "notifications": {
+      "title": "Powiadomienia",
+      "bellNew": "Powiadomienia, nowe: {count}",
+      "clear": "Wyczyść wszystko",
+      "empty": "Nic nowego",
+      "dismiss": "Odrzuć",
+      "later": "Zachowaj na później",
+      "justNow": "Przed chwilą",
+      "undone": "Cofnięto",
+      "updatedFrom": "Zaktualizowano z {device}",
+      "updatedHere": "Dodano, gdy było gotowe",
+      "fallbackModel": {
+        "title": "Przełączono na model zapasowy",
+        "description": "Wybrany model był niedostępny, więc Stella użyła innego."
+      },
+      "loadFailed": {
+        "activity": "Nie udało się wczytać aktywności",
+        "chatActivity": "Nie udało się wczytać aktywności czatu",
+        "files": "Nie udało się wczytać historii plików",
+        "retrying": "Stella spróbuje ponownie za chwilę.",
+        "stopped": "Przestano próbować. Otwórz ten czat ponownie, aby spróbować jeszcze raz."
+      },
+      "modelNotOnPlan": "Model niedostępny w Twoim planie"
     }
   },
   "sidebar": {

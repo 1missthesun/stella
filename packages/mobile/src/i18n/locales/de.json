@@ -3164,6 +3164,30 @@
         "one": "{count} Datei ansehen",
         "other": "{count} Dateien ansehen"
       }
+    },
+    "notifications": {
+      "title": "Mitteilungen",
+      "bellNew": "Mitteilungen, {count} neu",
+      "clear": "Alle löschen",
+      "empty": "Nichts Neues",
+      "dismiss": "Verwerfen",
+      "later": "Für später behalten",
+      "justNow": "Gerade eben",
+      "undone": "Rückgängig gemacht",
+      "updatedFrom": "Aktualisiert von {device}",
+      "updatedHere": "Hinzugefügt, als es bereit war",
+      "fallbackModel": {
+        "title": "Auf ein Ersatzmodell gewechselt",
+        "description": "Das gewählte Modell war nicht verfügbar, daher hat Stella ein anderes verwendet."
+      },
+      "loadFailed": {
+        "activity": "Aktivität konnte nicht geladen werden",
+        "chatActivity": "Chat-Aktivität konnte nicht geladen werden",
+        "files": "Dateiverlauf konnte nicht geladen werden",
+        "retrying": "Stella versucht es gleich noch einmal.",
+        "stopped": "Keine weiteren Versuche. Öffne diesen Chat erneut, um es noch einmal zu versuchen."
+      },
+      "modelNotOnPlan": "Modell in deinem Tarif nicht verfügbar"
     }
   },
   "sidebar": {

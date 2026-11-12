@@ -3145,6 +3145,30 @@
       "viewFiles": {
         "other": "查看 {count} 个文件"
       }
+    },
+    "notifications": {
+      "title": "通知",
+      "bellNew": "通知，{count} 条新通知",
+      "clear": "全部清除",
+      "empty": "没有新通知",
+      "dismiss": "忽略",
+      "later": "稍后再看",
+      "justNow": "刚刚",
+      "undone": "已撤销",
+      "updatedFrom": "已从 {device} 更新",
+      "updatedHere": "准备好后已添加",
+      "fallbackModel": {
+        "title": "已切换到备用模型",
+        "description": "你选择的模型不可用，所以 Stella 改用了另一个模型。"
+      },
+      "loadFailed": {
+        "activity": "无法加载活动",
+        "chatActivity": "无法加载聊天活动",
+        "files": "无法加载文件历史",
+        "retrying": "Stella 稍后会重试。",
+        "stopped": "已停止重试。重新打开此聊天即可再试一次。"
+      },
+      "modelNotOnPlan": "你的套餐不支持此模型"
     }
   },
   "sidebar": {

@@ -3198,6 +3198,30 @@
         "one": "Zobrazit {count} soubor",
         "other": "Zobrazit {count} souborů"
       }
+    },
+    "notifications": {
+      "title": "Oznámení",
+      "bellNew": "Oznámení, nová: {count}",
+      "clear": "Vymazat vše",
+      "empty": "Nic nového",
+      "dismiss": "Zavřít",
+      "later": "Nechat na později",
+      "justNow": "Právě teď",
+      "undone": "Vráceno zpět",
+      "updatedFrom": "Aktualizováno z {device}",
+      "updatedHere": "Přidáno, jakmile bylo připraveno",
+      "fallbackModel": {
+        "title": "Přepnuto na záložní model",
+        "description": "Vybraný model nebyl k dispozici, a tak Stella použila jiný."
+      },
+      "loadFailed": {
+        "activity": "Aktivitu se nepodařilo načíst",
+        "chatActivity": "Aktivitu chatu se nepodařilo načíst",
+        "files": "Historii souborů se nepodařilo načíst",
+        "retrying": "Stella to za chvíli zkusí znovu.",
+        "stopped": "Pokusy byly zastaveny. Znovu otevřete tento chat a zkuste to znovu."
+      },
+      "modelNotOnPlan": "Model není ve vašem tarifu k dispozici"
     }
   },
   "sidebar": {

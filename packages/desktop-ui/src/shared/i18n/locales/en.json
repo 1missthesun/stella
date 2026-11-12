@@ -3164,6 +3164,30 @@
         "one": "View {count} file",
         "other": "View {count} files"
       }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "bellNew": "Notifications, {count} new",
+      "clear": "Clear all",
+      "empty": "Nothing new",
+      "dismiss": "Dismiss",
+      "later": "Keep for later",
+      "justNow": "Just now",
+      "undone": "Undone",
+      "updatedFrom": "Updated from {device}",
+      "updatedHere": "Added once it was ready",
+      "fallbackModel": {
+        "title": "Switched to a fallback model",
+        "description": "The model you chose wasn’t available, so Stella used another one."
+      },
+      "loadFailed": {
+        "activity": "Couldn’t load activity",
+        "chatActivity": "Couldn’t load chat activity",
+        "files": "Couldn’t load file history",
+        "retrying": "Stella will try again in a moment.",
+        "stopped": "Stopped trying. Reopen this chat to try again."
+      },
+      "modelNotOnPlan": "Model not available on your plan"
     }
   },
   "sidebar": {

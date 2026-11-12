@@ -3164,6 +3164,30 @@
         "one": "{count} fájl megtekintése",
         "other": "{count} fájl megtekintése"
       }
+    },
+    "notifications": {
+      "title": "Értesítések",
+      "bellNew": "Értesítések, {count} új",
+      "clear": "Az összes törlése",
+      "empty": "Nincs újdonság",
+      "dismiss": "Elvetés",
+      "later": "Megtartás későbbre",
+      "justNow": "Épp most",
+      "undone": "Visszavonva",
+      "updatedFrom": "Frissítve innen: {device}",
+      "updatedHere": "Hozzáadva, amint elkészült",
+      "fallbackModel": {
+        "title": "Átváltás tartalék modellre",
+        "description": "A választott modell nem volt elérhető, ezért Stella egy másikat használt."
+      },
+      "loadFailed": {
+        "activity": "Nem sikerült betölteni a tevékenységet",
+        "chatActivity": "Nem sikerült betölteni a csevegés tevékenységét",
+        "files": "Nem sikerült betölteni a fájlelőzményeket",
+        "retrying": "Stella egy pillanat múlva újra megpróbálja.",
+        "stopped": "A próbálkozás leállt. Nyisd meg újra ezt a csevegést az újabb próbához."
+      },
+      "modelNotOnPlan": "A modell nem érhető el a csomagodban"
     }
   },
   "sidebar": {

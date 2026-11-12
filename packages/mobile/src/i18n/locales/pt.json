@@ -3181,6 +3181,30 @@
         "one": "Ver {count} arquivo",
         "other": "Ver {count} arquivos"
       }
+    },
+    "notifications": {
+      "title": "Notificações",
+      "bellNew": "Notificações, {count} novas",
+      "clear": "Limpar tudo",
+      "empty": "Nada de novo",
+      "dismiss": "Dispensar",
+      "later": "Guardar para depois",
+      "justNow": "Agora mesmo",
+      "undone": "Desfeito",
+      "updatedFrom": "Atualizado a partir de {device}",
+      "updatedHere": "Adicionado assim que ficou pronto",
+      "fallbackModel": {
+        "title": "Mudou para um modelo alternativo",
+        "description": "O modelo que você escolheu não estava disponível, então a Stella usou outro."
+      },
+      "loadFailed": {
+        "activity": "Não foi possível carregar a atividade",
+        "chatActivity": "Não foi possível carregar a atividade do chat",
+        "files": "Não foi possível carregar o histórico de arquivos",
+        "retrying": "A Stella vai tentar de novo em instantes.",
+        "stopped": "Parou de tentar. Reabra este chat para tentar de novo."
+      },
+      "modelNotOnPlan": "Modelo indisponível no seu plano"
     }
   },
   "sidebar": {

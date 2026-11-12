@@ -3164,6 +3164,30 @@
         "one": "Visa {count} fil",
         "other": "Visa {count} filer"
       }
+    },
+    "notifications": {
+      "title": "Aviseringar",
+      "bellNew": "Aviseringar, {count} nya",
+      "clear": "Rensa alla",
+      "empty": "Inget nytt",
+      "dismiss": "Avfärda",
+      "later": "Spara till senare",
+      "justNow": "Just nu",
+      "undone": "Ångrat",
+      "updatedFrom": "Uppdaterad från {device}",
+      "updatedHere": "Tillagd när den var klar",
+      "fallbackModel": {
+        "title": "Bytte till en reservmodell",
+        "description": "Modellen du valde var inte tillgänglig, så Stella använde en annan."
+      },
+      "loadFailed": {
+        "activity": "Kunde inte läsa in aktivitet",
+        "chatActivity": "Kunde inte läsa in chattaktivitet",
+        "files": "Kunde inte läsa in filhistorik",
+        "retrying": "Stella försöker igen om en stund.",
+        "stopped": "Slutade försöka. Öppna chatten igen för att försöka på nytt."
+      },
+      "modelNotOnPlan": "Modellen ingår inte i din plan"
     }
   },
   "sidebar": {

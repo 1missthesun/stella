@@ -3164,6 +3164,30 @@
         "one": "{count} dosyayı görüntüle",
         "other": "{count} dosyayı görüntüle"
       }
+    },
+    "notifications": {
+      "title": "Bildirimler",
+      "bellNew": "Bildirimler, {count} yeni",
+      "clear": "Tümünü temizle",
+      "empty": "Yeni bir şey yok",
+      "dismiss": "Kapat",
+      "later": "Sonraya sakla",
+      "justNow": "Az önce",
+      "undone": "Geri alındı",
+      "updatedFrom": "{device} cihazından güncellendi",
+      "updatedHere": "Hazır olunca eklendi",
+      "fallbackModel": {
+        "title": "Yedek bir modele geçildi",
+        "description": "Seçtiğin model kullanılamıyordu, bu yüzden Stella başka bir model kullandı."
+      },
+      "loadFailed": {
+        "activity": "Etkinlik yüklenemedi",
+        "chatActivity": "Sohbet etkinliği yüklenemedi",
+        "files": "Dosya geçmişi yüklenemedi",
+        "retrying": "Stella birazdan yeniden deneyecek.",
+        "stopped": "Denemeler durduruldu. Yeniden denemek için bu sohbeti tekrar aç."
+      },
+      "modelNotOnPlan": "Model planında kullanılamıyor"
     }
   },
   "sidebar": {

@@ -3164,6 +3164,30 @@
         "one": "Vis {count} fil",
         "other": "Vis {count} filer"
       }
+    },
+    "notifications": {
+      "title": "Notifikationer",
+      "bellNew": "Notifikationer, {count} nye",
+      "clear": "Ryd alle",
+      "empty": "Intet nyt",
+      "dismiss": "Afvis",
+      "later": "Gem til senere",
+      "justNow": "Lige nu",
+      "undone": "Fortrudt",
+      "updatedFrom": "Opdateret fra {device}",
+      "updatedHere": "Tilføjet, da den var klar",
+      "fallbackModel": {
+        "title": "Skiftede til en reservemodel",
+        "description": "Den model, du valgte, var ikke tilgængelig, så Stella brugte en anden."
+      },
+      "loadFailed": {
+        "activity": "Kunne ikke indlæse aktivitet",
+        "chatActivity": "Kunne ikke indlæse chataktivitet",
+        "files": "Kunne ikke indlæse filhistorik",
+        "retrying": "Stella prøver igen om et øjeblik.",
+        "stopped": "Holdt op med at prøve. Åbn denne chat igen for at prøve igen."
+      },
+      "modelNotOnPlan": "Modellen er ikke tilgængelig i din plan"
     }
   },
   "sidebar": {

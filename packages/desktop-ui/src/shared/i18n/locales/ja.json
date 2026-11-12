@@ -3145,6 +3145,30 @@
       "viewFiles": {
         "other": "{count} 個のファイルを表示"
       }
+    },
+    "notifications": {
+      "title": "通知",
+      "bellNew": "通知、新着 {count} 件",
+      "clear": "すべて消去",
+      "empty": "新しい通知はありません",
+      "dismiss": "閉じる",
+      "later": "あとで見る",
+      "justNow": "たった今",
+      "undone": "元に戻しました",
+      "updatedFrom": "{device} から更新しました",
+      "updatedHere": "準備ができた時点で追加しました",
+      "fallbackModel": {
+        "title": "代替モデルに切り替えました",
+        "description": "選んだモデルが使えなかったため、Stella は別のモデルを使いました。"
+      },
+      "loadFailed": {
+        "activity": "アクティビティを読み込めませんでした",
+        "chatActivity": "チャットのアクティビティを読み込めませんでした",
+        "files": "ファイル履歴を読み込めませんでした",
+        "retrying": "Stella はまもなく再試行します。",
+        "stopped": "再試行を停止しました。もう一度試すには、このチャットを開き直してください。"
+      },
+      "modelNotOnPlan": "このモデルはご利用のプランでは使えません"
     }
   },
   "sidebar": {

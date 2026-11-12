@@ -3164,6 +3164,30 @@
         "one": "{count} bestand bekijken",
         "other": "{count} bestanden bekijken"
       }
+    },
+    "notifications": {
+      "title": "Meldingen",
+      "bellNew": "Meldingen, {count} nieuw",
+      "clear": "Alles wissen",
+      "empty": "Niets nieuws",
+      "dismiss": "Sluiten",
+      "later": "Bewaren voor later",
+      "justNow": "Zojuist",
+      "undone": "Ongedaan gemaakt",
+      "updatedFrom": "Bijgewerkt vanaf {device}",
+      "updatedHere": "Toegevoegd zodra het klaar was",
+      "fallbackModel": {
+        "title": "Overgeschakeld naar een reservemodel",
+        "description": "Het gekozen model was niet beschikbaar, dus Stella gebruikte een ander."
+      },
+      "loadFailed": {
+        "activity": "Kan activiteit niet laden",
+        "chatActivity": "Kan chatactiviteit niet laden",
+        "files": "Kan bestandsgeschiedenis niet laden",
+        "retrying": "Stella probeert het zo opnieuw.",
+        "stopped": "Gestopt met proberen. Open deze chat opnieuw om het nog eens te proberen."
+      },
+      "modelNotOnPlan": "Model niet beschikbaar in je abonnement"
     }
   },
   "sidebar": {

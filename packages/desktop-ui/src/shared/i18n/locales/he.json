@@ -3181,6 +3181,30 @@
         "other": "הצג {count} קבצים",
         "two": "הצג {count} קבצים"
       }
+    },
+    "notifications": {
+      "title": "התראות",
+      "bellNew": "התראות, חדשות: {count}",
+      "clear": "ניקוי הכול",
+      "empty": "אין חדש",
+      "dismiss": "סגירה",
+      "later": "לשמור למועד מאוחר יותר",
+      "justNow": "עכשיו",
+      "undone": "בוטל",
+      "updatedFrom": "עודכן מ-{device}",
+      "updatedHere": "נוסף ברגע שהיה מוכן",
+      "fallbackModel": {
+        "title": "עברה למודל חלופי",
+        "description": "המודל שבחרת לא היה זמין, ולכן Stella השתמשה במודל אחר."
+      },
+      "loadFailed": {
+        "activity": "לא ניתן לטעון את הפעילות",
+        "chatActivity": "לא ניתן לטעון את פעילות הצ׳אט",
+        "files": "לא ניתן לטעון את היסטוריית הקבצים",
+        "retrying": "Stella תנסה שוב בעוד רגע.",
+        "stopped": "הניסיונות הופסקו. יש לפתוח מחדש את הצ׳אט כדי לנסות שוב."
+      },
+      "modelNotOnPlan": "המודל לא זמין בתוכנית שלך"
     }
   },
   "sidebar": {

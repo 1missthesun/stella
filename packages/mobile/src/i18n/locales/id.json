@@ -3145,6 +3145,30 @@
       "viewFiles": {
         "other": "Lihat {count} berkas"
       }
+    },
+    "notifications": {
+      "title": "Notifikasi",
+      "bellNew": "Notifikasi, {count} baru",
+      "clear": "Hapus semua",
+      "empty": "Tidak ada yang baru",
+      "dismiss": "Tutup",
+      "later": "Simpan untuk nanti",
+      "justNow": "Baru saja",
+      "undone": "Dibatalkan",
+      "updatedFrom": "Diperbarui dari {device}",
+      "updatedHere": "Ditambahkan setelah siap",
+      "fallbackModel": {
+        "title": "Beralih ke model cadangan",
+        "description": "Model yang kamu pilih tidak tersedia, jadi Stella memakai model lain."
+      },
+      "loadFailed": {
+        "activity": "Tidak dapat memuat aktivitas",
+        "chatActivity": "Tidak dapat memuat aktivitas chat",
+        "files": "Tidak dapat memuat riwayat file",
+        "retrying": "Stella akan mencoba lagi sebentar lagi.",
+        "stopped": "Berhenti mencoba. Buka lagi chat ini untuk mencoba lagi."
+      },
+      "modelNotOnPlan": "Model tidak tersedia di paketmu"
     }
   },
   "sidebar": {

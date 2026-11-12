@@ -3145,6 +3145,30 @@
       "viewFiles": {
         "other": "Xem {count} tệp"
       }
+    },
+    "notifications": {
+      "title": "Thông báo",
+      "bellNew": "Thông báo, {count} mới",
+      "clear": "Xóa tất cả",
+      "empty": "Không có gì mới",
+      "dismiss": "Bỏ qua",
+      "later": "Để sau",
+      "justNow": "Vừa xong",
+      "undone": "Đã hoàn tác",
+      "updatedFrom": "Đã cập nhật từ {device}",
+      "updatedHere": "Đã thêm ngay khi sẵn sàng",
+      "fallbackModel": {
+        "title": "Đã chuyển sang mô hình dự phòng",
+        "description": "Mô hình bạn chọn không khả dụng, nên Stella đã dùng mô hình khác."
+      },
+      "loadFailed": {
+        "activity": "Không tải được hoạt động",
+        "chatActivity": "Không tải được hoạt động trò chuyện",
+        "files": "Không tải được lịch sử tệp",
+        "retrying": "Stella sẽ thử lại sau giây lát.",
+        "stopped": "Đã ngừng thử. Mở lại cuộc trò chuyện này để thử lại."
+      },
+      "modelNotOnPlan": "Mô hình không có trong gói của bạn"
     }
   },
   "sidebar": {

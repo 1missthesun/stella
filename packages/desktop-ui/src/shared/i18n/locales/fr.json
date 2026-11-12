@@ -3181,6 +3181,30 @@
         "one": "Voir {count} fichier",
         "other": "Voir {count} fichiers"
       }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "bellNew": "Notifications, {count} nouvelles",
+      "clear": "Tout effacer",
+      "empty": "Rien de nouveau",
+      "dismiss": "Ignorer",
+      "later": "Garder pour plus tard",
+      "justNow": "À l’instant",
+      "undone": "Annulé",
+      "updatedFrom": "Mis à jour depuis {device}",
+      "updatedHere": "Ajouté dès qu’il était prêt",
+      "fallbackModel": {
+        "title": "Passage à un modèle de secours",
+        "description": "Le modèle choisi n’était pas disponible, Stella en a donc utilisé un autre."
+      },
+      "loadFailed": {
+        "activity": "Impossible de charger l’activité",
+        "chatActivity": "Impossible de charger l’activité du chat",
+        "files": "Impossible de charger l’historique des fichiers",
+        "retrying": "Stella réessaiera dans un instant.",
+        "stopped": "Nouvelles tentatives arrêtées. Rouvrez ce chat pour réessayer."
+      },
+      "modelNotOnPlan": "Modèle non disponible avec votre forfait"
     }
   },
   "sidebar": {

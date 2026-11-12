@@ -3181,6 +3181,30 @@
         "one": "Vezi {count} fișier",
         "other": "Vezi {count} de fișiere"
       }
+    },
+    "notifications": {
+      "title": "Notificări",
+      "bellNew": "Notificări, noi: {count}",
+      "clear": "Șterge tot",
+      "empty": "Nimic nou",
+      "dismiss": "Închide",
+      "later": "Păstrează pentru mai târziu",
+      "justNow": "Chiar acum",
+      "undone": "Anulat",
+      "updatedFrom": "Actualizat de pe {device}",
+      "updatedHere": "Adăugat imediat ce a fost gata",
+      "fallbackModel": {
+        "title": "S-a trecut la un model de rezervă",
+        "description": "Modelul ales nu era disponibil, așa că Stella a folosit altul."
+      },
+      "loadFailed": {
+        "activity": "Activitatea nu s-a putut încărca",
+        "chatActivity": "Activitatea chatului nu s-a putut încărca",
+        "files": "Istoricul fișierelor nu s-a putut încărca",
+        "retrying": "Stella va încerca din nou imediat.",
+        "stopped": "S-a oprit din încercat. Redeschide acest chat pentru a încerca din nou."
+      },
+      "modelNotOnPlan": "Modelul nu este disponibil în planul tău"
     }
   },
   "sidebar": {

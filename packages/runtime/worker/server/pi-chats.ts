@@ -483,12 +483,10 @@ export const piChatsFor = (
           () => session.runnerCell.get()?.pushedDevices(),
         ),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
-      agentRunEnded: ({ conversationId, threadId, interrupted }) => {
+      agentRunEnded: ({ conversationId, threadId, interrupted, waiting, report }) => {
         const runner = session.runnerCell.get();
         if (!runner) return;
-        void runner.piTools
-          .endAgentBrowserTurn(threadId)
-          .catch((error) => console.warn("[pi-chat] closing the agent's browser tabs failed", error));
+        runner.piTools.agentBrowserEnded(threadId, waiting, report);
         void runner.piTools
           .releaseAgentComputerUse(threadId)
           .catch((error) => console.warn("[pi-chat] stopping the agent's computer-use helper failed", error));
@@ -499,6 +497,7 @@ export const piChatsFor = (
       },
       agentStarted: (agent) => {
         session.runnerCell.get()?.backgroundExits.disarm({ conversationId: agent.conversationId, agentId: agent.threadId });
+        session.runnerCell.get()?.piTools.agentBrowserStarted(agent.threadId);
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
           const runner = session.runnerCell.get();

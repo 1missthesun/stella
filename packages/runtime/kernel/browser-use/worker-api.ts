@@ -236,6 +236,7 @@ export interface BrowserWorkerTab {
   close(): Promise<unknown>;
   markDeliverable(): Promise<unknown>;
   markHandoff(): Promise<unknown>;
+  leaveForUser(): Promise<unknown>;
   show(): Promise<unknown>;
   url(): Promise<string>;
   title(): Promise<string>;

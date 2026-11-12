@@ -280,7 +280,13 @@ export type DesktopChatsOptions = {
     attempt: number;
     parentThreadId?: string;
   }): void;
-  agentRunEnded?(agent: { conversationId: string; threadId: string; interrupted: boolean }): void;
+  agentRunEnded?(agent: {
+    conversationId: string;
+    threadId: string;
+    interrupted: boolean;
+    waiting: boolean;
+    report?: string;
+  }): void;
   subagentEnded?(agent: {
     conversationId: string;
     threadId: string;
@@ -1428,7 +1434,13 @@ export function desktopChats(options: DesktopChatsOptions) {
                   ? {
                       endAgentRun: async (run, _context, end) => {
                         const outcome = agentRunOutcome(end);
-                        agentRunEnded?.({ conversationId, threadId: run.threadId, interrupted: outcome === undefined });
+                        agentRunEnded?.({
+                          conversationId,
+                          threadId: run.threadId,
+                          interrupted: outcome === undefined,
+                          waiting: end?.waiting === true,
+                          ...(end?.answer ? { report: end.answer } : {}),
+                        });
                         if (!run.parentThreadId || !outcome || end?.waiting || !subagentEnded) return;
                         subagentEnded({
                           conversationId,

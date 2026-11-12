@@ -38,6 +38,12 @@ import {
   type BrowserProtocolAction,
   type BrowserSessionAction,
 } from "./protocol.js";
+import {
+  rememberableTabUrl,
+  reportMentionsTab,
+  type RememberedTabs,
+  type TaskTabs,
+} from "./task-tabs.js";
 
 export {
   WORKER_BOUND_BACKEND_PARAM,
@@ -50,6 +56,8 @@ const DEFAULT_BROWSER_CHAIN_WAIT_TIMEOUT_MS = 10_000;
 const BROWSER_CHAIN_STEP_BUDGET_MS = 1_000;
 const MIN_BROWSER_CHAIN_TIMEOUT_MS = 3 * 60_000;
 const MAX_BROWSER_TURN_CLEANUP_TIMEOUT_MS = 2_000;
+const BROWSER_TAB_RETIRE_TIMEOUT_MS = 10_000;
+const BROWSER_TAB_RESTORE_TIMEOUT_MS = 30_000;
 const BROWSER_COMMAND_TIMEOUT_GRACE_MS = 5_000;
 let lastBrowserOwnerLeaseIssuedAt = Date.now();
 
@@ -170,6 +178,7 @@ export type BrowserSessionOptions = Readonly<{
   ownerLeaseId?: string;
   ownerLeaseIssuedAt?: number;
   turnId?: string;
+  taskTabs?: TaskTabs;
 }>;
 
 export type BrowserSessionFactory = (
@@ -198,6 +207,8 @@ export interface BrowserSessionClient {
   resolveDefaultBackend?(): Promise<Readonly<{ backend: BrowserBackend }>>;
   beginTurn?(turnId: string): void;
   endTurn?(turnId: string, behavior: BrowserTurnEndBehavior): Promise<void>;
+  /** Closes the owner's tabs on these backends, remembering them for a later turn; returns the backends it reached. */
+  retireTabs?(backends: readonly BrowserBackend[]): Promise<readonly BrowserBackend[]>;
   dispose(): Promise<void>;
 }
 
@@ -1151,6 +1162,9 @@ export class BrowserSession implements BrowserSessionClient {
   private selectedBackend: BrowserBackend = "in-app";
   private backendChosen = false;
   private readonly activeTurnBackends = new Set<BrowserBackend>();
+  private readonly taskTabs?: TaskTabs;
+  private readonly restoreChecked = new WeakMap<object, Set<BrowserBackend>>();
+  private usedInApp = false;
   private socket?: Socket;
   private connectingSocket?: Socket;
   private readBuffer = EMPTY_BUFFER;
@@ -1200,6 +1214,7 @@ export class BrowserSession implements BrowserSessionClient {
       throw new TypeError("initializeInAppBrowser must be a function.");
     }
     this.signal = options.signal;
+    this.taskTabs = options.taskTabs;
     this.runner = options.runner ?? runBrowserCommand;
     this.getBridgeEnv = options.getBridgeEnv ?? getStellaBrowserBridgeEnv;
     this.initializeInAppBrowser =
@@ -1267,6 +1282,236 @@ export class BrowserSession implements BrowserSessionClient {
         }
       }
     });
+  }
+
+  async retireTabs(
+    backends: readonly BrowserBackend[],
+  ): Promise<readonly BrowserBackend[]> {
+    if (this.disposed) return [];
+    return await this.enqueue(async () => {
+      const turn = this.activeTurn ?? this.createTurnLease(randomUUID());
+      const targets = [...new Set([...this.activeTurnBackends, ...backends])];
+      const retired: BrowserBackend[] = [];
+      try {
+        for (const backend of targets) {
+          try {
+            if (await this.retireTabsOnBackend(turn, backend)) {
+              retired.push(backend);
+            }
+          } catch {}
+        }
+        const leaseBackend = targets.includes("external")
+          ? "external"
+          : targets[0];
+        if (leaseBackend) {
+          await this.cleanupTurnOnBackend(
+            turn,
+            leaseBackend,
+            true,
+            false,
+            true,
+          ).catch(() => undefined);
+        }
+      } finally {
+        if (this.activeTurn === turn) this.activeTurn = undefined;
+        this.activeTurnBackends.clear();
+        this.resetOwnerBinding();
+        if (this.socket) {
+          this.invalidateSocket(
+            this.socket,
+            new BrowserTransportError(
+              "connection_closed",
+              "Browser tabs retired.",
+            ),
+          );
+        }
+      }
+      return retired;
+    });
+  }
+
+  private async retireTabsOnBackend(
+    turn: Readonly<{
+      turnId: string;
+      ownerLeaseId: string;
+      ownerLeaseIssuedAt: number;
+    }>,
+    backend: BrowserBackend,
+  ): Promise<boolean> {
+    if (backend === "in-app" && !this.usedInApp) {
+      this.taskTabs?.retired(this.sessionId, backend);
+      return true;
+    }
+    const deadline = Date.now() + BROWSER_TAB_RETIRE_TIMEOUT_MS;
+    const config = await this.ensureInAppBrowserReady(
+      this.route.kind === "bound"
+        ? this.route.route.config
+        : this.resolveExecutionConfig(),
+      turn,
+      undefined,
+      deadline,
+    );
+    if (
+      backend === "external" &&
+      (await readStellaBrowserExtensionStatus({
+        env: config.env,
+        timeoutMs: EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS,
+      })) === false
+    ) {
+      return false;
+    }
+    const send = async (action: string, extra: Record<string, unknown> = {}) => {
+      const response = await this.ownerRoundTrip(
+        turn,
+        backend,
+        action,
+        extra,
+        undefined,
+        deadline,
+      );
+      if (!response.success) throw new Error(response.error);
+      return response;
+    };
+    const listing = (await send("tab_list")).data as
+      | {
+          tabs?: Array<{
+            tabId?: number;
+            url?: string;
+            title?: string;
+            active?: boolean;
+          }>;
+          activeTabId?: number | null;
+        }
+      | undefined;
+    const open = (listing?.tabs ?? []).filter(
+      (tab): tab is typeof tab & { tabId: number } =>
+        typeof tab.tabId === "number",
+    );
+    const { left, report } = this.taskTabs?.toRetire(this.sessionId, backend) ?? {
+      left: [],
+    };
+    const keep = open
+      .filter(
+        (tab) =>
+          left.includes(tab.tabId) ||
+          (report !== undefined && reportMentionsTab(report, tab)),
+      )
+      .map((tab) => ({ tabId: tab.tabId, status: "handoff" }));
+    const finalized = await send("finalize_tabs", {
+      keep,
+      preserveMarked: true,
+    });
+    const closedTabIds = new Set(
+      ((finalized.data as { closedTabIds?: unknown } | undefined)
+        ?.closedTabIds as number[] | undefined) ?? [],
+    );
+    const closed = open.filter(
+      (tab) =>
+        closedTabIds.has(tab.tabId) &&
+        typeof tab.url === "string" &&
+        rememberableTabUrl(tab.url),
+    );
+    const activeIndex = closed.findIndex((tab) =>
+      listing?.activeTabId != null
+        ? tab.tabId === listing.activeTabId
+        : tab.active === true,
+    );
+    this.taskTabs?.retired(
+      this.sessionId,
+      backend,
+      closed.length > 0
+        ? {
+            tabs: closed.map((tab) => ({
+              url: tab.url!,
+              title: tab.title ?? "",
+            })),
+            activeIndex: Math.max(0, activeIndex),
+            closedAt: Date.now(),
+          }
+        : undefined,
+    );
+    return true;
+  }
+
+  private async restoreRememberedTabs(
+    turn: Readonly<{
+      turnId: string;
+      ownerLeaseId: string;
+      ownerLeaseIssuedAt: number;
+    }>,
+    backend: BrowserBackend,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    if (!this.taskTabs) return;
+    const checked = this.restoreChecked.get(turn) ?? new Set<BrowserBackend>();
+    this.restoreChecked.set(turn, checked);
+    if (checked.has(backend)) return;
+    checked.add(backend);
+    const remembered: RememberedTabs | undefined =
+      this.taskTabs.takeRemembered(this.sessionId, backend);
+    if (!remembered) return;
+    const deadline = Date.now() + BROWSER_TAB_RESTORE_TIMEOUT_MS;
+    const send = async (action: string, extra: Record<string, unknown> = {}) => {
+      const response = await this.ownerRoundTrip(
+        turn,
+        backend,
+        action,
+        extra,
+        signal,
+        deadline,
+      );
+      if (!response.success) throw new Error(response.error);
+      return response;
+    };
+    let reopened = 0;
+    try {
+      const listed = await send("tab_list");
+      const open = (listed.data as { tabs?: unknown[] } | undefined)?.tabs;
+      if (Array.isArray(open) && open.length > 0) return;
+      for (const tab of remembered.tabs) {
+        await send("tab_new", { url: tab.url });
+        reopened += 1;
+      }
+      await send("tab_switch", { index: remembered.activeIndex });
+    } catch {
+      if (reopened === 0) {
+        this.taskTabs.putBack(this.sessionId, backend, remembered);
+      }
+    }
+  }
+
+  private async ownerRoundTrip(
+    turn: Readonly<{
+      turnId: string;
+      ownerLeaseId: string;
+      ownerLeaseIssuedAt: number;
+    }>,
+    backend: BrowserBackend,
+    action: string,
+    extra: Record<string, unknown>,
+    signal: AbortSignal | undefined,
+    deadline: number,
+  ): Promise<BrowserCommandResult> {
+    const timeoutMs = Math.max(1, deadline - Date.now());
+    await this.ensureConnected(signal, deadline, timeoutMs);
+    const requestId = randomUUID();
+    return await this.roundTrip(
+      {
+        id: requestId,
+        action,
+        ...extra,
+        ownerId: this.sessionId,
+        sessionId: this.sessionId,
+        turnId: turn.turnId,
+        ownerLeaseId: turn.ownerLeaseId,
+        ownerLeaseIssuedAt: turn.ownerLeaseIssuedAt,
+        ...(backend === "external" ? { browserBackend: "extension" } : {}),
+      },
+      requestId,
+      signal,
+      deadline,
+      timeoutMs,
+    );
   }
 
   async command<TData = unknown>(
@@ -1796,8 +2041,15 @@ export class BrowserSession implements BrowserSessionClient {
               deadline,
             );
           }
+          if (!BROWSER_OWNER_LIFECYCLE_ACTIONS.has(action)) {
+            await this.restoreRememberedTabs(turn, backend, signal);
+          }
           this.activeTurnBackends.add(backend);
           requestDispatched = true;
+          if (!BROWSER_OWNER_LIFECYCLE_ACTIONS.has(action)) {
+            if (backend === "in-app") this.usedInApp = true;
+            this.taskTabs?.used(this.sessionId, backend);
+          }
           response = (await this.roundTrip(
             request,
             requestId,
@@ -1951,6 +2203,14 @@ export class BrowserSession implements BrowserSessionClient {
             }
           : {}),
       });
+    }
+    if (
+      action === "mark_tab" &&
+      typeof requestParams.tabId === "number" &&
+      (requestParams.status === "handoff" ||
+        requestParams.status === "deliverable")
+    ) {
+      this.taskTabs?.leftForUser(this.sessionId, backend, requestParams.tabId);
     }
     return receipt as BrowserCommandReceipt<TData>;
   }

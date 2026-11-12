@@ -21,6 +21,7 @@ import {
 } from "./types.js";
 
 import { log, logError, recoverStaleSecretFiles } from "./utils.js";
+import { TaskTabs } from "../browser-use/task-tabs.js";
 import {
   buildAgentShellEnvironment,
   createShellState,
@@ -294,6 +295,9 @@ export const createToolHost = ({
     });
   const nodeReplRegistry = new NodeReplKernelRegistry({
     browserBinPath: _stellaBrowserBinPath,
+    ...(stellaDataDir
+      ? { taskTabs: new TaskTabs(path.join(stellaDataDir, "browser-task-tabs.json")) }
+      : {}),
     ...(requestBrowserExtensionConnect
       ? { requestBrowserExtensionConnect }
       : {}),
@@ -680,12 +684,12 @@ export const createToolHost = ({
       watchShellExit(shellState, sessionId, listener),
     readShellExitSnapshot: (sessionId: string) =>
       readShellExitSnapshot(shellState, sessionId),
-    endBrowserTurn: (
-      runId: string,
-      behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
-    ) => nodeReplRegistry.endBrowserTurn(runId, behavior),
     releaseAgentComputerSessions: (agentId: string) =>
       nodeReplRegistry.releaseAgentNativeSessions(agentId),
+    browserTaskStarted: (agentId: string) =>
+      nodeReplRegistry.browserTaskStarted(agentId),
+    browserTaskEnded: (agentId: string, keepTabs: boolean, report?: string) =>
+      nodeReplRegistry.browserTaskEnded(agentId, keepTabs, report),
     killAllShells,
     killShell,
     shutdown,

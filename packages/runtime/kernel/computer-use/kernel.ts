@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -32,6 +33,7 @@ import { resolveToolProcessIdentity } from "../tools/shell.js";
 import { toolStateEnvironment } from "@stella/contracts/cloud-tool-home";
 import { acquireAbortLatch } from "../agent-core/abort-bridge.js";
 import {
+  agentBrowserOwnerId,
   getStellaBrowserSessionId,
   getStellaComputerSessionId,
 } from "../tools/stella-computer-session.js";
@@ -49,7 +51,6 @@ import {
   type BrowserSessionAction,
   type BrowserSessionClient,
   type BrowserSessionOptions,
-  type BrowserTurnEndBehavior,
 } from "../browser-use/client.js";
 import {
   createSkyClient,
@@ -57,6 +58,11 @@ import {
   type SkyClient,
 } from "./client.js";
 import { createNodeReplWorkerSource } from "./kernel-worker.js";
+import {
+  TASK_TABS_FIRST_SWEEP_DELAY_MS,
+  TASK_TABS_SWEEP_INTERVAL_MS,
+  type TaskTabs,
+} from "../browser-use/task-tabs.js";
 import { saveBrowserScreenshot } from "./browser-screenshot-store.js";
 import { resolveStatePath } from "../cli/shared.js";
 import { expandHomePath, toolContextHome } from "../tools/utils.js";
@@ -184,6 +190,7 @@ export type NodeReplKernelManagerOptions = {
     context: ToolContext,
   ) => Promise<unknown>;
   memory?: NodeReplMemoryHost;
+  taskTabs?: TaskTabs;
 };
 
 export type NodeReplMemoryHost = Readonly<{
@@ -705,7 +712,7 @@ class NodeReplKernel {
   private readonly worker: NodeReplTransport;
   private readonly sky: SkyClient;
   private readonly browser: BrowserSessionClient;
-  private readonly browserSessionId: string;
+  readonly browserSessionId: string;
   private browserBackend: BrowserBackend = "in-app";
   private readonly requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
   private readonly executeTool?: NodeReplKernelManagerOptions["executeTool"];
@@ -768,6 +775,7 @@ class NodeReplKernel {
       ownerLeaseId: string;
       ownerLeaseIssuedAt: number;
       generation: number;
+      taskTabs?: TaskTabs;
       onIdle: (kernel: NodeReplKernel) => void;
     },
   ) {
@@ -805,6 +813,7 @@ class NodeReplKernel {
       commandTimeoutMs: options.commandTimeoutMs,
       ownerLeaseId: options.ownerLeaseId,
       ownerLeaseIssuedAt: options.ownerLeaseIssuedAt,
+      ...(options.taskTabs ? { taskTabs: options.taskTabs } : {}),
     });
     const workerData: NodeReplWorkerData = {
       cwd,
@@ -879,11 +888,10 @@ class NodeReplKernel {
     return this.closePromise;
   }
 
-  async endBrowserTurn(
-    turnId: string,
-    behavior: BrowserTurnEndBehavior,
-  ): Promise<void> {
-    await this.browser.endTurn?.(turnId, behavior);
+  async retireBrowserTabs(
+    backends: readonly BrowserBackend[],
+  ): Promise<readonly BrowserBackend[]> {
+    return (await this.browser.retireTabs?.(backends)) ?? [];
   }
 
   async fillSecureField(
@@ -2786,6 +2794,7 @@ export class NodeReplKernelRegistry {
     options: BrowserSessionOptions,
   ) => BrowserSessionClient;
   private lastOwnerLeaseIssuedAt = Date.now();
+  private sweeping = false;
 
   constructor(private readonly options: NodeReplKernelManagerOptions = {}) {
     this.evalTimeoutMs = options.evalTimeoutMs ?? DEFAULT_EVAL_TIMEOUT_MS;
@@ -2808,6 +2817,63 @@ export class NodeReplKernelRegistry {
     );
     this.browserSessionFactory =
       options.browserSessionFactory ?? createBrowserSession;
+    if (options.taskTabs) {
+      const sweep = () => void this.sweepTaskTabs();
+      setTimeout(sweep, TASK_TABS_FIRST_SWEEP_DELAY_MS).unref?.();
+      setInterval(sweep, TASK_TABS_SWEEP_INTERVAL_MS).unref?.();
+    }
+  }
+
+  browserTaskStarted(agentId: string): void {
+    this.options.taskTabs?.started(agentBrowserOwnerId(agentId));
+  }
+
+  /** A task's run ended; its tabs close after a grace period unless it is still waiting on work or on the user. */
+  browserTaskEnded(agentId: string, keepTabs: boolean, report?: string): void {
+    this.options.taskTabs?.ended(agentBrowserOwnerId(agentId), keepTabs, report);
+  }
+
+  async sweepTaskTabs(now = Date.now()): Promise<void> {
+    const taskTabs = this.options.taskTabs;
+    if (!taskTabs || this.sweeping) return;
+    this.sweeping = true;
+    try {
+      for (const owner of taskTabs.due(now)) {
+        await this.retireOwnerTabs(owner, taskTabs.backends(owner)).catch(
+          () => undefined,
+        );
+      }
+    } finally {
+      this.sweeping = false;
+    }
+  }
+
+  private async retireOwnerTabs(
+    owner: string,
+    backends: readonly BrowserBackend[],
+  ): Promise<void> {
+    const taskTabs = this.options.taskTabs!;
+    const kernels = [...this.kernels.values()].filter(
+      (kernel) => kernel.browserSessionId === owner,
+    );
+    if (kernels.length > 0) {
+      for (const kernel of kernels) await kernel.retireBrowserTabs(backends);
+      return;
+    }
+    const session = this.browserSessionFactory({
+      ...(this.options.browserBinPath
+        ? { binaryPath: this.options.browserBinPath }
+        : {}),
+      sessionId: owner,
+      cwd: os.tmpdir(),
+      commandTimeoutMs: this.commandTimeoutMs,
+      taskTabs,
+    });
+    try {
+      await session.retireTabs?.(backends);
+    } finally {
+      await session.dispose().catch(() => undefined);
+    }
   }
 
   async evaluate(
@@ -3010,6 +3076,7 @@ export class NodeReplKernelRegistry {
         commandTimeoutMs: this.commandTimeoutMs,
         idleTimeoutMs: this.idleTimeoutMs,
         toolDrainTimeoutMs: this.toolDrainTimeoutMs,
+        ...(this.options.taskTabs ? { taskTabs: this.options.taskTabs } : {}),
         onIdle: (candidate) => void this.disposeKernel(id, candidate),
       });
       this.kernels.set(id, kernel);
@@ -3241,17 +3308,6 @@ export class NodeReplKernelRegistry {
       );
     }
     return await kernel.fillSecureField(context, target);
-  }
-
-  async endBrowserTurn(
-    turnId: string,
-    behavior: BrowserTurnEndBehavior,
-  ): Promise<void> {
-    await Promise.all(
-      [...this.kernels.values()].map((kernel) =>
-        kernel.endBrowserTurn(turnId, behavior),
-      ),
-    );
   }
 
   /**

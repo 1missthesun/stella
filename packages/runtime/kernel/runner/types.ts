@@ -186,11 +186,9 @@ export type RunnerContext = {
       cwd: string,
     ) => Record<string, string>;
     setToolCallHooks: (hooks: Pick<HookEmitter, "emit"> | undefined) => void;
-    endBrowserTurn: (
-      runId: string,
-      behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
-    ) => Promise<void>;
     releaseAgentComputerSessions: (agentId: string) => Promise<number>;
+    browserTaskStarted: (agentId: string) => void;
+    browserTaskEnded: (agentId: string, keepTabs: boolean, report?: string) => void;
     registerExtensionTools: (tools: ToolDefinition[]) => void;
     unregisterExtensionTools: () => void;
     listRunningShellSessionsOwnedBy: (

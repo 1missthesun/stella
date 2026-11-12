@@ -146,6 +146,7 @@ const TAB_PUBLIC_API = publicApiNames<BrowserWorkerTab>({
   close: true,
   markDeliverable: true,
   markHandoff: true,
+  leaveForUser: true,
   show: true,
   url: true,
   title: true,
@@ -648,6 +649,13 @@ export const createTabs = (
     }
 
     async markHandoff(): Promise<unknown> {
+      return await this.run("mark_tab", {
+        tabId: this.id,
+        status: "handoff",
+      });
+    }
+
+    async leaveForUser(): Promise<unknown> {
       return await this.run("mark_tab", {
         tabId: this.id,
         status: "handoff",

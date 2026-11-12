@@ -1,3 +1,5 @@
+import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+
 import type { ToolContext } from "./types.js";
 
 const MAX_SESSION_LENGTH = 120;
@@ -68,3 +70,9 @@ export const getStellaBrowserSessionId = (
     sanitizeStellaComputerSessionId(context?.agentType) ?? "agent";
   return `${agentSegment}-${ownerSegment}`.slice(0, MAX_SESSION_LENGTH);
 };
+
+export const agentBrowserOwnerId = (agentId: string): string =>
+  getStellaBrowserSessionId({
+    agentId,
+    agentType: AGENT_IDS.GENERAL,
+  } as ToolContext)!;

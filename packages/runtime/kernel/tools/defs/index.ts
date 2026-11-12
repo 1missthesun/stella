@@ -25,6 +25,7 @@ import {
   createUseSecureValueTool,
 } from "./secure-input.js";
 import { createScheduleManageTools } from "./schedule-manage.js";
+import { EMAIL_FEATURE_ENABLED } from "@stella/contracts/email-feature";
 import { createEmailTool } from "./email-tool.js";
 import { createScriptDraftTool } from "./script-draft.js";
 import { createConnectorStatusTool } from "./connector-status.js";
@@ -131,13 +132,16 @@ export const buildBuiltinTools = (
   tools.push(
     ...createScheduleManageTools({ scheduleApi: options.scheduleApi }),
   );
-  tools.push(
-    createEmailTool({
-      ...(options.getCloudBackendAuth
-        ? { getCloudBackendAuth: options.getCloudBackendAuth }
-        : {}),
-    }),
-  );
+  // Email is off in released builds (see email-feature.ts); a dev runtime turns it on with STELLA_EMAIL_FEATURE=1.
+  if (EMAIL_FEATURE_ENABLED || process.env.STELLA_EMAIL_FEATURE === "1") {
+    tools.push(
+      createEmailTool({
+        ...(options.getCloudBackendAuth
+          ? { getCloudBackendAuth: options.getCloudBackendAuth }
+          : {}),
+      }),
+    );
+  }
   tools.push(
     createScriptDraftTool({
       stellaDataDir: options.stellaDataDir,

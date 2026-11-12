@@ -5,6 +5,7 @@ import { Text } from "../Text";
 import { Icon } from "../Icon";
 import { useT, useTPlural } from "../../i18n";
 import { openEmailDigest } from "../../lib/email";
+import { useEmailFeature } from "../../lib/email-feature";
 import { tapLight } from "../../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
@@ -19,8 +20,9 @@ export const EmailChatCard = memo(function EmailChatCard({ card, colors }: { car
   const t = useT();
   const tPlural = useTPlural();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const on = useEmailFeature();
   const count = card.items.length;
-  if (count === 0) return null;
+  if (count === 0 || !on) return null;
   const urgent = card.items.filter((item) => item.bucket === "urgent").length;
   const label =
     card.kind === "rule"

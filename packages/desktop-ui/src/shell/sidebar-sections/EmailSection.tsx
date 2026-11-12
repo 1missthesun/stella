@@ -1,6 +1,7 @@
 import { useDisplayPanelOpen } from "@/features/workspace-display/tab-store";
 import { useCallback, useEffect, useState } from "react";
 import { markEmailSeen } from "@/features/email/email-unseen";
+import { useEmailFeature } from "@/features/email/email-feature";
 import type { EmailFeed, EmailRule } from "@stella/contracts/backend/email";
 import { EmailDigestPanel } from "@/features/email/EmailDigest";
 import { backendClient } from "@/platform/backend/backend-client";
@@ -230,7 +231,12 @@ function SortedMail({ feed, active }: { feed: EmailFeed; active: boolean }) {
   );
 }
 
-export function EmailSection({ active: selected }: { active: boolean }) {
+/** Email shows only where it is turned on (see `email-feature.ts`). */
+export function EmailSection({ active }: { active: boolean }) {
+  return useEmailFeature() ? <EmailSectionBody active={active} /> : null;
+}
+
+function EmailSectionBody({ active: selected }: { active: boolean }) {
   // The section stays selected behind the Chat tab; it is only on screen while the panel is open.
   const panelOpen = useDisplayPanelOpen();
   const active = selected && panelOpen;

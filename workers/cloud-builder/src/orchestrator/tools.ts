@@ -24,6 +24,7 @@ import {
 import { worldRelativeToolPath } from "../world/path.js";
 import { createCloudScheduleTools } from "../cloud-schedule-tools.js";
 import { createCloudEmailTools } from "../cloud-email-tools.js";
+import { emailFeatureOnFor } from "@stella/contracts/email-feature";
 import {
   CloudConnectorDirectory,
   ownerMcpSource,
@@ -256,7 +257,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       }),
       createCloudDriveTool({ ownerInternal: toolContext.ownerInternal }),
       ...createCloudScheduleTools(toolContext),
-      ...createCloudEmailTools(toolContext),
+      ...(emailFeatureOnFor(this.env) ? createCloudEmailTools(toolContext) : []),
       createCloudConnectorStatusTool({
         directory: connectors,
         finishConnect: async (connectCode) =>

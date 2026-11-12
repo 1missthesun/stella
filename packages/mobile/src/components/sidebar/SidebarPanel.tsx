@@ -21,6 +21,7 @@ import { StellaMarkHero } from "../stella-mark/StellaMarkHero";
 import { DrawerScrollView } from "./DrawerStage";
 import { Rise, SIDEBAR_PLACES, SidebarPlaceRow } from "./SidebarNav";
 import { useEmailUnseenCount } from "../../lib/email";
+import { useEmailFeature } from "../../lib/email-feature";
 
 const AVATAR = 52;
 const BRAND_MARK = 40;
@@ -53,6 +54,7 @@ export function SidebarPanel({
   const image = user?.image ?? null;
   const accountLabel = t("mobile.nav.account");
   const emailUnseen = useEmailUnseenCount();
+  const emailOn = useEmailFeature();
   const metas: Partial<Record<MainTabId, string>> = {
     files: fileCount > 0 ? String(fileCount) : undefined,
   };
@@ -92,7 +94,7 @@ export function SidebarPanel({
 
         <View style={styles.spacer} />
 
-        {PLACES_FROM_TOP.map((place) => (
+        {PLACES_FROM_TOP.filter((place) => place !== "email" || emailOn).map((place) => (
           <Rise key={place} i={i++} animated={animated}>
             <SidebarPlaceRow
               place={place}

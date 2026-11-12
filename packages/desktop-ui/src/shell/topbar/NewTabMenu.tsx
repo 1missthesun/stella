@@ -8,6 +8,7 @@ import {
 } from "@/shell/sidebar-sections/section-meta";
 import { Trash2, type IconComponent } from "@/ui/icons";
 import { useEmailUnseenCount } from "@/features/email/email-unseen";
+import { useEmailFeature } from "@/features/email/email-feature";
 import "./new-tab-menu.css";
 
 type Place = {
@@ -21,9 +22,10 @@ type Place = {
 function PlaceTiles({ onPick }: { onPick: () => void }) {
   const fromSource = useAppSourceState() !== null;
   const emailUnseen = useEmailUnseenCount();
+  const emailOn = useEmailFeature();
   const places: Place[] = [
     ...HOME_LAUNCHER_SECTIONS.filter(
-      (section) => section !== "updates" || fromSource,
+      (section) => (section !== "updates" || fromSource) && (section !== "email" || emailOn),
     ).map((section) => ({
       key: section,
       label: SIDEBAR_SECTION_META[section].label,

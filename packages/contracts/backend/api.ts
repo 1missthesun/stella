@@ -23,6 +23,7 @@ import type { UserAskCalls, UserAskViews } from "./user-asks.js";
 import type { ClaudeSessionCalls } from "./claude-sessions.js";
 import type { AgentLogCalls } from "./agent-logs.js";
 import type { EmailCalls, EmailViews } from "./email.js";
+import type { EmailDigestCalls, EmailDigestViews } from "./email-digest-legacy.js";
 import type { McpServerCalls } from "./mcp-servers.js";
 import type { CatchUpCalls, CatchUpViews } from "./catch-ups.js";
 
@@ -55,6 +56,7 @@ export type BackendCalls = SystemCalls &
   ClaudeSessionCalls &
   AgentLogCalls &
   EmailCalls &
+  EmailDigestCalls &
   McpServerCalls &
   CatchUpCalls;
 export type BackendViews = ConversationViews &
@@ -77,6 +79,7 @@ export type BackendViews = ConversationViews &
   BrowserViews &
   UserAskViews &
   EmailViews &
+  EmailDigestViews &
   CatchUpViews;
 
 export type CallName = keyof BackendCalls & string;

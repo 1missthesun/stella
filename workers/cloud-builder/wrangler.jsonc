@@ -59,6 +59,8 @@
   "vars": {
     "STELLA_AUTH_URL": "https://auth-dev.stella.sh",
     "GMAIL_PUSH_TOPIC": "projects/fromyou-468223/topics/stella-gmail-dev",
+    // Email sorting and briefings run on dev only (packages/contracts/email-feature.ts); never set in production.
+    "EMAIL_FEATURE": "1",
     "TELEMETRY_ENVIRONMENT": "development",
     "TURN_TIMEOUT_MS": "900000",
     "SANDBOX_IDLE_TIMEOUT_MS": "600000",

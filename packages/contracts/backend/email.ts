@@ -252,6 +252,8 @@ export type EmailCalls = {
 };
 
 export type EmailViews = {
+  /** Whether this backend runs email at all (see `email-feature.ts`). */
+  "email.available": { args: Record<string, never>; result: { available: boolean } };
   "email.feed": { args: Record<string, never>; result: EmailFeed };
   "email.digests": { args: Record<string, never>; result: EmailDigests };
 };

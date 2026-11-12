@@ -1,4 +1,5 @@
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
+import { emailFeatureOnFor } from "@stella/contracts/email-feature";
 import {
   FINISH_CONNECT_PATH,
   GOOGLE_OAUTH_CALLBACK_PATH,
@@ -267,6 +268,8 @@ const sameSecret = (left: string, right: string): boolean => {
  * store debounces syncs. Always 204 for a known token so Pub/Sub doesn't retry.
  */
 const gmailPush = async (request: Request, env: RouteEnv): Promise<Response> => {
+  // Email is off on this backend: nothing to wake, and 204 keeps Pub/Sub from retrying.
+  if (!emailFeatureOnFor(env)) return new Response(null, { status: 204 });
   const expected = String((env as unknown as Record<string, unknown>).GMAIL_PUSH_TOKEN ?? "").trim();
   const token = new URL(request.url).searchParams.get("token")?.trim() ?? "";
   if (!sameSecret(token, expected)) return new Response(null, { status: 401 });

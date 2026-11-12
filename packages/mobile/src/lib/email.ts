@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
 import type { EmailBucket, EmailFocusAction, EmailItem, EmailTargets } from "@stella/contracts/backend/email";
 import { authClient } from "./auth-client";
+import { useEmailFeature } from "./email-feature";
 import { getBackendClient, useBackendView } from "./backend";
 
 export const gmailThreadUrl = (threadId: string, account?: string): string =>
@@ -29,7 +30,8 @@ export function useEmailFeedItems(): {
   showAccounts: boolean;
 } {
   const signedIn = Boolean(authClient.useSession().data?.user);
-  const feed = useBackendView("email.feed", signedIn ? {} : "skip").value;
+  const on = useEmailFeature();
+  const feed = useBackendView("email.feed", signedIn && on ? {} : "skip").value;
   const list = feed?.items;
   const items = useMemo(
     () => (list ? new Map(list.map((item) => [item.itemId, item])) : undefined),

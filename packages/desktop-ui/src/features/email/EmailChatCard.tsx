@@ -3,6 +3,7 @@ import type { EmailCard } from "@stella/contracts/email-card";
 import { useI18n } from "@/shared/i18n";
 import { Mail } from "@/ui/icons";
 import { openEmailDigest } from "./email-digest-store";
+import { useEmailFeature } from "./email-feature";
 import "./email-card.css";
 
 /**
@@ -12,8 +13,9 @@ import "./email-card.css";
  */
 export const EmailChatCard = memo(function EmailChatCard({ card }: { card: EmailCard }) {
   const { t, tPlural } = useI18n();
+  const on = useEmailFeature();
   const count = card.items.length;
-  if (count === 0) return null;
+  if (count === 0 || !on) return null;
   const urgent = card.items.filter((item) => item.bucket === "urgent").length;
   const label =
     card.kind === "rule"

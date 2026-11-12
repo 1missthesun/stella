@@ -31,6 +31,7 @@ import {
   type EmailCardItem,
 } from "@stella/contracts/email-card";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
+import { emailFeatureOnFor } from "@stella/contracts/email-feature";
 import { GoogleApiError, gmailFetcher, runGoogleAction, type Fetcher } from "../../integrations/google.js";
 import {
   addressesIn,
@@ -64,7 +65,7 @@ import {
 import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
-import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
+import type { InternalDef, JobDef, OwnerContext, OwnerDbReader, OwnerDomain, OwnerViewContext } from "../registry.js";
 import { readMainConversationId } from "./conversations.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
 import { stellaGmailTokens, stellaGoogleAccounts, stellaGoogleAvailable } from "./google-accounts.js";
@@ -114,9 +115,6 @@ const CAPS = {
 export const EMAIL_MIGRATION = {
   id: "email.1-init",
   statements: [
-    "DROP TABLE IF EXISTS email_digest_state",
-    "DROP TABLE IF EXISTS email_digests",
-    "DROP TABLE IF EXISTS email_digest_seen",
     `CREATE TABLE email_state (
        id INTEGER PRIMARY KEY CHECK (id = 1),
        enabled INTEGER NOT NULL,
@@ -201,21 +199,26 @@ export const EMAIL_MIGRATION = {
   ],
 };
 
-/** One row per email row posted in the chat, so the opened Email view can show it and every earlier one. */
+/**
+ * One row per email row posted in the chat, so the opened Email view can show
+ * it and every earlier one. Named `email_briefings` because owners who had the
+ * October digest still have its `email_digests`, `email_digest_state` and
+ * `email_digest_seen` tables, which are kept as they are.
+ */
 export const EMAIL_DIGESTS_MIGRATION = {
   id: "email.2-digests",
   statements: [
-    `CREATE TABLE email_digests (
+    `CREATE TABLE email_briefings (
        digest_id TEXT PRIMARY KEY,
        kind TEXT NOT NULL,
        created_at INTEGER NOT NULL,
        rule_text TEXT,
        item_ids TEXT
      )`,
-    "CREATE INDEX email_digests_by_time ON email_digests (created_at)",
+    "CREATE INDEX email_briefings_by_time ON email_briefings (created_at)",
     "ALTER TABLE email_items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
     "CREATE INDEX email_items_by_card ON email_items (card_id)",
-    `INSERT OR IGNORE INTO email_digests (digest_id, kind, created_at)
+    `INSERT OR IGNORE INTO email_briefings (digest_id, kind, created_at)
      SELECT card_id,
             CASE WHEN COUNT(*) > 1 OR SUM(state = 'summarized') > 0 THEN 'summary'
                  WHEN MAX(rule_id) IS NOT NULL THEN 'rule'
@@ -228,7 +231,34 @@ export const EMAIL_DIGESTS_MIGRATION = {
 /** The written briefing of each summary, kept with its digest. */
 export const EMAIL_BRIEF_MIGRATION = {
   id: "email.3-brief",
-  statements: ["ALTER TABLE email_digests ADD COLUMN brief TEXT"],
+  statements: ["ALTER TABLE email_briefings ADD COLUMN brief TEXT"],
+};
+
+/**
+ * Dev stores ran the first versions of the two migrations above, which named
+ * the table `email_digests` (dropping the October one): give them the new
+ * table, rebuilt from their items. A no-op where `email.2-digests` made it.
+ */
+export const EMAIL_BRIEFINGS_MIGRATION = {
+  id: "email.4-briefings",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS email_briefings (
+       digest_id TEXT PRIMARY KEY,
+       kind TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       rule_text TEXT,
+       item_ids TEXT,
+       brief TEXT
+     )`,
+    "CREATE INDEX IF NOT EXISTS email_briefings_by_time ON email_briefings (created_at)",
+    `INSERT OR IGNORE INTO email_briefings (digest_id, kind, created_at)
+     SELECT card_id,
+            CASE WHEN COUNT(*) > 1 OR SUM(state = 'summarized') > 0 THEN 'summary'
+                 WHEN MAX(rule_id) IS NOT NULL THEN 'rule'
+                 ELSE 'urgent' END,
+            MAX(sorted_at)
+       FROM email_items WHERE card_id IS NOT NULL GROUP BY card_id`,
+  ],
 };
 
 type DigestRow = {
@@ -596,7 +626,7 @@ const postCard = async (
   });
   if (!posted) throw new Error("The email card could not be posted yet.");
   ctx.db.run(
-    "INSERT OR IGNORE INTO email_digests (digest_id, kind, created_at, rule_text, item_ids, brief) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO email_briefings (digest_id, kind, created_at, rule_text, item_ids, brief) VALUES (?, ?, ?, ?, ?, ?)",
     card.cardId,
     card.kind,
     ctx.now,
@@ -1338,7 +1368,7 @@ const parseBrief = (text: string): { brief?: EmailBrief } => {
 /** Each email row in the chat, opened: what it surfaced, and what was skipped as noise in its stretch. */
 const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
   const rows = ctx.db.all<DigestRow>(
-    "SELECT * FROM email_digests WHERE created_at > ? ORDER BY created_at DESC LIMIT ?",
+    "SELECT * FROM email_briefings WHERE created_at > ? ORDER BY created_at DESC LIMIT ?",
     ctx.now - FEED_WINDOW_MS,
     DIGESTS_SHOWN,
   );
@@ -1347,7 +1377,7 @@ const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
     const kind = row.kind === "urgent" || row.kind === "rule" ? row.kind : "summary";
     const previous =
       ctx.db.one<{ created_at: number }>(
-        "SELECT created_at FROM email_digests WHERE kind = 'summary' AND created_at < ? ORDER BY created_at DESC LIMIT 1",
+        "SELECT created_at FROM email_briefings WHERE kind = 'summary' AND created_at < ? ORDER BY created_at DESC LIMIT 1",
         row.created_at,
       )?.created_at ?? null;
     // The newest summary also lists noise that arrived after it, so nothing skipped is out of sight.
@@ -1775,9 +1805,9 @@ const readThread = async (
 
 const ruleId = (): string => `r${crypto.randomUUID().replace(/-/gu, "").slice(0, 10)}`;
 
-export const emailDomain = {
+const runningEmailDomain = {
   name: "email",
-  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION],
+  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION, EMAIL_BRIEFINGS_MIGRATION],
   calls: {
     "email.setEnabled": {
       scope: "owner",
@@ -2021,9 +2051,46 @@ export const emailDomain = {
     for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB]) ctx.jobs.cancel(job);
     const addresses = ctx.db.all<{ email: string }>("SELECT email FROM email_accounts");
     for (const { email } of addresses) await indexWatch(ctx, email, false).catch(() => undefined);
-    for (const table of ["email_digests", "email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {
+    for (const table of ["email_briefings", "email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {
       ctx.db.run(`DELETE FROM ${table}`);
     }
     return { pending: false };
   },
 } satisfies OwnerDomain;
+
+const unavailable = (): never => {
+  throw new RpcError("NOT_FOUND", "Email isn't available.");
+};
+
+/**
+ * Email runs only where it is turned on (`email-feature.ts`). Elsewhere every
+ * call and view refuses, jobs and Gmail's change pings end without work, and
+ * the tool says it isn't available; `email.available` says which.
+ */
+type LooseCall = { handler: (ctx: OwnerContext, args: unknown) => unknown };
+type LooseView = { parse: unknown; read: (ctx: OwnerViewContext, args: unknown) => unknown };
+
+const gateEmailDomain = (domain: typeof runningEmailDomain): OwnerDomain => {
+  const on = (env: unknown): boolean => emailFeatureOnFor(env);
+  const calls: Record<string, LooseCall> = {};
+  for (const [name, def] of Object.entries(domain.calls as unknown as Record<string, LooseCall>)) {
+    calls[name] = { ...def, handler: (ctx, args) => (on(ctx.env) ? def.handler(ctx, args) : unavailable()) };
+  }
+  const views: Record<string, LooseView> = {
+    "email.available": { parse: empty(), read: (ctx) => ({ available: on(ctx.env) }) },
+  };
+  for (const [name, def] of Object.entries(domain.views as unknown as Record<string, LooseView>)) {
+    views[name] = { ...def, read: (ctx, args) => (on(ctx.env) ? def.read(ctx, args) : unavailable()) };
+  }
+  const internal: Record<string, InternalDef> = {};
+  for (const [name, run] of Object.entries(domain.internal as Record<string, InternalDef>)) {
+    internal[name] = (ctx, args) => (on(ctx.env) ? run(ctx, args) : name === "email.changed" ? { ok: true } : unavailable());
+  }
+  const jobs: Record<string, JobDef> = {};
+  for (const [name, def] of Object.entries(domain.jobs as Record<string, JobDef>)) {
+    jobs[name] = { ...def, run: (ctx, payload) => (on(ctx.env) ? def.run(ctx, payload) : undefined) };
+  }
+  return { ...domain, calls, views, internal, jobs } as unknown as OwnerDomain;
+};
+
+export const emailDomain = gateEmailDomain(runningEmailDomain);

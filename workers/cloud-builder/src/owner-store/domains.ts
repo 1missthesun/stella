@@ -30,6 +30,7 @@ import { userAsksDomain } from "./domains/user-asks.js";
 import { claudeSessionsDomain } from "./domains/claude-sessions.js";
 import { agentLogsDomain } from "./domains/agent-logs.js";
 import { emailDomain } from "./domains/email.js";
+import { emailDigestLegacyDomain } from "./domains/email-digest-legacy.js";
 import { mcpServersDomain } from "./domains/mcp-servers.js";
 import { catchUpsDomain } from "./domains/catch-ups.js";
 import { deviceOfflineDomain } from "./domains/device-offline.js";
@@ -75,6 +76,7 @@ export const ownerDomains: OwnerDomain[] = [
   agentEventsDomain,
   agentReportsDomain,
   emailDomain,
+  emailDigestLegacyDomain,
   agentLogsDomain,
   mcpServersDomain,
   catchUpsDomain,

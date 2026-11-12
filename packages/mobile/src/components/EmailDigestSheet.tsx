@@ -4,12 +4,18 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../i18n";
 import { closeEmailDigest, markEmailSeen, selectEmailDigest, useEmailDigestSheet } from "../lib/email";
+import { useEmailFeature } from "../lib/email-feature";
 import { EmailDigestView } from "./EmailDigestView";
 import { FileViewerFooter } from "./FileViewerPanel";
 import { TopSheet, TopSheetDragHandle } from "./TopSheet";
 
 /** The digest behind a chat email row, opened from the top like a file. */
 export function EmailDigestSheet({ bottomReserve = 0 }: { bottomReserve?: number }) {
+  // Email shows only where it is turned on (see `email-feature.ts`).
+  return useEmailFeature() ? <EmailDigestSheetBody bottomReserve={bottomReserve} /> : null;
+}
+
+function EmailDigestSheetBody({ bottomReserve }: { bottomReserve: number }) {
   const t = useT();
   const router = useRouter();
   const { digestId, open } = useEmailDigestSheet();

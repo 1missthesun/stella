@@ -4,6 +4,7 @@ import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
+import { useEmailFeature } from "./email-feature";
 
 export const gmailThreadUrl = (threadId: string, account?: string): string =>
   `https://mail.google.com/mail/u/${account?.includes("@") ? encodeURIComponent(account) : "0"}/#all/${encodeURIComponent(threadId)}`;
@@ -28,7 +29,8 @@ export function useEmailFeedItems(): {
   showAccounts: boolean;
 } {
   const { hasConnectedAccount } = useAuthSessionState();
-  const feed = useBackendView("email.feed", hasConnectedAccount ? {} : "skip").value;
+  const on = useEmailFeature();
+  const feed = useBackendView("email.feed", hasConnectedAccount && on ? {} : "skip").value;
   const list = feed?.items;
   const items = useMemo(
     () => (list ? new Map(list.map((item) => [item.itemId, item])) : undefined),

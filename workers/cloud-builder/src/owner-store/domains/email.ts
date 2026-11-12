@@ -50,7 +50,7 @@ import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { readMainConversationId } from "./conversations.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
-import { stellaGmailTokens, stellaGoogleAvailable } from "./google-accounts.js";
+import { stellaGmailTokens, stellaGoogleAccounts, stellaGoogleAvailable } from "./google-accounts.js";
 import { ownerZone } from "./schedules.js";
 
 const SYNC_JOB = "email.sync";
@@ -1027,7 +1027,7 @@ const postSummary = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
     items: chosen.map((row, index) => cardItem(row, index + 1, multi)),
     ...(noiseCount > 0 ? { noiseCount } : {}),
   };
-  await postCard(ctx, snapshot, card);
+  if (!(await postCard(ctx, snapshot, card))) return false;
   for (const row of chosen) {
     ctx.db.run(
       "UPDATE email_items SET state = 'summarized', card_id = ?, excerpt = NULL WHERE item_id = ?",
@@ -1176,8 +1176,9 @@ const statusOf = (ctx: { db: OwnerDbReader; now: number }, plan: string, zone: s
   const { today: _today, ...usage } = usageOf(ctx.now, state, plan, zone);
   return {
     enabled: state?.enabled === 1,
+    gmailConnected: stellaGoogleAccounts(ctx.db, "gmail").map((account) => account.email ?? account.label),
     accounts,
-    needsReconnect: accounts.length === 0 && composioGmailOnly(ctx.db),
+    needsReconnect: accounts.length === 0 && stellaGoogleAccounts(ctx.db, "gmail").length === 0 && composioGmailOnly(ctx.db),
     usage,
     ...(state?.last_summary_at ? { lastSummaryAt: state.last_summary_at } : {}),
   };

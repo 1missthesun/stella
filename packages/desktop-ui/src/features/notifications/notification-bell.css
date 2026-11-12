@@ -34,6 +34,11 @@
   overflow: hidden;
 }
 
+.notification-panel:focus,
+.notification-panel:focus-visible {
+  outline: none;
+}
+
 .notification-panel__head {
   display: flex;
   align-items: center;
@@ -149,7 +154,9 @@
 .notification-row__button {
   display: inline-flex;
   align-items: center;
-  padding: 0;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border-radius: 999px;
   border: 0;
   background: none;
   color: var(--text-weak);
@@ -166,6 +173,7 @@
 }
 
 .notification-row__button--primary {
+  margin: 0;
   padding: 0 11px;
   border-radius: 999px;
   background: var(--interactive);

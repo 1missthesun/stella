@@ -266,6 +266,11 @@ export const NotificationBell = memo(function NotificationBell() {
           collisionPadding={8}
           aria-label={t("shell.notifications.title")}
           data-testid="notification-panel"
+          tabIndex={-1}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
+          }}
         >
           <div className="notification-panel__head">
             <h2 className="notification-panel__title">{t("shell.notifications.title")}</h2>

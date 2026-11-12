@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { EMAIL_REASON_WORDS, type EmailCard, type EmailCardItem } from "@stella/contracts/email-card";
 import { Text } from "../Text";
@@ -14,6 +14,7 @@ import {
 } from "../../lib/email";
 import { tapLight, tapMedium } from "../../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
+import { useChatReveal } from "../../lib/chat-reveal";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { fadeHex } from "../../theme/oklch";
@@ -49,6 +50,8 @@ function Line({
   onPress,
   onLongPress,
   accessibilityLabel,
+  wrapRef,
+  onWrapLayout,
   children,
 }: {
   colors: Colors;
@@ -61,11 +64,18 @@ function Line({
   onPress?: () => void;
   onLongPress?: () => void;
   accessibilityLabel: string;
+  wrapRef?: Ref<View>;
+  onWrapLayout?: () => void;
   children?: ReactNode;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
-    <View style={[styles.lineWrap, expanded && styles.lineWrapOpen]} testID="email-card">
+    <View
+      ref={wrapRef}
+      onLayout={onWrapLayout}
+      style={[styles.lineWrap, expanded && styles.lineWrapOpen]}
+      testID="email-card"
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
@@ -153,6 +163,9 @@ function RuleCard({ card, item, colors }: { card: EmailCard; item: EmailCardItem
   );
 }
 
+const needsYou = (item: EmailCardItem) =>
+  item.bucket === "urgent" || item.bucket === "needs_you";
+
 function SummaryRow({
   item,
   showAccount,
@@ -195,6 +208,9 @@ function SummaryRow({
       onLongPress={more}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
+      <View style={styles.markCol}>
+        {needsYou(item) ? <View style={styles.mark} /> : null}
+      </View>
       <Text style={styles.n} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
         {item.n}
       </Text>
@@ -225,7 +241,25 @@ function SummaryCard({ card, colors }: { card: EmailCard; colors: Colors }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { showAccounts } = useEmailFeedItems();
   const [expanded, setExpanded] = useState(false);
-  const needYou = card.items.filter((item) => item.bucket === "urgent" || item.bucket === "needs_you").length;
+  const reveal = useChatReveal();
+  const wrapRef = useRef<View>(null);
+  const revealPending = useRef(false);
+  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (revealTimer.current) clearTimeout(revealTimer.current);
+    },
+    [],
+  );
+  // Opening the list near the bottom of the chat grows it past the screen;
+  // once it has laid out, scroll so all of it (its top first) is in view.
+  const onWrapLayout = () => {
+    if (!revealPending.current || !reveal) return;
+    revealPending.current = false;
+    if (revealTimer.current) clearTimeout(revealTimer.current);
+    revealTimer.current = setTimeout(() => reveal(wrapRef.current), 120);
+  };
+  const needYou = card.items.filter(needsYou).length;
   const worth = card.items.length - needYou;
   const text = [
     needYou > 0 ? tPlural("email.card.needYou", needYou) : null,
@@ -241,9 +275,12 @@ function SummaryCard({ card, colors }: { card: EmailCard; colors: Colors }) {
       chevron
       expanded={expanded}
       accessibilityLabel={text}
+      wrapRef={wrapRef}
+      onWrapLayout={onWrapLayout}
       onPress={() => {
         tapLight();
-        setExpanded((open) => !open);
+        revealPending.current = !expanded;
+        setExpanded(!expanded);
       }}
     >
       <View style={styles.rows}>
@@ -313,6 +350,8 @@ const makeStyles = (colors: Colors) =>
       paddingVertical: 8,
     },
     rowPressed: { opacity: 0.6 },
+    markCol: { alignItems: "center", height: 20, justifyContent: "center", marginRight: -4, width: 6 },
+    mark: { backgroundColor: colors.accent, borderRadius: 3, height: 6, width: 6 },
     rowDismissed: { opacity: 0.5 },
     n: {
       color: colors.textMuted,

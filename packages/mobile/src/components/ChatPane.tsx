@@ -1,6 +1,7 @@
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { agentIdsOf, type AgentLabelRow } from "@stella/contracts/agent-labels";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
+import { ChatRevealContext, type ChatReveal } from "../lib/chat-reveal";
 import {
   isPlacementThreadId,
   placementAliases,
@@ -774,6 +775,32 @@ export function ChatPane({
     listTrailingSlackPx,
     lastMessage?.id ?? null,
     topInset,
+  );
+
+  const messageListRef = useRef<View>(null);
+  const revealInsetsRef = useRef({ top: topInset, bottom: listBottomInsetPx });
+  revealInsetsRef.current = { top: topInset, bottom: listBottomInsetPx };
+  const revealBy = scroll.revealBy;
+  const revealRow = useCallback<ChatReveal>(
+    (node) => {
+      const list = messageListRef.current;
+      if (!node || !list) return;
+      list.measureInWindow((_lx, listY, _lw, listH) => {
+        node.measureInWindow((_x, y, _w, h) => {
+          const { top, bottom } = revealInsetsRef.current;
+          const viewTop = listY + top + 12;
+          const viewBottom = listY + listH - bottom - 12;
+          if (h >= viewBottom - viewTop || y < viewTop) {
+            revealBy(y - viewTop);
+            return;
+          }
+          if (y + h > viewBottom) {
+            revealBy(Math.min(y + h - viewBottom, y - viewTop));
+          }
+        });
+      });
+    },
+    [revealBy],
   );
 
   useEffect(() => {
@@ -1899,7 +1926,11 @@ export function ChatPane({
             </Pressable>
           ) : (
             <>
-              <Reanimated.View style={[styles.messageList, listKeyboardStyle]}>
+              <ChatRevealContext.Provider value={revealRow}>
+              <Reanimated.View
+                ref={messageListRef}
+                style={[styles.messageList, listKeyboardStyle]}
+              >
                 <LegendList<ChatMessage>
                   ref={scroll.listRef}
                   pointerEvents={replyFocus ? "none" : "auto"}
@@ -1934,6 +1965,7 @@ export function ChatPane({
                   }
                 />
               </Reanimated.View>
+              </ChatRevealContext.Provider>
               {/* Top taper — fades the list into the surface at the top edge so
                   messages scrolling under the top bar dissolve instead of
                   hard-cutting. Cross-platform (RN `fadingEdgeLength` is

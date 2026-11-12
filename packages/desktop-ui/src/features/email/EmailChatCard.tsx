@@ -165,7 +165,11 @@ function SummaryRow({ item }: { item: EmailCardItem }) {
   const { busy, failed, run } = useRun();
   const dismissed = settled === "dismissed";
   return (
-    <li className="email-card__row" data-dismissed={dismissed || undefined}>
+    <li
+      className="email-card__row"
+      data-dismissed={dismissed || undefined}
+      data-needs-you={item.bucket === "urgent" || item.bucket === "needs_you" || undefined}
+    >
       <button
         type="button"
         className="email-card__open"

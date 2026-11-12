@@ -276,3 +276,16 @@ button.email-line__main:focus-visible {
 .email-line__rows {
   margin: 0 12px 0 30px;
 }
+
+/* Rows that need the user carry a small accent dot in the gutter; rows
+   worth knowing carry nothing. */
+.email-line__rows .email-card__row[data-needs-you]::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: -12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--interactive);
+}

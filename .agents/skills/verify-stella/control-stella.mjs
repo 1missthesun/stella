@@ -463,7 +463,8 @@ const ensureRunHome = (run) => {
   const homeDir = path.join(run.runDir, "home");
   mkdirSync(homeDir, { recursive: true, mode: 0o700 });
   const stellaLink = path.join(homeDir, ".stella");
-  if (!existsSync(stellaLink)) symlinkSync(run.dataDir, stellaLink, "dir");
+  // A junction on Windows: a directory symlink needs admin rights or Developer Mode there.
+  if (!existsSync(stellaLink)) symlinkSync(run.dataDir, stellaLink, process.platform === "win32" ? "junction" : "dir");
   const gitconfig = path.join(homeDir, ".gitconfig");
   if (!existsSync(gitconfig)) {
     const read = (key) => {

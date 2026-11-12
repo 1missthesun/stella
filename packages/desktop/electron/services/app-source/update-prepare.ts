@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { removeScratchDir } from "./dir-links.js";
 import { git, gitRaw } from "./git.js";
 import {
   buildOnScratch,
@@ -93,7 +94,7 @@ export class UpdatePreparer {
     this.loading ??= (async () => {
       await Promise.all(
         [this.scratch, `${this.scratch}.index`, `${this.scratch}-deps`].map((leftover) =>
-          fs.rm(leftover, { recursive: true, force: true }).catch(() => undefined),
+          removeScratchDir(leftover).catch(() => undefined),
         ),
       );
       const names = await fs.readdir(this.root).catch(() => [] as string[]);

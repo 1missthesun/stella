@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { DirectoryLinkError, linkDirectory, removeScratchDir } from "./dir-links.js";
 import { git, gitRaw, run } from "./git.js";
 
 /**
@@ -20,7 +21,8 @@ import { git, gitRaw, run } from "./git.js";
  * through a private index (`read-tree` and `checkout-index`), which leaves no
  * worktree for git or anyone listing worktrees to see.
  *
- * `node_modules` is symlinked in rather than installed. The root directory
+ * `node_modules` is linked in rather than installed (a junction on Windows,
+ * see `dir-links.ts`; removed link-first, never followed). The root directory
  * holds no workspace packages (bun puts `@stella/*` in each package's own
  * `node_modules`), and the bundle resolves `@stella/contracts` and
  * `@stella/runtime` through esbuild aliases computed from the tree it is
@@ -93,7 +95,7 @@ const writeTree = async (
   whole: boolean,
   options: ScratchOptions,
 ) => {
-  await fs.rm(scratch, { recursive: true, force: true });
+  await removeScratchDir(scratch);
   await fs.mkdir(scratch, { recursive: true });
   const index = `${scratch}.index`;
   const env = { GIT_INDEX_FILE: index };
@@ -119,11 +121,7 @@ const writeTree = async (
 };
 
 export const linkNodeModules = async (cwd: string, scratch: string) => {
-  await fs.symlink(
-    path.join(cwd, "node_modules"),
-    path.join(scratch, "node_modules"),
-    "dir",
-  );
+  await linkDirectory(path.join(cwd, "node_modules"), path.join(scratch, "node_modules"));
   const packages = await fs
     .readdir(path.join(scratch, "packages"), { withFileTypes: true })
     .catch(() => []);
@@ -131,13 +129,20 @@ export const linkNodeModules = async (cwd: string, scratch: string) => {
     if (!entry.isDirectory()) continue;
     const from = path.join(cwd, "packages", entry.name, "node_modules");
     if (!(await fs.stat(from).catch(() => null))) continue;
-    await fs.symlink(
-      from,
-      path.join(scratch, "packages", entry.name, "node_modules"),
-      "dir",
-    );
+    await linkDirectory(from, path.join(scratch, "packages", entry.name, "node_modules"));
   }
 };
+
+/**
+ * What the check says when this computer can't link the app's packages into
+ * a scratch copy: the change goes to a task, whose draft installs its own.
+ */
+export const linkFailureOutput = (error: DirectoryLinkError) =>
+  [
+    "The build check couldn't run on this computer, because the app's packages could not be linked into the check's scratch folder:",
+    error.message,
+    "Nothing is known to be wrong with the change itself. Make it in a draft, install the draft's own packages there (packages/desktop/scripts/draft-deps.ts), and check that Electron main and preload build.",
+  ].join("\n");
 
 export const copyEnvFiles = async (cwd: string, scratch: string) => {
   const dir = path.join("packages", "desktop-ui");
@@ -216,8 +221,14 @@ export const buildOnScratch = async (args: {
     });
   };
   try {
-    let result = await attempt(false);
-    if (result.code !== 0) result = await attempt(true);
+    let result;
+    try {
+      result = await attempt(false);
+      if (result.code !== 0) result = await attempt(true);
+    } catch (error) {
+      if (!(error instanceof DirectoryLinkError)) throw error;
+      return { ok: false, ms: Date.now() - startedAt, output: linkFailureOutput(error) };
+    }
     if (result.code !== 0) {
       const output = `${result.stdout}\n${result.stderr}`.trim();
       return { ok: false, ms: Date.now() - startedAt, output: output.slice(-OUTPUT_LIMIT) };
@@ -235,7 +246,7 @@ export const buildOnScratch = async (args: {
     }
     return { ok: true, ms: Date.now() - startedAt };
   } finally {
-    await fs.rm(scratch, { recursive: true, force: true });
+    await removeScratchDir(scratch);
   }
 };
 

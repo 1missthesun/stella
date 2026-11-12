@@ -15,6 +15,12 @@ on:
     paths:
       - "launcher/**"
       - ".github/workflows/build-launchers.yml"
+      - ".github/scripts/update-links-check.ps1"
+      - "packages/desktop/scripts/check-update-links.mjs"
+      - "packages/desktop/electron/services/app-source/dir-links.ts"
+      - "packages/desktop/electron/services/app-source/update-gate.ts"
+      - "packages/desktop/electron/services/app-source/update-merge.ts"
+      - "packages/desktop/electron/services/app-source/draft-deps.ts"
   workflow_dispatch:
     inputs:
       publish:
@@ -187,6 +193,16 @@ jobs:
           $check.WaitForExit()
           if ($check.ExitCode -ne 0) { exit 1 }
           exit $p.ExitCode
+
+      # Taking a change on the install the self-test left: the update check's
+      # build and the background merge on scratch copies with the app's
+      # packages linked in (junctions), a draft prepared and removed, and the
+      # change applied, as a user without admin rights where the runner allows
+      # it. After every step the app's packages must all still be there.
+      - name: Update links check
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\scripts\update-links-check.ps1" -Root "$env:RUNNER_TEMP\stella-root" -Out "$env:RUNNER_TEMP\capture\update-links"
 
       # Authenticode through DigiCert KeyLocker, the same certificate pinning
       # as the old desktop release: certsync can return more than one, so the

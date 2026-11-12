@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { isDirectoryLink, linkDirectorySync, removeDirectoryLinkSync } from "./dir-links.js";
 
 export type DraftDependencies = { mode: "ready" | "linked" | "installed"; ms: number };
 
@@ -48,7 +49,7 @@ export const dependencyFingerprint = (root: string): string => {
 
 export const isLinkedToApp = (draftRoot: string, appRoot: string): boolean => {
   const modules = path.join(draftRoot, "node_modules");
-  if (!lstat(modules)?.isSymbolicLink()) return false;
+  if (!isDirectoryLink(modules)) return false;
   try {
     return fs.realpathSync(modules) === fs.realpathSync(path.join(appRoot, "node_modules"));
   } catch {
@@ -75,15 +76,14 @@ const link = (draftRoot: string, appRoot: string) => {
   const modules = path.join(draftRoot, "node_modules");
   const stat = lstat(modules);
   if (stat && !stat.isSymbolicLink()) fs.rmSync(modules, { recursive: true, force: true });
-  else if (stat) fs.unlinkSync(modules);
+  else if (stat) removeDirectoryLinkSync(modules);
   copyWorkspaceLinks(draftRoot, appRoot);
-  fs.symlinkSync(path.join(appRoot, "node_modules"), modules, "dir");
+  linkDirectorySync(path.join(appRoot, "node_modules"), modules);
 };
 
 export const unlinkFromApp = (draftRoot: string, appRoot: string): boolean => {
   if (!isLinkedToApp(draftRoot, appRoot)) return false;
-  fs.unlinkSync(path.join(draftRoot, "node_modules"));
-  return true;
+  return removeDirectoryLinkSync(path.join(draftRoot, "node_modules"));
 };
 
 const install = (bun: string, cwd: string, timeoutMs: number) =>
@@ -114,6 +114,10 @@ export const prepareDraftDependencies = async (options: {
   const startedAt = Date.now();
   const { draftRoot, appRoot } = options;
   const done = (mode: DraftDependencies["mode"]): DraftDependencies => ({ mode, ms: Date.now() - startedAt });
+  // Never on Windows. A draft is a git worktree that tasks remove with `git
+  // worktree remove`, and Git for Windows takes a junction for a directory
+  // (node_modules is ignored, so nothing stops it) and deletes the app's own
+  // packages through it. Windows drafts install their own.
   const linkable =
     process.platform !== "win32" &&
     lstat(path.join(appRoot, "node_modules"))?.isDirectory() === true &&
@@ -140,7 +144,8 @@ export const prepareDraftDependencies = async (options: {
     const modules = path.join(dir, "node_modules");
     const stat = lstat(modules);
     if (stat?.isDirectory()) continue;
-    if (stat) fs.rmSync(modules, { force: true });
+    if (stat?.isSymbolicLink()) removeDirectoryLinkSync(modules);
+    else if (stat) fs.rmSync(modules, { force: true });
     missing = true;
   }
   if (!missing) return done("ready");

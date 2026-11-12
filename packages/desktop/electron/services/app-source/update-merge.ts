@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { git, gitRaw, run } from "./git.js";
+import { removeScratchDir } from "./dir-links.js";
 import { copyEnvFiles, linkNodeModules } from "./update-gate.js";
 
 /**
@@ -72,8 +73,9 @@ const openScratch = async (
   env: NodeJS.ProcessEnv | undefined,
   signal?: AbortSignal,
 ): Promise<Scratch> => {
-  await gitRaw(cwd, ["worktree", "remove", "--force", dir]).catch(() => undefined);
-  await fs.rm(dir, { recursive: true, force: true });
+  // Links first: on Windows `git worktree remove` follows a junction and
+  // would delete the app's own packages through it.
+  await removeScratchDir(dir);
   await gitRaw(cwd, ["worktree", "prune"]);
   await fs.mkdir(path.dirname(dir), { recursive: true });
   await git(cwd, [...SCRATCH_CONFIG, "worktree", "add", "--detach", "--force", dir, head], {
@@ -90,8 +92,7 @@ const openScratch = async (
 };
 
 const closeScratch = async (cwd: string, dir: string) => {
-  await gitRaw(cwd, ["worktree", "remove", "--force", dir]).catch(() => undefined);
-  await fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  await removeScratchDir(dir).catch(() => undefined);
   await gitRaw(cwd, ["worktree", "prune"]).catch(() => undefined);
 };
 

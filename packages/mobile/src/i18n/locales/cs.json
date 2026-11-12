@@ -3639,8 +3639,8 @@
       "waiting": "Zatím v žádném přehledu",
       "empty": "Zatím žádný přehled. Když bude nová pošta důležitá, objeví se tady.",
       "settings": "Nastavení e-mailu",
-      "askReply": "Navrhni odpověď na e-mail od {from} „{subject}“.",
-      "askHandle": "Vyřiď e-mail od {from} „{subject}“.",
+      "askReply": "Navrhni odpověď na e-mail od {from} „{subject}“",
+      "askHandle": "Vyřiď e-mail od {from} „{subject}“",
       "askTell": "K e-mailu od {from} „{subject}“: {text}"
     }
   }

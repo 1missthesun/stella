@@ -3639,8 +3639,8 @@
       "waiting": "Jeszcze nie w podsumowaniu",
       "empty": "Brak podsumowania. Gdy nowa poczta będzie ważna, pojawi się tutaj.",
       "settings": "Ustawienia poczty",
-      "askReply": "Napisz szkic odpowiedzi na e-mail od {from} „{subject}”.",
-      "askHandle": "Zajmij się e-mailem od {from} „{subject}”.",
+      "askReply": "Napisz szkic odpowiedzi na e-mail od {from} „{subject}”",
+      "askHandle": "Zajmij się e-mailem od {from} „{subject}”",
       "askTell": "O e-mailu od {from} „{subject}”: {text}"
     }
   }

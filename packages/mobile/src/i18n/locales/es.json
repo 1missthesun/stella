@@ -3611,8 +3611,8 @@
       "waiting": "Aún no está en un resumen",
       "empty": "Aún no hay resumen. Cuando un correo nuevo importe, aparecerá aquí.",
       "settings": "Ajustes de correo",
-      "askReply": "Redacta una respuesta al correo de {from} «{subject}».",
-      "askHandle": "Encárgate del correo de {from} «{subject}».",
+      "askReply": "Redacta una respuesta al correo de {from} «{subject}»",
+      "askHandle": "Encárgate del correo de {from} «{subject}»",
       "askTell": "Sobre el correo de {from} «{subject}»: {text}"
     }
   }

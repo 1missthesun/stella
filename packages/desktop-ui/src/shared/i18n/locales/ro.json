@@ -3611,8 +3611,8 @@
       "waiting": "Încă nu e într-un rezumat",
       "empty": "Încă nu există rezumat. Când un e-mail nou contează, apare aici.",
       "settings": "Setări e-mail",
-      "askReply": "Scrie o ciornă de răspuns la e-mailul de la {from} „{subject}”.",
-      "askHandle": "Ocupă-te de e-mailul de la {from} „{subject}”.",
+      "askReply": "Scrie o ciornă de răspuns la e-mailul de la {from} „{subject}”",
+      "askHandle": "Ocupă-te de e-mailul de la {from} „{subject}”",
       "askTell": "Despre e-mailul de la {from} „{subject}”: {text}"
     }
   }

@@ -3611,8 +3611,8 @@
       "waiting": "Pas encore dans un résumé",
       "empty": "Pas encore de résumé. Quand un nouvel e-mail compte, il apparaît ici.",
       "settings": "Réglages e-mail",
-      "askReply": "Rédige une réponse à l’e-mail de {from} « {subject} ».",
-      "askHandle": "Occupe-toi de l’e-mail de {from} « {subject} ».",
+      "askReply": "Rédige une réponse à l’e-mail de {from} « {subject} »",
+      "askHandle": "Occupe-toi de l’e-mail de {from} « {subject} »",
       "askTell": "À propos de l’e-mail de {from} « {subject} » : {text}"
     }
   }

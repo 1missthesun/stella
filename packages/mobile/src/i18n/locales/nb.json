@@ -3583,8 +3583,8 @@
       "waiting": "Ikke i en oversikt ennå",
       "empty": "Ingen oversikt ennå. Når ny e-post betyr noe, vises den her.",
       "settings": "E-postinnstillinger",
-      "askReply": "Skriv et svarutkast til e-posten fra {from} «{subject}».",
-      "askHandle": "Ta deg av e-posten fra {from} «{subject}».",
+      "askReply": "Skriv et svarutkast til e-posten fra {from} «{subject}»",
+      "askHandle": "Ta deg av e-posten fra {from} «{subject}»",
       "askTell": "Om e-posten fra {from} «{subject}»: {text}"
     }
   }

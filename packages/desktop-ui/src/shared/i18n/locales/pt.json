@@ -3611,8 +3611,8 @@
       "waiting": "Ainda fora de um resumo",
       "empty": "Ainda não há resumo. Quando um e-mail novo importar, ele aparece aqui.",
       "settings": "Ajustes de e-mail",
-      "askReply": "Rascunhe uma resposta ao e-mail de {from} “{subject}”.",
-      "askHandle": "Resolva o e-mail de {from} “{subject}”.",
+      "askReply": "Rascunhe uma resposta ao e-mail de {from} “{subject}”",
+      "askHandle": "Resolva o e-mail de {from} “{subject}”",
       "askTell": "Sobre o e-mail de {from} “{subject}”: {text}"
     }
   }

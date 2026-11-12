@@ -3554,7 +3554,7 @@
       "empty": "还没有摘要。重要的新邮件会显示在这里。",
       "settings": "邮件设置",
       "askReply": "帮我起草对 {from} 的邮件“{subject}”的回复。",
-      "askHandle": "处理 {from} 的邮件“{subject}”。",
+      "askHandle": "处理 {from} 的邮件“{subject}”",
       "askTell": "关于 {from} 的邮件“{subject}”：{text}"
     }
   }

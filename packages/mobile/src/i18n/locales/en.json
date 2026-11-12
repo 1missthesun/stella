@@ -3583,8 +3583,8 @@
       "waiting": "Not in a digest yet",
       "empty": "No digest yet. When new mail matters, it shows up here.",
       "settings": "Email settings",
-      "askReply": "Draft a reply to {from}'s email “{subject}”.",
-      "askHandle": "Handle {from}'s email “{subject}”.",
+      "askReply": "Draft a reply to {from}'s email “{subject}”",
+      "askHandle": "Handle {from}'s email “{subject}”",
       "askTell": "About {from}'s email “{subject}”: {text}"
     }
   }

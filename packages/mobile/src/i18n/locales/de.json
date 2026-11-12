@@ -3583,8 +3583,8 @@
       "waiting": "Noch in keiner Übersicht",
       "empty": "Noch keine Übersicht. Wenn neue E-Mails wichtig sind, erscheinen sie hier.",
       "settings": "E-Mail-Einstellungen",
-      "askReply": "Entwirf eine Antwort auf die E-Mail von {from} „{subject}“.",
-      "askHandle": "Kümmere dich um die E-Mail von {from} „{subject}“.",
+      "askReply": "Entwirf eine Antwort auf die E-Mail von {from} „{subject}“",
+      "askHandle": "Kümmere dich um die E-Mail von {from} „{subject}“",
       "askTell": "Zur E-Mail von {from} „{subject}“: {text}"
     }
   }

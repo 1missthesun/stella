@@ -3611,8 +3611,8 @@
       "waiting": "Non ancora in un riepilogo",
       "empty": "Nessun riepilogo per ora. Quando una nuova email conta, appare qui.",
       "settings": "Impostazioni email",
-      "askReply": "Scrivi una bozza di risposta all’email di {from} «{subject}».",
-      "askHandle": "Occupati dell’email di {from} «{subject}».",
+      "askReply": "Scrivi una bozza di risposta all’email di {from} «{subject}»",
+      "askHandle": "Occupati dell’email di {from} «{subject}»",
       "askTell": "Sull’email di {from} «{subject}»: {text}"
     }
   }

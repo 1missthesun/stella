@@ -3583,8 +3583,8 @@
       "waiting": "Inte i någon sammanfattning än",
       "empty": "Ingen sammanfattning än. När nya mejl är viktiga syns de här.",
       "settings": "E-postinställningar",
-      "askReply": "Skriv ett svarsutkast till mejlet från {from} ”{subject}”.",
-      "askHandle": "Ta hand om mejlet från {from} ”{subject}”.",
+      "askReply": "Skriv ett svarsutkast till mejlet från {from} ”{subject}”",
+      "askHandle": "Ta hand om mejlet från {from} ”{subject}”",
       "askTell": "Om mejlet från {from} ”{subject}”: {text}"
     }
   }

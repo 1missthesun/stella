@@ -3583,8 +3583,8 @@
       "waiting": "Ikke i et overblik endnu",
       "empty": "Intet overblik endnu. Når ny mail betyder noget, vises den her.",
       "settings": "Mailindstillinger",
-      "askReply": "Skriv et svarudkast til mailen fra {from} »{subject}«.",
-      "askHandle": "Klar mailen fra {from} »{subject}«.",
+      "askReply": "Skriv et svarudkast til mailen fra {from} »{subject}«",
+      "askHandle": "Klar mailen fra {from} »{subject}«",
       "askTell": "Om mailen fra {from} »{subject}«: {text}"
     }
   }

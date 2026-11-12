@@ -3583,8 +3583,8 @@
       "waiting": "Δεν είναι ακόμα σε σύνοψη",
       "empty": "Καμία σύνοψη ακόμα. Όταν ένα νέο email έχει σημασία, εμφανίζεται εδώ.",
       "settings": "Ρυθμίσεις email",
-      "askReply": "Γράψε πρόχειρη απάντηση στο email του/της {from} «{subject}».",
-      "askHandle": "Ανάλαβε το email του/της {from} «{subject}».",
+      "askReply": "Γράψε πρόχειρη απάντηση στο email του/της {from} «{subject}»",
+      "askHandle": "Ανάλαβε το email του/της {from} «{subject}»",
       "askTell": "Για το email του/της {from} «{subject}»: {text}"
     }
   }

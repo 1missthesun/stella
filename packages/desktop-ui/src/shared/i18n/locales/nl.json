@@ -3583,8 +3583,8 @@
       "waiting": "Nog niet in een overzicht",
       "empty": "Nog geen overzicht. Belangrijke nieuwe mail verschijnt hier.",
       "settings": "E-mailinstellingen",
-      "askReply": "Stel een antwoord op op de e-mail van {from} ‘{subject}’.",
-      "askHandle": "Regel de e-mail van {from} ‘{subject}’.",
+      "askReply": "Stel een antwoord op op de e-mail van {from} ‘{subject}’",
+      "askHandle": "Regel de e-mail van {from} ‘{subject}’",
       "askTell": "Over de e-mail van {from} ‘{subject}’: {text}"
     }
   }

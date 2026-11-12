@@ -3611,8 +3611,8 @@
       "waiting": "עדיין לא בסיכום",
       "empty": "אין עדיין סיכום. כשדואר חדש חשוב, הוא יופיע כאן.",
       "settings": "הגדרות דואר",
-      "askReply": "נסחי טיוטת תשובה למייל מ-{from} „{subject}”.",
-      "askHandle": "טפלי במייל מ-{from} „{subject}”.",
+      "askReply": "נסחי טיוטת תשובה למייל מ-{from} „{subject}”",
+      "askHandle": "טפלי במייל מ-{from} „{subject}”",
       "askTell": "לגבי המייל מ-{from} „{subject}”: {text}"
     }
   }

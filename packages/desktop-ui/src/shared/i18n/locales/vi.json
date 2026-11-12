@@ -3553,8 +3553,8 @@
       "waiting": "Chưa có trong bản tóm tắt",
       "empty": "Chưa có bản tóm tắt. Thư mới quan trọng sẽ hiện ở đây.",
       "settings": "Cài đặt email",
-      "askReply": "Soạn nháp trả lời email của {from} “{subject}”.",
-      "askHandle": "Xử lý email của {from} “{subject}”.",
+      "askReply": "Soạn nháp trả lời email của {from} “{subject}”",
+      "askHandle": "Xử lý email của {from} “{subject}”",
       "askTell": "Về email của {from} “{subject}”: {text}"
     }
   }

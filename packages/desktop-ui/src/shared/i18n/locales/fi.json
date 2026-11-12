@@ -3583,8 +3583,8 @@
       "waiting": "Ei vielä koosteessa",
       "empty": "Ei vielä koostetta. Kun uusi viesti on tärkeä, se näkyy tässä.",
       "settings": "Sähköpostiasetukset",
-      "askReply": "Luonnostele vastaus lähettäjän {from} viestiin ”{subject}”.",
-      "askHandle": "Hoida lähettäjän {from} viesti ”{subject}”.",
+      "askReply": "Luonnostele vastaus lähettäjän {from} viestiin ”{subject}”",
+      "askHandle": "Hoida lähettäjän {from} viesti ”{subject}”",
       "askTell": "Lähettäjän {from} viestistä ”{subject}”: {text}"
     }
   }

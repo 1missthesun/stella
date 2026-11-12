@@ -3554,7 +3554,7 @@
       "empty": "還沒有摘要。重要的新郵件會顯示在這裡。",
       "settings": "郵件設定",
       "askReply": "幫我草擬對 {from} 的郵件「{subject}」的回覆。",
-      "askHandle": "處理 {from} 的郵件「{subject}」。",
+      "askHandle": "處理 {from} 的郵件「{subject}」",
       "askTell": "關於 {from} 的郵件「{subject}」：{text}"
     }
   }

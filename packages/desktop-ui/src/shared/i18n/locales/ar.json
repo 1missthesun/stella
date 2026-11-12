@@ -3695,8 +3695,8 @@
       "waiting": "ليست في ملخص بعد",
       "empty": "لا يوجد ملخص بعد. عندما تصل رسالة مهمة تظهر هنا.",
       "settings": "إعدادات البريد",
-      "askReply": "اكتب مسودة رد على رسالة {from} «{subject}».",
-      "askHandle": "تولَّ رسالة {from} «{subject}».",
+      "askReply": "اكتب مسودة رد على رسالة {from} «{subject}»",
+      "askHandle": "تولَّ رسالة {from} «{subject}»",
       "askTell": "بخصوص رسالة {from} «{subject}»: {text}"
     }
   }

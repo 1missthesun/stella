@@ -964,7 +964,7 @@ export class AppSourceService {
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;
     let phase: ApplyPhase = "planned";
     let holding: Promise<RelaunchHold | null> | null = null;
-    if (restart && (install || restartsRuntime(paths))) await this.waitForReply();
+    if (restart && (install || restartsRuntime(paths)) && (await this.waitForReply())) this.mark("reply");
     try {
       await this.moveHead(cwd, from, to);
       phase = "signed";
@@ -1228,7 +1228,7 @@ export class AppSourceService {
    */
   private async waitForReply() {
     const replying = this.options.replying;
-    if (!replying || !(await replying().catch(() => false))) return;
+    if (!replying || !(await replying().catch(() => false))) return false;
     this.heldForReply = true;
     this.publish({ ...this.state, heldForReply: true });
     this.options.log("app-source.held-for-reply", {});
@@ -1239,6 +1239,7 @@ export class AppSourceService {
     const { heldForReply: _held, ...rest } = this.state;
     this.publish(rest);
     this.options.log("app-source.reply-hold-ended", { ms: Date.now() - startedAt });
+    return true;
   }
 
   private setBusy(busy: boolean) {

@@ -23,7 +23,10 @@ import type {
 import { useNow } from "@/features/app-source/AppSourceCards";
 import { ChatRuntimeContext } from "@/context/chat-runtime-context";
 import { getComposerAppSelections } from "@/features/chat/composer-context";
-import { EMAIL_SELECTION_SURFACE as EMAIL_SURFACE } from "@/features/workspace-display/file-viewer-store";
+import {
+  EMAIL_CHIP_REMOVED_EVENT,
+  EMAIL_SELECTION_SURFACE as EMAIL_SURFACE,
+} from "@/features/workspace-display/file-viewer-store";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n } from "@/shared/i18n";
@@ -77,6 +80,32 @@ function Md({ text }: { text: string }) {
 
 // Composer context -------------------------------------------------------------
 
+/** Email views on screen now; with none, an email chip left in the composer is stale. */
+let emailChipOwners = 0;
+
+/**
+ * Always mounted: drops an email chip the composer restored (or kept) while no
+ * Email view is on screen, such as after a reload on the Chat tab.
+ */
+export function useStaleEmailChipCleanup(): void {
+  const chat = useContext(ChatRuntimeContext);
+  const setChatContext = chat?.composer.setChatContext;
+  const stale =
+    emailChipOwners === 0 &&
+    getComposerAppSelections(chat?.composer.chatContext ?? null).some((entry) => entry.surface === EMAIL_SURFACE);
+  useEffect(() => {
+    if (!stale || !setChatContext) return;
+    const timer = window.setTimeout(() => {
+      if (emailChipOwners > 0) return;
+      setChatContext((prev) => {
+        const others = getComposerAppSelections(prev).filter((entry) => entry.surface !== EMAIL_SURFACE);
+        return { ...(prev ?? { window: null }), appSelection: others[others.length - 1] ?? null, appSelections: others };
+      });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [stale, setChatContext]);
+}
+
 type Chip = { key: string; label: string; snapshot: string };
 
 /**
@@ -87,22 +116,34 @@ type Chip = { key: string; label: string; snapshot: string };
  */
 function useEmailChip(active: boolean, chip: Chip | null, pickedAt: number) {
   const chat = useContext(ChatRuntimeContext);
+  useEffect(() => {
+    if (!active) return;
+    emailChipOwners += 1;
+    return () => {
+      emailChipOwners -= 1;
+    };
+  }, [active]);
   const setChatContext = chat?.composer.setChatContext;
   const removed = useRef<string | null>(null);
-  const shown = useRef<string | null>(null);
   const key = chip?.key ?? null;
 
   useEffect(() => {
     removed.current = null;
   }, [pickedAt]);
 
+  // Only the chip's own ✕ turns it off; a send that clears the composer brings it back.
+  useEffect(() => {
+    const onRemoved = (event: Event) => {
+      const path = (event as CustomEvent<{ key?: string }>).detail?.key;
+      if (path) removed.current = path;
+    };
+    window.addEventListener(EMAIL_CHIP_REMOVED_EVENT, onRemoved);
+    return () => window.removeEventListener(EMAIL_CHIP_REMOVED_EVENT, onRemoved);
+  }, []);
+
   const present =
     getComposerAppSelections(chat?.composer.chatContext ?? null).find((entry) => entry.surface === EMAIL_SURFACE)?.anchor
       ?.path ?? null;
-  useEffect(() => {
-    if (shown.current && !present && shown.current === key) removed.current = key;
-    shown.current = present;
-  }, [present, key]);
 
   useEffect(() => {
     if (!setChatContext) return;
@@ -125,8 +166,9 @@ function useEmailChip(active: boolean, chip: Chip | null, pickedAt: number) {
       };
       return { ...(prev ?? { window: null }), appSelection: selection, appSelections: [...others, selection] };
     });
+    // `present` too: a restored or just-sent composer drops the chip, and it comes back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, key, chip?.label, chip?.snapshot, setChatContext, pickedAt]);
+  }, [active, key, chip?.label, chip?.snapshot, setChatContext, pickedAt, present]);
 
   useEffect(
     () => () =>

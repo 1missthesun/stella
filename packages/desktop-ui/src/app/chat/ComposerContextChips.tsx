@@ -31,6 +31,7 @@ import {
 import { ChipPreviewPortal } from "./ChipPreviewPortal";
 import { showInViewer } from "@/features/workspace-display/open-payload";
 import {
+  EMAIL_CHIP_REMOVED_EVENT,
   EMAIL_SELECTION_SURFACE,
   VIEWER_SELECTION_SURFACE,
 } from "@/features/workspace-display/file-viewer-store";
@@ -320,7 +321,10 @@ export function AppSelectionChip({
         <ContextPill as="span" kind="email" label={truncateChipLabel(label, 44)} title={label} className={className} />
         <ChipRemoveButton
           label={t("app.chat.contextChips.removeSelectedArea", { label })}
-          onRemove={() => removeComposerAppSelectionContext(index, setChatContext)}
+          onRemove={() => {
+            window.dispatchEvent(new CustomEvent(EMAIL_CHIP_REMOVED_EVENT, { detail: { key: appSelection.anchor?.path } }));
+            removeComposerAppSelectionContext(index, setChatContext);
+          }}
         />
       </span>
     );

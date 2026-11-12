@@ -153,3 +153,6 @@ export const VIEWER_SELECTION_SURFACE = "stella-viewer";
 
 /** `ChatAppSelection.surface` marking the composer chip for what the Email tab shows. */
 export const EMAIL_SELECTION_SURFACE = "email";
+
+/** Fired when the user takes the email chip off the composer (its ✕), not when a send clears it. */
+export const EMAIL_CHIP_REMOVED_EVENT = "stella:email-chip-removed";

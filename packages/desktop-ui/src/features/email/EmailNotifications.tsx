@@ -4,6 +4,7 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 import { useNotificationSource, type NotificationInput } from "@/features/notifications/notification-store";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n } from "@/shared/i18n";
+import { useStaleEmailChipCleanup } from "./EmailDigest";
 import { openEmailDigest } from "./email-digest-store";
 import { useEmailSeenAt } from "./email-unseen";
 
@@ -41,5 +42,6 @@ export function EmailNotifications() {
     ];
   }, [newest, seenAt, t]);
   useNotificationSource("email", items);
+  useStaleEmailChipCleanup();
   return null;
 }

@@ -449,6 +449,8 @@ const BRIEF_BUCKET_WORDS: Record<EmailBucket, string> = {
   noise: "noise",
 };
 
+const TONE_RANK: Record<"urgent" | "needs_you" | "fyi", number> = { urgent: 0, needs_you: 1, fyi: 2 };
+
 const cleanText = (value: unknown, max: number): string =>
   typeof value === "string" ? value.replace(/\s+/gu, " ").trim().slice(0, max) : "";
 
@@ -495,7 +497,7 @@ export const writeBrief = async (
     system: [
       "You write a short briefing on someone's new email, addressed to them as \"you\", the way a sharp assistant would answer \"what came in?\".",
       "lead: one or two sentences on what matters most and what, if anything, they must do and by when. Bold (**…**) the people, amounts and deadlines that matter. No greeting.",
-      "sections: group the emails into at most 3 sections in order of importance, each with a short heading of 1-3 words (\"Needs you\", \"Money\", \"Worth knowing\") and a tone: urgent if something can't wait, needs_you if they must reply, decide or act, fyi otherwise. Follow how each email was sorted unless the content clearly says otherwise.",
+      "sections: group the emails into at most 3 sections in order of importance, each with a short heading of 1-3 words (\"Needs you\", \"Money\", \"Worth knowing\") and a tone: urgent if something can't wait, needs_you if they must reply, decide or act, fyi otherwise. Follow how each email was sorted unless the content clearly says otherwise. Every heading must be different; head an urgent section by what can't wait (\"Security\", \"Urgent\"), not \"Needs you\".",
       "blocks: one per matter. Put emails of the same thread or the same matter in one block (list every n it covers). Every email n must be in exactly one block.",
       "title: \"**Sender** · what it is about\", at most 8 words after the sender.",
       "points: 1-3 bullets of at most 14 words each with the facts that matter (amounts, dates, asks). Don't repeat the title. Bold sparingly.",
@@ -533,7 +535,13 @@ export const writeBrief = async (
       blocks.push({ emails: ns, title, points, ...(label && ask ? { suggestion: { label, ask } } : {}) });
     }
     const heading = cleanText(section.heading, 40);
-    if (blocks.length > 0 && heading) sections.push({ heading, tone, blocks });
+    if (blocks.length === 0 || !heading) continue;
+    // Two sections under one heading read as a mistake: fold them, keeping the stronger tone.
+    const same = sections.find((entry) => entry.heading.toLowerCase() === heading.toLowerCase());
+    if (same) {
+      same.blocks.push(...blocks);
+      if (TONE_RANK[tone] < TONE_RANK[same.tone]) same.tone = tone;
+    } else sections.push({ heading, tone, blocks });
   }
   const lead = cleanText(raw.lead, 500);
   // Anything the model left out still gets a plain block, so no email goes missing.

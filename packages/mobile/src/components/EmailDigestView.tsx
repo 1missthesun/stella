@@ -436,7 +436,8 @@ export function EmailDigestView({
     const sorted = items.every((item) => item.bucket === "worth_knowing") ? "worth_knowing" : "needs_you";
     const archived = items.every((item) => item.archived);
     return [
-      ...(block.suggestion ? [{ label: block.suggestion.ask, run: () => ask(targets, "suggest", block.suggestion!.ask) }] : []),
+      // The short label: iOS shrinks and clips long action-sheet options. The full ask still goes to Stella.
+      ...(block.suggestion ? [{ label: block.suggestion.label, run: () => ask(targets, "suggest", block.suggestion!.ask) }] : []),
       { label: t("email.digest.reply"), run: () => ask(targets, "reply", t("email.digest.askReply", { from, subject: newestItem.subject })) },
       { label: t("email.digest.handle"), run: () => ask(targets, "handle", t("email.digest.askHandle", { from, subject: newestItem.subject })) },
       // Stella gets the email in hidden context; the chat is where they say what to do.

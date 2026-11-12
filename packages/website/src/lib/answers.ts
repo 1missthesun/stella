@@ -135,6 +135,7 @@ const faq = (q: string) => {
 };
 
 const CHECKED = "Checked on 10 November 2026 against each company’s own pages. Features and prices change; tell us at stella.sh if something here is out of date.";
+const CHECKED_12 = CHECKED.replace("10 November", "12 November");
 
 const SELF_CHANGE_ROW = (them: string): CompareRow => ({
   label: "Changes itself",
@@ -157,7 +158,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "Stella vs the ChatGPT desktop app: an honest comparison",
     metaDescription:
-      "The ChatGPT app is free and the simplest pick if you only use ChatGPT. Stella (stella.sh) runs on your ChatGPT plan too, and adds Claude, Linux and an app that changes itself.",
+      "The ChatGPT app is free and the simplest pick if you only use ChatGPT. Stella (stella.sh) runs on your ChatGPT plan too, and adds Claude and an app that changes itself.",
     eyebrow: "Stella vs ChatGPT",
     headline: "Stella vs the ChatGPT app.",
     answer: `If you only use ChatGPT, the official ChatGPT desktop app is free, made by OpenAI, and the simplest choice: since July 2026 it can do tasks across your apps on Mac and Windows. Stella (stella.sh) is for people who want more than that. It runs on the ChatGPT plan you already have and on your Claude plan, works on Mac, Windows and Linux, and can rewrite its own app when you ask. ${PRICE_LINE}`,
@@ -168,7 +169,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         { label: "Which AI it runs on", stella: "ChatGPT, Claude, your own API keys or local models", them: "OpenAI’s models only" },
         { label: "Clicks and types in your apps", stella: "Yes, on Mac and Windows", them: "Yes, with computer use in Work, on Mac and Windows" },
         { label: "Works with your files and browser", stella: "Yes", them: "Yes" },
-        { label: "Computers", stella: "Mac, Windows and Linux", them: "Mac and Windows" },
+        { label: "Computers", stella: "Mac, Windows and Linux", them: "Mac and Windows. Linux is in preview, without computer use." },
         { label: "Phone and web", stella: "iPhone, Android and the web", them: "iPhone, Android and the web" },
         { label: "Plug-ins", stella: "Fewer. Stella mostly works in your real apps instead.", them: "1,400+ plug-ins" },
         SELF_CHANGE_ROW("Adds features through plug-ins"),
@@ -182,14 +183,15 @@ export const ANSWER_PAGES: AnswerPage[] = [
       ],
       stellaBetter: [
         "You use ChatGPT and Claude, or want to switch between them, in one app and one chat.",
-        "You’re on Linux.",
+        "You’re on Linux and want ChatGPT and Claude in one app.",
         "You want an app you can reshape: ask for a new layout or feature, then keep it or undo it.",
         "You want open source you can read.",
       ],
-      checked: CHECKED,
+      checked: CHECKED_12,
       sources: [
         { label: "OpenAI: ChatGPT for your most ambitious work", href: "https://openai.com/index/chatgpt-for-your-most-ambitious-work/" },
         { label: "OpenAI Help: Moving to the new ChatGPT desktop app", href: "https://help.openai.com/en/articles/20001276-moving-to-the-new-chatgpt-desktop-app" },
+        { label: "ChatGPT: the desktop app for Linux (preview)", href: "https://learn.chatgpt.com/codex/linux/linux-app" },
       ],
     },
     questions: [
@@ -230,7 +232,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         { label: "Which AI it runs on", stella: "Claude, ChatGPT, your own API keys or local models", them: "Claude only" },
         { label: "Clicks and types in your apps", stella: "Yes, on Mac and Windows", them: "Yes, on Mac and Windows, on Pro and Max" },
         { label: "Works with your files and browser", stella: "Yes", them: "Yes" },
-        { label: "Computers", stella: "Mac, Windows and Linux", them: "Mac and Windows. Linux is in beta, without computer use or dictation." },
+        { label: "Computers", stella: "Mac, Windows and Linux", them: "Mac and Windows. Linux is in beta (Cowork included), without computer use or dictation." },
         { label: "Phone and web", stella: "iPhone, Android and the web", them: "iPhone, Android and the web" },
         { label: "Connectors", stella: "Fewer. Stella mostly works in your real apps instead.", them: "A large directory of connectors and plug-ins" },
         SELF_CHANGE_ROW("Adds skills, connectors and plug-ins"),
@@ -248,7 +250,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         "You want an app you can reshape: ask for a new layout or feature, then keep it or undo it.",
         "You want open source you can read.",
       ],
-      checked: CHECKED,
+      checked: CHECKED_12,
       sources: [
         { label: "Claude Help: Install Claude Desktop", href: "https://support.claude.com/en/articles/10065433-install-claude-desktop" },
         { label: "Claude Code docs: setup and plans", href: "https://code.claude.com/docs/en/setup" },
@@ -419,7 +421,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       },
       {
         q: "Can’t the ChatGPT app do this already?",
-        a: "Much of it, yes. Since July 2026 the official ChatGPT app for Mac and Windows has a Work mode that can use your apps, and it’s free. Stella adds Claude and other AI in the same app, a Linux app, and an app that can change itself. See [Stella vs the ChatGPT app](/ai/stella-vs-chatgpt-desktop-app).",
+        a: "Much of it, yes. Since July 2026 the official ChatGPT app for Mac and Windows has a Work mode that can use your apps, and it’s free. Stella adds Claude and other AI in the same app, on Linux too, and an app that can change itself. See [Stella vs the ChatGPT app](/ai/stella-vs-chatgpt-desktop-app).",
       },
       {
         q: "Does ChatGPT see all my files?",
@@ -495,7 +497,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         { label: "Your chats", stella: "One ongoing chat, whichever AI you use", them: "Separate in each app" },
         { label: "Other AI", stella: "Your own API keys (Anthropic, OpenAI, Google, xAI, OpenRouter and more) or local models", them: "No" },
         { label: "Newest features", stella: "Later", them: "First, from OpenAI and Anthropic" },
-        { label: "Linux", stella: "Yes", them: "Claude in beta; no ChatGPT app" },
+        { label: "Linux", stella: "Yes", them: "Both in beta or preview, without computer use" },
       ],
       themBetter: [
         "You want each company’s newest features the day they ship.",

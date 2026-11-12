@@ -129,7 +129,9 @@ export const hasIncompleteLeadingJournalTurn = (
     (record) =>
       (record.kind === "message" && record.role === "user") ||
       (record.kind === "card" &&
-        (record.card.type === "reminder" || record.card.type === "schedule-notice")),
+        (record.card.type === "reminder" ||
+          record.card.type === "schedule-notice" ||
+          record.card.type === "email")),
   );
   if (hasPrompt) return false;
   if (options.dropCardOnly) return true;

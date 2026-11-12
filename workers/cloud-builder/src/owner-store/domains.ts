@@ -29,7 +29,7 @@ import { browserDomain } from "./domains/browser.js";
 import { userAsksDomain } from "./domains/user-asks.js";
 import { claudeSessionsDomain } from "./domains/claude-sessions.js";
 import { agentLogsDomain } from "./domains/agent-logs.js";
-import { emailDigestDomain } from "./domains/email-digest.js";
+import { emailDomain } from "./domains/email.js";
 import { mcpServersDomain } from "./domains/mcp-servers.js";
 import { catchUpsDomain } from "./domains/catch-ups.js";
 import { deviceOfflineDomain } from "./domains/device-offline.js";
@@ -74,7 +74,7 @@ export const ownerDomains: OwnerDomain[] = [
   claudeSessionsDomain,
   agentEventsDomain,
   agentReportsDomain,
-  emailDigestDomain,
+  emailDomain,
   agentLogsDomain,
   mcpServersDomain,
   catchUpsDomain,

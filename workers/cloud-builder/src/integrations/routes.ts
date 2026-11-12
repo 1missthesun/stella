@@ -252,6 +252,50 @@ const googleCallback = async (request: Request, env: RouteEnv): Promise<Response
 
 const methodNotAllowed = () => fail(405, "Method not allowed.");
 
+const GMAIL_PUSH_PATH = "/api/gmail/push";
+
+const sameSecret = (left: string, right: string): boolean => {
+  if (!left || !right || left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return diff === 0;
+};
+
+/**
+ * Gmail's Pub/Sub push: "this address changed". It carries no mail, only the
+ * address, so a forged one can at most make that inbox sync early; each owner
+ * store debounces syncs. Always 204 for a known token so Pub/Sub doesn't retry.
+ */
+const gmailPush = async (request: Request, env: RouteEnv): Promise<Response> => {
+  const expected = String((env as unknown as Record<string, unknown>).GMAIL_PUSH_TOKEN ?? "").trim();
+  const token = new URL(request.url).searchParams.get("token")?.trim() ?? "";
+  if (!sameSecret(token, expected)) return new Response(null, { status: 401 });
+  const body = (await request.json().catch(() => null)) as { message?: { data?: unknown } } | null;
+  let address = "";
+  try {
+    const data = typeof body?.message?.data === "string" ? body.message.data : "";
+    const decoded = JSON.parse(atob(data.replace(/-/gu, "+").replace(/_/gu, "/"))) as { emailAddress?: unknown };
+    address = typeof decoded.emailAddress === "string" ? decoded.emailAddress.trim().toLowerCase() : "";
+  } catch {
+    address = "";
+  }
+  const db = (env as unknown as Cloudflare.Env).DB;
+  if (!address || !db) return new Response(null, { status: 204 });
+  const owners = await db
+    .prepare("SELECT owner_id FROM gmail_watch WHERE address = ? LIMIT 20")
+    .bind(address)
+    .all<{ owner_id: string }>()
+    .catch(() => ({ results: [] as { owner_id: string }[] }));
+  await Promise.all(
+    (owners.results ?? []).map((row) =>
+      internal(env, row.owner_id, "email.changed", { account: address }).catch((error: unknown) => {
+        console.error(JSON.stringify({ event: "gmail_push_forward_failed", message: error instanceof Error ? error.message : String(error) }));
+      }),
+    ),
+  );
+  return new Response(null, { status: 204 });
+};
+
 export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): Promise<Response | null> => {
   const path = new URL(request.url).pathname;
   const method = request.method;
@@ -305,6 +349,8 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
             account: body?.account,
           }))
         : methodNotAllowed();
+    case GMAIL_PUSH_PATH:
+      return method === "POST" ? await gmailPush(request, env) : methodNotAllowed();
     case "/api/native-integrations/run":
       return method === "POST" ? await run(request, env) : methodNotAllowed();
     case "/api/admin/native-integrations/upsert":

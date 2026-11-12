@@ -83,7 +83,9 @@ export type EmailUsage = {
 
 export type EmailStatus = {
   enabled: boolean;
-  /** Google accounts with Gmail connected through Stella. */
+  /** Gmail addresses connected through Stella, whether or not sorting is on. */
+  gmailConnected: string[];
+  /** The inboxes being sorted (empty while sorting is off). */
   accounts: EmailAccountStatus[];
   /** Gmail is connected only through Composio and needs reconnecting through Stella. */
   needsReconnect: boolean;

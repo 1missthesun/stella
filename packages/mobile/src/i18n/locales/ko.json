@@ -1491,6 +1491,7 @@
           }
         },
         "placeholder": "Stella에게 물어보세요",
+        "play": "이 데모 재생",
         "replay": "데모 다시 보기",
         "settledTitle": "간단히 둘러보기",
         "tablist": "Stella가 할 수 있는 일"
@@ -1720,6 +1721,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "이 데모 재생",
         "replay": "Replay this demo",
         "routines": {
           "caption": "무엇이든 예약해 두세요. 주무시는 동안에도 제때 처리할게요.",

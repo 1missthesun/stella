@@ -1536,6 +1536,7 @@
           }
         },
         "placeholder": "اسأل Stella",
+        "play": "تشغيل هذا العرض",
         "replay": "أعد تشغيل هذا العرض",
         "settledTitle": "جولة سريعة",
         "tablist": "ما تستطيع Stella فعله"
@@ -1765,6 +1766,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "تشغيل هذا العرض",
         "replay": "Replay this demo",
         "routines": {
           "caption": "جدول أي شيء وسأنجزه في موعده، حتى وأنت نائم.",

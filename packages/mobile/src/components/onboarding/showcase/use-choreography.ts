@@ -5,15 +5,17 @@ export function useChoreography({
   cues,
   playing,
   instant,
+  startAt = 0,
   onDone,
 }: {
   cues: readonly Cue[];
   playing: boolean;
   instant: boolean;
+  startAt?: number;
   onDone: () => void;
 }) {
   const [reached, setReached] = useState(instant ? cues.length - 1 : -1);
-  const elapsedRef = useRef(0);
+  const elapsedRef = useRef(startAt);
   const doneRef = useRef(false);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;

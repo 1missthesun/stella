@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Kysy Stellalta",
+        "play": "Toista tämä esittely",
         "replay": "Toista demo uudelleen",
         "settledTitle": "Pikakierros",
         "tablist": "Mitä Stella osaa"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Toista tämä esittely",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Ajasta mitä tahansa, niin teen sen ajallaan, vaikka nukkuisit.",

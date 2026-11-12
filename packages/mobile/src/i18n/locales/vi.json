@@ -1491,6 +1491,7 @@
           }
         },
         "placeholder": "Hỏi Stella",
+        "play": "Phát bản demo này",
         "replay": "Xem lại bản demo",
         "settledTitle": "Tham quan nhanh",
         "tablist": "Stella có thể làm gì"
@@ -1720,6 +1721,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Phát bản demo này",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Hẹn giờ bất cứ việc gì, tôi sẽ làm đúng giờ, kể cả khi bạn đang ngủ.",

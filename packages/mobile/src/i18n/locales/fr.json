@@ -1509,6 +1509,7 @@
           }
         },
         "placeholder": "Demandez à Stella",
+        "play": "Lire cette démo",
         "replay": "Revoir la démo",
         "settledTitle": "Le tour rapide",
         "tablist": "Ce que Stella sait faire"
@@ -1738,6 +1739,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Lire cette démo",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Planifiez ce que vous voulez et je m'en occupe à l'heure, même pendant votre sommeil.",

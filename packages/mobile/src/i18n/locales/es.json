@@ -1509,6 +1509,7 @@
           }
         },
         "placeholder": "Pregunta a Stella",
+        "play": "Reproducir esta demo",
         "replay": "Repetir esta demo",
         "settledTitle": "El recorrido rápido",
         "tablist": "Lo que Stella puede hacer"
@@ -1738,6 +1739,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Reproducir esta demo",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Programa lo que quieras y lo haré a su hora, incluso mientras duermes.",

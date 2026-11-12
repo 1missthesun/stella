@@ -137,8 +137,13 @@ export const CHAPTERS: readonly ChapterSpec[] = [
   },
 ];
 
+const SEND_LEAD_MS = 450;
+
+export const chapterStartAt = (spec: ChapterSpec) =>
+  Math.max(0, (spec.cues.find((cue) => cue.id === "send")?.at ?? 0) - SEND_LEAD_MS);
+
 export const chapterDuration = (spec: ChapterSpec) =>
-  spec.cues[spec.cues.length - 1]!.at;
+  spec.cues[spec.cues.length - 1]!.at - chapterStartAt(spec);
 
 export const chapterKey = (id: ChapterId, field: string) =>
   `mobile.onboarding.showcase.chapters.${id}.${field}`;

@@ -1509,6 +1509,7 @@
           }
         },
         "placeholder": "Întreab-o pe Stella",
+        "play": "Redă această demonstrație",
         "replay": "Redă din nou demonstrația",
         "settledTitle": "Turul rapid",
         "tablist": "Ce poate face Stella"
@@ -1738,6 +1739,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Redă această demonstrație",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Programează orice și o fac la timp, chiar și în timp ce dormi.",

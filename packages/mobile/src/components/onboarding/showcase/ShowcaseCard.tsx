@@ -46,6 +46,7 @@ import {
   TYPE_START_DELAY_MS,
   chapterDuration,
   chapterKey,
+  chapterStartAt,
   type ChapterSpec,
 } from "./chapters";
 import {
@@ -82,11 +83,13 @@ export function ShowcaseCard({
   const appVisible = useAppVisible();
   const [chapterIndex, setChapterIndex] = useState(0);
   const [playNonce, setPlayNonce] = useState(0);
-  const [chapterDone, setChapterDone] = useState(false);
+  const [phase, setPhase] = useState<"poster" | "playing" | "ended">("poster");
+  const chapterDone = phase === "ended";
   const [played, setPlayed] = useState<ReadonlySet<string>>(() => new Set());
   const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const playing = active && onScreen && appVisible && !reducedMotion;
+  const playing =
+    active && onScreen && appVisible && !reducedMotion && phase === "playing";
 
   const clearAdvance = useCallback(() => {
     if (advanceRef.current) {
@@ -105,28 +108,36 @@ export function ShowcaseCard({
         next.add(chapter.id);
         return next;
       });
-      setChapterDone(true);
+      if (reducedMotion) return;
+      setPhase("ended");
       if (index >= CHAPTERS.length - 1) return;
       clearAdvance();
       advanceRef.current = setTimeout(() => {
         advanceRef.current = null;
-        setChapterDone(false);
+        setPhase("poster");
         setChapterIndex(index + 1);
       }, AUTO_ADVANCE_HOLD_MS);
     },
-    [clearAdvance],
+    [clearAdvance, reducedMotion],
   );
 
-  const playChapter = useCallback(
+  const showChapter = useCallback(
     (index: number) => {
       selectionTick();
       clearAdvance();
-      setChapterDone(false);
+      setPhase("poster");
       setChapterIndex(index);
       setPlayNonce((nonce) => nonce + 1);
     },
     [clearAdvance],
   );
+
+  const play = useCallback(() => {
+    selectionTick();
+    clearAdvance();
+    if (phase === "ended") setPlayNonce((nonce) => nonce + 1);
+    setPhase("playing");
+  }, [clearAdvance, phase]);
 
   if (answered) {
     return (
@@ -154,7 +165,7 @@ export function ShowcaseCard({
           {t(chapterKey(chapter.id, "title"))}
         </Animated.Text>
         <View style={styles.replaySlot}>
-          {chapterDone || reducedMotion ? (
+          {chapterDone ? (
             <Animated.View
               entering={ZoomIn.springify()
                 .damping(32)
@@ -163,7 +174,7 @@ export function ShowcaseCard({
               exiting={fadeExiting(120)}
             >
               <SpringPressable
-                onPress={() => playChapter(chapterIndex)}
+                onPress={play}
                 accessibilityRole="button"
                 accessibilityLabel={t("mobile.onboarding.showcase.replay")}
                 hitSlop={8}
@@ -177,14 +188,35 @@ export function ShowcaseCard({
         </View>
       </View>
 
-      <View style={styles.stage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Chapter
-          key={runKey}
-          spec={chapter}
-          playing={playing}
-          instant={reducedMotion}
-          onDone={() => handleDone(chapterIndex)}
-        />
+      <View>
+        <View style={styles.stage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Chapter
+            key={runKey}
+            spec={chapter}
+            playing={playing}
+            instant={reducedMotion}
+            onDone={() => handleDone(chapterIndex)}
+          />
+        </View>
+        {phase === "poster" && !reducedMotion ? (
+          <Animated.View
+            entering={fadeEntering(0, 200)}
+            exiting={fadeExiting(160)}
+            style={styles.playLayer}
+          >
+            <SpringPressable
+              onPress={play}
+              disabled={!active}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.onboarding.showcase.play")}
+              pressScale={0.9}
+              containerStyle={styles.playHit}
+              style={styles.playDisc}
+            >
+              <Icon name="play" size={22} color={colors.background} weight="heavy" />
+            </SpringPressable>
+          </Animated.View>
+        ) : null}
       </View>
 
       <View
@@ -202,7 +234,7 @@ export function ShowcaseCard({
             playing={playing}
             instant={reducedMotion}
             runKey={runKey}
-            onPress={() => playChapter(index)}
+            onPress={() => showChapter(index)}
           />
         ))}
       </View>
@@ -241,7 +273,13 @@ function Chapter({
   const t = useT();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const has = useChoreography({ cues: spec.cues, playing, instant, onDone });
+  const has = useChoreography({
+    cues: spec.cues,
+    playing,
+    instant,
+    startAt: chapterStartAt(spec),
+    onDone,
+  });
   const ct = (field: string) => t(chapterKey(spec.id, field));
   const prompt = ct("prompt");
   const sendAt = spec.cues.find((cue) => cue.id === "send")?.at ?? 1500;
@@ -311,10 +349,11 @@ function Chapter({
       <MiniComposer
         text={prompt}
         placeholder={t("mobile.onboarding.showcase.placeholder")}
-        typing={playing}
+        typing={false}
         sent={instant || has("send")}
         charMs={charMs}
         startDelayMs={TYPE_START_DELAY_MS}
+        filled
       />
     </Animated.View>
   );
@@ -476,6 +515,36 @@ const makeStyles = (colors: Colors) =>
       alignItems: "center",
       flexDirection: "row",
       gap: 10,
+    },
+    playLayer: {
+      alignItems: "center",
+      bottom: 0,
+      left: 0,
+      position: "absolute",
+      right: 0,
+      top: 0,
+      backgroundColor: fadeHex(colors.background, 0.16),
+      borderCurve: "continuous",
+      borderRadius: 20,
+      justifyContent: "flex-end",
+      overflow: "hidden",
+      paddingBottom: 64,
+    },
+    playHit: {
+      padding: 12,
+    },
+    playDisc: {
+      alignItems: "center",
+      backgroundColor: fadeHex(colors.text, 0.92),
+      borderRadius: 28,
+      height: 56,
+      justifyContent: "center",
+      paddingLeft: 3,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 14,
+      width: 56,
     },
     replaySlot: {
       height: 30,

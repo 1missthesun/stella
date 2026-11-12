@@ -1509,6 +1509,7 @@
           }
         },
         "placeholder": "Pergunte à Stella",
+        "play": "Reproduzir esta demonstração",
         "replay": "Rever esta demonstração",
         "settledTitle": "O tour rápido",
         "tablist": "O que a Stella pode fazer"
@@ -1738,6 +1739,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Reproduzir esta demonstração",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Agende qualquer coisa e eu faço na hora certa, até enquanto você dorme.",

@@ -1518,6 +1518,7 @@
           }
         },
         "placeholder": "Zeptejte se Stelly",
+        "play": "Přehrát tuto ukázku",
         "replay": "Přehrát ukázku znovu",
         "settledTitle": "Rychlá prohlídka",
         "tablist": "Co Stella umí"
@@ -1747,6 +1748,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Přehrát tuto ukázku",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Naplánuj cokoli a udělám to načas, i když budeš spát.",

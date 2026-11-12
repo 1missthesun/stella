@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Ask Stella",
+        "play": "Play this demo",
         "replay": "Replay this demo",
         "settledTitle": "The quick tour",
         "tablist": "What Stella can do"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Play this demo",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Schedule anything and I'll do it on time, even while you sleep.",

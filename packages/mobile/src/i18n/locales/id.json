@@ -1491,6 +1491,7 @@
           }
         },
         "placeholder": "Tanya Stella",
+        "play": "Putar demo ini",
         "replay": "Putar ulang demo ini",
         "settledTitle": "Tur singkat",
         "tablist": "Yang bisa dilakukan Stella"
@@ -1720,6 +1721,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Putar demo ini",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Jadwalkan apa saja dan saya akan mengerjakannya tepat waktu, bahkan saat Anda tidur.",

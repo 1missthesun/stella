@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Fråga Stella",
+        "play": "Spela upp den här demon",
         "replay": "Spela upp demon igen",
         "settledTitle": "Snabbturen",
         "tablist": "Vad Stella kan göra"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Spela upp den här demon",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Schemalägg vad som helst så gör jag det i tid, även medan du sover.",

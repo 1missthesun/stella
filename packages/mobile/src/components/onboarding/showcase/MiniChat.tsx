@@ -289,6 +289,7 @@ export const MiniComposer = memo(function MiniComposer({
   sent,
   charMs,
   startDelayMs,
+  filled = false,
 }: {
   text: string;
   placeholder: string;
@@ -296,10 +297,11 @@ export const MiniComposer = memo(function MiniComposer({
   sent: boolean;
   charMs: number;
   startDelayMs: number;
+  filled?: boolean;
 }) {
   const colors = useColors();
   const styles = useMiniStyles();
-  const [count, setCount] = useState(0);
+  const [count, setCount] = useState(filled ? text.length : 0);
 
   useEffect(() => {
     if (!typing || sent) return;

@@ -1509,6 +1509,7 @@
           }
         },
         "placeholder": "Chiedi a Stella",
+        "play": "Riproduci questa demo",
         "replay": "Rivedi questa demo",
         "settledTitle": "Il tour veloce",
         "tablist": "Cosa sa fare Stella"
@@ -1738,6 +1739,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Riproduci questa demo",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Pianifica qualsiasi cosa e la farò in orario, anche mentre dormi.",

@@ -1491,6 +1491,7 @@
           }
         },
         "placeholder": "問問 Stella",
+        "play": "播放此示範",
         "replay": "重播示範",
         "settledTitle": "快速導覽",
         "tablist": "Stella 能做什麼"
@@ -1720,6 +1721,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "播放此示範",
         "replay": "Replay this demo",
         "routines": {
           "caption": "任何事都可以排程，我會準時完成，就算你正在睡覺。",

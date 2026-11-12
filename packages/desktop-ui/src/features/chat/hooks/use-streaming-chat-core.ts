@@ -336,6 +336,9 @@ export function useStreamingChatCore({
             conversationId: resolvedConversationId,
             retry: () => sendMessageRef.current(sent),
           });
+          // Signed in here, but the runtime hasn't taken the sign-in yet
+          // (Stella just started): nothing else will send it again.
+          if (signedInRef.current) void retryHeldSend({ attempts: 8, spacingMs: 1500 });
         } else {
           clearHeldSend();
           if (accepted) dismissHeldSendNotice();

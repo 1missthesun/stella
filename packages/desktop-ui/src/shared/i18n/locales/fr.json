@@ -3726,7 +3726,126 @@
       "briefing": "Votre synthèse d’e-mails est prête",
       "urgent": "E-mail urgent de {from}",
       "asked": "E-mail que vous avez demandé",
-      "open": "Ouvrir"
+      "open": "Ouvrir",
+      "more": {
+        "many": "et {count} autres",
+        "one": "et {count} autre",
+        "other": "et {count} autres"
+      },
+      "back": "De retour"
+    },
+    "today": {
+      "title": "Aujourd’hui",
+      "open": {
+        "many": "{count} à traiter",
+        "one": "{count} à traiter",
+        "other": "{count} à traiter"
+      },
+      "allClear": "Rien à traiter. Les nouveaux e-mails importants apparaîtront ici.",
+      "done": "Terminé",
+      "later": "Plus tard",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Ce soir",
+      "laterTomorrow": "Demain matin",
+      "laterWeekend": "Ce week-end",
+      "laterNextWeek": "La semaine prochaine",
+      "laterPick": "Choisir un moment…",
+      "laterSet": "Me le rappeler",
+      "back": "De retour",
+      "inLater": {
+        "many": "{count} pour plus tard",
+        "one": "{count} pour plus tard",
+        "other": "{count} pour plus tard"
+      },
+      "doneToday": {
+        "many": "{count} terminés aujourd’hui",
+        "one": "{count} terminé aujourd’hui",
+        "other": "{count} terminés aujourd’hui"
+      },
+      "until": "jusqu’à {when}",
+      "reopen": "Rouvrir",
+      "undo": "Annuler",
+      "toastDone": "Terminé · {headline}",
+      "toastLater": "Plus tard, {when} · {headline}",
+      "history": "Historique",
+      "backToToday": "Retour à Aujourd’hui",
+      "readToday": {
+        "many": "{count} e-mails lus aujourd’hui · écartés : {leftOut}",
+        "one": "{count} e-mail lu aujourd’hui · écartés : {leftOut}",
+        "other": "{count} e-mails lus aujourd’hui · écartés : {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Envoyer",
+      "saveDraft": "Enregistrer en brouillon Gmail",
+      "cancel": "Annuler",
+      "never": "Rien n’est envoyé tant que vous n’appuyez pas sur Envoyer.",
+      "to": "À {to}",
+      "sent": "Envoyé.",
+      "saved": "Enregistré dans vos brouillons Gmail.",
+      "hold": "Maintenez pour dicter une réponse",
+      "holdShort": "Maintenez pour parler",
+      "listening": "À l’écoute… relâchez quand vous avez fini.",
+      "writing": "Rédaction de votre réponse…"
+    },
+    "cleanup": {
+      "title": "Écartés",
+      "hint": "« Tout ranger » les archive dans Gmail. « Se désabonner » demande à l’expéditeur d’arrêter.",
+      "unsubscribe": "Se désabonner",
+      "unsubscribed": "Désabonné",
+      "clearAll": "Tout ranger",
+      "cleared": "Rangé",
+      "openedPage": "Terminez sur la page de l’expéditeur qui vient de s’ouvrir."
+    },
+    "log": {
+      "title": "Ce que Stella a fait",
+      "hint": "Stella lit les nouveaux e-mails pour les trier. Elle n’envoie ni n’archive rien d’elle-même, sauf si une consigne permanente le prévoit.",
+      "read": {
+        "many": "{count} e-mails lus · écartés : {leftOut}",
+        "one": "{count} e-mail lu · écartés : {leftOut}",
+        "other": "{count} e-mails lus · écartés : {leftOut}"
+      },
+      "briefed": {
+        "many": "{count} éléments ajoutés à Aujourd’hui",
+        "one": "{count} élément ajouté à Aujourd’hui",
+        "other": "{count} éléments ajoutés à Aujourd’hui"
+      },
+      "urgent": "Signalé tout de suite : {subject}",
+      "rule": "Consigne suivie : {subject}",
+      "sent": "Votre réponse a été envoyée à {who}",
+      "drafted": "Votre réponse à {who} a été enregistrée en brouillon Gmail",
+      "done": "Terminé, marqué comme lu dans Gmail : {subject}",
+      "later": "Plus tard, jusqu’à {when} : {subject}",
+      "returned": "De retour : {subject}",
+      "reopened": "Rouvert : {subject}",
+      "handled": "Confié à Stella dans le chat : {subject}",
+      "archived": "Archivé dans Gmail : {subject}",
+      "unsubscribed": "Désabonnement de {who}",
+      "cleared": {
+        "many": "{count} e-mails de {who} archivés",
+        "one": "{count} e-mail de {who} archivé",
+        "other": "{count} e-mails de {who} archivés"
+      },
+      "repliedInGmail": "Vous avez répondu dans Gmail : {subject}",
+      "archivedInGmail": "Vous l’avez archivé dans Gmail : {subject}"
+    },
+    "history": {
+      "title": "Historique",
+      "cameIn": "Reçu",
+      "empty": "Rien ces deux dernières semaines.",
+      "today": "Aujourd’hui",
+      "yesterday": "Hier"
+    },
+    "status": {
+      "open": "À traiter",
+      "done": "Terminé",
+      "replied": "Répondu",
+      "drafted": "Brouillon enregistré",
+      "handled": "Confié à Stella",
+      "archived": "Archivé",
+      "later": "Plus tard · {when}",
+      "repliedInGmail": "Répondu dans Gmail",
+      "archivedInGmail": "Archivé dans Gmail"
     }
   }
 }

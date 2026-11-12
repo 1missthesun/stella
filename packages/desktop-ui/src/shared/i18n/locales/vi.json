@@ -3656,7 +3656,110 @@
       "briefing": "Bản tóm tắt email của bạn đã sẵn sàng",
       "urgent": "Email khẩn từ {from}",
       "asked": "Email bạn đã hỏi",
-      "open": "Mở"
+      "open": "Mở",
+      "more": {
+        "other": "và {count} thư khác"
+      },
+      "back": "Đã quay lại"
+    },
+    "today": {
+      "title": "Hôm nay",
+      "open": {
+        "other": "{count} đang mở"
+      },
+      "allClear": "Không có gì đang mở. Thư mới quan trọng sẽ hiện ở đây.",
+      "done": "Xong",
+      "later": "Để sau",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Tối nay",
+      "laterTomorrow": "Sáng mai",
+      "laterWeekend": "Cuối tuần này",
+      "laterNextWeek": "Tuần sau",
+      "laterPick": "Chọn thời gian…",
+      "laterSet": "Đưa lại lúc đó",
+      "back": "Đã quay lại",
+      "inLater": {
+        "other": "{count} để sau"
+      },
+      "doneToday": {
+        "other": "{count} xong hôm nay"
+      },
+      "until": "đến {when}",
+      "reopen": "Mở lại",
+      "undo": "Hoàn tác",
+      "toastDone": "Xong · {headline}",
+      "toastLater": "Để sau, {when} · {headline}",
+      "history": "Lịch sử",
+      "backToToday": "Về Hôm nay",
+      "readToday": {
+        "other": "Đã đọc {count} email hôm nay · bỏ qua {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Gửi",
+      "saveDraft": "Lưu thành nháp Gmail",
+      "cancel": "Hủy",
+      "never": "Không có gì được gửi cho đến khi bạn nhấn Gửi.",
+      "to": "Đến {to}",
+      "sent": "Đã gửi.",
+      "saved": "Đã lưu vào thư nháp Gmail của bạn.",
+      "hold": "Giữ để nói câu trả lời",
+      "holdShort": "Giữ để nói",
+      "listening": "Đang nghe… thả ra khi bạn nói xong.",
+      "writing": "Đang viết câu trả lời…"
+    },
+    "cleanup": {
+      "title": "Đã bỏ qua",
+      "hint": "\"Dọn hết\" sẽ lưu trữ chúng trong Gmail. \"Hủy đăng ký\" sẽ đề nghị người gửi ngừng gửi.",
+      "unsubscribe": "Hủy đăng ký",
+      "unsubscribed": "Đã hủy đăng ký",
+      "clearAll": "Dọn hết",
+      "cleared": "Đã dọn",
+      "openedPage": "Hoàn tất trên trang của người gửi vừa mở."
+    },
+    "log": {
+      "title": "Stella đã làm gì",
+      "hint": "Stella đọc thư mới để phân loại. Stella không bao giờ tự gửi hay lưu trữ, trừ khi có chỉ dẫn cố định yêu cầu.",
+      "read": {
+        "other": "Đã đọc {count} email · bỏ qua {leftOut}"
+      },
+      "briefed": {
+        "other": "Đã thêm {count} mục vào Hôm nay"
+      },
+      "urgent": "Đã báo bạn ngay: {subject}",
+      "rule": "Đã làm theo chỉ dẫn của bạn: {subject}",
+      "sent": "Đã gửi câu trả lời của bạn tới {who}",
+      "drafted": "Đã lưu câu trả lời của bạn tới {who} thành nháp Gmail",
+      "done": "Xong, đã đánh dấu đã đọc trong Gmail: {subject}",
+      "later": "Để sau, đến {when}: {subject}",
+      "returned": "Đã quay lại: {subject}",
+      "reopened": "Đã mở lại: {subject}",
+      "handled": "Đã giao cho Stella trong cuộc trò chuyện: {subject}",
+      "archived": "Đã lưu trữ trong Gmail: {subject}",
+      "unsubscribed": "Đã hủy đăng ký {who} cho bạn",
+      "cleared": {
+        "other": "Đã lưu trữ {count} email từ {who}"
+      },
+      "repliedInGmail": "Bạn đã trả lời trong Gmail: {subject}",
+      "archivedInGmail": "Bạn đã lưu trữ trong Gmail: {subject}"
+    },
+    "history": {
+      "title": "Lịch sử",
+      "cameIn": "Đã nhận",
+      "empty": "Không có gì trong hai tuần qua.",
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua"
+    },
+    "status": {
+      "open": "Đang mở",
+      "done": "Xong",
+      "replied": "Đã trả lời",
+      "drafted": "Đã lưu nháp",
+      "handled": "Stella đang xử lý",
+      "archived": "Đã lưu trữ",
+      "later": "Để sau · {when}",
+      "repliedInGmail": "Đã trả lời trong Gmail",
+      "archivedInGmail": "Đã lưu trữ trong Gmail"
     }
   }
 }

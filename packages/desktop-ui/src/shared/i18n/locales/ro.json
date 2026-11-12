@@ -3726,7 +3726,126 @@
       "briefing": "Rezumatul e-mailurilor e gata",
       "urgent": "E-mail urgent de la {from}",
       "asked": "E-mail despre care ai întrebat",
-      "open": "Deschide"
+      "open": "Deschide",
+      "more": {
+        "few": "și încă {count}",
+        "one": "și încă {count}",
+        "other": "și încă {count}"
+      },
+      "back": "Din nou aici"
+    },
+    "today": {
+      "title": "Azi",
+      "open": {
+        "few": "Deschise: {count}",
+        "one": "Deschise: {count}",
+        "other": "Deschise: {count}"
+      },
+      "allClear": "Nimic deschis. E-mailurile noi care contează apar aici.",
+      "done": "Gata",
+      "later": "Mai târziu",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Diseară",
+      "laterTomorrow": "Mâine dimineață",
+      "laterWeekend": "În weekend",
+      "laterNextWeek": "Săptămâna viitoare",
+      "laterPick": "Alege o oră…",
+      "laterSet": "Adu-l înapoi",
+      "back": "Din nou aici",
+      "inLater": {
+        "few": "Pentru mai târziu: {count}",
+        "one": "Pentru mai târziu: {count}",
+        "other": "Pentru mai târziu: {count}"
+      },
+      "doneToday": {
+        "few": "Gata azi: {count}",
+        "one": "Gata azi: {count}",
+        "other": "Gata azi: {count}"
+      },
+      "until": "până {when}",
+      "reopen": "Redeschide",
+      "undo": "Anulează",
+      "toastDone": "Gata · {headline}",
+      "toastLater": "Mai târziu, {when} · {headline}",
+      "history": "Istoric",
+      "backToToday": "Înapoi la Azi",
+      "readToday": {
+        "few": "Citite azi: {count} · lăsate deoparte: {leftOut}",
+        "one": "Citite azi: {count} · lăsate deoparte: {leftOut}",
+        "other": "Citite azi: {count} · lăsate deoparte: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Trimite",
+      "saveDraft": "Salvează ca ciornă Gmail",
+      "cancel": "Anulează",
+      "never": "Nu se trimite nimic până nu atingi Trimite.",
+      "to": "Către {to}",
+      "sent": "Trimis.",
+      "saved": "Salvat în ciornele tale Gmail.",
+      "hold": "Ține apăsat ca să dictezi un răspuns",
+      "holdShort": "Ține apăsat ca să vorbești",
+      "listening": "Ascult… eliberează când ai terminat.",
+      "writing": "Îți scriu răspunsul…"
+    },
+    "cleanup": {
+      "title": "Lăsate deoparte",
+      "hint": "„Curăță tot” le arhivează în Gmail. „Dezabonare” îi cere expeditorului să se oprească.",
+      "unsubscribe": "Dezabonare",
+      "unsubscribed": "Dezabonat",
+      "clearAll": "Curăță tot",
+      "cleared": "Curățat",
+      "openedPage": "Termină pe pagina expeditorului care tocmai s-a deschis."
+    },
+    "log": {
+      "title": "Ce a făcut Stella",
+      "hint": "Stella citește e-mailurile noi ca să le sorteze. Nu trimite și nu arhivează nimic singură, decât dacă o instrucțiune permanentă spune asta.",
+      "read": {
+        "few": "E-mailuri citite: {count} · lăsate deoparte: {leftOut}",
+        "one": "E-mailuri citite: {count} · lăsate deoparte: {leftOut}",
+        "other": "E-mailuri citite: {count} · lăsate deoparte: {leftOut}"
+      },
+      "briefed": {
+        "few": "Adăugate la Azi: {count}",
+        "one": "Adăugate la Azi: {count}",
+        "other": "Adăugate la Azi: {count}"
+      },
+      "urgent": "Anunțat imediat: {subject}",
+      "rule": "Conform instrucțiunii tale: {subject}",
+      "sent": "Răspunsul tău a fost trimis către {who}",
+      "drafted": "Răspunsul tău către {who} a fost salvat ca ciornă Gmail",
+      "done": "Gata, marcat ca citit în Gmail: {subject}",
+      "later": "Mai târziu, până {when}: {subject}",
+      "returned": "Din nou aici: {subject}",
+      "reopened": "Redeschis: {subject}",
+      "handled": "Dat Stellei în chat: {subject}",
+      "archived": "Arhivat în Gmail: {subject}",
+      "unsubscribed": "Dezabonat de la {who}",
+      "cleared": {
+        "few": "E-mailuri de la {who} arhivate: {count}",
+        "one": "E-mailuri de la {who} arhivate: {count}",
+        "other": "E-mailuri de la {who} arhivate: {count}"
+      },
+      "repliedInGmail": "Ai răspuns în Gmail: {subject}",
+      "archivedInGmail": "L-ai arhivat în Gmail: {subject}"
+    },
+    "history": {
+      "title": "Istoric",
+      "cameIn": "Primit",
+      "empty": "Nimic în ultimele două săptămâni.",
+      "today": "Azi",
+      "yesterday": "Ieri"
+    },
+    "status": {
+      "open": "Deschis",
+      "done": "Gata",
+      "replied": "Răspuns trimis",
+      "drafted": "Ciornă salvată",
+      "handled": "La Stella",
+      "archived": "Arhivat",
+      "later": "Mai târziu · {when}",
+      "repliedInGmail": "Răspuns în Gmail",
+      "archivedInGmail": "Arhivat în Gmail"
     }
   }
 }

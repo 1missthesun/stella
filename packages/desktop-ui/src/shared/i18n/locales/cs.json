@@ -3760,7 +3760,134 @@
       "briefing": "Přehled pošty je připravený",
       "urgent": "Naléhavý e-mail od {from}",
       "asked": "E-mail, na který jste se ptali",
-      "open": "Otevřít"
+      "open": "Otevřít",
+      "more": {
+        "few": "a {count} další",
+        "many": "a {count} dalšího",
+        "one": "a {count} další",
+        "other": "a {count} dalších"
+      },
+      "back": "Znovu tady"
+    },
+    "today": {
+      "title": "Dnes",
+      "open": {
+        "few": "Otevřené: {count}",
+        "many": "Otevřené: {count}",
+        "one": "Otevřené: {count}",
+        "other": "Otevřené: {count}"
+      },
+      "allClear": "Nic otevřeného. Nová důležitá pošta se objeví tady.",
+      "done": "Hotovo",
+      "later": "Později",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Dnes večer",
+      "laterTomorrow": "Zítra ráno",
+      "laterWeekend": "Tento víkend",
+      "laterNextWeek": "Příští týden",
+      "laterPick": "Vybrat čas…",
+      "laterSet": "Připomenout",
+      "back": "Znovu tady",
+      "inLater": {
+        "few": "Na později: {count}",
+        "many": "Na později: {count}",
+        "one": "Na později: {count}",
+        "other": "Na později: {count}"
+      },
+      "doneToday": {
+        "few": "Dnes hotovo: {count}",
+        "many": "Dnes hotovo: {count}",
+        "one": "Dnes hotovo: {count}",
+        "other": "Dnes hotovo: {count}"
+      },
+      "until": "do {when}",
+      "reopen": "Znovu otevřít",
+      "undo": "Vrátit",
+      "toastDone": "Hotovo · {headline}",
+      "toastLater": "Později, {when} · {headline}",
+      "history": "Historie",
+      "backToToday": "Zpět na Dnes",
+      "readToday": {
+        "few": "Dnes přečteno e-mailů: {count} · vynecháno: {leftOut}",
+        "many": "Dnes přečteno e-mailů: {count} · vynecháno: {leftOut}",
+        "one": "Dnes přečteno e-mailů: {count} · vynecháno: {leftOut}",
+        "other": "Dnes přečteno e-mailů: {count} · vynecháno: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Odeslat",
+      "saveDraft": "Uložit jako koncept v Gmailu",
+      "cancel": "Zrušit",
+      "never": "Nic se neodešle, dokud neklepnete na Odeslat.",
+      "to": "Komu: {to}",
+      "sent": "Odesláno.",
+      "saved": "Uloženo do konceptů v Gmailu.",
+      "hold": "Podržením nadiktujete odpověď",
+      "holdShort": "Podržte a mluvte",
+      "listening": "Poslouchám… pusťte, až budete hotovi.",
+      "writing": "Píšu vaši odpověď…"
+    },
+    "cleanup": {
+      "title": "Vynecháno",
+      "hint": "„Vyčistit vše“ je archivuje v Gmailu. „Odhlásit odběr“ požádá odesílatele, ať přestane.",
+      "unsubscribe": "Odhlásit odběr",
+      "unsubscribed": "Odběr odhlášen",
+      "clearAll": "Vyčistit vše",
+      "cleared": "Vyčištěno",
+      "openedPage": "Dokončete to na stránce odesílatele, která se právě otevřela."
+    },
+    "log": {
+      "title": "Co Stella udělala",
+      "hint": "Stella čte novou poštu, aby ji roztřídila. Sama nikdy nic neodešle ani nearchivuje, pokud jí to neříká trvalý pokyn.",
+      "read": {
+        "few": "Přečteno e-mailů: {count} · vynecháno: {leftOut}",
+        "many": "Přečteno e-mailů: {count} · vynecháno: {leftOut}",
+        "one": "Přečteno e-mailů: {count} · vynecháno: {leftOut}",
+        "other": "Přečteno e-mailů: {count} · vynecháno: {leftOut}"
+      },
+      "briefed": {
+        "few": "Přidáno do Dnes: {count}",
+        "many": "Přidáno do Dnes: {count}",
+        "one": "Přidáno do Dnes: {count}",
+        "other": "Přidáno do Dnes: {count}"
+      },
+      "urgent": "Hned oznámeno: {subject}",
+      "rule": "Podle vašeho pokynu: {subject}",
+      "sent": "Odpověď pro {who} odeslána",
+      "drafted": "Odpověď pro {who} uložena jako koncept v Gmailu",
+      "done": "Hotovo, v Gmailu označeno jako přečtené: {subject}",
+      "later": "Později, do {when}: {subject}",
+      "returned": "Znovu tady: {subject}",
+      "reopened": "Znovu otevřeno: {subject}",
+      "handled": "Předáno Stelle v chatu: {subject}",
+      "archived": "Archivováno v Gmailu: {subject}",
+      "unsubscribed": "Odběr odhlášen: {who}",
+      "cleared": {
+        "few": "Archivováno e-mailů od {who}: {count}",
+        "many": "Archivováno e-mailů od {who}: {count}",
+        "one": "Archivováno e-mailů od {who}: {count}",
+        "other": "Archivováno e-mailů od {who}: {count}"
+      },
+      "repliedInGmail": "Odpověděli jste v Gmailu: {subject}",
+      "archivedInGmail": "Archivovali jste to v Gmailu: {subject}"
+    },
+    "history": {
+      "title": "Historie",
+      "cameIn": "Přišlo",
+      "empty": "Za poslední dva týdny nic.",
+      "today": "Dnes",
+      "yesterday": "Včera"
+    },
+    "status": {
+      "open": "Otevřené",
+      "done": "Hotovo",
+      "replied": "Zodpovězeno",
+      "drafted": "Koncept uložen",
+      "handled": "U Stelly",
+      "archived": "Archivováno",
+      "later": "Později · {when}",
+      "repliedInGmail": "Zodpovězeno v Gmailu",
+      "archivedInGmail": "Archivováno v Gmailu"
     }
   }
 }

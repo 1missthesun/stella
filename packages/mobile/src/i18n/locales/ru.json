@@ -3760,7 +3760,134 @@
       "briefing": "Сводка почты готова",
       "urgent": "Срочное письмо от {from}",
       "asked": "Письмо, о котором вы просили",
-      "open": "Открыть"
+      "open": "Открыть",
+      "more": {
+        "few": "и ещё {count}",
+        "many": "и ещё {count}",
+        "one": "и ещё {count}",
+        "other": "и ещё {count}"
+      },
+      "back": "Снова здесь"
+    },
+    "today": {
+      "title": "Сегодня",
+      "open": {
+        "few": "Открыто: {count}",
+        "many": "Открыто: {count}",
+        "one": "Открыто: {count}",
+        "other": "Открыто: {count}"
+      },
+      "allClear": "Ничего не открыто. Новые важные письма появятся здесь.",
+      "done": "Готово",
+      "later": "Позже",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Сегодня вечером",
+      "laterTomorrow": "Завтра утром",
+      "laterWeekend": "В выходные",
+      "laterNextWeek": "На следующей неделе",
+      "laterPick": "Выбрать время…",
+      "laterSet": "Напомнить",
+      "back": "Снова здесь",
+      "inLater": {
+        "few": "Отложено: {count}",
+        "many": "Отложено: {count}",
+        "one": "Отложено: {count}",
+        "other": "Отложено: {count}"
+      },
+      "doneToday": {
+        "few": "Готово сегодня: {count}",
+        "many": "Готово сегодня: {count}",
+        "one": "Готово сегодня: {count}",
+        "other": "Готово сегодня: {count}"
+      },
+      "until": "до {when}",
+      "reopen": "Открыть снова",
+      "undo": "Отменить",
+      "toastDone": "Готово · {headline}",
+      "toastLater": "Позже, {when} · {headline}",
+      "history": "История",
+      "backToToday": "Назад к «Сегодня»",
+      "readToday": {
+        "few": "Прочитано сегодня: {count} · отсеяно: {leftOut}",
+        "many": "Прочитано сегодня: {count} · отсеяно: {leftOut}",
+        "one": "Прочитано сегодня: {count} · отсеяно: {leftOut}",
+        "other": "Прочитано сегодня: {count} · отсеяно: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Отправить",
+      "saveDraft": "Сохранить как черновик Gmail",
+      "cancel": "Отмена",
+      "never": "Ничего не отправится, пока вы не нажмёте «Отправить».",
+      "to": "Кому: {to}",
+      "sent": "Отправлено.",
+      "saved": "Сохранено в черновиках Gmail.",
+      "hold": "Удерживайте, чтобы надиктовать ответ",
+      "holdShort": "Удерживайте и говорите",
+      "listening": "Слушаю… отпустите, когда закончите.",
+      "writing": "Пишу ваш ответ…"
+    },
+    "cleanup": {
+      "title": "Отсеяно",
+      "hint": "«Убрать все» отправляет их в архив Gmail. «Отписаться» просит отправителя больше не писать.",
+      "unsubscribe": "Отписаться",
+      "unsubscribed": "Вы отписаны",
+      "clearAll": "Убрать все",
+      "cleared": "Убрано",
+      "openedPage": "Завершите на странице отправителя, которая только что открылась."
+    },
+    "log": {
+      "title": "Что сделала Stella",
+      "hint": "Stella читает новые письма, чтобы их рассортировать. Она никогда ничего не отправляет и не архивирует сама, если этого не требует постоянное указание.",
+      "read": {
+        "few": "Прочитано писем: {count} · отсеяно: {leftOut}",
+        "many": "Прочитано писем: {count} · отсеяно: {leftOut}",
+        "one": "Прочитано писем: {count} · отсеяно: {leftOut}",
+        "other": "Прочитано писем: {count} · отсеяно: {leftOut}"
+      },
+      "briefed": {
+        "few": "Добавлено в «Сегодня»: {count}",
+        "many": "Добавлено в «Сегодня»: {count}",
+        "one": "Добавлено в «Сегодня»: {count}",
+        "other": "Добавлено в «Сегодня»: {count}"
+      },
+      "urgent": "Сообщено сразу: {subject}",
+      "rule": "По вашему указанию: {subject}",
+      "sent": "Ваш ответ для {who} отправлен",
+      "drafted": "Ваш ответ для {who} сохранён как черновик Gmail",
+      "done": "Готово, отмечено прочитанным в Gmail: {subject}",
+      "later": "Позже, до {when}: {subject}",
+      "returned": "Снова здесь: {subject}",
+      "reopened": "Открыто снова: {subject}",
+      "handled": "Передано Stella в чате: {subject}",
+      "archived": "В архиве Gmail: {subject}",
+      "unsubscribed": "Отписка от рассылки: {who}",
+      "cleared": {
+        "few": "Архивировано писем от {who}: {count}",
+        "many": "Архивировано писем от {who}: {count}",
+        "one": "Архивировано писем от {who}: {count}",
+        "other": "Архивировано писем от {who}: {count}"
+      },
+      "repliedInGmail": "Вы ответили в Gmail: {subject}",
+      "archivedInGmail": "Вы архивировали в Gmail: {subject}"
+    },
+    "history": {
+      "title": "История",
+      "cameIn": "Пришло",
+      "empty": "За последние две недели ничего.",
+      "today": "Сегодня",
+      "yesterday": "Вчера"
+    },
+    "status": {
+      "open": "Открыто",
+      "done": "Готово",
+      "replied": "Отвечено",
+      "drafted": "Черновик сохранён",
+      "handled": "У Stella",
+      "archived": "В архиве",
+      "later": "Позже · {when}",
+      "repliedInGmail": "Отвечено в Gmail",
+      "archivedInGmail": "В архиве Gmail"
     }
   }
 }

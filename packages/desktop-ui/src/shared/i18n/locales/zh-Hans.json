@@ -3656,7 +3656,110 @@
       "briefing": "你的邮件简报已就绪",
       "urgent": "来自 {from} 的紧急邮件",
       "asked": "你问过的邮件",
-      "open": "打开"
+      "open": "打开",
+      "more": {
+        "other": "还有 {count} 项"
+      },
+      "back": "稍后的事项已回来"
+    },
+    "today": {
+      "title": "今天",
+      "open": {
+        "other": "{count} 项待处理"
+      },
+      "allClear": "没有待处理的事项。重要的新邮件会出现在这里。",
+      "done": "完成",
+      "later": "稍后",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "今晚",
+      "laterTomorrow": "明天上午",
+      "laterWeekend": "这个周末",
+      "laterNextWeek": "下周",
+      "laterPick": "选择时间…",
+      "laterSet": "到时提醒",
+      "back": "稍后的事项已回来",
+      "inLater": {
+        "other": "稍后 {count} 项"
+      },
+      "doneToday": {
+        "other": "今天完成 {count} 项"
+      },
+      "until": "直到 {when}",
+      "reopen": "重新打开",
+      "undo": "撤销",
+      "toastDone": "已完成 · {headline}",
+      "toastLater": "稍后，{when} · {headline}",
+      "history": "历史",
+      "backToToday": "返回今天",
+      "readToday": {
+        "other": "今天读了 {count} 封邮件 · 略过 {leftOut} 封"
+      }
+    },
+    "reply": {
+      "send": "发送",
+      "saveDraft": "存为 Gmail 草稿",
+      "cancel": "取消",
+      "never": "在你点按发送之前，不会发出任何内容。",
+      "to": "收件人：{to}",
+      "sent": "已发送。",
+      "saved": "已存入你的 Gmail 草稿。",
+      "hold": "按住说出回复",
+      "holdShort": "按住说话",
+      "listening": "正在听…说完后松开。",
+      "writing": "正在写你的回复…"
+    },
+    "cleanup": {
+      "title": "已略过",
+      "hint": "“全部清理”会在 Gmail 中归档这些邮件。“退订”会请发件人停止发送。",
+      "unsubscribe": "退订",
+      "unsubscribed": "已退订",
+      "clearAll": "全部清理",
+      "cleared": "已清理",
+      "openedPage": "请在刚打开的发件人页面上完成操作。"
+    },
+    "log": {
+      "title": "Stella 做了什么",
+      "hint": "Stella 会读取新邮件来分类。除非有长期指令，否则它不会自行发送或归档。",
+      "read": {
+        "other": "读了 {count} 封邮件 · 略过 {leftOut} 封"
+      },
+      "briefed": {
+        "other": "向今天加入 {count} 项"
+      },
+      "urgent": "已立即告诉你：{subject}",
+      "rule": "已按你的指令处理：{subject}",
+      "sent": "已将你的回复发送给 {who}",
+      "drafted": "已将你给 {who} 的回复存为 Gmail 草稿",
+      "done": "已完成，并在 Gmail 中标为已读：{subject}",
+      "later": "稍后，直到 {when}：{subject}",
+      "returned": "已从稍后回来：{subject}",
+      "reopened": "已重新打开：{subject}",
+      "handled": "已在聊天中交给 Stella：{subject}",
+      "archived": "已在 Gmail 中归档：{subject}",
+      "unsubscribed": "已为你退订 {who}",
+      "cleared": {
+        "other": "已归档来自 {who} 的 {count} 封邮件"
+      },
+      "repliedInGmail": "你在 Gmail 中回复了：{subject}",
+      "archivedInGmail": "你在 Gmail 中归档了：{subject}"
+    },
+    "history": {
+      "title": "历史",
+      "cameIn": "收到",
+      "empty": "过去两周没有内容。",
+      "today": "今天",
+      "yesterday": "昨天"
+    },
+    "status": {
+      "open": "待处理",
+      "done": "已完成",
+      "replied": "已回复",
+      "drafted": "已存草稿",
+      "handled": "已交给 Stella",
+      "archived": "已归档",
+      "later": "稍后 · {when}",
+      "repliedInGmail": "已在 Gmail 中回复",
+      "archivedInGmail": "已在 Gmail 中归档"
     }
   }
 }

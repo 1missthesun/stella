@@ -3656,7 +3656,110 @@
       "briefing": "メールのまとめができました",
       "urgent": "{from} からの緊急メール",
       "asked": "確認を頼まれたメール",
-      "open": "開く"
+      "open": "開く",
+      "more": {
+        "other": "ほか {count}件"
+      },
+      "back": "あとでから戻りました"
+    },
+    "today": {
+      "title": "今日",
+      "open": {
+        "other": "未対応 {count}件"
+      },
+      "allClear": "未対応のものはありません。大事な新着メールはここに表示されます。",
+      "done": "完了",
+      "later": "あとで",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "今夜",
+      "laterTomorrow": "明日の朝",
+      "laterWeekend": "今週末",
+      "laterNextWeek": "来週",
+      "laterPick": "時間を選ぶ…",
+      "laterSet": "この時間に戻す",
+      "back": "あとでから戻りました",
+      "inLater": {
+        "other": "あとで {count}件"
+      },
+      "doneToday": {
+        "other": "今日完了 {count}件"
+      },
+      "until": "{when}まで",
+      "reopen": "もう一度開く",
+      "undo": "元に戻す",
+      "toastDone": "完了 · {headline}",
+      "toastLater": "あとで（{when}） · {headline}",
+      "history": "履歴",
+      "backToToday": "今日に戻る",
+      "readToday": {
+        "other": "今日 {count}件のメールを読みました · {leftOut}件を除外"
+      }
+    },
+    "reply": {
+      "send": "送信",
+      "saveDraft": "Gmail の下書きに保存",
+      "cancel": "キャンセル",
+      "never": "送信をタップするまで何も送られません。",
+      "to": "宛先: {to}",
+      "sent": "送信しました。",
+      "saved": "Gmail の下書きに保存しました。",
+      "hold": "長押しして返信を話す",
+      "holdShort": "長押しで話す",
+      "listening": "聞いています… 話し終えたら指を離してください。",
+      "writing": "返信を書いています…"
+    },
+    "cleanup": {
+      "title": "除外したメール",
+      "hint": "「すべて片付ける」で Gmail にアーカイブします。「配信停止」は送信者に配信の停止を依頼します。",
+      "unsubscribe": "配信停止",
+      "unsubscribed": "配信停止済み",
+      "clearAll": "すべて片付ける",
+      "cleared": "片付けました",
+      "openedPage": "開いた送信者のページで手続きを完了してください。"
+    },
+    "log": {
+      "title": "Stella がしたこと",
+      "hint": "Stella は新着メールを仕分けるために読みます。常設の指示がない限り、自分で送信やアーカイブをすることはありません。",
+      "read": {
+        "other": "{count}件のメールを読みました · {leftOut}件を除外"
+      },
+      "briefed": {
+        "other": "今日に {count}件追加"
+      },
+      "urgent": "すぐにお知らせ: {subject}",
+      "rule": "指示に従いました: {subject}",
+      "sent": "{who} に返信を送信しました",
+      "drafted": "{who} への返信を Gmail の下書きに保存しました",
+      "done": "完了、Gmail で既読にしました: {subject}",
+      "later": "あとで（{when}まで）: {subject}",
+      "returned": "あとでから戻りました: {subject}",
+      "reopened": "もう一度開きました: {subject}",
+      "handled": "チャットで Stella に任せました: {subject}",
+      "archived": "Gmail でアーカイブしました: {subject}",
+      "unsubscribed": "{who} の配信を停止しました",
+      "cleared": {
+        "other": "{who} からのメール {count}件をアーカイブしました"
+      },
+      "repliedInGmail": "あなたが Gmail で返信: {subject}",
+      "archivedInGmail": "あなたが Gmail でアーカイブ: {subject}"
+    },
+    "history": {
+      "title": "履歴",
+      "cameIn": "受信",
+      "empty": "過去 2 週間は何もありません。",
+      "today": "今日",
+      "yesterday": "昨日"
+    },
+    "status": {
+      "open": "未対応",
+      "done": "完了",
+      "replied": "返信済み",
+      "drafted": "下書き保存済み",
+      "handled": "Stella が対応中",
+      "archived": "アーカイブ済み",
+      "later": "あとで · {when}",
+      "repliedInGmail": "Gmail で返信済み",
+      "archivedInGmail": "Gmail でアーカイブ済み"
     }
   }
 }

@@ -3692,7 +3692,118 @@
       "briefing": "Din mejlsammanfattning är klar",
       "urgent": "Brådskande mejl från {from}",
       "asked": "Mejl du frågade om",
-      "open": "Öppna"
+      "open": "Öppna",
+      "more": {
+        "one": "och {count} till",
+        "other": "och {count} till"
+      },
+      "back": "Tillbaka från Senare"
+    },
+    "today": {
+      "title": "I dag",
+      "open": {
+        "one": "{count} öppet",
+        "other": "{count} öppna"
+      },
+      "allClear": "Inget öppet. Nya mejl som spelar roll dyker upp här.",
+      "done": "Klar",
+      "later": "Senare",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "I kväll",
+      "laterTomorrow": "I morgon bitti",
+      "laterWeekend": "I helgen",
+      "laterNextWeek": "Nästa vecka",
+      "laterPick": "Välj en tid…",
+      "laterSet": "Visa igen",
+      "back": "Tillbaka från Senare",
+      "inLater": {
+        "one": "{count} i Senare",
+        "other": "{count} i Senare"
+      },
+      "doneToday": {
+        "one": "{count} klar i dag",
+        "other": "{count} klara i dag"
+      },
+      "until": "till {when}",
+      "reopen": "Öppna igen",
+      "undo": "Ångra",
+      "toastDone": "Klar · {headline}",
+      "toastLater": "Senare, {when} · {headline}",
+      "history": "Historik",
+      "backToToday": "Tillbaka till I dag",
+      "readToday": {
+        "one": "Läste {count} mejl i dag · {leftOut} sorterades bort",
+        "other": "Läste {count} mejl i dag · {leftOut} sorterades bort"
+      }
+    },
+    "reply": {
+      "send": "Skicka",
+      "saveDraft": "Spara som Gmail-utkast",
+      "cancel": "Avbryt",
+      "never": "Inget skickas förrän du trycker på Skicka.",
+      "to": "Till {to}",
+      "sent": "Skickat.",
+      "saved": "Sparat bland dina Gmail-utkast.",
+      "hold": "Håll in för att tala in ett svar",
+      "holdShort": "Håll in för att tala",
+      "listening": "Lyssnar… släpp när du är klar.",
+      "writing": "Skriver ditt svar…"
+    },
+    "cleanup": {
+      "title": "Bortsorterat",
+      "hint": "Rensa alla arkiverar dem i Gmail. Avsluta prenumeration ber avsändaren att sluta.",
+      "unsubscribe": "Avsluta prenumeration",
+      "unsubscribed": "Prenumeration avslutad",
+      "clearAll": "Rensa alla",
+      "cleared": "Rensat",
+      "openedPage": "Gör klart på avsändarens sida som just öppnades."
+    },
+    "log": {
+      "title": "Vad Stella gjorde",
+      "hint": "Stella läser nya mejl för att sortera dem. Stella skickar eller arkiverar aldrig på egen hand, om inte en stående instruktion säger det.",
+      "read": {
+        "one": "Läste {count} mejl · {leftOut} sorterades bort",
+        "other": "Läste {count} mejl · {leftOut} sorterades bort"
+      },
+      "briefed": {
+        "one": "Lade {count} punkt på I dag",
+        "other": "Lade {count} punkter på I dag"
+      },
+      "urgent": "Sa till dig direkt: {subject}",
+      "rule": "Följde din instruktion: {subject}",
+      "sent": "Skickade ditt svar till {who}",
+      "drafted": "Sparade ditt svar till {who} som Gmail-utkast",
+      "done": "Klar, markerat som läst i Gmail: {subject}",
+      "later": "Senare, till {when}: {subject}",
+      "returned": "Tillbaka från Senare: {subject}",
+      "reopened": "Öppnades igen: {subject}",
+      "handled": "Lämnat till Stella i chatten: {subject}",
+      "archived": "Arkiverat i Gmail: {subject}",
+      "unsubscribed": "Avslutade din prenumeration från {who}",
+      "cleared": {
+        "one": "Arkiverade {count} mejl från {who}",
+        "other": "Arkiverade {count} mejl från {who}"
+      },
+      "repliedInGmail": "Du svarade i Gmail: {subject}",
+      "archivedInGmail": "Du arkiverade det i Gmail: {subject}"
+    },
+    "history": {
+      "title": "Historik",
+      "cameIn": "Kom in",
+      "empty": "Inget de senaste två veckorna.",
+      "today": "I dag",
+      "yesterday": "I går"
+    },
+    "status": {
+      "open": "Öppen",
+      "done": "Klar",
+      "replied": "Besvarat",
+      "drafted": "Utkast sparat",
+      "handled": "Hos Stella",
+      "archived": "Arkiverat",
+      "later": "Senare · {when}",
+      "repliedInGmail": "Besvarat i Gmail",
+      "archivedInGmail": "Arkiverat i Gmail"
     }
   }
 }

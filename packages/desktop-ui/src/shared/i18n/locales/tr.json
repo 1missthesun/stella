@@ -3692,7 +3692,118 @@
       "briefing": "E-posta özetin hazır",
       "urgent": "{from} kişisinden acil e-posta",
       "asked": "Sorduğun e-posta",
-      "open": "Aç"
+      "open": "Aç",
+      "more": {
+        "one": "ve {count} tane daha",
+        "other": "ve {count} tane daha"
+      },
+      "back": "Geri döndü"
+    },
+    "today": {
+      "title": "Bugün",
+      "open": {
+        "one": "{count} açık",
+        "other": "{count} açık"
+      },
+      "allClear": "Açık bir şey yok. Önemli yeni postalar burada görünür.",
+      "done": "Bitti",
+      "later": "Sonra",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Bu akşam",
+      "laterTomorrow": "Yarın sabah",
+      "laterWeekend": "Bu hafta sonu",
+      "laterNextWeek": "Gelecek hafta",
+      "laterPick": "Bir zaman seçin…",
+      "laterSet": "O zaman geri getir",
+      "back": "Geri döndü",
+      "inLater": {
+        "one": "Sonra: {count}",
+        "other": "Sonra: {count}"
+      },
+      "doneToday": {
+        "one": "Bugün biten: {count}",
+        "other": "Bugün biten: {count}"
+      },
+      "until": "dönüş: {when}",
+      "reopen": "Yeniden aç",
+      "undo": "Geri al",
+      "toastDone": "Bitti · {headline}",
+      "toastLater": "Sonra, {when} · {headline}",
+      "history": "Geçmiş",
+      "backToToday": "Bugün'e dön",
+      "readToday": {
+        "one": "Bugün {count} e-posta okundu · {leftOut} dışarıda kaldı",
+        "other": "Bugün {count} e-posta okundu · {leftOut} dışarıda kaldı"
+      }
+    },
+    "reply": {
+      "send": "Gönder",
+      "saveDraft": "Gmail taslağı olarak kaydet",
+      "cancel": "İptal",
+      "never": "Gönder'e dokunana kadar hiçbir şey gönderilmez.",
+      "to": "Alıcı: {to}",
+      "sent": "Gönderildi.",
+      "saved": "Gmail taslaklarınıza kaydedildi.",
+      "hold": "Yanıtı söylemek için basılı tutun",
+      "holdShort": "Konuşmak için basılı tutun",
+      "listening": "Dinliyorum… bitince bırakın.",
+      "writing": "Yanıtınız yazılıyor…"
+    },
+    "cleanup": {
+      "title": "Dışarıda kalanlar",
+      "hint": "\"Tümünü temizle\" bunları Gmail'de arşivler. \"Abonelikten çık\" gönderenden durmasını ister.",
+      "unsubscribe": "Abonelikten çık",
+      "unsubscribed": "Abonelikten çıkıldı",
+      "clearAll": "Tümünü temizle",
+      "cleared": "Temizlendi",
+      "openedPage": "Az önce açılan gönderen sayfasında işlemi tamamlayın."
+    },
+    "log": {
+      "title": "Stella ne yaptı",
+      "hint": "Stella yeni postaları ayırmak için okur. Kalıcı bir talimat söylemedikçe kendi başına asla göndermez veya arşivlemez.",
+      "read": {
+        "one": "{count} e-posta okundu · {leftOut} dışarıda kaldı",
+        "other": "{count} e-posta okundu · {leftOut} dışarıda kaldı"
+      },
+      "briefed": {
+        "one": "Bugün'e {count} öğe eklendi",
+        "other": "Bugün'e {count} öğe eklendi"
+      },
+      "urgent": "Hemen haber verildi: {subject}",
+      "rule": "Talimatınıza uyuldu: {subject}",
+      "sent": "{who} için yanıtınız gönderildi",
+      "drafted": "{who} için yanıtınız Gmail taslağı olarak kaydedildi",
+      "done": "Bitti, Gmail'de okundu olarak işaretlendi: {subject}",
+      "later": "Sonraya bırakıldı ({when}): {subject}",
+      "returned": "Geri döndü: {subject}",
+      "reopened": "Yeniden açıldı: {subject}",
+      "handled": "Sohbette Stella'ya verildi: {subject}",
+      "archived": "Gmail'de arşivlendi: {subject}",
+      "unsubscribed": "Abonelikten çıkıldı: {who}",
+      "cleared": {
+        "one": "{who} adresinden {count} e-posta arşivlendi",
+        "other": "{who} adresinden {count} e-posta arşivlendi"
+      },
+      "repliedInGmail": "Gmail'de yanıtladınız: {subject}",
+      "archivedInGmail": "Gmail'de arşivlediniz: {subject}"
+    },
+    "history": {
+      "title": "Geçmiş",
+      "cameIn": "Geldi",
+      "empty": "Son iki haftada bir şey yok.",
+      "today": "Bugün",
+      "yesterday": "Dün"
+    },
+    "status": {
+      "open": "Açık",
+      "done": "Bitti",
+      "replied": "Yanıtlandı",
+      "drafted": "Taslak kaydedildi",
+      "handled": "Stella'da",
+      "archived": "Arşivlendi",
+      "later": "Sonra · {when}",
+      "repliedInGmail": "Gmail'de yanıtlandı",
+      "archivedInGmail": "Gmail'de arşivlendi"
     }
   }
 }

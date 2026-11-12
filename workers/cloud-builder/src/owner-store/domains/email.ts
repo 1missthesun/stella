@@ -1279,8 +1279,9 @@ const runNote = async (ctx: OwnerContext): Promise<void> => {
 
 const LEAD_JOB = "email.lead";
 const LATER_JOB = "email.later";
-/** New mail is folded into Today at most this often; announcing it keeps the summary caps. */
-const FOLD_GAP_MS = 20 * MIN;
+/** New mail is folded into Today a few minutes after it lands (so a burst lands together) and at most this often; announcing it keeps the summary caps. */
+const FOLD_GAP_MS = 10 * MIN;
+const FOLD_SETTLE_MS = 3 * MIN;
 const FOLD_MAX = 15;
 const MATTER_RETENTION_MS = 30 * DAY;
 const HISTORY_DAYS = 14;
@@ -1663,8 +1664,10 @@ const fold = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, fo
   );
   if (waiting.length === 0) return;
   const last = stateOf(ctx.db)?.last_fold_at ?? null;
-  if (!force && last !== null && ctx.now - last < FOLD_GAP_MS) {
-    scheduleSummaryCheck(ctx, last + FOLD_GAP_MS);
+  const oldest = Math.min(...waiting.map((row) => row.sorted_at));
+  const at = Math.max(oldest + FOLD_SETTLE_MS, last === null ? 0 : last + FOLD_GAP_MS);
+  if (!force && waiting.length < FOLD_MAX && ctx.now < at) {
+    scheduleSummaryCheck(ctx, at);
     return;
   }
   ctx.db.run("UPDATE email_state SET last_fold_at = ? WHERE id = 1", ctx.now);

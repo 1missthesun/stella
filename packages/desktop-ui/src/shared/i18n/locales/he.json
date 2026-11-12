@@ -3726,7 +3726,126 @@
       "briefing": "סיכום הדואר שלך מוכן",
       "urgent": "אימייל דחוף מ-{from}",
       "asked": "אימייל ששאלת עליו",
-      "open": "פתיחה"
+      "open": "פתיחה",
+      "more": {
+        "one": "ועוד {count}",
+        "other": "ועוד {count}",
+        "two": "ועוד {count}"
+      },
+      "back": "חזר לכאן"
+    },
+    "today": {
+      "title": "היום",
+      "open": {
+        "one": "פתוחים: {count}",
+        "other": "פתוחים: {count}",
+        "two": "פתוחים: {count}"
+      },
+      "allClear": "אין שום דבר פתוח. דואר חדש שחשוב יופיע כאן.",
+      "done": "בוצע",
+      "later": "אחר כך",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "הערב",
+      "laterTomorrow": "מחר בבוקר",
+      "laterWeekend": "בסוף השבוע",
+      "laterNextWeek": "בשבוע הבא",
+      "laterPick": "בחירת שעה…",
+      "laterSet": "להחזיר אז",
+      "back": "חזר לכאן",
+      "inLater": {
+        "one": "לאחר כך: {count}",
+        "other": "לאחר כך: {count}",
+        "two": "לאחר כך: {count}"
+      },
+      "doneToday": {
+        "one": "בוצעו היום: {count}",
+        "other": "בוצעו היום: {count}",
+        "two": "בוצעו היום: {count}"
+      },
+      "until": "עד {when}",
+      "reopen": "פתיחה מחדש",
+      "undo": "בטל",
+      "toastDone": "בוצע · {headline}",
+      "toastLater": "אחר כך, {when} · {headline}",
+      "history": "היסטוריה",
+      "backToToday": "חזרה להיום",
+      "readToday": {
+        "one": "נקראו היום: {count} · הושארו בחוץ: {leftOut}",
+        "other": "נקראו היום: {count} · הושארו בחוץ: {leftOut}",
+        "two": "נקראו היום: {count} · הושארו בחוץ: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "שליחה",
+      "saveDraft": "שמירה כטיוטה ב-Gmail",
+      "cancel": "ביטול",
+      "never": "שום דבר לא נשלח עד שתקישו על שליחה.",
+      "to": "אל {to}",
+      "sent": "נשלח.",
+      "saved": "נשמר בטיוטות שלכם ב-Gmail.",
+      "hold": "החזיקו כדי להקליט תשובה",
+      "holdShort": "החזיקו כדי לדבר",
+      "listening": "מקשיבה… שחררו כשתסיימו.",
+      "writing": "כותבת את התשובה שלכם…"
+    },
+    "cleanup": {
+      "title": "הושארו בחוץ",
+      "hint": "\"ניקוי הכול\" מעביר אותם לארכיון ב-Gmail. \"ביטול מינוי\" מבקש מהשולח להפסיק.",
+      "unsubscribe": "ביטול מינוי",
+      "unsubscribed": "המינוי בוטל",
+      "clearAll": "ניקוי הכול",
+      "cleared": "נוקה",
+      "openedPage": "סיימו בדף של השולח שנפתח עכשיו."
+    },
+    "log": {
+      "title": "מה Stella עשתה",
+      "hint": "Stella קוראת דואר חדש כדי למיין אותו. היא אף פעם לא שולחת או מעבירה לארכיון בעצמה, אלא אם הנחיה קבועה אומרת זאת.",
+      "read": {
+        "one": "נקראו: {count} · הושארו בחוץ: {leftOut}",
+        "other": "נקראו: {count} · הושארו בחוץ: {leftOut}",
+        "two": "נקראו: {count} · הושארו בחוץ: {leftOut}"
+      },
+      "briefed": {
+        "one": "נוספו להיום: {count}",
+        "other": "נוספו להיום: {count}",
+        "two": "נוספו להיום: {count}"
+      },
+      "urgent": "עדכנה אתכם מיד: {subject}",
+      "rule": "פעלה לפי ההנחיה שלכם: {subject}",
+      "sent": "שלחה את התשובה שלכם אל {who}",
+      "drafted": "שמרה את התשובה שלכם אל {who} כטיוטה ב-Gmail",
+      "done": "בוצע, סומן כנקרא ב-Gmail: {subject}",
+      "later": "אחר כך, עד {when}: {subject}",
+      "returned": "חזר לכאן: {subject}",
+      "reopened": "נפתח מחדש: {subject}",
+      "handled": "הועבר ל-Stella בצ'אט: {subject}",
+      "archived": "הועבר לארכיון ב-Gmail: {subject}",
+      "unsubscribed": "ביטלה את המינוי שלכם אצל {who}",
+      "cleared": {
+        "one": "הועברו לארכיון מ-{who}: {count}",
+        "other": "הועברו לארכיון מ-{who}: {count}",
+        "two": "הועברו לארכיון מ-{who}: {count}"
+      },
+      "repliedInGmail": "עניתם ב-Gmail: {subject}",
+      "archivedInGmail": "העברתם לארכיון ב-Gmail: {subject}"
+    },
+    "history": {
+      "title": "היסטוריה",
+      "cameIn": "התקבל",
+      "empty": "אין כלום בשבועיים האחרונים.",
+      "today": "היום",
+      "yesterday": "אתמול"
+    },
+    "status": {
+      "open": "פתוח",
+      "done": "בוצע",
+      "replied": "נענה",
+      "drafted": "טיוטה נשמרה",
+      "handled": "אצל Stella",
+      "archived": "בארכיון",
+      "later": "אחר כך · {when}",
+      "repliedInGmail": "נענה ב-Gmail",
+      "archivedInGmail": "בארכיון ב-Gmail"
     }
   }
 }

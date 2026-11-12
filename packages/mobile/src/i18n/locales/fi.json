@@ -3692,7 +3692,118 @@
       "briefing": "Sähköpostikoosteesi on valmis",
       "urgent": "Kiireellinen sähköposti lähettäjältä {from}",
       "asked": "Sähköposti, jota kysyit",
-      "open": "Avaa"
+      "open": "Avaa",
+      "more": {
+        "one": "ja {count} muu",
+        "other": "ja {count} muuta"
+      },
+      "back": "Palasi takaisin"
+    },
+    "today": {
+      "title": "Tänään",
+      "open": {
+        "one": "{count} avoinna",
+        "other": "{count} avoinna"
+      },
+      "allClear": "Ei mitään avoinna. Uudet tärkeät viestit näkyvät tässä.",
+      "done": "Valmis",
+      "later": "Myöhemmin",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Tänä iltana",
+      "laterTomorrow": "Huomenna aamulla",
+      "laterWeekend": "Viikonloppuna",
+      "laterNextWeek": "Ensi viikolla",
+      "laterPick": "Valitse aika…",
+      "laterSet": "Palauta silloin",
+      "back": "Palasi takaisin",
+      "inLater": {
+        "one": "Myöhemmin: {count}",
+        "other": "Myöhemmin: {count}"
+      },
+      "doneToday": {
+        "one": "Tänään valmiina: {count}",
+        "other": "Tänään valmiina: {count}"
+      },
+      "until": "{when} asti",
+      "reopen": "Avaa uudelleen",
+      "undo": "Kumoa",
+      "toastDone": "Valmis · {headline}",
+      "toastLater": "Myöhemmin, {when} · {headline}",
+      "history": "Historia",
+      "backToToday": "Takaisin Tänään-näkymään",
+      "readToday": {
+        "one": "Luettu tänään {count} sähköposti · {leftOut} jätetty pois",
+        "other": "Luettu tänään {count} sähköpostia · {leftOut} jätetty pois"
+      }
+    },
+    "reply": {
+      "send": "Lähetä",
+      "saveDraft": "Tallenna Gmail-luonnokseksi",
+      "cancel": "Peruuta",
+      "never": "Mitään ei lähetetä ennen kuin napautat Lähetä.",
+      "to": "Vastaanottaja: {to}",
+      "sent": "Lähetetty.",
+      "saved": "Tallennettu Gmail-luonnoksiisi.",
+      "hold": "Sanele vastaus pitämällä painettuna",
+      "holdShort": "Puhu pitämällä painettuna",
+      "listening": "Kuuntelen… päästä irti, kun olet valmis.",
+      "writing": "Kirjoitan vastaustasi…"
+    },
+    "cleanup": {
+      "title": "Jätetty pois",
+      "hint": "Tyhjennä kaikki arkistoi ne Gmailissa. Peru tilaus pyytää lähettäjää lopettamaan.",
+      "unsubscribe": "Peru tilaus",
+      "unsubscribed": "Tilaus peruttu",
+      "clearAll": "Tyhjennä kaikki",
+      "cleared": "Tyhjennetty",
+      "openedPage": "Viimeistele juuri avautuneella lähettäjän sivulla."
+    },
+    "log": {
+      "title": "Mitä Stella teki",
+      "hint": "Stella lukee uudet viestit lajitellakseen ne. Se ei koskaan lähetä tai arkistoi mitään itse, ellei pysyvä ohje niin sano.",
+      "read": {
+        "one": "Luettu {count} sähköposti · {leftOut} jätetty pois",
+        "other": "Luettu {count} sähköpostia · {leftOut} jätetty pois"
+      },
+      "briefed": {
+        "one": "Lisätty {count} kohde Tänään-listalle",
+        "other": "Lisätty {count} kohdetta Tänään-listalle"
+      },
+      "urgent": "Kerrottu heti: {subject}",
+      "rule": "Ohjettasi noudatettu: {subject}",
+      "sent": "Vastauksesi lähetetty vastaanottajalle {who}",
+      "drafted": "Vastauksesi vastaanottajalle {who} tallennettu Gmail-luonnokseksi",
+      "done": "Valmis, merkitty luetuksi Gmailissa: {subject}",
+      "later": "Myöhemmin, {when} asti: {subject}",
+      "returned": "Palasi takaisin: {subject}",
+      "reopened": "Avattu uudelleen: {subject}",
+      "handled": "Annettu Stellalle chatissa: {subject}",
+      "archived": "Arkistoitu Gmailissa: {subject}",
+      "unsubscribed": "Tilaus peruttu: {who}",
+      "cleared": {
+        "one": "Arkistoitu {count} sähköposti lähettäjältä {who}",
+        "other": "Arkistoitu {count} sähköpostia lähettäjältä {who}"
+      },
+      "repliedInGmail": "Vastasit Gmailissa: {subject}",
+      "archivedInGmail": "Arkistoit sen Gmailissa: {subject}"
+    },
+    "history": {
+      "title": "Historia",
+      "cameIn": "Saapui",
+      "empty": "Ei mitään kahden viime viikon ajalta.",
+      "today": "Tänään",
+      "yesterday": "Eilen"
+    },
+    "status": {
+      "open": "Avoinna",
+      "done": "Valmis",
+      "replied": "Vastattu",
+      "drafted": "Luonnos tallennettu",
+      "handled": "Stellalla",
+      "archived": "Arkistoitu",
+      "later": "Myöhemmin · {when}",
+      "repliedInGmail": "Vastattu Gmailissa",
+      "archivedInGmail": "Arkistoitu Gmailissa"
     }
   }
 }

@@ -3828,7 +3828,150 @@
       "briefing": "ملخص بريدك جاهز",
       "urgent": "رسالة عاجلة من {from}",
       "asked": "رسالة سألت عنها",
-      "open": "فتح"
+      "open": "فتح",
+      "more": {
+        "few": "و{count} أخرى",
+        "many": "و{count} أخرى",
+        "one": "و{count} أخرى",
+        "other": "و{count} أخرى",
+        "two": "و{count} أخرى",
+        "zero": "و{count} أخرى"
+      },
+      "back": "عاد إليك"
+    },
+    "today": {
+      "title": "اليوم",
+      "open": {
+        "few": "مفتوحة: {count}",
+        "many": "مفتوحة: {count}",
+        "one": "مفتوحة: {count}",
+        "other": "مفتوحة: {count}",
+        "two": "مفتوحة: {count}",
+        "zero": "مفتوحة: {count}"
+      },
+      "allClear": "لا شيء مفتوح. سيظهر هنا البريد الجديد المهم.",
+      "done": "تم",
+      "later": "لاحقًا",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "هذا المساء",
+      "laterTomorrow": "صباح الغد",
+      "laterWeekend": "نهاية هذا الأسبوع",
+      "laterNextWeek": "الأسبوع القادم",
+      "laterPick": "اختر وقتًا…",
+      "laterSet": "أعِده حينها",
+      "back": "عاد إليك",
+      "inLater": {
+        "few": "لاحقًا: {count}",
+        "many": "لاحقًا: {count}",
+        "one": "لاحقًا: {count}",
+        "other": "لاحقًا: {count}",
+        "two": "لاحقًا: {count}",
+        "zero": "لاحقًا: {count}"
+      },
+      "doneToday": {
+        "few": "تم اليوم: {count}",
+        "many": "تم اليوم: {count}",
+        "one": "تم اليوم: {count}",
+        "other": "تم اليوم: {count}",
+        "two": "تم اليوم: {count}",
+        "zero": "تم اليوم: {count}"
+      },
+      "until": "حتى {when}",
+      "reopen": "إعادة فتح",
+      "undo": "تراجع",
+      "toastDone": "تم · {headline}",
+      "toastLater": "لاحقًا، {when} · {headline}",
+      "history": "السجل",
+      "backToToday": "العودة إلى اليوم",
+      "readToday": {
+        "few": "قُرئ اليوم: {count} · مستبعدة: {leftOut}",
+        "many": "قُرئ اليوم: {count} · مستبعدة: {leftOut}",
+        "one": "قُرئ اليوم: {count} · مستبعدة: {leftOut}",
+        "other": "قُرئ اليوم: {count} · مستبعدة: {leftOut}",
+        "two": "قُرئ اليوم: {count} · مستبعدة: {leftOut}",
+        "zero": "قُرئ اليوم: {count} · مستبعدة: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "إرسال",
+      "saveDraft": "حفظ كمسودة في Gmail",
+      "cancel": "إلغاء",
+      "never": "لن يُرسل شيء حتى تضغط إرسال.",
+      "to": "إلى {to}",
+      "sent": "تم الإرسال.",
+      "saved": "حُفظ في مسودات Gmail.",
+      "hold": "اضغط مطولًا لتقول ردك",
+      "holdShort": "اضغط مطولًا للتحدث",
+      "listening": "أستمع… ارفع إصبعك عند الانتهاء.",
+      "writing": "أكتب ردك…"
+    },
+    "cleanup": {
+      "title": "المستبعدة",
+      "hint": "«مسح الكل» يؤرشفها في Gmail. «إلغاء الاشتراك» يطلب من المرسل التوقف.",
+      "unsubscribe": "إلغاء الاشتراك",
+      "unsubscribed": "تم إلغاء الاشتراك",
+      "clearAll": "مسح الكل",
+      "cleared": "تم المسح",
+      "openedPage": "أكمل في صفحة المرسل التي فُتحت للتو."
+    },
+    "log": {
+      "title": "ما فعلته Stella",
+      "hint": "تقرأ Stella البريد الجديد لتفرزه. لا ترسل ولا تؤرشف شيئًا من تلقاء نفسها إلا إذا نصّت تعليمات دائمة على ذلك.",
+      "read": {
+        "few": "رسائل مقروءة: {count} · مستبعدة: {leftOut}",
+        "many": "رسائل مقروءة: {count} · مستبعدة: {leftOut}",
+        "one": "رسائل مقروءة: {count} · مستبعدة: {leftOut}",
+        "other": "رسائل مقروءة: {count} · مستبعدة: {leftOut}",
+        "two": "رسائل مقروءة: {count} · مستبعدة: {leftOut}",
+        "zero": "رسائل مقروءة: {count} · مستبعدة: {leftOut}"
+      },
+      "briefed": {
+        "few": "أُضيف إلى اليوم: {count}",
+        "many": "أُضيف إلى اليوم: {count}",
+        "one": "أُضيف إلى اليوم: {count}",
+        "other": "أُضيف إلى اليوم: {count}",
+        "two": "أُضيف إلى اليوم: {count}",
+        "zero": "أُضيف إلى اليوم: {count}"
+      },
+      "urgent": "أُبلغت فورًا: {subject}",
+      "rule": "نُفذت تعليماتك: {subject}",
+      "sent": "أُرسل ردك إلى {who}",
+      "drafted": "حُفظ ردك إلى {who} كمسودة في Gmail",
+      "done": "تم، وعُلّم كمقروء في Gmail: {subject}",
+      "later": "لاحقًا، حتى {when}: {subject}",
+      "returned": "عاد إليك: {subject}",
+      "reopened": "أُعيد فتحه: {subject}",
+      "handled": "سُلّم إلى Stella في المحادثة: {subject}",
+      "archived": "أُرشف في Gmail: {subject}",
+      "unsubscribed": "أُلغي اشتراكك لدى {who}",
+      "cleared": {
+        "few": "رسائل مؤرشفة من {who}: {count}",
+        "many": "رسائل مؤرشفة من {who}: {count}",
+        "one": "رسائل مؤرشفة من {who}: {count}",
+        "other": "رسائل مؤرشفة من {who}: {count}",
+        "two": "رسائل مؤرشفة من {who}: {count}",
+        "zero": "رسائل مؤرشفة من {who}: {count}"
+      },
+      "repliedInGmail": "رددت في Gmail: {subject}",
+      "archivedInGmail": "أرشفته في Gmail: {subject}"
+    },
+    "history": {
+      "title": "السجل",
+      "cameIn": "وصل",
+      "empty": "لا شيء خلال الأسبوعين الماضيين.",
+      "today": "اليوم",
+      "yesterday": "أمس"
+    },
+    "status": {
+      "open": "مفتوح",
+      "done": "تم",
+      "replied": "تم الرد",
+      "drafted": "حُفظت المسودة",
+      "handled": "لدى Stella",
+      "archived": "مؤرشف",
+      "later": "لاحقًا · {when}",
+      "repliedInGmail": "تم الرد في Gmail",
+      "archivedInGmail": "مؤرشف في Gmail"
     }
   }
 }

@@ -3692,7 +3692,118 @@
       "briefing": "आपका ईमेल सारांश तैयार है",
       "urgent": "{from} से ज़रूरी ईमेल",
       "asked": "जिस ईमेल के बारे में आपने पूछा",
-      "open": "खोलें"
+      "open": "खोलें",
+      "more": {
+        "one": "और {count} अन्य",
+        "other": "और {count} अन्य"
+      },
+      "back": "बाद में से वापस"
+    },
+    "today": {
+      "title": "आज",
+      "open": {
+        "one": "{count} खुले",
+        "other": "{count} खुले"
+      },
+      "allClear": "कुछ भी खुला नहीं है। ज़रूरी नए ईमेल यहाँ दिखेंगे।",
+      "done": "हो गया",
+      "later": "बाद में",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "आज शाम",
+      "laterTomorrow": "कल सुबह",
+      "laterWeekend": "इस वीकेंड",
+      "laterNextWeek": "अगले हफ़्ते",
+      "laterPick": "समय चुनें…",
+      "laterSet": "तब वापस लाएँ",
+      "back": "बाद में से वापस",
+      "inLater": {
+        "one": "बाद में: {count}",
+        "other": "बाद में: {count}"
+      },
+      "doneToday": {
+        "one": "आज हो गए: {count}",
+        "other": "आज हो गए: {count}"
+      },
+      "until": "{when} तक",
+      "reopen": "फिर से खोलें",
+      "undo": "पूर्ववत करें",
+      "toastDone": "हो गया · {headline}",
+      "toastLater": "बाद में, {when} · {headline}",
+      "history": "इतिहास",
+      "backToToday": "आज पर वापस",
+      "readToday": {
+        "one": "आज {count} ईमेल पढ़ा · {leftOut} छोड़े गए",
+        "other": "आज {count} ईमेल पढ़े · {leftOut} छोड़े गए"
+      }
+    },
+    "reply": {
+      "send": "भेजें",
+      "saveDraft": "Gmail ड्राफ़्ट के रूप में सेव करें",
+      "cancel": "रद्द करें",
+      "never": "जब तक आप भेजें पर टैप नहीं करते, कुछ नहीं भेजा जाता।",
+      "to": "{to} को",
+      "sent": "भेज दिया।",
+      "saved": "आपके Gmail ड्राफ़्ट में सेव हो गया।",
+      "hold": "जवाब बोलने के लिए दबाकर रखें",
+      "holdShort": "बोलने के लिए दबाकर रखें",
+      "listening": "सुन रही हूँ… बोल लें तो छोड़ दें।",
+      "writing": "आपका जवाब लिखा जा रहा है…"
+    },
+    "cleanup": {
+      "title": "छोड़े गए",
+      "hint": "\"सब हटाएँ\" उन्हें Gmail में संग्रहित कर देता है। \"अनसब्सक्राइब करें\" भेजने वाले से रुकने को कहता है।",
+      "unsubscribe": "अनसब्सक्राइब करें",
+      "unsubscribed": "अनसब्सक्राइब हो गया",
+      "clearAll": "सब हटाएँ",
+      "cleared": "हटा दिए",
+      "openedPage": "अभी खुले भेजने वाले के पेज पर इसे पूरा करें।"
+    },
+    "log": {
+      "title": "Stella ने क्या किया",
+      "hint": "Stella नए ईमेल छाँटने के लिए पढ़ती है। जब तक कोई स्थायी निर्देश न कहे, वह अपने आप कभी कुछ नहीं भेजती या संग्रहित करती।",
+      "read": {
+        "one": "{count} ईमेल पढ़ा · {leftOut} छोड़े गए",
+        "other": "{count} ईमेल पढ़े · {leftOut} छोड़े गए"
+      },
+      "briefed": {
+        "one": "आज में {count} आइटम जोड़ा",
+        "other": "आज में {count} आइटम जोड़े"
+      },
+      "urgent": "आपको तुरंत बताया: {subject}",
+      "rule": "आपके निर्देश का पालन किया: {subject}",
+      "sent": "{who} को आपका जवाब भेजा",
+      "drafted": "{who} को आपका जवाब Gmail ड्राफ़्ट में सेव किया",
+      "done": "हो गया, Gmail में पढ़ा हुआ चिह्नित: {subject}",
+      "later": "बाद में, {when} तक: {subject}",
+      "returned": "बाद में से वापस: {subject}",
+      "reopened": "फिर से खोला: {subject}",
+      "handled": "चैट में Stella को सौंपा: {subject}",
+      "archived": "Gmail में संग्रहित: {subject}",
+      "unsubscribed": "आपको {who} से अनसब्सक्राइब किया",
+      "cleared": {
+        "one": "{who} का {count} ईमेल संग्रहित किया",
+        "other": "{who} के {count} ईमेल संग्रहित किए"
+      },
+      "repliedInGmail": "आपने Gmail में जवाब दिया: {subject}",
+      "archivedInGmail": "आपने इसे Gmail में संग्रहित किया: {subject}"
+    },
+    "history": {
+      "title": "इतिहास",
+      "cameIn": "आया",
+      "empty": "पिछले दो हफ़्तों में कुछ नहीं।",
+      "today": "आज",
+      "yesterday": "कल"
+    },
+    "status": {
+      "open": "खुला",
+      "done": "हो गया",
+      "replied": "जवाब दिया",
+      "drafted": "ड्राफ़्ट सेव हुआ",
+      "handled": "Stella के पास",
+      "archived": "संग्रहित",
+      "later": "बाद में · {when}",
+      "repliedInGmail": "Gmail में जवाब दिया",
+      "archivedInGmail": "Gmail में संग्रहित"
     }
   }
 }

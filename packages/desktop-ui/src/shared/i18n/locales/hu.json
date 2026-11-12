@@ -3692,7 +3692,118 @@
       "briefing": "Elkészült az e-mail-összefoglalód",
       "urgent": "Sürgős e-mail tőle: {from}",
       "asked": "E-mail, amire rákérdeztél",
-      "open": "Megnyitás"
+      "open": "Megnyitás",
+      "more": {
+        "one": "és még {count}",
+        "other": "és még {count}"
+      },
+      "back": "Újra itt"
+    },
+    "today": {
+      "title": "Ma",
+      "open": {
+        "one": "{count} nyitott",
+        "other": "{count} nyitott"
+      },
+      "allClear": "Nincs semmi nyitott. Az új, fontos levelek itt jelennek meg.",
+      "done": "Kész",
+      "later": "Később",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Ma este",
+      "laterTomorrow": "Holnap reggel",
+      "laterWeekend": "A hétvégén",
+      "laterNextWeek": "Jövő héten",
+      "laterPick": "Időpont választása…",
+      "laterSet": "Visszahozás",
+      "back": "Újra itt",
+      "inLater": {
+        "one": "{count} későbbre",
+        "other": "{count} későbbre"
+      },
+      "doneToday": {
+        "one": "Ma kész: {count}",
+        "other": "Ma kész: {count}"
+      },
+      "until": "eddig: {when}",
+      "reopen": "Újranyitás",
+      "undo": "Visszavonás",
+      "toastDone": "Kész · {headline}",
+      "toastLater": "Később, {when} · {headline}",
+      "history": "Előzmények",
+      "backToToday": "Vissza a Ma nézethez",
+      "readToday": {
+        "one": "Ma {count} e-mail elolvasva · {leftOut} kihagyva",
+        "other": "Ma {count} e-mail elolvasva · {leftOut} kihagyva"
+      }
+    },
+    "reply": {
+      "send": "Küldés",
+      "saveDraft": "Mentés Gmail-piszkozatként",
+      "cancel": "Mégse",
+      "never": "Semmi nem megy el, amíg nem koppintasz a Küldésre.",
+      "to": "Címzett: {to}",
+      "sent": "Elküldve.",
+      "saved": "Elmentve a Gmail-piszkozataid közé.",
+      "hold": "Tartsd lenyomva a válasz bediktálásához",
+      "holdShort": "Tartsd lenyomva a beszédhez",
+      "listening": "Figyelek… engedd el, ha végeztél.",
+      "writing": "A válaszod készül…"
+    },
+    "cleanup": {
+      "title": "Kihagyva",
+      "hint": "A „Mind eltüntetése” archiválja őket a Gmailben. A „Leiratkozás” megkéri a feladót, hogy ne küldjön többet.",
+      "unsubscribe": "Leiratkozás",
+      "unsubscribed": "Leiratkozva",
+      "clearAll": "Mind eltüntetése",
+      "cleared": "Eltüntetve",
+      "openedPage": "Fejezd be a feladó most megnyílt oldalán."
+    },
+    "log": {
+      "title": "Mit csinált Stella",
+      "hint": "Stella elolvassa az új leveleket, hogy rendezze őket. Magától soha nem küld és nem archivál, kivéve ha egy állandó utasítás így szól.",
+      "read": {
+        "one": "{count} e-mail elolvasva · {leftOut} kihagyva",
+        "other": "{count} e-mail elolvasva · {leftOut} kihagyva"
+      },
+      "briefed": {
+        "one": "{count} tétel a Ma listára téve",
+        "other": "{count} tétel a Ma listára téve"
+      },
+      "urgent": "Azonnal szólt: {subject}",
+      "rule": "Az utasításod szerint: {subject}",
+      "sent": "Válasz elküldve neki: {who}",
+      "drafted": "Válasz Gmail-piszkozatként mentve neki: {who}",
+      "done": "Kész, olvasottnak jelölve a Gmailben: {subject}",
+      "later": "Későbbre téve ({when}): {subject}",
+      "returned": "Újra itt: {subject}",
+      "reopened": "Újranyitva: {subject}",
+      "handled": "Átadva Stellának a csevegésben: {subject}",
+      "archived": "Archiválva a Gmailben: {subject}",
+      "unsubscribed": "Leiratkozva innen: {who}",
+      "cleared": {
+        "one": "{count} e-mail archiválva tőle: {who}",
+        "other": "{count} e-mail archiválva tőle: {who}"
+      },
+      "repliedInGmail": "Válaszoltál a Gmailben: {subject}",
+      "archivedInGmail": "Archiváltad a Gmailben: {subject}"
+    },
+    "history": {
+      "title": "Előzmények",
+      "cameIn": "Beérkezett",
+      "empty": "Semmi az elmúlt két hétben.",
+      "today": "Ma",
+      "yesterday": "Tegnap"
+    },
+    "status": {
+      "open": "Nyitott",
+      "done": "Kész",
+      "replied": "Megválaszolva",
+      "drafted": "Piszkozat mentve",
+      "handled": "Stellánál",
+      "archived": "Archiválva",
+      "later": "Később · {when}",
+      "repliedInGmail": "Megválaszolva a Gmailben",
+      "archivedInGmail": "Archiválva a Gmailben"
     }
   }
 }

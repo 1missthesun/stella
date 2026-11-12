@@ -448,7 +448,7 @@ const MATTERS_TOOL: Tool = {
 const voiceBlock = (voice: string): string =>
   voice.trim()
     ? `How they write (a few of their own recent emails, for tone, length, greeting and sign-off only):\n${voice.trim()}`
-    : "No samples of their writing: write plainly, briefly and warmly, and sign off with nothing.";
+    : "No samples of their writing: write plainly, briefly and warmly, and end without any sign-off or name (never sign with the email address or company).";
 
 const REPLY_RULES =
   "Write it as the user, in first person, in their voice (match the samples: greeting, length, sign-off). Short and ready to send. Never invent facts, prices, dates, commitments or attachments they didn't give; when the reply needs a choice only they can make, write the answer the email plainly expects (such as approving or confirming) only if nothing suggests otherwise, else a short reply saying they'll come back on it.";

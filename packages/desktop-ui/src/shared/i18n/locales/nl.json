@@ -3692,7 +3692,118 @@
       "briefing": "Je e-mailoverzicht staat klaar",
       "urgent": "Dringende e-mail van {from}",
       "asked": "E-mail waar je om vroeg",
-      "open": "Openen"
+      "open": "Openen",
+      "more": {
+        "one": "en nog {count}",
+        "other": "en nog {count}"
+      },
+      "back": "Terug van Later"
+    },
+    "today": {
+      "title": "Vandaag",
+      "open": {
+        "one": "{count} open",
+        "other": "{count} open"
+      },
+      "allClear": "Niets open. Nieuwe mail die ertoe doet, verschijnt hier.",
+      "done": "Klaar",
+      "later": "Later",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Vanavond",
+      "laterTomorrow": "Morgenochtend",
+      "laterWeekend": "Dit weekend",
+      "laterNextWeek": "Volgende week",
+      "laterPick": "Kies een tijd…",
+      "laterSet": "Laat terugkomen",
+      "back": "Terug van Later",
+      "inLater": {
+        "one": "{count} in Later",
+        "other": "{count} in Later"
+      },
+      "doneToday": {
+        "one": "Vandaag klaar: {count}",
+        "other": "Vandaag klaar: {count}"
+      },
+      "until": "tot {when}",
+      "reopen": "Heropenen",
+      "undo": "Ongedaan maken",
+      "toastDone": "Klaar · {headline}",
+      "toastLater": "Later, {when} · {headline}",
+      "history": "Geschiedenis",
+      "backToToday": "Terug naar Vandaag",
+      "readToday": {
+        "one": "Vandaag {count} e-mail gelezen · {leftOut} weggelaten",
+        "other": "Vandaag {count} e-mails gelezen · {leftOut} weggelaten"
+      }
+    },
+    "reply": {
+      "send": "Versturen",
+      "saveDraft": "Opslaan als Gmail-concept",
+      "cancel": "Annuleren",
+      "never": "Er wordt niets verstuurd tot je op Versturen tikt.",
+      "to": "Aan {to}",
+      "sent": "Verstuurd.",
+      "saved": "Opgeslagen in je Gmail-concepten.",
+      "hold": "Houd ingedrukt om een antwoord in te spreken",
+      "holdShort": "Houd ingedrukt om te praten",
+      "listening": "Ik luister… laat los als je klaar bent.",
+      "writing": "Je antwoord wordt geschreven…"
+    },
+    "cleanup": {
+      "title": "Weggelaten",
+      "hint": "Alles opruimen archiveert ze in Gmail. Afmelden vraagt de afzender om te stoppen.",
+      "unsubscribe": "Afmelden",
+      "unsubscribed": "Afgemeld",
+      "clearAll": "Alles opruimen",
+      "cleared": "Opgeruimd",
+      "openedPage": "Rond het af op de pagina van de afzender die net is geopend."
+    },
+    "log": {
+      "title": "Wat Stella deed",
+      "hint": "Stella leest nieuwe mail om die te sorteren. Ze verstuurt of archiveert nooit zelf, tenzij een vaste instructie dat zegt.",
+      "read": {
+        "one": "{count} e-mail gelezen · {leftOut} weggelaten",
+        "other": "{count} e-mails gelezen · {leftOut} weggelaten"
+      },
+      "briefed": {
+        "one": "{count} item op Vandaag gezet",
+        "other": "{count} items op Vandaag gezet"
+      },
+      "urgent": "Meteen gemeld: {subject}",
+      "rule": "Je instructie gevolgd: {subject}",
+      "sent": "Je antwoord aan {who} verstuurd",
+      "drafted": "Je antwoord aan {who} opgeslagen als Gmail-concept",
+      "done": "Klaar, als gelezen gemarkeerd in Gmail: {subject}",
+      "later": "Later, tot {when}: {subject}",
+      "returned": "Terug van Later: {subject}",
+      "reopened": "Heropend: {subject}",
+      "handled": "In de chat aan Stella gegeven: {subject}",
+      "archived": "Gearchiveerd in Gmail: {subject}",
+      "unsubscribed": "Je afgemeld bij {who}",
+      "cleared": {
+        "one": "{count} e-mail van {who} gearchiveerd",
+        "other": "{count} e-mails van {who} gearchiveerd"
+      },
+      "repliedInGmail": "Je hebt in Gmail geantwoord: {subject}",
+      "archivedInGmail": "Je hebt het in Gmail gearchiveerd: {subject}"
+    },
+    "history": {
+      "title": "Geschiedenis",
+      "cameIn": "Binnengekomen",
+      "empty": "Niets in de afgelopen twee weken.",
+      "today": "Vandaag",
+      "yesterday": "Gisteren"
+    },
+    "status": {
+      "open": "Open",
+      "done": "Klaar",
+      "replied": "Beantwoord",
+      "drafted": "Concept opgeslagen",
+      "handled": "Bij Stella",
+      "archived": "Gearchiveerd",
+      "later": "Later · {when}",
+      "repliedInGmail": "Beantwoord in Gmail",
+      "archivedInGmail": "Gearchiveerd in Gmail"
     }
   }
 }

@@ -3656,7 +3656,110 @@
       "briefing": "สรุปอีเมลของคุณพร้อมแล้ว",
       "urgent": "อีเมลด่วนจาก {from}",
       "asked": "อีเมลที่คุณถามถึง",
-      "open": "เปิด"
+      "open": "เปิด",
+      "more": {
+        "other": "และอีก {count}"
+      },
+      "back": "กลับมาแล้ว"
+    },
+    "today": {
+      "title": "วันนี้",
+      "open": {
+        "other": "ค้างอยู่ {count}"
+      },
+      "allClear": "ไม่มีอะไรค้างอยู่ อีเมลใหม่ที่สำคัญจะแสดงที่นี่",
+      "done": "เสร็จแล้ว",
+      "later": "ไว้ทีหลัง",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "เย็นนี้",
+      "laterTomorrow": "พรุ่งนี้เช้า",
+      "laterWeekend": "สุดสัปดาห์นี้",
+      "laterNextWeek": "สัปดาห์หน้า",
+      "laterPick": "เลือกเวลา…",
+      "laterSet": "นำกลับมาตอนนั้น",
+      "back": "กลับมาแล้ว",
+      "inLater": {
+        "other": "ไว้ทีหลัง {count}"
+      },
+      "doneToday": {
+        "other": "เสร็จวันนี้ {count}"
+      },
+      "until": "จนถึง {when}",
+      "reopen": "เปิดอีกครั้ง",
+      "undo": "เลิกทำ",
+      "toastDone": "เสร็จแล้ว · {headline}",
+      "toastLater": "ไว้ทีหลัง {when} · {headline}",
+      "history": "ประวัติ",
+      "backToToday": "กลับไปที่วันนี้",
+      "readToday": {
+        "other": "วันนี้อ่าน {count} อีเมล · คัดออก {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "ส่ง",
+      "saveDraft": "บันทึกเป็นฉบับร่างใน Gmail",
+      "cancel": "ยกเลิก",
+      "never": "จะไม่มีอะไรถูกส่งจนกว่าคุณจะแตะส่ง",
+      "to": "ถึง {to}",
+      "sent": "ส่งแล้ว",
+      "saved": "บันทึกในฉบับร่าง Gmail ของคุณแล้ว",
+      "hold": "กดค้างไว้เพื่อพูดคำตอบ",
+      "holdShort": "กดค้างไว้เพื่อพูด",
+      "listening": "กำลังฟัง… ปล่อยเมื่อพูดเสร็จ",
+      "writing": "กำลังเขียนคำตอบของคุณ…"
+    },
+    "cleanup": {
+      "title": "คัดออก",
+      "hint": "\"ล้างทั้งหมด\" จะเก็บถาวรใน Gmail \"เลิกรับ\" จะขอให้ผู้ส่งหยุดส่ง",
+      "unsubscribe": "เลิกรับ",
+      "unsubscribed": "เลิกรับแล้ว",
+      "clearAll": "ล้างทั้งหมด",
+      "cleared": "ล้างแล้ว",
+      "openedPage": "ทำให้เสร็จในหน้าของผู้ส่งที่เพิ่งเปิดขึ้น"
+    },
+    "log": {
+      "title": "สิ่งที่ Stella ทำ",
+      "hint": "Stella อ่านอีเมลใหม่เพื่อคัดแยก Stella จะไม่ส่งหรือเก็บถาวรเอง เว้นแต่มีคำสั่งประจำให้ทำ",
+      "read": {
+        "other": "อ่าน {count} อีเมล · คัดออก {leftOut}"
+      },
+      "briefed": {
+        "other": "เพิ่ม {count} รายการในวันนี้"
+      },
+      "urgent": "แจ้งคุณทันที: {subject}",
+      "rule": "ทำตามคำสั่งของคุณ: {subject}",
+      "sent": "ส่งคำตอบของคุณถึง {who}",
+      "drafted": "บันทึกคำตอบของคุณถึง {who} เป็นฉบับร่างใน Gmail",
+      "done": "เสร็จแล้ว ทำเครื่องหมายว่าอ่านแล้วใน Gmail: {subject}",
+      "later": "ไว้ทีหลัง จนถึง {when}: {subject}",
+      "returned": "กลับมาแล้ว: {subject}",
+      "reopened": "เปิดอีกครั้ง: {subject}",
+      "handled": "ส่งให้ Stella ในแชท: {subject}",
+      "archived": "เก็บถาวรใน Gmail: {subject}",
+      "unsubscribed": "เลิกรับจาก {who} ให้คุณแล้ว",
+      "cleared": {
+        "other": "เก็บถาวร {count} อีเมลจาก {who}"
+      },
+      "repliedInGmail": "คุณตอบใน Gmail: {subject}",
+      "archivedInGmail": "คุณเก็บถาวรใน Gmail: {subject}"
+    },
+    "history": {
+      "title": "ประวัติ",
+      "cameIn": "เข้ามาเมื่อ",
+      "empty": "ไม่มีอะไรในสองสัปดาห์ที่ผ่านมา",
+      "today": "วันนี้",
+      "yesterday": "เมื่อวาน"
+    },
+    "status": {
+      "open": "ค้างอยู่",
+      "done": "เสร็จแล้ว",
+      "replied": "ตอบแล้ว",
+      "drafted": "บันทึกร่างแล้ว",
+      "handled": "อยู่กับ Stella",
+      "archived": "เก็บถาวรแล้ว",
+      "later": "ไว้ทีหลัง · {when}",
+      "repliedInGmail": "ตอบใน Gmail แล้ว",
+      "archivedInGmail": "เก็บถาวรใน Gmail แล้ว"
     }
   }
 }

@@ -3692,7 +3692,118 @@
       "briefing": "Η σύνοψη των email σου είναι έτοιμη",
       "urgent": "Επείγον email από {from}",
       "asked": "Email που ζήτησες",
-      "open": "Άνοιγμα"
+      "open": "Άνοιγμα",
+      "more": {
+        "one": "και {count} ακόμα",
+        "other": "και {count} ακόμα"
+      },
+      "back": "Επέστρεψε"
+    },
+    "today": {
+      "title": "Σήμερα",
+      "open": {
+        "one": "{count} ανοιχτό",
+        "other": "{count} ανοιχτά"
+      },
+      "allClear": "Τίποτα ανοιχτό. Τα νέα σημαντικά μηνύματα εμφανίζονται εδώ.",
+      "done": "Έγινε",
+      "later": "Αργότερα",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Απόψε",
+      "laterTomorrow": "Αύριο το πρωί",
+      "laterWeekend": "Το Σαββατοκύριακο",
+      "laterNextWeek": "Την επόμενη εβδομάδα",
+      "laterPick": "Επιλογή ώρας…",
+      "laterSet": "Να επιστρέψει τότε",
+      "back": "Επέστρεψε",
+      "inLater": {
+        "one": "{count} για αργότερα",
+        "other": "{count} για αργότερα"
+      },
+      "doneToday": {
+        "one": "{count} έγινε σήμερα",
+        "other": "{count} έγιναν σήμερα"
+      },
+      "until": "έως {when}",
+      "reopen": "Άνοιγμα ξανά",
+      "undo": "Αναίρεση",
+      "toastDone": "Έγινε · {headline}",
+      "toastLater": "Αργότερα, {when} · {headline}",
+      "history": "Ιστορικό",
+      "backToToday": "Πίσω στο Σήμερα",
+      "readToday": {
+        "one": "Διαβάστηκε {count} email σήμερα · εκτός: {leftOut}",
+        "other": "Διαβάστηκαν {count} email σήμερα · εκτός: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Αποστολή",
+      "saveDraft": "Αποθήκευση ως πρόχειρο Gmail",
+      "cancel": "Ακύρωση",
+      "never": "Τίποτα δεν στέλνεται μέχρι να πατήσετε Αποστολή.",
+      "to": "Προς {to}",
+      "sent": "Στάλθηκε.",
+      "saved": "Αποθηκεύτηκε στα πρόχειρα του Gmail.",
+      "hold": "Κρατήστε πατημένο για να πείτε μια απάντηση",
+      "holdShort": "Κρατήστε πατημένο για ομιλία",
+      "listening": "Ακούω… αφήστε το όταν τελειώσετε.",
+      "writing": "Γράφεται η απάντησή σας…"
+    },
+    "cleanup": {
+      "title": "Έμειναν έξω",
+      "hint": "Η «Εκκαθάριση όλων» τα αρχειοθετεί στο Gmail. Η «Διαγραφή συνδρομής» ζητά από τον αποστολέα να σταματήσει.",
+      "unsubscribe": "Διαγραφή συνδρομής",
+      "unsubscribed": "Η συνδρομή διαγράφηκε",
+      "clearAll": "Εκκαθάριση όλων",
+      "cleared": "Εκκαθαρίστηκαν",
+      "openedPage": "Ολοκληρώστε στη σελίδα του αποστολέα που μόλις άνοιξε."
+    },
+    "log": {
+      "title": "Τι έκανε η Stella",
+      "hint": "Η Stella διαβάζει τα νέα μηνύματα για να τα ταξινομήσει. Ποτέ δεν στέλνει ή αρχειοθετεί μόνη της, εκτός αν το λέει μια μόνιμη οδηγία.",
+      "read": {
+        "one": "Διαβάστηκε {count} email · εκτός: {leftOut}",
+        "other": "Διαβάστηκαν {count} email · εκτός: {leftOut}"
+      },
+      "briefed": {
+        "one": "Μπήκε {count} θέμα στο Σήμερα",
+        "other": "Μπήκαν {count} θέματα στο Σήμερα"
+      },
+      "urgent": "Σας ενημέρωσε αμέσως: {subject}",
+      "rule": "Ακολούθησε την οδηγία σας: {subject}",
+      "sent": "Η απάντησή σας στάλθηκε σε {who}",
+      "drafted": "Η απάντησή σας σε {who} αποθηκεύτηκε ως πρόχειρο Gmail",
+      "done": "Έγινε, σημειώθηκε ως αναγνωσμένο στο Gmail: {subject}",
+      "later": "Αργότερα, έως {when}: {subject}",
+      "returned": "Επέστρεψε: {subject}",
+      "reopened": "Άνοιξε ξανά: {subject}",
+      "handled": "Δόθηκε στη Stella στη συνομιλία: {subject}",
+      "archived": "Αρχειοθετήθηκε στο Gmail: {subject}",
+      "unsubscribed": "Διαγραφή συνδρομής από {who}",
+      "cleared": {
+        "one": "Αρχειοθετήθηκε {count} email από {who}",
+        "other": "Αρχειοθετήθηκαν {count} email από {who}"
+      },
+      "repliedInGmail": "Απαντήσατε στο Gmail: {subject}",
+      "archivedInGmail": "Το αρχειοθετήσατε στο Gmail: {subject}"
+    },
+    "history": {
+      "title": "Ιστορικό",
+      "cameIn": "Ήρθε",
+      "empty": "Τίποτα τις τελευταίες δύο εβδομάδες.",
+      "today": "Σήμερα",
+      "yesterday": "Χθες"
+    },
+    "status": {
+      "open": "Ανοιχτό",
+      "done": "Έγινε",
+      "replied": "Απαντήθηκε",
+      "drafted": "Αποθηκεύτηκε πρόχειρο",
+      "handled": "Στη Stella",
+      "archived": "Αρχειοθετήθηκε",
+      "later": "Αργότερα · {when}",
+      "repliedInGmail": "Απαντήθηκε στο Gmail",
+      "archivedInGmail": "Αρχειοθετήθηκε στο Gmail"
     }
   }
 }

@@ -3656,7 +3656,110 @@
       "briefing": "Ringkasan email kamu sudah siap",
       "urgent": "Email mendesak dari {from}",
       "asked": "Email yang kamu tanyakan",
-      "open": "Buka"
+      "open": "Buka",
+      "more": {
+        "other": "dan {count} lainnya"
+      },
+      "back": "Kembali dari Nanti"
+    },
+    "today": {
+      "title": "Hari ini",
+      "open": {
+        "other": "{count} terbuka"
+      },
+      "allClear": "Tidak ada yang terbuka. Email baru yang penting muncul di sini.",
+      "done": "Selesai",
+      "later": "Nanti",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Malam ini",
+      "laterTomorrow": "Besok pagi",
+      "laterWeekend": "Akhir pekan ini",
+      "laterNextWeek": "Minggu depan",
+      "laterPick": "Pilih waktu…",
+      "laterSet": "Munculkan lagi",
+      "back": "Kembali dari Nanti",
+      "inLater": {
+        "other": "{count} di Nanti"
+      },
+      "doneToday": {
+        "other": "{count} selesai hari ini"
+      },
+      "until": "sampai {when}",
+      "reopen": "Buka lagi",
+      "undo": "Urungkan",
+      "toastDone": "Selesai · {headline}",
+      "toastLater": "Nanti, {when} · {headline}",
+      "history": "Riwayat",
+      "backToToday": "Kembali ke Hari ini",
+      "readToday": {
+        "other": "Membaca {count} email hari ini · {leftOut} disisihkan"
+      }
+    },
+    "reply": {
+      "send": "Kirim",
+      "saveDraft": "Simpan sebagai draf Gmail",
+      "cancel": "Batal",
+      "never": "Tidak ada yang terkirim sampai Anda mengetuk Kirim.",
+      "to": "Kepada {to}",
+      "sent": "Terkirim.",
+      "saved": "Tersimpan di draf Gmail Anda.",
+      "hold": "Tahan untuk mengucapkan balasan",
+      "holdShort": "Tahan untuk bicara",
+      "listening": "Mendengarkan… lepaskan setelah selesai.",
+      "writing": "Menulis balasan Anda…"
+    },
+    "cleanup": {
+      "title": "Disisihkan",
+      "hint": "\"Bersihkan semua\" mengarsipkannya di Gmail. \"Berhenti berlangganan\" meminta pengirim berhenti.",
+      "unsubscribe": "Berhenti berlangganan",
+      "unsubscribed": "Langganan dihentikan",
+      "clearAll": "Bersihkan semua",
+      "cleared": "Dibersihkan",
+      "openedPage": "Selesaikan di halaman pengirim yang baru terbuka."
+    },
+    "log": {
+      "title": "Yang dilakukan Stella",
+      "hint": "Stella membaca email baru untuk memilahnya. Stella tidak pernah mengirim atau mengarsipkan sendiri, kecuali instruksi tetap memintanya.",
+      "read": {
+        "other": "Membaca {count} email · {leftOut} disisihkan"
+      },
+      "briefed": {
+        "other": "Menaruh {count} item di Hari ini"
+      },
+      "urgent": "Langsung memberi tahu Anda: {subject}",
+      "rule": "Mengikuti instruksi Anda: {subject}",
+      "sent": "Mengirim balasan Anda ke {who}",
+      "drafted": "Menyimpan balasan Anda ke {who} sebagai draf Gmail",
+      "done": "Selesai, ditandai sudah dibaca di Gmail: {subject}",
+      "later": "Nanti, sampai {when}: {subject}",
+      "returned": "Kembali dari Nanti: {subject}",
+      "reopened": "Dibuka lagi: {subject}",
+      "handled": "Diserahkan ke Stella di chat: {subject}",
+      "archived": "Diarsipkan di Gmail: {subject}",
+      "unsubscribed": "Menghentikan langganan Anda dari {who}",
+      "cleared": {
+        "other": "Mengarsipkan {count} email dari {who}"
+      },
+      "repliedInGmail": "Anda membalas di Gmail: {subject}",
+      "archivedInGmail": "Anda mengarsipkannya di Gmail: {subject}"
+    },
+    "history": {
+      "title": "Riwayat",
+      "cameIn": "Masuk",
+      "empty": "Tidak ada apa-apa dalam dua minggu terakhir.",
+      "today": "Hari ini",
+      "yesterday": "Kemarin"
+    },
+    "status": {
+      "open": "Terbuka",
+      "done": "Selesai",
+      "replied": "Dibalas",
+      "drafted": "Draf tersimpan",
+      "handled": "Ditangani Stella",
+      "archived": "Diarsipkan",
+      "later": "Nanti · {when}",
+      "repliedInGmail": "Dibalas di Gmail",
+      "archivedInGmail": "Diarsipkan di Gmail"
     }
   }
 }

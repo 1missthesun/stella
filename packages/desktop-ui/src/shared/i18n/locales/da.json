@@ -3692,7 +3692,118 @@
       "briefing": "Dit mailoverblik er klar",
       "urgent": "Vigtig e-mail fra {from}",
       "asked": "E-mail, du spurgte om",
-      "open": "Åbn"
+      "open": "Åbn",
+      "more": {
+        "one": "og {count} til",
+        "other": "og {count} til"
+      },
+      "back": "Tilbage fra Senere"
+    },
+    "today": {
+      "title": "I dag",
+      "open": {
+        "one": "{count} åben",
+        "other": "{count} åbne"
+      },
+      "allClear": "Intet åbent. Nye mails, der betyder noget, dukker op her.",
+      "done": "Færdig",
+      "later": "Senere",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "I aften",
+      "laterTomorrow": "I morgen tidlig",
+      "laterWeekend": "I weekenden",
+      "laterNextWeek": "Næste uge",
+      "laterPick": "Vælg et tidspunkt…",
+      "laterSet": "Vis igen",
+      "back": "Tilbage fra Senere",
+      "inLater": {
+        "one": "{count} i Senere",
+        "other": "{count} i Senere"
+      },
+      "doneToday": {
+        "one": "{count} færdig i dag",
+        "other": "{count} færdige i dag"
+      },
+      "until": "indtil {when}",
+      "reopen": "Genåbn",
+      "undo": "Fortryd",
+      "toastDone": "Færdig · {headline}",
+      "toastLater": "Senere, {when} · {headline}",
+      "history": "Historik",
+      "backToToday": "Tilbage til I dag",
+      "readToday": {
+        "one": "Læste {count} e-mail i dag · {leftOut} sorteret fra",
+        "other": "Læste {count} e-mails i dag · {leftOut} sorteret fra"
+      }
+    },
+    "reply": {
+      "send": "Send",
+      "saveDraft": "Gem som Gmail-kladde",
+      "cancel": "Annuller",
+      "never": "Intet bliver sendt, før du trykker på Send.",
+      "to": "Til {to}",
+      "sent": "Sendt.",
+      "saved": "Gemt i dine Gmail-kladder.",
+      "hold": "Hold for at indtale et svar",
+      "holdShort": "Hold for at tale",
+      "listening": "Lytter… slip, når du er færdig.",
+      "writing": "Skriver dit svar…"
+    },
+    "cleanup": {
+      "title": "Sorteret fra",
+      "hint": "Ryd alle arkiverer dem i Gmail. Afmeld beder afsenderen om at stoppe.",
+      "unsubscribe": "Afmeld",
+      "unsubscribed": "Afmeldt",
+      "clearAll": "Ryd alle",
+      "cleared": "Ryddet",
+      "openedPage": "Gør det færdigt på afsenderens side, der lige åbnede."
+    },
+    "log": {
+      "title": "Hvad Stella gjorde",
+      "hint": "Stella læser nye mails for at sortere dem. Stella sender eller arkiverer aldrig selv, medmindre en fast instruks siger det.",
+      "read": {
+        "one": "Læste {count} e-mail · {leftOut} sorteret fra",
+        "other": "Læste {count} e-mails · {leftOut} sorteret fra"
+      },
+      "briefed": {
+        "one": "Satte {count} punkt på I dag",
+        "other": "Satte {count} punkter på I dag"
+      },
+      "urgent": "Sagde til med det samme: {subject}",
+      "rule": "Fulgte din instruks: {subject}",
+      "sent": "Sendte dit svar til {who}",
+      "drafted": "Gemte dit svar til {who} som Gmail-kladde",
+      "done": "Færdig, markeret som læst i Gmail: {subject}",
+      "later": "Senere, indtil {when}: {subject}",
+      "returned": "Tilbage fra Senere: {subject}",
+      "reopened": "Genåbnet: {subject}",
+      "handled": "Givet til Stella i chatten: {subject}",
+      "archived": "Arkiveret i Gmail: {subject}",
+      "unsubscribed": "Afmeldte dig fra {who}",
+      "cleared": {
+        "one": "Arkiverede {count} e-mail fra {who}",
+        "other": "Arkiverede {count} e-mails fra {who}"
+      },
+      "repliedInGmail": "Du svarede i Gmail: {subject}",
+      "archivedInGmail": "Du arkiverede den i Gmail: {subject}"
+    },
+    "history": {
+      "title": "Historik",
+      "cameIn": "Modtaget",
+      "empty": "Intet de sidste to uger.",
+      "today": "I dag",
+      "yesterday": "I går"
+    },
+    "status": {
+      "open": "Åben",
+      "done": "Færdig",
+      "replied": "Besvaret",
+      "drafted": "Kladde gemt",
+      "handled": "Hos Stella",
+      "archived": "Arkiveret",
+      "later": "Senere · {when}",
+      "repliedInGmail": "Besvaret i Gmail",
+      "archivedInGmail": "Arkiveret i Gmail"
     }
   }
 }

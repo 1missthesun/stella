@@ -3692,7 +3692,118 @@
       "briefing": "Deine E-Mail-Übersicht ist da",
       "urgent": "Dringende E-Mail von {from}",
       "asked": "E-Mail, nach der du gefragt hast",
-      "open": "Öffnen"
+      "open": "Öffnen",
+      "more": {
+        "one": "und {count} weitere",
+        "other": "und {count} weitere"
+      },
+      "back": "Wieder da"
+    },
+    "today": {
+      "title": "Heute",
+      "open": {
+        "one": "{count} offen",
+        "other": "{count} offen"
+      },
+      "allClear": "Nichts offen. Neue E-Mails, die zählen, erscheinen hier.",
+      "done": "Erledigt",
+      "later": "Später",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Heute Abend",
+      "laterTomorrow": "Morgen früh",
+      "laterWeekend": "Am Wochenende",
+      "laterNextWeek": "Nächste Woche",
+      "laterPick": "Zeit wählen…",
+      "laterSet": "Wieder anzeigen",
+      "back": "Wieder da",
+      "inLater": {
+        "one": "Später: {count}",
+        "other": "Später: {count}"
+      },
+      "doneToday": {
+        "one": "{count} heute erledigt",
+        "other": "{count} heute erledigt"
+      },
+      "until": "bis {when}",
+      "reopen": "Wieder öffnen",
+      "undo": "Rückgängig",
+      "toastDone": "Erledigt · {headline}",
+      "toastLater": "Später, {when} · {headline}",
+      "history": "Verlauf",
+      "backToToday": "Zurück zu Heute",
+      "readToday": {
+        "one": "Heute {count} E-Mail gelesen · {leftOut} aussortiert",
+        "other": "Heute {count} E-Mails gelesen · {leftOut} aussortiert"
+      }
+    },
+    "reply": {
+      "send": "Senden",
+      "saveDraft": "Als Gmail-Entwurf speichern",
+      "cancel": "Abbrechen",
+      "never": "Nichts wird gesendet, bevor du auf Senden tippst.",
+      "to": "An {to}",
+      "sent": "Gesendet.",
+      "saved": "In deinen Gmail-Entwürfen gespeichert.",
+      "hold": "Halten, um eine Antwort zu sprechen",
+      "holdShort": "Halten zum Sprechen",
+      "listening": "Ich höre zu… lass los, wenn du fertig bist.",
+      "writing": "Deine Antwort wird geschrieben…"
+    },
+    "cleanup": {
+      "title": "Aussortiert",
+      "hint": "„Alle wegräumen“ archiviert sie in Gmail. „Abmelden“ bittet den Absender, keine mehr zu schicken.",
+      "unsubscribe": "Abmelden",
+      "unsubscribed": "Abgemeldet",
+      "clearAll": "Alle wegräumen",
+      "cleared": "Weggeräumt",
+      "openedPage": "Schließ es auf der gerade geöffneten Seite des Absenders ab."
+    },
+    "log": {
+      "title": "Was Stella getan hat",
+      "hint": "Stella liest neue E-Mails, um sie zu sortieren. Sie sendet oder archiviert nie von selbst, außer eine feste Anweisung sagt es.",
+      "read": {
+        "one": "{count} E-Mail gelesen · {leftOut} aussortiert",
+        "other": "{count} E-Mails gelesen · {leftOut} aussortiert"
+      },
+      "briefed": {
+        "one": "{count} Eintrag zu Heute hinzugefügt",
+        "other": "{count} Einträge zu Heute hinzugefügt"
+      },
+      "urgent": "Sofort Bescheid gesagt: {subject}",
+      "rule": "Deiner Anweisung gefolgt: {subject}",
+      "sent": "Deine Antwort an {who} gesendet",
+      "drafted": "Deine Antwort an {who} als Gmail-Entwurf gespeichert",
+      "done": "Erledigt, in Gmail als gelesen markiert: {subject}",
+      "later": "Später, bis {when}: {subject}",
+      "returned": "Wieder da: {subject}",
+      "reopened": "Wieder geöffnet: {subject}",
+      "handled": "Im Chat an Stella übergeben: {subject}",
+      "archived": "In Gmail archiviert: {subject}",
+      "unsubscribed": "Von {who} abgemeldet",
+      "cleared": {
+        "one": "{count} E-Mail von {who} archiviert",
+        "other": "{count} E-Mails von {who} archiviert"
+      },
+      "repliedInGmail": "Du hast in Gmail geantwortet: {subject}",
+      "archivedInGmail": "Du hast es in Gmail archiviert: {subject}"
+    },
+    "history": {
+      "title": "Verlauf",
+      "cameIn": "Eingegangen",
+      "empty": "Nichts in den letzten zwei Wochen.",
+      "today": "Heute",
+      "yesterday": "Gestern"
+    },
+    "status": {
+      "open": "Offen",
+      "done": "Erledigt",
+      "replied": "Beantwortet",
+      "drafted": "Entwurf gespeichert",
+      "handled": "Bei Stella",
+      "archived": "Archiviert",
+      "later": "Später · {when}",
+      "repliedInGmail": "In Gmail beantwortet",
+      "archivedInGmail": "In Gmail archiviert"
     }
   }
 }

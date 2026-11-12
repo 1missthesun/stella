@@ -3692,7 +3692,118 @@
       "briefing": "E-postoversikten din er klar",
       "urgent": "Haster: e-post fra {from}",
       "asked": "E-post du spurte om",
-      "open": "Åpne"
+      "open": "Åpne",
+      "more": {
+        "one": "og {count} til",
+        "other": "og {count} til"
+      },
+      "back": "Tilbake fra Senere"
+    },
+    "today": {
+      "title": "I dag",
+      "open": {
+        "one": "{count} åpen",
+        "other": "{count} åpne"
+      },
+      "allClear": "Ingenting åpent. Ny e-post som betyr noe, dukker opp her.",
+      "done": "Ferdig",
+      "later": "Senere",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "I kveld",
+      "laterTomorrow": "I morgen tidlig",
+      "laterWeekend": "I helgen",
+      "laterNextWeek": "Neste uke",
+      "laterPick": "Velg et tidspunkt…",
+      "laterSet": "Vis igjen",
+      "back": "Tilbake fra Senere",
+      "inLater": {
+        "one": "{count} i Senere",
+        "other": "{count} i Senere"
+      },
+      "doneToday": {
+        "one": "{count} ferdig i dag",
+        "other": "{count} ferdige i dag"
+      },
+      "until": "til {when}",
+      "reopen": "Åpne igjen",
+      "undo": "Angre",
+      "toastDone": "Ferdig · {headline}",
+      "toastLater": "Senere, {when} · {headline}",
+      "history": "Historikk",
+      "backToToday": "Tilbake til I dag",
+      "readToday": {
+        "one": "Leste {count} e-post i dag · {leftOut} sortert bort",
+        "other": "Leste {count} e-poster i dag · {leftOut} sortert bort"
+      }
+    },
+    "reply": {
+      "send": "Send",
+      "saveDraft": "Lagre som Gmail-utkast",
+      "cancel": "Avbryt",
+      "never": "Ingenting sendes før du trykker på Send.",
+      "to": "Til {to}",
+      "sent": "Sendt.",
+      "saved": "Lagret i Gmail-utkastene dine.",
+      "hold": "Hold inne for å snakke inn et svar",
+      "holdShort": "Hold inne for å snakke",
+      "listening": "Lytter… slipp når du er ferdig.",
+      "writing": "Skriver svaret ditt…"
+    },
+    "cleanup": {
+      "title": "Sortert bort",
+      "hint": "Fjern alle arkiverer dem i Gmail. Meld av ber avsenderen om å slutte.",
+      "unsubscribe": "Meld av",
+      "unsubscribed": "Meldt av",
+      "clearAll": "Fjern alle",
+      "cleared": "Fjernet",
+      "openedPage": "Fullfør på avsenderens side som nettopp åpnet seg."
+    },
+    "log": {
+      "title": "Hva Stella gjorde",
+      "hint": "Stella leser ny e-post for å sortere den. Stella sender eller arkiverer aldri på egen hånd, med mindre en fast instruks sier det.",
+      "read": {
+        "one": "Leste {count} e-post · {leftOut} sortert bort",
+        "other": "Leste {count} e-poster · {leftOut} sortert bort"
+      },
+      "briefed": {
+        "one": "La {count} sak på I dag",
+        "other": "La {count} saker på I dag"
+      },
+      "urgent": "Sa fra med en gang: {subject}",
+      "rule": "Fulgte instruksen din: {subject}",
+      "sent": "Sendte svaret ditt til {who}",
+      "drafted": "Lagret svaret ditt til {who} som Gmail-utkast",
+      "done": "Ferdig, merket som lest i Gmail: {subject}",
+      "later": "Senere, til {when}: {subject}",
+      "returned": "Tilbake fra Senere: {subject}",
+      "reopened": "Åpnet igjen: {subject}",
+      "handled": "Gitt til Stella i chatten: {subject}",
+      "archived": "Arkivert i Gmail: {subject}",
+      "unsubscribed": "Meldte deg av {who}",
+      "cleared": {
+        "one": "Arkiverte {count} e-post fra {who}",
+        "other": "Arkiverte {count} e-poster fra {who}"
+      },
+      "repliedInGmail": "Du svarte i Gmail: {subject}",
+      "archivedInGmail": "Du arkiverte den i Gmail: {subject}"
+    },
+    "history": {
+      "title": "Historikk",
+      "cameIn": "Kom inn",
+      "empty": "Ingenting de siste to ukene.",
+      "today": "I dag",
+      "yesterday": "I går"
+    },
+    "status": {
+      "open": "Åpen",
+      "done": "Ferdig",
+      "replied": "Besvart",
+      "drafted": "Utkast lagret",
+      "handled": "Hos Stella",
+      "archived": "Arkivert",
+      "later": "Senere · {when}",
+      "repliedInGmail": "Besvart i Gmail",
+      "archivedInGmail": "Arkivert i Gmail"
     }
   }
 }

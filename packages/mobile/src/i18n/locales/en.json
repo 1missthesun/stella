@@ -3692,7 +3692,118 @@
       "briefing": "Your email briefing is ready",
       "urgent": "Urgent email from {from}",
       "asked": "Email you asked about",
-      "open": "Open"
+      "open": "Open",
+      "more": {
+        "one": "and {count} more",
+        "other": "and {count} more"
+      },
+      "back": "Back from Later"
+    },
+    "today": {
+      "title": "Today",
+      "open": {
+        "one": "{count} open",
+        "other": "{count} open"
+      },
+      "allClear": "Nothing open. New mail that matters shows up here.",
+      "done": "Done",
+      "later": "Later",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "This evening",
+      "laterTomorrow": "Tomorrow morning",
+      "laterWeekend": "This weekend",
+      "laterNextWeek": "Next week",
+      "laterPick": "Pick a time…",
+      "laterSet": "Bring it back",
+      "back": "Back from Later",
+      "inLater": {
+        "one": "{count} in Later",
+        "other": "{count} in Later"
+      },
+      "doneToday": {
+        "one": "{count} done today",
+        "other": "{count} done today"
+      },
+      "until": "until {when}",
+      "reopen": "Reopen",
+      "undo": "Undo",
+      "toastDone": "Done · {headline}",
+      "toastLater": "Later, {when} · {headline}",
+      "history": "History",
+      "backToToday": "Back to Today",
+      "readToday": {
+        "one": "Read {count} email today · {leftOut} left out",
+        "other": "Read {count} emails today · {leftOut} left out"
+      }
+    },
+    "reply": {
+      "send": "Send",
+      "saveDraft": "Save as Gmail draft",
+      "cancel": "Cancel",
+      "never": "Nothing is sent until you tap Send.",
+      "to": "To {to}",
+      "sent": "Sent.",
+      "saved": "Saved in your Gmail drafts.",
+      "hold": "Hold to speak a reply",
+      "holdShort": "Hold to speak",
+      "listening": "Listening… let go when you're done.",
+      "writing": "Writing your reply…"
+    },
+    "cleanup": {
+      "title": "Left out",
+      "hint": "Clear all archives them in Gmail. Unsubscribe asks the sender to stop.",
+      "unsubscribe": "Unsubscribe",
+      "unsubscribed": "Unsubscribed",
+      "clearAll": "Clear all",
+      "cleared": "Cleared",
+      "openedPage": "Finish on the sender's page that just opened."
+    },
+    "log": {
+      "title": "What Stella did",
+      "hint": "Stella reads new mail to sort it. It never sends or archives on its own unless a standing instruction says so.",
+      "read": {
+        "one": "Read {count} email · {leftOut} left out",
+        "other": "Read {count} emails · {leftOut} left out"
+      },
+      "briefed": {
+        "one": "Put {count} item on Today",
+        "other": "Put {count} items on Today"
+      },
+      "urgent": "Told you right away: {subject}",
+      "rule": "Followed your instruction: {subject}",
+      "sent": "Sent your reply to {who}",
+      "drafted": "Saved your reply to {who} as a Gmail draft",
+      "done": "Done, marked read in Gmail: {subject}",
+      "later": "Later until {when}: {subject}",
+      "returned": "Back from Later: {subject}",
+      "reopened": "Reopened: {subject}",
+      "handled": "Handed to Stella in the chat: {subject}",
+      "archived": "Archived in Gmail: {subject}",
+      "unsubscribed": "Unsubscribed you from {who}",
+      "cleared": {
+        "one": "Archived {count} email from {who}",
+        "other": "Archived {count} emails from {who}"
+      },
+      "repliedInGmail": "You replied in Gmail: {subject}",
+      "archivedInGmail": "You archived it in Gmail: {subject}"
+    },
+    "history": {
+      "title": "History",
+      "cameIn": "Came in",
+      "empty": "Nothing in the last two weeks.",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "status": {
+      "open": "Open",
+      "done": "Done",
+      "replied": "Replied",
+      "drafted": "Draft saved",
+      "handled": "With Stella",
+      "archived": "Archived",
+      "later": "Later · {when}",
+      "repliedInGmail": "Replied in Gmail",
+      "archivedInGmail": "Archived in Gmail"
     }
   }
 }

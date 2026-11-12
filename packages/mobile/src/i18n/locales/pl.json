@@ -3760,7 +3760,134 @@
       "briefing": "Twoje podsumowanie poczty jest gotowe",
       "urgent": "Pilny e-mail od {from}",
       "asked": "E-mail, o który pytałeś",
-      "open": "Otwórz"
+      "open": "Otwórz",
+      "more": {
+        "few": "i jeszcze {count}",
+        "many": "i jeszcze {count}",
+        "one": "i jeszcze {count}",
+        "other": "i jeszcze {count}"
+      },
+      "back": "Znów tutaj"
+    },
+    "today": {
+      "title": "Dziś",
+      "open": {
+        "few": "Otwarte: {count}",
+        "many": "Otwarte: {count}",
+        "one": "Otwarte: {count}",
+        "other": "Otwarte: {count}"
+      },
+      "allClear": "Nic otwartego. Nowa ważna poczta pojawi się tutaj.",
+      "done": "Gotowe",
+      "later": "Później",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "Dziś wieczorem",
+      "laterTomorrow": "Jutro rano",
+      "laterWeekend": "W ten weekend",
+      "laterNextWeek": "W przyszłym tygodniu",
+      "laterPick": "Wybierz czas…",
+      "laterSet": "Przypomnij",
+      "back": "Znów tutaj",
+      "inLater": {
+        "few": "Na później: {count}",
+        "many": "Na później: {count}",
+        "one": "Na później: {count}",
+        "other": "Na później: {count}"
+      },
+      "doneToday": {
+        "few": "Gotowe dziś: {count}",
+        "many": "Gotowe dziś: {count}",
+        "one": "Gotowe dziś: {count}",
+        "other": "Gotowe dziś: {count}"
+      },
+      "until": "do {when}",
+      "reopen": "Otwórz ponownie",
+      "undo": "Cofnij",
+      "toastDone": "Gotowe · {headline}",
+      "toastLater": "Później, {when} · {headline}",
+      "history": "Historia",
+      "backToToday": "Wróć do Dziś",
+      "readToday": {
+        "few": "Przeczytane dziś: {count} · pominięte: {leftOut}",
+        "many": "Przeczytane dziś: {count} · pominięte: {leftOut}",
+        "one": "Przeczytane dziś: {count} · pominięte: {leftOut}",
+        "other": "Przeczytane dziś: {count} · pominięte: {leftOut}"
+      }
+    },
+    "reply": {
+      "send": "Wyślij",
+      "saveDraft": "Zapisz jako wersję roboczą w Gmailu",
+      "cancel": "Anuluj",
+      "never": "Nic nie zostanie wysłane, dopóki nie dotkniesz Wyślij.",
+      "to": "Do: {to}",
+      "sent": "Wysłano.",
+      "saved": "Zapisano w wersjach roboczych Gmaila.",
+      "hold": "Przytrzymaj, aby nagrać odpowiedź",
+      "holdShort": "Przytrzymaj, aby mówić",
+      "listening": "Słucham… puść, gdy skończysz.",
+      "writing": "Trwa pisanie odpowiedzi…"
+    },
+    "cleanup": {
+      "title": "Pominięte",
+      "hint": "„Wyczyść wszystko” archiwizuje je w Gmailu. „Wypisz się” prosi nadawcę, by przestał.",
+      "unsubscribe": "Wypisz się",
+      "unsubscribed": "Wypisano",
+      "clearAll": "Wyczyść wszystko",
+      "cleared": "Wyczyszczono",
+      "openedPage": "Dokończ na stronie nadawcy, która właśnie się otworzyła."
+    },
+    "log": {
+      "title": "Co zrobiła Stella",
+      "hint": "Stella czyta nową pocztę, żeby ją posortować. Nigdy sama niczego nie wysyła ani nie archiwizuje, chyba że każe jej to stałe polecenie.",
+      "read": {
+        "few": "Przeczytane e-maile: {count} · pominięte: {leftOut}",
+        "many": "Przeczytane e-maile: {count} · pominięte: {leftOut}",
+        "one": "Przeczytane e-maile: {count} · pominięte: {leftOut}",
+        "other": "Przeczytane e-maile: {count} · pominięte: {leftOut}"
+      },
+      "briefed": {
+        "few": "Dodane do Dziś: {count}",
+        "many": "Dodane do Dziś: {count}",
+        "one": "Dodane do Dziś: {count}",
+        "other": "Dodane do Dziś: {count}"
+      },
+      "urgent": "Od razu powiadomiono: {subject}",
+      "rule": "Zgodnie z twoim poleceniem: {subject}",
+      "sent": "Wysłano twoją odpowiedź do {who}",
+      "drafted": "Zapisano twoją odpowiedź do {who} jako wersję roboczą w Gmailu",
+      "done": "Gotowe, oznaczone w Gmailu jako przeczytane: {subject}",
+      "later": "Później, do {when}: {subject}",
+      "returned": "Znów tutaj: {subject}",
+      "reopened": "Otwarte ponownie: {subject}",
+      "handled": "Przekazane Stelli na czacie: {subject}",
+      "archived": "Zarchiwizowane w Gmailu: {subject}",
+      "unsubscribed": "Wypisano cię z listy: {who}",
+      "cleared": {
+        "few": "Zarchiwizowane e-maile od {who}: {count}",
+        "many": "Zarchiwizowane e-maile od {who}: {count}",
+        "one": "Zarchiwizowane e-maile od {who}: {count}",
+        "other": "Zarchiwizowane e-maile od {who}: {count}"
+      },
+      "repliedInGmail": "Twoja odpowiedź w Gmailu: {subject}",
+      "archivedInGmail": "Zarchiwizowane przez ciebie w Gmailu: {subject}"
+    },
+    "history": {
+      "title": "Historia",
+      "cameIn": "Przyszło",
+      "empty": "Nic z ostatnich dwóch tygodni.",
+      "today": "Dziś",
+      "yesterday": "Wczoraj"
+    },
+    "status": {
+      "open": "Otwarte",
+      "done": "Gotowe",
+      "replied": "Odpowiedziano",
+      "drafted": "Zapisano wersję roboczą",
+      "handled": "U Stelli",
+      "archived": "Zarchiwizowane",
+      "later": "Później · {when}",
+      "repliedInGmail": "Odpowiedziano w Gmailu",
+      "archivedInGmail": "Zarchiwizowano w Gmailu"
     }
   }
 }

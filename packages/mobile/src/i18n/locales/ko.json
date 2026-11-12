@@ -3656,7 +3656,110 @@
       "briefing": "이메일 요약이 준비됐어요",
       "urgent": "{from}의 긴급 이메일",
       "asked": "요청하신 이메일",
-      "open": "열기"
+      "open": "열기",
+      "more": {
+        "other": "외 {count}개"
+      },
+      "back": "나중에서 돌아왔어요"
+    },
+    "today": {
+      "title": "오늘",
+      "open": {
+        "other": "열린 항목 {count}개"
+      },
+      "allClear": "열린 항목이 없어요. 중요한 새 메일은 여기에 나타나요.",
+      "done": "완료",
+      "later": "나중에",
+      "laterSuggested": "{when} · {why}",
+      "laterTonight": "오늘 저녁",
+      "laterTomorrow": "내일 아침",
+      "laterWeekend": "이번 주말",
+      "laterNextWeek": "다음 주",
+      "laterPick": "시간 선택…",
+      "laterSet": "그때 다시 보기",
+      "back": "나중에서 돌아왔어요",
+      "inLater": {
+        "other": "나중에 {count}개"
+      },
+      "doneToday": {
+        "other": "오늘 완료 {count}개"
+      },
+      "until": "{when}까지",
+      "reopen": "다시 열기",
+      "undo": "실행 취소",
+      "toastDone": "완료 · {headline}",
+      "toastLater": "나중에, {when} · {headline}",
+      "history": "기록",
+      "backToToday": "오늘로 돌아가기",
+      "readToday": {
+        "other": "오늘 이메일 {count}개 읽음 · {leftOut}개 제외"
+      }
+    },
+    "reply": {
+      "send": "보내기",
+      "saveDraft": "Gmail 임시보관함에 저장",
+      "cancel": "취소",
+      "never": "보내기를 누르기 전에는 아무것도 보내지 않아요.",
+      "to": "받는 사람: {to}",
+      "sent": "보냈어요.",
+      "saved": "Gmail 임시보관함에 저장했어요.",
+      "hold": "길게 눌러 답장을 말하세요",
+      "holdShort": "길게 눌러 말하기",
+      "listening": "듣고 있어요… 다 말하면 손을 떼세요.",
+      "writing": "답장을 쓰고 있어요…"
+    },
+    "cleanup": {
+      "title": "제외된 메일",
+      "hint": "모두 정리를 누르면 Gmail에 보관돼요. 수신 거부는 보낸 사람에게 그만 보내 달라고 요청해요.",
+      "unsubscribe": "수신 거부",
+      "unsubscribed": "수신 거부됨",
+      "clearAll": "모두 정리",
+      "cleared": "정리됨",
+      "openedPage": "방금 열린 보낸 사람 페이지에서 마무리해 주세요."
+    },
+    "log": {
+      "title": "Stella가 한 일",
+      "hint": "Stella는 새 메일을 분류하려고 읽어요. 상시 지시가 없으면 스스로 보내거나 보관하지 않아요.",
+      "read": {
+        "other": "이메일 {count}개 읽음 · {leftOut}개 제외"
+      },
+      "briefed": {
+        "other": "오늘에 {count}개 추가"
+      },
+      "urgent": "바로 알려 드림: {subject}",
+      "rule": "지시를 따름: {subject}",
+      "sent": "{who}에게 답장을 보냄",
+      "drafted": "{who}에게 보낼 답장을 Gmail 임시보관함에 저장함",
+      "done": "완료, Gmail에서 읽음으로 표시: {subject}",
+      "later": "나중에, {when}까지: {subject}",
+      "returned": "나중에서 돌아옴: {subject}",
+      "reopened": "다시 열림: {subject}",
+      "handled": "채팅에서 Stella에게 맡김: {subject}",
+      "archived": "Gmail에서 보관함: {subject}",
+      "unsubscribed": "{who} 수신 거부함",
+      "cleared": {
+        "other": "{who}의 이메일 {count}개 보관함"
+      },
+      "repliedInGmail": "Gmail에서 직접 답장함: {subject}",
+      "archivedInGmail": "Gmail에서 직접 보관함: {subject}"
+    },
+    "history": {
+      "title": "기록",
+      "cameIn": "받은 시간",
+      "empty": "지난 2주 동안 아무것도 없어요.",
+      "today": "오늘",
+      "yesterday": "어제"
+    },
+    "status": {
+      "open": "열림",
+      "done": "완료",
+      "replied": "답장함",
+      "drafted": "초안 저장됨",
+      "handled": "Stella가 처리 중",
+      "archived": "보관됨",
+      "later": "나중에 · {when}",
+      "repliedInGmail": "Gmail에서 답장함",
+      "archivedInGmail": "Gmail에서 보관함"
     }
   }
 }

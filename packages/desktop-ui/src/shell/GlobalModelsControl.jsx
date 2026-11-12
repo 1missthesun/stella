@@ -66,7 +66,6 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
           : "global-models-control"
       }
     >
-      <GlobalExecutionTargetControl />
       <Popover open={open} onOpenChange={(next) => engineOverlay.setOpen(next)}>
         <PopoverTrigger asChild>
           <button
@@ -77,7 +76,7 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
             onMouseEnter={preloadModelsPicker}
             onFocus={preloadModelsPicker}
           >
-            <SlidersHorizontal size={14} strokeWidth={1.75} />
+            <SlidersHorizontal size={15} strokeWidth={1.75} />
             Models
           </button>
         </PopoverTrigger>
@@ -115,6 +114,7 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
           </PopoverBody>
         </PopoverContent>
       </Popover>
+      <GlobalExecutionTargetControl />
     </div>
   );
 }

@@ -3118,7 +3118,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, {plan} planı",
         "signOutDescription": "Emin misiniz?",
         "signOutTitle": "Stella oturumu kapatılsın mı?"
       },

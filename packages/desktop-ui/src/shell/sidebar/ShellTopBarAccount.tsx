@@ -1,20 +1,12 @@
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
-import { useBackendValue } from "@/platform/backend/use-backend-view";
-import {
-  Fragment,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { Fragment, useRef } from "react";
 import { CreditCard, LogOut, Settings } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
-import { planLabel } from "@stella/contracts/billing-plans";
 import {
   preloadAuthDialog,
   preloadBillingScreen,
 } from "@/shell/topbar/nav-surface-preloads";
-import { SUBSCRIPTION_UPGRADED_EVENT } from "@/global/billing/SubscriptionUpgradeDialog";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { useCurrentUser } from "@/global/auth/hooks/use-current-user";
 import { useNickname } from "@/global/auth/hooks/use-nickname";
@@ -33,10 +25,6 @@ import { useSettingsMenu } from "@/shell/topbar/use-settings-menu";
 import "./topbar-nav.css";
 import "./account-dialogs.css";
 
-type BillingStatusLite = {
-  plan?: string;
-};
-
 interface ShellTopBarAccountProps {
   onSignIn?: () => void;
 }
@@ -52,40 +40,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
     name: accountUser?.name ?? sessionUser?.name ?? undefined,
   };
 
-  const [billingQueryReady, setBillingQueryReady] = useState(false);
-  useEffect(() => {
-    const scheduleIdle =
-      window.requestIdleCallback ??
-      ((callback: IdleRequestCallback) =>
-        window.setTimeout(
-          () =>
-            callback({
-              didTimeout: false,
-              timeRemaining: () => 0,
-            } as IdleDeadline),
-          1,
-        ));
-    const cancelIdle =
-      window.cancelIdleCallback ??
-      ((handle: number) => window.clearTimeout(handle));
-    const handle = scheduleIdle(() => setBillingQueryReady(true));
-    return () => cancelIdle(handle);
-  }, []);
-
-  const [billingRefreshKey, setBillingRefreshKey] = useState(0);
-  useEffect(() => {
-    const handler = () => setBillingRefreshKey((n) => n + 1);
-    window.addEventListener(SUBSCRIPTION_UPGRADED_EVENT, handler);
-    return () =>
-      window.removeEventListener(SUBSCRIPTION_UPGRADED_EVENT, handler);
-  }, []);
-
   const selfHosted = useSelfHostedServer();
-  void billingRefreshKey;
-  const billingStatus: BillingStatusLite | undefined = useBackendValue(
-    "billing.status",
-    hasConnectedAccount && billingQueryReady && !selfHosted ? {} : "skip",
-  );
 
   const pendingSignOutRef = useRef(false);
 
@@ -134,11 +89,13 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
     (user.name ?? user.email ?? t("sidebar.account")).trim() ||
     t("sidebar.account");
   const displayLabel = nickname.trim() || accountName;
-  const sidebarPlanLabel = sessionPaused
+  const pausedLabel = sessionPaused
     ? t("global.sessionPaused.accountLabel")
-    : billingQueryReady && !selfHosted
-      ? planLabel(billingStatus?.plan)
-      : null;
+    : null;
+  const nameTitle =
+    displayLabel === accountName
+      ? accountName
+      : `${displayLabel} · ${accountName}`;
 
   return (
     <div className="shell-topbar-account">
@@ -147,45 +104,32 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
           <button
             type="button"
             className="shell-topbar-account-trigger"
-            title={
-              displayLabel === accountName
-                ? sidebarPlanLabel
-                  ? `${accountName} · ${sidebarPlanLabel}`
-                  : accountName
-                : sidebarPlanLabel
-                  ? `${displayLabel} · ${accountName} · ${sidebarPlanLabel}`
-                  : `${displayLabel} · ${accountName}`
-            }
+            title={pausedLabel ? `${nameTitle} · ${pausedLabel}` : nameTitle}
             aria-label={
-              sidebarPlanLabel
-                ? t("shell.sidebar.account.planAriaLabel", {
-                    name: displayLabel,
-                    plan: sidebarPlanLabel,
-                  })
-                : displayLabel
+              pausedLabel ? `${displayLabel}, ${pausedLabel}` : displayLabel
             }
           >
-            <span className="shell-topbar-account-identity">
-              <span className="shell-topbar-account-nickname">
-                {displayLabel}
-              </span>
-              {sidebarPlanLabel ? (
-                <span className="shell-topbar-account-plan">
-                  {sidebarPlanLabel}
-                </span>
-              ) : null}
-            </span>
-            {/* The gear is a pure clickability affordance — the whole button
-                is the single click target that opens the unified menu. */}
+            {/* The gear only says "this opens settings": the whole button is
+                the one target for the menu. */}
             <span
               className="shell-topbar-account-settings-icon"
               aria-hidden="true"
             >
-              <Settings size={14} strokeWidth={1.75} />
+              <Settings size={15} strokeWidth={1.75} />
+              {connectHint.active ? (
+                <span className="shell-topbar-nav-hint-dot" aria-hidden="true" />
+              ) : null}
             </span>
-            {connectHint.active ? (
-              <span className="shell-topbar-nav-hint-dot" aria-hidden="true" />
-            ) : null}
+            <span className="shell-topbar-account-identity">
+              <span className="shell-topbar-account-nickname">
+                {displayLabel}
+              </span>
+              {pausedLabel ? (
+                <span className="shell-topbar-account-status">
+                  {pausedLabel}
+                </span>
+              ) : null}
+            </span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

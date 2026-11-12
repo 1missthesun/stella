@@ -3101,7 +3101,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, paket {plan}",
         "signOutDescription": "Anda yakin?",
         "signOutTitle": "Keluar dari Stella?"
       },

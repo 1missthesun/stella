@@ -3118,7 +3118,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, tilaus: {plan}",
         "signOutDescription": "Oletko varma?",
         "signOutTitle": "Kirjaudutaanko ulos Stellasta?"
       },

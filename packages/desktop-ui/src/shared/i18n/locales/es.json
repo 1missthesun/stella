@@ -3133,7 +3133,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, plan {plan}",
         "signOutDescription": "¿Seguro?",
         "signOutTitle": "¿Cerrar sesión en Stella?"
       },

@@ -3178,7 +3178,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}، خطة {plan}",
         "signOutDescription": "هل أنت متأكد؟",
         "signOutTitle": "تسجيل الخروج من Stella؟"
       },

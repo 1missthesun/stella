@@ -3148,7 +3148,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, plán {plan}",
         "signOutDescription": "Určitě?",
         "signOutTitle": "Odhlásit se ze Stelly?"
       },

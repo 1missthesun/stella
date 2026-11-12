@@ -65,8 +65,112 @@ body[data-display-expanding="true"] .shell-topbar-full,
   justify-content: flex-end;
   gap: 4px;
   min-width: 0;
-  padding-right: 10px;
+  padding-right: 12px;
   -webkit-app-region: drag;
+}
+
+/* One rhythm for every control on the right, taken from the tabs: 26px tall,
+   7px corners, their text style, a 5% fill on hover and 9% while open; 4px
+   apart, icons of one optical size (15px; the narrower bell 16px), and
+   square when there is no word. */
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(
+    .sidebar-footer-button,
+    .shell-topbar-icon-btn,
+    .shell-topbar-account-trigger,
+    .shell-topbar-account-signin,
+    .shell-topbar-account-settings
+  ) {
+  height: 26px;
+  min-height: 26px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted, var(--text-weak));
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: inherit;
+  line-height: 1;
+}
+
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(
+    .sidebar-footer-button,
+    .shell-topbar-account-trigger,
+    .shell-topbar-account-signin
+  ) {
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(.shell-topbar-icon-btn, .shell-topbar-account-settings) {
+  width: 26px;
+  padding: 0;
+}
+
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(.sidebar-footer-button, .shell-topbar-account-trigger)
+  svg {
+  color: inherit;
+}
+
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(
+    .sidebar-footer-button,
+    .shell-topbar-icon-btn,
+    .shell-topbar-account-trigger,
+    .shell-topbar-account-signin,
+    .shell-topbar-account-settings
+  ):hover {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  color: var(--text-strong);
+}
+
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(
+    .sidebar-footer-button,
+    .shell-topbar-icon-btn,
+    .shell-topbar-account-trigger,
+    .shell-topbar-account-signin,
+    .shell-topbar-account-settings
+  ):is([data-state="open"], [data-active="true"]) {
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+  color: var(--text-strong);
+}
+
+.shell-topbar-full
+  .shell-topbar-full__right
+  :is(
+    .sidebar-footer-button,
+    .shell-topbar-icon-btn,
+    .shell-topbar-account-trigger,
+    .shell-topbar-account-signin,
+    .shell-topbar-account-settings
+  ):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* A control's name stays out of the way while its menu is open. */
+.shell-topbar-full__right .shell-topbar-icon-btn[data-state="open"]::after {
+  opacity: 0;
+}
+
+/* Narrow windows: Models drops its word, so the tabs keep their room. */
+@media (max-width: 820px) {
+  .shell-topbar-full .shell-topbar-full__right .work-models-button {
+    justify-content: center;
+    width: 26px;
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+  }
 }
 
 .shell-topbar-full__left .shell-topbar-nav {
@@ -87,16 +191,6 @@ body[data-display-expanding="true"] .shell-topbar-full,
   max-width: min(240px, 32vw);
 }
 
-.shell-topbar-full__right .shell-topbar-account-signin,
-.shell-topbar-full__right .shell-topbar-account-trigger {
-  padding-right: 6px;
-}
-
-.shell-topbar-full[data-platform="win"]
-  .shell-topbar-full__right
-  .shell-topbar-account-signin {
-  padding-right: 8px;
-}
 @media (prefers-reduced-motion: reduce) {
   .shell-topbar-full {
     transition: none;

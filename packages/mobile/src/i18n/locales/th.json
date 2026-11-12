@@ -3101,7 +3101,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, แผน {plan}",
         "signOutDescription": "แน่ใจหรือไม่",
         "signOutTitle": "ออกจากระบบ Stella หรือไม่"
       },

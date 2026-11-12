@@ -3101,7 +3101,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, gói {plan}",
         "signOutDescription": "Bạn chắc chứ?",
         "signOutTitle": "Đăng xuất khỏi Stella?"
       },

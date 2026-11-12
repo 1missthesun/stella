@@ -3133,7 +3133,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, תוכנית {plan}",
         "signOutDescription": "בטוח?",
         "signOutTitle": "להתנתק מ-Stella?"
       },

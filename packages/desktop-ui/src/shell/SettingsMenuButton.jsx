@@ -31,7 +31,7 @@ export function SettingsMenuButton({ className, showActiveState = false }) {
             onMouseEnter={preloadSettingsScreen}
             onFocus={preloadSettingsScreen}
           >
-            <Settings size={14} strokeWidth={1.75} />
+            <Settings size={15} strokeWidth={1.75} />
             {connectHint.active ? (
               <span className="shell-topbar-nav-hint-dot" aria-hidden="true" />
             ) : null}

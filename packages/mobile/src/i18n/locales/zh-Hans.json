@@ -3101,7 +3101,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}，{plan} 套餐",
         "signOutDescription": "确定吗？",
         "signOutTitle": "退出 Stella 登录？"
       },

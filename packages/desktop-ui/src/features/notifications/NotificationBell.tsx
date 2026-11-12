@@ -254,7 +254,7 @@ export const NotificationBell = memo(function NotificationBell() {
             data-unseen={unseen > 0 || undefined}
             data-testid="notification-bell"
           >
-            <Bell size={16} strokeWidth={1.8} />
+            <Bell size={16} strokeWidth={1.75} />
             {unseen > 0 ? <span className="notification-bell__dot" aria-hidden /> : null}
           </button>
         </PopoverTrigger>

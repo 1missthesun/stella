@@ -116,30 +116,13 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 24px;
-  padding: 0 10px;
+  min-width: 0;
   border: none;
-  background: transparent;
   cursor: default;
-  border-radius: var(--radius-sm, 5px);
-  color: var(--text-base);
   -webkit-app-region: no-drag;
   transition:
     background 0.12s ease,
     color 0.12s ease;
-}
-
-.shell-topbar-account-trigger:hover,
-.shell-topbar-account-trigger:focus-visible,
-.shell-topbar-account-trigger[data-state="open"] {
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
-  color: var(--text-strong);
-  outline: none;
-}
-
-.shell-topbar-account-trigger:focus-visible {
-  box-shadow: var(--focus-ring);
 }
 
 .shell-topbar-account-identity {
@@ -153,62 +136,42 @@
 }
 
 .shell-topbar-account-nickname {
-  font-family: inherit;
-  font-size: var(--font-size-base);
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.005em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 160px;
   pointer-events: none;
-  margin-left: 2px;
 }
 
-.shell-topbar-account-plan {
+/* Only while the session is paused ("Signed out"). */
+.shell-topbar-account-status {
   flex-shrink: 0;
-  font-family: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.005em;
   color: var(--text-weak);
   white-space: nowrap;
   pointer-events: none;
 }
 
 .shell-topbar-account-settings-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
   flex-shrink: 0;
-  color: var(--text-weak);
   pointer-events: none;
-  transition: color 0.12s ease;
 }
 
-.shell-topbar-account-trigger:hover .shell-topbar-account-settings-icon,
-.shell-topbar-account-trigger:focus-visible .shell-topbar-account-settings-icon,
-.shell-topbar-account-trigger[data-state="open"]
-  .shell-topbar-account-settings-icon {
-  color: var(--text-strong);
+.shell-topbar-account-settings-icon .shell-topbar-nav-hint-dot {
+  top: -3px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 1.5px var(--background);
 }
 
 .shell-topbar-account-signin {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 10px;
   border: none;
-  border-radius: var(--radius-sm, 5px);
-  background: transparent;
-  color: var(--text-base);
-  font-family: inherit;
-  font-size: var(--font-size-base);
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.005em;
   white-space: nowrap;
   cursor: default;
   -webkit-app-region: no-drag;
@@ -217,29 +180,15 @@
     color 0.12s ease;
 }
 
-.shell-topbar-account-signin:hover,
-.shell-topbar-account-signin:focus-visible {
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
-  color: var(--text-strong);
-  outline: none;
-}
-
-.shell-topbar-account-signin:focus-visible {
-  box-shadow: var(--focus-ring);
-}
-
 .shell-topbar-account-signin-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  color: currentColor;
 }
 
 .shell-topbar-account-signin-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 .shell-topbar-account-settings {
@@ -247,13 +196,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
   border: none;
-  border-radius: var(--radius-sm, 5px);
-  background: transparent;
-  color: var(--text-base);
   cursor: default;
   -webkit-app-region: no-drag;
   transition:
@@ -275,17 +218,4 @@
   background: transparent;
   opacity: 0;
   pointer-events: none;
-}
-
-.shell-topbar-account-settings:hover,
-.shell-topbar-account-settings:focus-visible,
-.shell-topbar-account-settings[data-state="open"],
-.shell-topbar-account-settings[data-active="true"] {
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
-  color: var(--text-strong);
-  outline: none;
-}
-
-.shell-topbar-account-settings:focus-visible {
-  box-shadow: var(--focus-ring);
 }

@@ -3118,7 +3118,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}, {plan}-plan",
         "signOutDescription": "Er du sikker?",
         "signOutTitle": "Vil du logge ud af Stella?"
       },

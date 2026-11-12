@@ -24,7 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/ui/popover";
-import { AppWindowMac, Check, Globe } from "@/ui/icons";
+import { Check, Globe, Monitor } from "@/ui/icons";
 import { platformCapabilities } from "@/platform/capabilities";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { useUiState } from "@/context/ui-state";
@@ -41,12 +41,6 @@ const BLOCKER_LABELS: Record<DeviceExecutionBlocker, string> = {
   declined: "Declined",
   notReady: "Not ready",
 };
-
-/** A computer's name as the top bar shows it: without the network suffix
-    macOS and routers add ("Someones-MacBook-Air.local"). The picker and the
-    tooltip keep the full name. */
-const shortDeviceName = (name: string): string =>
-  name.replace(/\.(?:local|lan|home|localdomain)$/iu, "") || name;
 
 const moveErrorMessage = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error)).replace(
@@ -124,8 +118,7 @@ export function GlobalExecutionTargetControl() {
           (brain && !brain.here ? brain.label : undefined) ??
           "Computer")
         : platformCapabilities.automaticExecutionLabel;
-  const isDeviceName = target.mode === "device";
-  const TriggerIcon = target.mode === "cloud" ? Globe : AppWindowMac;
+  const TriggerIcon = target.mode === "cloud" ? Globe : Monitor;
 
   const choose = (next: DesktopExecutionTarget) => {
     setOpen(false);
@@ -150,16 +143,13 @@ export function GlobalExecutionTargetControl() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="sidebar-footer-button execution-target-button"
+          className="shell-topbar-icon-btn execution-target-button"
           data-active={open || undefined}
           aria-busy={moving || undefined}
           aria-label={`Run on ${label}`}
           aria-pressed={open}
-          data-device-name={isDeviceName || undefined}
-          title={isDeviceName ? label : undefined}
         >
-          <TriggerIcon size={14} strokeWidth={1.75} />
-          <span>{isDeviceName ? shortDeviceName(label) : label}</span>
+          <TriggerIcon size={15} strokeWidth={1.75} />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -178,7 +168,7 @@ export function GlobalExecutionTargetControl() {
             {platformCapabilities.website ? (
               <Globe size={16} />
             ) : (
-              <AppWindowMac size={16} />
+              <Monitor size={16} />
             )}
             <span>{platformCapabilities.automaticExecutionLabel}</span>
             {target.mode === "automatic" ? <Check size={15} /> : null}
@@ -216,7 +206,7 @@ export function GlobalExecutionTargetControl() {
                   choose({ mode: "device", deviceId: device.deviceId })
                 }
               >
-                <AppWindowMac size={16} />
+                <Monitor size={16} />
                 <span>{device.label ?? "Computer"}</span>
                 {blocker ? (
                   <small>{BLOCKER_LABELS[blocker]}</small>
@@ -236,7 +226,7 @@ export function GlobalExecutionTargetControl() {
                 openConnectDialog();
               }}
             >
-              <AppWindowMac size={16} />
+              <Monitor size={16} />
               <span>Enable a computer…</span>
             </button>
           ) : null}

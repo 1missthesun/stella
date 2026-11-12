@@ -3101,7 +3101,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}、{plan} プラン",
         "signOutDescription": "よろしいですか？",
         "signOutTitle": "Stella からサインアウトしますか？"
       },

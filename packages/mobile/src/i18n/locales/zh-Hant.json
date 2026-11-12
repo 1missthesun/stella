@@ -3101,7 +3101,6 @@
     },
     "sidebar": {
       "account": {
-        "planAriaLabel": "{name}，{plan} 方案",
         "signOutDescription": "你確定嗎？",
         "signOutTitle": "要登出 Stella 嗎？"
       },

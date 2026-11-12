@@ -1898,7 +1898,7 @@ export const changelogEntries: ChangelogEntry[] = [
       "New deeper coding mode for technical tasks.",
     ],
     more: [
-      "Wake-word pipeline removed (Stella moved away from always-listening).",
+      "Wake-word pipeline removed for now (Stella moved away from always-listening). \"Hey Stella\" came back in a later release, off by default.",
       "Bundled Stella browser binary refreshed.",
       "Chat now pages by visible messages for performance.",
     ],

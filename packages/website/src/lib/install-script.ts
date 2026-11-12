@@ -1,7 +1,9 @@
 import { LAUNCHER_CHECKSUMS_URL, MAC_APP_ZIP, RELEASE_ASSETS, SITE_ORIGIN } from "@/lib/downloads";
 
 export const INSTALL_SCRIPT = `#!/bin/sh
-# Stella installer. ${SITE_ORIGIN}
+# Stella installer for macOS and Linux (x86_64 and arm64). ${SITE_ORIGIN}
+# Windows: download from ${SITE_ORIGIN}/download or use ${SITE_ORIGIN}/install.ps1.
+# iPhone and Android: the App Store and Google Play. Browser: ${SITE_ORIGIN}/chat.
 set -eu
 
 MAC_APP_ZIP="${MAC_APP_ZIP}"

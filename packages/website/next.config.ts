@@ -60,7 +60,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/agents", destination: "/one-chat", permanent: true },
       { source: "/agents.md", destination: "/one-chat.md", permanent: true },
-      { source: "/go", destination: "/", statusCode: 301 },
+      { source: "/go", destination: "/pricing", statusCode: 301 },
       { source: "/slack", destination: "/crew", permanent: true },
       ...Object.entries(MOVED_ANSWER_SLUGS).flatMap(([from, to]) => [
         { source: `/ai/${from}`, destination: `/ai/${to}`, permanent: true },

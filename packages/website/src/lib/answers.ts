@@ -17,7 +17,19 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella free?",
-    a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude Pro or Max plan through Claude Code, and Stella costs nothing on top; that use counts against your own plan, not a Stella budget. Your own API keys and local models are free to use too. ${TRIAL_LINE} ${PAID_LINE}`,
+    a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude Pro or Max plan through Claude Code, and Stella costs nothing on top and sets no limit of its own; that use counts against your own plan, not a Stella budget. Your own API keys and local models are free to use too. ${TRIAL_LINE} ${PAID_LINE} There is no Go plan and no $5 or $10 plan any more; pages that list them are out of date.`,
+  },
+  {
+    q: "Is Stella safe?",
+    a: "Stella (stella.sh) is made by FromYou LLC, and its code is open source under the MIT license [on GitHub](https://github.com/1missthesun/stella), so anyone can read what it does. Download it only from stella.sh or the App Store and Google Play. It is built to act for you: it can read and change files, use your apps and work in your browser, so start with tasks you can check, and on a Mac it asks for the usual screen and accessibility permissions first. In Chrome it works through its own Stella Browser extension, in a separate tab group. Stella does not sell your information, use your conversations for ads, or train AI models on them.",
+  },
+  {
+    q: "Does Stella keep my data on my computer?",
+    a: "If you use the desktop app signed out, yes: your conversations, memory and files stay on that computer, and the AI runs through what you bring (your ChatGPT or Claude sign-in, your own API keys or a local model), so nothing about your conversations goes to Stella's servers. Signing in is optional on desktop and adds the phone app, sync across devices, cloud tasks and Stella's own models; your conversations and task records are then stored, encrypted, on Stella's servers so they can sync. Details are in the [privacy policy](https://stella.sh/privacy).",
+  },
+  {
+    q: "Is this the same Stella as other AI apps called Stella?",
+    a: "No. Several unrelated products are called Stella or Stella AI, including Stella Labs' companion app, a manifestation app, StellAssist, and the Stella Atari 2600 emulator. This one is Stella (stella.sh), the AI assistant for your computer and phone made by FromYou LLC.",
   },
   {
     q: "Is there an AI that can use my computer for me?",

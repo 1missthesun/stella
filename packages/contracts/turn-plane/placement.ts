@@ -114,6 +114,8 @@ export const EXECUTION_CAPABILITIES = [
   "local-apps",
   "attachments",
   "claude-code",
+  "chatgpt",
+  "engine-sign-ins",
 ] as const;
 export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
 

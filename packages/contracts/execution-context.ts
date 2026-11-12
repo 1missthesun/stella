@@ -13,10 +13,24 @@ export type ExecutionDestination =
   | { kind: "cloud" }
   | { kind: "device"; deviceId: string; label: string };
 
+export type DeviceEngine = "claude-code" | "chatgpt";
+
 export type ExecutionContextDevice = Pick<
   DeviceDestination,
   "deviceId" | "label" | "online" | "remoteExecutionEnabled" | "remoteExecution"
->;
+> & { signedIn?: DeviceEngine[] };
+
+const DEVICE_ENGINES: readonly DeviceEngine[] = ["claude-code", "chatgpt"];
+const DEVICE_ENGINE_NAMES: Record<DeviceEngine, string> = { "claude-code": "Claude Code", chatgpt: "ChatGPT" };
+
+/** The engines a computer is signed in to, when it reports them (`engine-sign-ins`); older computers report none. */
+export const deviceEngineSignIns = (capabilities: readonly unknown[] | undefined): DeviceEngine[] | undefined =>
+  capabilities?.includes("engine-sign-ins")
+    ? DEVICE_ENGINES.filter((engine) => capabilities.includes(engine))
+    : undefined;
+
+const knownEngines = (value: unknown): DeviceEngine[] | undefined =>
+  Array.isArray(value) ? DEVICE_ENGINES.filter((engine) => value.includes(engine)) : undefined;
 
 export type MediaAccess = {
   stella: "included" | "upgrade" | "sign_in";
@@ -45,7 +59,7 @@ const labelText = (value: string): string =>
     .slice(0, 256);
 
 export const createExecutionContextSnapshot = (args: {
-  devices: readonly DeviceDestination[] | null;
+  devices: readonly (DeviceDestination & { signedIn?: DeviceEngine[] })[] | null;
   destination: ExecutionDestination;
   media?: MediaAccess | undefined;
 }): ExecutionContextSnapshot => ({
@@ -69,6 +83,10 @@ export const createExecutionContextSnapshot = (args: {
       online: device.online,
       remoteExecutionEnabled: device.remoteExecutionEnabled,
       remoteExecution: device.remoteExecution,
+      ...((): { signedIn?: DeviceEngine[] } => {
+        const signedIn = device.signedIn ?? deviceEngineSignIns(device.availability?.capabilities);
+        return device.online && signedIn ? { signedIn } : {};
+      })(),
     })),
   ...(args.media
     ? {
@@ -161,6 +179,14 @@ export const readExecutionContextSnapshot = (
       remoteExecutionEnabled: device.remoteExecutionEnabled,
       remoteExecution: remoteExecutionText(device.remoteExecution)
         ?? (device.remoteExecutionEnabled ? "enabled" : "unconfigured"),
+      ...((): { signedIn?: DeviceEngine[] } => {
+        const signedIn =
+          knownEngines(device.signedIn) ??
+          deviceEngineSignIns(isRecord(device.availability) && Array.isArray(device.availability.capabilities)
+            ? device.availability.capabilities
+            : undefined);
+        return signedIn ? { signedIn } : {};
+      })(),
     });
   }
   return createExecutionContextSnapshot({
@@ -170,17 +196,28 @@ export const readExecutionContextSnapshot = (
   });
 };
 
-const remoteExecutionNote = (device: ExecutionContextDevice): string => {
+const remoteExecutionNote = (device: ExecutionContextDevice, reader: "orchestrator" | "agent"): string => {
   switch (device.remoteExecution) {
     case "enabled":
       return "";
     case "asking":
-      return "; waiting for permission on that device's screen";
+      return "; its screen is asking the user to allow work from other devices";
     case "declined":
-      return "; not accepting work from other devices";
+      return "; set not to accept work from other devices";
     default:
-      return "; has not been enabled to accept work from other devices yet";
+      return reader === "orchestrator" && device.online
+        ? "; not yet allowed to take work from other devices: start the task there anyway, and its screen asks the user to allow it"
+        : "; not yet allowed to take work from other devices";
   }
+};
+
+const signInNote = (device: ExecutionContextDevice): string => {
+  if (!device.online || !device.signedIn) return "";
+  const names = (engines: readonly DeviceEngine[]) => engines.map((engine) => DEVICE_ENGINE_NAMES[engine]);
+  const have = names(device.signedIn);
+  const missing = names(DEVICE_ENGINES.filter((engine) => !device.signedIn!.includes(engine)));
+  if (have.length === 0) return `; not signed in to ${missing.join(" or ")}`;
+  return `; signed in to ${have.join(" and ")}${missing.length ? `, not ${missing.join(" or ")}` : ""}`;
 };
 
 export const renderExecutionDevices = (
@@ -192,7 +229,7 @@ export const renderExecutionDevices = (
     "- Cloud",
     ...snapshot.devices.map(
       (device) =>
-        `- ${device.label || device.deviceId} [device_id: ${device.deviceId}]: ${device.online ? "online" : "offline"}${remoteExecutionNote(device)}`,
+        `- ${device.label || device.deviceId} [device_id: ${device.deviceId}]: ${device.online ? "online" : "offline"}${signInNote(device)}${remoteExecutionNote(device, reader)}`,
     ),
     ...(!snapshot.devicesKnown
       ? ["The connected device list is currently unavailable."]

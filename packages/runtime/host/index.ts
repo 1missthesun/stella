@@ -259,6 +259,7 @@ export class StellaRuntimeHost {
   placedDispatchByRunId = new Map<string, PlacedDispatch>();
   placements = new ConversationPlacements();
   claudeCodeLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
+  chatGptLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
   hostDatabase: SqliteDatabase | null = null;
   constructor(options: StellaRuntimeHostOptions) {
@@ -805,7 +806,7 @@ export class StellaRuntimeHost {
           process.platform === "darwin" || process.platform === "win32"
             ? ["computer-use"]
             : [];
-        const claudeCode = await this.claudeCodeSignedIn();
+        const [claudeCode, chatGpt] = await Promise.all([this.claudeCodeSignedIn(), this.chatGptSignedIn()]);
         return {
           ready: Boolean(
             this.started &&
@@ -819,7 +820,9 @@ export class StellaRuntimeHost {
             "local-files",
             "attachments",
             ...platformCapabilities,
+            "engine-sign-ins",
             ...(claudeCode ? (["claude-code"] as const) : []),
+            ...(chatGpt ? (["chatgpt"] as const) : []),
           ],
         };
       },
@@ -1315,6 +1318,23 @@ export class StellaRuntimeHost {
       this.placements.submitted(submitting);
     }
   }
+  private async chatGptSignedIn(): Promise<boolean> {
+    const known = this.chatGptLogin;
+    if (Date.now() - known.at >= 60_000 && !known.pending) {
+      known.pending = (async () => {
+        const answer = (await this.options.hostHandlers
+          .requestLlmCredentials?.({ operation: "list" })
+          .catch(() => undefined)) as { ok?: boolean; oauthProviders?: unknown } | undefined;
+        this.chatGptLogin = {
+          signedIn: answer?.ok === true && Array.isArray(answer.oauthProviders) && answer.oauthProviders.includes("chatgpt"),
+          at: Date.now(),
+        };
+      })();
+      if (known.at === 0) await known.pending;
+    }
+    return this.chatGptLogin.signedIn;
+  }
+
   private async claudeCodeSignedIn(): Promise<boolean> {
     const known = this.claudeCodeLogin;
     if (Date.now() - known.at >= 60_000 && !known.pending) {

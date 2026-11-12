@@ -43,7 +43,7 @@ import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { PLACED_AGENT_STOPPED } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
-import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
+import { deviceEngineSignIns, type ExecutionContextSnapshot, type ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
@@ -1035,6 +1035,17 @@ export function desktopChats(options: DesktopChatsOptions) {
           if (there?.online && there.availability && !there.availability.capabilities.includes("claude-code")) {
             throw new Error(
               `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › Account there) and try again, or start the agent in the cloud with destination "cloud".`,
+            );
+          }
+        }
+        const pick = model ? parseModelPick(model.replace(/:(?:low|medium|high|xhigh|max)$/u, "")) : undefined;
+        if (pick?.kind === "direct" && pick.provider === CHATGPT_PROVIDER_ID) {
+          const there = await device();
+          const signedIn = there?.online ? deviceEngineSignIns(there.availability?.capabilities) : undefined;
+          if (signedIn && !signedIn.includes("chatgpt")) {
+            const name = there?.label?.trim() || deviceId;
+            throw new Error(
+              `${name} isn't signed in to ChatGPT, so "${model}" can't run there and nothing was started. Pick a model that runs there (see the devices list), or ask the user to sign in with ChatGPT in Stella's settings on ${name}.`,
             );
           }
         }

@@ -55,6 +55,11 @@ interface AgentModelPickerProps {
     onSelected?: () => void;
     className?: string;
     surface?: "sidebar" | "settings";
+    /** A request to show one provider's group open, e.g. from "Use my OpenRouter key". */
+    focusSection?: {
+        section: string;
+        seq: number;
+    } | null;
 }
 const ASSISTANT_TARGET = "__assistant__";
 const IMAGE_TARGET = "__image__";
@@ -129,7 +134,7 @@ export function AgentModelPicker(props: AgentModelPickerProps) {
     return isWebsiteHost() ? <WebsiteModelPicker {...props} /> : <DesktopAgentModelPicker {...props} />;
 }
 
-function DesktopAgentModelPicker({ active = true, onSelected, className, surface = "sidebar", }: AgentModelPickerProps) {
+function DesktopAgentModelPicker({ active = true, onSelected, className, surface = "sidebar", focusSection = null, }: AgentModelPickerProps) {
     const t = useT();
     const imageProviderOptions = useByokProviderOptions(IMAGE_PROVIDER_OPTIONS);
     const voiceProviderOptions = useByokProviderOptions(VOICE_PROVIDER_OPTIONS);
@@ -327,6 +332,12 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         }
         setActiveAgent(configurableAgents[0].key);
     }, [activeAgent, configurableAgents, surface, voiceVisible]);
+    // Provider groups live on the assistant tab, so a focus request lands there.
+    const focusSeq = focusSection?.seq ?? 0;
+    useEffect(() => {
+        if (focusSeq && surface !== "settings")
+            setActiveAgent(ASSISTANT_TARGET);
+    }, [focusSeq, surface]);
     const activeAssistant = activeAgent === ASSISTANT_TARGET;
     const activeImage = activeAgent === IMAGE_TARGET;
     const activeVoice = activeAgent === VOICE_TARGET && voiceVisible;
@@ -834,7 +845,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             <ProviderOnlyPicker providers={voiceProviderOptions} value={current || "stella"} onSelect={(key) => void handleVoiceProviderSelect(key)} disabled={!preferences || pendingAgent !== null} ariaLabel={t("settings.agentModelPicker.voiceProviderAriaLabel")}/>
             <VoiceCatalogPicker voiceProvider={voicePreferences.provider} selectedVoices={voicePreferences.voices} readAloudProvider={voicePreferences.readAloudProvider} onSelectVoice={(underlyingProvider, voiceId) => void handleVoiceSelect(underlyingProvider, voiceId)} onSelectReadAloudProvider={(provider) => void handleReadAloudProviderSelect(provider)} onSelectReadAloudVoice={(voiceId) => void handleReadAloudVoiceSelect(voiceId)} disabled={!preferences || pendingAgent !== null}/>
           </>) : (<>
-            <ProviderModelPanel value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={reasoningControl} collapsibleGroups activeSectionKey={activeSectionKey} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
+            <ProviderModelPanel value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={reasoningControl} collapsibleGroups activeSectionKey={activeSectionKey} focusSection={focusSection} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
                 ((claudeCodeSectionOpen || committedEngine === "claude_code_local") &&
                     claudeCodeModelsLoading)} extraSections={[
                 {

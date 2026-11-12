@@ -64,7 +64,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
     return () => clearTimeout(timer);
   }, [active]);
 
-  // The out-of-usage offer opens the panel straight on ChatGPT.
+  // The out-of-usage offer opens the panel straight on ChatGPT; Email's "Use my OpenRouter key" on OpenRouter.
   useEffect(() => {
     if (!active) return;
     const requested = takeChatSettingsBrainRequest();

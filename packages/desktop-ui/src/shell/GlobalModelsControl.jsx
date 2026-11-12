@@ -3,6 +3,7 @@ import { openModelPicker } from "@/features/workspace-display/default-tabs";
 import { OPEN_MODEL_PICKER_EVENT } from "@/global/billing/byok-action";
 import {
   engineOverlay,
+  useEngineOverlayFocus,
   useEngineOverlayOpen,
 } from "@/shell/display/engine-overlay-store";
 import {
@@ -39,13 +40,23 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
   const inTopbar = placement === "topbar";
   const open = useEngineOverlayOpen();
   const modelPinned = useComposerModelPinned();
+  const focus = useEngineOverlayFocus();
 
   useEffect(() => {
     if (visible && open) preloadModelsPicker();
   }, [open, visible]);
 
   useEffect(() => {
-    const handleOpenModelPicker = () => openModelPicker();
+    /** @param {Event} event */
+    const handleOpenModelPicker = (event) => {
+      const provider =
+        event instanceof CustomEvent ? event.detail?.provider : undefined;
+      if (typeof provider === "string" && provider) {
+        engineOverlay.openAt(provider);
+      } else {
+        openModelPicker();
+      }
+    };
     window.addEventListener(OPEN_MODEL_PICKER_EVENT, handleOpenModelPicker);
     return () => {
       window.removeEventListener(
@@ -99,7 +110,7 @@ export function GlobalModelsControl({ visible = true, placement = "footer" }) {
                   </div>
                 }
               >
-                <AgentModelPicker active={open} />
+                <AgentModelPicker active={open} focusSection={focus} />
               </Suspense>
             </div>
             <div className="models-popover__footer">

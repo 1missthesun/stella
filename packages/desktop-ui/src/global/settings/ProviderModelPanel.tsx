@@ -106,6 +106,8 @@ export interface ProviderModelPanelProps {
   onRequestSearchClose?: () => void;
   collapsibleGroups?: boolean;
   activeSectionKey?: string | null;
+  /** Opens this provider's group (and its connect form when it needs a key) and scrolls to it, once per `seq`. */
+  focusSection?: { section: string; seq: number } | null;
   extraSections?: readonly ProviderModelExtraSection[];
   sectionOrder?: readonly string[] | null;
   onExtraSectionExpanded?: (sectionKey: string, open: boolean) => void;
@@ -177,7 +179,7 @@ export function buildProviderTabs(groups: readonly ProviderGroup[], visibleProvi
     }
     return Array.from(tabs.values()).sort((a, b) => compareProviderRailOrder(a.key, b.key, a.label, b.label));
 }
-export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, onSelect, disabled = false, reasoningEffort, onSelectReasoning, restrictStellaPicks = false, restrictedPlanLabel, ariaLabel, hideDefaultRow = false, selectedHeaderKicker, hideSelectedTitle = false, hideSearch = false, hideSelectionCheck = false, disableNonStellaProviders = false, disabledProviderReason, hideProviderLabel = false, visibleProviders, hiddenProviders, favoriteScope, hideGroupHead = false, headerActionsTarget, authOpenRequest = 0, onRequestSearchClose, collapsibleGroups = false, activeSectionKey = null, extraSections = [], sectionOrder = null, onExtraSectionExpanded, onRefresh, refreshing = false, catalogError = null, selectedRowExtra = null, }: ProviderModelPanelProps) {
+export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, onSelect, disabled = false, reasoningEffort, onSelectReasoning, restrictStellaPicks = false, restrictedPlanLabel, ariaLabel, hideDefaultRow = false, selectedHeaderKicker, hideSelectedTitle = false, hideSearch = false, hideSelectionCheck = false, disableNonStellaProviders = false, disabledProviderReason, hideProviderLabel = false, visibleProviders, hiddenProviders, favoriteScope, hideGroupHead = false, headerActionsTarget, authOpenRequest = 0, onRequestSearchClose, collapsibleGroups = false, activeSectionKey = null, focusSection = null, extraSections = [], sectionOrder = null, onExtraSectionExpanded, onRefresh, refreshing = false, catalogError = null, selectedRowExtra = null, }: ProviderModelPanelProps) {
     const t = useT();
     const credentials = useLlmCredentials();
     const { isAuthenticated } = useAuthState();
@@ -564,6 +566,26 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         setDraftKey("");
         setExpandedProvider(section.tab.key);
     }, [authOpenRequest, section?.requiresAuth, section?.tab.key]);
+    const focusTab = focusSection ? tabs.find((tab) => tab.key === focusSection.section) : undefined;
+    const focusNeedsKey = focusTab ? getSectionContext(focusTab).requiresAuth : false;
+    const handledFocusRef = useRef(0);
+    useEffect(() => {
+        if (!focusSection || !focusTab || handledFocusRef.current === focusSection.seq)
+            return;
+        handledFocusRef.current = focusSection.seq;
+        const key = focusTab.key;
+        setOpenSections((current) => current.has(key) ? current : new Set(current).add(key));
+        if (focusNeedsKey) {
+            setAuthError(null);
+            setDraftKey("");
+            setExpandedProvider(key);
+        }
+        requestAnimationFrame(() => {
+            document
+                .querySelector(`.model-picker-group[data-section="${CSS.escape(key)}"]`)
+                ?.scrollIntoView({ block: "nearest" });
+        });
+    }, [focusSection, focusTab, focusNeedsKey]);
     const { requiresAuth: liftedRequiresAuth, supportsOAuth: liftedSupportsOAuth, expanded: liftedExpanded, sectionDisabled: liftedSectionDisabled, removable: liftedRemovable, armed: liftedArmed, isSigningOut: liftedIsSigningOut, hasCustomInputs: liftedHasCustomInputs, } = section ?? {};
     const liftedTabKey = section?.tab.key;
     const liftedTabLabel = section?.tab.label;
@@ -627,7 +649,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         const sectionHoldsSelection = isStella
             ? isDefaultSelected || (value ?? "").startsWith("stella/")
             : models.some((model) => model.id === value);
-        return (<div key={tab.key} className="model-picker-group" role="group" aria-label={tab.label} data-open={open || undefined}>
+        return (<div key={tab.key} className="model-picker-group" role="group" aria-label={tab.label} data-section={tab.key} data-open={open || undefined}>
         {showGroupHead ? (<div className="model-picker-group-head" data-label-hidden={(!collapsibleGroups && hideProviderLabel) || undefined} data-collapsible={collapsibleGroups || undefined} title={disabledProviderSet.has(tab.key)
                 ? disabledProviderReason
                 : undefined}>

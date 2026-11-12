@@ -19,6 +19,10 @@ const writePersistedOpen = (next: boolean): void => {
 let isOpen = readPersistedOpen();
 const listeners = new Set<Listener>();
 
+/** A request to open the Models popover on one provider's group. */
+export type EngineOverlayFocus = { section: string; seq: number };
+let focus: EngineOverlayFocus | null = null;
+
 const emit = (): void => {
   writePersistedOpen(isOpen);
   for (const listener of listeners) listener();
@@ -34,13 +38,30 @@ export const engineOverlay = {
   setOpen(next: boolean): void {
     if (next === isOpen) return;
     isOpen = next;
+    // A focus request is for one opening; the next one starts as usual.
+    if (!isOpen) focus = null;
     emit();
   },
   toggle(): void {
     isOpen = !isOpen;
+    if (!isOpen) focus = null;
+    emit();
+  },
+  /** Opens Models with `section` (a provider key) expanded and in view. */
+  openAt(section: string): void {
+    focus = { section, seq: (focus?.seq ?? 0) + 1 };
+    isOpen = true;
     emit();
   },
 };
+
+export function useEngineOverlayFocus(): EngineOverlayFocus | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => focus,
+    () => null,
+  );
+}
 
 export function useEngineOverlayOpen(): boolean {
   return useSyncExternalStore(

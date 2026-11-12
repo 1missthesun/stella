@@ -36,6 +36,12 @@ export function startConnectPlan(conversationId: string | null): void {
   openDrawer("end");
 }
 
+/** Opens the chat settings panel on one provider's page, such as `provider:openrouter`. */
+export function openChatSettingsAt(brainId: string): void {
+  brainRequest = brainId;
+  openDrawer("end");
+}
+
 /** The chat settings page the offer asked for, once. */
 export function takeChatSettingsBrainRequest(): string | null {
   const request = brainRequest;

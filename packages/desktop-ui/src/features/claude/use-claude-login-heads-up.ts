@@ -3,12 +3,23 @@ import { CLAUDE_LOGIN_WARN_BEFORE_MS } from "@stella/contracts/claude-local-acco
 import type { EngineSettings } from "@stella/contracts/backend/engines";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import { useCloudEngines } from "@/features/cloud/cloud-engines-api";
-import { dismissComposerNotice, presentComposerNotice } from "@/features/chat/composer-notice-store";
+import {
+  dismissComposerNotice,
+  presentComposerNotice,
+  type ComposerNoticeInput,
+} from "@/features/chat/composer-notice-store";
+import { notify, withdrawNotification } from "@/features/notifications/notification-store";
 import { useLocale, useT } from "@/shared/i18n";
 import { uiState } from "@/platform/ui-state";
 import { useClaudeLocalAccounts } from "./use-claude-local-accounts";
 
 const NOTICE_ID = "claude-login-heads-up";
+let shownInBell: string | null = null;
+
+const withdrawHeadsUp = () => {
+  if (shownInBell) withdrawNotification(shownInBell);
+  shownInBell = null;
+};
 const DISMISSED_KEY = "stella.claudeLogin.headsUpDismissed";
 
 type Attention = {
@@ -45,11 +56,12 @@ const cloudAttention = (settings: EngineSettings | undefined, now: number): Atte
 
 /**
  * Before the Claude login Stella answers with on this computer ends (a few
- * days ahead) and after it has ended: one calm notice above the composer with
- * Sign in, until the person signs in or closes it. Closing it hides it for
- * that login's current state only, so an ended login still gets its notice
- * after an "ends soon" one was closed. The cloud's login gets the same
- * notice when the cloud answers with Claude; this computer's comes first.
+ * days ahead) and after it has ended: one notification in the bell whose Sign
+ * in opens the sign-in card at the composer, until the person signs in or
+ * dismisses it. Dismissing hides it for that login's current state only, so
+ * an ended login still gets its notice after an "ends soon" one was
+ * dismissed. The cloud's login gets the same notice when the cloud answers
+ * with Claude; this computer's comes first.
  */
 export function useClaudeLoginHeadsUp(): void {
   const t = useT();
@@ -79,6 +91,7 @@ export function useClaudeLoginHeadsUp(): void {
       ? `${attention.place === "cloud" ? "cloud:" : ""}${attention.state}:${attention.id}:${attention.expiresAt ?? ""}`
       : "";
     if (!attention || uiState.getItem(DISMISSED_KEY) === key) {
+      withdrawHeadsUp();
       dismissComposerNotice(NOTICE_ID);
       return;
     }
@@ -94,7 +107,7 @@ export function useClaudeLoginHeadsUp(): void {
           }).format(new Date(attention.expiresAt))
         : "";
     const cloudPlace = attention.place === "cloud";
-    presentComposerNotice({
+    const notice = {
       id: NOTICE_ID,
       conversationId: null,
       kind: "sign-in",
@@ -116,6 +129,24 @@ export function useClaudeLoginHeadsUp(): void {
         ...(cloudPlace ? { place: "cloud" as const } : {}),
         dismissKey: key,
       },
+    } satisfies ComposerNoticeInput;
+    const bellId = `${NOTICE_ID}:${key}`;
+    if (shownInBell !== bellId) withdrawHeadsUp();
+    shownInBell = bellId;
+    notify({
+      id: bellId,
+      kind: "sign-in",
+      title: notice.title,
+      detail: notice.description,
+      actions: [
+        {
+          label: t("claudeLogin.signIn"),
+          primary: true,
+          keep: true,
+          run: () => presentComposerNotice(notice),
+        },
+      ],
+      onDismiss: () => rememberClaudeHeadsUpDismissed(key),
     });
   }, [attentionJson, locale, t]);
 }

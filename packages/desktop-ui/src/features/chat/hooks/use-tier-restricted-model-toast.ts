@@ -13,7 +13,8 @@ import {
   resolveTierRestrictedModelNotice,
   type NoticeRuntimeEngine,
 } from "./tier-restricted-model-notice";
-import { presentComposerNotice } from "@/features/chat/composer-notice-store";
+import { notify } from "@/features/notifications/notification-store";
+import { translateNow } from "@/shared/i18n/active-translator";
 
 type LocalModelPreferences = {
   modelOverrides?: Record<string, string>;
@@ -72,22 +73,23 @@ export function useTierRestrictedModelToast() {
     if (seenRef.current.has(dedupeKey)) return;
     seenRef.current.add(dedupeKey);
 
-    presentComposerNotice({
-      conversationId: null,
-      kind: "upgrade",
-      title: "Model not available on your plan",
-      description: getModelRestrictionDescription({
+    notify({
+      id: `model-not-on-plan:${dedupeKey}`,
+      kind: "plan",
+      title: translateNow("shell.notifications.modelNotOnPlan"),
+      detail: getModelRestrictionDescription({
         audience,
         modelLabel: notice.modelLabel,
         tense: "is",
       }),
-      action: {
-        label: getModelRestrictionActionLabel(audience),
-        onClick: () => {
-          planUsageDialog.openPlans();
+      actions: [
+        { label: BYOK_TOAST_ACTION.label, run: BYOK_TOAST_ACTION.onClick },
+        {
+          label: getModelRestrictionActionLabel(audience),
+          primary: true,
+          run: () => planUsageDialog.openPlans(),
         },
-      },
-      secondaryAction: BYOK_TOAST_ACTION,
+      ],
     });
   }, []);
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import {
+  CONNECT_PLAN_COPY,
   CONNECT_PLAN_NEAR_SHARE,
   CONNECT_PLAN_OFFER_ENABLED,
 } from "@stella/contracts/connect-plan-offer";
@@ -7,7 +8,8 @@ import { useDesktopAuthSession } from "@/global/auth/services/auth-session";
 import { resolveFreeAllowance } from "@/global/billing/audience";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { uiState } from "@/platform/ui-state";
-import { openConnectPlan } from "./connect-plan";
+import { notify } from "@/features/notifications/notification-store";
+import { connectPlanChatGptOnly, connectPlanCopy, openConnectPlan } from "./connect-plan";
 
 const SHOWN_KEY = "stella.connectPlan.nearShown";
 
@@ -16,8 +18,9 @@ let shownThisRun = false;
 
 /**
  * Once, when a Free account has used about 80% of its free usage: a quiet
- * heads-up that the ChatGPT or Claude plan it already has keeps Stella free
- * after that. Remembered per account on this device, so it never repeats.
+ * heads-up in the bell that the ChatGPT or Claude plan it already has keeps
+ * Stella free after that. It stays there until the person connects or
+ * dismisses it (remembered per account on this device), then never repeats.
  */
 export function useConnectPlanHeadsUp(conversationId: string | null): void {
   const session = useDesktopAuthSession();
@@ -39,7 +42,24 @@ export function useConnectPlanHeadsUp(conversationId: string | null): void {
     const key = `${SHOWN_KEY}:${userId}`;
     if (uiState.getItem(key)) return;
     shownThisRun = true;
-    uiState.setItem(key, "1");
-    openConnectPlan({ conversationId, reason: "allowance-near" });
+    const done = () => uiState.setItem(key, "1");
+    const copy = connectPlanCopy("allowance-near");
+    notify({
+      id: `connect-plan-near:${userId}`,
+      kind: "plan",
+      title: copy.title,
+      detail: copy.description,
+      actions: [
+        {
+          label: connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect,
+          primary: true,
+          run: () => {
+            done();
+            openConnectPlan({ conversationId, reason: "allowance-near" });
+          },
+        },
+      ],
+      onDismiss: done,
+    });
   }, [conversationId, near, userId]);
 }

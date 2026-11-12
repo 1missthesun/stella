@@ -14,7 +14,7 @@ import {
   type OutputMedia,
 } from "./media-output"
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload"
-import { showToast } from "@/ui/toast"
+import { notify } from "@/features/notifications/notification-store"
 import { imageGenerationFailureKey } from "./media-error-copy"
 import { useT } from "@/shared/i18n"
 import {
@@ -167,9 +167,10 @@ export const useMediaMaterializer = ({
       failedNotifiedJobs.add(job.jobId)
       capInMemory(failedNotifiedJobs)
       persistFailedNotifiedJobs()
-      showToast({
+      notify({
+        id: `image-failed:${job.jobId}`,
+        kind: "problem",
         title: t(imageGenerationFailureKey(job.error)),
-        variant: "error",
       })
     }
   }, [failedJobs, t])

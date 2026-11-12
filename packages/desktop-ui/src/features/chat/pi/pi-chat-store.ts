@@ -2,7 +2,8 @@ import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activit
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
 import { dismissClaudeLoginHeld, presentClaudeLoginHeld } from "@/features/claude/claude-login-notice";
 import { presentAllowanceConnectPlan } from "@/features/chat/connect-plan/connect-plan";
-import { showToast } from "@/ui/toast";
+import { notify } from "@/features/notifications/notification-store";
+import { translateNow } from "@/shared/i18n/active-translator";
 import { desktopSendOutbox, runtimeUnavailable } from "./desktop-send-outbox";
 import {
   dismissUsageLimitCard,
@@ -136,12 +137,11 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
       continue;
     }
     if (event.type === "engine_status" && event.state === "model-fallback") {
-      showToast({
-        title: "Switched to a fallback model",
-        description:
-          event.text || "The configured model was unavailable, so this session switched to a fallback model.",
-        variant: "error",
-        duration: 10000,
+      notify({
+        id: `model-fallback:${conversationId}`,
+        kind: "info",
+        title: translateNow("shell.notifications.fallbackModel.title"),
+        detail: event.text || translateNow("shell.notifications.fallbackModel.description"),
       });
       continue;
     }

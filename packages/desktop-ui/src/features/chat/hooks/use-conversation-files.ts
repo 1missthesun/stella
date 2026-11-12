@@ -11,7 +11,8 @@ import {
   subscribeToLocalFilesWindow,
   type LocalFilesWindowSnapshot,
 } from "@/features/chat/services/local-files-store";
-import { showToast } from "@/ui/toast";
+import { notify, withdrawNotification } from "@/features/notifications/notification-store";
+import { translateNow } from "@/shared/i18n/active-translator";
 import type { EventRecord } from "@stella/contracts/local-chat";
 import { localCacheRetryDelayMs } from "./local-cache-retry";
 
@@ -57,7 +58,6 @@ export const useConversationFiles = (
     visitToken,
     snapshot: EMPTY_SNAPSHOT,
   });
-  const lastLocalLoadToastAtRef = useRef(0);
   const [localRetryTick, setLocalRetryTick] = useState(0);
   const localRetryAttemptRef = useRef(0);
 
@@ -103,22 +103,25 @@ export const useConversationFiles = (
           retryTimer = null;
         }
         setSnapshotState({ visitToken, snapshot });
+        const noticeId = `load-failed:files:${conversationId}`;
         if (!snapshot.error) {
-          if (snapshot.hasLoaded) localRetryAttemptRef.current = 0;
+          if (snapshot.hasLoaded) {
+            localRetryAttemptRef.current = 0;
+            withdrawNotification(noticeId);
+          }
           return;
         }
         const willRetry = scheduleRetry();
-        const now = Date.now();
-        if (!willRetry || now - lastLocalLoadToastAtRef.current > 10_000) {
-          lastLocalLoadToastAtRef.current = now;
-          showToast({
-            title: "Couldn’t load file history",
-            description: willRetry
-              ? snapshot.error.message || "Stella will retry in a moment."
-              : "Automatic retries stopped. Reopen this conversation to try again.",
-            variant: "error",
-          });
-        }
+        notify({
+          id: noticeId,
+          kind: "problem",
+          title: translateNow("shell.notifications.loadFailed.files"),
+          detail: translateNow(
+            willRetry
+              ? "shell.notifications.loadFailed.retrying"
+              : "shell.notifications.loadFailed.stopped",
+          ),
+        });
       },
     );
     return () => {

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getRetainedThreadActivitySnapshot,
   subscribeToThreadActivity,
   type ThreadActivitySnapshot,
 } from "@/features/chat/services/thread-activity-store";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
-import { showToast } from "@/ui/toast";
+import { notify, withdrawNotification } from "@/features/notifications/notification-store";
+import { translateNow } from "@/shared/i18n/active-translator";
 
 const EMPTY_RECORDS: DesktopThreadActivityRecord[] = [];
 const EMPTY_SNAPSHOT: ThreadActivitySnapshot = {
@@ -34,7 +35,6 @@ export const useThreadActivity = (
     visitToken: symbol;
     snapshot: ThreadActivitySnapshot;
   }>({ visitToken, snapshot: EMPTY_SNAPSHOT });
-  const lastErrorToastAtRef = useRef(0);
   useEffect(() => {
     if (!conversationId) {
       setSnapshotState({
@@ -49,17 +49,17 @@ export const useThreadActivity = (
       (snapshot) => {
         if (cancelled) return;
         setSnapshotState({ visitToken, snapshot });
-        if (!snapshot.error) return;
-        const now = Date.now();
-        if (now - lastErrorToastAtRef.current > 10_000) {
-          lastErrorToastAtRef.current = now;
-          showToast({
-            title: "Couldn’t load activity",
-            description:
-              snapshot.error.message || "Stella will retry in a moment.",
-            variant: "error",
-          });
+        const noticeId = `load-failed:activity:${conversationId}`;
+        if (!snapshot.error) {
+          withdrawNotification(noticeId);
+          return;
         }
+        notify({
+          id: noticeId,
+          kind: "problem",
+          title: translateNow("shell.notifications.loadFailed.activity"),
+          detail: translateNow("shell.notifications.loadFailed.retrying"),
+        });
       },
     );
     return () => {

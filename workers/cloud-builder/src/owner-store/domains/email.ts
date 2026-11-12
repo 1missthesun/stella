@@ -56,6 +56,8 @@ import { ownerZone } from "./schedules.js";
 const SYNC_JOB = "email.sync";
 const TICK_JOB = "email.tick";
 const SUMMARY_JOB = "email.summary";
+/** A summary the user asked for (Check now, turning on), kept apart so a routine check can't replace it. */
+const SUMMARY_NOW_ID = "email.summary:now";
 const NOTE_JOB = "email.note";
 
 const MIN = 60_000;
@@ -765,7 +767,9 @@ const syncAccount = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
     log("history_reset", { owner: ctx.ownerId.slice(0, 12) });
     return false;
   }
-  const pending = history.added.filter((entry) => isIncoming(entry.labelIds) || entry.labelIds.includes("SENT"));
+  // Labels in the history can be mid-change ("Not spam" adds INBOX before it removes SPAM), so anything that
+  // reached the inbox is read again and its labels now decide.
+  const pending = history.added.filter((entry) => entry.labelIds.includes("INBOX") || entry.labelIds.includes("SENT"));
   const batch = pending.slice(0, MAX_PER_SYNC);
   for (const entry of batch) {
     await processMessage(ctx, snapshot, zone, account.email, get, entry.id, { backfill: false });
@@ -1228,7 +1232,7 @@ const setEnabled = async (ctx: OwnerContext, args: { enabled: boolean }): Promis
       await indexWatch(ctx, account.email, false).catch(() => undefined);
       if (!(await watchedElsewhere(ctx, account.email))) await gmailStopWatch(await account.get()).catch(() => undefined);
     }
-    for (const job of [TICK_JOB, SUMMARY_JOB, NOTE_JOB]) ctx.jobs.cancel(job);
+    for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB]) ctx.jobs.cancel(job);
     ctx.db.run("UPDATE email_state SET enabled = 0, updated_at = ? WHERE id = 1", ctx.now);
     ctx.db.run("DELETE FROM email_items");
     ctx.db.run("DELETE FROM email_accounts");
@@ -1243,8 +1247,8 @@ const setEnabled = async (ctx: OwnerContext, args: { enabled: boolean }): Promis
   ctx.db.run("UPDATE email_state SET enabled = 1, updated_at = ? WHERE id = 1", ctx.now);
   await reconcileAccounts(ctx, { backfill: !wasOn });
   scheduleTick(ctx);
-  if (!wasOn) scheduleSummaryCheck(ctx, ctx.now + 1_000);
-  ctx.jobs.schedule(SUMMARY_JOB, ctx.now + 1_000, { force: !wasOn }, { id: SUMMARY_JOB });
+  if (wasOn) scheduleSummaryCheck(ctx, ctx.now + 1_000);
+  else ctx.jobs.schedule(SUMMARY_JOB, ctx.now + 1_000, { force: true }, { id: SUMMARY_NOW_ID });
   return statusOf(ctx, snapshot.plan, zone);
 };
 
@@ -1392,7 +1396,7 @@ export const emailDomain = {
         const snapshot = await ctx.host.snapshot();
         if (enabled(ctx.db)) {
           ctx.jobs.schedule(TICK_JOB, ctx.now, {}, { id: TICK_JOB });
-          ctx.jobs.schedule(SUMMARY_JOB, ctx.now + 20_000, { force: true }, { id: SUMMARY_JOB });
+          ctx.jobs.schedule(SUMMARY_JOB, ctx.now + 20_000, { force: true }, { id: SUMMARY_NOW_ID });
         }
         return statusOf(ctx, snapshot.plan, zoneOf(ctx, snapshot));
       },
@@ -1457,7 +1461,7 @@ export const emailDomain = {
     [NOTE_JOB]: { run: (ctx) => runNote(ctx), maxAttempts: 2 },
   },
   purge: async (ctx) => {
-    for (const job of [TICK_JOB, SUMMARY_JOB, NOTE_JOB]) ctx.jobs.cancel(job);
+    for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB]) ctx.jobs.cancel(job);
     const addresses = ctx.db.all<{ email: string }>("SELECT email FROM email_accounts");
     for (const { email } of addresses) await indexWatch(ctx, email, false).catch(() => undefined);
     for (const table of ["email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {

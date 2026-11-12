@@ -345,9 +345,7 @@ function Footer({ feed, styles }: { feed: EmailFeed; styles: Styles }) {
   const { status } = feed;
   const usage = t("email.section.usage", {
     sorted: new Intl.NumberFormat(locale).format(status.usage.sorted),
-    cost: new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
-      status.usage.costUsd,
-    ),
+    cost: usageCost(locale, status.usage.costUsd),
   });
 
   const checkNow = async () => {
@@ -727,3 +725,9 @@ const makeStyles = (colors: Colors) =>
     pillLabel: { color: colors.text, fontFamily: fonts.sans.medium, fontSize: 13.5 },
     pillPrimaryLabel: { color: colors.accentForeground },
   });
+
+/** A month's sorting usually costs a fraction of a cent; show that as "<$0.01", not "$0.00". */
+function usageCost(locale: string, usd: number): string {
+  const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+  return usd > 0 && usd < 0.01 ? `<${money.format(0.01)}` : money.format(usd);
+}

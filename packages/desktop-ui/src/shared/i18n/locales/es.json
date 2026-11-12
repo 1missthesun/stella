@@ -3794,10 +3794,13 @@
       "unsubscribed": "Baja hecha",
       "clearAll": "Limpiar todo",
       "cleared": "Limpio",
-      "openedPage": "Termina en la página del remitente que se acaba de abrir."
+      "openedPage": "Termina en la página del remitente que se acaba de abrir.",
+      "peopleTitle": "Personas",
+      "peopleHint": "Personas que marcaste como no importantes. «Limpiar todo» archiva su correo en Gmail."
     },
     "log": {
       "title": "Lo que hizo Stella",
+      "yours": "Lo que hiciste",
       "hint": "Stella lee el correo nuevo para ordenarlo. Nunca envía ni archiva por su cuenta, salvo que una instrucción fija lo diga.",
       "read": {
         "many": "{count} correos leídos · descartados: {leftOut}",

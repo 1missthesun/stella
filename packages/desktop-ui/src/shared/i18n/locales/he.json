@@ -3794,10 +3794,13 @@
       "unsubscribed": "המינוי בוטל",
       "clearAll": "ניקוי הכול",
       "cleared": "נוקה",
-      "openedPage": "סיימו בדף של השולח שנפתח עכשיו."
+      "openedPage": "סיימו בדף של השולח שנפתח עכשיו.",
+      "peopleTitle": "אנשים",
+      "peopleHint": "אנשים שסימנתם כלא חשובים. \"ניקוי הכול\" מעביר את הדואר שלהם לארכיון ב-Gmail."
     },
     "log": {
       "title": "מה Stella עשתה",
+      "yours": "מה עשיתם",
       "hint": "Stella קוראת דואר חדש כדי למיין אותו. היא אף פעם לא שולחת או מעבירה לארכיון בעצמה, אלא אם הנחיה קבועה אומרת זאת.",
       "read": {
         "one": "נקראו: {count} · הושארו בחוץ: {leftOut}",
@@ -3819,7 +3822,7 @@
       "reopened": "נפתח מחדש: {subject}",
       "handled": "הועבר ל-Stella בצ'אט: {subject}",
       "archived": "הועבר לארכיון ב-Gmail: {subject}",
-      "unsubscribed": "ביטלה את המינוי שלכם אצל {who}",
+      "unsubscribed": "בוטל המינוי אצל {who}",
       "cleared": {
         "one": "הועברו לארכיון מ-{who}: {count}",
         "other": "הועברו לארכיון מ-{who}: {count}",

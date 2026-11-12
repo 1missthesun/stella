@@ -7,7 +7,7 @@ import type {
   EmailToday,
   EmailAccess,
 } from "@stella/contracts/backend/email";
-import { laterChoices, plainText, TODAY_TONES, whenLabel, type LaterChoiceId } from "@stella/contracts/email-brief";
+import { laterChoices, plainText, splitEmailLog, TODAY_TONES, whenLabel, type LaterChoiceId } from "@stella/contracts/email-brief";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { backendClient } from "@/platform/backend/backend-client";
 import { openExternalUrl } from "@/platform/electron/open-external";
@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { showToast } from "@/ui/toast";
-import { BYOK_TOAST_ACTION } from "@/global/billing/byok-action";
+import { openModelPickerAt } from "@/global/billing/byok-action";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { correctEmail, dismissEmail, emailTime, openGmailThread } from "./email-items";
 
@@ -232,6 +232,12 @@ function LaterMenu({ matter, now, onLater }: { matter: EmailMatter; now: number;
     return (
       <form
         className="email-today__pick"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setPicking(false);
+          }
+        }}
         onSubmit={(event) => {
           event.preventDefault();
           const value = new FormData(event.currentTarget).get("at");
@@ -243,6 +249,9 @@ function LaterMenu({ matter, now, onLater }: { matter: EmailMatter; now: number;
         <input name="at" type="datetime-local" defaultValue={local} className="email-today__pick-input" aria-label={t("email.today.laterSet")} />
         <button type="submit" className="email-today__quiet">
           {t("email.today.laterSet")}
+        </button>
+        <button type="button" className="email-today__quiet" onClick={() => setPicking(false)}>
+          {t("email.reply.cancel")}
         </button>
       </form>
     );
@@ -312,11 +321,17 @@ function Item({
       .finally(() => setBusy(false));
   };
 
+  // The item can leave the list once Stella takes it, so the confirmation is a toast that outlives it.
+  const ask = (action: "handle" | "suggest", text: string) =>
+    run(async () => {
+      await actions.ask(matter, action, text);
+      showToast({ description: t("email.digest.sent"), duration: 4000 });
+    });
   const openReply = () => voice.edit(matter, prepared?.kind === "reply" ? prepared.body : "");
   const primary = () => {
     if (!prepared) return;
     if (prepared.kind === "reply") openReply();
-    else run(() => actions.ask(matter, "suggest", prepared.ask), t("email.digest.sent"));
+    else ask("suggest", prepared.ask);
   };
   const hold = useHold(primary, () => voice.startHold(matter), voice.releaseHold);
   const micHold = useHold(openReply, () => voice.startHold(matter), voice.releaseHold);
@@ -345,6 +360,7 @@ function Item({
       <p className="email-today__headline">{matter.headline}</p>
       <p className="email-today__meta">
         {matter.returnedAt ? <span className="email-today__back">{t("email.today.back")} · </span> : null}
+        {matter.draftedAt ? <span className="email-today__back">{t("email.status.drafted")} · </span> : null}
         {meta}
       </p>
       {matter.points.length > 0 ? (
@@ -415,7 +431,7 @@ function Item({
             <DropdownMenuContent align="end" className="email-brief__menu">
               <DropdownMenuItem onSelect={openReply}>{t("email.digest.reply")}</DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => run(() => actions.ask(matter, "handle", t("email.digest.askHandle", { from: matter.from, subject: matter.subject })), t("email.digest.sent"))}
+                onSelect={() => ask("handle", t("email.digest.askHandle", { from: matter.from, subject: matter.subject }))}
               >
                 {t("email.digest.handle")}
               </DropdownMenuItem>
@@ -518,69 +534,83 @@ function LeftOut({ senders, now }: { senders: EmailNoiseSender[]; now: number })
       .catch((error: unknown) => setState((current) => ({ ...current, [address]: errorText(error, t("email.failed")) })));
   };
   const shown = senders.filter((sender) => state[sender.address] !== "cleared");
+  // People marked not important stay apart from newsletters and notifications.
+  const groups = [
+    { key: "lists", title: t("email.cleanup.title"), hint: t("email.cleanup.hint"), senders: shown.filter((sender) => !sender.person) },
+    { key: "people", title: t("email.cleanup.peopleTitle"), hint: t("email.cleanup.peopleHint"), senders: shown.filter((sender) => sender.person) },
+  ];
+  const row = (sender: EmailNoiseSender) => {
+    const status = state[sender.address];
+    const unsubscribed = sender.unsubscribed || status === "unsubscribed";
+    return (
+      <li key={sender.address} className="email-today__sender" data-testid="email-left-out-sender">
+        <span className="email-today__sender-main">
+          <span className="email-today__sender-name" title={sender.address}>
+            {sender.name}
+          </span>
+          <span className="email-today__sender-sub">
+            {tPlural("email.brief.emails", sender.count)} · {sender.latestSubject} · {emailTime(locale, sender.latestAt, now)}
+          </span>
+          {status && !["busy", "unsubscribed", "cleared", "page"].includes(status) ? (
+            <span className="email-today__sender-sub">{status}</span>
+          ) : status === "page" ? (
+            <span className="email-today__sender-sub">{t("email.cleanup.openedPage")}</span>
+          ) : null}
+        </span>
+        {sender.unsubscribe ? (
+          unsubscribed ? (
+            <span className="email-today__sender-done">{t("email.cleanup.unsubscribed")}</span>
+          ) : (
+            <button
+              type="button"
+              className="email-today__quiet"
+              disabled={status === "busy"}
+              onClick={() =>
+                run(sender.address, async () => {
+                  const result = await backendClient.call("email.unsubscribe", { address: sender.address });
+                  if (result.done) return "unsubscribed";
+                  if (result.url) openExternalUrl(result.url);
+                  return "page";
+                })
+              }
+            >
+              {t("email.cleanup.unsubscribe")}
+            </button>
+          )
+        ) : null}
+        <button
+          type="button"
+          className="email-today__quiet"
+          disabled={status === "busy"}
+          onClick={() =>
+            run(sender.address, async () => {
+              await backendClient.call("email.clearSender", { address: sender.address });
+              return "cleared";
+            })
+          }
+          data-testid="email-clear-sender"
+        >
+          {t("email.cleanup.clearAll")}
+        </button>
+      </li>
+    );
+  };
   return (
-    <section className="email-today__leftout" data-testid="email-left-out">
-      <h2 className="email-brief__heading">{t("email.cleanup.title")}</h2>
-      <p className="email-brief__hint">{t("email.cleanup.hint")}</p>
-      <ul className="email-today__senders">
-        {shown.map((sender) => {
-          const status = state[sender.address];
-          const unsubscribed = sender.unsubscribed || status === "unsubscribed";
-          return (
-            <li key={sender.address} className="email-today__sender" data-testid="email-left-out-sender">
-              <span className="email-today__sender-main">
-                <span className="email-today__sender-name" title={sender.address}>
-                  {sender.name}
-                </span>
-                <span className="email-today__sender-sub">
-                  {tPlural("email.brief.emails", sender.count)} · {sender.latestSubject} · {emailTime(locale, sender.latestAt, now)}
-                </span>
-                {status && !["busy", "unsubscribed", "cleared", "page"].includes(status) ? (
-                  <span className="email-today__sender-sub">{status}</span>
-                ) : status === "page" ? (
-                  <span className="email-today__sender-sub">{t("email.cleanup.openedPage")}</span>
-                ) : null}
-              </span>
-              {sender.unsubscribe ? (
-                unsubscribed ? (
-                  <span className="email-today__sender-done">{t("email.cleanup.unsubscribed")}</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="email-today__quiet"
-                    disabled={status === "busy"}
-                    onClick={() =>
-                      run(sender.address, async () => {
-                        const result = await backendClient.call("email.unsubscribe", { address: sender.address });
-                        if (result.done) return "unsubscribed";
-                        if (result.url) openExternalUrl(result.url);
-                        return "page";
-                      })
-                    }
-                  >
-                    {t("email.cleanup.unsubscribe")}
-                  </button>
-                )
-              ) : null}
-              <button
-                type="button"
-                className="email-today__quiet"
-                disabled={status === "busy"}
-                onClick={() =>
-                  run(sender.address, async () => {
-                    await backendClient.call("email.clearSender", { address: sender.address });
-                    return "cleared";
-                  })
-                }
-                data-testid="email-clear-sender"
-              >
-                {t("email.cleanup.clearAll")}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <>
+      {groups.map((group) =>
+        group.senders.length > 0 ? (
+          <section
+            key={group.key}
+            className="email-today__leftout"
+            data-testid={group.key === "people" ? "email-left-out-people" : "email-left-out"}
+          >
+            <h2 className="email-brief__heading">{group.title}</h2>
+            <p className="email-brief__hint">{group.hint}</p>
+            <ul className="email-today__senders">{group.senders.map(row)}</ul>
+          </section>
+        ) : null,
+      )}
+    </>
   );
 }
 
@@ -665,8 +695,9 @@ export function AccessNotice({ access }: { access: EmailAccess | undefined }) {
   const { t, locale } = useI18n();
   if (!access) return null;
   const onStella = access.payer === "stella";
+  const useOpenRouterKey = () => openModelPickerAt("openrouter");
   const addKey = (
-    <button type="button" className="email-brief__control email-brief__control--primary" onClick={BYOK_TOAST_ACTION.onClick}>
+    <button type="button" className="email-brief__control email-brief__control--primary" onClick={useOpenRouterKey}>
       {t("email.access.addKey")}
     </button>
   );
@@ -712,7 +743,7 @@ export function AccessNotice({ access }: { access: EmailAccess | undefined }) {
       <section className="email-today__notice email-today__notice--quiet">
         <p className="email-today__notice-body">{t("email.access.freeSortingOnly")}</p>
         <div className="email-today__notice-actions">
-          <button type="button" className="email-today__quiet" onClick={BYOK_TOAST_ACTION.onClick}>
+          <button type="button" className="email-today__quiet" onClick={useOpenRouterKey}>
             {t("email.access.addKey")}
           </button>
           {plans}
@@ -895,19 +926,29 @@ export function HistoryView({ history, now, onRead }: { history: EmailHistory | 
               </ul>
             </>
           ) : null}
-          {day.log.length > 0 ? (
-            <>
-              <h3 className="email-brief__heading email-history__sub">{t("email.log.title")}</h3>
-              <ul className="email-history__rows">
-                {day.log.map((entry, index) => (
-                  <li key={`${entry.at}-${index}`} className="email-history__row">
-                    <span className="email-brief__time">{time(entry.at)}</span>
-                    <span className="email-history__what email-history__what--plain">{logLine(t, tPlural, locale, entry, now)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
+          {(() => {
+            const { stella, user } = splitEmailLog(day.log);
+            return (
+              [
+                ["stella", "email.log.title", stella],
+                ["user", "email.log.yours", user],
+              ] as const
+            ).map(([who, title, entries]) =>
+              entries.length > 0 ? (
+                <Fragment key={who}>
+                  <h3 className="email-brief__heading email-history__sub">{t(title)}</h3>
+                  <ul className="email-history__rows" data-testid={`email-history-${who}`}>
+                    {entries.map((entry, index) => (
+                      <li key={`${entry.at}-${index}`} className="email-history__row">
+                        <span className="email-brief__time">{time(entry.at)}</span>
+                        <span className="email-history__what email-history__what--plain">{logLine(t, tPlural, locale, entry, now)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Fragment>
+              ) : null,
+            );
+          })()}
         </section>
       ))}
     </article>

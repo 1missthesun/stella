@@ -3755,10 +3755,13 @@
       "unsubscribed": "Unsubscribed",
       "clearAll": "Clear all",
       "cleared": "Cleared",
-      "openedPage": "Finish on the sender's page that just opened."
+      "openedPage": "Finish on the sender's page that just opened.",
+      "peopleTitle": "People",
+      "peopleHint": "People you marked not important. Clear all archives their mail in Gmail."
     },
     "log": {
       "title": "What Stella did",
+      "yours": "What you did",
       "hint": "Stella reads new mail to sort it. It never sends or archives on its own unless a standing instruction says so.",
       "read": {
         "one": "Read {count} email · {leftOut} left out",
@@ -3778,7 +3781,7 @@
       "reopened": "Reopened: {subject}",
       "handled": "Handed to Stella in the chat: {subject}",
       "archived": "Archived in Gmail: {subject}",
-      "unsubscribed": "Unsubscribed you from {who}",
+      "unsubscribed": "Unsubscribed from {who}",
       "cleared": {
         "one": "Archived {count} email from {who}",
         "other": "Archived {count} emails from {who}"

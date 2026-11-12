@@ -3794,10 +3794,13 @@
       "unsubscribed": "Désabonné",
       "clearAll": "Tout ranger",
       "cleared": "Rangé",
-      "openedPage": "Terminez sur la page de l’expéditeur qui vient de s’ouvrir."
+      "openedPage": "Terminez sur la page de l’expéditeur qui vient de s’ouvrir.",
+      "peopleTitle": "Personnes",
+      "peopleHint": "Personnes que vous avez marquées comme non importantes. « Tout ranger » archive leurs e-mails dans Gmail."
     },
     "log": {
       "title": "Ce que Stella a fait",
+      "yours": "Ce que vous avez fait",
       "hint": "Stella lit les nouveaux e-mails pour les trier. Elle n’envoie ni n’archive rien d’elle-même, sauf si une consigne permanente le prévoit.",
       "read": {
         "many": "{count} e-mails lus · écartés : {leftOut}",

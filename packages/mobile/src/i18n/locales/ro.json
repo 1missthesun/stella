@@ -3794,10 +3794,13 @@
       "unsubscribed": "Dezabonat",
       "clearAll": "Curăță tot",
       "cleared": "Curățat",
-      "openedPage": "Termină pe pagina expeditorului care tocmai s-a deschis."
+      "openedPage": "Termină pe pagina expeditorului care tocmai s-a deschis.",
+      "peopleTitle": "Persoane",
+      "peopleHint": "Persoane pe care le-ai marcat ca neimportante. „Curăță tot” le arhivează e-mailurile în Gmail."
     },
     "log": {
       "title": "Ce a făcut Stella",
+      "yours": "Ce ai făcut tu",
       "hint": "Stella citește e-mailurile noi ca să le sorteze. Nu trimite și nu arhivează nimic singură, decât dacă o instrucțiune permanentă spune asta.",
       "read": {
         "few": "E-mailuri citite: {count} · lăsate deoparte: {leftOut}",

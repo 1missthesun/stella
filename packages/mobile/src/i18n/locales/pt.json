@@ -3794,10 +3794,13 @@
       "unsubscribed": "Inscrição cancelada",
       "clearAll": "Limpar tudo",
       "cleared": "Limpo",
-      "openedPage": "Conclua na página do remetente que acabou de abrir."
+      "openedPage": "Conclua na página do remetente que acabou de abrir.",
+      "peopleTitle": "Pessoas",
+      "peopleHint": "Pessoas que você marcou como não importantes. \"Limpar tudo\" arquiva os e-mails delas no Gmail."
     },
     "log": {
       "title": "O que a Stella fez",
+      "yours": "O que você fez",
       "hint": "A Stella lê e-mails novos para organizá-los. Ela nunca envia nem arquiva sozinha, a menos que uma instrução permanente diga isso.",
       "read": {
         "many": "{count} e-mails lidos · deixados de fora: {leftOut}",

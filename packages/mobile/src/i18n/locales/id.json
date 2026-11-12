@@ -3714,10 +3714,13 @@
       "unsubscribed": "Langganan dihentikan",
       "clearAll": "Bersihkan semua",
       "cleared": "Dibersihkan",
-      "openedPage": "Selesaikan di halaman pengirim yang baru terbuka."
+      "openedPage": "Selesaikan di halaman pengirim yang baru terbuka.",
+      "peopleTitle": "Orang",
+      "peopleHint": "Orang yang Anda tandai tidak penting. \"Bersihkan semua\" mengarsipkan email mereka di Gmail."
     },
     "log": {
       "title": "Yang dilakukan Stella",
+      "yours": "Yang Anda lakukan",
       "hint": "Stella membaca email baru untuk memilahnya. Stella tidak pernah mengirim atau mengarsipkan sendiri, kecuali instruksi tetap memintanya.",
       "read": {
         "other": "Membaca {count} email · {leftOut} disisihkan"
@@ -3735,7 +3738,7 @@
       "reopened": "Dibuka lagi: {subject}",
       "handled": "Diserahkan ke Stella di chat: {subject}",
       "archived": "Diarsipkan di Gmail: {subject}",
-      "unsubscribed": "Menghentikan langganan Anda dari {who}",
+      "unsubscribed": "Berhenti berlangganan dari {who}",
       "cleared": {
         "other": "Mengarsipkan {count} email dari {who}"
       },

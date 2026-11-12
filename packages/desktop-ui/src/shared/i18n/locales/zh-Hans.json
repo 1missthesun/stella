@@ -3714,10 +3714,13 @@
       "unsubscribed": "已退订",
       "clearAll": "全部清理",
       "cleared": "已清理",
-      "openedPage": "请在刚打开的发件人页面上完成操作。"
+      "openedPage": "请在刚打开的发件人页面上完成操作。",
+      "peopleTitle": "联系人",
+      "peopleHint": "你标为不重要的联系人。“全部清理”会在 Gmail 中归档他们的邮件。"
     },
     "log": {
       "title": "Stella 做了什么",
+      "yours": "你做了什么",
       "hint": "Stella 会读取新邮件来分类。除非有长期指令，否则它不会自行发送或归档。",
       "read": {
         "other": "读了 {count} 封邮件 · 略过 {leftOut} 封"
@@ -3735,7 +3738,7 @@
       "reopened": "已重新打开：{subject}",
       "handled": "已在聊天中交给 Stella：{subject}",
       "archived": "已在 Gmail 中归档：{subject}",
-      "unsubscribed": "已为你退订 {who}",
+      "unsubscribed": "已退订 {who}",
       "cleared": {
         "other": "已归档来自 {who} 的 {count} 封邮件"
       },

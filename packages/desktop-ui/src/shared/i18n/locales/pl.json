@@ -3833,10 +3833,13 @@
       "unsubscribed": "Wypisano",
       "clearAll": "Wyczyść wszystko",
       "cleared": "Wyczyszczono",
-      "openedPage": "Dokończ na stronie nadawcy, która właśnie się otworzyła."
+      "openedPage": "Dokończ na stronie nadawcy, która właśnie się otworzyła.",
+      "peopleTitle": "Osoby",
+      "peopleHint": "Osoby oznaczone przez ciebie jako nieważne. „Wyczyść wszystko” archiwizuje ich wiadomości w Gmailu."
     },
     "log": {
       "title": "Co zrobiła Stella",
+      "yours": "Twoje działania",
       "hint": "Stella czyta nową pocztę, żeby ją posortować. Nigdy sama niczego nie wysyła ani nie archiwizuje, chyba że każe jej to stałe polecenie.",
       "read": {
         "few": "Przeczytane e-maile: {count} · pominięte: {leftOut}",
@@ -3860,7 +3863,7 @@
       "reopened": "Otwarte ponownie: {subject}",
       "handled": "Przekazane Stelli na czacie: {subject}",
       "archived": "Zarchiwizowane w Gmailu: {subject}",
-      "unsubscribed": "Wypisano cię z listy: {who}",
+      "unsubscribed": "Wypisano z listy: {who}",
       "cleared": {
         "few": "Zarchiwizowane e-maile od {who}: {count}",
         "many": "Zarchiwizowane e-maile od {who}: {count}",

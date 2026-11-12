@@ -10,9 +10,10 @@ import type {
   EmailAccess,
 } from "@stella/contracts/backend/email";
 import { useRouter } from "expo-router";
-import { openDrawer } from "../lib/drawer";
+import { openChatSettingsAt } from "../lib/connect-plan";
+import { providerBrainId } from "../lib/use-cloud-model-settings";
 import { useServerFeatures } from "../lib/server-features";
-import { laterChoices, TODAY_TONES, whenLabel, type LaterChoiceId } from "@stella/contracts/email-brief";
+import { laterChoices, splitEmailLog, TODAY_TONES, whenLabel, type LaterChoiceId } from "@stella/contracts/email-brief";
 import { Text } from "./Text";
 import { Icon } from "./Icon";
 import { useLocale, useT, useTPlural } from "../i18n";
@@ -419,6 +420,7 @@ function Item({
 
   const meta = [
     matter.returnedAt ? t("email.today.back") : null,
+    matter.draftedAt ? t("email.status.drafted") : null,
     matter.from,
     matter.itemIds.length > 1 ? tPlural("email.brief.emails", matter.itemIds.length) : matter.subject,
     emailTime(locale, matter.receivedAt, now),
@@ -551,73 +553,85 @@ function LeftOut({ senders, now, styles }: { senders: EmailNoiseSender[]; now: n
       .then((done) => setState((current) => ({ ...current, [address]: done })))
       .catch((error: unknown) => setState((current) => ({ ...current, [address]: errorText(error, t("email.failed")) })));
   };
-  return (
-    <View style={styles.after} testID="email-left-out">
-      <Text style={styles.heading} maxFontSizeMultiplier={SCALE}>
-        {t("email.cleanup.title")}
-      </Text>
-      <Text style={styles.hint} maxFontSizeMultiplier={SCALE}>
-        {t("email.cleanup.hint")}
-      </Text>
-      {shown.map((sender) => {
-        const status = state[sender.address];
-        const unsubscribed = sender.unsubscribed || status === "unsubscribed";
-        const note =
-          status === "page" ? t("email.cleanup.openedPage") : status && !["busy", "unsubscribed", "cleared"].includes(status) ? status : null;
-        return (
-          <View key={sender.address} style={styles.row} testID="email-left-out-sender">
-            <View style={styles.rowMain}>
-              <Text style={styles.rowTitle} numberOfLines={1} maxFontSizeMultiplier={SCALE}>
-                {sender.name}
+  // People marked not important stay apart from newsletters and notifications.
+  const groups = [
+    { key: "lists", title: t("email.cleanup.title"), hint: t("email.cleanup.hint"), senders: shown.filter((sender) => !sender.person) },
+    { key: "people", title: t("email.cleanup.peopleTitle"), hint: t("email.cleanup.peopleHint"), senders: shown.filter((sender) => sender.person) },
+  ];
+  const row = (sender: EmailNoiseSender) => {
+    const status = state[sender.address];
+    const unsubscribed = sender.unsubscribed || status === "unsubscribed";
+    const note =
+      status === "page" ? t("email.cleanup.openedPage") : status && !["busy", "unsubscribed", "cleared"].includes(status) ? status : null;
+    return (
+      <View key={sender.address} style={styles.row} testID="email-left-out-sender">
+        <View style={styles.rowMain}>
+          <Text style={styles.rowTitle} numberOfLines={1} maxFontSizeMultiplier={SCALE}>
+            {sender.name}
+          </Text>
+          <Text style={styles.rowSub} numberOfLines={1} maxFontSizeMultiplier={SCALE}>
+            {tPlural("email.brief.emails", sender.count)} · {sender.latestSubject} · {emailTime(locale, sender.latestAt, now)}
+          </Text>
+          {note ? (
+            <Text style={styles.rowSub} maxFontSizeMultiplier={SCALE}>
+              {note}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.rowActions}>
+          {sender.unsubscribe ? (
+            unsubscribed ? (
+              <Text style={styles.rowSub} maxFontSizeMultiplier={SCALE}>
+                {t("email.cleanup.unsubscribed")}
               </Text>
-              <Text style={styles.rowSub} numberOfLines={1} maxFontSizeMultiplier={SCALE}>
-                {tPlural("email.brief.emails", sender.count)} · {sender.latestSubject} · {emailTime(locale, sender.latestAt, now)}
-              </Text>
-              {note ? (
-                <Text style={styles.rowSub} maxFontSizeMultiplier={SCALE}>
-                  {note}
-                </Text>
-              ) : null}
-            </View>
-            <View style={styles.rowActions}>
-              {sender.unsubscribe ? (
-                unsubscribed ? (
-                  <Text style={styles.rowSub} maxFontSizeMultiplier={SCALE}>
-                    {t("email.cleanup.unsubscribed")}
-                  </Text>
-                ) : (
-                  <Quiet
-                    label={t("email.cleanup.unsubscribe")}
-                    disabled={status === "busy"}
-                    onPress={() =>
-                      run(sender.address, async () => {
-                        const result = await getBackendClient().call("email.unsubscribe", { address: sender.address });
-                        if (result.done) return "unsubscribed";
-                        if (result.url) void Linking.openURL(result.url).catch(() => undefined);
-                        return "page";
-                      })
-                    }
-                    styles={styles}
-                  />
-                )
-              ) : null}
+            ) : (
               <Quiet
-                label={t("email.cleanup.clearAll")}
+                label={t("email.cleanup.unsubscribe")}
                 disabled={status === "busy"}
                 onPress={() =>
                   run(sender.address, async () => {
-                    await getBackendClient().call("email.clearSender", { address: sender.address });
-                    return "cleared";
+                    const result = await getBackendClient().call("email.unsubscribe", { address: sender.address });
+                    if (result.done) return "unsubscribed";
+                    if (result.url) void Linking.openURL(result.url).catch(() => undefined);
+                    return "page";
                   })
                 }
                 styles={styles}
-                testID="email-clear-sender"
               />
-            </View>
+            )
+          ) : null}
+          <Quiet
+            label={t("email.cleanup.clearAll")}
+            disabled={status === "busy"}
+            onPress={() =>
+              run(sender.address, async () => {
+                await getBackendClient().call("email.clearSender", { address: sender.address });
+                return "cleared";
+              })
+            }
+            styles={styles}
+            testID="email-clear-sender"
+          />
+        </View>
+      </View>
+    );
+  };
+  return (
+    <>
+      {groups.map((group) =>
+        group.senders.length > 0 ? (
+          <View key={group.key} style={styles.after} testID={group.key === "people" ? "email-left-out-people" : "email-left-out"}>
+            <Text style={styles.heading} maxFontSizeMultiplier={SCALE}>
+              {group.title}
+            </Text>
+            <Text style={styles.hint} maxFontSizeMultiplier={SCALE}>
+              {group.hint}
+            </Text>
+            {group.senders.map(row)}
           </View>
-        );
-      })}
-    </View>
+        ) : null,
+      )}
+    </>
   );
 }
 
@@ -725,7 +739,7 @@ export function AccessNotice({ access }: { access: EmailAccess | undefined }) {
   const addKey = () => {
     tapLight();
     router.navigate("/chat");
-    setTimeout(() => openDrawer("end"), 350);
+    setTimeout(() => openChatSettingsAt(providerBrainId("openrouter")), 350);
   };
   const plans =
     onStella && access.plan === "free" && features.billing ? (
@@ -996,23 +1010,33 @@ export function HistoryView({ history, now, onRead }: { history: EmailHistory | 
               ))}
             </>
           ) : null}
-          {day.log.length > 0 ? (
-            <>
-              <Text style={[styles.heading, styles.subHeading]} maxFontSizeMultiplier={SCALE}>
-                {t("email.log.title")}
-              </Text>
-              {day.log.map((entry, index) => (
-                <View key={`${entry.at}-${index}`} style={styles.logRow}>
-                  <Text style={styles.logTime} maxFontSizeMultiplier={SCALE}>
-                    {time(entry.at)}
+          {(() => {
+            const { stella, user } = splitEmailLog(day.log);
+            return (
+              [
+                ["stella", "email.log.title", stella],
+                ["user", "email.log.yours", user],
+              ] as const
+            ).map(([who, title, entries]) =>
+              entries.length > 0 ? (
+                <View key={who} testID={`email-history-${who}`}>
+                  <Text style={[styles.heading, styles.subHeading]} maxFontSizeMultiplier={SCALE}>
+                    {t(title)}
                   </Text>
-                  <Text style={[styles.logWhat, styles.logPlain]} numberOfLines={2} maxFontSizeMultiplier={SCALE}>
-                    {logLine(t, tPlural, locale, entry, now)}
-                  </Text>
+                  {entries.map((entry, index) => (
+                    <View key={`${entry.at}-${index}`} style={styles.logRow}>
+                      <Text style={styles.logTime} maxFontSizeMultiplier={SCALE}>
+                        {time(entry.at)}
+                      </Text>
+                      <Text style={[styles.logWhat, styles.logPlain]} numberOfLines={2} maxFontSizeMultiplier={SCALE}>
+                        {logLine(t, tPlural, locale, entry, now)}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </>
-          ) : null}
+              ) : null,
+            );
+          })()}
         </View>
       ))}
     </View>

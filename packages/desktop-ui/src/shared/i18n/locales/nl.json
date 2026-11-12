@@ -3755,10 +3755,13 @@
       "unsubscribed": "Afgemeld",
       "clearAll": "Alles opruimen",
       "cleared": "Opgeruimd",
-      "openedPage": "Rond het af op de pagina van de afzender die net is geopend."
+      "openedPage": "Rond het af op de pagina van de afzender die net is geopend.",
+      "peopleTitle": "Personen",
+      "peopleHint": "Personen die je als niet belangrijk hebt gemarkeerd. Alles opruimen archiveert hun mail in Gmail."
     },
     "log": {
       "title": "Wat Stella deed",
+      "yours": "Wat jij deed",
       "hint": "Stella leest nieuwe mail om die te sorteren. Ze verstuurt of archiveert nooit zelf, tenzij een vaste instructie dat zegt.",
       "read": {
         "one": "{count} e-mail gelezen · {leftOut} weggelaten",
@@ -3778,7 +3781,7 @@
       "reopened": "Heropend: {subject}",
       "handled": "In de chat aan Stella gegeven: {subject}",
       "archived": "Gearchiveerd in Gmail: {subject}",
-      "unsubscribed": "Je afgemeld bij {who}",
+      "unsubscribed": "Afgemeld bij {who}",
       "cleared": {
         "one": "{count} e-mail van {who} gearchiveerd",
         "other": "{count} e-mails van {who} gearchiveerd"

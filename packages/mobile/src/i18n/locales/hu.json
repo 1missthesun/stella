@@ -3755,10 +3755,13 @@
       "unsubscribed": "Leiratkozva",
       "clearAll": "Mind eltüntetése",
       "cleared": "Eltüntetve",
-      "openedPage": "Fejezd be a feladó most megnyílt oldalán."
+      "openedPage": "Fejezd be a feladó most megnyílt oldalán.",
+      "peopleTitle": "Emberek",
+      "peopleHint": "Emberek, akiket nem fontosnak jelöltél. A „Mind eltüntetése” archiválja a leveleiket a Gmailben."
     },
     "log": {
       "title": "Mit csinált Stella",
+      "yours": "Mit csináltál",
       "hint": "Stella elolvassa az új leveleket, hogy rendezze őket. Magától soha nem küld és nem archivál, kivéve ha egy állandó utasítás így szól.",
       "read": {
         "one": "{count} e-mail elolvasva · {leftOut} kihagyva",

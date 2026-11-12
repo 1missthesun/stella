@@ -3911,10 +3911,13 @@
       "unsubscribed": "تم إلغاء الاشتراك",
       "clearAll": "مسح الكل",
       "cleared": "تم المسح",
-      "openedPage": "أكمل في صفحة المرسل التي فُتحت للتو."
+      "openedPage": "أكمل في صفحة المرسل التي فُتحت للتو.",
+      "peopleTitle": "أشخاص",
+      "peopleHint": "أشخاص وضعت على بريدهم «غير مهم». «مسح الكل» يؤرشف بريدهم في Gmail."
     },
     "log": {
       "title": "ما فعلته Stella",
+      "yours": "ما فعلته أنت",
       "hint": "تقرأ Stella البريد الجديد لتفرزه. لا ترسل ولا تؤرشف شيئًا من تلقاء نفسها إلا إذا نصّت تعليمات دائمة على ذلك.",
       "read": {
         "few": "رسائل مقروءة: {count} · مستبعدة: {leftOut}",
@@ -3942,7 +3945,7 @@
       "reopened": "أُعيد فتحه: {subject}",
       "handled": "سُلّم إلى Stella في المحادثة: {subject}",
       "archived": "أُرشف في Gmail: {subject}",
-      "unsubscribed": "أُلغي اشتراكك لدى {who}",
+      "unsubscribed": "أُلغي الاشتراك لدى {who}",
       "cleared": {
         "few": "رسائل مؤرشفة من {who}: {count}",
         "many": "رسائل مؤرشفة من {who}: {count}",

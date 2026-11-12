@@ -3714,10 +3714,13 @@
       "unsubscribed": "Đã hủy đăng ký",
       "clearAll": "Dọn hết",
       "cleared": "Đã dọn",
-      "openedPage": "Hoàn tất trên trang của người gửi vừa mở."
+      "openedPage": "Hoàn tất trên trang của người gửi vừa mở.",
+      "peopleTitle": "Cá nhân",
+      "peopleHint": "Những người bạn đã đánh dấu là không quan trọng. \"Dọn hết\" sẽ lưu trữ thư của họ trong Gmail."
     },
     "log": {
       "title": "Stella đã làm gì",
+      "yours": "Bạn đã làm gì",
       "hint": "Stella đọc thư mới để phân loại. Stella không bao giờ tự gửi hay lưu trữ, trừ khi có chỉ dẫn cố định yêu cầu.",
       "read": {
         "other": "Đã đọc {count} email · bỏ qua {leftOut}"
@@ -3735,7 +3738,7 @@
       "reopened": "Đã mở lại: {subject}",
       "handled": "Đã giao cho Stella trong cuộc trò chuyện: {subject}",
       "archived": "Đã lưu trữ trong Gmail: {subject}",
-      "unsubscribed": "Đã hủy đăng ký {who} cho bạn",
+      "unsubscribed": "Đã hủy đăng ký {who}",
       "cleared": {
         "other": "Đã lưu trữ {count} email từ {who}"
       },

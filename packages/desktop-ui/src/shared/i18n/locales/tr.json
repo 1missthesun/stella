@@ -3755,10 +3755,13 @@
       "unsubscribed": "Abonelikten çıkıldı",
       "clearAll": "Tümünü temizle",
       "cleared": "Temizlendi",
-      "openedPage": "Az önce açılan gönderen sayfasında işlemi tamamlayın."
+      "openedPage": "Az önce açılan gönderen sayfasında işlemi tamamlayın.",
+      "peopleTitle": "Kişiler",
+      "peopleHint": "Önemli değil olarak işaretlediğiniz kişiler. \"Tümünü temizle\" e-postalarını Gmail'de arşivler."
     },
     "log": {
       "title": "Stella ne yaptı",
+      "yours": "Sizin yaptıklarınız",
       "hint": "Stella yeni postaları ayırmak için okur. Kalıcı bir talimat söylemedikçe kendi başına asla göndermez veya arşivlemez.",
       "read": {
         "one": "{count} e-posta okundu · {leftOut} dışarıda kaldı",

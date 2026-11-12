@@ -1,4 +1,25 @@
-import type { EmailBrief, EmailBriefBlock, EmailDigest, EmailItem } from "./backend/email.js";
+import type { EmailBrief, EmailBriefBlock, EmailDigest, EmailItem, EmailLogEntry, EmailLogKind } from "./backend/email.js";
+
+/** Log lines that record the user's own choices (in Stella or in Gmail), as opposed to what Stella did on its own. */
+const BY_USER: ReadonlySet<EmailLogKind> = new Set<EmailLogKind>([
+  "sent",
+  "drafted",
+  "done",
+  "later",
+  "reopened",
+  "handled",
+  "archived",
+  "unsubscribed",
+  "cleared",
+  "replied_in_gmail",
+  "archived_in_gmail",
+]);
+
+/** A day's log split into what Stella did on its own and what the user did, each in the log's order. */
+export const splitEmailLog = (log: readonly EmailLogEntry[]): { stella: EmailLogEntry[]; user: EmailLogEntry[] } => ({
+  stella: log.filter((entry) => !BY_USER.has(entry.kind)),
+  user: log.filter((entry) => BY_USER.has(entry.kind)),
+});
 
 /** Plain text of the briefing's light markdown, for labels and Stella's context. */
 export const plainText = (markdown: string): string => markdown.replace(/\*\*|__/gu, "").replace(/(^|\s)\*(\S[^*]*)\*/gu, "$1$2");

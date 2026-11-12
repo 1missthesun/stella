@@ -3755,10 +3755,13 @@
       "unsubscribed": "Prenumeration avslutad",
       "clearAll": "Rensa alla",
       "cleared": "Rensat",
-      "openedPage": "Gör klart på avsändarens sida som just öppnades."
+      "openedPage": "Gör klart på avsändarens sida som just öppnades.",
+      "peopleTitle": "Personer",
+      "peopleHint": "Personer du har markerat som inte viktiga. Rensa alla arkiverar deras mejl i Gmail."
     },
     "log": {
       "title": "Vad Stella gjorde",
+      "yours": "Vad du gjorde",
       "hint": "Stella läser nya mejl för att sortera dem. Stella skickar eller arkiverar aldrig på egen hand, om inte en stående instruktion säger det.",
       "read": {
         "one": "Läste {count} mejl · {leftOut} sorterades bort",
@@ -3778,7 +3781,7 @@
       "reopened": "Öppnades igen: {subject}",
       "handled": "Lämnat till Stella i chatten: {subject}",
       "archived": "Arkiverat i Gmail: {subject}",
-      "unsubscribed": "Avslutade din prenumeration från {who}",
+      "unsubscribed": "Avslutade prenumerationen från {who}",
       "cleared": {
         "one": "Arkiverade {count} mejl från {who}",
         "other": "Arkiverade {count} mejl från {who}"

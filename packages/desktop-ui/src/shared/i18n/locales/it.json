@@ -3794,10 +3794,13 @@
       "unsubscribed": "Iscrizione annullata",
       "clearAll": "Rimuovi tutte",
       "cleared": "Rimosse",
-      "openedPage": "Completa sulla pagina del mittente che si è appena aperta."
+      "openedPage": "Completa sulla pagina del mittente che si è appena aperta.",
+      "peopleTitle": "Persone",
+      "peopleHint": "Persone che hai segnato come non importanti. \"Rimuovi tutte\" archivia le loro email in Gmail."
     },
     "log": {
       "title": "Cosa ha fatto Stella",
+      "yours": "Cosa hai fatto",
       "hint": "Stella legge le nuove email per smistarle. Non invia né archivia mai da sola, a meno che un'istruzione permanente non lo preveda.",
       "read": {
         "many": "{count} email lette · scartate: {leftOut}",

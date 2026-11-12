@@ -3755,10 +3755,13 @@
       "unsubscribed": "Afmeldt",
       "clearAll": "Ryd alle",
       "cleared": "Ryddet",
-      "openedPage": "Gør det færdigt på afsenderens side, der lige åbnede."
+      "openedPage": "Gør det færdigt på afsenderens side, der lige åbnede.",
+      "peopleTitle": "Personer",
+      "peopleHint": "Personer, du har markeret som ikke vigtige. Ryd alle arkiverer deres mails i Gmail."
     },
     "log": {
       "title": "Hvad Stella gjorde",
+      "yours": "Hvad du gjorde",
       "hint": "Stella læser nye mails for at sortere dem. Stella sender eller arkiverer aldrig selv, medmindre en fast instruks siger det.",
       "read": {
         "one": "Læste {count} e-mail · {leftOut} sorteret fra",
@@ -3778,7 +3781,7 @@
       "reopened": "Genåbnet: {subject}",
       "handled": "Givet til Stella i chatten: {subject}",
       "archived": "Arkiveret i Gmail: {subject}",
-      "unsubscribed": "Afmeldte dig fra {who}",
+      "unsubscribed": "Afmeldt fra {who}",
       "cleared": {
         "one": "Arkiverede {count} e-mail fra {who}",
         "other": "Arkiverede {count} e-mails fra {who}"

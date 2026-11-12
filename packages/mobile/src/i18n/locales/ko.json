@@ -3714,10 +3714,13 @@
       "unsubscribed": "수신 거부됨",
       "clearAll": "모두 정리",
       "cleared": "정리됨",
-      "openedPage": "방금 열린 보낸 사람 페이지에서 마무리해 주세요."
+      "openedPage": "방금 열린 보낸 사람 페이지에서 마무리해 주세요.",
+      "peopleTitle": "사람",
+      "peopleHint": "중요하지 않다고 표시한 사람들이에요. 모두 정리를 누르면 이들의 메일이 Gmail에 보관돼요."
     },
     "log": {
       "title": "Stella가 한 일",
+      "yours": "내가 한 일",
       "hint": "Stella는 새 메일을 분류하려고 읽어요. 상시 지시가 없으면 스스로 보내거나 보관하지 않아요.",
       "read": {
         "other": "이메일 {count}개 읽음 · {leftOut}개 제외"

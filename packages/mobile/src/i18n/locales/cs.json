@@ -3833,10 +3833,13 @@
       "unsubscribed": "Odběr odhlášen",
       "clearAll": "Vyčistit vše",
       "cleared": "Vyčištěno",
-      "openedPage": "Dokončete to na stránce odesílatele, která se právě otevřela."
+      "openedPage": "Dokončete to na stránce odesílatele, která se právě otevřela.",
+      "peopleTitle": "Lidé",
+      "peopleHint": "Lidé, které jste označili jako nedůležité. „Vyčistit vše“ archivuje jejich poštu v Gmailu."
     },
     "log": {
       "title": "Co Stella udělala",
+      "yours": "Co jste udělali",
       "hint": "Stella čte novou poštu, aby ji roztřídila. Sama nikdy nic neodešle ani nearchivuje, pokud jí to neříká trvalý pokyn.",
       "read": {
         "few": "Přečteno e-mailů: {count} · vynecháno: {leftOut}",

@@ -3755,10 +3755,13 @@
       "unsubscribed": "Tilaus peruttu",
       "clearAll": "Tyhjennä kaikki",
       "cleared": "Tyhjennetty",
-      "openedPage": "Viimeistele juuri avautuneella lähettäjän sivulla."
+      "openedPage": "Viimeistele juuri avautuneella lähettäjän sivulla.",
+      "peopleTitle": "Ihmiset",
+      "peopleHint": "Ihmiset, jotka merkitsit ei-tärkeiksi. Tyhjennä kaikki arkistoi heidän viestinsä Gmailissa."
     },
     "log": {
       "title": "Mitä Stella teki",
+      "yours": "Mitä sinä teit",
       "hint": "Stella lukee uudet viestit lajitellakseen ne. Se ei koskaan lähetä tai arkistoi mitään itse, ellei pysyvä ohje niin sano.",
       "read": {
         "one": "Luettu {count} sähköposti · {leftOut} jätetty pois",

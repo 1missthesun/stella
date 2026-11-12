@@ -3714,10 +3714,13 @@
       "unsubscribed": "已取消訂閱",
       "clearAll": "全部清理",
       "cleared": "已清理",
-      "openedPage": "請在剛開啟的寄件者頁面上完成操作。"
+      "openedPage": "請在剛開啟的寄件者頁面上完成操作。",
+      "peopleTitle": "聯絡人",
+      "peopleHint": "你標為不重要的聯絡人。「全部清理」會在 Gmail 中封存他們的郵件。"
     },
     "log": {
       "title": "Stella 做了什麼",
+      "yours": "你做了什麼",
       "hint": "Stella 會讀取新郵件來分類。除非有長期指示，否則它不會自行傳送或封存。",
       "read": {
         "other": "讀了 {count} 封郵件 · 略過 {leftOut} 封"
@@ -3735,7 +3738,7 @@
       "reopened": "已重新開啟：{subject}",
       "handled": "已在聊天中交給 Stella：{subject}",
       "archived": "已在 Gmail 中封存：{subject}",
-      "unsubscribed": "已為你取消訂閱 {who}",
+      "unsubscribed": "已取消訂閱 {who}",
       "cleared": {
         "other": "已封存來自 {who} 的 {count} 封郵件"
       },

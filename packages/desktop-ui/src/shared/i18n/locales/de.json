@@ -3755,10 +3755,13 @@
       "unsubscribed": "Abgemeldet",
       "clearAll": "Alle wegräumen",
       "cleared": "Weggeräumt",
-      "openedPage": "Schließ es auf der gerade geöffneten Seite des Absenders ab."
+      "openedPage": "Schließ es auf der gerade geöffneten Seite des Absenders ab.",
+      "peopleTitle": "Personen",
+      "peopleHint": "Personen, die du als unwichtig markiert hast. „Alle wegräumen“ archiviert ihre Mails in Gmail."
     },
     "log": {
       "title": "Was Stella getan hat",
+      "yours": "Was du getan hast",
       "hint": "Stella liest neue E-Mails, um sie zu sortieren. Sie sendet oder archiviert nie von selbst, außer eine feste Anweisung sagt es.",
       "read": {
         "one": "{count} E-Mail gelesen · {leftOut} aussortiert",

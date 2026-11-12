@@ -1518,6 +1518,7 @@
           }
         },
         "placeholder": "Zapytaj Stellę",
+        "play": "Odtwórz tę prezentację",
         "replay": "Odtwórz demo jeszcze raz",
         "settledTitle": "Szybka wycieczka",
         "tablist": "Co potrafi Stella"
@@ -1747,6 +1748,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Odtwórz tę prezentację",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Zaplanuj cokolwiek, a zrobię to na czas, nawet gdy śpisz.",

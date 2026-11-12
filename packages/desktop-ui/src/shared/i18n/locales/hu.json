@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Kérdezd Stellát",
+        "play": "A bemutató lejátszása",
         "replay": "Demó újralejátszása",
         "settledTitle": "Gyors körséta",
         "tablist": "Mit tud Stella"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "A bemutató lejátszása",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Ütemezz bármit, és időben elvégzem, még akkor is, amikor alszol.",

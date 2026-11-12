@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Vraag het Stella",
+        "play": "Deze demo afspelen",
         "replay": "Demo opnieuw afspelen",
         "settledTitle": "De snelle rondleiding",
         "tablist": "Wat Stella kan doen"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Deze demo afspelen",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Plan wat je wilt, dan doe ik het op tijd, ook terwijl je slaapt.",

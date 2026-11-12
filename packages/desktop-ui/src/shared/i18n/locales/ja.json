@@ -1491,6 +1491,7 @@
           }
         },
         "placeholder": "Stellaに聞く",
+        "play": "このデモを再生",
         "replay": "デモをもう一度見る",
         "settledTitle": "かんたんツアー",
         "tablist": "Stellaにできること"
@@ -1720,6 +1721,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "このデモを再生",
         "replay": "Replay this demo",
         "routines": {
           "caption": "何でもスケジュールしてください。眠っている間も、時間どおりにこなします。",

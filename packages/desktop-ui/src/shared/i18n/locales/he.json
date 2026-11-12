@@ -1509,6 +1509,7 @@
           }
         },
         "placeholder": "שאלו את Stella",
+        "play": "הפעלת ההדגמה",
         "replay": "להפעיל שוב את ההדגמה",
         "settledTitle": "הסיור המהיר",
         "tablist": "מה Stella יודעת לעשות"
@@ -1738,6 +1739,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "הפעלת ההדגמה",
         "replay": "Replay this demo",
         "routines": {
           "caption": "תזמן כל דבר ואני אבצע אותו בזמן, גם כשאתה ישן.",

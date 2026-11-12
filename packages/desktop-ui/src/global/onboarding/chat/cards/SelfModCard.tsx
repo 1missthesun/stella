@@ -1,8 +1,11 @@
-import { useCallback, useState } from "react";
 import { Button } from "@/ui/button";
-import { RotateCcw, Wand2 } from "@/ui/icons";
+import { Wand2 } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
-import { useChoreography, useTypedText } from "@/global/onboarding/demo/use-choreography";
+import {
+  DemoPlayerControls,
+  filmStartAt,
+  useDemoPlayer,
+} from "@/global/onboarding/demo/DemoPlayer";
 import {
   SELFMOD_CUES,
   SELFMOD_PROMPT,
@@ -18,21 +21,11 @@ type SelfModCardProps = {
 
 export function SelfModCard({ active, answered, onAnswer }: SelfModCardProps) {
   const t = useT();
-  const [done, setDone] = useState(false);
-  const film = useChoreography({
+  const film = useDemoPlayer({
     cues: SELFMOD_CUES,
     active: active && answered === undefined,
-    onDone: () => setDone(true),
+    startAt: filmStartAt(SELFMOD_CUES),
   });
-  const typed = useTypedText(SELFMOD_PROMPT, active && !film.has("send"), {
-    startDelay: 400,
-    charMs: 28,
-  });
-
-  const replay = useCallback(() => {
-    setDone(false);
-    film.restart();
-  }, [film]);
 
   if (answered !== undefined) {
     return (
@@ -62,19 +55,10 @@ export function SelfModCard({ active, answered, onAnswer }: SelfModCardProps) {
       <div className="obc-cap-frame">
         <div className="obc-cap-stage obc-cap-stage--film" aria-hidden="true">
           <div className="obc-cap-chapter" data-active>
-            <SelfModFilm has={film.has} typed={typed.value} typing={typed.typing} />
+            <SelfModFilm has={film.has} typed={SELFMOD_PROMPT} typing={false} />
           </div>
         </div>
-        <button
-          type="button"
-          className="obc-cap-replay"
-          data-visible={done || undefined}
-          disabled={!done}
-          aria-label={t("onboarding.chat.capabilities.replay")}
-          onClick={replay}
-        >
-          <RotateCcw size={12} />
-        </button>
+        <DemoPlayerControls phase={film.phase} disabled={!active} onPlay={film.play} />
       </div>
 
       <ol className="obc-steps">

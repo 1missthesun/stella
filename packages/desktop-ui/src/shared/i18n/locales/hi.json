@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Stella से पूछें",
+        "play": "यह डेमो चलाएं",
         "replay": "यह डेमो फिर चलाएँ",
         "settledTitle": "एक झलक",
         "tablist": "Stella क्या-क्या कर सकती है"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "यह डेमो चलाएं",
         "replay": "Replay this demo",
         "routines": {
           "caption": "कुछ भी शेड्यूल कीजिए और मैं उसे समय पर कर दूँगी, आपके सोते समय भी।",

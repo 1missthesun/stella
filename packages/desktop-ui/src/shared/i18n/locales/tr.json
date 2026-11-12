@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Stella'ya sor",
+        "play": "Bu demoyu oynat",
         "replay": "Demoyu yeniden oynat",
         "settledTitle": "Hızlı tur",
         "tablist": "Stella neler yapabilir"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Bu demoyu oynat",
         "replay": "Replay this demo",
         "routines": {
           "caption": "İstediğini zamanla, ben tam vaktinde yapayım, sen uyurken bile.",

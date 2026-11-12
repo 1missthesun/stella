@@ -3,10 +3,11 @@ import { Button } from "@/ui/button";
 import { ArrowRight, MessageSquare } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 import { ChatbotMock, StellaMemoryMock } from "@/global/onboarding/demo/DemoScenes";
+import type { ChoreographyCue } from "@/global/onboarding/demo/use-choreography";
 import {
-  useChoreography,
-  type ChoreographyCue,
-} from "@/global/onboarding/demo/use-choreography";
+  DemoPlayerControls,
+  useDemoPlayer,
+} from "@/global/onboarding/demo/DemoPlayer";
 import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
 
 type MemoryCardProps = {
@@ -34,16 +35,17 @@ type Mode = "chatbot" | "stella";
 export function MemoryCard({ active, answered, onAnswer }: MemoryCardProps) {
   const t = useT();
   const [mode, setMode] = useState<Mode>("chatbot");
-  const [chatbotDone, setChatbotDone] = useState(false);
-  const chatbot = useChoreography({
+  const chatbot = useDemoPlayer({
     cues: CHATBOT_CUES,
     active: active && mode === "chatbot",
-    onDone: () => setChatbotDone(true),
+    startAt: CHATBOT_CUES[0]!.at,
   });
-  const stella = useChoreography({
+  const stella = useDemoPlayer({
     cues: STELLA_CUES,
     active: active && mode === "stella",
+    startAt: STELLA_CUES[0]!.at,
   });
+  const shown = mode === "stella" ? stella : chatbot;
 
   const showStella = useCallback(() => setMode("stella"), []);
 
@@ -91,6 +93,12 @@ export function MemoryCard({ active, answered, onAnswer }: MemoryCardProps) {
             </div>
           </div>
         </div>
+        <DemoPlayerControls
+          key={mode}
+          phase={shown.phase}
+          disabled={!active}
+          onPlay={shown.play}
+        />
       </div>
 
       <div className="obc-actions">
@@ -98,7 +106,7 @@ export function MemoryCard({ active, answered, onAnswer }: MemoryCardProps) {
           <Button
             type="button"
             variant="primary"
-            disabled={!active || !chatbotDone}
+            disabled={!active}
             onClick={showStella}
           >
             {t("onboarding.chat.memory.showStella")}

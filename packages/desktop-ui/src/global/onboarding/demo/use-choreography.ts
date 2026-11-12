@@ -9,6 +9,7 @@ type UseChoreographyArgs = {
   cues: readonly ChoreographyCue[];
   active: boolean;
   onDone?: () => void;
+  startAt?: number;
 };
 
 const prefersReducedMotion = () =>
@@ -18,7 +19,12 @@ const prefersReducedMotion = () =>
 
 const TYPED_TEXT_CHARACTERS_PER_TICK = 3;
 
-export function useChoreography({ cues, active, onDone }: UseChoreographyArgs) {
+export function useChoreography({
+  cues,
+  active,
+  onDone,
+  startAt = 0,
+}: UseChoreographyArgs) {
   const [passed, setPassed] = useState<ReadonlySet<string>>(() => new Set());
   const [done, setDone] = useState(false);
   const [runKey, setRunKey] = useState(0);
@@ -44,13 +50,16 @@ export function useChoreography({ cues, active, onDone }: UseChoreographyArgs) {
       return;
     }
 
-    setPassed(new Set());
+    let cursor = 0;
+    while (cursor < sortedCues.length - 1 && sortedCues[cursor].at <= startAt) {
+      cursor += 1;
+    }
+    setPassed(new Set(sortedCues.slice(0, cursor).map((cue) => cue.id)));
     setDone(false);
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let cursor = 0;
-    let elapsed = 0;
+    let elapsed = startAt;
     let segmentStartedAt = Date.now();
     let paused = false;
 
@@ -116,7 +125,7 @@ export function useChoreography({ cues, active, onDone }: UseChoreographyArgs) {
       clearTimer();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [active, runKey, sortedCues]);
+  }, [active, runKey, sortedCues, startAt]);
 
   const restart = useCallback(() => {
     setRunKey((key) => key + 1);

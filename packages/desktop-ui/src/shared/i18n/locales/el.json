@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Ρωτήστε τη Stella",
+        "play": "Αναπαραγωγή αυτής της επίδειξης",
         "replay": "Επανάληψη της επίδειξης",
         "settledTitle": "Η γρήγορη ξενάγηση",
         "tablist": "Τι μπορεί να κάνει η Stella"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Αναπαραγωγή αυτής της επίδειξης",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Προγραμμάτισε οτιδήποτε και θα το κάνω στην ώρα του, ακόμη κι όταν κοιμάσαι.",

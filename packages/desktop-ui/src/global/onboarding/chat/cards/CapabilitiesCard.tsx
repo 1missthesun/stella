@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, RotateCcw } from "@/ui/icons";
+import { Play } from "@/ui/icons";
 import { Button } from "@/ui/button";
 import { useT } from "@/shared/i18n";
+import type { ChoreographyCue } from "@/global/onboarding/demo/use-choreography";
 import {
-  useChoreography,
-  useTypedText,
-  type ChoreographyCue,
-} from "@/global/onboarding/demo/use-choreography";
+  DemoPlayerControls,
+  filmStartAt,
+  useDemoPlayer,
+} from "@/global/onboarding/demo/DemoPlayer";
 import {
   CAPABILITY_FILMS,
-  type CapabilityFilm,
   type CapabilityId,
 } from "@/global/onboarding/film/capability-films";
 import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
@@ -20,49 +20,12 @@ type CapabilitiesCardProps = {
   onAnswer: (answer: OnboardingChatAnswer) => void;
 };
 
-const TYPE_CHAR_MS = 26;
-const TYPE_START_DELAY_MS = 350;
 const AUTO_ADVANCE_HOLD_MS = 1400;
 
 const CHAPTERS = CAPABILITY_FILMS;
 type ChapterId = CapabilityId;
 
 const scriptEnd = (cues: ChoreographyCue[]) => cues[cues.length - 1]!.at;
-
-function useChapterScript(
-  cues: ChoreographyCue[],
-  active: boolean,
-  playNonce: number,
-  onDone: () => void,
-) {
-  const { has, restart } = useChoreography({ cues, active, onDone });
-  const nonceRef = useRef(playNonce);
-  useEffect(() => {
-    if (nonceRef.current === playNonce) return;
-    nonceRef.current = playNonce;
-    if (active) restart();
-  }, [active, playNonce, restart]);
-  return has;
-}
-
-function Chapter({
-  spec,
-  active,
-  playNonce,
-  onDone,
-}: {
-  spec: CapabilityFilm;
-  active: boolean;
-  playNonce: number;
-  onDone: () => void;
-}) {
-  const has = useChapterScript(spec.cues, active, playNonce, onDone);
-  const typed = useTypedText(spec.prompt, active && !has("send"), {
-    startDelay: TYPE_START_DELAY_MS,
-    charMs: TYPE_CHAR_MS,
-  });
-  return <>{spec.render({ has, typed: typed.value, typing: typed.typing })}</>;
-}
 
 export function CapabilitiesCard({
   active,
@@ -72,11 +35,11 @@ export function CapabilitiesCard({
   const t = useT();
   const [chapterIndex, setChapterIndex] = useState(0);
   const [playNonce, setPlayNonce] = useState(0);
-  const [chapterDone, setChapterDone] = useState(false);
   const [playedChapters, setPlayedChapters] = useState<ReadonlySet<ChapterId>>(
     () => new Set(),
   );
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stillRef = useRef(false);
 
   const clearAdvanceTimer = useCallback(() => {
     if (advanceTimerRef.current) {
@@ -87,8 +50,13 @@ export function CapabilitiesCard({
 
   useEffect(() => clearAdvanceTimer, [clearAdvanceTimer]);
 
-  const handleChapterDone = useCallback(
-    (index: number) => {
+  const activeChapter = CHAPTERS[chapterIndex]!;
+  const player = useDemoPlayer({
+    cues: activeChapter.cues,
+    active: active && answered === undefined,
+    startAt: filmStartAt(activeChapter.cues),
+    onDone: () => {
+      const index = chapterIndex;
       const chapter = CHAPTERS[index]!;
       setPlayedChapters((prev) => {
         if (prev.has(chapter.id)) return prev;
@@ -96,26 +64,32 @@ export function CapabilitiesCard({
         next.add(chapter.id);
         return next;
       });
-      setChapterDone(true);
-      if (index >= CHAPTERS.length - 1) return;
+      if (stillRef.current || index >= CHAPTERS.length - 1) return;
       clearAdvanceTimer();
       advanceTimerRef.current = setTimeout(() => {
         advanceTimerRef.current = null;
-        setChapterDone(false);
         setChapterIndex(index + 1);
+        resetPlayer();
       }, AUTO_ADVANCE_HOLD_MS);
     },
-    [clearAdvanceTimer],
-  );
+  });
+  const { phase, reset: resetPlayer } = player;
+  const still = phase === "still";
+  stillRef.current = still;
 
-  const playChapter = useCallback(
+  const play = useCallback(() => {
+    clearAdvanceTimer();
+    setPlayNonce((nonce) => nonce + 1);
+    player.play();
+  }, [clearAdvanceTimer, player]);
+
+  const showChapter = useCallback(
     (index: number) => {
       clearAdvanceTimer();
-      setChapterDone(false);
       setChapterIndex(index);
-      setPlayNonce((nonce) => nonce + 1);
+      resetPlayer();
     },
-    [clearAdvanceTimer],
+    [clearAdvanceTimer, resetPlayer],
   );
 
   if (answered !== undefined) {
@@ -138,8 +112,6 @@ export function CapabilitiesCard({
     );
   }
 
-  const activeChapter = CHAPTERS[chapterIndex]!;
-
   return (
     <div className="obc-card">
       <h3 className="obc-card__title" key={activeChapter.id}>
@@ -150,24 +122,14 @@ export function CapabilitiesCard({
         <div className="obc-cap-stage obc-cap-stage--film" aria-hidden="true">
           {/* Only the active chapter mounts so inactive demos never burn frames. */}
           <div key={activeChapter.id} className="obc-cap-chapter" data-active>
-            <Chapter
-              spec={activeChapter}
-              active={active}
-              playNonce={playNonce}
-              onDone={() => handleChapterDone(chapterIndex)}
-            />
+            {activeChapter.render({
+              has: player.has,
+              typed: activeChapter.prompt,
+              typing: false,
+            })}
           </div>
         </div>
-        <button
-          type="button"
-          className="obc-cap-replay"
-          data-visible={chapterDone || undefined}
-          disabled={!chapterDone}
-          aria-label={t("onboarding.chat.capabilities.replay")}
-          onClick={() => playChapter(chapterIndex)}
-        >
-          <RotateCcw size={12} />
-        </button>
+        <DemoPlayerControls phase={phase} disabled={!active} onPlay={play} />
       </div>
 
       <div
@@ -186,18 +148,22 @@ export function CapabilitiesCard({
               className="obc-cap-words__word"
               data-active={isActive || undefined}
               data-completed={playedChapters.has(chapter.id) || undefined}
-              onClick={() => playChapter(index)}
+              onClick={() => showChapter(index)}
             >
               <span className="obc-cap-words__label">
                 {t(`onboarding.chat.capabilities.${chapter.id}.word`)}
               </span>
               <span className="obc-cap-words__track" aria-hidden="true">
-                {isActive ? (
+                {isActive && (phase === "playing" || phase === "ended") ? (
                   <span
                     key={playNonce}
                     className="obc-cap-words__fill"
-                    style={{ animationDuration: `${scriptEnd(chapter.cues)}ms` }}
+                    style={{
+                      animationDuration: `${scriptEnd(chapter.cues) - filmStartAt(chapter.cues)}ms`,
+                    }}
                   />
+                ) : isActive && still ? (
+                  <span className="obc-cap-words__fill" data-still />
                 ) : null}
               </span>
             </button>

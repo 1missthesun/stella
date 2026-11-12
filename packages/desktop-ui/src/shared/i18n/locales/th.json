@@ -1491,6 +1491,7 @@
           }
         },
         "placeholder": "ถาม Stella",
+        "play": "เล่นเดโมนี้",
         "replay": "เล่นเดโมนี้อีกครั้ง",
         "settledTitle": "ทัวร์สั้น ๆ",
         "tablist": "สิ่งที่ Stella ทำได้"
@@ -1720,6 +1721,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "เล่นเดโมนี้",
         "replay": "Replay this demo",
         "routines": {
           "caption": "ตั้งเวลาอะไรก็ได้ แล้วฉันจะทำให้ตรงเวลา แม้ตอนคุณหลับ",

@@ -1518,6 +1518,7 @@
           }
         },
         "placeholder": "Спросите Stella",
+        "play": "Воспроизвести демонстрацию",
         "replay": "Показать демо ещё раз",
         "settledTitle": "Быстрый тур",
         "tablist": "Что умеет Stella"
@@ -1747,6 +1748,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Воспроизвести демонстрацию",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Запланируйте что угодно, и я сделаю это вовремя, даже пока вы спите.",

@@ -50,6 +50,7 @@ type LegalDocument = "terms" | "privacy";
 const MARK_SIZE_PX = 40;
 const MARK_OFFSET_PX = MARK_SIZE_PX + 6;
 const SPEAKING_MS = 1600;
+const MIN_DEMO_HEIGHT_PX = 200;
 
 const STEP_MOODS: Record<OnboardingChatStep, StellaCharacterState> = {
   capabilities: "idle",
@@ -164,6 +165,10 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
         `[data-obc-entry="${CSS.escape(lastEntryId)}"]`,
       );
       if (lastEntryKind === "assistant" && target) {
+        if (target === contentRef.current?.querySelector("[data-obc-entry]")) {
+          scroller.scrollTo({ top: 0, behavior });
+          return;
+        }
         target.scrollIntoView({ behavior, block: "start" });
         return;
       }
@@ -204,6 +209,41 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
   }, [indicator.active]);
 
   const contentRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const content = contentRef.current;
+    if (!scroller || !content || typeof ResizeObserver === "undefined") return;
+    let frameRequest = 0;
+    const fit = () => {
+      frameRequest = 0;
+      const rows = content.querySelectorAll<HTMLElement>(".obc-row--assistant");
+      const entry = rows[rows.length - 1];
+      const demo = entry?.querySelector<HTMLElement>(".obc-cap-frame");
+      if (!entry || !demo || !demo.offsetHeight) {
+        content.style.removeProperty("--obc-demo-max-width");
+        return;
+      }
+      const ratio = demo.offsetWidth / demo.offsetHeight;
+      const topSpace = parseFloat(getComputedStyle(entry).scrollMarginTop) || 0;
+      const below = content.offsetHeight - (entry.offsetTop + entry.offsetHeight);
+      const spare = scroller.clientHeight - topSpace - entry.offsetHeight - below;
+      const height = Math.max(MIN_DEMO_HEIGHT_PX, demo.offsetHeight + spare);
+      content.style.setProperty("--obc-demo-max-width", `${Math.floor(height * ratio)}px`);
+    };
+    const schedule = () => {
+      if (!frameRequest) frameRequest = window.requestAnimationFrame(fit);
+    };
+    fit();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(scroller);
+    observer.observe(content);
+    return () => {
+      observer.disconnect();
+      if (frameRequest) window.cancelAnimationFrame(frameRequest);
+    };
+  }, [entries.length]);
+
   const [markTop, setMarkTop] = useState<number | null>(null);
   const lastAssistantId =
     [...entries].reverse().find((entry) => entry.kind === "assistant")?.id ?? null;
@@ -491,7 +531,10 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
                 />
               </div>
               {entries.map(renderEntry)}
-              <div className="obc-indicator">
+              <div
+                className="obc-indicator"
+                data-idle={(!indicator.active && !indicator.handoff) || undefined}
+              >
                 <InlineWorkingIndicator
                   active={indicator.active}
                   handoff={indicator.handoff}

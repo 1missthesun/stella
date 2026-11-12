@@ -58,7 +58,12 @@
 }
 
 .session-content.obc-scroll {
-  mask-image: linear-gradient(180deg, transparent 0, black 72px);
+  --obc-top-space: clamp(88px, 11.5vh, 108px);
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0,
+    black calc(var(--obc-top-space) - 40px)
+  );
 }
 
 .obc-scroll::-webkit-scrollbar {
@@ -69,7 +74,7 @@
   position: relative;
   max-width: min(50rem, 100%);
   margin: 0 auto;
-  padding: 108px 24px 32px;
+  padding: var(--obc-top-space, 108px) 24px 24px;
   display: flex;
   flex-direction: column;
 }
@@ -101,6 +106,10 @@
   height: 40px;
 }
 
+.obc-row--assistant {
+  scroll-margin-top: var(--obc-top-space, 108px);
+}
+
 .obc-row + .obc-row {
   margin-top: 30px;
 }
@@ -117,8 +126,14 @@
   margin-top: 30px;
 }
 
+.obc-indicator[data-idle] {
+  height: 0;
+  margin-top: 0;
+  overflow: hidden;
+}
+
 .obc-tail {
-  min-height: 48px;
+  min-height: 32px;
 }
 
 .obc-legal {
@@ -446,6 +461,9 @@
 .obc-cap-frame {
   position: relative;
   width: 100%;
+  max-width: var(--obc-demo-max-width, none);
+  margin-inline: auto;
+  container-type: inline-size;
   border-radius: 16px;
   border: 1px solid color-mix(in oklch, var(--foreground) 10%, transparent);
   background:
@@ -487,6 +505,83 @@
 
 .obc-cap-replay[data-visible] {
   opacity: 1;
+}
+
+.obc-cap-replay:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.obc-demo-play {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: end center;
+  margin: 0;
+  padding: 0 0 var(--obc-demo-play-bottom, 11%);
+  border: none;
+  background: color-mix(in oklch, var(--background) 18%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+  transition: opacity 240ms ease;
+}
+
+.obc-demo-play[data-visible] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.obc-demo-play:focus-visible {
+  outline: none;
+}
+
+.obc-demo-play__disc {
+  display: grid;
+  place-items: center;
+  width: clamp(40px, 9cqi, 56px);
+  height: clamp(40px, 9cqi, 56px);
+  border-radius: 999px;
+  border: none;
+  background: color-mix(in oklch, var(--foreground) 90%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.5);
+  color: var(--background);
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 220ms ease;
+}
+
+.obc-demo-play__disc svg {
+  width: 36%;
+  height: 36%;
+  margin-left: 8%;
+  fill: currentColor;
+}
+
+@media (max-height: 820px) {
+  .obc-card:not([data-settled]) {
+    gap: 10px;
+    padding-block: 14px;
+  }
+}
+
+.obc-demo-play:hover:not(:disabled) .obc-demo-play__disc {
+  transform: scale(1.06);
+  background: var(--foreground);
+}
+
+.obc-demo-play:active:not(:disabled) .obc-demo-play__disc {
+  transform: scale(0.96);
+}
+
+.obc-demo-play:focus-visible .obc-demo-play__disc {
+  box-shadow:
+    var(--focus-ring),
+    0 10px 30px -10px rgb(0 0 0 / 0.5);
 }
 
 .obc-cap-chapter {
@@ -580,6 +675,10 @@
   );
   transform-origin: left center;
   animation: obcCapWordFill linear forwards;
+}
+
+.obc-cap-words__fill[data-still] {
+  animation: none;
 }
 
 @keyframes obcCapWordFill {

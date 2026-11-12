@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Spør Stella",
+        "play": "Spill av denne demoen",
         "replay": "Spill av demoen på nytt",
         "settledTitle": "Rask omvisning",
         "tablist": "Dette kan Stella gjøre"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Spill av denne demoen",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Planlegg hva som helst, så gjør jeg det i tide, selv mens du sover.",

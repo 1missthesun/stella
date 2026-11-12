@@ -1500,6 +1500,7 @@
           }
         },
         "placeholder": "Stella fragen",
+        "play": "Diese Demo abspielen",
         "replay": "Demo erneut abspielen",
         "settledTitle": "Die Kurztour",
         "tablist": "Was Stella kann"
@@ -1729,6 +1730,7 @@
           "title": "Ask once. Consider it handled.",
           "word": "Errands"
         },
+        "play": "Diese Demo abspielen",
         "replay": "Replay this demo",
         "routines": {
           "caption": "Plane irgendetwas, und ich erledige es pünktlich, auch während du schläfst.",

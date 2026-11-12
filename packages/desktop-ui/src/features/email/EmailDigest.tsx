@@ -696,9 +696,6 @@ const dayLabel = (
   return new Intl.DateTimeFormat(locale, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(at);
 };
 
-const asksForYou = (digest: EmailDigest) =>
-  digest.items.some((item) => item.bucket === "urgent" || item.bucket === "needs_you") ||
-  Boolean(digest.brief?.sections.some((section) => section.tone !== "fyi"));
 
 /**
  * The Email tab: one briefing at a time, written like a good answer (a lead,
@@ -968,7 +965,6 @@ export function EmailDigestPanel({
                   selectEmailDigest(digest.digestId);
                 }}
               >
-                {asksForYou(digest) ? <span className="email-brief__dot" aria-hidden="true" /> : null}
                 <span>{emailTime(locale, digest.createdAt, now)}</span>
                 <span className="email-brief__stop-count">{digest.items.length}</span>
               </button>

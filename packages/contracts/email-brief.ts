@@ -34,10 +34,12 @@ const foldHeadings = (brief: EmailBrief): EmailBrief => {
 /** Same on desktop and phone. */
 export const briefOf = (digest: EmailDigest, words: { needsYou: string; worthKnowing: string; urgent: string; lead: string }): EmailBrief => {
   if (digest.brief) return foldHeadings(digest.brief);
+  // An urgent or asked-about email leads with its line, so its point doesn't repeat it.
+  const single = digest.kind !== "summary" && digest.items.length === 1;
   const block = (item: EmailItem): EmailBriefBlock => ({
     itemIds: [item.itemId],
     title: `**${senderOf(item.from)}** · ${item.subject}`,
-    points: item.line ? [item.line] : [],
+    points: item.line && !single ? [item.line] : [],
   });
   const urgent = digest.items.filter((item) => item.bucket === "urgent");
   const needs = digest.items.filter((item) => item.bucket === "needs_you");

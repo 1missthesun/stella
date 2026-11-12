@@ -315,9 +315,6 @@ const dayLabel = (t: ReturnType<typeof useT>, locale: string, at: number, now: n
   return new Date(at).toLocaleString(locale, { weekday: "long", hour: "numeric", minute: "2-digit" });
 };
 
-const asksForYou = (digest: EmailDigest) =>
-  digest.items.some((item) => item.bucket === "urgent" || item.bucket === "needs_you") ||
-  Boolean(digest.brief?.sections.some((section) => section.tone !== "fyi"));
 
 type SearchState = { query: string; state: { status: "loading" } | { status: "error"; message: string } | { status: "done"; result: EmailSearchResult } };
 
@@ -689,7 +686,6 @@ export function EmailDigestView({
                   stops.current.set(digest.digestId, { x, width });
                 }}
               >
-                {asksForYou(digest) ? <View style={styles.dot} /> : null}
                 <Text style={[styles.stopLabel, on && styles.stopOn]} maxFontSizeMultiplier={SCALE}>
                   {emailTime(locale, digest.createdAt, now)}
                 </Text>

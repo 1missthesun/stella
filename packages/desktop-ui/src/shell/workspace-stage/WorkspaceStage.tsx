@@ -127,29 +127,44 @@ const readTopbarHeight = (): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 38;
 };
 
-const findComposerRect = (): DOMRect | null => {
+const findComposerShell = (): HTMLElement | null => {
   const surface = document.querySelector(".persistent-chat-surface--active");
   if (!surface) return null;
-  let best: DOMRect | null = null;
+  let best: { el: HTMLElement; bottom: number } | null = null;
   for (const el of surface.querySelectorAll<HTMLElement>(".composer-shell")) {
     if (el.closest("[inert]")) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) continue;
-    if (!best || rect.bottom > best.bottom) best = rect;
+    if (!best || rect.bottom > best.bottom) best = { el, bottom: rect.bottom };
   }
-  return best;
+  return best?.el ?? null;
+};
+
+/** Cards pinned above the composer (a connect offer or question the agent's
+ *  turn is waiting on, a plan notice) sit between the conversation and the
+ *  composer; the stage ends above them too, or they wait unseen behind it. */
+const topOfComposerArea = (shell: HTMLElement, top: number): number => {
+  let el = shell.closest(".composer-wrap")?.previousElementSibling ?? null;
+  while (el && !el.classList.contains("chat-viewport-region")) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) top = Math.min(top, rect.top);
+    el = el.previousElementSibling;
+  }
+  return top;
 };
 
 const measureGeometry = (): Geometry => {
-  const composer = findComposerRect();
+  const shell = findComposerShell();
+  const composer = shell?.getBoundingClientRect() ?? null;
   const viewportHeight = window.innerHeight;
   return {
     topbar: readTopbarHeight(),
     viewportWidth: window.innerWidth,
     viewportHeight,
-    floor: composer
-      ? composer.top - STAGE_GAP_ABOVE_COMPOSER
-      : viewportHeight - STAGE_BOTTOM_WITHOUT_COMPOSER,
+    floor:
+      shell && composer
+        ? topOfComposerArea(shell, composer.top) - STAGE_GAP_ABOVE_COMPOSER
+        : viewportHeight - STAGE_BOTTOM_WITHOUT_COMPOSER,
     composer: composer ? { left: composer.left, width: composer.width } : null,
   };
 };

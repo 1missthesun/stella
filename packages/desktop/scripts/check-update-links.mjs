@@ -14,6 +14,9 @@
 //                     Stella itself uses <userData>/update-merge*
 //   --draft           also make a draft worktree, prepare its packages as a
 //                     task would (draft-deps.ts), and remove it
+//   --change <ref>    take this commit (e.g. refs/remotes/stella-fork/main, a
+//                     change from another computer) instead of a made-up one,
+//                     planned and merged the way Get does
 //   --apply           finally fast-forward the checkout to the merged change
 //                     (throwaway installs only: it moves the checkout's HEAD)
 //
@@ -38,6 +41,7 @@ const app = path.resolve(arg("--app") ?? path.join(here, "..", "..", ".."));
 const scratchBase = path.resolve(arg("--scratch") ?? path.join(os.tmpdir(), "stella-update-links-check"));
 const withDraft = process.argv.includes("--draft");
 const withApply = process.argv.includes("--apply");
+const changeRef = arg("--change");
 
 const results = [];
 const report = (step, ok, data = {}) => {
@@ -66,7 +70,7 @@ fs.mkdirSync(scratchBase, { recursive: true });
 const bundle = path.join(scratchBase, "app-source-check.mjs");
 await build({
   stdin: {
-    contents: ["dir-links", "update-gate", "update-merge", "draft-deps", "git"]
+    contents: ["dir-links", "update-gate", "update-merge", "update-plan", "draft-deps", "git"]
       .map((name) => `export * from ${JSON.stringify(path.join(source, `${name}.ts`).replaceAll("\\", "/"))};`)
       .join("\n"),
     resolveDir: source,
@@ -138,25 +142,44 @@ if (!intact().intact) {
   process.exit(1);
 }
 
-// A change the way another computer's arrives: a commit on top of HEAD.
-const index = path.join(scratchBase, "change.index");
-const env = { ...process.env, GIT_INDEX_FILE: index };
-const gitEnv = (args) => {
-  const result = spawnSync(process.env.STELLA_GIT_BIN?.trim() || "git", args, { cwd: app, env, encoding: "utf8" });
-  if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
-  return result.stdout.trim();
-};
-gitEnv(["read-tree", head]);
-const blob = spawnSync(process.env.STELLA_GIT_BIN?.trim() || "git", ["hash-object", "-w", "--stdin"], {
-  cwd: app,
-  input: `Taken on ${process.platform} by check-update-links.\n`,
-  encoding: "utf8",
-}).stdout.trim();
-gitEnv(["update-index", "--add", "--cacheinfo", `100644,${blob},stella-update-links-check.txt`]);
-const tree = gitEnv(["write-tree"]);
+// A change the way another computer's arrives: a commit on top of HEAD
+// (or the one --change names).
 const identity = ["-c", "user.name=Stella", "-c", "user.email=contact@fromyou.ai"];
-const change = gitEnv([...identity, "commit-tree", tree, "-p", head, "-m", "Update links check: a change from another computer"]);
-fs.rmSync(index, { force: true });
+const makeChange = () => {
+  const index = path.join(scratchBase, "change.index");
+  const env = { ...process.env, GIT_INDEX_FILE: index };
+  const gitEnv = (args) => {
+    const result = spawnSync(process.env.STELLA_GIT_BIN?.trim() || "git", args, { cwd: app, env, encoding: "utf8" });
+    if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
+    return result.stdout.trim();
+  };
+  gitEnv(["read-tree", head]);
+  const blob = spawnSync(process.env.STELLA_GIT_BIN?.trim() || "git", ["hash-object", "-w", "--stdin"], {
+    cwd: app,
+    input: `Taken on ${process.platform} by check-update-links.\n`,
+    encoding: "utf8",
+  }).stdout.trim();
+  gitEnv(["update-index", "--add", "--cacheinfo", `100644,${blob},stella-update-links-check.txt`]);
+  const tree = gitEnv(["write-tree"]);
+  const change = gitEnv([...identity, "commit-tree", tree, "-p", head, "-m", "Update links check: a change from another computer"]);
+  fs.rmSync(index, { force: true });
+  return change;
+};
+const change = changeRef ? await git(["rev-parse", "--verify", `${changeRef}^{commit}`]) : makeChange();
+
+// What Get does first: plan it, and for a clean merge make the merge commit
+// the check then builds.
+const plan = await m.classifyUpdate(app, head, change);
+let target = plan.kind === "fast-forward" ? plan.tip : null;
+if (plan.kind === "clean") {
+  target = await git([...identity, "commit-tree", plan.tree, "-p", head, "-p", plan.tip, "-m", "Merge the changes from another computer (links check)"]);
+}
+report("change planned", plan.kind !== "none", {
+  change: change.slice(0, 12),
+  ...(changeRef ? { ref: changeRef, subject: plan.subject } : {}),
+  kind: plan.kind,
+  ...(plan.kind === "conflict" ? { conflicts: plan.conflicts } : {}),
+});
 
 // 1. The update check: build main and preload on a scratch copy with the
 //    packages linked in, then remove it.
@@ -167,7 +190,7 @@ fs.rmSync(index, { force: true });
   const watch = setInterval(() => {
     sawLink ||= m.isDirectoryLink(path.join(scratch, "node_modules"));
   }, 100);
-  const result = await m.buildOnScratch({ cwd: app, commit: change, scratch });
+  const result = await m.buildOnScratch({ cwd: app, commit: target ?? change, scratch });
   clearInterval(watch);
   const state = intact();
   report("update check builds on a linked scratch copy", result.ok && !fs.existsSync(scratch) && state.intact, {
@@ -182,7 +205,7 @@ fs.rmSync(index, { force: true });
 
 // 2. The merge prepared before a change is offered: a scratch git worktree,
 //    packages linked, typechecked, then removed links first.
-let merged = null;
+let merged = target;
 {
   const dir = path.join(scratchBase, "update-merge-prepare-merge");
   const startedAt = Date.now();
@@ -203,7 +226,7 @@ let merged = null;
   clearInterval(watch);
   const listed = (await git(["worktree", "list", "--porcelain"])).replaceAll("\\", "/").includes(dir.replaceAll("\\", "/"));
   const state = intact();
-  if (result.ok) merged = result.to;
+  if (result.ok && !merged) merged = result.to;
   report("background merge on a linked scratch worktree", result.ok && !fs.existsSync(dir) && !listed && state.intact, {
     merged: result.ok,
     linkSeen: sawLink,
@@ -287,7 +310,7 @@ if (withApply && merged) {
   const now = await git(["rev-parse", "HEAD"]);
   const status = await git(["status", "--porcelain", "--untracked-files=no"]);
   const state = intact();
-  report("checkout fast-forwarded to the merged change", now === merged && status === "" && fs.existsSync(path.join(app, "stella-update-links-check.txt")) && state.intact, {
+  report("checkout fast-forwarded to the merged change", now === merged && status === "" && (changeRef || fs.existsSync(path.join(app, "stella-update-links-check.txt"))) && state.intact, {
     head: now.slice(0, 12),
     clean: status === "",
     ...state,

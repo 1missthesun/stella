@@ -499,7 +499,11 @@ const sortOne = async (
     tokens: verdict.inputTokens,
     attachment: Boolean(attachment),
   });
-  if (override && override !== verdict.bucket && verdict.bucket !== "urgent" && !(override === "noise" && wrote > 0)) {
+  // A sender the user moved up is never left out as noise; one they dismissed is left out unless they
+  // write to them. Finer judgement (needs you or worth knowing) stays with the model and the note.
+  const applies =
+    override === "noise" ? wrote === 0 && verdict.bucket !== "urgent" : override !== null && verdict.bucket === "noise";
+  if (override && applies) {
     verdict = { ...verdict, bucket: override };
   }
   return { verdict, sortedBy: "model" };

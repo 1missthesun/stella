@@ -2826,7 +2826,9 @@
         "upToDate": "Semmi sem várakozik",
         "waiting": "Várakozik",
         "upToDateTitle": "Minden naprakész",
-        "upToDateBody": "A Stella új verziói itt jelennek meg."
+        "upToDateBody": "A Stella új verziói itt jelennek meg.",
+        "notSharedConflict": "Az itt végzett módosítások nem jutnak el a többi számítógépedre: ütköznek egy másik számítógép módosításával. Szerezd be azt a módosítást a megosztásukhoz.",
+        "notSharedBuild": "Az itt végzett módosítások nem jutnak el a többi számítógépedre: egy másik számítógép módosításával együtt a Stella nem fordulna le. Szerezd be azt a módosítást a megosztásukhoz."
       },
       "updating": "Frissítés…",
       "afterRecording": "A felvétel után",

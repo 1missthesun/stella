@@ -2816,7 +2816,9 @@
         "upToDate": "没有待添加的内容",
         "waiting": "待添加",
         "upToDateTitle": "已是最新版本",
-        "upToDateBody": "Stella 的新版本会显示在这里。"
+        "upToDateBody": "Stella 的新版本会显示在这里。",
+        "notSharedConflict": "此处所做的更改没有同步到你的其他电脑：它们与另一台电脑上的更改冲突。获取那项更改即可共享。",
+        "notSharedBuild": "此处所做的更改没有同步到你的其他电脑：与另一台电脑上的更改合在一起时，Stella 无法构建。获取那项更改即可共享。"
       },
       "updating": "正在更新…",
       "afterRecording": "录制结束后",

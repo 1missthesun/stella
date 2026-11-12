@@ -2846,7 +2846,9 @@
         "upToDate": "Nic nečeká",
         "waiting": "Čeká",
         "upToDateTitle": "Máte nejnovější verzi",
-        "upToDateBody": "Nové verze Stelly se zobrazí tady."
+        "upToDateBody": "Nové verze Stelly se zobrazí tady.",
+        "notSharedConflict": "Změny provedené zde se nedostávají do vašich ostatních počítačů: střetávají se se změnou z jiného počítače. Získejte tuto změnu, aby se sdílely.",
+        "notSharedBuild": "Změny provedené zde se nedostávají do vašich ostatních počítačů: spolu se změnou z jiného počítače by se Stella nesestavila. Získejte tuto změnu, aby se sdílely."
       },
       "updating": "Aktualizace…",
       "afterRecording": "Po dokončení záznamu",

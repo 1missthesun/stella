@@ -209,6 +209,13 @@ export function UpdatesSection() {
           </ul>
         </>
       ) : null}
+      {state.notShared ? (
+        <p className="updates-section__note" data-testid="updates-not-shared">
+          {state.notShared === "conflict"
+            ? t("shell.appSource.updates.notSharedConflict")
+            : t("shell.appSource.updates.notSharedBuild")}
+        </p>
+      ) : null}
       {state.recent.length > 0 ? (
         <>
           <h2 className="updates-section__heading">{t("shell.appSource.updates.history")}</h2>

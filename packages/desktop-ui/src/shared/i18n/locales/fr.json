@@ -2836,7 +2836,9 @@
         "upToDate": "Rien en attente",
         "waiting": "En attente",
         "upToDateTitle": "Tout est à jour",
-        "upToDateBody": "Les nouvelles versions de Stella apparaissent ici."
+        "upToDateBody": "Les nouvelles versions de Stella apparaissent ici.",
+        "notSharedConflict": "Les modifications faites ici n'arrivent pas sur vos autres ordinateurs : elles entrent en conflit avec une modification d'un autre ordinateur. Récupérez cette modification pour les partager.",
+        "notSharedBuild": "Les modifications faites ici n'arrivent pas sur vos autres ordinateurs : avec une modification d'un autre ordinateur, Stella ne se compilerait pas. Récupérez cette modification pour les partager."
       },
       "updating": "Mise à jour…",
       "afterRecording": "Après votre enregistrement",

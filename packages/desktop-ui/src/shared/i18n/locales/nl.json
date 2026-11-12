@@ -2826,7 +2826,9 @@
         "upToDate": "Niets in afwachting",
         "waiting": "Wachtend",
         "upToDateTitle": "Je bent helemaal bij",
-        "upToDateBody": "Nieuwe versies van Stella verschijnen hier."
+        "upToDateBody": "Nieuwe versies van Stella verschijnen hier.",
+        "notSharedConflict": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: ze botsen met een wijziging van een andere computer. Haal die wijziging op om ze te delen.",
+        "notSharedBuild": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: samen met een wijziging van een andere computer zou Stella niet bouwen. Haal die wijziging op om ze te delen."
       },
       "updating": "Bijwerken…",
       "afterRecording": "Na je opname",

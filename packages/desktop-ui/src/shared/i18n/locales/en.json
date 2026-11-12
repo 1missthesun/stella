@@ -2826,7 +2826,9 @@
         "upToDate": "Nothing waiting",
         "waiting": "Waiting",
         "upToDateTitle": "You're up to date",
-        "upToDateBody": "New versions of Stella show up here."
+        "upToDateBody": "New versions of Stella show up here.",
+        "notSharedConflict": "Changes made here aren't reaching your other computers: they clash with a change from another computer. Get that change to share them.",
+        "notSharedBuild": "Changes made here aren't reaching your other computers: together with a change from another computer, Stella wouldn't build. Get that change to share them."
       },
       "updating": "Updating…",
       "afterRecording": "After your recording",

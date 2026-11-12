@@ -71,6 +71,13 @@ export type AppSourceState = {
   /** An agent Stella sent is drafting this merge; nothing else may start until it settles. */
   merging?: { from: "upstream" | "remote" | "draft"; draft: string };
   recent: AppSourceCommit[];
+  /**
+   * Changes made here are not reaching the user's other computers: they clash
+   * with a change from another computer this one hasn't taken ("conflict"),
+   * or the two together would not build ("build"). Taking that change shares
+   * them again.
+   */
+  notShared?: "conflict" | "build";
   waiting: AppSourceWaiting[];
   skipped: AppSourceWaiting[];
   busy: boolean;

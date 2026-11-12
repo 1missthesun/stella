@@ -2816,7 +2816,9 @@
         "upToDate": "Tidak ada yang menunggu",
         "waiting": "Menunggu",
         "upToDateTitle": "Semua sudah terbaru",
-        "upToDateBody": "Versi baru Stella muncul di sini."
+        "upToDateBody": "Versi baru Stella muncul di sini.",
+        "notSharedConflict": "Perubahan yang dibuat di sini tidak sampai ke komputer Anda yang lain: perubahan itu bentrok dengan perubahan dari komputer lain. Ambil perubahan itu untuk membagikannya.",
+        "notSharedBuild": "Perubahan yang dibuat di sini tidak sampai ke komputer Anda yang lain: bersama perubahan dari komputer lain, Stella tidak akan bisa dibangun. Ambil perubahan itu untuk membagikannya."
       },
       "updating": "Memperbarui…",
       "afterRecording": "Setelah rekaman Anda",

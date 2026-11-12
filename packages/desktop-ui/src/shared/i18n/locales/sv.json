@@ -2826,7 +2826,9 @@
         "upToDate": "Inget väntar",
         "waiting": "Väntar",
         "upToDateTitle": "Allt är uppdaterat",
-        "upToDateBody": "Nya versioner av Stella visas här."
+        "upToDateBody": "Nya versioner av Stella visas här.",
+        "notSharedConflict": "Ändringar som gjorts här når inte dina andra datorer: de krockar med en ändring från en annan dator. Hämta den ändringen för att dela dem.",
+        "notSharedBuild": "Ändringar som gjorts här når inte dina andra datorer: tillsammans med en ändring från en annan dator skulle Stella inte gå att bygga. Hämta den ändringen för att dela dem."
       },
       "updating": "Uppdaterar…",
       "afterRecording": "Efter din inspelning",

@@ -2816,7 +2816,9 @@
         "upToDate": "대기 중인 항목이 없습니다",
         "waiting": "대기 중",
         "upToDateTitle": "최신 상태예요",
-        "upToDateBody": "Stella의 새 버전이 여기에 표시돼요."
+        "upToDateBody": "Stella의 새 버전이 여기에 표시돼요.",
+        "notSharedConflict": "여기서 한 변경 사항이 다른 컴퓨터에 전달되지 않고 있습니다: 다른 컴퓨터의 변경 사항과 충돌합니다. 그 변경 사항을 받으면 공유됩니다.",
+        "notSharedBuild": "여기서 한 변경 사항이 다른 컴퓨터에 전달되지 않고 있습니다: 다른 컴퓨터의 변경 사항과 함께하면 Stella가 빌드되지 않습니다. 그 변경 사항을 받으면 공유됩니다."
       },
       "updating": "업데이트 중…",
       "afterRecording": "녹화가 끝나면",

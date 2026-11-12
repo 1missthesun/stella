@@ -2826,7 +2826,9 @@
         "upToDate": "Intet venter",
         "waiting": "Venter",
         "upToDateTitle": "Du er opdateret",
-        "upToDateBody": "Nye versioner af Stella vises her."
+        "upToDateBody": "Nye versioner af Stella vises her.",
+        "notSharedConflict": "Ændringer foretaget her når ikke frem til dine andre computere: de er i konflikt med en ændring fra en anden computer. Hent den ændring for at dele dem.",
+        "notSharedBuild": "Ændringer foretaget her når ikke frem til dine andre computere: sammen med en ændring fra en anden computer kan Stella ikke bygges. Hent den ændring for at dele dem."
       },
       "updating": "Opdaterer…",
       "afterRecording": "Efter din optagelse",

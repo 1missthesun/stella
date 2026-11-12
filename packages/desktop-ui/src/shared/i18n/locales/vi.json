@@ -2816,7 +2816,9 @@
         "upToDate": "Không có gì đang chờ",
         "waiting": "Đang chờ",
         "upToDateTitle": "Bạn đang dùng bản mới nhất",
-        "upToDateBody": "Các phiên bản mới của Stella sẽ hiện ở đây."
+        "upToDateBody": "Các phiên bản mới của Stella sẽ hiện ở đây.",
+        "notSharedConflict": "Các thay đổi thực hiện ở đây không đến được các máy tính khác của bạn: chúng xung đột với một thay đổi từ máy tính khác. Hãy lấy thay đổi đó để chia sẻ chúng.",
+        "notSharedBuild": "Các thay đổi thực hiện ở đây không đến được các máy tính khác của bạn: cùng với một thay đổi từ máy tính khác, Stella sẽ không build được. Hãy lấy thay đổi đó để chia sẻ chúng."
       },
       "updating": "Đang cập nhật…",
       "afterRecording": "Sau khi ghi xong",

@@ -121,6 +121,14 @@
   font-size: var(--font-size-sm);
 }
 
+.updates-section__note {
+  margin: 0;
+  padding: 4px 10px 10px;
+  color: var(--text-weak);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
 .updates-section__quiet {
   display: flex;
   align-items: center;

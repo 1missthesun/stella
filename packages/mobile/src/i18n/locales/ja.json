@@ -2816,7 +2816,9 @@
         "upToDate": "待機中のものはありません",
         "waiting": "待機中",
         "upToDateTitle": "最新の状態です",
-        "upToDateBody": "Stellaの新しいバージョンがここに表示されます。"
+        "upToDateBody": "Stellaの新しいバージョンがここに表示されます。",
+        "notSharedConflict": "ここでの変更が他のコンピュータに届いていません：別のコンピュータの変更と競合しています。その変更を取得すると共有されます。",
+        "notSharedBuild": "ここでの変更が他のコンピュータに届いていません：別のコンピュータの変更と合わせるとStellaがビルドできません。その変更を取得すると共有されます。"
       },
       "updating": "アップデート中…",
       "afterRecording": "録画の終了後",

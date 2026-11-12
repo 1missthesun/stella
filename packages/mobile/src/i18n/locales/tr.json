@@ -2826,7 +2826,9 @@
         "upToDate": "Bekleyen bir şey yok",
         "waiting": "Bekliyor",
         "upToDateTitle": "Her şey güncel",
-        "upToDateBody": "Stella'nın yeni sürümleri burada görünür."
+        "upToDateBody": "Stella'nın yeni sürümleri burada görünür.",
+        "notSharedConflict": "Burada yapılan değişiklikler diğer bilgisayarlarınıza ulaşmıyor: başka bir bilgisayardaki bir değişiklikle çakışıyorlar. Paylaşmak için o değişikliği alın.",
+        "notSharedBuild": "Burada yapılan değişiklikler diğer bilgisayarlarınıza ulaşmıyor: başka bir bilgisayardaki bir değişiklikle birlikte Stella derlenmiyor. Paylaşmak için o değişikliği alın."
       },
       "updating": "Güncelleniyor…",
       "afterRecording": "Kaydınızdan sonra",

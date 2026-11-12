@@ -174,6 +174,11 @@ const SYNC_RETRY_MAX_MS = 10 * 60_000;
 const RECENT_COUNT = 20;
 type RecentRow = { commit: AppSourceCommit; base: string };
 type HeadMove = { from: string; at: number };
+type Share =
+  | { kind: "merge"; merge: string }
+  | { kind: "nothing" }
+  | { kind: "conflict" }
+  | { kind: "build" };
 const SKIPPED_FILE = "stella-updates-skipped.json";
 const UPSTREAM_MERGE_SUBJECT = "Merge the published Stella update";
 const REMOTE_MERGE_SUBJECT = "Merge the changes from another computer";
@@ -315,6 +320,14 @@ export class AppSourceService {
   private access: SourceAccess | null = null;
   private forkBranch: string | null = null;
   private forkUnrelated = false;
+  /**
+   * Merges of this computer's changes with the account's copy, by
+   * `${forkTip}:${head}`: the merge to push, or why none could be shared.
+   */
+  private shares = new Map<string, Share>();
+  private notShared: "conflict" | "build" | null = null;
+  private sharing = false;
+  private shareAgain = false;
   private upstreamTracked = false;
   private merge: MergeRecord | null | undefined;
   private offers = new Map<string, Offer>();
@@ -1533,6 +1546,7 @@ export class AppSourceService {
         : { status: "none", count: 0 },
       upstream: upstream ?? NO_UPSTREAM,
       recent,
+      ...(this.notShared ? { notShared: this.notShared } : {}),
       waiting: offered.filter((offer) => offer.adding || !skipped.has(offer.key)),
       skipped: offered.filter((offer) => !offer.adding && skipped.has(offer.key)),
       ...(pending ? { merging: { from: pending.from, draft: pending.draft } } : {}),
@@ -2489,6 +2503,8 @@ export class AppSourceService {
     this.access = null;
     this.forkBranch = null;
     this.forkUnrelated = false;
+    this.shares.clear();
+    this.notShared = null;
     this.forkPushSeen = null;
     this.ownForkPushes.clear();
     this.forkPushHeld = null;
@@ -2667,7 +2683,15 @@ export class AppSourceService {
     const head = await git(cwd, ["rev-parse", "HEAD"]);
     const forkTip = await git(cwd, ["rev-parse", "--verify", ref]);
     let pushed = false;
-    if (forkTip !== head && (await isAncestor(cwd, forkTip, head))) {
+    if (forkTip === head || (await isAncestor(cwd, head, forkTip))) {
+      this.notShared = null;
+    } else if (!(await isAncestor(cwd, forkTip, head))) {
+      // Another computer's change is on the account's copy and not here
+      // (skipped, or not taken yet): this computer's own changes can only
+      // reach it inside a merge of the two.
+      this.shareLater(cwd, fork);
+    } else {
+      this.notShared = null;
       await git(
         cwd,
         ["push", "--quiet", fork.remote, `HEAD:refs/heads/${fork.branch}`],
@@ -2689,6 +2713,126 @@ export class AppSourceService {
     if ((await this.pushChangeTags(cwd, fork, ref)) || pushed) {
       this.reportForkPush(await git(cwd, ["rev-parse", ref]));
     }
+  }
+
+  /** Shares this computer's changes in the background: a merge is checked by building it first. */
+  private shareLater(cwd: string, fork: ForkAccess) {
+    if (this.sharing) {
+      this.shareAgain = true;
+      return;
+    }
+    this.sharing = true;
+    void this.shareMerge(cwd, fork)
+      .catch((error) => {
+        this.options.log("app-source.fork-share-failed", {
+          message: errorMessage(error),
+        });
+      })
+      .finally(() => {
+        this.sharing = false;
+        void this.refresh();
+        if (this.shareAgain && !this.disposed) {
+          this.shareAgain = false;
+          this.pushToFork();
+        }
+      });
+  }
+
+  private async shareMerge(cwd: string, fork: ForkAccess) {
+    const ref = `${FORK_REF_PREFIX}${fork.branch}`;
+    const [head, forkTip] = await Promise.all([
+      git(cwd, ["rev-parse", "HEAD"]),
+      git(cwd, ["rev-parse", "--verify", ref]),
+    ]);
+    if (
+      forkTip === head ||
+      (await isAncestor(cwd, head, forkTip)) ||
+      (await isAncestor(cwd, forkTip, head))
+    ) {
+      return;
+    }
+    const key = `${forkTip}:${head}`;
+    let share = this.shares.get(key);
+    if (!share) {
+      share = await this.mergeToShare(cwd, forkTip, head);
+      if (this.shares.size >= 32) this.shares.clear();
+      this.shares.set(key, share);
+    }
+    if (share.kind !== "merge") {
+      this.notShared = share.kind === "nothing" ? null : share.kind;
+      return;
+    }
+    await git(
+      cwd,
+      ["push", "--quiet", fork.remote, `${share.merge}:refs/heads/${fork.branch}`],
+      { env: pushEnv(fork.token), timeoutMs: 5 * 60_000 },
+    );
+    await git(cwd, ["update-ref", ref, share.merge, forkTip]);
+    this.notShared = null;
+    this.options.log("app-source.fork-shared", { merge: share.merge, head });
+    await this.pushChangeTags(cwd, fork, ref);
+    this.reportForkPush(share.merge);
+  }
+
+  /**
+   * The account's copy with this computer's changes merged in, built first
+   * like any merge Stella makes: the other computers take it as it is. A
+   * clash, or a merge that would not build, is held back, so this computer's
+   * changes stay here as they did before, and the Updates tab says so.
+   */
+  private async mergeToShare(cwd: string, forkTip: string, head: string): Promise<Share> {
+    const base = await git(cwd, ["merge-base", forkTip, head]);
+    const merged = await gitRaw(cwd, [
+      "merge-tree",
+      "--write-tree",
+      "--merge-base",
+      base,
+      forkTip,
+      head,
+    ]);
+    if (merged.code === 1) {
+      this.options.log("app-source.fork-share-held", {
+        reason: "conflict",
+        files: conflictedPaths(merged.stdout).length,
+      });
+      return { kind: "conflict" };
+    }
+    if (merged.code !== 0) {
+      throw new Error(merged.stderr.trim() || "Could not work out the merge.");
+    }
+    const tree = merged.stdout.split("\n")[0]!.trim();
+    if (tree === (await git(cwd, ["rev-parse", `${forkTip}^{tree}`]))) {
+      return { kind: "nothing" };
+    }
+    const merge = await git(
+      cwd,
+      [
+        "commit-tree",
+        tree,
+        "-p",
+        forkTip,
+        "-p",
+        head,
+        "-m",
+        `${REMOTE_MERGE_SUBJECT} ${head.slice(0, 12)}`,
+      ],
+      { env: await this.identityEnv(cwd) },
+    );
+    const gate = await checkMergedUpdate(
+      cwd,
+      merge,
+      `${this.options.updateScratchDir}-share`,
+      this.options.log,
+      { background: true },
+    );
+    if (!gate.ok) {
+      this.options.log("app-source.fork-share-held", {
+        reason: "build",
+        output: gate.output.slice(-400),
+      });
+      return { kind: "build" };
+    }
+    return { kind: "merge", merge };
   }
 
   private reportForkPush(tip: string) {

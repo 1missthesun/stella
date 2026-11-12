@@ -4,8 +4,14 @@ import {
   type EmailAccountStatus,
   type EmailBucket,
   type EmailCalls,
+  type EmailBrief,
   type EmailDigest,
   type EmailDigests,
+  type EmailFocusAction,
+  type EmailFound,
+  type EmailSearchResult,
+  type EmailTargets,
+  type EmailThread,
   type EmailFeed,
   type EmailItem,
   type EmailItemState,
@@ -34,6 +40,8 @@ import {
   gmailLabelsOf,
   gmailProfile,
   gmailReadMail,
+  gmailReadThread,
+  gmailSearch,
   gmailSentPeople,
   gmailSetInbox,
   gmailStopWatch,
@@ -45,13 +53,15 @@ import {
   DEFAULT_NOTE,
   DecisionRefused,
   NOTE_MAX_CHARS,
+  gmailQueryFor,
   rewriteNote,
+  writeBrief,
   sortEmail,
   writeLines,
   type SorterAccess,
   type SortVerdict,
 } from "../../integrations/email-sorter.js";
-import { array, boolean, empty, literal, object, optional, string } from "../args.js";
+import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -215,12 +225,19 @@ export const EMAIL_DIGESTS_MIGRATION = {
   ],
 };
 
+/** The written briefing of each summary, kept with its digest. */
+export const EMAIL_BRIEF_MIGRATION = {
+  id: "email.3-brief",
+  statements: ["ALTER TABLE email_digests ADD COLUMN brief TEXT"],
+};
+
 type DigestRow = {
   digest_id: string;
   kind: string;
   created_at: number;
   rule_text: string | null;
   item_ids: string | null;
+  brief?: string | null;
 };
 
 type StateRow = {
@@ -563,7 +580,12 @@ const cardItem = (row: ItemRow, n: number): EmailCardItem => ({
   receivedAt: row.received_at,
 });
 
-const postCard = async (ctx: OwnerContext, snapshot: OwnerSnapshot, card: EmailCard): Promise<string | null> => {
+const postCard = async (
+  ctx: OwnerContext,
+  snapshot: OwnerSnapshot,
+  card: EmailCard,
+  brief?: EmailBrief,
+): Promise<string | null> => {
   const conversationId = readMainConversationId(ctx.db);
   if (!conversationId || !snapshot.writable) return null;
   const posted = await ctx.host.postConversationCard({
@@ -574,19 +596,20 @@ const postCard = async (ctx: OwnerContext, snapshot: OwnerSnapshot, card: EmailC
   });
   if (!posted) throw new Error("The email card could not be posted yet.");
   ctx.db.run(
-    "INSERT OR IGNORE INTO email_digests (digest_id, kind, created_at, rule_text, item_ids) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO email_digests (digest_id, kind, created_at, rule_text, item_ids, brief) VALUES (?, ?, ?, ?, ?, ?)",
     card.cardId,
     card.kind,
     ctx.now,
     card.ruleText ?? null,
     JSON.stringify(card.items.map((item) => item.itemId)),
+    brief ? JSON.stringify(brief) : null,
   );
   await ctx.host
     .appendConversationNote({
       conversationId,
       ownerGeneration: snapshot.ownerGeneration,
       noteId: `email-note-${card.cardId}`,
-      text: emailCardNoteText(card),
+      text: emailCardNoteText(card, brief?.lead),
     })
     .catch((error: unknown) => log("note_failed", { message: errorText(error) }));
   return conversationId;
@@ -1089,6 +1112,47 @@ const postSummary = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
       }
     });
   }
+  const skippedRows = ctx.db.all<ItemRow>(
+    "SELECT * FROM email_items WHERE first_bucket = 'noise' AND card_id IS NULL AND sorted_at > ? ORDER BY received_at DESC LIMIT 12",
+    since,
+  );
+  const brief = await writeBrief(
+    access,
+    chosen.map((row, index) => ({
+      n: index + 1,
+      bucket: row.bucket as EmailBucket,
+      from: `${row.from_name} <${row.from_address}>`,
+      subject: row.subject,
+      threadId: row.thread_id,
+      receivedAt: row.received_at,
+      line: row.line ?? "",
+      excerpt: (row.excerpt ?? "").slice(0, 1_200),
+    })),
+    skippedRows.map((row) => ({ from: row.from_name || row.from_address, subject: row.subject })),
+    zone,
+  )
+    .then(({ brief, usd }): EmailBrief | undefined => {
+      recordLineCost(ctx, zone, usd);
+      if (!brief) return undefined;
+      return {
+        lead: brief.lead,
+        sections: brief.sections.map((section) => ({
+          heading: section.heading,
+          tone: section.tone,
+          blocks: section.blocks.map((block) => ({
+            itemIds: block.emails.map((n) => chosen[n - 1]!.item_id),
+            title: block.title,
+            points: block.points,
+            ...(block.suggestion ? { suggestion: block.suggestion } : {}),
+          })),
+        })),
+        ...(brief.skipped ? { skipped: brief.skipped } : {}),
+      };
+    })
+    .catch((error: unknown) => {
+      log("brief_failed", { message: errorText(error) });
+      return undefined;
+    });
   const cardId = `ec-${crypto.randomUUID()}`;
   const card: EmailCard = {
     type: EMAIL_CARD_TYPE,
@@ -1097,7 +1161,7 @@ const postSummary = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
     items: chosen.map((row, index) => cardItem(row, index + 1)),
     ...(noiseCount > 0 ? { noiseCount } : {}),
   };
-  if (!(await postCard(ctx, snapshot, card))) return false;
+  if (!(await postCard(ctx, snapshot, card, brief))) return false;
   for (const row of chosen) {
     ctx.db.run(
       "UPDATE email_items SET state = 'summarized', card_id = ?, excerpt = NULL WHERE item_id = ?",
@@ -1262,6 +1326,15 @@ const digestItems = (db: OwnerDbReader, row: DigestRow): EmailItem[] => {
     .map(toItem);
 };
 
+const parseBrief = (text: string): { brief?: EmailBrief } => {
+  try {
+    const brief = JSON.parse(text) as EmailBrief;
+    return brief && typeof brief.lead === "string" && Array.isArray(brief.sections) ? { brief } : {};
+  } catch {
+    return {};
+  }
+};
+
 /** Each email row in the chat, opened: what it surfaced, and what was skipped as noise in its stretch. */
 const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
   const rows = ctx.db.all<DigestRow>(
@@ -1299,6 +1372,7 @@ const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
       ...(row.rule_text ? { ruleText: row.rule_text } : {}),
       items: digestItems(ctx.db, row),
       skipped,
+      ...(row.brief ? parseBrief(row.brief) : {}),
     };
   });
   return {
@@ -1527,11 +1601,174 @@ const mailAction = async (ctx: OwnerContext, args: MailArgs): Promise<{ text: st
   }
 };
 
+const FOUND = object({
+  account: string({ max: 320 }),
+  messageId: string({ min: 1, max: 128 }),
+  threadId: string({ max: 128 }),
+  from: string({ max: 400 }),
+  fromAddress: string({ max: 320 }),
+  subject: string({ max: 500 }),
+  snippet: string({ max: 400 }),
+  receivedAt: number(),
+  unread: boolean(),
+  inInbox: boolean(),
+});
+
+const TARGETS = {
+  itemId: optional(string({ max: 64 })),
+  itemIds: optional(array(string({ max: 64 }), { max: 10 })),
+  found: optional(array(FOUND, { max: 10 })),
+};
+
+type Target = {
+  itemId?: string;
+  from: string;
+  fromAddress: string;
+  subject: string;
+  line?: string;
+  account: string;
+  messageId: string;
+  threadId: string;
+};
+
+/** The emails a call is about: sorted ones from the store, found ones as the search returned them. */
+const resolveTargets = (ctx: OwnerContext, args: EmailTargets): Target[] => {
+  const targets: Target[] = [
+    ...[...(args.itemId ? [args.itemId] : []), ...(args.itemIds ?? [])].map((itemId): Target => {
+      const row = requireItem(ctx, itemId);
+      return {
+        itemId: row.item_id,
+        from: row.from_name,
+        fromAddress: row.from_address,
+        subject: row.subject,
+        ...(row.line ? { line: row.line } : {}),
+        account: row.account,
+        messageId: row.message_id,
+        threadId: row.thread_id,
+      };
+    }),
+    ...(args.found ?? []).map(
+      (mail): Target => ({
+        from: mail.from,
+        fromAddress: mail.fromAddress,
+        subject: mail.subject,
+        account: mail.account.toLowerCase(),
+        messageId: mail.messageId,
+        threadId: mail.threadId,
+      }),
+    ),
+  ];
+  if (targets.length === 0) throw new RpcError("BAD_REQUEST", "Say which email.");
+  return targets;
+};
+
+const SEARCH_PER_ACCOUNT = 15;
+const SEARCH_SHOWN = 25;
+
+/** Plain words to a Gmail search (by the light model), run across every inbox connected through Stella. */
+const searchMail = async (ctx: OwnerContext, words: string): Promise<EmailSearchResult> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "email.search", { count: 60, windowMs: HOUR }, "Too many searches. Try again later.");
+  const accounts = await liveAccounts(ctx);
+  if (accounts.length === 0) throw new RpcError("NOT_FOUND", "No Gmail is connected through Stella.");
+  const snapshot = await ctx.host.snapshot();
+  const zone = zoneOf(ctx, snapshot);
+  ensureState(ctx);
+  const query = await gmailQueryFor(
+    {
+      env: ctx.env,
+      ownerId: ctx.ownerId,
+      ownerGeneration: snapshot.ownerGeneration,
+      execution: snapshot.execution,
+      audience: snapshot.allowance.audience,
+      budgetMicroCents: snapshot.allowance.budgetMicroCents,
+    },
+    words,
+    zone,
+  )
+    .then(({ q, usd }) => {
+      recordLineCost(ctx, zone, usd);
+      return q;
+    })
+    .catch((error: unknown) => {
+      log("search_query_failed", { message: errorText(error) });
+      return words.trim();
+    });
+  const found = await Promise.all(
+    accounts.map(async (account) => {
+      try {
+        const mails = await gmailSearch(await account.get(), query, SEARCH_PER_ACCOUNT);
+        return mails.map(
+          (mail): EmailFound => ({
+            account: account.email,
+            messageId: mail.id,
+            threadId: mail.threadId,
+            from: mail.fromName || mail.fromAddress,
+            fromAddress: mail.fromAddress,
+            subject: mail.subject,
+            snippet: mail.snippet,
+            receivedAt: mail.receivedAt,
+            unread: mail.labelIds.includes("UNREAD"),
+            inInbox: mail.labelIds.includes("INBOX"),
+          }),
+        );
+      } catch (error) {
+        log("search_failed", { message: errorText(error) });
+        return [];
+      }
+    }),
+  );
+  log("searched", { owner: ctx.ownerId.slice(0, 12) });
+  return {
+    gmailQuery: query,
+    results: found
+      .flat()
+      .sort((a, b) => b.receivedAt - a.receivedAt)
+      .slice(0, SEARCH_SHOWN),
+  };
+};
+
+/** A whole thread, read in place, from a sorted email or a found one. */
+const readThread = async (
+  ctx: OwnerContext,
+  args: { itemId?: string; account?: string; threadId?: string },
+): Promise<EmailThread> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "email.thread", { count: 300, windowMs: HOUR }, "Too many requests. Try again later.");
+  const row = args.itemId ? requireItem(ctx, args.itemId) : null;
+  const accountEmail = (row?.account ?? args.account ?? "").toLowerCase();
+  const threadId = row?.thread_id ?? args.threadId ?? "";
+  if (!accountEmail || !threadId) throw new RpcError("BAD_REQUEST", "Say which email.");
+  const account = (await liveAccounts(ctx)).find((entry) => entry.email === accountEmail);
+  if (!account) throw new RpcError("NOT_FOUND", `${accountEmail} isn't connected through Stella anymore.`);
+  let messages;
+  try {
+    messages = await gmailReadThread(await account.get(), threadId);
+  } catch (error) {
+    if (error instanceof GoogleApiError) throw new RpcError("UNAVAILABLE", error.message);
+    throw error;
+  }
+  if (!messages || messages.length === 0) throw new RpcError("NOT_FOUND", "That email isn't in this account anymore.");
+  return {
+    account: account.email,
+    threadId,
+    subject: messages[0]!.subject,
+    messages: messages.map((message) => ({
+      messageId: message.id,
+      from: message.fromName || message.fromAddress,
+      fromAddress: message.fromAddress,
+      to: message.to,
+      ...(message.cc ? { cc: message.cc } : {}),
+      receivedAt: message.receivedAt,
+      text: message.text,
+      attachments: message.attachments,
+    })),
+  };
+};
+
 const ruleId = (): string => `r${crypto.randomUUID().replace(/-/gu, "").slice(0, 10)}`;
 
 export const emailDomain = {
   name: "email",
-  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION],
+  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION],
   calls: {
     "email.setEnabled": {
       scope: "owner",
@@ -1629,53 +1866,59 @@ export const emailDomain = {
     },
     "email.archive": {
       scope: "owner",
-      parse: object({ itemId: string({ max: 64 }), archived: boolean() }),
+      parse: object({ ...TARGETS, archived: boolean() }),
       handler: async (ctx, args) => {
         enforceOwnerRateLimit(ctx.db, ctx.now, "email.archive", { count: 120, windowMs: HOUR }, "Too many changes. Try again later.");
-        const row = requireItem(ctx, args.itemId);
-        const account = (await liveAccounts(ctx)).find((entry) => entry.email === row.account);
-        if (!account) throw new RpcError("NOT_FOUND", `${row.account} isn't connected through Stella anymore.`);
-        try {
-          await gmailSetInbox(await account.get(), row.message_id, !args.archived);
-        } catch (error) {
-          if (error instanceof GoogleApiError) {
-            throw new RpcError(error.status === 404 ? "NOT_FOUND" : "UNAVAILABLE", error.status === 404 ? "That email isn't in this account anymore." : error.message);
+        const targets = resolveTargets(ctx, args);
+        const accounts = await liveAccounts(ctx);
+        for (const target of targets) {
+          const account = accounts.find((entry) => entry.email === target.account);
+          if (!account) throw new RpcError("NOT_FOUND", `${target.account} isn't connected through Stella anymore.`);
+          try {
+            await gmailSetInbox(await account.get(), target.messageId, !args.archived);
+          } catch (error) {
+            if (error instanceof GoogleApiError) {
+              throw new RpcError(error.status === 404 ? "NOT_FOUND" : "UNAVAILABLE", error.status === 404 ? "That email isn't in this account anymore." : error.message);
+            }
+            throw error;
           }
-          throw error;
+          if (target.itemId) ctx.db.run("UPDATE email_items SET archived = ? WHERE item_id = ?", args.archived ? 1 : 0, target.itemId);
         }
-        ctx.db.run("UPDATE email_items SET archived = ? WHERE item_id = ?", args.archived ? 1 : 0, row.item_id);
-        log(args.archived ? "archived" : "unarchived", { owner: ctx.ownerId.slice(0, 12) });
+        log(args.archived ? "archived" : "unarchived", { owner: ctx.ownerId.slice(0, 12), count: targets.length });
         return { ok: true as const };
       },
     },
     "email.focus": {
       scope: "owner",
-      parse: object({ itemId: string({ max: 64 }), action: literal("reply", "handle", "tell") }),
+      parse: object({ ...TARGETS, action: literal("reply", "handle", "tell", "suggest") }),
       handler: async (ctx, args) => {
         enforceOwnerRateLimit(ctx.db, ctx.now, "email.focus", { count: 120, windowMs: HOUR }, "Too many requests. Try again later.");
-        const row = requireItem(ctx, args.itemId);
+        const targets = resolveTargets(ctx, args);
         const conversationId = readMainConversationId(ctx.db);
         if (!conversationId) return { ok: true as const };
         const snapshot = await ctx.host.snapshot();
         await ctx.host.appendConversationNote({
           conversationId,
           ownerGeneration: snapshot.ownerGeneration,
-          noteId: `email-focus-${row.item_id}-${ctx.now}`,
-          text: emailFocusNoteText(
-            {
-              from: row.from_name,
-              fromAddress: row.from_address,
-              subject: row.subject,
-              ...(row.line ? { line: row.line } : {}),
-              account: row.account,
-              messageId: row.message_id,
-              threadId: row.thread_id,
-            },
-            args.action,
-          ),
+          noteId: `email-focus-${targets[0]!.messageId}-${ctx.now}`.slice(0, 120),
+          text: emailFocusNoteText(targets, args.action as EmailFocusAction),
         });
         return { ok: true as const };
       },
+    },
+    "email.search": {
+      scope: "owner",
+      parse: object({ query: string({ min: 1, max: 300 }) }),
+      handler: (ctx, args) => searchMail(ctx, args.query),
+    },
+    "email.thread": {
+      scope: "owner",
+      parse: object({
+        itemId: optional(string({ max: 64 })),
+        account: optional(string({ max: 320 })),
+        threadId: optional(string({ max: 128 })),
+      }),
+      handler: (ctx, args) => readThread(ctx, args),
     },
     "email.checkNow": {
       scope: "owner",

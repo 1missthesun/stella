@@ -24,7 +24,7 @@ const DECISION_TIMEOUT_MS = 25_000;
 const RUN_BUDGET_MICRO_CENTS = 5_000_000;
 
 export const DEFAULT_NOTE =
-  "No note yet. Usually what matters: people they know or have written to, anything that needs their reply or decision, deadlines, money, bills, security and account problems, travel changes. Newsletters, promotions, social notifications and receipts that need nothing usually don't.";
+  "No note yet. Usually what matters: people you know or have written to, anything that needs your reply or decision, deadlines, money, bills, security and account problems, travel changes. Newsletters, promotions, social notifications and receipts that need nothing usually don't.";
 
 export type SorterAccess = {
   env: Cloudflare.Env;
@@ -99,7 +99,7 @@ const relationLine = (count: number): string =>
 
 const inputText = (input: SortInput): string =>
   [
-    `What matters to this person, in their own note: ${input.note.trim() || DEFAULT_NOTE}`,
+    `What matters to this person, in their own note ("you" is them): ${input.note.trim() || DEFAULT_NOTE}`,
     "",
     `A new email arrived in their inbox (${input.account}).`,
     relationLine(input.wroteToSender),
@@ -360,7 +360,7 @@ export const rewriteNote = async (
     system: [
       "You keep a short note, in plain words, of what matters to one person in their email, which an email sorter reads.",
       "Rewrite the note so it also reflects the corrections the person just made. Keep what still holds, generalise from the corrections (a sender, a kind of email) without inventing preferences.",
-      `At most 120 words. Write it about them in the third person ("They care about…"). Answer only by calling set_note.`,
+      `At most 120 words. Write it to them in the second person ("You care about…", "Mail from your bank matters"), as a note they read about themselves. Answer only by calling set_note.`,
     ].join("\n"),
     prompt: [
       `Current note: ${note.trim() || DEFAULT_NOTE}`,
@@ -374,4 +374,215 @@ export const rewriteNote = async (
   const next =
     typeof output.args?.note === "string" ? output.args.note.replace(/\s+/gu, " ").trim().slice(0, NOTE_MAX_CHARS) : "";
   return { note: next || null, usd: output.usd };
+};
+
+export type BriefEmail = {
+  n: number;
+  bucket: EmailBucket;
+  from: string;
+  subject: string;
+  threadId: string;
+  receivedAt: number;
+  line: string;
+  excerpt: string;
+};
+
+export type BriefOutput = {
+  lead: string;
+  sections: {
+    heading: string;
+    tone: "urgent" | "needs_you" | "fyi";
+    blocks: { emails: number[]; title: string; points: string[]; suggestion?: { label: string; ask: string } }[];
+  }[];
+  skipped?: string;
+};
+
+const BRIEF_TOOL: Tool = {
+  name: "write_briefing",
+  description: "The briefing.",
+  parameters: {
+    type: "object",
+    properties: {
+      lead: { type: "string" },
+      sections: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            heading: { type: "string" },
+            tone: { type: "string", enum: ["urgent", "needs_you", "fyi"] },
+            blocks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  emails: { type: "array", items: { type: "number" } },
+                  title: { type: "string" },
+                  points: { type: "array", items: { type: "string" } },
+                  suggestion: {
+                    type: "object",
+                    properties: { label: { type: "string" }, ask: { type: "string" } },
+                    required: ["label", "ask"],
+                    additionalProperties: false,
+                  },
+                },
+                required: ["emails", "title", "points"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["heading", "tone", "blocks"],
+          additionalProperties: false,
+        },
+      },
+      skipped: { type: "string" },
+    },
+    required: ["lead", "sections"],
+    additionalProperties: false,
+  } as unknown as TSchema,
+};
+
+const BRIEF_BUCKET_WORDS: Record<EmailBucket, string> = {
+  urgent: "urgent",
+  needs_you: "needs them",
+  worth_knowing: "worth knowing",
+  noise: "noise",
+};
+
+const cleanText = (value: unknown, max: number): string =>
+  typeof value === "string" ? value.replace(/\s+/gu, " ").trim().slice(0, max) : "";
+
+/**
+ * A briefing on new email, written the way a good assistant answers: one lead
+ * sentence on what matters most, then short sections of points, related emails
+ * merged into one point, each with at most one suggested next step.
+ */
+export const writeBrief = async (
+  access: SorterAccess,
+  emails: BriefEmail[],
+  skipped: { from: string; subject: string }[],
+  zone: string,
+): Promise<{ brief: BriefOutput | null; usd: number }> => {
+  const when = (at: number): string =>
+    new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(at);
+  const prompt = [
+    `Now: ${when(Date.now())} (${zone}).`,
+    "",
+    ...emails.map((email) =>
+      [
+        `n: ${email.n}`,
+        `sorted as: ${BRIEF_BUCKET_WORDS[email.bucket]}`,
+        `from: ${email.from}`,
+        `subject: ${email.subject}`,
+        `thread: ${email.threadId}`,
+        `received: ${when(email.receivedAt)}`,
+        email.line ? `gist: ${email.line}` : "",
+        `excerpt: ${email.excerpt || "(none)"}`,
+        "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ),
+    skipped.length > 0
+      ? `Skipped as noise (${skipped.length}): ${skipped
+          .slice(0, 12)
+          .map((mail) => `${mail.from} — "${mail.subject}"`)
+          .join("; ")}`
+      : "Nothing was skipped.",
+  ].join("\n");
+  const output = await completeWithTool(access, {
+    purpose: "brief",
+    system: [
+      "You write a short briefing on someone's new email, addressed to them as \"you\", the way a sharp assistant would answer \"what came in?\".",
+      "lead: one or two sentences on what matters most and what, if anything, they must do and by when. Bold (**…**) the people, amounts and deadlines that matter. No greeting.",
+      "sections: group the emails into at most 3 sections in order of importance, each with a short heading of 1-3 words (\"Needs you\", \"Money\", \"Worth knowing\") and a tone: urgent if something can't wait, needs_you if they must reply, decide or act, fyi otherwise. Follow how each email was sorted unless the content clearly says otherwise.",
+      "blocks: one per matter. Put emails of the same thread or the same matter in one block (list every n it covers). Every email n must be in exactly one block.",
+      "title: \"**Sender** · what it is about\", at most 8 words after the sender.",
+      "points: 1-3 bullets of at most 14 words each with the facts that matter (amounts, dates, asks). Don't repeat the title. Bold sparingly.",
+      "suggestion: only when there is an obvious next step Stella could do for them (reply, schedule, pay, file). label: 2-4 words starting with a verb (\"Reply approving\"). ask: the full instruction in their voice (\"Reply to Blue Metal approving the $4,800 quote\"). Leave it out for anything that needs nothing.",
+      "skipped: if anything was skipped, one line starting with how many, saying what kind of mail it was.",
+      "Plain words, no emoji, no quotes around titles. Answer only by calling write_briefing.",
+    ].join("\n"),
+    prompt,
+    tool: BRIEF_TOOL,
+    maxTokens: 2_400,
+  });
+  const raw = output.args;
+  if (!raw) return { brief: null, usd: output.usd };
+  const known = new Set(emails.map((email) => email.n));
+  const used = new Set<number>();
+  const sections: BriefOutput["sections"] = [];
+  for (const entry of Array.isArray(raw.sections) ? raw.sections.slice(0, 4) : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const section = entry as Record<string, unknown>;
+    const tone = section.tone === "urgent" || section.tone === "needs_you" ? section.tone : "fyi";
+    const blocks: BriefOutput["sections"][number]["blocks"] = [];
+    for (const item of Array.isArray(section.blocks) ? section.blocks : []) {
+      if (!item || typeof item !== "object") continue;
+      const block = item as Record<string, unknown>;
+      const ns = (Array.isArray(block.emails) ? block.emails : [])
+        .map(Number)
+        .filter((n) => known.has(n) && !used.has(n));
+      const title = cleanText(block.title, 160);
+      if (ns.length === 0 || !title) continue;
+      ns.forEach((n) => used.add(n));
+      const points = (Array.isArray(block.points) ? block.points : []).map((point) => cleanText(point, 220)).filter(Boolean).slice(0, 3);
+      const suggestion = block.suggestion && typeof block.suggestion === "object" ? (block.suggestion as Record<string, unknown>) : null;
+      const label = cleanText(suggestion?.label, 40);
+      const ask = cleanText(suggestion?.ask, 300);
+      blocks.push({ emails: ns, title, points, ...(label && ask ? { suggestion: { label, ask } } : {}) });
+    }
+    const heading = cleanText(section.heading, 40);
+    if (blocks.length > 0 && heading) sections.push({ heading, tone, blocks });
+  }
+  const lead = cleanText(raw.lead, 500);
+  // Anything the model left out still gets a plain block, so no email goes missing.
+  const missed = emails.filter((email) => !used.has(email.n));
+  if (missed.length > 0) {
+    sections.push({
+      heading: "Also",
+      tone: "fyi",
+      blocks: missed.map((email) => ({
+        emails: [email.n],
+        title: `**${email.from.replace(/\s*<[^>]*>\s*$/u, "") || email.from}** · ${email.subject}`,
+        points: email.line ? [email.line] : [],
+      })),
+    });
+  }
+  if (!lead || sections.length === 0) return { brief: null, usd: output.usd };
+  const skippedLine = cleanText(raw.skipped, 200);
+  return { brief: { lead, sections, ...(skipped.length > 0 && skippedLine ? { skipped: skippedLine } : {}) }, usd: output.usd };
+};
+
+const QUERY_TOOL: Tool = {
+  name: "gmail_query",
+  description: "The Gmail search.",
+  parameters: {
+    type: "object",
+    properties: { q: { type: "string" } },
+    required: ["q"],
+    additionalProperties: false,
+  } as unknown as TSchema,
+};
+
+/** Turns plain words ("the invoice from Linear last month") into a Gmail search. */
+export const gmailQueryFor = async (
+  access: SorterAccess,
+  words: string,
+  zone: string,
+): Promise<{ q: string; usd: number }> => {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(Date.now());
+  const output = await completeWithTool(access, {
+    purpose: "search",
+    system: [
+      "Turn what someone wants to find in their email into one Gmail search query using Gmail's operators (from:, to:, subject:, has:attachment, filename:, after:YYYY/MM/DD, before:YYYY/MM/DD, newer_than:, is:unread, in:anywhere, OR, quotes, -word).",
+      "Keep the user's key words; don't add guesses that would narrow it wrongly. If it already is a Gmail query or a plain keyword, return it as is.",
+      `Today is ${today}. Answer only by calling gmail_query.`,
+    ].join("\n"),
+    prompt: words,
+    tool: QUERY_TOOL,
+    maxTokens: 300,
+  });
+  const q = cleanText(output.args?.q, 300);
+  return { q: q || words.trim().slice(0, 300), usd: output.usd };
 };

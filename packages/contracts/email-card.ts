@@ -121,13 +121,13 @@ export const EMAIL_REASON_WORDS: Record<EmailReason, string> = {
  * only a count; the list is in the opened Email view, in this order. Plain
  * text; ids are for the email tool.
  */
-export const emailCardNoteText = (card: EmailCard): string => {
+export const emailCardNoteText = (card: EmailCard, lead?: string): string => {
   const heading =
     card.kind === "urgent"
-      ? "Stella's email sorting just flagged this urgent email to the user (a small \"1 urgent\" row in the chat, not written by you; they also got a notification):"
+      ? "Stella's email sorting just flagged this urgent email to the user (an email row in the chat saying \"1 urgent\", not written by you; they also got a notification):"
       : card.kind === "rule"
-        ? `This email matched the user's standing instruction "${card.ruleText ?? ""}"; the chat shows a small email row for it:`
-        : `Stella's email sorting just gave the user a digest of new email (a small "${card.items.length} new" row in the chat, not written by you; they open it to read the list, in this order):`;
+        ? `This email matched the user's standing instruction "${card.ruleText ?? ""}"; the chat shows an email row for it:`
+        : `Stella's email sorting just gave the user a briefing on new email (an email row in the chat saying "${card.items.length} new emails", not written by you; they open it to read the briefing, which covers these emails):`;
   const lines = card.items.map((item) =>
     [
       `${item.n}. ${BUCKET_WORDS[item.bucket]} — ${item.from} — "${item.subject}"`,
@@ -137,6 +137,7 @@ export const emailCardNoteText = (card: EmailCard): string => {
   );
   return [
     heading,
+    ...(lead ? [`The briefing opens: ${lead.replace(/\*\*/gu, "")}`] : []),
     ...lines,
     ...(card.noiseCount ? [`${card.noiseCount} other emails were skipped as noise.`] : []),
     "If the user refers to one of these (\"reply to the Stripe one\", \"the second one\"), act on that email with the email tool (read, reply, draft), using its account and message_id. Numbers refer to this newest digest. Don't comment on this note unless the user asks about their email.",
@@ -155,19 +156,35 @@ export type EmailFocusSubject = {
 };
 
 /**
- * Hidden context written just before the user's own message from a digest
+ * Hidden context written just before the user's own message from a briefing
  * action, so a plain "Draft a reply to Blue Metal's email" names the real email.
  */
-export const emailFocusNoteText = (mail: EmailFocusSubject, action: "reply" | "handle" | "tell"): string =>
-  [
-    `The user's next message comes from an action on one email in their email digest (not written by you). The email: from ${mail.from} <${mail.fromAddress}>, subject "${mail.subject}"${mail.line ? ` — ${mail.line}` : ""} (account ${mail.account}, message_id ${mail.messageId}, thread_id ${mail.threadId}).`,
+export const emailFocusNoteText = (
+  mails: readonly EmailFocusSubject[],
+  action: "reply" | "handle" | "tell" | "suggest",
+): string => {
+  const one = (mail: EmailFocusSubject): string =>
+    `from ${mail.from} <${mail.fromAddress}>, subject "${mail.subject}"${mail.line ? ` — ${mail.line}` : ""} (account ${mail.account}, message_id ${mail.messageId}, thread_id ${mail.threadId})`;
+  const about =
+    mails.length === 1
+      ? `The user's next message comes from an action on one email in their email briefing (not written by you). The email: ${one(mails[0]!)}.`
+      : [
+          `The user's next message comes from an action on one point of their email briefing, which covers these ${mails.length} related emails (not written by you):`,
+          ...mails.map((mail, index) => `${index + 1}. ${one(mail)}`),
+          "Act on the newest one unless the message says otherwise.",
+        ].join("\n");
+  return [
+    about,
     action === "reply"
       ? "They asked for a draft reply: read the email with the email tool, write the reply in their voice, save it as a Gmail draft (don't send), and tell them in a sentence or two what it says."
       : action === "handle"
         ? "They asked you to handle it: read it and do what it needs (a reply, an event, a task, a payment check), saving replies as drafts and asking before sending anything as them, then say briefly what you did."
-        : "Their message says what to do with it; send email as them only if it clearly says to send or reply.",
+        : action === "suggest"
+          ? "They picked the next step the briefing suggested; their message says what it is. Read the email, then do it. Save any reply as a Gmail draft (don't send) and ask before doing anything else as them that can't be undone, then say briefly what you did."
+          : "Their message says what to do with it; send email as them only if it clearly says to send or reply.",
     "Don't mention this note.",
   ].join("\n");
+};
 
 /** One row of a conversation, as far as folding email cards is concerned. */
 export type EmailFoldEntry = { kind: "email"; cardId: string } | { kind: "user" } | { kind: "other" };

@@ -209,3 +209,110 @@ export const gmailSentPeople = async (get: Fetcher): Promise<Map<string, { count
   }
   return people;
 };
+
+export type GmailFoundMail = {
+  id: string;
+  threadId: string;
+  from: string;
+  fromName: string;
+  fromAddress: string;
+  subject: string;
+  snippet: string;
+  receivedAt: number;
+  labelIds: string[];
+};
+
+const decodeEntities = (text: string): string =>
+  text
+    .replace(/&#39;/gu, "'")
+    .replace(/&quot;/gu, '"')
+    .replace(/&lt;/gu, "<")
+    .replace(/&gt;/gu, ">")
+    .replace(/&amp;/gu, "&");
+
+/** Messages matching a Gmail search, newest first, read from headers and Gmail's snippet only. */
+export const gmailSearch = async (get: Fetcher, q: string, max: number): Promise<GmailFoundMail[]> => {
+  const list = (await get(`${GMAIL_API}/messages?q=${encodeURIComponent(q)}&maxResults=${max}`)) as JsonObject;
+  const ids = (Array.isArray(list.messages) ? list.messages : []).flatMap((entry) =>
+    isRecord(entry) && str(entry.id) ? [str(entry.id)] : [],
+  );
+  const found = await Promise.all(
+    ids.map(async (id): Promise<GmailFoundMail | null> => {
+      try {
+        const message = (await get(
+          `${GMAIL_API}/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+        )) as JsonObject;
+        const headers = isRecord(message.payload) ? message.payload.headers : undefined;
+        const from = gmailHeader(headers, "From") ?? "";
+        const sender = parseAddress(from);
+        const internal = Number(message.internalDate);
+        return {
+          id,
+          threadId: str(message.threadId) || id,
+          from,
+          fromName: sender.name,
+          fromAddress: sender.address,
+          subject: (gmailHeader(headers, "Subject") ?? "").trim() || "(no subject)",
+          snippet: decodeEntities(str(message.snippet)).slice(0, 240),
+          receivedAt: Number.isFinite(internal) && internal > 0 ? internal : 0,
+          labelIds: Array.isArray(message.labelIds) ? message.labelIds.map(String) : [],
+        };
+      } catch (error) {
+        if (error instanceof GoogleApiError && error.status === 404) return null;
+        throw error;
+      }
+    }),
+  );
+  return found.filter((mail): mail is GmailFoundMail => mail !== null);
+};
+
+const THREAD_MESSAGES = 20;
+const THREAD_TEXT_CHARS = 8_000;
+
+export type GmailThreadMessage = {
+  id: string;
+  from: string;
+  fromName: string;
+  fromAddress: string;
+  to: string;
+  cc: string;
+  subject: string;
+  receivedAt: number;
+  text: string;
+  attachments: string[];
+};
+
+/** A whole thread for reading in place: each message's plain text without the quoted history. */
+export const gmailReadThread = async (get: Fetcher, threadId: string): Promise<GmailThreadMessage[] | null> => {
+  let thread: JsonObject;
+  try {
+    thread = (await get(`${GMAIL_API}/threads/${encodeURIComponent(threadId)}?format=full`)) as JsonObject;
+  } catch (error) {
+    if (error instanceof GoogleApiError && error.status === 404) return null;
+    throw error;
+  }
+  const messages = (Array.isArray(thread.messages) ? thread.messages : []).filter(isRecord).slice(-THREAD_MESSAGES);
+  return messages.map((message) => {
+    const payload = isRecord(message.payload) ? message.payload : {};
+    const headers = payload.headers;
+    const from = gmailHeader(headers, "From") ?? "";
+    const sender = parseAddress(from);
+    const body = gmailMessageText(payload);
+    const internal = Number(message.internalDate);
+    return {
+      id: str(message.id),
+      from,
+      fromName: sender.name,
+      fromAddress: sender.address,
+      to: gmailHeader(headers, "To") ?? "",
+      cc: gmailHeader(headers, "Cc") ?? "",
+      subject: (gmailHeader(headers, "Subject") ?? "").trim() || "(no subject)",
+      receivedAt: Number.isFinite(internal) && internal > 0 ? internal : 0,
+      text: plainText(body.text || str(message.snippet))
+        .replace(/\n*On .{0,200}wrote:\s*$/su, "")
+        .trim()
+        .slice(0, THREAD_TEXT_CHARS),
+      attachments: body.attachments.map((entry) => str(entry.filename)).filter(Boolean),
+    };
+  });
+};

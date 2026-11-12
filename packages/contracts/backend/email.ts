@@ -67,6 +67,92 @@ export type EmailDigest = {
   items: EmailItem[];
   /** Mail sorted as noise in its stretch, newest first; summaries only. */
   skipped: EmailItem[];
+  /** The written briefing, when the summary got one (older and urgent rows are shown from their items). */
+  brief?: EmailBrief;
+};
+
+/**
+ * A summary written the way a good assistant answers: a lead sentence on what
+ * matters most, then sections of blocks. Text is light markdown (bold only).
+ */
+export type EmailBrief = {
+  lead: string;
+  sections: EmailBriefSection[];
+  /** One line on what was skipped, when anything was. */
+  skipped?: string;
+};
+
+/** How much a section asks of the user; it sets the colour, not the heading. */
+export type EmailBriefTone = "urgent" | "needs_you" | "fyi";
+
+export type EmailBriefSection = {
+  heading: string;
+  tone: EmailBriefTone;
+  blocks: EmailBriefBlock[];
+};
+
+/** One point in the briefing; related emails (a thread, the same matter) share a block. */
+export type EmailBriefBlock = {
+  itemIds: string[];
+  /** "**Sender** · what it is about". */
+  title: string;
+  points: string[];
+  /** The one next step worth offering, if any. */
+  suggestion?: EmailSuggestion;
+};
+
+export type EmailSuggestion = {
+  /** Button text, a few words ("Reply approving"). */
+  label: string;
+  /** What Stella should do, in the user's voice ("Reply approving the $4,800 quote"). */
+  ask: string;
+};
+
+/** An email found by search, outside any briefing. */
+export type EmailFound = {
+  account: string;
+  messageId: string;
+  threadId: string;
+  from: string;
+  fromAddress: string;
+  subject: string;
+  snippet: string;
+  receivedAt: number;
+  unread: boolean;
+  inInbox: boolean;
+};
+
+export type EmailSearchResult = {
+  /** The Gmail search the words became, shown so the user can tell what was searched. */
+  gmailQuery: string;
+  results: EmailFound[];
+};
+
+/** One message of a thread, read in place. */
+export type EmailMessage = {
+  messageId: string;
+  from: string;
+  fromAddress: string;
+  to: string;
+  cc?: string;
+  receivedAt: number;
+  text: string;
+  attachments: string[];
+};
+
+export type EmailThread = {
+  account: string;
+  threadId: string;
+  subject: string;
+  messages: EmailMessage[];
+};
+
+/** Which emails a call is about: sorted ones by id, found ones by reference. */
+export type EmailTargets = {
+  /** One sorted email (the first digest clients' form). */
+  itemId?: string;
+  itemIds?: string[];
+  found?: EmailFound[];
 };
 
 export type EmailDigests = {
@@ -77,7 +163,7 @@ export type EmailDigests = {
 };
 
 /** What the user asked Stella to do with one email from a digest. */
-export type EmailFocusAction = "reply" | "handle" | "tell";
+export type EmailFocusAction = "reply" | "handle" | "tell" | "suggest";
 
 /** A standing instruction the user gave in plain words. */
 export type EmailRule = {
@@ -145,13 +231,17 @@ export type EmailCalls = {
   "email.removeRule": { args: { ruleId: string }; result: { rules: EmailRule[] } };
   "email.rules": { args: Record<string, never>; result: { rules: EmailRule[]; note: string } };
   "email.checkNow": { args: Record<string, never>; result: EmailStatus };
-  /** Takes an email out of (or back into) the Gmail inbox. */
-  "email.archive": { args: { itemId: string; archived: boolean }; result: { ok: true } };
+  /** Takes emails out of (or back into) the Gmail inbox. */
+  "email.archive": { args: EmailTargets & { archived: boolean }; result: { ok: true } };
   /**
-   * Tells Stella, out of sight, which email the user's next message is about,
-   * so a digest action can be a plain chat message that still names the real email.
+   * Tells Stella, out of sight, which emails the user's next message is about,
+   * so a briefing action can be a plain chat message that still names the real email.
    */
-  "email.focus": { args: { itemId: string; action: EmailFocusAction }; result: { ok: true } };
+  "email.focus": { args: EmailTargets & { action: EmailFocusAction }; result: { ok: true } };
+  /** Plain-words search across the inboxes connected through Stella. */
+  "email.search": { args: { query: string }; result: EmailSearchResult };
+  /** Reads a whole thread in place. */
+  "email.thread": { args: { itemId?: string; account?: string; threadId?: string }; result: EmailThread };
   /** Read an email, or reply to it (sent or saved as a draft), in a Gmail account connected through Stella. */
   "email.mail": {
     args: { action: "read" | "reply" | "draft"; account?: string; messageId: string; body?: string; all?: boolean };

@@ -997,7 +997,7 @@
       "bodyFrom": "{requester} asked to run work on this computer. Allowing lets work sent from your devices run here.",
       "decline": "Not now",
       "failed": "That answer didn't go through. Try again.",
-      "note": "You can change this later in Connect, under your computers.",
+      "note": "Je kunt dit altijd wijzigen via Instellingen › Privacy.",
       "title": "Allow work from your other devices?"
     },
     "schedule": {

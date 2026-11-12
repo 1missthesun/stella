@@ -2,6 +2,7 @@ import { app, BrowserWindow, powerMonitor } from "electron";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { resolveAppIconPath } from "../app-icon.js";
 import { isDevHarness } from "../app-identity.js";
 import type { PiRunnerTarget } from "@stella/runtime/kernel/lifecycle-targets";
 import { readConfiguredBackendUrl } from "@stella/contracts/stella-api";
@@ -695,6 +696,8 @@ export class AuthService {
       maximizable: false,
       autoHideMenuBar: true,
       title: "Verify with Stella",
+      icon:
+        process.platform === "darwin" ? undefined : resolveAppIconPath(__dirname),
       backgroundColor: "#f6f5f0",
       webPreferences: {
         contextIsolation: true,

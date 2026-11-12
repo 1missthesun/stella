@@ -1,57 +1,18 @@
-import { app, nativeImage, type NativeImage } from 'electron'
 import fs from 'fs'
 import path from 'path'
 
-const decodedIconCache = new Map<string, NativeImage>()
-
-const resolveDesktopRoot = (electronDir: string) => path.resolve(electronDir, '..', '..', '..')
-
-const resolveDockIconPath = (electronDir: string) => {
-  const desktopRoot = resolveDesktopRoot(electronDir)
-  const preferredPaths = [
+// The window icon for Windows and Linux. Without a usable one, the title bar,
+// taskbar button and Alt-Tab fall back to electron.exe's icon. electronDir is
+// the bundle's folder, packages/desktop/dist-electron/electron. macOS takes
+// its icon from the Electron identity bundle (Stella.app) instead.
+export const resolveAppIconPath = (electronDir: string): string | undefined => {
+  const desktopRoot = path.resolve(electronDir, '..', '..')
+  const uiRoot = path.join(path.dirname(desktopRoot), 'desktop-ui')
+  const candidates = [
+    ...(process.platform === 'win32' ? [path.join(desktopRoot, 'build', 'icon.ico')] : []),
     path.join(desktopRoot, 'build', 'icon.png'),
-    path.join(desktopRoot, 'dist', 'stella-app-icon.png'),
-    path.join(desktopRoot, 'public', 'stella-app-icon.png'),
+    path.join(uiRoot, 'dist', 'stella-app-icon.png'),
+    path.join(uiRoot, 'public', 'stella-app-icon.png'),
   ]
-
-  return preferredPaths.find((candidatePath) => fs.existsSync(candidatePath)) ?? preferredPaths[0]
-}
-
-export const resolveAppIconPath = (electronDir: string) => {
-  const desktopRoot = resolveDesktopRoot(electronDir)
-  const candidates =
-    process.platform === 'win32'
-      ? [
-          path.join(desktopRoot, 'build', 'icon.ico'),
-          path.join(desktopRoot, 'dist', 'stella-app-icon.png'),
-          path.join(desktopRoot, 'public', 'stella-app-icon.png'),
-        ]
-      : [
-          path.join(desktopRoot, 'dist', 'stella-app-icon.png'),
-          path.join(desktopRoot, 'public', 'stella-app-icon.png'),
-        ]
-
-  return candidates.find((candidatePath) => fs.existsSync(candidatePath)) ?? candidates[candidates.length - 1]
-}
-
-export const applyDockIcon = (electronDir: string) => {
-  if (process.platform !== 'darwin' || !app.dock) {
-    return
-  }
-
-  const iconPath = resolveDockIconPath(electronDir)
-  if (!fs.existsSync(iconPath)) {
-    return
-  }
-
-  let iconImage = decodedIconCache.get(iconPath)
-  if (!iconImage) {
-    iconImage = nativeImage.createFromPath(iconPath)
-    if (iconImage.isEmpty()) {
-      return
-    }
-    decodedIconCache.set(iconPath, iconImage)
-  }
-
-  app.dock.setIcon(iconImage)
+  return candidates.find((candidatePath) => fs.existsSync(candidatePath))
 }

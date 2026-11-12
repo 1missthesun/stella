@@ -1,6 +1,5 @@
 import { app, dialog, globalShortcut } from "electron";
 import { writeFileSync } from "node:fs";
-import { applyDockIcon } from "../app-icon.js";
 import { getMainLogger } from "../observability/main-logger.js";
 import { t } from "../services/i18n-service.js";
 import { shutdownBootstrapRuntime } from "./resets.js";
@@ -127,9 +126,7 @@ export const registerBootstrapLifecycle = (context) => {
         if (process.platform === "darwin") {
             app.dock?.show();
         }
-        applyDockIcon(context.config.electronDir);
         await initializeBootstrapApplication(context);
-        applyDockIcon(context.config.electronDir);
     })
         .catch((error) => {
         void handleFatalStartupFailure(error);

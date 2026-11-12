@@ -956,7 +956,8 @@ export type IpcInvokeContract = {
   [IPC_APP_SOURCE_APPLY]: Invoke<[name: string], AppSourceActionResult>;
   [IPC_APP_SOURCE_UNDO]: Invoke<[sha: string], AppSourceActionResult>;
   [IPC_APP_SOURCE_APPLY_REMOTE]: Invoke<[], AppSourceActionResult>;
-  [IPC_APP_SOURCE_APPLY_UPSTREAM]: Invoke<[], AppSourceActionResult>;
+  /** `targets`: the other computers that update too; null is every one, [] only this one. */
+  [IPC_APP_SOURCE_APPLY_UPSTREAM]: Invoke<[targets?: string[] | null], AppSourceActionResult>;
   [IPC_APP_SOURCE_SKIP]: Invoke<[key: string], AppSourceActionResult>;
 
   [IPC_CHAT_CONTEXT_GET]: Invoke<[], ChatContext | null>;

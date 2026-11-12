@@ -9,8 +9,23 @@ export type AppSourceCommit = {
   kind: "version" | "other-computer" | "change";
 };
 
+/**
+ * A version Stella could not merge with the user's own changes by itself:
+ * `allowance` when merging it would spend a Free plan's allowance (so it waits
+ * for a click), `unsure` when it tried and was not confident.
+ */
+export type AppSourceConflicts = { files: string[]; why: "allowance" | "unsure" };
+
 export type AppSourceWaiting =
-  | { kind: "version"; key: string; adding: boolean; draft?: string }
+  | {
+      kind: "version";
+      key: string;
+      adding: boolean;
+      draft?: string;
+      /** The task drafting or that drafted `draft`. */
+      agentId?: string;
+      conflicts?: AppSourceConflicts;
+    }
   | {
       kind: "other-computer";
       key: string;
@@ -18,6 +33,7 @@ export type AppSourceWaiting =
       device: string;
       summary: string;
       draft?: string;
+      agentId?: string;
     }
   | {
       kind: "draft";
@@ -62,6 +78,18 @@ export type AppSourceState = {
   heldForRecording?: boolean;
   /** An update that restarts Stella's runtime waits until she finishes the reply she's in the middle of. */
   heldForReply?: boolean;
+  /**
+   * The last version that was applied by itself: because the user pressed
+   * Update on another computer (`from` names it), or here before it was ready.
+   */
+  arrived?: {
+    sha: string;
+    from: string | null;
+    date: number;
+    undone: boolean;
+    /** What Undo (or, once undone, Update) passes to `undo`. */
+    flip: string;
+  };
 };
 
 export type AppSourceActionResult =

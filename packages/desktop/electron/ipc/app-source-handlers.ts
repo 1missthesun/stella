@@ -59,7 +59,14 @@ export const registerAppSourceHandlers = (
   registerPrivilegedHandle(
     options,
     IPC_APP_SOURCE_APPLY_UPSTREAM,
-    (event) => service(event)?.applyUpstream() ?? unavailable,
+    (event, targets: unknown) =>
+      targets === undefined ||
+      targets === null ||
+      (Array.isArray(targets) &&
+        targets.length <= 64 &&
+        targets.every((target) => typeof target === "string" && target.length > 0 && target.length <= 256))
+        ? (service(event)?.applyUpstream((targets as string[] | null | undefined) ?? null) ?? unavailable)
+        : unavailable,
   );
   registerPrivilegedHandle(
     options,

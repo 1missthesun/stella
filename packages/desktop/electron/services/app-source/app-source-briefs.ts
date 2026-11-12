@@ -50,7 +50,7 @@ export const upstreamMergeBrief = (
   gateOutput?: string,
 ): AgentBrief => ({
   description: `Merge Stella update ${plan.tip.slice(0, 7)}`,
-  prompt: `An official Stella update has to be merged with this computer's own changes. The user already pressed Update, so nobody is waiting on a question — finish the draft. It then waits in Updates until they add it, so Stella never relaunches under them.
+  prompt: `An official Stella update has to be merged with this computer's own changes. The user already pressed Update, so nobody is waiting on a question — finish the draft. Stella applies it by itself as soon as you finish, at a moment that doesn't interrupt them; they are not asked again.
 
 Follow the "Updates" section of the modify-stella skill. Name the draft \`${mergeDraftName(plan.tip)}\`.
 
@@ -61,7 +61,9 @@ ${state(plan, head, {
   ref: "refs/remotes/stella-upstream/main",
 })}
 
-Resolve every conflict by keeping the user's changes: take the new version's code, then carry the user's changes onto it so both work. ${KEEP_MERGE}`,
+Resolve every conflict by keeping the user's changes: take the new version's code, then carry the user's changes onto it so both work. ${KEEP_MERGE}
+
+Your report is what the user sees about this update in the chat: say in a sentence or two that the update is merged and goes in by itself now, and how their own change was kept. If the two genuinely can't both work, say plainly what had to give.`,
 });
 
 export const remoteMergeBrief = (
@@ -71,7 +73,7 @@ export const remoteMergeBrief = (
   gateOutput?: string,
 ): AgentBrief => ({
   description: `Merge changes from another computer ${plan.tip.slice(0, 7)}`,
-  prompt: `The user changed Stella on another of their computers, and that change has to be merged with this computer's own changes. They already pressed the button to add it here, so nobody is waiting on a question — finish the draft. It then waits in Updates until they add it, so Stella never relaunches under them.
+  prompt: `The user changed Stella on another of their computers, and that change has to be merged with this computer's own changes. They already pressed the button to add it here, so nobody is waiting on a question — finish the draft. Stella applies it by itself as soon as you finish, at a moment that doesn't interrupt them.
 
 Follow the "Rebase, merge, or undo for the user" section of the modify-stella skill, the "changes from another computer diverged" case. Name the draft \`${remoteMergeDraftName(plan.tip)}\`.
 
@@ -92,7 +94,7 @@ export const staleDraftBrief = (
   gateOutput?: string,
 ): AgentBrief => ({
   description: `Bring the draft "${name}" up to date`,
-  prompt: `A finished change of the user's was made against an older version of Stella and no longer fits the current one. They pressed Update on it, so they want it — bring it up to date and leave it finished on its own branch, \`draft/${name}\`. It then waits in Updates until they add it.
+  prompt: `A finished change of the user's was made against an older version of Stella and no longer fits the current one. They pressed Update on it, so they want it — bring it up to date and leave it finished on its own branch, \`draft/${name}\`. Stella applies it by itself as soon as you finish.
 
 Follow the "Rebase, merge, or undo for the user" section of the modify-stella skill, the "stale draft" case: \`git worktree add "$STELLA_DRAFTS_DIR/${name}" draft/${name}\` (no \`-b\`), rebase onto the checkout's current branch, resolve, check, finish.
 

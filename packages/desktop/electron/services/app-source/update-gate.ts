@@ -118,7 +118,7 @@ const writeTree = async (
   }
 };
 
-const linkNodeModules = async (cwd: string, scratch: string) => {
+export const linkNodeModules = async (cwd: string, scratch: string) => {
   await fs.symlink(
     path.join(cwd, "node_modules"),
     path.join(scratch, "node_modules"),
@@ -139,7 +139,7 @@ const linkNodeModules = async (cwd: string, scratch: string) => {
   }
 };
 
-const copyEnvFiles = async (cwd: string, scratch: string) => {
+export const copyEnvFiles = async (cwd: string, scratch: string) => {
   const dir = path.join("packages", "desktop-ui");
   const names = await fs.readdir(path.join(cwd, dir)).catch(() => [] as string[]);
   for (const name of names) {

@@ -7,10 +7,16 @@ import {
   BackendClient,
   BackendRequestError,
 } from "@stella/contracts/backend/client";
-import type { AppSourceRemote } from "@stella/contracts/backend/app-source";
+import {
+  UPDATE_PREPARER_STALE_MS,
+  updateResultTag,
+  type AppSourceRemote,
+  type AppSourceUpdate,
+} from "@stella/contracts/backend/app-source";
 import type {
   AppSourceActionResult,
   AppSourceCommit,
+  AppSourceConflicts,
   AppSourceDraftOffer,
   AppSourceState,
   AppSourceWaiting,
@@ -31,6 +37,7 @@ import {
 import { DRAFT_AGENTS_DIR, installCheckoutGuard } from "./checkout-guard.js";
 import { ReleaseChannel } from "./release-channel.js";
 import {
+  MERGE_WAIT_MS,
   classifyMerge,
   isMerging,
   readMergeRecord,
@@ -61,7 +68,16 @@ import {
   UpdatePreparer,
   type PrepareJob,
   type PreparedUpdate,
+  type ResolveLevel,
 } from "./update-prepare.js";
+import type { ModelResolve } from "./update-merge.js";
+import {
+  readIntent,
+  writeIntent,
+  WANTED_MAX_AGE_MS,
+  type UpdateIntent,
+  type Wanted,
+} from "./update-intent.js";
 import {
   mergeDraftName,
   rejectedDraftNote,
@@ -108,6 +124,10 @@ type AppSourceServiceOptions = {
   tellAgent?: (agentId: string, messageId: string, text: string) => Promise<boolean>;
   /** null: the runtime can't be asked right now. */
   agentRunning?: (agent: DispatchedAgent) => Promise<boolean | null>;
+  /** This computer's id on the account, once it has one. */
+  getDeviceId?: () => string | null;
+  /** A model that resolves merge conflicts without a task; spends the user's model use. */
+  modelResolve?: ModelResolve;
 };
 
 type TakeSource = {
@@ -124,6 +144,8 @@ type TakeSource = {
   pendingDraft: string;
   pendingDraftExists: boolean;
   settle?: (to: string) => Promise<void>;
+  /** When a task has to draft it: the press it answers, so the draft is applied once it is ready. */
+  wanted?: Wanted;
 };
 
 type ForkAccess = {
@@ -162,6 +184,11 @@ const CHANGE_TAG = "stella-change/";
 const CHANGE_TAG_PREFIX = `refs/tags/${CHANGE_TAG}`;
 const FORK_CHANGES_PREFIX = "refs/stella/fork-changes/";
 const BOOTSTRAP_PATH = "/api/app-source/bootstrap";
+const RESULT_REF = "refs/stella/update-result";
+/** How often a computer asks to be the one that merges a version in the background. */
+const CLAIM_RETRY_MS = 5 * 60_000;
+const PLAN_TTL_MS = 10 * 60_000;
+const APPLY_ANNOUNCE_TIMEOUT_MS = 8_000;
 const ACCESS_ATTEMPTS = 5;
 
 const NO_UPSTREAM: AppSourceState["upstream"] = {
@@ -201,6 +228,9 @@ const deviceName = () =>
   hostname()
     .trim()
     .replace(/\.(local|localdomain|lan|home)$/i, "");
+
+/** The name this computer is registered under on the account. */
+const accountDeviceName = () => hostname().trim().slice(0, 96);
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -283,6 +313,17 @@ export class AppSourceService {
   private autoTimer: NodeJS.Timeout | null = null;
   private reloadTimer: NodeJS.Timeout | null = null;
   private readonly preparer: UpdatePreparer;
+  private update: AppSourceUpdate | null = null;
+  private updateWatch: { baseUrl: string; stop: () => void } | null = null;
+  private intent: UpdateIntent | null = null;
+  private plan: { paid: boolean | null; at: number } | null = null;
+  private readonly claimTried = new Map<string, number>();
+  private readonly reported = new Set<string>();
+  private fetchingResult: string | null = null;
+  private wantTimer: NodeJS.Timeout | null = null;
+  /** The version whose merge is prepared and can be applied at once. */
+  private versionReady: string | null = null;
+  private versionConflicts: AppSourceConflicts | null = null;
 
   constructor(options: AppSourceServiceOptions) {
     this.options = options;
@@ -292,6 +333,7 @@ export class AppSourceService {
       scratch: `${options.updateScratchDir}-prepare`,
       log: options.log,
       onPrepared: () => void this.refresh(),
+      model: () => options.modelResolve ?? null,
     });
     this.releases = new ReleaseChannel({
       onPublished: (version) => this.onPublished(version),
@@ -319,7 +361,19 @@ export class AppSourceService {
           error: error instanceof Error ? error.message : String(error),
         }),
     );
+    void this.rememberResolutions();
     void this.refresh();
+  }
+
+  /**
+   * Every merge resolved in this checkout (by a task in a draft, or here) is
+   * remembered by git, so the same conflict is never resolved twice.
+   */
+  private async rememberResolutions() {
+    const cwd = this.options.stellaAppDir;
+    const current = await gitRaw(cwd, ["config", "--get", "rerere.enabled"]).catch(() => null);
+    if (!current || current.stdout.trim() !== "") return;
+    await gitRaw(cwd, ["config", "rerere.enabled", "true"]).catch(() => undefined);
   }
 
   dispose() {
@@ -332,6 +386,10 @@ export class AppSourceService {
     this.syncTimer = null;
     if (this.autoTimer) clearTimeout(this.autoTimer);
     this.autoTimer = null;
+    if (this.wantTimer) clearTimeout(this.wantTimer);
+    this.wantTimer = null;
+    this.updateWatch?.stop();
+    this.updateWatch = null;
     if (this.reloadTimer) clearInterval(this.reloadTimer);
     this.reloadTimer = null;
     this.releases.dispose();
@@ -346,31 +404,38 @@ export class AppSourceService {
   }
 
   applyDraft(name: string) {
-    return this.exclusive(async (cwd) => {
-      if (!isDraftName(name)) throw new Error("Unknown draft.");
-      const ref = `${DRAFT_REF_PREFIX}${name}`;
-      const [worktrees, subject] = await Promise.all([
-        listWorktrees(cwd),
-        git(cwd, ["log", "-1", "--format=%s", `${ref}^{commit}`]),
-      ]);
-      if (worktrees.some((tree) => tree.branch === ref)) {
-        throw new Error(`The draft "${name}" is still being worked on.`);
-      }
-      return await this.take(cwd, {
-        kind: "draft",
-        ref,
-        emptyMessage: "That change is already in this version.",
-        subject,
-        trustIdenticalTree: false,
-        brief: (plan, head, gateOutput) =>
-          staleDraftBrief(plan, head, name, gateOutput),
-        pendingDraft: name,
-        pendingDraftExists: true,
-        settle: async (to) => {
-          await git(cwd, ["branch", "-D", `draft/${name}`]);
-          if (!isStellaDraft(name)) await this.rememberAgent(cwd, name, to);
-        },
-      });
+    return this.exclusive((cwd) => this.takeDraft(cwd, name));
+  }
+
+  private async takeDraft(cwd: string, name: string, after?: (to: string) => Promise<void>) {
+    if (!isDraftName(name)) throw new Error("Unknown draft.");
+    const ref = `${DRAFT_REF_PREFIX}${name}`;
+    const [worktrees, subject] = await Promise.all([
+      listWorktrees(cwd),
+      git(cwd, ["log", "-1", "--format=%s", `${ref}^{commit}`]),
+    ]);
+    if (worktrees.some((tree) => tree.branch === ref)) {
+      throw new Error(`The draft "${name}" is still being worked on.`);
+    }
+    return await this.take(cwd, {
+      kind: "draft",
+      ref,
+      emptyMessage: "That change is already in this version.",
+      subject,
+      trustIdenticalTree: false,
+      brief: (plan, head, gateOutput) =>
+        staleDraftBrief(plan, head, name, gateOutput),
+      pendingDraft: name,
+      pendingDraftExists: true,
+      settle: async (to) => {
+        const agentId = await this.agentOf(cwd, DRAFT_AGENTS_DIR, name);
+        await git(cwd, ["branch", "-D", `draft/${name}`]);
+        if (!isStellaDraft(name)) await this.rememberAgent(cwd, name, to);
+        else if (agentId) await this.writeChange(cwd, to, agentId, false);
+        await this.shareTaskMerge(name, to);
+        await after?.(to);
+      },
+      wanted: { kind: "draft", name, at: Date.now() },
     });
   }
 
@@ -498,6 +563,14 @@ export class AppSourceService {
       await this.swapIn(cwd, head, revert, async () => {
         const change = await this.changeOf(cwd, sha);
         if (change) await this.writeChange(cwd, revert, change.agentId, !change.undone);
+        await this.saveIntent((intent) => {
+          const arrived = intent.arrived;
+          if (arrived?.sha === sha) arrived.revert = revert;
+          else if (arrived?.revert === sha) {
+            arrived.sha = revert;
+            delete arrived.revert;
+          }
+        });
       });
     });
   }
@@ -509,6 +582,7 @@ export class AppSourceService {
       const ref = `${FORK_REF_PREFIX}${this.forkBranch}`;
       const tip = await git(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]);
       return await this.take(cwd, {
+        wanted: { kind: "draft", name: remoteMergeDraftName(tip), at: Date.now() },
         kind: "remote",
         ref,
         emptyMessage: "No changes from your other computers.",
@@ -522,24 +596,33 @@ export class AppSourceService {
     });
   }
 
-  applyUpstream() {
+  /**
+   * The user's Update. `targets` are the other computers it is for too (null:
+   * every one, []: this one only); they apply it by themselves. Here it is
+   * applied at once when it is prepared. When it isn't yet (a merge that
+   * still needs resolving), the press is the go-ahead: it is applied by
+   * itself once it is ready, with no second press.
+   */
+  applyUpstream(targets: string[] | null = null) {
     return this.exclusive(async (cwd) => {
       if (!this.upstreamTracked) throw new Error("No update is available.");
-      const tip = await git(cwd, [
-        "rev-parse",
-        "--verify",
-        `${UPSTREAM_REF}^{commit}`,
-      ]);
-      return await this.take(cwd, {
-        kind: "upstream",
-        ref: (await this.mergedElsewhere(cwd, tip)) ?? UPSTREAM_REF,
-        emptyMessage: "No update is available.",
-        subject: `Merge the published Stella update ${tip.slice(0, 12)}`,
-        trustIdenticalTree: true,
-        brief: upstreamMergeBrief,
-        pendingDraft: mergeDraftName(tip),
-        pendingDraftExists: false,
-      });
+      const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
+      const head = await git(cwd, ["rev-parse", "HEAD"]);
+      if (await isAncestor(cwd, version, head)) throw new Error("No update is available.");
+      await this.announceApply(version, targets);
+      const target = await this.updateTarget(cwd, head, version);
+      const prepared = await this.preparer.recordFor(head, target.tip);
+      const found = prepared ?? (await this.preparer.peek(head, target.tip));
+      const wanted: Wanted = { kind: "version", version, from: null, at: Date.now() };
+      if (!prepared && found?.plan?.kind === "conflict") {
+        const modelTried = found.resolve === "model" || Boolean(this.update?.version === version && this.update.unresolved);
+        if (this.waitingOnOther(version) || (!modelTried && this.options.modelResolve)) {
+          await this.want(wanted);
+          this.options.log("app-source.update-wanted", { version: version.slice(0, 12) });
+          return { background: true as const };
+        }
+      }
+      return await this.takeUpstream(cwd);
     });
   }
 
@@ -565,10 +648,10 @@ export class AppSourceService {
     });
     if (plan.kind === "none") throw new Error(source.emptyMessage);
     let to = plan.kind === "fast-forward" ? plan.tip : "";
-    if (plan.kind === "conflict") {
+    if (plan.kind === "conflict" && !prepared?.to) {
       return await this.dispatchMerge(cwd, source, source.brief(plan, head));
     }
-    if (plan.kind === "clean" && prepared?.to) {
+    if (plan.kind !== "fast-forward" && prepared?.to) {
       to = prepared.to;
       if (prepared.gate && !prepared.gate.ok) {
         return await this.dispatchMerge(
@@ -669,6 +752,7 @@ export class AppSourceService {
       since: Date.now(),
       agent,
     });
+    if (source.wanted) await this.want(source.wanted);
     return { background: true };
   }
 
@@ -1166,6 +1250,7 @@ export class AppSourceService {
             ...(this.heldForReply ? { heldForReply: true } : {}),
           });
           this.considerAutoApply(this.state);
+          this.considerWanted(this.state);
         } catch (error) {
           this.options.log("app-source.refresh-failed", {
             message: errorMessage(error),
@@ -1242,7 +1327,7 @@ export class AppSourceService {
     ) => {
       if (keys.some((key) => skippedNow.has(key))) return true;
       jobs.push({ ...job, head, identityEnv });
-      return await this.preparer.isReady(head, job.tip);
+      return await this.preparer.isReady(head, job.tip, job.resolve);
     };
     const shown: FoundDraft[] = [];
     for (const draft of drafts) {
@@ -1258,22 +1343,39 @@ export class AppSourceService {
       if (prepared) shown.push(draft);
     }
     const readyShown = shown.filter((draft) => !draft.stale);
+    const intent = await this.loadIntent();
     let upstreamShown = false;
-    if (upstreamOffer?.real) {
-      const ref = (await this.mergedElsewhere(cwd, upstreamOffer.tip)) ?? UPSTREAM_REF;
-      upstreamShown = await preparedFor(
+    let conflicts: AppSourceConflicts | undefined;
+    this.versionReady = null;
+    this.versionConflicts = null;
+    const version = upstreamOffer?.real ? upstreamOffer.tip : null;
+    if (version) {
+      const target = await this.updateTarget(cwd, head, version);
+      const resolve = await this.resolveLevel(head, version, target.tip);
+      const ready = await preparedFor(
         {
-          tip:
-            ref === UPSTREAM_REF
-              ? upstreamOffer.tip
-              : await git(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]),
-          ref,
-          subject: `${UPSTREAM_MERGE_SUBJECT} ${upstreamOffer.tip.slice(0, 12)}`,
+          tip: target.tip,
+          ref: target.ref,
+          subject: `${UPSTREAM_MERGE_SUBJECT} ${version.slice(0, 12)}`,
           trustIdenticalTree: true,
+          resolve,
         },
-        [`version:${upstreamOffer.tip}`],
+        [`version:${version}`],
       );
+      const record = await this.preparer.peek(head, target.tip);
+      if (record) void this.shareResult(version, head, record);
+      if (ready && record?.plan?.kind === "conflict" && !record.to) {
+        conflicts = this.conflictsToShow(version, record);
+        upstreamShown = conflicts !== undefined;
+        this.versionConflicts = conflicts ?? null;
+      } else {
+        upstreamShown = ready;
+        if (ready && record?.to) this.versionReady = version;
+      }
     }
+    const wantedVersion =
+      version !== null &&
+      intent.wanted.some((entry) => entry.kind === "version" && entry.version === version);
     const forkShown =
       forkRef && forkOffer?.real
         ? await preparedFor(
@@ -1300,18 +1402,23 @@ export class AppSourceService {
     const pending = merge && isMerging(merge.status) ? merge.record : null;
     const merging = pending?.from ?? null;
     const offered: AppSourceWaiting[] = [];
-    const versionTip = upstreamOffer?.real && upstreamShown ? upstreamOffer.tip : null;
+    const versionTip = version && (upstreamShown || wantedVersion) ? version : null;
     const updateDraft = readyShown.find((draft) =>
       versionTip
         ? draft.name === mergeDraftName(versionTip)
         : isUpdateDraft(draft.name),
     );
     if (versionTip || updateDraft) {
+      const agentId =
+        updateDraft?.agentId ??
+        (pending?.from === "upstream" ? pending.agent?.threadId : undefined);
       offered.push({
         kind: "version",
         key: `version:${versionTip ?? updateDraft!.sha}`,
-        adding: merging === "upstream",
+        adding: merging === "upstream" || wantedVersion,
         ...(updateDraft ? { draft: updateDraft.name } : {}),
+        ...(agentId ? { agentId } : {}),
+        ...(conflicts && !updateDraft && merging !== "upstream" && !wantedVersion ? { conflicts } : {}),
       });
     }
     if (forkRef && forkOffer?.real && forkShown) {
@@ -1322,13 +1429,19 @@ export class AppSourceService {
       const forkDraft = readyShown.find(
         (draft) => draft.name === remoteMergeDraftName(forkOffer.tip),
       );
+      const agentId =
+        forkDraft?.agentId ?? (pending?.from === "remote" ? pending.agent?.threadId : undefined);
       offered.push({
         kind: "other-computer",
         key: `other:${forkOffer.tip}`,
-        adding: merging === "remote",
+        adding:
+          merging === "remote" ||
+          (forkDraft !== undefined &&
+            intent.wanted.some((entry) => entry.kind === "draft" && entry.name === forkDraft.name)),
         device,
         summary,
         ...(forkDraft ? { draft: forkDraft.name } : {}),
+        ...(agentId ? { agentId } : {}),
       });
     }
     for (const draft of shown) {
@@ -1337,7 +1450,10 @@ export class AppSourceService {
       offered.push({
         kind: "draft",
         key: `draft:${draft.sha}`,
-        adding: merging === "draft" && pending?.draft === draft.name,
+        adding:
+          (merging === "draft" && pending?.draft === draft.name) ||
+          (!draft.stale &&
+            intent.wanted.some((entry) => entry.kind === "draft" && entry.name === draft.name)),
         summary: subject || draft.name,
         ...rest,
       });
@@ -1366,7 +1482,20 @@ export class AppSourceService {
     }
     this.offeredKeys = offered.map((offer) => offer.key);
     const skipped = skippedNow;
+    await this.pruneWanted(cwd, head, intent, drafts, worktrees);
+    const arrived = intent.arrived;
     return {
+      ...(arrived && Date.now() - arrived.at < WANTED_MAX_AGE_MS
+        ? {
+            arrived: {
+              sha: arrived.sha,
+              from: arrived.from,
+              date: arrived.at,
+              undone: Boolean(arrived.revert),
+              flip: arrived.revert ?? arrived.sha,
+            },
+          }
+        : {}),
       remote: remote
         ? { status: remote.status, count: remote.count }
         : { status: "none", count: 0 },
@@ -1376,6 +1505,490 @@ export class AppSourceService {
       skipped: offered.filter((offer) => !offer.adding && skipped.has(offer.key)),
       ...(pending ? { merging: { from: pending.from, draft: pending.draft } } : {}),
     };
+  }
+
+  private async loadIntent(): Promise<UpdateIntent> {
+    if (!this.intent) {
+      this.intent = await readIntent(await this.commonDir(this.options.stellaAppDir));
+    }
+    return this.intent;
+  }
+
+  private async saveIntent(change: (intent: UpdateIntent) => void) {
+    const intent = await this.loadIntent();
+    change(intent);
+    await writeIntent(await this.commonDir(this.options.stellaAppDir), intent).catch((error: unknown) =>
+      this.options.log("app-source.intent-write-failed", { message: errorMessage(error) }),
+    );
+  }
+
+  private want(entry: Wanted) {
+    return this.saveIntent((intent) => {
+      intent.wanted = [
+        ...intent.wanted.filter((other) =>
+          entry.kind === "version"
+            ? other.kind !== "version"
+            : !(other.kind === "draft" && other.name === entry.name),
+        ),
+        entry,
+      ];
+    });
+  }
+
+  /** Drops what was asked for once it is in, or can no longer arrive. */
+  private async pruneWanted(
+    cwd: string,
+    head: string,
+    intent: UpdateIntent,
+    ready: FoundDraft[],
+    worktrees: Awaited<ReturnType<typeof listWorktrees>>,
+  ) {
+    const kept: Wanted[] = [];
+    for (const entry of intent.wanted) {
+      if (Date.now() - entry.at >= WANTED_MAX_AGE_MS) continue;
+      if (entry.kind === "version") {
+        if (await isAncestor(cwd, entry.version, head)) continue;
+      } else {
+        const ref = `${DRAFT_REF_PREFIX}${entry.name}`;
+        const exists = (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])).code === 0;
+        const drafting = worktrees.some((tree) => tree.branch === ref);
+        const merging = this.merge?.draft === entry.name;
+        if (!exists && !drafting && !merging) continue;
+        if (!drafting && !merging && ready.some((draft) => draft.name === entry.name && draft.stale)) continue;
+      }
+      kept.push(entry);
+    }
+    if (kept.length !== intent.wanted.length) {
+      await this.saveIntent((current) => {
+        current.wanted = kept;
+      });
+    }
+  }
+
+  /**
+   * Where this computer gets `version` from: the merge the account already
+   * made of it when that merge brings nothing this checkout lacks but the
+   * version itself (the same personal changes, so the same answer); then the
+   * fork, when another computer already took it; else the published version.
+   */
+  private async updateTarget(cwd: string, head: string, version: string) {
+    const result = this.update?.version === version ? this.update.result : null;
+    const own = result ? await this.preparer.peek(head, version) : null;
+    if (result && own?.to !== result.sha) {
+      const known = (await gitRaw(cwd, ["cat-file", "-e", `${result.sha}^{commit}`])).code === 0;
+      if (!known) {
+        void this.fetchResult(version, result.sha);
+      } else if (await this.usableResult(cwd, head, result.sha, version)) {
+        return { ref: result.sha, tip: result.sha };
+      }
+    }
+    const ref = (await this.mergedElsewhere(cwd, version)) ?? UPSTREAM_REF;
+    return {
+      ref,
+      tip: ref === UPSTREAM_REF ? version : await git(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]),
+    };
+  }
+
+  /** `merged` holds `version` and nothing but changes this checkout already has (by content). */
+  private async usableResult(cwd: string, head: string, merged: string, version: string) {
+    if (!(await isAncestor(cwd, version, merged))) return false;
+    const extra = await gitRaw(cwd, [
+      "rev-list",
+      "--no-merges",
+      "--right-only",
+      "--cherry-pick",
+      "--max-count=1",
+      `${head}...${merged}`,
+      `^${version}`,
+    ]);
+    return extra.code === 0 && extra.stdout.trim() === "";
+  }
+
+  private async fetchResult(version: string, sha: string) {
+    if (this.fetchingResult === sha || this.disposed) return;
+    this.fetchingResult = sha;
+    const cwd = this.options.stellaAppDir;
+    try {
+      const fork = (await this.sourceAccess())?.fork;
+      if (!fork) return;
+      await git(
+        cwd,
+        [
+          "fetch",
+          "--quiet",
+          "--no-tags",
+          "--no-write-fetch-head",
+          fork.remote,
+          `+refs/tags/${updateResultTag(version)}:${RESULT_REF}`,
+        ],
+        { env: fetchEnv(fork.token), timeoutMs: 5 * 60_000 },
+      );
+      this.options.log("app-source.update-result-fetched", { version: version.slice(0, 12) });
+      void this.refresh();
+    } catch (error) {
+      this.options.log("app-source.update-result-fetch-failed", { message: errorMessage(error) });
+    } finally {
+      this.fetchingResult = null;
+    }
+  }
+
+  /**
+   * How far preparing may take a conflicting merge of `version`. Resolutions
+   * git already knows are free and always used. A model only when the user
+   * said yes (an Update press, here or for this computer elsewhere), or in the
+   * background on a paid plan when this is the one computer on the account
+   * that merges this version.
+   */
+  private async resolveLevel(head: string, version: string, tip: string): Promise<ResolveLevel> {
+    const record = await this.preparer.peek(head, tip);
+    const rerereFailed =
+      record?.plan?.kind === "conflict" && !record.to && record.resolve !== undefined && record.resolve !== "none";
+    if (!rerereFailed || !this.options.modelResolve) return "rerere";
+    if (this.waitingOnOther(version)) return "rerere";
+    const intent = await this.loadIntent();
+    if (intent.wanted.some((entry) => entry.kind === "version" && entry.version === version)) {
+      return "model";
+    }
+    return (await this.mayMergeInBackground(version, head)) ? "model" : "rerere";
+  }
+
+  private async paidPlan(): Promise<boolean | null> {
+    if (this.plan && Date.now() - this.plan.at < PLAN_TTL_MS) return this.plan.paid;
+    const baseUrl = this.options.getBackendUrl();
+    if (!baseUrl || !this.options.hasConnectedAccount()) return null;
+    try {
+      const status = await this.backendClient(baseUrl).read("billing.status", {}, { timeoutMs: 15_000 });
+      this.plan = { paid: status.plan !== "free", at: Date.now() };
+    } catch (error) {
+      this.options.log("app-source.plan-unknown", { message: errorMessage(error) });
+      this.plan = { paid: null, at: Date.now() - PLAN_TTL_MS + 60_000 };
+    }
+    return this.plan.paid;
+  }
+
+  private ownsMerge(version: string) {
+    const me = this.options.getDeviceId?.();
+    const update = this.update;
+    return Boolean(
+      me && update?.version === version && update.preparer?.deviceId === me && !update.result && !update.unresolved,
+    );
+  }
+
+  /** Another computer on the account is merging `version` right now; this one waits for it. */
+  private waitingOnOther(version: string) {
+    const me = this.options.getDeviceId?.();
+    const update = this.update;
+    const preparer = update?.version === version ? update.preparer : null;
+    return Boolean(
+      preparer &&
+        preparer.deviceId !== me &&
+        !update!.result &&
+        !update!.unresolved &&
+        Date.now() - preparer.at < UPDATE_PREPARER_STALE_MS,
+    );
+  }
+
+  private async mayMergeInBackground(version: string, head: string) {
+    const me = this.options.getDeviceId?.();
+    const baseUrl = this.options.getBackendUrl();
+    if (!me || !baseUrl || !this.options.hasConnectedAccount()) return false;
+    if ((await this.paidPlan()) !== true) return false;
+    if (this.ownsMerge(version)) return true;
+    const update = this.update?.version === version ? this.update : null;
+    if (update?.result || update?.unresolved || this.waitingOnOther(version)) return false;
+    const last = this.claimTried.get(version) ?? 0;
+    if (Date.now() - last < CLAIM_RETRY_MS) return false;
+    this.claimTried.set(version, Date.now());
+    try {
+      const { update: claimed } = await this.backendClient(baseUrl).call("appSource.claimUpdate", {
+        version,
+        deviceId: me,
+        device: accountDeviceName(),
+        base: head,
+      });
+      this.update = claimed;
+      const mine = this.ownsMerge(version);
+      this.options.log("app-source.merge-claimed", { version: version.slice(0, 12), mine });
+      return mine;
+    } catch (error) {
+      this.options.log("app-source.merge-claim-failed", { message: errorMessage(error) });
+      return false;
+    }
+  }
+
+  /**
+   * A merge preparing could not finish is shown (with what conflicts), except
+   * while another computer on the account is merging the same version: its
+   * result is what this one will take.
+   */
+  private conflictsToShow(version: string, record: PreparedUpdate): AppSourceConflicts | undefined {
+    const files = record.unresolved ?? [];
+    if (record.resolve === "model") return { files, why: "unsure" };
+    if (this.waitingOnOther(version) || this.ownsMerge(version)) return undefined;
+    const update = this.update?.version === version ? this.update : null;
+    if (update?.unresolved) return { files: files.length ? files : update.unresolved, why: "unsure" };
+    if (this.plan?.paid === false) return { files, why: "allowance" };
+    if (this.plan?.paid === true && this.options.modelResolve && !update?.result) {
+      const last = this.claimTried.get(version);
+      if (last === undefined || Date.now() - last < CLAIM_RETRY_MS) return undefined;
+    }
+    return { files, why: "unsure" };
+  }
+
+  /** A version merged here goes to the account, so other computers with the same changes take it as is. */
+  private async shareResult(version: string, head: string, record: PreparedUpdate) {
+    const me = this.options.getDeviceId?.();
+    const baseUrl = this.options.getBackendUrl();
+    if (!me || !baseUrl || !this.options.hasConnectedAccount()) return;
+    const merged = Boolean(record.to && record.resolvedBy);
+    const gaveUp = !record.to && record.resolve === "model";
+    if (!merged && !gaveUp) return;
+    const key = `${version}:${record.to ?? "unresolved"}`;
+    if (this.reported.has(key)) return;
+    const update = this.update?.version === version ? this.update : null;
+    if (update?.result || (gaveUp && !this.ownsMerge(version))) return;
+    this.reported.add(key);
+    if (!(await this.publishResult(version, head, merged ? record.to : null, record.unresolved))) {
+      this.reported.delete(key);
+    }
+  }
+
+  private async publishResult(version: string, base: string, to: string | null, unresolved?: string[]) {
+    const me = this.options.getDeviceId?.();
+    const baseUrl = this.options.getBackendUrl();
+    if (!me || !baseUrl || !this.options.hasConnectedAccount()) return false;
+    try {
+      if (to) {
+        const fork = (await this.sourceAccess())?.fork;
+        if (!fork) throw new Error("No fork to share the merged version through.");
+        await git(
+          this.options.stellaAppDir,
+          ["push", "--quiet", fork.remote, `+${to}:refs/tags/${updateResultTag(version)}`],
+          { env: pushEnv(fork.token), timeoutMs: 5 * 60_000 },
+        );
+      }
+      const { update: next } = await this.backendClient(baseUrl).call("appSource.updatePrepared", {
+        version,
+        deviceId: me,
+        device: accountDeviceName(),
+        base,
+        result: to,
+        ...(to ? {} : { unresolved: (unresolved ?? []).slice(0, 200) }),
+      });
+      this.update = next;
+      this.options.log("app-source.update-shared", { version: version.slice(0, 12), merged: Boolean(to) });
+      return true;
+    } catch (error) {
+      this.options.log("app-source.update-share-failed", { message: errorMessage(error) });
+      return false;
+    }
+  }
+
+  /** A version a task merged here goes to the account too, before Stella relaunches into it. */
+  private async shareTaskMerge(name: string, to: string) {
+    if (!isUpdateDraft(name)) return;
+    const cwd = this.options.stellaAppDir;
+    const version = (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${UPSTREAM_REF}^{commit}`])).stdout.trim();
+    if (!version || mergeDraftName(version) !== name || !(await isAncestor(cwd, version, to))) return;
+    const update = this.update?.version === version ? this.update : null;
+    if (update?.result) return;
+    const base = (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${to}^1`])).stdout.trim();
+    if (!base) return;
+    await Promise.race([this.publishResult(version, base, to), delay(6_000)]);
+  }
+
+  private onUpdate(update: AppSourceUpdate | null) {
+    const before = JSON.stringify(this.update);
+    this.update = update;
+    void this.takeIncoming(update).catch((error: unknown) =>
+      this.options.log("app-source.incoming-failed", { message: errorMessage(error) }),
+    );
+    if (before !== JSON.stringify(update)) void this.refresh();
+  }
+
+  /** Update pressed on another computer, for this one too: it is applied here by itself. */
+  private async takeIncoming(update: AppSourceUpdate | null) {
+    const apply = update?.apply;
+    const me = this.options.getDeviceId?.();
+    if (!update || !apply || !me || apply.deviceId === me) return;
+    if (apply.targets && !apply.targets.includes(me)) return;
+    const key = `${update.version}:${apply.at}`;
+    const intent = await this.loadIntent();
+    if (intent.handled.includes(key)) return;
+    const cwd = this.options.stellaAppDir;
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const fresh = Date.now() - apply.at < WANTED_MAX_AGE_MS;
+    const already = await isAncestor(cwd, update.version, head);
+    await this.saveIntent((current) => {
+      current.handled = [...current.handled, key];
+      if (fresh && !already) {
+        current.wanted = [
+          ...current.wanted.filter((entry) => entry.kind !== "version"),
+          {
+            kind: "version",
+            version: update.version,
+            from: { deviceId: apply.deviceId, device: apply.device },
+            at: Date.now(),
+          },
+        ];
+      }
+    });
+    this.options.log("app-source.update-requested-elsewhere", {
+      version: update.version.slice(0, 12),
+      taken: fresh && !already,
+    });
+    if (fresh && !already) {
+      this.wantSync("update");
+      void this.refresh();
+    }
+  }
+
+  private async announceApply(version: string, targets: string[] | null) {
+    if (targets && targets.length === 0) return;
+    const me = this.options.getDeviceId?.();
+    const baseUrl = this.options.getBackendUrl();
+    if (!me || !baseUrl || !this.options.hasConnectedAccount()) return;
+    try {
+      const call = this.backendClient(baseUrl).call("appSource.applyUpdate", {
+        version,
+        deviceId: me,
+        device: accountDeviceName(),
+        targets,
+      });
+      const { update } = await Promise.race([
+        call,
+        delay(APPLY_ANNOUNCE_TIMEOUT_MS).then(() => {
+          throw new Error("timed out");
+        }),
+      ]);
+      this.update = update;
+      this.options.log("app-source.update-announced", {
+        version: version.slice(0, 12),
+        targets: targets === null ? "all" : targets.length,
+      });
+    } catch (error) {
+      this.options.log("app-source.update-announce-failed", { message: errorMessage(error) });
+    }
+  }
+
+  /**
+   * What was asked for is applied as soon as it is ready, when the user's
+   * hands are off Stella (or they're away), one at a time.
+   */
+  private considerWanted(state: AppSourceState) {
+    if (this.wantTimer || this.disposed || state.busy || state.merging) return;
+    const intent = this.intent;
+    if (!intent || intent.wanted.length === 0) return;
+    let action: (() => Promise<AppSourceActionResult>) | null = null;
+    let label = "";
+    for (const entry of intent.wanted) {
+      if (entry.kind === "version") {
+        const offer = state.waiting.find(
+          (candidate): candidate is Extract<AppSourceWaiting, { kind: "version" }> =>
+            candidate.kind === "version" && candidate.key === `version:${entry.version}`,
+        );
+        if (!offer) continue;
+        if (offer.draft) {
+          const name = offer.draft;
+          action = () => this.applyDraftFor(name, entry);
+        } else if (this.versionReady === entry.version) {
+          action = () => this.exclusive((cwd) => this.takeUpstream(cwd, entry));
+        } else if (!entry.task && this.versionNeedsTask(entry)) {
+          action = async () => {
+            await this.want({ ...entry, task: true });
+            return await this.exclusive((cwd) => this.takeUpstream(cwd, entry));
+          };
+        }
+        label = `version:${entry.version.slice(0, 12)}`;
+      } else {
+        const ready = state.waiting.some(
+          (offer) =>
+            (offer.kind === "draft" && offer.name === entry.name && !offer.stale) ||
+            (offer.kind === "other-computer" && offer.draft === entry.name),
+        );
+        if (ready) action = () => this.applyDraftFor(entry.name, entry);
+        label = `draft:${entry.name}`;
+      }
+      if (action) break;
+    }
+    if (!action) return;
+    const run = action;
+    const attempt = async () => {
+      this.wantTimer = null;
+      if (this.disposed || this.state.merging) return;
+      const quiet = this.busy ? 0 : ((await this.options.userQuietFor?.()) ?? Infinity);
+      if (quiet < AUTO_APPLY_QUIET_MS) {
+        this.wantTimer = setTimeout(() => void attempt(), AUTO_APPLY_RETRY_MS);
+        this.wantTimer.unref?.();
+        return;
+      }
+      const result = await run();
+      this.options.log("app-source.wanted-applied", {
+        what: label,
+        ok: result.ok,
+        ...(result.ok ? {} : { error: result.error }),
+      });
+      if (!result.ok) {
+        await this.saveIntent((intent) => {
+          intent.wanted = intent.wanted.filter((entry) =>
+            label.startsWith("version:") ? entry.kind !== "version" : !(entry.kind === "draft" && label === `draft:${entry.name}`),
+          );
+        });
+        void this.refresh();
+      }
+    };
+    this.wantTimer = setTimeout(() => void attempt(), 0);
+  }
+
+  /**
+   * The background merge was not sure, so a task merges it (the press was the
+   * go-ahead). A press from another computer first waits for that computer's
+   * result: with the same changes here it is taken as is, and only a computer
+   * whose own changes differ merges it itself.
+   */
+  private versionNeedsTask(entry: Extract<Wanted, { kind: "version" }>) {
+    if (this.versionConflicts?.why !== "unsure" || this.waitingOnOther(entry.version)) return false;
+    const update = this.update?.version === entry.version ? this.update : null;
+    if (entry.from && !update?.result && Date.now() - entry.at < MERGE_WAIT_MS) return false;
+    return true;
+  }
+
+  private async noteArrived(entry: Wanted | undefined, to: string) {
+    await this.saveIntent((intent) => {
+      if (entry?.kind === "version") {
+        intent.arrived = { sha: to, version: entry.version, from: entry.from?.device ?? null, at: Date.now() };
+      }
+      intent.wanted = intent.wanted.filter((other) =>
+        entry?.kind === "draft"
+          ? !(other.kind === "draft" && other.name === entry.name)
+          : other.kind !== "version",
+      );
+    });
+  }
+
+  private applyDraftFor(name: string, entry: Wanted) {
+    return this.exclusive((cwd) => this.takeDraft(cwd, name, (to) => this.noteArrived(entry, to)));
+  }
+
+  private async takeUpstream(cwd: string, wanted?: Wanted) {
+    if (!this.upstreamTracked) throw new Error("No update is available.");
+    const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const target = await this.updateTarget(cwd, head, version);
+    const entry: Extract<Wanted, { kind: "version" }> =
+      wanted?.kind === "version" ? wanted : { kind: "version", version, from: null, at: Date.now() };
+    return await this.take(cwd, {
+      kind: "upstream",
+      ref: target.ref,
+      emptyMessage: "No update is available.",
+      subject: `Merge the published Stella update ${version.slice(0, 12)}`,
+      trustIdenticalTree: true,
+      brief: upstreamMergeBrief,
+      pendingDraft: mergeDraftName(version),
+      pendingDraftExists: false,
+      ...(wanted ? { settle: (to: string) => this.noteArrived(entry, to) } : {}),
+      wanted: { ...entry, task: true },
+    });
   }
 
   private recentLog(cwd: string) {
@@ -1747,6 +2360,7 @@ export class AppSourceService {
     const baseUrl = this.options.getBackendUrl();
     this.releases.follow(baseUrl);
     const watchFork = baseUrl && this.options.hasConnectedAccount() ? baseUrl : null;
+    this.followUpdates(watchFork);
     if (this.forkWatch?.baseUrl === watchFork) return;
     this.forkWatch?.stop();
     this.forkWatch = null;
@@ -1763,6 +2377,25 @@ export class AppSourceService {
         }),
     );
     this.forkWatch = { baseUrl: watchFork, stop };
+  }
+
+  /** The account's record of the published version on its way to its computers. */
+  private followUpdates(baseUrl: string | null) {
+    if (this.updateWatch?.baseUrl === baseUrl) return;
+    this.updateWatch?.stop();
+    this.updateWatch = null;
+    this.update = null;
+    if (!baseUrl) return;
+    const stop = this.backendClient(baseUrl).watch(
+      "appSource.update",
+      {},
+      (value) => this.onUpdate(value.update),
+      (error) =>
+        this.options.log("app-source.update-watch-failed", {
+          message: errorMessage(error),
+        }),
+    );
+    this.updateWatch = { baseUrl, stop };
   }
 
   private async currentOwner() {
@@ -1789,6 +2422,9 @@ export class AppSourceService {
     this.forkPushHeld = null;
     this.forkWatch?.stop();
     this.forkWatch = null;
+    this.updateWatch?.stop();
+    this.updateWatch = null;
+    this.update = null;
     this.followBackend();
   }
 
@@ -2089,6 +2725,7 @@ export class AppSourceService {
     if (this.backend?.baseUrl !== baseUrl) {
       this.backend?.client.dispose();
       this.forkWatch = null;
+      this.updateWatch = null;
       this.backend = {
         baseUrl,
         client: new BackendClient({

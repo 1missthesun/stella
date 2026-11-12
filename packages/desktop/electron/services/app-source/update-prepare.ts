@@ -8,6 +8,17 @@ import {
   type GateResult,
 } from "./update-gate.js";
 import { classifyUpdate, installs, relaunches, type UpdatePlan } from "./update-plan.js";
+import { mergeInBackground, type ModelResolve } from "./update-merge.js";
+
+/**
+ * How far a conflicting merge may be taken while preparing: not at all, with
+ * resolutions git already knows (free), or with a model too (spends the
+ * user's model use, so the caller decides).
+ */
+export type ResolveLevel = "none" | "rerere" | "model";
+
+const LEVELS: ResolveLevel[] = ["none", "rerere", "model"];
+const rank = (level: ResolveLevel | undefined) => LEVELS.indexOf(level ?? "none");
 
 export type PrepareJob = {
   head: string;
@@ -16,6 +27,7 @@ export type PrepareJob = {
   subject: string;
   trustIdenticalTree: boolean;
   identityEnv: () => Promise<NodeJS.ProcessEnv | undefined>;
+  resolve?: ResolveLevel;
 };
 
 export type PreparedUpdate = {
@@ -27,6 +39,10 @@ export type PreparedUpdate = {
   bundles: boolean;
   dir: string;
   ms: number;
+  /** For a conflicting merge: how far preparing went, and what it could not resolve. */
+  resolve?: ResolveLevel;
+  resolvedBy?: "rerere" | "model";
+  unresolved?: string[];
 };
 
 type Log = (event: string, data: Record<string, unknown>) => void;
@@ -43,10 +59,11 @@ export class UpdatePreparer {
   private readonly scratch: string;
   private readonly log: Log;
   private readonly onPrepared: () => void;
+  private readonly model: () => ModelResolve | null;
   private records = new Map<string, PreparedUpdate>();
   private loading: Promise<void> | null = null;
   private wanted: PrepareJob[] = [];
-  private running: { key: string; abort: AbortController } | null = null;
+  private running: { key: string; abort: AbortController; level: ResolveLevel } | null = null;
   private paused = 0;
 
   constructor(options: {
@@ -55,12 +72,21 @@ export class UpdatePreparer {
     scratch: string;
     log: Log;
     onPrepared: () => void;
+    model?: () => ModelResolve | null;
   }) {
     this.cwd = options.cwd;
     this.root = options.root;
     this.scratch = options.scratch;
     this.log = options.log;
     this.onPrepared = options.onPrepared;
+    this.model = options.model ?? (() => null);
+  }
+
+  /** A record from a lower resolve level than the job asks for is prepared again. */
+  private settles(job: Pick<PrepareJob, "resolve">, record: PreparedUpdate | undefined) {
+    if (!record) return false;
+    if (record.plan?.kind !== "conflict" || record.to) return true;
+    return rank(record.resolve) >= rank(job.resolve);
   }
 
   private load() {
@@ -87,9 +113,15 @@ export class UpdatePreparer {
     return this.loading;
   }
 
-  async isReady(head: string, tip: string) {
+  async isReady(head: string, tip: string, resolve?: ResolveLevel) {
     await this.load();
-    return this.records.has(prepareKey(head, tip));
+    return this.settles({ resolve }, this.records.get(prepareKey(head, tip)));
+  }
+
+  /** What preparing found, settled or not. */
+  async peek(head: string, tip: string): Promise<PreparedUpdate | null> {
+    await this.load();
+    return this.records.get(prepareKey(head, tip)) ?? null;
   }
 
   async want(jobs: PrepareJob[]) {
@@ -106,9 +138,10 @@ export class UpdatePreparer {
     this.next();
   }
 
+  /** A merge a model is resolving keeps going: it only touches its scratch worktree, and stopping it wastes what it spent. */
   pause() {
     this.paused += 1;
-    this.running?.abort.abort();
+    if (this.running?.level !== "model") this.running?.abort.abort();
   }
 
   resume() {
@@ -130,11 +163,13 @@ export class UpdatePreparer {
 
   private next() {
     if (this.running || this.paused > 0) return;
-    const job = this.wanted.find((candidate) => !this.records.has(prepareKey(candidate.head, candidate.tip)));
+    const job = this.wanted.find(
+      (candidate) => !this.settles(candidate, this.records.get(prepareKey(candidate.head, candidate.tip))),
+    );
     if (!job) return;
     const key = prepareKey(job.head, job.tip);
     const abort = new AbortController();
-    this.running = { key, abort };
+    this.running = { key, abort, level: job.resolve ?? "none" };
     void this.prepare(job, abort.signal)
       .then(
         async (record) => {
@@ -185,21 +220,44 @@ export class UpdatePreparer {
       if (plan.kind === "none" || plan.tip !== job.tip) {
         throw new Error("The version changed while it was being prepared.");
       }
-      if (plan.kind === "conflict") return record({ plan });
-      const to =
-        plan.kind === "fast-forward"
-          ? plan.tip
-          : await git(
-              cwd,
-              ["commit-tree", plan.tree, "-p", job.head, "-p", plan.tip, "-m", job.subject],
-              { env: await job.identityEnv(), ...options },
-            );
+      const level = job.resolve ?? "none";
+      let to: string;
+      let resolvedBy: "rerere" | "model" | undefined;
+      if (plan.kind === "conflict") {
+        if (level === "none") return record({ plan, resolve: level });
+        const merged = await mergeInBackground({
+          cwd,
+          head: job.head,
+          tip: job.tip,
+          subject: job.subject,
+          dir: `${this.scratch}-merge`,
+          identityEnv: await job.identityEnv(),
+          model: level === "model" ? this.model() : null,
+          log: this.log,
+          signal,
+        });
+        if (!merged.ok) {
+          return record({ plan, resolve: level, unresolved: merged.unresolved });
+        }
+        to = merged.to;
+        resolvedBy = merged.how;
+      } else {
+        to =
+          plan.kind === "fast-forward"
+            ? plan.tip
+            : await git(
+                cwd,
+                ["commit-tree", plan.tree, "-p", job.head, "-p", plan.tip, "-m", job.subject],
+                { env: await job.identityEnv(), ...options },
+              );
+      }
       const paths = (await git(cwd, ["diff", "--name-only", job.head, to], options))
         .split("\n")
         .filter(Boolean);
       const install = installs(paths);
       const keep = relaunches(paths) && !install ? dir : undefined;
-      const checked = plan.kind === "clean" && !(job.trustIdenticalTree && plan.identical);
+      const checked =
+        plan.kind === "conflict" || (plan.kind === "clean" && !(job.trustIdenticalTree && plan.identical));
       let gate: GateResult | null = null;
       let bundles = false;
       if (checked) {
@@ -220,7 +278,13 @@ export class UpdatePreparer {
         });
       }
       if (signal.aborted) throw new Error("Stopped.");
-      const done = record({ plan, to, gate, bundles });
+      const done = record({
+        plan,
+        to,
+        gate,
+        bundles,
+        ...(resolvedBy ? { resolve: level, resolvedBy } : {}),
+      });
       this.log("app-source.prepared", {
         tip: job.tip.slice(0, 12),
         kind: plan.kind,

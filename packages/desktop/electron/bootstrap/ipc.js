@@ -501,6 +501,21 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 });
                 return outcome !== "not_found" && outcome !== "refused";
             },
+            getDeviceId: () => state.deviceId ?? null,
+            modelResolve: async ({ system, user }) => {
+                const runner = lifecycle.getRunner();
+                if (!runner) {
+                    throw new Error("Stella isn't ready to merge this update yet.");
+                }
+                const { text } = await runner.runOneShotCompletion({
+                    agentType: "general",
+                    systemPrompt: system,
+                    userText: user,
+                    maxOutputTokens: 32_000,
+                    reasoningEffort: "medium",
+                });
+                return text;
+            },
             agentRunning: async ({ conversationId, threadId }) => {
                 const runner = lifecycle.getRunner();
                 if (!runner) return null;

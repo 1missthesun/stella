@@ -590,8 +590,18 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
 
   /** Stella hears of tasks waiting on this computer if it stays away (device-offline domain). */
   protected noteDeviceLost(deviceId: string): void {
+    // Its last connection names this absence: a new one needs it to be back.
+    const connectionId = this.ctx.storage.sql
+      .exec<{ connection_id: string | null }>(
+        "SELECT connection_id FROM device_presence WHERE device_id = ?",
+        deviceId,
+      )
+      .toArray()[0]?.connection_id;
     void this.ownerStore()
-      .internalCall("deviceOffline.lost", { deviceId })
+      .internalCall("deviceOffline.lost", {
+        deviceId,
+        ...(connectionId ? { connectionId } : {}),
+      })
       .catch(() => undefined);
   }
 

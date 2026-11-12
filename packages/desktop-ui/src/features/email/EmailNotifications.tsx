@@ -1,7 +1,11 @@
 import { useEffect, useMemo } from "react";
 import type { EmailMatter } from "@stella/contracts/backend/email";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
-import { useNotificationSource, type NotificationInput } from "@/features/notifications/notification-store";
+import {
+  setNotificationPanelOpen,
+  useNotificationSource,
+  type NotificationInput,
+} from "@/features/notifications/notification-store";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n } from "@/shared/i18n";
 import { useStaleEmailChipCleanup } from "./EmailDigest";
@@ -11,6 +15,11 @@ import { useEmailFeatureState } from "./email-feature";
 import { useEmailSeenAt } from "./email-unseen";
 
 const DETAIL_CHARS = 140;
+/** Open takes you to the mail, so the bell panel steps out of the way. */
+const openFromBell = () => {
+  setNotificationPanelOpen(false);
+  openEmailToday();
+};
 /** A new group of urgent mail toasts at most this often; the bell still lists it. */
 const URGENT_TOAST_GAP_MS = 30 * 60_000;
 const URGENT_TOAST_KEY = "stella.email.urgentToastAt";
@@ -68,7 +77,7 @@ function EmailBriefingNotifications() {
         title: clip(matters[0]!.wants),
         detail: more(matters.length - 1),
         createdAt: summary.at,
-        actions: [{ label: t("email.notify.open"), primary: true, run: openEmailToday }],
+        actions: [{ label: t("email.notify.open"), primary: true, run: openFromBell }],
       });
     }
     // Urgent mail and mail you asked about: one entry that grows, named after its oldest alert.
@@ -83,7 +92,7 @@ function EmailBriefingNotifications() {
         detail: more(matters.length - 1),
         createdAt: flagged[0]!.at,
         toast: urgentToastAllowed(id),
-        actions: [{ label: t("email.notify.open"), primary: true, run: openEmailToday }],
+        actions: [{ label: t("email.notify.open"), primary: true, run: openFromBell }],
       });
     }
     for (const matter of today.open) {
@@ -94,7 +103,7 @@ function EmailBriefingNotifications() {
         title: clip(matter.wants),
         detail: t("email.notify.back"),
         createdAt: matter.returnedAt,
-        actions: [{ label: t("email.notify.open"), primary: true, run: openEmailToday }],
+        actions: [{ label: t("email.notify.open"), primary: true, run: openFromBell }],
       });
     }
     return out;

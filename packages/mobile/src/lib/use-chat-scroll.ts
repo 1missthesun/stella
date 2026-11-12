@@ -190,20 +190,6 @@ export function useChatScroll(
     stopFollowLoop();
   }, [setFollowArmed, stopFollowLoop]);
 
-  /** Scrolls by `deltaPx` without re-pinning to the latest message. */
-  const revealBy = useCallback(
-    (deltaPx: number) => {
-      if (!Number.isFinite(deltaPx) || Math.abs(deltaPx) < 1) return;
-      releaseFollow();
-      const { offsetY } = metricsRef.current;
-      listRef.current?.scrollToOffset({
-        offset: Math.max(0, offsetY + deltaPx),
-        animated: true,
-      });
-    },
-    [releaseFollow],
-  );
-
   const onScrollBeginDrag = useCallback(() => {
     isDraggingRef.current = true;
     manualScrollActiveRef.current = true;
@@ -519,7 +505,6 @@ export function useChatScroll(
     onRowLayout,
     getShouldPlaceLatestTurn,
     releaseFollow,
-    revealBy,
     nudgeAfterSend,
     awayFromBottom,
     tailOffscreen,

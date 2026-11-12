@@ -3544,6 +3544,48 @@
       "checking": "Ellenőrzés…",
       "turnOff": "Kikapcsolás",
       "turnOffConfirm": "A kikapcsolás leállítja a rendezést, és törli a rendezett listát."
+    },
+    "row": {
+      "new": {
+        "one": "Új: {count}",
+        "other": "Új: {count}"
+      },
+      "urgent": {
+        "one": "Sürgős: {count}",
+        "other": "Sürgős: {count}"
+      },
+      "asked": {
+        "one": "Kért: {count}",
+        "other": "Kért: {count}"
+      },
+      "open": "Megnyitás az E-mailben"
+    },
+    "digest": {
+      "since": "{time} óta",
+      "ruleTitle": "Kérted, hogy szóljak erről",
+      "reply": "Válaszvázlat",
+      "handle": "Intézd el",
+      "archive": "Archiválás",
+      "unarchive": "Vissza a beérkezőkbe",
+      "open": "Megnyitás",
+      "tell": "Szólj Stellának…",
+      "tellPlaceholder": "Mit tegyen Stella ezzel a levéllel?",
+      "send": "Küldés",
+      "sent": "Elküldve Stellának. A válasz a csevegésben érkezik.",
+      "skipped": {
+        "one": "Kihagyva: {count}",
+        "other": "Kihagyva: {count}"
+      },
+      "skippedHint": "Levelek, amelyeket Stella zajként kihagyott. Jelöld meg a fontosakat, és Stella tanul belőle.",
+      "mattered": "Ez fontos volt",
+      "matteredDone": "Megjegyezve. Az ilyen levelek megjelennek.",
+      "earlier": "Korábban",
+      "waiting": "Még nincs összefoglalóban",
+      "empty": "Még nincs összefoglaló. Ha egy új levél fontos, itt jelenik meg.",
+      "settings": "E-mail-beállítások",
+      "askReply": "Írj válaszvázlatot {from} „{subject}” levelére.",
+      "askHandle": "Intézd el {from} „{subject}” levelét.",
+      "askTell": "{from} „{subject}” leveléről: {text}"
     }
   }
 }

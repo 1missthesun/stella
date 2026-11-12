@@ -3518,6 +3518,44 @@
       "checking": "正在檢查…",
       "turnOff": "關閉",
       "turnOffConfirm": "關閉後將停止分類，並刪除已分類的清單。"
+    },
+    "row": {
+      "new": {
+        "other": "新郵件 {count} 封"
+      },
+      "urgent": {
+        "other": "緊急 {count} 封"
+      },
+      "asked": {
+        "other": "你要求的 {count} 封"
+      },
+      "open": "在郵件中開啟"
+    },
+    "digest": {
+      "since": "自 {time} 起",
+      "ruleTitle": "你要求通知的郵件",
+      "reply": "草擬回覆",
+      "handle": "處理一下",
+      "archive": "封存",
+      "unarchive": "移回收件匣",
+      "open": "開啟",
+      "tell": "告訴 Stella…",
+      "tellPlaceholder": "Stella 該如何處理這封郵件？",
+      "send": "傳送",
+      "sent": "已傳給 Stella，回覆會出現在聊天中。",
+      "skipped": {
+        "other": "已略過 {count} 封"
+      },
+      "skippedHint": "Stella 判定為不重要而略過的郵件。標出重要的，它就會學會。",
+      "mattered": "這封很重要",
+      "matteredDone": "已記下。這類郵件會顯示出來。",
+      "earlier": "更早",
+      "waiting": "尚未收入摘要",
+      "empty": "還沒有摘要。重要的新郵件會顯示在這裡。",
+      "settings": "郵件設定",
+      "askReply": "幫我草擬對 {from} 的郵件「{subject}」的回覆。",
+      "askHandle": "處理 {from} 的郵件「{subject}」。",
+      "askTell": "關於 {from} 的郵件「{subject}」：{text}"
     }
   }
 }

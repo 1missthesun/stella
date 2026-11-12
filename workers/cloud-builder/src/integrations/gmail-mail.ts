@@ -162,6 +162,14 @@ export const gmailAttachmentBase64 = async (get: Fetcher, messageId: string, att
   return data.replace(/-/gu, "+").replace(/_/gu, "/");
 };
 
+/** Takes a message out of the inbox (archive) or puts it back. */
+export const gmailSetInbox = async (get: Fetcher, id: string, inInbox: boolean): Promise<void> => {
+  await get(`${GMAIL_API}/messages/${encodeURIComponent(id)}/modify`, {
+    method: "POST",
+    body: inInbox ? { addLabelIds: ["INBOX"] } : { removeLabelIds: ["INBOX"] },
+  });
+};
+
 /** Labels a message has now (to see whether the user already read or archived it). */
 export const gmailLabelsOf = async (get: Fetcher, id: string): Promise<string[] | null> => {
   try {

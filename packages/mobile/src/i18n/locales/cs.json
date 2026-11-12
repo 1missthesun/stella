@@ -3592,6 +3592,56 @@
       "checking": "Kontroluji…",
       "turnOff": "Vypnout",
       "turnOffConfirm": "Vypnutím se třídění zastaví a roztříděný seznam se smaže."
+    },
+    "row": {
+      "new": {
+        "few": "Nové: {count}",
+        "many": "Nové: {count}",
+        "one": "Nové: {count}",
+        "other": "Nové: {count}"
+      },
+      "urgent": {
+        "few": "Naléhavé: {count}",
+        "many": "Naléhavé: {count}",
+        "one": "Naléhavé: {count}",
+        "other": "Naléhavé: {count}"
+      },
+      "asked": {
+        "few": "Vyžádané: {count}",
+        "many": "Vyžádané: {count}",
+        "one": "Vyžádané: {count}",
+        "other": "Vyžádané: {count}"
+      },
+      "open": "Otevřít v E-mailu"
+    },
+    "digest": {
+      "since": "od {time}",
+      "ruleTitle": "Chtěli jste o tom vědět",
+      "reply": "Navrhnout odpověď",
+      "handle": "Vyřídit",
+      "archive": "Archivovat",
+      "unarchive": "Vrátit do doručených",
+      "open": "Otevřít",
+      "tell": "Říct Stelle…",
+      "tellPlaceholder": "Co má Stella s tímto e-mailem udělat?",
+      "send": "Odeslat",
+      "sent": "Odesláno Stelle. Odpověď přijde v chatu.",
+      "skipped": {
+        "few": "Přeskočeno: {count}",
+        "many": "Přeskočeno: {count}",
+        "one": "Přeskočeno: {count}",
+        "other": "Přeskočeno: {count}"
+      },
+      "skippedHint": "Pošta, kterou Stella vynechala jako šum. Označte důležité a Stella se poučí.",
+      "mattered": "Tenhle byl důležitý",
+      "matteredDone": "Zaznamenáno. Takové e-maily se zobrazí.",
+      "earlier": "Dříve",
+      "waiting": "Zatím v žádném přehledu",
+      "empty": "Zatím žádný přehled. Když bude nová pošta důležitá, objeví se tady.",
+      "settings": "Nastavení e-mailu",
+      "askReply": "Navrhni odpověď na e-mail od {from} „{subject}“.",
+      "askHandle": "Vyřiď e-mail od {from} „{subject}“.",
+      "askTell": "K e-mailu od {from} „{subject}“: {text}"
     }
   }
 }

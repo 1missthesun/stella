@@ -3518,6 +3518,44 @@
       "checking": "กำลังตรวจ…",
       "turnOff": "ปิด",
       "turnOffConfirm": "การปิดจะหยุดคัดแยกและลบรายการที่คัดแยกแล้ว"
+    },
+    "row": {
+      "new": {
+        "other": "ใหม่ {count}"
+      },
+      "urgent": {
+        "other": "ด่วน {count}"
+      },
+      "asked": {
+        "other": "ที่คุณขอ {count}"
+      },
+      "open": "เปิดในอีเมล"
+    },
+    "digest": {
+      "since": "ตั้งแต่ {time}",
+      "ruleTitle": "คุณขอให้แจ้งเรื่องนี้",
+      "reply": "ร่างคำตอบ",
+      "handle": "จัดการให้",
+      "archive": "เก็บถาวร",
+      "unarchive": "ย้ายกลับกล่องจดหมาย",
+      "open": "เปิด",
+      "tell": "บอก Stella…",
+      "tellPlaceholder": "ให้ Stella ทำอะไรกับอีเมลนี้",
+      "send": "ส่ง",
+      "sent": "ส่งถึง Stella แล้ว คำตอบจะอยู่ในแชท",
+      "skipped": {
+        "other": "ข้าม {count}"
+      },
+      "skippedHint": "อีเมลที่ Stella คัดออกเพราะไม่สำคัญ ทำเครื่องหมายฉบับที่สำคัญแล้ว Stella จะเรียนรู้",
+      "mattered": "ฉบับนี้สำคัญ",
+      "matteredDone": "บันทึกแล้ว อีเมลแบบนี้จะแสดง",
+      "earlier": "ก่อนหน้า",
+      "waiting": "ยังไม่อยู่ในสรุป",
+      "empty": "ยังไม่มีสรุป อีเมลใหม่ที่สำคัญจะแสดงที่นี่",
+      "settings": "การตั้งค่าอีเมล",
+      "askReply": "ร่างคำตอบอีเมลจาก {from} “{subject}”",
+      "askHandle": "จัดการอีเมลจาก {from} “{subject}”",
+      "askTell": "เกี่ยวกับอีเมลจาก {from} “{subject}”: {text}"
     }
   }
 }

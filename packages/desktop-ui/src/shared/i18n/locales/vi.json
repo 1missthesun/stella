@@ -3518,6 +3518,44 @@
       "checking": "Đang kiểm tra…",
       "turnOff": "Tắt",
       "turnOffConfirm": "Tắt sẽ dừng phân loại và xóa danh sách đã phân loại."
+    },
+    "row": {
+      "new": {
+        "other": "Mới: {count}"
+      },
+      "urgent": {
+        "other": "Khẩn: {count}"
+      },
+      "asked": {
+        "other": "Bạn đã yêu cầu: {count}"
+      },
+      "open": "Mở trong Email"
+    },
+    "digest": {
+      "since": "từ {time}",
+      "ruleTitle": "Bạn đã yêu cầu được báo về việc này",
+      "reply": "Soạn nháp trả lời",
+      "handle": "Xử lý",
+      "archive": "Lưu trữ",
+      "unarchive": "Đưa về hộp thư đến",
+      "open": "Mở",
+      "tell": "Nói với Stella…",
+      "tellPlaceholder": "Stella nên làm gì với email này?",
+      "send": "Gửi",
+      "sent": "Đã gửi cho Stella. Câu trả lời sẽ ở trong cuộc trò chuyện.",
+      "skipped": {
+        "other": "Đã bỏ qua: {count}"
+      },
+      "skippedHint": "Thư Stella đã bỏ qua vì không quan trọng. Đánh dấu thư quan trọng để Stella học.",
+      "mattered": "Thư này quan trọng",
+      "matteredDone": "Đã ghi nhận. Thư như vậy sẽ được hiển thị.",
+      "earlier": "Trước đó",
+      "waiting": "Chưa có trong bản tóm tắt",
+      "empty": "Chưa có bản tóm tắt. Thư mới quan trọng sẽ hiện ở đây.",
+      "settings": "Cài đặt email",
+      "askReply": "Soạn nháp trả lời email của {from} “{subject}”.",
+      "askHandle": "Xử lý email của {from} “{subject}”.",
+      "askTell": "Về email của {from} “{subject}”: {text}"
     }
   }
 }

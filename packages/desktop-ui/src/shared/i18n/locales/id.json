@@ -3518,6 +3518,44 @@
       "checking": "Memeriksa…",
       "turnOff": "Matikan",
       "turnOffConfirm": "Mematikan akan menghentikan pemilahan dan menghapus daftar yang sudah dipilah."
+    },
+    "row": {
+      "new": {
+        "other": "Baru: {count}"
+      },
+      "urgent": {
+        "other": "Mendesak: {count}"
+      },
+      "asked": {
+        "other": "Diminta: {count}"
+      },
+      "open": "Buka di Email"
+    },
+    "digest": {
+      "since": "sejak {time}",
+      "ruleTitle": "Anda minta diberi tahu soal ini",
+      "reply": "Draf balasan",
+      "handle": "Urus",
+      "archive": "Arsipkan",
+      "unarchive": "Kembalikan ke kotak masuk",
+      "open": "Buka",
+      "tell": "Beri tahu Stella…",
+      "tellPlaceholder": "Apa yang harus Stella lakukan dengan email ini?",
+      "send": "Kirim",
+      "sent": "Terkirim ke Stella. Jawabannya muncul di chat.",
+      "skipped": {
+        "other": "Dilewati: {count}"
+      },
+      "skippedHint": "Email yang disisihkan Stella sebagai gangguan. Tandai yang penting agar Stella belajar.",
+      "mattered": "Yang ini penting",
+      "matteredDone": "Dicatat. Email seperti ini akan ditampilkan.",
+      "earlier": "Sebelumnya",
+      "waiting": "Belum masuk ringkasan",
+      "empty": "Belum ada ringkasan. Email baru yang penting akan muncul di sini.",
+      "settings": "Pengaturan email",
+      "askReply": "Buat draf balasan untuk email dari {from} “{subject}”.",
+      "askHandle": "Urus email dari {from} “{subject}”.",
+      "askTell": "Tentang email dari {from} “{subject}”: {text}"
     }
   }
 }

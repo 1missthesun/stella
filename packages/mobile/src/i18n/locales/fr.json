@@ -3568,6 +3568,52 @@
       "checking": "Vérification…",
       "turnOff": "Désactiver",
       "turnOffConfirm": "Désactiver arrête le tri et supprime la liste triée."
+    },
+    "row": {
+      "new": {
+        "many": "Nouveaux : {count}",
+        "one": "Nouveaux : {count}",
+        "other": "Nouveaux : {count}"
+      },
+      "urgent": {
+        "many": "Urgents : {count}",
+        "one": "Urgents : {count}",
+        "other": "Urgents : {count}"
+      },
+      "asked": {
+        "many": "Demandés : {count}",
+        "one": "Demandés : {count}",
+        "other": "Demandés : {count}"
+      },
+      "open": "Ouvrir dans E-mail"
+    },
+    "digest": {
+      "since": "depuis {time}",
+      "ruleTitle": "Vous avez demandé à être prévenu",
+      "reply": "Rédiger une réponse",
+      "handle": "S’en occuper",
+      "archive": "Archiver",
+      "unarchive": "Remettre dans la boîte",
+      "open": "Ouvrir",
+      "tell": "Dire à Stella…",
+      "tellPlaceholder": "Que doit faire Stella de cet e-mail ?",
+      "send": "Envoyer",
+      "sent": "Envoyé à Stella. La réponse arrive dans le chat.",
+      "skipped": {
+        "many": "Ignorés : {count}",
+        "one": "Ignorés : {count}",
+        "other": "Ignorés : {count}"
+      },
+      "skippedHint": "Les e-mails que Stella a écartés comme superflus. Signalez ceux qui comptaient et elle apprend.",
+      "mattered": "Celui-ci comptait",
+      "matteredDone": "Noté. Ce genre d’e-mail s’affichera.",
+      "earlier": "Plus tôt",
+      "waiting": "Pas encore dans un résumé",
+      "empty": "Pas encore de résumé. Quand un nouvel e-mail compte, il apparaît ici.",
+      "settings": "Réglages e-mail",
+      "askReply": "Rédige une réponse à l’e-mail de {from} « {subject} ».",
+      "askHandle": "Occupe-toi de l’e-mail de {from} « {subject} ».",
+      "askTell": "À propos de l’e-mail de {from} « {subject} » : {text}"
     }
   }
 }

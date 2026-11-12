@@ -3568,6 +3568,52 @@
       "checking": "Se verifică…",
       "turnOff": "Dezactivează",
       "turnOffConfirm": "Dezactivarea oprește sortarea și șterge lista sortată."
+    },
+    "row": {
+      "new": {
+        "few": "Noi: {count}",
+        "one": "Noi: {count}",
+        "other": "Noi: {count}"
+      },
+      "urgent": {
+        "few": "Urgente: {count}",
+        "one": "Urgente: {count}",
+        "other": "Urgente: {count}"
+      },
+      "asked": {
+        "few": "Cerute: {count}",
+        "one": "Cerute: {count}",
+        "other": "Cerute: {count}"
+      },
+      "open": "Deschide în E-mail"
+    },
+    "digest": {
+      "since": "de la {time}",
+      "ruleTitle": "Ai cerut să afli despre asta",
+      "reply": "Ciornă de răspuns",
+      "handle": "Ocupă-te",
+      "archive": "Arhivează",
+      "unarchive": "Mută în inbox",
+      "open": "Deschide",
+      "tell": "Spune-i Stellei…",
+      "tellPlaceholder": "Ce să facă Stella cu acest e-mail?",
+      "send": "Trimite",
+      "sent": "Trimis Stellei. Răspunsul vine în chat.",
+      "skipped": {
+        "few": "Omise: {count}",
+        "one": "Omise: {count}",
+        "other": "Omise: {count}"
+      },
+      "skippedHint": "E-mailuri lăsate deoparte ca zgomot. Marchează-le pe cele care contau și Stella învață.",
+      "mattered": "Acesta conta",
+      "matteredDone": "Notat. E-mailurile de acest fel vor apărea.",
+      "earlier": "Mai devreme",
+      "waiting": "Încă nu e într-un rezumat",
+      "empty": "Încă nu există rezumat. Când un e-mail nou contează, apare aici.",
+      "settings": "Setări e-mail",
+      "askReply": "Scrie o ciornă de răspuns la e-mailul de la {from} „{subject}”.",
+      "askHandle": "Ocupă-te de e-mailul de la {from} „{subject}”.",
+      "askTell": "Despre e-mailul de la {from} „{subject}”: {text}"
     }
   }
 }

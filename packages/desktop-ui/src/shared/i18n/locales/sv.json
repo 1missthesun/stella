@@ -3544,6 +3544,48 @@
       "checking": "Kontrollerar…",
       "turnOff": "Stäng av",
       "turnOffConfirm": "Att stänga av stoppar sorteringen och raderar den sorterade listan."
+    },
+    "row": {
+      "new": {
+        "one": "Nya: {count}",
+        "other": "Nya: {count}"
+      },
+      "urgent": {
+        "one": "Brådskande: {count}",
+        "other": "Brådskande: {count}"
+      },
+      "asked": {
+        "one": "Efterfrågade: {count}",
+        "other": "Efterfrågade: {count}"
+      },
+      "open": "Öppna i E-post"
+    },
+    "digest": {
+      "since": "sedan {time}",
+      "ruleTitle": "Du bad att få veta om detta",
+      "reply": "Skriv svarsutkast",
+      "handle": "Ta hand om det",
+      "archive": "Arkivera",
+      "unarchive": "Flytta till inkorgen",
+      "open": "Öppna",
+      "tell": "Säg till Stella…",
+      "tellPlaceholder": "Vad ska Stella göra med det här mejlet?",
+      "send": "Skicka",
+      "sent": "Skickat till Stella. Svaret kommer i chatten.",
+      "skipped": {
+        "one": "Hoppade över: {count}",
+        "other": "Hoppade över: {count}"
+      },
+      "skippedHint": "Mejl som Stella sorterade bort som brus. Markera de som var viktiga så lär sig Stella.",
+      "mattered": "Det här var viktigt",
+      "matteredDone": "Noterat. Sådana mejl kommer att visas.",
+      "earlier": "Tidigare",
+      "waiting": "Inte i någon sammanfattning än",
+      "empty": "Ingen sammanfattning än. När nya mejl är viktiga syns de här.",
+      "settings": "E-postinställningar",
+      "askReply": "Skriv ett svarsutkast till mejlet från {from} ”{subject}”.",
+      "askHandle": "Ta hand om mejlet från {from} ”{subject}”.",
+      "askTell": "Om mejlet från {from} ”{subject}”: {text}"
     }
   }
 }

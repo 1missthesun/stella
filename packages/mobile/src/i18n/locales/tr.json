@@ -3544,6 +3544,48 @@
       "checking": "Kontrol ediliyor…",
       "turnOff": "Kapat",
       "turnOffConfirm": "Kapatmak ayırmayı durdurur ve ayrılmış listeyi siler."
+    },
+    "row": {
+      "new": {
+        "one": "Yeni: {count}",
+        "other": "Yeni: {count}"
+      },
+      "urgent": {
+        "one": "Acil: {count}",
+        "other": "Acil: {count}"
+      },
+      "asked": {
+        "one": "İstenen: {count}",
+        "other": "İstenen: {count}"
+      },
+      "open": "E-postada aç"
+    },
+    "digest": {
+      "since": "{time} itibarıyla",
+      "ruleTitle": "Bunu haber vermemi istemiştin",
+      "reply": "Yanıt taslağı",
+      "handle": "Hallet",
+      "archive": "Arşivle",
+      "unarchive": "Gelen kutusuna taşı",
+      "open": "Aç",
+      "tell": "Stella'ya söyle…",
+      "tellPlaceholder": "Stella bu e-postayla ne yapsın?",
+      "send": "Gönder",
+      "sent": "Stella'ya gönderildi. Yanıt sohbette gelecek.",
+      "skipped": {
+        "one": "Atlanan: {count}",
+        "other": "Atlanan: {count}"
+      },
+      "skippedHint": "Stella'nın gürültü diye ayırdığı postalar. Önemli olanları işaretle, Stella öğrensin.",
+      "mattered": "Bu önemliydi",
+      "matteredDone": "Not edildi. Böyle postalar gösterilecek.",
+      "earlier": "Daha önce",
+      "waiting": "Henüz bir özette değil",
+      "empty": "Henüz özet yok. Önemli yeni posta geldiğinde burada görünür.",
+      "settings": "E-posta ayarları",
+      "askReply": "{from} gönderen “{subject}” e-postasına bir yanıt taslağı yaz.",
+      "askHandle": "{from} gönderen “{subject}” e-postasını hallet.",
+      "askTell": "{from} gönderen “{subject}” e-postası hakkında: {text}"
     }
   }
 }

@@ -3518,6 +3518,44 @@
       "checking": "正在检查…",
       "turnOff": "关闭",
       "turnOffConfirm": "关闭后将停止分类，并删除已分类的列表。"
+    },
+    "row": {
+      "new": {
+        "other": "新邮件 {count} 封"
+      },
+      "urgent": {
+        "other": "紧急 {count} 封"
+      },
+      "asked": {
+        "other": "你要求的 {count} 封"
+      },
+      "open": "在邮件中打开"
+    },
+    "digest": {
+      "since": "自 {time} 起",
+      "ruleTitle": "你要求告知的邮件",
+      "reply": "起草回复",
+      "handle": "处理一下",
+      "archive": "归档",
+      "unarchive": "移回收件箱",
+      "open": "打开",
+      "tell": "告诉 Stella…",
+      "tellPlaceholder": "Stella 该如何处理这封邮件？",
+      "send": "发送",
+      "sent": "已发给 Stella，回复会出现在聊天中。",
+      "skipped": {
+        "other": "已跳过 {count} 封"
+      },
+      "skippedHint": "Stella 判定为无关紧要而略过的邮件。标出重要的，它会学会。",
+      "mattered": "这封很重要",
+      "matteredDone": "已记下。此类邮件会显示出来。",
+      "earlier": "更早",
+      "waiting": "尚未收入摘要",
+      "empty": "还没有摘要。重要的新邮件会显示在这里。",
+      "settings": "邮件设置",
+      "askReply": "帮我起草对 {from} 的邮件“{subject}”的回复。",
+      "askHandle": "处理 {from} 的邮件“{subject}”。",
+      "askTell": "关于 {from} 的邮件“{subject}”：{text}"
     }
   }
 }

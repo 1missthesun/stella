@@ -3544,6 +3544,48 @@
       "checking": "Tarkistetaan…",
       "turnOff": "Poista käytöstä",
       "turnOffConfirm": "Käytöstä poistaminen lopettaa lajittelun ja poistaa lajitellun listan."
+    },
+    "row": {
+      "new": {
+        "one": "Uusia: {count}",
+        "other": "Uusia: {count}"
+      },
+      "urgent": {
+        "one": "Kiireellisiä: {count}",
+        "other": "Kiireellisiä: {count}"
+      },
+      "asked": {
+        "one": "Pyydettyjä: {count}",
+        "other": "Pyydettyjä: {count}"
+      },
+      "open": "Avaa Sähköpostissa"
+    },
+    "digest": {
+      "since": "klo {time} alkaen",
+      "ruleTitle": "Pyysit kertomaan tästä",
+      "reply": "Luonnostele vastaus",
+      "handle": "Hoida se",
+      "archive": "Arkistoi",
+      "unarchive": "Palauta saapuneisiin",
+      "open": "Avaa",
+      "tell": "Kerro Stellalle…",
+      "tellPlaceholder": "Mitä Stellan pitäisi tehdä tälle viestille?",
+      "send": "Lähetä",
+      "sent": "Lähetetty Stellalle. Vastaus tulee keskusteluun.",
+      "skipped": {
+        "one": "Ohitettuja: {count}",
+        "other": "Ohitettuja: {count}"
+      },
+      "skippedHint": "Viestit, jotka Stella jätti pois turhina. Merkitse tärkeät, niin Stella oppii.",
+      "mattered": "Tämä oli tärkeä",
+      "matteredDone": "Merkitty. Tällaiset viestit näytetään.",
+      "earlier": "Aiemmin",
+      "waiting": "Ei vielä koosteessa",
+      "empty": "Ei vielä koostetta. Kun uusi viesti on tärkeä, se näkyy tässä.",
+      "settings": "Sähköpostiasetukset",
+      "askReply": "Luonnostele vastaus lähettäjän {from} viestiin ”{subject}”.",
+      "askHandle": "Hoida lähettäjän {from} viesti ”{subject}”.",
+      "askTell": "Lähettäjän {from} viestistä ”{subject}”: {text}"
     }
   }
 }

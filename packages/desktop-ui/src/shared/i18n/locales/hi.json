@@ -3544,6 +3544,48 @@
       "checking": "जाँच हो रही है…",
       "turnOff": "बंद करें",
       "turnOffConfirm": "बंद करने से छँटाई रुक जाती है और छँटी हुई सूची मिट जाती है।"
+    },
+    "row": {
+      "new": {
+        "one": "नए: {count}",
+        "other": "नए: {count}"
+      },
+      "urgent": {
+        "one": "ज़रूरी: {count}",
+        "other": "ज़रूरी: {count}"
+      },
+      "asked": {
+        "one": "आपने मांगे: {count}",
+        "other": "आपने मांगे: {count}"
+      },
+      "open": "ईमेल में खोलें"
+    },
+    "digest": {
+      "since": "{time} से",
+      "ruleTitle": "आपने इसके बारे में बताने को कहा था",
+      "reply": "जवाब का मसौदा",
+      "handle": "इसे संभालें",
+      "archive": "संग्रहित करें",
+      "unarchive": "इनबॉक्स में वापस",
+      "open": "खोलें",
+      "tell": "Stella को बताएं…",
+      "tellPlaceholder": "Stella इस ईमेल का क्या करे?",
+      "send": "भेजें",
+      "sent": "Stella को भेजा गया। जवाब चैट में आएगा।",
+      "skipped": {
+        "one": "छोड़े गए: {count}",
+        "other": "छोड़े गए: {count}"
+      },
+      "skippedHint": "जो मेल Stella ने फ़ालतू मानकर छोड़े। ज़रूरी वाले चिह्नित करें, Stella सीख जाएगी।",
+      "mattered": "यह ज़रूरी था",
+      "matteredDone": "नोट किया। ऐसे मेल दिखेंगे।",
+      "earlier": "पहले",
+      "waiting": "अभी किसी सारांश में नहीं",
+      "empty": "अभी कोई सारांश नहीं। ज़रूरी नया मेल यहाँ दिखेगा।",
+      "settings": "ईमेल सेटिंग्स",
+      "askReply": "{from} के ईमेल “{subject}” का जवाब ड्राफ़्ट करो।",
+      "askHandle": "{from} का ईमेल “{subject}” संभालो।",
+      "askTell": "{from} के ईमेल “{subject}” के बारे में: {text}"
     }
   }
 }

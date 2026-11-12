@@ -1,7 +1,7 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
-import type { EmailBucket, EmailItem } from "@stella/contracts/backend/email";
+import type { EmailBucket, EmailFocusAction, EmailItem } from "@stella/contracts/backend/email";
 import { authClient } from "./auth-client";
 import { getBackendClient, useBackendView } from "./backend";
 
@@ -126,3 +126,71 @@ export function useEmailUnseenCount(): number {
     return count;
   }, [items, seen]);
 }
+
+// The opened digest ----------------------------------------------------------
+
+type DigestSheetState = { digestId: string | null; open: boolean };
+let digestSheet: DigestSheetState = { digestId: null, open: false };
+const digestSheetListeners = new Set<() => void>();
+const emitDigestSheet = (next: DigestSheetState) => {
+  digestSheet = next;
+  for (const listener of digestSheetListeners) listener();
+};
+const subscribeDigestSheet = (listener: () => void) => {
+  digestSheetListeners.add(listener);
+  return () => {
+    digestSheetListeners.delete(listener);
+  };
+};
+
+/** Opens the digest behind a chat email row in the top sheet. */
+export const openEmailDigest = (digestId: string): void => emitDigestSheet({ digestId, open: true });
+export const closeEmailDigest = (): void => emitDigestSheet({ ...digestSheet, open: false });
+export const selectEmailDigest = (digestId: string): void => emitDigestSheet({ ...digestSheet, digestId });
+export const useEmailDigestSheet = (): DigestSheetState =>
+  useSyncExternalStore(subscribeDigestSheet, () => digestSheet);
+
+// Handing an email to Stella -------------------------------------------------
+
+const askQueue: string[] = [];
+const askListeners = new Set<() => void>();
+
+/**
+ * Hands one email to Stella as a plain chat message. A hidden note written
+ * just before it names the exact email, so Stella acts on the right one and
+ * the answer comes back in the chat like any other. The chat screen sends it.
+ */
+export const askStellaAboutEmail = async (
+  item: EmailItem,
+  action: EmailFocusAction,
+  text: string,
+): Promise<void> => {
+  await getBackendClient()
+    .call("email.focus", { itemId: item.itemId, action })
+    .catch(() => undefined);
+  askQueue.push(text);
+  for (const listener of askListeners) listener();
+};
+
+/** The chat screen sends what digest actions asked, as soon as it can. */
+export const useEmailAsks = (send: ((text: string) => unknown) | undefined, ready: boolean): void => {
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    const drain = () => {
+      if (!ready || !sendRef.current) return;
+      while (askQueue.length > 0) {
+        const text = askQueue.shift();
+        if (text) sendRef.current(text);
+      }
+    };
+    drain();
+    askListeners.add(drain);
+    return () => {
+      askListeners.delete(drain);
+    };
+  }, [ready]);
+};
+
+export const archiveEmail = (itemId: string, archived: boolean) =>
+  getBackendClient().call("email.archive", { itemId, archived });

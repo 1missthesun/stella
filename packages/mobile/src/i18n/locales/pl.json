@@ -3592,6 +3592,56 @@
       "checking": "Sprawdzam…",
       "turnOff": "Wyłącz",
       "turnOffConfirm": "Wyłączenie zatrzyma sortowanie i usunie posortowaną listę."
+    },
+    "row": {
+      "new": {
+        "few": "Nowe: {count}",
+        "many": "Nowe: {count}",
+        "one": "Nowe: {count}",
+        "other": "Nowe: {count}"
+      },
+      "urgent": {
+        "few": "Pilne: {count}",
+        "many": "Pilne: {count}",
+        "one": "Pilne: {count}",
+        "other": "Pilne: {count}"
+      },
+      "asked": {
+        "few": "Zamówione: {count}",
+        "many": "Zamówione: {count}",
+        "one": "Zamówione: {count}",
+        "other": "Zamówione: {count}"
+      },
+      "open": "Otwórz w Poczcie"
+    },
+    "digest": {
+      "since": "od {time}",
+      "ruleTitle": "Prosiłeś, by o tym powiedzieć",
+      "reply": "Napisz szkic odpowiedzi",
+      "handle": "Zajmij się tym",
+      "archive": "Archiwizuj",
+      "unarchive": "Przenieś do odebranych",
+      "open": "Otwórz",
+      "tell": "Powiedz Stelli…",
+      "tellPlaceholder": "Co Stella ma zrobić z tym e-mailem?",
+      "send": "Wyślij",
+      "sent": "Wysłano do Stelli. Odpowiedź pojawi się na czacie.",
+      "skipped": {
+        "few": "Pominięte: {count}",
+        "many": "Pominięte: {count}",
+        "one": "Pominięte: {count}",
+        "other": "Pominięte: {count}"
+      },
+      "skippedHint": "Poczta, którą Stella pominęła jako szum. Zaznacz ważne, a Stella się nauczy.",
+      "mattered": "Ten był ważny",
+      "matteredDone": "Zapisano. Takie e-maile będą widoczne.",
+      "earlier": "Wcześniej",
+      "waiting": "Jeszcze nie w podsumowaniu",
+      "empty": "Brak podsumowania. Gdy nowa poczta będzie ważna, pojawi się tutaj.",
+      "settings": "Ustawienia poczty",
+      "askReply": "Napisz szkic odpowiedzi na e-mail od {from} „{subject}”.",
+      "askHandle": "Zajmij się e-mailem od {from} „{subject}”.",
+      "askTell": "O e-mailu od {from} „{subject}”: {text}"
     }
   }
 }

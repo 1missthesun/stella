@@ -3568,6 +3568,52 @@
       "checking": "Revisando…",
       "turnOff": "Desactivar",
       "turnOffConfirm": "Al desactivarlo deja de ordenar y se borra la lista ordenada."
+    },
+    "row": {
+      "new": {
+        "many": "Nuevos: {count}",
+        "one": "Nuevos: {count}",
+        "other": "Nuevos: {count}"
+      },
+      "urgent": {
+        "many": "Urgentes: {count}",
+        "one": "Urgentes: {count}",
+        "other": "Urgentes: {count}"
+      },
+      "asked": {
+        "many": "Pedidos: {count}",
+        "one": "Pedidos: {count}",
+        "other": "Pedidos: {count}"
+      },
+      "open": "Abrir en Correo"
+    },
+    "digest": {
+      "since": "desde las {time}",
+      "ruleTitle": "Pediste que te avisara de esto",
+      "reply": "Redactar respuesta",
+      "handle": "Encárgate",
+      "archive": "Archivar",
+      "unarchive": "Mover a la bandeja",
+      "open": "Abrir",
+      "tell": "Decirle a Stella…",
+      "tellPlaceholder": "¿Qué debe hacer Stella con este correo?",
+      "send": "Enviar",
+      "sent": "Enviado a Stella. La respuesta llega en el chat.",
+      "skipped": {
+        "many": "Omitidos: {count}",
+        "one": "Omitidos: {count}",
+        "other": "Omitidos: {count}"
+      },
+      "skippedHint": "Correos que Stella dejó fuera como ruido. Marca los que importaban y aprenderá.",
+      "mattered": "Este importaba",
+      "matteredDone": "Anotado. Correos así se mostrarán.",
+      "earlier": "Antes",
+      "waiting": "Aún no está en un resumen",
+      "empty": "Aún no hay resumen. Cuando un correo nuevo importe, aparecerá aquí.",
+      "settings": "Ajustes de correo",
+      "askReply": "Redacta una respuesta al correo de {from} «{subject}».",
+      "askHandle": "Encárgate del correo de {from} «{subject}».",
+      "askTell": "Sobre el correo de {from} «{subject}»: {text}"
     }
   }
 }

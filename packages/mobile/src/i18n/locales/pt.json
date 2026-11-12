@@ -3568,6 +3568,52 @@
       "checking": "Verificando…",
       "turnOff": "Desativar",
       "turnOffConfirm": "Desativar interrompe a organização e apaga a lista organizada."
+    },
+    "row": {
+      "new": {
+        "many": "Novos: {count}",
+        "one": "Novos: {count}",
+        "other": "Novos: {count}"
+      },
+      "urgent": {
+        "many": "Urgentes: {count}",
+        "one": "Urgentes: {count}",
+        "other": "Urgentes: {count}"
+      },
+      "asked": {
+        "many": "Pedidos: {count}",
+        "one": "Pedidos: {count}",
+        "other": "Pedidos: {count}"
+      },
+      "open": "Abrir no E-mail"
+    },
+    "digest": {
+      "since": "desde {time}",
+      "ruleTitle": "Você pediu para saber disto",
+      "reply": "Rascunhar resposta",
+      "handle": "Resolver",
+      "archive": "Arquivar",
+      "unarchive": "Voltar para a caixa",
+      "open": "Abrir",
+      "tell": "Dizer à Stella…",
+      "tellPlaceholder": "O que a Stella deve fazer com este e-mail?",
+      "send": "Enviar",
+      "sent": "Enviado para a Stella. A resposta chega no chat.",
+      "skipped": {
+        "many": "Ignorados: {count}",
+        "one": "Ignorados: {count}",
+        "other": "Ignorados: {count}"
+      },
+      "skippedHint": "E-mails que a Stella deixou de fora como ruído. Marque os que importavam e ela aprende.",
+      "mattered": "Este importava",
+      "matteredDone": "Anotado. E-mails assim vão aparecer.",
+      "earlier": "Antes",
+      "waiting": "Ainda fora de um resumo",
+      "empty": "Ainda não há resumo. Quando um e-mail novo importar, ele aparece aqui.",
+      "settings": "Ajustes de e-mail",
+      "askReply": "Rascunhe uma resposta ao e-mail de {from} “{subject}”.",
+      "askHandle": "Resolva o e-mail de {from} “{subject}”.",
+      "askTell": "Sobre o e-mail de {from} “{subject}”: {text}"
     }
   }
 }

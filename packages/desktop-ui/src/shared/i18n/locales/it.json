@@ -3568,6 +3568,52 @@
       "checking": "Controllo…",
       "turnOff": "Disattiva",
       "turnOffConfirm": "Disattivando si interrompe lo smistamento e si elimina l'elenco smistato."
+    },
+    "row": {
+      "new": {
+        "many": "Nuove: {count}",
+        "one": "Nuove: {count}",
+        "other": "Nuove: {count}"
+      },
+      "urgent": {
+        "many": "Urgenti: {count}",
+        "one": "Urgenti: {count}",
+        "other": "Urgenti: {count}"
+      },
+      "asked": {
+        "many": "Richieste: {count}",
+        "one": "Richieste: {count}",
+        "other": "Richieste: {count}"
+      },
+      "open": "Apri in Email"
+    },
+    "digest": {
+      "since": "dalle {time}",
+      "ruleTitle": "Hai chiesto di saperlo",
+      "reply": "Bozza di risposta",
+      "handle": "Occupatene",
+      "archive": "Archivia",
+      "unarchive": "Riporta in arrivo",
+      "open": "Apri",
+      "tell": "Di’ a Stella…",
+      "tellPlaceholder": "Cosa deve fare Stella con questa email?",
+      "send": "Invia",
+      "sent": "Inviato a Stella. La risposta arriva nella chat.",
+      "skipped": {
+        "many": "Saltate: {count}",
+        "one": "Saltate: {count}",
+        "other": "Saltate: {count}"
+      },
+      "skippedHint": "Email che Stella ha scartato come rumore. Segna quelle importanti e imparerà.",
+      "mattered": "Questa contava",
+      "matteredDone": "Annotato. Email così verranno mostrate.",
+      "earlier": "Prima",
+      "waiting": "Non ancora in un riepilogo",
+      "empty": "Nessun riepilogo per ora. Quando una nuova email conta, appare qui.",
+      "settings": "Impostazioni email",
+      "askReply": "Scrivi una bozza di risposta all’email di {from} «{subject}».",
+      "askHandle": "Occupati dell’email di {from} «{subject}».",
+      "askTell": "Sull’email di {from} «{subject}»: {text}"
     }
   }
 }

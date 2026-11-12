@@ -3544,6 +3544,48 @@
       "checking": "Checking…",
       "turnOff": "Turn off",
       "turnOffConfirm": "Turning off stops sorting and deletes the sorted list."
+    },
+    "row": {
+      "new": {
+        "one": "{count} new",
+        "other": "{count} new"
+      },
+      "urgent": {
+        "one": "{count} urgent",
+        "other": "{count} urgent"
+      },
+      "asked": {
+        "one": "{count} you asked about",
+        "other": "{count} you asked about"
+      },
+      "open": "Open in Email"
+    },
+    "digest": {
+      "since": "since {time}",
+      "ruleTitle": "You asked to hear about this",
+      "reply": "Draft reply",
+      "handle": "Handle it",
+      "archive": "Archive",
+      "unarchive": "Move to inbox",
+      "open": "Open",
+      "tell": "Tell Stella…",
+      "tellPlaceholder": "What should Stella do with this email?",
+      "send": "Send",
+      "sent": "Sent to Stella. The answer comes in the chat.",
+      "skipped": {
+        "one": "{count} skipped",
+        "other": "{count} skipped"
+      },
+      "skippedHint": "Mail Stella left out as noise. Mark any that mattered and it learns.",
+      "mattered": "This one mattered",
+      "matteredDone": "Noted. Mail like this will show up.",
+      "earlier": "Earlier",
+      "waiting": "Not in a digest yet",
+      "empty": "No digest yet. When new mail matters, it shows up here.",
+      "settings": "Email settings",
+      "askReply": "Draft a reply to {from}'s email “{subject}”.",
+      "askHandle": "Handle {from}'s email “{subject}”.",
+      "askTell": "About {from}'s email “{subject}”: {text}"
     }
   }
 }

@@ -3544,6 +3544,48 @@
       "checking": "Tjekker…",
       "turnOff": "Slå fra",
       "turnOffConfirm": "Når du slår fra, stopper sorteringen, og den sorterede liste slettes."
+    },
+    "row": {
+      "new": {
+        "one": "Nye: {count}",
+        "other": "Nye: {count}"
+      },
+      "urgent": {
+        "one": "Haster: {count}",
+        "other": "Haster: {count}"
+      },
+      "asked": {
+        "one": "Efterspurgt: {count}",
+        "other": "Efterspurgt: {count}"
+      },
+      "open": "Åbn i E-mail"
+    },
+    "digest": {
+      "since": "siden {time}",
+      "ruleTitle": "Du bad om at høre om dette",
+      "reply": "Skriv svarudkast",
+      "handle": "Klar det",
+      "archive": "Arkivér",
+      "unarchive": "Flyt til indbakke",
+      "open": "Åbn",
+      "tell": "Sig til Stella…",
+      "tellPlaceholder": "Hvad skal Stella gøre med denne mail?",
+      "send": "Send",
+      "sent": "Sendt til Stella. Svaret kommer i chatten.",
+      "skipped": {
+        "one": "Sprunget over: {count}",
+        "other": "Sprunget over: {count}"
+      },
+      "skippedHint": "Mails Stella sorterede fra som støj. Markér dem, der betød noget, så lærer Stella.",
+      "mattered": "Den her betød noget",
+      "matteredDone": "Noteret. Mails som denne bliver vist.",
+      "earlier": "Tidligere",
+      "waiting": "Ikke i et overblik endnu",
+      "empty": "Intet overblik endnu. Når ny mail betyder noget, vises den her.",
+      "settings": "Mailindstillinger",
+      "askReply": "Skriv et svarudkast til mailen fra {from} »{subject}«.",
+      "askHandle": "Klar mailen fra {from} »{subject}«.",
+      "askTell": "Om mailen fra {from} »{subject}«: {text}"
     }
   }
 }

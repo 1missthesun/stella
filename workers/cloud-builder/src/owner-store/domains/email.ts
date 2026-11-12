@@ -4,6 +4,8 @@ import {
   type EmailAccountStatus,
   type EmailBucket,
   type EmailCalls,
+  type EmailDigest,
+  type EmailDigests,
   type EmailFeed,
   type EmailItem,
   type EmailItemState,
@@ -18,6 +20,7 @@ import {
   EMAIL_CARD_TYPE,
   EMAIL_REASON_WORDS,
   emailCardNoteText,
+  emailFocusNoteText,
   type EmailCard,
   type EmailCardItem,
 } from "@stella/contracts/email-card";
@@ -32,6 +35,7 @@ import {
   gmailProfile,
   gmailReadMail,
   gmailSentPeople,
+  gmailSetInbox,
   gmailStopWatch,
   gmailWatch,
   type GmailMail,
@@ -187,6 +191,38 @@ export const EMAIL_MIGRATION = {
   ],
 };
 
+/** One row per email row posted in the chat, so the opened Email view can show it and every earlier one. */
+export const EMAIL_DIGESTS_MIGRATION = {
+  id: "email.2-digests",
+  statements: [
+    `CREATE TABLE email_digests (
+       digest_id TEXT PRIMARY KEY,
+       kind TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       rule_text TEXT,
+       item_ids TEXT
+     )`,
+    "CREATE INDEX email_digests_by_time ON email_digests (created_at)",
+    "ALTER TABLE email_items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+    "CREATE INDEX email_items_by_card ON email_items (card_id)",
+    `INSERT OR IGNORE INTO email_digests (digest_id, kind, created_at)
+     SELECT card_id,
+            CASE WHEN COUNT(*) > 1 OR SUM(state = 'summarized') > 0 THEN 'summary'
+                 WHEN MAX(rule_id) IS NOT NULL THEN 'rule'
+                 ELSE 'urgent' END,
+            MAX(sorted_at)
+       FROM email_items WHERE card_id IS NOT NULL GROUP BY card_id`,
+  ],
+};
+
+type DigestRow = {
+  digest_id: string;
+  kind: string;
+  created_at: number;
+  rule_text: string | null;
+  item_ids: string | null;
+};
+
 type StateRow = {
   enabled: number;
   note: string;
@@ -232,6 +268,8 @@ type ItemRow = {
   state: string;
   line: string | null;
   corrected: number;
+  card_id: string | null;
+  archived?: number;
 };
 
 type RuleRow = {
@@ -535,6 +573,14 @@ const postCard = async (ctx: OwnerContext, snapshot: OwnerSnapshot, card: EmailC
     card,
   });
   if (!posted) throw new Error("The email card could not be posted yet.");
+  ctx.db.run(
+    "INSERT OR IGNORE INTO email_digests (digest_id, kind, created_at, rule_text, item_ids) VALUES (?, ?, ?, ?, ?)",
+    card.cardId,
+    card.kind,
+    ctx.now,
+    card.ruleText ?? null,
+    JSON.stringify(card.items.map((item) => item.itemId)),
+  );
   await ctx.host
     .appendConversationNote({
       conversationId,
@@ -1185,7 +1231,81 @@ const toItem = (row: ItemRow): EmailItem => ({
   ...(row.line ? { line: row.line } : {}),
   ...(row.rule_id ? { ruleId: row.rule_id } : {}),
   ...(row.corrected ? { corrected: true } : {}),
+  ...(row.archived ? { archived: true } : {}),
 });
+
+const DIGESTS_SHOWN = 20;
+const SKIPPED_SHOWN = 60;
+
+const bucketRank = (bucket: string): number => (bucket === "worth_knowing" ? 1 : bucket === "noise" ? 2 : 0);
+
+const digestItems = (db: OwnerDbReader, row: DigestRow): EmailItem[] => {
+  const rows = db.all<ItemRow>("SELECT * FROM email_items WHERE card_id = ?", row.digest_id);
+  let order: string[] = [];
+  try {
+    const parsed = row.item_ids ? (JSON.parse(row.item_ids) as unknown) : null;
+    if (Array.isArray(parsed)) order = parsed.filter((id): id is string => typeof id === "string");
+  } catch {
+    order = [];
+  }
+  const position = (id: string): number => {
+    const index = order.indexOf(id);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return rows
+    .sort(
+      (a, b) =>
+        position(a.item_id) - position(b.item_id) ||
+        bucketRank(a.first_bucket) - bucketRank(b.first_bucket) ||
+        b.received_at - a.received_at,
+    )
+    .map(toItem);
+};
+
+/** Each email row in the chat, opened: what it surfaced, and what was skipped as noise in its stretch. */
+const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
+  const rows = ctx.db.all<DigestRow>(
+    "SELECT * FROM email_digests WHERE created_at > ? ORDER BY created_at DESC LIMIT ?",
+    ctx.now - FEED_WINDOW_MS,
+    DIGESTS_SHOWN,
+  );
+  const newestSummary = rows.find((row) => row.kind === "summary")?.digest_id;
+  const digests = rows.map((row): EmailDigest => {
+    const kind = row.kind === "urgent" || row.kind === "rule" ? row.kind : "summary";
+    const previous =
+      ctx.db.one<{ created_at: number }>(
+        "SELECT created_at FROM email_digests WHERE kind = 'summary' AND created_at < ? ORDER BY created_at DESC LIMIT 1",
+        row.created_at,
+      )?.created_at ?? null;
+    // The newest summary also lists noise that arrived after it, so nothing skipped is out of sight.
+    const until = row.digest_id === newestSummary ? ctx.now : row.created_at;
+    const skipped =
+      kind === "summary"
+        ? ctx.db
+            .all<ItemRow>(
+              `SELECT * FROM email_items WHERE first_bucket = 'noise' AND card_id IS NULL AND sorted_at > ? AND sorted_at <= ?
+               ORDER BY received_at DESC LIMIT ?`,
+              previous ?? row.created_at - DAY,
+              until,
+              SKIPPED_SHOWN,
+            )
+            .map(toItem)
+        : [];
+    return {
+      digestId: row.digest_id,
+      kind,
+      createdAt: row.created_at,
+      ...(kind === "summary" && previous !== null ? { sinceAt: previous } : {}),
+      ...(row.rule_text ? { ruleText: row.rule_text } : {}),
+      items: digestItems(ctx.db, row),
+      skipped,
+    };
+  });
+  return {
+    digests,
+    multipleAccounts: (ctx.db.one<{ count: number }>("SELECT COUNT(*) AS count FROM email_accounts")?.count ?? 0) > 1,
+  };
+};
 
 const statusOf = (ctx: { db: OwnerDbReader; now: number }, plan: string, zone: string): EmailStatus => {
   const state = stateOf(ctx.db);
@@ -1411,7 +1531,7 @@ const ruleId = (): string => `r${crypto.randomUUID().replace(/-/gu, "").slice(0,
 
 export const emailDomain = {
   name: "email",
-  migrations: [EMAIL_MIGRATION],
+  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION],
   calls: {
     "email.setEnabled": {
       scope: "owner",
@@ -1507,6 +1627,56 @@ export const emailDomain = {
       }),
       handler: mailAction,
     },
+    "email.archive": {
+      scope: "owner",
+      parse: object({ itemId: string({ max: 64 }), archived: boolean() }),
+      handler: async (ctx, args) => {
+        enforceOwnerRateLimit(ctx.db, ctx.now, "email.archive", { count: 120, windowMs: HOUR }, "Too many changes. Try again later.");
+        const row = requireItem(ctx, args.itemId);
+        const account = (await liveAccounts(ctx)).find((entry) => entry.email === row.account);
+        if (!account) throw new RpcError("NOT_FOUND", `${row.account} isn't connected through Stella anymore.`);
+        try {
+          await gmailSetInbox(await account.get(), row.message_id, !args.archived);
+        } catch (error) {
+          if (error instanceof GoogleApiError) {
+            throw new RpcError(error.status === 404 ? "NOT_FOUND" : "UNAVAILABLE", error.status === 404 ? "That email isn't in this account anymore." : error.message);
+          }
+          throw error;
+        }
+        ctx.db.run("UPDATE email_items SET archived = ? WHERE item_id = ?", args.archived ? 1 : 0, row.item_id);
+        log(args.archived ? "archived" : "unarchived", { owner: ctx.ownerId.slice(0, 12) });
+        return { ok: true as const };
+      },
+    },
+    "email.focus": {
+      scope: "owner",
+      parse: object({ itemId: string({ max: 64 }), action: literal("reply", "handle", "tell") }),
+      handler: async (ctx, args) => {
+        enforceOwnerRateLimit(ctx.db, ctx.now, "email.focus", { count: 120, windowMs: HOUR }, "Too many requests. Try again later.");
+        const row = requireItem(ctx, args.itemId);
+        const conversationId = readMainConversationId(ctx.db);
+        if (!conversationId) return { ok: true as const };
+        const snapshot = await ctx.host.snapshot();
+        await ctx.host.appendConversationNote({
+          conversationId,
+          ownerGeneration: snapshot.ownerGeneration,
+          noteId: `email-focus-${row.item_id}-${ctx.now}`,
+          text: emailFocusNoteText(
+            {
+              from: row.from_name,
+              fromAddress: row.from_address,
+              subject: row.subject,
+              ...(row.line ? { line: row.line } : {}),
+              account: row.account,
+              messageId: row.message_id,
+              threadId: row.thread_id,
+            },
+            args.action,
+          ),
+        });
+        return { ok: true as const };
+      },
+    },
     "email.checkNow": {
       scope: "owner",
       parse: empty(),
@@ -1525,6 +1695,10 @@ export const emailDomain = {
     "email.feed": {
       parse: empty(),
       read: (ctx) => readFeed(ctx),
+    },
+    "email.digests": {
+      parse: empty(),
+      read: (ctx) => readDigests(ctx),
     },
   },
   internal: {
@@ -1595,7 +1769,7 @@ export const emailDomain = {
     for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB]) ctx.jobs.cancel(job);
     const addresses = ctx.db.all<{ email: string }>("SELECT email FROM email_accounts");
     for (const { email } of addresses) await indexWatch(ctx, email, false).catch(() => undefined);
-    for (const table of ["email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {
+    for (const table of ["email_digests", "email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {
       ctx.db.run(`DELETE FROM ${table}`);
     }
     return { pending: false };

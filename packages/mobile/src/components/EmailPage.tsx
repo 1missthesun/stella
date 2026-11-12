@@ -10,20 +10,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { EmailBucket, EmailFeed, EmailItem, EmailRule } from "@stella/contracts/backend/email";
+import type { EmailFeed, EmailRule } from "@stella/contracts/backend/email";
 import { Text } from "./Text";
-import { useLocale, useT, useTPlural } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import { authClient } from "../lib/auth-client";
 import { getBackendClient, useBackendView } from "../lib/backend";
-import {
-  chooseAction,
-  correctEmail,
-  dismissEmail,
-  emailTime,
-  openGmailThread,
-  senderName,
-  markEmailSeen,
-} from "../lib/email";
+import { markEmailSeen } from "../lib/email";
 import { tapLight, tapMedium } from "../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import type { Colors } from "../theme/colors";
@@ -31,146 +23,13 @@ import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
-import { Icon } from "./Icon";
-
-const LIST_PREVIEW = 6;
+import { EmailDigestView } from "./EmailDigestView";
+import { useRouter } from "expo-router";
 
 type Styles = ReturnType<typeof makeStyles>;
 
 const errorText = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
-
-function ItemRow({
-  item,
-  now,
-  showAccount,
-  styles,
-  colors,
-}: {
-  item: EmailItem;
-  now: number;
-  showAccount: boolean;
-  styles: Styles;
-  colors: Colors;
-}) {
-  const t = useT();
-  const locale = useLocale();
-  const [busy, setBusy] = useState(false);
-  const moveTo: EmailBucket = item.bucket === "worth_knowing" ? "needs_you" : "worth_knowing";
-  const open = () => {
-    tapLight();
-    openGmailThread(item.threadId, item.account);
-  };
-  const run = (action: () => Promise<unknown>) => {
-    setBusy(true);
-    void action()
-      .catch(() => Alert.alert(t("email.failed")))
-      .finally(() => setBusy(false));
-  };
-  const more = () => {
-    tapMedium();
-    chooseAction(
-      senderName(item.from),
-      [
-        { label: t("email.section.openInGmail") },
-        {
-          label:
-            moveTo === "needs_you" ? t("email.section.moveToNeedsYou") : t("email.section.moveToWorthKnowing"),
-        },
-        { label: t("email.notImportant"), destructive: true },
-      ],
-      t("common.cancel"),
-      (index) => {
-        if (index === 0) open();
-        else if (index === 1) run(() => correctEmail(item.itemId, moveTo));
-        else run(() => dismissEmail(item.itemId));
-      },
-    );
-  };
-  return (
-    <View style={[styles.item, busy && styles.busy]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint={t("email.section.openInGmail")}
-        onPress={open}
-        onLongPress={more}
-        style={({ pressed }) => [styles.itemOpen, pressed && styles.pressed]}
-      >
-        <View style={styles.itemHead}>
-          <Text style={styles.from} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {senderName(item.from)}
-          </Text>
-          {item.bucket === "urgent" ? (
-            <Text style={styles.urgent} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-              {t("email.section.urgent")}
-            </Text>
-          ) : null}
-          <Text style={styles.time} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {emailTime(locale, item.receivedAt, now)}
-          </Text>
-        </View>
-        <Text style={styles.subject} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {showAccount ? `${item.subject} · ${item.account}` : item.subject}
-        </Text>
-        {item.line ? (
-          <Text style={styles.line} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {item.line}
-          </Text>
-        ) : null}
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("email.section.actions")}
-        hitSlop={10}
-        disabled={busy}
-        onPress={more}
-        style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}
-      >
-        <Icon name="more-horizontal" size={17} color={colors.textMuted} />
-      </Pressable>
-    </View>
-  );
-}
-
-function ItemList({
-  title,
-  items,
-  now,
-  showAccount,
-  styles,
-  colors,
-}: {
-  title: string;
-  items: EmailItem[];
-  now: number;
-  showAccount: boolean;
-  styles: Styles;
-  colors: Colors;
-}) {
-  const t = useT();
-  const [expanded, setExpanded] = useState(false);
-  if (items.length === 0) return null;
-  const shown = expanded ? items : items.slice(0, LIST_PREVIEW);
-  return (
-    <View style={styles.group}>
-      <Text style={styles.heading} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-        {title}
-      </Text>
-      {shown.map((item, index) => (
-        <View key={item.itemId} style={index > 0 ? styles.separated : undefined}>
-          <ItemRow item={item} now={now} showAccount={showAccount} styles={styles} colors={colors} />
-        </View>
-      ))}
-      {items.length > LIST_PREVIEW ? (
-        <TextButton
-          label={expanded ? t("email.card.showLess") : t("email.card.showAll", { count: items.length })}
-          onPress={() => setExpanded((open) => !open)}
-          styles={styles}
-        />
-      ) : null}
-    </View>
-  );
-}
 
 function TextButton({
   label,
@@ -412,22 +271,10 @@ function Footer({ feed, styles }: { feed: EmailFeed; styles: Styles }) {
 }
 
 function SortedMail({ feed, styles, colors }: { feed: EmailFeed; styles: Styles; colors: Colors }) {
-  const t = useT();
-  const tPlural = useTPlural();
   const bottomInset = useSafeAreaInsets().bottom;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, [feed]);
-  const visible = feed.items.filter((item) => item.state !== "dismissed" && item.bucket !== "noise");
-  const needsYou = [
-    ...visible.filter((item) => item.bucket === "urgent"),
-    ...visible.filter((item) => item.bucket === "needs_you"),
-  ];
-  const worthKnowing = visible.filter((item) => item.bucket === "worth_knowing");
-  const showAccount = feed.status.accounts.length > 1;
+  const router = useRouter();
+  const [digestId, setDigestId] = useState<string | null>(null);
+  const waiting = feed.items.filter((item) => item.state === "waiting" && item.bucket !== "noise");
   return (
     <ScrollView
       style={styles.root}
@@ -436,35 +283,17 @@ function SortedMail({ feed, styles, colors }: { feed: EmailFeed; styles: Styles;
       showsVerticalScrollIndicator={false}
       testID="mobile-email"
     >
-      {visible.length === 0 ? (
-        <Text style={styles.empty} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {t("email.section.empty")}
-        </Text>
-      ) : null}
-      <ItemList
-        title={t("email.section.needsYou")}
-        items={needsYou}
-        now={now}
-        showAccount={showAccount}
-        styles={styles}
-        colors={colors}
+      <EmailDigestView
+        digestId={digestId}
+        onSelect={setDigestId}
+        onAsked={() => router.dismissTo("/chat")}
+        waiting={waiting}
       />
-      <ItemList
-        title={t("email.section.worthKnowing")}
-        items={worthKnowing}
-        now={now}
-        showAccount={showAccount}
-        styles={styles}
-        colors={colors}
-      />
-      {feed.noiseCount > 0 ? (
-        <Text style={[styles.hint, styles.skipped]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {tPlural("email.section.skippedThisWeek", feed.noiseCount)}
-        </Text>
-      ) : null}
+      <View style={styles.settings}>
       <NoteEditor note={feed.note} styles={styles} colors={colors} />
       <Rules rules={feed.rules} styles={styles} />
       <Footer feed={feed} styles={styles} />
+      </View>
     </ScrollView>
   );
 }
@@ -589,6 +418,13 @@ const makeStyles = (colors: Colors) =>
     root: { flex: 1, minHeight: 0 },
     content: { gap: 22, paddingTop: 8 },
     centered: { alignItems: "center", flex: 1, justifyContent: "center" },
+    settings: {
+      borderTopColor: colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      gap: 22,
+      marginTop: 8,
+      paddingTop: 22,
+    },
     group: { gap: 2 },
     heading: {
       color: colors.textMuted,

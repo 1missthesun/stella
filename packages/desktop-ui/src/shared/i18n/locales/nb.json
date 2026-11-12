@@ -3544,6 +3544,48 @@
       "checking": "Sjekker…",
       "turnOff": "Slå av",
       "turnOffConfirm": "Å slå av stopper sorteringen og sletter den sorterte listen."
+    },
+    "row": {
+      "new": {
+        "one": "Nye: {count}",
+        "other": "Nye: {count}"
+      },
+      "urgent": {
+        "one": "Haster: {count}",
+        "other": "Haster: {count}"
+      },
+      "asked": {
+        "one": "Etterspurt: {count}",
+        "other": "Etterspurt: {count}"
+      },
+      "open": "Åpne i E-post"
+    },
+    "digest": {
+      "since": "siden {time}",
+      "ruleTitle": "Du ba om å få vite om dette",
+      "reply": "Skriv svarutkast",
+      "handle": "Ta deg av det",
+      "archive": "Arkiver",
+      "unarchive": "Flytt til innboksen",
+      "open": "Åpne",
+      "tell": "Si til Stella…",
+      "tellPlaceholder": "Hva skal Stella gjøre med denne e-posten?",
+      "send": "Send",
+      "sent": "Sendt til Stella. Svaret kommer i chatten.",
+      "skipped": {
+        "one": "Hoppet over: {count}",
+        "other": "Hoppet over: {count}"
+      },
+      "skippedHint": "E-post Stella sorterte bort som støy. Merk de som betydde noe, så lærer Stella.",
+      "mattered": "Denne betydde noe",
+      "matteredDone": "Notert. Slik e-post vil vises.",
+      "earlier": "Tidligere",
+      "waiting": "Ikke i en oversikt ennå",
+      "empty": "Ingen oversikt ennå. Når ny e-post betyr noe, vises den her.",
+      "settings": "E-postinnstillinger",
+      "askReply": "Skriv et svarutkast til e-posten fra {from} «{subject}».",
+      "askHandle": "Ta deg av e-posten fra {from} «{subject}».",
+      "askTell": "Om e-posten fra {from} «{subject}»: {text}"
     }
   }
 }

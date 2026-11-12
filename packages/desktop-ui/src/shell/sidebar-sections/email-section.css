@@ -299,3 +299,15 @@
 .email-section__buttons .email-section__text-button {
   align-self: center;
 }
+
+/* Settings follow the digest, set apart by space and a hairline. */
+.email-section__settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 620px;
+  margin: 10px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-weak);
+}

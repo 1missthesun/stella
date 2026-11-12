@@ -3518,6 +3518,44 @@
       "checking": "確認中…",
       "turnOff": "オフにする",
       "turnOffConfirm": "オフにすると仕分けが止まり、仕分け済みの一覧が削除されます。"
+    },
+    "row": {
+      "new": {
+        "other": "新着 {count}件"
+      },
+      "urgent": {
+        "other": "急ぎ {count}件"
+      },
+      "asked": {
+        "other": "依頼分 {count}件"
+      },
+      "open": "メールで開く"
+    },
+    "digest": {
+      "since": "{time}以降",
+      "ruleTitle": "知らせるよう頼まれていたメール",
+      "reply": "返信を下書き",
+      "handle": "対応して",
+      "archive": "アーカイブ",
+      "unarchive": "受信トレイに戻す",
+      "open": "開く",
+      "tell": "Stellaに伝える…",
+      "tellPlaceholder": "このメールをStellaにどうしてほしい？",
+      "send": "送信",
+      "sent": "Stellaに送りました。返事はチャットに届きます。",
+      "skipped": {
+        "other": "スキップ {count}件"
+      },
+      "skippedHint": "Stellaが不要と判断したメールです。大事だったものに印を付けると学習します。",
+      "mattered": "これは大事だった",
+      "matteredDone": "了解。こうしたメールは表示されます。",
+      "earlier": "以前",
+      "waiting": "まだまとめに入っていません",
+      "empty": "まとめはまだありません。大事な新着メールはここに表示されます。",
+      "settings": "メール設定",
+      "askReply": "{from}さんのメール「{subject}」への返信を下書きして。",
+      "askHandle": "{from}さんのメール「{subject}」に対応して。",
+      "askTell": "{from}さんのメール「{subject}」について：{text}"
     }
   }
 }

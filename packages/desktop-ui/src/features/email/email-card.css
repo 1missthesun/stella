@@ -1,289 +1,40 @@
-.email-card .schedule-card__status {
-  min-width: 0;
-}
-
-.email-card__from {
-  color: var(--chat-assistant-bubble-text);
-  font-weight: var(--weight-medium, 500);
-}
-
-.email-card--list {
-  align-items: flex-start;
-  width: min(100%, 520px);
-  max-width: 85%;
-}
-
-.email-card--list .schedule-card__tile {
-  margin-top: 2px;
-}
-
-.email-card__rows {
-  display: flex;
-  flex-direction: column;
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.email-card__row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  border-top: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent);
-}
-
-.email-card__open {
-  display: flex;
-  flex: 1;
-  gap: 8px;
-  min-width: 0;
-  padding: 7px 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-
-.email-card__open:focus-visible {
-  outline: none;
-  border-radius: 6px;
-  box-shadow: var(--focus-ring);
-}
-
-.email-card__n {
-  flex: none;
-  width: 14px;
-  color: var(--text-weak);
-  font-size: var(--font-size-base, 13px);
-  line-height: 18px;
-  font-variant-numeric: tabular-nums;
-}
-
-.email-card__text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  font-size: var(--font-size-base, 13px);
-  line-height: 18px;
-}
-
-.email-card__head {
-  display: flex;
+/* Email in the chat: one tiny row with a count (see EmailChatCard). */
+.email-row {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.email-card__head .email-card__from {
-  flex: none;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.email-card__subject {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-weak);
-  text-overflow: ellipsis;
-}
-
-.email-card__line {
-  color: var(--chat-assistant-bubble-text);
-}
-
-.email-card__open:hover .email-card__subject {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.email-card__row-action,
-.email-card__row-note {
-  position: absolute;
-  top: 7px;
-  right: 0;
-  padding: 0 0 0 10px;
+  align-self: flex-start;
+  margin: 2px 0;
+  padding: 3px 9px 3px 7px;
   border: 0;
-  background: var(--chat-assistant-bubble-fill);
+  border-radius: 999px;
+  background: none;
   color: var(--text-weak);
   font: inherit;
-  font-size: var(--font-size-base, 13px);
+  font-size: var(--font-size-sm, 13px);
   line-height: 18px;
-}
-
-.email-card__row-action {
-  font-weight: var(--weight-medium, 500);
-  opacity: 0;
   cursor: pointer;
-  transition: opacity 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
-.email-card__row:hover .email-card__row-action,
-.email-card__row-action:focus-visible,
-.email-card__row-action[data-failed] {
-  opacity: 1;
-}
-
-.email-card__row-action:hover:not(:disabled) {
+.email-row:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
   color: var(--text-strong);
 }
 
-.email-card__row-action:focus-visible {
+.email-row:focus-visible {
   outline: none;
-  border-radius: 4px;
   box-shadow: var(--focus-ring);
 }
 
-.email-card__row[data-dismissed] .email-card__open {
-  opacity: 0.45;
-}
-
-.email-card__more {
-  align-self: flex-start;
-  margin-top: 2px;
-  padding-bottom: 1px;
-  font-size: var(--font-size-base, 13px);
-  line-height: 18px;
-}
-
-/* One quiet line per email moment in the chat (see EmailChatCard). */
-.email-line {
-  width: fit-content;
-  max-width: 85%;
-  min-width: 0;
-  border-radius: var(--radius-2xl, 14px);
-  color: var(--text-weak);
-  font-size: var(--font-size-base, 13px);
-  line-height: 18px;
-}
-
-.email-line[data-expanded] {
-  width: min(100%, 560px);
-  padding-bottom: 6px;
-  background: var(--chat-assistant-bubble-fill);
-}
-
-.email-line__bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 5px 10px;
-  border-radius: inherit;
-  background: color-mix(in oklch, var(--chat-assistant-bubble-fill) 70%, transparent);
-}
-
-.email-line[data-expanded] .email-line__bar {
-  background: none;
-}
-
-.email-line__main {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  white-space: nowrap;
-}
-
-button.email-line__main {
-  cursor: pointer;
-}
-
-button.email-line__main:hover .email-line__text {
-  color: var(--chat-assistant-bubble-text);
-}
-
-button.email-line__main:focus-visible {
-  outline: none;
-  border-radius: 6px;
-  box-shadow: var(--focus-ring);
-}
-
-.email-line__icon {
+.email-row__icon {
   flex: none;
 }
 
-.email-line__label {
+.email-row__dot {
   flex: none;
-  color: var(--interactive);
-  font-weight: var(--weight-medium, 500);
-}
-
-.email-line__from {
-  flex: none;
-  max-width: 40%;
-  overflow: hidden;
-  color: var(--chat-assistant-bubble-text);
-  font-weight: var(--weight-medium, 500);
-  text-overflow: ellipsis;
-}
-
-.email-line__text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.email-line__muted {
-  color: var(--text-weak);
-}
-
-.email-line[data-kind="summary"] .email-line__text {
-  color: var(--chat-assistant-bubble-text);
-}
-
-.email-line__chevron {
-  flex: none;
-  transition: transform 120ms ease;
-}
-
-.email-line[data-expanded] .email-line__chevron {
-  transform: rotate(180deg);
-}
-
-.email-line__actions {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 12px;
-}
-
-.email-line__hover-action {
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-.email-line:hover .email-line__hover-action,
-.email-line__hover-action:focus-visible {
-  opacity: 1;
-}
-
-.email-line__settled {
-  color: var(--text-weak);
-}
-
-.email-line__rows {
-  margin: 0 12px 0 30px;
-}
-
-/* Rows that need the user carry a small accent dot in the gutter; rows
-   worth knowing carry nothing. */
-.email-line__rows .email-card__row[data-needs-you]::before {
-  content: "";
-  position: absolute;
-  top: 13px;
-  left: -12px;
   width: 6px;
   height: 6px;
   border-radius: 50%;

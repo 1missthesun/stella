@@ -48,7 +48,36 @@ export type EmailItem = {
   ruleId?: string;
   /** The user moved it to another bucket. */
   corrected?: boolean;
+  /** The user archived it from Stella (it left the Gmail inbox). */
+  archived?: boolean;
 };
+
+/**
+ * What one email row in the chat stands for, opened: the emails it surfaced
+ * (in the order Stella refers to them) and the mail skipped as noise in its
+ * stretch of time. `digestId` is the chat card's id.
+ */
+export type EmailDigest = {
+  digestId: string;
+  kind: "urgent" | "summary" | "rule";
+  createdAt: number;
+  /** When the stretch it covers began (the previous summary), for "since 2:10 pm". */
+  sinceAt?: number;
+  ruleText?: string;
+  items: EmailItem[];
+  /** Mail sorted as noise in its stretch, newest first; summaries only. */
+  skipped: EmailItem[];
+};
+
+export type EmailDigests = {
+  /** The last week's digests, newest first. */
+  digests: EmailDigest[];
+  /** More than one inbox is sorted (only then is an item's account worth showing). */
+  multipleAccounts: boolean;
+};
+
+/** What the user asked Stella to do with one email from a digest. */
+export type EmailFocusAction = "reply" | "handle" | "tell";
 
 /** A standing instruction the user gave in plain words. */
 export type EmailRule = {
@@ -116,6 +145,13 @@ export type EmailCalls = {
   "email.removeRule": { args: { ruleId: string }; result: { rules: EmailRule[] } };
   "email.rules": { args: Record<string, never>; result: { rules: EmailRule[]; note: string } };
   "email.checkNow": { args: Record<string, never>; result: EmailStatus };
+  /** Takes an email out of (or back into) the Gmail inbox. */
+  "email.archive": { args: { itemId: string; archived: boolean }; result: { ok: true } };
+  /**
+   * Tells Stella, out of sight, which email the user's next message is about,
+   * so a digest action can be a plain chat message that still names the real email.
+   */
+  "email.focus": { args: { itemId: string; action: EmailFocusAction }; result: { ok: true } };
   /** Read an email, or reply to it (sent or saved as a draft), in a Gmail account connected through Stella. */
   "email.mail": {
     args: { action: "read" | "reply" | "draft"; account?: string; messageId: string; body?: string; all?: boolean };
@@ -125,6 +161,7 @@ export type EmailCalls = {
 
 export type EmailViews = {
   "email.feed": { args: Record<string, never>; result: EmailFeed };
+  "email.digests": { args: Record<string, never>; result: EmailDigests };
 };
 
 export const EMAIL_PUSH_KIND = "email-urgent" as const;

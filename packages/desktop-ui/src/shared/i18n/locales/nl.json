@@ -3544,6 +3544,48 @@
       "checking": "Controleren…",
       "turnOff": "Uitschakelen",
       "turnOffConfirm": "Uitschakelen stopt het sorteren en verwijdert de gesorteerde lijst."
+    },
+    "row": {
+      "new": {
+        "one": "Nieuw: {count}",
+        "other": "Nieuw: {count}"
+      },
+      "urgent": {
+        "one": "Dringend: {count}",
+        "other": "Dringend: {count}"
+      },
+      "asked": {
+        "one": "Gevraagd: {count}",
+        "other": "Gevraagd: {count}"
+      },
+      "open": "Openen in E-mail"
+    },
+    "digest": {
+      "since": "sinds {time}",
+      "ruleTitle": "Je vroeg hiervan op de hoogte te blijven",
+      "reply": "Antwoord opstellen",
+      "handle": "Regel het",
+      "archive": "Archiveren",
+      "unarchive": "Terug naar inbox",
+      "open": "Openen",
+      "tell": "Zeg tegen Stella…",
+      "tellPlaceholder": "Wat moet Stella met deze e-mail doen?",
+      "send": "Versturen",
+      "sent": "Naar Stella gestuurd. Het antwoord komt in de chat.",
+      "skipped": {
+        "one": "Overgeslagen: {count}",
+        "other": "Overgeslagen: {count}"
+      },
+      "skippedHint": "Mail die Stella als ruis heeft weggelaten. Markeer wat belangrijk was en Stella leert ervan.",
+      "mattered": "Deze was belangrijk",
+      "matteredDone": "Genoteerd. Zulke mail wordt getoond.",
+      "earlier": "Eerder",
+      "waiting": "Nog niet in een overzicht",
+      "empty": "Nog geen overzicht. Belangrijke nieuwe mail verschijnt hier.",
+      "settings": "E-mailinstellingen",
+      "askReply": "Stel een antwoord op op de e-mail van {from} ‘{subject}’.",
+      "askHandle": "Regel de e-mail van {from} ‘{subject}’.",
+      "askTell": "Over de e-mail van {from} ‘{subject}’: {text}"
     }
   }
 }

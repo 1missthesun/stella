@@ -3640,6 +3640,64 @@
       "checking": "جارٍ الفحص…",
       "turnOff": "إيقاف",
       "turnOffConfirm": "يؤدي الإيقاف إلى إنهاء الفرز وحذف القائمة المفروزة."
+    },
+    "row": {
+      "new": {
+        "few": "جديدة: {count}",
+        "many": "جديدة: {count}",
+        "one": "جديدة: {count}",
+        "other": "جديدة: {count}",
+        "two": "جديدة: {count}",
+        "zero": "جديدة: {count}"
+      },
+      "urgent": {
+        "few": "عاجلة: {count}",
+        "many": "عاجلة: {count}",
+        "one": "عاجلة: {count}",
+        "other": "عاجلة: {count}",
+        "two": "عاجلة: {count}",
+        "zero": "عاجلة: {count}"
+      },
+      "asked": {
+        "few": "طلبتَها: {count}",
+        "many": "طلبتَها: {count}",
+        "one": "طلبتَها: {count}",
+        "other": "طلبتَها: {count}",
+        "two": "طلبتَها: {count}",
+        "zero": "طلبتَها: {count}"
+      },
+      "open": "فتح في البريد"
+    },
+    "digest": {
+      "since": "منذ {time}",
+      "ruleTitle": "طلبتَ أن أخبرك بهذا",
+      "reply": "مسودة رد",
+      "handle": "تولَّ الأمر",
+      "archive": "أرشفة",
+      "unarchive": "إعادة إلى الوارد",
+      "open": "فتح",
+      "tell": "أخبر Stella…",
+      "tellPlaceholder": "ماذا تفعل Stella بهذه الرسالة؟",
+      "send": "إرسال",
+      "sent": "أُرسل إلى Stella. سيأتي الرد في المحادثة.",
+      "skipped": {
+        "few": "تم تخطيها: {count}",
+        "many": "تم تخطيها: {count}",
+        "one": "تم تخطيها: {count}",
+        "other": "تم تخطيها: {count}",
+        "two": "تم تخطيها: {count}",
+        "zero": "تم تخطيها: {count}"
+      },
+      "skippedHint": "رسائل استبعدتها Stella كضجيج. حدّد ما كان مهمًا لتتعلم.",
+      "mattered": "هذه كانت مهمة",
+      "matteredDone": "تم. ستظهر الرسائل المشابهة.",
+      "earlier": "سابقًا",
+      "waiting": "ليست في ملخص بعد",
+      "empty": "لا يوجد ملخص بعد. عندما تصل رسالة مهمة تظهر هنا.",
+      "settings": "إعدادات البريد",
+      "askReply": "اكتب مسودة رد على رسالة {from} «{subject}».",
+      "askHandle": "تولَّ رسالة {from} «{subject}».",
+      "askTell": "بخصوص رسالة {from} «{subject}»: {text}"
     }
   }
 }

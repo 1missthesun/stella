@@ -3544,6 +3544,48 @@
       "checking": "Wird geprüft…",
       "turnOff": "Ausschalten",
       "turnOffConfirm": "Beim Ausschalten endet das Sortieren und die sortierte Liste wird gelöscht."
+    },
+    "row": {
+      "new": {
+        "one": "Neu: {count}",
+        "other": "Neu: {count}"
+      },
+      "urgent": {
+        "one": "Dringend: {count}",
+        "other": "Dringend: {count}"
+      },
+      "asked": {
+        "one": "Angefragt: {count}",
+        "other": "Angefragt: {count}"
+      },
+      "open": "In E-Mail öffnen"
+    },
+    "digest": {
+      "since": "seit {time}",
+      "ruleTitle": "Darüber wolltest du informiert werden",
+      "reply": "Antwort entwerfen",
+      "handle": "Erledigen",
+      "archive": "Archivieren",
+      "unarchive": "In den Posteingang",
+      "open": "Öffnen",
+      "tell": "Stella sagen…",
+      "tellPlaceholder": "Was soll Stella mit dieser E-Mail tun?",
+      "send": "Senden",
+      "sent": "An Stella gesendet. Die Antwort kommt im Chat.",
+      "skipped": {
+        "one": "Übersprungen: {count}",
+        "other": "Übersprungen: {count}"
+      },
+      "skippedHint": "E-Mails, die Stella als unwichtig aussortiert hat. Markiere, was wichtig war, und Stella lernt daraus.",
+      "mattered": "Die war wichtig",
+      "matteredDone": "Notiert. Solche E-Mails werden angezeigt.",
+      "earlier": "Früher",
+      "waiting": "Noch in keiner Übersicht",
+      "empty": "Noch keine Übersicht. Wenn neue E-Mails wichtig sind, erscheinen sie hier.",
+      "settings": "E-Mail-Einstellungen",
+      "askReply": "Entwirf eine Antwort auf die E-Mail von {from} „{subject}“.",
+      "askHandle": "Kümmere dich um die E-Mail von {from} „{subject}“.",
+      "askTell": "Zur E-Mail von {from} „{subject}“: {text}"
     }
   }
 }

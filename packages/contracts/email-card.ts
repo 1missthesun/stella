@@ -116,16 +116,18 @@ export const EMAIL_REASON_WORDS: Record<EmailReason, string> = {
 };
 
 /**
- * What Stella reads about a card the user saw, so "reply to the second one"
- * resolves to a real message. Plain text; ids are for the gmail tools.
+ * What Stella reads about an email row the user got, so "reply to the Stripe
+ * one" or "the second one" resolves to a real message. The chat itself shows
+ * only a count; the list is in the opened Email view, in this order. Plain
+ * text; ids are for the email tool.
  */
 export const emailCardNoteText = (card: EmailCard): string => {
   const heading =
     card.kind === "urgent"
-      ? "Stella's email sorting just showed the user this urgent email in the chat (as a card, not written by you):"
+      ? "Stella's email sorting just flagged this urgent email to the user (a small \"1 urgent\" row in the chat, not written by you; they also got a notification):"
       : card.kind === "rule"
-        ? `This email matched the user's standing instruction "${card.ruleText ?? ""}" and was shown to them in the chat as a card:`
-        : "Stella's email sorting just showed the user this email summary in the chat (as a card, not written by you):";
+        ? `This email matched the user's standing instruction "${card.ruleText ?? ""}"; the chat shows a small email row for it:`
+        : `Stella's email sorting just gave the user a digest of new email (a small "${card.items.length} new" row in the chat, not written by you; they open it to read the list, in this order):`;
   const lines = card.items.map((item) =>
     [
       `${item.n}. ${BUCKET_WORDS[item.bucket]} — ${item.from} — "${item.subject}"`,
@@ -136,19 +138,44 @@ export const emailCardNoteText = (card: EmailCard): string => {
   return [
     heading,
     ...lines,
-    ...(card.noiseCount ? [`${card.noiseCount} other emails were left out as noise.`] : []),
-    "If the user refers to one of these (\"the second one\"), act on that email with the email tool (read, reply, draft), using its account and message_id. This list is now the one the user sees: its numbers replace those of earlier email cards, which the chat folds away. Don't comment on this note unless the user asks about their email.",
+    ...(card.noiseCount ? [`${card.noiseCount} other emails were skipped as noise.`] : []),
+    "If the user refers to one of these (\"reply to the Stripe one\", \"the second one\"), act on that email with the email tool (read, reply, draft), using its account and message_id. Numbers refer to this newest digest. Don't comment on this note unless the user asks about their email.",
   ].join("\n");
 };
+
+/** The email a digest action is about, as Stella's hidden note names it. */
+export type EmailFocusSubject = {
+  from: string;
+  fromAddress: string;
+  subject: string;
+  line?: string;
+  account: string;
+  messageId: string;
+  threadId: string;
+};
+
+/**
+ * Hidden context written just before the user's own message from a digest
+ * action, so a plain "Draft a reply to Blue Metal's email" names the real email.
+ */
+export const emailFocusNoteText = (mail: EmailFocusSubject, action: "reply" | "handle" | "tell"): string =>
+  [
+    `The user's next message comes from an action on one email in their email digest (not written by you). The email: from ${mail.from} <${mail.fromAddress}>, subject "${mail.subject}"${mail.line ? ` — ${mail.line}` : ""} (account ${mail.account}, message_id ${mail.messageId}, thread_id ${mail.threadId}).`,
+    action === "reply"
+      ? "They asked for a draft reply: read the email with the email tool, write the reply in their voice, save it as a Gmail draft (don't send), and tell them in a sentence or two what it says."
+      : action === "handle"
+        ? "They asked you to handle it: read it and do what it needs (a reply, an event, a task, a payment check), saving replies as drafts and asking before sending anything as them, then say briefly what you did."
+        : "Their message says what to do with it; send email as them only if it clearly says to send or reply.",
+    "Don't mention this note.",
+  ].join("\n");
 
 /** One row of a conversation, as far as folding email cards is concerned. */
 export type EmailFoldEntry = { kind: "email"; cardId: string } | { kind: "user" } | { kind: "other" };
 
 /**
- * Email cards never stack up in the chat: only the newest stays, plus any card the
- * user answered right after it (so "reply to the second one" never points at
- * nothing when scrolling back). Returns the card ids to fold away; their notes
- * stay in Stella's context and the Email section keeps the history.
+ * Email never stacks up in the chat: only the newest email row stays. Returns
+ * the card ids to fold away; their notes stay in Stella's context and the
+ * opened Email view keeps every digest.
  */
 export const foldedEmailCards = (entries: readonly EmailFoldEntry[]): Set<string> => {
   const folded = new Set<string>();
@@ -157,9 +184,7 @@ export const foldedEmailCards = (entries: readonly EmailFoldEntry[]): Set<string
     if (entry.kind === "email") lastEmail = index;
   });
   entries.forEach((entry, index) => {
-    if (entry.kind !== "email" || index === lastEmail) return;
-    const next = entries.slice(index + 1).find((later) => later.kind !== "email");
-    if (next?.kind !== "user") folded.add(entry.cardId);
+    if (entry.kind === "email" && index !== lastEmail) folded.add(entry.cardId);
   });
   return folded;
 };

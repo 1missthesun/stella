@@ -3568,6 +3568,52 @@
       "checking": "בודקת…",
       "turnOff": "כיבוי",
       "turnOffConfirm": "כיבוי עוצר את המיון ומוחק את הרשימה הממוינת."
+    },
+    "row": {
+      "new": {
+        "one": "חדשים: {count}",
+        "other": "חדשים: {count}",
+        "two": "חדשים: {count}"
+      },
+      "urgent": {
+        "one": "דחופים: {count}",
+        "other": "דחופים: {count}",
+        "two": "דחופים: {count}"
+      },
+      "asked": {
+        "one": "ביקשת: {count}",
+        "other": "ביקשת: {count}",
+        "two": "ביקשת: {count}"
+      },
+      "open": "פתיחה בדואר"
+    },
+    "digest": {
+      "since": "מאז {time}",
+      "ruleTitle": "ביקשת לשמוע על זה",
+      "reply": "טיוטת תשובה",
+      "handle": "לטפל בזה",
+      "archive": "העברה לארכיון",
+      "unarchive": "החזרה לתיבת הדואר",
+      "open": "פתיחה",
+      "tell": "לומר ל-Stella…",
+      "tellPlaceholder": "מה Stella צריכה לעשות עם המייל הזה?",
+      "send": "שליחה",
+      "sent": "נשלח ל-Stella. התשובה תגיע בצ׳אט.",
+      "skipped": {
+        "one": "דולגו: {count}",
+        "other": "דולגו: {count}",
+        "two": "דולגו: {count}"
+      },
+      "skippedHint": "דואר ש-Stella השאירה בחוץ כרעש. סמנו מה היה חשוב והיא תלמד.",
+      "mattered": "זה היה חשוב",
+      "matteredDone": "נרשם. דואר כזה יוצג.",
+      "earlier": "קודם",
+      "waiting": "עדיין לא בסיכום",
+      "empty": "אין עדיין סיכום. כשדואר חדש חשוב, הוא יופיע כאן.",
+      "settings": "הגדרות דואר",
+      "askReply": "נסחי טיוטת תשובה למייל מ-{from} „{subject}”.",
+      "askHandle": "טפלי במייל מ-{from} „{subject}”.",
+      "askTell": "לגבי המייל מ-{from} „{subject}”: {text}"
     }
   }
 }

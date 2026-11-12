@@ -1,117 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { markEmailSeen } from "@/features/email/email-unseen";
-import type { EmailBucket, EmailFeed, EmailItem, EmailRule } from "@stella/contracts/backend/email";
-import { useNow } from "@/features/app-source/AppSourceCards";
-import {
-  correctEmail,
-  dismissEmail,
-  emailTime,
-  openGmailThread,
-  senderName,
-} from "@/features/email/email-items";
+import type { EmailFeed, EmailRule } from "@stella/contracts/backend/email";
+import { EmailDigestPanel } from "@/features/email/EmailDigest";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { useI18n } from "@/shared/i18n";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
-import { LogIn, Mail, MoreHorizontal } from "@/ui/icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/ui/dropdown-menu";
+import { LogIn, Mail } from "@/ui/icons";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import "./email-section.css";
 
-const LIST_PREVIEW = 6;
-
 const errorText = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
-
-function ItemRow({ item, now, showAccount }: { item: EmailItem; now: number; showAccount: boolean }) {
-  const { t, locale } = useI18n();
-  const [busy, setBusy] = useState(false);
-  const run = (action: () => Promise<unknown>) => {
-    setBusy(true);
-    void action()
-      .catch(() => undefined)
-      .finally(() => setBusy(false));
-  };
-  const moveTo: EmailBucket = item.bucket === "worth_knowing" ? "needs_you" : "worth_knowing";
-  const open = () => openGmailThread(item.threadId, item.account);
-  return (
-    <li className="email-section__item" data-busy={busy || undefined} data-testid="email-item">
-      <button type="button" className="email-section__item-open" title={item.from} onClick={open}>
-        <span className="email-section__item-head">
-          <span className="email-section__from">{senderName(item.from)}</span>
-          {item.bucket === "urgent" ? (
-            <span className="email-section__urgent">{t("email.section.urgent")}</span>
-          ) : null}
-          <span className="email-section__time">{emailTime(locale, item.receivedAt, now)}</span>
-        </span>
-        <span className="email-section__subject">
-          {showAccount ? `${item.subject} · ${item.account}` : item.subject}
-        </span>
-        {item.line ? <span className="email-section__line">{item.line}</span> : null}
-      </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="email-section__more"
-            aria-label={t("email.section.actions")}
-            disabled={busy}
-          >
-            <MoreHorizontal size={15} strokeWidth={1.9} />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={open}>{t("email.section.openInGmail")}</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => run(() => correctEmail(item.itemId, moveTo))}>
-            {moveTo === "needs_you" ? t("email.section.moveToNeedsYou") : t("email.section.moveToWorthKnowing")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => run(() => dismissEmail(item.itemId))}>
-            {t("email.notImportant")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </li>
-  );
-}
-
-function ItemList({
-  title,
-  items,
-  now,
-  showAccount,
-}: {
-  title: string;
-  items: EmailItem[];
-  now: number;
-  showAccount: boolean;
-}) {
-  const { t } = useI18n();
-  const [expanded, setExpanded] = useState(false);
-  if (items.length === 0) return null;
-  const shown = expanded ? items : items.slice(0, LIST_PREVIEW);
-  return (
-    <section className="email-section__group">
-      <h2 className="email-section__heading">{title}</h2>
-      <ul className="email-section__list">
-        {shown.map((item) => (
-          <ItemRow key={item.itemId} item={item} now={now} showAccount={showAccount} />
-        ))}
-      </ul>
-      {items.length > LIST_PREVIEW ? (
-        <button type="button" className="email-section__text-button" onClick={() => setExpanded((open) => !open)}>
-          {expanded ? t("email.card.showLess") : t("email.card.showAll", { count: items.length })}
-        </button>
-      ) : null}
-    </section>
-  );
-}
 
 function NoteEditor({ note }: { note: string }) {
   const { t } = useI18n();
@@ -304,31 +206,18 @@ function Footer({ feed }: { feed: EmailFeed }) {
 }
 
 function SortedMail({ feed }: { feed: EmailFeed }) {
-  const { t, tPlural } = useI18n();
-  const now = useNow();
-  const visible = feed.items.filter((item) => item.state !== "dismissed" && item.bucket !== "noise");
-  const needsYou = [
-    ...visible.filter((item) => item.bucket === "urgent"),
-    ...visible.filter((item) => item.bucket === "needs_you"),
-  ];
-  const worthKnowing = visible.filter((item) => item.bucket === "worth_knowing");
   const showAccount = feed.status.accounts.length > 1;
+  const waiting = feed.items.filter(
+    (item) => item.state === "waiting" && item.bucket !== "noise",
+  );
   return (
     <div className="email-section sidebar-section__scroll" data-testid="email-section">
-      {visible.length === 0 ? <p className="email-section__empty">{t("email.section.empty")}</p> : null}
-      <ItemList title={t("email.section.needsYou")} items={needsYou} now={now} showAccount={showAccount} />
-      <ItemList
-        title={t("email.section.worthKnowing")}
-        items={worthKnowing}
-        now={now}
-        showAccount={showAccount}
-      />
-      {feed.noiseCount > 0 ? (
-        <p className="email-section__skipped">{tPlural("email.section.skippedThisWeek", feed.noiseCount)}</p>
-      ) : null}
-      <NoteEditor note={feed.note} />
-      <Rules rules={feed.rules} />
-      <Footer feed={feed} />
+      <EmailDigestPanel enabled waiting={waiting} showAccount={showAccount} />
+      <div className="email-section__settings">
+        <NoteEditor note={feed.note} />
+        <Rules rules={feed.rules} />
+        <Footer feed={feed} />
+      </div>
     </div>
   );
 }

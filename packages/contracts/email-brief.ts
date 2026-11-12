@@ -52,3 +52,35 @@ export const briefOf = (digest: EmailDigest, words: { needsYou: string; worthKno
   };
 };
 
+
+/** A search result's Gmail preview as one short point: about two lines, cut at a word. */
+export const snippetPoint = (snippet: string, max = 140): string => {
+  const text = snippet.replace(/\s+/gu, " ").trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/u, "")}…`;
+};
+
+const LIST_OR_QUOTE = /^\s*(?:[-*•>]|\d+[.)])\s/u;
+
+/**
+ * Plain-text mail is often hard-wrapped near 70–80 columns, which reads as
+ * ragged lines on a narrow screen: join wrapped lines back into paragraphs,
+ * leaving blank lines, short lines (greetings, sign-offs), lists and quotes.
+ */
+export const reflowText = (text: string): string =>
+  text
+    .split(/\n[ \t]*\n/u)
+    .map((paragraph) => {
+      const lines = paragraph.split("\n");
+      let out = lines[0] ?? "";
+      for (let index = 1; index < lines.length; index += 1) {
+        const previous = lines[index - 1]!;
+        const line = lines[index]!;
+        const wrapped = previous.trimEnd().length >= 45 && line.trim() !== "" && !LIST_OR_QUOTE.test(line) && !LIST_OR_QUOTE.test(previous);
+        out += wrapped ? ` ${line.trimStart()}` : `\n${line}`;
+      }
+      return out;
+    })
+    .join("\n\n");

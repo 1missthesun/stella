@@ -7,7 +7,7 @@ import type {
   EmailThread,
 } from "@stella/contracts/backend/email";
 
-export { briefOf, plainText, senderOf } from "@stella/contracts/email-brief";
+export { briefOf, plainText, reflowText, senderOf, snippetPoint } from "@stella/contracts/email-brief";
 import { plainText, senderOf } from "@stella/contracts/email-brief";
 
 const mailLine = (item: { from: string; fromAddress: string; subject: string; account: string; messageId: string; threadId: string }) =>

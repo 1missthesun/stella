@@ -45,7 +45,9 @@ import {
   briefingSnapshot,
   foundSnapshot,
   plainText,
+  reflowText,
   senderOf,
+  snippetPoint,
   threadSnapshot,
 } from "./email-brief";
 import { correctEmail, dismissEmail, emailTime, openGmailThread } from "./email-items";
@@ -562,7 +564,7 @@ function SearchResults({
                   key={key}
                   tone="fyi"
                   title={`**${mail.from}** · ${mail.subject}`}
-                  points={mail.snippet ? [mail.snippet] : []}
+                  points={mail.snippet ? [snippetPoint(mail.snippet)] : []}
                   foot={[emailTime(locale, mail.receivedAt, now), mail.account].join(" · ")}
                   selected={picked === key}
                   actions={{
@@ -659,7 +661,7 @@ function Reader({
                 <span className="email-brief__time">{emailTime(locale, message.receivedAt, now)}</span>
               </header>
               <p className="email-reader__to">{t("email.brief.to", { to: message.to })}</p>
-              <div className="email-reader__text">{message.text}</div>
+              <div className="email-reader__text">{reflowText(message.text)}</div>
               {message.attachments.length > 0 ? (
                 <p className="email-reader__attachments">
                   <Paperclip size={13} strokeWidth={1.9} aria-hidden="true" />

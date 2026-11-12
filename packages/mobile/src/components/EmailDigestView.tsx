@@ -11,7 +11,7 @@ import type {
   EmailTargets,
   EmailThread,
 } from "@stella/contracts/backend/email";
-import { briefOf, plainText, senderOf } from "@stella/contracts/email-brief";
+import { briefOf, plainText, reflowText, senderOf, snippetPoint } from "@stella/contracts/email-brief";
 import { Text } from "./Text";
 import { Icon } from "./Icon";
 import { useLocale, useT, useTPlural } from "../i18n";
@@ -297,7 +297,7 @@ function Reader({ target, now, onLoaded, styles, colors }: { target: ReadTarget;
             {t("email.brief.to", { to: message.to })}
           </Text>
           <Text style={styles.readerText} selectable maxFontSizeMultiplier={SCALE}>
-            {message.text}
+            {reflowText(message.text)}
           </Text>
           {message.attachments.length > 0 ? (
             <Text style={styles.foot} maxFontSizeMultiplier={SCALE}>
@@ -371,11 +371,18 @@ export function EmailDigestView({
   const [reading, setReading] = useState<ReadTarget | null>(null);
   const [thread, setThread] = useState<EmailThread | null>(null);
   const stripRef = useRef<ScrollView>(null);
+  // Where each briefing sits in the strip, so moving with ‹ › brings the shown one into view.
+  const stopX = useRef(new Map<string, number>());
 
   const digests = view.value?.digests ?? [];
   const index = Math.max(0, digests.findIndex((digest) => digest.digestId === digestId));
   const shown = digests[index] ?? null;
   const newest = index === 0;
+  const shownId = shown?.digestId;
+  useEffect(() => {
+    const x = shownId ? stopX.current.get(shownId) : undefined;
+    if (x !== undefined) stripRef.current?.scrollTo({ x: Math.max(0, x - 48), animated: true });
+  }, [shownId]);
   const fallback = useMemo(() => {
     const need = shown ? shown.items.filter((item) => item.bucket === "urgent" || item.bucket === "needs_you").length : 0;
     const worth = (shown?.items.length ?? 0) - need;
@@ -593,7 +600,7 @@ export function EmailDigestView({
                     key={key}
                     tone="fyi"
                     title={`**${mail.from}** · ${mail.subject}`}
-                    points={mail.snippet ? [mail.snippet] : []}
+                    points={mail.snippet ? [snippetPoint(mail.snippet)] : []}
                     foot={[emailTime(locale, mail.receivedAt, now), showAccount ? mail.account : null].filter(Boolean).join(" · ")}
                     selected={foundPick?.messageId === mail.messageId}
                     choices={() => [
@@ -735,6 +742,7 @@ export function EmailDigestView({
                   onSelect(digest.digestId);
                 }}
                 style={styles.stop}
+                onLayout={(event) => stopX.current.set(digest.digestId, event.nativeEvent.layout.x)}
               >
                 {asksForYou(digest) ? <View style={styles.dot} /> : null}
                 <Text style={[styles.stopLabel, on && styles.stopOn]} maxFontSizeMultiplier={SCALE}>

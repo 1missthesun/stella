@@ -10,24 +10,14 @@ import {
 import {
   addOffer,
   ago,
+  describeChange,
   deviceLabel,
-  subjectOf,
   useAppSourceAction,
   useNow,
 } from "@/features/app-source/AppSourceCards";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Check } from "@/ui/icons";
 import "./updates-section.css";
-
-const REMOTE_MERGE_SUBJECT = "Merge the changes from another computer";
-const UPSTREAM_MERGE_SUBJECT = "Merge the published Stella update";
-
-const reverted = (subject: string): { inner: string; depth: number } => {
-  const inner = /^Revert "(.*)"$/.exec(subject)?.[1];
-  if (inner === undefined) return { inner: subject, depth: 0 };
-  const deeper = reverted(inner);
-  return { inner: deeper.inner, depth: deeper.depth + 1 };
-};
 
 const WaitingItem = ({
   offer,
@@ -54,7 +44,7 @@ const WaitingItem = ({
   const detail =
     offer.kind === "version"
       ? t("shell.appSource.updates.newVersionDetail")
-      : subjectOf(offer.summary);
+      : describeChange(t, offer.summary);
   const adding = offer.adding || pending;
   return (
     <li className="updates-section__item" data-kind={offer.kind}>
@@ -118,20 +108,12 @@ const HistoryItem = ({
 }) => {
   const t = useT();
   const locale = useLocale();
-  const { inner, depth } = reverted(commit.subject);
-  const change = inner.startsWith(REMOTE_MERGE_SUBJECT)
-    ? t("shell.appSource.updates.fromOtherComputers")
-    : inner.startsWith(UPSTREAM_MERGE_SUBJECT)
-      ? t("shell.appSource.updates.newVersion")
-      : inner;
   const title =
     commit.kind === "version"
       ? t("shell.appSource.updates.newVersion")
       : commit.kind === "other-computer"
         ? t("shell.appSource.updates.fromOtherComputers")
-        : depth % 2 === 1
-          ? t("shell.appSource.updates.removed", { change })
-          : change;
+        : describeChange(t, commit.subject);
   const when =
     now - commit.date < 60_000
       ? t("shell.appSource.updates.justNow")

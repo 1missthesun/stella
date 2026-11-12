@@ -79,6 +79,12 @@
   color: var(--text-weak);
 }
 
+/* A longer detail (what an update overlaps) wraps instead of running under the button. */
+.app-update-card__detail .app-update-swap__layer {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .app-update-card__button {
   position: relative;
   display: inline-grid;

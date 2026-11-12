@@ -44,6 +44,30 @@ export const subjectOf = (subject: string): string => {
   return inner === undefined ? subject : subjectOf(inner);
 };
 
+const REMOTE_MERGE_SUBJECT = "Merge the changes from another computer";
+const UPSTREAM_MERGE_SUBJECT = "Merge the published Stella update";
+
+const reverted = (subject: string): { inner: string; depth: number } => {
+  const inner = /^Revert "(.*)"$/.exec(subject)?.[1];
+  if (inner === undefined) return { inner: subject, depth: 0 };
+  const deeper = reverted(inner);
+  return { inner: deeper.inner, depth: deeper.depth + 1 };
+};
+
+/**
+ * A change in words: Stella's own merges by what they brought, and an undo as
+ * an undo, so taking another computer's Undo never looks like taking the change.
+ */
+export const describeChange = (t: ReturnType<typeof useT>, subject: string): string => {
+  const { inner, depth } = reverted(subject);
+  const change = inner.startsWith(REMOTE_MERGE_SUBJECT)
+    ? t("shell.appSource.updates.fromOtherComputers")
+    : inner.startsWith(UPSTREAM_MERGE_SUBJECT)
+      ? t("shell.appSource.updates.newVersion")
+      : inner;
+  return depth % 2 === 1 ? t("shell.appSource.updates.removed", { change }) : change;
+};
+
 export const useAppSourceAction = () => {
   const t = useT();
   const pending = usePendingAppSourceAction();
@@ -261,7 +285,11 @@ export const AppSourceOffers = memo(function AppSourceOffers({
   const arrived =
     state.arrived &&
     now - state.arrived.date < ARRIVED_SHOWN_MS &&
-    !state.recent.some((commit) => commit.sha === state.arrived!.sha && commit.agentId)
+    // A task's report row carries its own card when that row is in this chat.
+    !state.recent.some(
+      (commit) =>
+        commit.sha === state.arrived!.sha && commit.agentId && relayed.has(commit.agentId),
+    )
       ? state.arrived
       : null;
   const offers = state.waiting.filter(
@@ -359,7 +387,7 @@ export const AppSourceOffers = memo(function AppSourceOffers({
                       : t("shell.appSource.updates.fromOtherComputer")}
                   </span>
                   <span className="schedule-card__meta">
-                    <span className="schedule-card__status">{subjectOf(offer.summary)}</span>
+                    <span className="schedule-card__status">{describeChange(t, offer.summary)}</span>
                     <span className="schedule-card__actions">
                       <button
                         type="button"

@@ -76,14 +76,10 @@ export const classifyUpdate = async (
   const base = await git(cwd, ["merge-base", head, tip]);
   const localChanges =
     (await gitRaw(cwd, ["diff", "--quiet", base, head])).code !== 0;
-  const merge = await gitRaw(cwd, [
-    "merge-tree",
-    "--write-tree",
-    "--merge-base",
-    base,
-    head,
-    tip,
-  ]);
+  // Every merge base, as `git merge` uses: two computers that each merged
+  // the other's changes leave two, and either one alone can show a clash
+  // that the merge itself doesn't have.
+  const merge = await gitRaw(cwd, ["merge-tree", "--write-tree", head, tip]);
   if (merge.code === 1) {
     return {
       kind: "conflict",

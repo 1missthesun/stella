@@ -2180,15 +2180,7 @@ export class AppSourceService {
     if (await isAncestor(cwd, onto, tip)) {
       return await git(cwd, ["rev-parse", `${tip}^{tree}`]);
     }
-    const base = await git(cwd, ["merge-base", onto, tip]);
-    const merge = await gitRaw(cwd, [
-      "merge-tree",
-      "--write-tree",
-      "--merge-base",
-      base,
-      onto,
-      tip,
-    ]);
+    const merge = await gitRaw(cwd, ["merge-tree", "--write-tree", onto, tip]);
     if (merge.code === 1) return null;
     if (merge.code !== 0) {
       throw new Error(merge.stderr.trim() || "Could not work out the merge.");
@@ -2781,15 +2773,7 @@ export class AppSourceService {
    * changes stay here as they did before, and the Updates tab says so.
    */
   private async mergeToShare(cwd: string, forkTip: string, head: string): Promise<Share> {
-    const base = await git(cwd, ["merge-base", forkTip, head]);
-    const merged = await gitRaw(cwd, [
-      "merge-tree",
-      "--write-tree",
-      "--merge-base",
-      base,
-      forkTip,
-      head,
-    ]);
+    const merged = await gitRaw(cwd, ["merge-tree", "--write-tree", forkTip, head]);
     if (merged.code === 1) {
       this.options.log("app-source.fork-share-held", {
         reason: "conflict",

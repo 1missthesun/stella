@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
-import type { EmailBucket, EmailFocusAction, EmailItem, EmailTargets } from "@stella/contracts/backend/email";
+import type { EmailBucket, EmailFocusAction, EmailTargets } from "@stella/contracts/backend/email";
 import { authClient } from "./auth-client";
 import { useEmailFeature } from "./email-feature";
 import { getBackendClient, useBackendView } from "./backend";
@@ -20,25 +20,6 @@ export const correctEmail = (itemId: string, bucket: EmailBucket) =>
   getBackendClient().call("email.correct", { itemId, bucket });
 
 export const dismissEmail = (itemId: string) => getBackendClient().call("email.dismiss", { itemId });
-
-/**
- * The sorted week's items by id, so a card shows corrections made anywhere,
- * and whether more than one inbox is sorted (only then is an item's account shown).
- */
-export function useEmailFeedItems(): {
-  items: ReadonlyMap<string, EmailItem> | undefined;
-  showAccounts: boolean;
-} {
-  const signedIn = Boolean(authClient.useSession().data?.user);
-  const on = useEmailFeature();
-  const feed = useBackendView("email.feed", signedIn && on ? {} : "skip").value;
-  const list = feed?.items;
-  const items = useMemo(
-    () => (list ? new Map(list.map((item) => [item.itemId, item])) : undefined),
-    [list],
-  );
-  return { items, showAccounts: (feed?.status.accounts.length ?? 0) > 1 };
-}
 
 export const emailTime = (locale: string, at: number, now: number): string => {
   const sameDay = new Date(at).toDateString() === new Date(now).toDateString();
@@ -115,21 +96,19 @@ const subscribeSeen = (listener: () => void) => {
   return () => seenListeners.delete(listener);
 };
 
-/** Sorted mail worth showing that arrived since the Email page was last open. */
+/** Items open on Today that arrived (or came back from Later) since the Email page was last open. */
 export function useEmailUnseenCount(): number {
-  const { items } = useEmailFeedItems();
+  const signedIn = Boolean(authClient.useSession().data?.user);
+  const on = useEmailFeature();
+  const open = useBackendView("email.today", signedIn && on ? {} : "skip").value?.open;
   const seen = useSyncExternalStore(subscribeSeen, () => seenAt);
-  return useMemo(() => {
-    if (!items) return 0;
-    let count = 0;
-    for (const item of items.values()) {
-      if (item.bucket !== "noise" && item.state !== "dismissed" && item.receivedAt > seen) count += 1;
-    }
-    return count;
-  }, [items, seen]);
+  return useMemo(
+    () => (open ?? []).filter((matter) => Math.max(matter.arrivedAt, matter.returnedAt ?? 0) > seen).length,
+    [open, seen],
+  );
 }
 
-// The opened digest ----------------------------------------------------------
+// Handing email to Stella ------------------------------------------------------
 
 const askQueue: string[] = [];
 const askListeners = new Set<() => void>();
@@ -138,20 +117,22 @@ const askListeners = new Set<() => void>();
  * Hands emails to Stella as a plain chat message. A hidden note written just
  * before it names the exact emails, so Stella acts on the right ones and the
  * answer comes back in the chat like any other. The chat screen sends it.
+ * With `matterId`, the Today item is handed over (and settled as with Stella).
  */
 export const askStellaAboutEmail = async (
   targets: EmailTargets,
   action: EmailFocusAction,
   text: string,
+  matterId?: string,
 ): Promise<void> => {
   await getBackendClient()
-    .call("email.focus", { ...targets, action })
+    .call("email.focus", { ...targets, action, ...(matterId ? { matterId } : {}) })
     .catch(() => undefined);
   askQueue.push(text);
   for (const listener of askListeners) listener();
 };
 
-/** The chat screen sends what briefing actions asked, as soon as it can. */
+/** The chat screen sends what Today's actions asked, as soon as it can. */
 export const useEmailAsks = (send: ((text: string) => unknown) | undefined, ready: boolean): void => {
   const sendRef = useRef(send);
   sendRef.current = send;

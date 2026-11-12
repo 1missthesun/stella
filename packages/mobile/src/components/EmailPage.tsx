@@ -15,7 +15,6 @@ import { Text } from "./Text";
 import { useLocale, useT } from "../i18n";
 import { authClient } from "../lib/auth-client";
 import { getBackendClient, useBackendView } from "../lib/backend";
-import { markEmailSeen } from "../lib/email";
 import { tapLight, tapMedium } from "../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import type { Colors } from "../theme/colors";
@@ -23,7 +22,8 @@ import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
-import { EmailDigestView } from "./EmailDigestView";
+import { EmailTodayView } from "./EmailTodayView";
+import { EmailNoticeBar } from "./EmailToday";
 import { useRouter } from "expo-router";
 
 type Styles = ReturnType<typeof makeStyles>;
@@ -273,28 +273,26 @@ function Footer({ feed, styles }: { feed: EmailFeed; styles: Styles }) {
 function SortedMail({ feed, styles, colors }: { feed: EmailFeed; styles: Styles; colors: Colors }) {
   const bottomInset = useSafeAreaInsets().bottom;
   const router = useRouter();
-  const [digestId, setDigestId] = useState<string | null>(null);
-  const waiting = feed.items.filter((item) => item.state === "waiting" && item.bucket !== "noise");
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 24 }]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      testID="mobile-email"
-    >
-      <EmailDigestView
-        digestId={digestId}
-        onSelect={setDigestId}
-        onAsked={() => router.dismissTo("/chat")}
-        waiting={waiting}
-      />
-      <View style={styles.settings}>
-      <NoteEditor note={feed.note} styles={styles} colors={colors} />
-      <Rules rules={feed.rules} styles={styles} />
-      <Footer feed={feed} styles={styles} />
-      </View>
-    </ScrollView>
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 72 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+        testID="mobile-email"
+      >
+        <EmailTodayView onAsked={() => router.dismissTo("/chat")} />
+        <View style={styles.settings}>
+          <NoteEditor note={feed.note} styles={styles} colors={colors} />
+          <Rules rules={feed.rules} styles={styles} />
+          <Footer feed={feed} styles={styles} />
+        </View>
+      </ScrollView>
+      <EmailNoticeBar bottom={bottomInset} />
+    </View>
   );
 }
 
@@ -315,11 +313,6 @@ export function EmailPage() {
   useEffect(() => {
     if (connected) setWaiting(false);
   }, [connected]);
-
-  // Looking at the page clears the unseen badge, including mail that arrives while it is open.
-  useEffect(() => {
-    if (value) markEmailSeen();
-  }, [value]);
 
   const connect = useCallback(async () => {
     setConnectFailed(false);

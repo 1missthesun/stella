@@ -92,14 +92,6 @@ const deepMerge = <T>(base: T, patch?: Partial<T>): T => {
   return output as T;
 };
 
-const gatewayOptions = (
-  provider: ManagedGatewayProvider,
-): Record<string, Record<string, JSONValue>> => ({
-  gateway: {
-    order: [provider],
-  },
-});
-
 export const DEEPSEEK_V4_FLASH_FIREWORKS_MODEL =
   "accounts/fireworks/models/deepseek-v4-flash-0731";
 export const DEEPSEEK_V4_FLASH_DIRECT_MODEL = "deepseek/deepseek-v4-flash";
@@ -161,11 +153,12 @@ export const MANAGED_MODEL_API_OVERRIDES: Readonly<
 
 export const GEMINI_3_1_FLASH_LITE_MODEL = "google/gemini-3.1-flash-lite";
 
+// Through OpenRouter like every other managed model, so nothing needs a Google key.
 const GEMINI_3_1_FLASH_LITE_IMAGE_DESCRIPTION_CONFIG: ModelConfig = {
   model: GEMINI_3_1_FLASH_LITE_MODEL,
-  managedGatewayProvider: "google",
+  managedGatewayProvider: "openrouter",
+  api: "openai-completions",
   maxOutputTokens: 4096,
-  providerOptions: gatewayOptions("google"),
 };
 
 export const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL =
@@ -298,9 +291,9 @@ export const isStellaModelAllowedForAudience = (
 export const LOCKED_AGENT_TYPES: ReadonlySet<string> = new Set<string>([
   "chronicle",
   AGENT_IDS.OFFLINE_RESPONDER,
-  // Image descriptions must stay on a vision-capable Google route. Treating
+  // Image descriptions must stay on a vision-capable Gemini route. Treating
   // this utility pass as General lets restricted audiences coerce the model
-  // back to DeepSeek while the desktop still serializes a Google request.
+  // back to DeepSeek.
   "image_description",
 ]);
 

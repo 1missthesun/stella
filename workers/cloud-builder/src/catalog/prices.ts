@@ -47,6 +47,7 @@ const MODELS_DEV_ALIASES: Record<string, string[]> = {
 // provider's row so billing matches what Stella pays.
 const MODELS_DEV_PREFERRED_ALIASES: Record<string, string[]> = {
   "google/gemini-3.8-flash": ["openrouter/google/gemini-3.8-flash"],
+  "google/gemini-3.1-flash-lite": ["openrouter/google/gemini-3.1-flash-lite"],
   "meta/muse-spark-1.3-contributor": ["openrouter/meta/muse-spark-1.3-contributor"],
 };
 

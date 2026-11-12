@@ -7,9 +7,9 @@ export const GATEWAY_PREPARE_PATH = "/v1/models/prepare" as const;
 export const GATEWAY_RESOLVE_PATH = "/v1/models/resolve" as const;
 export const GATEWAY_SESSION_CAPABILITY_PATH = "/v1/capabilities/session" as const;
 export const GATEWAY_HEALTH_PATH = "/healthz" as const;
-/** Gemini Decision 1 for Stella's own background decisions (email sorting). */
+/** Gemini Decision 1 for Stella's own background decisions (email sorting), served through OpenRouter. */
 export const GATEWAY_DECISIONS_PATH = "/v1/decisions" as const;
-export const GATEWAY_DECISIONS_MODEL = "gemini-decision-1" as const;
+export const GATEWAY_DECISIONS_MODEL = "google/gemini-decision-1" as const;
 export const GATEWAY_DECISIONS_MAX_BODY_BYTES = 6 * 1024 * 1024;
 
 export const GATEWAY_BYOK_RELAY_PREFIX = "/v1/byok" as const;

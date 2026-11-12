@@ -150,7 +150,7 @@ function DigestItem({
         ) : null}
       </View>
       {dismissed ? (
-        <Text style={styles.notice} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+        <Text style={[styles.notice, styles.flush]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
           {t("email.card.wontShow")}
         </Text>
       ) : (
@@ -528,6 +528,7 @@ const makeStyles = (colors: Colors) =>
       marginTop: 4,
       paddingHorizontal: 2,
     },
+    flush: { paddingHorizontal: 0 },
     disclosure: { alignItems: "center", alignSelf: "flex-start", flexDirection: "row", gap: 4, paddingHorizontal: 2, paddingVertical: 2 },
     disclosureLabel: { color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: 14 },
     skippedRow: {

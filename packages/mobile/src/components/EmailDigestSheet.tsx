@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../i18n";
 import { closeEmailDigest, markEmailSeen, selectEmailDigest, useEmailDigestSheet } from "../lib/email";
 import { EmailDigestView } from "./EmailDigestView";
@@ -12,6 +13,7 @@ export function EmailDigestSheet({ bottomReserve = 0 }: { bottomReserve?: number
   const t = useT();
   const router = useRouter();
   const { digestId, open } = useEmailDigestSheet();
+  const insets = useSafeAreaInsets();
   useEffect(() => {
     if (open) markEmailSeen();
   }, [open]);
@@ -31,7 +33,7 @@ export function EmailDigestSheet({ bottomReserve = 0 }: { bottomReserve?: number
   );
   return (
     <TopSheet visible={open} onClose={closeEmailDigest} dim={false} presentation="overlay" bottomReserve={bottomReserve}>
-      <View style={styles.root} testID="email-digest-sheet">
+      <View style={[styles.root, { paddingTop: insets.top }]} testID="email-digest-sheet">
         <ScrollView
           style={styles.root}
           contentContainerStyle={styles.content}

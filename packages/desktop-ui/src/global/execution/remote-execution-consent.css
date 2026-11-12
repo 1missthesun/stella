@@ -8,6 +8,15 @@
   align-items: stretch;
 }
 
+/* The body already pads the card; the dialog's own description padding
+   (meant for a description sitting under the header) would indent it. */
+.remote-execution-consent-body[data-slot="dialog-body"]
+  .remote-execution-consent-text {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
 .remote-execution-consent-text {
   margin: 0;
   color: var(--text-base);

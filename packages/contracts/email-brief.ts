@@ -55,7 +55,8 @@ export const briefOf = (digest: EmailDigest, words: { needsYou: string; worthKno
 
 /** A search result's Gmail preview as one short point: about two lines, cut at a word. */
 export const snippetPoint = (snippet: string, max = 140): string => {
-  const text = snippet.replace(/\s+/gu, " ").trim();
+  // Marketing mail pads previews with invisible joiners and soft hyphens; drop them before measuring.
+  const text = snippet.replace(/[\u034F\u00AD\u180E\u200B-\u200F\u2060-\u2064\uFEFF]/gu, "").replace(/\s+/gu, " ").trim();
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const space = cut.lastIndexOf(" ");

@@ -36,6 +36,9 @@ import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 
 type Styles = ReturnType<typeof makeStyles>;
+
+/** About two lines of a search preview at phone width. */
+const PHONE_SNIPPET_CHARS = 84;
 const SCALE = CONTENT_MAX_FONT_SCALE;
 const URGENT = "#ff6b5e";
 
@@ -372,7 +375,8 @@ export function EmailDigestView({
   const [thread, setThread] = useState<EmailThread | null>(null);
   const stripRef = useRef<ScrollView>(null);
   // Where each briefing sits in the strip, so moving with ‹ › brings the shown one into view.
-  const stopX = useRef(new Map<string, number>());
+  const stops = useRef(new Map<string, { x: number; width: number }>());
+  const stripWidth = useRef(0);
 
   const digests = view.value?.digests ?? [];
   const index = Math.max(0, digests.findIndex((digest) => digest.digestId === digestId));
@@ -380,8 +384,13 @@ export function EmailDigestView({
   const newest = index === 0;
   const shownId = shown?.digestId;
   useEffect(() => {
-    const x = shownId ? stopX.current.get(shownId) : undefined;
-    if (x !== undefined) stripRef.current?.scrollTo({ x: Math.max(0, x - 48), animated: true });
+    // After this render's layout settles (the selected label turns bold), centre the shown time.
+    const timer = setTimeout(() => {
+      const stop = shownId ? stops.current.get(shownId) : undefined;
+      if (!stop) return;
+      stripRef.current?.scrollTo({ x: Math.max(0, stop.x + stop.width / 2 - stripWidth.current / 2), animated: false });
+    }, 60);
+    return () => clearTimeout(timer);
   }, [shownId]);
   const fallback = useMemo(() => {
     const need = shown ? shown.items.filter((item) => item.bucket === "urgent" || item.bucket === "needs_you").length : 0;
@@ -600,7 +609,7 @@ export function EmailDigestView({
                     key={key}
                     tone="fyi"
                     title={`**${mail.from}** · ${mail.subject}`}
-                    points={mail.snippet ? [snippetPoint(mail.snippet)] : []}
+                    points={mail.snippet ? [snippetPoint(mail.snippet, PHONE_SNIPPET_CHARS)] : []}
                     foot={[emailTime(locale, mail.receivedAt, now), showAccount ? mail.account : null].filter(Boolean).join(" · ")}
                     selected={foundPick?.messageId === mail.messageId}
                     choices={() => [
@@ -724,6 +733,9 @@ export function EmailDigestView({
           showsHorizontalScrollIndicator={false}
           style={styles.strip}
           contentContainerStyle={styles.stripContent}
+          onLayout={(event) => {
+            stripWidth.current = event.nativeEvent.layout.width;
+          }}
           onContentSizeChange={() => {
             if (newest) stripRef.current?.scrollToEnd({ animated: false });
           }}
@@ -742,7 +754,10 @@ export function EmailDigestView({
                   onSelect(digest.digestId);
                 }}
                 style={styles.stop}
-                onLayout={(event) => stopX.current.set(digest.digestId, event.nativeEvent.layout.x)}
+                onLayout={(event) => {
+                  const { x, width } = event.nativeEvent.layout;
+                  stops.current.set(digest.digestId, { x, width });
+                }}
               >
                 {asksForYou(digest) ? <View style={styles.dot} /> : null}
                 <Text style={[styles.stopLabel, on && styles.stopOn]} maxFontSizeMultiplier={SCALE}>

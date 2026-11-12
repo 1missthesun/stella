@@ -27,10 +27,15 @@ type WaitingThread = {
   owner_generation: string | null;
 };
 
+/** Signals this close together (a socket drop, then its tasks' leases lapsing) are one absence. */
+const SAME_ABSENCE_MS = 3 * 60_000;
+
 const deviceLost = (ctx: OwnerContext, args: { deviceId: string }): { scheduled: boolean } => {
-  const pending = ctx.db.one<{ id: string }>("SELECT id FROM owner_jobs WHERE id = ?", jobId(args.deviceId));
-  if (pending) return { scheduled: false };
-  ctx.jobs.schedule(DEVICE_OFFLINE_JOB, ctx.now + DEVICE_OFFLINE_NOTE_AFTER_MS, { deviceId: args.deviceId }, {
+  const pending = ctx.db.one<{ payload: string }>("SELECT payload FROM owner_jobs WHERE id = ?", jobId(args.deviceId));
+  const lostAt = pending ? (JSON.parse(pending.payload) as { lostAt?: unknown }).lostAt : undefined;
+  if (typeof lostAt === "number" && ctx.now - lostAt < SAME_ABSENCE_MS) return { scheduled: false };
+  // A new absence (or the first): count from now, not from an earlier drop.
+  ctx.jobs.schedule(DEVICE_OFFLINE_JOB, ctx.now + DEVICE_OFFLINE_NOTE_AFTER_MS, { deviceId: args.deviceId, lostAt: ctx.now }, {
     id: jobId(args.deviceId),
   });
   return { scheduled: true };
@@ -56,15 +61,10 @@ export const deviceOfflineNoteText = (args: {
 };
 
 const check = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
-  const deviceId = (payload as { deviceId?: unknown } | null)?.deviceId;
+  const { deviceId, lostAt } = (payload ?? {}) as { deviceId?: unknown; lostAt?: unknown };
   if (typeof deviceId !== "string" || !deviceId) return;
   const device = (await ctx.host.deviceDestinations()).find((candidate) => candidate.deviceId === deviceId);
   if (!device || device.online) return;
-  // The check was set by an earlier drop; this absence began later.
-  if (device.lastSeenAt && ctx.now - device.lastSeenAt < DEVICE_OFFLINE_NOTE_AFTER_MS) {
-    ctx.jobs.schedule(DEVICE_OFFLINE_JOB, device.lastSeenAt + DEVICE_OFFLINE_NOTE_AFTER_MS, { deviceId }, { id: jobId(deviceId) });
-    return;
-  }
   const threads = ctx.db.all<WaitingThread>(
     `SELECT thread_id, description, COALESCE(origin_conversation_id, conversation_id) AS conversation, owner_generation
        FROM agent_threads
@@ -89,11 +89,11 @@ const check = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
       conversationId,
       ownerGeneration,
       // One note per offline stretch: the same last-seen time is the same stretch.
-      noteId: `offline-${deviceId.slice(0, 48)}-${device.lastSeenAt ?? 0}`,
+      noteId: `offline-${deviceId.slice(0, 48)}-${typeof lostAt === "number" ? lostAt : 0}`,
       text: deviceOfflineNoteText({
         name,
         deviceId,
-        since: device.lastSeenAt,
+        since: typeof lostAt === "number" ? lostAt : undefined,
         now: ctx.now,
         tasks: waiting.map((thread) => ({ threadId: thread.thread_id, description: thread.description })),
       }),

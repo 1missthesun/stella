@@ -41,7 +41,7 @@ const hiddenVerdict = (
   if (message.role === "user" || messageHasText(message) || message.stopped || message.cloudFallback) {
     return { hidden: false, context: NOT_CONSULTED };
   }
-  if ((message.askRecords?.length ?? 0) > 0 || message.scheduleNotice || message.emailCard) {
+  if ((message.askRecords?.length ?? 0) > 0 || message.scheduleNotice) {
     return { hidden: false, context: NOT_CONSULTED };
   }
   const context = options.contextMessageIds?.get(message.id);

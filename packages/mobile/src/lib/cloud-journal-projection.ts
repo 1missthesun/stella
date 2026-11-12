@@ -1,6 +1,6 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
-import { EMAIL_CARD_TYPE, foldedEmailCards } from "@stella/contracts/email-card";
+import { EMAIL_CARD_TYPE } from "@stella/contracts/email-card";
 import {
   parseSafeguardCard,
   safeguardCardLabel,
@@ -291,18 +291,6 @@ const projectTurn = (
       canonicalCreatedAt: record.createdAtMs,
       sequence: record.seq,
       scheduleNotice: record.card,
-    });
-  }
-  for (const record of turn) {
-    if (record.kind !== "card" || record.card.type !== EMAIL_CARD_TYPE) continue;
-    out.push({
-      id: `cloud:${turnId}:email:${record.seq}`,
-      role: "assistant",
-      text: "",
-      createdAt: record.createdAtMs,
-      canonicalCreatedAt: record.createdAtMs,
-      sequence: record.seq,
-      emailCard: record.card,
     });
   }
   for (const record of turn) {
@@ -690,17 +678,7 @@ export const projectCloudConversationMessages = (args: {
       ? (turn.memo as { projection?: TurnProjection }).projection
       : undefined;
   });
-  // Email cards never stack up: older ones fold away (see foldedEmailCards).
-  const folded = foldedEmailCards(
-    messages.map((message) =>
-      message.emailCard
-        ? { kind: "email" as const, cardId: message.emailCard.cardId }
-        : { kind: message.role === "user" ? ("user" as const) : ("other" as const) },
-    ),
-  );
-  return folded.size > 0
-    ? messages.filter((message) => !(message.emailCard && folded.has(message.emailCard.cardId)))
-    : messages;
+  return messages;
 };
 
 type TurnPhases = { last?: string; firstAt: number; failed: boolean };

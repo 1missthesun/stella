@@ -353,16 +353,8 @@ export const journalRecordsToMessageRecords = (
         });
         continue;
       }
-      const emailCard = record.kind === "card" ? parseEmailCard(record.card) : null;
-      if (emailCard) {
-        events.push({
-          _id: `cloud:${turnId}:email:${record.seq}`,
-          timestamp: record.createdAtMs,
-          type: "assistant_message",
-          payload: { text: "", metadata: { emailCard } },
-        });
-        continue;
-      }
+      // Email isn't shown in the chat (it lives in the Email tab and the bell); older email rows stay hidden.
+      if (record.kind === "card" && parseEmailCard(record.card)) continue;
       const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
       const safeguardLabel = safeguard ? safeguardCardLabel(safeguard) : null;
       if (safeguardLabel) {

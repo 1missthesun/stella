@@ -401,8 +401,7 @@ const assistantRowEqual = (
   (a.voiceSession?.durationMs ?? null) ===
     (b.voiceSession?.durationMs ?? null) &&
   (a.reminder?.fireId ?? null) === (b.reminder?.fireId ?? null) &&
-  JSON.stringify(a.scheduleNotice ?? null) === JSON.stringify(b.scheduleNotice ?? null) &&
-  (a.emailCard?.cardId ?? null) === (b.emailCard?.cardId ?? null);
+  JSON.stringify(a.scheduleNotice ?? null) === JSON.stringify(b.scheduleNotice ?? null);
 
 export const eventRowEqual = (
   a: EventRowViewModel,

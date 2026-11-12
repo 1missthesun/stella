@@ -8,7 +8,11 @@ export const senderOf = (from: string): string =>
 
 const TONE_RANK = { urgent: 0, needs_you: 1, fyi: 2 } as const;
 
-/** Two sections under one heading read as a mistake: fold them, keeping the stronger tone (older briefings can have this). */
+/**
+ * Two sections under one heading read as a mistake: fold them, keeping the
+ * stronger tone (older briefings can have this). Then the most pressing first:
+ * urgent, then needs you, then the rest, each keeping the writer's order.
+ */
 const foldHeadings = (brief: EmailBrief): EmailBrief => {
   const sections: EmailBrief["sections"] = [];
   for (const section of brief.sections) {
@@ -19,7 +23,8 @@ const foldHeadings = (brief: EmailBrief): EmailBrief => {
       if (TONE_RANK[section.tone] < TONE_RANK[same.tone]) same.tone = section.tone;
     }
   }
-  return sections.length === brief.sections.length ? brief : { ...brief, sections };
+  sections.sort((a, b) => TONE_RANK[a.tone] - TONE_RANK[b.tone]);
+  return { ...brief, sections };
 };
 
 /**

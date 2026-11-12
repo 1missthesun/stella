@@ -610,21 +610,18 @@ const cardItem = (row: ItemRow, n: number): EmailCardItem => ({
   receivedAt: row.received_at,
 });
 
-const postCard = async (
+/**
+ * Records a briefing, which the Email view and the bell show, and gives Stella
+ * its hidden note in the main chat so the user can talk about it there.
+ * Nothing visible goes into the chat: a busy inbox never fills it.
+ */
+const recordBriefing = async (
   ctx: OwnerContext,
   snapshot: OwnerSnapshot,
   card: EmailCard,
   brief?: EmailBrief,
-): Promise<string | null> => {
-  const conversationId = readMainConversationId(ctx.db);
-  if (!conversationId || !snapshot.writable) return null;
-  const posted = await ctx.host.postConversationCard({
-    conversationId,
-    ownerGeneration: snapshot.ownerGeneration,
-    sourceTurnId: `email:${card.cardId}`,
-    card,
-  });
-  if (!posted) throw new Error("The email card could not be posted yet.");
+): Promise<boolean> => {
+  if (!snapshot.writable) return false;
   ctx.db.run(
     "INSERT OR IGNORE INTO email_briefings (digest_id, kind, created_at, rule_text, item_ids, brief) VALUES (?, ?, ?, ?, ?, ?)",
     card.cardId,
@@ -634,15 +631,18 @@ const postCard = async (
     JSON.stringify(card.items.map((item) => item.itemId)),
     brief ? JSON.stringify(brief) : null,
   );
-  await ctx.host
-    .appendConversationNote({
-      conversationId,
-      ownerGeneration: snapshot.ownerGeneration,
-      noteId: `email-note-${card.cardId}`,
-      text: emailCardNoteText(card, brief?.lead),
-    })
-    .catch((error: unknown) => log("note_failed", { message: errorText(error) }));
-  return conversationId;
+  const conversationId = readMainConversationId(ctx.db);
+  if (conversationId) {
+    await ctx.host
+      .appendConversationNote({
+        conversationId,
+        ownerGeneration: snapshot.ownerGeneration,
+        noteId: `email-note-${card.cardId}`,
+        text: emailCardNoteText(card, brief?.lead),
+      })
+      .catch((error: unknown) => log("note_failed", { message: errorText(error) }));
+  }
+  return true;
 };
 
 const pushUrgent = async (
@@ -713,7 +713,8 @@ const surfaceNow = async (
     items: [cardItem(fresh, 1)],
     ...(rule ? { ruleText: rule.text } : {}),
   };
-  const conversationId = await postCard(ctx, snapshot, card);
+  if (!(await recordBriefing(ctx, snapshot, card))) return;
+  const conversationId = readMainConversationId(ctx.db);
   ctx.db.run(
     "UPDATE email_items SET state = 'surfaced', card_id = ?, excerpt = NULL WHERE item_id = ?",
     cardId,
@@ -1191,7 +1192,7 @@ const postSummary = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
     items: chosen.map((row, index) => cardItem(row, index + 1)),
     ...(noiseCount > 0 ? { noiseCount } : {}),
   };
-  if (!(await postCard(ctx, snapshot, card, brief))) return false;
+  if (!(await recordBriefing(ctx, snapshot, card, brief))) return false;
   for (const row of chosen) {
     ctx.db.run(
       "UPDATE email_items SET state = 'summarized', card_id = ?, excerpt = NULL WHERE item_id = ?",

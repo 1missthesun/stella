@@ -58,7 +58,6 @@ import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
 import { ReminderFireCard } from "@/features/reminders/ReminderFireCard";
 import { ScheduleNoticeCard } from "@/features/schedule/ScheduleNoticeCard";
-import { EmailChatCard } from "@/features/email/EmailChatCard";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { AgentUpdateCard } from "@/features/app-source/AppSourceCards";
@@ -797,7 +796,6 @@ export const AssistantMessageRow = memo(
           {row.scheduleNotice ? (
             <ScheduleNoticeCard card={row.scheduleNotice} />
           ) : null}
-          {row.emailCard ? <EmailChatCard card={row.emailCard} /> : null}
           {hasBody && (
             <div className="message-line message-line--assistant">
               <div className="assistant-message-text chat-bubble-text">

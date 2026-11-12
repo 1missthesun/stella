@@ -25,8 +25,6 @@ import {
   dismissEmail,
   emailTime,
   openGmailThread,
-  setEmailComposerContext,
-  type EmailComposerContext,
 } from "../lib/email";
 import { tapLight, tapMedium } from "../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
@@ -40,7 +38,6 @@ type Styles = ReturnType<typeof makeStyles>;
 /** About two lines of a search preview at phone width. */
 const PHONE_SNIPPET_CHARS = 84;
 const SCALE = CONTENT_MAX_FONT_SCALE;
-const URGENT = "#ff6b5e";
 
 /** The briefing's light markdown: bold only, nested in the surrounding text. */
 function Md({ text, boldStyle }: { text: string; boldStyle: object }) {
@@ -69,11 +66,9 @@ function Block({
   title,
   points,
   foot,
-  selected,
   quiet,
   suggestion,
   choices,
-  onPress,
   styles,
   colors,
   testID,
@@ -82,11 +77,9 @@ function Block({
   title: string;
   points: string[];
   foot: string;
-  selected: boolean;
   quiet?: boolean;
   suggestion?: { label: string };
   choices: () => Choice[];
-  onPress: () => void;
   styles: Styles;
   colors: Colors;
   testID: string;
@@ -105,16 +98,9 @@ function Block({
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={() => {
-        tapLight();
-        onPress();
-      }}
-      style={[
-        styles.block,
-        tone === "needs_you" && styles.blockNeeds,
-        tone === "urgent" && styles.blockUrgent,
-        selected && styles.blockSelected,
-      ]}
+      // The whole point opens its menu; the one control says what's in it.
+      onPress={open}
+      style={styles.block}
       testID={testID}
     >
       <View style={quiet ? styles.quiet : undefined}>
@@ -131,7 +117,7 @@ function Block({
               style={({ pressed }) => [styles.more, pressed && styles.dimmed]}
               testID="email-block-control"
             >
-              <Icon name="more-horizontal" size={16} color={colors.textBase} />
+              <Icon name="more-horizontal" size={16} color={colors.textMuted} />
             </Pressable>
           )}
         </View>
@@ -347,7 +333,6 @@ export function EmailDigestView({
   onSelect,
   onAsked,
   waiting = [],
-  composerContext = false,
 }: {
   digestId: string | null;
   onSelect: (digestId: string) => void;
@@ -355,8 +340,6 @@ export function EmailDigestView({
   onAsked: () => void;
   /** Mail sorted since the newest briefing, not in one yet. */
   waiting?: EmailItem[];
-  /** Put what's on screen in front of the chat composer (the top sheet). */
-  composerContext?: boolean;
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -366,11 +349,9 @@ export function EmailDigestView({
   const signedIn = Boolean(authClient.useSession().data?.user);
   const view = useBackendView("email.digests", signedIn ? {} : "skip");
   const [now] = useState(() => Date.now());
-  const [picked, setPicked] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState<SearchState | null>(null);
-  const [foundPick, setFoundPick] = useState<EmailFound | null>(null);
   const [reading, setReading] = useState<ReadTarget | null>(null);
   const [thread, setThread] = useState<EmailThread | null>(null);
   const stripRef = useRef<ScrollView>(null);
@@ -410,53 +391,10 @@ export function EmailDigestView({
   const byId = useMemo(() => new Map([...(shown?.items ?? []), ...waiting].map((item) => [item.itemId, item])), [shown, waiting]);
 
   useEffect(() => {
-    setPicked(null);
     setReading(null);
   }, [shown?.digestId]);
 
-  // What the composer carries while the sheet is open.
-  const context = useMemo((): EmailComposerContext | null => {
-    if (reading && thread) {
-      return {
-        key: `thread:${thread.threadId}`,
-        label: t("email.brief.chip", { title: thread.subject }),
-        targets: "itemId" in reading ? { itemIds: [reading.itemId] } : foundPick ? { found: [foundPick] } : { itemIds: [] },
-      };
-    }
-    if (search) {
-      return foundPick
-        ? { key: `found:${foundPick.messageId}`, label: t("email.brief.chip", { title: `${foundPick.from} · ${foundPick.subject}` }), targets: { found: [foundPick] } }
-        : null;
-    }
-    if (!shown || !brief) return null;
-    const block = picked ? brief.sections.flatMap((section) => section.blocks).find((entry) => blockKey(entry) === picked) : undefined;
-    if (block) return { key: `block:${picked}`, label: t("email.brief.chip", { title: plainText(block.title) }), targets: { itemIds: block.itemIds.slice(0, 10) } };
-    return {
-      key: `brief:${shown.digestId}`,
-      label: t("email.brief.chip", { title: t("email.brief.chipBriefing", { time: emailTime(locale, shown.createdAt, now) }) }),
-      targets: { itemIds: shown.items.map((item) => item.itemId).slice(0, 10) },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reading, thread, search, foundPick, shown, picked, locale]);
-
-  useEffect(() => {
-    if (!composerContext) return;
-    const valid = context && ((context.targets.itemIds?.length ?? 0) > 0 || (context.targets.found?.length ?? 0) > 0) ? context : null;
-    setEmailComposerContext(valid);
-  }, [composerContext, context]);
-  useEffect(
-    () => () => {
-      if (composerContext) setEmailComposerContext(null);
-    },
-    [composerContext],
-  );
-
-  const pick = (key: string | null) => {
-    setPicked(key);
-    if (composerContext) setEmailComposerContext(null, true);
-  };
-
-  const ask = (targets: EmailTargets, action: "reply" | "handle" | "suggest", text: string) =>
+  const ask = (targets: EmailTargets, action: "reply" | "handle" | "suggest" | "tell", text: string) =>
     void askStellaAboutEmail(targets, action, text)
       .then(onAsked)
       .catch((error: unknown) => Alert.alert(errorText(error, t("email.failed"))));
@@ -465,7 +403,6 @@ export function EmailDigestView({
     const words = query.trim();
     if (!words) return;
     setReading(null);
-    setFoundPick(null);
     setSearch({ query: words, state: { status: "loading" } });
     void getBackendClient()
       .call("email.search", { query: words })
@@ -477,7 +414,6 @@ export function EmailDigestView({
 
   const closeSearch = () => {
     setSearch(null);
-    setFoundPick(null);
     setQuery("");
     setSearchOpen(false);
   };
@@ -506,7 +442,8 @@ export function EmailDigestView({
       ...(block.suggestion ? [{ label: block.suggestion.ask, run: () => ask(targets, "suggest", block.suggestion!.ask) }] : []),
       { label: t("email.digest.reply"), run: () => ask(targets, "reply", t("email.digest.askReply", { from, subject: newestItem.subject })) },
       { label: t("email.digest.handle"), run: () => ask(targets, "handle", t("email.digest.askHandle", { from, subject: newestItem.subject })) },
-      { label: t("email.digest.tell"), run: () => pick(blockKey(block)) },
+      // Stella gets the email in hidden context; the chat is where they say what to do.
+      { label: t("email.digest.tell"), run: () => ask(targets, "tell", "") },
       { label: t("email.brief.read"), run: () => setReading({ itemId: newestItem.itemId }) },
       {
         label: archived ? t("email.digest.unarchive") : t("email.digest.archive"),
@@ -549,11 +486,9 @@ export function EmailDigestView({
         title={block.title}
         points={block.points}
         foot={foot}
-        selected={picked === key}
         quiet={items.every((item) => item.state === "dismissed")}
         {...(block.suggestion ? { suggestion: { label: block.suggestion.label } } : {})}
         choices={blockChoices(block, items)}
-        onPress={() => pick(picked === key ? null : key)}
         styles={styles}
         colors={colors}
         testID="email-brief-block"
@@ -611,22 +546,17 @@ export function EmailDigestView({
                     title={`**${mail.from}** · ${mail.subject}`}
                     points={mail.snippet ? [snippetPoint(mail.snippet, PHONE_SNIPPET_CHARS)] : []}
                     foot={[emailTime(locale, mail.receivedAt, now), showAccount ? mail.account : null].filter(Boolean).join(" · ")}
-                    selected={foundPick?.messageId === mail.messageId}
                     choices={() => [
                       { label: t("email.digest.reply"), run: () => ask(found, "reply", t("email.digest.askReply", { from: mail.from, subject: mail.subject })) },
                       { label: t("email.digest.handle"), run: () => ask(found, "handle", t("email.digest.askHandle", { from: mail.from, subject: mail.subject })) },
-                      { label: t("email.digest.tell"), run: () => { setFoundPick(mail); setEmailComposerContext(null, true); } },
-                      { label: t("email.brief.read"), run: () => { setFoundPick(mail); setReading({ account: mail.account, threadId: mail.threadId }); } },
+                      { label: t("email.digest.tell"), run: () => ask(found, "tell", "") },
+                      { label: t("email.brief.read"), run: () => setReading({ account: mail.account, threadId: mail.threadId }) },
                       {
                         label: mail.inInbox ? t("email.digest.archive") : t("email.digest.unarchive"),
                         run: () => archiveEmail(found, mail.inInbox).catch((error: unknown) => Alert.alert(errorText(error, t("email.failed")))),
                       },
                       { label: t("email.brief.openGmail"), run: () => openGmailThread(mail.threadId, mail.account) },
                     ]}
-                    onPress={() => {
-                      setFoundPick(foundPick?.messageId === mail.messageId ? null : mail);
-                      setEmailComposerContext(null, true);
-                    }}
                     styles={styles}
                     colors={colors}
                     testID="email-search-result"
@@ -651,12 +581,12 @@ export function EmailDigestView({
         ) : null}
         {brief.sections.map((section, sectionIndex) => (
           <View key={`${section.heading}-${sectionIndex}`} style={styles.section}>
-            <Text
-              style={[styles.heading, section.tone === "needs_you" && styles.headingNeeds, section.tone === "urgent" && styles.headingUrgent]}
-              maxFontSizeMultiplier={SCALE}
-            >
-              {section.heading}
-            </Text>
+            <View style={styles.headingRow}>
+              {section.tone === "urgent" ? <View style={styles.dot} /> : null}
+              <Text style={[styles.heading, section.tone !== "fyi" && styles.headingStrong]} maxFontSizeMultiplier={SCALE}>
+                {section.heading}
+              </Text>
+            </View>
             <View style={styles.blocks}>{section.blocks.map((block) => renderBlock(block, section.tone))}</View>
           </View>
         ))}
@@ -815,7 +745,6 @@ const makeStyles = (colors: Colors) =>
     bar: { alignItems: "center", flexDirection: "row", gap: 10 },
     nav: {
       alignItems: "center",
-      backgroundColor: fadeHex(colors.text, 0.06),
       borderRadius: 10,
       height: 32,
       justifyContent: "center",
@@ -842,8 +771,9 @@ const makeStyles = (colors: Colors) =>
     searchToggle: { alignItems: "center", height: 32, justifyContent: "center", paddingLeft: 8, width: 36 },
     searchBox: {
       alignItems: "center",
-      backgroundColor: fadeHex(colors.text, 0.06),
+      borderColor: colors.border,
       borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
       flexDirection: "row",
       gap: 8,
       height: 40,
@@ -855,29 +785,17 @@ const makeStyles = (colors: Colors) =>
     lead: { color: colors.textBase, fontFamily: fonts.sans.medium, fontSize: 18, letterSpacing: -0.3, lineHeight: 26 },
     leadBold: { color: colors.text, fontFamily: fonts.sans.bold },
     section: { marginTop: 22 },
-    heading: { color: colors.textMuted, fontFamily: fonts.sans.semiBold, fontSize: 13, marginBottom: 8, paddingHorizontal: 2 },
-    headingNeeds: { color: colors.accent },
-    headingUrgent: { color: URGENT },
-    blocks: { gap: 8 },
-    block: {
-      backgroundColor: fadeHex(colors.text, 0.05),
-      borderColor: "transparent",
-      borderRadius: 16,
-      borderWidth: 1,
-      paddingBottom: 12,
-      paddingHorizontal: 14,
-      paddingTop: 13,
-    },
-    blockNeeds: { borderColor: fadeHex(colors.accent, 0.32) },
-    blockUrgent: { borderColor: fadeHex(URGENT, 0.45) },
-    blockSelected: { borderColor: colors.accent, borderWidth: 1.5 },
+    headingRow: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 10 },
+    heading: { color: colors.textMuted, fontFamily: fonts.sans.semiBold, fontSize: 13 },
+    headingStrong: { color: colors.text },
+    blocks: { gap: 22 },
+    block: {},
     quiet: { opacity: 0.5 },
     blockHead: { alignItems: "flex-start", flexDirection: "row", gap: 10 },
     blockTitle: { color: colors.textBase, flex: 1, fontFamily: fonts.sans.regular, fontSize: 15.5, letterSpacing: -0.2, lineHeight: 21 },
     bold: { color: colors.text, fontFamily: fonts.sans.semiBold },
     more: {
       alignItems: "center",
-      backgroundColor: fadeHex(colors.text, 0.07),
       borderRadius: 9,
       height: 28,
       justifyContent: "center",
@@ -906,7 +824,7 @@ const makeStyles = (colors: Colors) =>
     dimmed: { opacity: 0.5 },
     notice: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 13.5, lineHeight: 19, marginTop: 6 },
     link: { color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: 13.5 },
-    matter: { color: colors.accent, marginTop: 4 },
+    matter: { marginTop: 4 },
     back: { alignItems: "center", alignSelf: "flex-start", flexDirection: "row", gap: 4, marginBottom: 14, paddingVertical: 2 },
     inlineLink: { alignItems: "center", alignSelf: "flex-start", flexDirection: "row", gap: 5, marginTop: 14 },
     skipped: {
@@ -931,16 +849,7 @@ const makeStyles = (colors: Colors) =>
     readerSubject: { color: colors.text, fontFamily: fonts.sans.semiBold, fontSize: 19, letterSpacing: -0.3, lineHeight: 25, marginBottom: 6 },
     message: { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 10, paddingTop: 12 },
     readerFrom: { color: colors.text, flexShrink: 1, fontFamily: fonts.sans.semiBold, fontSize: 15 },
-    draft: {
-      backgroundColor: fadeHex(colors.accent, 0.16),
-      borderRadius: 6,
-      color: colors.accent,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 11.5,
-      overflow: "hidden",
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-    },
+    draft: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 13 },
     readerTo: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 12, marginBottom: 10, marginTop: 2 },
     readerText: { color: colors.textBase, fontFamily: fonts.sans.regular, fontSize: 15, lineHeight: 22 },
   });

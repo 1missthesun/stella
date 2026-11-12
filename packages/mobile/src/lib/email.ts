@@ -131,29 +131,6 @@ export function useEmailUnseenCount(): number {
 
 // The opened digest ----------------------------------------------------------
 
-type DigestSheetState = { digestId: string | null; open: boolean };
-let digestSheet: DigestSheetState = { digestId: null, open: false };
-const digestSheetListeners = new Set<() => void>();
-const emitDigestSheet = (next: DigestSheetState) => {
-  digestSheet = next;
-  for (const listener of digestSheetListeners) listener();
-};
-const subscribeDigestSheet = (listener: () => void) => {
-  digestSheetListeners.add(listener);
-  return () => {
-    digestSheetListeners.delete(listener);
-  };
-};
-
-/** Opens the digest behind a chat email row in the top sheet. */
-export const openEmailDigest = (digestId: string): void => emitDigestSheet({ digestId, open: true });
-export const closeEmailDigest = (): void => emitDigestSheet({ ...digestSheet, open: false });
-export const selectEmailDigest = (digestId: string): void => emitDigestSheet({ ...digestSheet, digestId });
-export const useEmailDigestSheet = (): DigestSheetState =>
-  useSyncExternalStore(subscribeDigestSheet, () => digestSheet);
-
-// Handing an email to Stella -------------------------------------------------
-
 const askQueue: string[] = [];
 const askListeners = new Set<() => void>();
 
@@ -197,47 +174,3 @@ export const useEmailAsks = (send: ((text: string) => unknown) | undefined, read
 export const archiveEmail = (targets: EmailTargets, archived: boolean) =>
   getBackendClient().call("email.archive", { ...targets, archived });
 
-// What the open briefing puts in front of the composer ------------------------
-
-/**
- * While the briefing sheet is open, what's on screen (the briefing, a picked
- * point, a found email or an open thread) shows as a chip on the composer. A
- * message typed with it goes to Stella through the same hidden note the
- * briefing's actions use, so "tell them Thursday works" needs no more words.
- */
-export type EmailComposerContext = { key: string; label: string; targets: EmailTargets };
-
-let composerContext: EmailComposerContext | null = null;
-let removedKey: string | null = null;
-const contextListeners = new Set<() => void>();
-const emitContext = () => {
-  for (const listener of contextListeners) listener();
-};
-
-export const setEmailComposerContext = (next: EmailComposerContext | null, picked = false): void => {
-  if (picked) removedKey = null;
-  const shown = next && next.key !== removedKey ? next : null;
-  if (shown?.key === composerContext?.key && shown?.label === composerContext?.label) return;
-  composerContext = shown;
-  emitContext();
-};
-
-/** The user took the chip off; it stays off until something else is picked. */
-export const removeEmailComposerContext = (): void => {
-  removedKey = composerContext?.key ?? null;
-  composerContext = null;
-  emitContext();
-};
-
-export const getEmailComposerContext = (): EmailComposerContext | null => composerContext;
-
-export const useEmailComposerContext = (): EmailComposerContext | null =>
-  useSyncExternalStore(
-    (listener) => {
-      contextListeners.add(listener);
-      return () => {
-        contextListeners.delete(listener);
-      };
-    },
-    () => composerContext,
-  );

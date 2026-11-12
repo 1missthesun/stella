@@ -32,6 +32,7 @@ import { ServerStatusGate } from "../src/components/self-host/ServerStatusGate";
 import { markSplashHidden } from "../src/lib/splash-state";
 import {
   takeMainChatRequest,
+  requestedMainTab,
   useMainChatRequested,
 } from "../src/lib/main-chat-request";
 
@@ -283,7 +284,7 @@ function AuthenticatedLayout() {
     const openMainChat = () => {
       if (!takeMainChatRequest()) return false;
       takePendingMainTab();
-      router.dismissTo(MAIN_TAB_HREFS.chat);
+      router.dismissTo(MAIN_TAB_HREFS[requestedMainTab()]);
       return true;
     };
 

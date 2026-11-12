@@ -38,7 +38,6 @@ import type { ComposerQuote } from "../../types";
 import { DictationRecordingBar } from "../DictationRecordingBar";
 import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
-import { removeEmailComposerContext, useEmailComposerContext } from "../../lib/email";
 import { useServerFeatures } from "../../lib/server-features";
 import { AskSlotContext, type AskSlot } from "./ask-slot";
 import {
@@ -454,8 +453,6 @@ export const Composer = memo(function Composer({
   const showAttachmentStrip = !compact && (attachments?.length ?? 0) > 0;
   const quoteChips = quotes ?? [];
   const showQuoteStrip = !compact && quoteChips.length > 0;
-  const emailContext = useEmailComposerContext();
-  const showEmailChip = !compact && emailContext !== null;
 
   return (
     <View style={[styles.composerWrap, { paddingBottom: bottomPad }]}>
@@ -481,25 +478,6 @@ export const Composer = memo(function Composer({
           fallbackColor={colors.surface}
           style={styles.shell}
         >
-          {showEmailChip ? (
-            <View style={styles.composerQuoteStrip}>
-              <View style={[styles.composerQuote, styles.composerEmailChip]} testID="composer-email-chip">
-                <Icon name="mail" size={14} color={colors.accent} weight="regular" />
-                <Text style={styles.composerQuoteText} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-                  {emailContext.label}
-                </Text>
-                <Pressable
-                  style={({ pressed }) => [styles.composerQuoteRemove, pressed && styles.composerQuoteRemovePressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={emailContext.label}
-                  onPress={removeEmailComposerContext}
-                  hitSlop={10}
-                >
-                  <Icon name="x" size={10} color={colors.textMuted} weight="bold" />
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
           {showQuoteStrip ? (
             <View style={styles.composerQuoteStrip}>
               {quoteChips.map((quote) => (
@@ -745,12 +723,6 @@ const makeComposerStyles = (colors: Colors) =>
       gap: 6,
       paddingHorizontal: 10,
       paddingTop: 10,
-    },
-    composerEmailChip: {
-      alignSelf: "flex-start",
-      backgroundColor: fadeHex(colors.accent, 0.12),
-      maxWidth: "100%",
-      paddingVertical: 6,
     },
     composerQuote: {
       alignItems: "center",

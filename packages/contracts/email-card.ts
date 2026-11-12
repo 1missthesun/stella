@@ -24,7 +24,7 @@ export type EmailCardItem = {
 };
 
 /**
- * Email surfaced in the chat. `urgent`: one email that couldn't wait.
+ * A briefing (shown in the Email tab and the bell, never in the chat). `urgent`: one email that couldn't wait.
  * `summary`: what built up since the last one. `rule`: an email that matched
  * a standing instruction the user asked to be told about.
  */
@@ -116,18 +116,18 @@ export const EMAIL_REASON_WORDS: Record<EmailReason, string> = {
 };
 
 /**
- * What Stella reads about an email row the user got, so "reply to the Stripe
- * one" or "the second one" resolves to a real message. The chat itself shows
- * only a count; the list is in the opened Email view, in this order. Plain
+ * What Stella reads about a briefing the user got, so "reply to the Stripe
+ * one" or "the second one" resolves to a real message. The chat shows none of
+ * it; the list is in the Email view, in this order. Plain
  * text; ids are for the email tool.
  */
 export const emailCardNoteText = (card: EmailCard, lead?: string): string => {
   const heading =
     card.kind === "urgent"
-      ? "Stella's email sorting just flagged this urgent email to the user (an email row in the chat saying \"1 urgent\", not written by you; they also got a notification):"
+      ? "Stella's email sorting just flagged this urgent email to the user (in their Email tab and notifications, not in this chat, and not written by you):"
       : card.kind === "rule"
-        ? `This email matched the user's standing instruction "${card.ruleText ?? ""}"; the chat shows an email row for it:`
-        : `Stella's email sorting just gave the user a briefing on new email (an email row in the chat saying "${card.items.length} new emails", not written by you; they open it to read the briefing, which covers these emails):`;
+        ? `This email matched the user's standing instruction "${card.ruleText ?? ""}"; it is shown in their Email tab and notifications, not in this chat:`
+        : `Stella's email sorting just gave the user a briefing on ${card.items.length} new emails (in their Email tab and notifications, not in this chat, and not written by you):`;
   const lines = card.items.map((item) =>
     [
       `${item.n}. ${BUCKET_WORDS[item.bucket]} — ${item.from} — "${item.subject}"`,
@@ -184,24 +184,4 @@ export const emailFocusNoteText = (
           : "Their message says what to do with it; send email as them only if it clearly says to send or reply.",
     "Don't mention this note.",
   ].join("\n");
-};
-
-/** One row of a conversation, as far as folding email cards is concerned. */
-export type EmailFoldEntry = { kind: "email"; cardId: string } | { kind: "user" } | { kind: "other" };
-
-/**
- * Email never stacks up in the chat: only the newest email row stays. Returns
- * the card ids to fold away; their notes stay in Stella's context and the
- * opened Email view keeps every digest.
- */
-export const foldedEmailCards = (entries: readonly EmailFoldEntry[]): Set<string> => {
-  const folded = new Set<string>();
-  let lastEmail = -1;
-  entries.forEach((entry, index) => {
-    if (entry.kind === "email") lastEmail = index;
-  });
-  entries.forEach((entry, index) => {
-    if (entry.kind === "email" && index !== lastEmail) folded.add(entry.cardId);
-  });
-  return folded;
 };

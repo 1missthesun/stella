@@ -435,7 +435,10 @@ function Briefing({
       {digest.ruleText ? <p className="email-brief__rule">“{digest.ruleText}”</p> : null}
       {brief.sections.map((section, index) => (
         <section key={`${section.heading}-${index}`} className="email-brief__section" data-tone={section.tone}>
-          <h2 className="email-brief__heading">{section.heading}</h2>
+          <h2 className="email-brief__heading">
+            {section.tone === "urgent" ? <span className="email-brief__dot" aria-hidden="true" /> : null}
+            {section.heading}
+          </h2>
           <ul className="email-brief__blocks">{section.blocks.map((block) => renderBlock(block, section.tone))}</ul>
         </section>
       ))}

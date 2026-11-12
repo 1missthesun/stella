@@ -167,7 +167,6 @@ export type ChatMessage = {
   askRecords?: readonly UserAskRecord[];
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };
   scheduleNotice?: import("@stella/contracts/schedule-notice").ScheduleNoticeCard;
-  emailCard?: import("@stella/contracts/email-card").EmailCard;
   replyRefs?: ReplyRef[];
   reaction?: string;
   reactionAt?: number;

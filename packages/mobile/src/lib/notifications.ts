@@ -394,7 +394,8 @@ const handleNotificationResponse = (
     return;
   }
   if ((response.notification.request.content.data as { kind?: unknown } | null)?.kind === EMAIL_PUSH_KIND) {
-    requestMainChat();
+    // Email lives on the Email page, never in the chat.
+    requestMainChat("email");
     return;
   }
   const data = response.notification.request.content.data as

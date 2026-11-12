@@ -115,7 +115,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. MetadataFixer is a paid app built for exactly this, and GPTH is free and open source. Stella is free with the ChatGPT or Claude plan you already have, and does the same matching. It also handles the next job, like sorting the photos by year or [tidying the Downloads folder](/how/pc-cleanup/organize-downloads-folder) they arrived in.",
       },
     ],
-    related: ["photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder", "photos-files/rename-pdf-files-based-on-content"],
+    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "photos-files/rename-pdf-files-based-on-content"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Google: Download your Google Photos data (Takeout)", href: "https://support.google.com/accounts/answer/3024190" },
@@ -343,7 +343,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/fix-google-takeout-photo-dates"],
+    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
@@ -466,12 +466,121 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "The open-source ones (dupeGuru, Czkawka) are. Be wary of “PC cleaner” apps that scan for free and then charge to delete. Whatever you use, review the groups and send deletions to the Trash.",
       },
     ],
-    related: ["photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder"],
+    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "dupeGuru", href: "https://dupeguru.voltaicideas.net" },
       { label: "Apple: Merge duplicate photos and videos on iPhone", href: "https://support.apple.com/guide/iphone/merge-duplicate-photos-and-videos-iph1978d9c23/ios" },
       { label: "Czkawka", href: "https://github.com/qarmin/czkawka" },
+    ],
+  },
+  {
+    slug: "sort-photos-into-folders-by-date",
+    niche: "photos-files",
+    searchPhrases: [
+      "sort photos into folders by date",
+      "organize photos by date taken",
+      "sort photos by year and month",
+      "move photos into folders by exif date",
+      "organize pictures into folders by date windows",
+    ],
+    title: "Sort photos into folders by year and month taken",
+    description:
+      "File photos into year and month folders by the date they were taken, not the file date: with ExifTool, digiKam or Lightroom, or ask Stella (stella.sh) to do it.",
+    h1: "Sort photos into folders by the date they were taken",
+    short: "Sort photos into folders by date",
+    lede: "33 mixed photos filed into year and month folders by when they were taken, none lost.",
+    answer:
+      "Use the date taken stored inside each photo (EXIF), not the file's modified date, which changes whenever photos are copied. ExifTool does it with one command, and digiKam or Lightroom can file photos into date folders as they import. Stella (stella.sh) reads each photo's date, files it under year and month, keeps clashing names apart and leaves a log so every move can be undone.",
+    stellaSteps: [
+      "Reads the date taken stored inside every photo, the creation date inside videos, and ignores the misleading file dates and names",
+      "Plans every move first, then files them into folders like 2024/03 - March",
+      "Dates WhatsApp images and screenshots from the date in their names, which is where those apps keep it, and says so",
+      "Puts photos with no date anywhere into an Undated folder instead of guessing",
+      "Never overwrites: a second IMG_0001.JPG from the same month becomes IMG_0001 (1).JPG, and a log lists where every file came from",
+    ],
+    prompt:
+      "Sort my photos into folders by year and month using the date they were taken. They're in Pictures/To sort.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-12",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "33 files were sorted into year and month folders from 2019 to 2026 in 47 seconds. Checked afterwards against the answer key written before the run: all 33 are there exactly once and byte-for-byte identical, all 26 photos with a date taken are in the right month (including four with misleading names, a leap day and a month boundary), both IMG_0001.JPG files survived, and the two with no date at all went to an Undated folder.",
+      note: "The 33 test files are generated pictures with dates written into them for this run, all with a file date of the day they were copied, plus one short video. The wait is sped up 8×. There was no ExifTool on the test computer, so Stella wrote its own small date reader.",
+      video: {
+        src: `${PROOFS}/photos-files/sort-photos-into-folders-by-date/proof.mp4`,
+        cuts: webCuts("photos-files/sort-photos-into-folders-by-date"),
+        poster: `${PROOFS}/photos-files/sort-photos-into-folders-by-date/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 39,
+        realDuration: 47,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 33 photos and a video are in Pictures/To sort, some in subfolders." },
+        { at: 3, text: "The prompt: sort my photos into folders by year and month using the date they were taken." },
+        { at: 8, text: "Stella replies that it will use each photo's capture date and list any with no date." },
+        { at: 9, text: "Reading every file's date, planning the moves, then moving, sped up 8×." },
+        { at: 14.8, text: "Done: 33 files sorted, 2019 to 2026. Two undated, four dated by their names, one name clash kept apart." },
+        { at: 26.3, text: "The sorting log opened in Stella: where every file was, where it went, and how it was dated." },
+      ],
+    },
+    manualTitle: "Sort them yourself",
+    manualSteps: [
+      {
+        title: "Work on a copy first",
+        body: "Copy the folder somewhere else before you start, or make sure it's in your backup. Moving thousands of files by a rule is quick to do and slow to undo by hand.",
+      },
+      {
+        title: "With ExifTool (free, Windows, Mac and Linux)",
+        body: "Install ExifTool, open a terminal in the folder and run `exiftool -r -d \"%Y/%m\" \"-Directory<CreateDate\" \"-Directory<DateTimeOriginal\" .` It moves each photo into a year/month folder from its date taken, falls back to the creation date for videos, and leaves files with no date where they are. Add `-o .` to copy them into the new folders instead of moving them.",
+      },
+      {
+        title: "With digiKam or Lightroom",
+        body: "digiKam (free) can create date-based albums as it imports from a folder or camera. In Lightroom Classic's Import window, set the Destination panel's Organize option to By Date and pick a year-and-month date format. Both use the date taken, not the file date.",
+      },
+      {
+        title: "Deal with the leftovers",
+        body: "Screenshots and WhatsApp images usually carry no date taken, but their names do (`IMG-20240312-WA0007.jpg`, `Screenshot_20250611-142233.png`); file those by hand or with a rename tool. Put anything with no date at all in an Undated folder rather than trusting the file date.",
+      },
+      {
+        title: "Check nothing went missing",
+        body: "Compare the file count before and after (right-click > Properties on Windows, Get Info on a Mac), and look out for names that clashed. ExifTool never overwrites a file with the same name; it leaves that photo where it was, so check the old folders for any left behind.",
+      },
+    ],
+    limits: [
+      "Files are moved, not copied, because that's what the prompt asks. The log makes every move reversible, but there's no second copy; ask for a copy instead if you want one.",
+      "WhatsApp and screenshot dates come from their file names, which is usually right but not guaranteed. Photos with no date anywhere stay unsorted in Undated.",
+      "33 files took under a minute. Tens of thousands will take longer, mainly to read each file's date, and photos in a cloud folder that aren't downloaded yet (OneDrive, iCloud) have to download first.",
+      "It also deleted the subfolders that were left empty, and said so. Say “keep the old folders” if you'd rather it didn't.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why are my photos sorted by the wrong date?",
+        a: "Most tools sort by the file's modified or created date, which changes every time photos are copied, downloaded or restored from a backup. The date the photo was taken is stored inside the file (EXIF DateTimeOriginal), and that's the one to sort by.",
+      },
+      {
+        q: "Can Windows sort photos into folders by date taken?",
+        a: "File Explorer can group and sort a view by Date taken, but it can't move files into folders by it. For that you need a tool like ExifTool, digiKam or Lightroom, or Stella.",
+      },
+      {
+        q: "What happens to videos?",
+        a: "Videos keep their date in a different place (the QuickTime creation date). Stella read it and filed the test video under July 2024; the ExifTool command above covers it with the CreateDate fallback.",
+      },
+      {
+        q: "Can it also find duplicates or fix wrong dates?",
+        a: "Yes, as separate asks: [find duplicate photos](/how/photos-files/find-duplicate-photos), or [fix Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates) if the dates themselves are wrong.",
+      },
+    ],
+    related: ["photos-files/find-duplicate-photos", "photos-files/fix-google-takeout-photo-dates", "pc-cleanup/organize-downloads-folder"],
+    lastChecked: "2026-11-12",
+    sources: [
+      { label: "ExifTool: Writing FileName and Directory tags", href: "https://exiftool.org/filename.html" },
+      { label: "digiKam", href: "https://www.digikam.org" },
+      { label: "Adobe: Import photos in Lightroom Classic", href: "https://helpx.adobe.com/lightroom-classic/help/photo-video-import-options.html" },
     ],
   },
 ];

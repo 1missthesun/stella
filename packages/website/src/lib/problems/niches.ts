@@ -16,9 +16,9 @@ export const NICHES: Niche[] = [
     slug: "video",
     name: "Video editing",
     h1: "Video edits, done on your computer.",
-    title: "Video editing how-tos: subtitles, silences, file size",
+    title: "Video how-tos: subtitles, silences, file size, MKV to MP4",
     description:
-      "Burn in subtitles, cut silences and shrink a video for Discord, with free tools or with Stella (stella.sh) working on your own files, no watermark or upload.",
+      "Burn in subtitles, cut silences, shrink a video for Discord and convert MKV to MP4 for your TV, with free tools or Stella (stella.sh) on your own files.",
     intro:
       "Most quick video jobs (captions, trimming dead air, resizing for vertical) are a few commands in free tools. Each guide gives you those, and shows Stella (stella.sh) doing it on a real file.",
   },
@@ -36,9 +36,9 @@ export const NICHES: Niche[] = [
     slug: "photos-files",
     name: "Photos and files",
     h1: "Photos and files, put in order.",
-    title: "Photos and files: convert, de-duplicate, fix dates, rename",
+    title: "Photos and files: convert, de-duplicate, sort by date, rename",
     description:
-      "Convert iPhone HEIC photos to JPG, find duplicate photos, fix Google Takeout dates and rename PDFs by content, with free tools or Stella (stella.sh) on your computer.",
+      "Convert HEIC to JPG, find duplicate photos, sort photos into folders by date taken, fix Takeout dates and rename PDFs, with free tools or Stella (stella.sh).",
     intro:
       "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
   },
@@ -46,11 +46,21 @@ export const NICHES: Niche[] = [
     slug: "pdf-excel",
     name: "PDFs and Excel",
     h1: "PDFs and spreadsheets, sorted.",
-    title: "PDF and Excel how-tos: compress, convert, combine",
+    title: "PDF and Excel how-tos: compress, convert, combine, receipts",
     description:
-      "Shrink a PDF that's too large to email, get bank statements into Excel and combine Excel files into one sheet, with free tools or Stella (stella.sh), no uploads.",
+      "Shrink a PDF to email, get bank statements and receipts into Excel and combine Excel files into one sheet, with free tools or Stella (stella.sh), no uploads.",
     intro:
       "PDFs are where office jobs get fiddly: files too big to send, numbers stuck in tables you can't copy. Each guide shows the free route first, then Stella (stella.sh) doing it with a real file.",
+  },
+  {
+    slug: "local-ai",
+    name: "AI on your computer",
+    h1: "AI that runs on your own computer.",
+    title: "Run AI locally: offline models on your own computer",
+    description:
+      "Set up a small AI model that runs offline on your own computer with Ollama, LM Studio or llama.cpp, or let Stella (stella.sh) install and test one for you.",
+    intro:
+      "Small AI models now run on ordinary computers with no internet, if you're curious and don't mind them being slower and less clever than ChatGPT or Claude. Each guide gives the manual setup and Stella (stella.sh) doing it on a real computer.",
   },
 ];
 

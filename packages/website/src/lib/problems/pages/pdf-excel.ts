@@ -110,7 +110,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "video/burn-subtitles-into-video-for-tiktok"],
+    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -349,11 +349,136 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat, for example totals by store and month on a second sheet. The same approach turns [bank statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/compress-pdf-too-large-to-email"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft: Import data from a folder with multiple files (Power Query)", href: "https://support.microsoft.com/en-us/office/import-data-from-a-folder-with-multiple-files-power-query-94b8023c-2e66-4f6b-8c78-6a00041c90e4" },
       { label: "Microsoft: Append queries (Power Query)", href: "https://support.microsoft.com/en-us/excel/append-queries-power-query" },
+    ],
+  },
+  {
+    slug: "receipts-to-spreadsheet",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "receipts to spreadsheet",
+      "scan receipts into excel",
+      "receipts to excel",
+      "expense report from receipts",
+      "convert receipt photos to spreadsheet",
+    ],
+    title: "Turn receipts into a spreadsheet for an expense report",
+    description:
+      "Get a pile of receipt photos and PDFs into one Excel sheet with date, shop and total: by hand, with Excel's Data from Picture, or with Stella (stella.sh).",
+    h1: "Turn receipts into a spreadsheet for your expense report",
+    short: "Receipts into a spreadsheet",
+    lede: "20 receipt photos and PDFs in one sheet, every total right and a grand total that adds up.",
+    answer:
+      "For a handful, type them in: date, shop, total, one row each, and a SUM at the bottom. For more, Excel's Data from Picture (Microsoft 365) reads one photo at a time, and expense apps scan as you go. Stella (stella.sh) reads every photo and PDF in the folder, builds one sheet with a grand total, and flags anything an expense policy may question.",
+    stellaSteps: [
+      "Opens every receipt in the folder: in the recording 14 phone photos, 4 PDFs with text and 2 scanned PDFs that are only pictures",
+      "Reads the photos itself, zooming in on the faded and angled ones to check the numbers",
+      "Takes the amount actually paid, not the subtotal, cash handed over or change, and the order date rather than the delivery date",
+      "Builds one sheet: date, shop, what it was, category, payment, total, VAT and the file it came from, with a SUM grand total",
+      "Highlights receipts a manager may query, like groceries paid in cash or wine with dinner, and says why",
+    ],
+    prompt:
+      "Put all these receipts into one spreadsheet for my expense report, with date, shop and total. They're in Documents/Receipts.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-12",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "20 receipts became one Excel sheet in 1 minute 32 seconds. Checked afterwards against the answer key written before the run: all 20 rows have the right date, shop and total, none missing or doubled, and the grand total is a live SUM formula that comes to £770.05, exactly right. The receipts themselves were unchanged.",
+      note: "The receipts are made up for this test (fictional shops, card ending 4417): computer-printed receipts photographed at an angle with shadows, one faded, plus PDFs. They include traps: a discount, a tip, cash and change lines, a delivery date and a due date. The reading is sped up 12×, and opening the sheet 3× and 2.5×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/receipts-to-spreadsheet/proof.mp4`,
+        cuts: webCuts("pdf-excel/receipts-to-spreadsheet"),
+        poster: `${PROOFS}/pdf-excel/receipts-to-spreadsheet/poster.jpg`,
+        width: 1280,
+        height: 800,
+        duration: 57,
+        realDuration: 92,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 20 receipts, photos and PDFs, are in Documents/Receipts." },
+        { at: 3, text: "The prompt: put all these receipts into one spreadsheet for my expense report, with date, shop and total." },
+        { at: 12, text: "Stella replies that it will add a grand total and point out anything hard to read or duplicated." },
+        { at: 13, text: "Reading every photo and PDF, then building and checking the sheet, sped up 12×." },
+        { at: 20.2, text: "Done: all 20 receipts, 3 Oct to 3 Nov, adding up to £770.05, with five flagged for the expense policy." },
+        { at: 34.7, text: "The spreadsheet opened in Stella's viewer, sped up 2.5×." },
+        { at: 44, text: "Expanded: one row per receipt and the grand total at the bottom." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/pdf-excel/receipts-to-spreadsheet/receipts.jpg`,
+          alt: "Three of the test receipt photos: a faded pharmacy receipt on a car seat, a fuel receipt in shadow, and a restaurant bill with wine and an optional service charge, each at a slight angle.",
+          width: 1350,
+          height: 600,
+          caption: "Three of the 20 test receipts Stella read: faded, shadowed, and one with optional service.",
+        },
+        {
+          src: `${PROOFS}/pdf-excel/receipts-to-spreadsheet/sheet.jpg`,
+          alt: "The spreadsheet Stella made: 20 rows with date, shop, description, category, payment, currency, total, VAT and source file, and a grand total of 770.05 at the bottom.",
+          width: 1308,
+          height: 457,
+          caption: "The sheet it made, opened in Stella. The Notes column (cut off here) explains each yellow flag.",
+        },
+      ],
+    },
+    manualTitle: "Do it yourself",
+    manualSteps: [
+      {
+        title: "Set up the sheet",
+        body: "In Excel or Google Sheets, make columns for Date, Shop, Description, Total and the file name, and format the Date column as a date and Total as currency. One row per receipt keeps it easy to sort and check.",
+      },
+      {
+        title: "Read the right number off each receipt",
+        body: "Use the TOTAL actually paid, not the subtotal (which can leave out discounts, delivery or tips) and not the cash handed over or the change. For invoices and online orders, use the order or invoice date, not the delivery or due date. Note anything personal or optional, like wine or a service charge, if your policy cares.",
+      },
+      {
+        title: "Let Excel read the photos (Microsoft 365)",
+        body: "In Excel choose Data > From Picture > Picture From File, pick a receipt photo, check what it read in the side panel, then Insert Data. On a phone, tap Insert > Data from Picture and point the camera at the receipt. It works one receipt at a time, and you still need to check each number.",
+      },
+      {
+        title: "Copy the PDFs",
+        body: "For PDFs with real text, open them and copy the date and total. For scanned PDFs, take a screenshot and use Data from Picture, or open them in Google Drive with Google Docs, which reads the text out of scans.",
+      },
+      {
+        title: "Add the grand total and check it",
+        body: "Below the last row, type `=SUM(` and select the Total column, so it updates if you fix a row. Then count the rows against the number of receipts and spot-check a few against the paper. Many expense apps (Expensify, Zoho Expense, your company's own) also scan receipts one by one if you'd rather not keep a sheet.",
+      },
+    ],
+    limits: [
+      "The test receipts were computer-printed and photographed clearly, if at an angle. Crumpled, handwritten, foreign-language or very long supermarket receipts are harder and weren't tested; check those rows yourself.",
+      "Stella reads the photos with the AI model you use in Stella, so the receipt images are sent to that model (here Claude). The spreadsheet itself is made and kept on your computer.",
+      "It made an Excel file in the receipts folder. If your company wants its own template or an upload to its expense system, say so in the prompt or copy the rows across.",
+      "It picks a category and flags possible personal items from what's printed. Your company's rules decide what's allowed, so check the yellow rows before you submit.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Excel read receipts from photos?",
+        a: "Yes, Microsoft 365's Data from Picture turns a photo or screenshot into rows, one image at a time, and you check each one before inserting. It's built for tables, so a receipt's total may need moving into the right column by hand.",
+      },
+      {
+        q: "Should I use the subtotal or the total?",
+        a: "The total you actually paid, including tips, delivery and fees, unless your policy says otherwise. Two test receipts printed a subtotal that didn't match the amount charged, and Stella used the amount charged and said so.",
+      },
+      {
+        q: "What about receipts in different currencies?",
+        a: "Keep the currency in its own column and the amount as printed, then convert at the rate your company uses, usually the one on your card statement. Mixed currencies weren't part of this test.",
+      },
+      {
+        q: "Can Stella put them in Google Sheets instead?",
+        a: "Ask for a CSV, which Google Sheets opens directly, or for an .xlsx you upload to Google Drive. If your bank statements need the same treatment, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
+      },
+    ],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/combine-excel-files-into-one-sheet", "photos-files/rename-pdf-files-based-on-content"],
+    lastChecked: "2026-11-12",
+    sources: [
+      { label: "Microsoft Support: Insert data from picture", href: "https://support.microsoft.com/office/insert-data-from-picture-3c1bb58d-2c59-4bc0-b04a-a671a6868fd7" },
+      { label: "Microsoft Support: Use AutoSum to sum numbers", href: "https://support.microsoft.com/office/use-autosum-to-sum-numbers-543941e7-e783-44ef-8317-7d1bb85fe706" },
     ],
   },
 ];

@@ -5,6 +5,7 @@ import {
 } from "@stella/contracts/stella-usage-limit";
 import { billingControl, billingGatewayConfig } from "./billing-control.js";
 import {
+  GATEWAY_DECISIONS_PATH,
   GATEWAY_HEALTH_PATH,
   GATEWAY_MODEL_REVISION_HEADER,
   GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
@@ -47,6 +48,7 @@ import {
 import { handleManagedRelay } from "./managed-lane.js";
 import { classifyNetwork } from "../../shared/network-class.js";
 import { handleNativeRelay } from "./native-lane.js";
+import { handleDecisions } from "./decisions.js";
 import { handleByokRelay, isByokRelayPath } from "./byok-lane.js";
 import {
   ownerEnforcementAdmission,
@@ -607,6 +609,11 @@ export const handleRequest = async (
         throw new GatewayError(405, "bad_request", "Method not allowed.");
       }
       return jsonResponse(200, { ok: true }, traceId);
+    }
+    if (url.pathname === GATEWAY_DECISIONS_PATH) {
+      if (request.method !== "POST")
+        throw new GatewayError(405, "bad_request", "Method not allowed.");
+      return await handleDecisions(request, env, traceId);
     }
     if (url.pathname === GATEWAY_SESSION_CAPABILITY_PATH) {
       if (request.method !== "POST")

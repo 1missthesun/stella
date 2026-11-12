@@ -1,4 +1,5 @@
 import {
+  EMAIL_BUCKETS,
   EMAIL_PUSH_KIND,
   type EmailAccountStatus,
   type EmailBucket,
@@ -397,7 +398,8 @@ const senderOverride = (db: OwnerDbReader, address: string): EmailBucket | null 
     "SELECT bucket, corrections FROM email_senders WHERE address = ?",
     address,
   );
-  return row ? (row.bucket as EmailBucket) : null;
+  // 'pending' marks a sender with corrections that haven't added up to an override yet.
+  return EMAIL_BUCKETS.find((bucket) => bucket === row?.bucket) ?? null;
 };
 
 /** Without the model (off, capped or refused): Gmail's own signals and who they write to. */
@@ -785,6 +787,10 @@ const syncAccount = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: str
 
 const runSync = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   if (!enabled(ctx.db)) return;
+  // Mail sorted while a sender's 'pending' corrections leaked in as a bucket.
+  ctx.db.run(
+    "UPDATE email_items SET bucket = 'worth_knowing', first_bucket = 'worth_knowing' WHERE bucket NOT IN ('urgent', 'needs_you', 'worth_knowing', 'noise')",
+  );
   const target = payload && typeof payload === "object" ? String((payload as Record<string, unknown>).account ?? "") : "";
   const snapshot = await ctx.host.snapshot();
   rememberPlan(ctx, snapshot);

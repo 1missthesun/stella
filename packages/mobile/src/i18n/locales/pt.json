@@ -3573,7 +3573,7 @@
     },
     "section": {
       "connectTitle": "Os e-mails que importam",
-      "connectBody": "Conecte o Gmail e a Stella organiza os novos e-mails assim que chegam. O urgente chega a você na hora; o resto vem como um resumo curto no chat.",
+      "connectBody": "Conecte o Gmail e a Stella organiza os novos e-mails assim que chegam. O urgente chega a você na hora; o resto espera em Hoje, com uma resposta já rascunhada quando é preciso responder.",
       "connect": "Conectar Gmail",
       "connecting": "Aguardando o Google…",
       "connectError": "O Gmail não conectou. Tente de novo.",
@@ -3583,7 +3583,7 @@
       "loadErrorTitle": "Não foi possível carregar seus e-mails",
       "loadErrorBody": "A Stella não consegue acessar os servidores agora. Verifique sua conexão e tente de novo.",
       "offTitle": "Organize seus e-mails",
-      "offBody": "A Stella organiza os novos e-mails assim que chegam. O urgente chega a você na hora; o resto vem como um resumo curto no chat. O ruído fica de fora.",
+      "offBody": "A Stella organiza os novos e-mails assim que chegam. O urgente chega a você na hora; o resto espera em Hoje, com uma resposta já rascunhada quando é preciso responder. O ruído fica de fora.",
       "turnOn": "Ativar",
       "turningOn": "Organizando seus e-mails recentes…",
       "empty": "Nada ainda. Novos e-mails aparecem aqui quando a Stella os organiza.",

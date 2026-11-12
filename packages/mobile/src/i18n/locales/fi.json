@@ -3550,7 +3550,7 @@
     },
     "section": {
       "connectTitle": "Sähköposti, jolla on väliä",
-      "connectBody": "Yhdistä Gmail, niin Stella lajittelee uuden postin sen saapuessa. Kiireelliset tavoittavat sinut heti; muut tulevat lyhyenä yhteenvetona chattiin.",
+      "connectBody": "Yhdistä Gmail, niin Stella lajittelee uuden postin sen saapuessa. Kiireelliset tavoittavat sinut heti; muut odottavat Tänään-näkymässä, ja vastausluonnos on valmiina, kun vastausta tarvitaan.",
       "connect": "Yhdistä Gmail",
       "connecting": "Odotetaan Googlea…",
       "connectError": "Gmail ei yhdistynyt. Yritä uudelleen.",
@@ -3560,7 +3560,7 @@
       "loadErrorTitle": "Sähköpostia ei voitu ladata",
       "loadErrorBody": "Stella ei tavoita palvelimiaan juuri nyt. Tarkista yhteys ja yritä uudelleen.",
       "offTitle": "Lajittele sähköpostisi",
-      "offBody": "Stella lajittelee uuden postin sen saapuessa. Kiireelliset tavoittavat sinut heti; muut tulevat lyhyenä yhteenvetona chattiin. Turha pysyy poissa.",
+      "offBody": "Stella lajittelee uuden postin sen saapuessa. Kiireelliset tavoittavat sinut heti; muut odottavat Tänään-näkymässä, ja vastausluonnos on valmiina, kun vastausta tarvitaan. Turha pysyy poissa.",
       "turnOn": "Ota käyttöön",
       "turningOn": "Lajitellaan viimeaikaista postia…",
       "empty": "Ei vielä mitään. Uusi posti näkyy täällä, kun Stella on lajitellut sen.",

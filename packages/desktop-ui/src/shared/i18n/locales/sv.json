@@ -3550,7 +3550,7 @@
     },
     "section": {
       "connectTitle": "E-posten som spelar roll",
-      "connectBody": "Anslut Gmail så sorterar Stella ny e-post när den kommer. Brådskande når dig direkt; resten kommer som en kort sammanfattning i chatten.",
+      "connectBody": "Anslut Gmail så sorterar Stella ny e-post när den kommer. Brådskande når dig direkt; resten väntar i I dag, med ett svarsutkast klart när det behövs.",
       "connect": "Anslut Gmail",
       "connecting": "Väntar på Google…",
       "connectError": "Gmail anslöts inte. Försök igen.",
@@ -3560,7 +3560,7 @@
       "loadErrorTitle": "Kunde inte läsa in din e-post",
       "loadErrorBody": "Stella når inte sina servrar just nu. Kontrollera anslutningen och försök igen.",
       "offTitle": "Sortera din e-post",
-      "offBody": "Stella sorterar ny e-post när den kommer. Brådskande når dig direkt; resten kommer som en kort sammanfattning i chatten. Brus hålls borta.",
+      "offBody": "Stella sorterar ny e-post när den kommer. Brådskande når dig direkt; resten väntar i I dag, med ett svarsutkast klart när det behövs. Brus hålls borta.",
       "turnOn": "Slå på",
       "turningOn": "Sorterar din senaste e-post…",
       "empty": "Inget än. Ny e-post visas här när Stella har sorterat den.",

@@ -3596,7 +3596,7 @@
     },
     "section": {
       "connectTitle": "E-maily, na kterých záleží",
-      "connectBody": "Připojte Gmail a Stella bude třídit novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek přijde jako krátké shrnutí v chatu.",
+      "connectBody": "Připojte Gmail a Stella bude třídit novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek počká v sekci Dnes, s připravenou odpovědí, kde je potřeba.",
       "connect": "Připojit Gmail",
       "connecting": "Čekám na Google…",
       "connectError": "Gmail se nepřipojil. Zkuste to znovu.",
@@ -3606,7 +3606,7 @@
       "loadErrorTitle": "E-maily se nepodařilo načíst",
       "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontrolujte připojení a zkuste to znovu.",
       "offTitle": "Třiďte svou poštu",
-      "offBody": "Stella třídí novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek přijde jako krátké shrnutí v chatu. Šum zůstane venku.",
+      "offBody": "Stella třídí novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek počká v sekci Dnes, s připravenou odpovědí, kde je potřeba. Šum zůstane venku.",
       "turnOn": "Zapnout",
       "turningOn": "Třídím nedávnou poštu…",
       "empty": "Zatím nic. Nová pošta se tu objeví, jakmile ji Stella roztřídí.",

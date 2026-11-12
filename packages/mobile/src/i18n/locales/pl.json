@@ -3596,7 +3596,7 @@
     },
     "section": {
       "connectTitle": "Poczta, która ma znaczenie",
-      "connectBody": "Połącz Gmaila, a Stella będzie sortować nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta przyjdzie jako krótkie podsumowanie na czacie.",
+      "connectBody": "Połącz Gmaila, a Stella będzie sortować nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta czeka w widoku Dziś, z gotowym szkicem odpowiedzi, gdy trzeba odpisać.",
       "connect": "Połącz Gmaila",
       "connecting": "Czekam na Google…",
       "connectError": "Gmail się nie połączył. Spróbuj ponownie.",
@@ -3606,7 +3606,7 @@
       "loadErrorTitle": "Nie udało się wczytać poczty",
       "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
       "offTitle": "Sortuj pocztę",
-      "offBody": "Stella sortuje nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta przyjdzie jako krótkie podsumowanie na czacie. Szum zostaje za drzwiami.",
+      "offBody": "Stella sortuje nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta czeka w widoku Dziś, z gotowym szkicem odpowiedzi, gdy trzeba odpisać. Szum zostaje za drzwiami.",
       "turnOn": "Włącz",
       "turningOn": "Sortuję ostatnią pocztę…",
       "empty": "Jeszcze nic. Nowe wiadomości pojawią się tu, gdy Stella je posortuje.",

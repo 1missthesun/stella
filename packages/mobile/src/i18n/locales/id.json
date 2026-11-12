@@ -3525,7 +3525,7 @@
     },
     "section": {
       "connectTitle": "Email yang penting",
-      "connectBody": "Hubungkan Gmail dan Stella memilah email baru begitu tiba. Yang mendesak langsung sampai ke Anda; sisanya datang sebagai ringkasan singkat di chat.",
+      "connectBody": "Hubungkan Gmail dan Stella memilah email baru begitu tiba. Yang mendesak langsung sampai ke Anda; sisanya menunggu di Hari ini, dengan draf balasan bila perlu dibalas.",
       "connect": "Hubungkan Gmail",
       "connecting": "Menunggu Google…",
       "connectError": "Gmail tidak terhubung. Coba lagi.",
@@ -3535,7 +3535,7 @@
       "loadErrorTitle": "Tidak dapat memuat email",
       "loadErrorBody": "Stella tidak bisa menjangkau servernya sekarang. Periksa koneksi Anda lalu coba lagi.",
       "offTitle": "Pilah email Anda",
-      "offBody": "Stella memilah email baru begitu tiba. Yang mendesak langsung sampai ke Anda; sisanya datang sebagai ringkasan singkat di chat. Yang tidak penting tetap di luar.",
+      "offBody": "Stella memilah email baru begitu tiba. Yang mendesak langsung sampai ke Anda; sisanya menunggu di Hari ini, dengan draf balasan bila perlu dibalas. Yang tidak penting tetap di luar.",
       "turnOn": "Aktifkan",
       "turningOn": "Memilah email terbaru…",
       "empty": "Belum ada. Email baru muncul di sini setelah Stella memilahnya.",

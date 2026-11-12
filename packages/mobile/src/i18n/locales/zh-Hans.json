@@ -3525,7 +3525,7 @@
     },
     "section": {
       "connectTitle": "只看重要的邮件",
-      "connectBody": "连接 Gmail 后，Stella 会在新邮件到达时进行分类。紧急邮件会立即通知你，其余的以简短摘要发到聊天中。",
+      "connectBody": "连接 Gmail 后，Stella 会在新邮件到达时进行分类。紧急邮件会立即通知你，其余的留在「今天」里，需要回复时会备好回复草稿。",
       "connect": "连接 Gmail",
       "connecting": "正在等待 Google…",
       "connectError": "Gmail 未连接，请重试。",
@@ -3535,7 +3535,7 @@
       "loadErrorTitle": "无法加载邮件",
       "loadErrorBody": "Stella 暂时无法连接服务器。请检查网络后重试。",
       "offTitle": "分类你的邮件",
-      "offBody": "Stella 会在新邮件到达时进行分类。紧急邮件会立即通知你，其余的以简短摘要发到聊天中。无关邮件会被挡在外面。",
+      "offBody": "Stella 会在新邮件到达时进行分类。紧急邮件会立即通知你，其余的留在「今天」里，需要回复时会备好回复草稿。无关邮件会被挡在外面。",
       "turnOn": "开启",
       "turningOn": "正在分类最近的邮件…",
       "empty": "暂无内容。Stella 分类后的新邮件会显示在这里。",

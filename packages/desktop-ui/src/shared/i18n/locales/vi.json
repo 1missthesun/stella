@@ -3525,7 +3525,7 @@
     },
     "section": {
       "connectTitle": "Những email quan trọng",
-      "connectBody": "Kết nối Gmail và Stella sẽ phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại đến dưới dạng tóm tắt ngắn trong cuộc trò chuyện.",
+      "connectBody": "Kết nối Gmail và Stella sẽ phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại chờ trong Hôm nay, kèm thư trả lời soạn sẵn khi cần trả lời.",
       "connect": "Kết nối Gmail",
       "connecting": "Đang chờ Google…",
       "connectError": "Gmail chưa kết nối được. Hãy thử lại.",
@@ -3535,7 +3535,7 @@
       "loadErrorTitle": "Không tải được email",
       "loadErrorBody": "Stella hiện không kết nối được máy chủ. Hãy kiểm tra kết nối rồi thử lại.",
       "offTitle": "Phân loại email của bạn",
-      "offBody": "Stella phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại đến dưới dạng tóm tắt ngắn trong cuộc trò chuyện. Thư rác vặt bị gạt ra ngoài.",
+      "offBody": "Stella phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại chờ trong Hôm nay, kèm thư trả lời soạn sẵn khi cần trả lời. Thư rác vặt bị gạt ra ngoài.",
       "turnOn": "Bật",
       "turningOn": "Đang phân loại thư gần đây…",
       "empty": "Chưa có gì. Thư mới sẽ hiện ở đây khi Stella phân loại xong.",

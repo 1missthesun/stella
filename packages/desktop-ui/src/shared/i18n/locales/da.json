@@ -3550,7 +3550,7 @@
     },
     "section": {
       "connectTitle": "Den e-mail, der betyder noget",
-      "connectBody": "Forbind Gmail, så sorterer Stella ny post, når den kommer. Det presserende når dig med det samme; resten kommer som en kort opsummering i chatten.",
+      "connectBody": "Forbind Gmail, så sorterer Stella ny post, når den kommer. Det presserende når dig med det samme; resten venter i I dag, med et svar skrevet klar, når der skal svares.",
       "connect": "Forbind Gmail",
       "connecting": "Venter på Google…",
       "connectError": "Gmail blev ikke forbundet. Prøv igen.",
@@ -3560,7 +3560,7 @@
       "loadErrorTitle": "Kunne ikke indlæse din e-mail",
       "loadErrorBody": "Stella kan ikke nå sine servere lige nu. Tjek din forbindelse, og prøv igen.",
       "offTitle": "Sortér din e-mail",
-      "offBody": "Stella sorterer ny post, når den kommer. Det presserende når dig med det samme; resten kommer som en kort opsummering i chatten. Støj holdes ude.",
+      "offBody": "Stella sorterer ny post, når den kommer. Det presserende når dig med det samme; resten venter i I dag, med et svar skrevet klar, når der skal svares. Støj holdes ude.",
       "turnOn": "Slå til",
       "turningOn": "Sorterer din seneste post…",
       "empty": "Intet endnu. Ny post vises her, når Stella har sorteret den.",

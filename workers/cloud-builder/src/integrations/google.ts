@@ -1485,7 +1485,8 @@ export const withStellaGoogle = <Source extends ConnectorSourceLike>(
 /**
  * The callback page for a Google sign-in waiting on its one-time code. It
  * opens the Stella app on this device, which redeems the code as its own
- * signed-in user; the code is also shown to paste into a Stella chat.
+ * signed-in user. Without the app, Copy gives a whole sentence for a Stella chat,
+ * so the chat knows to redeem it (a bare code reads as nothing to answer).
  */
 export const googleConnectCodePage = (email: string, code: string, appLink: string): Response =>
   new Response(
@@ -1505,15 +1506,15 @@ export const googleConnectCodePage = (email: string, code: string, appLink: stri
 <h1>Finish in Stella</h1>
 <p>Open Stella to connect ${escapeHtml(email)}. Only the Stella account on this device can finish it.</p>
 <a class="open" id="open" href="${escapeHtml(appLink)}">Open Stella</a>
-<p class="note">No Stella app here? Paste this code into a Stella chat:</p>
+<p class="note">No Stella app here? Copy this and paste it into a Stella chat:</p>
 <div class="code" id="code">${escapeHtml(code)}</div>
-<button type="button" id="copy">Copy code</button>
+<button type="button" id="copy">Copy</button>
 <p class="note">Works for 10 minutes. Only use it in your own Stella.</p>
 </div>
 <script>
 document.getElementById("copy").addEventListener("click", function () {
   var button = this;
-  navigator.clipboard.writeText(document.getElementById("code").textContent).then(function () { button.textContent = "Copied"; });
+  navigator.clipboard.writeText("Finish connecting my Google account with this connect code: " + document.getElementById("code").textContent).then(function () { button.textContent = "Copied"; });
 });
 window.location.href = document.getElementById("open").getAttribute("href");
 </script>

@@ -3550,7 +3550,7 @@
     },
     "section": {
       "connectTitle": "The email that matters",
-      "connectBody": "Connect Gmail and Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest comes as a short summary in the chat.",
+      "connectBody": "Connect Gmail and Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest waits in Today, with a reply drafted when one is needed.",
       "connect": "Connect Gmail",
       "connecting": "Waiting for Google…",
       "connectError": "Gmail didn't connect. Try again.",
@@ -3560,7 +3560,7 @@
       "loadErrorTitle": "Couldn't load your email",
       "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
       "offTitle": "Sort your email",
-      "offBody": "Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest comes as a short summary in the chat. Noise stays out.",
+      "offBody": "Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest waits in Today, with a reply drafted when one is needed. Noise stays out.",
       "turnOn": "Turn on",
       "turningOn": "Sorting your recent mail…",
       "empty": "Nothing yet. New mail shows up here once Stella sorts it.",

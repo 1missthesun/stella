@@ -296,7 +296,8 @@ function EmailSectionBody({ active: selected }: { active: boolean }) {
   }
 
   if (!value) {
-    if (feed.status === "error") {
+    // Signed in but the session token isn't ready yet (right after launch): it loads by itself.
+    if (feed.status === "error" && feed.error.code !== "UNAUTHENTICATED") {
       return <EmptyState motif="mail" title={t("email.section.loadErrorTitle")} body={t("email.section.loadErrorBody")} />;
     }
     return <div className="email-section" aria-busy="true" />;

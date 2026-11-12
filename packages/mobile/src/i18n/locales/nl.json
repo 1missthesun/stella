@@ -3550,7 +3550,7 @@
     },
     "section": {
       "connectTitle": "De e-mail die ertoe doet",
-      "connectBody": "Koppel Gmail en Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest komt als korte samenvatting in de chat.",
+      "connectBody": "Koppel Gmail en Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest wacht in Vandaag, met een conceptantwoord als er een antwoord nodig is.",
       "connect": "Gmail koppelen",
       "connecting": "Wachten op Google…",
       "connectError": "Gmail is niet gekoppeld. Probeer het opnieuw.",
@@ -3560,7 +3560,7 @@
       "loadErrorTitle": "Je e-mail kon niet worden geladen",
       "loadErrorBody": "Stella kan haar servers nu niet bereiken. Controleer je verbinding en probeer het opnieuw.",
       "offTitle": "Sorteer je e-mail",
-      "offBody": "Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest komt als korte samenvatting in de chat. Ruis blijft buiten.",
+      "offBody": "Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest wacht in Vandaag, met een conceptantwoord als er een antwoord nodig is. Ruis blijft buiten.",
       "turnOn": "Inschakelen",
       "turningOn": "Je recente mail wordt gesorteerd…",
       "empty": "Nog niets. Nieuwe mail verschijnt hier zodra Stella die heeft gesorteerd.",

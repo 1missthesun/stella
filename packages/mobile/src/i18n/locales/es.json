@@ -3573,7 +3573,7 @@
     },
     "section": {
       "connectTitle": "El correo que importa",
-      "connectBody": "Conecta Gmail y Stella ordena el correo nuevo en cuanto llega. Lo urgente te llega al momento; el resto, como un breve resumen en el chat.",
+      "connectBody": "Conecta Gmail y Stella ordena el correo nuevo en cuanto llega. Lo urgente te llega al momento; el resto espera en Hoy, con una respuesta preparada cuando hace falta.",
       "connect": "Conectar Gmail",
       "connecting": "Esperando a Google…",
       "connectError": "Gmail no se conectó. Inténtalo de nuevo.",
@@ -3583,7 +3583,7 @@
       "loadErrorTitle": "No se pudo cargar tu correo",
       "loadErrorBody": "Stella no puede contactar con sus servidores ahora. Revisa tu conexión e inténtalo de nuevo.",
       "offTitle": "Ordena tu correo",
-      "offBody": "Stella ordena el correo nuevo en cuanto llega. Lo urgente te llega al momento; el resto, como un breve resumen en el chat. Lo irrelevante se queda fuera.",
+      "offBody": "Stella ordena el correo nuevo en cuanto llega. Lo urgente te llega al momento; el resto espera en Hoy, con una respuesta preparada cuando hace falta. Lo irrelevante se queda fuera.",
       "turnOn": "Activar",
       "turningOn": "Ordenando tu correo reciente…",
       "empty": "Nada aún. El correo nuevo aparece aquí cuando Stella lo ordena.",

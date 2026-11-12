@@ -3573,7 +3573,7 @@
     },
     "section": {
       "connectTitle": "Les e-mails qui comptent",
-      "connectBody": "Connectez Gmail et Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste arrive en court résumé dans le chat.",
+      "connectBody": "Connectez Gmail et Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste vous attend dans Aujourd’hui, avec une réponse préparée quand il en faut une.",
       "connect": "Connecter Gmail",
       "connecting": "En attente de Google…",
       "connectError": "Gmail ne s'est pas connecté. Réessayez.",
@@ -3583,7 +3583,7 @@
       "loadErrorTitle": "Impossible de charger vos e-mails",
       "loadErrorBody": "Stella ne peut pas joindre ses serveurs pour le moment. Vérifiez votre connexion et réessayez.",
       "offTitle": "Trier vos e-mails",
-      "offBody": "Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste arrive en court résumé dans le chat. Le superflu reste à l'écart.",
+      "offBody": "Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste vous attend dans Aujourd’hui, avec une réponse préparée quand il en faut une. Le superflu reste à l'écart.",
       "turnOn": "Activer",
       "turningOn": "Tri de vos e-mails récents…",
       "empty": "Rien pour l'instant. Les nouveaux e-mails apparaissent ici une fois triés par Stella.",

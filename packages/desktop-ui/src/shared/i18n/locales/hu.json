@@ -3550,7 +3550,7 @@
     },
     "section": {
       "connectTitle": "A fontos e-mailek",
-      "connectBody": "Kapcsold össze a Gmailt, és Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi rövid összefoglalóként jön a csevegésbe.",
+      "connectBody": "Kapcsold össze a Gmailt, és Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi a Ma nézetben vár, ahol kell, előre megírt válasszal.",
       "connect": "Gmail összekapcsolása",
       "connecting": "Várakozás a Google-re…",
       "connectError": "A Gmail nem kapcsolódott. Próbáld újra.",
@@ -3560,7 +3560,7 @@
       "loadErrorTitle": "Nem sikerült betölteni az e-mailjeidet",
       "loadErrorBody": "Stella most nem éri el a szervereit. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "offTitle": "Rendezd az e-mailjeidet",
-      "offBody": "Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi rövid összefoglalóként jön a csevegésbe. A zaj kimarad.",
+      "offBody": "Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi a Ma nézetben vár, ahol kell, előre megírt válasszal. A zaj kimarad.",
       "turnOn": "Bekapcsolás",
       "turningOn": "A legutóbbi levelek rendezése…",
       "empty": "Még semmi. Az új levelek itt jelennek meg, miután Stella rendezte őket.",

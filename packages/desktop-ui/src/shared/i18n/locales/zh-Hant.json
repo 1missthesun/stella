@@ -3525,7 +3525,7 @@
     },
     "section": {
       "connectTitle": "只看重要的郵件",
-      "connectBody": "連結 Gmail 後，Stella 會在新郵件抵達時進行分類。緊急郵件會立即通知你，其餘的以簡短摘要傳到聊天中。",
+      "connectBody": "連結 Gmail 後，Stella 會在新郵件抵達時進行分類。緊急郵件會立即通知你，其餘的留在「今天」裡，需要回覆時會備好回覆草稿。",
       "connect": "連結 Gmail",
       "connecting": "正在等待 Google…",
       "connectError": "Gmail 未連結，請再試一次。",
@@ -3535,7 +3535,7 @@
       "loadErrorTitle": "無法載入郵件",
       "loadErrorBody": "Stella 暫時無法連線到伺服器。請檢查網路後再試一次。",
       "offTitle": "分類你的郵件",
-      "offBody": "Stella 會在新郵件抵達時進行分類。緊急郵件會立即通知你，其餘的以簡短摘要傳到聊天中。無關郵件會被擋在外面。",
+      "offBody": "Stella 會在新郵件抵達時進行分類。緊急郵件會立即通知你，其餘的留在「今天」裡，需要回覆時會備好回覆草稿。無關郵件會被擋在外面。",
       "turnOn": "開啟",
       "turningOn": "正在分類最近的郵件…",
       "empty": "目前沒有內容。Stella 分類後的新郵件會顯示在這裡。",

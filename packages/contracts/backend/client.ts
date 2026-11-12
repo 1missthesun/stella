@@ -418,6 +418,9 @@ export class BackendClient {
             message: "Sign in to load this.",
             retryable: false,
           });
+          // The token can arrive moments later (right after launch or an update):
+          // keep trying, so open views load without waiting for another to start.
+          this.scheduleReconnect();
           return;
         }
         if (credential) this.openSocket(token, credential);

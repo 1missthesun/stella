@@ -3573,7 +3573,7 @@
     },
     "section": {
       "connectTitle": "Le email che contano",
-      "connectBody": "Collega Gmail e Stella smista la posta nuova appena arriva. Le urgenti ti raggiungono subito; il resto arriva come breve riepilogo in chat.",
+      "connectBody": "Collega Gmail e Stella smista la posta nuova appena arriva. Le urgenti ti raggiungono subito; il resto ti aspetta in Oggi, con una risposta già pronta quando serve.",
       "connect": "Collega Gmail",
       "connecting": "In attesa di Google…",
       "connectError": "Gmail non si è collegato. Riprova.",
@@ -3583,7 +3583,7 @@
       "loadErrorTitle": "Impossibile caricare le tue email",
       "loadErrorBody": "Stella non riesce a raggiungere i suoi server. Controlla la connessione e riprova.",
       "offTitle": "Smista la tua posta",
-      "offBody": "Stella smista la posta nuova appena arriva. Le urgenti ti raggiungono subito; il resto arriva come breve riepilogo in chat. Il rumore resta fuori.",
+      "offBody": "Stella smista la posta nuova appena arriva. Le urgenti ti raggiungono subito; il resto ti aspetta in Oggi, con una risposta già pronta quando serve. Il rumore resta fuori.",
       "turnOn": "Attiva",
       "turningOn": "Smisto la posta recente…",
       "empty": "Ancora niente. La posta nuova compare qui quando Stella l'ha smistata.",

@@ -190,6 +190,8 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     });
   const servedImports = new Map<string, Set<string>>();
   const servedStylesheets = new Set<string>();
+  /** JSON the window imported: kept by its address, so a swap can't give it the new data. */
+  const servedData = new Set<string>();
   const tailwindStylesheets = new Set<string>();
   const versions = new Map<string, number>();
   let lastVersion = 0;
@@ -682,6 +684,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
           return javascript(`${prefix}${cssModule(await stylesheet(file), pathname)}`);
         }
         if (ext === ".json") {
+          servedData.add(file);
           return javascript(`export default ${await fs.promises.readFile(file, "utf8")};\n`);
         }
         return javascript(`export default ${JSON.stringify(pathname)};\n`);
@@ -874,6 +877,8 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const reloads = (file: string) =>
       file === hotClientFile || isInside(publicDir, file) || path.extname(file) === ".html";
     if ([...changed].some(reloads)) return { mode: "reload", reason: "a page or public file changed" };
+    const data = [...changed].find((file) => servedData.has(file));
+    if (data) return { mode: "reload", reason: `${describe(data)} is data the window keeps by its address` };
     if (!hot) return await planSwap(changed, ran);
 
     const importers = new Map<string, string[]>();
@@ -981,6 +986,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     dispose: () => {
       servedImports.clear();
       servedStylesheets.clear();
+      servedData.clear();
     },
   };
 };

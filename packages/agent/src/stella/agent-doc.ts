@@ -11,6 +11,8 @@ export type StellaAgentRole = {
   notes?: StellaPendingNote[];
   /** Stella last answered this agent's ask_user or request_secure_input, which then goes straight to the user. */
   stellaReplied?: { tool: string; at: number };
+  /** An ask this agent put to Stella first and is waiting on; her next message lands in `reply`, not the inbox. */
+  askingStella?: { key: string; reply?: string };
 };
 
 export type StellaPendingNote = {

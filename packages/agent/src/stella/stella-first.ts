@@ -1,14 +1,16 @@
 import type { Context } from "@earendil-works/chord";
-import { InboxDoc, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
+import type { ConversationId, ToolExecutionApi, ToolRegistration, Tx, Wrap } from "@earendil-works/pi-durable";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 /**
  * A task's question or secure card goes to Stella before it reaches the user:
  * she holds the user's memory and this conversation, so she can often settle
- * it herself. The tool waits for her reply (her send_message, queued in the
- * task's inbox), which then reaches the task as its next input. With no reply in time, or once she has answered and the
- * task asks again, the card goes to the user as before. Values the user saved
- * on this computer are reused first, without asking anyone.
+ * it herself. The tool waits for her reply: while it waits, her send_message
+ * to the task becomes the tool's result instead of a queued input, so every
+ * engine (Claude Code included, which takes no input mid-turn) reads it at
+ * once. With no reply in time, or once she has answered and the task asks
+ * again, the card goes to the user as before. Values the user saved on this
+ * computer are reused first, without asking anyone.
  */
 
 const ASK_USER = "ask_user";
@@ -71,8 +73,8 @@ const noteFor = (tool: string, args: Record<string, unknown>): string =>
     `I'm waiting for your reply with send_message. If what you know settles it (a standing rule, memory, an earlier answer, or how to go on without it), tell me and the user sees nothing. If only the user can give it, say so and it goes to them. With no reply in ${STELLA_FIRST_WAIT_MS / 1000} seconds it goes to them anyway.`,
   ].join("\n\n");
 
-const repliedText = (tool: string): string =>
-  `Stella saw this before it reached the user, and replied; her message follows. Act on it. If she says only the user can give this, call ${tool} again and it goes straight to them.`;
+const repliedText = (tool: string, reply: string): string =>
+  `Stella saw this before it reached the user, and answered instead:\n\n${reply}\n\nAct on her answer. If she says only the user can give this, call ${tool} again and it goes straight to them.`;
 
 const sleep = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
   new Promise((resolve) => {
@@ -87,18 +89,26 @@ const sleep = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
 
 const FROM_STELLA = '<agent-message from="Stella"';
 
-const inputText = (content: unknown): string =>
-  typeof content === "string"
-    ? content
-    : Array.isArray(content)
-      ? content.map((part) => (part && typeof part === "object" && typeof part.text === "string" ? part.text : "")).join("\n")
-      : "";
+/**
+ * Inside the commit that would deliver `message` to an agent: when that agent
+ * is waiting on Stella's answer to its ask and the message is hers, hand it to
+ * the waiting tool and report true, so the caller doesn't also deliver it.
+ */
+export const takeStellaReply = async (tx: Tx, conversationId: ConversationId, message: string): Promise<boolean> => {
+  if (!message.includes(FROM_STELLA)) return false;
+  const role = await tx.doc(StellaAgentDoc, conversationId);
+  if (!role.askingStella || role.askingStella.reply !== undefined) return false;
+  role.askingStella.reply = message;
+  return true;
+};
 
-/** Queued messages from Stella in this agent's inbox, by submission id. */
-const stellaMessages = async (api: ToolExecutionApi, context: Context): Promise<string[]> =>
-  ((await api.snapshot(InboxDoc, api.conversationId, context))?.items ?? [])
-    .filter((item) => item.mode !== "write" && inputText(item.content).includes(FROM_STELLA))
-    .map((item) => String(item.id));
+const setAsking = (api: ToolExecutionApi, key: string | undefined, context: Context) =>
+  api.commit(async (tx) => {
+    const role = await tx.doc(StellaAgentDoc, api.conversationId);
+    if (key) role.askingStella = { key };
+    else delete role.askingStella;
+    return undefined;
+  }, context);
 
 const notSaved = (result: Awaited<ReturnType<ToolRegistration["execute"]>>): boolean => {
   const details = (result as { details?: unknown } | undefined)?.details;
@@ -119,20 +129,24 @@ const askStella = async (
   args: Record<string, unknown>,
   api: ToolExecutionApi,
   context: Context,
-): Promise<boolean> => {
-  const before = new Set(await stellaMessages(api, context));
-  const told = await host
-    .tellStella(api, `stella-first:${String(api.taskId)}`, noteFor(tool, args), context)
-    .catch(() => false);
-  if (!told) return false;
-  const signal = context.abortSignal;
-  const deadline = Date.now() + STELLA_FIRST_WAIT_MS;
-  while (Date.now() < deadline && !signal?.aborted) {
-    await sleep(Math.min(STELLA_FIRST_POLL_MS, deadline - Date.now()), signal);
-    if ((await stellaMessages(api, context)).some((id) => !before.has(id))) return true;
+): Promise<string | undefined> => {
+  const key = `stella-first:${String(api.taskId)}`;
+  await setAsking(api, key, context);
+  try {
+    const told = await host.tellStella(api, key, noteFor(tool, args), context).catch(() => false);
+    if (!told) return undefined;
+    const signal = context.abortSignal;
+    const deadline = Date.now() + STELLA_FIRST_WAIT_MS;
+    while (Date.now() < deadline && !signal?.aborted) {
+      await sleep(Math.min(STELLA_FIRST_POLL_MS, deadline - Date.now()), signal);
+      const reply = (await api.snapshot(StellaAgentDoc, api.conversationId, context))?.askingStella?.reply;
+      if (reply !== undefined) return reply;
+    }
+    if (signal?.aborted) throw signal.reason ?? new Error(`Tool ${tool} was aborted`);
+    return undefined;
+  } finally {
+    await setAsking(api, undefined, context).catch(() => undefined);
   }
-  if (signal?.aborted) throw signal.reason ?? new Error(`Tool ${tool} was aborted`);
-  return false;
 };
 
 export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
@@ -153,9 +167,10 @@ export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
           const saved = await tool.execute({ ...input, [SECURE_INPUT_SAVED_ONLY_ARG]: true }, api, context);
           if (!notSaved(saved)) return saved;
         }
-        if (!(await askStella(host, name, input, api, context))) return await tool.execute(args, api, context);
+        const reply = await askStella(host, name, input, api, context);
+        if (reply === undefined) return await tool.execute(args, api, context);
         await markPass(api, name, context);
-        return { content: [{ type: "text", text: repliedText(name) }] };
+        return { content: [{ type: "text", text: repliedText(name, reply) }] };
       },
     }),
   }));

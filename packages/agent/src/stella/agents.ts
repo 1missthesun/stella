@@ -72,7 +72,7 @@ import {
   type StellaExecutionHost,
 } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
-import { stellaFirstWraps, type StellaFirstHost } from "./stella-first.ts";
+import { stellaFirstWraps, takeStellaReply, type StellaFirstHost } from "./stella-first.ts";
 import {
   describePlacement,
   parseSpawnDestination,
@@ -683,6 +683,9 @@ export function stellaAgents(host: StellaAgentsHost) {
             const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
             if (agent && wasStopped(agent) && (reporter.input.report || reporter.input.note)) {
               agent.held = [...(agent.held ?? []), message];
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            }
+            if (!agent?.held?.length && !agent?.moved && (await takeStellaReply(tx, agentConversationId, message))) {
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }
             const held = [...(agent?.held ?? [])];
@@ -2554,11 +2557,14 @@ export function stellaAgents(host: StellaAgentsHost) {
         ? await harness.conversation(record.conversationId as ConversationId, context)
         : undefined;
     if (!agent || !threadId) return false;
-    await harness.commit(async (tx) => {
+    const answered = await harness.commit(async (tx) => {
       const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
-      if (!current || current.steers?.some((steer) => steer.key === args.key)) return;
+      if (!current || current.steers?.some((steer) => steer.key === args.key)) return false;
+      if (await takeStellaReply(tx, record!.conversationId as ConversationId, args.message)) return true;
       current.steers = [...(current.steers ?? []), { key: args.key, message: args.message }];
+      return false;
     }, context);
+    if (answered) return true;
     await agent.submit({ type: "input", content: args.message, whenBusy: "steer", requestId: `steer:${args.key}` }, context);
     return true;
   };

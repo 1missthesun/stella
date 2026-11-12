@@ -1065,6 +1065,14 @@
       "failed": "Impossible de supprimer la conversation du compte précédent. Réessayez.",
       "removed": "La conversation du compte précédent a été supprimée de cet ordinateur.",
       "title": "Passer à un autre compte ?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Autoriser",
+      "body": "Les tâches que vous lancez depuis votre téléphone ou un autre ordinateur pourront alors s'exécuter ici, avec les fichiers, les apps et le navigateur de cet ordinateur.",
+      "failed": "Ça n'a pas abouti. Réessayez.",
+      "later": "Pas maintenant",
+      "note": "Vous pouvez changer cela à tout moment dans Réglages › Confidentialité.",
+      "title": "Autoriser Stella sur vos autres appareils à lancer du travail sur cet ordinateur ?"
     }
   },
   "mobile": {
@@ -2767,6 +2775,10 @@
       "title": "Envoyer des comptages d’utilisation anonymes",
       "description": "Nous permet de compter les installations et l’usage quotidien : que Stella a été installée, quel type d’IA vous avez choisi, qu’elle a répondu et qu’elle a été ouverte aujourd’hui. Utilise un identifiant aléatoire créé sur cet ordinateur, jamais vos messages, fichiers ou compte. S’applique que vous soyez connecté ou non.",
       "error": "Impossible de modifier ce réglage. Réessayez."
+    },
+    "thisComputerWork": {
+      "description": "Autoriser Stella sur votre téléphone ou vos autres ordinateurs à lancer des tâches sur cet ordinateur.",
+      "title": "Travail depuis vos autres appareils"
     }
   },
   "shell": {

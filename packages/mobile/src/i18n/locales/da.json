@@ -1056,6 +1056,14 @@
       "failed": "Kunne ikke fjerne den forrige kontos chat. Prøv igen.",
       "removed": "Den forrige kontos chat er fjernet fra denne computer.",
       "title": "Skift til en anden konto?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Tillad",
+      "body": "Opgaver, du starter fra din telefon eller en anden computer, kan så køre her og bruge denne computers filer, apps og browser.",
+      "failed": "Det gik ikke igennem. Prøv igen.",
+      "later": "Ikke nu",
+      "note": "Du kan altid ændre det under Indstillinger › Privatliv.",
+      "title": "Vil du lade Stella på dine andre enheder starte arbejde på denne computer?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Send anonyme brugstal",
       "description": "Lader os tælle installationer og daglig brug: at Stella blev installeret, hvilken slags AI du valgte, at den svarede, og at den blev åbnet i dag. Bruger et tilfældigt ID lavet på denne computer, aldrig dine beskeder, filer eller din konto. Gælder, uanset om du er logget ind eller ej.",
       "error": "Indstillingen kunne ikke ændres. Prøv igen."
+    },
+    "thisComputerWork": {
+      "description": "Lad Stella på din telefon eller andre computere starte opgaver på denne computer.",
+      "title": "Arbejde fra dine andre enheder"
     }
   },
   "shell": {

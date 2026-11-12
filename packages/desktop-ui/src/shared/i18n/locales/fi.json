@@ -1056,6 +1056,14 @@
       "failed": "Edellisen tilin keskustelua ei voitu poistaa. Yritä uudelleen.",
       "removed": "Edellisen tilin keskustelu poistettiin tältä tietokoneelta.",
       "title": "Vaihdetaanko toiseen tiliin?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Salli",
+      "body": "Puhelimesta tai toiselta tietokoneelta aloittamasi tehtävät voivat silloin toimia täällä ja käyttää tämän tietokoneen tiedostoja, sovelluksia ja selainta.",
+      "failed": "Se ei onnistunut. Yritä uudelleen.",
+      "later": "Ei nyt",
+      "note": "Voit muuttaa tätä milloin tahansa kohdassa Asetukset › Tietosuoja.",
+      "title": "Saako Stella muilla laitteillasi aloittaa töitä tällä tietokoneella?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Lähetä anonyymejä käyttömääriä",
       "description": "Auttaa meitä laskemaan asennukset ja päivittäisen käytön: että Stella asennettiin, minkä tekoälyn valitsit, että se vastasi ja että se avattiin tänään. Käyttää tällä tietokoneella luotua satunnaista tunnusta, ei koskaan viestejäsi, tiedostojasi tai tiliäsi. Pätee, olitpa kirjautunut tai et.",
       "error": "Asetusta ei voitu muuttaa. Yritä uudelleen."
+    },
+    "thisComputerWork": {
+      "description": "Salli Stellan puhelimessasi tai muilla tietokoneilla aloittaa tehtäviä tällä tietokoneella.",
+      "title": "Työt muilta laitteiltasi"
     }
   },
   "shell": {

@@ -1065,6 +1065,14 @@
       "failed": "Impossibile rimuovere la chat dell'account precedente. Riprova.",
       "removed": "La chat dell'account precedente è stata rimossa da questo computer.",
       "title": "Passare a un altro account?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Consenti",
+      "body": "Le attività che avvii dal telefono o da un altro computer potranno così essere eseguite qui, con i file, le app e il browser di questo computer.",
+      "failed": "Non è andato a buon fine. Riprova.",
+      "later": "Non ora",
+      "note": "Puoi cambiarlo in qualsiasi momento in Impostazioni › Privacy.",
+      "title": "Consentire a Stella sui tuoi altri dispositivi di avviare lavoro su questo computer?"
     }
   },
   "mobile": {
@@ -2767,6 +2775,10 @@
       "title": "Invia conteggi di utilizzo anonimi",
       "description": "Ci permette di contare installazioni e uso quotidiano: che Stella è stata installata, quale tipo di IA hai scelto, che ha risposto e che è stata aperta oggi. Usa un ID casuale creato su questo computer, mai i tuoi messaggi, file o account. Vale sia con accesso sia senza.",
       "error": "Impossibile modificare questa impostazione. Riprova."
+    },
+    "thisComputerWork": {
+      "description": "Consenti a Stella sul telefono o su altri computer di avviare attività su questo computer.",
+      "title": "Lavoro dagli altri tuoi dispositivi"
     }
   },
   "shell": {

@@ -1047,6 +1047,14 @@
       "failed": "Không thể xóa cuộc trò chuyện của tài khoản trước. Hãy thử lại.",
       "removed": "Đã xóa cuộc trò chuyện của tài khoản trước khỏi máy tính này.",
       "title": "Chuyển sang tài khoản khác?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Cho phép",
+      "body": "Khi đó, các tác vụ bạn bắt đầu từ điện thoại hoặc máy tính khác có thể chạy ở đây, dùng tệp, ứng dụng và trình duyệt của máy tính này.",
+      "failed": "Chưa thực hiện được. Hãy thử lại.",
+      "later": "Để sau",
+      "note": "Bạn có thể thay đổi bất cứ lúc nào trong Cài đặt › Quyền riêng tư.",
+      "title": "Cho phép Stella trên các thiết bị khác của bạn bắt đầu công việc trên máy tính này?"
     }
   },
   "mobile": {
@@ -2749,6 +2757,10 @@
       "title": "Gửi số liệu sử dụng ẩn danh",
       "description": "Giúp chúng tôi đếm lượt cài đặt và mức dùng hằng ngày: rằng Stella đã được cài, bạn chọn loại AI nào, rằng nó đã trả lời và được mở hôm nay. Dùng một ID ngẫu nhiên tạo trên máy tính này, không bao giờ dùng tin nhắn, tệp hay tài khoản của bạn. Áp dụng dù bạn có đăng nhập hay không.",
       "error": "Không thể thay đổi cài đặt này. Hãy thử lại."
+    },
+    "thisComputerWork": {
+      "description": "Cho phép Stella trên điện thoại hoặc máy tính khác bắt đầu tác vụ trên máy tính này.",
+      "title": "Công việc từ các thiết bị khác"
     }
   },
   "shell": {

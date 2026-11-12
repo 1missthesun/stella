@@ -1056,6 +1056,14 @@
       "failed": "Nem sikerült eltávolítani az előző fiók csevegését. Próbáld újra.",
       "removed": "Az előző fiók csevegése eltávolításra került erről a számítógépről.",
       "title": "Átváltasz egy másik fiókra?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Engedélyezés",
+      "body": "A telefonodról vagy egy másik számítógépről indított feladatok ezután itt is futhatnak, ennek a számítógépnek a fájljaival, alkalmazásaival és böngészőjével.",
+      "failed": "Ez nem sikerült. Próbáld újra.",
+      "later": "Most nem",
+      "note": "Ezt bármikor módosíthatod a Beállítások › Adatvédelem menüben.",
+      "title": "Engedélyezed, hogy a többi eszközödön futó Stella munkát indítson ezen a számítógépen?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Névtelen használati számok küldése",
       "description": "Lehetővé teszi a telepítések és a napi használat számlálását: hogy a Stella telepítve lett, milyen MI-t választottál, hogy válaszolt, és hogy ma megnyitották. Egy ezen a gépen létrehozott véletlen azonosítót használ, soha nem az üzeneteidet, fájljaidat vagy fiókodat. Bejelentkezve és kijelentkezve is érvényes.",
       "error": "Nem sikerült módosítani ezt a beállítást. Próbáld újra."
+    },
+    "thisComputerWork": {
+      "description": "A telefonodon vagy más számítógépeken futó Stella feladatokat indíthat ezen a számítógépen.",
+      "title": "Munka a többi eszközödről"
     }
   },
   "shell": {

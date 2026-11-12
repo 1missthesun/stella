@@ -1074,6 +1074,14 @@
       "failed": "Chat předchozího účtu se nepodařilo odebrat. Zkuste to znovu.",
       "removed": "Chat předchozího účtu byl z tohoto počítače odebrán.",
       "title": "Přepnout na jiný účet?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Povolit",
+      "body": "Úkoly, které spustíte z telefonu nebo jiného počítače, pak mohou běžet tady a používat soubory, aplikace a prohlížeč tohoto počítače.",
+      "failed": "Nepodařilo se to. Zkuste to znovu.",
+      "later": "Teď ne",
+      "note": "Kdykoli to můžete změnit v Nastavení › Soukromí.",
+      "title": "Povolit Stelle na vašich dalších zařízeních spouštět práci na tomto počítači?"
     }
   },
   "mobile": {
@@ -2776,6 +2784,10 @@
       "title": "Odesílat anonymní počty používání",
       "description": "Umožňuje nám počítat instalace a denní používání: že byla Stella nainstalována, jaký druh AI jste zvolili, že odpověděla a že byla dnes otevřena. Používá náhodné ID vytvořené na tomto počítači, nikdy vaše zprávy, soubory ani účet. Platí bez ohledu na to, zda jste přihlášeni.",
       "error": "Toto nastavení se nepodařilo změnit. Zkuste to znovu."
+    },
+    "thisComputerWork": {
+      "description": "Povolit Stelle na telefonu nebo jiných počítačích spouštět úkoly na tomto počítači.",
+      "title": "Práce z vašich dalších zařízení"
     }
   },
   "shell": {

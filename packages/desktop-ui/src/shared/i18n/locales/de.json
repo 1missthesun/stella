@@ -1056,6 +1056,14 @@
       "failed": "Der Chat des vorherigen Kontos konnte nicht entfernt werden. Versuch es noch einmal.",
       "removed": "Der Chat des vorherigen Kontos wurde von diesem Computer entfernt.",
       "title": "Zu einem anderen Konto wechseln?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Erlauben",
+      "body": "Aufgaben, die du auf deinem Handy oder einem anderen Computer startest, können dann hier laufen, mit den Dateien, Apps und dem Browser dieses Computers.",
+      "failed": "Das hat nicht geklappt. Versuch es noch einmal.",
+      "later": "Nicht jetzt",
+      "note": "Du kannst das jederzeit unter Einstellungen › Datenschutz ändern.",
+      "title": "Darf Stella auf deinen anderen Geräten Arbeit auf diesem Computer starten?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Anonyme Nutzungszahlen senden",
       "description": "Damit wir Installationen und tägliche Nutzung zählen können: dass Stella installiert wurde, welche Art von KI du gewählt hast, dass sie geantwortet hat und dass sie heute geöffnet wurde. Nutzt eine zufällige ID, die auf diesem Computer erzeugt wird, niemals deine Nachrichten, Dateien oder dein Konto. Gilt angemeldet wie abgemeldet.",
       "error": "Diese Einstellung konnte nicht geändert werden. Versuch es noch einmal."
+    },
+    "thisComputerWork": {
+      "description": "Stella auf deinem Handy oder anderen Computern darf Aufgaben auf diesem Computer starten.",
+      "title": "Arbeit von deinen anderen Geräten"
     }
   },
   "shell": {

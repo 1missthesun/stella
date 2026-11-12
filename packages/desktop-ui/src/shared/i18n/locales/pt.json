@@ -1065,6 +1065,14 @@
       "failed": "Não foi possível remover o chat da conta anterior. Tente novamente.",
       "removed": "O chat da conta anterior foi removido deste computador.",
       "title": "Mudar para outra conta?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Permitir",
+      "body": "As tarefas que você iniciar no celular ou em outro computador poderão rodar aqui, usando os arquivos, apps e o navegador deste computador.",
+      "failed": "Não deu certo. Tente de novo.",
+      "later": "Agora não",
+      "note": "Você pode mudar isso a qualquer momento em Ajustes › Privacidade.",
+      "title": "Permitir que a Stella nos seus outros dispositivos inicie trabalho neste computador?"
     }
   },
   "mobile": {
@@ -2767,6 +2775,10 @@
       "title": "Enviar contagens de uso anônimas",
       "description": "Permite contar instalações e uso diário: que a Stella foi instalada, que tipo de IA você escolheu, que ela respondeu e que foi aberta hoje. Usa um ID aleatório criado neste computador, nunca suas mensagens, arquivos ou conta. Vale com ou sem login.",
       "error": "Não foi possível alterar esta configuração. Tente novamente."
+    },
+    "thisComputerWork": {
+      "description": "Permita que a Stella no seu celular ou em outros computadores inicie tarefas neste computador.",
+      "title": "Trabalho dos seus outros dispositivos"
     }
   },
   "shell": {

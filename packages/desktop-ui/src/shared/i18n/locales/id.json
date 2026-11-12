@@ -1047,6 +1047,14 @@
       "failed": "Tidak bisa menghapus obrolan akun sebelumnya. Coba lagi.",
       "removed": "Obrolan akun sebelumnya sudah dihapus dari komputer ini.",
       "title": "Beralih ke akun lain?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Izinkan",
+      "body": "Tugas yang Anda mulai dari ponsel atau komputer lain lalu bisa berjalan di sini, menggunakan file, aplikasi, dan browser komputer ini.",
+      "failed": "Gagal. Coba lagi.",
+      "later": "Jangan sekarang",
+      "note": "Anda bisa mengubahnya kapan saja di Pengaturan › Privasi.",
+      "title": "Izinkan Stella di perangkat Anda yang lain memulai pekerjaan di komputer ini?"
     }
   },
   "mobile": {
@@ -2749,6 +2757,10 @@
       "title": "Kirim hitungan penggunaan anonim",
       "description": "Memungkinkan kami menghitung instalasi dan penggunaan harian: bahwa Stella dipasang, jenis AI yang kamu pilih, bahwa ia membalas, dan bahwa ia dibuka hari ini. Menggunakan ID acak yang dibuat di komputer ini, tidak pernah pesan, file, atau akunmu. Berlaku baik saat masuk maupun tidak.",
       "error": "Pengaturan ini tidak dapat diubah. Coba lagi."
+    },
+    "thisComputerWork": {
+      "description": "Izinkan Stella di ponsel atau komputer lain memulai tugas di komputer ini.",
+      "title": "Pekerjaan dari perangkat Anda yang lain"
     }
   },
   "shell": {

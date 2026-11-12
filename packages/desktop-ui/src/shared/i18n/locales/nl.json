@@ -1056,6 +1056,14 @@
       "failed": "De chat van het vorige account kon niet worden verwijderd. Probeer het opnieuw.",
       "removed": "De chat van het vorige account is van deze computer verwijderd.",
       "title": "Overstappen naar een ander account?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Toestaan",
+      "body": "Taken die je vanaf je telefoon of een andere computer start, kunnen dan hier draaien, met de bestanden, apps en browser van deze computer.",
+      "failed": "Dat is niet gelukt. Probeer het opnieuw.",
+      "later": "Niet nu",
+      "note": "Je kunt dit altijd wijzigen via Instellingen › Privacy.",
+      "title": "Mag Stella op je andere apparaten werk starten op deze computer?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Anonieme gebruikstellingen versturen",
       "description": "Hiermee tellen we installaties en dagelijks gebruik: dat Stella is geïnstalleerd, welk soort AI je koos, dat ze antwoordde en dat ze vandaag is geopend. Gebruikt een willekeurige ID die op deze computer is gemaakt, nooit je berichten, bestanden of account. Geldt of je nu bent ingelogd of niet.",
       "error": "Deze instelling kon niet worden gewijzigd. Probeer het opnieuw."
+    },
+    "thisComputerWork": {
+      "description": "Laat Stella op je telefoon of andere computers taken starten op deze computer.",
+      "title": "Werk vanaf je andere apparaten"
     }
   },
   "shell": {

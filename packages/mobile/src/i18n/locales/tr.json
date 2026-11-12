@@ -1056,6 +1056,14 @@
       "failed": "Önceki hesabın sohbeti kaldırılamadı. Tekrar dene.",
       "removed": "Önceki hesabın sohbeti bu bilgisayardan kaldırıldı.",
       "title": "Başka bir hesaba geçilsin mi?"
+    },
+    "deviceWorkOffer": {
+      "allow": "İzin ver",
+      "body": "Telefonunuzdan veya başka bir bilgisayardan başlattığınız görevler bu bilgisayarın dosyalarını, uygulamalarını ve tarayıcısını kullanarak burada çalışabilir.",
+      "failed": "Olmadı. Tekrar deneyin.",
+      "later": "Şimdi değil",
+      "note": "Bunu istediğiniz zaman Ayarlar › Gizlilik bölümünden değiştirebilirsiniz.",
+      "title": "Diğer cihazlarınızdaki Stella bu bilgisayarda iş başlatabilsin mi?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Anonim kullanım sayıları gönder",
       "description": "Kurulumları ve günlük kullanımı saymamızı sağlar: Stella'nın kurulduğunu, hangi tür yapay zekâyı seçtiğini, yanıt verdiğini ve bugün açıldığını. Bu bilgisayarda oluşturulan rastgele bir kimlik kullanır; mesajların, dosyaların veya hesabın asla gönderilmez. Oturum açık olsun ya da olmasın geçerlidir.",
       "error": "Bu ayar değiştirilemedi. Tekrar dene."
+    },
+    "thisComputerWork": {
+      "description": "Telefonunuzdaki veya diğer bilgisayarlardaki Stella bu bilgisayarda görev başlatabilsin.",
+      "title": "Diğer cihazlarınızdan gelen işler"
     }
   },
   "shell": {

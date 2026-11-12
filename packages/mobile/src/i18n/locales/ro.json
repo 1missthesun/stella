@@ -1065,6 +1065,14 @@
       "failed": "Nu s-a putut elimina conversația contului anterior. Încearcă din nou.",
       "removed": "Conversația contului anterior a fost eliminată de pe acest computer.",
       "title": "Treci la alt cont?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Permite",
+      "body": "Sarcinile pe care le pornești de pe telefon sau de pe alt computer vor putea rula aici, folosind fișierele, aplicațiile și browserul acestui computer.",
+      "failed": "Nu a mers. Încearcă din nou.",
+      "later": "Nu acum",
+      "note": "Poți schimba asta oricând din Setări › Confidențialitate.",
+      "title": "Permiți ca Stella de pe celelalte dispozitive să pornească lucru pe acest computer?"
     }
   },
   "mobile": {
@@ -2767,6 +2775,10 @@
       "title": "Trimite numărători anonime de utilizare",
       "description": "Ne permite să numărăm instalările și utilizarea zilnică: că Stella a fost instalată, ce fel de AI ai ales, că a răspuns și că a fost deschisă azi. Folosește un ID aleatoriu creat pe acest computer, niciodată mesajele, fișierele sau contul tău. Se aplică fie că ești conectat, fie că nu.",
       "error": "Setarea nu a putut fi schimbată. Încearcă din nou."
+    },
+    "thisComputerWork": {
+      "description": "Permite ca Stella de pe telefon sau de pe alte computere să pornească sarcini pe acest computer.",
+      "title": "Lucru de pe celelalte dispozitive"
     }
   },
   "shell": {

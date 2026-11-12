@@ -261,6 +261,13 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
   {
     tab: "privacy",
     availability: "native",
+    titleKey: "settings.thisComputerWork.title",
+    descriptionKey: "settings.thisComputerWork.description",
+    keywords: ["other devices", "phone", "remote", "tasks", "allow", "computers"],
+  },
+  {
+    tab: "privacy",
+    availability: "native",
     titleKey: "settings.lockedComputerUse.title",
     descriptionKey: "settings.lockedComputerUse.description",
     keywords: [

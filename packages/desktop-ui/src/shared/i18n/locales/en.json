@@ -1056,6 +1056,14 @@
       "failed": "Couldn't remove the previous account's chat. Try again.",
       "removed": "The previous account's chat was removed from this computer.",
       "title": "Switch to another account?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Allow",
+      "body": "Tasks you start from your phone or another computer can then run here, using this computer's files, apps and browser.",
+      "failed": "That didn't go through. Try again.",
+      "later": "Not now",
+      "note": "You can change this anytime in Settings › Privacy.",
+      "title": "Let Stella on your other devices start work on this computer?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Send anonymous usage counts",
       "description": "Lets us count installs and daily use: that Stella was installed, which kind of AI you chose, that it replied, and that it was opened today. Uses a random ID made on this computer, never your messages, files or account. Applies whether or not you're signed in.",
       "error": "Couldn’t change this setting. Try again."
+    },
+    "thisComputerWork": {
+      "description": "Let Stella on your phone or other computers start tasks on this computer.",
+      "title": "Work from your other devices"
     }
   },
   "shell": {

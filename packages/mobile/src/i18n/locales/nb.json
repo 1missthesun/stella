@@ -1056,6 +1056,14 @@
       "failed": "Kunne ikke fjerne chatten til forrige konto. Prøv igjen.",
       "removed": "Chatten til forrige konto er fjernet fra denne datamaskinen.",
       "title": "Bytte til en annen konto?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Tillat",
+      "body": "Oppgaver du starter fra telefonen eller en annen datamaskin, kan da kjøre her og bruke filene, appene og nettleseren på denne datamaskinen.",
+      "failed": "Det gikk ikke. Prøv igjen.",
+      "later": "Ikke nå",
+      "note": "Du kan når som helst endre dette under Innstillinger › Personvern.",
+      "title": "Vil du la Stella på de andre enhetene dine starte arbeid på denne datamaskinen?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Send anonyme brukstall",
       "description": "Lar oss telle installasjoner og daglig bruk: at Stella ble installert, hvilken type KI du valgte, at den svarte, og at den ble åpnet i dag. Bruker en tilfeldig ID laget på denne datamaskinen, aldri meldingene, filene eller kontoen din. Gjelder enten du er logget inn eller ikke.",
       "error": "Kunne ikke endre innstillingen. Prøv igjen."
+    },
+    "thisComputerWork": {
+      "description": "La Stella på telefonen eller andre datamaskiner starte oppgaver på denne datamaskinen.",
+      "title": "Arbeid fra de andre enhetene dine"
     }
   },
   "shell": {

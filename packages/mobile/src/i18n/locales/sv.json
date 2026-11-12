@@ -1056,6 +1056,14 @@
       "failed": "Det gick inte att ta bort det förra kontots chatt. Försök igen.",
       "removed": "Det förra kontots chatt har tagits bort från den här datorn.",
       "title": "Byta till ett annat konto?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Tillåt",
+      "body": "Uppgifter som du startar från telefonen eller en annan dator kan då köras här, med den här datorns filer, appar och webbläsare.",
+      "failed": "Det gick inte. Försök igen.",
+      "later": "Inte nu",
+      "note": "Du kan ändra det när som helst under Inställningar › Integritet.",
+      "title": "Vill du låta Stella på dina andra enheter starta arbete på den här datorn?"
     }
   },
   "mobile": {
@@ -2758,6 +2766,10 @@
       "title": "Skicka anonyma användningssiffror",
       "description": "Låter oss räkna installationer och daglig användning: att Stella installerades, vilken sorts AI du valde, att den svarade och att den öppnades i dag. Använder ett slumpmässigt ID som skapas på den här datorn, aldrig dina meddelanden, filer eller ditt konto. Gäller oavsett om du är inloggad eller inte.",
       "error": "Det gick inte att ändra inställningen. Försök igen."
+    },
+    "thisComputerWork": {
+      "description": "Låt Stella på telefonen eller andra datorer starta uppgifter på den här datorn.",
+      "title": "Arbete från dina andra enheter"
     }
   },
   "shell": {

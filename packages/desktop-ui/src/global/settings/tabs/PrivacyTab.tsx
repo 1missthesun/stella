@@ -19,6 +19,7 @@ import { TelemetrySettingsCard } from "./TelemetrySettingsCard";
 import { AnonymousCountsSettingsCard } from "./AnonymousCountsSettingsCard";
 import { GoogleConnectionCard } from "./GoogleConnectionCard";
 import { YourDataCard } from "./YourDataCard";
+import { ThisComputerWorkCard } from "./ThisComputerWorkCard";
 
 const NativePermissionSettings = lazy(() =>
   import("./NativePermissionSettings").then((module) => ({
@@ -104,6 +105,7 @@ export function PrivacyTab() {
           retryLabel={t("common.tryAgain")}
         />
       )}
+      {platformCapabilities.nativeBridges && session.hasConnectedAccount ? <ThisComputerWorkCard /> : null}
       {window.electronAPI?.cloudHome ? <CloudSyncCard /> : null}
       {window.electronAPI?.cloudHome && isCloudConversationReady ? (
         <CloudMemoryReimportSettings

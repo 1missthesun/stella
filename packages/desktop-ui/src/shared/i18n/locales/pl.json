@@ -1074,6 +1074,14 @@
       "failed": "Nie udało się usunąć czatu poprzedniego konta. Spróbuj ponownie.",
       "removed": "Czat poprzedniego konta został usunięty z tego komputera.",
       "title": "Przełączyć na inne konto?"
+    },
+    "deviceWorkOffer": {
+      "allow": "Zezwól",
+      "body": "Zadania uruchomione z telefonu lub innego komputera będą mogły działać tutaj, korzystając z plików, aplikacji i przeglądarki tego komputera.",
+      "failed": "Nie udało się. Spróbuj ponownie.",
+      "later": "Nie teraz",
+      "note": "Możesz to zmienić w każdej chwili w Ustawieniach › Prywatność.",
+      "title": "Pozwolić Stelli na Twoich innych urządzeniach uruchamiać pracę na tym komputerze?"
     }
   },
   "mobile": {
@@ -2776,6 +2784,10 @@
       "title": "Wysyłaj anonimowe statystyki użycia",
       "description": "Pozwala nam liczyć instalacje i codzienne użycie: że Stella została zainstalowana, jaki rodzaj AI wybrałeś, że odpowiedziała i że została dziś otwarta. Używa losowego identyfikatora utworzonego na tym komputerze, nigdy twoich wiadomości, plików ani konta. Działa niezależnie od tego, czy jesteś zalogowany.",
       "error": "Nie udało się zmienić tego ustawienia. Spróbuj ponownie."
+    },
+    "thisComputerWork": {
+      "description": "Pozwól Stelli na telefonie lub innych komputerach uruchamiać zadania na tym komputerze.",
+      "title": "Praca z innych urządzeń"
     }
   },
   "shell": {

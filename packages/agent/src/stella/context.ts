@@ -9,6 +9,7 @@ export type StellaAgentPromptId = "agents/orchestrator.md" | "agents/general.md"
 export type StellaMemory = {
   enabled: boolean;
   main?: string;
+  rules?: string;
 };
 
 export type StellaContextSources = {
@@ -17,6 +18,8 @@ export type StellaContextSources = {
   agentPrompt(id: StellaAgentPromptId, context: Context): Promise<string | undefined>;
   personality(context: Context): Promise<string | undefined>;
   memory(context: Context): Promise<StellaMemory>;
+  /** The user's standing rules (`memories/rules.md`) for a task's or helper's prompt; undefined when memory is off. */
+  rules?(context: Context): Promise<string | undefined>;
   skillsCatalog(context: Context): Promise<string | undefined>;
   executionContext(conversationId: ConversationId, context: Context): Promise<ExecutionContextSnapshot | undefined>;
   locale?(context: Context): Promise<string | undefined>;

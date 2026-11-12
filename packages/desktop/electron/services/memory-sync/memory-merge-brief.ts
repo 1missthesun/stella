@@ -1,17 +1,10 @@
 import path from "node:path";
 
-import {
-  MAIN_MEMORY_INJECTED_MAX_CHARS,
-  MAIN_MEMORY_RELATIVE_PATH,
-} from "@stella/runtime/kernel/memory/memory-layout.js";
-import { MEMORY_FILE_MAX_CHARS } from "@stella/runtime/kernel/memory/memory-client.js";
+import { memoryFileMaxChars } from "@stella/runtime/kernel/memory/memory-client.js";
 
 export type MemoryMerge = { path: string; copy: string };
 
-const limit = (relative: string): number =>
-  relative === MAIN_MEMORY_RELATIVE_PATH
-    ? MAIN_MEMORY_INJECTED_MAX_CHARS
-    : MEMORY_FILE_MAX_CHARS;
+const limit = memoryFileMaxChars;
 
 export const memoryMergeBrief = (
   stellaDataDir: string,

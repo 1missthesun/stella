@@ -212,6 +212,7 @@ type PiAgentState = {
   tools?: StellaToolSpec[];
   agentTools?: StellaToolSpec[];
   locale?: string;
+  memoryEnabled?: true;
   lastTurnId?: string;
 };
 
@@ -383,6 +384,8 @@ export type PiRuntimeOptions = {
   ): Promise<readonly CloudCodeSourceAgentTool[]>;
   browserHandoff?(handoff: PiBrowserHandoff, signal: AbortSignal | undefined): Promise<PiBrowserHandoffEnd>;
   agentGuard?(authority: PiAuthority, turnId: string): Promise<PiAgentGuard>;
+  /** The owner's `memories/rules.md`, read fresh for each task prompt. */
+  rules?(authority: PiAuthority): Promise<string | null>;
   claudeCode?: ClaudeCodeTransport & {
     resolvedModel?(alias: string): string | undefined;
     contextWindow?(model: string): number | undefined;
@@ -412,6 +415,7 @@ export const thinkingLevelFor = (effort: AgentModelReasoningEffort | string): Mo
 
 const MEMORY_FIELDS: Record<string, keyof Omit<StellaMemory, "enabled">> = {
   "~/.stella/memories/main.md": "main",
+  "~/.stella/memories/rules.md": "rules",
 };
 
 export const memoryFromDocuments = (
@@ -804,6 +808,11 @@ export class PiConversationRuntime {
             : bundledPrompt(id),
       personality: async () => (await turn()).personality,
       memory: async () => (await turn()).memory,
+      rules: async () => {
+        const state = await this.#agentState();
+        if (!state.memoryEnabled || !this.#options.rules) return undefined;
+        return (await this.#options.rules(state.authority)) ?? undefined;
+      },
       skillsCatalog: async () => this.#binding?.sources.skillsCatalog ?? (await this.#agentState()).skillsCatalog,
       executionContext: async () =>
         this.#binding?.sources.executionContext ?? (await this.#agentState()).executionContext,
@@ -1776,6 +1785,7 @@ export class PiConversationRuntime {
       tools,
       agentTools,
       ...(binding.sources.locale ? { locale: binding.sources.locale } : {}),
+      ...(binding.sources.memory.enabled ? { memoryEnabled: true as const } : {}),
       lastTurnId: binding.turnId,
     };
     if (JSON.stringify(state) !== JSON.stringify(this.#state)) {

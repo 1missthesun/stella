@@ -134,6 +134,7 @@ import { Effect } from "effect";
 import { ownerGateStub } from "../rpc-release.js";
 import { importAgentLogIntoThread } from "./agent-log-bridge.js";
 import { agentDevicesSection, takeAgentMove } from "./agent-move.js";
+import { agentRulesSection } from "./agent-rules.js";
 import { CLOUD_AGENT_MOVE_TOOL } from "@stella/executor-cloud/cloud-agent-move-protocol";
 
 export type ContainerTurnHost = Pick<
@@ -1580,7 +1581,9 @@ export const runAgentAttempt = async (
     setupStep("skillsWait");
 
     turnExecution.assertActive();
-    const devicesSection = await agentDevicesSection(host.env, turn);
+    const [devicesSection, rulesSection] = orchestrator
+      ? [undefined, undefined]
+      : await Promise.all([agentDevicesSection(host.env, turn), agentRulesSection(host.env, turn)]);
     let roleInput: CloudCliTurnRoleInput = {
       role: "agent",
       systemPrompt: [
@@ -1588,6 +1591,7 @@ export const runAgentAttempt = async (
           names: [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL],
           history: true,
         }),
+        ...(rulesSection ? [rulesSection] : []),
         ...(devicesSection ? [devicesSection] : []),
       ].join("\n\n"),
     };

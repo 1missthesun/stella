@@ -18,6 +18,7 @@ import { messageIdsHook } from "./message-ids.ts";
 import { processableImagesHook } from "./processable-images.ts";
 import { ENGINE_MODEL_SECTION, engineModelText, residentContextHook, runsOn } from "./resident-context.ts";
 import type { StellaAgentPromptId, StellaContextSources } from "./context.ts";
+import { rulesDoc, standingRulesSection, startupDoc } from "./standing-rules.ts";
 
 export const STELLA_PROMPT_EXTENSION = "stella-prompt";
 
@@ -25,11 +26,6 @@ export const promptBody = (source: string): string => {
   const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(source);
   return (match ? source.slice(match[0].length) : source).trim();
 };
-
-const startupDoc = (path: string, content: string | undefined): string | undefined =>
-  content === undefined || content.trim() === ""
-    ? undefined
-    : `<startup_doc path="${path}">\n${content.trim()}\n</startup_doc>`;
 
 const memoryDoc = (path: string, raw: string | undefined, maxChars: number): string | undefined =>
   startupDoc(path, raw === undefined ? undefined : shapeResidentMemoryDoc(raw, maxChars));
@@ -126,8 +122,18 @@ export function stellaPromptExtension(sources: StellaContextSources, imageBudget
         "main-memory",
         orchestratorOnly(async (_input, context) => {
           const docs = await memory(context);
-          return docs.enabled ? memoryDoc(MAIN_MEMORY_DISPLAY_PATH, docs.main, MAIN_MEMORY_INJECTED_MAX_CHARS) : undefined;
+          if (!docs.enabled) return undefined;
+          const shown = [memoryDoc(MAIN_MEMORY_DISPLAY_PATH, docs.main, MAIN_MEMORY_INJECTED_MAX_CHARS), rulesDoc(docs.rules)];
+          return shown.filter((doc) => doc !== undefined).join("\n\n") || undefined;
         }),
+        { tag: false },
+      ),
+      section(
+        "standing-rules",
+        async (input, context) => {
+          if ((await role(input, context)).agentType === "orchestrator") return undefined;
+          return standingRulesSection(await sources.rules?.(context));
+        },
         { tag: false },
       ),
       section("skills", async (_input, context) => sources.skillsCatalog(context), { tag: false }),

@@ -78,6 +78,8 @@ import {
 } from "../cloud-code-tool.js";
 import type { CloudBrowserClient } from "../cloud-browser.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
+import { ownerMemoryWorld, readWorldStellaText } from "../world-memory.js";
+import { RULES_MEMORY_RELATIVE_PATH } from "@stella/runtime/kernel/memory/memory-layout.js";
 import { createCloudImageGenTool } from "../cloud-image-gen-tool.js";
 import { createCloudVideoGenTool } from "../cloud-video-gen-tool.js";
 import { createCloudScheduleTools } from "../cloud-schedule-tools.js";
@@ -351,6 +353,15 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           claudeCode: this.claudeCodeTransport(),
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
+          ...(slack
+            ? {}
+            : {
+                rules: async (authority: { ownerId: string }) =>
+                  await readWorldStellaText(
+                    await ownerMemoryWorld(this.env.WORLDS, authority.ownerId),
+                    RULES_MEMORY_RELATIVE_PATH,
+                  ),
+              }),
           moveBrain: slack ? undefined : async (authority, host, brief) => {
             const handoff: BrainHandoff = {
               turnId: this.current?.turnId ?? "",

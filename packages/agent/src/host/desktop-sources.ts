@@ -84,9 +84,16 @@ export function desktopContextSources(options: DesktopSourcesOptions): StellaCon
     personality: async () => readOrSeedPersonality(options.stellaHome) || undefined,
     memory: async (): Promise<StellaMemory> => {
       if (options.memoryEnabled?.() === false) return { enabled: false };
-      const main = await readOptional(path.join(options.stellaHome, "memories", "main.md"));
-      return { enabled: true, ...(main ? { main } : {}) };
+      const [main, rules] = await Promise.all([
+        readOptional(path.join(options.stellaHome, "memories", "main.md")),
+        readOptional(path.join(options.stellaHome, "memories", "rules.md")),
+      ]);
+      return { enabled: true, ...(main ? { main } : {}), ...(rules ? { rules } : {}) };
     },
+    rules: async () =>
+      options.memoryEnabled?.() === false
+        ? undefined
+        : await readOptional(path.join(options.stellaHome, "memories", "rules.md")),
     skillsCatalog: async () => renderSkillCatalogBlock(options.stellaHome),
     executionContext: async () => {
       const loaded = await options.executionContext?.();

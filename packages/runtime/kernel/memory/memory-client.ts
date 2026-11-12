@@ -4,8 +4,10 @@ import {
   MAIN_MEMORY_INJECTED_MAX_CHARS,
   MAIN_MEMORY_RELATIVE_PATH,
   MEMORIES_DIR,
-  mainMemoryCapNote,
+  memoryCapNote,
   PERSONALITY_FILE,
+  RULES_MEMORY_MAX_CHARS,
+  RULES_MEMORY_RELATIVE_PATH,
 } from "./memory-layout.js";
 
 export const MEMORY_FILE_MAX_CHARS = 32_000;
@@ -133,6 +135,7 @@ export const isSyncedMemoryPath = (path: string): boolean =>
 
 export const memoryFileMaxChars = (path: string): number => {
   if (path === MAIN_MEMORY_RELATIVE_PATH) return MAIN_MEMORY_INJECTED_MAX_CHARS;
+  if (path === RULES_MEMORY_RELATIVE_PATH) return RULES_MEMORY_MAX_CHARS;
   return MEMORY_FILE_MAX_CHARS;
 };
 
@@ -172,6 +175,9 @@ export const prepareMemoryWrite = async (
   return { bytes, sha: await memorySha(bytes) };
 };
 
+const residentRank = (path: string): number =>
+  path === MAIN_MEMORY_RELATIVE_PATH ? 0 : path === RULES_MEMORY_RELATIVE_PATH ? 1 : 2;
+
 export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
   read: async (input) => {
     const path = memoryPath(input, "read");
@@ -205,8 +211,8 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
     const outcome = await store.write(path, bytes, sha, expectSha);
     if (!outcome.ok) throw changed(outcome.actualSha);
     const note =
-      path === MAIN_MEMORY_RELATIVE_PATH
-        ? mainMemoryCapNote(residentMemoryChars(decoder.decode(bytes)))
+      path === MAIN_MEMORY_RELATIVE_PATH || path === RULES_MEMORY_RELATIVE_PATH
+        ? memoryCapNote(path, residentMemoryChars(decoder.decode(bytes)))
         : undefined;
     return {
       sha: visibleSha(sha),
@@ -217,13 +223,7 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
   list: async () =>
     (await store.list())
       .filter((file) => isMemoryPath(file.path))
-      .sort((left, right) =>
-        left.path === MAIN_MEMORY_RELATIVE_PATH
-          ? -1
-          : right.path === MAIN_MEMORY_RELATIVE_PATH
-            ? 1
-            : left.path.localeCompare(right.path),
-      )
+      .sort((left, right) => residentRank(left.path) - residentRank(right.path) || left.path.localeCompare(right.path))
       .slice(0, MEMORY_LIST_MAX_FILES)
       .map((file) => ({
         path: file.path,

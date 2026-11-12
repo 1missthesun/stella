@@ -35,6 +35,7 @@ import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 export const RESIDENT_SECTION_KEYS: ReadonlySet<string> = new Set([
   "personality",
   "main-memory",
+  "standing-rules",
   "skills",
   "execution-devices",
   "execution-destination",

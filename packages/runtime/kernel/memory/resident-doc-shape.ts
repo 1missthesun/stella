@@ -10,16 +10,19 @@ const stripInjectedHtmlComments = (text: string): string =>
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
 
-const truncationMarker = (chars: number): string =>
-  `\n[Truncated here. ${mainMemoryCapNote(chars) ?? ""}]`;
+type CapNote = (chars: number) => string | undefined;
+
+const truncationMarker = (chars: number, capNote: CapNote): string =>
+  `\n[Truncated here. ${capNote(chars) ?? ""}]`;
 
 const truncateUnicodeAtLineBoundary = (
   text: string,
   maxChars: number,
+  capNote: CapNote,
 ): string => {
   const chars = unicodeCodePointLength(text);
   if (chars <= maxChars) return text;
-  const marker = truncationMarker(chars);
+  const marker = truncationMarker(chars, capNote);
   const markerChars = unicodeCodePointLength(marker);
   if (maxChars < markerChars) return "";
   const prefixBudget = maxChars - markerChars;
@@ -41,8 +44,9 @@ export const residentMemoryChars = (raw: string): number =>
 export const shapeResidentMemoryDoc = (
   raw: string,
   maxChars: number,
+  capNote: CapNote = mainMemoryCapNote,
 ): string | undefined => {
   const content = stripInjectedHtmlComments(raw);
   if (!content) return undefined;
-  return truncateUnicodeAtLineBoundary(redactMemoryText(content), maxChars) || undefined;
+  return truncateUnicodeAtLineBoundary(redactMemoryText(content), maxChars, capNote) || undefined;
 };

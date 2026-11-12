@@ -2,7 +2,16 @@ import {
   EMAIL_BUCKETS,
   EMAIL_PUSH_KIND,
   type EmailAccountStatus,
+  type EmailBriefTone,
   type EmailBucket,
+  type EmailHistory,
+  type EmailHistoryDay,
+  type EmailLogKind,
+  type EmailMatter,
+  type EmailNoiseSender,
+  type EmailPrepared,
+  type EmailSettledHow,
+  type EmailToday,
   type EmailCalls,
   type EmailBrief,
   type EmailDigest,
@@ -24,7 +33,6 @@ import {
 import {
   EMAIL_CARD_MAX_ITEMS,
   EMAIL_CARD_TYPE,
-  EMAIL_REASON_WORDS,
   emailCardNoteText,
   emailFocusNoteText,
   type EmailCard,
@@ -36,7 +44,10 @@ import { GoogleApiError, gmailFetcher, runGoogleAction, type Fetcher } from "../
 import {
   addressesIn,
   parseAddress,
+  gmailArchiveMany,
   gmailAttachmentBase64,
+  gmailMarkRead,
+  gmailWritingSamples,
   gmailHistorySince,
   gmailLabelsOf,
   gmailProfile,
@@ -48,6 +59,7 @@ import {
   gmailStopWatch,
   gmailWatch,
   type GmailMail,
+  type GmailUnsubscribe,
 } from "../../integrations/gmail-mail.js";
 import {
   DECISION_INPUT_USD_PER_M,
@@ -56,9 +68,12 @@ import {
   NOTE_MAX_CHARS,
   gmailQueryFor,
   rewriteNote,
-  writeBrief,
   sortEmail,
-  writeLines,
+  writeMatters,
+  writeTodayLead,
+  writeVoiceReply,
+  type MatterEmail,
+  type MatterOutput,
   type SorterAccess,
   type SortVerdict,
 } from "../../integrations/email-sorter.js";
@@ -90,7 +105,7 @@ const BACKFILL_MAX = 20;
 const ITEM_RETENTION_MS = 30 * DAY;
 const FEED_WINDOW_MS = 7 * DAY;
 const FEED_ITEMS = 60;
-const EXCERPT_CHARS = 600;
+const EXCERPT_CHARS = 1_500;
 
 const SUMMARY_MIN_GAP_MS = 2 * HOUR;
 const SUMMARY_PILE = 3;
@@ -261,6 +276,68 @@ export const EMAIL_BRIEFINGS_MIGRATION = {
   ],
 };
 
+/**
+ * The Today view: items (matters) that stay until done, put off, or acted on;
+ * a plain log of what Stella read and did; and what a left-out sender needs
+ * to unsubscribe.
+ */
+export const EMAIL_TODAY_MIGRATION = {
+  id: "email.5-today",
+  statements: [
+    `CREATE TABLE email_matters (
+       matter_id TEXT PRIMARY KEY,
+       briefing_id TEXT,
+       announced_in TEXT,
+       kind TEXT NOT NULL,
+       tone TEXT NOT NULL,
+       headline TEXT NOT NULL,
+       wants TEXT NOT NULL,
+       points TEXT,
+       item_ids TEXT NOT NULL,
+       thread_ids TEXT NOT NULL,
+       account TEXT NOT NULL,
+       from_name TEXT NOT NULL,
+       from_address TEXT NOT NULL,
+       subject TEXT NOT NULL,
+       thread_id TEXT NOT NULL,
+       message_id TEXT NOT NULL,
+       received_at INTEGER NOT NULL,
+       rule_text TEXT,
+       prepared TEXT,
+       later_at INTEGER NOT NULL,
+       later_why TEXT,
+       status TEXT NOT NULL,
+       snooze_until INTEGER,
+       returned_at INTEGER,
+       settled_at INTEGER,
+       settled_how TEXT,
+       arrived_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`,
+    "CREATE INDEX email_matters_by_status ON email_matters (status, arrived_at)",
+    `CREATE TABLE email_log (
+       log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+       at INTEGER NOT NULL,
+       kind TEXT NOT NULL,
+       who TEXT,
+       subject TEXT,
+       count INTEGER,
+       until_at INTEGER,
+       matter_id TEXT
+     )`,
+    "CREATE INDEX email_log_by_time ON email_log (at)",
+    "ALTER TABLE email_items ADD COLUMN matter_id TEXT",
+    "ALTER TABLE email_items ADD COLUMN unsubscribe TEXT",
+    "ALTER TABLE email_items ADD COLUMN cleared INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE email_state ADD COLUMN today_lead TEXT",
+    "ALTER TABLE email_state ADD COLUMN lead_ids TEXT",
+    "ALTER TABLE email_state ADD COLUMN voice TEXT",
+    "ALTER TABLE email_state ADD COLUMN last_fold_at INTEGER",
+    "ALTER TABLE email_senders ADD COLUMN unsubscribed_at INTEGER",
+    "ALTER TABLE email_briefings ADD COLUMN matter_ids TEXT",
+  ],
+};
+
 type DigestRow = {
   digest_id: string;
   kind: string;
@@ -286,6 +363,10 @@ type StateRow = {
   sort_day: string | null;
   sorted_today: number;
   plan: string | null;
+  today_lead?: string | null;
+  lead_ids?: string | null;
+  voice?: string | null;
+  last_fold_at?: number | null;
 };
 
 type AccountRow = {
@@ -317,6 +398,9 @@ type ItemRow = {
   corrected: number;
   card_id: string | null;
   archived?: number;
+  matter_id?: string | null;
+  unsubscribe?: string | null;
+  cleared?: number;
 };
 
 type RuleRow = {
@@ -334,7 +418,8 @@ type LiveAccount = { email: string; get: () => Promise<Fetcher> };
 const stateOf = (db: OwnerDbReader): StateRow | null =>
   db.one<StateRow>(
     `SELECT enabled, note, corrections_since_note, last_summary_at, summary_day, summaries_today, urgent_day, urgent_today,
-            month, month_sorted, month_tokens, month_line_usd, sort_day, sorted_today, plan
+            month, month_sorted, month_tokens, month_line_usd, sort_day, sorted_today, plan,
+            today_lead, lead_ids, voice, last_fold_at
        FROM email_state WHERE id = 1`,
   );
 
@@ -650,23 +735,25 @@ const pushUrgent = async (
   row: ItemRow,
   conversationId: string | null,
   title: string,
+  body: string,
+  matterId?: string,
 ): Promise<void> => {
   const tokens = livePushTokens(ctx);
   if (tokens.length === 0) return;
   const data: EmailPushData = {
     kind: EMAIL_PUSH_KIND,
     itemId: row.item_id,
+    ...(matterId ? { matterId } : {}),
     ...(conversationId ? { conversationId } : {}),
   };
   const collapse = `email:${row.item_id}`.slice(0, 64);
-  const body = `${row.from_name}: ${row.subject}`.slice(0, 300);
   await sendPushMessages(
     ctx,
     tokens,
     tokens.map((token) => ({
       to: token.token,
       title,
-      body,
+      body: body.slice(0, 300),
       data,
       sound: "default",
       priority: "high",
@@ -680,6 +767,11 @@ const pushUrgent = async (
 const readItem = (db: OwnerDbReader, itemId: string): ItemRow | null =>
   db.one<ItemRow>("SELECT * FROM email_items WHERE item_id = ?", itemId);
 
+/**
+ * Urgent mail, and mail a standing instruction asked to hear about, goes onto
+ * Today at once with its step prepared, and is announced right away: the bell,
+ * and a push saying in one sentence what it wants.
+ */
 const surfaceNow = async (
   ctx: OwnerContext,
   snapshot: OwnerSnapshot,
@@ -687,25 +779,27 @@ const surfaceNow = async (
   row: ItemRow,
   rule: RuleRow | null,
 ): Promise<void> => {
-  const access: SorterAccess = {
-    env: ctx.env,
-    ownerId: ctx.ownerId,
-    ownerGeneration: snapshot.ownerGeneration,
-    execution: snapshot.execution,
-    audience: snapshot.allowance.audience,
-    budgetMicroCents: snapshot.allowance.budgetMicroCents,
-  };
-  const line = await writeLines(access, [
-    { n: 1, from: `${row.from_name} <${row.from_address}>`, subject: row.subject, excerpt: row.excerpt ?? "" },
-  ])
-    .then(({ lines, usd }) => {
-      recordLineCost(ctx, zone, usd);
-      return lines.get(1) ?? "";
+  if (!snapshot.writable) return;
+  const out = await writeMatters(accessOf(ctx, snapshot), matterEmails([row]), zone, await voiceOf(ctx))
+    .then((result) => {
+      recordLineCost(ctx, zone, result.usd);
+      return result;
     })
-    .catch(() => "");
-  if (line) ctx.db.run("UPDATE email_items SET line = ? WHERE item_id = ?", line, row.item_id);
-  const fresh = readItem(ctx.db, row.item_id) ?? row;
+    .catch((error: unknown) => {
+      log("today_failed", { message: errorText(error) });
+      return null;
+    });
+  const drafts = draftsFrom([row], out?.matters ?? null, ctx.now, zone);
+  if (!rule) for (const draft of drafts) draft.tone = "urgent";
   const cardId = `ec-${crypto.randomUUID()}`;
+  const [matterId] = recordMatters(ctx, drafts, {
+    briefingId: cardId,
+    kind: rule ? "rule" : "urgent",
+    ...(rule ? { ruleText: rule.text } : {}),
+    announcedIn: cardId,
+    state: "surfaced",
+  });
+  const fresh = readItem(ctx.db, row.item_id) ?? row;
   const card: EmailCard = {
     type: EMAIL_CARD_TYPE,
     cardId,
@@ -714,14 +808,13 @@ const surfaceNow = async (
     ...(rule ? { ruleText: rule.text } : {}),
   };
   if (!(await recordBriefing(ctx, snapshot, card))) return;
+  ctx.db.run("UPDATE email_briefings SET matter_ids = ? WHERE digest_id = ?", JSON.stringify(matterId ? [matterId] : []), cardId);
+  const matter = matterId ? readMatter(ctx.db, matterId) : null;
+  addLog(ctx, { kind: rule ? "rule" : "urgent", who: fresh.from_name, subject: matter?.headline ?? fresh.subject, ...(matterId ? { matterId } : {}) });
+  scheduleLead(ctx);
   const conversationId = readMainConversationId(ctx.db);
-  ctx.db.run(
-    "UPDATE email_items SET state = 'surfaced', card_id = ?, excerpt = NULL WHERE item_id = ?",
-    cardId,
-    row.item_id,
-  );
-  const title = rule ? "Email you asked about" : `Urgent email · ${EMAIL_REASON_WORDS[fresh.reason as EmailReason]}`;
-  await pushUrgent(ctx, fresh, conversationId, title).catch((error: unknown) =>
+  const body = matter?.wants || fresh.line || `${fresh.from_name}: ${fresh.subject}`;
+  await pushUrgent(ctx, fresh, conversationId, fresh.from_name || fresh.from_address, body, matterId).catch((error: unknown) =>
     log("push_failed", { message: errorText(error) }),
   );
 };
@@ -807,6 +900,7 @@ const processMessage = async (
   if (!mail) return;
   if (mail.labelIds.includes("SENT")) {
     notePeople(ctx, mail);
+    settleFromSent(ctx, mail);
     return;
   }
   if (!isIncoming(mail.labelIds) || mail.fromAddress === account) return;
@@ -820,8 +914,8 @@ const processMessage = async (
   const itemId = `em-${crypto.randomUUID()}`;
   ctx.db.run(
     `INSERT INTO email_items (item_id, account, message_id, thread_id, from_name, from_address, subject, excerpt, bucket,
-       first_bucket, urgent_p, reason, rule_id, sorted_by, tokens, received_at, sorted_at, state)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       first_bucket, urgent_p, reason, rule_id, sorted_by, tokens, received_at, sorted_at, state, unsubscribe)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (account, message_id) DO NOTHING`,
     itemId,
     account,
@@ -841,6 +935,7 @@ const processMessage = async (
     mail.receivedAt,
     ctx.now,
     "waiting" satisfies EmailItemState,
+    mail.unsubscribe ? JSON.stringify(mail.unsubscribe) : null,
   );
   const row = readItem(ctx.db, itemId);
   if (!row) return;
@@ -1024,6 +1119,9 @@ const runTick = async (ctx: OwnerContext): Promise<void> => {
     await reconcileAccounts(ctx, { backfill: false });
     ctx.db.run("DELETE FROM email_items WHERE sorted_at < ?", ctx.now - ITEM_RETENTION_MS);
     ctx.db.run("DELETE FROM email_corrections WHERE at < ?", ctx.now - ITEM_RETENTION_MS);
+    ctx.db.run("DELETE FROM email_matters WHERE status = 'done' AND settled_at < ?", ctx.now - MATTER_RETENTION_MS);
+    ctx.db.run("DELETE FROM email_log WHERE at < ?", ctx.now - MATTER_RETENTION_MS);
+    await settleArchived(ctx).catch((error: unknown) => log("settle_check_failed", { message: errorText(error) }));
     await runSync(ctx, {});
   } finally {
     scheduleTick(ctx);
@@ -1034,18 +1132,6 @@ const runTick = async (ctx: OwnerContext): Promise<void> => {
 
 const scheduleSummaryCheck = (ctx: OwnerContext, at: number): void => {
   ctx.jobs.schedule(SUMMARY_JOB, at, {}, { id: SUMMARY_JOB });
-};
-
-type Waiting = { needsYou: ItemRow[]; worth: ItemRow[] };
-
-const waitingItems = (db: OwnerDbReader): Waiting => {
-  const rows = db.all<ItemRow>(
-    "SELECT * FROM email_items WHERE state = 'waiting' AND bucket IN ('urgent', 'needs_you', 'worth_knowing') ORDER BY received_at DESC LIMIT 100",
-  );
-  return {
-    needsYou: rows.filter((row) => row.bucket !== "worth_knowing"),
-    worth: rows.filter((row) => row.bucket === "worth_knowing"),
-  };
 };
 
 /** When a summary is due: enough has built up, something has waited long, or it is the first moment of the day. */
@@ -1085,130 +1171,10 @@ const dropHandled = async (ctx: OwnerContext, rows: ItemRow[]): Promise<ItemRow[
   return keep;
 };
 
+/** Folds waiting mail into Today, then announces it when a summary is due. */
 const postSummary = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, force: boolean): Promise<boolean> => {
-  const state = stateOf(ctx.db);
-  const { day, hour } = localParts(ctx.now, zone);
-  const waiting = waitingItems(ctx.db);
-  const summariesToday = state?.summary_day === day ? state.summaries_today : 0;
-  const due =
-    force ||
-    summaryDue({
-      now: ctx.now,
-      hour,
-      lastSummaryAt: state?.last_summary_at ?? null,
-      summariesToday,
-      needsYou: waiting.needsYou.map((row) => row.sorted_at),
-      worth: waiting.worth.map((row) => row.sorted_at),
-      firstOfDay: summariesToday === 0 && (state?.last_summary_at ?? 0) < ctx.now - 6 * HOUR,
-    });
-  if (!due) return false;
-  const chosen = await dropHandled(ctx, [...waiting.needsYou, ...waiting.worth].slice(0, EMAIL_CARD_MAX_ITEMS));
-  if (chosen.length === 0) return false;
-  const since = state?.last_summary_at ?? 0;
-  const noiseCount =
-    ctx.db.one<{ count: number }>("SELECT COUNT(*) AS count FROM email_items WHERE bucket = 'noise' AND sorted_at > ?", since)
-      ?.count ?? 0;
-  const access: SorterAccess = {
-    env: ctx.env,
-    ownerId: ctx.ownerId,
-    ownerGeneration: snapshot.ownerGeneration,
-    execution: snapshot.execution,
-    audience: snapshot.allowance.audience,
-    budgetMicroCents: snapshot.allowance.budgetMicroCents,
-  };
-  const missing = chosen.filter((row) => !row.line);
-  if (missing.length > 0) {
-    const lines = await writeLines(
-      access,
-      missing.map((row, index) => ({
-        n: index + 1,
-        from: `${row.from_name} <${row.from_address}>`,
-        subject: row.subject,
-        excerpt: row.excerpt ?? "",
-      })),
-    )
-      .then(({ lines, usd }) => {
-        recordLineCost(ctx, zone, usd);
-        return lines;
-      })
-      .catch((error: unknown) => {
-        log("lines_failed", { message: errorText(error) });
-        return new Map<number, string>();
-      });
-    missing.forEach((row, index) => {
-      const line = lines.get(index + 1);
-      if (line) {
-        row.line = line;
-        ctx.db.run("UPDATE email_items SET line = ? WHERE item_id = ?", line, row.item_id);
-      }
-    });
-  }
-  const skippedRows = ctx.db.all<ItemRow>(
-    "SELECT * FROM email_items WHERE first_bucket = 'noise' AND card_id IS NULL AND sorted_at > ? ORDER BY received_at DESC LIMIT 12",
-    since,
-  );
-  const brief = await writeBrief(
-    access,
-    chosen.map((row, index) => ({
-      n: index + 1,
-      bucket: row.bucket as EmailBucket,
-      from: `${row.from_name} <${row.from_address}>`,
-      subject: row.subject,
-      threadId: row.thread_id,
-      receivedAt: row.received_at,
-      line: row.line ?? "",
-      excerpt: (row.excerpt ?? "").slice(0, 1_200),
-    })),
-    skippedRows.map((row) => ({ from: row.from_name || row.from_address, subject: row.subject })),
-    zone,
-  )
-    .then(({ brief, usd }): EmailBrief | undefined => {
-      recordLineCost(ctx, zone, usd);
-      if (!brief) return undefined;
-      return {
-        lead: brief.lead,
-        sections: brief.sections.map((section) => ({
-          heading: section.heading,
-          tone: section.tone,
-          blocks: section.blocks.map((block) => ({
-            itemIds: block.emails.map((n) => chosen[n - 1]!.item_id),
-            title: block.title,
-            points: block.points,
-            ...(block.suggestion ? { suggestion: block.suggestion } : {}),
-          })),
-        })),
-        ...(brief.skipped ? { skipped: brief.skipped } : {}),
-      };
-    })
-    .catch((error: unknown) => {
-      log("brief_failed", { message: errorText(error) });
-      return undefined;
-    });
-  const cardId = `ec-${crypto.randomUUID()}`;
-  const card: EmailCard = {
-    type: EMAIL_CARD_TYPE,
-    cardId,
-    kind: "summary",
-    items: chosen.map((row, index) => cardItem(row, index + 1)),
-    ...(noiseCount > 0 ? { noiseCount } : {}),
-  };
-  if (!(await recordBriefing(ctx, snapshot, card, brief))) return false;
-  for (const row of chosen) {
-    ctx.db.run(
-      "UPDATE email_items SET state = 'summarized', card_id = ?, excerpt = NULL WHERE item_id = ?",
-      cardId,
-      row.item_id,
-    );
-  }
-  ctx.db.run(
-    "UPDATE email_state SET last_summary_at = ?, summaries_today = ?, summary_day = ?, updated_at = ? WHERE id = 1",
-    ctx.now,
-    summariesToday + 1,
-    day,
-    ctx.now,
-  );
-  log("summary", { owner: ctx.ownerId.slice(0, 12), items: chosen.length, noise: noiseCount });
-  return true;
+  await fold(ctx, snapshot, zone, force);
+  return await announce(ctx, snapshot, zone, force);
 };
 
 const runSummary = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
@@ -1309,6 +1275,903 @@ const runNote = async (ctx: OwnerContext): Promise<void> => {
   log("note_rewritten", { owner: ctx.ownerId.slice(0, 12), corrections: corrections.length });
 };
 
+// Today -----------------------------------------------------------------------------
+
+const LEAD_JOB = "email.lead";
+const LATER_JOB = "email.later";
+/** New mail is folded into Today at most this often; announcing it keeps the summary caps. */
+const FOLD_GAP_MS = 20 * MIN;
+const FOLD_MAX = 15;
+const MATTER_RETENTION_MS = 30 * DAY;
+const HISTORY_DAYS = 14;
+const NOISE_WINDOW_MS = 7 * DAY;
+const NOISE_SENDERS = 30;
+const SETTLE_CHECKS = 10;
+const VOICE_CHARS = 2_000;
+
+type MatterRow = {
+  matter_id: string;
+  briefing_id: string | null;
+  announced_in: string | null;
+  kind: string;
+  tone: string;
+  headline: string;
+  wants: string;
+  points: string | null;
+  item_ids: string;
+  thread_ids: string;
+  account: string;
+  from_name: string;
+  from_address: string;
+  subject: string;
+  thread_id: string;
+  message_id: string;
+  received_at: number;
+  rule_text: string | null;
+  prepared: string | null;
+  later_at: number;
+  later_why: string | null;
+  status: string;
+  snooze_until: number | null;
+  returned_at: number | null;
+  settled_at: number | null;
+  settled_how: string | null;
+  arrived_at: number;
+  updated_at: number;
+};
+
+const TONE_ORDER: Record<string, number> = { urgent: 0, needs_you: 1, fyi: 2 };
+
+const jsonList = (text: string | null | undefined): string[] => {
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const placeholders = (values: readonly unknown[]): string => values.map(() => "?").join(", ");
+
+const accessOf = (ctx: OwnerContext, snapshot: OwnerSnapshot): SorterAccess => ({
+  env: ctx.env,
+  ownerId: ctx.ownerId,
+  ownerGeneration: snapshot.ownerGeneration,
+  execution: snapshot.execution,
+  audience: snapshot.allowance.audience,
+  budgetMicroCents: snapshot.allowance.budgetMicroCents,
+});
+
+/** A wall-clock time ("YYYY-MM-DD HH:MM") in a time zone, as an instant. */
+const zonedTime = (local: string, zone: string): number | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/u.exec(local.trim());
+  if (!match) return null;
+  const wall = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]));
+  if (!Number.isFinite(wall)) return null;
+  const offsetAt = (at: number): number => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      })
+        .formatToParts(at)
+        .map((part) => [part.type, part.value]),
+    );
+    return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute)) - Math.floor(at / MIN) * MIN;
+  };
+  const first = wall - offsetAt(wall);
+  return wall - offsetAt(first);
+};
+
+const defaultLater = (now: number, zone: string): number =>
+  zonedTime(`${localParts(now + DAY, zone).day} 09:00`, zone) ?? now + DAY;
+
+const laterFrom = (text: string | undefined, now: number, zone: string): number => {
+  const at = text ? zonedTime(text, zone) : null;
+  return at !== null && at > now + 30 * MIN && at < now + 60 * DAY ? at : defaultLater(now, zone);
+};
+
+const startOfDay = (now: number, zone: string): number => zonedTime(`${localParts(now, zone).day} 00:00`, zone) ?? now - DAY;
+
+const addLog = (
+  ctx: OwnerContext,
+  entry: { kind: EmailLogKind; who?: string; subject?: string; count?: number; until?: number; matterId?: string },
+): void => {
+  ctx.db.run(
+    "INSERT INTO email_log (at, kind, who, subject, count, until_at, matter_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ctx.now,
+    entry.kind,
+    entry.who?.slice(0, 200) ?? null,
+    entry.subject?.slice(0, 300) ?? null,
+    entry.count ?? null,
+    entry.until ?? null,
+    entry.matterId ?? null,
+  );
+};
+
+const parsePrepared = (text: string | null): EmailPrepared | undefined => {
+  if (!text) return undefined;
+  try {
+    const value = JSON.parse(text) as EmailPrepared;
+    if (value?.kind === "reply" && typeof value.label === "string" && typeof value.body === "string") return value;
+    if (value?.kind === "ask" && typeof value.label === "string" && typeof value.ask === "string") return value;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+};
+
+const SETTLED: readonly EmailSettledHow[] = ["done", "replied", "drafted", "handled", "archived", "replied_in_gmail", "archived_in_gmail"];
+
+const toMatter = (row: MatterRow, now: number): EmailMatter => {
+  const due = row.status === "later" && row.snooze_until !== null && row.snooze_until <= now;
+  const prepared = parsePrepared(row.prepared);
+  const settledHow = SETTLED.find((how) => how === row.settled_how);
+  const returnedAt = due ? row.snooze_until! : row.returned_at;
+  return {
+    matterId: row.matter_id,
+    kind: row.kind === "urgent" || row.kind === "rule" ? row.kind : "summary",
+    ...(row.briefing_id ? { briefingId: row.briefing_id } : {}),
+    tone: row.tone === "urgent" || row.tone === "needs_you" ? row.tone : "fyi",
+    headline: row.headline,
+    wants: row.wants,
+    points: jsonList(row.points),
+    from: row.from_name,
+    fromAddress: row.from_address,
+    subject: row.subject,
+    account: row.account,
+    itemIds: jsonList(row.item_ids),
+    threadId: row.thread_id,
+    messageId: row.message_id,
+    receivedAt: row.received_at,
+    arrivedAt: row.arrived_at,
+    status: due ? "open" : row.status === "later" || row.status === "done" ? row.status : "open",
+    ...(row.status === "later" && !due && row.snooze_until !== null ? { laterUntil: row.snooze_until } : {}),
+    laterSuggestion: { at: row.later_at, why: row.later_why ?? "" },
+    ...(returnedAt ? { returnedAt } : {}),
+    ...(row.status === "done" && row.settled_at !== null ? { settledAt: row.settled_at } : {}),
+    ...(row.status === "done" && settledHow ? { settledHow } : {}),
+    ...(prepared ? { prepared } : {}),
+    ...(row.rule_text ? { ruleText: row.rule_text } : {}),
+  };
+};
+
+const readMatter = (db: OwnerDbReader, matterId: string): MatterRow | null =>
+  db.one<MatterRow>("SELECT * FROM email_matters WHERE matter_id = ?", matterId);
+
+const requireMatter = (ctx: OwnerContext, matterId: string): MatterRow => {
+  const row = readMatter(ctx.db, matterId);
+  if (!row) throw new RpcError("NOT_FOUND", "That item is no longer here.");
+  return row;
+};
+
+/** The unsettled item a thread already belongs to, so a new email in it joins it instead of repeating it. */
+const unsettledMatterFor = (db: OwnerDbReader, threads: string[]): MatterRow | null => {
+  for (const thread of threads) {
+    const row = db.one<MatterRow>(
+      "SELECT * FROM email_matters WHERE status != 'done' AND thread_ids LIKE ? ORDER BY updated_at DESC LIMIT 1",
+      `%"${thread.replace(/[%_"]/gu, "")}"%`,
+    );
+    if (row) return row;
+  }
+  return null;
+};
+
+const openRows = (db: OwnerDbReader, now: number): MatterRow[] =>
+  db
+    .all<MatterRow>("SELECT * FROM email_matters WHERE status = 'open' OR (status = 'later' AND snooze_until <= ?) LIMIT 200", now)
+    .sort(
+      (a, b) =>
+        (TONE_ORDER[a.tone] ?? 2) - (TONE_ORDER[b.tone] ?? 2) ||
+        Math.max(b.updated_at, b.snooze_until ?? 0) - Math.max(a.updated_at, a.snooze_until ?? 0),
+    );
+
+type MatterDraft = {
+  rows: ItemRow[];
+  tone: EmailBriefTone;
+  headline: string;
+  wants: string;
+  points: string[];
+  prepared?: EmailPrepared;
+  laterAt: number;
+  laterWhy: string;
+};
+
+const plainDraft = (row: ItemRow, now: number, zone: string): MatterDraft => ({
+  rows: [row],
+  tone: row.bucket === "urgent" ? "urgent" : row.bucket === "needs_you" ? "needs_you" : "fyi",
+  headline: row.subject.slice(0, 120),
+  wants: row.line ?? `${row.from_name}: ${row.subject}`,
+  points: [],
+  laterAt: defaultLater(now, zone),
+  laterWhy: "",
+});
+
+/** The model's items, with anything it left out added plainly so no email goes missing. */
+const draftsFrom = (rows: ItemRow[], out: MatterOutput[] | null, now: number, zone: string): MatterDraft[] => {
+  const drafts: MatterDraft[] = [];
+  const used = new Set<number>();
+  for (const matter of out ?? []) {
+    const own = matter.emails.flatMap((n) => (rows[n - 1] ? [rows[n - 1]!] : []));
+    if (own.length === 0) continue;
+    matter.emails.forEach((n) => used.add(n));
+    drafts.push({
+      rows: own,
+      tone: matter.tone,
+      headline: matter.headline,
+      wants: matter.wants || matter.headline,
+      points: matter.points,
+      ...(matter.reply
+        ? { prepared: { kind: "reply" as const, ...matter.reply } }
+        : matter.action
+          ? { prepared: { kind: "ask" as const, ...matter.action } }
+          : {}),
+      laterAt: laterFrom(matter.laterAt, now, zone),
+      laterWhy: matter.laterWhy ?? "",
+    });
+  }
+  rows.forEach((row, index) => {
+    if (!used.has(index + 1)) drafts.push(plainDraft(row, now, zone));
+  });
+  return drafts;
+};
+
+/**
+ * Writes items onto Today. An email in a thread that already has an open (or
+ * put-off) item joins it: the item is rewritten from the newest email and, if
+ * it was put off, comes back.
+ */
+const recordMatters = (
+  ctx: OwnerContext,
+  drafts: MatterDraft[],
+  options: { briefingId: string; kind: "summary" | "urgent" | "rule"; ruleText?: string; announcedIn?: string; state: EmailItemState },
+): string[] => {
+  const ids: string[] = [];
+  for (const draft of drafts) {
+    const rows = [...draft.rows].sort((a, b) => a.received_at - b.received_at);
+    const newest = rows[rows.length - 1]!;
+    const threads = [...new Set(rows.map((row) => row.thread_id))];
+    const existing = unsettledMatterFor(ctx.db, threads);
+    const prepared = draft.prepared ? JSON.stringify(draft.prepared) : null;
+    let matterId: string;
+    if (existing) {
+      matterId = existing.matter_id;
+      ctx.db.run(
+        `UPDATE email_matters SET briefing_id = ?, announced_in = ?, kind = ?, tone = ?, headline = ?, wants = ?, points = ?,
+           item_ids = ?, thread_ids = ?, from_name = ?, from_address = ?, subject = ?, thread_id = ?, message_id = ?,
+           received_at = ?, rule_text = COALESCE(?, rule_text), prepared = ?, later_at = ?, later_why = ?, status = 'open',
+           snooze_until = NULL, returned_at = CASE WHEN status = 'later' THEN ? ELSE returned_at END, updated_at = ?
+         WHERE matter_id = ?`,
+        options.briefingId,
+        options.announcedIn ?? null,
+        options.kind,
+        draft.tone,
+        draft.headline,
+        draft.wants,
+        JSON.stringify(draft.points),
+        JSON.stringify([...new Set([...jsonList(existing.item_ids), ...rows.map((row) => row.item_id)])]),
+        JSON.stringify([...new Set([...jsonList(existing.thread_ids), ...threads])]),
+        newest.from_name,
+        newest.from_address,
+        newest.subject,
+        newest.thread_id,
+        newest.message_id,
+        newest.received_at,
+        options.ruleText ?? null,
+        prepared,
+        draft.laterAt,
+        draft.laterWhy,
+        ctx.now,
+        ctx.now,
+        matterId,
+      );
+    } else {
+      matterId = `mt-${crypto.randomUUID()}`;
+      ctx.db.run(
+        `INSERT INTO email_matters (matter_id, briefing_id, announced_in, kind, tone, headline, wants, points, item_ids, thread_ids,
+           account, from_name, from_address, subject, thread_id, message_id, received_at, rule_text, prepared, later_at, later_why,
+           status, arrived_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+        matterId,
+        options.briefingId,
+        options.announcedIn ?? null,
+        options.kind,
+        draft.tone,
+        draft.headline,
+        draft.wants,
+        JSON.stringify(draft.points),
+        JSON.stringify(rows.map((row) => row.item_id)),
+        JSON.stringify(threads),
+        newest.account,
+        newest.from_name,
+        newest.from_address,
+        newest.subject,
+        newest.thread_id,
+        newest.message_id,
+        newest.received_at,
+        options.ruleText ?? null,
+        prepared,
+        draft.laterAt,
+        draft.laterWhy,
+        ctx.now,
+        ctx.now,
+      );
+    }
+    ids.push(matterId);
+    for (const row of rows) {
+      ctx.db.run(
+        "UPDATE email_items SET matter_id = ?, line = ?, state = ?, card_id = ?, excerpt = NULL WHERE item_id = ?",
+        matterId,
+        draft.wants,
+        options.state,
+        options.briefingId,
+        row.item_id,
+      );
+    }
+  }
+  return ids;
+};
+
+/** A few lines of the user's own writing, read once from their sent mail, so drafted replies sound like them. */
+const voiceOf = async (ctx: OwnerContext): Promise<string> => {
+  const stored = stateOf(ctx.db)?.voice;
+  if (typeof stored === "string") return stored;
+  const account = (await liveAccounts(ctx))[0];
+  if (!account) return "";
+  const samples = await gmailWritingSamples(await account.get()).catch(() => [] as string[]);
+  const voice = samples
+    .map((sample, index) => `--- ${index + 1}\n${sample}`)
+    .join("\n")
+    .slice(0, VOICE_CHARS);
+  ctx.db.run("UPDATE email_state SET voice = ? WHERE id = 1", voice);
+  return voice;
+};
+
+const matterEmails = (rows: ItemRow[]): MatterEmail[] =>
+  rows.map((row, index) => ({
+    n: index + 1,
+    bucket: row.bucket as EmailBucket,
+    from: `${row.from_name} <${row.from_address}>`,
+    to: row.account,
+    subject: row.subject,
+    threadId: row.thread_id,
+    receivedAt: row.received_at,
+    excerpt: (row.excerpt ?? "").slice(0, EXCERPT_CHARS),
+  }));
+
+const scheduleLead = (ctx: OwnerContext): void => {
+  ctx.jobs.schedule(LEAD_JOB, ctx.now + 15_000, {}, { id: LEAD_JOB });
+};
+
+const scheduleLater = (ctx: OwnerContext): void => {
+  const next = ctx.db.one<{ at: number | null }>("SELECT MIN(snooze_until) AS at FROM email_matters WHERE status = 'later'")?.at;
+  if (next) ctx.jobs.schedule(LATER_JOB, Math.max(next, ctx.now + 1_000), {}, { id: LATER_JOB });
+  else ctx.jobs.cancel(LATER_JOB);
+};
+
+/** Folds mail sorted since the last pass into Today, quietly; announcing it is separate. */
+const fold = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, force: boolean): Promise<void> => {
+  const waiting = ctx.db.all<ItemRow>(
+    "SELECT * FROM email_items WHERE state = 'waiting' AND bucket IN ('urgent', 'needs_you', 'worth_knowing') ORDER BY received_at ASC LIMIT ?",
+    FOLD_MAX,
+  );
+  if (waiting.length === 0) return;
+  const last = stateOf(ctx.db)?.last_fold_at ?? null;
+  if (!force && last !== null && ctx.now - last < FOLD_GAP_MS) {
+    scheduleSummaryCheck(ctx, last + FOLD_GAP_MS);
+    return;
+  }
+  ctx.db.run("UPDATE email_state SET last_fold_at = ? WHERE id = 1", ctx.now);
+  const rows = await dropHandled(ctx, waiting);
+  if (rows.length === 0) return;
+  const voice = await voiceOf(ctx);
+  const out = await writeMatters(accessOf(ctx, snapshot), matterEmails(rows), zone, voice)
+    .then((result) => {
+      recordLineCost(ctx, zone, result.usd);
+      return result;
+    })
+    .catch((error: unknown) => {
+      log("today_failed", { message: errorText(error) });
+      return null;
+    });
+  const briefingId = `ef-${crypto.randomUUID()}`;
+  const ids = recordMatters(ctx, draftsFrom(rows, out?.matters ?? null, ctx.now, zone), {
+    briefingId,
+    kind: "summary",
+    state: "summarized",
+  });
+  ctx.db.run(
+    "INSERT INTO email_briefings (digest_id, kind, created_at, item_ids, matter_ids, brief) VALUES (?, 'fold', ?, ?, ?, ?)",
+    briefingId,
+    ctx.now,
+    JSON.stringify(rows.map((row) => row.item_id)),
+    JSON.stringify(ids),
+    out?.lead ? JSON.stringify({ lead: out.lead, sections: [] }) : null,
+  );
+  log("folded", { owner: ctx.ownerId.slice(0, 12), items: rows.length, matters: ids.length });
+  scheduleLead(ctx);
+  if (waiting.length === FOLD_MAX) ctx.jobs.schedule(SUMMARY_JOB, ctx.now + 2_000, { force: true }, { id: SUMMARY_NOW_ID });
+};
+
+const TONE_HEADINGS: Record<EmailBriefTone, string> = { urgent: "Urgent", needs_you: "Needs you", fyi: "Worth knowing" };
+
+/** The written form of an announcement, kept with it (and read by the chat's hidden note). */
+const briefFromMatters = (rows: MatterRow[]): EmailBrief => {
+  const sections: EmailBrief["sections"] = [];
+  for (const row of rows) {
+    const tone = row.tone === "urgent" || row.tone === "needs_you" ? row.tone : "fyi";
+    let section = sections.find((entry) => entry.tone === tone);
+    if (!section) {
+      section = { heading: TONE_HEADINGS[tone], tone, blocks: [] };
+      sections.push(section);
+    }
+    const prepared = parsePrepared(row.prepared);
+    section.blocks.push({
+      itemIds: jsonList(row.item_ids),
+      title: `**${row.from_name}** · ${row.headline}`,
+      points: jsonList(row.points),
+      ...(prepared ? { suggestion: { label: prepared.label, ask: prepared.kind === "ask" ? prepared.ask : prepared.label } } : {}),
+    });
+  }
+  return { lead: rows[0]?.wants ?? "", sections };
+};
+
+/**
+ * Announces what was folded in since the last announcement (the bell, the
+ * badge, the chat's hidden note), on the summary cadence and caps.
+ */
+const announce = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, force: boolean): Promise<boolean> => {
+  const pending = ctx.db.all<MatterRow>(
+    "SELECT * FROM email_matters WHERE status = 'open' AND announced_in IS NULL ORDER BY updated_at DESC LIMIT 20",
+  );
+  if (pending.length === 0) return false;
+  const state = stateOf(ctx.db);
+  const { day, hour } = localParts(ctx.now, zone);
+  const summariesToday = state?.summary_day === day ? state.summaries_today : 0;
+  const due =
+    force ||
+    summaryDue({
+      now: ctx.now,
+      hour,
+      lastSummaryAt: state?.last_summary_at ?? null,
+      summariesToday,
+      needsYou: pending.filter((row) => row.tone !== "fyi").map((row) => row.updated_at),
+      worth: pending.filter((row) => row.tone === "fyi").map((row) => row.updated_at),
+      firstOfDay: summariesToday === 0 && (state?.last_summary_at ?? 0) < ctx.now - 6 * HOUR,
+    });
+  if (!due || !snapshot.writable) return false;
+  const ordered = [...pending].sort(
+    (a, b) => (TONE_ORDER[a.tone] ?? 2) - (TONE_ORDER[b.tone] ?? 2) || b.updated_at - a.updated_at,
+  );
+  const itemIds = ordered.flatMap((row) => jsonList(row.item_ids));
+  const items = itemIds.flatMap((id) => {
+    const row = readItem(ctx.db, id);
+    return row ? [row] : [];
+  });
+  const briefingId = `ec-${crypto.randomUUID()}`;
+  const card: EmailCard = {
+    type: EMAIL_CARD_TYPE,
+    cardId: briefingId,
+    kind: "summary",
+    items: items.slice(0, EMAIL_CARD_MAX_ITEMS).map((row, index) => cardItem(row, index + 1)),
+  };
+  const brief = briefFromMatters(ordered);
+  if (!(await recordBriefing(ctx, snapshot, card, brief))) return false;
+  const matterIds = ordered.map((row) => row.matter_id);
+  ctx.db.run("UPDATE email_briefings SET matter_ids = ? WHERE digest_id = ?", JSON.stringify(matterIds), briefingId);
+  ctx.db.run(`UPDATE email_matters SET announced_in = ? WHERE matter_id IN (${placeholders(matterIds)})`, briefingId, ...matterIds);
+  ctx.db.run(
+    "UPDATE email_state SET last_summary_at = ?, summaries_today = ?, summary_day = ?, updated_at = ? WHERE id = 1",
+    ctx.now,
+    summariesToday + 1,
+    day,
+    ctx.now,
+  );
+  addLog(ctx, { kind: "briefed", count: ordered.length });
+  log("summary", { owner: ctx.ownerId.slice(0, 12), matters: ordered.length });
+  return true;
+};
+
+const runLead = async (ctx: OwnerContext): Promise<void> => {
+  if (!enabled(ctx.db)) return;
+  const open = openRows(ctx.db, ctx.now);
+  const ids = open.map((row) => row.matter_id).sort();
+  if (open.length <= 1) {
+    ctx.db.run("UPDATE email_state SET today_lead = NULL, lead_ids = ? WHERE id = 1", JSON.stringify(ids));
+    return;
+  }
+  const state = stateOf(ctx.db);
+  if (state?.today_lead && jsonList(state.lead_ids).sort().join(",") === ids.join(",")) return;
+  const snapshot = await ctx.host.snapshot();
+  const { lead, usd } = await writeTodayLead(
+    accessOf(ctx, snapshot),
+    open.slice(0, 12).map((row) => ({ tone: row.tone, headline: row.headline, wants: row.wants })),
+  );
+  recordLineCost(ctx, zoneOf(ctx, snapshot), usd);
+  ctx.db.run("UPDATE email_state SET today_lead = ?, lead_ids = ? WHERE id = 1", lead || null, JSON.stringify(ids));
+};
+
+const runLater = (ctx: OwnerContext): void => {
+  const due = ctx.db.all<MatterRow>("SELECT * FROM email_matters WHERE status = 'later' AND snooze_until <= ?", ctx.now);
+  for (const row of due) {
+    ctx.db.run(
+      "UPDATE email_matters SET status = 'open', returned_at = snooze_until, snooze_until = NULL, updated_at = ? WHERE matter_id = ?",
+      ctx.now,
+      row.matter_id,
+    );
+    addLog(ctx, { kind: "returned", subject: row.headline, matterId: row.matter_id });
+  }
+  if (due.length > 0) scheduleLead(ctx);
+  scheduleLater(ctx);
+};
+
+/** Settles an item because of something done through Stella or seen in Gmail. */
+const settleAs = (ctx: OwnerContext, row: MatterRow, how: Exclude<EmailSettledHow, "done">): void => {
+  if (row.status === "done") return;
+  ctx.db.run(
+    "UPDATE email_matters SET status = 'done', settled_at = ?, settled_how = ?, snooze_until = NULL, updated_at = ? WHERE matter_id = ?",
+    ctx.now,
+    how,
+    ctx.now,
+    row.matter_id,
+  );
+  const kind: EmailLogKind = how === "replied" ? "sent" : how;
+  addLog(ctx, { kind, who: row.from_name, subject: row.headline, matterId: row.matter_id });
+  scheduleLead(ctx);
+  scheduleLater(ctx);
+};
+
+const markRead = async (ctx: OwnerContext, row: MatterRow): Promise<void> => {
+  const ids = jsonList(row.item_ids);
+  if (ids.length === 0) return;
+  const messages = ctx.db
+    .all<{ message_id: string }>(`SELECT message_id FROM email_items WHERE item_id IN (${placeholders(ids)})`, ...ids)
+    .map((entry) => entry.message_id);
+  const account = (await liveAccounts(ctx)).find((entry) => entry.email === row.account);
+  if (!account || messages.length === 0) return;
+  await gmailMarkRead(await account.get(), messages);
+};
+
+const settle = async (ctx: OwnerContext, args: EmailCalls["email.settle"]["args"]): Promise<{ ok: true }> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "email.settle", { count: 600, windowMs: HOUR }, "Too many changes. Try again later.");
+  const row = requireMatter(ctx, args.matterId);
+  const zone = ownerZone(ctx.db) ?? "UTC";
+  if (args.status === "done") {
+    if (row.status === "done") return { ok: true };
+    ctx.db.run(
+      "UPDATE email_matters SET status = 'done', settled_at = ?, settled_how = 'done', snooze_until = NULL, updated_at = ? WHERE matter_id = ?",
+      ctx.now,
+      ctx.now,
+      row.matter_id,
+    );
+    addLog(ctx, { kind: "done", subject: row.headline, matterId: row.matter_id });
+    await markRead(ctx, row).catch((error: unknown) => log("mark_read_failed", { message: errorText(error) }));
+  } else if (args.status === "later") {
+    const asked = args.laterUntil;
+    const until =
+      asked !== undefined && asked > ctx.now + MIN && asked < ctx.now + 366 * DAY
+        ? asked
+        : row.later_at > ctx.now + MIN
+          ? row.later_at
+          : defaultLater(ctx.now, zone);
+    ctx.db.run(
+      "UPDATE email_matters SET status = 'later', snooze_until = ?, returned_at = NULL, settled_at = NULL, settled_how = NULL, updated_at = ? WHERE matter_id = ?",
+      until,
+      ctx.now,
+      row.matter_id,
+    );
+    addLog(ctx, { kind: "later", subject: row.headline, until, matterId: row.matter_id });
+  } else {
+    if (row.status === "open" && row.snooze_until === null) return { ok: true };
+    ctx.db.run(
+      "UPDATE email_matters SET status = 'open', snooze_until = NULL, settled_at = NULL, settled_how = NULL, updated_at = ? WHERE matter_id = ?",
+      ctx.now,
+      row.matter_id,
+    );
+    addLog(ctx, { kind: "reopened", subject: row.headline, matterId: row.matter_id });
+  }
+  scheduleLater(ctx);
+  scheduleLead(ctx);
+  return { ok: true };
+};
+
+const sendReply = async (ctx: OwnerContext, args: EmailCalls["email.sendReply"]["args"]): Promise<{ text: string }> => {
+  const row = requireMatter(ctx, args.matterId);
+  const result = await mailAction(ctx, {
+    action: args.mode === "send" ? "reply" : "draft",
+    account: row.account,
+    messageId: row.message_id,
+    body: args.body,
+  });
+  settleAs(ctx, readMatter(ctx.db, row.matter_id) ?? row, args.mode === "send" ? "replied" : "drafted");
+  return result;
+};
+
+const voiceReply = async (ctx: OwnerContext, args: EmailCalls["email.voiceReply"]["args"]): Promise<{ body: string }> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "email.voiceReply", { count: 60, windowMs: HOUR }, "Too many replies. Try again later.");
+  const row = requireMatter(ctx, args.matterId);
+  const account = (await liveAccounts(ctx)).find((entry) => entry.email === row.account);
+  if (!account) throw new RpcError("NOT_FOUND", `${row.account} isn't connected through Stella anymore.`);
+  const mail = await gmailReadMail(await account.get(), row.message_id).catch(() => null);
+  const snapshot = await ctx.host.snapshot();
+  const zone = zoneOf(ctx, snapshot);
+  const { body, usd } = await writeVoiceReply(accessOf(ctx, snapshot), {
+    words: args.words,
+    from: `${row.from_name} <${row.from_address}>`,
+    subject: row.subject,
+    text: mail?.text ?? "",
+    ...(args.draft ? { draft: args.draft } : {}),
+    voice: await voiceOf(ctx),
+  });
+  recordLineCost(ctx, zone, usd);
+  if (!body) throw new RpcError("UNAVAILABLE", "Couldn't write the reply. Try again.");
+  return { body };
+};
+
+const noiseRows = (db: OwnerDbReader, now: number, address?: string): ItemRow[] =>
+  db.all<ItemRow>(
+    `SELECT * FROM email_items WHERE (bucket = 'noise' OR state = 'dismissed') AND cleared = 0 AND sorted_at > ?
+       ${address ? "AND from_address = ?" : ""} ORDER BY received_at DESC LIMIT 400`,
+    now - NOISE_WINDOW_MS,
+    ...(address ? [address] : []),
+  );
+
+const unsubscribeOf = (row: ItemRow): GmailUnsubscribe | null => {
+  if (!row.unsubscribe) return null;
+  try {
+    return JSON.parse(row.unsubscribe) as GmailUnsubscribe;
+  } catch {
+    return null;
+  }
+};
+
+const noiseSenders = (db: OwnerDbReader, now: number): EmailNoiseSender[] => {
+  const groups = new Map<string, ItemRow[]>();
+  for (const row of noiseRows(db, now)) {
+    const list = groups.get(row.from_address) ?? [];
+    list.push(row);
+    groups.set(row.from_address, list);
+  }
+  const unsubscribed = new Set(
+    db.all<{ address: string }>("SELECT address FROM email_senders WHERE unsubscribed_at IS NOT NULL").map((row) => row.address),
+  );
+  return [...groups.entries()]
+    .map(([address, rows]): EmailNoiseSender => {
+      const ways = rows.map(unsubscribeOf).filter((entry): entry is GmailUnsubscribe => entry !== null);
+      const stella = ways.some((way) => (way.oneClick && way.url) || way.mailto);
+      const link = ways.some((way) => way.url);
+      return {
+        address,
+        name: rows[0]!.from_name || address,
+        count: rows.length,
+        latestSubject: rows[0]!.subject,
+        latestAt: rows[0]!.received_at,
+        itemIds: rows.map((row) => row.item_id),
+        ...(stella ? { unsubscribe: "stella" as const } : link ? { unsubscribe: "link" as const } : {}),
+        ...(unsubscribed.has(address) ? { unsubscribed: true } : {}),
+      };
+    })
+    .sort((a, b) => b.count - a.count || b.latestAt - a.latestAt)
+    .slice(0, NOISE_SENDERS);
+};
+
+const unsubscribe = async (ctx: OwnerContext, args: { address: string }): Promise<{ done: boolean; url?: string }> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "email.unsubscribe", { count: 60, windowMs: HOUR }, "Too many changes. Try again later.");
+  const address = args.address.trim().toLowerCase();
+  const row = ctx.db.one<ItemRow>(
+    "SELECT * FROM email_items WHERE from_address = ? AND unsubscribe IS NOT NULL ORDER BY received_at DESC LIMIT 1",
+    address,
+  );
+  const way = row ? unsubscribeOf(row) : null;
+  if (!row || !way) throw new RpcError("NOT_FOUND", "This sender has no unsubscribe link.");
+  let done = false;
+  if (way.oneClick && way.url) {
+    const response = await fetch(way.url, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "List-Unsubscribe=One-Click",
+      redirect: "follow",
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => null);
+    done = Boolean(response && response.status < 400);
+  }
+  if (!done && way.mailto) {
+    const target = new URL(way.mailto);
+    const to = decodeURIComponent(target.pathname);
+    const account = (await liveAccounts(ctx)).find((entry) => entry.email === row.account);
+    if (account && to.includes("@")) {
+      await runGoogleAction(await account.get(), "gmail", "GMAIL_SEND_EMAIL", {
+        to: [to],
+        subject: target.searchParams.get("subject") || "unsubscribe",
+        body: target.searchParams.get("body") || "unsubscribe",
+      });
+      done = true;
+    }
+  }
+  if (!done) {
+    if (way.url) return { done: false, url: way.url };
+    throw new RpcError("UNAVAILABLE", "Couldn't unsubscribe from this sender.");
+  }
+  ctx.db.run(
+    `INSERT INTO email_senders (address, bucket, corrections, updated_at, unsubscribed_at) VALUES (?, 'noise', 0, ?, ?)
+     ON CONFLICT (address) DO UPDATE SET bucket = 'noise', updated_at = excluded.updated_at, unsubscribed_at = excluded.unsubscribed_at`,
+    address,
+    ctx.now,
+    ctx.now,
+  );
+  addLog(ctx, { kind: "unsubscribed", who: row.from_name || address });
+  log("unsubscribed", { owner: ctx.ownerId.slice(0, 12) });
+  return { done: true };
+};
+
+const clearSender = async (ctx: OwnerContext, args: { address: string }): Promise<{ cleared: number }> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "email.clearSender", { count: 120, windowMs: HOUR }, "Too many changes. Try again later.");
+  const rows = noiseRows(ctx.db, ctx.now, args.address.trim().toLowerCase());
+  if (rows.length === 0) return { cleared: 0 };
+  const accounts = await liveAccounts(ctx);
+  const cleared: ItemRow[] = [];
+  for (const email of new Set(rows.map((row) => row.account))) {
+    const account = accounts.find((entry) => entry.email === email);
+    if (!account) continue;
+    const own = rows.filter((row) => row.account === email);
+    try {
+      await gmailArchiveMany(
+        await account.get(),
+        own.map((row) => row.message_id),
+      );
+      cleared.push(...own);
+    } catch (error) {
+      if (error instanceof GoogleApiError) throw new RpcError("UNAVAILABLE", error.message);
+      throw error;
+    }
+  }
+  if (cleared.length === 0) throw new RpcError("NOT_FOUND", "That inbox isn't connected through Stella anymore.");
+  const ids = cleared.map((row) => row.item_id);
+  ctx.db.run(`UPDATE email_items SET cleared = 1, archived = 1 WHERE item_id IN (${placeholders(ids)})`, ...ids);
+  addLog(ctx, { kind: "cleared", who: cleared[0]!.from_name || cleared[0]!.from_address, count: cleared.length });
+  return { cleared: cleared.length };
+};
+
+/** Items the user dealt with in Gmail itself: a reply they sent there settles the item. */
+const settleFromSent = (ctx: OwnerContext, mail: GmailMail): void => {
+  const row = unsettledMatterFor(ctx.db, [mail.threadId]);
+  if (row && mail.receivedAt >= row.received_at) settleAs(ctx, row, "replied_in_gmail");
+};
+
+/** ...and so does archiving it there. A few items are checked each tick. */
+const settleArchived = async (ctx: OwnerContext): Promise<void> => {
+  const rows = ctx.db.all<MatterRow>(
+    "SELECT * FROM email_matters WHERE status != 'done' ORDER BY updated_at ASC LIMIT ?",
+    SETTLE_CHECKS,
+  );
+  if (rows.length === 0) return;
+  const accounts = new Map((await liveAccounts(ctx)).map((account) => [account.email, account]));
+  for (const row of rows) {
+    const account = accounts.get(row.account);
+    if (!account) continue;
+    const labels = await gmailLabelsOf(await account.get(), row.message_id).catch(() => undefined);
+    if (labels === undefined) continue;
+    if (labels === null || !labels.includes("INBOX")) settleAs(ctx, row, "archived_in_gmail");
+  }
+};
+
+const readToday = (ctx: { db: OwnerDbReader; now: number }): EmailToday => {
+  const state = stateOf(ctx.db);
+  const zone = ownerZone(ctx.db) ?? "UTC";
+  const midnight = startOfDay(ctx.now, zone);
+  const open = openRows(ctx.db, ctx.now).map((row) => toMatter(row, ctx.now));
+  const later = ctx.db
+    .all<MatterRow>("SELECT * FROM email_matters WHERE status = 'later' AND snooze_until > ? ORDER BY snooze_until LIMIT 100", ctx.now)
+    .map((row) => toMatter(row, ctx.now));
+  const doneToday = ctx.db
+    .all<MatterRow>("SELECT * FROM email_matters WHERE status = 'done' AND settled_at >= ? ORDER BY settled_at DESC LIMIT 40", midnight)
+    .map((row) => toMatter(row, ctx.now));
+  const openIds = open.map((matter) => matter.matterId).sort().join(",");
+  const leadFits = Boolean(state?.today_lead) && jsonList(state?.lead_ids).sort().join(",") === openIds;
+  const read = ctx.db.one<{ total: number; noise: number }>(
+    "SELECT COUNT(*) AS total, COALESCE(SUM(first_bucket = 'noise'), 0) AS noise FROM email_items WHERE sorted_at >= ?",
+    midnight,
+  );
+  const alerts = ctx.db
+    .all<{ digest_id: string; kind: string; created_at: number; matter_ids: string | null }>(
+      `SELECT digest_id, kind, created_at, matter_ids FROM email_briefings
+        WHERE kind IN ('summary', 'urgent', 'rule') AND matter_ids IS NOT NULL AND created_at > ?
+        ORDER BY created_at DESC LIMIT 20`,
+      ctx.now - 2 * DAY,
+    )
+    .map((row): EmailToday["alerts"][number] => ({
+      briefingId: row.digest_id,
+      kind: row.kind === "urgent" || row.kind === "rule" ? row.kind : "summary",
+      at: row.created_at,
+      matterIds: jsonList(row.matter_ids),
+    }));
+  const checked = ctx.db.one<{ at: number | null }>("SELECT MAX(last_sync_at) AS at FROM email_accounts")?.at;
+  return {
+    enabled: state?.enabled === 1,
+    ...(leadFits && state?.today_lead ? { lead: state.today_lead } : {}),
+    open,
+    later,
+    doneToday,
+    noise: noiseSenders(ctx.db, ctx.now),
+    readToday: { total: read?.total ?? 0, leftOut: read?.noise ?? 0 },
+    alerts,
+    multipleAccounts: (ctx.db.one<{ count: number }>("SELECT COUNT(*) AS count FROM email_accounts")?.count ?? 0) > 1,
+    ...(checked ? { lastCheckedAt: checked } : {}),
+  };
+};
+
+const LOG_KINDS: readonly EmailLogKind[] = [
+  "briefed",
+  "urgent",
+  "rule",
+  "sent",
+  "drafted",
+  "done",
+  "later",
+  "returned",
+  "reopened",
+  "handled",
+  "archived",
+  "unsubscribed",
+  "cleared",
+  "replied_in_gmail",
+  "archived_in_gmail",
+];
+
+const readHistory = (ctx: { db: OwnerDbReader; now: number }): EmailHistory => {
+  const zone = ownerZone(ctx.db) ?? "UTC";
+  const since = ctx.now - HISTORY_DAYS * DAY;
+  const days = new Map<string, EmailHistoryDay>();
+  const dayOf = (at: number): EmailHistoryDay => {
+    const day = localParts(at, zone).day;
+    let entry = days.get(day);
+    if (!entry) {
+      entry = { day, read: 0, leftOut: 0, arrived: [], log: [] };
+      days.set(day, entry);
+    }
+    return entry;
+  };
+  for (const row of ctx.db.all<{ sorted_at: number; noise: number }>(
+    "SELECT sorted_at, first_bucket = 'noise' AS noise FROM email_items WHERE sorted_at > ?",
+    since,
+  )) {
+    const entry = dayOf(row.sorted_at);
+    entry.read += 1;
+    if (row.noise) entry.leftOut += 1;
+  }
+  for (const row of ctx.db.all<MatterRow>("SELECT * FROM email_matters WHERE arrived_at > ? ORDER BY arrived_at DESC LIMIT 300", since)) {
+    dayOf(row.arrived_at).arrived.push(toMatter(row, ctx.now));
+  }
+  for (const row of ctx.db.all<{
+    at: number;
+    kind: string;
+    who: string | null;
+    subject: string | null;
+    count: number | null;
+    until_at: number | null;
+    matter_id: string | null;
+  }>("SELECT * FROM email_log WHERE at > ? ORDER BY at DESC LIMIT 600", since)) {
+    const kind = LOG_KINDS.find((entry) => entry === row.kind);
+    if (!kind) continue;
+    dayOf(row.at).log.push({
+      at: row.at,
+      kind,
+      ...(row.who ? { who: row.who } : {}),
+      ...(row.subject ? { subject: row.subject } : {}),
+      ...(row.count !== null ? { count: row.count } : {}),
+      ...(row.until_at !== null ? { until: row.until_at } : {}),
+      ...(row.matter_id ? { matterId: row.matter_id } : {}),
+    });
+  }
+  return { days: [...days.values()].sort((a, b) => (a.day < b.day ? 1 : -1)) };
+};
+
 // Feed and calls ----------------------------------------------------------------
 
 const toItem = (row: ItemRow): EmailItem => ({
@@ -1369,7 +2232,7 @@ const parseBrief = (text: string): { brief?: EmailBrief } => {
 /** Each email row in the chat, opened: what it surfaced, and what was skipped as noise in its stretch. */
 const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
   const rows = ctx.db.all<DigestRow>(
-    "SELECT * FROM email_briefings WHERE created_at > ? ORDER BY created_at DESC LIMIT ?",
+    "SELECT * FROM email_briefings WHERE kind != 'fold' AND created_at > ? ORDER BY created_at DESC LIMIT ?",
     ctx.now - FEED_WINDOW_MS,
     DIGESTS_SHOWN,
   );
@@ -1471,9 +2334,14 @@ const setEnabled = async (ctx: OwnerContext, args: { enabled: boolean }): Promis
       await indexWatch(ctx, account.email, false).catch(() => undefined);
       if (!(await watchedElsewhere(ctx, account.email))) await gmailStopWatch(await account.get()).catch(() => undefined);
     }
-    for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB]) ctx.jobs.cancel(job);
-    ctx.db.run("UPDATE email_state SET enabled = 0, updated_at = ? WHERE id = 1", ctx.now);
+    for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB, LEAD_JOB, LATER_JOB]) ctx.jobs.cancel(job);
+    ctx.db.run(
+      "UPDATE email_state SET enabled = 0, today_lead = NULL, lead_ids = NULL, voice = NULL, updated_at = ? WHERE id = 1",
+      ctx.now,
+    );
     ctx.db.run("DELETE FROM email_items");
+    ctx.db.run("DELETE FROM email_matters");
+    ctx.db.run("DELETE FROM email_log");
     ctx.db.run("DELETE FROM email_accounts");
     ctx.db.run("DELETE FROM email_people");
     return statusOf(ctx, snapshot.plan, zone);
@@ -1808,7 +2676,7 @@ const ruleId = (): string => `r${crypto.randomUUID().replace(/-/gu, "").slice(0,
 
 const runningEmailDomain = {
   name: "email",
-  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION, EMAIL_BRIEFINGS_MIGRATION],
+  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION, EMAIL_BRIEFINGS_MIGRATION, EMAIL_TODAY_MIGRATION],
   calls: {
     "email.setEnabled": {
       scope: "owner",
@@ -1840,6 +2708,17 @@ const runningEmailDomain = {
         if (row.state !== "dismissed") {
           correct(ctx, row, "dismissed");
           ctx.db.run("UPDATE email_items SET state = 'dismissed', corrected = 1 WHERE item_id = ?", row.item_id);
+          const matter = row.matter_id ? readMatter(ctx.db, row.matter_id) : null;
+          if (matter && matter.status !== "done") {
+            ctx.db.run(
+              "UPDATE email_matters SET status = 'done', settled_at = ?, settled_how = 'done', snooze_until = NULL, updated_at = ? WHERE matter_id = ?",
+              ctx.now,
+              ctx.now,
+              matter.matter_id,
+            );
+            addLog(ctx, { kind: "done", subject: matter.headline, matterId: matter.matter_id });
+            scheduleLead(ctx);
+          }
         }
         return { ok: true as const };
       },
@@ -1893,6 +2772,35 @@ const runningEmailDomain = {
       parse: empty(),
       handler: (ctx) => ({ rules: rulesOf(ctx.db).map(toRule), note: stateOf(ctx.db)?.note ?? "" }),
     },
+    "email.settle": {
+      scope: "owner",
+      parse: object({
+        matterId: string({ max: 64 }),
+        status: literal("open", "later", "done"),
+        laterUntil: optional(number()),
+      }),
+      handler: settle,
+    },
+    "email.sendReply": {
+      scope: "owner",
+      parse: object({ matterId: string({ max: 64 }), body: string({ min: 1, max: 20_000 }), mode: literal("send", "draft") }),
+      handler: sendReply,
+    },
+    "email.voiceReply": {
+      scope: "owner",
+      parse: object({ matterId: string({ max: 64 }), words: string({ min: 1, max: 4_000 }), draft: optional(string({ max: 20_000 })) }),
+      handler: voiceReply,
+    },
+    "email.unsubscribe": {
+      scope: "owner",
+      parse: object({ address: string({ min: 3, max: 320 }) }),
+      handler: unsubscribe,
+    },
+    "email.clearSender": {
+      scope: "owner",
+      parse: object({ address: string({ min: 3, max: 320 }) }),
+      handler: clearSender,
+    },
     "email.mail": {
       scope: "owner",
       parse: object({
@@ -1922,7 +2830,12 @@ const runningEmailDomain = {
             }
             throw error;
           }
-          if (target.itemId) ctx.db.run("UPDATE email_items SET archived = ? WHERE item_id = ?", args.archived ? 1 : 0, target.itemId);
+          if (target.itemId) {
+            ctx.db.run("UPDATE email_items SET archived = ? WHERE item_id = ?", args.archived ? 1 : 0, target.itemId);
+            const item = readItem(ctx.db, target.itemId);
+            const matter = item?.matter_id ? readMatter(ctx.db, item.matter_id) : null;
+            if (matter && args.archived) settleAs(ctx, matter, "archived");
+          }
         }
         log(args.archived ? "archived" : "unarchived", { owner: ctx.ownerId.slice(0, 12), count: targets.length });
         return { ok: true as const };
@@ -1930,10 +2843,13 @@ const runningEmailDomain = {
     },
     "email.focus": {
       scope: "owner",
-      parse: object({ ...TARGETS, action: literal("reply", "handle", "tell", "suggest") }),
+      parse: object({ ...TARGETS, action: literal("reply", "handle", "tell", "suggest"), matterId: optional(string({ max: 64 })) }),
       handler: async (ctx, args) => {
         enforceOwnerRateLimit(ctx.db, ctx.now, "email.focus", { count: 120, windowMs: HOUR }, "Too many requests. Try again later.");
         const targets = resolveTargets(ctx, args);
+        // Handing an item to Stella (its prepared step, a reply or "handle it") settles it; telling Stella something doesn't.
+        const matter = args.matterId && args.action !== "tell" ? readMatter(ctx.db, args.matterId) : null;
+        if (matter) settleAs(ctx, matter, "handled");
         const conversationId = readMainConversationId(ctx.db);
         if (!conversationId) return { ok: true as const };
         const snapshot = await ctx.host.snapshot();
@@ -1982,6 +2898,14 @@ const runningEmailDomain = {
     "email.digests": {
       parse: empty(),
       read: (ctx) => readDigests(ctx),
+    },
+    "email.today": {
+      parse: empty(),
+      read: (ctx) => readToday(ctx),
+    },
+    "email.history": {
+      parse: empty(),
+      read: (ctx) => readHistory(ctx),
     },
   },
   internal: {
@@ -2047,12 +2971,14 @@ const runningEmailDomain = {
     [TICK_JOB]: { run: (ctx) => runTick(ctx), maxAttempts: 2 },
     [SUMMARY_JOB]: { run: (ctx, payload) => runSummary(ctx, payload), maxAttempts: 3 },
     [NOTE_JOB]: { run: (ctx) => runNote(ctx), maxAttempts: 2 },
+    [LEAD_JOB]: { run: (ctx) => runLead(ctx), maxAttempts: 2 },
+    [LATER_JOB]: { run: (ctx) => runLater(ctx), maxAttempts: 3 },
   },
   purge: async (ctx) => {
-    for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB]) ctx.jobs.cancel(job);
+    for (const job of [TICK_JOB, SUMMARY_JOB, SUMMARY_NOW_ID, NOTE_JOB, LEAD_JOB, LATER_JOB]) ctx.jobs.cancel(job);
     const addresses = ctx.db.all<{ email: string }>("SELECT email FROM email_accounts");
     for (const { email } of addresses) await indexWatch(ctx, email, false).catch(() => undefined);
-    for (const table of ["email_briefings", "email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {
+    for (const table of ["email_matters", "email_log", "email_briefings", "email_items", "email_accounts", "email_people", "email_rules", "email_senders", "email_corrections", "email_state"]) {
       ctx.db.run(`DELETE FROM ${table}`);
     }
     return { pending: false };

@@ -221,6 +221,153 @@ export type EmailFeed = {
   noiseCount: number;
 };
 
+// Today ---------------------------------------------------------------------------
+
+/** Where an item stands: still open, put off until a time, or settled. */
+export type EmailMatterStatus = "open" | "later" | "done";
+
+/** How an item was settled. */
+export type EmailSettledHow =
+  | "done"
+  | "replied"
+  | "drafted"
+  | "handled"
+  | "archived"
+  | "replied_in_gmail"
+  | "archived_in_gmail";
+
+/**
+ * The step Stella prepared, so one tap does it: a reply already written (it
+ * opens for review and is sent only with the user's tap), or something Stella
+ * does in the chat. `label` says what will happen ("Send reply approving the quote").
+ */
+export type EmailPrepared =
+  | { kind: "reply"; label: string; body: string }
+  | { kind: "ask"; label: string; ask: string };
+
+/**
+ * One item on the Today view: a matter (an email, or a thread or several
+ * emails about the same thing), headlined by its outcome, with its next step
+ * prepared. It stays until it is done, put off, or acted on through Stella.
+ */
+export type EmailMatter = {
+  matterId: string;
+  /** How it arrived: in a summary, at once as urgent, or by a standing instruction. */
+  kind: "summary" | "urgent" | "rule";
+  /** The arrival it came in (an entry of the history), for grouping notifications. */
+  briefingId?: string;
+  tone: EmailBriefTone;
+  /** The outcome, in a few words ("BlueMetal renewal: sign off by Friday"). */
+  headline: string;
+  /** One sentence on what the email wants, for notifications ("Joyi needs a yes on the deposit by Monday"). */
+  wants: string;
+  /** Up to three short facts (light markdown, bold only). */
+  points: string[];
+  from: string;
+  fromAddress: string;
+  subject: string;
+  account: string;
+  /** The sorted emails it covers, oldest first. */
+  itemIds: string[];
+  threadId: string;
+  /** The newest email, the one a reply answers. */
+  messageId: string;
+  receivedAt: number;
+  arrivedAt: number;
+  status: EmailMatterStatus;
+  /** Put off until then (status "later"). */
+  laterUntil?: number;
+  /** When Later brings it back unless the user picks another time, as Stella judged from the email. */
+  laterSuggestion: { at: number; why: string };
+  /** It came back from Later (or a new email in its thread brought it back) at this time. */
+  returnedAt?: number;
+  settledAt?: number;
+  settledHow?: EmailSettledHow;
+  prepared?: EmailPrepared;
+  ruleText?: string;
+};
+
+/** Mail Stella left out, grouped by who sent it. */
+export type EmailNoiseSender = {
+  address: string;
+  name: string;
+  count: number;
+  latestSubject: string;
+  latestAt: number;
+  itemIds: string[];
+  /** How Unsubscribe works: Stella does it (one-click or by email), or it opens the sender's page. */
+  unsubscribe?: "stella" | "link";
+  unsubscribed?: boolean;
+};
+
+export type EmailToday = {
+  enabled: boolean;
+  /** A sentence or two over what is open now; absent while it is rewritten. */
+  lead?: string;
+  /** Open now: urgent, then needs you, then worth knowing; newest first within each. */
+  open: EmailMatter[];
+  /** Waiting in Later, soonest back first. */
+  later: EmailMatter[];
+  /** Settled today, newest first (they can be reopened). */
+  doneToday: EmailMatter[];
+  /** Left out this week and not cleared, busiest sender first. */
+  noise: EmailNoiseSender[];
+  /** Today's mail read by Stella, and how much of it was left out. */
+  readToday: { total: number; leftOut: number };
+  /** Arrivals worth announcing (summaries, urgent mail, standing instructions) of the last two days, newest first. */
+  alerts: { briefingId: string; kind: "summary" | "urgent" | "rule"; at: number; matterIds: string[] }[];
+  multipleAccounts: boolean;
+  lastCheckedAt?: number;
+};
+
+/** One line of the plain log of what Stella read and did with the mail. */
+export type EmailLogKind =
+  | "briefed"
+  | "urgent"
+  | "rule"
+  | "sent"
+  | "drafted"
+  | "done"
+  | "later"
+  | "returned"
+  | "reopened"
+  | "handled"
+  | "archived"
+  | "unsubscribed"
+  | "cleared"
+  | "replied_in_gmail"
+  | "archived_in_gmail";
+
+export type EmailLogEntry = {
+  at: number;
+  kind: EmailLogKind;
+  /** The sender, for entries about one sender. */
+  who?: string;
+  /** The item's headline or the email's subject. */
+  subject?: string;
+  count?: number;
+  /** For "later": when it comes back. */
+  until?: number;
+  matterId?: string;
+};
+
+export type EmailHistoryDay = {
+  /** Local day, YYYY-MM-DD. */
+  day: string;
+  /** Mail read that day, and how much was left out. */
+  read: number;
+  leftOut: number;
+  /** What came in that day, with where each stands now. */
+  arrived: EmailMatter[];
+  /** What Stella and the user did, newest first. */
+  log: EmailLogEntry[];
+};
+
+export type EmailHistory = {
+  /** The last two weeks, newest first, days with nothing left out. */
+  days: EmailHistoryDay[];
+};
+
 export type EmailCalls = {
   "email.setEnabled": { args: { enabled: boolean }; result: EmailStatus };
   "email.correct": { args: { itemId: string; bucket: EmailBucket }; result: { ok: true } };
@@ -239,12 +386,31 @@ export type EmailCalls = {
    * Tells Stella, out of sight, which emails the user's next message is about,
    * so a briefing action can be a plain chat message that still names the real email.
    */
-  "email.focus": { args: EmailTargets & { action: EmailFocusAction }; result: { ok: true } };
+  "email.focus": {
+    args: EmailTargets & { action: EmailFocusAction; matterId?: string };
+    result: { ok: true };
+  };
   /** Plain-words search across the inboxes connected through Stella. */
   "email.search": { args: { query: string }; result: EmailSearchResult };
   /** Reads a whole thread in place. */
   "email.thread": { args: { itemId?: string; account?: string; threadId?: string }; result: EmailThread };
   /** Read an email, or reply to it (sent or saved as a draft), in a Gmail account connected through Stella. */
+  /** Done, Later (until a time) or back to open. Done also marks its emails read in Gmail. */
+  "email.settle": {
+    args: { matterId: string; status: EmailMatterStatus; laterUntil?: number };
+    result: { ok: true };
+  };
+  /** Sends the reply (or saves it as a Gmail draft) the user reviewed, and settles the item. */
+  "email.sendReply": {
+    args: { matterId: string; body: string; mode: "send" | "draft" };
+    result: { text: string };
+  };
+  /** Turns what the user said into a reply in their voice, for them to review. Nothing is sent. */
+  "email.voiceReply": { args: { matterId: string; words: string; draft?: string }; result: { body: string } };
+  /** Stops a sender's mailing list: Stella does it when it can, otherwise it returns the sender's page. */
+  "email.unsubscribe": { args: { address: string }; result: { done: boolean; url?: string } };
+  /** Archives a left-out sender's mail of the week in Gmail. */
+  "email.clearSender": { args: { address: string }; result: { cleared: number } };
   "email.mail": {
     args: { action: "read" | "reply" | "draft"; account?: string; messageId: string; body?: string; all?: boolean };
     result: { text: string };
@@ -256,6 +422,8 @@ export type EmailViews = {
   "email.available": { args: Record<string, never>; result: { available: boolean } };
   "email.feed": { args: Record<string, never>; result: EmailFeed };
   "email.digests": { args: Record<string, never>; result: EmailDigests };
+  "email.today": { args: Record<string, never>; result: EmailToday };
+  "email.history": { args: Record<string, never>; result: EmailHistory };
 };
 
 export const EMAIL_PUSH_KIND = "email-urgent" as const;
@@ -263,5 +431,6 @@ export const EMAIL_PUSH_KIND = "email-urgent" as const;
 export type EmailPushData = {
   kind: typeof EMAIL_PUSH_KIND;
   itemId: string;
+  matterId?: string;
   conversationId?: string;
 };

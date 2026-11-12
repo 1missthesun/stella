@@ -277,58 +277,6 @@ const completeWithTool = async (
   return { args: call?.arguments ?? null, usd };
 };
 
-export type LineRequest = { n: number; from: string; subject: string; excerpt: string };
-
-const LINES_TOOL: Tool = {
-  name: "write_lines",
-  description: "One line per email.",
-  parameters: {
-    type: "object",
-    properties: {
-      lines: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: { n: { type: "number" }, line: { type: "string" } },
-          required: ["n", "line"],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ["lines"],
-    additionalProperties: false,
-  } as unknown as TSchema,
-};
-
-/** One plain line per email: what it is and what, if anything, it needs. Written by the engine's cheap model. */
-export const writeLines = async (
-  access: SorterAccess,
-  emails: LineRequest[],
-): Promise<{ lines: Map<number, string>; usd: number }> => {
-  const prompt = emails
-    .map((email) => `n: ${email.n}\nfrom: ${email.from}\nsubject: ${email.subject}\nexcerpt: ${email.excerpt || "(none)"}`)
-    .join("\n\n");
-  const output = await completeWithTool(access, {
-    purpose: "lines",
-    system: [
-      "For each email below write one plain line of at most 14 words for its recipient: what it is and what, if anything, they need to do and by when.",
-      "Don't repeat the sender's name or the subject. No quotes, no emoji.",
-      "Answer only by calling write_lines once with every email.",
-    ].join("\n"),
-    prompt,
-    tool: LINES_TOOL,
-    maxTokens: 1_200,
-  });
-  const lines = new Map<number, string>();
-  for (const entry of Array.isArray(output.args?.lines) ? output.args.lines : []) {
-    if (!entry || typeof entry !== "object") continue;
-    const n = Number((entry as Record<string, unknown>).n);
-    const line = String((entry as Record<string, unknown>).line ?? "").replace(/\s+/gu, " ").trim().slice(0, 160);
-    if (Number.isFinite(n) && line) lines.set(n, line);
-  }
-  return { lines, usd: output.usd };
-};
-
 const NOTE_TOOL: Tool = {
   name: "set_note",
   description: "The rewritten note.",
@@ -376,72 +324,6 @@ export const rewriteNote = async (
   return { note: next || null, usd: output.usd };
 };
 
-export type BriefEmail = {
-  n: number;
-  bucket: EmailBucket;
-  from: string;
-  subject: string;
-  threadId: string;
-  receivedAt: number;
-  line: string;
-  excerpt: string;
-};
-
-export type BriefOutput = {
-  lead: string;
-  sections: {
-    heading: string;
-    tone: "urgent" | "needs_you" | "fyi";
-    blocks: { emails: number[]; title: string; points: string[]; suggestion?: { label: string; ask: string } }[];
-  }[];
-  skipped?: string;
-};
-
-const BRIEF_TOOL: Tool = {
-  name: "write_briefing",
-  description: "The briefing.",
-  parameters: {
-    type: "object",
-    properties: {
-      lead: { type: "string" },
-      sections: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            heading: { type: "string" },
-            tone: { type: "string", enum: ["urgent", "needs_you", "fyi"] },
-            blocks: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  emails: { type: "array", items: { type: "number" } },
-                  title: { type: "string" },
-                  points: { type: "array", items: { type: "string" } },
-                  suggestion: {
-                    type: "object",
-                    properties: { label: { type: "string" }, ask: { type: "string" } },
-                    required: ["label", "ask"],
-                    additionalProperties: false,
-                  },
-                },
-                required: ["emails", "title", "points"],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ["heading", "tone", "blocks"],
-          additionalProperties: false,
-        },
-      },
-      skipped: { type: "string" },
-    },
-    required: ["lead", "sections"],
-    additionalProperties: false,
-  } as unknown as TSchema,
-};
-
 const BRIEF_BUCKET_WORDS: Record<EmailBucket, string> = {
   urgent: "urgent",
   needs_you: "needs them",
@@ -449,118 +331,8 @@ const BRIEF_BUCKET_WORDS: Record<EmailBucket, string> = {
   noise: "noise",
 };
 
-const TONE_RANK: Record<"urgent" | "needs_you" | "fyi", number> = { urgent: 0, needs_you: 1, fyi: 2 };
-
 const cleanText = (value: unknown, max: number): string =>
   typeof value === "string" ? value.replace(/\s+/gu, " ").trim().slice(0, max) : "";
-
-/**
- * A briefing on new email, written the way a good assistant answers: one lead
- * sentence on what matters most, then short sections of points, related emails
- * merged into one point, each with at most one suggested next step.
- */
-export const writeBrief = async (
-  access: SorterAccess,
-  emails: BriefEmail[],
-  skipped: { from: string; subject: string }[],
-  zone: string,
-): Promise<{ brief: BriefOutput | null; usd: number }> => {
-  const when = (at: number): string =>
-    new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(at);
-  const prompt = [
-    `Now: ${when(Date.now())} (${zone}).`,
-    "",
-    ...emails.map((email) =>
-      [
-        `n: ${email.n}`,
-        `sorted as: ${BRIEF_BUCKET_WORDS[email.bucket]}`,
-        `from: ${email.from}`,
-        `subject: ${email.subject}`,
-        `thread: ${email.threadId}`,
-        `received: ${when(email.receivedAt)}`,
-        email.line ? `gist: ${email.line}` : "",
-        `excerpt: ${email.excerpt || "(none)"}`,
-        "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    ),
-    skipped.length > 0
-      ? `Skipped as noise (${skipped.length}): ${skipped
-          .slice(0, 12)
-          .map((mail) => `${mail.from} — "${mail.subject}"`)
-          .join("; ")}`
-      : "Nothing was skipped.",
-  ].join("\n");
-  const output = await completeWithTool(access, {
-    purpose: "brief",
-    system: [
-      "You write a short briefing on someone's new email, addressed to them as \"you\", the way a sharp assistant would answer \"what came in?\".",
-      "lead: one or two sentences on what matters most and what, if anything, they must do and by when. Bold (**…**) the people, amounts and deadlines that matter. No greeting.",
-      "sections: group the emails into at most 3 sections in order of importance, each with a short heading of 1-3 words (\"Needs you\", \"Money\", \"Worth knowing\") and a tone: urgent if something can't wait, needs_you if they must reply, decide or act, fyi otherwise. Follow how each email was sorted unless the content clearly says otherwise. Every heading must be different; head an urgent section by what can't wait (\"Security\", \"Urgent\"), not \"Needs you\".",
-      "blocks: one per matter. Put emails of the same thread or the same matter in one block (list every n it covers). Every email n must be in exactly one block.",
-      "title: \"**Sender** · what it is about\", at most 8 words after the sender.",
-      "points: 1-3 bullets of at most 14 words each with the facts that matter (amounts, dates, asks). Don't repeat the title. Bold sparingly.",
-      "suggestion: only when there is an obvious next step Stella could do for them (reply, schedule, pay, file). label: 2-4 words starting with a verb (\"Reply approving\"). ask: the full instruction in their voice (\"Reply to Blue Metal approving the $4,800 quote\"). Leave it out for anything that needs nothing.",
-      "skipped: if anything was skipped, one line starting with how many, saying what kind of mail it was.",
-      "Plain words, no emoji, no quotes around titles. Answer only by calling write_briefing.",
-    ].join("\n"),
-    prompt,
-    tool: BRIEF_TOOL,
-    maxTokens: 2_400,
-  });
-  const raw = output.args;
-  if (!raw) return { brief: null, usd: output.usd };
-  const known = new Set(emails.map((email) => email.n));
-  const used = new Set<number>();
-  const sections: BriefOutput["sections"] = [];
-  for (const entry of Array.isArray(raw.sections) ? raw.sections.slice(0, 4) : []) {
-    if (!entry || typeof entry !== "object") continue;
-    const section = entry as Record<string, unknown>;
-    const tone = section.tone === "urgent" || section.tone === "needs_you" ? section.tone : "fyi";
-    const blocks: BriefOutput["sections"][number]["blocks"] = [];
-    for (const item of Array.isArray(section.blocks) ? section.blocks : []) {
-      if (!item || typeof item !== "object") continue;
-      const block = item as Record<string, unknown>;
-      const ns = (Array.isArray(block.emails) ? block.emails : [])
-        .map(Number)
-        .filter((n) => known.has(n) && !used.has(n));
-      const title = cleanText(block.title, 160);
-      if (ns.length === 0 || !title) continue;
-      ns.forEach((n) => used.add(n));
-      const points = (Array.isArray(block.points) ? block.points : []).map((point) => cleanText(point, 220)).filter(Boolean).slice(0, 3);
-      const suggestion = block.suggestion && typeof block.suggestion === "object" ? (block.suggestion as Record<string, unknown>) : null;
-      const label = cleanText(suggestion?.label, 40);
-      const ask = cleanText(suggestion?.ask, 300);
-      blocks.push({ emails: ns, title, points, ...(label && ask ? { suggestion: { label, ask } } : {}) });
-    }
-    const heading = cleanText(section.heading, 40);
-    if (blocks.length === 0 || !heading) continue;
-    // Two sections under one heading read as a mistake: fold them, keeping the stronger tone.
-    const same = sections.find((entry) => entry.heading.toLowerCase() === heading.toLowerCase());
-    if (same) {
-      same.blocks.push(...blocks);
-      if (TONE_RANK[tone] < TONE_RANK[same.tone]) same.tone = tone;
-    } else sections.push({ heading, tone, blocks });
-  }
-  const lead = cleanText(raw.lead, 500);
-  // Anything the model left out still gets a plain block, so no email goes missing.
-  const missed = emails.filter((email) => !used.has(email.n));
-  if (missed.length > 0) {
-    sections.push({
-      heading: "Also",
-      tone: "fyi",
-      blocks: missed.map((email) => ({
-        emails: [email.n],
-        title: `**${email.from.replace(/\s*<[^>]*>\s*$/u, "") || email.from}** · ${email.subject}`,
-        points: email.line ? [email.line] : [],
-      })),
-    });
-  }
-  if (!lead || sections.length === 0) return { brief: null, usd: output.usd };
-  const skippedLine = cleanText(raw.skipped, 200);
-  return { brief: { lead, sections, ...(skipped.length > 0 && skippedLine ? { skipped: skippedLine } : {}) }, usd: output.usd };
-};
 
 const QUERY_TOOL: Tool = {
   name: "gmail_query",
@@ -599,4 +371,237 @@ export const gmailQueryFor = async (
   const q = cleanText(output.args?.q, 300) || words.trim().slice(0, 300);
   const broader = cleanText(output.args?.broader, 300) || q;
   return { q, broader, usd: output.usd };
+};
+
+// Today ----------------------------------------------------------------------------
+
+export type MatterEmail = {
+  n: number;
+  bucket: EmailBucket;
+  from: string;
+  to: string;
+  subject: string;
+  threadId: string;
+  receivedAt: number;
+  excerpt: string;
+};
+
+export type MatterOutput = {
+  emails: number[];
+  tone: "urgent" | "needs_you" | "fyi";
+  headline: string;
+  wants: string;
+  points: string[];
+  reply?: { label: string; body: string };
+  action?: { label: string; ask: string };
+  /** Local time "YYYY-MM-DD HH:MM" in the owner's zone, as the model gave it. */
+  laterAt?: string;
+  laterWhy?: string;
+};
+
+const MATTERS_TOOL: Tool = {
+  name: "write_today",
+  description: "The items for the Today list.",
+  parameters: {
+    type: "object",
+    properties: {
+      lead: { type: "string" },
+      matters: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            emails: { type: "array", items: { type: "number" } },
+            tone: { type: "string", enum: ["urgent", "needs_you", "fyi"] },
+            headline: { type: "string" },
+            wants: { type: "string" },
+            points: { type: "array", items: { type: "string" } },
+            reply: {
+              type: "object",
+              properties: { label: { type: "string" }, body: { type: "string" } },
+              required: ["label", "body"],
+              additionalProperties: false,
+            },
+            action: {
+              type: "object",
+              properties: { label: { type: "string" }, ask: { type: "string" } },
+              required: ["label", "ask"],
+              additionalProperties: false,
+            },
+            later: {
+              type: "object",
+              properties: { at: { type: "string" }, why: { type: "string" } },
+              required: ["at", "why"],
+              additionalProperties: false,
+            },
+          },
+          required: ["emails", "tone", "headline", "wants", "points", "later"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["lead", "matters"],
+    additionalProperties: false,
+  } as unknown as TSchema,
+};
+
+const voiceBlock = (voice: string): string =>
+  voice.trim()
+    ? `How they write (a few of their own recent emails, for tone, length, greeting and sign-off only):\n${voice.trim()}`
+    : "No samples of their writing: write plainly, briefly and warmly, and sign off with nothing.";
+
+const REPLY_RULES =
+  "Write it as the user, in first person, in their voice (match the samples: greeting, length, sign-off). Short and ready to send. Never invent facts, prices, dates, commitments or attachments they didn't give; when the reply needs a choice only they can make, write the answer the email plainly expects (such as approving or confirming) only if nothing suggests otherwise, else a short reply saying they'll come back on it.";
+
+/**
+ * Turns new email into items for the Today list: each matter headlined by its
+ * outcome, one sentence on what it wants, a few facts, the next step prepared
+ * (a reply already written, or something Stella can do), and when Later
+ * should bring it back.
+ */
+export const writeMatters = async (
+  access: SorterAccess,
+  emails: MatterEmail[],
+  zone: string,
+  voice: string,
+): Promise<{ lead: string; matters: MatterOutput[]; usd: number }> => {
+  const when = (at: number): string =>
+    new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(at);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(Date.now());
+  const prompt = [
+    `Now: ${when(Date.now())}, today is ${today} (${zone}).`,
+    "",
+    voiceBlock(voice),
+    "",
+    ...emails.map((email) =>
+      [
+        `n: ${email.n}`,
+        `sorted as: ${BRIEF_BUCKET_WORDS[email.bucket]}`,
+        `from: ${email.from}`,
+        `to: ${email.to}`,
+        `subject: ${email.subject}`,
+        `thread: ${email.threadId}`,
+        `received: ${when(email.receivedAt)}`,
+        `text: ${email.excerpt || "(none)"}`,
+        "",
+      ].join("\n"),
+    ),
+  ].join("\n");
+  const output = await completeWithTool(access, {
+    purpose: "today",
+    system: [
+      "You prepare someone's new email for their Today list, a short list of what needs them, addressed to them as \"you\". Each item stays until they deal with it.",
+      "lead: one sentence on what came in that matters most. Bold (**…**) the key person, amount or deadline. No greeting.",
+      "matters: one per matter. Put emails of the same thread or the same matter in one (list every n it covers). Every email n must be in exactly one matter.",
+      "tone: urgent if it can't wait hours, needs_you if they must reply, decide, pay or act, fyi otherwise. Follow how each email was sorted unless the content clearly says otherwise.",
+      "headline: the outcome in at most 8 words, what needs to happen or what happened, naming the thing (\"BlueMetal renewal: sign off by Friday\", \"Lisbon flight moved to 9:40\"). Not just the sender, not the subject line. No bold.",
+      "wants: one sentence of at most 20 words naming who wants what from them and by when (\"Joyi needs a yes on the €600 deposit by Monday.\"). For fyi, what happened.",
+      "points: 0-2 bullets of at most 14 words with facts not already in the headline (amounts, dates, asks). Bold sparingly.",
+      `reply: only when the obvious next step is replying. body: the reply. ${REPLY_RULES} label: at most 7 words saying what tapping does, starting with \"Send reply\" (\"Send reply approving the quote\", \"Send reply confirming Thursday\").`,
+      "action: only when the next step is something else Stella can do for them (add to calendar, pay, file, track a delivery). label: at most 6 words saying what will happen (\"Add the flight to your calendar\"). ask: the full instruction in their voice. Never both reply and action; neither for fyi that needs nothing.",
+      "later: when to bring it back if they put it off. at: local time \"YYYY-MM-DD HH:MM\", a sensible moment before any deadline (morning of the day before it's due), else 09:00 tomorrow. why: at most 5 words (\"the day before it's due\").",
+      "Plain words, no emoji. Answer only by calling write_today.",
+    ].join("\n"),
+    prompt,
+    tool: MATTERS_TOOL,
+    maxTokens: 4_000,
+  });
+  const raw = output.args;
+  const known = new Set(emails.map((email) => email.n));
+  const used = new Set<number>();
+  const matters: MatterOutput[] = [];
+  for (const entry of Array.isArray(raw?.matters) ? raw.matters : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const matter = entry as Record<string, unknown>;
+    const ns = (Array.isArray(matter.emails) ? matter.emails : []).map(Number).filter((n) => known.has(n) && !used.has(n));
+    const headline = cleanText(matter.headline, 120).replace(/\*\*/gu, "");
+    if (ns.length === 0 || !headline) continue;
+    ns.forEach((n) => used.add(n));
+    const tone = matter.tone === "urgent" || matter.tone === "needs_you" ? matter.tone : "fyi";
+    const reply = matter.reply && typeof matter.reply === "object" ? (matter.reply as Record<string, unknown>) : null;
+    const action = matter.action && typeof matter.action === "object" ? (matter.action as Record<string, unknown>) : null;
+    const later = matter.later && typeof matter.later === "object" ? (matter.later as Record<string, unknown>) : null;
+    const replyLabel = cleanText(reply?.label, 60);
+    const replyBody = typeof reply?.body === "string" ? reply.body.trim().slice(0, 4_000) : "";
+    const actionLabel = cleanText(action?.label, 60);
+    const actionAsk = cleanText(action?.ask, 300);
+    matters.push({
+      emails: ns,
+      tone,
+      headline,
+      wants: cleanText(matter.wants, 220),
+      points: (Array.isArray(matter.points) ? matter.points : []).map((point) => cleanText(point, 220)).filter(Boolean).slice(0, 2),
+      ...(replyLabel && replyBody ? { reply: { label: replyLabel, body: replyBody } } : actionLabel && actionAsk ? { action: { label: actionLabel, ask: actionAsk } } : {}),
+      ...(later ? { laterAt: cleanText(later.at, 20), laterWhy: cleanText(later.why, 60) } : {}),
+    });
+  }
+  return { lead: cleanText(raw?.lead, 500), matters, usd: output.usd };
+};
+
+const LEAD_TOOL: Tool = {
+  name: "write_lead",
+  description: "The lead sentence.",
+  parameters: {
+    type: "object",
+    properties: { lead: { type: "string" } },
+    required: ["lead"],
+    additionalProperties: false,
+  } as unknown as TSchema,
+};
+
+/** One or two sentences over what is open now, so the top of Today always reads true. */
+export const writeTodayLead = async (
+  access: SorterAccess,
+  open: { tone: string; headline: string; wants: string }[],
+): Promise<{ lead: string; usd: number }> => {
+  const output = await completeWithTool(access, {
+    purpose: "lead",
+    system: [
+      "Someone's Today list of email items is below, most pressing first. Write the lead at its top: one or two short sentences, addressed to them as \"you\", on what matters most right now and what they must do by when. Mention at most three items; don't count them. Bold (**…**) the key people, amounts and deadlines. No greeting, no emoji.",
+      "Answer only by calling write_lead.",
+    ].join("\n"),
+    prompt: open.map((item, index) => `${index + 1}. [${item.tone}] ${item.headline} — ${item.wants}`).join("\n"),
+    tool: LEAD_TOOL,
+    maxTokens: 400,
+  });
+  return { lead: cleanText(output.args?.lead, 400), usd: output.usd };
+};
+
+const VOICE_TOOL: Tool = {
+  name: "write_reply",
+  description: "The reply.",
+  parameters: {
+    type: "object",
+    properties: { body: { type: "string" } },
+    required: ["body"],
+    additionalProperties: false,
+  } as unknown as TSchema,
+};
+
+/** What the user said out loud, written up as their reply to the email. Nothing is sent. */
+export const writeVoiceReply = async (
+  access: SorterAccess,
+  args: { words: string; from: string; subject: string; text: string; draft?: string; voice: string },
+): Promise<{ body: string; usd: number }> => {
+  const output = await completeWithTool(access, {
+    purpose: "voice-reply",
+    system: [
+      "The user spoke what they want to answer to an email. Write their reply from what they said.",
+      `${REPLY_RULES} Keep everything they said (names, numbers, times) exactly, drop filler and false starts, and add nothing they didn't say beyond a greeting and sign-off in their style. If they gave instructions about the current draft ("make it shorter", "say Thursday instead"), apply them to it.`,
+      "Answer only by calling write_reply with the reply text.",
+    ].join("\n"),
+    prompt: [
+      voiceBlock(args.voice),
+      "",
+      `The email, from ${args.from}, subject "${args.subject}":`,
+      args.text.slice(0, 3_000) || "(no text)",
+      "",
+      args.draft ? `Current draft:\n${args.draft.slice(0, 3_000)}\n` : "",
+      `What they said: ${args.words}`,
+    ].join("\n"),
+    tool: VOICE_TOOL,
+    maxTokens: 1_200,
+  });
+  const body = typeof output.args?.body === "string" ? output.args.body.trim().slice(0, 4_000) : "";
+  return { body, usd: output.usd };
 };

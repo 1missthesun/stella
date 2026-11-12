@@ -439,7 +439,9 @@ const sortOne = async (
 ): Promise<Sorted> => {
   const wrote = wroteTo(ctx.db, mail.fromAddress);
   const override = senderOverride(ctx.db, mail.fromAddress);
-  if (override === "noise") {
+  // Dismissals silence a sender outright only when the user never writes to them and no standing
+  // instruction could match; a person they correspond with is still read, with the note's lesson.
+  if (override === "noise" && wrote === 0 && rulesOf(ctx.db).length === 0) {
     return { verdict: { bucket: "noise", urgentP: 0, reason: "other", inputTokens: 0 }, sortedBy: "sender" };
   }
   const state = stateOf(ctx.db);
@@ -495,7 +497,7 @@ const sortOne = async (
     tokens: verdict.inputTokens,
     attachment: Boolean(attachment),
   });
-  if (override && override !== verdict.bucket && verdict.bucket !== "urgent") {
+  if (override && override !== verdict.bucket && verdict.bucket !== "urgent" && !(override === "noise" && wrote > 0)) {
     verdict = { ...verdict, bucket: override };
   }
   return { verdict, sortedBy: "model" };

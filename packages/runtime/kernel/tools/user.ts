@@ -45,6 +45,8 @@ export type SecureInputRequest = {
   detail?: string;
   fields: readonly UserAskField[];
   save?: SecureInputSaveRequest;
+  /** Only reuse a value saved on this computer: resolve null instead of showing a card. */
+  savedOnly?: true;
   urgency: UserAskUrgencyLevel;
   conversationId?: string;
   agentId?: string;
@@ -66,7 +68,7 @@ export type UserToolsConfig = {
   requestSecureInput?: (
     request: SecureInputRequest,
     signal?: AbortSignal,
-  ) => Promise<UserAskResolution>;
+  ) => Promise<UserAskResolution | null>;
   useSecureValue?: (
     request: SecureValueUseRequest,
   ) => Promise<SecureValueUseReceipt>;
@@ -255,6 +257,13 @@ const mergePresetFields = (
   return rows;
 };
 
+/**
+ * Internal argument: reuse a saved value if this computer has one, and
+ * otherwise return `{ outcome: "not_saved" }` without showing a card.
+ */
+export const SECURE_INPUT_SAVED_ONLY_ARG = "__savedOnly";
+const SECURE_INPUT_NOT_SAVED = { outcome: "not_saved" } as const;
+
 export const handleRequestSecureInput = async (
   config: UserToolsConfig,
   args: Record<string, unknown>,
@@ -288,6 +297,7 @@ export const handleRequestSecureInput = async (
         "replace_saved needs service (and account when you know it) so Stella knows which saved value to replace.",
     };
   }
+  const savedOnly = args[SECURE_INPUT_SAVED_ONLY_ARG] === true;
   try {
     const resolution = await config.requestSecureInput({
       purpose,
@@ -298,9 +308,13 @@ export const handleRequestSecureInput = async (
         ...(account ? { account } : {}),
         ...(replace ? { replace: true } : {}),
       },
+      ...(savedOnly ? { savedOnly: true as const } : {}),
       urgency: clampUrgency(args.urgency),
       ...contextFields(context, args),
     }, signal);
+    if (resolution === null) {
+      return { result: SECURE_INPUT_NOT_SAVED, details: SECURE_INPUT_NOT_SAVED };
+    }
     return userAskResolutionResult(resolution, [], purpose);
   } catch (error) {
     return { error: (error as Error).message || "Secure input failed." };

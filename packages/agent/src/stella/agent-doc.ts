@@ -9,6 +9,8 @@ export type StellaAgentRole = {
   startedBy?: { threadId: string; label: string };
   moving?: { deviceId: string; name: string; brief: string; key: string };
   notes?: StellaPendingNote[];
+  /** Stella last answered this agent's ask_user or request_secure_input, which then goes straight to the user. */
+  stellaReplied?: { tool: string; at: number };
 };
 
 export type StellaPendingNote = {

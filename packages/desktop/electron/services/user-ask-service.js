@@ -591,6 +591,9 @@ export class UserAskService {
                 }
             }
         }
+        if (request.savedOnly === true) {
+            return null;
+        }
         const label = save ? savedValueLabel(save.service, save.account) || request.purpose : "";
         return await this.open({
             request,

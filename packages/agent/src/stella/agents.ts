@@ -72,6 +72,7 @@ import {
   type StellaExecutionHost,
 } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
+import { stellaFirstWraps, type StellaFirstHost } from "./stella-first.ts";
 import {
   describePlacement,
   parseSpawnDestination,
@@ -1319,21 +1320,35 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  const messageStella = async (api: ToolExecutionApi, message: string, context: Context) => {
+  const stellaRoute = async (api: ToolExecutionApi, context: Context) => {
     const { self, root, top } = await chainOf(api, context);
-    if (self.agentType === "orchestrator" || !self.threadId) {
-      throw new Error(`"${STELLA_MESSAGE_TARGET}" is you. Message an agent by its thread_id.`);
-    }
-    assertMessageSize(message);
+    if (self.agentType === "orchestrator" || !self.threadId) return undefined;
     const state = root === undefined ? undefined : await api.snapshot(StellaAgentsDoc, root, context);
     const record = top.threadId ? state?.agents[top.threadId] : undefined;
     const reportsHere =
       record !== undefined &&
       !record.origin &&
       Object.values(state?.calls ?? {}).some((call) => call.threadId === top.threadId && call.reporter >= 0);
-    const from = senderOf(self, STELLA_MESSAGE_TARGET);
     const remote = root !== undefined && record !== undefined && !reportsHere && host.directory !== undefined;
-    if (root === undefined || (!reportsHere && !remote)) {
+    if (root === undefined || (!reportsHere && !remote)) return { self, remote };
+    return { self, root, remote, from: senderOf(self, STELLA_MESSAGE_TARGET) };
+  };
+
+  const tellStella: StellaFirstHost["tellStella"] = async (api, key, message, context) => {
+    const route = await stellaRoute(api, context);
+    if (!route?.root) return false;
+    const note = { callId: api.callId, key, message, from: route.from, ...(route.remote ? { remote: true as const } : {}) };
+    return Boolean(await deliverNote(route.root, note, context, (id) => api.conversation(id, context)));
+  };
+
+  const messageStella = async (api: ToolExecutionApi, message: string, context: Context) => {
+    const route = await stellaRoute(api, context);
+    if (!route) {
+      throw new Error(`"${STELLA_MESSAGE_TARGET}" is you. Message an agent by its thread_id.`);
+    }
+    assertMessageSize(message);
+    const { self, root, remote, from } = route;
+    if (root === undefined || from === undefined) {
       throw new Error(
         "The Stella you work for runs on another host, which send_message cannot reach from here. Put what it needs in your final report.",
       );
@@ -2646,6 +2661,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     name: STELLA_AGENTS_EXTENSION,
     tasks: [Anchor, Reporter],
     hooks: [notesHook],
+    wraps: stellaFirstWraps({ tellStella }),
     tools: [
       spawnAgent,
       sendMessage,

@@ -501,6 +501,9 @@ const usageOf = (now: number, state: StateRow | null, plan: string, zone: string
   };
 };
 
+/** The month's (or day's) cap is reached: no model call is made for this owner's email until it resets. */
+const overCap = (ctx: OwnerContext, plan: string, zone: string): boolean => usageOf(ctx.now, stateOf(ctx.db), plan, zone).capped;
+
 const recordSort = (ctx: OwnerContext, zone: string, tokens: number): void => {
   const { month, day } = localParts(ctx.now, zone);
   ctx.db.run(
@@ -780,7 +783,9 @@ const surfaceNow = async (
   rule: RuleRow | null,
 ): Promise<void> => {
   if (!snapshot.writable) return;
-  const out = await writeMatters(accessOf(ctx, snapshot), matterEmails([row]), zone, await voiceOf(ctx))
+  const out = overCap(ctx, snapshot.plan, zone)
+    ? null
+    : await writeMatters(accessOf(ctx, snapshot), matterEmails([row]), zone, await voiceOf(ctx))
     .then((result) => {
       recordLineCost(ctx, zone, result.usd);
       return result;
@@ -1252,6 +1257,7 @@ const runNote = async (ctx: OwnerContext): Promise<void> => {
       now: row.now as EmailBucket | "dismissed",
     }));
   const snapshot = await ctx.host.snapshot();
+  if (overCap(ctx, snapshot.plan, zoneOf(ctx, snapshot))) return;
   const rewritten = await rewriteNote(
     {
       env: ctx.env,
@@ -1673,8 +1679,9 @@ const fold = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, fo
   ctx.db.run("UPDATE email_state SET last_fold_at = ? WHERE id = 1", ctx.now);
   const rows = await dropHandled(ctx, waiting);
   if (rows.length === 0) return;
-  const voice = await voiceOf(ctx);
-  const out = await writeMatters(accessOf(ctx, snapshot), matterEmails(rows), zone, voice)
+  const out = overCap(ctx, snapshot.plan, zone)
+    ? null
+    : await writeMatters(accessOf(ctx, snapshot), matterEmails(rows), zone, await voiceOf(ctx))
     .then((result) => {
       recordLineCost(ctx, zone, result.usd);
       return result;
@@ -1792,6 +1799,10 @@ const runLead = async (ctx: OwnerContext): Promise<void> => {
   const state = stateOf(ctx.db);
   if (state?.today_lead && jsonList(state.lead_ids).sort().join(",") === ids.join(",")) return;
   const snapshot = await ctx.host.snapshot();
+  if (overCap(ctx, snapshot.plan, zoneOf(ctx, snapshot))) {
+    ctx.db.run("UPDATE email_state SET today_lead = NULL, lead_ids = ? WHERE id = 1", JSON.stringify(ids));
+    return;
+  }
   const { lead, usd } = await writeTodayLead(
     accessOf(ctx, snapshot),
     open.slice(0, 12).map((row) => ({ tone: row.tone, headline: row.headline, wants: row.wants })),
@@ -1904,6 +1915,9 @@ const voiceReply = async (ctx: OwnerContext, args: EmailCalls["email.voiceReply"
   const mail = await gmailReadMail(await account.get(), row.message_id).catch(() => null);
   const snapshot = await ctx.host.snapshot();
   const zone = zoneOf(ctx, snapshot);
+  if (overCap(ctx, snapshot.plan, zone)) {
+    throw new RpcError("RATE_LIMITED", "Email's monthly limit is reached, so Stella can't write replies until it resets. You can still type one.");
+  }
   const { body, usd } = await writeVoiceReply(accessOf(ctx, snapshot), {
     words: args.words,
     from: `${row.from_name} <${row.from_address}>`,
@@ -2575,7 +2589,9 @@ const searchMail = async (ctx: OwnerContext, words: string): Promise<EmailSearch
   const snapshot = await ctx.host.snapshot();
   const zone = zoneOf(ctx, snapshot);
   ensureState(ctx);
-  const queries = await gmailQueryFor(
+  const queries = overCap(ctx, snapshot.plan, zone)
+    ? { q: words.trim(), broader: words.trim() }
+    : await gmailQueryFor(
     {
       env: ctx.env,
       ownerId: ctx.ownerId,

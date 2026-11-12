@@ -132,7 +132,7 @@ export const buildBuiltinTools = (
   tools.push(
     ...createScheduleManageTools({ scheduleApi: options.scheduleApi }),
   );
-  // Email is off in released builds (see email-feature.ts); a dev runtime turns it on with STELLA_EMAIL_FEATURE=1.
+  // Email is on unless EMAIL_FEATURE_ENABLED is false (see email-feature.ts); then STELLA_EMAIL_FEATURE=1 turns it on.
   if (EMAIL_FEATURE_ENABLED || process.env.STELLA_EMAIL_FEATURE === "1") {
     tools.push(
       createEmailTool({

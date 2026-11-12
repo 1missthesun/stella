@@ -1386,42 +1386,13 @@ export const runGoogleAction = async (
   return await spec.run({ get: typeof access === "string" ? fetcherFor(access) : access, input });
 };
 
-// Email digest -------------------------------------------------------------
+// Email sorting -----------------------------------------------------------
 
-/** The digest's Gmail page, fetched directly from Gmail. */
-export const fetchGmailPageDirect = async (
-  accessToken: string,
-  query: string,
-  maxResults: number,
-  pageToken?: string,
-): Promise<{ messages: JsonObject[]; nextPageToken?: string }> => {
-  const get = fetcherFor(accessToken);
-  const list = (await get(
-    `${GMAIL}/messages${qs({ q: query, maxResults, pageToken })}`,
-  )) as JsonObject;
-  const ids = Array.isArray(list.messages) ? list.messages : [];
-  const messages = await Promise.all(
-    ids.map(async (entry) => {
-      const message = (await get(
-        `${GMAIL}/messages/${enc(String((entry as JsonObject).id))}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
-      )) as JsonObject;
-      const headers = isRecord(message.payload) ? message.payload.headers : undefined;
-      return {
-        id: message.id,
-        threadId: message.threadId,
-        from: headerOf(headers, "From") ?? "",
-        subject: headerOf(headers, "Subject") ?? "",
-        snippet: typeof message.snippet === "string" ? message.snippet : "",
-        internalDate: message.internalDate,
-        labelIds: message.labelIds,
-      };
-    }),
-  );
-  return {
-    messages,
-    ...(typeof list.nextPageToken === "string" ? { nextPageToken: list.nextPageToken } : {}),
-  };
-};
+/** Gmail calls for Stella's email sorting, made with one account's access token. */
+export const gmailFetcher = (accessToken: string): Fetcher => fetcherFor(accessToken);
+export const GMAIL_API = GMAIL;
+export const gmailHeader = headerOf;
+export const gmailMessageText = (payload: unknown): { text: string; attachments: JsonObject[] } => messageBody(payload);
 
 // Callback page ------------------------------------------------------------
 

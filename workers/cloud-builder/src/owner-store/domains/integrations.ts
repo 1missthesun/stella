@@ -56,7 +56,6 @@ import {
   xClient,
   type XTokenResponse,
 } from "../../integrations/x.js";
-import { GMAIL_INTEGRATION_ID } from "../../integrations/gmail-digest.js";
 import {
   GOOGLE_SERVICES,
   googleAction,
@@ -93,7 +92,6 @@ import {
 } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
-import { startEmailDigest } from "./email-digest.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
 
 const CONNECT_REQUEST_TTL_MS = 5 * 60_000;
@@ -1261,7 +1259,6 @@ export const integrationsDomain = {
           await requireIntegration(ctx.env, args.id);
         }
         const state = await connectionState(ctx, args.id, { force: true });
-        if (state.connected && args.id === GMAIL_INTEGRATION_ID) startEmailDigest(ctx);
         return state;
       },
     },

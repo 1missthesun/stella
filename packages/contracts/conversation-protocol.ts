@@ -23,6 +23,7 @@ import {
   SCHEDULE_NOTICE_CARD_TYPE,
   type ScheduleNoticeCard,
 } from "./schedule-notice.js";
+import { EMAIL_CARD_TYPE, parseEmailCard, type EmailCard } from "./email-card.js";
 import {
   parseAgentActivityEntry,
   type AgentActivityEntry,
@@ -106,7 +107,8 @@ export type JournalCard =
   | { type: "files"; files: JournalFile[] }
   | ClaudeUsageLimitCard
   | ReminderCard
-  | ScheduleNoticeCard;
+  | ScheduleNoticeCard
+  | EmailCard;
 
 type JournalRecordBase = {
   seq: number;
@@ -327,6 +329,7 @@ const decodeCard = (value: unknown): JournalCard | null => {
   if (type === SAFEGUARD_CARD_TYPE) return parseSafeguardCard(raw);
   if (type === REMINDER_CARD_TYPE) return parseReminderCard(raw);
   if (type === SCHEDULE_NOTICE_CARD_TYPE) return parseScheduleNoticeCard(raw);
+  if (type === EMAIL_CARD_TYPE) return parseEmailCard(raw);
   if (type === "build") {
     const buildId = str(raw.buildId);
     if (!buildId) return null;

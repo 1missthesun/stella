@@ -81,6 +81,7 @@ export type ConversationCard =
   | import("@stella/contracts/claude-usage-limit").ClaudeUsageLimitCard
   | import("@stella/contracts/reminders").ReminderCard
   | import("@stella/contracts/schedule-notice").ScheduleNoticeCard
+  | import("@stella/contracts/email-card").EmailCard
   | { type: "build"; buildId: string; appId?: string }
   | { type: "operation"; operation: string; args?: unknown; result?: unknown }
   | {

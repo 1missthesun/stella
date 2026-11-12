@@ -3149,31 +3149,6 @@
         "one": "Visa {count} fil",
         "other": "Visa {count} filer"
       }
-    },
-    "emailDigest": {
-      "title": "E-post",
-      "connectTitle": "Mejlen som spelar roll",
-      "connectBody": "Anslut Gmail så kollar Stella din inkorg under dagen och skriver en kort sammanfattning av bara de viktiga nya mejlen.",
-      "connect": "Anslut Gmail",
-      "connecting": "Väntar på Google…",
-      "connectError": "Gmail anslöts inte. Försök igen.",
-      "checkNow": "Kolla nu",
-      "checking": "Kollar inkorgen…",
-      "checked": "Kollad {when}",
-      "firstDigest": "Din första sammanfattning är på väg",
-      "nothingNew": "Inget nytt",
-      "error": "Kunde inte kolla inkorgen. Stella försöker igen snart.",
-      "justNow": "Precis nu",
-      "loadErrorTitle": "Kunde inte läsa in sammanfattningen",
-      "loadErrorBody": "Stella når inte sina servrar just nu. Kontrollera anslutningen och försök igen.",
-      "retry": "Försök igen",
-      "nothingNewSince": "Inget nytt sedan {time}",
-      "minutesAgo": "för {count} min sedan",
-      "hoursAgo": "för {count} tim sedan",
-      "daysAgo": "för {count} d sedan",
-      "claudeLimit": "Din användningsgräns för Claude är nådd, så Stellas modell kontrollerade den här gången.",
-      "claudeLimitUntil": "Din användningsgräns för Claude är nådd till {time}, så Stellas modell kontrollerade den här gången.",
-      "claudeFailed": "Claude Code kunde inte köra den här kontrollen, så Stellas modell gjorde det."
     }
   },
   "sidebar": {
@@ -3500,5 +3475,75 @@
     "signedInContinuing": "Inloggad på Claude. Stella svarar nu.",
     "signedInAsResend": "Inloggad på Claude som {email}. Skicka ditt meddelande igen för att fortsätta.",
     "signedInResend": "Inloggad på Claude. Skicka ditt meddelande igen för att fortsätta."
+  },
+  "email": {
+    "title": "E-post",
+    "notUrgent": "Inte brådskande",
+    "notImportant": "Inte viktigt",
+    "failed": "Kunde inte uppdatera. Försök igen.",
+    "card": {
+      "movedToSummary": "Flyttat till nästa sammanfattning",
+      "wontShow": "Visar inte sådana igen",
+      "showAll": "Visa alla {count}",
+      "showLess": "Visa färre",
+      "needYou": {
+        "one": "{count} behöver dig",
+        "other": "{count} behöver dig"
+      },
+      "worthKnowing": {
+        "one": "{count} bra att veta",
+        "other": "{count} bra att veta"
+      },
+      "skipped": {
+        "one": "{count} hoppades över",
+        "other": "{count} hoppades över"
+      }
+    },
+    "section": {
+      "connectTitle": "E-posten som spelar roll",
+      "connectBody": "Anslut Gmail så sorterar Stella ny e-post när den kommer. Brådskande når dig direkt; resten kommer som en kort sammanfattning i chatten.",
+      "connect": "Anslut Gmail",
+      "connecting": "Väntar på Google…",
+      "connectError": "Gmail anslöts inte. Försök igen.",
+      "reconnectTitle": "Anslut Gmail igen",
+      "reconnectBody": "Gmail behöver anslutas igen via Stella innan Stella kan sortera din e-post.",
+      "reconnect": "Anslut Gmail igen",
+      "loadErrorTitle": "Kunde inte läsa in din e-post",
+      "loadErrorBody": "Stella når inte sina servrar just nu. Kontrollera anslutningen och försök igen.",
+      "offTitle": "Sortera din e-post",
+      "offBody": "Stella sorterar ny e-post när den kommer. Brådskande når dig direkt; resten kommer som en kort sammanfattning i chatten. Brus hålls borta.",
+      "turnOn": "Slå på",
+      "turningOn": "Sorterar din senaste e-post…",
+      "empty": "Inget än. Ny e-post visas här när Stella har sorterat den.",
+      "needsYou": "Behöver dig",
+      "worthKnowing": "Bra att veta",
+      "urgent": "Brådskande",
+      "actions": "E-poståtgärder",
+      "openInGmail": "Öppna i Gmail",
+      "moveToNeedsYou": "Flytta till Behöver dig",
+      "moveToWorthKnowing": "Flytta till Bra att veta",
+      "skippedThisWeek": {
+        "one": "{count} hoppades över i veckan",
+        "other": "{count} hoppades över i veckan"
+      },
+      "noteTitle": "Det som är viktigt för dig",
+      "notePlaceholder": "Stella lär sig av det du avfärdar. Lägg till sådant hon bör veta, t.ex. \"allt från mitt barns skola är viktigt; nyhetsbrev inte\".",
+      "saved": "Sparat",
+      "rulesTitle": "Stående instruktioner",
+      "rulesHint": "Säg det till Stella i chatten, t.ex. \"säg till direkt när min hyresvärd mejlar\" eller \"när en faktura kommer, spara den i Drive\".",
+      "ruleTell": "Säger till direkt",
+      "ruleAct": "Stella tar hand om det",
+      "remove": "Ta bort",
+      "accountsTitle": "Konton",
+      "live": "Live",
+      "polled": "Kontrolleras med några minuters mellanrum",
+      "accountError": "Kunde inte kontrollera kontot",
+      "usage": "Den här månaden: {sorted} sorterade · {cost}",
+      "capped": "Sorteringen är pausad till nästa månad",
+      "checkNow": "Kontrollera nu",
+      "checking": "Kontrollerar…",
+      "turnOff": "Stäng av",
+      "turnOffConfirm": "Att stänga av stoppar sorteringen och raderar den sorterade listan."
+    }
   }
 }

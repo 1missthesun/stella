@@ -3217,31 +3217,6 @@
         "two": "اعرض {count} ملفين",
         "zero": "اعرض {count} ملف"
       }
-    },
-    "emailDigest": {
-      "title": "البريد",
-      "connectTitle": "البريد الذي يهمّك",
-      "connectBody": "اربط Gmail وستفحص Stella بريدك على مدار اليوم، ثم تكتب ملخصًا قصيرًا للرسائل الجديدة المهمة فقط.",
-      "connect": "ربط Gmail",
-      "connecting": "بانتظار Google…",
-      "connectError": "لم يتم ربط Gmail. حاول مرة أخرى.",
-      "checkNow": "افحص الآن",
-      "checking": "جارٍ فحص بريدك…",
-      "checked": "تم الفحص {when}",
-      "firstDigest": "ملخصك الأول في الطريق",
-      "nothingNew": "لا جديد",
-      "error": "تعذّر فحص بريدك. ستحاول Stella مرة أخرى قريبًا.",
-      "justNow": "الآن",
-      "loadErrorTitle": "تعذّر تحميل ملخصك",
-      "loadErrorBody": "لا تستطيع Stella الوصول إلى خوادمها الآن. تحقّق من اتصالك وحاول مرة أخرى.",
-      "retry": "حاول مرة أخرى",
-      "nothingNewSince": "لا جديد منذ {time}",
-      "minutesAgo": "قبل {count} د",
-      "hoursAgo": "قبل {count} س",
-      "daysAgo": "قبل {count} ي",
-      "claudeLimit": "وصلت إلى حد استخدام Claude، لذا تحقق نموذج Stella هذه المرة.",
-      "claudeLimitUntil": "وصلت إلى حد استخدام Claude حتى {time}، لذا تحقق نموذج Stella هذه المرة.",
-      "claudeFailed": "تعذّر على Claude Code إجراء هذا الفحص، لذا أجراه نموذج Stella."
     }
   },
   "sidebar": {
@@ -3580,5 +3555,91 @@
     "signedInContinuing": "تم تسجيل الدخول إلى Claude. يجيب Stella الآن.",
     "signedInAsResend": "تم تسجيل الدخول إلى Claude باسم {email}. أرسل رسالتك مرة أخرى للمتابعة.",
     "signedInResend": "تم تسجيل الدخول إلى Claude. أرسل رسالتك مرة أخرى للمتابعة."
+  },
+  "email": {
+    "title": "البريد",
+    "notUrgent": "ليس عاجلًا",
+    "notImportant": "ليس مهمًا",
+    "failed": "تعذّر التحديث. حاول مرة أخرى.",
+    "card": {
+      "movedToSummary": "نُقل إلى ملخصك التالي",
+      "wontShow": "لن أعرض مثل هذه بعد الآن",
+      "showAll": "عرض الكل ({count})",
+      "showLess": "عرض أقل",
+      "needYou": {
+        "few": "تحتاجك: {count}",
+        "many": "تحتاجك: {count}",
+        "one": "تحتاجك: {count}",
+        "other": "تحتاجك: {count}",
+        "two": "تحتاجك: {count}",
+        "zero": "تحتاجك: {count}"
+      },
+      "worthKnowing": {
+        "few": "من المفيد معرفته: {count}",
+        "many": "من المفيد معرفته: {count}",
+        "one": "من المفيد معرفته: {count}",
+        "other": "من المفيد معرفته: {count}",
+        "two": "من المفيد معرفته: {count}",
+        "zero": "من المفيد معرفته: {count}"
+      },
+      "skipped": {
+        "few": "تم تخطيه: {count}",
+        "many": "تم تخطيه: {count}",
+        "one": "تم تخطيه: {count}",
+        "other": "تم تخطيه: {count}",
+        "two": "تم تخطيه: {count}",
+        "zero": "تم تخطيه: {count}"
+      }
+    },
+    "section": {
+      "connectTitle": "البريد المهم",
+      "connectBody": "صِل Gmail وستفرز Stella البريد الجديد فور وصوله. يصلك العاجل فورًا، ويأتي الباقي في ملخص قصير في المحادثة.",
+      "connect": "ربط Gmail",
+      "connecting": "بانتظار Google…",
+      "connectError": "لم يتم ربط Gmail. حاول مرة أخرى.",
+      "reconnectTitle": "إعادة ربط Gmail",
+      "reconnectBody": "يجب إعادة ربط Gmail عبر Stella لكي تتمكن Stella من فرز بريدك.",
+      "reconnect": "إعادة ربط Gmail",
+      "loadErrorTitle": "تعذّر تحميل بريدك",
+      "loadErrorBody": "لا تستطيع Stella الوصول إلى خوادمها الآن. تحقّق من اتصالك وحاول مرة أخرى.",
+      "offTitle": "افرز بريدك",
+      "offBody": "تفرز Stella البريد الجديد فور وصوله. يصلك العاجل فورًا، ويأتي الباقي في ملخص قصير في المحادثة. ويبقى غير المهم بعيدًا.",
+      "turnOn": "تشغيل",
+      "turningOn": "جارٍ فرز بريدك الأخير…",
+      "empty": "لا شيء بعد. يظهر البريد الجديد هنا بعد أن تفرزه Stella.",
+      "needsYou": "يحتاجك",
+      "worthKnowing": "من المفيد معرفته",
+      "urgent": "عاجل",
+      "actions": "إجراءات البريد",
+      "openInGmail": "فتح في Gmail",
+      "moveToNeedsYou": "نقل إلى يحتاجك",
+      "moveToWorthKnowing": "نقل إلى من المفيد معرفته",
+      "skippedThisWeek": {
+        "few": "تم تخطيه هذا الأسبوع: {count}",
+        "many": "تم تخطيه هذا الأسبوع: {count}",
+        "one": "تم تخطيه هذا الأسبوع: {count}",
+        "other": "تم تخطيه هذا الأسبوع: {count}",
+        "two": "تم تخطيه هذا الأسبوع: {count}",
+        "zero": "تم تخطيه هذا الأسبوع: {count}"
+      },
+      "noteTitle": "ما يهمك",
+      "notePlaceholder": "تتعلم Stella مما تتجاهله. أضف ما يجب أن تعرفه، مثل \"كل ما يأتي من مدرسة طفلي مهم، والنشرات البريدية ليست كذلك\".",
+      "saved": "تم الحفظ",
+      "rulesTitle": "تعليمات دائمة",
+      "rulesHint": "أخبر Stella في المحادثة، مثل \"أخبرني فورًا عندما يراسلني المالك\" أو \"عندما تصل فاتورة، احفظها في Drive\".",
+      "ruleTell": "تخبرك فورًا",
+      "ruleAct": "تتولى Stella الأمر",
+      "remove": "إزالة",
+      "accountsTitle": "الحسابات",
+      "live": "مباشر",
+      "polled": "يُفحص كل بضع دقائق",
+      "accountError": "تعذّر فحص هذا الحساب",
+      "usage": "هذا الشهر: {sorted} مفرز · {cost}",
+      "capped": "الفرز متوقف حتى الشهر القادم",
+      "checkNow": "افحص الآن",
+      "checking": "جارٍ الفحص…",
+      "turnOff": "إيقاف",
+      "turnOffConfirm": "يؤدي الإيقاف إلى إنهاء الفرز وحذف القائمة المفروزة."
+    }
   }
 }

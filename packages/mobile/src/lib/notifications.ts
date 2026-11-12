@@ -31,6 +31,7 @@ import {
 } from "./user-asks";
 import { i18nFallback } from "../i18n";
 import { requestMainChat } from "./main-chat-request";
+import { EMAIL_PUSH_KIND } from "@stella/contracts/backend/email";
 import { userAskTitleOf } from "@stella/contracts/user-ask";
 import {
   askPushCapabilities,
@@ -389,6 +390,10 @@ const handleNotificationResponse = (
       void handleReminderActionResponse(response).catch(() => undefined);
       return;
     }
+    requestMainChat();
+    return;
+  }
+  if ((response.notification.request.content.data as { kind?: unknown } | null)?.kind === EMAIL_PUSH_KIND) {
     requestMainChat();
     return;
   }

@@ -3149,31 +3149,6 @@
         "one": "Vis {count} fil",
         "other": "Vis {count} filer"
       }
-    },
-    "emailDigest": {
-      "title": "E-post",
-      "connectTitle": "E-posten som betyr noe",
-      "connectBody": "Koble til Gmail, så sjekker Stella innboksen din gjennom dagen og skriver en kort oversikt over bare den viktige nye e-posten.",
-      "connect": "Koble til Gmail",
-      "connecting": "Venter på Google…",
-      "connectError": "Gmail ble ikke koblet til. Prøv igjen.",
-      "checkNow": "Sjekk nå",
-      "checking": "Sjekker innboksen…",
-      "checked": "Sjekket {when}",
-      "firstDigest": "Den første oversikten din er på vei",
-      "nothingNew": "Ingenting nytt",
-      "error": "Kunne ikke sjekke innboksen. Stella prøver igjen snart.",
-      "justNow": "Akkurat nå",
-      "loadErrorTitle": "Kunne ikke laste oversikten",
-      "loadErrorBody": "Stella når ikke serverne sine akkurat nå. Sjekk tilkoblingen og prøv igjen.",
-      "retry": "Prøv igjen",
-      "nothingNewSince": "Ingenting nytt siden {time}",
-      "minutesAgo": "for {count} min siden",
-      "hoursAgo": "for {count} t siden",
-      "daysAgo": "for {count} d siden",
-      "claudeLimit": "Du har nådd bruksgrensen for Claude, så Stellas modell sjekket denne gangen.",
-      "claudeLimitUntil": "Du har nådd bruksgrensen for Claude til {time}, så Stellas modell sjekket denne gangen.",
-      "claudeFailed": "Claude Code kunne ikke kjøre denne sjekken, så Stellas modell gjorde det."
     }
   },
   "sidebar": {
@@ -3500,5 +3475,75 @@
     "signedInContinuing": "Logget på Claude. Stella svarer nå.",
     "signedInAsResend": "Logget på Claude som {email}. Send meldingen på nytt for å fortsette.",
     "signedInResend": "Logget på Claude. Send meldingen på nytt for å fortsette."
+  },
+  "email": {
+    "title": "E-post",
+    "notUrgent": "Ikke haster",
+    "notImportant": "Ikke viktig",
+    "failed": "Kunne ikke oppdatere. Prøv igjen.",
+    "card": {
+      "movedToSummary": "Flyttet til neste oppsummering",
+      "wontShow": "Viser ikke slike igjen",
+      "showAll": "Vis alle {count}",
+      "showLess": "Vis færre",
+      "needYou": {
+        "one": "{count} trenger deg",
+        "other": "{count} trenger deg"
+      },
+      "worthKnowing": {
+        "one": "{count} greit å vite",
+        "other": "{count} greit å vite"
+      },
+      "skipped": {
+        "one": "{count} hoppet over",
+        "other": "{count} hoppet over"
+      }
+    },
+    "section": {
+      "connectTitle": "E-posten som betyr noe",
+      "connectBody": "Koble til Gmail, så sorterer Stella ny e-post når den kommer. Det som haster, når deg med en gang; resten kommer som en kort oppsummering i chatten.",
+      "connect": "Koble til Gmail",
+      "connecting": "Venter på Google…",
+      "connectError": "Gmail ble ikke koblet til. Prøv igjen.",
+      "reconnectTitle": "Koble til Gmail på nytt",
+      "reconnectBody": "Gmail må kobles til på nytt via Stella før Stella kan sortere e-posten din.",
+      "reconnect": "Koble til Gmail på nytt",
+      "loadErrorTitle": "Kunne ikke laste inn e-posten",
+      "loadErrorBody": "Stella når ikke serverne sine akkurat nå. Sjekk tilkoblingen og prøv igjen.",
+      "offTitle": "Sorter e-posten din",
+      "offBody": "Stella sorterer ny e-post når den kommer. Det som haster, når deg med en gang; resten kommer som en kort oppsummering i chatten. Støy holdes ute.",
+      "turnOn": "Slå på",
+      "turningOn": "Sorterer den nyeste e-posten…",
+      "empty": "Ingenting ennå. Ny e-post dukker opp her når Stella har sortert den.",
+      "needsYou": "Trenger deg",
+      "worthKnowing": "Greit å vite",
+      "urgent": "Haster",
+      "actions": "E-posthandlinger",
+      "openInGmail": "Åpne i Gmail",
+      "moveToNeedsYou": "Flytt til Trenger deg",
+      "moveToWorthKnowing": "Flytt til Greit å vite",
+      "skippedThisWeek": {
+        "one": "{count} hoppet over denne uken",
+        "other": "{count} hoppet over denne uken"
+      },
+      "noteTitle": "Det som betyr noe for deg",
+      "notePlaceholder": "Stella lærer av det du avviser. Legg til det hun bør vite, for eksempel \"alt fra skolen til barnet mitt er viktig; nyhetsbrev er det ikke\".",
+      "saved": "Lagret",
+      "rulesTitle": "Faste instrukser",
+      "rulesHint": "Si det til Stella i chatten, f.eks. \"si fra med en gang når huseieren min sender e-post\" eller \"når en faktura kommer, legg den i Drive\".",
+      "ruleTell": "Sier fra med en gang",
+      "ruleAct": "Stella tar seg av det",
+      "remove": "Fjern",
+      "accountsTitle": "Kontoer",
+      "live": "Live",
+      "polled": "Sjekkes med noen minutters mellomrom",
+      "accountError": "Kunne ikke sjekke denne kontoen",
+      "usage": "Denne måneden: {sorted} sortert · {cost}",
+      "capped": "Sorteringen er satt på pause til neste måned",
+      "checkNow": "Sjekk nå",
+      "checking": "Sjekker…",
+      "turnOff": "Slå av",
+      "turnOffConfirm": "Å slå av stopper sorteringen og sletter den sorterte listen."
+    }
   }
 }

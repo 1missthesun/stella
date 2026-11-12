@@ -3149,31 +3149,6 @@
         "one": "{count} Datei ansehen",
         "other": "{count} Dateien ansehen"
       }
-    },
-    "emailDigest": {
-      "title": "E-Mail",
-      "connectTitle": "Die E-Mails, die zählen",
-      "connectBody": "Verbinde Gmail, und Stella prüft deinen Posteingang über den Tag und schreibt eine kurze Übersicht nur der wichtigen neuen Mails.",
-      "connect": "Gmail verbinden",
-      "connecting": "Warte auf Google…",
-      "connectError": "Gmail wurde nicht verbunden. Versuch es noch einmal.",
-      "checkNow": "Jetzt prüfen",
-      "checking": "Posteingang wird geprüft…",
-      "checked": "Geprüft {when}",
-      "firstDigest": "Deine erste Übersicht ist unterwegs",
-      "nothingNew": "Nichts Neues",
-      "error": "Posteingang konnte nicht geprüft werden. Stella versucht es bald erneut.",
-      "justNow": "Gerade eben",
-      "loadErrorTitle": "Übersicht konnte nicht geladen werden",
-      "loadErrorBody": "Stella erreicht ihre Server gerade nicht. Prüf deine Verbindung und versuch es noch einmal.",
-      "retry": "Erneut versuchen",
-      "nothingNewSince": "Nichts Neues seit {time}",
-      "minutesAgo": "vor {count} Min.",
-      "hoursAgo": "vor {count} Std.",
-      "daysAgo": "vor {count} T.",
-      "claudeLimit": "Dein Claude-Nutzungslimit ist erreicht, daher hat diesmal Stellas Modell geprüft.",
-      "claudeLimitUntil": "Dein Claude-Nutzungslimit ist bis {time} erreicht, daher hat diesmal Stellas Modell geprüft.",
-      "claudeFailed": "Claude Code konnte diese Prüfung nicht ausführen, daher hat Stellas Modell sie übernommen."
     }
   },
   "sidebar": {
@@ -3500,5 +3475,75 @@
     "signedInContinuing": "Bei Claude angemeldet. Stella antwortet jetzt.",
     "signedInAsResend": "Bei Claude als {email} angemeldet. Sende deine Nachricht erneut, um fortzufahren.",
     "signedInResend": "Bei Claude angemeldet. Sende deine Nachricht erneut, um fortzufahren."
+  },
+  "email": {
+    "title": "E-Mail",
+    "notUrgent": "Nicht dringend",
+    "notImportant": "Nicht wichtig",
+    "failed": "Konnte nicht aktualisiert werden. Versuch es noch einmal.",
+    "card": {
+      "movedToSummary": "In deine nächste Zusammenfassung verschoben",
+      "wontShow": "Solche zeige ich nicht mehr",
+      "showAll": "Alle {count} anzeigen",
+      "showLess": "Weniger anzeigen",
+      "needYou": {
+        "one": "{count} braucht dich",
+        "other": "{count} brauchen dich"
+      },
+      "worthKnowing": {
+        "one": "{count} gut zu wissen",
+        "other": "{count} gut zu wissen"
+      },
+      "skipped": {
+        "one": "{count} übersprungen",
+        "other": "{count} übersprungen"
+      }
+    },
+    "section": {
+      "connectTitle": "Die E-Mails, die zählen",
+      "connectBody": "Verbinde Gmail, und Stella sortiert neue E-Mails, sobald sie ankommen. Dringendes erreicht dich sofort, der Rest kommt als kurze Zusammenfassung im Chat.",
+      "connect": "Gmail verbinden",
+      "connecting": "Warte auf Google…",
+      "connectError": "Gmail wurde nicht verbunden. Versuch es noch einmal.",
+      "reconnectTitle": "Gmail neu verbinden",
+      "reconnectBody": "Gmail muss über Stella neu verbunden werden, bevor Stella deine E-Mails sortieren kann.",
+      "reconnect": "Gmail neu verbinden",
+      "loadErrorTitle": "Deine E-Mails konnten nicht geladen werden",
+      "loadErrorBody": "Stella erreicht ihre Server gerade nicht. Prüf deine Verbindung und versuch es noch einmal.",
+      "offTitle": "E-Mails sortieren",
+      "offBody": "Stella sortiert neue E-Mails, sobald sie ankommen. Dringendes erreicht dich sofort, der Rest kommt als kurze Zusammenfassung im Chat. Unwichtiges bleibt draußen.",
+      "turnOn": "Einschalten",
+      "turningOn": "Deine letzten E-Mails werden sortiert…",
+      "empty": "Noch nichts. Neue E-Mails erscheinen hier, sobald Stella sie sortiert hat.",
+      "needsYou": "Braucht dich",
+      "worthKnowing": "Gut zu wissen",
+      "urgent": "Dringend",
+      "actions": "E-Mail-Aktionen",
+      "openInGmail": "In Gmail öffnen",
+      "moveToNeedsYou": "Zu „Braucht dich“ verschieben",
+      "moveToWorthKnowing": "Zu „Gut zu wissen“ verschieben",
+      "skippedThisWeek": {
+        "one": "{count} diese Woche übersprungen",
+        "other": "{count} diese Woche übersprungen"
+      },
+      "noteTitle": "Was dir wichtig ist",
+      "notePlaceholder": "Stella lernt aus dem, was du verwirfst. Ergänze, was sie wissen soll, etwa „alles von der Schule meines Kindes ist wichtig, Newsletter nicht“.",
+      "saved": "Gespeichert",
+      "rulesTitle": "Feste Anweisungen",
+      "rulesHint": "Sag es Stella im Chat, z. B. „sag mir sofort Bescheid, wenn mein Vermieter schreibt“ oder „wenn eine Rechnung kommt, leg sie in Drive ab“.",
+      "ruleTell": "Sagt dir sofort Bescheid",
+      "ruleAct": "Stella kümmert sich darum",
+      "remove": "Entfernen",
+      "accountsTitle": "Konten",
+      "live": "Live",
+      "polled": "Alle paar Minuten geprüft",
+      "accountError": "Dieses Konto konnte nicht geprüft werden",
+      "usage": "Diesen Monat: {sorted} sortiert · {cost}",
+      "capped": "Sortieren pausiert bis nächsten Monat",
+      "checkNow": "Jetzt prüfen",
+      "checking": "Wird geprüft…",
+      "turnOff": "Ausschalten",
+      "turnOffConfirm": "Beim Ausschalten endet das Sortieren und die sortierte Liste wird gelöscht."
+    }
   }
 }

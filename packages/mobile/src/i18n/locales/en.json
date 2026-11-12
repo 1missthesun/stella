@@ -2804,7 +2804,23 @@
       },
       "updating": "Updating…",
       "afterRecording": "After your recording",
-      "afterReply": "After Stella's reply"
+      "afterReply": "After Stella's reply",
+      "devices": {
+        "choose": "Choose computers",
+        "thisComputer": "This computer",
+        "offline": "Gets it when it's back on",
+        "updateThisOnly": "Update this computer only",
+        "updateAll": "Update all your computers"
+      },
+      "conflicts": {
+        "title": "This update overlaps your changes",
+        "unsure": "A task merges them when you update",
+        "allowance": "Merging them uses some of your free allowance"
+      },
+      "arrived": {
+        "fromJustNow": "Updated from {device} just now",
+        "fromAgo": "Updated from {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pause",
@@ -3133,31 +3149,6 @@
         "one": "View {count} file",
         "other": "View {count} files"
       }
-    },
-    "emailDigest": {
-      "title": "Email",
-      "connectTitle": "The email that matters",
-      "connectBody": "Connect Gmail and Stella checks your inbox through the day, then writes a short digest of only the important new mail.",
-      "connect": "Connect Gmail",
-      "connecting": "Waiting for Google…",
-      "connectError": "Gmail didn't connect. Try again.",
-      "checkNow": "Check now",
-      "checking": "Checking your inbox…",
-      "checked": "Checked {when}",
-      "firstDigest": "Your first digest is on its way",
-      "nothingNew": "Nothing new",
-      "error": "Couldn't check your inbox. Stella will try again soon.",
-      "justNow": "Just now",
-      "loadErrorTitle": "Couldn't load your digest",
-      "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
-      "retry": "Try again",
-      "nothingNewSince": "Nothing new since {time}",
-      "minutesAgo": "{count} min ago",
-      "hoursAgo": "{count} hr ago",
-      "daysAgo": "{count} d ago",
-      "claudeLimit": "Your Claude usage limit is reached, so Stella's model checked this time.",
-      "claudeLimitUntil": "Your Claude usage limit is reached until {time}, so Stella's model checked this time.",
-      "claudeFailed": "Claude Code couldn't run this check, so Stella's model did."
     }
   },
   "sidebar": {
@@ -3469,5 +3460,90 @@
     "ownPlan": "Claude Code runs on your own Claude Pro or Max subscription.",
     "chatTitle": "Claude Code isn't installed",
     "chatDescription": "Install it here, then sign in to your Claude plan and send your message again."
+  },
+  "claudeLogin": {
+    "heldTitle": "Waiting for you to sign in to Claude",
+    "heldDescription": "Your Claude sign-in on this computer has ended. Your message is kept and goes out as soon as you sign in.",
+    "endedTitle": "Your Claude sign-in has ended",
+    "endedDescription": "Sign in again so Stella can keep answering with your Claude plan.",
+    "endedDescriptionEmail": "Sign in to {email} again so Stella can keep answering with your Claude plan.",
+    "endingTitle": "Your Claude sign-in ends soon",
+    "endingDescription": "Sign in again before {date} so your Claude replies keep working.",
+    "cloudEndingTitle": "Your Claude sign-in in your cloud ends soon",
+    "cloudEndedTitle": "Your Claude sign-in in your cloud has ended",
+    "signIn": "Sign in",
+    "signedInContinuing": "Signed in to Claude. Stella is answering now.",
+    "signedInAsResend": "Signed in to Claude as {email}. Send your message again to continue.",
+    "signedInResend": "Signed in to Claude. Send your message again to continue."
+  },
+  "email": {
+    "title": "Email",
+    "notUrgent": "Not urgent",
+    "notImportant": "Not important",
+    "failed": "Couldn't update. Try again.",
+    "card": {
+      "movedToSummary": "Moved to your next summary",
+      "wontShow": "Won't show these",
+      "showAll": "Show all {count}",
+      "showLess": "Show less",
+      "needYou": {
+        "one": "{count} needs you",
+        "other": "{count} need you"
+      },
+      "worthKnowing": {
+        "one": "{count} worth knowing",
+        "other": "{count} worth knowing"
+      },
+      "skipped": {
+        "one": "{count} skipped",
+        "other": "{count} skipped"
+      }
+    },
+    "section": {
+      "connectTitle": "The email that matters",
+      "connectBody": "Connect Gmail and Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest comes as a short summary in the chat.",
+      "connect": "Connect Gmail",
+      "connecting": "Waiting for Google…",
+      "connectError": "Gmail didn't connect. Try again.",
+      "reconnectTitle": "Reconnect Gmail",
+      "reconnectBody": "Gmail needs reconnecting through Stella before Stella can sort your mail.",
+      "reconnect": "Reconnect Gmail",
+      "loadErrorTitle": "Couldn't load your email",
+      "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
+      "offTitle": "Sort your email",
+      "offBody": "Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest comes as a short summary in the chat. Noise stays out.",
+      "turnOn": "Turn on",
+      "turningOn": "Sorting your recent mail…",
+      "empty": "Nothing yet. New mail shows up here once Stella sorts it.",
+      "needsYou": "Needs you",
+      "worthKnowing": "Worth knowing",
+      "urgent": "Urgent",
+      "actions": "Email actions",
+      "openInGmail": "Open in Gmail",
+      "moveToNeedsYou": "Move to Needs you",
+      "moveToWorthKnowing": "Move to Worth knowing",
+      "skippedThisWeek": {
+        "one": "{count} skipped this week",
+        "other": "{count} skipped this week"
+      },
+      "noteTitle": "What matters to you",
+      "notePlaceholder": "Stella learns from what you dismiss. Add anything it should know, like \"anything from my kid's school matters; newsletters don't\".",
+      "saved": "Saved",
+      "rulesTitle": "Standing instructions",
+      "rulesHint": "Tell Stella in the chat, e.g. \"tell me right away when my landlord emails\" or \"when an invoice arrives, file it in Drive\".",
+      "ruleTell": "Tells you right away",
+      "ruleAct": "Stella takes care of it",
+      "remove": "Remove",
+      "accountsTitle": "Accounts",
+      "live": "Live",
+      "polled": "Checked every few minutes",
+      "accountError": "Couldn't check this account",
+      "usage": "This month: {sorted} sorted · {cost}",
+      "capped": "Sorting is paused until next month",
+      "checkNow": "Check now",
+      "checking": "Checking…",
+      "turnOff": "Turn off",
+      "turnOffConfirm": "Turning off stops sorting and deletes the sorted list."
+    }
   }
 }

@@ -2824,7 +2824,23 @@
       },
       "updating": "Aktualizowanie…",
       "afterRecording": "Po nagraniu",
-      "afterReply": "Gdy Stella skończy odpowiadać"
+      "afterReply": "Gdy Stella skończy odpowiadać",
+      "devices": {
+        "choose": "Wybierz komputery",
+        "thisComputer": "Ten komputer",
+        "offline": "Otrzyma ją po ponownym włączeniu",
+        "updateThisOnly": "Zaktualizuj tylko ten komputer",
+        "updateAll": "Zaktualizuj wszystkie swoje komputery"
+      },
+      "conflicts": {
+        "title": "Ta aktualizacja pokrywa się z twoimi zmianami",
+        "unsure": "Przy aktualizacji połączy je zadanie",
+        "allowance": "Łączenie zużywa część twojego darmowego limitu"
+      },
+      "arrived": {
+        "fromJustNow": "Zaktualizowano z {device} przed chwilą",
+        "fromAgo": "Zaktualizowano z {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Wstrzymaj",
@@ -3167,31 +3183,6 @@
         "one": "Zobacz {count} plik",
         "other": "Zobacz {count} pliku"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "E-maile, które się liczą",
-      "connectBody": "Połącz Gmaila, a Stella będzie w ciągu dnia sprawdzać Twoją skrzynkę i pisać krótkie podsumowanie tylko ważnych nowych wiadomości.",
-      "connect": "Połącz Gmaila",
-      "connecting": "Czekam na Google…",
-      "connectError": "Nie udało się połączyć Gmaila. Spróbuj ponownie.",
-      "checkNow": "Sprawdź teraz",
-      "checking": "Sprawdzanie skrzynki…",
-      "checked": "Sprawdzono {when}",
-      "firstDigest": "Twoje pierwsze podsumowanie jest w drodze",
-      "nothingNew": "Nic nowego",
-      "error": "Nie udało się sprawdzić skrzynki. Stella wkrótce spróbuje ponownie.",
-      "justNow": "Przed chwilą",
-      "loadErrorTitle": "Nie udało się wczytać podsumowania",
-      "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
-      "retry": "Spróbuj ponownie",
-      "nothingNewSince": "Nic nowego od {time}",
-      "minutesAgo": "{count} min temu",
-      "hoursAgo": "{count} godz. temu",
-      "daysAgo": "{count} dn. temu",
-      "claudeLimit": "Osiągnięto limit użycia Claude, więc tym razem sprawdzał model Stelli.",
-      "claudeLimitUntil": "Osiągnięto limit użycia Claude do {time}, więc tym razem sprawdzał model Stelli.",
-      "claudeFailed": "Claude Code nie mógł wykonać tego sprawdzenia, więc zrobił to model Stelli."
     }
   },
   "sidebar": {
@@ -3509,5 +3500,98 @@
     "ownPlan": "Claude Code działa na Twojej własnej subskrypcji Claude Pro lub Max.",
     "chatTitle": "Claude Code nie jest zainstalowany",
     "chatDescription": "Zainstaluj go tutaj, zaloguj się do swojego planu Claude i wyślij wiadomość ponownie."
+  },
+  "claudeLogin": {
+    "heldTitle": "Czekamy, aż zalogujesz się do Claude",
+    "heldDescription": "Twoje logowanie do Claude na tym komputerze wygasło. Twoja wiadomość jest zachowana i zostanie wysłana, gdy tylko się zalogujesz.",
+    "endedTitle": "Twoje logowanie do Claude wygasło",
+    "endedDescription": "Zaloguj się ponownie, aby Stella mogła dalej odpowiadać w ramach Twojego planu Claude.",
+    "endedDescriptionEmail": "Zaloguj się ponownie na {email}, aby Stella mogła dalej odpowiadać w ramach Twojego planu Claude.",
+    "endingTitle": "Twoje logowanie do Claude wkrótce wygaśnie",
+    "endingDescription": "Zaloguj się ponownie przed {date}, aby odpowiedzi Claude dalej działały.",
+    "cloudEndingTitle": "Twoje logowanie do Claude w Twojej chmurze wkrótce wygaśnie",
+    "cloudEndedTitle": "Twoje logowanie do Claude w Twojej chmurze wygasło",
+    "signIn": "Zaloguj się",
+    "signedInContinuing": "Zalogowano do Claude. Stella właśnie odpowiada.",
+    "signedInAsResend": "Zalogowano do Claude jako {email}. Wyślij wiadomość ponownie, aby kontynuować.",
+    "signedInResend": "Zalogowano do Claude. Wyślij wiadomość ponownie, aby kontynuować."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Niepilne",
+    "notImportant": "Nieważne",
+    "failed": "Nie udało się zaktualizować. Spróbuj ponownie.",
+    "card": {
+      "movedToSummary": "Przeniesiono do następnego podsumowania",
+      "wontShow": "Takich już nie pokażę",
+      "showAll": "Pokaż wszystkie: {count}",
+      "showLess": "Pokaż mniej",
+      "needYou": {
+        "few": "Czeka na ciebie: {count}",
+        "many": "Czeka na ciebie: {count}",
+        "one": "Czeka na ciebie: {count}",
+        "other": "Czeka na ciebie: {count}"
+      },
+      "worthKnowing": {
+        "few": "Warto wiedzieć: {count}",
+        "many": "Warto wiedzieć: {count}",
+        "one": "Warto wiedzieć: {count}",
+        "other": "Warto wiedzieć: {count}"
+      },
+      "skipped": {
+        "few": "Pominięte: {count}",
+        "many": "Pominięte: {count}",
+        "one": "Pominięte: {count}",
+        "other": "Pominięte: {count}"
+      }
+    },
+    "section": {
+      "connectTitle": "Poczta, która ma znaczenie",
+      "connectBody": "Połącz Gmaila, a Stella będzie sortować nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta przyjdzie jako krótkie podsumowanie na czacie.",
+      "connect": "Połącz Gmaila",
+      "connecting": "Czekam na Google…",
+      "connectError": "Gmail się nie połączył. Spróbuj ponownie.",
+      "reconnectTitle": "Połącz Gmaila ponownie",
+      "reconnectBody": "Gmaila trzeba ponownie połączyć przez Stellę, żeby mogła sortować twoją pocztę.",
+      "reconnect": "Połącz Gmaila ponownie",
+      "loadErrorTitle": "Nie udało się wczytać poczty",
+      "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
+      "offTitle": "Sortuj pocztę",
+      "offBody": "Stella sortuje nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta przyjdzie jako krótkie podsumowanie na czacie. Szum zostaje za drzwiami.",
+      "turnOn": "Włącz",
+      "turningOn": "Sortuję ostatnią pocztę…",
+      "empty": "Jeszcze nic. Nowe wiadomości pojawią się tu, gdy Stella je posortuje.",
+      "needsYou": "Czeka na ciebie",
+      "worthKnowing": "Warto wiedzieć",
+      "urgent": "Pilne",
+      "actions": "Działania na wiadomości",
+      "openInGmail": "Otwórz w Gmailu",
+      "moveToNeedsYou": "Przenieś do „Czeka na ciebie”",
+      "moveToWorthKnowing": "Przenieś do „Warto wiedzieć”",
+      "skippedThisWeek": {
+        "few": "Pominięte w tym tygodniu: {count}",
+        "many": "Pominięte w tym tygodniu: {count}",
+        "one": "Pominięte w tym tygodniu: {count}",
+        "other": "Pominięte w tym tygodniu: {count}"
+      },
+      "noteTitle": "Co jest dla ciebie ważne",
+      "notePlaceholder": "Stella uczy się z tego, co odrzucasz. Dodaj, co powinna wiedzieć, np. „wszystko ze szkoły dziecka jest ważne; newslettery nie”.",
+      "saved": "Zapisano",
+      "rulesTitle": "Stałe polecenia",
+      "rulesHint": "Powiedz Stelli na czacie, np. „daj znać od razu, gdy napisze właściciel mieszkania” albo „gdy przyjdzie faktura, zapisz ją na Dysku”.",
+      "ruleTell": "Daje znać od razu",
+      "ruleAct": "Stella się tym zajmie",
+      "remove": "Usuń",
+      "accountsTitle": "Konta",
+      "live": "Na żywo",
+      "polled": "Sprawdzane co kilka minut",
+      "accountError": "Nie udało się sprawdzić tego konta",
+      "usage": "W tym miesiącu: posortowano {sorted} · {cost}",
+      "capped": "Sortowanie wstrzymane do przyszłego miesiąca",
+      "checkNow": "Sprawdź teraz",
+      "checking": "Sprawdzam…",
+      "turnOff": "Wyłącz",
+      "turnOffConfirm": "Wyłączenie zatrzyma sortowanie i usunie posortowaną listę."
+    }
   }
 }

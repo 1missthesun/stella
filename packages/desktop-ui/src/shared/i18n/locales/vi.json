@@ -3130,31 +3130,6 @@
       "viewFiles": {
         "other": "Xem {count} tệp"
       }
-    },
-    "emailDigest": {
-      "title": "Email",
-      "connectTitle": "Những email quan trọng",
-      "connectBody": "Kết nối Gmail và Stella sẽ kiểm tra hộp thư của bạn trong ngày, rồi viết bản tóm tắt ngắn chỉ những email mới quan trọng.",
-      "connect": "Kết nối Gmail",
-      "connecting": "Đang chờ Google…",
-      "connectError": "Không kết nối được Gmail. Hãy thử lại.",
-      "checkNow": "Kiểm tra ngay",
-      "checking": "Đang kiểm tra hộp thư…",
-      "checked": "Đã kiểm tra {when}",
-      "firstDigest": "Bản tóm tắt đầu tiên đang đến",
-      "nothingNew": "Không có gì mới",
-      "error": "Không kiểm tra được hộp thư. Stella sẽ thử lại sớm.",
-      "justNow": "Vừa xong",
-      "loadErrorTitle": "Không tải được bản tóm tắt",
-      "loadErrorBody": "Stella hiện không kết nối được máy chủ. Hãy kiểm tra kết nối và thử lại.",
-      "retry": "Thử lại",
-      "nothingNewSince": "Không có gì mới kể từ {time}",
-      "minutesAgo": "{count} phút trước",
-      "hoursAgo": "{count} giờ trước",
-      "daysAgo": "{count} ngày trước",
-      "claudeLimit": "Bạn đã đạt giới hạn sử dụng Claude, nên lần này mô hình của Stella đã kiểm tra.",
-      "claudeLimitUntil": "Bạn đã đạt giới hạn sử dụng Claude đến {time}, nên lần này mô hình của Stella đã kiểm tra.",
-      "claudeFailed": "Claude Code không thể chạy lần kiểm tra này, nên mô hình của Stella đã làm thay."
     }
   },
   "sidebar": {
@@ -3478,5 +3453,71 @@
     "signedInContinuing": "Đã đăng nhập Claude. Stella đang trả lời.",
     "signedInAsResend": "Đã đăng nhập Claude bằng {email}. Gửi lại tin nhắn để tiếp tục.",
     "signedInResend": "Đã đăng nhập Claude. Gửi lại tin nhắn để tiếp tục."
+  },
+  "email": {
+    "title": "Email",
+    "notUrgent": "Không gấp",
+    "notImportant": "Không quan trọng",
+    "failed": "Không cập nhật được. Hãy thử lại.",
+    "card": {
+      "movedToSummary": "Đã chuyển sang bản tóm tắt tiếp theo",
+      "wontShow": "Sẽ không hiện những thư như vậy nữa",
+      "showAll": "Hiện tất cả {count}",
+      "showLess": "Thu gọn",
+      "needYou": {
+        "other": "{count} cần bạn"
+      },
+      "worthKnowing": {
+        "other": "{count} nên biết"
+      },
+      "skipped": {
+        "other": "Đã bỏ qua {count}"
+      }
+    },
+    "section": {
+      "connectTitle": "Những email quan trọng",
+      "connectBody": "Kết nối Gmail và Stella sẽ phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại đến dưới dạng tóm tắt ngắn trong cuộc trò chuyện.",
+      "connect": "Kết nối Gmail",
+      "connecting": "Đang chờ Google…",
+      "connectError": "Gmail chưa kết nối được. Hãy thử lại.",
+      "reconnectTitle": "Kết nối lại Gmail",
+      "reconnectBody": "Cần kết nối lại Gmail qua Stella để Stella có thể phân loại thư của bạn.",
+      "reconnect": "Kết nối lại Gmail",
+      "loadErrorTitle": "Không tải được email",
+      "loadErrorBody": "Stella hiện không kết nối được máy chủ. Hãy kiểm tra kết nối rồi thử lại.",
+      "offTitle": "Phân loại email của bạn",
+      "offBody": "Stella phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại đến dưới dạng tóm tắt ngắn trong cuộc trò chuyện. Thư rác vặt bị gạt ra ngoài.",
+      "turnOn": "Bật",
+      "turningOn": "Đang phân loại thư gần đây…",
+      "empty": "Chưa có gì. Thư mới sẽ hiện ở đây khi Stella phân loại xong.",
+      "needsYou": "Cần bạn",
+      "worthKnowing": "Nên biết",
+      "urgent": "Gấp",
+      "actions": "Thao tác email",
+      "openInGmail": "Mở trong Gmail",
+      "moveToNeedsYou": "Chuyển sang Cần bạn",
+      "moveToWorthKnowing": "Chuyển sang Nên biết",
+      "skippedThisWeek": {
+        "other": "Đã bỏ qua {count} trong tuần này"
+      },
+      "noteTitle": "Điều quan trọng với bạn",
+      "notePlaceholder": "Stella học từ những gì bạn bỏ qua. Thêm điều Stella nên biết, ví dụ \"mọi thư từ trường của con tôi đều quan trọng; bản tin thì không\".",
+      "saved": "Đã lưu",
+      "rulesTitle": "Chỉ dẫn cố định",
+      "rulesHint": "Nói với Stella trong cuộc trò chuyện, ví dụ \"báo tôi ngay khi chủ nhà gửi email\" hoặc \"khi có hóa đơn, lưu vào Drive\".",
+      "ruleTell": "Báo bạn ngay",
+      "ruleAct": "Stella sẽ lo",
+      "remove": "Xóa",
+      "accountsTitle": "Tài khoản",
+      "live": "Trực tiếp",
+      "polled": "Kiểm tra vài phút một lần",
+      "accountError": "Không kiểm tra được tài khoản này",
+      "usage": "Tháng này: đã phân loại {sorted} · {cost}",
+      "capped": "Tạm dừng phân loại đến tháng sau",
+      "checkNow": "Kiểm tra ngay",
+      "checking": "Đang kiểm tra…",
+      "turnOff": "Tắt",
+      "turnOffConfirm": "Tắt sẽ dừng phân loại và xóa danh sách đã phân loại."
+    }
   }
 }

@@ -2814,7 +2814,23 @@
       },
       "updating": "Mise à jour…",
       "afterRecording": "Après votre enregistrement",
-      "afterReply": "Quand Stella aura fini de répondre"
+      "afterReply": "Quand Stella aura fini de répondre",
+      "devices": {
+        "choose": "Choisir les ordinateurs",
+        "thisComputer": "Cet ordinateur",
+        "offline": "La recevra une fois rallumé",
+        "updateThisOnly": "Mettre à jour cet ordinateur seulement",
+        "updateAll": "Mettre à jour tous vos ordinateurs"
+      },
+      "conflicts": {
+        "title": "Cette mise à jour recoupe vos modifications",
+        "unsure": "Une tâche les fusionne lors de la mise à jour",
+        "allowance": "La fusion utilise une partie de votre crédit gratuit"
+      },
+      "arrived": {
+        "fromJustNow": "Mis à jour depuis {device} à l'instant",
+        "fromAgo": "Mis à jour depuis {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pause",
@@ -3150,31 +3166,6 @@
         "one": "Voir {count} fichier",
         "other": "Voir {count} fichiers"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "Les e-mails qui comptent",
-      "connectBody": "Connectez Gmail et Stella vérifie votre boîte de réception au fil de la journée, puis rédige un court résumé des seuls nouveaux e-mails importants.",
-      "connect": "Connecter Gmail",
-      "connecting": "En attente de Google…",
-      "connectError": "Gmail ne s'est pas connecté. Réessayez.",
-      "checkNow": "Vérifier",
-      "checking": "Vérification de votre boîte…",
-      "checked": "Vérifié {when}",
-      "firstDigest": "Votre premier résumé arrive",
-      "nothingNew": "Rien de nouveau",
-      "error": "Impossible de vérifier votre boîte. Stella réessaiera bientôt.",
-      "justNow": "À l'instant",
-      "loadErrorTitle": "Impossible de charger votre résumé",
-      "loadErrorBody": "Stella ne parvient pas à joindre ses serveurs. Vérifiez votre connexion et réessayez.",
-      "retry": "Réessayer",
-      "nothingNewSince": "Rien de nouveau depuis {time}",
-      "minutesAgo": "il y a {count} min",
-      "hoursAgo": "il y a {count} h",
-      "daysAgo": "il y a {count} j",
-      "claudeLimit": "Votre limite d'utilisation de Claude est atteinte, le modèle de Stella a donc vérifié cette fois.",
-      "claudeLimitUntil": "Votre limite d'utilisation de Claude est atteinte jusqu'à {time}, le modèle de Stella a donc vérifié cette fois.",
-      "claudeFailed": "Claude Code n'a pas pu effectuer cette vérification, le modèle de Stella s'en est chargé."
     }
   },
   "sidebar": {
@@ -3489,5 +3480,94 @@
     "ownPlan": "Claude Code fonctionne avec votre propre abonnement Claude Pro ou Max.",
     "chatTitle": "Claude Code n’est pas installé",
     "chatDescription": "Installez-le ici, connectez-vous à votre abonnement Claude, puis renvoyez votre message."
+  },
+  "claudeLogin": {
+    "heldTitle": "En attente de votre connexion à Claude",
+    "heldDescription": "Votre connexion à Claude sur cet ordinateur a expiré. Votre message est conservé et partira dès que vous vous connecterez.",
+    "endedTitle": "Votre connexion à Claude a expiré",
+    "endedDescription": "Reconnectez-vous pour que Stella continue de répondre avec votre forfait Claude.",
+    "endedDescriptionEmail": "Reconnectez-vous à {email} pour que Stella continue de répondre avec votre forfait Claude.",
+    "endingTitle": "Votre connexion à Claude expire bientôt",
+    "endingDescription": "Reconnectez-vous avant le {date} pour que les réponses de Claude continuent de fonctionner.",
+    "cloudEndingTitle": "Votre connexion à Claude dans votre cloud expire bientôt",
+    "cloudEndedTitle": "Votre connexion à Claude dans votre cloud a expiré",
+    "signIn": "Se connecter",
+    "signedInContinuing": "Connecté à Claude. Stella répond maintenant.",
+    "signedInAsResend": "Connecté à Claude en tant que {email}. Renvoyez votre message pour continuer.",
+    "signedInResend": "Connecté à Claude. Renvoyez votre message pour continuer."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Pas urgent",
+    "notImportant": "Pas important",
+    "failed": "Mise à jour impossible. Réessayez.",
+    "card": {
+      "movedToSummary": "Déplacé dans votre prochain résumé",
+      "wontShow": "Ceux-ci ne s'afficheront plus",
+      "showAll": "Tout afficher ({count})",
+      "showLess": "Afficher moins",
+      "needYou": {
+        "many": "{count} vous attendent",
+        "one": "{count} vous attend",
+        "other": "{count} vous attendent"
+      },
+      "worthKnowing": {
+        "many": "{count} bons à savoir",
+        "one": "{count} bon à savoir",
+        "other": "{count} bons à savoir"
+      },
+      "skipped": {
+        "many": "{count} ignorés",
+        "one": "{count} ignoré",
+        "other": "{count} ignorés"
+      }
+    },
+    "section": {
+      "connectTitle": "Les e-mails qui comptent",
+      "connectBody": "Connectez Gmail et Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste arrive en court résumé dans le chat.",
+      "connect": "Connecter Gmail",
+      "connecting": "En attente de Google…",
+      "connectError": "Gmail ne s'est pas connecté. Réessayez.",
+      "reconnectTitle": "Reconnecter Gmail",
+      "reconnectBody": "Gmail doit être reconnecté via Stella pour que Stella puisse trier vos e-mails.",
+      "reconnect": "Reconnecter Gmail",
+      "loadErrorTitle": "Impossible de charger vos e-mails",
+      "loadErrorBody": "Stella ne peut pas joindre ses serveurs pour le moment. Vérifiez votre connexion et réessayez.",
+      "offTitle": "Trier vos e-mails",
+      "offBody": "Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste arrive en court résumé dans le chat. Le superflu reste à l'écart.",
+      "turnOn": "Activer",
+      "turningOn": "Tri de vos e-mails récents…",
+      "empty": "Rien pour l'instant. Les nouveaux e-mails apparaissent ici une fois triés par Stella.",
+      "needsYou": "Vous attend",
+      "worthKnowing": "Bon à savoir",
+      "urgent": "Urgent",
+      "actions": "Actions sur l'e-mail",
+      "openInGmail": "Ouvrir dans Gmail",
+      "moveToNeedsYou": "Déplacer vers Vous attend",
+      "moveToWorthKnowing": "Déplacer vers Bon à savoir",
+      "skippedThisWeek": {
+        "many": "{count} ignorés cette semaine",
+        "one": "{count} ignoré cette semaine",
+        "other": "{count} ignorés cette semaine"
+      },
+      "noteTitle": "Ce qui compte pour vous",
+      "notePlaceholder": "Stella apprend de ce que vous écartez. Ajoutez ce qu'elle doit savoir, par exemple « tout ce qui vient de l'école de mon enfant compte ; pas les newsletters ».",
+      "saved": "Enregistré",
+      "rulesTitle": "Consignes permanentes",
+      "rulesHint": "Dites-le à Stella dans le chat, par ex. « préviens-moi tout de suite quand mon propriétaire écrit » ou « quand une facture arrive, range-la dans Drive ».",
+      "ruleTell": "Vous prévient tout de suite",
+      "ruleAct": "Stella s'en occupe",
+      "remove": "Retirer",
+      "accountsTitle": "Comptes",
+      "live": "En direct",
+      "polled": "Vérifié toutes les quelques minutes",
+      "accountError": "Impossible de vérifier ce compte",
+      "usage": "Ce mois-ci : {sorted} triés · {cost}",
+      "capped": "Tri en pause jusqu'au mois prochain",
+      "checkNow": "Vérifier",
+      "checking": "Vérification…",
+      "turnOff": "Désactiver",
+      "turnOffConfirm": "Désactiver arrête le tri et supprime la liste triée."
+    }
   }
 }

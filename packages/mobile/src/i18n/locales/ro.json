@@ -2814,7 +2814,23 @@
       },
       "updating": "Se actualizează…",
       "afterRecording": "După înregistrare",
-      "afterReply": "După ce Stella termină răspunsul"
+      "afterReply": "După ce Stella termină răspunsul",
+      "devices": {
+        "choose": "Alege computerele",
+        "thisComputer": "Acest computer",
+        "offline": "O primește când pornește din nou",
+        "updateThisOnly": "Actualizează doar acest computer",
+        "updateAll": "Actualizează toate computerele tale"
+      },
+      "conflicts": {
+        "title": "Această actualizare se suprapune cu modificările tale",
+        "unsure": "O sarcină le îmbină când actualizezi",
+        "allowance": "Îmbinarea folosește o parte din alocarea ta gratuită"
+      },
+      "arrived": {
+        "fromJustNow": "Actualizat de pe {device} chiar acum",
+        "fromAgo": "Actualizat de pe {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pauză",
@@ -3150,31 +3166,6 @@
         "one": "Vezi {count} fișier",
         "other": "Vezi {count} de fișiere"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "E-mailurile care contează",
-      "connectBody": "Conectează Gmail și Stella îți verifică inboxul pe parcursul zilei, apoi scrie un scurt rezumat doar al e-mailurilor noi importante.",
-      "connect": "Conectează Gmail",
-      "connecting": "Se așteaptă Google…",
-      "connectError": "Gmail nu s-a conectat. Încearcă din nou.",
-      "checkNow": "Verifică acum",
-      "checking": "Se verifică inboxul…",
-      "checked": "Verificat {when}",
-      "firstDigest": "Primul tău rezumat e pe drum",
-      "nothingNew": "Nimic nou",
-      "error": "Inboxul nu a putut fi verificat. Stella va reîncerca în curând.",
-      "justNow": "Chiar acum",
-      "loadErrorTitle": "Rezumatul nu s-a putut încărca",
-      "loadErrorBody": "Stella nu își poate accesa serverele acum. Verifică conexiunea și încearcă din nou.",
-      "retry": "Încearcă din nou",
-      "nothingNewSince": "Nimic nou de la {time}",
-      "minutesAgo": "acum {count} min",
-      "hoursAgo": "acum {count} h",
-      "daysAgo": "acum {count} z",
-      "claudeLimit": "Ai atins limita de utilizare Claude, așa că de data aceasta a verificat modelul Stella.",
-      "claudeLimitUntil": "Ai atins limita de utilizare Claude până la {time}, așa că de data aceasta a verificat modelul Stella.",
-      "claudeFailed": "Claude Code nu a putut face această verificare, așa că a făcut-o modelul Stella."
     }
   },
   "sidebar": {
@@ -3489,5 +3480,94 @@
     "ownPlan": "Claude Code funcționează cu propriul tău abonament Claude Pro sau Max.",
     "chatTitle": "Claude Code nu este instalat",
     "chatDescription": "Instalează-l aici, apoi conectează-te la abonamentul Claude și trimite din nou mesajul."
+  },
+  "claudeLogin": {
+    "heldTitle": "Se așteaptă să te conectezi la Claude",
+    "heldDescription": "Conectarea ta la Claude pe acest computer a expirat. Mesajul tău este păstrat și pleacă imediat ce te conectezi.",
+    "endedTitle": "Conectarea ta la Claude a expirat",
+    "endedDescription": "Conectează-te din nou ca Stella să poată răspunde în continuare cu planul tău Claude.",
+    "endedDescriptionEmail": "Conectează-te din nou la {email} ca Stella să poată răspunde în continuare cu planul tău Claude.",
+    "endingTitle": "Conectarea ta la Claude expiră în curând",
+    "endingDescription": "Conectează-te din nou înainte de {date} ca răspunsurile Claude să funcționeze în continuare.",
+    "cloudEndingTitle": "Conectarea ta la Claude în cloudul tău expiră în curând",
+    "cloudEndedTitle": "Conectarea ta la Claude în cloudul tău a expirat",
+    "signIn": "Conectează-te",
+    "signedInContinuing": "Conectat la Claude. Stella răspunde acum.",
+    "signedInAsResend": "Conectat la Claude ca {email}. Trimite din nou mesajul pentru a continua.",
+    "signedInResend": "Conectat la Claude. Trimite din nou mesajul pentru a continua."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Nu e urgent",
+    "notImportant": "Nu e important",
+    "failed": "Actualizarea a eșuat. Încearcă din nou.",
+    "card": {
+      "movedToSummary": "Mutat în următorul rezumat",
+      "wontShow": "Nu le mai arăt pe acestea",
+      "showAll": "Arată toate ({count})",
+      "showLess": "Arată mai puțin",
+      "needYou": {
+        "few": "{count} au nevoie de tine",
+        "one": "{count} are nevoie de tine",
+        "other": "{count} au nevoie de tine"
+      },
+      "worthKnowing": {
+        "few": "{count} bune de știut",
+        "one": "{count} bun de știut",
+        "other": "{count} bune de știut"
+      },
+      "skipped": {
+        "few": "{count} omise",
+        "one": "{count} omis",
+        "other": "{count} omise"
+      }
+    },
+    "section": {
+      "connectTitle": "E-mailurile care contează",
+      "connectBody": "Conectează Gmail și Stella sortează mesajele noi pe măsură ce sosesc. Cele urgente ajung imediat la tine; restul vin ca un scurt rezumat în chat.",
+      "connect": "Conectează Gmail",
+      "connecting": "Se așteaptă Google…",
+      "connectError": "Gmail nu s-a conectat. Încearcă din nou.",
+      "reconnectTitle": "Reconectează Gmail",
+      "reconnectBody": "Gmail trebuie reconectat prin Stella ca Stella să-ți poată sorta mesajele.",
+      "reconnect": "Reconectează Gmail",
+      "loadErrorTitle": "Nu am putut încărca e-mailurile",
+      "loadErrorBody": "Stella nu își poate accesa serverele acum. Verifică conexiunea și încearcă din nou.",
+      "offTitle": "Sortează-ți e-mailurile",
+      "offBody": "Stella sortează mesajele noi pe măsură ce sosesc. Cele urgente ajung imediat la tine; restul vin ca un scurt rezumat în chat. Zgomotul rămâne afară.",
+      "turnOn": "Activează",
+      "turningOn": "Se sortează mesajele recente…",
+      "empty": "Nimic încă. Mesajele noi apar aici după ce Stella le sortează.",
+      "needsYou": "Are nevoie de tine",
+      "worthKnowing": "Bun de știut",
+      "urgent": "Urgent",
+      "actions": "Acțiuni e-mail",
+      "openInGmail": "Deschide în Gmail",
+      "moveToNeedsYou": "Mută la Are nevoie de tine",
+      "moveToWorthKnowing": "Mută la Bun de știut",
+      "skippedThisWeek": {
+        "few": "{count} omise săptămâna aceasta",
+        "one": "{count} omis săptămâna aceasta",
+        "other": "{count} omise săptămâna aceasta"
+      },
+      "noteTitle": "Ce contează pentru tine",
+      "notePlaceholder": "Stella învață din ce respingi. Adaugă ce ar trebui să știe, de exemplu „tot ce vine de la școala copilului contează; newsletterele nu”.",
+      "saved": "Salvat",
+      "rulesTitle": "Instrucțiuni permanente",
+      "rulesHint": "Spune-i Stellei în chat, de ex. „anunță-mă imediat când îmi scrie proprietarul” sau „când vine o factură, pune-o în Drive”.",
+      "ruleTell": "Te anunță imediat",
+      "ruleAct": "Stella se ocupă",
+      "remove": "Elimină",
+      "accountsTitle": "Conturi",
+      "live": "În timp real",
+      "polled": "Verificat la câteva minute",
+      "accountError": "Contul nu a putut fi verificat",
+      "usage": "Luna aceasta: {sorted} sortate · {cost}",
+      "capped": "Sortarea e oprită până luna viitoare",
+      "checkNow": "Verifică acum",
+      "checking": "Se verifică…",
+      "turnOff": "Dezactivează",
+      "turnOffConfirm": "Dezactivarea oprește sortarea și șterge lista sortată."
+    }
   }
 }

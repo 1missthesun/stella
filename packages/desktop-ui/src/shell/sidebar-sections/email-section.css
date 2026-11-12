@@ -1,0 +1,301 @@
+.email-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 14px 14px 24px;
+}
+
+.email-section__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.email-section__heading {
+  margin: 0 4px 2px;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.02em;
+}
+
+.email-section__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.email-section__item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  border-top: 1px solid var(--border-weak);
+}
+
+.email-section__item:first-child {
+  border-top: 0;
+}
+
+.email-section__item[data-busy] {
+  opacity: 0.5;
+}
+
+.email-section__item-open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 9px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.email-section__item-open:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.email-section__item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding-inline-end: 26px;
+}
+
+.email-section__from {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-section__urgent {
+  flex: none;
+  color: var(--interactive);
+  font-size: var(--font-size-xs, 12px);
+  font-weight: var(--weight-medium);
+}
+
+.email-section__time {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.email-section__subject {
+  overflow: hidden;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-section__line {
+  margin-top: 1px;
+  color: var(--text-base);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.email-section__item-open:hover .email-section__subject {
+  color: var(--text-base);
+}
+
+.email-section__more {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text-weak);
+  opacity: 0;
+  cursor: default;
+  transition: opacity 0.12s ease;
+}
+
+.email-section__item:hover .email-section__more,
+.email-section__more:focus-visible,
+.email-section__more[data-state="open"] {
+  opacity: 1;
+}
+
+.email-section__more:hover {
+  color: var(--text-strong);
+  background: color-mix(in oklch, var(--foreground) 6%, var(--background));
+}
+
+.email-section__more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.email-section__empty,
+.email-section__skipped,
+.email-section__hint {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+  line-height: 1.5;
+}
+
+.email-section__empty {
+  font-size: var(--font-size-sm);
+}
+
+.email-section__skipped {
+  margin-top: -10px;
+}
+
+.email-section__muted {
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+}
+
+.email-section__note {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.email-section__note::placeholder {
+  color: var(--text-weak);
+}
+
+.email-section__note:focus {
+  outline: none;
+  border-color: var(--border-strong, var(--border));
+  box-shadow: var(--focus-ring);
+}
+
+.email-section__row-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 28px;
+}
+
+.email-section__rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--border-weak);
+}
+
+.email-section__rule:first-child {
+  border-top: 0;
+}
+
+.email-section__rule-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  color: var(--text-base);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.email-section__rule-remove {
+  opacity: 0;
+}
+
+.email-section__rule:hover .email-section__rule-remove,
+.email-section__rule-remove:focus-visible {
+  opacity: 1;
+}
+
+.email-section__account {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px;
+}
+
+.email-section__account-email {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-base);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-section__buttons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+
+.email-section__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.email-section__text-button {
+  align-self: flex-start;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-weak);
+  font-family: inherit;
+  font-size: var(--font-size-xs, 12px);
+  font-weight: var(--weight-medium);
+  cursor: default;
+}
+
+.email-section__text-button:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+.email-section__text-button:disabled {
+  opacity: 0.5;
+}
+
+.email-section__text-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.email-section__buttons .email-section__text-button {
+  align-self: center;
+}

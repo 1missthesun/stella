@@ -2804,7 +2804,23 @@
       },
       "updating": "Güncelleniyor…",
       "afterRecording": "Kaydınızdan sonra",
-      "afterReply": "Stella yanıtını bitirince"
+      "afterReply": "Stella yanıtını bitirince",
+      "devices": {
+        "choose": "Bilgisayarları seç",
+        "thisComputer": "Bu bilgisayar",
+        "offline": "Yeniden açıldığında alacak",
+        "updateThisOnly": "Yalnızca bu bilgisayarı güncelle",
+        "updateAll": "Tüm bilgisayarlarını güncelle"
+      },
+      "conflicts": {
+        "title": "Bu güncelleme değişikliklerinle çakışıyor",
+        "unsure": "Güncellediğinde bir görev bunları birleştirir",
+        "allowance": "Birleştirme ücretsiz kotanın bir kısmını kullanır"
+      },
+      "arrived": {
+        "fromJustNow": "Az önce {device} üzerinden güncellendi",
+        "fromAgo": "{ago} {device} üzerinden güncellendi"
+      }
     },
     "audioPlayer": {
       "pause": "Duraklat",
@@ -3133,31 +3149,6 @@
         "one": "{count} dosyayı görüntüle",
         "other": "{count} dosyayı görüntüle"
       }
-    },
-    "emailDigest": {
-      "title": "E-posta",
-      "connectTitle": "Önemli e-postalar",
-      "connectBody": "Gmail'i bağlayın; Stella gün boyunca gelen kutunuzu kontrol edip yalnızca önemli yeni e-postaların kısa bir özetini yazsın.",
-      "connect": "Gmail'i bağla",
-      "connecting": "Google bekleniyor…",
-      "connectError": "Gmail bağlanamadı. Tekrar deneyin.",
-      "checkNow": "Şimdi kontrol et",
-      "checking": "Gelen kutusu kontrol ediliyor…",
-      "checked": "{when} kontrol edildi",
-      "firstDigest": "İlk özetiniz yolda",
-      "nothingNew": "Yeni bir şey yok",
-      "error": "Gelen kutusu kontrol edilemedi. Stella yakında tekrar deneyecek.",
-      "justNow": "Az önce",
-      "loadErrorTitle": "Özet yüklenemedi",
-      "loadErrorBody": "Stella şu anda sunucularına ulaşamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
-      "retry": "Tekrar dene",
-      "nothingNewSince": "{time} itibarıyla yeni bir şey yok",
-      "minutesAgo": "{count} dk önce",
-      "hoursAgo": "{count} sa önce",
-      "daysAgo": "{count} g önce",
-      "claudeLimit": "Claude kullanım sınırına ulaştın, bu yüzden bu sefer Stella'nın modeli kontrol etti.",
-      "claudeLimitUntil": "Claude kullanım sınırına {time} saatine kadar ulaştın, bu yüzden bu sefer Stella'nın modeli kontrol etti.",
-      "claudeFailed": "Claude Code bu kontrolü yapamadı, bu yüzden Stella'nın modeli yaptı."
     }
   },
   "sidebar": {
@@ -3469,5 +3460,90 @@
     "ownPlan": "Claude Code, kendi Claude Pro veya Max aboneliğinle çalışır.",
     "chatTitle": "Claude Code yüklü değil",
     "chatDescription": "Burada kur, ardından Claude planına giriş yap ve mesajını yeniden gönder."
+  },
+  "claudeLogin": {
+    "heldTitle": "Claude'da oturum açmanız bekleniyor",
+    "heldDescription": "Bu bilgisayardaki Claude oturumunuz sona erdi. Mesajınız saklanıyor ve oturum açar açmaz gönderilecek.",
+    "endedTitle": "Claude oturumunuz sona erdi",
+    "endedDescription": "Stella'nın Claude planınızla yanıt vermeye devam edebilmesi için yeniden oturum açın.",
+    "endedDescriptionEmail": "Stella'nın Claude planınızla yanıt vermeye devam edebilmesi için {email} hesabında yeniden oturum açın.",
+    "endingTitle": "Claude oturumunuz yakında sona erecek",
+    "endingDescription": "Claude yanıtlarının çalışmaya devam etmesi için {date} tarihinden önce yeniden oturum açın.",
+    "cloudEndingTitle": "Bulutundaki Claude oturumun yakında sona eriyor",
+    "cloudEndedTitle": "Bulutundaki Claude oturumun sona erdi",
+    "signIn": "Oturum aç",
+    "signedInContinuing": "Claude'da oturum açıldı. Stella şimdi yanıtlıyor.",
+    "signedInAsResend": "Claude'da {email} olarak oturum açıldı. Devam etmek için mesajınızı yeniden gönderin.",
+    "signedInResend": "Claude'da oturum açıldı. Devam etmek için mesajınızı yeniden gönderin."
+  },
+  "email": {
+    "title": "E-posta",
+    "notUrgent": "Acil değil",
+    "notImportant": "Önemli değil",
+    "failed": "Güncellenemedi. Tekrar deneyin.",
+    "card": {
+      "movedToSummary": "Sonraki özetinize taşındı",
+      "wontShow": "Bunlar artık gösterilmeyecek",
+      "showAll": "Tümünü göster ({count})",
+      "showLess": "Daha az göster",
+      "needYou": {
+        "one": "{count} sizi bekliyor",
+        "other": "{count} sizi bekliyor"
+      },
+      "worthKnowing": {
+        "one": "{count} bilmekte fayda var",
+        "other": "{count} bilmekte fayda var"
+      },
+      "skipped": {
+        "one": "{count} atlandı",
+        "other": "{count} atlandı"
+      }
+    },
+    "section": {
+      "connectTitle": "Önemli olan e-postalar",
+      "connectBody": "Gmail'i bağlayın; Stella yeni postaları geldikçe ayırsın. Acil olanlar size hemen ulaşır, gerisi sohbette kısa bir özet olarak gelir.",
+      "connect": "Gmail'i bağla",
+      "connecting": "Google bekleniyor…",
+      "connectError": "Gmail bağlanmadı. Tekrar deneyin.",
+      "reconnectTitle": "Gmail'i yeniden bağla",
+      "reconnectBody": "Stella'nın postalarınızı ayırabilmesi için Gmail'in Stella üzerinden yeniden bağlanması gerekiyor.",
+      "reconnect": "Gmail'i yeniden bağla",
+      "loadErrorTitle": "E-postalarınız yüklenemedi",
+      "loadErrorBody": "Stella şu anda sunucularına ulaşamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
+      "offTitle": "E-postalarınızı ayırın",
+      "offBody": "Stella yeni postaları geldikçe ayırır. Acil olanlar size hemen ulaşır, gerisi sohbette kısa bir özet olarak gelir. Gereksizler dışarıda kalır.",
+      "turnOn": "Aç",
+      "turningOn": "Son postalarınız ayrılıyor…",
+      "empty": "Henüz bir şey yok. Yeni postalar Stella ayırdıkça burada görünür.",
+      "needsYou": "Sizi bekliyor",
+      "worthKnowing": "Bilmekte fayda var",
+      "urgent": "Acil",
+      "actions": "E-posta işlemleri",
+      "openInGmail": "Gmail'de aç",
+      "moveToNeedsYou": "Sizi bekliyor'a taşı",
+      "moveToWorthKnowing": "Bilmekte fayda var'a taşı",
+      "skippedThisWeek": {
+        "one": "Bu hafta {count} atlandı",
+        "other": "Bu hafta {count} atlandı"
+      },
+      "noteTitle": "Sizin için önemli olanlar",
+      "notePlaceholder": "Stella, kapattıklarınızdan öğrenir. Bilmesi gerekenleri ekleyin; örneğin \"çocuğumun okulundan gelen her şey önemli, bültenler değil\".",
+      "saved": "Kaydedildi",
+      "rulesTitle": "Kalıcı talimatlar",
+      "rulesHint": "Stella'ya sohbette söyleyin; örneğin \"ev sahibim yazınca hemen haber ver\" ya da \"fatura gelince Drive'a kaydet\".",
+      "ruleTell": "Hemen haber verir",
+      "ruleAct": "Stella halleder",
+      "remove": "Kaldır",
+      "accountsTitle": "Hesaplar",
+      "live": "Canlı",
+      "polled": "Birkaç dakikada bir kontrol edilir",
+      "accountError": "Bu hesap kontrol edilemedi",
+      "usage": "Bu ay: {sorted} ayrıldı · {cost}",
+      "capped": "Ayırma gelecek aya kadar duraklatıldı",
+      "checkNow": "Şimdi kontrol et",
+      "checking": "Kontrol ediliyor…",
+      "turnOff": "Kapat",
+      "turnOffConfirm": "Kapatmak ayırmayı durdurur ve ayrılmış listeyi siler."
+    }
   }
 }

@@ -3149,31 +3149,6 @@
         "one": "{count} फ़ाइल देखें",
         "other": "{count} फ़ाइलें देखें"
       }
-    },
-    "emailDigest": {
-      "title": "ईमेल",
-      "connectTitle": "ज़रूरी ईमेल",
-      "connectBody": "Gmail कनेक्ट करें और Stella दिन भर आपका इनबॉक्स देखेगी, फिर सिर्फ़ ज़रूरी नए ईमेल का छोटा सा सारांश लिखेगी।",
-      "connect": "Gmail कनेक्ट करें",
-      "connecting": "Google का इंतज़ार…",
-      "connectError": "Gmail कनेक्ट नहीं हुआ। फिर से कोशिश करें।",
-      "checkNow": "अभी देखें",
-      "checking": "इनबॉक्स देखा जा रहा है…",
-      "checked": "{when} देखा गया",
-      "firstDigest": "आपका पहला सारांश आ रहा है",
-      "nothingNew": "कुछ नया नहीं",
-      "error": "इनबॉक्स नहीं देख पाए। Stella जल्द फिर कोशिश करेगी।",
-      "justNow": "अभी",
-      "loadErrorTitle": "सारांश लोड नहीं हो सका",
-      "loadErrorBody": "Stella अभी अपने सर्वर तक नहीं पहुँच पा रही है। कनेक्शन जाँचें और फिर कोशिश करें।",
-      "retry": "फिर कोशिश करें",
-      "nothingNewSince": "{time} से कुछ नया नहीं",
-      "minutesAgo": "{count} मिनट पहले",
-      "hoursAgo": "{count} घंटे पहले",
-      "daysAgo": "{count} दिन पहले",
-      "claudeLimit": "आपकी Claude उपयोग सीमा पूरी हो गई है, इसलिए इस बार Stella के मॉडल ने जाँच की।",
-      "claudeLimitUntil": "आपकी Claude उपयोग सीमा {time} तक पूरी हो गई है, इसलिए इस बार Stella के मॉडल ने जाँच की।",
-      "claudeFailed": "Claude Code यह जाँच नहीं कर सका, इसलिए Stella के मॉडल ने की।"
     }
   },
   "sidebar": {
@@ -3500,5 +3475,75 @@
     "signedInContinuing": "Claude में साइन इन हो गया। Stella अब जवाब दे रही है।",
     "signedInAsResend": "Claude में {email} के रूप में साइन इन हो गया। जारी रखने के लिए अपना संदेश फिर से भेजें।",
     "signedInResend": "Claude में साइन इन हो गया। जारी रखने के लिए अपना संदेश फिर से भेजें।"
+  },
+  "email": {
+    "title": "ईमेल",
+    "notUrgent": "ज़रूरी नहीं",
+    "notImportant": "महत्वपूर्ण नहीं",
+    "failed": "अपडेट नहीं हो सका। फिर से कोशिश करें।",
+    "card": {
+      "movedToSummary": "आपके अगले सारांश में भेजा गया",
+      "wontShow": "ऐसे अब नहीं दिखाऊँगी",
+      "showAll": "सभी {count} दिखाएँ",
+      "showLess": "कम दिखाएँ",
+      "needYou": {
+        "one": "{count} को आपकी ज़रूरत है",
+        "other": "{count} को आपकी ज़रूरत है"
+      },
+      "worthKnowing": {
+        "one": "{count} जानने लायक",
+        "other": "{count} जानने लायक"
+      },
+      "skipped": {
+        "one": "{count} छोड़ा गया",
+        "other": "{count} छोड़े गए"
+      }
+    },
+    "section": {
+      "connectTitle": "वे ईमेल जो मायने रखते हैं",
+      "connectBody": "Gmail जोड़ें और Stella नया मेल आते ही छाँटेगी। ज़रूरी मेल आप तक तुरंत पहुँचता है; बाकी चैट में एक छोटे सारांश के रूप में आता है।",
+      "connect": "Gmail जोड़ें",
+      "connecting": "Google का इंतज़ार…",
+      "connectError": "Gmail नहीं जुड़ा। फिर से कोशिश करें।",
+      "reconnectTitle": "Gmail फिर से जोड़ें",
+      "reconnectBody": "Stella आपका मेल छाँट सके, इसके लिए Gmail को Stella के ज़रिए फिर से जोड़ना होगा।",
+      "reconnect": "Gmail फिर से जोड़ें",
+      "loadErrorTitle": "आपका ईमेल लोड नहीं हो सका",
+      "loadErrorBody": "Stella अभी अपने सर्वर तक नहीं पहुँच पा रही। कनेक्शन जाँचें और फिर से कोशिश करें।",
+      "offTitle": "अपना ईमेल छाँटें",
+      "offBody": "Stella नया मेल आते ही छाँटती है। ज़रूरी मेल आप तक तुरंत पहुँचता है; बाकी चैट में एक छोटे सारांश के रूप में आता है। फ़ालतू मेल बाहर रहता है।",
+      "turnOn": "चालू करें",
+      "turningOn": "आपके हाल के मेल छाँटे जा रहे हैं…",
+      "empty": "अभी कुछ नहीं। Stella के छाँटने के बाद नया मेल यहाँ दिखेगा।",
+      "needsYou": "आपकी ज़रूरत",
+      "worthKnowing": "जानने लायक",
+      "urgent": "ज़रूरी",
+      "actions": "ईमेल कार्रवाइयाँ",
+      "openInGmail": "Gmail में खोलें",
+      "moveToNeedsYou": "'आपकी ज़रूरत' में ले जाएँ",
+      "moveToWorthKnowing": "'जानने लायक' में ले जाएँ",
+      "skippedThisWeek": {
+        "one": "इस हफ़्ते {count} छोड़ा गया",
+        "other": "इस हफ़्ते {count} छोड़े गए"
+      },
+      "noteTitle": "आपके लिए क्या मायने रखता है",
+      "notePlaceholder": "Stella उससे सीखती है जिसे आप हटाते हैं। जो उसे जानना चाहिए वह जोड़ें, जैसे \"मेरे बच्चे के स्कूल से आया सब कुछ ज़रूरी है; न्यूज़लेटर नहीं\"।",
+      "saved": "सहेजा गया",
+      "rulesTitle": "स्थायी निर्देश",
+      "rulesHint": "चैट में Stella से कहें, जैसे \"जब मकान मालिक ईमेल करे तो तुरंत बताना\" या \"इनवॉइस आए तो उसे Drive में रख देना\"।",
+      "ruleTell": "तुरंत बताती है",
+      "ruleAct": "Stella सँभाल लेती है",
+      "remove": "हटाएँ",
+      "accountsTitle": "खाते",
+      "live": "लाइव",
+      "polled": "हर कुछ मिनट में जाँचा जाता है",
+      "accountError": "यह खाता जाँचा नहीं जा सका",
+      "usage": "इस महीने: {sorted} छाँटे गए · {cost}",
+      "capped": "छँटाई अगले महीने तक रुकी है",
+      "checkNow": "अभी जाँचें",
+      "checking": "जाँच हो रही है…",
+      "turnOff": "बंद करें",
+      "turnOffConfirm": "बंद करने से छँटाई रुक जाती है और छँटी हुई सूची मिट जाती है।"
+    }
   }
 }

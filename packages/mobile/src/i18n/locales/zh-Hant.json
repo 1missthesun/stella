@@ -2794,7 +2794,23 @@
       },
       "updating": "正在更新…",
       "afterRecording": "錄製結束後",
-      "afterReply": "等 Stella 回覆完"
+      "afterReply": "等 Stella 回覆完",
+      "devices": {
+        "choose": "選擇電腦",
+        "thisComputer": "這台電腦",
+        "offline": "重新開機後就會更新",
+        "updateThisOnly": "只更新這台電腦",
+        "updateAll": "更新你所有的電腦"
+      },
+      "conflicts": {
+        "title": "此更新與你的變更有重疊",
+        "unsure": "更新時會由一個任務合併它們",
+        "allowance": "合併會用掉一部分免費額度"
+      },
+      "arrived": {
+        "fromJustNow": "剛剛從 {device} 更新",
+        "fromAgo": "{ago}從 {device} 更新"
+      }
     },
     "audioPlayer": {
       "pause": "暫停",
@@ -3114,31 +3130,6 @@
       "viewFiles": {
         "other": "查看 {count} 個檔案"
       }
-    },
-    "emailDigest": {
-      "title": "郵件",
-      "connectTitle": "重要的郵件",
-      "connectBody": "連接 Gmail 後，Stella 會在一天中查看你的收件匣，只為重要的新郵件寫一份簡短摘要。",
-      "connect": "連接 Gmail",
-      "connecting": "正在等待 Google…",
-      "connectError": "Gmail 未能連接，請再試一次。",
-      "checkNow": "立即查看",
-      "checking": "正在查看收件匣…",
-      "checked": "{when}已查看",
-      "firstDigest": "你的第一份摘要即將送達",
-      "nothingNew": "沒有新內容",
-      "error": "無法查看收件匣，Stella 稍後會再試。",
-      "justNow": "剛剛",
-      "loadErrorTitle": "無法載入摘要",
-      "loadErrorBody": "Stella 暫時無法連線到伺服器。請檢查網路後再試一次。",
-      "retry": "再試一次",
-      "nothingNewSince": "自 {time} 以來沒有新內容",
-      "minutesAgo": "{count} 分鐘前",
-      "hoursAgo": "{count} 小時前",
-      "daysAgo": "{count} 天前",
-      "claudeLimit": "已達到 Claude 使用上限，因此這次由 Stella 的模型檢查。",
-      "claudeLimitUntil": "Claude 使用上限將持續到 {time}，因此這次由 Stella 的模型檢查。",
-      "claudeFailed": "Claude Code 無法執行這次檢查，因此由 Stella 的模型完成。"
     }
   },
   "sidebar": {
@@ -3447,5 +3438,86 @@
     "ownPlan": "Claude Code 使用你自己的 Claude Pro 或 Max 訂閱執行。",
     "chatTitle": "未安裝 Claude Code",
     "chatDescription": "在這裡安裝，然後登入你的 Claude 方案並重新傳送訊息。"
+  },
+  "claudeLogin": {
+    "heldTitle": "正在等待你登入 Claude",
+    "heldDescription": "你在這台電腦上的 Claude 登入已失效。你的訊息已保留，登入後會立即送出。",
+    "endedTitle": "你的 Claude 登入已失效",
+    "endedDescription": "請重新登入，讓 Stella 繼續使用你的 Claude 方案回覆。",
+    "endedDescriptionEmail": "請重新登入 {email}，讓 Stella 繼續使用你的 Claude 方案回覆。",
+    "endingTitle": "你的 Claude 登入即將失效",
+    "endingDescription": "請在 {date} 之前重新登入，讓 Claude 回覆繼續正常運作。",
+    "cloudEndingTitle": "你雲端的 Claude 登入即將到期",
+    "cloudEndedTitle": "你雲端的 Claude 登入已到期",
+    "signIn": "登入",
+    "signedInContinuing": "已登入 Claude。Stella 正在回覆。",
+    "signedInAsResend": "已以 {email} 登入 Claude。請重新傳送訊息以繼續。",
+    "signedInResend": "已登入 Claude。請重新傳送訊息以繼續。"
+  },
+  "email": {
+    "title": "郵件",
+    "notUrgent": "不緊急",
+    "notImportant": "不重要",
+    "failed": "無法更新，請再試一次。",
+    "card": {
+      "movedToSummary": "已移到下一份摘要",
+      "wontShow": "不再顯示此類郵件",
+      "showAll": "顯示全部 {count} 封",
+      "showLess": "收合",
+      "needYou": {
+        "other": "{count} 封需要你處理"
+      },
+      "worthKnowing": {
+        "other": "{count} 封值得了解"
+      },
+      "skipped": {
+        "other": "已略過 {count} 封"
+      }
+    },
+    "section": {
+      "connectTitle": "只看重要的郵件",
+      "connectBody": "連結 Gmail 後，Stella 會在新郵件抵達時進行分類。緊急郵件會立即通知你，其餘的以簡短摘要傳到聊天中。",
+      "connect": "連結 Gmail",
+      "connecting": "正在等待 Google…",
+      "connectError": "Gmail 未連結，請再試一次。",
+      "reconnectTitle": "重新連結 Gmail",
+      "reconnectBody": "需要透過 Stella 重新連結 Gmail，Stella 才能為你分類郵件。",
+      "reconnect": "重新連結 Gmail",
+      "loadErrorTitle": "無法載入郵件",
+      "loadErrorBody": "Stella 暫時無法連線到伺服器。請檢查網路後再試一次。",
+      "offTitle": "分類你的郵件",
+      "offBody": "Stella 會在新郵件抵達時進行分類。緊急郵件會立即通知你，其餘的以簡短摘要傳到聊天中。無關郵件會被擋在外面。",
+      "turnOn": "開啟",
+      "turningOn": "正在分類最近的郵件…",
+      "empty": "目前沒有內容。Stella 分類後的新郵件會顯示在這裡。",
+      "needsYou": "需要你處理",
+      "worthKnowing": "值得了解",
+      "urgent": "緊急",
+      "actions": "郵件動作",
+      "openInGmail": "在 Gmail 中開啟",
+      "moveToNeedsYou": "移到「需要你處理」",
+      "moveToWorthKnowing": "移到「值得了解」",
+      "skippedThisWeek": {
+        "other": "本週已略過 {count} 封"
+      },
+      "noteTitle": "對你重要的事",
+      "notePlaceholder": "Stella 會從你忽略的郵件中學習。也可以寫下它需要知道的，例如「孩子學校的郵件都重要，電子報不重要」。",
+      "saved": "已儲存",
+      "rulesTitle": "長期指示",
+      "rulesHint": "在聊天中告訴 Stella，例如「房東來信時馬上告訴我」或「收到發票時存到 Drive」。",
+      "ruleTell": "立即通知你",
+      "ruleAct": "由 Stella 處理",
+      "remove": "移除",
+      "accountsTitle": "帳戶",
+      "live": "即時",
+      "polled": "每隔幾分鐘檢查一次",
+      "accountError": "無法檢查此帳戶",
+      "usage": "本月：已分類 {sorted} 封 · {cost}",
+      "capped": "分類已暫停，下個月恢復",
+      "checkNow": "立即檢查",
+      "checking": "正在檢查…",
+      "turnOff": "關閉",
+      "turnOffConfirm": "關閉後將停止分類，並刪除已分類的清單。"
+    }
   }
 }

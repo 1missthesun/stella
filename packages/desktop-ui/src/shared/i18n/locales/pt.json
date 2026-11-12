@@ -3166,31 +3166,6 @@
         "one": "Ver {count} arquivo",
         "other": "Ver {count} arquivos"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "Os e-mails que importam",
-      "connectBody": "Conecte o Gmail e a Stella verifica sua caixa de entrada ao longo do dia, escrevendo um resumo curto só dos novos e-mails importantes.",
-      "connect": "Conectar Gmail",
-      "connecting": "Aguardando o Google…",
-      "connectError": "O Gmail não conectou. Tente novamente.",
-      "checkNow": "Verificar agora",
-      "checking": "Verificando sua caixa…",
-      "checked": "Verificado {when}",
-      "firstDigest": "Seu primeiro resumo está a caminho",
-      "nothingNew": "Nada novo",
-      "error": "Não foi possível verificar sua caixa. A Stella tentará de novo em breve.",
-      "justNow": "Agora mesmo",
-      "loadErrorTitle": "Não foi possível carregar seu resumo",
-      "loadErrorBody": "A Stella não consegue acessar os servidores agora. Verifique sua conexão e tente novamente.",
-      "retry": "Tentar novamente",
-      "nothingNewSince": "Nada novo desde {time}",
-      "minutesAgo": "há {count} min",
-      "hoursAgo": "há {count} h",
-      "daysAgo": "há {count} d",
-      "claudeLimit": "Você atingiu o limite de uso do Claude, então desta vez o modelo da Stella verificou.",
-      "claudeLimitUntil": "Você atingiu o limite de uso do Claude até {time}, então desta vez o modelo da Stella verificou.",
-      "claudeFailed": "O Claude Code não conseguiu fazer esta verificação, então o modelo da Stella fez."
     }
   },
   "sidebar": {
@@ -3520,5 +3495,79 @@
     "signedInContinuing": "Conectado ao Claude. A Stella está respondendo agora.",
     "signedInAsResend": "Conectado ao Claude como {email}. Envie sua mensagem novamente para continuar.",
     "signedInResend": "Conectado ao Claude. Envie sua mensagem novamente para continuar."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Não é urgente",
+    "notImportant": "Não é importante",
+    "failed": "Não foi possível atualizar. Tente de novo.",
+    "card": {
+      "movedToSummary": "Movido para o próximo resumo",
+      "wontShow": "Não vou mostrar mais estes",
+      "showAll": "Mostrar todos ({count})",
+      "showLess": "Mostrar menos",
+      "needYou": {
+        "many": "{count} precisam de você",
+        "one": "{count} precisa de você",
+        "other": "{count} precisam de você"
+      },
+      "worthKnowing": {
+        "many": "{count} valem saber",
+        "one": "{count} vale saber",
+        "other": "{count} valem saber"
+      },
+      "skipped": {
+        "many": "{count} ignorados",
+        "one": "{count} ignorado",
+        "other": "{count} ignorados"
+      }
+    },
+    "section": {
+      "connectTitle": "Os e-mails que importam",
+      "connectBody": "Conecte o Gmail e a Stella organiza os novos e-mails assim que chegam. O urgente chega a você na hora; o resto vem como um resumo curto no chat.",
+      "connect": "Conectar Gmail",
+      "connecting": "Aguardando o Google…",
+      "connectError": "O Gmail não conectou. Tente de novo.",
+      "reconnectTitle": "Reconectar Gmail",
+      "reconnectBody": "O Gmail precisa ser reconectado pela Stella para que ela possa organizar seus e-mails.",
+      "reconnect": "Reconectar Gmail",
+      "loadErrorTitle": "Não foi possível carregar seus e-mails",
+      "loadErrorBody": "A Stella não consegue acessar os servidores agora. Verifique sua conexão e tente de novo.",
+      "offTitle": "Organize seus e-mails",
+      "offBody": "A Stella organiza os novos e-mails assim que chegam. O urgente chega a você na hora; o resto vem como um resumo curto no chat. O ruído fica de fora.",
+      "turnOn": "Ativar",
+      "turningOn": "Organizando seus e-mails recentes…",
+      "empty": "Nada ainda. Novos e-mails aparecem aqui quando a Stella os organiza.",
+      "needsYou": "Precisa de você",
+      "worthKnowing": "Vale saber",
+      "urgent": "Urgente",
+      "actions": "Ações do e-mail",
+      "openInGmail": "Abrir no Gmail",
+      "moveToNeedsYou": "Mover para Precisa de você",
+      "moveToWorthKnowing": "Mover para Vale saber",
+      "skippedThisWeek": {
+        "many": "{count} ignorados esta semana",
+        "one": "{count} ignorado esta semana",
+        "other": "{count} ignorados esta semana"
+      },
+      "noteTitle": "O que importa para você",
+      "notePlaceholder": "A Stella aprende com o que você descarta. Acrescente o que ela deve saber, como \"tudo da escola do meu filho importa; newsletters não\".",
+      "saved": "Salvo",
+      "rulesTitle": "Instruções permanentes",
+      "rulesHint": "Diga à Stella no chat, por ex. \"me avise na hora quando o proprietário escrever\" ou \"quando chegar uma fatura, arquive no Drive\".",
+      "ruleTell": "Avisa você na hora",
+      "ruleAct": "A Stella cuida disso",
+      "remove": "Remover",
+      "accountsTitle": "Contas",
+      "live": "Ao vivo",
+      "polled": "Verificado a cada poucos minutos",
+      "accountError": "Não foi possível verificar esta conta",
+      "usage": "Este mês: {sorted} organizados · {cost}",
+      "capped": "Organização pausada até o próximo mês",
+      "checkNow": "Verificar agora",
+      "checking": "Verificando…",
+      "turnOff": "Desativar",
+      "turnOffConfirm": "Desativar interrompe a organização e apaga a lista organizada."
+    }
   }
 }

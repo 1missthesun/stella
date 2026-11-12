@@ -2804,7 +2804,23 @@
       },
       "updating": "Frissítés…",
       "afterRecording": "A felvétel után",
-      "afterReply": "Miután Stella befejezte a választ"
+      "afterReply": "Miután Stella befejezte a választ",
+      "devices": {
+        "choose": "Számítógépek kiválasztása",
+        "thisComputer": "Ez a számítógép",
+        "offline": "Megkapja, amikor újra be lesz kapcsolva",
+        "updateThisOnly": "Csak ennek a számítógépnek a frissítése",
+        "updateAll": "Az összes számítógéped frissítése"
+      },
+      "conflicts": {
+        "title": "Ez a frissítés átfedésben van a módosításaiddal",
+        "unsure": "Frissítéskor egy feladat egyesíti őket",
+        "allowance": "Az egyesítés felhasznál az ingyenes keretedből"
+      },
+      "arrived": {
+        "fromJustNow": "Frissítve innen: {device}, az imént",
+        "fromAgo": "Frissítve innen: {device}, {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Szünet",
@@ -3133,31 +3149,6 @@
         "one": "{count} fájl megtekintése",
         "other": "{count} fájl megtekintése"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "A fontos e-mailek",
-      "connectBody": "Csatlakoztasd a Gmailt, és a Stella a nap folyamán átnézi a beérkezett leveleidet, majd rövid összefoglalót ír csak a fontos új levelekről.",
-      "connect": "Gmail csatlakoztatása",
-      "connecting": "Várakozás a Google-ra…",
-      "connectError": "A Gmail nem csatlakozott. Próbáld újra.",
-      "checkNow": "Ellenőrzés most",
-      "checking": "Beérkezett levelek ellenőrzése…",
-      "checked": "Ellenőrizve {when}",
-      "firstDigest": "Az első összefoglalód úton van",
-      "nothingNew": "Nincs újdonság",
-      "error": "Nem sikerült ellenőrizni a leveleidet. A Stella hamarosan újra próbálja.",
-      "justNow": "Épp most",
-      "loadErrorTitle": "Nem sikerült betölteni az összefoglalót",
-      "loadErrorBody": "A Stella most nem éri el a szervereit. Ellenőrizd a kapcsolatot, és próbáld újra.",
-      "retry": "Újra",
-      "nothingNewSince": "Nincs újdonság {time} óta",
-      "minutesAgo": "{count} perce",
-      "hoursAgo": "{count} órája",
-      "daysAgo": "{count} napja",
-      "claudeLimit": "Elérted a Claude használati korlátját, ezért most a Stella modellje ellenőrzött.",
-      "claudeLimitUntil": "Elérted a Claude használati korlátját {time}-ig, ezért most a Stella modellje ellenőrzött.",
-      "claudeFailed": "A Claude Code nem tudta lefuttatni ezt az ellenőrzést, ezért a Stella modellje végezte el."
     }
   },
   "sidebar": {
@@ -3469,5 +3460,90 @@
     "ownPlan": "A Claude Code a saját Claude Pro- vagy Max-előfizetéseddel működik.",
     "chatTitle": "A Claude Code nincs telepítve",
     "chatDescription": "Telepítsd itt, jelentkezz be a Claude-előfizetésedbe, majd küldd el újra az üzenetet."
+  },
+  "claudeLogin": {
+    "heldTitle": "Várakozás a Claude-bejelentkezésedre",
+    "heldDescription": "A Claude-bejelentkezésed ezen a számítógépen lejárt. Az üzeneted megmarad, és azonnal elmegy, amint bejelentkezel.",
+    "endedTitle": "A Claude-bejelentkezésed lejárt",
+    "endedDescription": "Jelentkezz be újra, hogy Stella továbbra is a Claude-előfizetéseddel válaszolhasson.",
+    "endedDescriptionEmail": "Jelentkezz be újra ezzel: {email}, hogy Stella továbbra is a Claude-előfizetéseddel válaszolhasson.",
+    "endingTitle": "A Claude-bejelentkezésed hamarosan lejár",
+    "endingDescription": "Jelentkezz be újra ez előtt: {date}, hogy a Claude-válaszok továbbra is működjenek.",
+    "cloudEndingTitle": "A Claude-bejelentkezésed a felhődben hamarosan lejár",
+    "cloudEndedTitle": "A Claude-bejelentkezésed a felhődben lejárt",
+    "signIn": "Bejelentkezés",
+    "signedInContinuing": "Bejelentkeztél a Claude-ba. Stella most válaszol.",
+    "signedInAsResend": "Bejelentkeztél a Claude-ba ezzel: {email}. A folytatáshoz küldd el újra az üzeneted.",
+    "signedInResend": "Bejelentkeztél a Claude-ba. A folytatáshoz küldd el újra az üzeneted."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Nem sürgős",
+    "notImportant": "Nem fontos",
+    "failed": "Nem sikerült frissíteni. Próbáld újra.",
+    "card": {
+      "movedToSummary": "Áthelyezve a következő összefoglalóba",
+      "wontShow": "Ilyeneket nem mutatok többé",
+      "showAll": "Mind a(z) {count} mutatása",
+      "showLess": "Kevesebb",
+      "needYou": {
+        "one": "{count} rád vár",
+        "other": "{count} rád vár"
+      },
+      "worthKnowing": {
+        "one": "{count} jó tudni",
+        "other": "{count} jó tudni"
+      },
+      "skipped": {
+        "one": "{count} kihagyva",
+        "other": "{count} kihagyva"
+      }
+    },
+    "section": {
+      "connectTitle": "A fontos e-mailek",
+      "connectBody": "Kapcsold össze a Gmailt, és Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi rövid összefoglalóként jön a csevegésbe.",
+      "connect": "Gmail összekapcsolása",
+      "connecting": "Várakozás a Google-re…",
+      "connectError": "A Gmail nem kapcsolódott. Próbáld újra.",
+      "reconnectTitle": "Gmail újrakapcsolása",
+      "reconnectBody": "A Gmailt újra össze kell kapcsolni Stellán keresztül, hogy Stella rendezhesse a leveleidet.",
+      "reconnect": "Gmail újrakapcsolása",
+      "loadErrorTitle": "Nem sikerült betölteni az e-mailjeidet",
+      "loadErrorBody": "Stella most nem éri el a szervereit. Ellenőrizd a kapcsolatot, és próbáld újra.",
+      "offTitle": "Rendezd az e-mailjeidet",
+      "offBody": "Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi rövid összefoglalóként jön a csevegésbe. A zaj kimarad.",
+      "turnOn": "Bekapcsolás",
+      "turningOn": "A legutóbbi levelek rendezése…",
+      "empty": "Még semmi. Az új levelek itt jelennek meg, miután Stella rendezte őket.",
+      "needsYou": "Rád vár",
+      "worthKnowing": "Jó tudni",
+      "urgent": "Sürgős",
+      "actions": "E-mail műveletek",
+      "openInGmail": "Megnyitás a Gmailben",
+      "moveToNeedsYou": "Áthelyezés: Rád vár",
+      "moveToWorthKnowing": "Áthelyezés: Jó tudni",
+      "skippedThisWeek": {
+        "one": "{count} kihagyva a héten",
+        "other": "{count} kihagyva a héten"
+      },
+      "noteTitle": "Ami neked fontos",
+      "notePlaceholder": "Stella abból tanul, amit elvetsz. Írd le, amit tudnia kell, például: \"a gyerekem iskolájától minden fontos, a hírlevelek nem\".",
+      "saved": "Mentve",
+      "rulesTitle": "Állandó utasítások",
+      "rulesHint": "Mondd el Stellának a csevegésben, pl. \"szólj azonnal, ha a főbérlőm ír\" vagy \"ha számla jön, tedd a Drive-ba\".",
+      "ruleTell": "Azonnal szól",
+      "ruleAct": "Stella elintézi",
+      "remove": "Eltávolítás",
+      "accountsTitle": "Fiókok",
+      "live": "Élő",
+      "polled": "Néhány percenként ellenőrizve",
+      "accountError": "Ezt a fiókot nem sikerült ellenőrizni",
+      "usage": "Ebben a hónapban: {sorted} rendezve · {cost}",
+      "capped": "A rendezés jövő hónapig szünetel",
+      "checkNow": "Ellenőrzés most",
+      "checking": "Ellenőrzés…",
+      "turnOff": "Kikapcsolás",
+      "turnOffConfirm": "A kikapcsolás leállítja a rendezést, és törli a rendezett listát."
+    }
   }
 }

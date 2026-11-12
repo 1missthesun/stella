@@ -2794,7 +2794,23 @@
       },
       "updating": "アップデート中…",
       "afterRecording": "録画の終了後",
-      "afterReply": "Stellaの返信が終わったら"
+      "afterReply": "Stellaの返信が終わったら",
+      "devices": {
+        "choose": "コンピュータを選ぶ",
+        "thisComputer": "このコンピュータ",
+        "offline": "次に起動したときに適用されます",
+        "updateThisOnly": "このコンピュータだけ更新",
+        "updateAll": "すべてのコンピュータを更新"
+      },
+      "conflicts": {
+        "title": "このアップデートはあなたの変更と重なっています",
+        "unsure": "更新するとタスクが統合します",
+        "allowance": "統合には無料枠の一部を使います"
+      },
+      "arrived": {
+        "fromJustNow": "たった今 {device} から更新",
+        "fromAgo": "{ago}に {device} から更新"
+      }
     },
     "audioPlayer": {
       "pause": "一時停止",
@@ -3114,31 +3130,6 @@
       "viewFiles": {
         "other": "{count} 個のファイルを表示"
       }
-    },
-    "emailDigest": {
-      "title": "メール",
-      "connectTitle": "大切なメールだけ",
-      "connectBody": "Gmail を接続すると、Stella が一日を通して受信トレイを確認し、重要な新着メールだけを短くまとめます。",
-      "connect": "Gmail を接続",
-      "connecting": "Google を待っています…",
-      "connectError": "Gmail に接続できませんでした。もう一度お試しください。",
-      "checkNow": "今すぐ確認",
-      "checking": "受信トレイを確認中…",
-      "checked": "{when}に確認",
-      "firstDigest": "最初のまとめを準備中です",
-      "nothingNew": "新着なし",
-      "error": "受信トレイを確認できませんでした。まもなく再試行します。",
-      "justNow": "たった今",
-      "loadErrorTitle": "まとめを読み込めませんでした",
-      "loadErrorBody": "Stella がサーバーに接続できません。接続を確認して、もう一度お試しください。",
-      "retry": "再試行",
-      "nothingNewSince": "{time} 以降、新着なし",
-      "minutesAgo": "{count}分前",
-      "hoursAgo": "{count}時間前",
-      "daysAgo": "{count}日前",
-      "claudeLimit": "Claude の使用上限に達したため、今回は Stella のモデルが確認しました。",
-      "claudeLimitUntil": "{time} まで Claude の使用上限に達しているため、今回は Stella のモデルが確認しました。",
-      "claudeFailed": "Claude Code でこの確認を実行できなかったため、Stella のモデルが実行しました。"
     }
   },
   "sidebar": {
@@ -3447,5 +3438,86 @@
     "ownPlan": "Claude Code は、ご自身の Claude Pro または Max のサブスクリプションで動作します。",
     "chatTitle": "Claude Code がインストールされていません",
     "chatDescription": "ここでインストールし、Claude のプランにサインインしてから、メッセージをもう一度送信してください。"
+  },
+  "claudeLogin": {
+    "heldTitle": "Claude へのサインインを待っています",
+    "heldDescription": "このコンピュータでの Claude のサインインが終了しました。メッセージは保存されており、サインインするとすぐに送信されます。",
+    "endedTitle": "Claude のサインインが終了しました",
+    "endedDescription": "Stella が Claude プランで応答を続けられるよう、もう一度サインインしてください。",
+    "endedDescriptionEmail": "Stella が Claude プランで応答を続けられるよう、{email} にもう一度サインインしてください。",
+    "endingTitle": "Claude のサインインがまもなく終了します",
+    "endingDescription": "Claude の返信が引き続き動作するよう、{date} までにもう一度サインインしてください。",
+    "cloudEndingTitle": "クラウドの Claude のサインインがまもなく終了します",
+    "cloudEndedTitle": "クラウドの Claude のサインインが終了しました",
+    "signIn": "サインイン",
+    "signedInContinuing": "Claude にサインインしました。Stella が応答しています。",
+    "signedInAsResend": "{email} として Claude にサインインしました。続けるにはメッセージをもう一度送信してください。",
+    "signedInResend": "Claude にサインインしました。続けるにはメッセージをもう一度送信してください。"
+  },
+  "email": {
+    "title": "メール",
+    "notUrgent": "急ぎではない",
+    "notImportant": "重要ではない",
+    "failed": "更新できませんでした。もう一度お試しください。",
+    "card": {
+      "movedToSummary": "次のまとめに移しました",
+      "wontShow": "今後このようなメールは表示しません",
+      "showAll": "すべて表示（{count}件）",
+      "showLess": "表示を減らす",
+      "needYou": {
+        "other": "要対応 {count}件"
+      },
+      "worthKnowing": {
+        "other": "知っておくと良い {count}件"
+      },
+      "skipped": {
+        "other": "{count}件スキップ"
+      }
+    },
+    "section": {
+      "connectTitle": "大切なメールだけを",
+      "connectBody": "Gmail を接続すると、Stella が新着メールを届いた順に仕分けます。急ぎのメールはすぐに、その他はチャットで短いまとめとして届きます。",
+      "connect": "Gmail を接続",
+      "connecting": "Google を待っています…",
+      "connectError": "Gmail に接続できませんでした。もう一度お試しください。",
+      "reconnectTitle": "Gmail を再接続",
+      "reconnectBody": "Stella がメールを仕分けるには、Stella 経由で Gmail を再接続する必要があります。",
+      "reconnect": "Gmail を再接続",
+      "loadErrorTitle": "メールを読み込めませんでした",
+      "loadErrorBody": "Stella がサーバーに接続できません。接続を確認して、もう一度お試しください。",
+      "offTitle": "メールを仕分ける",
+      "offBody": "Stella が新着メールを届いた順に仕分けます。急ぎのメールはすぐに、その他はチャットで短いまとめとして届きます。不要なメールは表示しません。",
+      "turnOn": "オンにする",
+      "turningOn": "最近のメールを仕分けています…",
+      "empty": "まだありません。Stella が仕分けた新着メールがここに表示されます。",
+      "needsYou": "要対応",
+      "worthKnowing": "知っておくと良い",
+      "urgent": "急ぎ",
+      "actions": "メールの操作",
+      "openInGmail": "Gmail で開く",
+      "moveToNeedsYou": "「要対応」に移動",
+      "moveToWorthKnowing": "「知っておくと良い」に移動",
+      "skippedThisWeek": {
+        "other": "今週 {count}件スキップ"
+      },
+      "noteTitle": "あなたにとって大切なこと",
+      "notePlaceholder": "Stella はあなたが除外したものから学びます。知っておいてほしいことを書いてください。例：「子どもの学校からのメールは重要、ニュースレターは不要」",
+      "saved": "保存しました",
+      "rulesTitle": "常設の指示",
+      "rulesHint": "チャットで Stella に伝えてください。例：「大家さんからメールが来たらすぐ知らせて」「請求書が届いたら Drive に保存して」",
+      "ruleTell": "すぐに知らせます",
+      "ruleAct": "Stella が対応します",
+      "remove": "削除",
+      "accountsTitle": "アカウント",
+      "live": "リアルタイム",
+      "polled": "数分ごとに確認",
+      "accountError": "このアカウントを確認できませんでした",
+      "usage": "今月：{sorted}件を仕分け · {cost}",
+      "capped": "来月まで仕分けを一時停止しています",
+      "checkNow": "今すぐ確認",
+      "checking": "確認中…",
+      "turnOff": "オフにする",
+      "turnOffConfirm": "オフにすると仕分けが止まり、仕分け済みの一覧が削除されます。"
+    }
   }
 }

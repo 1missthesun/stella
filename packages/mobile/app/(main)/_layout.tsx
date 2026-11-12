@@ -96,7 +96,7 @@ const EMPTY_RUNNING_AGENTS: readonly ActivityIndicatorEntry[] = [];
 
 const PAGE_TITLE_KEYS: Partial<Record<MainTabId, string>> = {
   schedule: "mobile.activityHub.tabs.schedule",
-  email: "shell.emailDigest.title",
+  email: "email.title",
   apps: "mobile.nav.apps",
   files: "mobile.activityHub.tabs.files",
 };

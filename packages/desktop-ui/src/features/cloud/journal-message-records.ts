@@ -7,6 +7,7 @@ import type {
 import { isPiAgentText } from "@stella/contracts/pi-chat";
 import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
+import { parseEmailCard } from "@stella/contracts/email-card";
 import {
   parseSafeguardCard,
   safeguardCardLabel,
@@ -347,6 +348,16 @@ export const journalRecordsToMessageRecords = (
           timestamp: record.createdAtMs,
           type: "assistant_message",
           payload: { text: "", metadata: { scheduleNotice } },
+        });
+        continue;
+      }
+      const emailCard = record.kind === "card" ? parseEmailCard(record.card) : null;
+      if (emailCard) {
+        events.push({
+          _id: `cloud:${turnId}:email:${record.seq}`,
+          timestamp: record.createdAtMs,
+          type: "assistant_message",
+          payload: { text: "", metadata: { emailCard } },
         });
         continue;
       }

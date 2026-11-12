@@ -3183,31 +3183,6 @@
         "one": "Zobrazit {count} soubor",
         "other": "Zobrazit {count} souborů"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "E-maily, na kterých záleží",
-      "connectBody": "Propojte Gmail a Stella bude během dne kontrolovat vaši schránku a psát krátký přehled jen důležité nové pošty.",
-      "connect": "Propojit Gmail",
-      "connecting": "Čekání na Google…",
-      "connectError": "Gmail se nepropojil. Zkuste to znovu.",
-      "checkNow": "Zkontrolovat",
-      "checking": "Kontroluji schránku…",
-      "checked": "Zkontrolováno {when}",
-      "firstDigest": "Váš první přehled je na cestě",
-      "nothingNew": "Nic nového",
-      "error": "Schránku se nepodařilo zkontrolovat. Stella to brzy zkusí znovu.",
-      "justNow": "Právě teď",
-      "loadErrorTitle": "Přehled se nepodařilo načíst",
-      "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontrolujte připojení a zkuste to znovu.",
-      "retry": "Zkusit znovu",
-      "nothingNewSince": "Nic nového od {time}",
-      "minutesAgo": "před {count} min",
-      "hoursAgo": "před {count} h",
-      "daysAgo": "před {count} d",
-      "claudeLimit": "Dosáhli jste limitu využití Claude, takže tentokrát kontroloval model Stella.",
-      "claudeLimitUntil": "Dosáhli jste limitu využití Claude do {time}, takže tentokrát kontroloval model Stella.",
-      "claudeFailed": "Claude Code tuto kontrolu nemohl provést, takže ji provedl model Stella."
     }
   },
   "sidebar": {
@@ -3540,5 +3515,83 @@
     "signedInContinuing": "Přihlášeno ke Claude. Stella právě odpovídá.",
     "signedInAsResend": "Přihlášeno ke Claude jako {email}. Pokračujte odesláním zprávy znovu.",
     "signedInResend": "Přihlášeno ke Claude. Pokračujte odesláním zprávy znovu."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Nespěchá",
+    "notImportant": "Nedůležité",
+    "failed": "Aktualizace se nezdařila. Zkuste to znovu.",
+    "card": {
+      "movedToSummary": "Přesunuto do příštího shrnutí",
+      "wontShow": "Takové už neukážu",
+      "showAll": "Zobrazit vše: {count}",
+      "showLess": "Zobrazit méně",
+      "needYou": {
+        "few": "Čeká na vás: {count}",
+        "many": "Čeká na vás: {count}",
+        "one": "Čeká na vás: {count}",
+        "other": "Čeká na vás: {count}"
+      },
+      "worthKnowing": {
+        "few": "Dobré vědět: {count}",
+        "many": "Dobré vědět: {count}",
+        "one": "Dobré vědět: {count}",
+        "other": "Dobré vědět: {count}"
+      },
+      "skipped": {
+        "few": "Přeskočeno: {count}",
+        "many": "Přeskočeno: {count}",
+        "one": "Přeskočeno: {count}",
+        "other": "Přeskočeno: {count}"
+      }
+    },
+    "section": {
+      "connectTitle": "E-maily, na kterých záleží",
+      "connectBody": "Připojte Gmail a Stella bude třídit novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek přijde jako krátké shrnutí v chatu.",
+      "connect": "Připojit Gmail",
+      "connecting": "Čekám na Google…",
+      "connectError": "Gmail se nepřipojil. Zkuste to znovu.",
+      "reconnectTitle": "Znovu připojit Gmail",
+      "reconnectBody": "Gmail je potřeba znovu připojit přes Stellu, aby mohla třídit vaši poštu.",
+      "reconnect": "Znovu připojit Gmail",
+      "loadErrorTitle": "E-maily se nepodařilo načíst",
+      "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontrolujte připojení a zkuste to znovu.",
+      "offTitle": "Třiďte svou poštu",
+      "offBody": "Stella třídí novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek přijde jako krátké shrnutí v chatu. Šum zůstane venku.",
+      "turnOn": "Zapnout",
+      "turningOn": "Třídím nedávnou poštu…",
+      "empty": "Zatím nic. Nová pošta se tu objeví, jakmile ji Stella roztřídí.",
+      "needsYou": "Čeká na vás",
+      "worthKnowing": "Dobré vědět",
+      "urgent": "Naléhavé",
+      "actions": "Akce s e-mailem",
+      "openInGmail": "Otevřít v Gmailu",
+      "moveToNeedsYou": "Přesunout do „Čeká na vás“",
+      "moveToWorthKnowing": "Přesunout do „Dobré vědět“",
+      "skippedThisWeek": {
+        "few": "Přeskočeno tento týden: {count}",
+        "many": "Přeskočeno tento týden: {count}",
+        "one": "Přeskočeno tento týden: {count}",
+        "other": "Přeskočeno tento týden: {count}"
+      },
+      "noteTitle": "Na čem vám záleží",
+      "notePlaceholder": "Stella se učí z toho, co odmítnete. Doplňte, co by měla vědět, např. „všechno ze školy mého dítěte je důležité, newslettery ne“.",
+      "saved": "Uloženo",
+      "rulesTitle": "Trvalé pokyny",
+      "rulesHint": "Řekněte to Stelle v chatu, např. „dej mi hned vědět, když napíše pronajímatel“ nebo „když přijde faktura, ulož ji na Disk“.",
+      "ruleTell": "Dá vědět hned",
+      "ruleAct": "Stella se o to postará",
+      "remove": "Odebrat",
+      "accountsTitle": "Účty",
+      "live": "Živě",
+      "polled": "Kontrolováno každých pár minut",
+      "accountError": "Tento účet se nepodařilo zkontrolovat",
+      "usage": "Tento měsíc: roztříděno {sorted} · {cost}",
+      "capped": "Třídění je pozastaveno do příštího měsíce",
+      "checkNow": "Zkontrolovat",
+      "checking": "Kontroluji…",
+      "turnOff": "Vypnout",
+      "turnOffConfirm": "Vypnutím se třídění zastaví a roztříděný seznam se smaže."
+    }
   }
 }

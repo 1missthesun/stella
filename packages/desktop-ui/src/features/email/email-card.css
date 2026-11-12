@@ -1,0 +1,151 @@
+.email-card .schedule-card__status {
+  min-width: 0;
+}
+
+.email-card__from {
+  color: var(--chat-assistant-bubble-text);
+  font-weight: var(--weight-medium, 500);
+}
+
+.email-card--list {
+  align-items: flex-start;
+  width: min(100%, 520px);
+  max-width: 85%;
+}
+
+.email-card--list .schedule-card__tile {
+  margin-top: 2px;
+}
+
+.email-card__rows {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.email-card__row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-top: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.email-card__open {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.email-card__open:focus-visible {
+  outline: none;
+  border-radius: 6px;
+  box-shadow: var(--focus-ring);
+}
+
+.email-card__n {
+  flex: none;
+  width: 14px;
+  color: var(--text-weak);
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.email-card__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+}
+
+.email-card__head {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.email-card__head .email-card__from {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.email-card__subject {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-weak);
+  text-overflow: ellipsis;
+}
+
+.email-card__line {
+  color: var(--chat-assistant-bubble-text);
+}
+
+.email-card__open:hover .email-card__subject {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.email-card__row-action,
+.email-card__row-note {
+  position: absolute;
+  top: 7px;
+  right: 0;
+  padding: 0 0 0 10px;
+  border: 0;
+  background: var(--chat-assistant-bubble-fill);
+  color: var(--text-weak);
+  font: inherit;
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+}
+
+.email-card__row-action {
+  font-weight: var(--weight-medium, 500);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.email-card__row:hover .email-card__row-action,
+.email-card__row-action:focus-visible,
+.email-card__row-action[data-failed] {
+  opacity: 1;
+}
+
+.email-card__row-action:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+.email-card__row-action:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+.email-card__row[data-dismissed] .email-card__open {
+  opacity: 0.45;
+}
+
+.email-card__more {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding-bottom: 1px;
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+}

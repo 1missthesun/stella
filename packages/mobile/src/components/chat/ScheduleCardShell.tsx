@@ -28,6 +28,7 @@ export function ScheduleCardShell({
   accessibilityLabel,
   accessibilityHint,
   testID,
+  children,
 }: {
   colors: Colors;
   headline: string;
@@ -46,6 +47,8 @@ export function ScheduleCardShell({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   testID?: string;
+  /** Content under the status (a list); the tile then sits at the top. */
+  children?: ReactNode;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const body = (
@@ -58,7 +61,7 @@ export function ScheduleCardShell({
       <View style={styles.tile}>
         <Icon name={icon} size={17} color={iconColor ?? colors.textMuted} />
       </View>
-      <View style={styles.body}>
+      <View style={[styles.body, children ? styles.bodyList : null]}>
         <Text
           style={[styles.headline, struck && styles.struck, onDismiss && styles.headlineDismiss]}
           numberOfLines={wrap ? undefined : 1}
@@ -75,6 +78,7 @@ export function ScheduleCardShell({
           </View>
         ) : null}
         {actions ? <View style={styles.actions}>{actions}</View> : null}
+        {children}
       </View>
       {onDismiss ? (
         <Pressable
@@ -91,7 +95,11 @@ export function ScheduleCardShell({
   );
   if (!onPress) {
     return (
-      <View style={styles.card} testID={testID} accessibilityLabel={accessibilityLabel}>
+      <View
+        style={[styles.card, children ? styles.cardList : null]}
+        testID={testID}
+        accessibilityLabel={accessibilityLabel}
+      >
         {body}
       </View>
     );
@@ -125,6 +133,7 @@ const makeStyles = (colors: Colors) =>
       paddingHorizontal: 14,
       paddingTop: 9,
     },
+    cardList: { alignItems: "flex-start", alignSelf: "stretch" },
     pressed: { opacity: 0.75 },
     tile: {
       alignItems: "center",
@@ -135,6 +144,7 @@ const makeStyles = (colors: Colors) =>
       width: 34,
     },
     body: { flexShrink: 1, gap: 1 },
+    bodyList: { flexGrow: 1 },
     headlineDismiss: { paddingRight: 24 },
     // With a ✕: the status line drops so its primary pill clears the ✕ by ~10pt.
     metaDismiss: { marginTop: 4 },

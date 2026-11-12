@@ -21,6 +21,7 @@ import { isOrchestratorReservedBuiltinAgentId } from "@stella/contracts/agent-ru
 import { isOfficePreviewRef } from "@stella/contracts/office-preview";
 import { parseReminderMark } from "@stella/contracts/reminders";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
+import { parseEmailCard } from "@stella/contracts/email-card";
 import {
   collectTurnSourceDiffPayloads,
   deriveTurnInlineImagePayloads,
@@ -782,6 +783,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const voiceSession = payload?.metadata?.voiceSession;
         const reminder = parseReminderMark(payload?.metadata?.reminder);
         const scheduleNotice = parseScheduleNoticeCard(payload?.metadata?.scheduleNotice);
+        const emailCard = parseEmailCard(payload?.metadata?.emailCard);
         const backgroundWorks = buildBackgroundWorks(toolEvents);
         const backgroundWork = backgroundWorks[0];
         const spawnedThreadIds = getSpawnedThreadIds(toolEvents);
@@ -819,6 +821,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           ...(voiceSession ? { voiceSession } : {}),
           ...(reminder ? { reminder } : {}),
           ...(scheduleNotice ? { scheduleNotice } : {}),
+          ...(emailCard ? { emailCard } : {}),
           ...(backgroundWork ? { backgroundWork } : {}),
           ...(spawnedThreadIds.length > 0 ? { spawnedThreadIds } : {}),
           ...(spawnedDescriptions.length > 0 ? { spawnedDescriptions } : {}),

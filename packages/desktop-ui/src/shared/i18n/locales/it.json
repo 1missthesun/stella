@@ -3166,31 +3166,6 @@
         "one": "Vedi {count} file",
         "other": "Vedi {count} file"
       }
-    },
-    "emailDigest": {
-      "title": "Email",
-      "connectTitle": "Le email che contano",
-      "connectBody": "Collega Gmail e Stella controllerà la tua posta in arrivo durante la giornata, scrivendo un breve riepilogo solo delle nuove email importanti.",
-      "connect": "Collega Gmail",
-      "connecting": "In attesa di Google…",
-      "connectError": "Gmail non si è collegato. Riprova.",
-      "checkNow": "Controlla ora",
-      "checking": "Controllo della posta…",
-      "checked": "Controllato {when}",
-      "firstDigest": "Il tuo primo riepilogo è in arrivo",
-      "nothingNew": "Niente di nuovo",
-      "error": "Impossibile controllare la posta. Stella riproverà a breve.",
-      "justNow": "Proprio ora",
-      "loadErrorTitle": "Impossibile caricare il riepilogo",
-      "loadErrorBody": "Stella non riesce a raggiungere i suoi server. Controlla la connessione e riprova.",
-      "retry": "Riprova",
-      "nothingNewSince": "Niente di nuovo dalle {time}",
-      "minutesAgo": "{count} min fa",
-      "hoursAgo": "{count} h fa",
-      "daysAgo": "{count} g fa",
-      "claudeLimit": "Hai raggiunto il limite di utilizzo di Claude, quindi questa volta ha controllato il modello di Stella.",
-      "claudeLimitUntil": "Hai raggiunto il limite di utilizzo di Claude fino alle {time}, quindi questa volta ha controllato il modello di Stella.",
-      "claudeFailed": "Claude Code non è riuscito a eseguire questo controllo, quindi l'ha fatto il modello di Stella."
     }
   },
   "sidebar": {
@@ -3520,5 +3495,79 @@
     "signedInContinuing": "Accesso a Claude eseguito. Stella sta rispondendo.",
     "signedInAsResend": "Accesso a Claude eseguito come {email}. Invia di nuovo il messaggio per continuare.",
     "signedInResend": "Accesso a Claude eseguito. Invia di nuovo il messaggio per continuare."
+  },
+  "email": {
+    "title": "Email",
+    "notUrgent": "Non urgente",
+    "notImportant": "Non importante",
+    "failed": "Impossibile aggiornare. Riprova.",
+    "card": {
+      "movedToSummary": "Spostata nel prossimo riepilogo",
+      "wontShow": "Non mostrerò più queste",
+      "showAll": "Mostra tutte ({count})",
+      "showLess": "Mostra meno",
+      "needYou": {
+        "many": "{count} richiedono te",
+        "one": "{count} richiede te",
+        "other": "{count} richiedono te"
+      },
+      "worthKnowing": {
+        "many": "{count} da sapere",
+        "one": "{count} da sapere",
+        "other": "{count} da sapere"
+      },
+      "skipped": {
+        "many": "{count} saltate",
+        "one": "{count} saltata",
+        "other": "{count} saltate"
+      }
+    },
+    "section": {
+      "connectTitle": "Le email che contano",
+      "connectBody": "Collega Gmail e Stella smista la posta nuova appena arriva. Le urgenti ti raggiungono subito; il resto arriva come breve riepilogo in chat.",
+      "connect": "Collega Gmail",
+      "connecting": "In attesa di Google…",
+      "connectError": "Gmail non si è collegato. Riprova.",
+      "reconnectTitle": "Ricollega Gmail",
+      "reconnectBody": "Gmail va ricollegato tramite Stella perché Stella possa smistare la tua posta.",
+      "reconnect": "Ricollega Gmail",
+      "loadErrorTitle": "Impossibile caricare le tue email",
+      "loadErrorBody": "Stella non riesce a raggiungere i suoi server. Controlla la connessione e riprova.",
+      "offTitle": "Smista la tua posta",
+      "offBody": "Stella smista la posta nuova appena arriva. Le urgenti ti raggiungono subito; il resto arriva come breve riepilogo in chat. Il rumore resta fuori.",
+      "turnOn": "Attiva",
+      "turningOn": "Smisto la posta recente…",
+      "empty": "Ancora niente. La posta nuova compare qui quando Stella l'ha smistata.",
+      "needsYou": "Richiede te",
+      "worthKnowing": "Da sapere",
+      "urgent": "Urgente",
+      "actions": "Azioni email",
+      "openInGmail": "Apri in Gmail",
+      "moveToNeedsYou": "Sposta in Richiede te",
+      "moveToWorthKnowing": "Sposta in Da sapere",
+      "skippedThisWeek": {
+        "many": "{count} saltate questa settimana",
+        "one": "{count} saltata questa settimana",
+        "other": "{count} saltate questa settimana"
+      },
+      "noteTitle": "Cosa conta per te",
+      "notePlaceholder": "Stella impara da ciò che scarti. Aggiungi ciò che deve sapere, ad esempio \"tutto dalla scuola di mio figlio conta; le newsletter no\".",
+      "saved": "Salvato",
+      "rulesTitle": "Istruzioni permanenti",
+      "rulesHint": "Dillo a Stella in chat, ad es. \"avvisami subito quando scrive il padrone di casa\" o \"quando arriva una fattura, archiviala in Drive\".",
+      "ruleTell": "Ti avvisa subito",
+      "ruleAct": "Ci pensa Stella",
+      "remove": "Rimuovi",
+      "accountsTitle": "Account",
+      "live": "In tempo reale",
+      "polled": "Controllato ogni pochi minuti",
+      "accountError": "Impossibile controllare questo account",
+      "usage": "Questo mese: {sorted} smistate · {cost}",
+      "capped": "Smistamento in pausa fino al mese prossimo",
+      "checkNow": "Controlla ora",
+      "checking": "Controllo…",
+      "turnOff": "Disattiva",
+      "turnOffConfirm": "Disattivando si interrompe lo smistamento e si elimina l'elenco smistato."
+    }
   }
 }

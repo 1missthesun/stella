@@ -9,7 +9,7 @@ import { FileSidebarTabExistenceReconciler } from "./FileSidebarTabExistenceReco
 import { FilesSection } from "./FilesSection";
 import { CloudBrowserTakeoverSection } from "./CloudBrowserTakeoverSection";
 import { UpdatesSection } from "./UpdatesSection";
-import { EmailDigestSection } from "./EmailDigestSection";
+import { EmailSection } from "./EmailSection";
 import { ScheduleSection } from "./ScheduleSection";
 import { RetainedSurface } from "@/ui/retained-surface";
 import "./sidebar-sections.css";
@@ -76,7 +76,7 @@ export function SidebarSectionBody() {
         <UpdatesSection />
       </SectionHost>
       <SectionHost section="email" active={emailActive}>
-        <EmailDigestSection active={emailActive} />
+        <EmailSection active={emailActive} />
       </SectionHost>
       <SectionHost section="schedule" active={scheduleActive}>
         <ScheduleSection active={scheduleActive} />

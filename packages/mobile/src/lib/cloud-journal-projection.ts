@@ -1,5 +1,6 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
+import { EMAIL_CARD_TYPE } from "@stella/contracts/email-card";
 import {
   parseSafeguardCard,
   safeguardCardLabel,
@@ -293,6 +294,18 @@ const projectTurn = (
     });
   }
   for (const record of turn) {
+    if (record.kind !== "card" || record.card.type !== EMAIL_CARD_TYPE) continue;
+    out.push({
+      id: `cloud:${turnId}:email:${record.seq}`,
+      role: "assistant",
+      text: "",
+      createdAt: record.createdAtMs,
+      canonicalCreatedAt: record.createdAtMs,
+      sequence: record.seq,
+      emailCard: record.card,
+    });
+  }
+  for (const record of turn) {
     const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
     const label = safeguard ? safeguardCardLabel(safeguard) : null;
     if (!label) continue;
@@ -583,7 +596,9 @@ const leadingTurnLacksPrompt = (turn: JournalTurn): boolean =>
     (record) =>
       (record.kind === "message" && record.role === "user") ||
       (record.kind === "card" &&
-        (record.card.type === "reminder" || record.card.type === SCHEDULE_NOTICE_CARD_TYPE)),
+        (record.card.type === "reminder" ||
+          record.card.type === SCHEDULE_NOTICE_CARD_TYPE ||
+          record.card.type === EMAIL_CARD_TYPE)),
   );
 
 /** The turns a window shows: all but a leading turn cut off from its prompt. */

@@ -28,7 +28,7 @@ export const SIDEBAR_PLACES: readonly SidebarPlace[] = [
 const PLACE_LABEL_KEYS: Record<SidebarPlace, string> = {
   chat: "mobile.nav.chat",
   schedule: "mobile.activityHub.tabs.schedule",
-  email: "shell.emailDigest.title",
+  email: "email.title",
   apps: "mobile.nav.apps",
   files: "mobile.activityHub.tabs.files",
 };

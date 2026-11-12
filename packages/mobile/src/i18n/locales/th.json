@@ -2794,7 +2794,23 @@
       },
       "updating": "กำลังอัปเดต…",
       "afterRecording": "หลังการบันทึกของคุณ",
-      "afterReply": "หลังจาก Stella ตอบเสร็จ"
+      "afterReply": "หลังจาก Stella ตอบเสร็จ",
+      "devices": {
+        "choose": "เลือกคอมพิวเตอร์",
+        "thisComputer": "คอมพิวเตอร์เครื่องนี้",
+        "offline": "จะได้รับเมื่อเปิดเครื่องอีกครั้ง",
+        "updateThisOnly": "อัปเดตเฉพาะเครื่องนี้",
+        "updateAll": "อัปเดตคอมพิวเตอร์ทุกเครื่อง"
+      },
+      "conflicts": {
+        "title": "อัปเดตนี้ทับซ้อนกับการเปลี่ยนแปลงของคุณ",
+        "unsure": "งานจะรวมให้เมื่อคุณอัปเดต",
+        "allowance": "การรวมจะใช้โควตาฟรีของคุณบางส่วน"
+      },
+      "arrived": {
+        "fromJustNow": "อัปเดตจาก {device} เมื่อสักครู่",
+        "fromAgo": "อัปเดตจาก {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "หยุดชั่วคราว",
@@ -3114,31 +3130,6 @@
       "viewFiles": {
         "other": "ดู {count} ไฟล์"
       }
-    },
-    "emailDigest": {
-      "title": "อีเมล",
-      "connectTitle": "อีเมลที่สำคัญ",
-      "connectBody": "เชื่อมต่อ Gmail แล้ว Stella จะตรวจกล่องจดหมายของคุณตลอดวัน และเขียนสรุปสั้น ๆ เฉพาะอีเมลใหม่ที่สำคัญ",
-      "connect": "เชื่อมต่อ Gmail",
-      "connecting": "กำลังรอ Google…",
-      "connectError": "เชื่อมต่อ Gmail ไม่สำเร็จ ลองอีกครั้ง",
-      "checkNow": "ตรวจตอนนี้",
-      "checking": "กำลังตรวจกล่องจดหมาย…",
-      "checked": "ตรวจแล้ว {when}",
-      "firstDigest": "สรุปฉบับแรกของคุณกำลังมา",
-      "nothingNew": "ไม่มีอะไรใหม่",
-      "error": "ตรวจกล่องจดหมายไม่ได้ Stella จะลองใหม่เร็ว ๆ นี้",
-      "justNow": "เมื่อสักครู่",
-      "loadErrorTitle": "โหลดสรุปไม่ได้",
-      "loadErrorBody": "Stella ติดต่อเซิร์ฟเวอร์ไม่ได้ในขณะนี้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
-      "retry": "ลองอีกครั้ง",
-      "nothingNewSince": "ไม่มีอะไรใหม่ตั้งแต่ {time}",
-      "minutesAgo": "{count} นาทีที่แล้ว",
-      "hoursAgo": "{count} ชม. ที่แล้ว",
-      "daysAgo": "{count} วันที่แล้ว",
-      "claudeLimit": "คุณใช้ Claude ครบขีดจำกัดแล้ว ครั้งนี้โมเดลของ Stella จึงเป็นผู้ตรวจ",
-      "claudeLimitUntil": "คุณใช้ Claude ครบขีดจำกัดแล้วจนถึง {time} ครั้งนี้โมเดลของ Stella จึงเป็นผู้ตรวจ",
-      "claudeFailed": "Claude Code ไม่สามารถตรวจครั้งนี้ได้ โมเดลของ Stella จึงตรวจแทน"
     }
   },
   "sidebar": {
@@ -3447,5 +3438,86 @@
     "ownPlan": "Claude Code ทำงานด้วยการสมัครสมาชิก Claude Pro หรือ Max ของคุณเอง",
     "chatTitle": "ยังไม่ได้ติดตั้ง Claude Code",
     "chatDescription": "ติดตั้งที่นี่ แล้วลงชื่อเข้าใช้แพ็กเกจ Claude ของคุณและส่งข้อความอีกครั้ง"
+  },
+  "claudeLogin": {
+    "heldTitle": "กำลังรอให้คุณลงชื่อเข้าใช้ Claude",
+    "heldDescription": "การลงชื่อเข้าใช้ Claude บนคอมพิวเตอร์เครื่องนี้หมดอายุแล้ว ข้อความของคุณถูกเก็บไว้และจะส่งทันทีที่คุณลงชื่อเข้าใช้",
+    "endedTitle": "การลงชื่อเข้าใช้ Claude ของคุณหมดอายุแล้ว",
+    "endedDescription": "ลงชื่อเข้าใช้อีกครั้งเพื่อให้ Stella ตอบด้วยแพ็กเกจ Claude ของคุณต่อไปได้",
+    "endedDescriptionEmail": "ลงชื่อเข้าใช้ {email} อีกครั้งเพื่อให้ Stella ตอบด้วยแพ็กเกจ Claude ของคุณต่อไปได้",
+    "endingTitle": "การลงชื่อเข้าใช้ Claude ของคุณจะหมดอายุเร็วๆ นี้",
+    "endingDescription": "ลงชื่อเข้าใช้อีกครั้งก่อน {date} เพื่อให้การตอบกลับของ Claude ยังใช้งานได้",
+    "cloudEndingTitle": "การลงชื่อเข้าใช้ Claude ในคลาวด์ของคุณจะหมดอายุเร็วๆ นี้",
+    "cloudEndedTitle": "การลงชื่อเข้าใช้ Claude ในคลาวด์ของคุณหมดอายุแล้ว",
+    "signIn": "ลงชื่อเข้าใช้",
+    "signedInContinuing": "ลงชื่อเข้าใช้ Claude แล้ว Stella กำลังตอบ",
+    "signedInAsResend": "ลงชื่อเข้าใช้ Claude เป็น {email} แล้ว ส่งข้อความอีกครั้งเพื่อดำเนินการต่อ",
+    "signedInResend": "ลงชื่อเข้าใช้ Claude แล้ว ส่งข้อความอีกครั้งเพื่อดำเนินการต่อ"
+  },
+  "email": {
+    "title": "อีเมล",
+    "notUrgent": "ไม่ด่วน",
+    "notImportant": "ไม่สำคัญ",
+    "failed": "อัปเดตไม่สำเร็จ ลองอีกครั้ง",
+    "card": {
+      "movedToSummary": "ย้ายไปไว้ในสรุปครั้งถัดไปแล้ว",
+      "wontShow": "จะไม่แสดงแบบนี้อีก",
+      "showAll": "แสดงทั้งหมด {count}",
+      "showLess": "แสดงน้อยลง",
+      "needYou": {
+        "other": "{count} รอคุณอยู่"
+      },
+      "worthKnowing": {
+        "other": "{count} น่ารู้"
+      },
+      "skipped": {
+        "other": "ข้าม {count}"
+      }
+    },
+    "section": {
+      "connectTitle": "อีเมลที่สำคัญ",
+      "connectBody": "เชื่อมต่อ Gmail แล้ว Stella จะคัดแยกอีเมลใหม่ทันทีที่มาถึง อีเมลด่วนถึงคุณทันที ส่วนที่เหลือมาเป็นสรุปสั้นๆ ในแชท",
+      "connect": "เชื่อมต่อ Gmail",
+      "connecting": "กำลังรอ Google…",
+      "connectError": "เชื่อมต่อ Gmail ไม่สำเร็จ ลองอีกครั้ง",
+      "reconnectTitle": "เชื่อมต่อ Gmail ใหม่",
+      "reconnectBody": "ต้องเชื่อมต่อ Gmail ใหม่ผ่าน Stella ก่อน Stella จึงจะคัดแยกอีเมลของคุณได้",
+      "reconnect": "เชื่อมต่อ Gmail ใหม่",
+      "loadErrorTitle": "โหลดอีเมลไม่ได้",
+      "loadErrorBody": "ตอนนี้ Stella ติดต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+      "offTitle": "คัดแยกอีเมลของคุณ",
+      "offBody": "Stella คัดแยกอีเมลใหม่ทันทีที่มาถึง อีเมลด่วนถึงคุณทันที ส่วนที่เหลือมาเป็นสรุปสั้นๆ ในแชท เรื่องไม่จำเป็นถูกกันไว้ข้างนอก",
+      "turnOn": "เปิด",
+      "turningOn": "กำลังคัดแยกอีเมลล่าสุด…",
+      "empty": "ยังไม่มี อีเมลใหม่จะแสดงที่นี่เมื่อ Stella คัดแยกแล้ว",
+      "needsYou": "รอคุณอยู่",
+      "worthKnowing": "น่ารู้",
+      "urgent": "ด่วน",
+      "actions": "การทำงานกับอีเมล",
+      "openInGmail": "เปิดใน Gmail",
+      "moveToNeedsYou": "ย้ายไป รอคุณอยู่",
+      "moveToWorthKnowing": "ย้ายไป น่ารู้",
+      "skippedThisWeek": {
+        "other": "สัปดาห์นี้ข้ามไป {count}"
+      },
+      "noteTitle": "สิ่งที่สำคัญสำหรับคุณ",
+      "notePlaceholder": "Stella เรียนรู้จากสิ่งที่คุณปัดทิ้ง เพิ่มสิ่งที่ควรรู้ได้ เช่น \"ทุกอย่างจากโรงเรียนลูกสำคัญ จดหมายข่าวไม่สำคัญ\"",
+      "saved": "บันทึกแล้ว",
+      "rulesTitle": "คำสั่งประจำ",
+      "rulesHint": "บอก Stella ในแชท เช่น \"บอกฉันทันทีเมื่อเจ้าของห้องส่งอีเมลมา\" หรือ \"เมื่อมีใบแจ้งหนี้มา ให้เก็บไว้ใน Drive\"",
+      "ruleTell": "บอกคุณทันที",
+      "ruleAct": "Stella จัดการให้",
+      "remove": "ลบ",
+      "accountsTitle": "บัญชี",
+      "live": "สด",
+      "polled": "ตรวจทุกไม่กี่นาที",
+      "accountError": "ตรวจบัญชีนี้ไม่ได้",
+      "usage": "เดือนนี้: คัดแยก {sorted} · {cost}",
+      "capped": "หยุดคัดแยกชั่วคราวจนถึงเดือนหน้า",
+      "checkNow": "ตรวจตอนนี้",
+      "checking": "กำลังตรวจ…",
+      "turnOff": "ปิด",
+      "turnOffConfirm": "การปิดจะหยุดคัดแยกและลบรายการที่คัดแยกแล้ว"
+    }
   }
 }

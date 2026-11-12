@@ -2814,7 +2814,23 @@
       },
       "updating": "מעדכן…",
       "afterRecording": "אחרי ההקלטה",
-      "afterReply": "אחרי ש-Stella תסיים לענות"
+      "afterReply": "אחרי ש-Stella תסיים לענות",
+      "devices": {
+        "choose": "בחירת מחשבים",
+        "thisComputer": "המחשב הזה",
+        "offline": "יקבל את זה כשיופעל שוב",
+        "updateThisOnly": "לעדכן רק את המחשב הזה",
+        "updateAll": "לעדכן את כל המחשבים שלך"
+      },
+      "conflicts": {
+        "title": "העדכון הזה חופף לשינויים שלך",
+        "unsure": "משימה תמזג אותם כשתעדכן",
+        "allowance": "המיזוג משתמש בחלק מהמכסה החינמית שלך"
+      },
+      "arrived": {
+        "fromJustNow": "עודכן מ-{device} עכשיו",
+        "fromAgo": "עודכן מ-{device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "השהה",
@@ -3150,31 +3166,6 @@
         "other": "הצג {count} קבצים",
         "two": "הצג {count} קבצים"
       }
-    },
-    "emailDigest": {
-      "title": "אימייל",
-      "connectTitle": "המיילים שחשובים",
-      "connectBody": "חברו את Gmail ו-Stella תבדוק את תיבת הדואר שלכם במהלך היום ותכתוב תקציר קצר של המיילים החדשים החשובים בלבד.",
-      "connect": "חיבור Gmail",
-      "connecting": "ממתין ל-Google…",
-      "connectError": "Gmail לא התחבר. נסו שוב.",
-      "checkNow": "בדיקה עכשיו",
-      "checking": "בודק את תיבת הדואר…",
-      "checked": "נבדק {when}",
-      "firstDigest": "התקציר הראשון שלכם בדרך",
-      "nothingNew": "אין חדש",
-      "error": "לא ניתן היה לבדוק את תיבת הדואר. Stella תנסה שוב בקרוב.",
-      "justNow": "עכשיו",
-      "loadErrorTitle": "לא ניתן לטעון את התקציר",
-      "loadErrorBody": "Stella לא מצליחה להגיע לשרתים שלה כרגע. בדקו את החיבור ונסו שוב.",
-      "retry": "נסו שוב",
-      "nothingNewSince": "אין חדש מאז {time}",
-      "minutesAgo": "לפני {count} דק׳",
-      "hoursAgo": "לפני {count} שע׳",
-      "daysAgo": "לפני {count} ימים",
-      "claudeLimit": "הגעת למגבלת השימוש ב-Claude, לכן הפעם בדק המודל של Stella.",
-      "claudeLimitUntil": "הגעת למגבלת השימוש ב-Claude עד {time}, לכן הפעם בדק המודל של Stella.",
-      "claudeFailed": "Claude Code לא הצליח לבצע את הבדיקה הזו, לכן המודל של Stella ביצע אותה."
     }
   },
   "sidebar": {
@@ -3489,5 +3480,94 @@
     "ownPlan": "Claude Code פועל עם המינוי שלך ל-Claude Pro או Max.",
     "chatTitle": "Claude Code לא מותקן",
     "chatDescription": "התקן אותו כאן, התחבר למינוי Claude שלך ושלח את ההודעה שוב."
+  },
+  "claudeLogin": {
+    "heldTitle": "ממתין שתתחבר ל-Claude",
+    "heldDescription": "החיבור שלך ל-Claude במחשב הזה הסתיים. ההודעה שלך נשמרת ותישלח ברגע שתתחבר.",
+    "endedTitle": "החיבור שלך ל-Claude הסתיים",
+    "endedDescription": "התחבר שוב כדי ש-Stella תמשיך לענות עם תוכנית Claude שלך.",
+    "endedDescriptionEmail": "התחבר שוב ל-{email} כדי ש-Stella תמשיך לענות עם תוכנית Claude שלך.",
+    "endingTitle": "החיבור שלך ל-Claude מסתיים בקרוב",
+    "endingDescription": "התחבר שוב לפני {date} כדי שהתשובות של Claude ימשיכו לעבוד.",
+    "cloudEndingTitle": "ההתחברות שלכם ל-Claude בענן שלכם תסתיים בקרוב",
+    "cloudEndedTitle": "ההתחברות שלכם ל-Claude בענן שלכם הסתיימה",
+    "signIn": "התחברות",
+    "signedInContinuing": "התחברת ל-Claude. Stella עונה עכשיו.",
+    "signedInAsResend": "התחברת ל-Claude בתור {email}. שלח את ההודעה שוב כדי להמשיך.",
+    "signedInResend": "התחברת ל-Claude. שלח את ההודעה שוב כדי להמשיך."
+  },
+  "email": {
+    "title": "דוא\"ל",
+    "notUrgent": "לא דחוף",
+    "notImportant": "לא חשוב",
+    "failed": "העדכון נכשל. נסו שוב.",
+    "card": {
+      "movedToSummary": "הועבר לסיכום הבא",
+      "wontShow": "לא אציג כאלה יותר",
+      "showAll": "הצגת כל ה-{count}",
+      "showLess": "הצגת פחות",
+      "needYou": {
+        "one": "{count} מחכה לך",
+        "other": "{count} מחכים לך",
+        "two": "{count} מחכים לך"
+      },
+      "worthKnowing": {
+        "one": "{count} כדאי לדעת",
+        "other": "{count} כדאי לדעת",
+        "two": "{count} כדאי לדעת"
+      },
+      "skipped": {
+        "one": "{count} דולג",
+        "other": "{count} דולגו",
+        "two": "{count} דולגו"
+      }
+    },
+    "section": {
+      "connectTitle": "הדוא\"ל שחשוב",
+      "connectBody": "חברו את Gmail ו-Stella תמיין דואר חדש כשהוא מגיע. דחוף יגיע אליכם מיד; השאר יגיע כסיכום קצר בצ'אט.",
+      "connect": "חיבור Gmail",
+      "connecting": "ממתינים ל-Google…",
+      "connectError": "Gmail לא התחבר. נסו שוב.",
+      "reconnectTitle": "חיבור Gmail מחדש",
+      "reconnectBody": "צריך לחבר את Gmail מחדש דרך Stella כדי ש-Stella תוכל למיין את הדואר שלכם.",
+      "reconnect": "חיבור Gmail מחדש",
+      "loadErrorTitle": "לא ניתן לטעון את הדואר",
+      "loadErrorBody": "Stella לא מצליחה להגיע לשרתים שלה כרגע. בדקו את החיבור ונסו שוב.",
+      "offTitle": "מיון הדואר שלכם",
+      "offBody": "Stella ממיינת דואר חדש כשהוא מגיע. דחוף יגיע אליכם מיד; השאר יגיע כסיכום קצר בצ'אט. הרעש נשאר בחוץ.",
+      "turnOn": "הפעלה",
+      "turningOn": "ממיינת את הדואר האחרון…",
+      "empty": "עדיין כלום. דואר חדש יופיע כאן אחרי ש-Stella תמיין אותו.",
+      "needsYou": "מחכה לך",
+      "worthKnowing": "כדאי לדעת",
+      "urgent": "דחוף",
+      "actions": "פעולות דוא\"ל",
+      "openInGmail": "פתיחה ב-Gmail",
+      "moveToNeedsYou": "העברה ל'מחכה לך'",
+      "moveToWorthKnowing": "העברה ל'כדאי לדעת'",
+      "skippedThisWeek": {
+        "one": "{count} דולג השבוע",
+        "other": "{count} דולגו השבוע",
+        "two": "{count} דולגו השבוע"
+      },
+      "noteTitle": "מה חשוב לך",
+      "notePlaceholder": "Stella לומדת ממה שאתם דוחים. הוסיפו מה שכדאי לה לדעת, למשל \"כל מה שמגיע מבית הספר של הילד חשוב; ניוזלטרים לא\".",
+      "saved": "נשמר",
+      "rulesTitle": "הנחיות קבועות",
+      "rulesHint": "אמרו ל-Stella בצ'אט, למשל \"תגידי לי מיד כשבעל הדירה כותב\" או \"כשמגיעה חשבונית, שמרי אותה ב-Drive\".",
+      "ruleTell": "מודיעה מיד",
+      "ruleAct": "Stella מטפלת בזה",
+      "remove": "הסרה",
+      "accountsTitle": "חשבונות",
+      "live": "בזמן אמת",
+      "polled": "נבדק כל כמה דקות",
+      "accountError": "לא ניתן לבדוק את החשבון הזה",
+      "usage": "החודש: {sorted} מוינו · {cost}",
+      "capped": "המיון מושהה עד החודש הבא",
+      "checkNow": "בדיקה עכשיו",
+      "checking": "בודקת…",
+      "turnOff": "כיבוי",
+      "turnOffConfirm": "כיבוי עוצר את המיון ומוחק את הרשימה הממוינת."
+    }
   }
 }

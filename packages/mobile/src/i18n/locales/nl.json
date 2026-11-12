@@ -2804,7 +2804,23 @@
       },
       "updating": "Bijwerken…",
       "afterRecording": "Na je opname",
-      "afterReply": "Zodra Stella klaar is met antwoorden"
+      "afterReply": "Zodra Stella klaar is met antwoorden",
+      "devices": {
+        "choose": "Computers kiezen",
+        "thisComputer": "Deze computer",
+        "offline": "Krijgt het zodra hij weer aan staat",
+        "updateThisOnly": "Alleen deze computer bijwerken",
+        "updateAll": "Al je computers bijwerken"
+      },
+      "conflicts": {
+        "title": "Deze update overlapt met je wijzigingen",
+        "unsure": "Een taak voegt ze samen als je bijwerkt",
+        "allowance": "Samenvoegen gebruikt een deel van je gratis tegoed"
+      },
+      "arrived": {
+        "fromJustNow": "Zojuist bijgewerkt vanaf {device}",
+        "fromAgo": "{ago} bijgewerkt vanaf {device}"
+      }
     },
     "audioPlayer": {
       "pause": "Pauzeren",
@@ -3133,31 +3149,6 @@
         "one": "{count} bestand bekijken",
         "other": "{count} bestanden bekijken"
       }
-    },
-    "emailDigest": {
-      "title": "E-mail",
-      "connectTitle": "De e-mail die ertoe doet",
-      "connectBody": "Koppel Gmail en Stella controleert je inbox gedurende de dag en schrijft een kort overzicht van alleen de belangrijke nieuwe mail.",
-      "connect": "Gmail koppelen",
-      "connecting": "Wachten op Google…",
-      "connectError": "Gmail is niet gekoppeld. Probeer het opnieuw.",
-      "checkNow": "Nu controleren",
-      "checking": "Inbox controleren…",
-      "checked": "Gecontroleerd {when}",
-      "firstDigest": "Je eerste overzicht komt eraan",
-      "nothingNew": "Niets nieuws",
-      "error": "Kon je inbox niet controleren. Stella probeert het snel opnieuw.",
-      "justNow": "Zojuist",
-      "loadErrorTitle": "Kon je overzicht niet laden",
-      "loadErrorBody": "Stella kan haar servers nu niet bereiken. Controleer je verbinding en probeer het opnieuw.",
-      "retry": "Opnieuw proberen",
-      "nothingNewSince": "Niets nieuws sinds {time}",
-      "minutesAgo": "{count} min geleden",
-      "hoursAgo": "{count} u geleden",
-      "daysAgo": "{count} d geleden",
-      "claudeLimit": "Je Claude-gebruikslimiet is bereikt, dus deze keer controleerde het model van Stella.",
-      "claudeLimitUntil": "Je Claude-gebruikslimiet is bereikt tot {time}, dus deze keer controleerde het model van Stella.",
-      "claudeFailed": "Claude Code kon deze controle niet uitvoeren, dus het model van Stella deed het."
     }
   },
   "sidebar": {
@@ -3469,5 +3460,90 @@
     "ownPlan": "Claude Code werkt met je eigen Claude Pro- of Max-abonnement.",
     "chatTitle": "Claude Code is niet geïnstalleerd",
     "chatDescription": "Installeer het hier, log dan in bij je Claude-abonnement en stuur je bericht opnieuw."
+  },
+  "claudeLogin": {
+    "heldTitle": "Wachten tot je inlogt bij Claude",
+    "heldDescription": "Je Claude-aanmelding op deze computer is verlopen. Je bericht blijft bewaard en gaat meteen weg zodra je inlogt.",
+    "endedTitle": "Je Claude-aanmelding is verlopen",
+    "endedDescription": "Log opnieuw in zodat Stella kan blijven antwoorden met je Claude-abonnement.",
+    "endedDescriptionEmail": "Log opnieuw in bij {email} zodat Stella kan blijven antwoorden met je Claude-abonnement.",
+    "endingTitle": "Je Claude-aanmelding verloopt binnenkort",
+    "endingDescription": "Log vóór {date} opnieuw in zodat je Claude-antwoorden blijven werken.",
+    "cloudEndingTitle": "Je Claude-aanmelding in je cloud verloopt binnenkort",
+    "cloudEndedTitle": "Je Claude-aanmelding in je cloud is verlopen",
+    "signIn": "Inloggen",
+    "signedInContinuing": "Ingelogd bij Claude. Stella antwoordt nu.",
+    "signedInAsResend": "Ingelogd bij Claude als {email}. Stuur je bericht opnieuw om verder te gaan.",
+    "signedInResend": "Ingelogd bij Claude. Stuur je bericht opnieuw om verder te gaan."
+  },
+  "email": {
+    "title": "E-mail",
+    "notUrgent": "Niet dringend",
+    "notImportant": "Niet belangrijk",
+    "failed": "Bijwerken lukte niet. Probeer het opnieuw.",
+    "card": {
+      "movedToSummary": "Verplaatst naar je volgende samenvatting",
+      "wontShow": "Deze laat ik niet meer zien",
+      "showAll": "Alle {count} tonen",
+      "showLess": "Minder tonen",
+      "needYou": {
+        "one": "{count} heeft je nodig",
+        "other": "{count} hebben je nodig"
+      },
+      "worthKnowing": {
+        "one": "{count} goed om te weten",
+        "other": "{count} goed om te weten"
+      },
+      "skipped": {
+        "one": "{count} overgeslagen",
+        "other": "{count} overgeslagen"
+      }
+    },
+    "section": {
+      "connectTitle": "De e-mail die ertoe doet",
+      "connectBody": "Koppel Gmail en Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest komt als korte samenvatting in de chat.",
+      "connect": "Gmail koppelen",
+      "connecting": "Wachten op Google…",
+      "connectError": "Gmail is niet gekoppeld. Probeer het opnieuw.",
+      "reconnectTitle": "Gmail opnieuw koppelen",
+      "reconnectBody": "Gmail moet opnieuw via Stella worden gekoppeld voordat Stella je mail kan sorteren.",
+      "reconnect": "Gmail opnieuw koppelen",
+      "loadErrorTitle": "Je e-mail kon niet worden geladen",
+      "loadErrorBody": "Stella kan haar servers nu niet bereiken. Controleer je verbinding en probeer het opnieuw.",
+      "offTitle": "Sorteer je e-mail",
+      "offBody": "Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest komt als korte samenvatting in de chat. Ruis blijft buiten.",
+      "turnOn": "Inschakelen",
+      "turningOn": "Je recente mail wordt gesorteerd…",
+      "empty": "Nog niets. Nieuwe mail verschijnt hier zodra Stella die heeft gesorteerd.",
+      "needsYou": "Heeft je nodig",
+      "worthKnowing": "Goed om te weten",
+      "urgent": "Dringend",
+      "actions": "E-mailacties",
+      "openInGmail": "Openen in Gmail",
+      "moveToNeedsYou": "Verplaatsen naar Heeft je nodig",
+      "moveToWorthKnowing": "Verplaatsen naar Goed om te weten",
+      "skippedThisWeek": {
+        "one": "{count} overgeslagen deze week",
+        "other": "{count} overgeslagen deze week"
+      },
+      "noteTitle": "Wat voor jou telt",
+      "notePlaceholder": "Stella leert van wat je wegklikt. Voeg toe wat ze moet weten, zoals \"alles van de school van mijn kind telt; nieuwsbrieven niet\".",
+      "saved": "Opgeslagen",
+      "rulesTitle": "Vaste instructies",
+      "rulesHint": "Zeg het tegen Stella in de chat, bijv. \"laat het me meteen weten als mijn verhuurder mailt\" of \"zet een binnengekomen factuur in Drive\".",
+      "ruleTell": "Laat het je meteen weten",
+      "ruleAct": "Stella regelt het",
+      "remove": "Verwijderen",
+      "accountsTitle": "Accounts",
+      "live": "Live",
+      "polled": "Elke paar minuten gecontroleerd",
+      "accountError": "Dit account kon niet worden gecontroleerd",
+      "usage": "Deze maand: {sorted} gesorteerd · {cost}",
+      "capped": "Sorteren staat stil tot volgende maand",
+      "checkNow": "Nu controleren",
+      "checking": "Controleren…",
+      "turnOff": "Uitschakelen",
+      "turnOffConfirm": "Uitschakelen stopt het sorteren en verwijdert de gesorteerde lijst."
+    }
   }
 }

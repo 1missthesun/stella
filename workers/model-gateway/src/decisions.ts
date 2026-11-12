@@ -2,6 +2,7 @@ import {
   GATEWAY_DECISIONS_MAX_BODY_BYTES,
   GATEWAY_DECISIONS_MODEL,
 } from "@stella/contracts/gateway/api";
+import { accessFor } from "./byok-lane.js";
 import { authenticateCapability } from "./capability.js";
 import { GatewayError, jsonResponse } from "./errors.js";
 
@@ -84,7 +85,19 @@ export const handleDecisions = async (
   } catch {
     throw new GatewayError(400, "bad_request", "The decision request must be a JSON object.");
   }
-  const apiKey = (env as unknown as Record<string, string | undefined>).OPENROUTER_API_KEY?.trim();
+  // An email capability admitted on the owner's own OpenRouter key spends theirs; otherwise Stella's
+  // (on a self-hosted server, that server's own key).
+  const execution = claims.turn?.execution;
+  const ownKey = execution?.engine === "provider" && execution.provider === "openrouter";
+  if (ownKey && execution.model !== GATEWAY_DECISIONS_MODEL) {
+    throw new GatewayError(403, "execution_mismatch", `This capability was admitted for "${execution.model}".`);
+  }
+  if (execution?.engine === "provider" && !ownKey) {
+    throw new GatewayError(403, "execution_mismatch", "Decisions run on Stella's key or an OpenRouter key.");
+  }
+  const apiKey = ownKey
+    ? (await accessFor(env, claims, "openrouter", Date.now())).apiKey?.trim()
+    : (env as unknown as Record<string, string | undefined>).OPENROUTER_API_KEY?.trim();
   if (!apiKey) {
     throw new GatewayError(503, "internal", "The decision model is not configured.", { retryable: false });
   }
@@ -116,6 +129,7 @@ export const handleDecisions = async (
       traceId,
       owner: claims.sub.slice(0, 12),
       status: upstream.status,
+      payer: ownKey ? "own_key" : "stella",
       inputTokens,
       costUsd,
       ms: Date.now() - startedAt,

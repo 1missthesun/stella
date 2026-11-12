@@ -29,6 +29,8 @@ import {
   type EmailRule,
   type EmailStatus,
   type EmailUsage,
+  type EmailAccess,
+  type EmailPayer,
 } from "@stella/contracts/backend/email";
 import {
   EMAIL_CARD_MAX_ITEMS,
@@ -85,6 +87,7 @@ import { readMainConversationId } from "./conversations.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
 import { stellaGmailTokens, stellaGoogleAccounts, stellaGoogleAvailable } from "./google-accounts.js";
 import { ownerZone } from "./schedules.js";
+import { ownerModeEnabled } from "../../selfhost/owner-mode.js";
 
 const SYNC_JOB = "email.sync";
 const TICK_JOB = "email.tick";
@@ -122,10 +125,18 @@ const IMAGE_MAX_BYTES = 1_500_000;
 const PDF_MAX_BYTES = 1_000_000;
 
 /** Hard per-owner guard on what sorting may spend. */
+/**
+ * Email's allowance per owner on Stella's key. Free is a taste: sorting only
+ * (no written items or replies), a cent a month, about a hundred emails.
+ */
 const CAPS = {
-  free: { perDay: 150, usdPerMonth: 0.4 },
+  free: { perDay: 25, usdPerMonth: 0.01 },
   paid: { perDay: 600, usdPerMonth: 2 },
 } as const;
+/** On the owner's own key, or a self-hosted server's, only this daily rate limit applies. */
+const OWN_KEY_PER_DAY = 600;
+/** After the owner's key is refused, Stella's allowance is used this long (or until they save a new key). */
+const OWN_KEY_RETRY_MS = HOUR;
 
 export const EMAIL_MIGRATION = {
   id: "email.1-init",
@@ -281,6 +292,16 @@ export const EMAIL_BRIEFINGS_MIGRATION = {
  * a plain log of what Stella read and did; and what a left-out sender needs
  * to unsubscribe.
  */
+/** What the owner's own key spent this month, and when it was last refused. */
+export const EMAIL_OWN_KEY_MIGRATION = {
+  id: "email.6-own-key",
+  statements: [
+    "ALTER TABLE email_state ADD COLUMN month_own_usd REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE email_state ADD COLUMN own_key_refused_at INTEGER",
+    "ALTER TABLE email_state ADD COLUMN own_key_error TEXT",
+  ],
+};
+
 export const EMAIL_TODAY_MIGRATION = {
   id: "email.5-today",
   statements: [
@@ -367,6 +388,9 @@ type StateRow = {
   lead_ids?: string | null;
   voice?: string | null;
   last_fold_at?: number | null;
+  month_own_usd?: number;
+  own_key_refused_at?: number | null;
+  own_key_error?: string | null;
 };
 
 type AccountRow = {
@@ -419,7 +443,7 @@ const stateOf = (db: OwnerDbReader): StateRow | null =>
   db.one<StateRow>(
     `SELECT enabled, note, corrections_since_note, last_summary_at, summary_day, summaries_today, urgent_day, urgent_today,
             month, month_sorted, month_tokens, month_line_usd, sort_day, sorted_today, plan,
-            today_lead, lead_ids, voice, last_fold_at
+            today_lead, lead_ids, voice, last_fold_at, month_own_usd, own_key_refused_at, own_key_error
        FROM email_state WHERE id = 1`,
   );
 
@@ -483,34 +507,126 @@ const composioGmailOnly = (db: OwnerDbReader): boolean =>
 
 // Usage and the cost guard ---------------------------------------------------
 
-const usageOf = (now: number, state: StateRow | null, plan: string, zone: string): EmailUsage & { today: number } => {
+type Reader = { db: OwnerDbReader; env: unknown; now: number };
+
+/** The owner's own OpenRouter key saved to their account, if any. */
+const ownKeyRow = (db: OwnerDbReader): { status: string; updated_at: number } | null => {
+  try {
+    return db.one<{ status: string; updated_at: number }>(
+      "SELECT status, updated_at FROM provider_credentials WHERE provider = 'openrouter'",
+    );
+  } catch {
+    return null;
+  }
+};
+
+/** Whose key pays for this owner's email model calls right now. */
+const payerOf = (ctx: Reader): EmailPayer => {
+  if (ownerModeEnabled(ctx.env)) return "server";
+  const key = ownKeyRow(ctx.db);
+  if (key?.status !== "ok") return "stella";
+  const refusedAt = stateOf(ctx.db)?.own_key_refused_at ?? null;
+  return refusedAt !== null && refusedAt >= key.updated_at && ctx.now - refusedAt < OWN_KEY_RETRY_MS ? "stella" : "own_key";
+};
+
+const usageOf = (
+  now: number,
+  state: StateRow | null,
+  plan: string,
+  zone: string,
+  payer: EmailPayer,
+): EmailUsage & { today: number; why?: "month" | "day" } => {
   const { month, day } = localParts(now, zone);
   const sameMonth = state?.month === month;
   const tokens = sameMonth ? state.month_tokens : 0;
   const lineUsd = sameMonth ? state.month_line_usd : 0;
-  const costUsd = (tokens / 1_000_000) * DECISION_INPUT_USD_PER_M + lineUsd;
-  const caps = plan === "free" ? CAPS.free : CAPS.paid;
+  const own = payer !== "stella";
+  const costUsd = own
+    ? sameMonth
+      ? (state.month_own_usd ?? 0)
+      : 0
+    : (tokens / 1_000_000) * DECISION_INPUT_USD_PER_M + lineUsd;
+  const caps = own
+    ? { perDay: OWN_KEY_PER_DAY, usdPerMonth: Number.POSITIVE_INFINITY }
+    : plan === "free"
+      ? CAPS.free
+      : CAPS.paid;
   const today = state?.sort_day === day ? state.sorted_today : 0;
+  const why = costUsd >= caps.usdPerMonth ? "month" : today >= caps.perDay ? "day" : undefined;
   return {
     month,
     sorted: sameMonth ? state.month_sorted : 0,
     inputTokens: tokens,
     costUsd: Math.round(costUsd * 10_000) / 10_000,
-    capped: costUsd >= caps.usdPerMonth || today >= caps.perDay,
+    capped: why !== undefined,
     today,
+    ...(why ? { why } : {}),
   };
 };
 
-/** The month's (or day's) cap is reached: no model call is made for this owner's email until it resets. */
-const overCap = (ctx: OwnerContext, plan: string, zone: string): boolean => usageOf(ctx.now, stateOf(ctx.db), plan, zone).capped;
+/**
+ * No written parts (Today items, the lead, replies, the note, search wording) for this owner now:
+ * the allowance or the day's limit is used up, or they are on Free with Stella's key (sorting only).
+ */
+const writingOff = (ctx: OwnerContext, plan: string, zone: string): boolean => {
+  const payer = payerOf(ctx);
+  return usageOf(ctx.now, stateOf(ctx.db), plan, zone, payer).capped || (payer === "stella" && plan === "free");
+};
 
-const recordSort = (ctx: OwnerContext, zone: string, tokens: number): void => {
+/** The start of the next local month or day, when a paused allowance comes back. */
+const nextReset = (now: number, zone: string, why: "month" | "day"): number => {
+  if (why === "day") {
+    const { day } = localParts(now + DAY, zone);
+    return zonedTime(`${day} 00:00`, zone) ?? now + DAY;
+  }
+  const { month } = localParts(now, zone);
+  const [year, number] = month.split("-").map(Number) as [number, number];
+  const next = number === 12 ? `${year + 1}-01-01` : `${year}-${String(number + 1).padStart(2, "0")}-01`;
+  return zonedTime(`${next} 00:00`, zone) ?? now + 30 * DAY;
+};
+
+/** Whose key email runs on, what that allows, and whether sorting is paused: what the Email page says. */
+const accessInfo = (ctx: Reader, plan: string, zone: string): EmailAccess => {
+  const payer = payerOf(ctx);
+  const state = stateOf(ctx.db);
+  const usage = usageOf(ctx.now, state, plan, zone, payer);
+  const free = plan === "free";
+  const refused =
+    payer === "stella" && ownKeyRow(ctx.db)?.status === "ok" && state?.own_key_refused_at
+      ? state.own_key_error || "Your OpenRouter key was refused."
+      : undefined;
+  return {
+    payer,
+    plan: free ? "free" : "paid",
+    writes: payer !== "stella" || !free,
+    ...(payer === "stella" ? { limitUsd: (free ? CAPS.free : CAPS.paid).usdPerMonth } : {}),
+    ...(usage.why ? { paused: { why: usage.why, until: nextReset(ctx.now, zone, usage.why) } } : {}),
+    ...(refused ? { ownKeyRefused: refused } : {}),
+  };
+};
+
+const ownKeyRefused = (ctx: OwnerContext, message: string): void => {
+  ctx.db.run(
+    "UPDATE email_state SET own_key_refused_at = ?, own_key_error = ?, updated_at = ? WHERE id = 1",
+    ctx.now,
+    message.slice(0, 300),
+    ctx.now,
+  );
+  log("own_key_refused", { owner: ctx.ownerId.slice(0, 12), message: message.slice(0, 200) });
+};
+
+const recordSort = (ctx: OwnerContext, zone: string, inputTokens: number): void => {
   const { month, day } = localParts(ctx.now, zone);
+  // Spend on the owner's own key is kept apart: it never counts against Stella's allowance.
+  const own = payerOf(ctx) !== "stella";
+  const tokens = own ? 0 : inputTokens;
+  const ownUsd = own ? (inputTokens / 1_000_000) * DECISION_INPUT_USD_PER_M : 0;
   ctx.db.run(
     `UPDATE email_state SET
        month_sorted = CASE WHEN month = ? THEN month_sorted + 1 ELSE 1 END,
        month_tokens = CASE WHEN month = ? THEN month_tokens + ? ELSE ? END,
        month_line_usd = CASE WHEN month = ? THEN month_line_usd ELSE 0 END,
+       month_own_usd = CASE WHEN month = ? THEN month_own_usd + ? ELSE ? END,
        month = ?,
        sorted_today = CASE WHEN sort_day = ? THEN sorted_today + 1 ELSE 1 END,
        sort_day = ?,
@@ -522,6 +638,9 @@ const recordSort = (ctx: OwnerContext, zone: string, tokens: number): void => {
     tokens,
     month,
     month,
+    ownUsd,
+    ownUsd,
+    month,
     day,
     day,
     ctx.now,
@@ -531,14 +650,21 @@ const recordSort = (ctx: OwnerContext, zone: string, tokens: number): void => {
 const recordLineCost = (ctx: OwnerContext, zone: string, usd: number): void => {
   if (!(usd > 0)) return;
   const { month } = localParts(ctx.now, zone);
+  const own = payerOf(ctx) !== "stella";
+  const stellaUsd = own ? 0 : usd;
+  const ownUsd = own ? usd : 0;
   ctx.db.run(
     `UPDATE email_state SET month_line_usd = CASE WHEN month = ? THEN month_line_usd + ? ELSE ? END,
+       month_own_usd = CASE WHEN month = ? THEN month_own_usd + ? ELSE ? END,
        month_tokens = CASE WHEN month = ? THEN month_tokens ELSE 0 END,
        month_sorted = CASE WHEN month = ? THEN month_sorted ELSE 0 END,
        month = ?, updated_at = ? WHERE id = 1`,
     month,
-    usd,
-    usd,
+    stellaUsd,
+    stellaUsd,
+    month,
+    ownUsd,
+    ownUsd,
     month,
     month,
     month,
@@ -620,19 +746,12 @@ const sortOne = async (
     return { verdict: { bucket: "noise", urgentP: 0, reason: "other", inputTokens: 0 }, sortedBy: "sender" };
   }
   const state = stateOf(ctx.db);
-  const usage = usageOf(ctx.now, state, snapshot.plan, zone);
+  const usage = usageOf(ctx.now, state, snapshot.plan, zone, payerOf(ctx));
   if (sortingSwitchedOff(ctx) || usage.capped) {
     if (usage.capped) log("capped", { owner: ctx.ownerId.slice(0, 12), today: usage.today, costUsd: usage.costUsd });
     return { verdict: fallbackVerdict(mail, wrote), sortedBy: "fallback" };
   }
-  const access: SorterAccess = {
-    env: ctx.env,
-    ownerId: ctx.ownerId,
-    ownerGeneration: snapshot.ownerGeneration,
-    execution: snapshot.execution,
-    audience: snapshot.allowance.audience,
-    budgetMicroCents: snapshot.allowance.budgetMicroCents,
-  };
+  const access = accessOf(ctx, snapshot);
   const attachment = await attachmentFor(get, mail);
   const input = {
     note: state?.note ?? "",
@@ -783,7 +902,7 @@ const surfaceNow = async (
   rule: RuleRow | null,
 ): Promise<void> => {
   if (!snapshot.writable) return;
-  const out = overCap(ctx, snapshot.plan, zone)
+  const out = writingOff(ctx, snapshot.plan, zone)
     ? null
     : await writeMatters(accessOf(ctx, snapshot), matterEmails([row]), zone, await voiceOf(ctx))
     .then((result) => {
@@ -1257,16 +1376,9 @@ const runNote = async (ctx: OwnerContext): Promise<void> => {
       now: row.now as EmailBucket | "dismissed",
     }));
   const snapshot = await ctx.host.snapshot();
-  if (overCap(ctx, snapshot.plan, zoneOf(ctx, snapshot))) return;
+  if (writingOff(ctx, snapshot.plan, zoneOf(ctx, snapshot))) return;
   const rewritten = await rewriteNote(
-    {
-      env: ctx.env,
-      ownerId: ctx.ownerId,
-      ownerGeneration: snapshot.ownerGeneration,
-      execution: snapshot.execution,
-      audience: snapshot.allowance.audience,
-      budgetMicroCents: snapshot.allowance.budgetMicroCents,
-    },
+    accessOf(ctx, snapshot),
     state.note,
     corrections,
   );
@@ -1348,6 +1460,9 @@ const accessOf = (ctx: OwnerContext, snapshot: OwnerSnapshot): SorterAccess => (
   execution: snapshot.execution,
   audience: snapshot.allowance.audience,
   budgetMicroCents: snapshot.allowance.budgetMicroCents,
+  ...(payerOf(ctx) === "own_key"
+    ? { ownKey: "openrouter" as const, onOwnKeyRefused: (message: string) => ownKeyRefused(ctx, message) }
+    : {}),
 });
 
 /** A wall-clock time ("YYYY-MM-DD HH:MM") in a time zone, as an instant. */
@@ -1679,7 +1794,7 @@ const fold = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, fo
   ctx.db.run("UPDATE email_state SET last_fold_at = ? WHERE id = 1", ctx.now);
   const rows = await dropHandled(ctx, waiting);
   if (rows.length === 0) return;
-  const out = overCap(ctx, snapshot.plan, zone)
+  const out = writingOff(ctx, snapshot.plan, zone)
     ? null
     : await writeMatters(accessOf(ctx, snapshot), matterEmails(rows), zone, await voiceOf(ctx))
     .then((result) => {
@@ -1799,7 +1914,7 @@ const runLead = async (ctx: OwnerContext): Promise<void> => {
   const state = stateOf(ctx.db);
   if (state?.today_lead && jsonList(state.lead_ids).sort().join(",") === ids.join(",")) return;
   const snapshot = await ctx.host.snapshot();
-  if (overCap(ctx, snapshot.plan, zoneOf(ctx, snapshot))) {
+  if (writingOff(ctx, snapshot.plan, zoneOf(ctx, snapshot))) {
     ctx.db.run("UPDATE email_state SET today_lead = NULL, lead_ids = ? WHERE id = 1", JSON.stringify(ids));
     return;
   }
@@ -1915,8 +2030,14 @@ const voiceReply = async (ctx: OwnerContext, args: EmailCalls["email.voiceReply"
   const mail = await gmailReadMail(await account.get(), row.message_id).catch(() => null);
   const snapshot = await ctx.host.snapshot();
   const zone = zoneOf(ctx, snapshot);
-  if (overCap(ctx, snapshot.plan, zone)) {
-    throw new RpcError("RATE_LIMITED", "Email's monthly limit is reached, so Stella can't write replies until it resets. You can still type one.");
+  if (writingOff(ctx, snapshot.plan, zone)) {
+    const paused = usageOf(ctx.now, stateOf(ctx.db), snapshot.plan, zone, payerOf(ctx)).capped;
+    throw new RpcError(
+      "RATE_LIMITED",
+      paused
+        ? "Email's allowance is used up for now, so Stella can't write replies until it resets. You can still type one."
+        : "Stella writes replies on a paid plan or with your own OpenRouter key. You can still type one.",
+    );
   }
   const { body, usd } = await writeVoiceReply(accessOf(ctx, snapshot), {
     words: args.words,
@@ -2078,7 +2199,7 @@ const settleArchived = async (ctx: OwnerContext): Promise<void> => {
   }
 };
 
-const readToday = (ctx: { db: OwnerDbReader; now: number }): EmailToday => {
+const readToday = (ctx: Reader): EmailToday => {
   const state = stateOf(ctx.db);
   const zone = ownerZone(ctx.db) ?? "UTC";
   const midnight = startOfDay(ctx.now, zone);
@@ -2120,6 +2241,7 @@ const readToday = (ctx: { db: OwnerDbReader; now: number }): EmailToday => {
     alerts,
     multipleAccounts: (ctx.db.one<{ count: number }>("SELECT COUNT(*) AS count FROM email_accounts")?.count ?? 0) > 1,
     ...(checked ? { lastCheckedAt: checked } : {}),
+    access: accessInfo(ctx, state?.plan ?? "free", zone),
   };
 };
 
@@ -2292,7 +2414,7 @@ const readDigests = (ctx: { db: OwnerDbReader; now: number }): EmailDigests => {
   };
 };
 
-const statusOf = (ctx: { db: OwnerDbReader; now: number }, plan: string, zone: string): EmailStatus => {
+const statusOf = (ctx: Reader, plan: string, zone: string): EmailStatus => {
   const state = stateOf(ctx.db);
   const accounts: EmailAccountStatus[] = ctx.db
     .all<AccountRow>("SELECT * FROM email_accounts ORDER BY created_at")
@@ -2302,9 +2424,10 @@ const statusOf = (ctx: { db: OwnerDbReader; now: number }, plan: string, zone: s
       ...(row.last_sync_at !== null ? { lastSyncAt: row.last_sync_at } : {}),
       ...(row.last_error ? { error: row.last_error } : {}),
     }));
-  const { today: _today, ...usage } = usageOf(ctx.now, state, plan, zone);
+  const { today: _today, why: _why, ...usage } = usageOf(ctx.now, state, plan, zone, payerOf(ctx));
   return {
     enabled: state?.enabled === 1,
+    access: accessInfo(ctx, plan, zone),
     gmailConnected: stellaGoogleAccounts(ctx.db, "gmail").map((account) => account.email ?? account.label),
     accounts,
     needsReconnect: accounts.length === 0 && stellaGoogleAccounts(ctx.db, "gmail").length === 0 && composioGmailOnly(ctx.db),
@@ -2317,7 +2440,7 @@ const rememberPlan = (ctx: OwnerContext, snapshot: OwnerSnapshot): void => {
   ctx.db.run("UPDATE email_state SET plan = ? WHERE id = 1", snapshot.plan);
 };
 
-const readFeed = (ctx: { db: OwnerDbReader; now: number }): EmailFeed => {
+const readFeed = (ctx: Reader): EmailFeed => {
   const zone = ownerZone(ctx.db) ?? "UTC";
   const items = ctx.db
     .all<ItemRow>(
@@ -2589,17 +2712,10 @@ const searchMail = async (ctx: OwnerContext, words: string): Promise<EmailSearch
   const snapshot = await ctx.host.snapshot();
   const zone = zoneOf(ctx, snapshot);
   ensureState(ctx);
-  const queries = overCap(ctx, snapshot.plan, zone)
+  const queries = writingOff(ctx, snapshot.plan, zone)
     ? { q: words.trim(), broader: words.trim() }
     : await gmailQueryFor(
-    {
-      env: ctx.env,
-      ownerId: ctx.ownerId,
-      ownerGeneration: snapshot.ownerGeneration,
-      execution: snapshot.execution,
-      audience: snapshot.allowance.audience,
-      budgetMicroCents: snapshot.allowance.budgetMicroCents,
-    },
+    accessOf(ctx, snapshot),
     words,
     zone,
   )
@@ -2695,7 +2811,7 @@ const ruleId = (): string => `r${crypto.randomUUID().replace(/-/gu, "").slice(0,
 
 const runningEmailDomain = {
   name: "email",
-  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION, EMAIL_BRIEFINGS_MIGRATION, EMAIL_TODAY_MIGRATION],
+  migrations: [EMAIL_MIGRATION, EMAIL_DIGESTS_MIGRATION, EMAIL_BRIEF_MIGRATION, EMAIL_BRIEFINGS_MIGRATION, EMAIL_TODAY_MIGRATION, EMAIL_OWN_KEY_MIGRATION],
   calls: {
     "email.setEnabled": {
       scope: "owner",
@@ -2956,14 +3072,7 @@ const runningEmailDomain = {
         const parsed = { name: mail.from, address: mail.from.toLowerCase() };
         const started = Date.now();
         const verdict = await sortEmail(
-          {
-            env: ctx.env,
-            ownerId: ctx.ownerId,
-            ownerGeneration: snapshot.ownerGeneration,
-            execution: snapshot.execution,
-            audience: snapshot.allowance.audience,
-            budgetMicroCents: snapshot.allowance.budgetMicroCents,
-          },
+          accessOf(ctx, snapshot),
           {
             note: stateOf(ctx.db)?.note ?? "",
             account: "probe@example.com",

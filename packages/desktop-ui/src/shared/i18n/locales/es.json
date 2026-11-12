@@ -3845,6 +3845,25 @@
       "later": "Más tarde · {when}",
       "repliedInGmail": "Respondido en Gmail",
       "archivedInGmail": "Archivado en Gmail"
+    },
+    "access": {
+      "addKey": "Usar mi clave de OpenRouter",
+      "plans": "Ver planes",
+      "pausedMonthTitle": "El orden está en pausa hasta el {date}",
+      "pausedDayTitle": "El orden está en pausa hasta mañana",
+      "pausedFreeBody": "El saldo gratuito de Stella para el correo se ha agotado este mes, así que el correo nuevo espera sin ordenar. Añade tu propia clave de OpenRouter para seguir con tu clave, o elige un plan para tener más.",
+      "pausedPaidBody": "El saldo de correo de tu plan se ha agotado este mes, así que el correo nuevo espera sin ordenar. Añade tu propia clave de OpenRouter para seguir con tu clave.",
+      "pausedDayFreeBody": "Se ha alcanzado el límite de correo de hoy del plan gratuito; el correo nuevo espera hasta mañana. Añade tu propia clave de OpenRouter o elige un plan para tener más.",
+      "pausedDayBody": "Se ha alcanzado el límite de correo de hoy; el correo nuevo espera hasta mañana.",
+      "pausedOwnBody": "Se ha alcanzado el límite de hoy de tu propia clave; el correo nuevo espera hasta mañana.",
+      "refusedTitle": "Tu clave de OpenRouter fue rechazada",
+      "refusedBody": "OpenRouter dice: {reason} Correo usa el saldo de Stella hasta que la clave vuelva a funcionar.",
+      "freeSortingOnly": "En el plan gratuito, Stella ordena tu correo. Las respuestas preparadas y los resúmenes necesitan tu propia clave de OpenRouter o un plan.",
+      "lineStella": "Con el saldo de Stella: {sorted} ordenados este mes · {cost} de {limit}",
+      "lineOwn": "Con tu clave de OpenRouter: {sorted} ordenados este mes · {cost} en tu clave. No se usa el saldo de Stella.",
+      "lineServer": "Con la clave de OpenRouter de este servidor: {sorted} ordenados este mes · {cost}",
+      "deviceKeyHint": "Para usar tu propia clave de OpenRouter, añádela en Modelos con la sesión iniciada para que se guarde en tu cuenta. Una clave guardada solo en este ordenador no se puede usar mientras está apagado.",
+      "deviceKeyHintPhone": "Para usar tu propia clave de OpenRouter, añádela en los ajustes del chat con la sesión iniciada para que se guarde en tu cuenta. Una clave guardada solo en este teléfono no se puede usar para el correo."
     }
   }
 }

@@ -3803,6 +3803,25 @@
       "later": "Senere · {when}",
       "repliedInGmail": "Besvart i Gmail",
       "archivedInGmail": "Arkivert i Gmail"
+    },
+    "access": {
+      "addKey": "Bruk OpenRouter-nøkkelen min",
+      "plans": "Se abonnementer",
+      "pausedMonthTitle": "Sorteringen er satt på pause til {date}",
+      "pausedDayTitle": "Sorteringen er satt på pause til i morgen",
+      "pausedFreeBody": "Stellas gratiskvote for e-post er brukt opp denne måneden, så ny e-post venter usortert. Legg til din egen OpenRouter-nøkkel for å fortsette på nøkkelen din, eller velg et abonnement for mer.",
+      "pausedPaidBody": "E-postkvoten i abonnementet ditt er brukt opp denne måneden, så ny e-post venter usortert. Legg til din egen OpenRouter-nøkkel for å fortsette på nøkkelen din.",
+      "pausedDayFreeBody": "Dagens e-postgrense i gratisabonnementet er nådd; ny e-post venter til i morgen. Legg til din egen OpenRouter-nøkkel, eller velg et abonnement for mer.",
+      "pausedDayBody": "Dagens e-postgrense er nådd; ny e-post venter til i morgen.",
+      "pausedOwnBody": "Dagens grense på din egen nøkkel er nådd; ny e-post venter til i morgen.",
+      "refusedTitle": "OpenRouter-nøkkelen din ble avvist",
+      "refusedBody": "OpenRouter svarte: {reason} E-post bruker Stellas kvote til nøkkelen virker igjen.",
+      "freeSortingOnly": "I gratisabonnementet sorterer Stella e-posten din. Forberedte svar og sammendrag krever din egen OpenRouter-nøkkel eller et abonnement.",
+      "lineStella": "På Stellas kvote: {sorted} sortert denne måneden · {cost} av {limit}",
+      "lineOwn": "På OpenRouter-nøkkelen din: {sorted} sortert denne måneden · {cost} på nøkkelen din. Stellas kvote brukes ikke.",
+      "lineServer": "På denne serverens OpenRouter-nøkkel: {sorted} sortert denne måneden · {cost}",
+      "deviceKeyHint": "For å bruke din egen OpenRouter-nøkkel, legg den til under Modeller mens du er logget inn, så den lagres på kontoen din. En nøkkel som bare ligger på denne datamaskinen, kan ikke brukes mens datamaskinen er av.",
+      "deviceKeyHintPhone": "For å bruke din egen OpenRouter-nøkkel, legg den til i chatinnstillingene mens du er logget inn, så den lagres på kontoen din. En nøkkel som bare ligger på denne telefonen, kan ikke brukes til e-post."
     }
   }
 }

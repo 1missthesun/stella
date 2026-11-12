@@ -3887,6 +3887,25 @@
       "later": "Później · {when}",
       "repliedInGmail": "Odpowiedziano w Gmailu",
       "archivedInGmail": "Zarchiwizowano w Gmailu"
+    },
+    "access": {
+      "addKey": "Użyj mojego klucza OpenRouter",
+      "plans": "Zobacz plany",
+      "pausedMonthTitle": "Sortowanie wstrzymane do {date}",
+      "pausedDayTitle": "Sortowanie wstrzymane do jutra",
+      "pausedFreeBody": "Darmowy limit Stelli na pocztę wyczerpał się w tym miesiącu, więc nowe wiadomości czekają nieposortowane. Dodaj własny klucz OpenRouter, aby działać dalej na swoim kluczu, albo wybierz plan, aby mieć więcej.",
+      "pausedPaidBody": "Limit poczty w twoim planie wyczerpał się w tym miesiącu, więc nowe wiadomości czekają nieposortowane. Dodaj własny klucz OpenRouter, aby działać dalej na swoim kluczu.",
+      "pausedDayFreeBody": "Dzisiejszy limit poczty w darmowym planie został osiągnięty; nowe wiadomości poczekają do jutra. Dodaj własny klucz OpenRouter albo wybierz plan, aby mieć więcej.",
+      "pausedDayBody": "Dzisiejszy limit poczty został osiągnięty; nowe wiadomości poczekają do jutra.",
+      "pausedOwnBody": "Dzisiejszy limit na twoim własnym kluczu został osiągnięty; nowe wiadomości poczekają do jutra.",
+      "refusedTitle": "Twój klucz OpenRouter został odrzucony",
+      "refusedBody": "OpenRouter odpowiedział: {reason} E-mail korzysta z limitu Stelli, dopóki klucz znów nie zadziała.",
+      "freeSortingOnly": "W darmowym planie Stella sortuje twoją pocztę. Przygotowane odpowiedzi i podsumowania wymagają własnego klucza OpenRouter lub planu.",
+      "lineStella": "Z limitu Stelli: w tym miesiącu posortowano {sorted} · {cost} z {limit}",
+      "lineOwn": "Z twojego klucza OpenRouter: w tym miesiącu posortowano {sorted} · {cost} na twoim kluczu. Limit Stelli nie jest używany.",
+      "lineServer": "Z klucza OpenRouter tego serwera: w tym miesiącu posortowano {sorted} · {cost}",
+      "deviceKeyHint": "Aby używać własnego klucza OpenRouter, dodaj go w Modelach, będąc zalogowanym, żeby zapisał się na twoim koncie. Klucza zapisanego tylko na tym komputerze nie da się użyć, gdy komputer jest wyłączony.",
+      "deviceKeyHintPhone": "Aby używać własnego klucza OpenRouter, dodaj go w ustawieniach czatu, będąc zalogowanym, żeby zapisał się na twoim koncie. Klucza zapisanego tylko na tym telefonie nie da się użyć do poczty."
     }
   }
 }

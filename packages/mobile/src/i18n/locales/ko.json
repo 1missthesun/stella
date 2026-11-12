@@ -3759,6 +3759,25 @@
       "later": "나중에 · {when}",
       "repliedInGmail": "Gmail에서 답장함",
       "archivedInGmail": "Gmail에서 보관함"
+    },
+    "access": {
+      "addKey": "내 OpenRouter 키 사용",
+      "plans": "요금제 보기",
+      "pausedMonthTitle": "{date}까지 분류가 일시 중지됐어요",
+      "pausedDayTitle": "내일까지 분류가 일시 중지됐어요",
+      "pausedFreeBody": "이번 달 Stella의 이메일 무료 사용량을 다 써서 새 메일이 분류되지 않은 채 기다리고 있어요. 본인의 OpenRouter 키를 추가하면 그 키로 계속 쓸 수 있고, 더 쓰려면 요금제를 선택하세요.",
+      "pausedPaidBody": "이번 달 요금제의 이메일 사용량을 다 써서 새 메일이 분류되지 않은 채 기다리고 있어요. 본인의 OpenRouter 키를 추가하면 그 키로 계속 쓸 수 있어요.",
+      "pausedDayFreeBody": "무료 요금제의 오늘 이메일 한도에 도달했어요. 새 메일은 내일까지 기다려요. 더 쓰려면 본인의 OpenRouter 키를 추가하거나 요금제를 선택하세요.",
+      "pausedDayBody": "오늘 이메일 한도에 도달했어요. 새 메일은 내일까지 기다려요.",
+      "pausedOwnBody": "본인 키의 오늘 한도에 도달했어요. 새 메일은 내일까지 기다려요.",
+      "refusedTitle": "OpenRouter 키가 거부됐어요",
+      "refusedBody": "OpenRouter 응답: {reason} 키가 다시 작동할 때까지 이메일은 Stella의 사용량을 써요.",
+      "freeSortingOnly": "무료 요금제에서는 Stella가 메일을 분류해요. 준비된 답장과 요약을 쓰려면 본인의 OpenRouter 키나 요금제가 필요해요.",
+      "lineStella": "Stella 사용량: 이번 달 {sorted}개 분류 · {limit} 중 {cost}",
+      "lineOwn": "내 OpenRouter 키: 이번 달 {sorted}개 분류 · 내 키에서 {cost}. Stella의 사용량은 쓰지 않아요.",
+      "lineServer": "이 서버의 OpenRouter 키: 이번 달 {sorted}개 분류 · {cost}",
+      "deviceKeyHint": "본인의 OpenRouter 키를 쓰려면 로그인한 상태에서 모델에 추가하세요. 그래야 계정에 저장돼요. 이 컴퓨터에만 저장된 키는 컴퓨터가 꺼져 있는 동안 쓸 수 없어요.",
+      "deviceKeyHintPhone": "본인의 OpenRouter 키를 쓰려면 로그인한 상태에서 채팅 설정에 추가하세요. 그래야 계정에 저장돼요. 이 휴대폰에만 저장된 키는 이메일에 쓸 수 없어요."
     }
   }
 }

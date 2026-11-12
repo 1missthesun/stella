@@ -3803,6 +3803,25 @@
       "later": "Later · {when}",
       "repliedInGmail": "Beantwoord in Gmail",
       "archivedInGmail": "Gearchiveerd in Gmail"
+    },
+    "access": {
+      "addKey": "Mijn OpenRouter-sleutel gebruiken",
+      "plans": "Abonnementen bekijken",
+      "pausedMonthTitle": "Sorteren staat stil tot {date}",
+      "pausedDayTitle": "Sorteren staat stil tot morgen",
+      "pausedFreeBody": "Stella's gratis tegoed voor e-mail is deze maand op, dus nieuwe mail wacht ongesorteerd. Voeg je eigen OpenRouter-sleutel toe om op je eigen sleutel door te gaan, of kies een abonnement voor meer.",
+      "pausedPaidBody": "Het e-mailtegoed van je abonnement is deze maand op, dus nieuwe mail wacht ongesorteerd. Voeg je eigen OpenRouter-sleutel toe om op je eigen sleutel door te gaan.",
+      "pausedDayFreeBody": "De e-maillimiet van vandaag op het gratis abonnement is bereikt; nieuwe mail wacht tot morgen. Voeg je eigen OpenRouter-sleutel toe of kies een abonnement voor meer.",
+      "pausedDayBody": "De e-maillimiet van vandaag is bereikt; nieuwe mail wacht tot morgen.",
+      "pausedOwnBody": "De limiet van vandaag op je eigen sleutel is bereikt; nieuwe mail wacht tot morgen.",
+      "refusedTitle": "Je OpenRouter-sleutel is geweigerd",
+      "refusedBody": "OpenRouter meldt: {reason} E-mail gebruikt het tegoed van Stella tot de sleutel weer werkt.",
+      "freeSortingOnly": "Op het gratis abonnement sorteert Stella je mail. Voorbereide antwoorden en samenvattingen hebben je eigen OpenRouter-sleutel of een abonnement nodig.",
+      "lineStella": "Op Stella's tegoed: {sorted} gesorteerd deze maand · {cost} van {limit}",
+      "lineOwn": "Op je OpenRouter-sleutel: {sorted} gesorteerd deze maand · {cost} op je sleutel. Stella's tegoed wordt niet gebruikt.",
+      "lineServer": "Op de OpenRouter-sleutel van deze server: {sorted} gesorteerd deze maand · {cost}",
+      "deviceKeyHint": "Wil je je eigen OpenRouter-sleutel gebruiken? Voeg hem toe in Modellen terwijl je bent ingelogd, zodat hij in je account wordt bewaard. Een sleutel die alleen op deze computer staat, kan niet worden gebruikt als de computer uit staat.",
+      "deviceKeyHintPhone": "Wil je je eigen OpenRouter-sleutel gebruiken? Voeg hem toe in de chatinstellingen terwijl je bent ingelogd, zodat hij in je account wordt bewaard. Een sleutel die alleen op deze telefoon staat, kan niet voor e-mail worden gebruikt."
     }
   }
 }

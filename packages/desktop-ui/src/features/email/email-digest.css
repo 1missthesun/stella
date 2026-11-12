@@ -904,3 +904,36 @@ button.email-history__what:hover {
   opacity: 0.5;
   cursor: default;
 }
+
+/* What limits email right now (allowance used up, own key refused, Free sorting only): plain type, no box. */
+.email-today__notice {
+  margin: 0 0 22px;
+}
+
+.email-today__notice-title {
+  margin: 0 0 4px;
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: var(--weight-semibold, 650);
+}
+
+.email-today__notice-body {
+  margin: 0;
+  color: var(--text-weak);
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+  max-width: 56ch;
+}
+
+.email-today__notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.email-today__notice--quiet .email-today__notice-actions {
+  margin-top: 4px;
+  margin-left: -8px;
+}

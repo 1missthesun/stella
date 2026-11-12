@@ -7,7 +7,11 @@ import type {
   EmailMatter,
   EmailNoiseSender,
   EmailToday,
+  EmailAccess,
 } from "@stella/contracts/backend/email";
+import { useRouter } from "expo-router";
+import { openDrawer } from "../lib/drawer";
+import { useServerFeatures } from "../lib/server-features";
 import { laterChoices, TODAY_TONES, whenLabel, type LaterChoiceId } from "@stella/contracts/email-brief";
 import { Text } from "./Text";
 import { Icon } from "./Icon";
@@ -704,6 +708,85 @@ function Folded({ label, matters, now, styles, testID }: { label: string; matter
  * and left too); new mail joins; what was put off comes back on its own.
  * Not scrollable itself.
  */
+/**
+ * What stops or limits email, said plainly with what unlocks more: sorting paused because the
+ * allowance or the day's limit is used up, the owner's own key refused, or Free's sorting-only taste.
+ * Keys are added in the chat settings panel, so "Use my OpenRouter key" opens it over Chat.
+ */
+export function AccessNotice({ access }: { access: EmailAccess | undefined }) {
+  const t = useT();
+  const locale = useLocale();
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const router = useRouter();
+  const features = useServerFeatures();
+  if (!access) return null;
+  const onStella = access.payer === "stella";
+  const addKey = () => {
+    tapLight();
+    router.navigate("/chat");
+    setTimeout(() => openDrawer("end"), 350);
+  };
+  const plans =
+    onStella && access.plan === "free" && features.billing ? (
+      <Pressable accessibilityRole="button" onPress={() => router.push("/settings")} style={({ pressed }) => [styles.quiet, pressed && styles.dimmed]}>
+        <Text style={styles.quietLabel} maxFontSizeMultiplier={SCALE}>
+          {t("email.access.plans")}
+        </Text>
+      </Pressable>
+    ) : null;
+  const keyButton = (primary: boolean) => (
+    <Pressable
+      accessibilityRole="button"
+      onPress={addKey}
+      style={({ pressed }) => [primary ? styles.primary : styles.quiet, pressed && styles.dimmed]}
+    >
+      <Text style={primary ? styles.primaryLabel : styles.quietLabel} maxFontSizeMultiplier={SCALE}>
+        {t("email.access.addKey")}
+      </Text>
+    </Pressable>
+  );
+  let title: string | null = null;
+  let body: string;
+  let primary = true;
+  if (access.ownKeyRefused) {
+    title = t("email.access.refusedTitle");
+    body = t("email.access.refusedBody", { reason: access.ownKeyRefused });
+  } else if (access.paused) {
+    const date = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" }).format(access.paused.until);
+    title = access.paused.why === "day" ? t("email.access.pausedDayTitle") : t("email.access.pausedMonthTitle", { date });
+    body = !onStella
+      ? t("email.access.pausedOwnBody")
+      : access.paused.why === "day"
+        ? t(access.plan === "free" ? "email.access.pausedDayFreeBody" : "email.access.pausedDayBody")
+        : t(access.plan === "free" ? "email.access.pausedFreeBody" : "email.access.pausedPaidBody");
+  } else if (onStella && !access.writes) {
+    body = t("email.access.freeSortingOnly");
+    primary = false;
+  } else {
+    return null;
+  }
+  const actions = onStella || access.ownKeyRefused;
+  return (
+    <View style={styles.notice} accessibilityRole={title ? "alert" : undefined}>
+      {title ? (
+        <Text style={styles.noticeTitle} maxFontSizeMultiplier={SCALE}>
+          {title}
+        </Text>
+      ) : null}
+      <Text style={styles.noticeBody} maxFontSizeMultiplier={SCALE}>
+        {body}
+      </Text>
+      {actions ? (
+        <View style={styles.noticeActions}>
+          {keyButton(primary)}
+          {plans}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function TodayView({
   today,
   now,
@@ -755,6 +838,7 @@ export function TodayView({
 
   return (
     <View testID="email-today">
+      <AccessNotice access={today.access} />
       {open.length > 0 && today.lead ? (
         <Text style={styles.lead} maxFontSizeMultiplier={SCALE}>
           <Md text={today.lead} boldStyle={styles.leadBold} />
@@ -969,6 +1053,10 @@ const makeStyles = (colors: Colors) =>
     primaryListening: { opacity: 0.85 },
     primaryLabel: { color: colors.accentForeground, fontFamily: fonts.sans.semiBold, fontSize: 14 },
     quiet: { paddingVertical: 4 },
+    notice: { marginBottom: 22 },
+    noticeTitle: { color: colors.text, fontFamily: fonts.sans.semiBold, fontSize: 16, lineHeight: 22, marginBottom: 4 },
+    noticeBody: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 14, lineHeight: 20 },
+    noticeActions: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 10 },
     quietLabel: { color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: 14 },
     listening: { color: colors.text },
     mic: { alignItems: "center", flexDirection: "row", gap: 5, paddingVertical: 4 },

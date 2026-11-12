@@ -3803,6 +3803,25 @@
       "later": "Myöhemmin · {when}",
       "repliedInGmail": "Vastattu Gmailissa",
       "archivedInGmail": "Arkistoitu Gmailissa"
+    },
+    "access": {
+      "addKey": "Käytä omaa OpenRouter-avaintani",
+      "plans": "Katso tilaukset",
+      "pausedMonthTitle": "Lajittelu on tauolla {date} asti",
+      "pausedDayTitle": "Lajittelu on tauolla huomiseen",
+      "pausedFreeBody": "Stellan ilmainen sähköpostikiintiö on käytetty tältä kuulta, joten uusi posti odottaa lajittelematta. Lisää oma OpenRouter-avaimesi jatkaaksesi omalla avaimellasi, tai valitse tilaus saadaksesi enemmän.",
+      "pausedPaidBody": "Tilauksesi sähköpostikiintiö on käytetty tältä kuulta, joten uusi posti odottaa lajittelematta. Lisää oma OpenRouter-avaimesi jatkaaksesi omalla avaimellasi.",
+      "pausedDayFreeBody": "Ilmaisen tilauksen tämän päivän sähköpostiraja on täynnä; uusi posti odottaa huomiseen. Lisää oma OpenRouter-avaimesi tai valitse tilaus saadaksesi enemmän.",
+      "pausedDayBody": "Tämän päivän sähköpostiraja on täynnä; uusi posti odottaa huomiseen.",
+      "pausedOwnBody": "Oman avaimesi tämän päivän raja on täynnä; uusi posti odottaa huomiseen.",
+      "refusedTitle": "OpenRouter-avaimesi hylättiin",
+      "refusedBody": "OpenRouter vastasi: {reason} Sähköposti käyttää Stellan kiintiötä, kunnes avain toimii taas.",
+      "freeSortingOnly": "Ilmaisessa tilauksessa Stella lajittelee postisi. Valmiit vastaukset ja yhteenvedot vaativat oman OpenRouter-avaimen tai tilauksen.",
+      "lineStella": "Stellan kiintiöllä: {sorted} lajiteltu tässä kuussa · {cost} / {limit}",
+      "lineOwn": "Omalla OpenRouter-avaimellasi: {sorted} lajiteltu tässä kuussa · {cost} avaimellasi. Stellan kiintiötä ei käytetä.",
+      "lineServer": "Tämän palvelimen OpenRouter-avaimella: {sorted} lajiteltu tässä kuussa · {cost}",
+      "deviceKeyHint": "Jos haluat käyttää omaa OpenRouter-avaintasi, lisää se kohdassa Mallit kirjautuneena, niin se tallentuu tiliisi. Vain tälle tietokoneelle tallennettua avainta ei voi käyttää, kun tietokone on pois päältä.",
+      "deviceKeyHintPhone": "Jos haluat käyttää omaa OpenRouter-avaintasi, lisää se keskustelun asetuksissa kirjautuneena, niin se tallentuu tiliisi. Vain tälle puhelimelle tallennettua avainta ei voi käyttää sähköpostiin."
     }
   }
 }

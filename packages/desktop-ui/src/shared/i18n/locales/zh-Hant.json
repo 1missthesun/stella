@@ -3759,6 +3759,25 @@
       "later": "稍後 · {when}",
       "repliedInGmail": "已在 Gmail 中回覆",
       "archivedInGmail": "已在 Gmail 中封存"
+    },
+    "access": {
+      "addKey": "使用我的 OpenRouter 金鑰",
+      "plans": "查看方案",
+      "pausedMonthTitle": "分類已暫停，{date} 恢復",
+      "pausedDayTitle": "分類已暫停，明天恢復",
+      "pausedFreeBody": "Stella 本月的郵件免費額度已用完，新郵件暫不分類。加入你自己的 OpenRouter 金鑰即可用你的金鑰繼續，或選擇方案取得更多額度。",
+      "pausedPaidBody": "你的方案本月的郵件額度已用完，新郵件暫不分類。加入你自己的 OpenRouter 金鑰即可用你的金鑰繼續。",
+      "pausedDayFreeBody": "免費方案今天的郵件上限已達到，新郵件要等到明天。加入你自己的 OpenRouter 金鑰或選擇方案即可取得更多。",
+      "pausedDayBody": "今天的郵件上限已達到，新郵件要等到明天。",
+      "pausedOwnBody": "你自己的金鑰今天的上限已達到，新郵件要等到明天。",
+      "refusedTitle": "你的 OpenRouter 金鑰遭到拒絕",
+      "refusedBody": "OpenRouter 回應：{reason} 在金鑰恢復可用之前，郵件會使用 Stella 的額度。",
+      "freeSortingOnly": "免費方案下 Stella 會為你分類郵件。備好的回覆和摘要需要你自己的 OpenRouter 金鑰或方案。",
+      "lineStella": "使用 Stella 的額度：本月已分類 {sorted} 封 · {cost} / {limit}",
+      "lineOwn": "使用你的 OpenRouter 金鑰：本月已分類 {sorted} 封 · 你的金鑰花費 {cost}。不佔用 Stella 的額度。",
+      "lineServer": "使用此伺服器的 OpenRouter 金鑰：本月已分類 {sorted} 封 · {cost}",
+      "deviceKeyHint": "若要使用你自己的 OpenRouter 金鑰，請在登入狀態下到「模型」中加入，這樣它會儲存到你的帳戶。只儲存在這台電腦上的金鑰，在電腦關機時無法使用。",
+      "deviceKeyHintPhone": "若要使用你自己的 OpenRouter 金鑰，請在登入狀態下到聊天設定中加入，這樣它會儲存到你的帳戶。只儲存在這支手機上的金鑰無法用於郵件。"
     }
   }
 }

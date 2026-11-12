@@ -3845,6 +3845,25 @@
       "later": "Plus tard · {when}",
       "repliedInGmail": "Répondu dans Gmail",
       "archivedInGmail": "Archivé dans Gmail"
+    },
+    "access": {
+      "addKey": "Utiliser ma clé OpenRouter",
+      "plans": "Voir les forfaits",
+      "pausedMonthTitle": "Tri en pause jusqu'au {date}",
+      "pausedDayTitle": "Tri en pause jusqu'à demain",
+      "pausedFreeBody": "Le crédit gratuit de Stella pour les e-mails est épuisé ce mois-ci : les nouveaux e-mails attendent sans être triés. Ajoutez votre propre clé OpenRouter pour continuer avec votre clé, ou choisissez un forfait pour en avoir plus.",
+      "pausedPaidBody": "Le crédit e-mail de votre forfait est épuisé ce mois-ci : les nouveaux e-mails attendent sans être triés. Ajoutez votre propre clé OpenRouter pour continuer avec votre clé.",
+      "pausedDayFreeBody": "La limite d'e-mails du jour est atteinte sur le forfait gratuit ; les nouveaux e-mails attendent jusqu'à demain. Ajoutez votre propre clé OpenRouter ou choisissez un forfait pour en avoir plus.",
+      "pausedDayBody": "La limite d'e-mails du jour est atteinte ; les nouveaux e-mails attendent jusqu'à demain.",
+      "pausedOwnBody": "La limite du jour sur votre propre clé est atteinte ; les nouveaux e-mails attendent jusqu'à demain.",
+      "refusedTitle": "Votre clé OpenRouter a été refusée",
+      "refusedBody": "Réponse d'OpenRouter : {reason} E-mail utilise le crédit de Stella jusqu'à ce que la clé fonctionne de nouveau.",
+      "freeSortingOnly": "Avec le forfait gratuit, Stella trie vos e-mails. Les réponses préparées et les résumés nécessitent votre propre clé OpenRouter ou un forfait.",
+      "lineStella": "Sur le crédit de Stella : {sorted} triés ce mois-ci · {cost} sur {limit}",
+      "lineOwn": "Sur votre clé OpenRouter : {sorted} triés ce mois-ci · {cost} sur votre clé. Le crédit de Stella n'est pas utilisé.",
+      "lineServer": "Sur la clé OpenRouter de ce serveur : {sorted} triés ce mois-ci · {cost}",
+      "deviceKeyHint": "Pour utiliser votre propre clé OpenRouter, ajoutez-la dans Modèles en étant connecté, afin qu'elle soit enregistrée dans votre compte. Une clé gardée uniquement sur cet ordinateur ne peut pas servir quand l'ordinateur est éteint.",
+      "deviceKeyHintPhone": "Pour utiliser votre propre clé OpenRouter, ajoutez-la dans les paramètres du chat en étant connecté, afin qu'elle soit enregistrée dans votre compte. Une clé gardée uniquement sur ce téléphone ne peut pas servir pour les e-mails."
     }
   }
 }

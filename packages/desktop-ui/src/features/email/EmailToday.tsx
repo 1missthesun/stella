@@ -5,6 +5,7 @@ import type {
   EmailMatter,
   EmailNoiseSender,
   EmailToday,
+  EmailAccess,
 } from "@stella/contracts/backend/email";
 import { laterChoices, plainText, TODAY_TONES, whenLabel, type LaterChoiceId } from "@stella/contracts/email-brief";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
@@ -20,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { showToast } from "@/ui/toast";
+import { BYOK_TOAST_ACTION } from "@/global/billing/byok-action";
+import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { correctEmail, dismissEmail, emailTime, openGmailThread } from "./email-items";
 
 /** The briefing's light markdown: bold and nothing else, rendered inline. */
@@ -654,6 +657,72 @@ const statusWords = (t: T, locale: string, matter: EmailMatter, now: number): st
  * outcome with the step already prepared. Done and Later take it away; new
  * mail joins; what was put off comes back on its own.
  */
+/**
+ * What stops or limits email, said plainly with what unlocks more: sorting paused because the
+ * allowance or the day's limit is used up, the owner's own key refused, or Free's sorting-only taste.
+ */
+export function AccessNotice({ access }: { access: EmailAccess | undefined }) {
+  const { t, locale } = useI18n();
+  if (!access) return null;
+  const onStella = access.payer === "stella";
+  const addKey = (
+    <button type="button" className="email-brief__control email-brief__control--primary" onClick={BYOK_TOAST_ACTION.onClick}>
+      {t("email.access.addKey")}
+    </button>
+  );
+  const plans =
+    onStella && access.plan === "free" ? (
+      <button type="button" className="email-today__quiet" onClick={() => planUsageDialog.openPlans()}>
+        {t("email.access.plans")}
+      </button>
+    ) : null;
+  if (access.ownKeyRefused) {
+    return (
+      <section className="email-today__notice" role="status">
+        <h2 className="email-today__notice-title">{t("email.access.refusedTitle")}</h2>
+        <p className="email-today__notice-body">{t("email.access.refusedBody", { reason: access.ownKeyRefused })}</p>
+        <div className="email-today__notice-actions">{addKey}</div>
+      </section>
+    );
+  }
+  if (access.paused) {
+    const date = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" }).format(access.paused.until);
+    const title =
+      access.paused.why === "day" ? t("email.access.pausedDayTitle") : t("email.access.pausedMonthTitle", { date });
+    const body = !onStella
+      ? t("email.access.pausedOwnBody")
+      : access.paused.why === "day"
+        ? t(access.plan === "free" ? "email.access.pausedDayFreeBody" : "email.access.pausedDayBody")
+        : t(access.plan === "free" ? "email.access.pausedFreeBody" : "email.access.pausedPaidBody");
+    return (
+      <section className="email-today__notice" role="status">
+        <h2 className="email-today__notice-title">{title}</h2>
+        <p className="email-today__notice-body">{body}</p>
+        {onStella ? (
+          <div className="email-today__notice-actions">
+            {addKey}
+            {plans}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+  if (onStella && !access.writes) {
+    return (
+      <section className="email-today__notice email-today__notice--quiet">
+        <p className="email-today__notice-body">{t("email.access.freeSortingOnly")}</p>
+        <div className="email-today__notice-actions">
+          <button type="button" className="email-today__quiet" onClick={BYOK_TOAST_ACTION.onClick}>
+            {t("email.access.addKey")}
+          </button>
+          {plans}
+        </div>
+      </section>
+    );
+  }
+  return null;
+}
+
 export function TodayView({
   today,
   now,
@@ -708,6 +777,7 @@ export function TodayView({
   return (
     <article className="email-brief__doc email-today" data-testid="email-today">
       {listener}
+      <AccessNotice access={today.access} />
       {open.length > 0 && today.lead ? (
         <p className="email-brief__lead">
           <Md text={today.lead} />

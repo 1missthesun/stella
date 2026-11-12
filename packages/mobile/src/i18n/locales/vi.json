@@ -3759,6 +3759,25 @@
       "later": "Để sau · {when}",
       "repliedInGmail": "Đã trả lời trong Gmail",
       "archivedInGmail": "Đã lưu trữ trong Gmail"
+    },
+    "access": {
+      "addKey": "Dùng khóa OpenRouter của tôi",
+      "plans": "Xem các gói",
+      "pausedMonthTitle": "Tạm dừng phân loại đến {date}",
+      "pausedDayTitle": "Tạm dừng phân loại đến ngày mai",
+      "pausedFreeBody": "Hạn mức miễn phí của Stella cho email đã hết trong tháng này, nên thư mới đang chờ chưa được phân loại. Thêm khóa OpenRouter của bạn để tiếp tục bằng khóa của bạn, hoặc chọn một gói để dùng nhiều hơn.",
+      "pausedPaidBody": "Hạn mức email của gói bạn đã hết trong tháng này, nên thư mới đang chờ chưa được phân loại. Thêm khóa OpenRouter của bạn để tiếp tục bằng khóa của bạn.",
+      "pausedDayFreeBody": "Đã đạt giới hạn email hôm nay của gói miễn phí; thư mới sẽ chờ đến ngày mai. Thêm khóa OpenRouter của bạn hoặc chọn một gói để dùng nhiều hơn.",
+      "pausedDayBody": "Đã đạt giới hạn email hôm nay; thư mới sẽ chờ đến ngày mai.",
+      "pausedOwnBody": "Đã đạt giới hạn hôm nay trên khóa của bạn; thư mới sẽ chờ đến ngày mai.",
+      "refusedTitle": "Khóa OpenRouter của bạn bị từ chối",
+      "refusedBody": "OpenRouter cho biết: {reason} Email đang dùng hạn mức của Stella cho đến khi khóa hoạt động trở lại.",
+      "freeSortingOnly": "Với gói miễn phí, Stella phân loại thư của bạn. Thư trả lời soạn sẵn và bản tóm tắt cần khóa OpenRouter của bạn hoặc một gói.",
+      "lineStella": "Dùng hạn mức của Stella: đã phân loại {sorted} trong tháng này · {cost} trên {limit}",
+      "lineOwn": "Dùng khóa OpenRouter của bạn: đã phân loại {sorted} trong tháng này · {cost} trên khóa của bạn. Không dùng hạn mức của Stella.",
+      "lineServer": "Dùng khóa OpenRouter của máy chủ này: đã phân loại {sorted} trong tháng này · {cost}",
+      "deviceKeyHint": "Để dùng khóa OpenRouter của riêng bạn, hãy thêm khóa trong Mô hình khi đã đăng nhập để khóa được lưu vào tài khoản. Khóa chỉ lưu trên máy tính này sẽ không dùng được khi máy tắt.",
+      "deviceKeyHintPhone": "Để dùng khóa OpenRouter của riêng bạn, hãy thêm khóa trong cài đặt trò chuyện khi đã đăng nhập để khóa được lưu vào tài khoản. Khóa chỉ lưu trên điện thoại này sẽ không dùng được cho email."
     }
   }
 }

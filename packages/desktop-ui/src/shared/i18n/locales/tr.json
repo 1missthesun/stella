@@ -3803,6 +3803,25 @@
       "later": "Sonra · {when}",
       "repliedInGmail": "Gmail'de yanıtlandı",
       "archivedInGmail": "Gmail'de arşivlendi"
+    },
+    "access": {
+      "addKey": "Kendi OpenRouter anahtarımı kullan",
+      "plans": "Planları gör",
+      "pausedMonthTitle": "Ayırma {date} tarihine kadar duraklatıldı",
+      "pausedDayTitle": "Ayırma yarına kadar duraklatıldı",
+      "pausedFreeBody": "Stella'nın e-posta için ücretsiz kotası bu ay doldu, bu yüzden yeni postalar ayrılmadan bekliyor. Kendi anahtarınızla devam etmek için kendi OpenRouter anahtarınızı ekleyin ya da daha fazlası için bir plan seçin.",
+      "pausedPaidBody": "Planınızın bu ayki e-posta kotası doldu, bu yüzden yeni postalar ayrılmadan bekliyor. Kendi anahtarınızla devam etmek için kendi OpenRouter anahtarınızı ekleyin.",
+      "pausedDayFreeBody": "Ücretsiz planda bugünkü e-posta sınırına ulaşıldı; yeni postalar yarına kadar bekliyor. Daha fazlası için kendi OpenRouter anahtarınızı ekleyin ya da bir plan seçin.",
+      "pausedDayBody": "Bugünkü e-posta sınırına ulaşıldı; yeni postalar yarına kadar bekliyor.",
+      "pausedOwnBody": "Kendi anahtarınızın bugünkü sınırına ulaşıldı; yeni postalar yarına kadar bekliyor.",
+      "refusedTitle": "OpenRouter anahtarınız reddedildi",
+      "refusedBody": "OpenRouter'ın yanıtı: {reason} Anahtar yeniden çalışana kadar E-posta, Stella'nın kotasını kullanıyor.",
+      "freeSortingOnly": "Ücretsiz planda Stella postalarınızı ayırır. Hazır yanıtlar ve özetler için kendi OpenRouter anahtarınız ya da bir plan gerekir.",
+      "lineStella": "Stella'nın kotasıyla: bu ay {sorted} ayrıldı · {cost} / {limit}",
+      "lineOwn": "OpenRouter anahtarınızla: bu ay {sorted} ayrıldı · anahtarınızda {cost}. Stella'nın kotası kullanılmıyor.",
+      "lineServer": "Bu sunucunun OpenRouter anahtarıyla: bu ay {sorted} ayrıldı · {cost}",
+      "deviceKeyHint": "Kendi OpenRouter anahtarınızı kullanmak için oturum açıkken Modeller bölümüne ekleyin; böylece hesabınıza kaydedilir. Yalnızca bu bilgisayarda tutulan bir anahtar, bilgisayar kapalıyken kullanılamaz.",
+      "deviceKeyHintPhone": "Kendi OpenRouter anahtarınızı kullanmak için oturum açıkken sohbet ayarlarına ekleyin; böylece hesabınıza kaydedilir. Yalnızca bu telefonda tutulan bir anahtar e-posta için kullanılamaz."
     }
   }
 }

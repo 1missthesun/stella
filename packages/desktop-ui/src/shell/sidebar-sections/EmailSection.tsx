@@ -1,3 +1,4 @@
+import { AccessNotice } from "@/features/email/EmailToday";
 import { useDisplayPanelOpen } from "@/features/workspace-display/tab-store";
 import { useCallback, useEffect, useState } from "react";
 import { markEmailSeen } from "@/features/email/email-unseen";
@@ -128,10 +129,21 @@ function Footer({ feed }: { feed: EmailFeed }) {
   const [confirmOff, setConfirmOff] = useState(false);
   const [turningOff, setTurningOff] = useState(false);
   const { status } = feed;
-  const usage = t("email.section.usage", {
-    sorted: new Intl.NumberFormat(locale).format(status.usage.sorted),
-    cost: usageCost(locale, status.usage.costUsd),
-  });
+  const access = status.access;
+  const sorted = new Intl.NumberFormat(locale).format(status.usage.sorted);
+  const cost = usageCost(locale, status.usage.costUsd);
+  const usage =
+    access?.payer === "own_key"
+      ? t("email.access.lineOwn", { sorted, cost })
+      : access?.payer === "server"
+        ? t("email.access.lineServer", { sorted, cost })
+        : t("email.access.lineStella", {
+            sorted,
+            cost,
+            limit: new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
+              access?.limitUsd ?? 0,
+            ),
+          });
 
   const checkNow = async () => {
     setChecking(true);
@@ -172,9 +184,9 @@ function Footer({ feed }: { feed: EmailFeed }) {
           </li>
         ))}
       </ul>
-      <p className="email-section__hint">
-        {status.usage.capped ? `${usage}. ${t("email.section.capped")}` : usage}
-      </p>
+      {access?.paused || access?.ownKeyRefused ? <AccessNotice access={access} /> : null}
+      <p className="email-section__hint">{usage}</p>
+      {access?.payer === "stella" ? <p className="email-section__hint">{t("email.access.deviceKeyHint")}</p> : null}
       {message ? <p className="email-section__hint" role="alert">{message}</p> : null}
       {confirmOff ? (
         <div className="email-section__confirm">

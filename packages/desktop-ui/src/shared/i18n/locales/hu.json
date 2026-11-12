@@ -3803,6 +3803,25 @@
       "later": "Később · {when}",
       "repliedInGmail": "Megválaszolva a Gmailben",
       "archivedInGmail": "Archiválva a Gmailben"
+    },
+    "access": {
+      "addKey": "A saját OpenRouter-kulcsom használata",
+      "plans": "Csomagok megtekintése",
+      "pausedMonthTitle": "A rendezés szünetel eddig: {date}",
+      "pausedDayTitle": "A rendezés holnapig szünetel",
+      "pausedFreeBody": "Stella ingyenes e-mail-kerete erre a hónapra elfogyott, így az új levelek rendezetlenül várnak. Add meg a saját OpenRouter-kulcsodat, hogy a saját kulcsoddal folytasd, vagy válassz csomagot a többért.",
+      "pausedPaidBody": "A csomagod e-mail-kerete erre a hónapra elfogyott, így az új levelek rendezetlenül várnak. Add meg a saját OpenRouter-kulcsodat, hogy a saját kulcsoddal folytasd.",
+      "pausedDayFreeBody": "Az ingyenes csomag mai e-mail-korlátja elfogyott; az új levelek holnapig várnak. A többért add meg a saját OpenRouter-kulcsodat, vagy válassz csomagot.",
+      "pausedDayBody": "A mai e-mail-korlát elfogyott; az új levelek holnapig várnak.",
+      "pausedOwnBody": "A saját kulcsod mai korlátja elfogyott; az új levelek holnapig várnak.",
+      "refusedTitle": "Az OpenRouter elutasította a kulcsodat",
+      "refusedBody": "Az OpenRouter válasza: {reason} Az E-mail Stella keretét használja, amíg a kulcs újra nem működik.",
+      "freeSortingOnly": "Az ingyenes csomagban Stella rendezi a leveleidet. Az előkészített válaszokhoz és az összefoglalókhoz saját OpenRouter-kulcs vagy csomag kell.",
+      "lineStella": "Stella keretéből: ebben a hónapban {sorted} rendezve · {cost} / {limit}",
+      "lineOwn": "A saját OpenRouter-kulcsodról: ebben a hónapban {sorted} rendezve · {cost} a kulcsodon. Stella keretét nem használja.",
+      "lineServer": "A szerver OpenRouter-kulcsáról: ebben a hónapban {sorted} rendezve · {cost}",
+      "deviceKeyHint": "A saját OpenRouter-kulcsod használatához bejelentkezve add meg a Modellek alatt, így a fiókodba mentődik. A csak ezen a számítógépen tárolt kulcs nem használható, amíg a gép ki van kapcsolva.",
+      "deviceKeyHintPhone": "A saját OpenRouter-kulcsod használatához bejelentkezve add meg a csevegés beállításaiban, így a fiókodba mentődik. A csak ezen a telefonon tárolt kulcs nem használható az e-mailekhez."
     }
   }
 }

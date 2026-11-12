@@ -3803,6 +3803,25 @@
       "later": "Später · {when}",
       "repliedInGmail": "In Gmail beantwortet",
       "archivedInGmail": "In Gmail archiviert"
+    },
+    "access": {
+      "addKey": "Meinen OpenRouter-Schlüssel verwenden",
+      "plans": "Pläne ansehen",
+      "pausedMonthTitle": "Sortieren pausiert bis {date}",
+      "pausedDayTitle": "Sortieren pausiert bis morgen",
+      "pausedFreeBody": "Stellas kostenloses Kontingent für E-Mails ist diesen Monat aufgebraucht, neue E-Mails bleiben daher unsortiert. Füge deinen eigenen OpenRouter-Schlüssel hinzu, um mit deinem Schlüssel weiterzumachen, oder wähle einen Plan für mehr.",
+      "pausedPaidBody": "Das E-Mail-Kontingent deines Plans ist diesen Monat aufgebraucht, neue E-Mails bleiben daher unsortiert. Füge deinen eigenen OpenRouter-Schlüssel hinzu, um mit deinem Schlüssel weiterzumachen.",
+      "pausedDayFreeBody": "Das heutige E-Mail-Limit im kostenlosen Plan ist erreicht; neue E-Mails warten bis morgen. Füge deinen eigenen OpenRouter-Schlüssel hinzu oder wähle einen Plan für mehr.",
+      "pausedDayBody": "Das heutige E-Mail-Limit ist erreicht; neue E-Mails warten bis morgen.",
+      "pausedOwnBody": "Das heutige Limit für deinen eigenen Schlüssel ist erreicht; neue E-Mails warten bis morgen.",
+      "refusedTitle": "Dein OpenRouter-Schlüssel wurde abgelehnt",
+      "refusedBody": "OpenRouter meldet: {reason} E-Mail nutzt Stellas Kontingent, bis der Schlüssel wieder funktioniert.",
+      "freeSortingOnly": "Im kostenlosen Plan sortiert Stella deine E-Mails. Vorbereitete Antworten und Zusammenfassungen brauchen deinen eigenen OpenRouter-Schlüssel oder einen Plan.",
+      "lineStella": "Über Stellas Kontingent: diesen Monat {sorted} sortiert · {cost} von {limit}",
+      "lineOwn": "Über deinen OpenRouter-Schlüssel: diesen Monat {sorted} sortiert · {cost} auf deinem Schlüssel. Stellas Kontingent wird nicht genutzt.",
+      "lineServer": "Über den OpenRouter-Schlüssel dieses Servers: diesen Monat {sorted} sortiert · {cost}",
+      "deviceKeyHint": "Um deinen eigenen OpenRouter-Schlüssel zu nutzen, füge ihn angemeldet unter Modelle hinzu, damit er in deinem Konto gespeichert wird. Ein Schlüssel, der nur auf diesem Computer liegt, kann nicht genutzt werden, solange der Computer aus ist.",
+      "deviceKeyHintPhone": "Um deinen eigenen OpenRouter-Schlüssel zu nutzen, füge ihn angemeldet in den Chat-Einstellungen hinzu, damit er in deinem Konto gespeichert wird. Ein Schlüssel, der nur auf diesem Telefon liegt, kann nicht für E-Mails genutzt werden."
     }
   }
 }

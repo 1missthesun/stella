@@ -3803,6 +3803,25 @@
       "later": "Senere · {when}",
       "repliedInGmail": "Besvaret i Gmail",
       "archivedInGmail": "Arkiveret i Gmail"
+    },
+    "access": {
+      "addKey": "Brug min OpenRouter-nøgle",
+      "plans": "Se abonnementer",
+      "pausedMonthTitle": "Sorteringen er sat på pause til {date}",
+      "pausedDayTitle": "Sorteringen er sat på pause til i morgen",
+      "pausedFreeBody": "Stellas gratis kvote til e-mail er brugt op denne måned, så ny post venter usorteret. Tilføj din egen OpenRouter-nøgle for at fortsætte på din nøgle, eller vælg et abonnement for at få mere.",
+      "pausedPaidBody": "Dit abonnements e-mailkvote er brugt op denne måned, så ny post venter usorteret. Tilføj din egen OpenRouter-nøgle for at fortsætte på din nøgle.",
+      "pausedDayFreeBody": "Dagens e-mailgrænse på gratisabonnementet er nået; ny post venter til i morgen. Tilføj din egen OpenRouter-nøgle, eller vælg et abonnement for at få mere.",
+      "pausedDayBody": "Dagens e-mailgrænse er nået; ny post venter til i morgen.",
+      "pausedOwnBody": "Dagens grænse på din egen nøgle er nået; ny post venter til i morgen.",
+      "refusedTitle": "Din OpenRouter-nøgle blev afvist",
+      "refusedBody": "OpenRouter svarede: {reason} E-mail bruger Stellas kvote, indtil nøglen virker igen.",
+      "freeSortingOnly": "På gratisabonnementet sorterer Stella din post. Forberedte svar og resuméer kræver din egen OpenRouter-nøgle eller et abonnement.",
+      "lineStella": "På Stellas kvote: {sorted} sorteret denne måned · {cost} af {limit}",
+      "lineOwn": "På din OpenRouter-nøgle: {sorted} sorteret denne måned · {cost} på din nøgle. Stellas kvote bruges ikke.",
+      "lineServer": "På denne servers OpenRouter-nøgle: {sorted} sorteret denne måned · {cost}",
+      "deviceKeyHint": "Vil du bruge din egen OpenRouter-nøgle, så tilføj den under Modeller, mens du er logget ind, så den gemmes på din konto. En nøgle, der kun ligger på denne computer, kan ikke bruges, mens computeren er slukket.",
+      "deviceKeyHintPhone": "Vil du bruge din egen OpenRouter-nøgle, så tilføj den i chatindstillingerne, mens du er logget ind, så den gemmes på din konto. En nøgle, der kun ligger på denne telefon, kan ikke bruges til e-mail."
     }
   }
 }

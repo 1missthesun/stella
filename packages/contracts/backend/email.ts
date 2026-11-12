@@ -198,8 +198,34 @@ export type EmailUsage = {
   capped: boolean;
 };
 
+/**
+ * Whose key pays for email's model calls (sorting and the written parts), as
+ * the Email page states it.
+ * - `stella`: Stella's key, within the plan's email allowance. On Free that is
+ *   sorting only (no written items or replies), a cent a month.
+ * - `own_key`: the owner's own OpenRouter key saved to their account; Stella's
+ *   allowance isn't used, only a daily rate limit applies.
+ * - `server`: a self-hosted server, on that server's own OpenRouter key.
+ */
+export type EmailPayer = "stella" | "own_key" | "server";
+
+export type EmailAccess = {
+  payer: EmailPayer;
+  /** The plan Stella's allowance comes from (only meaningful for `stella`). */
+  plan: "free" | "paid";
+  /** Stella writes Today items, replies and voice replies (false on Free: sorting only). */
+  writes: boolean;
+  /** This month's allowance on Stella's key, in USD (`stella` only). */
+  limitUsd?: number;
+  /** Sorting is paused: the month's allowance or the day's limit is used up. */
+  paused?: { why: "month" | "day"; until: number };
+  /** The owner's own key was refused just now (invalid or out of credit); Stella's allowance is used meanwhile. */
+  ownKeyRefused?: string;
+};
+
 export type EmailStatus = {
   enabled: boolean;
+  access: EmailAccess;
   /** Gmail addresses connected through Stella, whether or not sorting is on. */
   gmailConnected: string[];
   /** The inboxes being sorted (empty while sorting is off). */
@@ -318,6 +344,7 @@ export type EmailToday = {
   alerts: { briefingId: string; kind: "summary" | "urgent" | "rule"; at: number; matterIds: string[] }[];
   multipleAccounts: boolean;
   lastCheckedAt?: number;
+  access: EmailAccess;
 };
 
 /** One line of the plain log of what Stella read and did with the mail. */

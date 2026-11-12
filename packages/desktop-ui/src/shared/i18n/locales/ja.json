@@ -3759,6 +3759,25 @@
       "later": "あとで · {when}",
       "repliedInGmail": "Gmail で返信済み",
       "archivedInGmail": "Gmail でアーカイブ済み"
+    },
+    "access": {
+      "addKey": "自分の OpenRouter キーを使う",
+      "plans": "プランを見る",
+      "pausedMonthTitle": "{date}まで仕分けを一時停止しています",
+      "pausedDayTitle": "明日まで仕分けを一時停止しています",
+      "pausedFreeBody": "今月の Stella のメール用無料枠を使い切ったため、新着メールは仕分けされずに待機しています。ご自身の OpenRouter キーを追加すればそのキーで続けられます。さらに使うにはプランをお選びください。",
+      "pausedPaidBody": "今月のプランのメール用利用枠を使い切ったため、新着メールは仕分けされずに待機しています。ご自身の OpenRouter キーを追加すればそのキーで続けられます。",
+      "pausedDayFreeBody": "無料プランの今日のメール上限に達しました。新着メールは明日まで待機します。さらに使うには、ご自身の OpenRouter キーを追加するかプランをお選びください。",
+      "pausedDayBody": "今日のメール上限に達しました。新着メールは明日まで待機します。",
+      "pausedOwnBody": "ご自身のキーの今日の上限に達しました。新着メールは明日まで待機します。",
+      "refusedTitle": "OpenRouter キーが拒否されました",
+      "refusedBody": "OpenRouter からの応答：{reason} キーが再び使えるようになるまで、メールは Stella の利用枠を使います。",
+      "freeSortingOnly": "無料プランでは Stella がメールを仕分けます。返信の下書きや要約には、ご自身の OpenRouter キーかプランが必要です。",
+      "lineStella": "Stella の利用枠：今月 {sorted}件を仕分け · {cost} / {limit}",
+      "lineOwn": "ご自身の OpenRouter キー：今月 {sorted}件を仕分け · キーで {cost}。Stella の利用枠は使っていません。",
+      "lineServer": "このサーバーの OpenRouter キー：今月 {sorted}件を仕分け · {cost}",
+      "deviceKeyHint": "ご自身の OpenRouter キーを使うには、サインインした状態でモデルから追加してください。アカウントに保存されます。このコンピュータだけに保存したキーは、コンピュータの電源が切れている間は使えません。",
+      "deviceKeyHintPhone": "ご自身の OpenRouter キーを使うには、サインインした状態でチャット設定から追加してください。アカウントに保存されます。この電話だけに保存したキーはメールには使えません。"
     }
   }
 }

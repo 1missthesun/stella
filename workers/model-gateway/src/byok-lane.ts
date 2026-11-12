@@ -56,7 +56,7 @@ const RESPONSE_HEADER_ALLOWLIST = [
 type AccessEntry = { access: ProviderAccessResponse; validUntil: number };
 const accessCache = new Map<string, AccessEntry>();
 
-const accessFor = async (
+export const accessFor = async (
   env: Pick<Env, "BILLING">,
   claims: GatewayCapabilityClaims,
   provider: string,

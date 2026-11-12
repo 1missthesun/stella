@@ -3759,6 +3759,25 @@
       "later": "Nanti · {when}",
       "repliedInGmail": "Dibalas di Gmail",
       "archivedInGmail": "Diarsipkan di Gmail"
+    },
+    "access": {
+      "addKey": "Pakai kunci OpenRouter saya",
+      "plans": "Lihat paket",
+      "pausedMonthTitle": "Pemilahan dijeda hingga {date}",
+      "pausedDayTitle": "Pemilahan dijeda hingga besok",
+      "pausedFreeBody": "Kuota gratis Stella untuk email sudah habis bulan ini, jadi email baru menunggu tanpa dipilah. Tambahkan kunci OpenRouter milik Anda untuk lanjut dengan kunci Anda, atau pilih paket untuk mendapat lebih banyak.",
+      "pausedPaidBody": "Kuota email paket Anda sudah habis bulan ini, jadi email baru menunggu tanpa dipilah. Tambahkan kunci OpenRouter milik Anda untuk lanjut dengan kunci Anda.",
+      "pausedDayFreeBody": "Batas email hari ini pada paket gratis sudah tercapai; email baru menunggu hingga besok. Tambahkan kunci OpenRouter milik Anda atau pilih paket untuk mendapat lebih banyak.",
+      "pausedDayBody": "Batas email hari ini sudah tercapai; email baru menunggu hingga besok.",
+      "pausedOwnBody": "Batas hari ini pada kunci Anda sendiri sudah tercapai; email baru menunggu hingga besok.",
+      "refusedTitle": "Kunci OpenRouter Anda ditolak",
+      "refusedBody": "Kata OpenRouter: {reason} Email memakai kuota Stella sampai kunci berfungsi lagi.",
+      "freeSortingOnly": "Di paket gratis, Stella memilah email Anda. Balasan siap pakai dan ringkasan memerlukan kunci OpenRouter milik Anda atau sebuah paket.",
+      "lineStella": "Dengan kuota Stella: {sorted} dipilah bulan ini · {cost} dari {limit}",
+      "lineOwn": "Dengan kunci OpenRouter Anda: {sorted} dipilah bulan ini · {cost} di kunci Anda. Kuota Stella tidak terpakai.",
+      "lineServer": "Dengan kunci OpenRouter server ini: {sorted} dipilah bulan ini · {cost}",
+      "deviceKeyHint": "Untuk memakai kunci OpenRouter milik Anda, tambahkan di Model saat sedang masuk agar tersimpan di akun Anda. Kunci yang hanya disimpan di komputer ini tidak bisa dipakai saat komputer mati.",
+      "deviceKeyHintPhone": "Untuk memakai kunci OpenRouter milik Anda, tambahkan di pengaturan obrolan saat sedang masuk agar tersimpan di akun Anda. Kunci yang hanya disimpan di ponsel ini tidak bisa dipakai untuk email."
     }
   }
 }

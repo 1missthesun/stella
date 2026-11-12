@@ -3845,6 +3845,25 @@
       "later": "Mai târziu · {when}",
       "repliedInGmail": "Răspuns în Gmail",
       "archivedInGmail": "Arhivat în Gmail"
+    },
+    "access": {
+      "addKey": "Folosește cheia mea OpenRouter",
+      "plans": "Vezi planurile",
+      "pausedMonthTitle": "Sortarea e oprită până pe {date}",
+      "pausedDayTitle": "Sortarea e oprită până mâine",
+      "pausedFreeBody": "Alocarea gratuită a Stella pentru e-mail s-a terminat luna aceasta, așa că mesajele noi așteaptă nesortate. Adaugă propria cheie OpenRouter ca să continui pe cheia ta sau alege un plan pentru mai mult.",
+      "pausedPaidBody": "Alocarea de e-mail a planului tău s-a terminat luna aceasta, așa că mesajele noi așteaptă nesortate. Adaugă propria cheie OpenRouter ca să continui pe cheia ta.",
+      "pausedDayFreeBody": "Limita de e-mail de azi a planului gratuit a fost atinsă; mesajele noi așteaptă până mâine. Adaugă propria cheie OpenRouter sau alege un plan pentru mai mult.",
+      "pausedDayBody": "Limita de e-mail de azi a fost atinsă; mesajele noi așteaptă până mâine.",
+      "pausedOwnBody": "Limita de azi pe cheia ta a fost atinsă; mesajele noi așteaptă până mâine.",
+      "refusedTitle": "Cheia ta OpenRouter a fost refuzată",
+      "refusedBody": "OpenRouter a răspuns: {reason} E-mail folosește alocarea Stella până când cheia funcționează din nou.",
+      "freeSortingOnly": "Pe planul gratuit, Stella îți sortează e-mailurile. Răspunsurile pregătite și rezumatele au nevoie de propria ta cheie OpenRouter sau de un plan.",
+      "lineStella": "Din alocarea Stella: {sorted} sortate luna aceasta · {cost} din {limit}",
+      "lineOwn": "Pe cheia ta OpenRouter: {sorted} sortate luna aceasta · {cost} pe cheia ta. Alocarea Stella nu e folosită.",
+      "lineServer": "Pe cheia OpenRouter a acestui server: {sorted} sortate luna aceasta · {cost}",
+      "deviceKeyHint": "Ca să folosești propria cheie OpenRouter, adaug-o în Modele cât timp ești conectat, ca să fie salvată în contul tău. O cheie păstrată doar pe acest computer nu poate fi folosită cât timp computerul e oprit.",
+      "deviceKeyHintPhone": "Ca să folosești propria cheie OpenRouter, adaug-o în setările chatului cât timp ești conectat, ca să fie salvată în contul tău. O cheie păstrată doar pe acest telefon nu poate fi folosită pentru e-mail."
     }
   }
 }

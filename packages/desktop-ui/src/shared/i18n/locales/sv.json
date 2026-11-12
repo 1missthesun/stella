@@ -3803,6 +3803,25 @@
       "later": "Senare · {when}",
       "repliedInGmail": "Besvarat i Gmail",
       "archivedInGmail": "Arkiverat i Gmail"
+    },
+    "access": {
+      "addKey": "Använd min OpenRouter-nyckel",
+      "plans": "Se planer",
+      "pausedMonthTitle": "Sorteringen är pausad till {date}",
+      "pausedDayTitle": "Sorteringen är pausad till i morgon",
+      "pausedFreeBody": "Stellas gratiskvot för e-post är slut den här månaden, så ny e-post väntar osorterad. Lägg till din egen OpenRouter-nyckel för att fortsätta på din nyckel, eller välj en plan för mer.",
+      "pausedPaidBody": "Din plans e-postkvot är slut den här månaden, så ny e-post väntar osorterad. Lägg till din egen OpenRouter-nyckel för att fortsätta på din nyckel.",
+      "pausedDayFreeBody": "Dagens e-postgräns på gratisplanen är nådd; ny e-post väntar till i morgon. Lägg till din egen OpenRouter-nyckel eller välj en plan för mer.",
+      "pausedDayBody": "Dagens e-postgräns är nådd; ny e-post väntar till i morgon.",
+      "pausedOwnBody": "Dagens gräns på din egen nyckel är nådd; ny e-post väntar till i morgon.",
+      "refusedTitle": "Din OpenRouter-nyckel nekades",
+      "refusedBody": "OpenRouter svarade: {reason} E-post använder Stellas kvot tills nyckeln fungerar igen.",
+      "freeSortingOnly": "På gratisplanen sorterar Stella din e-post. Förberedda svar och sammanfattningar kräver din egen OpenRouter-nyckel eller en plan.",
+      "lineStella": "På Stellas kvot: {sorted} sorterade den här månaden · {cost} av {limit}",
+      "lineOwn": "På din OpenRouter-nyckel: {sorted} sorterade den här månaden · {cost} på din nyckel. Stellas kvot används inte.",
+      "lineServer": "På den här serverns OpenRouter-nyckel: {sorted} sorterade den här månaden · {cost}",
+      "deviceKeyHint": "Om du vill använda din egen OpenRouter-nyckel lägger du till den under Modeller medan du är inloggad, så sparas den på ditt konto. En nyckel som bara finns på den här datorn kan inte användas när datorn är avstängd.",
+      "deviceKeyHintPhone": "Om du vill använda din egen OpenRouter-nyckel lägger du till den i chattinställningarna medan du är inloggad, så sparas den på ditt konto. En nyckel som bara finns på den här telefonen kan inte användas för e-post."
     }
   }
 }

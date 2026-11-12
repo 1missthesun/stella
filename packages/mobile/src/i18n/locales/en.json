@@ -3803,6 +3803,25 @@
       "later": "Later · {when}",
       "repliedInGmail": "Replied in Gmail",
       "archivedInGmail": "Archived in Gmail"
+    },
+    "access": {
+      "addKey": "Use my OpenRouter key",
+      "plans": "See plans",
+      "pausedMonthTitle": "Sorting is paused until {date}",
+      "pausedDayTitle": "Sorting is paused until tomorrow",
+      "pausedFreeBody": "Stella's free allowance for email is used up this month, so new mail waits unsorted. Add your own OpenRouter key to keep going on your key, or choose a plan for more.",
+      "pausedPaidBody": "This month's email allowance on your plan is used up, so new mail waits unsorted. Add your own OpenRouter key to keep going on your key.",
+      "pausedDayFreeBody": "Today's email limit on the free plan is reached; new mail waits until tomorrow. Add your own OpenRouter key or choose a plan for more.",
+      "pausedDayBody": "Today's email limit is reached; new mail waits until tomorrow.",
+      "pausedOwnBody": "Today's limit on your own key is reached; new mail waits until tomorrow.",
+      "refusedTitle": "Your OpenRouter key was refused",
+      "refusedBody": "OpenRouter said: {reason} Email is using Stella's allowance until the key works again.",
+      "freeSortingOnly": "On the free plan Stella sorts your mail. Prepared replies and summaries need your own OpenRouter key or a plan.",
+      "lineStella": "On Stella's allowance: {sorted} sorted this month · {cost} of {limit}",
+      "lineOwn": "On your OpenRouter key: {sorted} sorted this month · {cost} on your key. Stella's allowance isn't used.",
+      "lineServer": "On this server's OpenRouter key: {sorted} sorted this month · {cost}",
+      "deviceKeyHint": "To use your own OpenRouter key, add it in Models while signed in so it's saved to your account. A key kept only on this computer can't be used while the computer is off.",
+      "deviceKeyHintPhone": "To use your own OpenRouter key, add it in Chat's settings while signed in so it's saved to your account. A key kept only on this phone can't be used for email."
     }
   }
 }

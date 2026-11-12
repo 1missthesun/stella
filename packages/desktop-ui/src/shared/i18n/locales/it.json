@@ -3845,6 +3845,25 @@
       "later": "Più tardi · {when}",
       "repliedInGmail": "Risposto in Gmail",
       "archivedInGmail": "Archiviata in Gmail"
+    },
+    "access": {
+      "addKey": "Usa la mia chiave OpenRouter",
+      "plans": "Vedi i piani",
+      "pausedMonthTitle": "Smistamento in pausa fino al {date}",
+      "pausedDayTitle": "Smistamento in pausa fino a domani",
+      "pausedFreeBody": "Il credito gratuito di Stella per l'email è esaurito per questo mese, quindi la posta nuova resta da smistare. Aggiungi la tua chiave OpenRouter per continuare con la tua chiave, oppure scegli un piano per averne di più.",
+      "pausedPaidBody": "Il credito email del tuo piano è esaurito per questo mese, quindi la posta nuova resta da smistare. Aggiungi la tua chiave OpenRouter per continuare con la tua chiave.",
+      "pausedDayFreeBody": "Hai raggiunto il limite email di oggi del piano gratuito; la posta nuova aspetta fino a domani. Aggiungi la tua chiave OpenRouter o scegli un piano per averne di più.",
+      "pausedDayBody": "Hai raggiunto il limite email di oggi; la posta nuova aspetta fino a domani.",
+      "pausedOwnBody": "Hai raggiunto il limite di oggi sulla tua chiave; la posta nuova aspetta fino a domani.",
+      "refusedTitle": "La tua chiave OpenRouter è stata rifiutata",
+      "refusedBody": "OpenRouter dice: {reason} Email usa il credito di Stella finché la chiave non torna a funzionare.",
+      "freeSortingOnly": "Con il piano gratuito Stella smista la tua posta. Le risposte già pronte e i riepiloghi richiedono la tua chiave OpenRouter o un piano.",
+      "lineStella": "Con il credito di Stella: {sorted} smistate questo mese · {cost} su {limit}",
+      "lineOwn": "Con la tua chiave OpenRouter: {sorted} smistate questo mese · {cost} sulla tua chiave. Il credito di Stella non viene usato.",
+      "lineServer": "Con la chiave OpenRouter di questo server: {sorted} smistate questo mese · {cost}",
+      "deviceKeyHint": "Per usare la tua chiave OpenRouter, aggiungila in Modelli dopo aver effettuato l'accesso, così viene salvata nel tuo account. Una chiave conservata solo su questo computer non si può usare quando il computer è spento.",
+      "deviceKeyHintPhone": "Per usare la tua chiave OpenRouter, aggiungila nelle impostazioni della chat dopo aver effettuato l'accesso, così viene salvata nel tuo account. Una chiave conservata solo su questo telefono non si può usare per l'email."
     }
   }
 }

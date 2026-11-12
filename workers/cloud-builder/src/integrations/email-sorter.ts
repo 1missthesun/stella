@@ -3,9 +3,10 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import type { TSchema } from "@sinclair/typebox";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { EMAIL_REASONS, type EmailBucket, type EmailReason } from "@stella/contracts/backend/email";
-import { GATEWAY_DECISIONS_PATH, gatewayRelayBaseUrl } from "@stella/contracts/gateway/api";
+import { GATEWAY_DECISIONS_MODEL, GATEWAY_DECISIONS_PATH, gatewayRelayBaseUrl } from "@stella/contracts/gateway/api";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import { stellaModel, stellaProvider } from "@stella/agent/provider/stella";
+import { accountByokProvider, listedAccountProviderModel } from "@stella/agent/provider/account-byok";
 import { STELLA_DEFAULT_MODEL } from "@stella/model-catalog/aliases";
 import { mintTurnCapability } from "../capability-signer.js";
 import { piModelSpec } from "../orchestrator/support.js";
@@ -33,7 +34,21 @@ export type SorterAccess = {
   execution: CloudExecutionSelection;
   audience: ManagedModelAudience;
   budgetMicroCents: number;
+  /** The owner's own key saved to their account, which pays for email's model calls instead of Stella's. */
+  ownKey?: OwnKeyProvider;
+  /** Their key was refused (invalid, out of credit): email goes back to Stella's allowance for a while. */
+  onOwnKeyRefused?: (message: string) => void;
 };
+
+/** Account keys that can serve both of email's model calls (Decision 1 and the writing model). */
+export type OwnKeyProvider = "openrouter";
+/** The writing model on the owner's OpenRouter key: the same model Stella uses for email. */
+export const OWN_KEY_WRITING_MODEL = "openai/gpt-6-luna";
+
+/** The owner's key was refused, so this call fails and the next ones use Stella's allowance. */
+export class OwnKeyRefused extends Error {}
+
+const refusedText = /\b(401|402|403)\b|unauthori[sz]ed|invalid api key|insufficient|credits|payment required|no .* key is saved|sign in again/iu;
 
 export type SortInput = {
   note: string;
@@ -67,13 +82,16 @@ const execFor = (execution: CloudExecutionSelection): Extract<CloudExecutionSele
     ? execution
     : { engine: "stella", provider: "stella", model: STELLA_DEFAULT_MODEL, reasoningEffort: "low" };
 
-const capabilityFor = async (access: SorterAccess, purpose: string) =>
+const capabilityFor = async (access: SorterAccess, purpose: string, ownModel?: string) =>
   await mintTurnCapability(access.env, {
     ownerId: access.ownerId,
     ownerGeneration: access.ownerGeneration,
     turnId: `email-${purpose}-${crypto.randomUUID()}`,
     conversationId: "email",
-    execution: execFor(access.execution),
+    execution:
+      access.ownKey && ownModel
+        ? { engine: "provider", provider: access.ownKey, model: ownModel, reasoningEffort: "low" }
+        : execFor(access.execution),
     audience: access.audience,
     budgetMicroCents: Math.min(access.budgetMicroCents, RUN_BUDGET_MICRO_CENTS),
     agentTypes: ["general"],
@@ -209,7 +227,7 @@ export const sortEmail = async (access: SorterAccess, input: SortInput): Promise
   const gateway = access.env.MODEL_GATEWAY;
   const origin = access.env.MODEL_GATEWAY_URL?.trim() ?? "";
   if (!gateway || !origin) throw new Error("Model gateway is not configured.");
-  const capability = await capabilityFor(access, "sort");
+  const capability = await capabilityFor(access, "sort", access.ownKey ? GATEWAY_DECISIONS_MODEL : undefined);
   const response = await gateway.fetch(
     new Request(`${origin.replace(/\/+$/u, "")}${GATEWAY_DECISIONS_PATH}`, {
       method: "POST",
@@ -222,6 +240,10 @@ export const sortEmail = async (access: SorterAccess, input: SortInput): Promise
   if (!response.ok) {
     const error = payload?.error && typeof payload.error === "object" ? (payload.error as Record<string, unknown>) : {};
     const message = typeof error.message === "string" ? error.message : `The decision model answered ${response.status}.`;
+    if (access.ownKey && (response.status === 401 || response.status === 402 || response.status === 403)) {
+      access.onOwnKeyRefused?.(message);
+      throw new OwnKeyRefused(message);
+    }
     if (response.status === 400) throw new DecisionRefused(message);
     throw new Error(message);
   }
@@ -235,34 +257,60 @@ const completeWithTool = async (
   const gateway = access.env.MODEL_GATEWAY;
   const origin = access.env.MODEL_GATEWAY_URL?.trim() ?? "";
   if (!gateway || !origin) throw new Error("Model gateway is not configured.");
-  const execution = execFor(access.execution);
-  const capability = await capabilityFor(access, args.purpose);
-  const spec = piModelSpec("general", execution, access.audience);
-  const relayBaseUrl = gatewayRelayBaseUrl(origin);
+  const context = {
+    systemPrompt: args.system,
+    messages: [{ role: "user" as const, content: args.prompt, timestamp: Date.now() }],
+    tools: [args.tool],
+  };
+  const options = { maxTokens: args.maxTokens, signal: AbortSignal.timeout(MODEL_TIMEOUT_MS) };
   const models = createModels();
-  models.setProvider(
-    stellaProvider({
-      access: {
-        relayBaseUrl,
-        capability: async () => capability.token,
-        fetch: async (request, init) => {
-          const outgoing = request instanceof Request ? new Request(request, init) : new Request(String(request), init);
-          outgoing.headers.set("authorization", `Bearer ${capability.token}`);
-          return await gateway.fetch(outgoing);
+  let answer;
+  if (access.ownKey) {
+    // The owner's own key, through the gateway's account-key lane.
+    const capability = await capabilityFor(access, args.purpose, OWN_KEY_WRITING_MODEL);
+    const model = await listedAccountProviderModel(access.ownKey, OWN_KEY_WRITING_MODEL);
+    if (!model) throw new Error(`${OWN_KEY_WRITING_MODEL} isn't available on ${access.ownKey}.`);
+    models.setProvider(
+      accountByokProvider({
+        providerId: access.ownKey,
+        models: [model],
+        transport: {
+          gatewayOrigin: origin,
+          fetch: async (request) => {
+            const outgoing = new Request(request);
+            outgoing.headers.set("authorization", `Bearer ${capability.token}`);
+            return await gateway.fetch(outgoing);
+          },
         },
-      },
-      models: [spec],
-    }),
-  );
-  const answer = await models.completeSimple(
-    stellaModel(spec, relayBaseUrl),
-    {
-      systemPrompt: args.system,
-      messages: [{ role: "user", content: args.prompt, timestamp: Date.now() }],
-      tools: [args.tool],
-    },
-    { maxTokens: args.maxTokens, signal: AbortSignal.timeout(MODEL_TIMEOUT_MS) },
-  );
+      }),
+    );
+    answer = await models.completeSimple({ ...model, provider: access.ownKey }, context, { ...options, reasoning: "low" });
+    if (answer.stopReason === "error" && refusedText.test(answer.errorMessage ?? "")) {
+      const message = (answer.errorMessage ?? "").slice(0, 300);
+      access.onOwnKeyRefused?.(message);
+      throw new OwnKeyRefused(message);
+    }
+  } else {
+    const execution = execFor(access.execution);
+    const capability = await capabilityFor(access, args.purpose);
+    const spec = piModelSpec("general", execution, access.audience);
+    const relayBaseUrl = gatewayRelayBaseUrl(origin);
+    models.setProvider(
+      stellaProvider({
+        access: {
+          relayBaseUrl,
+          capability: async () => capability.token,
+          fetch: async (request, init) => {
+            const outgoing = request instanceof Request ? new Request(request, init) : new Request(String(request), init);
+            outgoing.headers.set("authorization", `Bearer ${capability.token}`);
+            return await gateway.fetch(outgoing);
+          },
+        },
+        models: [spec],
+      }),
+    );
+    answer = await models.completeSimple(stellaModel(spec, relayBaseUrl), context, options);
+  }
   if (answer.stopReason === "error" || answer.stopReason === "aborted") {
     throw new Error((answer.errorMessage ?? "The summary model call failed.").slice(0, 300));
   }

@@ -1,3 +1,4 @@
+import { AccessNotice } from "./EmailToday";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -203,10 +204,21 @@ function Footer({ feed, styles }: { feed: EmailFeed; styles: Styles }) {
   const locale = useLocale();
   const [checking, setChecking] = useState(false);
   const { status } = feed;
-  const usage = t("email.section.usage", {
-    sorted: new Intl.NumberFormat(locale).format(status.usage.sorted),
-    cost: usageCost(locale, status.usage.costUsd),
-  });
+  const access = status.access;
+  const sorted = new Intl.NumberFormat(locale).format(status.usage.sorted);
+  const cost = usageCost(locale, status.usage.costUsd);
+  const usage =
+    access?.payer === "own_key"
+      ? t("email.access.lineOwn", { sorted, cost })
+      : access?.payer === "server"
+        ? t("email.access.lineServer", { sorted, cost })
+        : t("email.access.lineStella", {
+            sorted,
+            cost,
+            limit: new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
+              access?.limitUsd ?? 0,
+            ),
+          });
 
   const checkNow = async () => {
     setChecking(true);
@@ -254,9 +266,15 @@ function Footer({ feed, styles }: { feed: EmailFeed; styles: Styles }) {
           </Text>
         </View>
       ))}
+      {access?.paused || access?.ownKeyRefused ? <AccessNotice access={access} /> : null}
       <Text style={styles.hint} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-        {status.usage.capped ? `${usage}. ${t("email.section.capped")}` : usage}
+        {usage}
       </Text>
+      {access?.payer === "stella" ? (
+        <Text style={styles.hint} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+          {t("email.access.deviceKeyHintPhone")}
+        </Text>
+      ) : null}
       <View style={styles.buttons}>
         <PillButton
           label={checking ? t("email.section.checking") : t("email.section.checkNow")}

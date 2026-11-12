@@ -3845,6 +3845,25 @@
       "later": "Depois · {when}",
       "repliedInGmail": "Respondido no Gmail",
       "archivedInGmail": "Arquivado no Gmail"
+    },
+    "access": {
+      "addKey": "Usar minha chave do OpenRouter",
+      "plans": "Ver planos",
+      "pausedMonthTitle": "Organização pausada até {date}",
+      "pausedDayTitle": "Organização pausada até amanhã",
+      "pausedFreeBody": "O saldo gratuito da Stella para e-mail acabou neste mês, então os novos e-mails esperam sem organizar. Adicione sua própria chave do OpenRouter para continuar na sua chave ou escolha um plano para ter mais.",
+      "pausedPaidBody": "O saldo de e-mail do seu plano acabou neste mês, então os novos e-mails esperam sem organizar. Adicione sua própria chave do OpenRouter para continuar na sua chave.",
+      "pausedDayFreeBody": "O limite de e-mail de hoje no plano gratuito foi atingido; os novos e-mails esperam até amanhã. Adicione sua própria chave do OpenRouter ou escolha um plano para ter mais.",
+      "pausedDayBody": "O limite de e-mail de hoje foi atingido; os novos e-mails esperam até amanhã.",
+      "pausedOwnBody": "O limite de hoje na sua própria chave foi atingido; os novos e-mails esperam até amanhã.",
+      "refusedTitle": "Sua chave do OpenRouter foi recusada",
+      "refusedBody": "O OpenRouter disse: {reason} O E-mail está usando o saldo da Stella até a chave voltar a funcionar.",
+      "freeSortingOnly": "No plano gratuito, a Stella organiza seus e-mails. Respostas preparadas e resumos precisam da sua própria chave do OpenRouter ou de um plano.",
+      "lineStella": "No saldo da Stella: {sorted} organizados neste mês · {cost} de {limit}",
+      "lineOwn": "Na sua chave do OpenRouter: {sorted} organizados neste mês · {cost} na sua chave. O saldo da Stella não é usado.",
+      "lineServer": "Na chave do OpenRouter deste servidor: {sorted} organizados neste mês · {cost}",
+      "deviceKeyHint": "Para usar sua própria chave do OpenRouter, adicione-a em Modelos com a conta conectada, para que ela fique salva na sua conta. Uma chave guardada só neste computador não pode ser usada enquanto ele estiver desligado.",
+      "deviceKeyHintPhone": "Para usar sua própria chave do OpenRouter, adicione-a nas configurações do chat com a conta conectada, para que ela fique salva na sua conta. Uma chave guardada só neste celular não pode ser usada para e-mail."
     }
   }
 }

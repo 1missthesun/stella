@@ -3759,6 +3759,25 @@
       "later": "稍后 · {when}",
       "repliedInGmail": "已在 Gmail 中回复",
       "archivedInGmail": "已在 Gmail 中归档"
+    },
+    "access": {
+      "addKey": "使用我的 OpenRouter 密钥",
+      "plans": "查看套餐",
+      "pausedMonthTitle": "分类已暂停，{date} 恢复",
+      "pausedDayTitle": "分类已暂停，明天恢复",
+      "pausedFreeBody": "Stella 本月的邮件免费额度已用完，新邮件暂不分类。添加你自己的 OpenRouter 密钥即可用你的密钥继续，或选择套餐获得更多额度。",
+      "pausedPaidBody": "你的套餐本月的邮件额度已用完，新邮件暂不分类。添加你自己的 OpenRouter 密钥即可用你的密钥继续。",
+      "pausedDayFreeBody": "免费套餐今天的邮件上限已达到，新邮件要等到明天。添加你自己的 OpenRouter 密钥或选择套餐即可获得更多。",
+      "pausedDayBody": "今天的邮件上限已达到，新邮件要等到明天。",
+      "pausedOwnBody": "你自己的密钥今天的上限已达到，新邮件要等到明天。",
+      "refusedTitle": "你的 OpenRouter 密钥被拒绝",
+      "refusedBody": "OpenRouter 返回：{reason} 在密钥恢复可用之前，邮件会使用 Stella 的额度。",
+      "freeSortingOnly": "免费套餐下 Stella 会为你分类邮件。备好的回复和摘要需要你自己的 OpenRouter 密钥或套餐。",
+      "lineStella": "使用 Stella 的额度：本月已分类 {sorted} 封 · {cost} / {limit}",
+      "lineOwn": "使用你的 OpenRouter 密钥：本月已分类 {sorted} 封 · 你的密钥花费 {cost}。不占用 Stella 的额度。",
+      "lineServer": "使用此服务器的 OpenRouter 密钥：本月已分类 {sorted} 封 · {cost}",
+      "deviceKeyHint": "要使用你自己的 OpenRouter 密钥，请在登录状态下到“模型”中添加，这样它会保存到你的账户。只保存在这台电脑上的密钥，在电脑关机时无法使用。",
+      "deviceKeyHintPhone": "要使用你自己的 OpenRouter 密钥，请在登录状态下到聊天设置中添加，这样它会保存到你的账户。只保存在这部手机上的密钥无法用于邮件。"
     }
   }
 }

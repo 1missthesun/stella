@@ -3887,6 +3887,25 @@
       "later": "Později · {when}",
       "repliedInGmail": "Zodpovězeno v Gmailu",
       "archivedInGmail": "Archivováno v Gmailu"
+    },
+    "access": {
+      "addKey": "Použít můj klíč OpenRouter",
+      "plans": "Zobrazit plány",
+      "pausedMonthTitle": "Třídění je pozastaveno do {date}",
+      "pausedDayTitle": "Třídění je pozastaveno do zítřka",
+      "pausedFreeBody": "Bezplatný limit Stelly pro e-mail je tento měsíc vyčerpaný, takže nová pošta čeká neroztříděná. Přidejte vlastní klíč OpenRouter a pokračujte na svůj klíč, nebo si pro víc vyberte plán.",
+      "pausedPaidBody": "E-mailový limit vašeho plánu je tento měsíc vyčerpaný, takže nová pošta čeká neroztříděná. Přidejte vlastní klíč OpenRouter a pokračujte na svůj klíč.",
+      "pausedDayFreeBody": "Dnešní e-mailový limit bezplatného plánu je vyčerpaný; nová pošta počká do zítřka. Pro víc přidejte vlastní klíč OpenRouter nebo si vyberte plán.",
+      "pausedDayBody": "Dnešní e-mailový limit je vyčerpaný; nová pošta počká do zítřka.",
+      "pausedOwnBody": "Dnešní limit vašeho vlastního klíče je vyčerpaný; nová pošta počká do zítřka.",
+      "refusedTitle": "Váš klíč OpenRouter byl odmítnut",
+      "refusedBody": "OpenRouter odpověděl: {reason} E-mail používá limit Stelly, dokud klíč znovu nebude fungovat.",
+      "freeSortingOnly": "V bezplatném plánu Stella třídí vaši poštu. Připravené odpovědi a shrnutí vyžadují vlastní klíč OpenRouter nebo plán.",
+      "lineStella": "Z limitu Stelly: tento měsíc roztříděno {sorted} · {cost} z {limit}",
+      "lineOwn": "Z vašeho klíče OpenRouter: tento měsíc roztříděno {sorted} · {cost} na váš klíč. Limit Stelly se nečerpá.",
+      "lineServer": "Z klíče OpenRouter tohoto serveru: tento měsíc roztříděno {sorted} · {cost}",
+      "deviceKeyHint": "Chcete-li použít vlastní klíč OpenRouter, přidejte ho v sekci Modely, když jste přihlášeni, aby se uložil do vašeho účtu. Klíč uložený jen v tomto počítači nelze použít, když je počítač vypnutý.",
+      "deviceKeyHintPhone": "Chcete-li použít vlastní klíč OpenRouter, přidejte ho v nastavení chatu, když jste přihlášeni, aby se uložil do vašeho účtu. Klíč uložený jen v tomto telefonu nelze pro e-mail použít."
     }
   }
 }

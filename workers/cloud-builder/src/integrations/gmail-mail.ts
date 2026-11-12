@@ -73,7 +73,6 @@ export type GmailHistory = {
 
 export const gmailHistorySince = async (get: Fetcher, startHistoryId: string): Promise<GmailHistory> => {
   const added: { id: string; labelIds: string[] }[] = [];
-  const seen = new Set<string>();
   let pageToken: string | undefined;
   let historyId = startHistoryId;
   try {
@@ -92,9 +91,11 @@ export const gmailHistorySince = async (get: Fetcher, startHistoryId: string): P
         for (const addedEntry of [...(Array.isArray(entry.messagesAdded) ? entry.messagesAdded : []), ...movedIn]) {
           const message = isRecord(addedEntry) && isRecord(addedEntry.message) ? addedEntry.message : null;
           const id = message ? str(message.id) : "";
-          if (!id || seen.has(id)) continue;
-          seen.add(id);
-          added.push({ id, labelIds: Array.isArray(message!.labelIds) ? message!.labelIds.map(String) : [] });
+          if (!id) continue;
+          const labelIds = Array.isArray(message!.labelIds) ? message!.labelIds.map(String) : [];
+          const known = added.find((entry) => entry.id === id);
+          if (known) known.labelIds = labelIds;
+          else added.push({ id, labelIds });
         }
       }
       pageToken = str(answer.nextPageToken) || undefined;

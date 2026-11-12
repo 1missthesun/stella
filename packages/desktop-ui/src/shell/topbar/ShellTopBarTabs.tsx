@@ -27,7 +27,11 @@ import { displaySearchStore } from "@/features/workspace-display/display-search-
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { NewTabMenu } from "./NewTabMenu";
 import { useTabReorder } from "./use-tab-reorder";
-import { useOpenTabNotch, useTabStripReach } from "./open-tab-notch";
+import {
+  revealOpenTab,
+  useOpenTabNotch,
+  useTabStripReach,
+} from "./open-tab-notch";
 import { useEmailUnseenCount } from "@/features/email/email-unseen";
 import "./shell-topbar-tabs.css";
 
@@ -64,18 +68,29 @@ export function ShellTopBarTabs() {
   };
 
   useLayoutEffect(() => {
-    if (!activeTabId || !panelOpen) return;
-    stripRef.current
-      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
+    const strip = stripRef.current;
+    if (!activeTabId || !panelOpen || !strip) return;
+    strip
+      .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    // The browser does not know the pinned Chat tab covers the strip's
+    // start, so a tab scrolled under it still counts as in view.
+    revealOpenTab(strip);
   }, [activeTabId, panelOpen]);
 
   // Fade a tab's title only when it is actually cut off, and note how far
   // the tabs have been narrowed (the close button moves; see the CSS).
+  // Chat gives up its name first: it goes to its icon alone whenever the
+  // other tabs would otherwise be narrowed past their titles.
   useEffect(() => {
     const strip = stripRef.current;
     if (!strip) return;
     const mark = () => {
+      const chat = strip.querySelector<HTMLElement>(".topbar-tabs__tab--chat");
+      if (chat) {
+        if (chatNeedsRoom(strip)) chat.dataset.compact = "true";
+        else delete chat.dataset.compact;
+      }
       for (const label of strip.querySelectorAll<HTMLElement>(
         ".topbar-tabs__label",
       )) {
@@ -93,6 +108,10 @@ export function ShellTopBarTabs() {
     };
     const observer = new ResizeObserver(mark);
     observer.observe(strip);
+    // The strip sizes to its tabs while they fit, so watch the bar's side
+    // that gives it room too.
+    const side = strip.closest<HTMLElement>(".shell-topbar-full__left");
+    if (side) observer.observe(side);
     for (const tab of strip.children) observer.observe(tab);
     mark();
     return () => observer.disconnect();
@@ -271,4 +290,85 @@ export function ShellTopBarTabs() {
       </Popover>
     </div>
   );
+}
+
+/** Pinned Chat with its name, and the room around the strip (see the CSS). */
+const CHAT_FULL_GAP = 6;
+const TAB_GAP = 2;
+const TAB_MAX = 152;
+const TAB_TIGHT = 104;
+/** Icon, its gap and the leading padding of a tab with a title. */
+const TAB_LEAD = 10 + 18 + 6;
+/** Room kept after the title: for the close button, or less once tight. */
+const TAB_TRAIL = 26;
+const TAB_TRAIL_TIGHT = 10;
+
+let measureContext: CanvasRenderingContext2D | null = null;
+
+function textWidth(text: string, font: string): number {
+  measureContext ??= document.createElement("canvas").getContext("2d");
+  if (!measureContext) return 0;
+  measureContext.font = font;
+  return measureContext.measureText(text).width;
+}
+
+function labelRoom(width: number): number {
+  return width - TAB_LEAD - (width < TAB_TIGHT ? TAB_TRAIL_TIGHT : TAB_TRAIL);
+}
+
+/**
+ * Whether the tabs would be narrowed past their titles (or scroll) with
+ * Chat showing its name. Worked out from the room the bar gives the strip,
+ * not from the tabs as they stand, so Chat does not flip back and forth as
+ * its own width changes.
+ */
+function chatNeedsRoom(strip: HTMLElement): boolean {
+  const chat = strip.querySelector<HTMLElement>(".topbar-tabs__tab--chat");
+  const tabs = [
+    ...strip.querySelectorAll<HTMLElement>(".topbar-tabs__tab[data-tab-id]"),
+  ];
+  const side = strip.closest<HTMLElement>(".shell-topbar-full__left");
+  const holder = strip.parentElement;
+  if (!chat || !side || !holder || tabs.length === 0) return false;
+
+  const sideStyle = getComputedStyle(side);
+  let room =
+    side.clientWidth -
+    parseFloat(sideStyle.paddingLeft) -
+    parseFloat(sideStyle.paddingRight);
+  const sideGap = parseFloat(sideStyle.columnGap) || 0;
+  for (const child of side.children) {
+    if (child === holder) continue;
+    const width = (child as HTMLElement).offsetWidth;
+    if (width > 0) room -= width + sideGap;
+  }
+  const holderGap = parseFloat(getComputedStyle(holder).columnGap) || 0;
+  for (const child of holder.children) {
+    if (child === strip) continue;
+    room -= (child as HTMLElement).offsetWidth + holderGap;
+  }
+  // The strip's trailing padding, less what its negative margin gives back.
+  const stripStyle = getComputedStyle(strip);
+  room -=
+    parseFloat(stripStyle.paddingRight) + parseFloat(stripStyle.marginRight);
+
+  const target = chat.querySelector<HTMLElement>(".topbar-tabs__target");
+  const label = chat.querySelector<HTMLElement>(".topbar-tabs__label");
+  if (!target || !label) return false;
+  const font = getComputedStyle(target).font;
+  const chatFull = Math.ceil(TAB_LEAD + 10 + textWidth(label.textContent ?? "", font));
+
+  const width = Math.min(
+    TAB_MAX,
+    (room - chatFull - CHAT_FULL_GAP - TAB_GAP * tabs.length) / tabs.length,
+  );
+  const fits = labelRoom(width);
+  return tabs.some((tab) => {
+    const title = tab.querySelector<HTMLElement>(".topbar-tabs__label")
+      ?.textContent;
+    if (!title) return false;
+    // A title too long even for a full-width tab only asks for that width.
+    const wanted = Math.min(textWidth(title, font), labelRoom(TAB_MAX));
+    return wanted > fits + 0.5;
+  });
 }

@@ -62,7 +62,7 @@ export function syncOpenTabNotch(strip: HTMLElement | null): void {
  * When the strip gets narrower than its tabs, keep the open tab (with its
  * feet) inside the part that shows, clear of the pinned Chat tab.
  */
-function revealOpenTab(strip: HTMLElement): void {
+export function revealOpenTab(strip: HTMLElement): void {
   if (strip.dataset.reordering === "true") return;
   const open = strip.querySelector<HTMLElement>(OPEN_TAB);
   if (!open) return;

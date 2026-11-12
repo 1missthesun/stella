@@ -96,6 +96,17 @@
     calc(100% - 2px) no-repeat;
 }
 
+/* With too little room for every title, Chat gives its name up first. */
+.topbar-tabs__tab--chat[data-compact="true"] .topbar-tabs__target {
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+}
+
+.topbar-tabs__tab--chat[data-compact="true"] .topbar-tabs__label {
+  display: none;
+}
+
 .topbar-tabs__tab:hover {
   color: var(--text-base);
 }
@@ -326,12 +337,13 @@
   left: 9px;
 }
 
-.topbar-tabs__tab[data-compact="true"][data-active="true"]:hover
+.topbar-tabs__tab[data-tab-id][data-compact="true"][data-active="true"]:hover
   .topbar-tabs__icon,
-.topbar-tabs__tab[data-compact="true"]:has(:focus-visible) .topbar-tabs__icon,
-.topbar-tabs__tab[data-tight="true"]:hover
+.topbar-tabs__tab[data-tab-id][data-compact="true"]:has(:focus-visible)
   .topbar-tabs__icon,
-.topbar-tabs__tab[data-tight="true"]:has(
+.topbar-tabs__tab[data-tab-id][data-tight="true"]:hover
+  .topbar-tabs__icon,
+.topbar-tabs__tab[data-tab-id][data-tight="true"]:has(
     :focus-visible
   )
   .topbar-tabs__icon {

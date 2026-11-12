@@ -78,7 +78,8 @@
           "activity": "Pregunta sobre esta actividad…",
           "window": "Pregunta sobre esta ventana…",
           "selection": "Pregunta sobre la selección…",
-          "default": "Haz lo que sea"
+          "default": "Haz lo que sea",
+          "email": "Pregunta sobre esto o dile a Stella qué hacer…"
         }
       },
       "connectorConnect": {
@@ -3599,7 +3600,22 @@
         "one": "Pedidos: {count}",
         "other": "Pedidos: {count}"
       },
-      "open": "Abrir en Correo"
+      "open": "Abrir en Correo",
+      "newEmails": {
+        "many": "{count} correos nuevos",
+        "one": "{count} correo nuevo",
+        "other": "{count} correos nuevos"
+      },
+      "urgentEmails": {
+        "many": "{count} correos urgentes",
+        "one": "{count} correo urgente",
+        "other": "{count} correos urgentes"
+      },
+      "askedEmails": {
+        "many": "{count} correos por los que preguntaste",
+        "one": "{count} correo por el que preguntaste",
+        "other": "{count} correos por los que preguntaste"
+      }
     },
     "digest": {
       "since": "desde las {time}",
@@ -3628,6 +3644,47 @@
       "askReply": "Redacta una respuesta al correo de {from} «{subject}»",
       "askHandle": "Encárgate del correo de {from} «{subject}»",
       "askTell": "Sobre el correo de {from} «{subject}»: {text}"
+    },
+    "brief": {
+      "today": "Hoy, {time}",
+      "yesterday": "Ayer, {time}",
+      "newSince": {
+        "many": "{count} nuevos desde las {time}",
+        "one": "{count} nuevo desde las {time}",
+        "other": "{count} nuevos desde las {time}"
+      },
+      "earlier": "Resumen anterior",
+      "later": "Resumen siguiente",
+      "all": "Resúmenes",
+      "search": "Buscar en tu correo",
+      "searching": "Buscando…",
+      "found": {
+        "many": "{count} correos encontrados",
+        "one": "{count} correo encontrado",
+        "other": "{count} correos encontrados"
+      },
+      "nothingFound": "No se encontró nada.",
+      "searched": "Búsqueda en Gmail: {query}",
+      "backToBrief": "Volver al resumen",
+      "more": "Qué hacer con esto",
+      "suggestHint": "Stella se encarga; las respuestas quedan como borrador",
+      "read": "Leer el correo",
+      "openGmail": "Abrir en Gmail",
+      "noted": "Anotado.",
+      "emails": {
+        "many": "{count} correos",
+        "one": "{count} correo",
+        "other": "{count} correos"
+      },
+      "chip": "Correo · {title}",
+      "chipBriefing": "Resumen de las {time}",
+      "back": "Atrás",
+      "opening": "Abriendo…",
+      "to": "para {to}",
+      "waiting": "Desde este resumen",
+      "empty": "Aún no hay resumen. Cuando un correo nuevo importe, aparecerá aquí.",
+      "show": "Mostrar",
+      "hide": "Ocultar"
     }
   }
 }

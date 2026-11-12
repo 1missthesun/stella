@@ -81,7 +81,8 @@
           "activity": "Спросите об этом действии…",
           "window": "Спросите об этом окне…",
           "selection": "Спросите о выделении…",
-          "default": "Делайте что угодно"
+          "default": "Делайте что угодно",
+          "email": "Спросите об этом или скажите Stella, что сделать…"
         }
       },
       "connectorConnect": {
@@ -3626,7 +3627,25 @@
         "one": "По запросу: {count}",
         "other": "По запросу: {count}"
       },
-      "open": "Открыть в Почте"
+      "open": "Открыть в Почте",
+      "newEmails": {
+        "few": "Новых писем: {count}",
+        "many": "Новых писем: {count}",
+        "one": "Новых писем: {count}",
+        "other": "Новых писем: {count}"
+      },
+      "urgentEmails": {
+        "few": "Срочных писем: {count}",
+        "many": "Срочных писем: {count}",
+        "one": "Срочных писем: {count}",
+        "other": "Срочных писем: {count}"
+      },
+      "askedEmails": {
+        "few": "Писем, о которых вы просили: {count}",
+        "many": "Писем, о которых вы просили: {count}",
+        "one": "Писем, о которых вы просили: {count}",
+        "other": "Писем, о которых вы просили: {count}"
+      }
     },
     "digest": {
       "since": "с {time}",
@@ -3656,6 +3675,50 @@
       "askReply": "Подготовь черновик ответа на письмо от {from} «{subject}»",
       "askHandle": "Разберись с письмом от {from} «{subject}»",
       "askTell": "О письме от {from} «{subject}»: {text}"
+    },
+    "brief": {
+      "today": "Сегодня, {time}",
+      "yesterday": "Вчера, {time}",
+      "newSince": {
+        "few": "Новых с {time}: {count}",
+        "many": "Новых с {time}: {count}",
+        "one": "Новых с {time}: {count}",
+        "other": "Новых с {time}: {count}"
+      },
+      "earlier": "Предыдущая сводка",
+      "later": "Следующая сводка",
+      "all": "Сводки",
+      "search": "Поиск по почте",
+      "searching": "Поиск…",
+      "found": {
+        "few": "Найдено писем: {count}",
+        "many": "Найдено писем: {count}",
+        "one": "Найдено писем: {count}",
+        "other": "Найдено писем: {count}"
+      },
+      "nothingFound": "Ничего не найдено.",
+      "searched": "Поиск в Gmail: {query}",
+      "backToBrief": "Назад к сводке",
+      "more": "Что с этим сделать",
+      "suggestHint": "Stella сделает; ответы останутся черновиками",
+      "read": "Прочитать письмо",
+      "openGmail": "Открыть в Gmail",
+      "noted": "Принято.",
+      "emails": {
+        "few": "Писем: {count}",
+        "many": "Писем: {count}",
+        "one": "Писем: {count}",
+        "other": "Писем: {count}"
+      },
+      "chip": "Почта · {title}",
+      "chipBriefing": "Сводка {time}",
+      "back": "Назад",
+      "opening": "Открываю…",
+      "to": "кому: {to}",
+      "waiting": "После этой сводки",
+      "empty": "Сводок пока нет. Когда придёт важное письмо, оно появится здесь.",
+      "show": "Показать",
+      "hide": "Скрыть"
     }
   }
 }

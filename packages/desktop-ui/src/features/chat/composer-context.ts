@@ -1,6 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
-import { VIEWER_SELECTION_SURFACE } from "@/features/workspace-display/file-viewer-store";
+import {
+  EMAIL_SELECTION_SURFACE,
+  VIEWER_SELECTION_SURFACE,
+} from "@/features/workspace-display/file-viewer-store";
 
 type ComposerContextState = {
   hasScreenshotContext: boolean;
@@ -10,6 +13,8 @@ type ComposerContextState = {
   hasPastedTextContext: boolean;
   hasAppSelectionContext: boolean;
   hasViewerContext: boolean;
+  /** The Email tab's briefing, point, email or thread rides along. */
+  hasEmailContext: boolean;
   hasActivityContext: boolean;
   hasWindowContext: boolean;
   hasVisibleWindowContext: boolean;
@@ -100,7 +105,12 @@ export const resolveComposerContextState = (
   const hasAppSelectionContext = getComposerAppSelections(chatContext).some(
     (selection) =>
       Boolean(selection.snapshot) &&
-      selection.surface !== VIEWER_SELECTION_SURFACE,
+      selection.surface !== VIEWER_SELECTION_SURFACE &&
+      selection.surface !== EMAIL_SELECTION_SURFACE,
+  );
+  // Like the viewer's chip, email context rides along but isn't a message on its own.
+  const hasEmailContext = getComposerAppSelections(chatContext).some(
+    (selection) => selection.surface === EMAIL_SELECTION_SURFACE,
   );
   const hasViewerContext = getComposerAppSelections(chatContext).some(
     (selection) => selection.surface === VIEWER_SELECTION_SURFACE,
@@ -126,6 +136,7 @@ export const resolveComposerContextState = (
     hasPastedTextContext,
     hasAppSelectionContext,
     hasViewerContext,
+    hasEmailContext,
     hasActivityContext,
     hasWindowContext,
     hasVisibleWindowContext,
@@ -136,7 +147,8 @@ export const resolveComposerContextState = (
       hasSubmittableContext ||
         hasPendingCaptureContext ||
         hasVisibleWindowContext ||
-        hasViewerContext,
+        hasViewerContext ||
+        hasEmailContext,
     ),
   };
 };
@@ -154,6 +166,7 @@ const resolveComposerPlaceholderKey = ({
     if (contextState.hasFileContext) return "file";
     if (contextState.hasPastedTextContext) return "pastedText";
     if (contextState.hasAppSelectionContext) return "selectedArea";
+    if (contextState.hasEmailContext) return "email";
     if (contextState.hasViewerContext) return "open";
     if (contextState.hasActivityContext) return "activity";
     if (contextState.hasWindowContext) return "window";

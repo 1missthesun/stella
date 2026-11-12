@@ -75,7 +75,8 @@
           "activity": "Fråga om den här aktiviteten…",
           "window": "Fråga om det här fönstret…",
           "selection": "Fråga om markeringen…",
-          "default": "Gör vad som helst"
+          "default": "Gör vad som helst",
+          "email": "Fråga om detta eller säg vad Stella ska göra…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Efterfrågade: {count}",
         "other": "Efterfrågade: {count}"
       },
-      "open": "Öppna i E-post"
+      "open": "Öppna i E-post",
+      "newEmails": {
+        "one": "{count} nytt mejl",
+        "other": "{count} nya mejl"
+      },
+      "urgentEmails": {
+        "one": "{count} brådskande mejl",
+        "other": "{count} brådskande mejl"
+      },
+      "askedEmails": {
+        "one": "{count} mejl du frågade om",
+        "other": "{count} mejl du frågade om"
+      }
     },
     "digest": {
       "since": "sedan {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Skriv ett svarsutkast till mejlet från {from} ”{subject}”",
       "askHandle": "Ta hand om mejlet från {from} ”{subject}”",
       "askTell": "Om mejlet från {from} ”{subject}”: {text}"
+    },
+    "brief": {
+      "today": "I dag, {time}",
+      "yesterday": "I går, {time}",
+      "newSince": {
+        "one": "{count} nytt sedan {time}",
+        "other": "{count} nya sedan {time}"
+      },
+      "earlier": "Tidigare sammanfattning",
+      "later": "Senare sammanfattning",
+      "all": "Sammanfattningar",
+      "search": "Sök i din mejl",
+      "searching": "Söker…",
+      "found": {
+        "one": "{count} mejl hittades",
+        "other": "{count} mejl hittades"
+      },
+      "nothingFound": "Inget hittades.",
+      "searched": "Sökte i Gmail efter {query}",
+      "backToBrief": "Tillbaka till sammanfattningen",
+      "more": "Vad ska göras med detta",
+      "suggestHint": "Stella fixar det; svar sparas som utkast",
+      "read": "Läs mejlet",
+      "openGmail": "Öppna i Gmail",
+      "noted": "Noterat.",
+      "emails": {
+        "one": "{count} mejl",
+        "other": "{count} mejl"
+      },
+      "chip": "Mejl · {title}",
+      "chipBriefing": "Sammanfattning {time}",
+      "back": "Tillbaka",
+      "opening": "Öppnar…",
+      "to": "till {to}",
+      "waiting": "Sedan den här sammanfattningen",
+      "empty": "Ingen sammanfattning än. När ny mejl spelar roll visas den här.",
+      "show": "Visa",
+      "hide": "Dölj"
     }
   }
 }

@@ -75,7 +75,8 @@
           "activity": "Kérdezz erről a tevékenységről…",
           "window": "Kérdezz erről az ablakról…",
           "selection": "Kérdezz a kijelölésről…",
-          "default": "Bármit megtehetsz"
+          "default": "Bármit megtehetsz",
+          "email": "Kérdezz róla, vagy mondd meg Stellának, mit tegyen…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Kért: {count}",
         "other": "Kért: {count}"
       },
-      "open": "Megnyitás az E-mailben"
+      "open": "Megnyitás az E-mailben",
+      "newEmails": {
+        "one": "{count} új e-mail",
+        "other": "{count} új e-mail"
+      },
+      "urgentEmails": {
+        "one": "{count} sürgős e-mail",
+        "other": "{count} sürgős e-mail"
+      },
+      "askedEmails": {
+        "one": "{count} e-mail, amire rákérdeztél",
+        "other": "{count} e-mail, amire rákérdeztél"
+      }
     },
     "digest": {
       "since": "{time} óta",
@@ -3600,6 +3613,44 @@
       "askReply": "Írj válaszvázlatot {from} „{subject}” levelére.",
       "askHandle": "Intézd el {from} „{subject}” levelét.",
       "askTell": "{from} „{subject}” leveléről: {text}"
+    },
+    "brief": {
+      "today": "Ma, {time}",
+      "yesterday": "Tegnap, {time}",
+      "newSince": {
+        "one": "{count} új {time} óta",
+        "other": "{count} új {time} óta"
+      },
+      "earlier": "Korábbi összefoglaló",
+      "later": "Későbbi összefoglaló",
+      "all": "Összefoglalók",
+      "search": "Keresés a levelekben",
+      "searching": "Keresés…",
+      "found": {
+        "one": "{count} e-mail található",
+        "other": "{count} e-mail található"
+      },
+      "nothingFound": "Nincs találat.",
+      "searched": "Gmail-keresés: {query}",
+      "backToBrief": "Vissza az összefoglalóhoz",
+      "more": "Mi legyen ezzel",
+      "suggestHint": "Stella elintézi; a válaszok piszkozatok maradnak",
+      "read": "E-mail elolvasása",
+      "openGmail": "Megnyitás a Gmailben",
+      "noted": "Feljegyezve.",
+      "emails": {
+        "one": "{count} e-mail",
+        "other": "{count} e-mail"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "{time} összefoglaló",
+      "back": "Vissza",
+      "opening": "Megnyitás…",
+      "to": "címzett: {to}",
+      "waiting": "Ezen összefoglaló óta",
+      "empty": "Még nincs összefoglaló. Ha egy új levél fontos, itt jelenik meg.",
+      "show": "Mutasd",
+      "hide": "Elrejtés"
     }
   }
 }

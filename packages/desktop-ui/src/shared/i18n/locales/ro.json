@@ -78,7 +78,8 @@
           "activity": "Întreabă despre această activitate…",
           "window": "Întreabă despre această fereastră…",
           "selection": "Întreabă despre selecție…",
-          "default": "Fă orice"
+          "default": "Fă orice",
+          "email": "Întreabă despre asta sau spune-i Stellei ce să facă…"
         }
       },
       "connectorConnect": {
@@ -3599,7 +3600,22 @@
         "one": "Cerute: {count}",
         "other": "Cerute: {count}"
       },
-      "open": "Deschide în E-mail"
+      "open": "Deschide în E-mail",
+      "newEmails": {
+        "few": "E-mailuri noi: {count}",
+        "one": "E-mailuri noi: {count}",
+        "other": "E-mailuri noi: {count}"
+      },
+      "urgentEmails": {
+        "few": "E-mailuri urgente: {count}",
+        "one": "E-mailuri urgente: {count}",
+        "other": "E-mailuri urgente: {count}"
+      },
+      "askedEmails": {
+        "few": "E-mailuri despre care ai întrebat: {count}",
+        "one": "E-mailuri despre care ai întrebat: {count}",
+        "other": "E-mailuri despre care ai întrebat: {count}"
+      }
     },
     "digest": {
       "since": "de la {time}",
@@ -3628,6 +3644,47 @@
       "askReply": "Scrie o ciornă de răspuns la e-mailul de la {from} „{subject}”",
       "askHandle": "Ocupă-te de e-mailul de la {from} „{subject}”",
       "askTell": "Despre e-mailul de la {from} „{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Azi, {time}",
+      "yesterday": "Ieri, {time}",
+      "newSince": {
+        "few": "Noi de la {time}: {count}",
+        "one": "Noi de la {time}: {count}",
+        "other": "Noi de la {time}: {count}"
+      },
+      "earlier": "Rezumatul anterior",
+      "later": "Rezumatul următor",
+      "all": "Rezumate",
+      "search": "Caută în e-mailuri",
+      "searching": "Se caută…",
+      "found": {
+        "few": "E-mailuri găsite: {count}",
+        "one": "E-mailuri găsite: {count}",
+        "other": "E-mailuri găsite: {count}"
+      },
+      "nothingFound": "Nu s-a găsit nimic.",
+      "searched": "Căutat în Gmail: {query}",
+      "backToBrief": "Înapoi la rezumat",
+      "more": "Ce faci cu asta",
+      "suggestHint": "Stella se ocupă; răspunsurile rămân ciorne",
+      "read": "Citește e-mailul",
+      "openGmail": "Deschide în Gmail",
+      "noted": "Notat.",
+      "emails": {
+        "few": "E-mailuri: {count}",
+        "one": "E-mailuri: {count}",
+        "other": "E-mailuri: {count}"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "Rezumatul de la {time}",
+      "back": "Înapoi",
+      "opening": "Se deschide…",
+      "to": "către {to}",
+      "waiting": "De la acest rezumat",
+      "empty": "Încă niciun rezumat. Când un e-mail nou contează, apare aici.",
+      "show": "Arată",
+      "hide": "Ascunde"
     }
   }
 }

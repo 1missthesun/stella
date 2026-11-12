@@ -75,7 +75,8 @@
           "activity": "Kysy tästä toiminnasta…",
           "window": "Kysy tästä ikkunasta…",
           "selection": "Kysy valinnasta…",
-          "default": "Tee mitä tahansa"
+          "default": "Tee mitä tahansa",
+          "email": "Kysy tästä tai kerro Stellalle, mitä tehdä…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Pyydettyjä: {count}",
         "other": "Pyydettyjä: {count}"
       },
-      "open": "Avaa Sähköpostissa"
+      "open": "Avaa Sähköpostissa",
+      "newEmails": {
+        "one": "{count} uusi sähköposti",
+        "other": "{count} uutta sähköpostia"
+      },
+      "urgentEmails": {
+        "one": "{count} kiireellinen sähköposti",
+        "other": "{count} kiireellistä sähköpostia"
+      },
+      "askedEmails": {
+        "one": "Kysymäsi sähköpostit: {count}",
+        "other": "Kysymäsi sähköpostit: {count}"
+      }
     },
     "digest": {
       "since": "klo {time} alkaen",
@@ -3600,6 +3613,44 @@
       "askReply": "Luonnostele vastaus lähettäjän {from} viestiin ”{subject}”",
       "askHandle": "Hoida lähettäjän {from} viesti ”{subject}”",
       "askTell": "Lähettäjän {from} viestistä ”{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Tänään {time}",
+      "yesterday": "Eilen {time}",
+      "newSince": {
+        "one": "{count} uusi klo {time} jälkeen",
+        "other": "{count} uutta klo {time} jälkeen"
+      },
+      "earlier": "Edellinen kooste",
+      "later": "Seuraava kooste",
+      "all": "Koosteet",
+      "search": "Hae sähköposteista",
+      "searching": "Haetaan…",
+      "found": {
+        "one": "Löytyi {count} sähköposti",
+        "other": "Löytyi {count} sähköpostia"
+      },
+      "nothingFound": "Mitään ei löytynyt.",
+      "searched": "Gmail-haku: {query}",
+      "backToBrief": "Takaisin koosteeseen",
+      "more": "Mitä tälle tehdään",
+      "suggestHint": "Stella hoitaa sen; vastaukset jäävät luonnoksiksi",
+      "read": "Lue sähköposti",
+      "openGmail": "Avaa Gmailissa",
+      "noted": "Merkitty.",
+      "emails": {
+        "one": "{count} sähköposti",
+        "other": "{count} sähköpostia"
+      },
+      "chip": "Sähköposti · {title}",
+      "chipBriefing": "Kooste klo {time}",
+      "back": "Takaisin",
+      "opening": "Avataan…",
+      "to": "vastaanottaja {to}",
+      "waiting": "Tämän koosteen jälkeen",
+      "empty": "Ei vielä koostetta. Kun uusi sähköposti on tärkeä, se näkyy täällä.",
+      "show": "Näytä",
+      "hide": "Piilota"
     }
   }
 }

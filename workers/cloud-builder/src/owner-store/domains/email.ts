@@ -1673,7 +1673,7 @@ const searchMail = async (ctx: OwnerContext, words: string): Promise<EmailSearch
   const snapshot = await ctx.host.snapshot();
   const zone = zoneOf(ctx, snapshot);
   ensureState(ctx);
-  const query = await gmailQueryFor(
+  const queries = await gmailQueryFor(
     {
       env: ctx.env,
       ownerId: ctx.ownerId,
@@ -1685,43 +1685,51 @@ const searchMail = async (ctx: OwnerContext, words: string): Promise<EmailSearch
     words,
     zone,
   )
-    .then(({ q, usd }) => {
+    .then(({ q, broader, usd }) => {
       recordLineCost(ctx, zone, usd);
-      return q;
+      return { q, broader };
     })
     .catch((error: unknown) => {
       log("search_query_failed", { message: errorText(error) });
-      return words.trim();
+      return { q: words.trim(), broader: words.trim() };
     });
-  const found = await Promise.all(
-    accounts.map(async (account) => {
-      try {
-        const mails = await gmailSearch(await account.get(), query, SEARCH_PER_ACCOUNT);
-        return mails.map(
-          (mail): EmailFound => ({
-            account: account.email,
-            messageId: mail.id,
-            threadId: mail.threadId,
-            from: mail.fromName || mail.fromAddress,
-            fromAddress: mail.fromAddress,
-            subject: mail.subject,
-            snippet: mail.snippet,
-            receivedAt: mail.receivedAt,
-            unread: mail.labelIds.includes("UNREAD"),
-            inInbox: mail.labelIds.includes("INBOX"),
-          }),
-        );
-      } catch (error) {
-        log("search_failed", { message: errorText(error) });
-        return [];
-      }
-    }),
-  );
+  const run = async (q: string): Promise<EmailFound[]> =>
+    (
+      await Promise.all(
+        accounts.map(async (account) => {
+          try {
+            const mails = await gmailSearch(await account.get(), q, SEARCH_PER_ACCOUNT);
+            return mails.map(
+              (mail): EmailFound => ({
+                account: account.email,
+                messageId: mail.id,
+                threadId: mail.threadId,
+                from: mail.fromName || mail.fromAddress,
+                fromAddress: mail.fromAddress,
+                subject: mail.subject,
+                snippet: mail.snippet,
+                receivedAt: mail.receivedAt,
+                unread: mail.labelIds.includes("UNREAD"),
+                inInbox: mail.labelIds.includes("INBOX"),
+              }),
+            );
+          } catch (error) {
+            log("search_failed", { message: errorText(error) });
+            return [];
+          }
+        }),
+      )
+    ).flat();
+  let query = queries.q;
+  let found = await run(query);
+  if (found.length === 0 && queries.broader && queries.broader !== query) {
+    query = queries.broader;
+    found = await run(query);
+  }
   log("searched", { owner: ctx.ownerId.slice(0, 12) });
   return {
     gmailQuery: query,
     results: found
-      .flat()
       .sort((a, b) => b.receivedAt - a.receivedAt)
       .slice(0, SEARCH_SHOWN),
   };

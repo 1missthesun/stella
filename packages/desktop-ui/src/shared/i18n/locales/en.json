@@ -75,7 +75,8 @@
           "activity": "Ask about this activity…",
           "window": "Ask about this window…",
           "selection": "Ask about the selection…",
-          "default": "Do anything"
+          "default": "Do anything",
+          "email": "Ask about this, or tell Stella what to do…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "{count} you asked about",
         "other": "{count} you asked about"
       },
-      "open": "Open in Email"
+      "open": "Open in Email",
+      "newEmails": {
+        "one": "{count} new email",
+        "other": "{count} new emails"
+      },
+      "urgentEmails": {
+        "one": "{count} urgent email",
+        "other": "{count} urgent emails"
+      },
+      "askedEmails": {
+        "one": "{count} email you asked about",
+        "other": "{count} emails you asked about"
+      }
     },
     "digest": {
       "since": "since {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Draft a reply to {from}'s email “{subject}”",
       "askHandle": "Handle {from}'s email “{subject}”",
       "askTell": "About {from}'s email “{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Today, {time}",
+      "yesterday": "Yesterday, {time}",
+      "newSince": {
+        "one": "{count} new since {time}",
+        "other": "{count} new since {time}"
+      },
+      "earlier": "Earlier briefing",
+      "later": "Later briefing",
+      "all": "Briefings",
+      "search": "Search your mail",
+      "searching": "Searching…",
+      "found": {
+        "one": "{count} email found",
+        "other": "{count} emails found"
+      },
+      "nothingFound": "Nothing found.",
+      "searched": "Searched Gmail for {query}",
+      "backToBrief": "Back to the briefing",
+      "more": "What to do with this",
+      "suggestHint": "Stella does it; replies wait as drafts",
+      "read": "Read the email",
+      "openGmail": "Open in Gmail",
+      "noted": "Noted.",
+      "emails": {
+        "one": "{count} email",
+        "other": "{count} emails"
+      },
+      "chip": "Email · {title}",
+      "chipBriefing": "{time} briefing",
+      "back": "Back",
+      "opening": "Opening…",
+      "to": "to {to}",
+      "waiting": "Since this briefing",
+      "empty": "No briefing yet. When new mail matters, it shows up here.",
+      "show": "Show",
+      "hide": "Hide"
     }
   }
 }

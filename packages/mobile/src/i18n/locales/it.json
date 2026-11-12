@@ -78,7 +78,8 @@
           "activity": "Chiedi di questa attività…",
           "window": "Chiedi di questa finestra…",
           "selection": "Chiedi della selezione…",
-          "default": "Fai qualsiasi cosa"
+          "default": "Fai qualsiasi cosa",
+          "email": "Chiedi su questo o di’ a Stella cosa fare…"
         }
       },
       "connectorConnect": {
@@ -3599,7 +3600,22 @@
         "one": "Richieste: {count}",
         "other": "Richieste: {count}"
       },
-      "open": "Apri in Email"
+      "open": "Apri in Email",
+      "newEmails": {
+        "many": "{count} nuove email",
+        "one": "{count} nuova email",
+        "other": "{count} nuove email"
+      },
+      "urgentEmails": {
+        "many": "{count} email urgenti",
+        "one": "{count} email urgente",
+        "other": "{count} email urgenti"
+      },
+      "askedEmails": {
+        "many": "{count} email che hai chiesto",
+        "one": "{count} email che hai chiesto",
+        "other": "{count} email che hai chiesto"
+      }
     },
     "digest": {
       "since": "dalle {time}",
@@ -3628,6 +3644,47 @@
       "askReply": "Scrivi una bozza di risposta all’email di {from} «{subject}»",
       "askHandle": "Occupati dell’email di {from} «{subject}»",
       "askTell": "Sull’email di {from} «{subject}»: {text}"
+    },
+    "brief": {
+      "today": "Oggi, {time}",
+      "yesterday": "Ieri, {time}",
+      "newSince": {
+        "many": "{count} nuove dalle {time}",
+        "one": "{count} nuova dalle {time}",
+        "other": "{count} nuove dalle {time}"
+      },
+      "earlier": "Riepilogo precedente",
+      "later": "Riepilogo successivo",
+      "all": "Riepiloghi",
+      "search": "Cerca nella posta",
+      "searching": "Ricerca…",
+      "found": {
+        "many": "{count} email trovate",
+        "one": "{count} email trovata",
+        "other": "{count} email trovate"
+      },
+      "nothingFound": "Nessun risultato.",
+      "searched": "Cercato in Gmail: {query}",
+      "backToBrief": "Torna al riepilogo",
+      "more": "Cosa farne",
+      "suggestHint": "Ci pensa Stella; le risposte restano bozze",
+      "read": "Leggi l’email",
+      "openGmail": "Apri in Gmail",
+      "noted": "Preso nota.",
+      "emails": {
+        "many": "{count} email",
+        "one": "{count} email",
+        "other": "{count} email"
+      },
+      "chip": "Email · {title}",
+      "chipBriefing": "Riepilogo delle {time}",
+      "back": "Indietro",
+      "opening": "Apertura…",
+      "to": "a {to}",
+      "waiting": "Da questo riepilogo",
+      "empty": "Ancora nessun riepilogo. Quando una nuova email conta, compare qui.",
+      "show": "Mostra",
+      "hide": "Nascondi"
     }
   }
 }

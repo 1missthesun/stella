@@ -306,8 +306,6 @@
   flex-direction: column;
   gap: 18px;
   width: 100%;
-  max-width: 620px;
-  margin: 10px auto 0;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-weak);
+  max-width: 660px;
+  margin: 0 auto;
 }

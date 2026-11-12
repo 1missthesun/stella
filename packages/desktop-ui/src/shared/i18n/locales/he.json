@@ -78,7 +78,8 @@
           "activity": "שאלו על הפעילות הזו…",
           "window": "שאלו על החלון הזה…",
           "selection": "שאלו על הבחירה…",
-          "default": "עשו כל דבר"
+          "default": "עשו כל דבר",
+          "email": "שאלו על זה, או אמרו ל-Stella מה לעשות…"
         }
       },
       "connectorConnect": {
@@ -3599,7 +3600,22 @@
         "other": "ביקשת: {count}",
         "two": "ביקשת: {count}"
       },
-      "open": "פתיחה בדואר"
+      "open": "פתיחה בדואר",
+      "newEmails": {
+        "one": "אימיילים חדשים: {count}",
+        "other": "אימיילים חדשים: {count}",
+        "two": "אימיילים חדשים: {count}"
+      },
+      "urgentEmails": {
+        "one": "אימיילים דחופים: {count}",
+        "other": "אימיילים דחופים: {count}",
+        "two": "אימיילים דחופים: {count}"
+      },
+      "askedEmails": {
+        "one": "אימיילים ששאלת עליהם: {count}",
+        "other": "אימיילים ששאלת עליהם: {count}",
+        "two": "אימיילים ששאלת עליהם: {count}"
+      }
     },
     "digest": {
       "since": "מאז {time}",
@@ -3628,6 +3644,47 @@
       "askReply": "נסחי טיוטת תשובה למייל מ-{from} „{subject}”",
       "askHandle": "טפלי במייל מ-{from} „{subject}”",
       "askTell": "לגבי המייל מ-{from} „{subject}”: {text}"
+    },
+    "brief": {
+      "today": "היום, {time}",
+      "yesterday": "אתמול, {time}",
+      "newSince": {
+        "one": "חדשים מאז {time}: {count}",
+        "other": "חדשים מאז {time}: {count}",
+        "two": "חדשים מאז {time}: {count}"
+      },
+      "earlier": "סיכום קודם",
+      "later": "סיכום הבא",
+      "all": "סיכומים",
+      "search": "חיפוש בדואר",
+      "searching": "מחפש…",
+      "found": {
+        "one": "נמצאו אימיילים: {count}",
+        "other": "נמצאו אימיילים: {count}",
+        "two": "נמצאו אימיילים: {count}"
+      },
+      "nothingFound": "לא נמצא דבר.",
+      "searched": "חיפוש ב-Gmail: {query}",
+      "backToBrief": "חזרה לסיכום",
+      "more": "מה לעשות עם זה",
+      "suggestHint": "Stella מטפלת בזה; תשובות נשמרות כטיוטות",
+      "read": "קריאת האימייל",
+      "openGmail": "פתיחה ב-Gmail",
+      "noted": "נרשם.",
+      "emails": {
+        "one": "אימיילים: {count}",
+        "other": "אימיילים: {count}",
+        "two": "אימיילים: {count}"
+      },
+      "chip": "אימייל · {title}",
+      "chipBriefing": "סיכום {time}",
+      "back": "חזרה",
+      "opening": "פותח…",
+      "to": "אל {to}",
+      "waiting": "מאז הסיכום הזה",
+      "empty": "עדיין אין סיכום. כשדואר חדש חשוב, הוא יופיע כאן.",
+      "show": "הצג",
+      "hide": "הסתר"
     }
   }
 }

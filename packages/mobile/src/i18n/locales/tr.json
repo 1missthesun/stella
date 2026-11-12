@@ -75,7 +75,8 @@
           "activity": "Bu etkinlik hakkında sor…",
           "window": "Bu pencere hakkında sor…",
           "selection": "Seçim hakkında sor…",
-          "default": "Her şeyi yap"
+          "default": "Her şeyi yap",
+          "email": "Bununla ilgili sor ya da Stella’ya ne yapacağını söyle…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "İstenen: {count}",
         "other": "İstenen: {count}"
       },
-      "open": "E-postada aç"
+      "open": "E-postada aç",
+      "newEmails": {
+        "one": "{count} yeni e-posta",
+        "other": "{count} yeni e-posta"
+      },
+      "urgentEmails": {
+        "one": "{count} acil e-posta",
+        "other": "{count} acil e-posta"
+      },
+      "askedEmails": {
+        "one": "Sorduğun {count} e-posta",
+        "other": "Sorduğun {count} e-posta"
+      }
     },
     "digest": {
       "since": "{time} itibarıyla",
@@ -3600,6 +3613,44 @@
       "askReply": "{from} gönderen “{subject}” e-postasına bir yanıt taslağı yaz.",
       "askHandle": "{from} gönderen “{subject}” e-postasını hallet.",
       "askTell": "{from} gönderen “{subject}” e-postası hakkında: {text}"
+    },
+    "brief": {
+      "today": "Bugün, {time}",
+      "yesterday": "Dün, {time}",
+      "newSince": {
+        "one": "{time} itibarıyla {count} yeni",
+        "other": "{time} itibarıyla {count} yeni"
+      },
+      "earlier": "Önceki özet",
+      "later": "Sonraki özet",
+      "all": "Özetler",
+      "search": "Postalarında ara",
+      "searching": "Aranıyor…",
+      "found": {
+        "one": "{count} e-posta bulundu",
+        "other": "{count} e-posta bulundu"
+      },
+      "nothingFound": "Hiçbir şey bulunamadı.",
+      "searched": "Gmail’de arandı: {query}",
+      "backToBrief": "Özete dön",
+      "more": "Bununla ne yapılsın",
+      "suggestHint": "Stella halleder; yanıtlar taslak olarak kalır",
+      "read": "E-postayı oku",
+      "openGmail": "Gmail’de aç",
+      "noted": "Not edildi.",
+      "emails": {
+        "one": "{count} e-posta",
+        "other": "{count} e-posta"
+      },
+      "chip": "E-posta · {title}",
+      "chipBriefing": "{time} özeti",
+      "back": "Geri",
+      "opening": "Açılıyor…",
+      "to": "alıcı: {to}",
+      "waiting": "Bu özetten beri",
+      "empty": "Henüz özet yok. Yeni bir e-posta önemli olduğunda burada görünür.",
+      "show": "Göster",
+      "hide": "Gizle"
     }
   }
 }

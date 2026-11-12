@@ -75,7 +75,8 @@
           "activity": "Ρώτα για αυτή τη δραστηριότητα…",
           "window": "Ρώτα για αυτό το παράθυρο…",
           "selection": "Ρώτα για την επιλογή…",
-          "default": "Κάνε οτιδήποτε"
+          "default": "Κάνε οτιδήποτε",
+          "email": "Ρώτα γι’ αυτό ή πες στη Stella τι να κάνει…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Ζητημένα: {count}",
         "other": "Ζητημένα: {count}"
       },
-      "open": "Άνοιγμα στο Email"
+      "open": "Άνοιγμα στο Email",
+      "newEmails": {
+        "one": "{count} νέο email",
+        "other": "{count} νέα email"
+      },
+      "urgentEmails": {
+        "one": "{count} επείγον email",
+        "other": "{count} επείγοντα email"
+      },
+      "askedEmails": {
+        "one": "{count} email που ζήτησες",
+        "other": "{count} email που ζήτησες"
+      }
     },
     "digest": {
       "since": "από τις {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Γράψε πρόχειρη απάντηση στο email του/της {from} «{subject}»",
       "askHandle": "Ανάλαβε το email του/της {from} «{subject}»",
       "askTell": "Για το email του/της {from} «{subject}»: {text}"
+    },
+    "brief": {
+      "today": "Σήμερα, {time}",
+      "yesterday": "Χθες, {time}",
+      "newSince": {
+        "one": "{count} νέο από τις {time}",
+        "other": "{count} νέα από τις {time}"
+      },
+      "earlier": "Προηγούμενη σύνοψη",
+      "later": "Επόμενη σύνοψη",
+      "all": "Συνόψεις",
+      "search": "Αναζήτηση στο email",
+      "searching": "Αναζήτηση…",
+      "found": {
+        "one": "Βρέθηκε {count} email",
+        "other": "Βρέθηκαν {count} email"
+      },
+      "nothingFound": "Δεν βρέθηκε τίποτα.",
+      "searched": "Αναζήτηση στο Gmail: {query}",
+      "backToBrief": "Πίσω στη σύνοψη",
+      "more": "Τι να γίνει με αυτό",
+      "suggestHint": "Το αναλαμβάνει η Stella· οι απαντήσεις μένουν πρόχειρα",
+      "read": "Ανάγνωση email",
+      "openGmail": "Άνοιγμα στο Gmail",
+      "noted": "Σημειώθηκε.",
+      "emails": {
+        "one": "{count} email",
+        "other": "{count} email"
+      },
+      "chip": "Email · {title}",
+      "chipBriefing": "Σύνοψη {time}",
+      "back": "Πίσω",
+      "opening": "Άνοιγμα…",
+      "to": "προς {to}",
+      "waiting": "Από αυτή τη σύνοψη",
+      "empty": "Δεν υπάρχει σύνοψη ακόμα. Όταν ένα νέο email έχει σημασία, εμφανίζεται εδώ.",
+      "show": "Εμφάνιση",
+      "hide": "Απόκρυψη"
     }
   }
 }

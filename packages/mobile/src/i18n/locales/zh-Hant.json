@@ -72,7 +72,8 @@
           "activity": "詢問這項活動…",
           "window": "詢問這個視窗…",
           "selection": "詢問所選內容…",
-          "default": "做任何事"
+          "default": "做任何事",
+          "email": "問問這件事，或告訴 Stella 該做什麼…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "你要求的 {count} 封"
       },
-      "open": "在郵件中開啟"
+      "open": "在郵件中開啟",
+      "newEmails": {
+        "other": "{count} 封新郵件"
+      },
+      "urgentEmails": {
+        "other": "{count} 封緊急郵件"
+      },
+      "askedEmails": {
+        "other": "{count} 封你問過的郵件"
+      }
     },
     "digest": {
       "since": "自 {time} 起",
@@ -3570,6 +3580,41 @@
       "askReply": "幫我草擬對 {from} 的郵件「{subject}」的回覆。",
       "askHandle": "處理 {from} 的郵件「{subject}」",
       "askTell": "關於 {from} 的郵件「{subject}」：{text}"
+    },
+    "brief": {
+      "today": "今天 {time}",
+      "yesterday": "昨天 {time}",
+      "newSince": {
+        "other": "{time} 以來 {count} 封新郵件"
+      },
+      "earlier": "上一份簡報",
+      "later": "下一份簡報",
+      "all": "簡報",
+      "search": "搜尋郵件",
+      "searching": "正在搜尋…",
+      "found": {
+        "other": "找到 {count} 封郵件"
+      },
+      "nothingFound": "沒有找到。",
+      "searched": "已在 Gmail 中搜尋：{query}",
+      "backToBrief": "返回簡報",
+      "more": "要怎麼處理",
+      "suggestHint": "交給 Stella；回覆會儲存為草稿",
+      "read": "閱讀郵件",
+      "openGmail": "在 Gmail 中開啟",
+      "noted": "已記下。",
+      "emails": {
+        "other": "{count} 封郵件"
+      },
+      "chip": "郵件 · {title}",
+      "chipBriefing": "{time} 簡報",
+      "back": "返回",
+      "opening": "正在開啟…",
+      "to": "收件者：{to}",
+      "waiting": "這份簡報之後",
+      "empty": "還沒有簡報。有重要的新郵件時會顯示在這裡。",
+      "show": "顯示",
+      "hide": "隱藏"
     }
   }
 }

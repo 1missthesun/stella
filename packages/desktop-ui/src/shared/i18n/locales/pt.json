@@ -78,7 +78,8 @@
           "activity": "Pergunte sobre esta atividade…",
           "window": "Pergunte sobre esta janela…",
           "selection": "Pergunte sobre a seleção…",
-          "default": "Faça qualquer coisa"
+          "default": "Faça qualquer coisa",
+          "email": "Pergunte sobre isto ou diga à Stella o que fazer…"
         }
       },
       "connectorConnect": {
@@ -3599,7 +3600,22 @@
         "one": "Pedidos: {count}",
         "other": "Pedidos: {count}"
       },
-      "open": "Abrir no E-mail"
+      "open": "Abrir no E-mail",
+      "newEmails": {
+        "many": "{count} e-mails novos",
+        "one": "{count} e-mail novo",
+        "other": "{count} e-mails novos"
+      },
+      "urgentEmails": {
+        "many": "{count} e-mails urgentes",
+        "one": "{count} e-mail urgente",
+        "other": "{count} e-mails urgentes"
+      },
+      "askedEmails": {
+        "many": "{count} e-mails que você pediu",
+        "one": "{count} e-mail que você pediu",
+        "other": "{count} e-mails que você pediu"
+      }
     },
     "digest": {
       "since": "desde {time}",
@@ -3628,6 +3644,47 @@
       "askReply": "Rascunhe uma resposta ao e-mail de {from} “{subject}”",
       "askHandle": "Resolva o e-mail de {from} “{subject}”",
       "askTell": "Sobre o e-mail de {from} “{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Hoje, {time}",
+      "yesterday": "Ontem, {time}",
+      "newSince": {
+        "many": "{count} novos desde {time}",
+        "one": "{count} novo desde {time}",
+        "other": "{count} novos desde {time}"
+      },
+      "earlier": "Resumo anterior",
+      "later": "Próximo resumo",
+      "all": "Resumos",
+      "search": "Pesquisar seus e-mails",
+      "searching": "Pesquisando…",
+      "found": {
+        "many": "{count} e-mails encontrados",
+        "one": "{count} e-mail encontrado",
+        "other": "{count} e-mails encontrados"
+      },
+      "nothingFound": "Nada encontrado.",
+      "searched": "Pesquisado no Gmail: {query}",
+      "backToBrief": "Voltar ao resumo",
+      "more": "O que fazer com isto",
+      "suggestHint": "A Stella cuida disso; respostas ficam como rascunho",
+      "read": "Ler o e-mail",
+      "openGmail": "Abrir no Gmail",
+      "noted": "Anotado.",
+      "emails": {
+        "many": "{count} e-mails",
+        "one": "{count} e-mail",
+        "other": "{count} e-mails"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "Resumo das {time}",
+      "back": "Voltar",
+      "opening": "Abrindo…",
+      "to": "para {to}",
+      "waiting": "Desde este resumo",
+      "empty": "Ainda não há resumo. Quando um e-mail novo importar, ele aparece aqui.",
+      "show": "Mostrar",
+      "hide": "Ocultar"
     }
   }
 }

@@ -87,7 +87,8 @@
           "activity": "اسأل عن هذا النشاط…",
           "window": "اسأل عن هذه النافذة…",
           "selection": "اسأل عن التحديد…",
-          "default": "افعل أي شيء"
+          "default": "افعل أي شيء",
+          "email": "اسأل عن هذا أو أخبر Stella بما تفعله…"
         }
       },
       "connectorConnect": {
@@ -3680,7 +3681,31 @@
         "two": "طلبتَها: {count}",
         "zero": "طلبتَها: {count}"
       },
-      "open": "فتح في البريد"
+      "open": "فتح في البريد",
+      "newEmails": {
+        "few": "رسائل جديدة: {count}",
+        "many": "رسائل جديدة: {count}",
+        "one": "رسائل جديدة: {count}",
+        "other": "رسائل جديدة: {count}",
+        "two": "رسائل جديدة: {count}",
+        "zero": "رسائل جديدة: {count}"
+      },
+      "urgentEmails": {
+        "few": "رسائل عاجلة: {count}",
+        "many": "رسائل عاجلة: {count}",
+        "one": "رسائل عاجلة: {count}",
+        "other": "رسائل عاجلة: {count}",
+        "two": "رسائل عاجلة: {count}",
+        "zero": "رسائل عاجلة: {count}"
+      },
+      "askedEmails": {
+        "few": "رسائل سألت عنها: {count}",
+        "many": "رسائل سألت عنها: {count}",
+        "one": "رسائل سألت عنها: {count}",
+        "other": "رسائل سألت عنها: {count}",
+        "two": "رسائل سألت عنها: {count}",
+        "zero": "رسائل سألت عنها: {count}"
+      }
     },
     "digest": {
       "since": "منذ {time}",
@@ -3712,6 +3737,56 @@
       "askReply": "اكتب مسودة رد على رسالة {from} «{subject}»",
       "askHandle": "تولَّ رسالة {from} «{subject}»",
       "askTell": "بخصوص رسالة {from} «{subject}»: {text}"
+    },
+    "brief": {
+      "today": "اليوم، {time}",
+      "yesterday": "أمس، {time}",
+      "newSince": {
+        "few": "جديدة منذ {time}: {count}",
+        "many": "جديدة منذ {time}: {count}",
+        "one": "جديدة منذ {time}: {count}",
+        "other": "جديدة منذ {time}: {count}",
+        "two": "جديدة منذ {time}: {count}",
+        "zero": "جديدة منذ {time}: {count}"
+      },
+      "earlier": "الملخص السابق",
+      "later": "الملخص التالي",
+      "all": "الملخصات",
+      "search": "ابحث في بريدك",
+      "searching": "جارٍ البحث…",
+      "found": {
+        "few": "رسائل عُثر عليها: {count}",
+        "many": "رسائل عُثر عليها: {count}",
+        "one": "رسائل عُثر عليها: {count}",
+        "other": "رسائل عُثر عليها: {count}",
+        "two": "رسائل عُثر عليها: {count}",
+        "zero": "رسائل عُثر عليها: {count}"
+      },
+      "nothingFound": "لم يُعثر على شيء.",
+      "searched": "بحث في Gmail: {query}",
+      "backToBrief": "العودة إلى الملخص",
+      "more": "ماذا نفعل بهذا",
+      "suggestHint": "تتولاه Stella؛ تبقى الردود مسودات",
+      "read": "اقرأ الرسالة",
+      "openGmail": "افتح في Gmail",
+      "noted": "تم.",
+      "emails": {
+        "few": "رسائل: {count}",
+        "many": "رسائل: {count}",
+        "one": "رسائل: {count}",
+        "other": "رسائل: {count}",
+        "two": "رسائل: {count}",
+        "zero": "رسائل: {count}"
+      },
+      "chip": "البريد · {title}",
+      "chipBriefing": "ملخص {time}",
+      "back": "رجوع",
+      "opening": "جارٍ الفتح…",
+      "to": "إلى {to}",
+      "waiting": "منذ هذا الملخص",
+      "empty": "لا يوجد ملخص بعد. عندما يكون بريد جديد مهمًا، يظهر هنا.",
+      "show": "إظهار",
+      "hide": "إخفاء"
     }
   }
 }

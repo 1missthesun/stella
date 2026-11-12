@@ -6,32 +6,38 @@ import { openEmailDigest } from "./email-digest-store";
 import "./email-card.css";
 
 /**
- * Email in the chat is one tiny row: a count, never the mail itself. Opening
- * it shows the digest in the Email tab; Stella keeps the list in hidden context.
+ * Email in the chat is one row the size of a reply: a mail icon and how much
+ * came in, never the mail itself. Opening it shows the briefing in the Email
+ * tab; Stella keeps the list in hidden context.
  */
 export const EmailChatCard = memo(function EmailChatCard({ card }: { card: EmailCard }) {
   const { t, tPlural } = useI18n();
   const count = card.items.length;
   if (count === 0) return null;
-  const urgent = card.kind === "urgent";
-  const label = urgent
-    ? tPlural("email.row.urgent", count)
-    : card.kind === "rule"
-      ? tPlural("email.row.asked", count)
-      : tPlural("email.row.new", count);
+  const urgent = card.items.filter((item) => item.bucket === "urgent").length;
+  const label =
+    card.kind === "rule"
+      ? tPlural("email.row.askedEmails", count)
+      : card.kind === "urgent"
+        ? tPlural("email.row.urgentEmails", count)
+        : urgent > 0
+          ? `${tPlural("email.row.urgent", urgent)} · ${tPlural("email.row.newEmails", count)}`
+          : tPlural("email.row.newEmails", count);
   return (
-    <button
-      type="button"
-      className="email-row"
-      data-kind={card.kind}
-      data-testid="email-card"
-      aria-label={`${t("email.title")}: ${label}`}
-      title={t("email.row.open")}
-      onClick={() => openEmailDigest(card.cardId)}
-    >
-      <Mail size={13} strokeWidth={1.9} className="email-row__icon" aria-hidden="true" />
-      {urgent ? <span className="email-row__dot" aria-hidden="true" /> : null}
-      <span className="email-row__label">{label}</span>
-    </button>
+    <div className="message-line message-line--assistant">
+      <button
+        type="button"
+        className="email-row"
+        data-kind={card.kind}
+        data-urgent={card.kind === "urgent" || urgent > 0 || undefined}
+        data-testid="email-card"
+        aria-label={`${t("email.title")}: ${label}`}
+        title={t("email.row.open")}
+        onClick={() => openEmailDigest(card.cardId)}
+      >
+        <Mail size={18} strokeWidth={1.8} className="email-row__icon" aria-hidden="true" />
+        <span className="email-row__label">{label}</span>
+      </button>
+    </div>
   );
 });

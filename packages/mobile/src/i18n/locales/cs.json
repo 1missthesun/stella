@@ -81,7 +81,8 @@
           "activity": "Zeptejte se na tuto aktivitu…",
           "window": "Zeptejte se na toto okno…",
           "selection": "Zeptejte se na výběr…",
-          "default": "Udělejte cokoli"
+          "default": "Udělejte cokoli",
+          "email": "Zeptejte se na to, nebo řekněte Stelle, co udělat…"
         }
       },
       "connectorConnect": {
@@ -3626,7 +3627,25 @@
         "one": "Vyžádané: {count}",
         "other": "Vyžádané: {count}"
       },
-      "open": "Otevřít v E-mailu"
+      "open": "Otevřít v E-mailu",
+      "newEmails": {
+        "few": "Nové e-maily: {count}",
+        "many": "Nové e-maily: {count}",
+        "one": "Nové e-maily: {count}",
+        "other": "Nové e-maily: {count}"
+      },
+      "urgentEmails": {
+        "few": "Naléhavé e-maily: {count}",
+        "many": "Naléhavé e-maily: {count}",
+        "one": "Naléhavé e-maily: {count}",
+        "other": "Naléhavé e-maily: {count}"
+      },
+      "askedEmails": {
+        "few": "E-maily, na které jste se ptali: {count}",
+        "many": "E-maily, na které jste se ptali: {count}",
+        "one": "E-maily, na které jste se ptali: {count}",
+        "other": "E-maily, na které jste se ptali: {count}"
+      }
     },
     "digest": {
       "since": "od {time}",
@@ -3656,6 +3675,50 @@
       "askReply": "Navrhni odpověď na e-mail od {from} „{subject}“",
       "askHandle": "Vyřiď e-mail od {from} „{subject}“",
       "askTell": "K e-mailu od {from} „{subject}“: {text}"
+    },
+    "brief": {
+      "today": "Dnes, {time}",
+      "yesterday": "Včera, {time}",
+      "newSince": {
+        "few": "Nové od {time}: {count}",
+        "many": "Nové od {time}: {count}",
+        "one": "Nové od {time}: {count}",
+        "other": "Nové od {time}: {count}"
+      },
+      "earlier": "Předchozí přehled",
+      "later": "Další přehled",
+      "all": "Přehledy",
+      "search": "Hledat v poště",
+      "searching": "Hledám…",
+      "found": {
+        "few": "Nalezené e-maily: {count}",
+        "many": "Nalezené e-maily: {count}",
+        "one": "Nalezené e-maily: {count}",
+        "other": "Nalezené e-maily: {count}"
+      },
+      "nothingFound": "Nic nenalezeno.",
+      "searched": "Hledáno v Gmailu: {query}",
+      "backToBrief": "Zpět na přehled",
+      "more": "Co s tím udělat",
+      "suggestHint": "Stella to zařídí; odpovědi zůstanou jako koncepty",
+      "read": "Přečíst e-mail",
+      "openGmail": "Otevřít v Gmailu",
+      "noted": "Zaznamenáno.",
+      "emails": {
+        "few": "E-maily: {count}",
+        "many": "E-maily: {count}",
+        "one": "E-maily: {count}",
+        "other": "E-maily: {count}"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "Přehled z {time}",
+      "back": "Zpět",
+      "opening": "Otevírám…",
+      "to": "komu: {to}",
+      "waiting": "Od tohoto přehledu",
+      "empty": "Zatím žádný přehled. Když bude nová pošta důležitá, objeví se tady.",
+      "show": "Zobrazit",
+      "hide": "Skrýt"
     }
   }
 }

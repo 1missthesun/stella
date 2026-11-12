@@ -556,33 +556,39 @@ export const writeBrief = async (
 
 const QUERY_TOOL: Tool = {
   name: "gmail_query",
-  description: "The Gmail search.",
+  description: "The Gmail searches.",
   parameters: {
     type: "object",
-    properties: { q: { type: "string" } },
-    required: ["q"],
+    properties: { q: { type: "string" }, broader: { type: "string" } },
+    required: ["q", "broader"],
     additionalProperties: false,
   } as unknown as TSchema,
 };
 
-/** Turns plain words ("the invoice from Linear last month") into a Gmail search. */
+/**
+ * Turns plain words ("the invoice from Linear last month") into a Gmail
+ * search, plus a looser one to try when the first finds nothing.
+ */
 export const gmailQueryFor = async (
   access: SorterAccess,
   words: string,
   zone: string,
-): Promise<{ q: string; usd: number }> => {
+): Promise<{ q: string; broader: string; usd: number }> => {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(Date.now());
   const output = await completeWithTool(access, {
     purpose: "search",
     system: [
-      "Turn what someone wants to find in their email into one Gmail search query using Gmail's operators (from:, to:, subject:, has:attachment, filename:, after:YYYY/MM/DD, before:YYYY/MM/DD, newer_than:, is:unread, in:anywhere, OR, quotes, -word).",
-      "Keep the user's key words; don't add guesses that would narrow it wrongly. If it already is a Gmail query or a plain keyword, return it as is.",
+      "Turn what someone wants to find in their email into Gmail searches using Gmail's operators (from:, to:, subject:, has:attachment, filename:, after:YYYY/MM/DD, before:YYYY/MM/DD, newer_than:, is:unread, in:anywhere, OR, -word).",
+      "q: the search. Use the user's key words as loose keywords; quote a phrase only if the user quoted it. A person's or company's name goes in as a bare word (it matches the sender, recipients and body), not from:, unless they give an email address or clearly mean the sender's address. Drop filler words such as email, emails, message, about, the.",
+      "broader: a looser search for when q finds nothing: the one or two most distinctive words, with OR between alternatives (e.g. renewal OR quote).",
+      "If the input already is a Gmail query or a single keyword, return it as is for both.",
       `Today is ${today}. Answer only by calling gmail_query.`,
     ].join("\n"),
     prompt: words,
     tool: QUERY_TOOL,
     maxTokens: 300,
   });
-  const q = cleanText(output.args?.q, 300);
-  return { q: q || words.trim().slice(0, 300), usd: output.usd };
+  const q = cleanText(output.args?.q, 300) || words.trim().slice(0, 300);
+  const broader = cleanText(output.args?.broader, 300) || q;
+  return { q, broader, usd: output.usd };
 };

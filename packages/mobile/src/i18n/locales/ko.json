@@ -72,7 +72,8 @@
           "activity": "이 활동에 대해 질문하기…",
           "window": "이 창에 대해 질문하기…",
           "selection": "선택 항목에 대해 질문하기…",
-          "default": "무엇이든 해 보세요"
+          "default": "무엇이든 해 보세요",
+          "email": "이것에 대해 묻거나 Stella에게 할 일을 알려 주세요…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "요청한 메일 {count}개"
       },
-      "open": "이메일에서 열기"
+      "open": "이메일에서 열기",
+      "newEmails": {
+        "other": "새 이메일 {count}개"
+      },
+      "urgentEmails": {
+        "other": "긴급 이메일 {count}개"
+      },
+      "askedEmails": {
+        "other": "요청하신 이메일 {count}개"
+      }
     },
     "digest": {
       "since": "{time} 이후",
@@ -3570,6 +3580,41 @@
       "askReply": "{from}의 메일 “{subject}”에 대한 답장 초안을 써 줘.",
       "askHandle": "{from}의 메일 “{subject}”을 처리해 줘.",
       "askTell": "{from}의 메일 “{subject}”에 대해: {text}"
+    },
+    "brief": {
+      "today": "오늘 {time}",
+      "yesterday": "어제 {time}",
+      "newSince": {
+        "other": "{time} 이후 새 메일 {count}개"
+      },
+      "earlier": "이전 요약",
+      "later": "다음 요약",
+      "all": "요약",
+      "search": "메일 검색",
+      "searching": "검색 중…",
+      "found": {
+        "other": "이메일 {count}개 찾음"
+      },
+      "nothingFound": "찾은 항목이 없습니다.",
+      "searched": "Gmail 검색: {query}",
+      "backToBrief": "요약으로 돌아가기",
+      "more": "이 항목 처리",
+      "suggestHint": "Stella가 처리합니다. 답장은 임시보관함에 저장됩니다",
+      "read": "이메일 읽기",
+      "openGmail": "Gmail에서 열기",
+      "noted": "기록했어요.",
+      "emails": {
+        "other": "이메일 {count}개"
+      },
+      "chip": "이메일 · {title}",
+      "chipBriefing": "{time} 요약",
+      "back": "뒤로",
+      "opening": "여는 중…",
+      "to": "받는 사람: {to}",
+      "waiting": "이 요약 이후",
+      "empty": "아직 요약이 없습니다. 중요한 새 메일이 오면 여기에 표시됩니다.",
+      "show": "보기",
+      "hide": "숨기기"
     }
   }
 }

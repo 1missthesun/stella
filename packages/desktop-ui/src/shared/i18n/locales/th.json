@@ -72,7 +72,8 @@
           "activity": "ถามเกี่ยวกับกิจกรรมนี้…",
           "window": "ถามเกี่ยวกับหน้าต่างนี้…",
           "selection": "ถามเกี่ยวกับส่วนที่เลือก…",
-          "default": "ทำอะไรก็ได้"
+          "default": "ทำอะไรก็ได้",
+          "email": "ถามเกี่ยวกับสิ่งนี้ หรือบอก Stella ว่าต้องทำอะไร…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "ที่คุณขอ {count}"
       },
-      "open": "เปิดในอีเมล"
+      "open": "เปิดในอีเมล",
+      "newEmails": {
+        "other": "อีเมลใหม่ {count} ฉบับ"
+      },
+      "urgentEmails": {
+        "other": "อีเมลด่วน {count} ฉบับ"
+      },
+      "askedEmails": {
+        "other": "อีเมลที่คุณถามถึง {count} ฉบับ"
+      }
     },
     "digest": {
       "since": "ตั้งแต่ {time}",
@@ -3570,6 +3580,41 @@
       "askReply": "ร่างคำตอบอีเมลจาก {from} “{subject}”",
       "askHandle": "จัดการอีเมลจาก {from} “{subject}”",
       "askTell": "เกี่ยวกับอีเมลจาก {from} “{subject}”: {text}"
+    },
+    "brief": {
+      "today": "วันนี้ {time}",
+      "yesterday": "เมื่อวาน {time}",
+      "newSince": {
+        "other": "ใหม่ {count} ฉบับตั้งแต่ {time}"
+      },
+      "earlier": "สรุปก่อนหน้า",
+      "later": "สรุปถัดไป",
+      "all": "สรุป",
+      "search": "ค้นหาในอีเมล",
+      "searching": "กำลังค้นหา…",
+      "found": {
+        "other": "พบอีเมล {count} ฉบับ"
+      },
+      "nothingFound": "ไม่พบอะไรเลย",
+      "searched": "ค้นหาใน Gmail: {query}",
+      "backToBrief": "กลับไปที่สรุป",
+      "more": "จะทำอะไรกับสิ่งนี้",
+      "suggestHint": "Stella จัดการให้ คำตอบจะเก็บเป็นฉบับร่าง",
+      "read": "อ่านอีเมล",
+      "openGmail": "เปิดใน Gmail",
+      "noted": "บันทึกแล้ว",
+      "emails": {
+        "other": "อีเมล {count} ฉบับ"
+      },
+      "chip": "อีเมล · {title}",
+      "chipBriefing": "สรุปเวลา {time}",
+      "back": "กลับ",
+      "opening": "กำลังเปิด…",
+      "to": "ถึง {to}",
+      "waiting": "ตั้งแต่สรุปนี้",
+      "empty": "ยังไม่มีสรุป เมื่ออีเมลใหม่มีความสำคัญ จะแสดงที่นี่",
+      "show": "แสดง",
+      "hide": "ซ่อน"
     }
   }
 }

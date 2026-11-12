@@ -72,7 +72,8 @@
           "activity": "Hỏi về hoạt động này…",
           "window": "Hỏi về cửa sổ này…",
           "selection": "Hỏi về phần đã chọn…",
-          "default": "Làm bất cứ điều gì"
+          "default": "Làm bất cứ điều gì",
+          "email": "Hỏi về mục này, hoặc bảo Stella cần làm gì…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "Bạn đã yêu cầu: {count}"
       },
-      "open": "Mở trong Email"
+      "open": "Mở trong Email",
+      "newEmails": {
+        "other": "{count} email mới"
+      },
+      "urgentEmails": {
+        "other": "{count} email khẩn"
+      },
+      "askedEmails": {
+        "other": "{count} email bạn đã hỏi"
+      }
     },
     "digest": {
       "since": "từ {time}",
@@ -3570,6 +3580,41 @@
       "askReply": "Soạn nháp trả lời email của {from} “{subject}”",
       "askHandle": "Xử lý email của {from} “{subject}”",
       "askTell": "Về email của {from} “{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Hôm nay, {time}",
+      "yesterday": "Hôm qua, {time}",
+      "newSince": {
+        "other": "{count} mới từ {time}"
+      },
+      "earlier": "Bản tóm tắt trước",
+      "later": "Bản tóm tắt sau",
+      "all": "Các bản tóm tắt",
+      "search": "Tìm trong email",
+      "searching": "Đang tìm…",
+      "found": {
+        "other": "Tìm thấy {count} email"
+      },
+      "nothingFound": "Không tìm thấy gì.",
+      "searched": "Đã tìm trong Gmail: {query}",
+      "backToBrief": "Quay lại bản tóm tắt",
+      "more": "Làm gì với mục này",
+      "suggestHint": "Stella lo; thư trả lời được lưu nháp",
+      "read": "Đọc email",
+      "openGmail": "Mở trong Gmail",
+      "noted": "Đã ghi nhận.",
+      "emails": {
+        "other": "{count} email"
+      },
+      "chip": "Email · {title}",
+      "chipBriefing": "Tóm tắt lúc {time}",
+      "back": "Quay lại",
+      "opening": "Đang mở…",
+      "to": "gửi {to}",
+      "waiting": "Từ bản tóm tắt này",
+      "empty": "Chưa có bản tóm tắt. Khi có email mới quan trọng, nó sẽ hiện ở đây.",
+      "show": "Hiện",
+      "hide": "Ẩn"
     }
   }
 }

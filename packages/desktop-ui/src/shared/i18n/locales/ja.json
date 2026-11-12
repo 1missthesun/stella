@@ -72,7 +72,8 @@
           "activity": "このアクティビティについて質問…",
           "window": "このウインドウについて質問…",
           "selection": "選択部分について質問…",
-          "default": "なんでもどうぞ"
+          "default": "なんでもどうぞ",
+          "email": "これについて質問するか、Stella にしてほしいことを伝えましょう…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "依頼分 {count}件"
       },
-      "open": "メールで開く"
+      "open": "メールで開く",
+      "newEmails": {
+        "other": "新着メール {count} 件"
+      },
+      "urgentEmails": {
+        "other": "緊急メール {count} 件"
+      },
+      "askedEmails": {
+        "other": "確認を頼まれたメール {count} 件"
+      }
     },
     "digest": {
       "since": "{time}以降",
@@ -3570,6 +3580,41 @@
       "askReply": "{from}さんのメール「{subject}」への返信を下書きして。",
       "askHandle": "{from}さんのメール「{subject}」に対応して。",
       "askTell": "{from}さんのメール「{subject}」について：{text}"
+    },
+    "brief": {
+      "today": "今日 {time}",
+      "yesterday": "昨日 {time}",
+      "newSince": {
+        "other": "{time} 以降の新着 {count} 件"
+      },
+      "earlier": "前のまとめ",
+      "later": "次のまとめ",
+      "all": "まとめ",
+      "search": "メールを検索",
+      "searching": "検索中…",
+      "found": {
+        "other": "{count} 件見つかりました"
+      },
+      "nothingFound": "見つかりませんでした。",
+      "searched": "Gmail で検索: {query}",
+      "backToBrief": "まとめに戻る",
+      "more": "これをどうするか",
+      "suggestHint": "Stella が対応します。返信は下書きのままです",
+      "read": "メールを読む",
+      "openGmail": "Gmail で開く",
+      "noted": "記録しました。",
+      "emails": {
+        "other": "{count} 件"
+      },
+      "chip": "メール · {title}",
+      "chipBriefing": "{time} のまとめ",
+      "back": "戻る",
+      "opening": "開いています…",
+      "to": "宛先: {to}",
+      "waiting": "このまとめ以降",
+      "empty": "まだまとめはありません。大事な新着メールがあるとここに表示されます。",
+      "show": "表示",
+      "hide": "隠す"
     }
   }
 }

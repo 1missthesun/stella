@@ -75,7 +75,8 @@
           "activity": "Frag zu dieser Aktivität…",
           "window": "Frag zu diesem Fenster…",
           "selection": "Frag zur Auswahl…",
-          "default": "Mach irgendwas"
+          "default": "Mach irgendwas",
+          "email": "Frag dazu oder sag Stella, was zu tun ist…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Angefragt: {count}",
         "other": "Angefragt: {count}"
       },
-      "open": "In E-Mail öffnen"
+      "open": "In E-Mail öffnen",
+      "newEmails": {
+        "one": "{count} neue E-Mail",
+        "other": "{count} neue E-Mails"
+      },
+      "urgentEmails": {
+        "one": "{count} dringende E-Mail",
+        "other": "{count} dringende E-Mails"
+      },
+      "askedEmails": {
+        "one": "{count} E-Mail, nach der du gefragt hast",
+        "other": "{count} E-Mails, nach denen du gefragt hast"
+      }
     },
     "digest": {
       "since": "seit {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Entwirf eine Antwort auf die E-Mail von {from} „{subject}“",
       "askHandle": "Kümmere dich um die E-Mail von {from} „{subject}“",
       "askTell": "Zur E-Mail von {from} „{subject}“: {text}"
+    },
+    "brief": {
+      "today": "Heute, {time}",
+      "yesterday": "Gestern, {time}",
+      "newSince": {
+        "one": "{count} neu seit {time}",
+        "other": "{count} neu seit {time}"
+      },
+      "earlier": "Frühere Übersicht",
+      "later": "Spätere Übersicht",
+      "all": "Übersichten",
+      "search": "E-Mails durchsuchen",
+      "searching": "Suche läuft…",
+      "found": {
+        "one": "{count} E-Mail gefunden",
+        "other": "{count} E-Mails gefunden"
+      },
+      "nothingFound": "Nichts gefunden.",
+      "searched": "In Gmail gesucht nach {query}",
+      "backToBrief": "Zurück zur Übersicht",
+      "more": "Was damit tun",
+      "suggestHint": "Stella erledigt es; Antworten bleiben Entwürfe",
+      "read": "E-Mail lesen",
+      "openGmail": "In Gmail öffnen",
+      "noted": "Notiert.",
+      "emails": {
+        "one": "{count} E-Mail",
+        "other": "{count} E-Mails"
+      },
+      "chip": "E-Mail · {title}",
+      "chipBriefing": "Übersicht {time}",
+      "back": "Zurück",
+      "opening": "Wird geöffnet…",
+      "to": "an {to}",
+      "waiting": "Seit dieser Übersicht",
+      "empty": "Noch keine Übersicht. Wenn neue E-Mails wichtig sind, erscheinen sie hier.",
+      "show": "Anzeigen",
+      "hide": "Ausblenden"
     }
   }
 }

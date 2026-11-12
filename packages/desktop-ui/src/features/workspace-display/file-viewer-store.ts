@@ -150,3 +150,6 @@ export const opensAsStageTab = (kind: string): boolean => kind === "canvas";
 
 /** `ChatAppSelection.surface` marking the composer chip for the viewed item. */
 export const VIEWER_SELECTION_SURFACE = "stella-viewer";
+
+/** `ChatAppSelection.surface` marking the composer chip for what the Email tab shows. */
+export const EMAIL_SELECTION_SURFACE = "email";

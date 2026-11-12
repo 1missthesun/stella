@@ -205,19 +205,26 @@ function Footer({ feed }: { feed: EmailFeed }) {
   );
 }
 
-function SortedMail({ feed }: { feed: EmailFeed }) {
+function SortedMail({ feed, active }: { feed: EmailFeed; active: boolean }) {
   const showAccount = feed.status.accounts.length > 1;
   const waiting = feed.items.filter(
     (item) => item.state === "waiting" && item.bucket !== "noise",
   );
   return (
     <div className="email-section sidebar-section__scroll" data-testid="email-section">
-      <EmailDigestPanel enabled waiting={waiting} showAccount={showAccount} />
-      <div className="email-section__settings">
-        <NoteEditor note={feed.note} />
-        <Rules rules={feed.rules} />
-        <Footer feed={feed} />
-      </div>
+      <EmailDigestPanel
+        active={active}
+        enabled
+        waiting={waiting}
+        showAccount={showAccount}
+        settings={
+          <div className="email-section__settings">
+            <NoteEditor note={feed.note} />
+            <Rules rules={feed.rules} />
+            <Footer feed={feed} />
+          </div>
+        }
+      />
     </div>
   );
 }
@@ -327,7 +334,7 @@ export function EmailSection({ active }: { active: boolean }) {
     );
   }
 
-  return <SortedMail feed={value} />;
+  return <SortedMail feed={value} active={active} />;
 }
 
 /** A month's sorting usually costs a fraction of a cent; show that as "<$0.01", not "$0.00". */

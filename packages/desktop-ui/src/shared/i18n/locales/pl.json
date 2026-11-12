@@ -81,7 +81,8 @@
           "activity": "Zapytaj o tę aktywność…",
           "window": "Zapytaj o to okno…",
           "selection": "Zapytaj o zaznaczenie…",
-          "default": "Zrób cokolwiek"
+          "default": "Zrób cokolwiek",
+          "email": "Zapytaj o to albo powiedz Stelli, co zrobić…"
         }
       },
       "connectorConnect": {
@@ -3626,7 +3627,25 @@
         "one": "Zamówione: {count}",
         "other": "Zamówione: {count}"
       },
-      "open": "Otwórz w Poczcie"
+      "open": "Otwórz w Poczcie",
+      "newEmails": {
+        "few": "Nowe e-maile: {count}",
+        "many": "Nowe e-maile: {count}",
+        "one": "Nowe e-maile: {count}",
+        "other": "Nowe e-maile: {count}"
+      },
+      "urgentEmails": {
+        "few": "Pilne e-maile: {count}",
+        "many": "Pilne e-maile: {count}",
+        "one": "Pilne e-maile: {count}",
+        "other": "Pilne e-maile: {count}"
+      },
+      "askedEmails": {
+        "few": "E-maile, o które pytałeś: {count}",
+        "many": "E-maile, o które pytałeś: {count}",
+        "one": "E-maile, o które pytałeś: {count}",
+        "other": "E-maile, o które pytałeś: {count}"
+      }
     },
     "digest": {
       "since": "od {time}",
@@ -3656,6 +3675,50 @@
       "askReply": "Napisz szkic odpowiedzi na e-mail od {from} „{subject}”",
       "askHandle": "Zajmij się e-mailem od {from} „{subject}”",
       "askTell": "O e-mailu od {from} „{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Dziś, {time}",
+      "yesterday": "Wczoraj, {time}",
+      "newSince": {
+        "few": "Nowe od {time}: {count}",
+        "many": "Nowe od {time}: {count}",
+        "one": "Nowe od {time}: {count}",
+        "other": "Nowe od {time}: {count}"
+      },
+      "earlier": "Poprzednie podsumowanie",
+      "later": "Następne podsumowanie",
+      "all": "Podsumowania",
+      "search": "Szukaj w poczcie",
+      "searching": "Szukam…",
+      "found": {
+        "few": "Znalezione e-maile: {count}",
+        "many": "Znalezione e-maile: {count}",
+        "one": "Znalezione e-maile: {count}",
+        "other": "Znalezione e-maile: {count}"
+      },
+      "nothingFound": "Nic nie znaleziono.",
+      "searched": "Wyszukano w Gmailu: {query}",
+      "backToBrief": "Wróć do podsumowania",
+      "more": "Co z tym zrobić",
+      "suggestHint": "Stella się tym zajmie; odpowiedzi zostają w wersjach roboczych",
+      "read": "Przeczytaj e-mail",
+      "openGmail": "Otwórz w Gmailu",
+      "noted": "Zapisano.",
+      "emails": {
+        "few": "E-maile: {count}",
+        "many": "E-maile: {count}",
+        "one": "E-maile: {count}",
+        "other": "E-maile: {count}"
+      },
+      "chip": "Poczta · {title}",
+      "chipBriefing": "Podsumowanie z {time}",
+      "back": "Wstecz",
+      "opening": "Otwieram…",
+      "to": "do {to}",
+      "waiting": "Od tego podsumowania",
+      "empty": "Jeszcze brak podsumowania. Gdy nowa poczta będzie ważna, pojawi się tutaj.",
+      "show": "Pokaż",
+      "hide": "Ukryj"
     }
   }
 }

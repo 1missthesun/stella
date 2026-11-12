@@ -1,27 +1,28 @@
-/* Email in the chat: one tiny row with a count (see EmailChatCard). */
+/* Email in the chat: one row the size of an assistant reply (see EmailChatCard). */
 .email-row {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  margin: 2px 0;
-  padding: 3px 9px 3px 7px;
+  gap: 10px;
+  width: fit-content;
+  max-width: 85%;
+  min-width: 0;
+  padding: 8px 16px 8px 13px;
   border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--text-weak);
+  border-radius: var(--radius-3xl);
+  background: var(--chat-assistant-bubble-fill);
+  color: var(--chat-assistant-bubble-text);
   font: inherit;
-  font-size: var(--font-size-sm, 13px);
-  line-height: 18px;
+  font-size: var(--chat-text-size);
+  font-weight: var(--chat-text-weight);
+  letter-spacing: var(--chat-text-tracking);
+  line-height: var(--chat-text-line-height);
+  text-align: left;
   cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
+  transition: background-color 120ms ease;
 }
 
 .email-row:hover {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-  color: var(--text-strong);
+  background: color-mix(in oklch, var(--chat-assistant-bubble-fill) 88%, var(--foreground));
 }
 
 .email-row:focus-visible {
@@ -31,12 +32,16 @@
 
 .email-row__icon {
   flex: none;
+  color: var(--text-weak);
 }
 
-.email-row__dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--interactive);
+.email-row[data-urgent] .email-row__icon {
+  color: var(--primary);
+}
+
+.email-row__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

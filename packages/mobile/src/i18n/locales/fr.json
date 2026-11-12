@@ -78,7 +78,8 @@
           "activity": "Posez une question sur cette activité…",
           "window": "Posez une question sur cette fenêtre…",
           "selection": "Posez une question sur la sélection…",
-          "default": "Faites n’importe quoi"
+          "default": "Faites n’importe quoi",
+          "email": "Posez une question ou dites à Stella quoi faire…"
         }
       },
       "connectorConnect": {
@@ -3599,7 +3600,22 @@
         "one": "Demandés : {count}",
         "other": "Demandés : {count}"
       },
-      "open": "Ouvrir dans E-mail"
+      "open": "Ouvrir dans E-mail",
+      "newEmails": {
+        "many": "{count} nouveaux e-mails",
+        "one": "{count} nouvel e-mail",
+        "other": "{count} nouveaux e-mails"
+      },
+      "urgentEmails": {
+        "many": "{count} e-mails urgents",
+        "one": "{count} e-mail urgent",
+        "other": "{count} e-mails urgents"
+      },
+      "askedEmails": {
+        "many": "{count} e-mails que vous avez demandés",
+        "one": "{count} e-mail que vous avez demandé",
+        "other": "{count} e-mails que vous avez demandés"
+      }
     },
     "digest": {
       "since": "depuis {time}",
@@ -3628,6 +3644,47 @@
       "askReply": "Rédige une réponse à l’e-mail de {from} « {subject} »",
       "askHandle": "Occupe-toi de l’e-mail de {from} « {subject} »",
       "askTell": "À propos de l’e-mail de {from} « {subject} » : {text}"
+    },
+    "brief": {
+      "today": "Aujourd’hui, {time}",
+      "yesterday": "Hier, {time}",
+      "newSince": {
+        "many": "{count} nouveaux depuis {time}",
+        "one": "{count} nouveau depuis {time}",
+        "other": "{count} nouveaux depuis {time}"
+      },
+      "earlier": "Synthèse précédente",
+      "later": "Synthèse suivante",
+      "all": "Synthèses",
+      "search": "Rechercher dans vos e-mails",
+      "searching": "Recherche…",
+      "found": {
+        "many": "{count} e-mails trouvés",
+        "one": "{count} e-mail trouvé",
+        "other": "{count} e-mails trouvés"
+      },
+      "nothingFound": "Rien trouvé.",
+      "searched": "Recherche Gmail : {query}",
+      "backToBrief": "Retour à la synthèse",
+      "more": "Que faire avec ceci",
+      "suggestHint": "Stella s’en charge ; les réponses restent en brouillon",
+      "read": "Lire l’e-mail",
+      "openGmail": "Ouvrir dans Gmail",
+      "noted": "C’est noté.",
+      "emails": {
+        "many": "{count} e-mails",
+        "one": "{count} e-mail",
+        "other": "{count} e-mails"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "Synthèse de {time}",
+      "back": "Retour",
+      "opening": "Ouverture…",
+      "to": "à {to}",
+      "waiting": "Depuis cette synthèse",
+      "empty": "Pas encore de synthèse. Quand un nouvel e-mail compte, il apparaît ici.",
+      "show": "Afficher",
+      "hide": "Masquer"
     }
   }
 }

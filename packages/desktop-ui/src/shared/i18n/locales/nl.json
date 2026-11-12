@@ -75,7 +75,8 @@
           "activity": "Vraag over deze activiteit…",
           "window": "Vraag over dit venster…",
           "selection": "Vraag over de selectie…",
-          "default": "Doe wat je wilt"
+          "default": "Doe wat je wilt",
+          "email": "Vraag hiernaar of zeg Stella wat ze moet doen…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Gevraagd: {count}",
         "other": "Gevraagd: {count}"
       },
-      "open": "Openen in E-mail"
+      "open": "Openen in E-mail",
+      "newEmails": {
+        "one": "{count} nieuwe e-mail",
+        "other": "{count} nieuwe e-mails"
+      },
+      "urgentEmails": {
+        "one": "{count} dringende e-mail",
+        "other": "{count} dringende e-mails"
+      },
+      "askedEmails": {
+        "one": "{count} e-mail waar je om vroeg",
+        "other": "{count} e-mails waar je om vroeg"
+      }
     },
     "digest": {
       "since": "sinds {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Stel een antwoord op op de e-mail van {from} ‘{subject}’",
       "askHandle": "Regel de e-mail van {from} ‘{subject}’",
       "askTell": "Over de e-mail van {from} ‘{subject}’: {text}"
+    },
+    "brief": {
+      "today": "Vandaag, {time}",
+      "yesterday": "Gisteren, {time}",
+      "newSince": {
+        "one": "{count} nieuw sinds {time}",
+        "other": "{count} nieuw sinds {time}"
+      },
+      "earlier": "Vorig overzicht",
+      "later": "Volgend overzicht",
+      "all": "Overzichten",
+      "search": "Zoek in je e-mail",
+      "searching": "Zoeken…",
+      "found": {
+        "one": "{count} e-mail gevonden",
+        "other": "{count} e-mails gevonden"
+      },
+      "nothingFound": "Niets gevonden.",
+      "searched": "Gezocht in Gmail op {query}",
+      "backToBrief": "Terug naar het overzicht",
+      "more": "Wat hiermee te doen",
+      "suggestHint": "Stella regelt het; antwoorden blijven concepten",
+      "read": "E-mail lezen",
+      "openGmail": "Openen in Gmail",
+      "noted": "Genoteerd.",
+      "emails": {
+        "one": "{count} e-mail",
+        "other": "{count} e-mails"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "Overzicht van {time}",
+      "back": "Terug",
+      "opening": "Openen…",
+      "to": "aan {to}",
+      "waiting": "Sinds dit overzicht",
+      "empty": "Nog geen overzicht. Als nieuwe e-mail belangrijk is, verschijnt die hier.",
+      "show": "Tonen",
+      "hide": "Verbergen"
     }
   }
 }

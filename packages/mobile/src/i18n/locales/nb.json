@@ -75,7 +75,8 @@
           "activity": "Spør om denne aktiviteten…",
           "window": "Spør om dette vinduet…",
           "selection": "Spør om markeringen…",
-          "default": "Gjør hva som helst"
+          "default": "Gjør hva som helst",
+          "email": "Spør om dette, eller si hva Stella skal gjøre…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Etterspurt: {count}",
         "other": "Etterspurt: {count}"
       },
-      "open": "Åpne i E-post"
+      "open": "Åpne i E-post",
+      "newEmails": {
+        "one": "{count} ny e-post",
+        "other": "{count} nye e-poster"
+      },
+      "urgentEmails": {
+        "one": "{count} haster",
+        "other": "{count} haster"
+      },
+      "askedEmails": {
+        "one": "{count} e-post du spurte om",
+        "other": "{count} e-poster du spurte om"
+      }
     },
     "digest": {
       "since": "siden {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Skriv et svarutkast til e-posten fra {from} «{subject}»",
       "askHandle": "Ta deg av e-posten fra {from} «{subject}»",
       "askTell": "Om e-posten fra {from} «{subject}»: {text}"
+    },
+    "brief": {
+      "today": "I dag, {time}",
+      "yesterday": "I går, {time}",
+      "newSince": {
+        "one": "{count} ny siden {time}",
+        "other": "{count} nye siden {time}"
+      },
+      "earlier": "Forrige oversikt",
+      "later": "Neste oversikt",
+      "all": "Oversikter",
+      "search": "Søk i e-posten",
+      "searching": "Søker…",
+      "found": {
+        "one": "{count} e-post funnet",
+        "other": "{count} e-poster funnet"
+      },
+      "nothingFound": "Fant ingenting.",
+      "searched": "Søkte i Gmail etter {query}",
+      "backToBrief": "Tilbake til oversikten",
+      "more": "Hva skal gjøres med dette",
+      "suggestHint": "Stella tar seg av det; svar lagres som utkast",
+      "read": "Les e-posten",
+      "openGmail": "Åpne i Gmail",
+      "noted": "Notert.",
+      "emails": {
+        "one": "{count} e-post",
+        "other": "{count} e-poster"
+      },
+      "chip": "E-post · {title}",
+      "chipBriefing": "Oversikt kl. {time}",
+      "back": "Tilbake",
+      "opening": "Åpner…",
+      "to": "til {to}",
+      "waiting": "Siden denne oversikten",
+      "empty": "Ingen oversikt ennå. Når ny e-post er viktig, vises den her.",
+      "show": "Vis",
+      "hide": "Skjul"
     }
   }
 }

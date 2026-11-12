@@ -72,7 +72,8 @@
           "activity": "询问这项活动…",
           "window": "询问这个窗口…",
           "selection": "询问所选内容…",
-          "default": "做任何事"
+          "default": "做任何事",
+          "email": "问问这件事，或告诉 Stella 该做什么…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "你要求的 {count} 封"
       },
-      "open": "在邮件中打开"
+      "open": "在邮件中打开",
+      "newEmails": {
+        "other": "{count} 封新邮件"
+      },
+      "urgentEmails": {
+        "other": "{count} 封紧急邮件"
+      },
+      "askedEmails": {
+        "other": "{count} 封你问过的邮件"
+      }
     },
     "digest": {
       "since": "自 {time} 起",
@@ -3570,6 +3580,41 @@
       "askReply": "帮我起草对 {from} 的邮件“{subject}”的回复。",
       "askHandle": "处理 {from} 的邮件“{subject}”",
       "askTell": "关于 {from} 的邮件“{subject}”：{text}"
+    },
+    "brief": {
+      "today": "今天 {time}",
+      "yesterday": "昨天 {time}",
+      "newSince": {
+        "other": "{time} 以来 {count} 封新邮件"
+      },
+      "earlier": "上一份简报",
+      "later": "下一份简报",
+      "all": "简报",
+      "search": "搜索邮件",
+      "searching": "正在搜索…",
+      "found": {
+        "other": "找到 {count} 封邮件"
+      },
+      "nothingFound": "没有找到。",
+      "searched": "已在 Gmail 中搜索：{query}",
+      "backToBrief": "返回简报",
+      "more": "怎么处理",
+      "suggestHint": "交给 Stella；回复会保存为草稿",
+      "read": "阅读邮件",
+      "openGmail": "在 Gmail 中打开",
+      "noted": "已记下。",
+      "emails": {
+        "other": "{count} 封邮件"
+      },
+      "chip": "邮件 · {title}",
+      "chipBriefing": "{time} 简报",
+      "back": "返回",
+      "opening": "正在打开…",
+      "to": "收件人：{to}",
+      "waiting": "这份简报之后",
+      "empty": "还没有简报。有重要的新邮件时会显示在这里。",
+      "show": "显示",
+      "hide": "隐藏"
     }
   }
 }

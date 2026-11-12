@@ -75,7 +75,8 @@
           "activity": "Spørg om denne aktivitet…",
           "window": "Spørg om dette vindue…",
           "selection": "Spørg om markeringen…",
-          "default": "Gør hvad som helst"
+          "default": "Gør hvad som helst",
+          "email": "Spørg om dette, eller sig, hvad Stella skal gøre…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "Efterspurgt: {count}",
         "other": "Efterspurgt: {count}"
       },
-      "open": "Åbn i E-mail"
+      "open": "Åbn i E-mail",
+      "newEmails": {
+        "one": "{count} ny e-mail",
+        "other": "{count} nye e-mails"
+      },
+      "urgentEmails": {
+        "one": "{count} vigtig e-mail",
+        "other": "{count} vigtige e-mails"
+      },
+      "askedEmails": {
+        "one": "{count} e-mail, du spurgte om",
+        "other": "{count} e-mails, du spurgte om"
+      }
     },
     "digest": {
       "since": "siden {time}",
@@ -3600,6 +3613,44 @@
       "askReply": "Skriv et svarudkast til mailen fra {from} »{subject}«",
       "askHandle": "Klar mailen fra {from} »{subject}«",
       "askTell": "Om mailen fra {from} »{subject}«: {text}"
+    },
+    "brief": {
+      "today": "I dag, {time}",
+      "yesterday": "I går, {time}",
+      "newSince": {
+        "one": "{count} ny siden {time}",
+        "other": "{count} nye siden {time}"
+      },
+      "earlier": "Tidligere overblik",
+      "later": "Senere overblik",
+      "all": "Overblik",
+      "search": "Søg i din mail",
+      "searching": "Søger…",
+      "found": {
+        "one": "{count} e-mail fundet",
+        "other": "{count} e-mails fundet"
+      },
+      "nothingFound": "Intet fundet.",
+      "searched": "Søgte i Gmail efter {query}",
+      "backToBrief": "Tilbage til overblikket",
+      "more": "Hvad skal der ske med dette",
+      "suggestHint": "Stella gør det; svar gemmes som kladder",
+      "read": "Læs e-mailen",
+      "openGmail": "Åbn i Gmail",
+      "noted": "Noteret.",
+      "emails": {
+        "one": "{count} e-mail",
+        "other": "{count} e-mails"
+      },
+      "chip": "E-mail · {title}",
+      "chipBriefing": "Overblik kl. {time}",
+      "back": "Tilbage",
+      "opening": "Åbner…",
+      "to": "til {to}",
+      "waiting": "Siden dette overblik",
+      "empty": "Intet overblik endnu. Når ny mail betyder noget, vises den her.",
+      "show": "Vis",
+      "hide": "Skjul"
     }
   }
 }

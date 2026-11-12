@@ -75,7 +75,8 @@
           "activity": "इस गतिविधि के बारे में पूछें…",
           "window": "इस विंडो के बारे में पूछें…",
           "selection": "चयन के बारे में पूछें…",
-          "default": "कुछ भी करें"
+          "default": "कुछ भी करें",
+          "email": "इसके बारे में पूछें, या Stella को बताएँ क्या करना है…"
         }
       },
       "connectorConnect": {
@@ -3572,7 +3573,19 @@
         "one": "आपने मांगे: {count}",
         "other": "आपने मांगे: {count}"
       },
-      "open": "ईमेल में खोलें"
+      "open": "ईमेल में खोलें",
+      "newEmails": {
+        "one": "नए ईमेल: {count}",
+        "other": "नए ईमेल: {count}"
+      },
+      "urgentEmails": {
+        "one": "ज़रूरी ईमेल: {count}",
+        "other": "ज़रूरी ईमेल: {count}"
+      },
+      "askedEmails": {
+        "one": "जिन ईमेल के बारे में आपने पूछा: {count}",
+        "other": "जिन ईमेल के बारे में आपने पूछा: {count}"
+      }
     },
     "digest": {
       "since": "{time} से",
@@ -3600,6 +3613,44 @@
       "askReply": "{from} के ईमेल “{subject}” का जवाब ड्राफ़्ट करो।",
       "askHandle": "{from} का ईमेल “{subject}” संभालो।",
       "askTell": "{from} के ईमेल “{subject}” के बारे में: {text}"
+    },
+    "brief": {
+      "today": "आज, {time}",
+      "yesterday": "कल, {time}",
+      "newSince": {
+        "one": "{time} से नए: {count}",
+        "other": "{time} से नए: {count}"
+      },
+      "earlier": "पिछला सारांश",
+      "later": "अगला सारांश",
+      "all": "सारांश",
+      "search": "अपने मेल में खोजें",
+      "searching": "खोज रहे हैं…",
+      "found": {
+        "one": "मिले ईमेल: {count}",
+        "other": "मिले ईमेल: {count}"
+      },
+      "nothingFound": "कुछ नहीं मिला।",
+      "searched": "Gmail में खोजा: {query}",
+      "backToBrief": "सारांश पर वापस",
+      "more": "इसका क्या करें",
+      "suggestHint": "Stella कर देगी; जवाब ड्राफ़्ट में रहेंगे",
+      "read": "ईमेल पढ़ें",
+      "openGmail": "Gmail में खोलें",
+      "noted": "नोट कर लिया।",
+      "emails": {
+        "one": "ईमेल: {count}",
+        "other": "ईमेल: {count}"
+      },
+      "chip": "ईमेल · {title}",
+      "chipBriefing": "{time} का सारांश",
+      "back": "वापस",
+      "opening": "खुल रहा है…",
+      "to": "को: {to}",
+      "waiting": "इस सारांश के बाद से",
+      "empty": "अभी कोई सारांश नहीं। जब नया मेल ज़रूरी होगा, यहाँ दिखेगा।",
+      "show": "दिखाएँ",
+      "hide": "छिपाएँ"
     }
   }
 }

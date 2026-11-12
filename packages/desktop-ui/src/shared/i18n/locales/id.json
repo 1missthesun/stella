@@ -72,7 +72,8 @@
           "activity": "Tanyakan tentang aktivitas ini…",
           "window": "Tanyakan tentang jendela ini…",
           "selection": "Tanyakan tentang pilihan…",
-          "default": "Lakukan apa saja"
+          "default": "Lakukan apa saja",
+          "email": "Tanyakan tentang ini, atau beri tahu Stella apa yang harus dilakukan…"
         }
       },
       "connectorConnect": {
@@ -3543,7 +3544,16 @@
       "asked": {
         "other": "Diminta: {count}"
       },
-      "open": "Buka di Email"
+      "open": "Buka di Email",
+      "newEmails": {
+        "other": "{count} email baru"
+      },
+      "urgentEmails": {
+        "other": "{count} email mendesak"
+      },
+      "askedEmails": {
+        "other": "{count} email yang kamu tanyakan"
+      }
     },
     "digest": {
       "since": "sejak {time}",
@@ -3570,6 +3580,41 @@
       "askReply": "Buat draf balasan untuk email dari {from} “{subject}”",
       "askHandle": "Urus email dari {from} “{subject}”",
       "askTell": "Tentang email dari {from} “{subject}”: {text}"
+    },
+    "brief": {
+      "today": "Hari ini, {time}",
+      "yesterday": "Kemarin, {time}",
+      "newSince": {
+        "other": "{count} baru sejak {time}"
+      },
+      "earlier": "Ringkasan sebelumnya",
+      "later": "Ringkasan berikutnya",
+      "all": "Ringkasan",
+      "search": "Cari di email",
+      "searching": "Mencari…",
+      "found": {
+        "other": "{count} email ditemukan"
+      },
+      "nothingFound": "Tidak ada hasil.",
+      "searched": "Dicari di Gmail: {query}",
+      "backToBrief": "Kembali ke ringkasan",
+      "more": "Apa yang dilakukan dengan ini",
+      "suggestHint": "Stella yang mengerjakan; balasan tetap jadi draf",
+      "read": "Baca email",
+      "openGmail": "Buka di Gmail",
+      "noted": "Dicatat.",
+      "emails": {
+        "other": "{count} email"
+      },
+      "chip": "Email · {title}",
+      "chipBriefing": "Ringkasan {time}",
+      "back": "Kembali",
+      "opening": "Membuka…",
+      "to": "ke {to}",
+      "waiting": "Sejak ringkasan ini",
+      "empty": "Belum ada ringkasan. Saat email baru penting, akan muncul di sini.",
+      "show": "Tampilkan",
+      "hide": "Sembunyikan"
     }
   }
 }

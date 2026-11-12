@@ -55,12 +55,14 @@ function UrgentCard({ item, colors }: { item: EmailCardItem; colors: Colors }) {
       .finally(() => setBusy(false));
   };
 
-  const trailing = settled ? (
+  // Urgent mail must be readable at a glance: the sender, subject and line wrap, and the two
+  // buttons sit on their own row under them instead of squeezing the text to a few words.
+  const actions = settled ? (
     <Text style={styles.settled} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
       {settled === "moved" ? t("email.card.movedToSummary") : t("email.card.wontShow")}
     </Text>
   ) : (
-    <View style={styles.actions}>
+    <>
       <Pressable
         accessibilityRole="button"
         hitSlop={10}
@@ -85,7 +87,7 @@ function UrgentCard({ item, colors }: { item: EmailCardItem; colors: Colors }) {
           {t("common.open")}
         </Text>
       </Pressable>
-    </View>
+    </>
   );
 
   return (
@@ -94,7 +96,8 @@ function UrgentCard({ item, colors }: { item: EmailCardItem; colors: Colors }) {
       icon="mail"
       headline={headline}
       status={settled ? "" : status}
-      trailing={trailing}
+      actions={actions}
+      wrap
       testID="email-card"
       accessibilityLabel={`${headline}, ${status}`}
     />

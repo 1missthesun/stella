@@ -21,6 +21,7 @@ export const homeFooterGroups: FooterGroup[] = [
     items: [
       { label: "Learn More", href: "/learn-more" },
       { label: "What Stella can fix", href: "/fix" },
+      { label: "How-to guides", href: "/how" },
       { label: "One chat", href: "/one-chat" },
       { label: "Voice", href: "/voice" },
       { label: "Stella Crew", href: "/crew" },

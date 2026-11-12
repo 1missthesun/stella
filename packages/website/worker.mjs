@@ -182,9 +182,50 @@ const optimizedImage = async (request, env, ctx) => {
   return cacheable;
 };
 
+// Proof videos, posters and screenshots for /how, streamed from the R2 bucket
+// (PROOF_MEDIA) under marketing/proofs/, so pages never link to r2.dev.
+const PROOF_PATH = "/media/proofs/";
+const PROOF_CACHE = "public, max-age=86400, s-maxage=604800";
+
+const proofMedia = async (request, env, pathname) => {
+  const rest = pathname.slice(PROOF_PATH.length);
+  if (!env.PROOF_MEDIA || !/^[a-z0-9-]+(\/[a-z0-9-]+)*\/[a-z0-9-]+\.(mp4|jpg|png|vtt)$/.test(rest)) {
+    return new Response("Not found", { status: 404 });
+  }
+  const object = await env.PROOF_MEDIA.get(`marketing/proofs/${rest}`, {
+    range: request.headers,
+    onlyIf: request.headers,
+  });
+  if (!object) return new Response("Not found", { status: 404 });
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("ETag", object.httpEtag);
+  headers.set("Accept-Ranges", "bytes");
+  headers.set("Cache-Control", PROOF_CACHE);
+  headers.set("X-Content-Type-Options", "nosniff");
+  if (!("body" in object)) return new Response(null, { status: 304, headers });
+  const size = object.size;
+  let status = 200;
+  let length = size;
+  const range = request.headers.has("Range") ? object.range : undefined;
+  if (range) {
+    const suffix = typeof range.suffix === "number" ? range.suffix : undefined;
+    const start = suffix !== undefined ? Math.max(0, size - suffix) : (range.offset ?? 0);
+    const end = suffix === undefined && typeof range.length === "number" ? start + range.length - 1 : size - 1;
+    status = 206;
+    length = end - start + 1;
+    headers.set("Content-Range", `bytes ${start}-${end}/${size}`);
+  }
+  headers.set("Content-Length", String(length));
+  return new Response(request.method === "HEAD" ? null : object.body, { status, headers });
+};
+
 const handle = {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
+    if ((request.method === "GET" || request.method === "HEAD") && pathname.startsWith(PROOF_PATH)) {
+      return proofMedia(request, env, pathname);
+    }
     const shortLink = request.method === "GET" || request.method === "HEAD" ? shortLinkSource(pathname) : null;
     if (shortLink) return shortLinkResponse(request, env, shortLink);
     if (request.method === "GET" && pathname === "/_next/image") {

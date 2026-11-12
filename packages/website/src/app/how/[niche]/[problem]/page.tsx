@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       url: path,
       type: "article",
       ...(page.proof.kind === "video"
-        ? { videos: [{ url: page.proof.video.src, width: page.proof.video.width, height: page.proof.video.height, type: "video/mp4" }] }
+        ? { videos: [{ url: new URL(page.proof.video.src, getSiteUrl()).href, width: page.proof.video.width, height: page.proof.video.height, type: "video/mp4" }] }
         : {}),
     },
     twitter: { card: "summary_large_image", title: page.title, description: page.description },

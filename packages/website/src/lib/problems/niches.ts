@@ -8,7 +8,7 @@ export const NICHES: Niche[] = [
     h1: "Game mods, installed and working.",
     title: "Game mods: install guides and fixes after updates",
     description:
-      "Install mods and fix them after game updates: Minecraft (Fabric, Sodium, Iris), The Sims 4, Cyberpunk 2077. The manual steps, or Stella (stella.sh) doing it for you.",
+      "Install Minecraft mods (Fabric, Sodium, Iris) and fix a modpack that crashes with exit code 1. The manual steps, or Stella (stella.sh) doing it for you.",
     intro:
       "Mods break when a game updates, and installing them by hand means matching versions, folders and loaders. Each guide gives the manual way, and Stella (stella.sh) doing it on a real computer where we could record it.",
   },
@@ -28,7 +28,7 @@ export const NICHES: Niche[] = [
     h1: "Get your space back, safely.",
     title: "PC cleanup: free up disk space and tidy folders",
     description:
-      "Find what's filling your C drive, sort a messy Downloads folder and clear space safely on Windows or Mac, by hand or with Stella (stella.sh), told not to delete anything without asking.",
+      "Sort a messy Downloads folder, find true duplicates and clear space safely on Windows or Mac, by hand or with Stella (stella.sh), told not to delete anything without asking.",
     intro:
       "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and the Stella (stella.sh) way, with a prompt that tells it to ask before deleting anything.",
   },

@@ -85,7 +85,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Can Stella work with Word, Excel, PowerPoint and PDFs?",
-    a: "Yes. Stella creates and edits real documents, spreadsheets, decks and PDFs that open in the apps you already use.",
+    a: "Yes. Stella creates and edits real documents, spreadsheets, decks and PDFs that open in the apps you already use. Watch it [turn bank statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel), or see [all the how-to guides](/how).",
   },
   {
     q: "How do I get Stella?",

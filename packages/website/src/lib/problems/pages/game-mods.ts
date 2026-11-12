@@ -108,7 +108,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Sodium, Iris and Mod Menu only change graphics and menus on your side, and they're allowed on most servers. Some servers ban client mods outright, so read their rules first.",
       },
     ],
-    related: ["game-mods/minecraft-modpack-exit-code-1", "game-mods/find-broken-sims-4-mods", "game-mods/cyberpunk-mods-not-working-after-2-5"],
+    related: ["game-mods/minecraft-modpack-exit-code-1", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Fabric installer", href: "https://fabricmc.net/use/installer/" },
@@ -226,7 +226,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Install a loader first, then add mods made for the same Minecraft version. The guide to [install Fabric, Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) walks through it, and Stella can do it in the same chat.",
       },
     ],
-    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/find-broken-sims-4-mods"],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "pc-cleanup/organize-downloads-folder"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Minecraft Wiki: Java Edition system requirements and Java versions", href: "https://minecraft.wiki/w/Tutorial:Update_Java" },
@@ -236,6 +236,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
   },
   {
     slug: "find-broken-sims-4-mods",
+    // Held back from stella.sh until there's a recorded run (steps-only).
+    draft: true,
     niche: "game-mods",
     searchPhrases: [
       "how to find broken mods sims 4",
@@ -332,6 +334,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
   },
   {
     slug: "cyberpunk-mods-not-working-after-2-5",
+    // Held back from stella.sh until there's a recorded run (steps-only).
+    draft: true,
     niche: "game-mods",
     searchPhrases: [
       "cyberpunk mods not working after update 2.5",

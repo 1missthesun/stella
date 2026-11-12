@@ -1,7 +1,8 @@
 /* /how index, hubs and guides. Built on the home page's vocabulary: Mona Sans
    only (the price line comes from the home hero's own class), 820-weight
    titles with the wide second phrase, "Questions."-style section heads, and
-   product visuals framed as windows on a soft wallpaper. No mono labels. */
+   product visuals shown as windows straight on the page with the home page's
+   neutral edge and shadow. No mono labels, no coloured rails or outlines. */
 
 .page {
   --h-ink: #0a0a0d;
@@ -106,7 +107,7 @@
   }
 }
 
-/* ── Stage: the recording as a window on a wallpaper ──── */
+/* ── Stage: the recording as a window, like the home product shot ── */
 
 .stage {
   position: relative;
@@ -120,22 +121,13 @@
 
 .wall {
   position: relative;
-  padding: clamp(12px, 4.6vw, 64px);
-  border-radius: clamp(18px, 2vw, 26px);
-  background:
-    radial-gradient(70% 90% at 12% 112%, #ffb36b 0%, transparent 60%),
-    radial-gradient(60% 80% at 92% 104%, #ff6fae 0%, transparent 60%),
-    radial-gradient(80% 70% at 60% -12%, #6aa8ff 0%, transparent 70%),
-    linear-gradient(180deg, #8fb6ff, #f0b7d9);
-  box-shadow: 0 0 0 1px rgba(10, 10, 20, 0.06), 0 60px 120px -50px rgba(30, 30, 80, 0.45);
 }
 
-.wall[data-tone="calm"] {
-  background:
-    radial-gradient(70% 90% at 10% 110%, #9fe7ff 0%, transparent 60%),
-    radial-gradient(60% 80% at 92% 100%, #c8a8ff 0%, transparent 62%),
-    radial-gradient(80% 70% at 55% -10%, #a9c4ff 0%, transparent 70%),
-    linear-gradient(180deg, #c9d8ff, #f3d6f0);
+/* Steps-only pages: the prompt card on a plain light panel. */
+.wall[data-prompt] {
+  padding: clamp(40px, 6vw, 88px) clamp(16px, 4vw, 64px);
+  border-radius: clamp(18px, 2vw, 26px);
+  background: #f4f4f6;
 }
 
 .window {
@@ -144,8 +136,8 @@
   border-radius: clamp(8px, 1vw, 14px);
   background: #1c1c1f;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 40px 90px -36px rgba(10, 10, 30, 0.75);
+    0 0 0 1px rgba(0, 0, 0, 0.09),
+    0 50px 120px -30px rgba(10, 20, 60, 0.55);
 }
 
 .video {
@@ -196,7 +188,7 @@
   display: block;
   height: 100%;
   width: calc(var(--p, 0) * 100%);
-  background: linear-gradient(90deg, #00eeff, #0e8aff 30%, #703cff 60%, #ff4ac0);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .caption {
@@ -388,7 +380,7 @@
   overflow: hidden;
   border-radius: 14px;
   background: #1c1c1f;
-  box-shadow: 0 0 0 1px var(--h-line), 0 40px 80px -40px rgba(30, 30, 80, 0.45);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.09), 0 40px 90px -36px rgba(10, 20, 60, 0.45);
 }
 
 .frame img,
@@ -475,12 +467,12 @@
   background: #fff;
   box-shadow:
     0 0 0 1px var(--h-line),
-    0 30px 70px -36px rgba(40, 20, 120, 0.45);
+    0 30px 70px -36px rgba(10, 20, 60, 0.35);
 }
 
 .wall .prompt {
   margin: 0 auto;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 40px 90px -40px rgba(20, 10, 60, 0.6);
+  box-shadow: 0 0 0 1px var(--h-line), 0 30px 70px -36px rgba(10, 20, 60, 0.35);
 }
 
 .page .promptText {
@@ -660,11 +652,7 @@
 }
 
 .thumbWall {
-  background:
-    radial-gradient(70% 90% at 10% 110%, #9fe7ff 0%, transparent 60%),
-    radial-gradient(60% 80% at 92% 100%, #c8a8ff 0%, transparent 62%),
-    radial-gradient(80% 70% at 55% -10%, #a9c4ff 0%, transparent 70%),
-    linear-gradient(180deg, #c9d8ff, #f3d6f0);
+  background: #f4f4f6;
 }
 
 .thumbPrompt {
@@ -794,11 +782,6 @@
   .stage > .made,
   .stage > .stageNote {
     padding: 0 calc(var(--l-margin) - 12px);
-  }
-
-  .wall {
-    padding: 10px;
-    border-radius: 18px;
   }
 
   /* Phones play the square cut of the chat and the result. */

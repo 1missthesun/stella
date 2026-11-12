@@ -117,7 +117,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
       },
     ],
-    related: ["pc-cleanup/free-up-space-on-c-drive", "photos-files/fix-google-takeout-photo-dates", "pdf-excel/bank-statement-pdf-to-excel"],
+    related: ["photos-files/fix-google-takeout-photo-dates", "pdf-excel/bank-statement-pdf-to-excel"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -129,6 +129,8 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
   },
   {
     slug: "free-up-space-on-c-drive",
+    // Held back from stella.sh until there's a recorded run (steps-only).
+    draft: true,
     niche: "pc-cleanup",
     searchPhrases: [
       "how to free up space on c drive",

@@ -71,6 +71,7 @@ Models & providers: OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot AI.
 - Voice: ${abs("/voice.md")}
 - Pricing: ${abs("/pricing.md")}
 - Stella compared and explained: ${abs("/ai.md")}
+- How-to guides: ${abs("/how.md")}
 - What's New: ${abs("/learn-more/whats-new.md")}
 `;
 

@@ -6,9 +6,6 @@
 export const MOVED_FIX_PAGES: Record<string, string> = {
   "organize-downloads-folder": "/how/pc-cleanup/organize-downloads-folder",
   "bank-statement-to-excel": "/how/pdf-excel/bank-statement-pdf-to-excel",
-  "c-drive-full": "/how/pc-cleanup/free-up-space-on-c-drive",
-  "sims-4-mods-broken": "/how/game-mods/find-broken-sims-4-mods",
-  "game-mods-broken-after-patch": "/how/game-mods/cyberpunk-mods-not-working-after-2-5",
   "minecraft-modpack-crash": "/how/game-mods/minecraft-modpack-exit-code-1",
   // Retired (audit 2026-11-10): developer topics are the wrong audience, and the
   // DLSS 5 page promised a "leaked build". They redirect to the how-to index.

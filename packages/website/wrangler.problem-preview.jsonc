@@ -17,6 +17,8 @@
     "not_found_handling": "none"
   },
   "images": { "binding": "IMAGES" },
+  // /media/proofs/* (worker.mjs): proof media for the /how pages.
+  "r2_buckets": [{ "binding": "PROOF_MEDIA", "bucket_name": "stella-files" }],
   "observability": { "enabled": true, "redact_query_string": true },
   "analytics_engine_datasets": [
     { "binding": "SHORT_LINKS", "dataset": "stella_short_links_preview" }

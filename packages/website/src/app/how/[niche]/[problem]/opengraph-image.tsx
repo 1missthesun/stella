@@ -1,6 +1,6 @@
+import { proofFetchUrl } from "@/lib/problems/media";
 import { formatDate, getNiche, getProblemPage, publishedProblemPages } from "@/lib/problems";
 import { OG_SIZE, problemOgImage } from "@/lib/problems/og";
-import { getSiteUrl } from "@/lib/site-url";
 
 export const size = OG_SIZE;
 export const contentType = "image/png";
@@ -22,6 +22,6 @@ export default async function Image({ params }: { params: Promise<{ niche: strin
       proof.kind === "steps-only"
         ? `Manual steps + Stella · checked ${formatDate(page.lastChecked)}`
         : `Shown working on ${proof.platform} · ${formatDate(proof.recordedOn)}`,
-    poster: proof.kind === "video" ? new URL(proof.output?.poster ?? proof.video.poster, getSiteUrl()).href : proof.kind === "shots" ? new URL(proof.shots[0].src, getSiteUrl()).href : undefined,
+    poster: proof.kind === "video" ? proofFetchUrl(proof.output?.poster ?? proof.video.poster) : proof.kind === "shots" ? proofFetchUrl(proof.shots[0].src) : undefined,
   });
 }

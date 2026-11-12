@@ -2804,7 +2804,23 @@
       },
       "updating": "Bijwerken…",
       "afterRecording": "Na je opname",
-      "afterReply": "Zodra Stella klaar is met antwoorden"
+      "afterReply": "Zodra Stella klaar is met antwoorden",
+      "devices": {
+        "choose": "Computers kiezen",
+        "thisComputer": "Deze computer",
+        "offline": "Krijgt het zodra hij weer aan staat",
+        "updateThisOnly": "Alleen deze computer bijwerken",
+        "updateAll": "Al je computers bijwerken"
+      },
+      "conflicts": {
+        "title": "Deze update overlapt met je wijzigingen",
+        "unsure": "Een taak voegt ze samen als je bijwerkt",
+        "allowance": "Samenvoegen gebruikt een deel van je gratis tegoed"
+      },
+      "arrived": {
+        "fromJustNow": "Zojuist bijgewerkt vanaf {device}",
+        "fromAgo": "{ago} bijgewerkt vanaf {device}"
+      }
     },
     "audioPlayer": {
       "pause": "Pauzeren",

@@ -2794,7 +2794,23 @@
       },
       "updating": "Memperbarui…",
       "afterRecording": "Setelah rekaman Anda",
-      "afterReply": "Setelah Stella selesai membalas"
+      "afterReply": "Setelah Stella selesai membalas",
+      "devices": {
+        "choose": "Pilih komputer",
+        "thisComputer": "Komputer ini",
+        "offline": "Akan mendapatkannya saat menyala lagi",
+        "updateThisOnly": "Perbarui komputer ini saja",
+        "updateAll": "Perbarui semua komputermu"
+      },
+      "conflicts": {
+        "title": "Pembaruan ini bertumpang tindih dengan perubahanmu",
+        "unsure": "Sebuah tugas menggabungkannya saat kamu memperbarui",
+        "allowance": "Penggabungan memakai sebagian kuota gratismu"
+      },
+      "arrived": {
+        "fromJustNow": "Diperbarui dari {device} baru saja",
+        "fromAgo": "Diperbarui dari {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Jeda",

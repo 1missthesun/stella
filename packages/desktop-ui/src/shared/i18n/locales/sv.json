@@ -2804,7 +2804,23 @@
       },
       "updating": "Uppdaterar…",
       "afterRecording": "Efter din inspelning",
-      "afterReply": "När Stella har svarat klart"
+      "afterReply": "När Stella har svarat klart",
+      "devices": {
+        "choose": "Välj datorer",
+        "thisComputer": "Den här datorn",
+        "offline": "Får den när den är på igen",
+        "updateThisOnly": "Uppdatera bara den här datorn",
+        "updateAll": "Uppdatera alla dina datorer"
+      },
+      "conflicts": {
+        "title": "Den här uppdateringen överlappar dina ändringar",
+        "unsure": "En uppgift slår ihop dem när du uppdaterar",
+        "allowance": "Sammanslagningen använder en del av din gratiskvot"
+      },
+      "arrived": {
+        "fromJustNow": "Uppdaterad från {device} nyss",
+        "fromAgo": "Uppdaterad från {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pausa",

@@ -2804,7 +2804,23 @@
       },
       "updating": "Opdaterer…",
       "afterRecording": "Efter din optagelse",
-      "afterReply": "Når Stella har svaret færdigt"
+      "afterReply": "Når Stella har svaret færdigt",
+      "devices": {
+        "choose": "Vælg computere",
+        "thisComputer": "Denne computer",
+        "offline": "Får den, når den er tændt igen",
+        "updateThisOnly": "Opdater kun denne computer",
+        "updateAll": "Opdater alle dine computere"
+      },
+      "conflicts": {
+        "title": "Denne opdatering overlapper dine ændringer",
+        "unsure": "En opgave fletter dem, når du opdaterer",
+        "allowance": "Fletningen bruger lidt af din gratis kvote"
+      },
+      "arrived": {
+        "fromJustNow": "Opdateret fra {device} lige nu",
+        "fromAgo": "Opdateret fra {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pause",

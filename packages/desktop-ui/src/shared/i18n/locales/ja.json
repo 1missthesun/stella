@@ -2794,7 +2794,23 @@
       },
       "updating": "アップデート中…",
       "afterRecording": "録画の終了後",
-      "afterReply": "Stellaの返信が終わったら"
+      "afterReply": "Stellaの返信が終わったら",
+      "devices": {
+        "choose": "コンピュータを選ぶ",
+        "thisComputer": "このコンピュータ",
+        "offline": "次に起動したときに適用されます",
+        "updateThisOnly": "このコンピュータだけ更新",
+        "updateAll": "すべてのコンピュータを更新"
+      },
+      "conflicts": {
+        "title": "このアップデートはあなたの変更と重なっています",
+        "unsure": "更新するとタスクが統合します",
+        "allowance": "統合には無料枠の一部を使います"
+      },
+      "arrived": {
+        "fromJustNow": "たった今 {device} から更新",
+        "fromAgo": "{ago}に {device} から更新"
+      }
     },
     "audioPlayer": {
       "pause": "一時停止",

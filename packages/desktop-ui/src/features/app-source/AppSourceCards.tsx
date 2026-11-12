@@ -1,7 +1,9 @@
-import { memo, useEffect, useState } from "react";
+import { Fragment, memo, useEffect, useState, type ReactNode } from "react";
 import type {
   AppSourceActionResult,
+  AppSourceConflicts,
   AppSourceDraftOffer,
+  AppSourceState,
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
 import { showToast } from "@/ui/toast";
@@ -115,6 +117,30 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
   const blocked =
     state.merging !== undefined || ((state.busy || running !== null) && !pending);
 
+  if (change.kind === "merge") {
+    const { offer } = change;
+    return (
+      <UpdateCard
+        tone="update"
+        title={
+          offer.kind === "version"
+            ? t("shell.appSource.updates.newVersion")
+            : offer.device
+              ? t("shell.appSource.updates.fromDevice", { device: deviceLabel(offer.device) })
+              : t("shell.appSource.updates.fromOtherComputer")
+        }
+        detail={t("shell.appSource.updating")}
+        busy={pending || offer.adding}
+        disabled={blocked && !offer.adding}
+        action={{
+          label: t("shell.appSource.update"),
+          primary: true,
+          onClick: () => void run(agentId, () => addOffer(offer)),
+        }}
+      />
+    );
+  }
+
   if (change.kind === "draft") {
     const { offer } = change;
     return (
@@ -128,7 +154,12 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
   }
 
   const { commit } = change;
-  const subject = subjectOf(commit.subject);
+  const subject =
+    commit.kind === "version"
+      ? t("shell.appSource.updates.newVersion")
+      : commit.kind === "other-computer"
+        ? t("shell.appSource.updates.fromOtherComputers")
+        : subjectOf(commit.subject);
   const recent = now - commit.date < 60_000;
   const when = ago(locale, commit.date, now);
   return (
@@ -156,13 +187,50 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
 });
 
 export const deviceLabel = (device: string) =>
-  device.replace(/[-_]+/g, " ").trim();
+  device.replace(/\.(local|localdomain|lan|home)$/i, "").replace(/[-_]+/g, " ").trim();
 
-export const addOffer = (offer: AppSourceWaiting) => {
+/** How long the card saying a version arrived by itself stays at the end of the chat. */
+const ARRIVED_SHOWN_MS = 12 * 60 * 60_000;
+
+type Translate = ReturnType<typeof useT>;
+
+const arrivedDetail = (
+  t: Translate,
+  locale: string,
+  arrived: NonNullable<AppSourceState["arrived"]>,
+  now: number,
+) => {
+  const recent = now - arrived.date < 60_000;
+  const when = ago(locale, arrived.date, now);
+  if (arrived.undone) {
+    return recent ? t("shell.appSource.undoneJustNow") : t("shell.appSource.undoneAgo", { ago: when });
+  }
+  if (arrived.from) {
+    const device = deviceLabel(arrived.from);
+    return recent
+      ? t("shell.appSource.arrived.fromJustNow", { device })
+      : t("shell.appSource.arrived.fromAgo", { device, ago: when });
+  }
+  return recent ? t("shell.appSource.updatedJustNow") : t("shell.appSource.updatedAgo", { ago: when });
+};
+
+const conflictDetail = (t: Translate, conflicts: AppSourceConflicts) => {
+  const names = conflicts.files.map((file) => file.split("/").at(-1) ?? file);
+  const shown = names.slice(0, 2).join(", ");
+  const files = names.length > 2 ? `${shown} +${names.length - 2}` : shown;
+  const how =
+    conflicts.why === "allowance"
+      ? t("shell.appSource.conflicts.allowance")
+      : t("shell.appSource.conflicts.unsure");
+  return files ? `${files} · ${how}` : how;
+};
+
+/** `targets`: for a new version, the other computers it goes to as well (default: every one). */
+export const addOffer = (offer: AppSourceWaiting, targets: string[] | null = null) => {
   const api = appSourceApi();
   if (!api) return Promise.resolve<AppSourceActionResult>({ ok: false, error: "" });
   if (offer.kind === "version") {
-    return offer.draft ? api.apply(offer.draft) : api.applyUpstream();
+    return offer.draft ? api.apply(offer.draft) : api.applyUpstream(targets);
   }
   if (offer.kind === "other-computer") {
     return offer.draft ? api.apply(offer.draft) : api.applyRemote();
@@ -178,21 +246,82 @@ export const AppSourceOffers = memo(function AppSourceOffers({
   placement?: "message" | "composer";
 }) {
   const t = useT();
+  const locale = useLocale();
+  const now = useNow();
   const state = useAppSourceState();
   const relayed = useRelayedAgents(conversationId);
   const { pending, run } = useAppSourceAction();
-  if (!state || !appSourceApi()) return null;
+  const api = appSourceApi();
+  if (!state || !api) return null;
   const merging = state.merging !== undefined;
+  const version = state.waiting.find(
+    (offer): offer is Extract<AppSourceWaiting, { kind: "version" }> => offer.kind === "version",
+  );
+  const conflicted = version?.conflicts && !version.adding && !version.draft ? version : null;
+  const arrived =
+    state.arrived &&
+    now - state.arrived.date < ARRIVED_SHOWN_MS &&
+    !state.recent.some((commit) => commit.sha === state.arrived!.sha && commit.agentId)
+      ? state.arrived
+      : null;
   const offers = state.waiting.filter(
     (offer): offer is Exclude<AppSourceWaiting, { kind: "version" }> =>
       offer.kind !== "version" &&
       (!merging || offer.adding) &&
       !(offer.kind === "draft" && offer.agentId && relayed.has(offer.agentId)),
   );
-  if (offers.length === 0) return null;
+  if (offers.length === 0 && !conflicted && !arrived) return null;
   const blocked = state.busy || pending !== null || merging;
+  const wrap = (key: string, card: ReactNode) =>
+    placement === "composer" ? (
+      <Fragment key={key}>{card}</Fragment>
+    ) : (
+      <div key={key} className="event-row event-row--assistant">
+        <div className="event-item assistant">{card}</div>
+      </div>
+    );
   return (
     <div className="app-update-messages" data-testid="app-source-offers">
+      {arrived
+        ? wrap(
+            "arrived",
+            <div data-testid="app-source-arrived">
+              <UpdateCard
+                tone={arrived.undone ? "update" : "done"}
+                placement={placement}
+                title={t("shell.appSource.updates.newVersion")}
+                detail={arrivedDetail(t, locale, arrived, now)}
+                busy={pending === `arrived:${arrived.flip}`}
+                disabled={blocked}
+                action={{
+                  label: arrived.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
+                  primary: arrived.undone,
+                  onClick: () => void run(`arrived:${arrived.flip}`, () => api.undo(arrived.flip)),
+                }}
+              />
+            </div>,
+          )
+        : null}
+      {conflicted
+        ? wrap(
+            "conflicts",
+            <div data-testid="app-source-conflicts">
+              <UpdateCard
+                tone="update"
+                placement={placement}
+                title={t("shell.appSource.conflicts.title")}
+                detail={conflictDetail(t, conflicted.conflicts!)}
+                busy={pending === conflicted.key}
+                disabled={blocked}
+                action={{
+                  label: t("shell.appSource.update"),
+                  primary: true,
+                  onClick: () => void run(conflicted.key, () => addOffer(conflicted)),
+                }}
+              />
+            </div>,
+          )
+        : null}
       {offers.map((offer) => {
         const adding = offer.adding || pending === offer.key;
         if (offer.kind === "draft") {

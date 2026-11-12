@@ -2794,7 +2794,23 @@
       },
       "updating": "正在更新…",
       "afterRecording": "錄製結束後",
-      "afterReply": "等 Stella 回覆完"
+      "afterReply": "等 Stella 回覆完",
+      "devices": {
+        "choose": "選擇電腦",
+        "thisComputer": "這台電腦",
+        "offline": "重新開機後就會更新",
+        "updateThisOnly": "只更新這台電腦",
+        "updateAll": "更新你所有的電腦"
+      },
+      "conflicts": {
+        "title": "此更新與你的變更有重疊",
+        "unsure": "更新時會由一個任務合併它們",
+        "allowance": "合併會用掉一部分免費額度"
+      },
+      "arrived": {
+        "fromJustNow": "剛剛從 {device} 更新",
+        "fromAgo": "{ago}從 {device} 更新"
+      }
     },
     "audioPlayer": {
       "pause": "暫停",

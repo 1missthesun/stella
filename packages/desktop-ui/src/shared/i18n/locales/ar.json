@@ -2844,7 +2844,23 @@
       },
       "updating": "جارٍ التحديث…",
       "afterRecording": "بعد انتهاء التسجيل",
-      "afterReply": "بعد أن تُنهي Stella ردها"
+      "afterReply": "بعد أن تُنهي Stella ردها",
+      "devices": {
+        "choose": "اختر الأجهزة",
+        "thisComputer": "هذا الجهاز",
+        "offline": "سيحصل عليه عند تشغيله",
+        "updateThisOnly": "تحديث هذا الجهاز فقط",
+        "updateAll": "تحديث كل أجهزتك"
+      },
+      "conflicts": {
+        "title": "هذا التحديث يتداخل مع تغييراتك",
+        "unsure": "ستدمجها مهمة عند التحديث",
+        "allowance": "الدمج يستهلك جزءًا من رصيدك المجاني"
+      },
+      "arrived": {
+        "fromJustNow": "تم التحديث من {device} للتو",
+        "fromAgo": "تم التحديث من {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "إيقاف مؤقت",

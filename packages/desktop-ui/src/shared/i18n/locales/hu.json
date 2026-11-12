@@ -2804,7 +2804,23 @@
       },
       "updating": "Frissítés…",
       "afterRecording": "A felvétel után",
-      "afterReply": "Miután Stella befejezte a választ"
+      "afterReply": "Miután Stella befejezte a választ",
+      "devices": {
+        "choose": "Számítógépek kiválasztása",
+        "thisComputer": "Ez a számítógép",
+        "offline": "Megkapja, amikor újra be lesz kapcsolva",
+        "updateThisOnly": "Csak ennek a számítógépnek a frissítése",
+        "updateAll": "Az összes számítógéped frissítése"
+      },
+      "conflicts": {
+        "title": "Ez a frissítés átfedésben van a módosításaiddal",
+        "unsure": "Frissítéskor egy feladat egyesíti őket",
+        "allowance": "Az egyesítés felhasznál az ingyenes keretedből"
+      },
+      "arrived": {
+        "fromJustNow": "Frissítve innen: {device}, az imént",
+        "fromAgo": "Frissítve innen: {device}, {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Szünet",

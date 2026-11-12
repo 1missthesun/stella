@@ -2804,7 +2804,23 @@
       },
       "updating": "अपडेट हो रहा है…",
       "afterRecording": "आपकी रिकॉर्डिंग के बाद",
-      "afterReply": "Stella का जवाब पूरा होने के बाद"
+      "afterReply": "Stella का जवाब पूरा होने के बाद",
+      "devices": {
+        "choose": "कंप्यूटर चुनें",
+        "thisComputer": "यह कंप्यूटर",
+        "offline": "फिर से चालू होने पर मिलेगा",
+        "updateThisOnly": "सिर्फ़ इस कंप्यूटर को अपडेट करें",
+        "updateAll": "अपने सभी कंप्यूटर अपडेट करें"
+      },
+      "conflicts": {
+        "title": "यह अपडेट आपके बदलावों से टकराता है",
+        "unsure": "अपडेट करने पर एक टास्क इन्हें मिला देगा",
+        "allowance": "मिलाने में आपकी मुफ़्त सीमा का कुछ हिस्सा लगेगा"
+      },
+      "arrived": {
+        "fromJustNow": "अभी {device} से अपडेट हुआ",
+        "fromAgo": "{device} से {ago} अपडेट हुआ"
+      }
     },
     "audioPlayer": {
       "pause": "रोकें",

@@ -2814,7 +2814,23 @@
       },
       "updating": "Mise à jour…",
       "afterRecording": "Après votre enregistrement",
-      "afterReply": "Quand Stella aura fini de répondre"
+      "afterReply": "Quand Stella aura fini de répondre",
+      "devices": {
+        "choose": "Choisir les ordinateurs",
+        "thisComputer": "Cet ordinateur",
+        "offline": "La recevra une fois rallumé",
+        "updateThisOnly": "Mettre à jour cet ordinateur seulement",
+        "updateAll": "Mettre à jour tous vos ordinateurs"
+      },
+      "conflicts": {
+        "title": "Cette mise à jour recoupe vos modifications",
+        "unsure": "Une tâche les fusionne lors de la mise à jour",
+        "allowance": "La fusion utilise une partie de votre crédit gratuit"
+      },
+      "arrived": {
+        "fromJustNow": "Mis à jour depuis {device} à l'instant",
+        "fromAgo": "Mis à jour depuis {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pause",

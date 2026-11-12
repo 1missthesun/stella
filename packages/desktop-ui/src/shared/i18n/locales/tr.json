@@ -2804,7 +2804,23 @@
       },
       "updating": "Güncelleniyor…",
       "afterRecording": "Kaydınızdan sonra",
-      "afterReply": "Stella yanıtını bitirince"
+      "afterReply": "Stella yanıtını bitirince",
+      "devices": {
+        "choose": "Bilgisayarları seç",
+        "thisComputer": "Bu bilgisayar",
+        "offline": "Yeniden açıldığında alacak",
+        "updateThisOnly": "Yalnızca bu bilgisayarı güncelle",
+        "updateAll": "Tüm bilgisayarlarını güncelle"
+      },
+      "conflicts": {
+        "title": "Bu güncelleme değişikliklerinle çakışıyor",
+        "unsure": "Güncellediğinde bir görev bunları birleştirir",
+        "allowance": "Birleştirme ücretsiz kotanın bir kısmını kullanır"
+      },
+      "arrived": {
+        "fromJustNow": "Az önce {device} üzerinden güncellendi",
+        "fromAgo": "{ago} {device} üzerinden güncellendi"
+      }
     },
     "audioPlayer": {
       "pause": "Duraklat",

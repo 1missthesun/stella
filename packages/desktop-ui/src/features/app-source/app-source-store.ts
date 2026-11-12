@@ -73,8 +73,11 @@ export const runAppSourceAction = async (
   }
 };
 
+type MergeOffer = Extract<AppSourceWaiting, { kind: "version" | "other-computer" }>;
+
 export type AgentChange =
   | { kind: "draft"; offer: AppSourceDraftOffer }
+  | { kind: "merge"; offer: MergeOffer }
   | { kind: "applied"; commit: AppSourceCommit };
 
 const draftOffers = (state: AppSourceState) =>
@@ -89,6 +92,11 @@ export const agentChange = (
 ): AgentChange | null => {
   const offer = draftOffers(state).find((entry) => entry.agentId === agentId);
   if (offer) return { kind: "draft", offer };
+  const merge = state.waiting.find(
+    (entry): entry is MergeOffer =>
+      (entry.kind === "version" || entry.kind === "other-computer") && entry.agentId === agentId,
+  );
+  if (merge) return { kind: "merge", offer: merge };
   const commit = state.recent.find((entry) => entry.agentId === agentId);
   return commit ? { kind: "applied", commit } : null;
 };

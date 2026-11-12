@@ -2814,7 +2814,23 @@
       },
       "updating": "Se actualizează…",
       "afterRecording": "După înregistrare",
-      "afterReply": "După ce Stella termină răspunsul"
+      "afterReply": "După ce Stella termină răspunsul",
+      "devices": {
+        "choose": "Alege computerele",
+        "thisComputer": "Acest computer",
+        "offline": "O primește când pornește din nou",
+        "updateThisOnly": "Actualizează doar acest computer",
+        "updateAll": "Actualizează toate computerele tale"
+      },
+      "conflicts": {
+        "title": "Această actualizare se suprapune cu modificările tale",
+        "unsure": "O sarcină le îmbină când actualizezi",
+        "allowance": "Îmbinarea folosește o parte din alocarea ta gratuită"
+      },
+      "arrived": {
+        "fromJustNow": "Actualizat de pe {device} chiar acum",
+        "fromAgo": "Actualizat de pe {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pauză",

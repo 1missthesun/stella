@@ -2814,7 +2814,23 @@
       },
       "updating": "Aggiornamento…",
       "afterRecording": "Dopo la registrazione",
-      "afterReply": "Quando Stella ha finito di rispondere"
+      "afterReply": "Quando Stella ha finito di rispondere",
+      "devices": {
+        "choose": "Scegli i computer",
+        "thisComputer": "Questo computer",
+        "offline": "La riceverà quando sarà di nuovo acceso",
+        "updateThisOnly": "Aggiorna solo questo computer",
+        "updateAll": "Aggiorna tutti i tuoi computer"
+      },
+      "conflicts": {
+        "title": "Questo aggiornamento si sovrappone alle tue modifiche",
+        "unsure": "Un'attività le unisce quando aggiorni",
+        "allowance": "L'unione usa parte del tuo credito gratuito"
+      },
+      "arrived": {
+        "fromJustNow": "Aggiornato da {device} proprio ora",
+        "fromAgo": "Aggiornato da {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pausa",

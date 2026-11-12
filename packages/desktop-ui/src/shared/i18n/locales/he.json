@@ -2814,7 +2814,23 @@
       },
       "updating": "מעדכן…",
       "afterRecording": "אחרי ההקלטה",
-      "afterReply": "אחרי ש-Stella תסיים לענות"
+      "afterReply": "אחרי ש-Stella תסיים לענות",
+      "devices": {
+        "choose": "בחירת מחשבים",
+        "thisComputer": "המחשב הזה",
+        "offline": "יקבל את זה כשיופעל שוב",
+        "updateThisOnly": "לעדכן רק את המחשב הזה",
+        "updateAll": "לעדכן את כל המחשבים שלך"
+      },
+      "conflicts": {
+        "title": "העדכון הזה חופף לשינויים שלך",
+        "unsure": "משימה תמזג אותם כשתעדכן",
+        "allowance": "המיזוג משתמש בחלק מהמכסה החינמית שלך"
+      },
+      "arrived": {
+        "fromJustNow": "עודכן מ-{device} עכשיו",
+        "fromAgo": "עודכן מ-{device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "השהה",

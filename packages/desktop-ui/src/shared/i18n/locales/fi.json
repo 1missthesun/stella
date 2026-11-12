@@ -2804,7 +2804,23 @@
       },
       "updating": "Päivitetään…",
       "afterRecording": "Tallenteesi jälkeen",
-      "afterReply": "Kun Stella on vastannut"
+      "afterReply": "Kun Stella on vastannut",
+      "devices": {
+        "choose": "Valitse tietokoneet",
+        "thisComputer": "Tämä tietokone",
+        "offline": "Saa sen, kun se on taas päällä",
+        "updateThisOnly": "Päivitä vain tämä tietokone",
+        "updateAll": "Päivitä kaikki tietokoneesi"
+      },
+      "conflicts": {
+        "title": "Tämä päivitys menee päällekkäin muutostesi kanssa",
+        "unsure": "Tehtävä yhdistää ne, kun päivität",
+        "allowance": "Yhdistäminen käyttää osan ilmaisesta kiintiöstäsi"
+      },
+      "arrived": {
+        "fromJustNow": "Päivitetty laitteelta {device} juuri nyt",
+        "fromAgo": "Päivitetty laitteelta {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Keskeytä",

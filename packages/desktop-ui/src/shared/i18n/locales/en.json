@@ -2804,7 +2804,23 @@
       },
       "updating": "Updating…",
       "afterRecording": "After your recording",
-      "afterReply": "After Stella's reply"
+      "afterReply": "After Stella's reply",
+      "devices": {
+        "choose": "Choose computers",
+        "thisComputer": "This computer",
+        "offline": "Gets it when it's back on",
+        "updateThisOnly": "Update this computer only",
+        "updateAll": "Update all your computers"
+      },
+      "conflicts": {
+        "title": "This update overlaps your changes",
+        "unsure": "A task merges them when you update",
+        "allowance": "Merging them uses some of your free allowance"
+      },
+      "arrived": {
+        "fromJustNow": "Updated from {device} just now",
+        "fromAgo": "Updated from {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pause",

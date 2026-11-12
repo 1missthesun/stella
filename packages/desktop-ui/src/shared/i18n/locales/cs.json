@@ -2824,7 +2824,23 @@
       },
       "updating": "Aktualizace…",
       "afterRecording": "Po dokončení záznamu",
-      "afterReply": "Až Stella dokončí odpověď"
+      "afterReply": "Až Stella dokončí odpověď",
+      "devices": {
+        "choose": "Vybrat počítače",
+        "thisComputer": "Tento počítač",
+        "offline": "Dostane ji, až bude zase zapnutý",
+        "updateThisOnly": "Aktualizovat jen tento počítač",
+        "updateAll": "Aktualizovat všechny vaše počítače"
+      },
+      "conflicts": {
+        "title": "Tato aktualizace se překrývá s vašimi změnami",
+        "unsure": "Při aktualizaci je sloučí úloha",
+        "allowance": "Sloučení spotřebuje část vašeho bezplatného limitu"
+      },
+      "arrived": {
+        "fromJustNow": "Aktualizováno z {device} právě teď",
+        "fromAgo": "Aktualizováno z {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pozastavit",

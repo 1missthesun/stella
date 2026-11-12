@@ -2804,7 +2804,23 @@
       },
       "updating": "Oppdaterer…",
       "afterRecording": "Etter opptaket ditt",
-      "afterReply": "Når Stella har svart ferdig"
+      "afterReply": "Når Stella har svart ferdig",
+      "devices": {
+        "choose": "Velg datamaskiner",
+        "thisComputer": "Denne datamaskinen",
+        "offline": "Får den når den er på igjen",
+        "updateThisOnly": "Oppdater bare denne datamaskinen",
+        "updateAll": "Oppdater alle datamaskinene dine"
+      },
+      "conflicts": {
+        "title": "Denne oppdateringen overlapper endringene dine",
+        "unsure": "En oppgave slår dem sammen når du oppdaterer",
+        "allowance": "Sammenslåingen bruker litt av gratiskvoten din"
+      },
+      "arrived": {
+        "fromJustNow": "Oppdatert fra {device} akkurat nå",
+        "fromAgo": "Oppdatert fra {device} {ago}"
+      }
     },
     "audioPlayer": {
       "pause": "Pause",

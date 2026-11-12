@@ -79,3 +79,64 @@
   flex-shrink: 0;
   opacity: 0.88;
 }
+
+.shell-topbar-update-pill[data-split] .shell-topbar-update-pill__main {
+  padding-right: 9px;
+}
+
+.shell-topbar-update-pill__more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 100%;
+  padding: 0 4px 0 2px;
+  border: none;
+  border-left: 1px solid color-mix(in oklch, var(--primary) 26%, transparent);
+  background: transparent;
+  color: inherit;
+  opacity: 0.72;
+  cursor: default;
+  -webkit-app-region: no-drag;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.shell-topbar-update-pill__more:hover,
+.shell-topbar-update-pill__more[data-state="open"] {
+  opacity: 1;
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.shell-topbar-update-pill__more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.shell-topbar-update-targets {
+  min-width: 220px;
+}
+
+.shell-topbar-update-targets__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.shell-topbar-update-targets__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-topbar-update-targets__hint {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-regular, 400);
+  color: var(--text-weak, var(--muted-foreground));
+}
+
+.shell-topbar-update-targets__go {
+  justify-content: center;
+  font-weight: var(--weight-semibold);
+  color: var(--text-strong, var(--foreground));
+}

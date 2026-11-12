@@ -397,7 +397,7 @@ static bool loadServer(Server &out) {
 }
 
 struct State {
-    string bunLockHash, preparedHead, installedAt;
+    string bunLockHash, preparedHead, installedAt, caughtUpTo;
 
     static State load() {
         State s;
@@ -407,6 +407,7 @@ struct State {
         if (const char *v = mj_get_string(json, "bunLockHash")) s.bunLockHash = v;
         if (const char *v = mj_get_string(json, "preparedHead")) s.preparedHead = v;
         if (const char *v = mj_get_string(json, "installedAt")) s.installedAt = v;
+        if (const char *v = mj_get_string(json, "caughtUpTo")) s.caughtUpTo = v;
         mj_free(json);
         return s;
     }
@@ -422,6 +423,7 @@ struct State {
             first = false;
         };
         add("bunLockHash", bunLockHash);
+        add("caughtUpTo", caughtUpTo);
         add("installedAt", installedAt);
         add("preparedHead", preparedHead);
         out += "\n}\n";
@@ -3504,6 +3506,87 @@ static void returnToKnownGood() {
     signHead("");
 }
 
+// Stella versions from 2026-10-14 until the fix (dir-links.ts) build their
+// update check on a scratch copy with the app's node_modules linked in by a
+// plain directory symlink, which Windows refuses without admin rights or
+// Developer Mode (EPERM). On such a version every update that restarts
+// Stella fails inside the app, so the app can never update past it by
+// itself. The launcher, which updates itself, takes it over the hump once:
+// before starting Stella it moves the checkout to the published version when
+// that version has the fix, the way an Update would (a fast-forward, or a
+// clean merge over the user's own changes), and signs it. A conflict, a
+// failure or an unpublished fix leaves everything as it was. Tried once per
+// published version (state caughtUpTo), so a version that won't start and is
+// rolled back to the last working one is not retried.
+static const char *kBrokenUpdateCheck = "packages/desktop/electron/services/app-source/update-gate.ts";
+static const char *kFixedUpdateCheck = "packages/desktop/electron/services/app-source/dir-links.ts";
+
+static bool hasPath(const string &commit, const char *path) {
+    return gGit->raw({"cat-file", "-e", commit + ":" + path}, P.app()).code == 0;
+}
+
+static void catchUpStuckUpdate() {
+    if (O.selfTest && trim(utf8(envVar(L"STELLA_LAUNCHER_TEST_CATCH_UP"))) != "1") return;
+    wstring app = P.app();
+    if (!hasPath("HEAD", kBrokenUpdateCheck) || hasPath("HEAD", kFixedUpdateCheck)) return;
+    string head = gGit->run({"rev-parse", "HEAD"}, app);
+    string upstream = string("refs/remotes/") + kUpstreamRemoteName + "/" + kUpstreamBranch;
+    string testRef = trim(utf8(envVar(L"STELLA_LAUNCHER_CATCH_UP_REF")));
+    if (!testRef.empty()) {
+        upstream = testRef;
+    } else if (!O.source.empty()) {
+        gGit->run({"fetch", "--quiet", "--no-tags", O.source,
+                   "+" + (O.sourceRef.empty() ? string("HEAD") : O.sourceRef) + ":" + upstream},
+                  app);
+    } else {
+        string remote, token;
+        bootstrapAccess(remote, token);
+        vector<std::pair<wstring, wstring>> env = {{L"GIT_CONFIG_COUNT", L"2"},
+                                                  {L"GIT_CONFIG_KEY_0", L"http.extraHeader"},
+                                                  {L"GIT_CONFIG_VALUE_0", wide("Authorization: Bearer " + token)},
+                                                  {L"GIT_CONFIG_KEY_1", L"protocol.version"},
+                                                  {L"GIT_CONFIG_VALUE_1", L"1"}};
+        gGit->run({"fetch", "--quiet", "--no-tags", remote,
+                   string("+refs/heads/") + kUpstreamBranch + ":" + upstream},
+                  app, env);
+    }
+    string tip = gGit->run({"rev-parse", "--verify", upstream + "^{commit}"}, app);
+    if (!hasPath(tip, kFixedUpdateCheck)) {
+        LOG("catch-up: %s can't update itself on Windows; the published %s has no fix yet", short12(head).c_str(),
+            short12(tip).c_str());
+        return;
+    }
+    if (S.caughtUpTo == tip) {
+        LOG("catch-up: already tried %s; staying on %s", short12(tip).c_str(), short12(head).c_str());
+        return;
+    }
+    if (gGit->raw({"merge-base", "--is-ancestor", tip, head}, app).code == 0) return;
+    string to;
+    if (gGit->raw({"merge-base", "--is-ancestor", head, tip}, app).code == 0) {
+        to = tip;
+    } else {
+        CmdResult merged = gGit->raw({"merge-tree", "--write-tree", head, tip}, app);
+        if (merged.code != 0) {
+            LOG("catch-up: %s and the published %s don't merge cleanly; leaving it to Stella", short12(head).c_str(),
+                short12(tip).c_str());
+            S.caughtUpTo = tip;
+            S.save();
+            return;
+        }
+        string tree = trim(splitLines(merged.out).empty() ? string() : splitLines(merged.out)[0]);
+        to = gGit->run({"commit-tree", tree, "-p", head, "-p", tip, "-m",
+                        "Merge the published Stella update " + short12(tip)},
+                       app, kIdentityEnv);
+    }
+    S.caughtUpTo = tip;
+    S.save();
+    progress("Updating Stella…", 0.30, 0.40);
+    gGit->run({"merge", "--ff-only", "--quiet", to}, app);
+    signHead(to);
+    LOG("catch-up: moved %s to %s (published %s), which can update itself on Windows", short12(head).c_str(),
+        short12(to).c_str(), short12(tip).c_str());
+}
+
 static int gRecoveryCount = 0;
 
 static void refreshInstallInfo() {
@@ -3565,6 +3648,11 @@ static wstring prepareForLaunch() {
         throw OutsideChangesFound();
     }
     LOG("verify: HEAD signed and clean");
+    try {
+        catchUpStuckUpdate();
+    } catch (const LauncherError &e) {
+        LOG("catch-up: %s", e.message.c_str());
+    }
     refreshInstallInfo();
     ensureBun();
     return prepare();

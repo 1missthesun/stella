@@ -116,6 +116,11 @@ export type EmailCalls = {
   "email.removeRule": { args: { ruleId: string }; result: { rules: EmailRule[] } };
   "email.rules": { args: Record<string, never>; result: { rules: EmailRule[]; note: string } };
   "email.checkNow": { args: Record<string, never>; result: EmailStatus };
+  /** Read an email, or reply to it (sent or saved as a draft), in a Gmail account connected through Stella. */
+  "email.mail": {
+    args: { action: "read" | "reply" | "draft"; account?: string; messageId: string; body?: string; all?: boolean };
+    result: { text: string };
+  };
 };
 
 export type EmailViews = {

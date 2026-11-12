@@ -137,6 +137,6 @@ export const emailCardNoteText = (card: EmailCard): string => {
     heading,
     ...lines,
     ...(card.noiseCount ? [`${card.noiseCount} other emails were left out as noise.`] : []),
-    "If the user refers to one of these (\"the second one\"), act on that email with the gmail tools, using its account and message_id. Don't comment on this note unless the user asks about their email.",
+    "If the user refers to one of these (\"the second one\"), act on that email with the email tool (read, reply, draft), using its account and message_id. Don't comment on this note unless the user asks about their email.",
   ].join("\n");
 };

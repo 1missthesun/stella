@@ -17,6 +17,7 @@ const SLOW_CALLS = new Set<string>([
   "search.web",
   "data.export",
   "email.checkNow",
+  "email.mail",
   "email.setEnabled",
   "media.generate",
   "tts.prepare",

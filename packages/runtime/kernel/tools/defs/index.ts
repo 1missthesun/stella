@@ -25,7 +25,7 @@ import {
   createUseSecureValueTool,
 } from "./secure-input.js";
 import { createScheduleManageTools } from "./schedule-manage.js";
-import { createEmailInstructionsTool } from "./email-instructions.js";
+import { createEmailTool } from "./email-tool.js";
 import { createScriptDraftTool } from "./script-draft.js";
 import { createConnectorStatusTool } from "./connector-status.js";
 import { createWebTool } from "./web.js";
@@ -132,7 +132,7 @@ export const buildBuiltinTools = (
     ...createScheduleManageTools({ scheduleApi: options.scheduleApi }),
   );
   tools.push(
-    createEmailInstructionsTool({
+    createEmailTool({
       ...(options.getCloudBackendAuth
         ? { getCloudBackendAuth: options.getCloudBackendAuth }
         : {}),

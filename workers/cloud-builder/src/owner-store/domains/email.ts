@@ -2,6 +2,7 @@ import {
   EMAIL_PUSH_KIND,
   type EmailAccountStatus,
   type EmailBucket,
+  type EmailCalls,
   type EmailFeed,
   type EmailItem,
   type EmailItemState,
@@ -20,9 +21,10 @@ import {
   type EmailCardItem,
 } from "@stella/contracts/email-card";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
-import { gmailFetcher, type Fetcher } from "../../integrations/google.js";
+import { GoogleApiError, gmailFetcher, runGoogleAction, type Fetcher } from "../../integrations/google.js";
 import {
   addressesIn,
+  parseAddress,
   gmailAttachmentBase64,
   gmailHistorySince,
   gmailLabelsOf,
@@ -44,7 +46,7 @@ import {
   type SorterAccess,
   type SortVerdict,
 } from "../../integrations/email-sorter.js";
-import { array, boolean, empty, literal, object, string } from "../args.js";
+import { array, boolean, empty, literal, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -622,7 +624,7 @@ const ruleTurnPrompt = (rule: RuleRow, row: ItemRow): string =>
     `Their instruction, in their words: "${rule.text}"`,
     `The email: from ${row.from_name} <${row.from_address}>, subject "${row.subject}", in their Gmail account ${row.account} (message_id ${row.message_id}, thread_id ${row.thread_id}).`,
     row.excerpt ? `It begins: ${row.excerpt.slice(0, 400)}` : "",
-    `Do what the instruction asks, using the gmail tools with that account and message_id. Send email as the user only if the instruction clearly says to send or reply; otherwise prepare a draft and ask them. Then tell the user briefly what you did.`,
+    `Do what the instruction asks with the email tool (read, reply, draft) using that account and message_id, or other tools for anything else it asks. Send email as the user only if the instruction clearly says to send or reply; otherwise save a draft and ask them. Then tell the user in one or two sentences what came in and what you did.`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -1299,6 +1301,100 @@ const emailTool = (ctx: OwnerContext, raw: unknown): { rules: EmailRule[]; note:
   return { rules: rulesOf(ctx.db).map(toRule), note: stateOf(ctx.db)?.note ?? "", ...(added ? { added } : {}) };
 };
 
+type MailArgs = EmailCalls["email.mail"]["args"];
+
+const MAIL_TEXT_CHARS = 12_000;
+
+const header = (headers: unknown, name: string): string => {
+  if (!Array.isArray(headers)) return "";
+  const found = headers.find(
+    (entry) => entry && typeof entry === "object" && String((entry as Record<string, unknown>).name).toLowerCase() === name.toLowerCase(),
+  ) as Record<string, unknown> | undefined;
+  return typeof found?.value === "string" ? found.value : "";
+};
+
+/**
+ * Reads, replies to or drafts a reply to one email in a Gmail account connected
+ * through Stella, so "reply to the second one" works from any device, with the
+ * same connection that sorted it.
+ */
+const mailAction = async (ctx: OwnerContext, args: MailArgs): Promise<{ text: string }> => {
+  const accounts = await liveAccounts(ctx);
+  const wanted = (args.account ?? "").trim().toLowerCase();
+  const account = wanted ? accounts.find((entry) => entry.email === wanted) : accounts.length === 1 ? accounts[0] : undefined;
+  if (!account) {
+    throw new RpcError(
+      "NOT_FOUND",
+      accounts.length === 0
+        ? "No Gmail is connected through Stella."
+        : `Say which account: ${accounts.map((entry) => entry.email).join(", ")}.`,
+    );
+  }
+  const get = await account.get();
+  try {
+    if (args.action === "read") {
+      const mail = (await runGoogleAction(get, "gmail", "GMAIL_GET_EMAIL", { message_id: args.messageId })) as Record<string, unknown>;
+      const body = typeof mail.body === "string" ? mail.body : "";
+      const attachments = Array.isArray(mail.attachments)
+        ? mail.attachments.map((entry) => String((entry as Record<string, unknown>).filename ?? "")).filter(Boolean)
+        : [];
+      return {
+        text: [
+          `From: ${String(mail.from ?? "")}`,
+          `To: ${String(mail.to ?? "")}`,
+          ...(mail.cc ? [`Cc: ${String(mail.cc)}`] : []),
+          `Subject: ${String(mail.subject ?? "")}`,
+          `Date: ${String(mail.date ?? "")}`,
+          `Account: ${account.email}, message_id ${String(mail.id ?? args.messageId)}, thread_id ${String(mail.threadId ?? "")}`,
+          ...(attachments.length ? [`Attachments: ${attachments.join(", ")}`] : []),
+          "",
+          body.slice(0, MAIL_TEXT_CHARS),
+        ].join("\n"),
+      };
+    }
+    const body = (args.body ?? "").trim();
+    if (!body) throw new RpcError("BAD_REQUEST", "reply and draft need a body.");
+    enforceOwnerRateLimit(ctx.db, ctx.now, "email.mail.reply", { count: 30, windowMs: HOUR }, "Too many emails sent. Try again later.");
+    const original = (await get(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(args.messageId)}?format=metadata&metadataHeaders=From&metadataHeaders=Reply-To&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Subject`,
+    )) as Record<string, unknown>;
+    const headers = original.payload && typeof original.payload === "object" ? (original.payload as Record<string, unknown>).headers : undefined;
+    const sender = header(headers, "Reply-To") || header(headers, "From");
+    const others = args.all
+      ? [...addressesIn(header(headers, "To")), ...addressesIn(header(headers, "Cc"))].filter(
+          (address) => address !== account.email && address !== parseAddress(sender).address,
+        )
+      : [];
+    const subject = header(headers, "Subject");
+    const input = {
+      to: [sender],
+      ...(others.length ? { cc: [...new Set(others)] } : {}),
+      subject: /^re:/iu.test(subject.trim()) ? subject : `Re: ${subject}`,
+      body,
+      reply_to_message_id: args.messageId,
+    };
+    const result = (await runGoogleAction(
+      get,
+      "gmail",
+      args.action === "reply" ? "GMAIL_SEND_EMAIL" : "GMAIL_CREATE_DRAFT",
+      input,
+    )) as Record<string, unknown>;
+    log(args.action === "reply" ? "mail_replied" : "mail_drafted", { owner: ctx.ownerId.slice(0, 12) });
+    const recipients = [sender, ...(others.length ? others : [])].join(", ");
+    return {
+      text:
+        args.action === "reply"
+          ? `Sent from ${account.email} to ${recipients}, in the email's thread (message_id ${String(result.id ?? "")}).`
+          : `Saved a draft reply in ${account.email} to ${recipients}, in the email's thread (draft ${String(result.id ?? "")}).`,
+    };
+  } catch (error) {
+    if (error instanceof GoogleApiError) {
+      throw new RpcError(error.status === 404 ? "NOT_FOUND" : "UNAVAILABLE", error.status === 404 ? "That email isn't in this account anymore." : error.message);
+    }
+    throw error;
+  }
+};
+
 const ruleId = (): string => `r${crypto.randomUUID().replace(/-/gu, "").slice(0, 10)}`;
 
 export const emailDomain = {
@@ -1388,6 +1484,17 @@ export const emailDomain = {
       parse: empty(),
       handler: (ctx) => ({ rules: rulesOf(ctx.db).map(toRule), note: stateOf(ctx.db)?.note ?? "" }),
     },
+    "email.mail": {
+      scope: "owner",
+      parse: object({
+        action: literal("read", "reply", "draft"),
+        account: optional(string({ max: 320 })),
+        messageId: string({ min: 1, max: 128 }),
+        body: optional(string({ max: 20_000 })),
+        all: optional(boolean()),
+      }),
+      handler: mailAction,
+    },
     "email.checkNow": {
       scope: "owner",
       parse: empty(),
@@ -1410,7 +1517,19 @@ export const emailDomain = {
   },
   internal: {
     "email.changed": changed,
-    "email.tool": (ctx: OwnerContext, args: unknown) => emailTool(ctx, args),
+    "email.tool": async (ctx: OwnerContext, args: unknown) => {
+      const raw = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+      if (raw.action === "read" || raw.action === "reply" || raw.action === "draft") {
+        return await mailAction(ctx, {
+          action: raw.action,
+          messageId: typeof raw.message_id === "string" ? raw.message_id.trim().slice(0, 128) : "",
+          ...(typeof raw.account === "string" ? { account: raw.account.slice(0, 320) } : {}),
+          ...(typeof raw.body === "string" ? { body: raw.body.slice(0, 20_000) } : {}),
+          ...(raw.all === true ? { all: true } : {}),
+        });
+      }
+      return emailTool(ctx, args);
+    },
     "email.summaryNow": async (ctx: OwnerContext) => {
       const snapshot = await ctx.host.snapshot();
       return { posted: await postSummary(ctx, snapshot, zoneOf(ctx, snapshot), true) };

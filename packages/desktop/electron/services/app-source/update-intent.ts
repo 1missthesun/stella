@@ -75,6 +75,7 @@ export const readIntent = async (commonDir: string): Promise<UpdateIntent> => {
 export const writeIntent = async (commonDir: string, intent: UpdateIntent) => {
   const file = path.join(commonDir, FILE);
   const kept: UpdateIntent = { ...intent, handled: intent.handled.slice(-HANDLED_KEEP) };
-  await fs.writeFile(`${file}.tmp`, JSON.stringify(kept));
-  await fs.rename(`${file}.tmp`, file);
+  const staging = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(staging, JSON.stringify(kept));
+  await fs.rename(staging, file);
 };

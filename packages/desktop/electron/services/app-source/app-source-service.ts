@@ -335,6 +335,7 @@ export class AppSourceService {
   private update: AppSourceUpdate | null = null;
   private updateWatch: { baseUrl: string; stop: () => void } | null = null;
   private intent: UpdateIntent | null = null;
+  private intentWrites: Promise<void> = Promise.resolve();
   private plan: { paid: boolean | null; at: number } | null = null;
   private readonly claimTried = new Map<string, number>();
   private readonly reported = new Set<string>();
@@ -1544,12 +1545,21 @@ export class AppSourceService {
     return this.intent;
   }
 
+  /**
+   * Writes go one at a time: an update landing notes its arrival and prunes
+   * what was asked for at the same moment, and each write is the whole file.
+   */
   private async saveIntent(change: (intent: UpdateIntent) => void) {
     const intent = await this.loadIntent();
     change(intent);
-    await writeIntent(await this.commonDir(this.options.stellaAppDir), intent).catch((error: unknown) =>
-      this.options.log("app-source.intent-write-failed", { message: errorMessage(error) }),
+    const commonDir = await this.commonDir(this.options.stellaAppDir);
+    const write = this.intentWrites.then(() =>
+      writeIntent(commonDir, intent).catch((error: unknown) =>
+        this.options.log("app-source.intent-write-failed", { message: errorMessage(error) }),
+      ),
     );
+    this.intentWrites = write;
+    await write;
   }
 
   private want(entry: Wanted) {

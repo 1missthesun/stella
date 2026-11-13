@@ -381,6 +381,8 @@ export type StellaAgentsHost = {
     report: string;
   }): void;
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
+  /** A stopped agent's own processes (its shells, tools and what they started) end. */
+  endAgentProcesses?(threadId: string): Promise<void>;
   directory?: AgentDirectoryHost;
   agentDirectory?(threadId: string): string;
   directoryProblem?(directory: string): Promise<string | undefined>;
@@ -2047,6 +2049,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         (await agentsBusy(busyReader(store, context), id).catch(() => false));
       await markStopped(store, agent.parentConversationId, agent.threadId, context);
       await (await store.conversation(id, context))?.abort(context);
+      await host.endAgentProcesses?.(agent.threadId).catch(() => undefined);
       local.push(agent.threadId);
       if (waiting && agent.parentConversationId === rootConversationId) {
         await host.agentStopped?.({ threadId: agent.threadId, description: record.description }, context);

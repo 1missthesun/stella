@@ -5,8 +5,17 @@ import type { EnvTarget } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { defaultAgentDirectory } from "@stella/runtime/kernel/agents/agent-directory";
 import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree";
+import { endTaskProcesses, pruneTaskProcessLedgers } from "@stella/runtime/kernel/shared/task-processes";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import type { RemoteAgentHost, StellaAgentsHost } from "../stella/agents.ts";
+
+const LEDGER_PRUNE_DELAY_MS = 60_000;
+const prunedLedgers = new Set<string>();
+const pruneLedgersOnce = (dataDir: string) => {
+  if (prunedLedgers.has(dataDir)) return;
+  prunedLedgers.add(dataDir);
+  setTimeout(() => void pruneTaskProcessLedgers(dataDir).catch(() => undefined), LEDGER_PRUNE_DELAY_MS).unref?.();
+};
 
 export function desktopAgentsHost(
   options: {
@@ -29,6 +38,7 @@ export function desktopAgentsHost(
     agentLog?: StellaAgentsHost["agentLog"];
   } = {},
 ): StellaAgentsHost {
+  if (options.dataDir) pruneLedgersOnce(options.dataDir);
   return {
     ...(options.agentReported ? { agentReported: options.agentReported } : {}),
     ...(options.agentStopped ? { agentStopped: options.agentStopped } : {}),
@@ -42,6 +52,13 @@ export function desktopAgentsHost(
     ...(options.reportsFromLedger ? { reportsFromLedger: options.reportsFromLedger } : {}),
     ...(options.directory ? { directory: options.directory } : {}),
     ...(options.dataDir ? { agentDirectory: (threadId: string) => defaultAgentDirectory(options.dataDir!, threadId) } : {}),
+    ...(options.dataDir
+      ? {
+          endAgentProcesses: async (threadId: string) => {
+            await endTaskProcesses({ owner: threadId, stellaDataDir: options.dataDir! });
+          },
+        }
+      : {}),
     ...(options.execution ? { execution: options.execution } : {}),
     ...(options.agentLog ? { agentLog: options.agentLog } : {}),
     directoryProblem: async (directory) => {

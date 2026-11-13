@@ -2259,6 +2259,9 @@ class ClaudeCodeSessionRuntime {
     let loginRefusals = 0;
     let refreshLockWaits = 0;
     let transientAuthRetries = 0;
+    // Holds in this step so far: each one waits longer before trying a
+    // refused login again.
+    let loginHolds = 0;
     await this.awaitClaudeLogin(request);
 
     for (;;) {
@@ -2349,7 +2352,12 @@ class ClaudeCodeSessionRuntime {
             console.warn("[claude-code] waiting for a Claude sign-in", {
               detail: normalizeErrorMessage(error).slice(0, 400),
             });
-            await this.awaitClaudeLogin(request, { email: session.claudeLoginEmail ?? next.email, force: true });
+            await this.awaitClaudeLogin(request, {
+              email: session.claudeLoginEmail ?? next.email,
+              force: true,
+              earlierHolds: loginHolds,
+            });
+            loginHolds += 1;
             // A fresh try after the wait: a sign-in, or a refused login
             // that answers again.
             loginRechecks = 0;
@@ -2419,7 +2427,7 @@ class ClaudeCodeSessionRuntime {
    */
   async awaitClaudeLogin(
     request: ClaudeCodeTurnRequest,
-    options: { email?: string; force?: boolean } = {},
+    options: { email?: string; force?: boolean; earlierHolds?: number } = {},
   ) {
     let config = await getClaudeCodeConfig();
     if (config.signedIn && !options.force) return;
@@ -2434,8 +2442,9 @@ class ClaudeCodeSessionRuntime {
     });
     const deadline = Date.now() + CLAUDE_LOGIN_HOLD_MAX_MS;
     let resumed = false;
-    let reprobes = 0;
-    let reprobeAt = Date.now() + CLAUDE_LOGIN_REPROBE_DELAYS_MS[0]!;
+    let reprobes = options.earlierHolds ?? 0;
+    let reprobeAt =
+      Date.now() + CLAUDE_LOGIN_REPROBE_DELAYS_MS[Math.min(reprobes, CLAUDE_LOGIN_REPROBE_DELAYS_MS.length - 1)]!;
     try {
       for (;;) {
         await waitUntil(

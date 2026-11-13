@@ -23,6 +23,19 @@ export const CLOUD_USER_ASK_PATH = "/api/cloud/user-ask";
 
 const ANSWER_POLL_MS = 10_000;
 const FIRST_POLL_MS = 1_500;
+/** Backoff between tries of a request that failed for a passing reason. */
+const RETRY_DELAYS_MS = [500, 1_000, 2_000, 4_000, 8_000, 15_000];
+/**
+ * While waiting for the user, how long reads may keep failing for a passing
+ * reason (a deploy, a dropped connection) before the question is given up.
+ * The user may take hours to answer; one failed read must not end the ask.
+ */
+const ANSWER_OUTAGE_MAX_MS = 10 * 60_000;
+
+/** A failure that says nothing about the ask itself: try again. */
+class TransientAskError extends Error {}
+
+const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export type CloudUserAskHost = {
   handlers: Required<Pick<UserToolsConfig, "askUser" | "requestSecureInput">> &
@@ -83,20 +96,54 @@ export const createCloudUserAskHost = (args: {
   const openAsks = new Set<string>();
   let shutdownNote: string | null = null;
 
-  const request = async (body: Record<string, unknown>): Promise<unknown> => {
-    const response = await args.post(CLOUD_USER_ASK_PATH, {
-      turnId: args.turnId,
-      ...body,
-    });
+  const attempt = async (body: Record<string, unknown>): Promise<unknown> => {
+    let response: Response;
+    try {
+      response = await args.post(CLOUD_USER_ASK_PATH, {
+        turnId: args.turnId,
+        ...body,
+      });
+    } catch (error) {
+      throw new TransientAskError(
+        `Stella's cloud could not be reached (${(error as Error).message || "connection failed"}).`,
+      );
+    }
     if (!response.ok) {
       const detail = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      throw new Error(
-        detail?.error ?? `The ask could not be registered (${response.status}).`,
+      const message =
+        detail?.error ?? `The ask could not be registered (${response.status}).`;
+      throw TRANSIENT_STATUSES.has(response.status)
+        ? new TransientAskError(message)
+        : new Error(message);
+    }
+    try {
+      return (await response.json()) as unknown;
+    } catch (error) {
+      throw new TransientAskError(
+        `The reply from Stella's cloud was cut off (${(error as Error).message}).`,
       );
     }
-    return (await response.json()) as unknown;
+  };
+
+  // Every op is idempotent on the server (register by askId + toolCallId), so
+  // a try that failed in passing is simply sent again.
+  const request = async (body: Record<string, unknown>): Promise<unknown> => {
+    for (let index = 0; ; index += 1) {
+      try {
+        return await attempt(body);
+      } catch (error) {
+        if (
+          !(error instanceof TransientAskError) ||
+          index >= RETRY_DELAYS_MS.length ||
+          shutdownNote
+        ) {
+          throw error;
+        }
+        await sleep(RETRY_DELAYS_MS[index]!);
+      }
+    }
   };
 
   const cancel = async (askId: string): Promise<void> => {
@@ -104,8 +151,10 @@ export const createCloudUserAskHost = (args: {
     await request({ op: "cancel", askId }).catch(() => undefined);
   };
 
+  // Polled for as long as the user takes, so a read gets one try; the wait
+  // loop decides how long a run of passing failures may last.
   const readAnswer = async (askId: string): Promise<AnswerRead> =>
-    (await request({ op: "answer", askId })) as AnswerRead;
+    (await attempt({ op: "answer", askId })) as AnswerRead;
 
   const register = async (body: Record<string, unknown>): Promise<string> => {
     const askId = randomUUID();
@@ -125,6 +174,8 @@ export const createCloudUserAskHost = (args: {
     onDefault: () => UserAskResolution;
   }): Promise<UserAskResolution> => {
     let delay = FIRST_POLL_MS;
+    let failingSince: number | null = null;
+    let failures = 0;
     while (true) {
       if (shutdownNote) {
         return {
@@ -144,7 +195,18 @@ export const createCloudUserAskHost = (args: {
       let read: AnswerRead;
       try {
         read = await readAnswer(input.askId);
+        failingSince = null;
+        failures = 0;
       } catch (error) {
+        if (error instanceof TransientAskError) {
+          failingSince ??= Date.now();
+          if (Date.now() - failingSince < ANSWER_OUTAGE_MAX_MS) {
+            delay =
+              RETRY_DELAYS_MS[Math.min(failures, RETRY_DELAYS_MS.length - 1)]!;
+            failures += 1;
+            continue;
+          }
+        }
         openAsks.delete(input.askId);
         return {
           outcome: "canceled",

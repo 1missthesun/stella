@@ -14,6 +14,7 @@ import {
 } from 'effect'
 import {
   ensurePrivateDirSync,
+  readPrivateJsonFileSync,
   writePrivateFileSync,
 } from './shared/private-fs.js'
 import {
@@ -684,6 +685,12 @@ export class LocalSchedulerService {
   private tickFiber: Fiber.Fiber<void, unknown> | null = null
   private started = false
   private tickInFlight = false
+  /** Set when this start found the state file damaged: what came back, and from where. */
+  private damage: {
+    damagedCopy: string | null
+    from: 'file' | 'last-good' | null
+    conversationIds: string[]
+  } | null = null
 
   constructor(private readonly options: LocalSchedulerServiceOptions) {
     this.statePath = path.join(options.stellaDataDir, 'local-scheduler.json')
@@ -701,13 +708,18 @@ export class LocalSchedulerService {
     this.started = true
     this.serviceScope = Scope.makeUnsafe()
     this.state = this.readState()
-    if (!fs.existsSync(this.statePath)) {
+    if (!fs.existsSync(this.statePath) || this.damage) {
       this.persistState()
     }
     if (this.clearRecoveredRunningFlags()) {
       this.persistState()
     }
-    this.collectOrphanScripts()
+    if (this.damage) {
+      // Scripts of schedules that didn't come back stay, so they can be restored.
+      this.reportDamage()
+    } else {
+      this.collectOrphanScripts()
+    }
     this.scheduleNextTick(250)
   }
 
@@ -993,12 +1005,104 @@ export class LocalSchedulerService {
     return events.slice(events.length - normalizedMax).map(cloneGeneratedEvent)
   }
 
+  private get lastGoodPath() {
+    return `${this.statePath}.last-good`
+  }
+
+  /**
+   * A damaged state file is never taken for an empty one (two schedules
+   * silently stopped for two weeks that way): the damaged file is kept beside
+   * it, the newest whole state at its start comes back (else the copy last
+   * read whole at a start), and the user and Stella are told.
+   */
   private readState(): LocalSchedulerState {
+    this.damage = null
+    let read
     try {
-      const raw = fs.readFileSync(this.statePath, 'utf-8')
-      return sanitizeState(JSON.parse(raw), this.scriptsDir)
-    } catch {
+      read = readPrivateJsonFileSync(this.statePath, 'local-scheduler.json')
+    } catch (error) {
+      console.error('[local-scheduler] Could not read local-scheduler.json:', error)
       return createEmptyState()
+    }
+    if (read.kind === 'missing') return createEmptyState()
+    if (read.kind === 'ok') {
+      this.keepLastGood(read.value)
+      return sanitizeState(read.value, this.scriptsDir)
+    }
+    let from: 'file' | 'last-good' | null = null
+    let state = createEmptyState()
+    if (read.recovered !== undefined) {
+      state = sanitizeState(read.recovered, this.scriptsDir)
+      from = 'file'
+    } else {
+      try {
+        const lastGood = readPrivateJsonFileSync(this.lastGoodPath, 'local-scheduler.json.last-good')
+        if (lastGood.kind === 'ok') {
+          state = sanitizeState(lastGood.value, this.scriptsDir)
+          from = 'last-good'
+        }
+      } catch {
+        // No usable last-good copy: what was lost is reported as lost.
+      }
+    }
+    const conversationIds = new Set(state.cronJobs.map((job) => job.conversationId))
+    if (read.damagedCopy) {
+      try {
+        const raw = fs.readFileSync(read.damagedCopy, 'utf-8')
+        for (const match of raw.matchAll(/"conversationId"\s*:\s*"([^"\\]{1,200})"/g)) {
+          conversationIds.add(match[1]!)
+        }
+      } catch {
+        // The copy is only used to find who to tell.
+      }
+    }
+    this.damage = { damagedCopy: read.damagedCopy, from, conversationIds: [...conversationIds] }
+    console.error(
+      `[local-scheduler] local-scheduler.json was damaged; ${
+        from ? `recovered ${state.cronJobs.length} schedule(s) from ${from === 'file' ? 'the file' : 'the last good copy'}` : 'no schedules could be recovered'
+      }.`,
+    )
+    return state
+  }
+
+  /** The state as last read whole at a start: what a damaged file falls back to when nothing at its start parses. */
+  private keepLastGood(value: unknown) {
+    try {
+      const body = JSON.stringify(value)
+      const current = fs.existsSync(this.lastGoodPath) ? fs.readFileSync(this.lastGoodPath, 'utf-8') : null
+      if (current !== body) writePrivateFileSync(this.lastGoodPath, body)
+    } catch (error) {
+      console.warn('[local-scheduler] Could not keep a last-good copy of local-scheduler.json:', error)
+    }
+  }
+
+  private reportDamage() {
+    const damage = this.damage
+    if (!damage) return
+    const names = this.state.cronJobs.map((job) => job.name?.trim() || job.id)
+    const kept = damage.damagedCopy ? ` The damaged file is kept at ${damage.damagedCopy}.` : ''
+    const text = damage.from
+      ? `[Schedules recovered] This computer's schedules file (local-scheduler.json) was damaged. ${
+          names.length
+        } schedule(s) came back from ${
+          damage.from === 'file' ? 'the file itself' : 'the copy kept at the last start, so changes made since then are missing'
+        }${names.length ? `: ${names.join(', ')}` : ''}. Check with schedule_list that nothing is missing and recreate anything that is.${kept}`
+      : `[Schedules lost] This computer's schedules file (local-scheduler.json) was damaged and none of its schedules could be recovered. Recreate them with schedule_add; the user may need to say which they had.${kept}`
+    for (const conversationId of damage.conversationIds) {
+      this.appendGeneratedAssistantMessage(conversationId, { text, source: 'cron' })
+    }
+    if (damage.conversationIds.length > 0) {
+      this.fireOsNotification({
+        title: damage.from ? 'Schedules recovered' : 'Schedules lost',
+        body: damage.from
+          ? `This computer's schedules file was damaged; ${names.length} schedule(s) came back.`
+          : "This computer's schedules file was damaged and its schedules could not be recovered.",
+        conversationId: damage.conversationIds[0]!,
+        source: 'cron',
+        refId: 'local-scheduler-damage',
+      })
+      this.persistState()
+      this.emitChange()
     }
   }
 

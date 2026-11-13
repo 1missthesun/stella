@@ -17,7 +17,7 @@ import {
   protectValue,
   unprotectValue,
 } from "@stella/runtime/kernel/shared/protected-storage";
-import { writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
 
 const INDEX_FILE = "user-ask-saved-values.json";
 const LEGACY_FILE = "user-ask-secrets.json";
@@ -289,7 +289,7 @@ export class SavedSecureValues {
 
   private readIndex(dir: string): IndexFile {
     try {
-      const parsed = JSON.parse(fs.readFileSync(this.indexPath(dir), "utf-8"));
+      const parsed = readPrivateJsonValueSync(this.indexPath(dir)) as Partial<IndexFile> | undefined;
       if (parsed?.version === 1 && parsed.entries && typeof parsed.entries === "object") {
         return parsed as IndexFile;
       }

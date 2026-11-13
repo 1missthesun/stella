@@ -1,11 +1,11 @@
-import { promises as fs } from "node:fs";
 import path from "node:path";
+import { readPrivateJsonValueSync, writePrivateFile } from "../shared/private-fs.js";
 
 import type { ApiConnectorConfig, ConnectorCommandConfig } from "./types.js";
 
 const readJson = async <T = unknown>(filePath: string): Promise<T | null> => {
   try {
-    return JSON.parse(await fs.readFile(filePath, "utf-8")) as T;
+    return (readPrivateJsonValueSync(filePath) as T | undefined) ?? null;
   } catch {
     return null;
   }
@@ -34,12 +34,7 @@ export const saveConfiguredConnectorCommands = async (
   commands: ConnectorCommandConfig[],
 ) => {
   const filePath = getConfiguredCommandsPath(stellaAppDir);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(
-    filePath,
-    `${JSON.stringify({ commands }, null, 2)}\n`,
-    "utf-8",
-  );
+  await writePrivateFile(filePath, `${JSON.stringify({ commands }, null, 2)}\n`);
 };
 
 export const listConfiguredApiConnectors = async (
@@ -56,8 +51,7 @@ export const saveConfiguredApiConnectors = async (
   apis: ApiConnectorConfig[],
 ) => {
   const filePath = getConfiguredApiConnectorsPath(stellaAppDir);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify({ apis }, null, 2)}\n`, "utf-8");
+  await writePrivateFile(filePath, `${JSON.stringify({ apis }, null, 2)}\n`);
 };
 
 export const removeConfiguredConnector = async (

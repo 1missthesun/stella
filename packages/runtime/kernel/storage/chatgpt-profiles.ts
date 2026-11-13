@@ -16,7 +16,7 @@ import {
 } from "@stella/contracts/chatgpt-siwc-flows";
 import type { ChatGptSavedRegistration } from "../integrations/chatgpt-sign-in.js";
 import { protectValue, unprotectValue } from "../shared/protected-storage.js";
-import { writePrivateFileSync } from "../shared/private-fs.js";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "../shared/private-fs.js";
 
 const PROFILES_FILE = "chatgpt_profiles.json";
 const SECRET_SCOPE = "chatgpt-profile";
@@ -57,7 +57,7 @@ const filePath = (stellaAppDir: string) => path.join(stellaAppDir, PROFILES_FILE
 
 const readFile = (stellaAppDir: string): ProfilesFile => {
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath(stellaAppDir), "utf-8")) as ProfilesFile;
+    const parsed = readPrivateJsonValueSync(filePath(stellaAppDir)) as ProfilesFile | undefined;
     if (parsed?.version === 1 && isChatGptHostId(parsed.hostId) && Array.isArray(parsed.profiles)) {
       return {
         version: 1,
@@ -80,9 +80,7 @@ const readFile = (stellaAppDir: string): ProfilesFile => {
 
 const writeFile = (stellaAppDir: string, file: ProfilesFile): void => {
   const target = filePath(stellaAppDir);
-  const temp = `${target}.${process.pid}.tmp`;
-  writePrivateFileSync(temp, JSON.stringify(file, null, 2));
-  fs.renameSync(temp, target);
+  writePrivateFileSync(target, JSON.stringify(file, null, 2));
 };
 
 const secretScope = (profileId: string) => `${SECRET_SCOPE}:${profileId}`;

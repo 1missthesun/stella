@@ -48,7 +48,7 @@ import {
   validateUserAskResponses,
 } from "@stella/contracts/user-ask";
 import { protectValue } from "@stella/runtime/kernel/shared/protected-storage";
-import { writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
 import {
   getUserAskEscalationPolicy,
   setUserAskEscalationPolicy,
@@ -139,7 +139,7 @@ const storeKeychainFallback = (stellaAppDir, target, value) => {
     const filePath = path.join(stellaAppDir, KEYCHAIN_FALLBACK_FILE);
     let entries = {};
     try {
-        const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        const parsed = readPrivateJsonValueSync(filePath);
         if (parsed?.version === 1 && parsed.entries && typeof parsed.entries === "object") {
             entries = parsed.entries;
         }
@@ -1320,7 +1320,7 @@ export class UserAskService {
         this.cloudOutbox = new Map();
         const filePath = this.cloudOutboxPath();
         try {
-            const parsed = filePath ? JSON.parse(fs.readFileSync(filePath, "utf-8")) : null;
+            const parsed = filePath ? readPrivateJsonValueSync(filePath) : null;
             for (const [askId, entry] of Object.entries(parsed?.entries ?? {})) {
                 if (entry?.op === "close" && !entry.ask) {
                     this.cloudOutbox.set(askId, entry);

@@ -1,5 +1,5 @@
-import { promises as fs } from "node:fs";
 import path from "node:path";
+import { readPrivateJsonValueSync, writePrivateFile } from "../shared/private-fs.js";
 
 import {
   GOOGLE_WORKSPACE_TOOL_ALLOWLIST,
@@ -247,9 +247,7 @@ const readState = async (
   stellaAppDir: string,
 ): Promise<NativeConnectorStateFile> => {
   try {
-    const parsed = JSON.parse(
-      await fs.readFile(statePath(stellaAppDir), "utf-8"),
-    ) as NativeConnectorStateFile;
+    const parsed = readPrivateJsonValueSync(statePath(stellaAppDir)) as NativeConnectorStateFile | undefined;
     if (parsed?.version === 1 && parsed.integrations) return parsed;
   } catch {
     // Empty state is valid.
@@ -262,8 +260,7 @@ const writeState = async (
   state: NativeConnectorStateFile,
 ) => {
   const filePath = statePath(stellaAppDir);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
+  await writePrivateFile(filePath, `${JSON.stringify(state, null, 2)}\n`);
 };
 
 export const getNativeConnectorCatalogEntry = (

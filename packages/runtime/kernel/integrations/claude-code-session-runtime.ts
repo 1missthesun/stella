@@ -21,6 +21,7 @@ import {
 } from "./effect-runtime.js";
 import { watchChildStdio } from "../shared/child-stdio.js";
 import { trackAgentProcess } from "../shared/agent-process-registry.js";
+import { recordTaskProcess } from "../shared/task-processes.js";
 import { sanitizeSensitiveData } from "@stella/contracts/sensitive-data";
 import {
   isSafeguardBlockText,
@@ -2900,6 +2901,7 @@ class ClaudeCodeSessionRuntime {
     trackAgentProcess(child, `claude-code ${request.sessionKey}`, {
       processGroup: process.platform !== "win32",
     });
+    child.once("exit", recordTaskProcess(childEnv, child.pid));
     const processState: ClaudeCodeProcessState = {
       child,
       stdoutBuffer: "",

@@ -34,6 +34,7 @@ import {
 } from "../session-fs.js";
 import type { Rect } from "./ax-format.js";
 import type { SessionPaths } from "./session-paths.js";
+import { withoutTaskProcessOwnership } from "../../shared/task-processes.js";
 
 type AutomationDaemonRequestPayload = {
   seq: number;
@@ -494,7 +495,7 @@ const spawnAutomationDaemonLocally = (
         stdio,
         windowsHide: true,
         env: {
-          ...getComputerExecutionEnv(),
+          ...withoutTaskProcessOwnership(getComputerExecutionEnv()),
           STELLA_COMPUTER_SESSION: sessionPaths.sessionId,
           STELLA_COMPUTER_STATE_DIR: computerStateDir(),
         },

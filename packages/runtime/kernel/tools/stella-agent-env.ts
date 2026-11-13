@@ -1,4 +1,5 @@
 import path from "path";
+import { taskProcessEnvironment } from "../shared/task-processes.js";
 
 export const stellaAgentShellEnvironment = (context: {
   stellaAppDir?: string;
@@ -15,6 +16,11 @@ export const stellaAgentShellEnvironment = (context: {
       "drafts",
     );
   }
-  if (context.agentId) env.STELLA_AGENT_ID = context.agentId;
+  if (context.agentId) {
+    env.STELLA_AGENT_ID = context.agentId;
+    if (context.stellaDataDir) {
+      Object.assign(env, taskProcessEnvironment(context.stellaDataDir, context.agentId));
+    }
+  }
   return env;
 };

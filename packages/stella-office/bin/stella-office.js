@@ -14,6 +14,13 @@ import {
 import { arch, platform } from "os";
 import { basename, extname, join, resolve } from "path";
 
+const withoutTaskProcessOwnership = (env) => {
+  const next = { ...env };
+  delete next.STELLA_TASK_PROCESS_OWNER;
+  delete next.STELLA_TASK_PROCESS_LEDGER;
+  return next;
+};
+
 const __dirname = import.meta.dirname;
 const CURRENT_FILE_PATH = import.meta.filename;
 const PREVIEW_ROOT_DIRNAME = "office-previews";
@@ -295,7 +302,7 @@ async function startPreviewSession(binaryPath, argv) {
       stdio: "ignore",
       windowsHide: true,
       env: {
-        ...process.env,
+        ...withoutTaskProcessOwnership(process.env),
         OFFICECLI_SKIP_UPDATE: "1",
       },
     },

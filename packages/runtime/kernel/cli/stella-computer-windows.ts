@@ -35,6 +35,7 @@ import {
   type StateDiff,
   type StateDiffTarget,
 } from "./stella-computer-state-diff.js";
+import { withoutTaskProcessOwnership } from "../shared/task-processes.js";
 
 type WinFrame = {
   x: number;
@@ -592,7 +593,7 @@ export const spawnWindowsDaemonProcess = async (
         detached: false,
         stdio: "ignore",
         windowsHide: true,
-        env: getComputerExecutionEnv(),
+        env: withoutTaskProcessOwnership(getComputerExecutionEnv()),
       },
     );
   } catch (error) {

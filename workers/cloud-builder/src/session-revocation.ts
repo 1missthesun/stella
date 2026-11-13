@@ -7,7 +7,7 @@
  */
 
 import type { VerifiedToken, VerifyResult } from "./auth-jwt.js";
-import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
+import { log, withInfrastructureDeadline } from "./build-session/shared/keys.js";
 import { ownerGateStub } from "./rpc-release.js";
 
 export type SessionRevocations = {
@@ -33,7 +33,15 @@ export const sessionRevokedBy = (
 };
 
 const REVOCATION_CACHE_MS = 5_000;
-const REVOCATION_LOOKUP_TIMEOUT_MS = 3_000;
+// An OwnerGate that has to start up first (it sleeps when idle) takes 3-6 s to
+// answer; clients wait 10 s for a socket ticket, so the lookup waits for it
+// rather than refusing every request that arrives while it wakes.
+const REVOCATION_LOOKUP_TIMEOUT_MS = 8_000;
+// When the OwnerGate can't answer in time, the revocations this isolate read
+// within this window still stand in for them. A sign-out made in this isolate
+// clears its copy, the OwnerGate closes the sockets of a signed-out session
+// itself, and owner calls are still checked there.
+const REVOCATION_STALE_FALLBACK_MS = 10 * 60_000;
 const CACHE_MAX = 10_000;
 const cache = new Map<string, { revocations: SessionRevocations; fetchedAtMs: number }>();
 
@@ -66,6 +74,15 @@ const ownerSessionRevocations = async (
     // before sign-out revocation existed answers without this method. That
     // code never recorded a revocation, so it has none to report.
     if (isMissingRevocationMethod(error)) return NO_REVOCATIONS;
+    const known = cache.get(ownerId);
+    if (known && Date.now() - known.fetchedAtMs < REVOCATION_STALE_FALLBACK_MS) {
+      log("info", "session_revocations_stale_used", {
+        ownerId,
+        ageMs: Date.now() - known.fetchedAtMs,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return known.revocations;
+    }
     throw error;
   }
   if (cache.size >= CACHE_MAX) cache.clear();

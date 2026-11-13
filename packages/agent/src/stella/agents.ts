@@ -673,7 +673,7 @@ const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDel
             : delivery.outcome === "queued"
               ? "That Stella reads it as its next turn."
               : delivery.outcome === "held"
-                ? "Its computer is offline, so the message is held and reaches it once that computer reconnects; its report goes to whoever started it."
+                ? "The message is held for it and delivered as soon as it can take it; its report goes to whoever started it."
                 : "It reads your message before its next step; its report goes to whoever started it."
       }${delivery.note ? ` ${delivery.note}` : ""}`,
     },

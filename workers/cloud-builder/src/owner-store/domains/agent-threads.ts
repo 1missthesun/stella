@@ -2092,9 +2092,18 @@ type ControlInput = {
   refuseOffline?: true;
 };
 
+/**
+ * Why a command waits in the outbox instead of landing now: its computer is
+ * offline (`unreachable`), didn't answer (`timeout`), or the agent is running
+ * but between runs (`between_runs`: starting up, reconnecting or just
+ * finishing), so no run takes a steer at this moment. Each is retried every
+ * `COMMAND_RETRY_MS` until it lands, starts the agent's next run, or expires.
+ */
+type CommandHold = "unreachable" | "timeout" | "between_runs";
+
 type Routed =
   | { outcome: AgentControlOutcome; note?: string; waitingForDevice?: true }
-  | { hold: "unreachable" | "timeout" };
+  | { hold: CommandHold };
 
 const controlAgent = async (
   ctx: OwnerContext,
@@ -2144,7 +2153,7 @@ const controlAgent = async (
   }
   const result = await commandResult(ctx, input, executor, deviceId, routed);
   if ("hold" in routed) {
-    holdCommand(ctx, input, deviceId!, routed.hold);
+    holdCommand(ctx, input, deviceId, routed.hold);
   }
   ctx.db.run(
     `UPDATE agent_commands SET state = ?, outcome = ?, result_json = ?, updated_at = ?,
@@ -2275,8 +2284,8 @@ const errorReason = (error: unknown): string =>
 const holdCommand = (
   ctx: OwnerContext,
   input: ControlInput,
-  deviceId: string,
-  reason: "unreachable" | "timeout",
+  deviceId: string | null,
+  reason: CommandHold,
 ): void => {
   ctx.jobs.schedule(
     COMMAND_JOB,
@@ -2400,11 +2409,10 @@ const routeCommand = async (
           return { outcome: "steered" };
         }
         if (steered.reason === "unreachable" || steered.reason === "timeout") return { hold: steered.reason };
-        throw new RpcError(
-          "CONFLICT",
-          `${thread.thread_id} is between runs on its device (starting up or just finishing). Check agent_status, then send_message again.`,
-          { reason: "thread_changed", retryable: true },
-        );
+        // Running, but no run takes a steer right now (its dispatch is being
+        // reconciled after a reconnect, or the run is starting or finishing).
+        // Hold it: a retry steers the next run, or starts one once this attempt ends.
+        return { hold: "between_runs" };
       }
       const destination = await assertDeviceDestination(ctx, executor.deviceId);
       nextAttempt(ctx, input);
@@ -2432,12 +2440,7 @@ const routeCommand = async (
           thread.thread_id,
           thread.attempt_generation,
         );
-        if (queued) {
-          throw new RpcError("CONFLICT", `${thread.thread_id} is starting up. Send the message again in a moment.`, {
-            retryable: true,
-            reason: "thread_starting",
-          });
-        }
+        if (queued) return { hold: "between_runs" };
       }
       nextAttempt(ctx, input);
       return { outcome: "resumed" };
@@ -2553,7 +2556,12 @@ const commandResult = async (
   const offlineName = device
     ? `${device.name}${device.lastSeenAt !== undefined ? ` (last seen ${new Date(device.lastSeenAt).toISOString()})` : ""}`
     : "that computer";
-  if ("hold" in routed) {
+  if ("hold" in routed && routed.hold === "between_runs") {
+    // Not "held": that reads as offline to the sender. The agent is running and
+    // takes the message at its next step, as a steer would.
+    outcome = "queued";
+    note = `It is between runs ${where} (starting up, reconnecting or just finishing), so the message waits and reaches it at its next step, or starts its next run if this one ended. No need to send it again.`;
+  } else if ("hold" in routed) {
     const name = device?.name ?? "that computer";
     outcome = "held";
     note =
@@ -2607,7 +2615,7 @@ const recordMessageLanded = (
   messageId: string,
   delivered: "steered" | "resumed" | "queued" | "held",
   source: string,
-  deviceId: string,
+  deviceId: string | null,
 ): void => {
   const kind = delivered === "steered" ? "steered" : delivered === "resumed" ? "resume_requested" : "input_queued";
   recordAgentChange(
@@ -2619,7 +2627,7 @@ const recordMessageLanded = (
       source,
       detail: {
         messageId,
-        deviceId,
+        ...(deviceId ? { deviceId } : {}),
         ...(kind === "input_queued" ? { heldBy: delivered === "held" ? "owner" : "device" } : {}),
       },
       always: true,

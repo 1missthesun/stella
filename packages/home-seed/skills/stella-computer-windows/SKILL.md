@@ -143,10 +143,14 @@ Stella works in the background: the user keeps their pointer, keyboard focus and
 
 `delivery` is `"background"` (default) or `"foreground"`. `"auto"` is still accepted and means `"background"`.
 
-- Background: element actions go through UI Automation (Invoke, Toggle, Select, Expand, Scroll, Value); other input is posted to the window as messages. The pointer and focus do not move.
-- Some windows ignore posted input: Chromium/Electron/Edge content (pointer: coordinate clicks, drags, scrolling), UWP/XAML apps, GTK and Delphi/VCL apps (pointer and keys). Stella refuses those actions with `background_unavailable` instead of sending input that would be lost. Element clicks still work there through UI Automation, so prefer `element_index` over coordinates.
+Background picks a route per app framework, and every receipt names it (`route`, `delivery`, `delivery_reason`):
+
+- Element actions go through UI Automation (Invoke, Toggle, Select, Expand, Scroll, Value). Scrolling without an element scrolls the UI Automation container under the point.
+- Clicks UI Automation can't do, and drags: posted window messages for ordinary Win32 apps. Chromium/Electron/Edge (and Chromium views inside other apps, like CEF launchers) skip UI Automation for clicks and get single left clicks as posted messages, which land even when the window is covered; double and right clicks and drags there, and clicks in WPF, UWP/XAML, Tk, GTK and Delphi apps, go as synthetic pen input at the point, which needs the point to be visible on screen (not covered by another app's window, not minimized).
+- Keys and text: typed text goes into the focused edit control directly when there is one, into UWP/XAML, WinUI and WPF text fields through UI Automation (appended to what is there), and otherwise as posted characters to the focused control. Shortcuts with Ctrl, Shift or Win can't be sent in the background (apps read those keys from the real keyboard); use the menu item or button instead. Alt shortcuts work in ordinary Win32 and GTK apps.
+- Some input can't reach a window in the background at all: WPF drags, clicks and drags by position in WinUI 3 apps, middle clicks wherever pen input would be needed, `press_key` in WPF, UWP/XAML, WinUI 3, Tk and LibreOffice apps, typed text in WPF, UWP/XAML, WinUI 3 and Tk apps when no text field takes it through UI Automation, mouse-wheel scrolling in Chromium, WPF, UWP/XAML and WinUI 3 where no element under the point scrolls, and pen input where another app's window covers the point. Stella refuses those with `background_unavailable` instead of sending input that would be lost.
 - If a background action changed nothing, the next state says so. Stella does not switch to foreground on its own.
-- Foreground brings the window to the front, sends real OS input at the pointer, then puts the user's previous window and pointer back. Use it only when the user asked Stella to take over the screen (for example "go ahead and use my screen"); otherwise tell the user what you could not do in the background.
+- Foreground brings the window to the front, sends real OS input at the pointer, then puts the user's previous window and pointer back (the receipt's `restored` says whether both came back). Switching back closes menus the action opened and can minimize a fullscreen game. Use it only when the user asked Stella to take over the screen (for example "go ahead and use my screen"); otherwise tell the user what you could not do in the background.
 
 ### Windows that expose no elements
 
@@ -156,10 +160,13 @@ A state without a screenshot says why (minimized, off-screen, or black pixels fr
 
 ### Errors that mean input was refused
 
-Nothing (or only what the message says) was delivered. Do not retry them blindly and never work around them with your own input tools:
+These come back as errors with a specific `code`; nothing (or only what the message says) was delivered. Do not retry them blindly and never work around them with your own input tools:
 
-- `background_unavailable`: this window would ignore background input of this kind; the message names the reason and your options. Use an element (UI Automation) route or `set_value` if there is one, otherwise tell the user. Retry with `delivery: "foreground"` only if the user asked Stella to take over the screen.
-- Other refusals name their cause in the message: the app runs as administrator (Windows drops Stella's input to it), or Windows would not bring the window to the front for foreground input. Tell the user.
+- `background_unavailable`: this window would ignore this background input, or the point is covered or minimized; the message names the framework, the input and your options. Use an element (UI Automation) route or `set_value` if there is one, otherwise tell the user. Retry with `delivery: "foreground"` only if the user asked Stella to take over the screen.
+- `uipi_blocked`: the app runs as administrator; Windows drops Stella's input to it.
+- `input_desktop_unavailable`: the screen is locked or a UAC/secure prompt is showing.
+- `input_partially_injected`: Windows took part of the input and refused the rest (the message says what was delivered).
+- Foreground only: `input_refused` (SendInput accepted none of the events, commonly a game's anti-cheat), `pointer_not_moved` (the pointer was intercepted on the way to the point; no button was pressed), `foreground_refused` (Windows would not bring the window to the front; the message names the window that kept focus), `point_covered` (another app's window, such as an always-on-top one, still covers the point). Tell the user; Stella cannot drive that part of the app.
 
 Do not add sleeps. `get_app_state` performs adaptive settling and extends its wait only while UI Automation events indicate continued changes.
 

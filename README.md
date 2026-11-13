@@ -38,3 +38,5 @@ For the manual reference, see [SELF_HOSTING.md](SELF_HOSTING.md).
 ## Credits
 
 Record screen's capture builder (keyframes, marks, auto-crop and contact sheets) is adapted from [Scrawl](https://github.com/kitlangton/scrawl) by Kit Langton, under the MIT license ([notice](packages/native/show/LICENSE-scrawl)).
+
+Windows computer use's background input (synthetic pen clicks and drags into windows that ignore posted messages, keeping the target from activating, giving the foreground back, and which frameworks drop which background input) follows [Cua](https://github.com/trycua/cua)'s Windows driver by Cua AI, Inc., under the MIT license ([notice](packages/native/LICENSE-cua)).

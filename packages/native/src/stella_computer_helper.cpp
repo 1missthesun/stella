@@ -369,6 +369,7 @@ struct Snapshot {
     bool captureOccluded = false;
     bool captureBlank = false;
     std::string surfaceKind;
+    std::string framework;
     bool surfaceFullscreen = false;
     bool surfaceMinimized = false;
     int contentElementCount = -1;
@@ -1816,6 +1817,53 @@ public:
     }
 };
 
+// The UI framework that draws a window decides which background input it
+// accepts: posted messages, pen/touch injection, or only UI Automation.
+enum class Framework {
+    Win32,
+    Chromium,
+    ChromiumEmbedded,
+    Wpf,
+    Tk,
+    XamlUwp,
+    WinUI3,
+    Gtk,
+    LibreOffice,
+    DelphiVcl,
+};
+
+static std::string frameworkId(Framework framework) {
+    switch (framework) {
+    case Framework::Chromium: return "chromium";
+    case Framework::ChromiumEmbedded: return "chromium_embedded";
+    case Framework::Wpf: return "wpf";
+    case Framework::Tk: return "tk";
+    case Framework::XamlUwp: return "xaml";
+    case Framework::WinUI3: return "winui3";
+    case Framework::Gtk: return "gtk";
+    case Framework::LibreOffice: return "libreoffice";
+    case Framework::DelphiVcl: return "delphi_vcl";
+    case Framework::Win32: break;
+    }
+    return "win32";
+}
+
+static std::string frameworkLabel(Framework framework) {
+    switch (framework) {
+    case Framework::Chromium: return "a Chromium/Electron window";
+    case Framework::ChromiumEmbedded: return "a Chromium view (CEF/WebView2) embedded in the app";
+    case Framework::Wpf: return "a WPF window";
+    case Framework::Tk: return "a Tk window (Tkinter, IDLE)";
+    case Framework::XamlUwp: return "a UWP/XAML window";
+    case Framework::WinUI3: return "a WinUI 3 window";
+    case Framework::Gtk: return "a GTK window";
+    case Framework::LibreOffice: return "a LibreOffice window";
+    case Framework::DelphiVcl: return "a Delphi VCL window";
+    case Framework::Win32: break;
+    }
+    return "a Win32 window";
+}
+
 struct TargetState {
     WindowProcess process;
     IUIAutomationElement* root = nullptr;
@@ -1831,10 +1879,11 @@ struct TargetState {
     bool visualContextNeeded = false;
     bool handlersInstalled = false;
     // What kind of surface the window is, from its child windows and the
-    // last materialized tree. Drives automatic foreground delivery.
+    // last materialized tree. Decides which background input it takes.
     bool surfaceKnown = false;
     bool chromium = false;
     bool chromiumTopLevel = false;
+    Framework framework = Framework::Win32;
     int contentElementCount = -1;
     bool accessibilityWakeAttempted = false;
     std::string accessibilityWake = "not_needed";
@@ -2081,6 +2130,8 @@ static void captureSnapshotImage(Snapshot& snapshot, HWND hwnd) {
 
 struct ChildWindowScan {
     bool chromium = false;
+    bool winUiIsland = false;
+    bool xamlIsland = false;
     std::vector<HWND> chromiumHosts;
 };
 
@@ -2091,6 +2142,11 @@ static bool isChromiumClassName(const std::wstring& className) {
 static BOOL CALLBACK scanChildWindowProc(HWND child, LPARAM lParam) {
     ChildWindowScan* scan = reinterpret_cast<ChildWindowScan*>(lParam);
     std::wstring className = classNameForWindow(child);
+    if (className == L"Microsoft.UI.Content.DesktopChildSiteBridge") scan->winUiIsland = true;
+    if (className == L"Windows.UI.Composition.DesktopWindowContentBridge" || className == L"Windows.UI.Core.CoreWindow" ||
+        className.rfind(L"DesktopWindowXamlSource", 0) == 0) {
+        scan->xamlIsland = true;
+    }
     if (isChromiumClassName(className)) {
         scan->chromium = true;
         if (className == L"Chrome_RenderWidgetHostHWND" || className.rfind(L"Chrome_WidgetWin", 0) == 0) {
@@ -2114,6 +2170,23 @@ static void refreshSurfaceIdentity(TargetState& state) {
     state.chromiumTopLevel = topClass.rfind(L"Chrome_WidgetWin", 0) == 0;
     state.chromium = state.chromiumTopLevel || isChromiumClassName(topClass) || scan.chromium ||
         processName == L"chrome" || processName == L"msedge" || processName == L"electron";
+    std::wstring lowerClass = lowerW(topClass);
+    if (state.chromiumTopLevel) state.framework = Framework::Chromium;
+    else if (topClass == L"WinUIDesktopWin32WindowClass" || scan.winUiIsland) state.framework = Framework::WinUI3;
+    else if (topClass == L"ApplicationFrameWindow" || topClass == L"Windows.UI.Core.CoreWindow" || scan.xamlIsland) {
+        state.framework = Framework::XamlUwp;
+    }
+    else if (topClass.rfind(L"HwndWrapper[", 0) == 0) state.framework = Framework::Wpf;
+    else if (topClass == L"TkTopLevel" || topClass.rfind(L"TkTopLevel.", 0) == 0) state.framework = Framework::Tk;
+    else if (topClass.rfind(L"gdkWindow", 0) == 0 || topClass.rfind(L"gdkSurface", 0) == 0) state.framework = Framework::Gtk;
+    else if (topClass.rfind(L"SAL", 0) == 0) state.framework = Framework::LibreOffice;
+    else if (state.chromium) state.framework = Framework::ChromiumEmbedded;
+    else if (lowerClass.find(L"tapplication") != std::wstring::npos || lowerClass.find(L"vcl") != std::wstring::npos ||
+             processName.find(L"vcl") != std::wstring::npos) {
+        state.framework = Framework::DelphiVcl;
+    } else {
+        state.framework = Framework::Win32;
+    }
     state.surfaceKnown = true;
 }
 
@@ -2266,6 +2339,7 @@ static Snapshot materializeSnapshot(IUIAutomation* uia, TargetState& state, cons
     snapshot.contentElementCount = state.contentElementCount;
     snapshot.accessibilityWake = state.chromium ? state.accessibilityWake : "not_needed";
     snapshot.surfaceKind = state.chromium ? "chromium" : (state.contentElementCount == 0 ? "opaque" : "native");
+    snapshot.framework = frameworkId(state.framework);
     snapshot.surfaceFullscreen = isWindowFullscreen(state.process.hwnd);
     snapshot.surfaceMinimized = IsIconic(state.process.hwnd) != FALSE;
     snapshot.focusedSummary = focusedSummary(uia, state.process.pid);
@@ -2485,27 +2559,112 @@ static void postChecked(HWND target, UINT message, WPARAM wParam, LPARAM lParam,
         "), so the input was not delivered.");
 }
 
-static void sendMouseClick(HWND hwnd, POINT screen, const std::string& button, int count) {
+static BOOL CALLBACK collectWindowThreadProc(HWND child, LPARAM lParam) {
+    auto* threads = reinterpret_cast<std::vector<DWORD>*>(lParam);
+    DWORD thread = GetWindowThreadProcessId(child, NULL);
+    if (thread && std::find(threads->begin(), threads->end(), thread) == threads->end()) threads->push_back(thread);
+    return threads->size() < 64 ? TRUE : FALSE;
+}
+
+// The child window that has keyboard focus inside `root`, across every UI
+// thread that owns part of it (embedded renderers run on their own thread).
+// Keyboard messages posted to a top-level window are not forwarded to the
+// control inside it.
+static HWND focusedDescendant(HWND root) {
+    DWORD rootThread = GetWindowThreadProcessId(root, NULL);
+    if (!rootThread) return NULL;
+    std::vector<DWORD> threads = {rootThread};
+    EnumChildWindows(root, collectWindowThreadProc, reinterpret_cast<LPARAM>(&threads));
+    HWND best = NULL;
+    int bestDepth = -1;
+    for (DWORD thread : threads) {
+        GUITHREADINFO info = {};
+        info.cbSize = sizeof(info);
+        if (!GetGUIThreadInfo(thread, &info) || !info.hwndFocus) continue;
+        HWND focused = info.hwndFocus;
+        if (focused == root || !IsChild(root, focused)) continue;
+        int depth = 0;
+        for (HWND current = focused; current && current != root && depth < 64; current = GetParent(current)) depth++;
+        if (depth > bestDepth) {
+            best = focused;
+            bestDepth = depth;
+        }
+    }
+    return best;
+}
+
+static HWND keyboardMessageTarget(HWND root) {
+    HWND focused = focusedDescendant(root);
+    return focused ? focused : root;
+}
+
+// Suspends the thread that owns a window while a click's messages are
+// posted, so the thread sees move, press and release together without a
+// real pointer move from the user in between.
+class SuspendedWindowThread {
+public:
+    explicit SuspendedWindowThread(HWND hwnd) {
+        DWORD threadId = GetWindowThreadProcessId(hwnd, NULL);
+        if (!threadId || threadId == GetCurrentThreadId()) return;
+        HANDLE handle = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT, FALSE, threadId);
+        if (!handle) return;
+        if (SuspendThread(handle) == (DWORD)-1) {
+            CloseHandle(handle);
+            return;
+        }
+        // SuspendThread is asynchronous; reading the context waits until the
+        // thread has actually stopped.
+        CONTEXT context = {};
+        context.ContextFlags = CONTEXT_CONTROL;
+        if (!GetThreadContext(handle, &context)) {
+            ResumeThread(handle);
+            CloseHandle(handle);
+            return;
+        }
+        thread_ = handle;
+    }
+    ~SuspendedWindowThread() {
+        if (!thread_) return;
+        ResumeThread(thread_);
+        CloseHandle(thread_);
+    }
+    SuspendedWindowThread(const SuspendedWindowThread&) = delete;
+    SuspendedWindowThread& operator=(const SuspendedWindowThread&) = delete;
+
+private:
+    HANDLE thread_ = NULL;
+};
+
+static void sendMouseClick(HWND hwnd, POINT screen, const std::string& button, int count, bool holdTargetThread) {
     POINT client = {};
     HWND target = resolveMessageTarget(hwnd, screen, &client);
-    UINT down = WM_LBUTTONDOWN, up = WM_LBUTTONUP;
+    UINT down = WM_LBUTTONDOWN, up = WM_LBUTTONUP, doubleDown = WM_LBUTTONDBLCLK;
     WPARAM downFlag = MK_LBUTTON;
     if (button == "right") {
         down = WM_RBUTTONDOWN;
         up = WM_RBUTTONUP;
+        doubleDown = WM_RBUTTONDBLCLK;
         downFlag = MK_RBUTTON;
     } else if (button == "middle") {
         down = WM_MBUTTONDOWN;
         up = WM_MBUTTONUP;
+        doubleDown = WM_MBUTTONDBLCLK;
         downFlag = MK_MBUTTON;
     }
+    // Windows turns a second real press into a double-click message only for
+    // classes that ask for it; posted presses are never converted.
+    bool wantsDoubleClicks = (GetClassLongPtrW(target, GCL_STYLE) & CS_DBLCLKS) != 0;
     LPARAM lp = toLParam(client.x, client.y);
     for (int i = 0; i < std::max(1, count); i++) {
-        postChecked(target, WM_MOUSEMOVE, 0, lp, "mouse-move");
-        postChecked(target, down, downFlag, lp, "mouse-button-down");
-        Sleep(35);
-        postChecked(target, up, 0, lp, "mouse-button-up");
-        Sleep(50);
+        UINT press = wantsDoubleClicks && i % 2 == 1 ? doubleDown : down;
+        {
+            std::unique_ptr<SuspendedWindowThread> hold;
+            if (holdTargetThread) hold.reset(new SuspendedWindowThread(target));
+            postChecked(target, WM_MOUSEMOVE, 0, lp, "mouse-move");
+            postChecked(target, press, downFlag, lp, "mouse-button-down");
+            postChecked(target, up, 0, lp, "mouse-button-up");
+        }
+        if (i + 1 < count) Sleep(80);
     }
 }
 
@@ -2535,13 +2694,6 @@ static void sendScroll(HWND hwnd, POINT screen, const std::string& direction, do
     if (direction == "left" || direction == "right") message = WM_MOUSEHWHEEL;
     // Wheel messages carry screen coordinates.
     postChecked(target, message, toWheelWParam(delta), toLParam(screen.x, screen.y), "mouse-wheel");
-}
-
-static void sendText(HWND hwnd, const std::wstring& text) {
-    for (wchar_t ch : text) {
-        postChecked(hwnd, WM_CHAR, (WPARAM)ch, 0, "character");
-        Sleep(8);
-    }
 }
 
 static bool sendTextToEditHandle(HWND hwnd, const std::wstring& text, IUIAutomationElement* element) {
@@ -2620,26 +2772,66 @@ static std::vector<int> modifierKeys(const std::vector<std::string>& parts) {
     return modifiers;
 }
 
+static bool isExtendedVirtualKey(WORD vk) {
+    switch (vk) {
+    case VK_LEFT: case VK_RIGHT: case VK_UP: case VK_DOWN:
+    case VK_HOME: case VK_END: case VK_PRIOR: case VK_NEXT:
+    case VK_INSERT: case VK_DELETE: case VK_LWIN: case VK_RWIN:
+    case VK_RCONTROL: case VK_RMENU: case VK_DIVIDE: case VK_NUMLOCK:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static LPARAM keyMessageLParam(WORD vk, bool keyUp, bool altHeld) {
+    UINT scan = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC);
+    LPARAM lp = 1 | ((LPARAM)(scan & 0xff) << 16);
+    if (isExtendedVirtualKey(vk)) lp |= (LPARAM)1 << 24;
+    if (altHeld) lp |= (LPARAM)1 << 29;
+    if (keyUp) lp |= ((LPARAM)1 << 30) | ((LPARAM)1 << 31);
+    return lp;
+}
+
+// Posted keys reach the focused control without moving focus. Alt chords go
+// as system keys, the way Windows delivers them, so menus open; posted
+// messages cannot change the keyboard state apps read for Ctrl/Shift/Win, so
+// those chords are refused before this is called.
 static void sendKey(HWND hwnd, const std::string& key) {
     std::vector<std::string> parts = keyParts(key);
     if (parts.empty()) throw std::runtime_error("press_key requires a key.");
     std::vector<int> modifiers = modifierKeys(parts);
-    int vk = virtualKey(parts.back());
-    for (int mod : modifiers) postChecked(hwnd, WM_KEYDOWN, mod, 0, "key-down");
-    postChecked(hwnd, WM_KEYDOWN, vk, 0, "key-down");
+    WORD vk = (WORD)virtualKey(parts.back());
+    bool alt = std::find(modifiers.begin(), modifiers.end(), VK_MENU) != modifiers.end();
+    HWND target = keyboardMessageTarget(hwnd);
+    UINT down = alt ? WM_SYSKEYDOWN : WM_KEYDOWN;
+    UINT up = alt ? WM_SYSKEYUP : WM_KEYUP;
+    for (int mod : modifiers) postChecked(target, down, mod, keyMessageLParam((WORD)mod, false, alt), "key-down");
+    postChecked(target, down, vk, keyMessageLParam(vk, false, alt), "key-down");
     Sleep(25);
-    postChecked(hwnd, WM_KEYUP, vk, 0, "key-up");
+    postChecked(target, up, vk, keyMessageLParam(vk, true, alt), "key-up");
     std::reverse(modifiers.begin(), modifiers.end());
-    for (int mod : modifiers) postChecked(hwnd, WM_KEYUP, mod, 0, "key-up");
+    for (int mod : modifiers) {
+        bool altStillHeld = alt && mod != VK_MENU;
+        postChecked(target, altStillHeld ? WM_SYSKEYUP : WM_KEYUP, mod, keyMessageLParam((WORD)mod, true, altStillHeld), "key-up");
+    }
 }
 
-// ---- Foreground delivery: the window is brought to the front and gets real
-// OS input at the pointer, for windows that ignore posted messages (Chromium
-// and CEF content, DirectX/OpenGL/game-engine surfaces). Every injection is
-// checked: SendInput's count, the pointer's actual position, the foreground
-// window and the window under the point. Nothing is reported as delivered
-// unless Windows accepted it. Input that something on the machine filters
-// (a game's anti-cheat, a secure desktop) is reported, never worked around.
+static void sendText(HWND hwnd, const std::wstring& text) {
+    HWND target = keyboardMessageTarget(hwnd);
+    for (wchar_t ch : text) {
+        postChecked(target, WM_CHAR, (WPARAM)ch, 1, "character");
+        Sleep(8);
+    }
+}
+
+// ---- Foreground delivery, only when the caller asks for it: the window is
+// brought to the front and gets real OS input at the pointer, then the
+// user's window and pointer are put back. Every injection is checked:
+// SendInput's count, the pointer's actual position, the foreground window
+// and the window under the point. Nothing is reported as delivered unless
+// Windows accepted it. Input that something on the machine filters (a game's
+// anti-cheat, a secure desktop) is reported, never worked around.
 
 static void ensureInputDesktop() {
     HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
@@ -2684,19 +2876,7 @@ static void sendInputChecked(std::vector<INPUT>& inputs, const std::string& what
     throw CodedError(sent == 0 ? "input_refused" : "input_partially_injected", message.str());
 }
 
-static bool isExtendedVirtualKey(WORD vk) {
-    switch (vk) {
-    case VK_LEFT: case VK_RIGHT: case VK_UP: case VK_DOWN:
-    case VK_HOME: case VK_END: case VK_PRIOR: case VK_NEXT:
-    case VK_INSERT: case VK_DELETE: case VK_LWIN: case VK_RWIN:
-    case VK_RCONTROL: case VK_RMENU: case VK_DIVIDE: case VK_NUMLOCK:
-        return true;
-    default:
-        return false;
-    }
-}
-
-// Virtual key plus its hardware scan code, like a physical keyboard: apps
+// Virtual key plus// Virtual key plus its hardware scan code, like a physical keyboard: apps
 // that read raw input or DirectInput (games) see the scan code, the rest the
 // virtual key.
 static INPUT keyInput(WORD vk, DWORD flags) {
@@ -2822,6 +3002,523 @@ static void prepareForegroundInput(HWND hwnd, DWORD pid) {
     ensureForegroundInputTarget(hwnd);
 }
 
+static bool writeUtf8File(const std::wstring& path, const std::string& text);
+
+// ---- Background delivery: the user keeps their pointer, keyboard focus and
+// the window in front. Each route is chosen per framework and kind of input;
+// input a window would silently drop is refused with background_unavailable
+// rather than sent, and nothing here ever brings the target forward.
+
+static bool forceForegroundAttached(HWND window) {
+    HWND current = GetForegroundWindow();
+    if (current == window) return true;
+    DWORD self = GetCurrentThreadId();
+    DWORD currentThread = current ? GetWindowThreadProcessId(current, NULL) : 0;
+    bool attached = currentThread && currentThread != self && AttachThreadInput(self, currentThread, TRUE);
+    SetForegroundWindow(window);
+    if (attached) AttachThreadInput(self, currentThread, FALSE);
+    return GetForegroundWindow() == window;
+}
+
+// Gives `window` the foreground back after Stella's input moved it, retrying
+// once this process owns the last input event (a key with no meaning to any
+// app), which the foreground lock requires.
+static bool restoreForegroundTo(HWND window) {
+    if (!window || !IsWindow(window)) return false;
+    if (forceForegroundAttached(window) || waitForForeground(window, 60)) return true;
+    INPUT nudge[2] = {};
+    nudge[0].type = INPUT_KEYBOARD;
+    nudge[0].ki.wVk = 0xFC; // VK_NONAME
+    nudge[1] = nudge[0];
+    nudge[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(2, nudge, sizeof(INPUT));
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (forceForegroundAttached(window) || waitForForeground(window, 40)) return true;
+        Sleep(25);
+    }
+    return waitForForeground(window, 100);
+}
+
+static bool onCurrentVirtualDesktop(HWND root) {
+    IVirtualDesktopManager* manager = nullptr;
+    if (FAILED(CoCreateInstance(CLSID_VirtualDesktopManager, NULL, CLSCTX_ALL, IID_PPV_ARGS(&manager))) || !manager) {
+        return true;
+    }
+    BOOL on = TRUE;
+    HRESULT hr = manager->IsWindowOnCurrentVirtualDesktop(root, &on);
+    manager->Release();
+    return FAILED(hr) || on;
+}
+
+// A window Stella disabled for a UI Automation call is written down until it
+// is enabled again, so a helper that is killed mid-call can re-enable it the
+// next time it starts.
+static std::wstring disabledWindowRecordPath() {
+    wchar_t temp[MAX_PATH] = {};
+    DWORD length = GetTempPathW(MAX_PATH, temp);
+    return std::wstring(temp, length) + L"stella-computer-helper-disabled-window.txt";
+}
+
+static void recordDisabledWindow(HWND hwnd, DWORD pid) {
+    std::ostringstream out;
+    out << hwndValue(hwnd) << " " << pid << " " << toUtf8(classNameForWindow(hwnd));
+    writeUtf8File(disabledWindowRecordPath(), out.str());
+}
+
+static void clearDisabledWindowRecord() {
+    DeleteFileW(disabledWindowRecordPath().c_str());
+}
+
+static void recoverDisabledWindow() {
+    std::string text = readUtf8File(disabledWindowRecordPath());
+    if (text.empty()) return;
+    std::istringstream in(text);
+    long long value = 0;
+    DWORD pid = 0;
+    std::string className;
+    in >> value >> pid;
+    std::getline(in, className);
+    if (!className.empty() && className[0] == ' ') className.erase(0, 1);
+    HWND hwnd = hwndFromValue(value);
+    DWORD currentPid = 0;
+    if (hwnd && IsWindow(hwnd)) GetWindowThreadProcessId(hwnd, &currentPid);
+    if (hwnd && IsWindow(hwnd) && currentPid == pid && toUtf8(classNameForWindow(hwnd)) == className &&
+        !IsWindowEnabled(hwnd)) {
+        EnableWindow(hwnd, TRUE);
+    }
+    clearDisabledWindowRecord();
+}
+
+// Held around every background action on a window the user is not using.
+// WS_EX_NOACTIVATE keeps the window from activating on the click it gets;
+// around UI Automation calls on UWP/XAML and Chromium hosts, which call
+// SetForegroundWindow on themselves from their handlers, the window is also
+// disabled for the call (a disabled window can't take the foreground; the
+// call still lands). Afterwards it watches briefly for the window taking
+// the foreground anyway and gives it back to the window the user had in
+// front, and puts the pointer back if injected pen input moved it.
+class BackgroundGuard {
+public:
+    BackgroundGuard(HWND target, DWORD pid, bool disableForCall, int watchMs)
+        : pid_(pid), watchMs_(watchMs) {
+        root_ = GetAncestor(target, GA_ROOT);
+        if (!root_) root_ = target;
+        previousForeground_ = GetForegroundWindow();
+        cursorKnown_ = !!GetCursorPos(&cursor_);
+        DWORD foregroundPid = 0;
+        if (previousForeground_) GetWindowThreadProcessId(previousForeground_, &foregroundPid);
+        targetInFront_ = previousForeground_ &&
+            (GetAncestor(previousForeground_, GA_ROOT) == root_ || foregroundPid == pid_);
+        if (targetInFront_) return;
+        LONG_PTR style = GetWindowLongPtrW(root_, GWL_EXSTYLE);
+        if (!(style & WS_EX_NOACTIVATE) && onCurrentVirtualDesktop(root_)) {
+            SetWindowLongPtrW(root_, GWL_EXSTYLE, style | WS_EX_NOACTIVATE);
+            noActivate_ = (GetWindowLongPtrW(root_, GWL_EXSTYLE) & WS_EX_NOACTIVATE) != 0;
+        }
+        if (disableForCall && IsWindowEnabled(root_)) {
+            recordDisabledWindow(root_, pid_);
+            EnableWindow(root_, FALSE);
+            disabled_ = true;
+        }
+    }
+
+    ~BackgroundGuard() { finish(); }
+    BackgroundGuard(const BackgroundGuard&) = delete;
+    BackgroundGuard& operator=(const BackgroundGuard&) = delete;
+
+    void injectedAt(POINT point) { injectedPoints_.push_back(point); }
+
+    void finish() {
+        if (finished_) return;
+        finished_ = true;
+        if (disabled_) {
+            EnableWindow(root_, TRUE);
+            clearDisabledWindowRecord();
+        }
+        unsigned long long deadline = GetTickCount64() + (unsigned long long)(targetInFront_ ? 0 : std::max(0, watchMs_));
+        while (true) {
+            restoreCursorIfStellaMovedIt();
+            reclaimForegroundIfTargetTookIt();
+            if (GetTickCount64() >= deadline) break;
+            Sleep(15);
+        }
+        if (noActivate_) {
+            LONG_PTR style = GetWindowLongPtrW(root_, GWL_EXSTYLE);
+            SetWindowLongPtrW(root_, GWL_EXSTYLE, style & ~(LONG_PTR)WS_EX_NOACTIVATE);
+        }
+        reclaimForegroundIfTargetTookIt();
+    }
+
+private:
+    bool belongsToTarget(HWND window) const {
+        if (!window) return false;
+        if (GetAncestor(window, GA_ROOT) == root_) return true;
+        DWORD windowPid = 0;
+        GetWindowThreadProcessId(window, &windowPid);
+        return windowPid == pid_;
+    }
+
+    void reclaimForegroundIfTargetTookIt() {
+        if (targetInFront_ || !previousForeground_ || !IsWindow(previousForeground_)) return;
+        HWND now = GetForegroundWindow();
+        if (now == previousForeground_ || !belongsToTarget(now)) return;
+        restoreForegroundTo(previousForeground_);
+    }
+
+    void restoreCursorIfStellaMovedIt() {
+        if (!cursorKnown_ || injectedPoints_.empty()) return;
+        POINT now = {};
+        if (!GetCursorPos(&now) || (now.x == cursor_.x && now.y == cursor_.y)) return;
+        for (const POINT& point : injectedPoints_) {
+            if (std::abs(now.x - point.x) <= 2 && std::abs(now.y - point.y) <= 2) {
+                SetCursorPos(cursor_.x, cursor_.y);
+                return;
+            }
+        }
+    }
+
+    HWND root_ = NULL;
+    DWORD pid_ = 0;
+    int watchMs_ = 0;
+    HWND previousForeground_ = NULL;
+    POINT cursor_ = {};
+    bool cursorKnown_ = false;
+    bool targetInFront_ = false;
+    bool noActivate_ = false;
+    bool disabled_ = false;
+    bool finished_ = false;
+    std::vector<POINT> injectedPoints_;
+};
+
+static bool selfActivatesFromUiaCalls(Framework framework) {
+    return framework == Framework::XamlUwp || framework == Framework::WinUI3 ||
+        framework == Framework::Chromium || framework == Framework::ChromiumEmbedded;
+}
+
+static const int kBackgroundWatchMs = 150;
+
+// ---- Synthetic pen input. Windows routes it by screen position through the
+// system input queue, so apps that ignore posted messages (Chromium, WPF,
+// UWP, Tk, GTK) take it as real pointer input, without the target being in
+// front and without the user's pointer. It lands on whatever is visible at
+// the point, so a covered point is refused instead of clicking the cover.
+// Technique after Cua's Windows driver (MIT, Cua AI, Inc.; packages/native/LICENSE-cua).
+
+typedef HSYNTHETICPOINTERDEVICE(WINAPI* CreateSyntheticPointerDeviceFn)(POINTER_INPUT_TYPE, ULONG, POINTER_FEEDBACK_MODE);
+typedef BOOL(WINAPI* InjectSyntheticPointerInputFn)(HSYNTHETICPOINTERDEVICE, const POINTER_TYPE_INFO*, UINT32);
+typedef void(WINAPI* DestroySyntheticPointerDeviceFn)(HSYNTHETICPOINTERDEVICE);
+
+struct SyntheticPointerApi {
+    CreateSyntheticPointerDeviceFn create = nullptr;
+    InjectSyntheticPointerInputFn inject = nullptr;
+    DestroySyntheticPointerDeviceFn destroy = nullptr;
+    bool available() const { return create && inject && destroy; }
+};
+
+static const SyntheticPointerApi& syntheticPointerApi() {
+    static SyntheticPointerApi api = [] {
+        SyntheticPointerApi loaded;
+        HMODULE user32 = GetModuleHandleW(L"user32.dll");
+        if (!user32) return loaded;
+        loaded.create = reinterpret_cast<CreateSyntheticPointerDeviceFn>(
+            reinterpret_cast<void*>(GetProcAddress(user32, "CreateSyntheticPointerDevice")));
+        loaded.inject = reinterpret_cast<InjectSyntheticPointerInputFn>(
+            reinterpret_cast<void*>(GetProcAddress(user32, "InjectSyntheticPointerInput")));
+        loaded.destroy = reinterpret_cast<DestroySyntheticPointerDeviceFn>(
+            reinterpret_cast<void*>(GetProcAddress(user32, "DestroySyntheticPointerDevice")));
+        return loaded;
+    }();
+    return api;
+}
+
+class SyntheticPen {
+public:
+    SyntheticPen() {
+        const SyntheticPointerApi& api = syntheticPointerApi();
+        if (!api.available()) {
+            throw CodedError(
+                "background_unavailable",
+                "This version of Windows has no synthetic pen input (it arrived in Windows 10 1809), which Stella needs "
+                "to act on this window in the background.");
+        }
+        device_ = api.create(PT_PEN, 1, POINTER_FEEDBACK_DEFAULT);
+        if (!device_) {
+            throw CodedError(
+                "background_unavailable",
+                "Windows refused to create the synthetic pen Stella uses for background input (" +
+                win32ErrorText(GetLastError()) + ").");
+        }
+    }
+    ~SyntheticPen() {
+        if (device_) syntheticPointerApi().destroy(device_);
+    }
+    SyntheticPen(const SyntheticPen&) = delete;
+    SyntheticPen& operator=(const SyntheticPen&) = delete;
+
+    bool inject(POINT point, POINTER_FLAGS flags, bool barrel) {
+        POINTER_TYPE_INFO info = {};
+        info.type = PT_PEN;
+        info.penInfo.pointerInfo.pointerType = PT_PEN;
+        info.penInfo.pointerInfo.pointerId = 0;
+        info.penInfo.pointerInfo.pointerFlags = flags;
+        info.penInfo.pointerInfo.ptPixelLocation = point;
+        info.penInfo.penFlags = barrel ? PEN_FLAG_BARREL : PEN_FLAG_NONE;
+        info.penInfo.pressure = 512;
+        SetLastError(0);
+        return syntheticPointerApi().inject(device_, &info, 1) != FALSE;
+    }
+
+    void injectChecked(POINT point, POINTER_FLAGS flags, bool barrel, const char* what, bool somethingSent) {
+        if (inject(point, flags, barrel)) return;
+        DWORD error = GetLastError();
+        throw CodedError(
+            somethingSent ? "input_partially_injected" : "background_unavailable",
+            std::string("Windows refused the pen ") + what + " (" + win32ErrorText(error) + ")" +
+            (somethingSent ? "; part of the gesture was already delivered." : "; nothing was delivered."));
+    }
+
+private:
+    HSYNTHETICPOINTERDEVICE device_ = NULL;
+};
+
+static const POINTER_FLAGS kPenDown = POINTER_FLAG_DOWN | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT;
+static const POINTER_FLAGS kPenMove = POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT;
+static const POINTER_FLAGS kPenUp = POINTER_FLAG_UP;
+
+static void penTap(POINT point, bool barrel, int count) {
+    SyntheticPen pen;
+    for (int i = 0; i < std::max(1, count); i++) {
+        pen.injectChecked(point, kPenDown, barrel, "press", i > 0);
+        Sleep(25);
+        if (!pen.inject(point, kPenUp, barrel)) {
+            DWORD error = GetLastError();
+            pen.inject(point, kPenUp, barrel);
+            throw CodedError(
+                "input_partially_injected",
+                "Windows took the pen press but refused its release (" + win32ErrorText(error) + ").");
+        }
+        if (i + 1 < count) Sleep(70);
+    }
+}
+
+static void penDrag(POINT from, POINT to, int steps) {
+    SyntheticPen pen;
+    pen.injectChecked(from, kPenDown, false, "press", false);
+    for (int i = 1; i <= steps; i++) {
+        Sleep(8);
+        POINT step = {
+            (LONG)std::lround(from.x + (to.x - from.x) * (double)i / steps),
+            (LONG)std::lround(from.y + (to.y - from.y) * (double)i / steps),
+        };
+        if (!pen.inject(step, kPenMove, false)) {
+            DWORD error = GetLastError();
+            pen.inject(step, kPenUp, false);
+            throw CodedError(
+                "input_partially_injected",
+                "Windows stopped taking the pen drag partway (" + win32ErrorText(error) + "); it was released where it stopped.");
+        }
+    }
+    Sleep(8);
+    pen.injectChecked(to, kPenUp, false, "release", true);
+}
+
+static bool pointOnAnyMonitor(POINT point) {
+    return MonitorFromPoint(point, MONITOR_DEFAULTTONULL) != NULL;
+}
+
+// Pen input lands on whatever is visible at the point: the target, or one of
+// the target app's own popups, never another app's window over it.
+static void ensureVisibleForPen(HWND root, DWORD pid, POINT point, Framework framework, const std::string& what) {
+    std::string where = "(" + std::to_string(point.x) + ", " + std::to_string(point.y) + ")";
+    if (IsIconic(root)) {
+        throw CodedError(
+            "background_unavailable",
+            frameworkLabel(framework) + " takes " + what + " in the background only where it shows on screen, and this "
+            "window is minimized.");
+    }
+    if (!pointOnAnyMonitor(point)) {
+        throw CodedError(
+            "background_unavailable",
+            "The point " + where + " is off every screen, so background " + what + " can't reach it.");
+    }
+    HWND hit = WindowFromPoint(point);
+    HWND hitRoot = hit ? GetAncestor(hit, GA_ROOT) : NULL;
+    DWORD hitPid = 0;
+    if (hit) GetWindowThreadProcessId(hit, &hitPid);
+    if (hitRoot == root || hitPid == pid) return;
+    throw CodedError(
+        "background_unavailable",
+        frameworkLabel(framework) + " takes " + what + " in the background only where it shows on screen, and the point " +
+        where + " is covered by " + describeWindow(hitRoot ? hitRoot : hit) + ".");
+}
+
+enum class BackgroundRoute { Post, Pen, Refuse };
+
+struct BackgroundPlan {
+    BackgroundRoute route = BackgroundRoute::Post;
+    std::string why;
+};
+
+static BackgroundPlan postRoute() { return {BackgroundRoute::Post, ""}; }
+static BackgroundPlan penRoute() { return {BackgroundRoute::Pen, ""}; }
+static BackgroundPlan refusedRoute(const std::string& why) { return {BackgroundRoute::Refuse, why}; }
+
+// kind: "click", "drag" or "scroll". `chromiumAtPoint` is true when the
+// window under the point is Chromium's, e.g. a CEF/WebView2 view inside
+// another app's window.
+static BackgroundPlan pointerPlan(Framework framework, const std::string& kind, const std::string& button, int count,
+                                  bool chromiumAtPoint) {
+    if (framework == Framework::Chromium || chromiumAtPoint) {
+        if (kind == "scroll") {
+            return refusedRoute("ignores posted mouse-wheel input, and no element at that point scrolls through UI Automation");
+        }
+        if (kind == "drag") return penRoute();
+        if (button == "middle") return refusedRoute("ignores posted middle clicks, and pen input has no middle button");
+        // A single left click posted to the renderer's window is taken as a
+        // click even while the window is covered; other clicks need the pen.
+        if (button == "left" && count == 1) return postRoute();
+        return penRoute();
+    }
+    switch (framework) {
+    case Framework::Wpf:
+        if (kind == "drag") return refusedRoute("handles a pen drag only while its window is in front, and ignores posted drags");
+        if (kind == "scroll") {
+            return refusedRoute("aims mouse-wheel input at the user's real pointer, and no element at that point scrolls through UI Automation");
+        }
+        if (button == "middle") return refusedRoute("ignores posted clicks, and pen input has no middle button");
+        return penRoute();
+    case Framework::XamlUwp:
+        if (kind == "scroll") {
+            return refusedRoute("ignores posted mouse-wheel input, and no element at that point scrolls through UI Automation");
+        }
+        if (kind == "drag") return penRoute();
+        if (button == "middle") return refusedRoute("ignores posted clicks, and pen input has no middle button");
+        return penRoute();
+    case Framework::WinUI3:
+        return refusedRoute(
+            "ignores posted pointer input, and pen input would bring it to the front; only its UI Automation elements "
+            "can be used in the background");
+    case Framework::Tk:
+    case Framework::DelphiVcl:
+        if (kind == "scroll") return postRoute();
+        if (button == "middle") return refusedRoute("ignores posted clicks, and pen input has no middle button");
+        return penRoute();
+    case Framework::Gtk:
+        if (kind != "click") return postRoute();
+        if (button == "middle") return refusedRoute("ignores posted clicks on buttons, and pen input has no middle button");
+        return penRoute();
+    default:
+        return postRoute();
+    }
+}
+
+static bool hasModifier(const std::string& key) {
+    return keyParts(key).size() > 1;
+}
+
+static bool onlyAltModifier(const std::string& key) {
+    std::vector<std::string> parts = keyParts(key);
+    if (parts.size() < 2) return false;
+    for (size_t i = 0; i + 1 < parts.size(); i++) {
+        std::string m = parts[i];
+        std::transform(m.begin(), m.end(), m.begin(), ::tolower);
+        if (m != "alt") return false;
+    }
+    return true;
+}
+
+// kind: "key" (press_key) or "text" (posted characters, after the text
+// field routes were tried).
+static BackgroundPlan keyboardPlan(Framework framework, const std::string& kind, const std::string& key) {
+    switch (framework) {
+    case Framework::Wpf:
+        return refusedRoute("ignores posted keyboard input while another window is in front");
+    case Framework::Tk:
+        return refusedRoute("reads keys from the real keyboard state, so posted keys are ignored");
+    case Framework::XamlUwp:
+    case Framework::WinUI3:
+        return refusedRoute("ignores posted keyboard input");
+    case Framework::LibreOffice:
+        if (kind == "key") return refusedRoute("reads keys and shortcuts from the real keyboard state, so posted keys are ignored");
+        return postRoute();
+    case Framework::DelphiVcl:
+        if (kind == "key" && hasModifier(key)) {
+            return refusedRoute("reads shortcuts from the real keyboard state, so posted shortcuts are ignored");
+        }
+        return postRoute();
+    case Framework::Chromium:
+    case Framework::ChromiumEmbedded:
+        if (kind == "key" && hasModifier(key)) {
+            return refusedRoute("reads modifier keys from the real keyboard state, which posted keys don't change");
+        }
+        return postRoute();
+    default:
+        if (kind == "key" && hasModifier(key) && !onlyAltModifier(key)) {
+            return refusedRoute(
+                "reads Ctrl, Shift and Win from the real keyboard state, which posted keys don't change, so the shortcut "
+                "would be ignored. Use the menu item or button for that command instead");
+        }
+        return postRoute();
+    }
+}
+
+static CodedError backgroundUnavailable(Framework framework, const std::string& inputKind, const BackgroundPlan& plan) {
+    return CodedError(
+        "background_unavailable",
+        "Background " + inputKind + " can't reach this window: it is " + frameworkLabel(framework) + ", which " +
+        plan.why + ".");
+}
+
+// Foreground input borrows the screen for one action; the user's window and
+// pointer are given back afterwards.
+struct ForegroundRestore {
+    HWND previous = NULL;
+    HWND targetRoot = NULL;
+    POINT cursor = {};
+    bool cursorKnown = false;
+    bool used = false;
+    bool foregroundRestored = false;
+    bool cursorRestored = false;
+};
+
+static void beginForegroundInput(ForegroundRestore& restore, HWND target) {
+    restore = ForegroundRestore();
+    restore.used = true;
+    restore.previous = GetForegroundWindow();
+    HWND root = GetAncestor(target, GA_ROOT);
+    restore.targetRoot = root ? root : target;
+    restore.cursorKnown = !!GetCursorPos(&restore.cursor);
+}
+
+static void endForegroundInput(ForegroundRestore& restore) {
+    // Let the target take the input from its queue before focus leaves it.
+    Sleep(60);
+    if (restore.cursorKnown) {
+        SetCursorPos(restore.cursor.x, restore.cursor.y);
+        POINT now = {};
+        restore.cursorRestored = GetCursorPos(&now) && std::abs(now.x - restore.cursor.x) <= 1 &&
+            std::abs(now.y - restore.cursor.y) <= 1;
+    }
+    HWND previous = restore.previous;
+    if (!previous || !IsWindow(previous) || GetAncestor(previous, GA_ROOT) == restore.targetRoot) {
+        restore.foregroundRestored = true;
+        return;
+    }
+    restore.foregroundRestored = restoreForegroundTo(previous);
+}
+
+template <typename Body>
+static void withForegroundInput(HWND hwnd, ForegroundRestore& restore, Body body) {
+    beginForegroundInput(restore, hwnd);
+    try {
+        body();
+    } catch (...) {
+        endForegroundInput(restore);
+        throw;
+    }
+    endForegroundInput(restore);
+}
+
 static void releaseMouseButtonQuietly(DWORD upFlag) {
     INPUT up = mouseButtonInput(upFlag);
     SendInput(1, &up, sizeof(INPUT));
@@ -2939,55 +3636,6 @@ static void sendForegroundText(HWND hwnd, DWORD pid, const std::wstring& text) {
     }
 }
 
-// Returns why posted window messages won't reach this target for the given
-// kind of input, or "" when background delivery is expected to work.
-static std::string backgroundDropReason(TargetState& state, const std::string& eventKind) {
-    const WindowProcess& process = state.process;
-    if (!state.surfaceKnown) refreshSurfaceIdentity(state);
-    std::wstring haystack = lowerW(process.processName + L" " + classNameForWindow(process.hwnd));
-    bool xaml = haystack.find(L"applicationframewindow") != std::wstring::npos ||
-                haystack.find(L"windows.ui.core") != std::wstring::npos ||
-                haystack.find(L"xaml") != std::wstring::npos;
-    bool gtk = haystack.find(L"gtk") != std::wstring::npos || haystack.find(L"gdk") != std::wstring::npos;
-    bool vcl = haystack.find(L"tapplication") != std::wstring::npos || haystack.find(L"vcl") != std::wstring::npos;
-    bool opaque = state.contentElementCount == 0;
-    bool pointer = eventKind == "mouse" || eventKind == "drag" || eventKind == "scroll";
-    bool keys = eventKind == "keyboard" || eventKind == "text";
-    if (pointer) {
-        if (state.chromium) return "chromium";
-        if (opaque) return "opaque_surface";
-        if (xaml || gtk || vcl) return "framework";
-    }
-    if (keys) {
-        // Chromium's own top-level window routes posted keys to the page; a
-        // Chromium view embedded in another app's window (CEF) does not.
-        if (state.chromium && !state.chromiumTopLevel) return "embedded_chromium";
-        if (opaque) return "opaque_surface";
-        if (xaml || gtk || vcl) return "framework";
-    }
-    return "";
-}
-
-static bool shouldUseForegroundDispatch(
-    TargetState& state, const std::string& eventKind, const std::string& dispatch, std::string* reasonOut) {
-    if (dispatch == "foreground") {
-        if (reasonOut) *reasonOut = "requested";
-        return true;
-    }
-    std::string reason = backgroundDropReason(state, eventKind);
-    if (dispatch == "auto") {
-        if (reasonOut) *reasonOut = reason.empty() ? "" : reason;
-        return !reason.empty();
-    }
-    if (dispatch == "background" && !reason.empty() && reason != "opaque_surface") {
-        throw CodedError(
-            "background_unavailable",
-            "This window ignores background " + eventKind + " input (" + reason +
-            "), so it would be silently dropped. Nothing was sent; retry with delivery \"auto\" or \"foreground\".");
-    }
-    return false;
-}
-
 static bool invokePreferredClick(IUIAutomationElement* element) {
     IUIAutomationInvokePattern* invoke = getPattern<IUIAutomationInvokePattern>(element, UIA_InvokePatternId);
     if (invoke) {
@@ -3066,7 +3714,9 @@ static bool elementContainsScreenPoint(IUIAutomationElement* element, DWORD pid,
     return true;
 }
 
-static bool invokeClickableElementAtPoint(IUIAutomation* uia, IUIAutomationElement* root, DWORD pid, POINT screen, const Frame& windowFrame) {
+// The smallest clickable element (Invoke, Select, Toggle or Expand) at the
+// point, or null. The caller releases it.
+static IUIAutomationElement* clickableElementAtPoint(IUIAutomation* uia, IUIAutomationElement* root, DWORD pid, POINT screen, const Frame& windowFrame) {
     std::vector<IUIAutomationElement*> all;
     collectAllElements(uia, root, all);
     IUIAutomationElement* best = nullptr;
@@ -3080,9 +3730,10 @@ static bool invokeClickableElementAtPoint(IUIAutomation* uia, IUIAutomationEleme
             bestArea = area;
         }
     }
-    bool handled = best && invokePreferredClick(best);
-    for (IUIAutomationElement* candidate : all) candidate->Release();
-    return handled;
+    for (IUIAutomationElement* candidate : all) {
+        if (candidate != best) candidate->Release();
+    }
+    return best;
 }
 
 static void invokeSecondaryAction(IUIAutomationElement* element, const std::string& action, int index) {
@@ -3224,10 +3875,19 @@ static bool invokeScroll(IUIAutomationElement* element, const std::string& direc
     return ok;
 }
 
+// Window classes that take EM_REPLACESEL/WM_SETTEXT: Win32 edit and rich
+// edit controls and the controls built on them (WinForms, Delphi, Scintilla).
+static bool isEditWindowClass(HWND hwnd) {
+    std::wstring cls = lowerW(classNameForWindow(hwnd));
+    if (cls.rfind(L"chrome_", 0) == 0) return false;
+    return cls.find(L"edit") != std::wstring::npos || cls == L"scintilla" || cls == L"tmemo";
+}
+
 static bool isTextCandidate(HWND rootHwnd, IUIAutomationElement* element) {
     if (!element) return false;
     UIA_HWND native = NULL;
     if (FAILED(element->get_CurrentNativeWindowHandle(&native)) || native == 0 || (HWND)(intptr_t)native == rootHwnd) return false;
+    if (!isEditWindowClass((HWND)(intptr_t)native)) return false;
     std::wstring control = controlTypeName([&] { CONTROLTYPEID c = 0; element->get_CurrentControlType(&c); return c; }());
     std::wstring cls = getBstrProperty(&IUIAutomationElement::get_CurrentClassName, element);
     std::wstring hay = lowerW(control + L" " + cls);
@@ -3302,35 +3962,118 @@ static HWND findTextEntryWindowHandle(IUIAutomation* uia, IUIAutomationElement* 
     return hwnd;
 }
 
-static bool invokeTypeText(IUIAutomation* uia, IUIAutomationElement* root, const WindowProcess& process, const std::wstring& text) {
-    IUIAutomationElement* element = findTextEntryElement(uia, root, process.pid);
-    HWND target = findTextEntryWindowHandle(uia, root, process.hwnd, element);
-    if (target && sendTextToEditHandle(target, text, element)) {
-        safeRelease(element);
+// The element's current center on screen. An element scrolled out of the
+// window is scrolled back in through UI Automation first; a position outside
+// the window would land on whatever is there.
+static POINT liveElementCenter(IUIAutomationElement* element, const Frame& windowFrame) {
+    auto read = [&](POINT* out) {
+        RECT rect = {};
+        if (FAILED(element->get_CurrentBoundingRectangle(&rect)) || rect.right <= rect.left || rect.bottom <= rect.top) {
+            return false;
+        }
+        out->x = (rect.left + rect.right) / 2;
+        out->y = (rect.top + rect.bottom) / 2;
         return true;
+    };
+    auto inside = [&](POINT p) {
+        return !windowFrame.present ||
+            (p.x >= windowFrame.x && p.x < windowFrame.x + windowFrame.width &&
+             p.y >= windowFrame.y && p.y < windowFrame.y + windowFrame.height);
+    };
+    POINT center = {};
+    if (!read(&center)) throw std::runtime_error("The element has no position on screen; observe again and pick a visible element.");
+    if (inside(center)) return center;
+    IUIAutomationScrollItemPattern* scrollItem = getPattern<IUIAutomationScrollItemPattern>(element, UIA_ScrollItemPatternId);
+    if (scrollItem) {
+        scrollItem->ScrollIntoView();
+        scrollItem->Release();
+        Sleep(120);
+        if (read(&center) && inside(center)) return center;
     }
-    if (element) {
+    throw std::runtime_error(
+        "The element is outside the visible part of the window; scroll it into view (scroll with an element_index) "
+        "and observe again.");
+}
+
+// Scrolls the innermost UI Automation container under the point that can
+// scroll in that direction.
+static bool scrollViaUiaAtPoint(IUIAutomation* uia, DWORD pid, POINT point, const std::string& direction, double pages) {
+    IUIAutomationElement* current = nullptr;
+    if (FAILED(uia->ElementFromPoint(point, &current)) || !current) return false;
+    IUIAutomationTreeWalker* walker = nullptr;
+    if (FAILED(uia->get_ControlViewWalker(&walker)) || !walker) {
+        current->Release();
+        return false;
+    }
+    bool vertical = direction == "up" || direction == "down";
+    bool handled = false;
+    for (int depth = 0; current && depth < 32; depth++) {
+        int elementPid = 0;
+        if (FAILED(current->get_CurrentProcessId(&elementPid)) || (DWORD)elementPid != pid) break;
+        IUIAutomationScrollPattern* scroll = getPattern<IUIAutomationScrollPattern>(current, UIA_ScrollPatternId);
+        if (scroll) {
+            BOOL can = FALSE;
+            HRESULT hr = vertical ? scroll->get_CurrentVerticallyScrollable(&can) : scroll->get_CurrentHorizontallyScrollable(&can);
+            scroll->Release();
+            if (SUCCEEDED(hr) && can) {
+                handled = invokeScroll(current, direction, pages);
+                break;
+            }
+        }
+        IUIAutomationElement* parent = nullptr;
+        walker->GetParentElement(current, &parent);
+        current->Release();
+        current = parent;
+    }
+    safeRelease(current);
+    walker->Release();
+    return handled;
+}
+
+// Puts text into the app's text field without keystrokes: an edit control
+// through its own messages, a UI Automation value field through ValuePattern
+// (appended to what is there). Returns the route, or "" when the window has
+// neither.
+static std::string typeTextIntoField(
+    IUIAutomation* uia, IUIAutomationElement* root, const WindowProcess& process, Framework framework, const std::wstring& text) {
+    IUIAutomationElement* element = findTextEntryElement(uia, root, process.pid);
+    HWND editWindow = focusedDescendant(process.hwnd);
+    if (!editWindow || !isEditWindowClass(editWindow)) editWindow = findTextEntryWindowHandle(uia, root, process.hwnd, element);
+    if (editWindow && sendTextToEditHandle(editWindow, text, element)) {
+        safeRelease(element);
+        return "hwnd.edit.text";
+    }
+    // Web text fields in Chromium accept a UI Automation value without the
+    // page seeing an input event, so they get typed characters instead.
+    bool valueTextAllowed = framework == Framework::XamlUwp || framework == Framework::WinUI3 ||
+        framework == Framework::Wpf || envFlag("STELLA_COMPUTER_WINDOWS_ALLOW_UIA_TEXT_FALLBACK");
+    if (element && valueTextAllowed) {
         IUIAutomationValuePattern* value = getPattern<IUIAutomationValuePattern>(element, UIA_ValuePatternId);
         BOOL readOnly = TRUE;
         if (value && SUCCEEDED(value->get_CurrentIsReadOnly(&readOnly)) && !readOnly) {
-            if (!envFlag("STELLA_COMPUTER_WINDOWS_ALLOW_UIA_TEXT_FALLBACK")) {
-                safeRelease(value);
-                safeRelease(element);
-                throw std::runtime_error("UIA ValuePattern text fallback is disabled by default because it may bring the target app to the foreground; set STELLA_COMPUTER_WINDOWS_ALLOW_UIA_TEXT_FALLBACK=1 to enable it.");
-            }
-            std::wstring current = getElementValue(element);
-            std::wstring combined = current + text;
+            std::wstring combined = getElementValue(element) + text;
             BSTR next = SysAllocString(combined.c_str());
-            HRESULT hr = value->SetValue(next);
+            HRESULT hr = E_FAIL;
+            {
+                BackgroundGuard guard(process.hwnd, process.pid, selfActivatesFromUiaCalls(framework), kBackgroundWatchMs);
+                hr = value->SetValue(next);
+                guard.finish();
+            }
             SysFreeString(next);
-            safeRelease(value);
+            value->Release();
             safeRelease(element);
-            return SUCCEEDED(hr);
+            if (FAILED(hr)) {
+                std::ostringstream message;
+                message << "The text field refused the text through UI Automation (HRESULT 0x" << std::hex << (unsigned long)hr
+                        << "); nothing was typed.";
+                throw std::runtime_error(message.str());
+            }
+            return "uia.value.text";
         }
         safeRelease(value);
     }
     safeRelease(element);
-    return false;
+    return "";
 }
 
 struct ActionProbe {
@@ -3356,7 +4099,8 @@ static std::string receiptJson(
     unsigned long long finalRevision,
     int pendingActionCount,
     const std::string& delivery = "",
-    const std::string& deliveryReason = "") {
+    const std::string& deliveryReason = "",
+    const ForegroundRestore* restore = nullptr) {
     POINT after = {};
     bool afterKnown = !!GetCursorPos(&after);
     bool cursorMoved = !before.cursorKnown || !afterKnown || before.cursor.x != after.x || before.cursor.y != after.y;
@@ -3374,6 +4118,10 @@ static std::string receiptJson(
         << ",\"pendingActionCount\":" << pendingActionCount;
     if (!delivery.empty()) out << ",\"delivery\":" << jsonString(delivery);
     if (!deliveryReason.empty()) out << ",\"delivery_reason\":" << jsonString(deliveryReason);
+    if (restore && restore->used) {
+        out << ",\"restored\":{\"foreground\":" << (restore->foregroundRestored ? "true" : "false")
+            << ",\"cursor\":" << (restore->cursorRestored ? "true" : "false") << "}";
+    }
     if (settle) {
         out << ",\"settle\":{\"observed\":" << (settle->observed ? "true" : "false")
             << ",\"quietMs\":" << adaptiveQuietMs
@@ -3475,6 +4223,7 @@ static std::string snapshotJson(const Snapshot& snapshot) {
     out << "}";
     if (!snapshot.surfaceKind.empty()) {
         out << ",\"surface\":{\"kind\":" << jsonString(snapshot.surfaceKind)
+            << ",\"framework\":" << jsonString(snapshot.framework)
             << ",\"contentElements\":" << snapshot.contentElementCount
             << ",\"accessibilityWake\":" << jsonString(snapshot.accessibilityWake)
             << ",\"fullscreen\":" << (snapshot.surfaceFullscreen ? "true" : "false")
@@ -3593,6 +4342,8 @@ static std::string doctorText(IUIAutomation* uia) {
     if (foreground) {
         out << "Foreground window: target=hwnd:" << hwndValue(foreground) << " pid=" << foregroundPid << "\n";
     }
+    out << "Synthetic pen input (background clicks in Chromium, WPF, UWP, Tk and GTK windows): "
+        << (syntheticPointerApi().available() ? "available" : "not available (needs Windows 10 1809 or later)") << "\n";
     out << "Background input: Win32 messages can be blocked by higher-integrity target apps; Stella reports that instead of pretending the click worked.";
     return out.str();
 }
@@ -4042,7 +4793,8 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
     std::string delivery = "uia";
     std::string deliveryReason;
     std::string dispatch = operation.str("dispatch", "background");
-    if (dispatch != "background" && dispatch != "foreground" && dispatch != "auto") {
+    if (dispatch == "auto") dispatch = "background";
+    if (dispatch != "background" && dispatch != "foreground") {
         throw std::runtime_error("unsupported dispatch mode: " + dispatch);
     }
 
@@ -4083,111 +4835,214 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
         }
     }
 
+    if (!targetState.surfaceKnown) refreshSurfaceIdentity(targetState);
+    const Framework framework = targetState.framework;
+    const bool background = dispatch == "background";
+    ForegroundRestore foregroundRestore;
+    auto screenshotPoint = [&](const char* xKey, const char* yKey) {
+        double screenshotWidth = operation.num("screenshot_width", windowFrame.width);
+        double screenshotHeight = operation.num("screenshot_height", windowFrame.height);
+        double scaleX = screenshotWidth > 0 ? windowFrame.width / screenshotWidth : 1.0;
+        double scaleY = screenshotHeight > 0 ? windowFrame.height / screenshotHeight : 1.0;
+        return POINT{
+            (LONG)std::round(windowFrame.x + operation.num(xKey) * scaleX),
+            (LONG)std::round(windowFrame.y + operation.num(yKey) * scaleY),
+        };
+    };
+    auto chromiumAt = [&](POINT point) {
+        return framework == Framework::Chromium ||
+            isChromiumClassName(classNameForWindow(deepestChildFromPoint(process.hwnd, point)));
+    };
+    auto effectiveFramework = [&](bool chromiumAtPoint) {
+        return chromiumAtPoint && framework != Framework::Chromium ? Framework::ChromiumEmbedded : framework;
+    };
+    auto runUia = [&](auto call) {
+        BackgroundGuard guard(process.hwnd, process.pid, selfActivatesFromUiaCalls(framework), kBackgroundWatchMs);
+        auto result = call();
+        guard.finish();
+        return result;
+    };
+
     if (tool == "click") {
         std::string button = operation.str("mouse_button", "left");
-        bool handled = false;
-        if (element && button != "right" && button != "middle" && dispatch != "foreground") {
-            handled = invokePreferredClick(element);
-            if (handled) route = "uia.pattern.click";
-        }
-        if (!handled) {
-            POINT point = {};
-            Frame elementFrame = parseFrame(elementJsonValue);
-            if (elementFrame.present && windowFrame.present) {
-                point = screenPointFromFrame(elementFrame, windowFrame);
-            } else {
-                double screenshotWidth = operation.num("screenshot_width", windowFrame.width);
-                double screenshotHeight = operation.num("screenshot_height", windowFrame.height);
-                double scaleX = screenshotWidth > 0 ? windowFrame.width / screenshotWidth : 1.0;
-                double scaleY = screenshotHeight > 0 ? windowFrame.height / screenshotHeight : 1.0;
-                point.x = (LONG)std::round(windowFrame.x + operation.num("x") * scaleX);
-                point.y = (LONG)std::round(windowFrame.y + operation.num("y") * scaleY);
+        int clickCount = std::max(1, (int)operation.num("click_count", 1));
+        Frame elementFrame = parseFrame(elementJsonValue);
+        POINT point = elementFrame.present && windowFrame.present ? screenPointFromFrame(elementFrame, windowFrame)
+                                                                  : screenshotPoint("x", "y");
+        if (!background) {
+            withForegroundInput(process.hwnd, foregroundRestore, [&] {
+                sendForegroundClick(process.hwnd, process.pid, point, button, clickCount);
+            });
+            delivery = "foreground";
+            deliveryReason = "requested";
+            route = "foreground.sendinput.click";
+        } else {
+            bool chromiumAtPoint = chromiumAt(point);
+            // Chromium answers UI Automation Invoke with success without
+            // clicking when the window is covered, and raises it when it
+            // does; clicks there go by position instead.
+            bool uiaClick = !chromiumAtPoint && button == "left" && clickCount == 1;
+            bool handled = false;
+            if (uiaClick && element) {
+                handled = runUia([&] { return invokePreferredClick(element); });
+                if (handled) route = "uia.pattern.click";
             }
-            int clickCount = (int)operation.num("click_count", 1);
-            if (button == "left" && clickCount == 1 && dispatch != "foreground") {
-                handled = invokeClickableElementAtPoint(uia, root, process.pid, point, windowFrame);
+            if (uiaClick && !handled) {
+                IUIAutomationElement* hit = clickableElementAtPoint(uia, root, process.pid, point, windowFrame);
+                if (hit) {
+                    try {
+                        handled = runUia([&] { return invokePreferredClick(hit); });
+                    } catch (...) {
+                        hit->Release();
+                        throw;
+                    }
+                    hit->Release();
+                }
                 if (handled) route = "uia.hit_test.click";
             }
-            if (!handled) {
-                if (shouldUseForegroundDispatch(targetState, "mouse", dispatch, &deliveryReason)) {
-                    sendForegroundClick(process.hwnd, process.pid, point, button, clickCount);
-                    delivery = "foreground";
-                    route = "foreground.sendinput.click";
+            if (handled) {
+                delivery = "uia";
+            } else {
+                if (element) point = liveElementCenter(element, windowFrame);
+                Framework effective = effectiveFramework(chromiumAtPoint);
+                BackgroundPlan plan = pointerPlan(framework, "click", button, clickCount, chromiumAtPoint);
+                if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(effective, "clicks", plan);
+                ensureCanPostMessages(process.pid);
+                deliveryReason = frameworkId(effective);
+                if (plan.route == BackgroundRoute::Pen) {
+                    ensureVisibleForPen(process.hwnd, process.pid, point, effective, "clicks");
+                    ensureInputDesktop();
+                    BackgroundGuard guard(process.hwnd, process.pid, false, kBackgroundWatchMs);
+                    guard.injectedAt(point);
+                    penTap(point, button == "right", clickCount);
+                    guard.finish();
+                    route = "pointer.pen.click";
                 } else {
-                    ensureCanPostMessages(process.pid);
-                    sendMouseClick(process.hwnd, point, button, clickCount);
-                    delivery = "background";
+                    BackgroundGuard guard(process.hwnd, process.pid, false, kBackgroundWatchMs);
+                    sendMouseClick(process.hwnd, point, button, clickCount, chromiumAtPoint);
+                    guard.finish();
                     route = "hwnd.postmessage.click";
                 }
+                delivery = "background";
             }
         }
     } else if (tool == "perform_secondary_action") {
         if (!element) throw std::runtime_error("unknown element_index '" + std::to_string(operationElementIndex(operation)) + "'");
         std::string action = operation.str("action");
-        invokeSecondaryAction(element, action, operationElementIndex(operation));
+        runUia([&] {
+            invokeSecondaryAction(element, action, operationElementIndex(operation));
+            return true;
+        });
         route = "uia.secondary_action." + action;
+        delivery = "uia";
     } else if (tool == "scroll") {
         std::string direction = operation.str("direction", "down");
         double pages = operation.num("pages", 1);
-        bool handled = dispatch != "foreground" && element && invokeScroll(element, direction, pages);
-        if (handled) {
-            route = "uia.scroll";
-        } else {
-            Frame elementFrame = parseFrame(elementJsonValue);
-            POINT point = elementFrame.present ? screenPointFromFrame(elementFrame, windowFrame)
-                                               : POINT{(LONG)std::round(windowFrame.x + windowFrame.width / 2), (LONG)std::round(windowFrame.y + windowFrame.height / 2)};
-            if (shouldUseForegroundDispatch(targetState, "scroll", dispatch, &deliveryReason)) {
+        Frame elementFrame = parseFrame(elementJsonValue);
+        POINT point = elementFrame.present ? screenPointFromFrame(elementFrame, windowFrame)
+                                           : POINT{(LONG)std::round(windowFrame.x + windowFrame.width / 2), (LONG)std::round(windowFrame.y + windowFrame.height / 2)};
+        if (!background) {
+            withForegroundInput(process.hwnd, foregroundRestore, [&] {
                 sendForegroundScroll(process.hwnd, process.pid, point, direction, pages);
-                delivery = "foreground";
-                route = "foreground.sendinput.scroll";
+            });
+            delivery = "foreground";
+            deliveryReason = "requested";
+            route = "foreground.sendinput.scroll";
+        } else {
+            bool handled = element && runUia([&] { return invokeScroll(element, direction, pages); });
+            if (handled) route = "uia.scroll";
+            if (!handled) {
+                handled = runUia([&] { return scrollViaUiaAtPoint(uia, process.pid, point, direction, pages); });
+                if (handled) route = "uia.scroll.at_point";
+            }
+            if (handled) {
+                delivery = "uia";
             } else {
+                bool chromiumAtPoint = chromiumAt(point);
+                Framework effective = effectiveFramework(chromiumAtPoint);
+                BackgroundPlan plan = pointerPlan(framework, "scroll", "left", 1, chromiumAtPoint);
+                if (plan.route != BackgroundRoute::Post) throw backgroundUnavailable(effective, "scrolling", plan);
                 ensureCanPostMessages(process.pid);
                 sendScroll(process.hwnd, point, direction, pages);
                 delivery = "background";
+                deliveryReason = frameworkId(effective);
                 route = "hwnd.postmessage.scroll";
             }
         }
     } else if (tool == "drag") {
-        double screenshotWidth = operation.num("screenshot_width", windowFrame.width);
-        double screenshotHeight = operation.num("screenshot_height", windowFrame.height);
-        double scaleX = screenshotWidth > 0 ? windowFrame.width / screenshotWidth : 1.0;
-        double scaleY = screenshotHeight > 0 ? windowFrame.height / screenshotHeight : 1.0;
-        POINT from = {(LONG)std::round(windowFrame.x + operation.num("from_x") * scaleX), (LONG)std::round(windowFrame.y + operation.num("from_y") * scaleY)};
-        POINT to = {(LONG)std::round(windowFrame.x + operation.num("to_x") * scaleX), (LONG)std::round(windowFrame.y + operation.num("to_y") * scaleY)};
-        if (shouldUseForegroundDispatch(targetState, "drag", dispatch, &deliveryReason)) {
-            sendForegroundDrag(process.hwnd, process.pid, from, to);
+        POINT from = screenshotPoint("from_x", "from_y");
+        POINT to = screenshotPoint("to_x", "to_y");
+        if (!background) {
+            withForegroundInput(process.hwnd, foregroundRestore, [&] {
+                sendForegroundDrag(process.hwnd, process.pid, from, to);
+            });
             delivery = "foreground";
+            deliveryReason = "requested";
             route = "foreground.sendinput.drag";
         } else {
+            bool chromiumAtPoint = chromiumAt(from);
+            Framework effective = effectiveFramework(chromiumAtPoint);
+            BackgroundPlan plan = pointerPlan(framework, "drag", "left", 1, chromiumAtPoint);
+            if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(effective, "drags", plan);
             ensureCanPostMessages(process.pid);
-            sendDrag(process.hwnd, from, to);
+            deliveryReason = frameworkId(effective);
+            if (plan.route == BackgroundRoute::Pen) {
+                ensureVisibleForPen(process.hwnd, process.pid, from, effective, "drags");
+                ensureInputDesktop();
+                BackgroundGuard guard(process.hwnd, process.pid, false, kBackgroundWatchMs);
+                guard.injectedAt(from);
+                guard.injectedAt(to);
+                penDrag(from, to, 16);
+                guard.finish();
+                route = "pointer.pen.drag";
+            } else {
+                BackgroundGuard guard(process.hwnd, process.pid, false, kBackgroundWatchMs);
+                sendDrag(process.hwnd, from, to);
+                guard.finish();
+                route = "hwnd.postmessage.drag";
+            }
             delivery = "background";
-            route = "hwnd.postmessage.drag";
         }
     } else if (tool == "type_text") {
         std::wstring text = toWide(operation.str("text"));
-        if (dispatch != "foreground" && invokeTypeText(uia, root, process, text)) route = "uia_or_hwnd.text_target";
-        else {
-            if (shouldUseForegroundDispatch(targetState, "text", dispatch, &deliveryReason)) {
+        if (!background) {
+            withForegroundInput(process.hwnd, foregroundRestore, [&] {
                 sendForegroundText(process.hwnd, process.pid, text);
-                delivery = "foreground";
-                route = "foreground.sendinput.text";
+            });
+            delivery = "foreground";
+            deliveryReason = "requested";
+            route = "foreground.sendinput.text";
+        } else {
+            std::string textRoute = runUia([&] { return typeTextIntoField(uia, root, process, framework, text); });
+            if (!textRoute.empty()) {
+                route = textRoute;
+                delivery = textRoute.rfind("uia.", 0) == 0 ? "uia" : "background";
             } else {
+                BackgroundPlan plan = keyboardPlan(framework, "text", "");
+                if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(framework, "typing", plan);
                 ensureCanPostMessages(process.pid);
                 sendText(process.hwnd, text);
                 delivery = "background";
                 route = "hwnd.postmessage.text";
             }
+            deliveryReason = frameworkId(framework);
         }
     } else if (tool == "press_key") {
-        if (shouldUseForegroundDispatch(targetState, "keyboard", dispatch, &deliveryReason)) {
-            sendForegroundKey(process.hwnd, process.pid, operation.str("key"));
+        std::string key = operation.str("key");
+        if (!background) {
+            withForegroundInput(process.hwnd, foregroundRestore, [&] {
+                sendForegroundKey(process.hwnd, process.pid, key);
+            });
             delivery = "foreground";
+            deliveryReason = "requested";
             route = "foreground.sendinput.key";
         } else {
+            BackgroundPlan plan = keyboardPlan(framework, "key", key);
+            if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(framework, "keys", plan);
             ensureCanPostMessages(process.pid);
-            sendKey(process.hwnd, operation.str("key"));
+            sendKey(process.hwnd, key);
             delivery = "background";
+            deliveryReason = frameworkId(framework);
             route = "hwnd.postmessage.key";
         }
     } else if (tool == "set_value") {
@@ -4196,20 +5051,25 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
         if (!value) throw std::runtime_error("Cannot set a value for an element that is not settable");
         std::wstring next = toWide(operation.str("value"));
         BSTR bstr = SysAllocString(next.c_str());
-        HRESULT hr = value->SetValue(bstr);
+        HRESULT hr = runUia([&] { return value->SetValue(bstr); });
         SysFreeString(bstr);
         value->Release();
         if (FAILED(hr)) throw std::runtime_error("Cannot set a value for an element that is not settable");
         route = "uia.value.set";
+        delivery = "uia";
     } else if (tool == "select_text") {
         if (!element) throw std::runtime_error("unknown element_index '" + std::to_string(operationElementIndex(operation)) + "'");
-        selectExactText(
-            element,
-            toWide(operation.str("text")),
-            toWide(operation.str("prefix")),
-            toWide(operation.str("suffix")),
-            operation.str("selection", "text"));
+        runUia([&] {
+            selectExactText(
+                element,
+                toWide(operation.str("text")),
+                toWide(operation.str("prefix")),
+                toWide(operation.str("suffix")),
+                operation.str("selection", "text"));
+            return true;
+        });
         route = "uia.text.select";
+        delivery = "uia";
     } else {
         throw std::runtime_error("unsupportedTool(\"" + tool + "\")");
     }
@@ -4230,7 +5090,7 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
     bool deferred = operationBool(operation, "defer_observation");
     if (deferred) {
         std::string response = "{\"ok\":true,\"receipt\":" +
-            receiptJson(probe, route, dispatch, nullptr, true, baselineRevision, invalidatedRevision, targetState.pendingActionCount, delivery, deliveryReason) +
+            receiptJson(probe, route, dispatch, nullptr, true, baselineRevision, invalidatedRevision, targetState.pendingActionCount, delivery, deliveryReason, &foregroundRestore) +
             ",\"revision\":" + std::to_string(invalidatedRevision) + ",\"deferred\":true}";
         safeRelease(element);
         safeRelease(root);
@@ -4249,7 +5109,7 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
     refreshed.settleBaselineRevision = settle.baselineRevision;
     refreshed.settleFinalRevision = settle.finalRevision;
     std::string response = "{\"ok\":true,\"receipt\":" +
-        receiptJson(probe, route, dispatch, &settle, false, baselineRevision, settle.finalRevision, targetState.pendingActionCount, delivery, deliveryReason) +
+        receiptJson(probe, route, dispatch, &settle, false, baselineRevision, settle.finalRevision, targetState.pendingActionCount, delivery, deliveryReason, &foregroundRestore) +
         ",\"revision\":" + std::to_string(settle.finalRevision) +
         ",\"deferred\":false,\"snapshot\":" + snapshotJson(refreshed) + "}";
     targetState.pendingActionCount = 0;
@@ -4291,6 +5151,8 @@ int main(int argc, char** argv) {
         printf("%s\n", failJson("UI Automation initialization failed").c_str());
         return 0;
     }
+
+    recoverDisabledWindow();
 
     // Start the passive overlay only after GDI+ and UI Automation are ready;
     // the helper's process lifetime owns it in both one-shot and daemon mode.

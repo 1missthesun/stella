@@ -90,6 +90,7 @@ import { relocatedAgentBrief } from "@stella/agent/stella/execution";
 import { AGENT_LOG_CLOUD_HOLDER, agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
 import { array, boolean, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
+import { log } from "../../build-session/shared/keys.js";
 import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import {
@@ -208,7 +209,20 @@ const OUTPUT_FILE_CARD_MAX = 20;
 const DISPATCH_MAX_ATTEMPTS = 3;
 const DISPATCH_RETRY_MS = 15_000;
 const DEVICE_AVAILABILITY_RETRY_MS = 10_000;
-const DEVICE_AVAILABILITY_WAIT_MS = 60 * 60_000;
+/**
+ * How long work for a computer that is away waits for it: an attempt that
+ * has not started yet, or a held message. A computer off overnight or for a
+ * weekend is ordinary, so this is only the ceiling for one that never comes
+ * back; past it the attempt fails saying so. (An attempt already running
+ * there waits however long it takes: the owner gate keeps it.) Its computer
+ * coming back wakes the waiting work at once (`agentThreads.deviceReady`);
+ * the backed-off rechecks only cover a missed signal.
+ */
+const DEVICE_AVAILABILITY_WAIT_MS = 7 * 24 * 60 * 60_000;
+const DEVICE_AVAILABILITY_RECHECK_MAX_MS = 10 * 60_000;
+const deviceWaitDelay = (retries: number): number =>
+  Math.min(DEVICE_AVAILABILITY_RECHECK_MAX_MS, DEVICE_AVAILABILITY_RETRY_MS * 2 ** Math.min(Math.max(0, retries), 10));
+const DISPATCH_JOB = "agentThreads.dispatch";
 const DEVICE_AVAILABILITY_CODES = new Set<string>([
   "SELECTED_DEVICE_OFFLINE",
   "SELECTED_DEVICE_UNAVAILABLE",
@@ -218,9 +232,9 @@ const COMMAND_JOB = "agentThreads.deviceMessage";
 const COMMAND_RETRY_MS = 10_000;
 const commandJobId = (commandId: string): string => `devmsg:${commandId}`;
 const COMMAND_WAIT_MS: Record<AgentControlCommand["kind"], number> = {
-  message: 60 * 60_000,
-  resume: 60 * 60_000,
-  stop: 7 * 24 * 60 * 60_000,
+  message: DEVICE_AVAILABILITY_WAIT_MS,
+  resume: DEVICE_AVAILABILITY_WAIT_MS,
+  stop: DEVICE_AVAILABILITY_WAIT_MS,
 };
 const COMMAND_TTL_MS = 8 * 24 * 60 * 60_000;
 /** `paused` is a stopped attempt from builds before `stop_agent`, which the migration renames. */
@@ -680,10 +694,16 @@ const waitForAvailableDevice = (
   availabilityRetries: number,
 ): boolean => {
   if (!turn.thread_id || turn.attempt_generation === null) return false;
-  if (ctx.now - turn.created_at >= DEVICE_AVAILABILITY_WAIT_MS) return false;
+  if (ctx.now - turn.created_at >= DEVICE_AVAILABILITY_WAIT_MS) {
+    log("info", "agent_device_wait_expired", { threadId: turn.thread_id, turnId: turn.turn_id, retries: availabilityRetries });
+    return false;
+  }
+  if (availabilityRetries === 0) {
+    log("info", "agent_device_wait_started", { threadId: turn.thread_id, turnId: turn.turn_id });
+  }
   ctx.jobs.schedule(
-    "agentThreads.dispatch",
-    ctx.now + DEVICE_AVAILABILITY_RETRY_MS,
+    DISPATCH_JOB,
+    ctx.now + deviceWaitDelay(availabilityRetries),
     {
       threadId: turn.thread_id,
       turnId: turn.turn_id,
@@ -697,7 +717,47 @@ const waitForAvailableDevice = (
 };
 
 const deviceWaitExpiredMessage = (message: string): string =>
-  `${message} It did not become available within ${Math.round(DEVICE_AVAILABILITY_WAIT_MS / 60_000)} minutes, so this agent never started.`;
+  `${message} It did not come back within ${Math.round(DEVICE_AVAILABILITY_WAIT_MS / (24 * 60 * 60_000))} days, so this agent never started. send_message to it to try again (it waits for that computer again), or carry it on elsewhere with send_message's destination.`;
+
+/**
+ * Whether a recheck of an attempt waiting for its computer can skip the
+ * placement: the computer is known to be offline still. (Online but not
+ * ready, or asking for consent, still goes to the gate, which asks again.)
+ */
+const deviceStillAway = async (ctx: OwnerContext, deviceId: string): Promise<boolean> => {
+  const devices = await ctx.host.deviceDestinations().catch(() => undefined);
+  const device = devices?.find((candidate) => candidate.deviceId === deviceId);
+  return Boolean(device && !device.online);
+};
+
+/**
+ * A computer is back and ready: attempts waiting for it start now instead of
+ * at their next recheck, and messages held for it are offered again.
+ */
+const deviceReady = (ctx: OwnerContext, raw: unknown): { woke: number; scheduled: number } => {
+  const { deviceId } = object({ deviceId: id(256) })(raw);
+  let woke = 0;
+  for (const job of ctx.db.all<{ id: string; payload: string }>(
+    "SELECT id, payload FROM owner_jobs WHERE kind = ? AND run_at > ?",
+    DISPATCH_JOB,
+    ctx.now,
+  )) {
+    let payload: DispatchJob;
+    try {
+      payload = JSON.parse(job.payload) as DispatchJob;
+    } catch {
+      continue;
+    }
+    if (!payload?.availabilityRetries || typeof payload.threadId !== "string") continue;
+    const thread = readThread(ctx.db, payload.threadId);
+    if (!thread?.executor_device_id || resolveCurrentDeviceId(ctx.db, thread.executor_device_id) !== deviceId) continue;
+    ctx.jobs.schedule(DISPATCH_JOB, ctx.now + woke, payload, { id: job.id });
+    woke += 1;
+  }
+  const { scheduled } = flushDeviceCommands(ctx, { deviceId });
+  if (woke > 0) log("info", "agent_device_wait_woken", { deviceId, woke });
+  return { woke, scheduled };
+};
 
 const dispatchAttachments = (raw: string | null | undefined): string[] => {
   if (raw == null) return [];
@@ -724,6 +784,18 @@ const runDeviceDispatch = async (
   prompt: string,
   storedAttachments: string | null | undefined,
 ): Promise<void> => {
+  if (job.availabilityRetries && (await deviceStillAway(ctx, thread.executor_device_id!))) {
+    if (waitForAvailableDevice(ctx, turn, job.availabilityRetries)) return;
+    ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
+    await settleDeviceAttempt(
+      ctx,
+      turn.turn_id,
+      "failed",
+      { errorMessage: deviceWaitExpiredMessage("The selected computer is offline.") },
+      "owner:dispatch",
+    );
+    return;
+  }
   try {
     const attachments = dispatchAttachments(storedAttachments);
     const { dispatchId } = await ctx.host.dispatchDeviceAgentTurn({
@@ -2096,8 +2168,10 @@ type ControlInput = {
  * Why a command waits in the outbox instead of landing now: its computer is
  * offline (`unreachable`), didn't answer (`timeout`), or the agent is running
  * but between runs (`between_runs`: starting up, reconnecting or just
- * finishing), so no run takes a steer at this moment. Each is retried every
- * `COMMAND_RETRY_MS` until it lands, starts the agent's next run, or expires.
+ * finishing, or its attempt waiting to start on a computer that is online),
+ * so no run takes a steer at this moment. Each is retried (`commandRetryDelay`)
+ * until it lands, starts the agent's next run, or expires; its computer
+ * coming back offers it again at once.
  */
 type CommandHold = "unreachable" | "timeout" | "between_runs";
 
@@ -2138,7 +2212,7 @@ const controlAgent = async (
   }
   let routed: Routed;
   try {
-    routed = await routeCommand(ctx, input, executor, deviceId);
+    routed = (await coveredScheduleFire(ctx, input, deviceId)) ?? (await routeCommand(ctx, input, executor, deviceId));
   } catch (error) {
     settleCommand(ctx, input.commandId, "failed", errorReason(error));
     logCommand(ctx, input.thread.thread_id, "command_routed", `command_routed:${input.commandId}:${prior ? prior.attempts + 1 : 0}`, input.source, {
@@ -2395,6 +2469,11 @@ const routeCommand = async (
     case "dispatch": {
       if (ACTIVE_STATUSES.has(thread.status)) {
         const turn = runningTurn(ctx.db, thread);
+        if (turn && attemptWaitingToStart(ctx.db, turn.turn_id)) {
+          // Its attempt waits for its computer (or is about to start): the
+          // message is held and steered in once that attempt runs.
+          return { hold: deviceId && (await deviceStanding(ctx, deviceId)).online ? "between_runs" : "unreachable" };
+        }
         const steered = turn?.dispatch_id
           ? await ctx.host.steerDeviceAgentTurn({
               dispatchId: turn.dispatch_id,
@@ -2570,8 +2649,8 @@ const commandResult = async (
           ? `${name} is offline right now, so it could not stop yet. The stop is held and applied the moment ${name} reconnects, unless you message the agent first.`
           : `${name} did not answer in time. The stop is offered again until ${name} answers.`
         : routed.hold === "unreachable"
-          ? `${offlineName} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, if that is within an hour.`
-          : `${name} did not answer in time. The message is offered to ${threadId} again until ${name} answers, for up to an hour.`;
+            ? `${offlineName} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, however long that takes.`
+            : `${name} did not answer in time. The message is offered to ${threadId} again until ${name} answers.`;
   } else if (input.kind !== "stop" && routed.outcome === "resumed" && routed.waitingForDevice && device && !device.online) {
     outcome = "held";
     note = `${offlineName} is offline. The message is held, and ${threadId}'s next run starts with it when ${device.name} reconnects.`;
@@ -2637,6 +2716,64 @@ const recordMessageLanded = (
   );
 };
 
+/**
+ * When a held command is offered again. Its computer coming back flushes it
+ * at once (`flushDeviceCommands`), so a long absence backs off to a slow
+ * recheck; one waiting for its attempt to start there rechecks within a minute.
+ */
+const commandRetryDelay = (hold: CommandHold, attempts: number): number =>
+  hold === "unreachable"
+    ? Math.max(COMMAND_RETRY_MS, deviceWaitDelay(attempts))
+    : Math.min(60_000, Math.max(COMMAND_RETRY_MS, deviceWaitDelay(attempts)));
+
+/** An attempt not yet running on its computer: its start (or its wait for that computer) is still queued. */
+const attemptWaitingToStart = (db: OwnerDbReader, turnId: string): boolean =>
+  db.one<{ id: string }>("SELECT id FROM owner_jobs WHERE id = ?", `dispatch:${turnId}`) !== null;
+
+/**
+ * A schedule's fire for an agent that is still waiting on an earlier fire of
+ * the same schedule (held for its computer, or its run waiting to start
+ * there) is covered by that one: missed fires catch up once, not once each.
+ */
+const coveredScheduleFire = async (
+  ctx: OwnerContext,
+  input: ControlInput,
+  deviceId: string | null,
+): Promise<Routed | null> => {
+  if (input.kind !== "message" || !input.source.startsWith("schedule:")) return null;
+  const thread = input.thread;
+  const heldEarlier = ctx.db.one<{ command_id: string }>(
+    `SELECT command_id FROM agent_commands
+      WHERE thread_id = ? AND source = ? AND command_id <> ? AND state = 'pending' LIMIT 1`,
+    thread.thread_id,
+    input.source,
+    input.commandId,
+  );
+  let waiting = Boolean(heldEarlier);
+  if (!waiting && ACTIVE_STATUSES.has(thread.status)) {
+    const turn = runningTurn(ctx.db, thread);
+    waiting = Boolean(
+      turn &&
+        attemptWaitingToStart(ctx.db, turn.turn_id) &&
+        ctx.db.one<{ command_id: string }>(
+          `SELECT command_id FROM agent_commands
+            WHERE thread_id = ? AND source = ? AND command_id <> ? AND created_at >= ?
+              AND state IN ('pending', 'delivered') LIMIT 1`,
+          thread.thread_id,
+          input.source,
+          input.commandId,
+          turn.created_at,
+        ),
+    );
+  }
+  if (!waiting) return null;
+  const name = deviceId ? (await deviceStanding(ctx, deviceId)).name : "its computer";
+  return {
+    outcome: "queued",
+    note: `An earlier run of this schedule is still waiting for ${name}. It runs once when ${name} is back, which covers this one.`,
+  };
+};
+
 const RETRY_REASONS = new Set(["thread_changed", "thread_starting", "thread_busy", "device_unreachable"]);
 
 const runCommand = async (ctx: OwnerContext, payload: { messageId?: unknown }): Promise<void> => {
@@ -2677,14 +2814,24 @@ const runCommand = async (ctx: OwnerContext, payload: { messageId?: unknown }): 
   } catch (error) {
     const reason = errorReason(error);
     if (RETRY_REASONS.has(reason) || (error instanceof RpcError && error.code === "UNAVAILABLE")) {
-      ctx.jobs.schedule(COMMAND_JOB, ctx.now + COMMAND_RETRY_MS, { messageId: row.command_id }, { id: commandJobId(row.command_id) });
+      ctx.jobs.schedule(
+        COMMAND_JOB,
+        ctx.now + commandRetryDelay(reason === "device_unreachable" ? "unreachable" : "between_runs", row.attempts),
+        { messageId: row.command_id },
+        { id: commandJobId(row.command_id) },
+      );
       return;
     }
     dropCommand(ctx, { ...row, attempts: row.attempts + 1 }, reason);
     return;
   }
   if ("hold" in routed) {
-    ctx.jobs.schedule(COMMAND_JOB, ctx.now + COMMAND_RETRY_MS, { messageId: row.command_id }, { id: commandJobId(row.command_id) });
+    ctx.jobs.schedule(
+      COMMAND_JOB,
+      ctx.now + commandRetryDelay(routed.hold, row.attempts),
+      { messageId: row.command_id },
+      { id: commandJobId(row.command_id) },
+    );
     return;
   }
   settleCommand(ctx, row.command_id, "delivered", routed.outcome);
@@ -4906,6 +5053,7 @@ export const agentThreadsDomain = {
     "agentThreads.stop": async (ctx, raw) => await stopAgent(ctx, stopParser(raw)),
     "agentThreads.pause": async (ctx, raw) => await legacyPauseAgent(ctx, pauseParser(raw)),
     "agentThreads.flushDeviceMessages": flushDeviceCommands,
+    "agentThreads.deviceReady": deviceReady,
     "agentThreads.control": async (ctx, raw) => await controlRequest(ctx, controlParser(raw)),
     "agentThreads.statuses": async (ctx, raw) => {
       const args = object({

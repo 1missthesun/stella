@@ -517,7 +517,11 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     await this.scheduleAlarm(now);
   }
 
-  /** Scheduled runs that waited for this computer (Free plan) go now. */
+  /**
+   * The computer is ready for work: scheduled runs that waited for it (Free
+   * plan), agent attempts waiting to start on it and messages held for it go
+   * now.
+   */
   protected async wakeWaitingSchedules(deviceId: string): Promise<void> {
     const woke = await this.ownerStore().internalCall("schedules.computerBack", {
       deviceId,
@@ -526,6 +530,15 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       log("error", "schedules_computer_back_failed", {
         deviceId,
         message: woke.error.message,
+      });
+    }
+    const agents = await this.ownerStore().internalCall("agentThreads.deviceReady", {
+      deviceId,
+    });
+    if (!agents.ok) {
+      log("error", "agent_device_ready_failed", {
+        deviceId,
+        message: agents.error.message,
       });
     }
   }

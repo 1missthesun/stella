@@ -1352,8 +1352,8 @@ export function stellaAgents(host: StellaAgentsHost) {
         const where = standing ? { ...placement, label: standing.name } : placement;
         const waitingFor =
           standing?.online && standing.remoteExecution && standing.remoteExecution !== "enabled"
-            ? `${describePlacement(where)} is asking the user on its screen to allow work from other devices, so it starts once they allow it there, waiting up to an hour. Tell the user to answer that prompt on ${describePlacement(where)}.`
-            : `${describePlacement(where)} can't take it yet (not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`;
+            ? `${describePlacement(where)} is asking the user on its screen to allow work from other devices, so it starts once they allow it there (it waits for that, up to a week). Tell the user to answer that prompt on ${describePlacement(where)}.`
+            : `${describePlacement(where)} can't take it yet (not ready, or waiting for the user to allow work from other devices there), so it starts once it can (it waits for that, up to a week). Tell the user.`;
         return {
           content: [
             {

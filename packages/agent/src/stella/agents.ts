@@ -381,8 +381,8 @@ export type StellaAgentsHost = {
     report: string;
   }): void;
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
-  /** A stopped agent's own processes (its shells, tools and what they started) end. */
-  endAgentProcesses?(threadId: string): Promise<void>;
+  /** A stopped agent's own processes (its shells, tools and what they started) end; resolves with how many. */
+  endAgentProcesses?(threadId: string): Promise<number>;
   directory?: AgentDirectoryHost;
   agentDirectory?(threadId: string): string;
   directoryProblem?(directory: string): Promise<string | undefined>;
@@ -2029,10 +2029,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     target: TreeAgent,
     rootConversationId: ConversationId,
     context: Context,
-  ): Promise<{ local: string[]; elsewhere: AgentStopResult[] }> => {
+  ): Promise<{ local: string[]; elsewhere: AgentStopResult[]; endedProcesses: number }> => {
     const below = target.record.remote ? [] : await agentTree(store, target.record.conversationId as ConversationId, context);
     const local: string[] = [];
     const elsewhere: AgentStopResult[] = [];
+    let endedProcesses = 0;
     for (const agent of [...below.reverse(), target]) {
       const { record } = agent;
       if (record.remote) {
@@ -2049,13 +2050,13 @@ export function stellaAgents(host: StellaAgentsHost) {
         (await agentsBusy(busyReader(store, context), id).catch(() => false));
       await markStopped(store, agent.parentConversationId, agent.threadId, context);
       await (await store.conversation(id, context))?.abort(context);
-      await host.endAgentProcesses?.(agent.threadId).catch(() => undefined);
+      endedProcesses += (await host.endAgentProcesses?.(agent.threadId).catch(() => 0)) ?? 0;
       local.push(agent.threadId);
       if (waiting && agent.parentConversationId === rootConversationId) {
         await host.agentStopped?.({ threadId: agent.threadId, description: record.description }, context);
       }
     }
-    return { local, elsewhere };
+    return { local, elsewhere, endedProcesses };
   };
 
   const stopAgent = defineTool({
@@ -2074,7 +2075,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       const scope = stella ? root : (api.conversationId as ConversationId);
       const target = scope === undefined ? undefined : (await agentTree(api, scope, context)).find((agent) => agent.threadId === threadId);
       if (target) {
-        const { elsewhere } = await stopSubtree(api, target, root ?? (api.conversationId as ConversationId), context);
+        const { elsewhere, endedProcesses } = await stopSubtree(api, target, root ?? (api.conversationId as ConversationId), context);
         const there = elsewhere.find((result) => result.threadId === threadId);
         if (there) return { content: [{ type: "text", text: agentStopText(there) }] };
         const others = elsewhere.flatMap((result) => [result, ...(result.descendants ?? [])]).filter((result) => result.outcome !== "not_running");
@@ -2082,7 +2083,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           content: [
             {
               type: "text",
-              text: `Stopped ${threadId}${others.length ? ` and, elsewhere, ${others.map((result) => `${result.threadId} (${result.where})`).join(", ")}` : ""}. Each keeps its history; send_message resumes it.`,
+              text: `Stopped ${threadId}${others.length ? ` and, elsewhere, ${others.map((result) => `${result.threadId} (${result.where})`).join(", ")}` : ""}. Each keeps its history; send_message resumes it.${endedProcesses > 0 ? ` Their running processes (${endedProcesses}: shells, servers, builds and the like) ended too; when you resume one, tell it to start again what it still needs.` : ""}`,
             },
           ],
         };

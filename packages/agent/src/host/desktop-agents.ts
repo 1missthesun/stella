@@ -54,9 +54,7 @@ export function desktopAgentsHost(
     ...(options.dataDir ? { agentDirectory: (threadId: string) => defaultAgentDirectory(options.dataDir!, threadId) } : {}),
     ...(options.dataDir
       ? {
-          endAgentProcesses: async (threadId: string) => {
-            await endTaskProcesses({ owner: threadId, stellaDataDir: options.dataDir! });
-          },
+          endAgentProcesses: (threadId: string) => endTaskProcesses({ owner: threadId, stellaDataDir: options.dataDir! }),
         }
       : {}),
     ...(options.execution ? { execution: options.execution } : {}),

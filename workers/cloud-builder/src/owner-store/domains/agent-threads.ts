@@ -720,14 +720,17 @@ const deviceWaitExpiredMessage = (message: string): string =>
   `${message} It did not come back within ${Math.round(DEVICE_AVAILABILITY_WAIT_MS / (24 * 60 * 60_000))} days, so this agent never started. send_message to it to try again (it waits for that computer again), or carry it on elsewhere with send_message's destination.`;
 
 /**
- * Whether a recheck of an attempt waiting for its computer can skip the
- * placement: the computer is known to be offline still. (Online but not
- * ready, or asking for consent, still goes to the gate, which asks again.)
+ * Where a recheck of an attempt waiting for its computer stands: `away`
+ * skips the placement while the computer is known to be offline; `gone` is a
+ * computer no longer on the account, which will never take it. (Online but
+ * not ready, or asking for consent, still goes to the gate, which asks again.)
  */
-const deviceStillAway = async (ctx: OwnerContext, deviceId: string): Promise<boolean> => {
+const waitingDeviceStanding = async (ctx: OwnerContext, deviceId: string): Promise<"away" | "gone" | "check"> => {
   const devices = await ctx.host.deviceDestinations().catch(() => undefined);
-  const device = devices?.find((candidate) => candidate.deviceId === deviceId);
-  return Boolean(device && !device.online);
+  if (!devices) return "check";
+  const device = devices.find((candidate) => candidate.deviceId === resolveCurrentDeviceId(ctx.db, deviceId));
+  if (!device) return "gone";
+  return device.online ? "check" : "away";
 };
 
 /**
@@ -784,14 +787,20 @@ const runDeviceDispatch = async (
   prompt: string,
   storedAttachments: string | null | undefined,
 ): Promise<void> => {
-  if (job.availabilityRetries && (await deviceStillAway(ctx, thread.executor_device_id!))) {
-    if (waitForAvailableDevice(ctx, turn, job.availabilityRetries)) return;
+  const standing = job.availabilityRetries ? await waitingDeviceStanding(ctx, thread.executor_device_id!) : "check";
+  if (standing !== "check") {
+    if (standing === "away" && waitForAvailableDevice(ctx, turn, job.availabilityRetries ?? 0)) return;
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
     await settleDeviceAttempt(
       ctx,
       turn.turn_id,
       "failed",
-      { errorMessage: deviceWaitExpiredMessage("The selected computer is offline.") },
+      {
+        errorMessage:
+          standing === "gone"
+            ? "The computer this agent was waiting for is no longer connected to this account, so it never started. Carry it on elsewhere with send_message's destination."
+            : deviceWaitExpiredMessage("The selected computer is offline."),
+      },
       "owner:dispatch",
     );
     return;

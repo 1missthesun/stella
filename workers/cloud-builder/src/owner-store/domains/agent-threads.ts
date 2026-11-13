@@ -80,7 +80,7 @@ import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
-import { boundReportText, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
+import { boundReportText, heldAncestorIds, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
@@ -4330,13 +4330,26 @@ const conversationThreadRows = (
     .slice(0, limit);
 };
 
-const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] =>
-  conversationThreadRows(
+const presentedSummary = (db: OwnerDbReader, row: ThreadRow, ownerId: string): AgentThreadSummary =>
+  reportHeldForHelpers(db, row)
+    ? { ...summary(row, ownerId), status: "waiting_for_helpers" }
+    : summary(row, ownerId);
+
+const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] => {
+  const live = conversationThreadRows(
     db,
     conversationId,
     ` AND status IN ${LIVE_STATUSES_SQL}`,
     RUNNING_AGENT_THREADS_LIMIT,
-  ).map((row) => summary(row, ownerId));
+  );
+  const held = heldAncestorIds(db, live).flatMap((threadId) => {
+    const row = readThread(db, threadId);
+    return row && (row.conversation_id === conversationId || row.origin_conversation_id === conversationId)
+      ? [row]
+      : [];
+  });
+  return [...live, ...held].map((row) => presentedSummary(db, row, ownerId));
+};
 
 const deviceThreads = (
   db: OwnerDbReader,
@@ -4784,7 +4797,7 @@ export const agentThreadsDomain = {
         const limit = args.limit ?? 30;
         const rows = conversationThreadRows(ctx.db, args.conversationId, "", limit + 1);
         return {
-          threads: rows.slice(0, limit).map((row) => summary(row, ctx.ownerId)),
+          threads: rows.slice(0, limit).map((row) => presentedSummary(ctx.db, row, ctx.ownerId)),
           hasMore: rows.length > limit,
         };
       },
@@ -4795,7 +4808,7 @@ export const agentThreadsDomain = {
         const row = readConversationThread(ctx.db, args.conversationId, args.threadId);
         return row &&
           (row.conversation_id === args.conversationId || row.origin_conversation_id === args.conversationId)
-          ? summary(row, ctx.ownerId)
+          ? presentedSummary(ctx.db, row, ctx.ownerId)
           : null;
       },
     },

@@ -264,6 +264,26 @@ export const reportHeldForHelpers = (
   !readOutbox(db, agentReportId(thread.thread_id, thread.attempt_generation)) &&
   liveDescendants(db, thread.thread_id).length > 0;
 
+/** The ancestors of these agents whose reports wait for helpers still at work. */
+export const heldAncestorIds = (
+  db: OwnerDbReader,
+  threads: readonly Pick<ThreadRow, "thread_id" | "parent_thread_id">[],
+): string[] => {
+  const seen = new Set(threads.map((thread) => thread.thread_id));
+  const held: string[] = [];
+  for (const thread of threads) {
+    let parentId = thread.parent_thread_id;
+    for (let depth = 0; parentId && !seen.has(parentId) && depth < TREE_DEPTH_MAX; depth += 1) {
+      seen.add(parentId);
+      const parent = readThread(db, parentId);
+      if (!parent) break;
+      if (reportHeldForHelpers(db, parent)) held.push(parent.thread_id);
+      parentId = parent.parent_thread_id;
+    }
+  }
+  return held;
+};
+
 export const deriveAgentReport = (
   db: OwnerDb,
   threadId: string,

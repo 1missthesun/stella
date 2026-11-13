@@ -28,6 +28,8 @@ export type AgentDirectoryAgentRow = {
   awaitingConsent?: true;
   /** A usage limit paused it mid-run; Resume on the chat's card continues it. */
   pausedBy?: "usage-limit";
+  /** It ended its turn waiting for this, with no report; a message resumes it. */
+  waitingFor?: string;
 };
 
 export type AgentDirectorySessionRow = {
@@ -95,12 +97,17 @@ const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
     ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (up to an hour after it was sent)`
     : undefined;
 
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
+
 const statusText = (row: AgentDirectoryAgentRow): string =>
-  row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status) ? USAGE_LIMIT_PAUSED_STATUS : row.status;
+  row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status)
+    ? USAGE_LIMIT_PAUSED_STATUS
+    : row.status === "waiting" && row.waitingFor
+      ? `waiting for ${oneLine(row.waitingFor)}`
+      : row.status;
 
 const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
 
-const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
 
 const rosterLine = (
   row: AgentDirectoryAgentRow,

@@ -1,4 +1,5 @@
 import type { AgentAttemptOutcome } from "../agent-status.js";
+import { resultWaitingFor } from "../agent-waiting.js";
 
 export const agentReportId = (
   threadId: string,
@@ -109,6 +110,7 @@ export const silentRunReport = (args: {
 // result for the same attempt may replace before the report is delivered.
 export const isPlaceholderAgentResult = (resultJson: string | null | undefined): boolean => {
   if (!resultJson?.trim()) return true;
+  if (resultWaitingFor(resultJson) !== undefined) return false;
   let text: unknown = resultJson;
   try {
     const parsed = JSON.parse(resultJson) as { finalText?: unknown };

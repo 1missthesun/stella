@@ -3,6 +3,7 @@ export const AGENT_STATUSES = [
   "running",
   "waiting_for_helpers",
   "waiting_for_user",
+  "waiting",
   "completed",
   "failed",
   "canceled",
@@ -51,6 +52,7 @@ export const LIVE_AGENT_STATUSES: ReadonlySet<AgentStatus> = new Set([
   "running",
   "waiting_for_helpers",
   "waiting_for_user",
+  "waiting",
 ]);
 
 export const isAgentStatus = (value: unknown): value is AgentStatus =>
@@ -64,7 +66,6 @@ export const isLiveAgentStatus = (status: AgentStatus): boolean => LIVE_AGENT_ST
 const LEGACY_STATUS: Readonly<Record<string, AgentStatus>> = {
   pending: "queued",
   resuming: "running",
-  waiting: "waiting_for_user",
   error: "failed",
   cancelled: "canceled",
   paused: "canceled",

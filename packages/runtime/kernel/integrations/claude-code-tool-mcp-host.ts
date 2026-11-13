@@ -744,6 +744,10 @@ export const createClaudeCodeToolMcpHost = async (
       }
     });
   });
+  // Claude Code's fetch reuses idle keep-alive sockets and does not retry a
+  // POST the server closed under it (ECONNRESET), so idle sockets stay open
+  // until the client closes them.
+  httpServer.keepAliveTimeout = 0;
   httpServer.on("connection", (socket) => {
     sockets.add(socket);
     socket.once("close", () => sockets.delete(socket));

@@ -1000,6 +1000,21 @@ export const createClaudeNativeToolUseCorrelator = () => {
   };
   return {
     observe,
+    observeToolResults(event: ClaudeStreamEvent) {
+      if (event.type !== "user") return;
+      const content = asObject(event.message)?.content;
+      if (!Array.isArray(content)) return;
+      for (const raw of content) {
+        const block = asObject(raw);
+        if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+        for (const [key, ids] of queued) {
+          const at = ids.indexOf(block.tool_use_id);
+          if (at < 0) continue;
+          ids.splice(at, 1);
+          if (ids.length === 0) queued.delete(key);
+        }
+      }
+    },
     observeAssistantMessage(event: ClaudeStreamEvent) {
       if (event.type !== "assistant") return null;
       const content = asObject(event.message)?.content;
@@ -3032,6 +3047,7 @@ class ClaudeCodeSessionRuntime {
             });
           }
           correlator.observeStreamEvent(parsedLine);
+          correlator.observeToolResults(parsedLine);
         }
         if (
           updateClaudeCodeNativeToolActivity(

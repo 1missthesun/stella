@@ -6,9 +6,17 @@ src="$script_dir/src/stella_computer_helper.cpp"
 output_dir="$script_dir/out/win32"
 obj="${TMPDIR:-/tmp}/stella_computer_helper.obj"
 out="$output_dir/stella-computer-helper.exe"
-xwin="${XWIN:-$HOME/Library/Caches/cargo-xwin/xwin}"
-llvm="${LLVM:-/opt/homebrew/opt/llvm/bin}"
-lld="${LLD:-$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/gcc-ld/lld-link}"
+if [[ "$(uname -s)" == "Linux" ]]; then
+  # Linux: `cargo install xwin && xwin --accept-license splat --output ~/.cache/xwin-sdk`,
+  # system clang (clang-cl), and the lld-link that ships with rustup.
+  xwin="${XWIN:-$HOME/.cache/xwin-sdk}"
+  llvm="${LLVM:-/usr/bin}"
+  lld="${LLD:-$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/lld-link}"
+else
+  xwin="${XWIN:-$HOME/Library/Caches/cargo-xwin/xwin}"
+  llvm="${LLVM:-/opt/homebrew/opt/llvm/bin}"
+  lld="${LLD:-$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/gcc-ld/lld-link}"
+fi
 
 if [[ ! -d "$xwin" ]]; then
   echo "ERROR: xwin SDK cache not found at $xwin" >&2
@@ -47,7 +55,7 @@ cd "$script_dir"
   /libpath:"$xwin/crt/lib/x86_64" \
   /libpath:"$xwin/sdk/lib/um/x86_64" \
   /libpath:"$xwin/sdk/lib/ucrt/x86_64" \
-  "$obj" ole32.lib oleaut32.lib uuid.lib user32.lib gdi32.lib gdiplus.lib shell32.lib advapi32.lib dwmapi.lib \
+  "$obj" ole32.lib oleaut32.lib uuid.lib user32.lib gdi32.lib gdiplus.lib shell32.lib advapi32.lib dwmapi.lib oleacc.lib \
   /out:"$out"
 
 echo "Build successful: $out"

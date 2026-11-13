@@ -4853,6 +4853,16 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
         return framework == Framework::Chromium ||
             isChromiumClassName(classNameForWindow(deepestChildFromPoint(process.hwnd, point)));
     };
+    // An edit control inside a XAML/WinUI window (Notepad's text area) is an
+    // ordinary Win32 window that takes posted input.
+    auto pointerFramework = [&](POINT point) {
+        HWND deepest = deepestChildFromPoint(process.hwnd, point);
+        return deepest != process.hwnd && isEditWindowClass(deepest) ? Framework::Win32 : framework;
+    };
+    auto keyboardFramework = [&]() {
+        HWND focused = focusedDescendant(process.hwnd);
+        return focused && isEditWindowClass(focused) ? Framework::Win32 : framework;
+    };
     auto effectiveFramework = [&](bool chromiumAtPoint) {
         return chromiumAtPoint && framework != Framework::Chromium ? Framework::ChromiumEmbedded : framework;
     };
@@ -4904,8 +4914,9 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
                 delivery = "uia";
             } else {
                 if (element) point = liveElementCenter(element, windowFrame);
-                Framework effective = effectiveFramework(chromiumAtPoint);
-                BackgroundPlan plan = pointerPlan(framework, "click", button, clickCount, chromiumAtPoint);
+                Framework base = chromiumAtPoint ? framework : pointerFramework(point);
+                Framework effective = chromiumAtPoint ? effectiveFramework(true) : base;
+                BackgroundPlan plan = pointerPlan(base, "click", button, clickCount, chromiumAtPoint);
                 if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(effective, "clicks", plan);
                 ensureCanPostMessages(process.pid);
                 deliveryReason = frameworkId(effective);
@@ -4959,8 +4970,9 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
                 delivery = "uia";
             } else {
                 bool chromiumAtPoint = chromiumAt(point);
-                Framework effective = effectiveFramework(chromiumAtPoint);
-                BackgroundPlan plan = pointerPlan(framework, "scroll", "left", 1, chromiumAtPoint);
+                Framework base = chromiumAtPoint ? framework : pointerFramework(point);
+                Framework effective = chromiumAtPoint ? effectiveFramework(true) : base;
+                BackgroundPlan plan = pointerPlan(base, "scroll", "left", 1, chromiumAtPoint);
                 if (plan.route != BackgroundRoute::Post) throw backgroundUnavailable(effective, "scrolling", plan);
                 ensureCanPostMessages(process.pid);
                 sendScroll(process.hwnd, point, direction, pages);
@@ -4981,8 +4993,9 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
             route = "foreground.sendinput.drag";
         } else {
             bool chromiumAtPoint = chromiumAt(from);
-            Framework effective = effectiveFramework(chromiumAtPoint);
-            BackgroundPlan plan = pointerPlan(framework, "drag", "left", 1, chromiumAtPoint);
+            Framework base = chromiumAtPoint ? framework : pointerFramework(from);
+            Framework effective = chromiumAtPoint ? effectiveFramework(true) : base;
+            BackgroundPlan plan = pointerPlan(base, "drag", "left", 1, chromiumAtPoint);
             if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(effective, "drags", plan);
             ensureCanPostMessages(process.pid);
             deliveryReason = frameworkId(effective);
@@ -5018,8 +5031,9 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
                 route = textRoute;
                 delivery = textRoute.rfind("uia.", 0) == 0 ? "uia" : "background";
             } else {
-                BackgroundPlan plan = keyboardPlan(framework, "text", "");
-                if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(framework, "typing", plan);
+                Framework keys = keyboardFramework();
+                BackgroundPlan plan = keyboardPlan(keys, "text", "");
+                if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(keys, "typing", plan);
                 ensureCanPostMessages(process.pid);
                 sendText(process.hwnd, text);
                 delivery = "background";
@@ -5037,12 +5051,13 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
             deliveryReason = "requested";
             route = "foreground.sendinput.key";
         } else {
-            BackgroundPlan plan = keyboardPlan(framework, "key", key);
-            if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(framework, "keys", plan);
+            Framework keys = keyboardFramework();
+            BackgroundPlan plan = keyboardPlan(keys, "key", key);
+            if (plan.route == BackgroundRoute::Refuse) throw backgroundUnavailable(keys, "keys", plan);
             ensureCanPostMessages(process.pid);
             sendKey(process.hwnd, key);
             delivery = "background";
-            deliveryReason = frameworkId(framework);
+            deliveryReason = frameworkId(keys);
             route = "hwnd.postmessage.key";
         }
     } else if (tool == "set_value") {

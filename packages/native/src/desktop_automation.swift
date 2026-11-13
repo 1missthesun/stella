@@ -110,6 +110,9 @@ struct SnapshotNode: Codable {
     let frame: Rect?
     let actions: [String]
     let children: [SnapshotNode]
+    // Identity of the full value when `value` is cut at the display limit, so
+    // edits past the cut still change the observed state.
+    var valueDigest: String? = nil
 }
 
 struct SnapshotDocument: Codable {
@@ -376,6 +379,7 @@ struct TypedDaemonActionOptions: Codable, Equatable {
     let raise: Bool?
     let showOverlay: Bool?
     let deferObservation: Bool?
+    let quickGlide: Bool?
 }
 
 struct TypedDaemonAction: Codable, Equatable {
@@ -565,6 +569,8 @@ struct ActionOptions {
     let raise: Bool
     let inlineScreenshot: Bool
     let showOverlay: Bool
+    // A follow-on action in a batch: the software cursor moves quickly.
+    let quickGlide: Bool
     let deferObservation: Bool
     let screenshotPolicy: ScreenshotPolicy
     let explicitVision: Bool
@@ -586,6 +592,7 @@ struct NodeDetails {
     let title: String?
     let description: String?
     let value: String?
+    var valueDigest: String? = nil
     let valueType: String?
     let settable: Bool?
     let details: String?
@@ -1230,6 +1237,15 @@ func trimmed(_ value: String?) -> String? {
     guard let value else { return nil }
     let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return result.isEmpty ? nil : result
+}
+
+func truncatedValueDigest(_ value: String?, limit: Int = 160) -> String? {
+    guard let value = trimmed(value), value.count > limit else { return nil }
+    let digest = SHA256.hash(data: Data(value.utf8))
+        .prefix(12)
+        .map { String(format: "%02x", $0) }
+        .joined()
+    return "\(value.count):\(digest)"
 }
 
 func truncateValue(_ value: String?, limit: Int = 160) -> String? {
@@ -2092,9 +2108,9 @@ func nodeDetails(for element: AXUIElement) -> NodeDetails {
     var expanded: Bool? = nil
     var frame: Rect? = nil
     let shouldReadValue = valueBearingRoles.contains(role) || likelyActionable
-    var value: String? = shouldReadValue
-        ? truncateValue(coerceString(rawValue))
-        : nil
+    let fullValue: String? = shouldReadValue ? coerceString(rawValue) : nil
+    var value: String? = truncateValue(fullValue)
+    var valueDigest: String? = truncatedValueDigest(fullValue)
     var actions: [String] = []
 
     if likelyActionable {
@@ -2155,7 +2171,9 @@ func nodeDetails(for element: AXUIElement) -> NodeDetails {
         actions = axActions(element)
         if value == nil {
             // Some elements only expose value lazily; pick it up here.
-            value = truncateValue(axStringValue(element, kAXValueAttribute as String))
+            let lazyValue = axStringValue(element, kAXValueAttribute as String)
+            value = truncateValue(lazyValue)
+            valueDigest = truncatedValueDigest(lazyValue)
         }
     } else if selectableRoles.contains(role) {
         // Selection-bearing leaf rows: cheap single read.
@@ -2168,6 +2186,7 @@ func nodeDetails(for element: AXUIElement) -> NodeDetails {
         title: title,
         description: description,
         value: value,
+        valueDigest: valueDigest,
         valueType: valueType,
         settable: settable,
         details: details,
@@ -2376,7 +2395,8 @@ final class SnapshotBuilder {
             expanded: details.expanded,
             frame: details.frame,
             actions: details.actions,
-            children: children
+            children: children,
+            valueDigest: details.valueDigest
         )
     }
 
@@ -2994,6 +3014,7 @@ let overlayCursorBaseRotation: CGFloat = 44 * .pi / 180
 let overlayCursorTangentLagFraction: CGFloat = 0.45
 let overlayFadeOutDuration: TimeInterval = 0.18
 let overlayCursorMoveDuration: TimeInterval = 0.85
+let overlayCursorQuickMoveDuration: TimeInterval = 0.18
 let overlayCursorPathOutHandleFactor: CGFloat = 0.42
 let overlayCursorPathInHandleFactor: CGFloat = 0.42
 let overlayCursorTimingControl1: CGPoint = CGPoint(x: 0.42, y: 0.0)
@@ -3794,6 +3815,7 @@ final class PersistentOverlayController {
     private var activeTiming: BezierFunction = .easeInEaseOut
     private var activeStartTime: CFTimeInterval = 0
     private var activeDuration: TimeInterval = overlayCursorMoveDuration
+    var quickGlide = false
     private var lastArrivalTangent: CGPoint?
     private var renderedAngle: CGFloat = overlayCursorBaseRotation
     private var idleAnimationStartedAt: CFTimeInterval?
@@ -4049,7 +4071,7 @@ final class PersistentOverlayController {
         idleAnimationStartedAt = nil
         activeStartTime = CACurrentMediaTime()
         let scaled = overlayCursorMoveDuration * Double(min(1.0, max(0.45, distance / 600.0)))
-        activeDuration = scaled
+        activeDuration = quickGlide ? min(overlayCursorQuickMoveDuration, scaled) : scaled
         scheduleAnimationFinish()
         let totalRemaining = activeDuration + 0.06
         writeBusyUntil(remainingSeconds: totalRemaining, actionReadyInSeconds: totalRemaining)
@@ -4144,12 +4166,14 @@ final class UnifiedAutomationOverlayService {
 
     func perform<T>(
         enabled: Bool,
+        quickGlide: Bool = false,
         target: UnifiedOverlayTarget?,
         body: () -> T
     ) -> T {
         guard enabled, let target else {
             return body()
         }
+        controller.quickGlide = quickGlide
 
         startTicking()
         waitUntilIdle()
@@ -4222,6 +4246,7 @@ func overlayInteractionIsClickLike(_ kind: String?) -> Bool {
 
 func withUnifiedActionOverlay<T>(
     enabled: Bool,
+    quickGlide: Bool = false,
     statePath: String,
     snapshot: SnapshotDocument?,
     target: AppTarget,
@@ -4240,7 +4265,7 @@ func withUnifiedActionOverlay<T>(
                 interactionKind: interactionKind
             )
         }
-        return service.perform(enabled: enabled, target: overlayTarget, body: body)
+        return service.perform(enabled: enabled, quickGlide: quickGlide, target: overlayTarget, body: body)
     }
     return withActionOverlay(
         enabled: enabled,
@@ -5468,6 +5493,28 @@ private func launchTargetIfPossible(appName: String?, bundleId: String?) {
         }
         _ = openApplication(at: appURL)
     }
+}
+
+// Target resolution: running apps only, straight from NSWorkspace. Spotlight
+// usage metadata (a synchronous MDQuery plus an MDItem per app, ~250 ms and
+// ~1 s of mds_stores CPU) is only for `list-apps`, which ranks recent apps.
+func runningAppsCommand() -> ListAppsPayload {
+    let frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+    let apps = NSWorkspace.shared.runningApplications
+        .filter { $0.activationPolicy != .prohibited && $0.processIdentifier > 0 }
+        .map { app in
+            ListedAppPayload(
+                name: app.localizedName ?? app.bundleIdentifier ?? "pid \(app.processIdentifier)",
+                bundleId: app.bundleIdentifier,
+                pid: app.processIdentifier,
+                activationPolicy: activationPolicyName(app.activationPolicy),
+                isRunning: true,
+                isActive: app.processIdentifier == frontmostPid,
+                lastUsedDate: nil,
+                useCount: nil
+            )
+        }
+    return ListAppsPayload(ok: true, apps: apps, warnings: [])
 }
 
 func listAppsCommand() -> ListAppsPayload {
@@ -8801,6 +8848,7 @@ func actionOptions(from args: [String]) throws -> ActionOptions {
         raise: raise,
         inlineScreenshot: inlineScreenshot,
         showOverlay: showOverlay,
+        quickGlide: hasFlag(args, key: "--quick-glide"),
         deferObservation: hasFlag(args, key: "--defer-observation"),
         screenshotPolicy: policy,
         explicitVision: hasFlag(args, key: "--vision")
@@ -9247,6 +9295,9 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
     if command == "list-apps" {
         return commandResult(listAppsCommand())
     }
+    if command == "running-apps" {
+        return commandResult(runningAppsCommand())
+    }
     if command == "list-windows" {
         return commandResult(listWindowsCommand())
     }
@@ -9386,6 +9437,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         )
         let (clicked, usedAction, dispatch) = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -9457,6 +9509,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         )
         let (filled, fillUsedAction, fillDispatch) = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -9571,6 +9624,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         )
         let focusOk = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -9643,6 +9697,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         }
         let secondaryOk = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -9707,6 +9762,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         )
         let scrollResult = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -9794,6 +9850,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         let point = CGPoint(x: x, y: y)
         let (clicked, usedAction, dispatch) = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -9879,6 +9936,7 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         let dragEnd = CGPoint(x: toX, y: toY)
         let dragDispatch = withUnifiedActionOverlay(
             enabled: overlayEnabled(options),
+            quickGlide: options.quickGlide,
             statePath: options.statePath,
             snapshot: snapshot,
             target: target,
@@ -10845,7 +10903,7 @@ func validateTypedOperationWireShape(
                 options,
                 allowed: [
                     "allowHid", "coordinateFallback", "raise", "showOverlay",
-                    "deferObservation",
+                    "deferObservation", "quickGlide",
                 ],
                 path: "\(path).action.options"
             )
@@ -11128,7 +11186,7 @@ func validateTypedDaemonOperation(
 ) throws {
     let type = normalized(operation.type).replacingOccurrences(of: "-", with: "_")
     switch type {
-    case "list_apps", "list_windows":
+    case "list_apps", "running_apps", "list_windows":
         guard operation.target == nil,
               operation.state == nil,
               operation.action == nil,
@@ -11308,6 +11366,7 @@ func typedActionArguments(_ action: TypedDaemonAction) throws -> [String] {
     if action.options?.raise == true { args.append("--raise") }
     if action.options?.showOverlay == false { args.append("--no-overlay") }
     if action.options?.deferObservation == true { args.append("--defer-observation") }
+    if action.options?.quickGlide == true { args.append("--quick-glide") }
     return args
 }
 
@@ -11317,6 +11376,8 @@ func typedDaemonInvocation(for operation: TypedDaemonOperation) throws -> TypedD
     switch type {
     case "list_apps":
         return TypedDaemonInvocation(argv: ["list-apps"], env: [:], target: nil, statePath: nil)
+    case "running_apps":
+        return TypedDaemonInvocation(argv: ["running-apps"], env: [:], target: nil, statePath: nil)
     case "list_windows":
         return TypedDaemonInvocation(argv: ["list-windows"], env: [:], target: nil, statePath: nil)
     case "get_app_state", "snapshot":

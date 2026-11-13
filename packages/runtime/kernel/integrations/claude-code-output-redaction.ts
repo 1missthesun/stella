@@ -4,6 +4,7 @@ import {
 } from "@stella/contracts/secret-redaction";
 import { sanitizeToolVisibleText } from "../tools/safety.js";
 import { currentSecureValueFingerprints } from "../shared/secure-value-redaction.js";
+import { memorySyncNoteForFile } from "../memory/memory-sync-note.js";
 
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", "NotebookRead"]);
 const BINARY_KEYS = new Set(["base64", "data"]);
@@ -62,6 +63,7 @@ export const claudeCodePostToolUseHookResponse = async (
   const body = input as {
     hook_event_name?: unknown;
     tool_name?: unknown;
+    tool_input?: unknown;
     tool_response?: unknown;
   } | null;
   if (
@@ -73,15 +75,28 @@ export const claudeCodePostToolUseHookResponse = async (
   ) {
     return {};
   }
-  const { changed, output } = await redactClaudeCodeToolOutput(
-    body.tool_name,
-    body.tool_response,
-  );
-  if (!changed) return {};
+  const written = FILE_WRITE_TOOLS.has(body.tool_name)
+    ? writtenFilePath(body.tool_input)
+    : undefined;
+  const [{ changed, output }, memoryNote] = await Promise.all([
+    redactClaudeCodeToolOutput(body.tool_name, body.tool_response),
+    written ? memorySyncNoteForFile(written) : Promise.resolve(undefined),
+  ]);
+  if (!changed && !memoryNote) return {};
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
-      updatedToolOutput: output,
+      ...(changed ? { updatedToolOutput: output } : {}),
+      ...(memoryNote ? { additionalContext: memoryNote } : {}),
     },
   };
+};
+
+const FILE_WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+
+const writtenFilePath = (input: unknown): string | undefined => {
+  if (!input || typeof input !== "object") return undefined;
+  const record = input as { file_path?: unknown; notebook_path?: unknown };
+  const value = record.file_path ?? record.notebook_path;
+  return typeof value === "string" && value ? value : undefined;
 };

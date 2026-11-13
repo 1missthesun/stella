@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { isBlockedPath } from "./command-safety.js";
 import type { ToolContext, ToolResult } from "./types.js";
+import { memorySyncNoteForFile } from "../memory/memory-sync-note.js";
 import { expandHomePath, toolContextHome } from "./utils.js";
 import {
   replaceFileText,
@@ -760,6 +761,14 @@ export const handleApplyPatch = async (
         default:
           break;
       }
+    }
+    for (const entry of results) {
+      if (entry.kind === "delete" || entry.kind === "noop") continue;
+      const note = await memorySyncNoteForFile(
+        entry.movedTo ?? entry.path,
+        context?.stellaDataDir,
+      );
+      if (note) entry.note = entry.note ? `${entry.note} ${note}` : note;
     }
     return {
       result: { results },

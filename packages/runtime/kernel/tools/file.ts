@@ -23,6 +23,7 @@ import {
 import { isBlockedPath } from "./command-safety.js";
 import { sanitizeToolVisibleText } from "./safety.js";
 import { replaceFileText, withFileWriteLock } from "./file-write-lock.js";
+import { memorySyncNoteForFile } from "../memory/memory-sync-note.js";
 import {
   imageMimeTypeFromPath,
   resolveImageMimeType,
@@ -414,6 +415,15 @@ export const handleRead = async (
   }
 };
 
+const withMemorySyncNote = async (
+  result: string,
+  filePath: string,
+  context: ToolContext | undefined,
+): Promise<string> => {
+  const note = await memorySyncNoteForFile(filePath, context?.stellaDataDir);
+  return note ? `${result}\n\n${note}` : result;
+};
+
 export const handleWrite = async (
   args: Record<string, unknown>,
   context?: ToolContext,
@@ -427,7 +437,11 @@ export const handleWrite = async (
       context,
     );
     return {
-      result: created ? `Created ${filePath}` : `Wrote ${filePath}`,
+      result: await withMemorySyncNote(
+        created ? `Created ${filePath}` : `Wrote ${filePath}`,
+        filePath,
+        context,
+      ),
     };
   } catch (error) {
     return { error: `Error writing file: ${(error as Error).message}` };
@@ -451,7 +465,11 @@ export const handleEdit = async (
         context,
       );
       return {
-        result: `Applied ${applied.edits} edit(s) to ${applied.path} (at line${applied.lines.length === 1 ? "" : "s"} ${applied.lines.join(", ")})`,
+        result: await withMemorySyncNote(
+          `Applied ${applied.edits} edit(s) to ${applied.path} (at line${applied.lines.length === 1 ? "" : "s"} ${applied.lines.join(", ")})`,
+          applied.path,
+          context,
+        ),
       };
     }
 
@@ -479,7 +497,11 @@ export const handleEdit = async (
           : `lines ${applied.startLine}-${applied.endLine}`;
       const action = applied.linesRemoved === 0 ? "Inserted after" : "Replaced";
       return {
-        result: `${action} ${range} in ${filePath} (-${applied.linesRemoved}/+${applied.linesAdded} lines)`,
+        result: await withMemorySyncNote(
+          `${action} ${range} in ${filePath} (-${applied.linesRemoved}/+${applied.linesAdded} lines)`,
+          filePath,
+          context,
+        ),
       };
     }
 
@@ -502,7 +524,11 @@ export const handleEdit = async (
       };
     }
     return {
-      result: `Replaced ${replacements} occurrence(s) in ${filePath}`,
+      result: await withMemorySyncNote(
+        `Replaced ${replacements} occurrence(s) in ${filePath}`,
+        filePath,
+        context,
+      ),
     };
   } catch (error) {
     return { error: (error as Error).message };

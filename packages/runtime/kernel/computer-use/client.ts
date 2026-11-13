@@ -23,8 +23,11 @@ type CommonAction = {
   window_id?: string | number;
   state_id?: string;
   observation_id?: string;
-  /** Windows: "auto" (default), "background" or "foreground". */
-  delivery?: ComputerUseInputDelivery;
+  /**
+   * Windows: "background" (default) or "foreground". "auto" is accepted from
+   * older callers and means "background".
+   */
+  delivery?: ComputerUseInputDelivery | "auto";
   /** Windows: "auto" (default) or "window" for never-still windows. */
   stale_check?: ComputerUseStaleCheck;
 };
@@ -295,11 +298,10 @@ const dragAction = (args: DragArgs): ComputerUseAction => {
 };
 
 const deliveryOption = (value: unknown): ComputerUseInputDelivery => {
-  if (value === "auto" || value === "background" || value === "foreground") {
-    return value;
-  }
+  if (value === "background" || value === "auto") return "background";
+  if (value === "foreground") return value;
   throw new Error(
-    `delivery must be "auto", "background" or "foreground", not ${JSON.stringify(value)}.`,
+    `delivery must be "background" or "foreground", not ${JSON.stringify(value)}.`,
   );
 };
 

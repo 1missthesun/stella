@@ -74,13 +74,15 @@ export type ComputerUseAction =
   | Readonly<{ type: "type_text"; text: string }>;
 
 /**
- * How input reaches the window. "background" posts window messages without
- * moving the user's pointer or focus; "foreground" brings the window to the
- * front and sends real OS input at the pointer; "auto" (default) picks
- * foreground only where background input is known to be ignored. Honoured
- * on Windows; other platforms deliver input their own way.
+ * How input reaches the window. "background" (default) never moves the
+ * user's pointer or focus; a window that would ignore background input
+ * refuses the action with background_unavailable instead of being taken
+ * over. "foreground" brings the window to the front, sends real OS input and
+ * then gives the user back their window and pointer; it is only for tasks
+ * where the user asked for the screen to be taken over. Honoured on Windows;
+ * other platforms deliver input their own way.
  */
-export type ComputerUseInputDelivery = "auto" | "background" | "foreground";
+export type ComputerUseInputDelivery = "background" | "foreground";
 
 /**
  * What must be unchanged since the observation for the action to go ahead.
@@ -528,7 +530,7 @@ const assertActionCommand = (value: unknown, context: string) => {
   if (candidate.delivery !== undefined) {
     oneOf(
       candidate.delivery,
-      ["auto", "background", "foreground"],
+      ["background", "foreground"],
       `${context}.delivery`,
     );
   }

@@ -139,12 +139,14 @@ await sky.click({ window_id: 123456, x: 512, y: 300, state_id: state.state_id, o
 
 ### Delivery
 
-`delivery` picks how input reaches the window: `"auto"` (default), `"background"` or `"foreground"`.
+Stella works in the background: the user keeps their pointer, keyboard focus and the window they are using. Never take over the screen unless the user asked for that in this task.
 
-- Background posts window messages: your pointer and focus stay with the user.
-- Foreground brings the window to the front and sends real OS input at the pointer; Stella leaves the window in front and the pointer where it acted.
-- Auto uses foreground for windows that ignore background input: Chromium/CEF/Electron content (mouse; keyboard too when the Chromium view is embedded in another app's window), and windows that draw their own content (DirectX/OpenGL/game engines, custom canvases). If a background click changed nothing, the next state says so and later auto actions on that window go foreground.
-- Pass `delivery: "foreground"` when a background action visibly did nothing; it also skips UI Automation shortcuts and clicks with the real pointer.
+`delivery` is `"background"` (default) or `"foreground"`. `"auto"` is still accepted and means `"background"`.
+
+- Background: element actions go through UI Automation (Invoke, Toggle, Select, Expand, Scroll, Value); other input is posted to the window as messages. The pointer and focus do not move.
+- Some windows ignore posted input: Chromium/Electron/Edge content (pointer: coordinate clicks, drags, scrolling), UWP/XAML apps, GTK and Delphi/VCL apps (pointer and keys). Stella refuses those actions with `background_unavailable` instead of sending input that would be lost. Element clicks still work there through UI Automation, so prefer `element_index` over coordinates.
+- If a background action changed nothing, the next state says so. Stella does not switch to foreground on its own.
+- Foreground brings the window to the front, sends real OS input at the pointer, then puts the user's previous window and pointer back. Use it only when the user asked Stella to take over the screen (for example "go ahead and use my screen"); otherwise tell the user what you could not do in the background.
 
 ### Windows that expose no elements
 
@@ -154,15 +156,10 @@ A state without a screenshot says why (minimized, off-screen, or black pixels fr
 
 ### Errors that mean input was refused
 
-These come back as errors with a specific `code`; nothing (or only what the message says) was delivered. Do not retry them blindly and never work around them with your own input tools:
+Nothing (or only what the message says) was delivered. Do not retry them blindly and never work around them with your own input tools:
 
-- `input_refused` / `input_partially_injected`: Windows' SendInput accepted fewer events than sent (the message has the count and the Windows error). Commonly a game's anti-cheat filtering injected input. Tell the user; Stella cannot drive that part of the app.
-- `pointer_not_moved`: the pointer was intercepted on the way to the point; no button was pressed.
-- `uipi_blocked`: the app runs as administrator; Windows drops Stella's input to it.
-- `foreground_refused`: Windows would not bring the window to the front; the message names the window that kept focus.
-- `point_covered`: another app's window covers the point; the message names it.
-- `input_desktop_unavailable`: the screen is locked or a UAC/secure prompt is showing.
-- `background_unavailable`: you forced `delivery: "background"` on a window that ignores it.
+- `background_unavailable`: this window would ignore background input of this kind; the message names the reason and your options. Use an element (UI Automation) route or `set_value` if there is one, otherwise tell the user. Retry with `delivery: "foreground"` only if the user asked Stella to take over the screen.
+- Other refusals name their cause in the message: the app runs as administrator (Windows drops Stella's input to it), or Windows would not bring the window to the front for foreground input. Tell the user.
 
 Do not add sleeps. `get_app_state` performs adaptive settling and extends its wait only while UI Automation events indicate continued changes.
 

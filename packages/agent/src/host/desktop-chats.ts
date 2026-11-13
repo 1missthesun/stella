@@ -179,6 +179,8 @@ const NOTE_APPEND_RETRY_MS = 15_000;
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
 /** A hold that comes back within this long (a refused login tried again) is the same episode. */
 const CLAUDE_SIGN_IN_EPISODE_GRACE_MS = 45 * 60_000;
+/** Claude answering again for this long ends the episode, and Stella hears it is over. */
+const CLAUDE_SIGN_IN_BACK_AFTER_MS = 60_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
@@ -810,7 +812,13 @@ export function desktopChats(options: DesktopChatsOptions) {
   // refused login again and comes straight back is the same episode.
   const loginEpisodes = new Map<
     string,
-    { since: number; note?: ReturnType<typeof setTimeout>; end?: ReturnType<typeof setTimeout> }
+    {
+      since: number;
+      note?: ReturnType<typeof setTimeout>;
+      noted?: true;
+      end?: ReturnType<typeof setTimeout>;
+      back?: ReturnType<typeof setTimeout>;
+    }
   >();
   const claudeSignInHeld = (conversationId: string, threadId: string): boolean =>
     loginHeldSince.get(conversationId)?.has(threadId) ?? false;
@@ -829,7 +837,9 @@ export function desktopChats(options: DesktopChatsOptions) {
       let episode = loginEpisodes.get(conversationId);
       if (!episode) loginEpisodes.set(conversationId, (episode = { since: Date.now() }));
       clearTimeout(episode.end);
+      clearTimeout(episode.back);
       episode.end = undefined;
+      episode.back = undefined;
       if (!held.has(threadId ?? "")) held.set(threadId ?? "", episode.since);
       if (!episode.note) {
         episode.note = setTimeout(() => {
@@ -843,6 +853,17 @@ export function desktopChats(options: DesktopChatsOptions) {
       held?.delete(threadId ?? "");
       if (held?.size === 0) loginHeldSince.delete(conversationId);
       const episode = loginEpisodes.get(conversationId);
+      if (episode?.noted && status.resumed && !loginHeldSince.has(conversationId) && !episode.back) {
+        // Claude answers again: once that holds for a minute, Stella hears
+        // it, so she doesn't pass on a sign-in problem that is over.
+        episode.back = setTimeout(() => {
+          if (loginHeldSince.has(conversationId)) return;
+          clearTimeout(episode.end);
+          loginEpisodes.delete(conversationId);
+          void sendClaudeSignInBackNote(conversationId, episode.since).catch((error: unknown) => options.report(error));
+        }, CLAUDE_SIGN_IN_BACK_AFTER_MS);
+        episode.back.unref?.();
+      }
       if (episode && !loginHeldSince.has(conversationId) && !episode.end) {
         // Over once nothing has waited again for a while; a later sign-in
         // loss then gets its own note.
@@ -1384,7 +1405,22 @@ export function desktopChats(options: DesktopChatsOptions) {
       },
     );
     const appendId = `claude-sign-in-${since}-${createHash("sha256").update(`${conversationId}\0${options.deviceId ?? ""}`).digest("hex").slice(0, 12)}`;
+    const episode = loginEpisodes.get(conversationId);
+    if (episode) episode.noted = true;
     await appendHiddenNote(chat, conversationId, appendId, text, Date.now());
+  };
+
+  const sendClaudeSignInBackNote = async (conversationId: string, since: number) => {
+    const chat = await open(conversationId);
+    const at = Date.now();
+    const answeredAt = at - CLAUDE_SIGN_IN_BACK_AFTER_MS;
+    const name = options.computerName ?? "this computer";
+    const text = [
+      "[Claude sign-in back]",
+      `Claude Code on ${options.deviceId ? `${name} (device_id: ${options.deviceId})` : name} answers again since ${new Date(answeredAt).toISOString()}: the sign-in problem noted at ${new Date(since).toISOString()} is over, and the work that waited there has continued by itself. Nothing needs doing; if you haven't told the user about it yet, there is no need to now.`,
+    ].join("\n");
+    const appendId = `claude-sign-in-back-${since}-${createHash("sha256").update(`${conversationId}\0${options.deviceId ?? ""}`).digest("hex").slice(0, 12)}`;
+    await appendHiddenNote(chat, conversationId, appendId, text, at);
   };
 
   const open = (conversationId: string): Promise<Chat> => {

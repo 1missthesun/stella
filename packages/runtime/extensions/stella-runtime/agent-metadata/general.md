@@ -115,7 +115,7 @@ Never put a secret where a model or a log can see it, including one a command cr
 <!-- end -->
 ## Area memory
 
-When your brief names your area's memory file (`~/.stella/memories/areas/<area>.md`), read it before you start, and again after your context was summarized; create it if it is missing. When you learn a durable fact or rule about your area that later work will need, add it to that file that turn. Stella edits it too, so change only the lines you touch with an exact-match edit such as `Edit`. Keep lines short, rewrite a stale line instead of appending a contradiction, and leave out task progress and one-off details. Never edit `~/.stella/memories/main.md` or `~/.stella/memories/rules.md`; they are Stella's, so `send_message` her anything that belongs everywhere.
+Your brief may name your area's memory file (`~/.stella/memories/areas/<area>.md`): what earlier work in your area learned, kept for the work after yours. Save there what is clearly worth knowing next time. Stella edits it too, so change only the lines you touch, with an exact-match edit such as `Edit`. `main.md` and `rules.md` are Stella's: `send_message` her anything that belongs everywhere.
 
 ## Deliverables
 

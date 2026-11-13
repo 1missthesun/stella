@@ -1,5 +1,5 @@
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator";
-import { isTopLevelAgent } from "@stella/contracts/agent-ledger";
+import { topLevelAgentActivity } from "@stella/contracts/agent-ledger";
 import {
   agentWorkCardSections,
   isAgentWorkArtifact,
@@ -26,10 +26,23 @@ export const sortHubTasksByRecency = (
 
 export const runningActivityIndicatorEntries = (
   tasks: readonly MobileTask[],
-): ActivityIndicatorEntry[] =>
-  sortHubTasksByRecency(
-    tasks.filter((task) => isTopLevelAgent(task) && task.status === "running"),
-  ).map((task) => ({ id: task.id, title: task.title.trim() }));
+): ActivityIndicatorEntry[] => {
+  const helpersById = new Map<string, number>();
+  const running: MobileTask[] = [];
+  for (const { task, status, workingHelpers } of topLevelAgentActivity(tasks)) {
+    if (status !== "running") continue;
+    running.push(task.status === status ? task : { ...task, status });
+    if (workingHelpers > 0) helpersById.set(task.id, workingHelpers);
+  }
+  return sortHubTasksByRecency(running).map((task) => {
+    const workingHelpers = helpersById.get(task.id);
+    return {
+      id: task.id,
+      title: task.title.trim(),
+      ...(workingHelpers ? { workingHelpers } : {}),
+    };
+  });
+};
 
 const NO_ARTIFACTS: readonly ChatArtifact[] = [];
 

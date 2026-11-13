@@ -4,6 +4,7 @@ import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 import { Icon } from "./Icon";
 import { AgentLifecycleStatusIcon } from "./AgentLifecycleStatusIcon";
 import { ShimmerText } from "./ShimmerText";
+import { Text } from "./Text";
 import { StellaStarGlyph } from "./AgentActivityGlyph";
 import {
   AGENT_ACTIVITY_INK,
@@ -25,8 +26,10 @@ export function AgentActivityRow({
   colors,
   onPress,
   roomy = false,
+  meta,
 }: {
   title: string;
+  meta?: string;
   glyph?: AgentActivityGlyph;
   lifecycleStatus?: TaskLifecycleStatus;
   working: boolean;
@@ -39,7 +42,7 @@ export function AgentActivityRow({
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : "text"}
-      accessibilityLabel={title}
+      accessibilityLabel={meta ? `${title}, ${meta}` : title}
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && onPress ? styles.rowPressed : null]}
@@ -94,6 +97,11 @@ export function AgentActivityRow({
           dimAlpha={RUNNING_REST_ALPHA}
         />
       </View>
+      {meta ? (
+        <Text numberOfLines={1} style={[styles.meta, roomy ? styles.metaRoomy : null]}>
+          {meta}
+        </Text>
+      ) : null}
       {onPress ? (
         <Icon
           name="chevron-right"
@@ -144,5 +152,16 @@ const makeStyles = (colors: Colors) =>
     },
     chevron: {
       opacity: 0.7,
+    },
+    meta: {
+      color: colors.textMuted,
+      flexShrink: 0,
+      fontFamily: fonts.sans.regular,
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    metaRoomy: {
+      fontSize: 14.5,
+      lineHeight: 23,
     },
   });

@@ -16,6 +16,12 @@
   }
 }
 
+@container shell-topbar-activity (max-width: 200px) {
+  .shell-topbar-activity__helpers {
+    display: none;
+  }
+}
+
 @container shell-topbar-activity (max-width: 34px) {
   .shell-topbar-activity__trigger {
     visibility: hidden;

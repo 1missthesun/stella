@@ -478,6 +478,8 @@ export const createStellaHostRunner = (
         }),
       resume: async (args) => await context.backend.require().call("usageLimits.resume", args),
     },
+    signInAlert: async (args) =>
+      await context.backend.require().call("phone.notifySignIn", { ...args, deviceId: context.deviceId }),
     safeguards: {
       resolve: async (args) => await context.backend.require().call("safeguards.resolve", args),
     },

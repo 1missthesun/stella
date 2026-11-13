@@ -181,6 +181,13 @@ const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
 const CLAUDE_SIGN_IN_EPISODE_GRACE_MS = 45 * 60_000;
 /** Claude answering again for this long ends the episode, and Stella hears it is over. */
 const CLAUDE_SIGN_IN_BACK_AFTER_MS = 60_000;
+/**
+ * The user's phone hears of a hold once it has lasted this long. A hold only
+ * starts after Anthropic's temporary failures have been retried for about
+ * half an hour, and this outlasts the first re-checks of a refused login
+ * (2 and 5 minutes), so an outage blip or a refusal by mistake never pings.
+ */
+const CLAUDE_SIGN_IN_ALERT_AFTER_MS = 8 * 60_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
@@ -358,6 +365,14 @@ export type DesktopChatsOptions = {
     }): Promise<void>;
     resume(args: { conversationId: string; requestId: string }): Promise<{ cloud: number }>;
   };
+  /** Pushes one alert to the user's phone while work here waits for a sign-in, and clears it once that's over. */
+  signInAlert?(args: {
+    provider: "claude";
+    state: "held" | "cleared";
+    computer: string;
+    tasks: number;
+    reply: boolean;
+  }): Promise<unknown>;
   /** Records a choice on a safety block in the chat's journal, where every place that holds the chat applies it. */
   safeguards?: {
     resolve(args: { conversationId: string; action: SafeguardAction; requestId: string }): Promise<unknown>;
@@ -820,6 +835,50 @@ export function desktopChats(options: DesktopChatsOptions) {
       back?: ReturnType<typeof setTimeout>;
     }
   >();
+  // The phone alert is per computer, across chats: one per hold, sent once
+  // it has lasted a while, and cleared when no chat's episode is left.
+  const signInAlert: { timer?: ReturnType<typeof setTimeout>; sent?: true } = {};
+  const sendSignInAlert = () => {
+    signInAlert.timer = undefined;
+    if (signInAlert.sent || !options.signInAlert) return;
+    // Nothing waits right now (the hold ended, or a refused login is being
+    // tried again): the next hold starts the wait afresh.
+    if (loginHeldSince.size === 0) return;
+    let tasks = 0;
+    let reply = false;
+    for (const held of loginHeldSince.values()) {
+      for (const threadId of held.keys()) {
+        if (threadId === "") reply = true;
+        else tasks += 1;
+      }
+    }
+    signInAlert.sent = true;
+    console.info(`[desktop-chats] claude sign-in alert ${JSON.stringify({ tasks, reply })}`);
+    void options
+      .signInAlert({ provider: "claude", state: "held", computer: options.computerName ?? "", tasks, reply })
+      .catch((error: unknown) => {
+        signInAlert.sent = undefined;
+        options.report(error);
+        armSignInAlert(5 * 60_000);
+      });
+  };
+  const armSignInAlert = (after: number) => {
+    if (signInAlert.timer || signInAlert.sent || !options.signInAlert) return;
+    signInAlert.timer = setTimeout(sendSignInAlert, after);
+    signInAlert.timer.unref?.();
+  };
+  const endSignInAlert = () => {
+    if (loginEpisodes.size > 0) return;
+    clearTimeout(signInAlert.timer);
+    signInAlert.timer = undefined;
+    if (!options.signInAlert) return;
+    // Cleared even when this run sent nothing: a restart mid-hold forgets it sent one.
+    signInAlert.sent = undefined;
+    console.info("[desktop-chats] claude sign-in alert cleared");
+    void options
+      .signInAlert({ provider: "claude", state: "cleared", computer: options.computerName ?? "", tasks: 0, reply: false })
+      .catch((error: unknown) => options.report(error));
+  };
   const claudeSignInHeld = (conversationId: string, threadId: string): boolean =>
     loginHeldSince.get(conversationId)?.has(threadId) ?? false;
   const noteLoginHold = (
@@ -847,6 +906,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         }, CLAUDE_SIGN_IN_NOTE_AFTER_MS);
         episode.note.unref?.();
       }
+      armSignInAlert(CLAUDE_SIGN_IN_ALERT_AFTER_MS);
     } else {
       holds?.delete(key);
       if (holds?.size === 0) loginHolds.delete(conversationId);
@@ -860,6 +920,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           if (loginHeldSince.has(conversationId)) return;
           clearTimeout(episode.end);
           loginEpisodes.delete(conversationId);
+          endSignInAlert();
           void sendClaudeSignInBackNote(conversationId, episode.since).catch((error: unknown) => options.report(error));
         }, CLAUDE_SIGN_IN_BACK_AFTER_MS);
         episode.back.unref?.();
@@ -870,6 +931,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         episode.end = setTimeout(() => {
           clearTimeout(episode.note);
           loginEpisodes.delete(conversationId);
+          endSignInAlert();
         }, CLAUDE_SIGN_IN_EPISODE_GRACE_MS);
         episode.end.unref?.();
       }

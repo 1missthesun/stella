@@ -2,6 +2,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ImageCapTarget } from "../shared/image-caps.js";
 import type { BackgroundExitWake } from "./background-exit-wake.js";
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
+import type { DeviceCalls } from "@stella/contracts/backend/devices";
 import type { HookEmitter } from "../extensions/hook-emitter.js";
 import type {
   ScheduleToolApi,
@@ -367,6 +368,10 @@ export type RunnerPublicApi = {
       args: AgentThreadCalls["usageLimits.resume"]["args"],
     ) => Promise<AgentThreadCalls["usageLimits.resume"]["result"]>;
   };
+  /** One push to the user's phone while work here waits for a sign-in; "cleared" once that's over. */
+  signInAlert: (
+    args: Omit<DeviceCalls["phone.notifySignIn"]["args"], "deviceId">,
+  ) => Promise<DeviceCalls["phone.notifySignIn"]["result"]>;
 safeguards: {
     resolve: (
       args: AgentThreadCalls["safeguards.resolve"]["args"],

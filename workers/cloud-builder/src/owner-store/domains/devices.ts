@@ -13,7 +13,7 @@ import {
   type DevicesResponse,
 } from "@stella/contracts/turn-plane/placement";
 import { deviceDestination, presenceState, type PresenceRow } from "../../owner-gate/presence.js";
-import { array, boolean, empty, literal, nullable, object, optional, string } from "../args.js";
+import { array, boolean, empty, literal, nullable, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerCaller, OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -170,6 +170,18 @@ export const DEVICES_PUSH_CAPABILITIES_MIGRATION = {
 export const DEVICES_BRAIN_HOME_MIGRATION = {
   id: "devices.8-brain-home",
   statements: [`ALTER TABLE devices ADD COLUMN brain_home INTEGER NOT NULL DEFAULT 0`],
+};
+
+export const DEVICES_SIGN_IN_ALERTS_MIGRATION = {
+  id: "devices.9-sign-in-alerts",
+  statements: [
+    `CREATE TABLE sign_in_alerts (
+       device_id TEXT NOT NULL,
+       provider TEXT NOT NULL,
+       sent_at INTEGER NOT NULL,
+       PRIMARY KEY (device_id, provider)
+     )`,
+  ],
 };
 
 type DeviceRow = {
@@ -808,6 +820,82 @@ const flushDigest = async (ctx: OwnerContext): Promise<void> => {
   await sendPush(ctx, digestCopy(digest), "agent_activity:digest");
 };
 
+/**
+ * A computer's work has waited a while for a sign-in only the user can give.
+ * One push per hold: a desktop restarting mid-hold asks again, so the alert
+ * stays sent until that computer says the hold is over (or the longest hold
+ * has passed).
+ */
+const SIGN_IN_ALERT_HOLD_MS = 12 * 60 * 60_000;
+const SIGN_IN_PROVIDER_NAMES = { claude: "Claude", chatgpt: "ChatGPT" } as const;
+
+export const signInAlertCopy = (args: {
+  provider: keyof typeof SIGN_IN_PROVIDER_NAMES;
+  computer: string;
+  tasks: number;
+  reply: boolean;
+}): { title: string; body: string } => {
+  const provider = SIGN_IN_PROVIDER_NAMES[args.provider];
+  const what =
+    args.tasks > 0
+      ? `${taskCount(args.tasks)} ${args.tasks === 1 ? "is" : "are"} waiting${args.reply ? ", and so is Stella's reply" : ""}`
+      : args.reply
+        ? "Stella's reply is waiting"
+        : "Work there is waiting";
+  return {
+    title: `Sign in to ${provider} on ${args.computer}`,
+    body: `${what}. It carries on by itself once you sign in to ${provider} there.`,
+  };
+};
+
+const notifySignIn = async (
+  ctx: OwnerContext,
+  args: DeviceCalls["phone.notifySignIn"]["args"],
+): Promise<DeviceCalls["phone.notifySignIn"]["result"]> => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "phone.notifySignIn", { count: 20, windowMs: 60_000 }, "Slow down a moment and try again.");
+  if (args.state === "cleared") {
+    ctx.db.run("DELETE FROM sign_in_alerts WHERE device_id = ? AND provider = ?", args.deviceId, args.provider);
+    return { sent: false };
+  }
+  const earlier = ctx.db.one<{ sent_at: number }>(
+    "SELECT sent_at FROM sign_in_alerts WHERE device_id = ? AND provider = ?",
+    args.deviceId,
+    args.provider,
+  );
+  if (earlier && ctx.now - earlier.sent_at < SIGN_IN_ALERT_HOLD_MS) return { sent: false };
+  const named = ctx.db.one<{ name: string | null }>("SELECT name FROM devices WHERE device_id = ?", args.deviceId);
+  const computer = named?.name?.trim() || args.computer.trim() || "your computer";
+  ctx.db.run(
+    `INSERT INTO sign_in_alerts (device_id, provider, sent_at) VALUES (?, ?, ?)
+     ON CONFLICT (device_id, provider) DO UPDATE SET sent_at = excluded.sent_at`,
+    args.deviceId,
+    args.provider,
+    ctx.now,
+  );
+  const tokens = livePushTokens(ctx);
+  if (tokens.length === 0) return { sent: false };
+  const copy = signInAlertCopy({ provider: args.provider, computer, tasks: args.tasks, reply: args.reply });
+  const collapseId = `sign_in:${args.provider}:${args.deviceId}`.slice(0, 64);
+  const sent = await sendPushMessages(
+    ctx,
+    tokens,
+    tokens.map(({ token }) => ({
+      to: token,
+      title: copy.title,
+      body: copy.body,
+      sound: "default",
+      priority: "high",
+      data: { kind: "agent_activity" },
+      categoryId: "agent_activity",
+      threadId: "sign_in",
+      collapseId,
+      tag: collapseId,
+    })),
+  );
+  console.info(`[devices] sign-in alert ${JSON.stringify({ ...copy, provider: args.provider, deviceId: args.deviceId, tasks: args.tasks, reply: args.reply, tokens: tokens.length, sent })}`);
+  return { sent };
+};
+
 export const sendPushMessages = async (
   ctx: OwnerContext,
   tokens: readonly LivePushToken[],
@@ -948,6 +1036,7 @@ export const devicesDomain = {
     DEVICES_DROP_PAIRING_CODES_MIGRATION,
     DEVICES_PUSH_CAPABILITIES_MIGRATION,
     DEVICES_BRAIN_HOME_MIGRATION,
+    DEVICES_SIGN_IN_ALERTS_MIGRATION,
   ],
   calls: {
     "devices.identity": {
@@ -994,6 +1083,18 @@ export const devicesDomain = {
         taskId: optional(string({ max: 256 })),
       }),
       handler: (ctx: OwnerContext, args: DeviceCalls["phone.notifyActivity"]["args"]) => notifyActivity(ctx, args),
+    },
+    "phone.notifySignIn": {
+      scope: "owner",
+      parse: object({
+        deviceId: deviceIdArg,
+        provider: literal("claude", "chatgpt"),
+        state: literal("held", "cleared"),
+        computer: string({ max: 200 }),
+        tasks: number({ int: true, min: 0, max: 10_000 }),
+        reply: boolean(),
+      }),
+      handler: (ctx: OwnerContext, args: DeviceCalls["phone.notifySignIn"]["args"]) => notifySignIn(ctx, args),
     },
   },
   internal: {

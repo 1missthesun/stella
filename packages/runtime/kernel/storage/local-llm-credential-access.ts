@@ -24,6 +24,8 @@ export type ClaudeCodeConfigRequest = {
   cached?: boolean;
   /** Anthropic refused the login in this config directory (null: Claude Code's own). */
   rejectedConfigDir?: string | null;
+  /** Put logins Anthropic refused, that still read as signed in, back into use and read again. */
+  retryRefused?: boolean;
 };
 
 export type ClaudeCodeConfigAccess = {

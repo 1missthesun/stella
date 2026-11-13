@@ -55,6 +55,18 @@ export type DeviceCalls = {
     args: { kind: ActivityNotificationKind; title?: string; taskId?: string };
     result: null;
   };
+  /** Work on a computer waits for a sign-in only the user can give: one push per hold ("held"), reset when it's over ("cleared"). */
+  "phone.notifySignIn": {
+    args: {
+      deviceId: string;
+      provider: "claude" | "chatgpt";
+      state: "held" | "cleared";
+      computer: string;
+      tasks: number;
+      reply: boolean;
+    };
+    result: { sent: boolean };
+  };
 };
 
 export type DeviceViews = {

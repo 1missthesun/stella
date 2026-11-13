@@ -98,13 +98,13 @@ const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefin
 
 const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
   row.awaitingConsent && !row.offline && row.pausedBy === undefined
-    ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (up to an hour after it was sent)`
+    ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (it waits up to a week for that)`
     : undefined;
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
 
 const claudeSignInStatus = (row: AgentDirectoryAgentRow): string =>
-  `waiting for a Claude sign-in on ${row.where} (its Claude login there ended; it continues by itself once someone signs in there)`;
+  `waiting for a Claude sign-in on ${row.where} (Anthropic refused the Claude login there; it continues by itself once someone signs in there or the login answers again)`;
 
 const statusText = (row: AgentDirectoryAgentRow): string =>
   row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status)

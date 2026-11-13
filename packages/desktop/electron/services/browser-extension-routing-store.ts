@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
 import type {
   BrowserExtensionClient,
   BrowserExtensionClientsState,
@@ -89,9 +89,7 @@ export const readBrowserExtensionRouting = (
   stellaDataDir: string,
 ): BrowserExtensionRoutingRecord => {
   try {
-    const raw: unknown = JSON.parse(
-      fs.readFileSync(storePath(stellaDataDir), "utf-8"),
-    );
+    const raw: unknown = readPrivateJsonValueSync(storePath(stellaDataDir));
     const parsed = storeSchema.safeParse(raw);
     if (!parsed.success) return emptyRecord();
     return {

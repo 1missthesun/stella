@@ -62,6 +62,7 @@ const SERVER_MISMATCH_RETRIES = 2;
 const FENCE_LOG_WINDOW_MS = 10_000;
 
 const RUNTIME_EXIT_TIMEOUT_MS = 15_000;
+const RELAUNCH_ANNOUNCE_TIMEOUT_MS = 1_000;
 
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1_000, 2_000, 5_000];
 const REAP_POLL_MS = 5;
@@ -107,6 +108,8 @@ export class RemoteRuntimeHost {
     options: {
       shutdownRuntime?: boolean;
       quit?: boolean;
+      /** The app relaunches and attaches to this runtime again, which keeps its work going meanwhile. */
+      relaunching?: boolean;
       exitTimeoutMs?: number;
     } = {},
   ): Promise<void> {
@@ -115,6 +118,7 @@ export class RemoteRuntimeHost {
     const shutdownRequested = options.shutdownRuntime
       ? await this.requestRuntimeShutdown(options.quit === true)
       : false;
+    if (!options.shutdownRuntime && options.relaunching) await this.announceRelaunch();
     this.reconnectTimer?.cancel();
     this.reconnectTimer = null;
     const connection = this.connection;
@@ -145,6 +149,14 @@ export class RemoteRuntimeHost {
       .request(RUNTIME_CLIENT_METHODS.SHUTDOWN, quit ? { mode: "quit" } : {})
       .catch(() => undefined);
     return true;
+  }
+
+  private async announceRelaunch(): Promise<void> {
+    const connection = this.connection;
+    if (!connection || connection.peer.isClosed()) return;
+    await connection.peer
+      .request(RUNTIME_CLIENT_METHODS.RELAUNCHING, {}, { timeoutMs: RELAUNCH_ANNOUNCE_TIMEOUT_MS })
+      .catch(() => undefined);
   }
 
   private async waitForRuntimeExit(exitTimeoutMs: number): Promise<void> {

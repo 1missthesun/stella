@@ -122,6 +122,7 @@ export class RuntimeHostAdapter {
         await this.host.stop({
             shutdownRuntime: options.shutdownRuntime === true,
             quit: options.quit === true,
+            relaunching: options.relaunching === true,
             ...(options.exitTimeoutMs !== undefined ? { exitTimeoutMs: options.exitTimeoutMs } : {}),
         });
     }

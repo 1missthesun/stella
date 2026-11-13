@@ -6,10 +6,7 @@ import {
   protectValue,
   unprotectValue,
 } from "../shared/protected-storage.js";
-import {
-  ensurePrivateDirSync,
-  writePrivateFileSync,
-} from "../shared/private-fs.js";
+import { ensurePrivateDirSync, readPrivateJsonValueSync, writePrivateFileSync } from "../shared/private-fs.js";
 
 const LLM_OAUTH_CREDENTIALS_FILE = "llm_oauth_credentials.json";
 const LLM_OAUTH_SCOPE_PREFIX = "llm-oauth-credential";
@@ -57,8 +54,7 @@ const readCredentialFile = (
 ): StoredLlmOAuthCredentialFile => {
   const filePath = getLlmOAuthCredentialStorePath(stellaAppDir);
   try {
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(raw) as StoredLlmOAuthCredentialFile;
+    const parsed = readPrivateJsonValueSync(filePath) as StoredLlmOAuthCredentialFile | undefined;
     if (
       parsed &&
       parsed.version === 1 &&

@@ -17,7 +17,8 @@ export const registerBootstrapProcessCleanups = (context) => {
         }
         if (runtimeTeardown?.runner !== runner) {
             const keep = isRelaunching() && context.state.keepRuntimeAcrossRelaunch;
-            const teardown = keep ? runner.stop({}).catch((error) => {
+            // A relaunch that keeps the runtime tells it so: its tasks carry on until the new app attaches.
+            const teardown = keep ? runner.stop({ relaunching: true }).catch((error) => {
                 console.warn("[cleanup] Runtime detach failed:", error);
             }) : (async () => {
                 // The runtime's quit seals Stella's chats and then stops their shells and engines, so work cut off

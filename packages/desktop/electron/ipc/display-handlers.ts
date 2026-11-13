@@ -445,12 +445,18 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return { bytes, mimeType };
   };
 
+  // A request that came from another device (a phone or another computer)
+  // never looks on the other computers: the requester probes each of them
+  // itself, and a computer that asked its peers would have each peer ask its
+  // peers in turn, bouncing one missing file between computers until the
+  // relay refused them as busy.
   const findPeerHolder = async (
     requestedPath: string,
     conversationId: string,
     source: ResolvedDeviceFileSource | null,
+    access: { remote: boolean },
   ) => {
-    if (!options.peerDeviceFiles) return null;
+    if (access.remote || !options.peerDeviceFiles) return null;
     const preferred =
       source && (source.kind === "drive" || source.kind === "elsewhere")
         ? (source.deviceId ?? null)
@@ -467,6 +473,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     mimeType: string,
     range: { offset: number; length: number } | null,
     conversationId: string,
+    access: { remote: boolean },
   ) => {
     const source = await resolveDeviceFileSource(
       requestedPath,
@@ -475,7 +482,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     if (source.kind === "local") {
       return null;
     }
-    const holder = await findPeerHolder(requestedPath, conversationId, source);
+    const holder = await findPeerHolder(requestedPath, conversationId, source, access);
     if (holder) {
       if (holder.stat.kind !== "file") {
         throw new Error(`display:readFile target is not a file: ${resolvedPath}`);
@@ -699,6 +706,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         mimeType,
         range,
         viewerConversation,
+        access,
       );
       if (remote) return remote;
       stats = await fs.stat(resolved);
@@ -786,7 +794,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     const viewerConversation =
       conversationId || (access.remote ? "" : (options.getActiveConversationId?.() ?? ""));
     const source = await resolveDeviceFileSource(requestedPath, deviceFileDeps());
-    const holder = await findPeerHolder(requestedPath, viewerConversation, source);
+    const holder = await findPeerHolder(requestedPath, viewerConversation, source, access);
     if (holder) {
       return {
         ...holder.stat,
@@ -836,7 +844,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     const viewerConversation =
       conversationId || (access.remote ? "" : (options.getActiveConversationId?.() ?? ""));
     const source = await resolveDeviceFileSource(requestedPath, deviceFileDeps());
-    const holder = await findPeerHolder(requestedPath, viewerConversation, source);
+    const holder = await findPeerHolder(requestedPath, viewerConversation, source, access);
     if (holder) {
       const listing = await options.peerDeviceFiles!.list(
         holder.computer.deviceId,

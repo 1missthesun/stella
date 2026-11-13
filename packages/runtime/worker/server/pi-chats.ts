@@ -436,6 +436,11 @@ export const piChatsFor = (
           return await runner.usageLimits.resume(args);
         },
       },
+      signInAlert: async (args) => {
+        const runner = session.runnerCell.get();
+        if (!runner?.getStellaSiteAuth()) return;
+        await runner.signInAlert(args);
+      },
       simulateSafeguardBlocks: process.env.STELLA_DEV_HARNESS === "1",
       safeguards: {
         resolve: async (args) => {

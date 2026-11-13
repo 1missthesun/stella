@@ -177,6 +177,17 @@ const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
 /** A sign-in made right away (the notice in the chat) needs no note to Stella. */
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
+/** A hold that comes back within this long (a refused login tried again) is the same episode. */
+const CLAUDE_SIGN_IN_EPISODE_GRACE_MS = 45 * 60_000;
+/** Claude answering again for this long ends the episode, and Stella hears it is over. */
+const CLAUDE_SIGN_IN_BACK_AFTER_MS = 60_000;
+/**
+ * The user's phone hears of a hold once it has lasted this long. A hold only
+ * starts after Anthropic's temporary failures have been retried for about
+ * half an hour, and this outlasts the first re-checks of a refused login
+ * (2 and 5 minutes), so an outage blip or a refusal by mistake never pings.
+ */
+const CLAUDE_SIGN_IN_ALERT_AFTER_MS = 8 * 60_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
@@ -237,7 +248,7 @@ export const claudeSignInNoteText = (
     `Claude Code on ${where} can't answer since ${new Date(since).toISOString()}: its Claude sign-in${held.email ? ` (${held.email})` : ""} there has ended or was refused, so work there that runs on Claude waits for a sign-in instead of failing. Waiting there:`,
     ...held.tasks.map((task) => `- ${task.description} (thread_id: ${task.threadId})`),
     ...(held.reply ? ["- your own reply in this chat"] : []),
-    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › Account › Claude there), and give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
+    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › Account › Claude there), or when the login answers again (that computer tries it every few minutes, in case Anthropic refused it by mistake); they give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
     "Only the user can sign in, so tell them when they're next around if it matters to them. A task that can't wait can be carried on elsewhere with send_message's destination (the cloud or another computer), or stopped.",
   ].join("\n");
 };
@@ -354,6 +365,14 @@ export type DesktopChatsOptions = {
     }): Promise<void>;
     resume(args: { conversationId: string; requestId: string }): Promise<{ cloud: number }>;
   };
+  /** Pushes one alert to the user's phone while work here waits for a sign-in, and clears it once that's over. */
+  signInAlert?(args: {
+    provider: "claude";
+    state: "held" | "cleared";
+    computer: string;
+    tasks: number;
+    reply: boolean;
+  }): Promise<unknown>;
   /** Records a choice on a safety block in the chat's journal, where every place that holds the chat applies it. */
   safeguards?: {
     resolve(args: { conversationId: string; action: SafeguardAction; requestId: string }): Promise<unknown>;
@@ -804,7 +823,62 @@ export function desktopChats(options: DesktopChatsOptions) {
   // reply) with when it began. agent_status shows them as waiting, and Stella
   // gets one note per chat once a hold outlasts a sign-in made right away.
   const loginHeldSince = new Map<string, Map<string, number>>();
-  const loginNoteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // One note per episode: a hold that ends while the computer tries a
+  // refused login again and comes straight back is the same episode.
+  const loginEpisodes = new Map<
+    string,
+    {
+      since: number;
+      note?: ReturnType<typeof setTimeout>;
+      noted?: true;
+      end?: ReturnType<typeof setTimeout>;
+      back?: ReturnType<typeof setTimeout>;
+    }
+  >();
+  // The phone alert is per computer, across chats: one per hold, sent once
+  // it has lasted a while, and cleared when no chat's episode is left.
+  const signInAlert: { timer?: ReturnType<typeof setTimeout>; sent?: true } = {};
+  const sendSignInAlert = () => {
+    signInAlert.timer = undefined;
+    if (signInAlert.sent || !options.signInAlert) return;
+    // Nothing waits right now (the hold ended, or a refused login is being
+    // tried again): the next hold starts the wait afresh.
+    if (loginHeldSince.size === 0) return;
+    let tasks = 0;
+    let reply = false;
+    for (const held of loginHeldSince.values()) {
+      for (const threadId of held.keys()) {
+        if (threadId === "") reply = true;
+        else tasks += 1;
+      }
+    }
+    signInAlert.sent = true;
+    console.info(`[desktop-chats] claude sign-in alert ${JSON.stringify({ tasks, reply })}`);
+    void options
+      .signInAlert({ provider: "claude", state: "held", computer: options.computerName ?? "", tasks, reply })
+      .catch((error: unknown) => {
+        signInAlert.sent = undefined;
+        options.report(error);
+        armSignInAlert(5 * 60_000);
+      });
+  };
+  const armSignInAlert = (after: number) => {
+    if (signInAlert.timer || signInAlert.sent || !options.signInAlert) return;
+    signInAlert.timer = setTimeout(sendSignInAlert, after);
+    signInAlert.timer.unref?.();
+  };
+  const endSignInAlert = () => {
+    if (loginEpisodes.size > 0) return;
+    clearTimeout(signInAlert.timer);
+    signInAlert.timer = undefined;
+    if (!options.signInAlert) return;
+    // Cleared even when this run sent nothing: a restart mid-hold forgets it sent one.
+    signInAlert.sent = undefined;
+    console.info("[desktop-chats] claude sign-in alert cleared");
+    void options
+      .signInAlert({ provider: "claude", state: "cleared", computer: options.computerName ?? "", tasks: 0, reply: false })
+      .catch((error: unknown) => options.report(error));
+  };
   const claudeSignInHeld = (conversationId: string, threadId: string): boolean =>
     loginHeldSince.get(conversationId)?.has(threadId) ?? false;
   const noteLoginHold = (
@@ -819,23 +893,47 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!holds) loginHolds.set(conversationId, (holds = new Map()));
       holds.set(key, { text: status.text, ...(status.email ? { email: status.email } : {}) });
       if (!held) loginHeldSince.set(conversationId, (held = new Map()));
-      if (!held.has(threadId ?? "")) held.set(threadId ?? "", Date.now());
-      if (!loginNoteTimers.has(conversationId)) {
-        const timer = setTimeout(() => {
+      let episode = loginEpisodes.get(conversationId);
+      if (!episode) loginEpisodes.set(conversationId, (episode = { since: Date.now() }));
+      clearTimeout(episode.end);
+      clearTimeout(episode.back);
+      episode.end = undefined;
+      episode.back = undefined;
+      if (!held.has(threadId ?? "")) held.set(threadId ?? "", episode.since);
+      if (!episode.note) {
+        episode.note = setTimeout(() => {
           void sendClaudeSignInNote(conversationId).catch((error: unknown) => options.report(error));
         }, CLAUDE_SIGN_IN_NOTE_AFTER_MS);
-        timer.unref?.();
-        loginNoteTimers.set(conversationId, timer);
+        episode.note.unref?.();
       }
+      armSignInAlert(CLAUDE_SIGN_IN_ALERT_AFTER_MS);
     } else {
       holds?.delete(key);
       if (holds?.size === 0) loginHolds.delete(conversationId);
       held?.delete(threadId ?? "");
-      if (held?.size === 0) {
-        loginHeldSince.delete(conversationId);
-        // The episode is over: a later sign-in loss gets its own note.
-        clearTimeout(loginNoteTimers.get(conversationId));
-        loginNoteTimers.delete(conversationId);
+      if (held?.size === 0) loginHeldSince.delete(conversationId);
+      const episode = loginEpisodes.get(conversationId);
+      if (episode?.noted && status.resumed && !loginHeldSince.has(conversationId) && !episode.back) {
+        // Claude answers again: once that holds for a minute, Stella hears
+        // it, so she doesn't pass on a sign-in problem that is over.
+        episode.back = setTimeout(() => {
+          if (loginHeldSince.has(conversationId)) return;
+          clearTimeout(episode.end);
+          loginEpisodes.delete(conversationId);
+          endSignInAlert();
+          void sendClaudeSignInBackNote(conversationId, episode.since).catch((error: unknown) => options.report(error));
+        }, CLAUDE_SIGN_IN_BACK_AFTER_MS);
+        episode.back.unref?.();
+      }
+      if (episode && !loginHeldSince.has(conversationId) && !episode.end) {
+        // Over once nothing has waited again for a while; a later sign-in
+        // loss then gets its own note.
+        episode.end = setTimeout(() => {
+          clearTimeout(episode.note);
+          loginEpisodes.delete(conversationId);
+          endSignInAlert();
+        }, CLAUDE_SIGN_IN_EPISODE_GRACE_MS);
+        episode.end.unref?.();
       }
     }
     const event: PiChatEvent | undefined =
@@ -1353,7 +1451,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   const sendClaudeSignInNote = async (conversationId: string) => {
     const held = loginHeldSince.get(conversationId);
     if (!held?.size) return;
-    const since = Math.min(...held.values());
+    const since = loginEpisodes.get(conversationId)?.since ?? Math.min(...held.values());
     const chat = await open(conversationId);
     const descriptions = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record.description]));
     const email = [...(loginHolds.get(conversationId)?.values() ?? [])].find((hold) => hold.email)?.email;
@@ -1369,7 +1467,22 @@ export function desktopChats(options: DesktopChatsOptions) {
       },
     );
     const appendId = `claude-sign-in-${since}-${createHash("sha256").update(`${conversationId}\0${options.deviceId ?? ""}`).digest("hex").slice(0, 12)}`;
+    const episode = loginEpisodes.get(conversationId);
+    if (episode) episode.noted = true;
     await appendHiddenNote(chat, conversationId, appendId, text, Date.now());
+  };
+
+  const sendClaudeSignInBackNote = async (conversationId: string, since: number) => {
+    const chat = await open(conversationId);
+    const at = Date.now();
+    const answeredAt = at - CLAUDE_SIGN_IN_BACK_AFTER_MS;
+    const name = options.computerName ?? "this computer";
+    const text = [
+      "[Claude sign-in back]",
+      `Claude Code on ${options.deviceId ? `${name} (device_id: ${options.deviceId})` : name} answers again since ${new Date(answeredAt).toISOString()}: the sign-in problem noted at ${new Date(since).toISOString()} is over, and the work that waited there has continued by itself. Nothing needs doing; if you haven't told the user about it yet, there is no need to now.`,
+    ].join("\n");
+    const appendId = `claude-sign-in-back-${since}-${createHash("sha256").update(`${conversationId}\0${options.deviceId ?? ""}`).digest("hex").slice(0, 12)}`;
+    await appendHiddenNote(chat, conversationId, appendId, text, at);
   };
 
   const open = (conversationId: string): Promise<Chat> => {

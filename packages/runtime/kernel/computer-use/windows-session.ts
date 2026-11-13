@@ -320,10 +320,32 @@ class WindowsInputError extends Error {
   }
 }
 
+const BACKGROUND_UNAVAILABLE_OPTIONS =
+  'Nothing was sent and Stella did not take over the screen. What you can do: act on an element instead (click, scroll, set_value or perform_secondary_action with an element_index go through UI Automation, which works in the background), use set_value to fill a text field, or tell the user what you could not do. Only if the user asked Stella to take over the screen for this task, retry with delivery: "foreground": the window comes to the front for the action, then the user gets their window and pointer back.';
+
+// Helpers without coded errors send the code as a "code: message" prefix.
+// What the agent may do next is the runtime's to say, not the helper's.
+const codedHelperError = (response: WinHelperResponse, fallback: string) => {
+  let code = response.code;
+  let message = response.error?.trim() || fallback;
+  const prefixed = /^([a-z_]+):\s*(.*)$/s.exec(message);
+  if (!code && prefixed && WINDOWS_INPUT_ERROR_CODES.has(prefixed[1]!)) {
+    code = prefixed[1];
+    message = prefixed[2]!.trim();
+  }
+  if (code === "background_unavailable") {
+    message = `${message
+      .replace(/;?\s*(nothing was sent;?\s*)?retry with[^.]*\.?/gi, ".")
+      .replace(/\.\.$/, ".")
+      .trim()} ${BACKGROUND_UNAVAILABLE_OPTIONS}`;
+  }
+  return { code, message };
+};
+
 const helperActionError = (response: WinHelperResponse, fallback: string) => {
-  const message = response.error?.trim() || fallback;
-  return response.code && WINDOWS_INPUT_ERROR_CODES.has(response.code)
-    ? new WindowsInputError(response.code, message)
+  const { code, message } = codedHelperError(response, fallback);
+  return code && WINDOWS_INPUT_ERROR_CODES.has(code)
+    ? new WindowsInputError(code, message)
     : new Error(message);
 };
 
@@ -669,9 +691,6 @@ export const createWindowsComputerUseSession = (
   const committedStateKeys = new Set<string>();
   const committedStateKey = (sessionId: string, alias: string) =>
     `${sessionId}\u0000${alias}`;
-  // Windows that ignored a background-delivered action: later "auto"
-  // actions on them use foreground delivery.
-  const backgroundIneffective = new Set<string>();
   // The state right before a background-delivered action, compared with the
   // next observation to tell whether the action had any effect.
   const backgroundProbes = new Map<
@@ -679,16 +698,8 @@ export const createWindowsComputerUseSession = (
     { stateId: string; visualStateId: string; action: string }
   >();
   const deliveryFor = (
-    sessionId: string,
     command: ComputerUseActionCommand,
-  ): ComputerUseInputDelivery => {
-    const requested = command.delivery ?? "auto";
-    if (requested !== "auto") return requested;
-    const alias = targetDetails(command.target).snapshotAlias;
-    return backgroundIneffective.has(committedStateKey(sessionId, alias))
-      ? "foreground"
-      : "auto";
-  };
+  ): ComputerUseInputDelivery => command.delivery ?? "background";
   const backgroundEffectNotes = (
     stateKey: string,
     snapshot: WinSnapshot,
@@ -702,9 +713,8 @@ export const createWindowsComputerUseSession = (
     ) {
       return [];
     }
-    backgroundIneffective.add(stateKey);
     return [
-      `The last ${probe.action} was delivered in the background (posted window messages) and nothing in the window changed, so this window probably ignores background input. Later actions on it use foreground delivery (it comes to the front and gets real pointer/keyboard input). Repeat the ${probe.action} if it was meant to change something; pass delivery: "background" to opt out.`,
+      `The last ${probe.action} was delivered in the background and nothing in the window changed, so this window probably ignores background input there. Stella did not take over the screen and will not on its own. What you can do: act on an element instead (element_index actions go through UI Automation), use set_value for a text field, or tell the user what you could not do. Only if the user asked Stella to take over the screen for this task, repeat it with delivery: "foreground" (the window comes to the front for the action, then the user gets their window and pointer back).`,
     ];
   };
   const requestHelper =
@@ -1172,11 +1182,7 @@ export const createWindowsComputerUseSession = (
                 );
                 backgroundProbes.delete(stateKey);
                 const visualStateId = windowsVisualStateId(before);
-                if (
-                  receiptDelivery(response) !== "background" ||
-                  (command.delivery ?? "auto") !== "auto" ||
-                  !visualStateId
-                ) {
+                if (receiptDelivery(response) !== "background" || !visualStateId) {
                   return;
                 }
                 backgroundProbes.set(stateKey, {
@@ -1198,7 +1204,7 @@ export const createWindowsComputerUseSession = (
                   {
                     tool: "atomic_action",
                     command: actionOperation(typedRequest.sessionId, command, {
-                      dispatch: deliveryFor(typedRequest.sessionId, command),
+                      dispatch: deliveryFor(command),
                       liveSnapshot: snapshot,
                     }),
                     precondition: observationPrecondition(command, snapshot),
@@ -1231,7 +1237,7 @@ export const createWindowsComputerUseSession = (
               const operations = typedRequest.commands.map(
                 (command, index) => ({
                   command: actionOperation(typedRequest.sessionId, command, {
-                    dispatch: deliveryFor(typedRequest.sessionId, command),
+                    dispatch: deliveryFor(command),
                     liveSnapshot: snapshots[index]!,
                   }),
                   precondition: observationPrecondition(

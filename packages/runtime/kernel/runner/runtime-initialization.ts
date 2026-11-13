@@ -116,7 +116,7 @@ const interruptAndJoinPromise = <A>(
     );
   });
 
-export type ExtensionWatchScope = "resource-tree" | "data-dir";
+export type ExtensionWatchScope = "resource-tree" | "agent-definitions" | "data-dir";
 
 /**
  * The non-recursive data-directory watcher exists only to observe the atomic
@@ -130,6 +130,21 @@ export const isExtensionWatchChangeRelevant = (
 ): boolean => {
   if (scope === "data-dir") {
     return filename !== null && path.basename(String(filename)) === "system";
+  }
+  // `agents/` holds the user's agent definitions as top-level `.md` files,
+  // and also every task's working folder (`agents/<day>/<thread>/`). Only
+  // the definitions matter; reacting to task files reloaded every extension
+  // on each file a task wrote (hundreds of reloads a day, each leaking the
+  // previous modules).
+  if (scope === "agent-definitions") {
+    if (filename === null) return false;
+    const name = String(filename);
+    return (
+      !name.includes("/") &&
+      !name.includes("\\") &&
+      name.endsWith(".md") &&
+      !name.startsWith(".")
+    );
   }
   if (filename === null) return true;
   const basename = path.basename(String(filename));
@@ -484,8 +499,8 @@ export const createRuntimeInitialization = (
       },
       {
         path: agentsPath,
-        recursive: true,
-        scope: "resource-tree" as const,
+        recursive: false,
+        scope: "agent-definitions" as const,
       },
       // The system mirror is replaced by an atomic directory swap, which a
       // recursive watcher on the old inode would miss — watch the data dir

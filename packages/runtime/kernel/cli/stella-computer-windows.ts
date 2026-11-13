@@ -152,7 +152,7 @@ export type WinHelperRequest = {
   selection?: "text" | "cursor-before" | "cursor-after";
   windowId?: number;
   windowBounds?: WinFrame | null;
-  dispatch?: "background" | "foreground" | "auto";
+  dispatch?: "background" | "foreground";
   start_minimized?: boolean;
   defer_observation?: boolean;
   screenshot_policy?: ScreenshotPolicy;
@@ -261,15 +261,15 @@ Usage:
   stella-computer [--session ID] snapshot (--app NAME|--bundle-id ID|--pid PID|--window-id HWND) [--screenshot-policy auto|always|never] [--disable-diff] [--json]
   stella-computer [--session ID] get-state (--app NAME|--bundle-id ID|--pid PID|--window-id HWND) [--screenshot-policy auto|always|never] [--disable-diff] [--json]
   stella-computer [--session ID] launch-app <name|path|url> [--start-minimized] [--json]
-  stella-computer [--session ID] click <element> [--app NAME|--window-id HWND] [--mouse-button left|right|middle] [--click-count N] [--dispatch background|foreground|auto] [--defer-observation]
+  stella-computer [--session ID] click <element> [--app NAME|--window-id HWND] [--mouse-button left|right|middle] [--click-count N] [--dispatch background|foreground] [--defer-observation]
   stella-computer [--session ID] fill <element> <text> [--app NAME|--window-id HWND] [--defer-observation]
   stella-computer [--session ID] select-text <element> <text> [--prefix TEXT] [--suffix TEXT] [--selection text|cursor-before|cursor-after] [--app NAME|--window-id HWND] [--defer-observation]
   stella-computer [--session ID] secondary-action <element> <action> [--app NAME|--window-id HWND]
-  stella-computer [--session ID] scroll <element> <up|down|left|right> [--app NAME|--window-id HWND] [--pages N] [--dispatch background|foreground|auto]
-  stella-computer [--session ID] click-screenshot <x_px> <y_px> [--app NAME|--window-id HWND] [--mouse-button left|right|middle] [--click-count N] [--dispatch background|foreground|auto]
-  stella-computer [--session ID] drag-screenshot <from_x_px> <from_y_px> <to_x_px> <to_y_px> [--app NAME|--window-id HWND] [--dispatch background|foreground|auto]
-  stella-computer [--session ID] type <text> [--app NAME|--window-id HWND] [--dispatch background|foreground|auto]
-  stella-computer [--session ID] press <key> [--app NAME|--window-id HWND] [--dispatch background|foreground|auto]
+  stella-computer [--session ID] scroll <element> <up|down|left|right> [--app NAME|--window-id HWND] [--pages N] [--dispatch background|foreground]
+  stella-computer [--session ID] click-screenshot <x_px> <y_px> [--app NAME|--window-id HWND] [--mouse-button left|right|middle] [--click-count N] [--dispatch background|foreground]
+  stella-computer [--session ID] drag-screenshot <from_x_px> <from_y_px> <to_x_px> <to_y_px> [--app NAME|--window-id HWND] [--dispatch background|foreground]
+  stella-computer [--session ID] type <text> [--app NAME|--window-id HWND] [--dispatch background|foreground]
+  stella-computer [--session ID] press <key> [--app NAME|--window-id HWND] [--dispatch background|foreground]
   stella-computer [--session ID] shutdown-session [--json]
 
 Notes:
@@ -280,7 +280,8 @@ Notes:
   - Windows uses the bundled stella-computer-helper.exe native helper
   - Windows keeps one helper daemon per Stella computer-use session when possible
   - the helper uses UI Automation patterns first and Win32 window messages as fallback
-  - --dispatch auto (default) chooses foreground for windows that ignore posted input, background is strict, foreground uses real input
+  - --dispatch background (default) never moves the pointer or focus; a window that would ignore it refuses with background_unavailable
+  - --dispatch foreground brings the window forward for real input, then restores the previous window and pointer; only when the user asked for it
   - SetFocus and UIA text fallback are opt-in via STELLA_COMPUTER_WINDOWS_ALLOW_* env flags
 `;
 
@@ -1103,13 +1104,10 @@ const appFromActionArgs = (sessionId: string, args: string[]) => {
   );
 };
 
-const getDispatchOption = (
-  args: string[],
-): "background" | "foreground" | "auto" => {
-  const value = getOptionValue(args, "--dispatch") ?? "auto";
-  if (value === "background" || value === "foreground" || value === "auto") {
-    return value;
-  }
+const getDispatchOption = (args: string[]): "background" | "foreground" => {
+  const value = getOptionValue(args, "--dispatch") ?? "background";
+  if (value === "background" || value === "auto") return "background";
+  if (value === "foreground") return value;
   throw new Error(`Invalid --dispatch value: ${value}`);
 };
 
@@ -1277,12 +1275,12 @@ export const windowsSurfaceNotes = (snapshot: WinSnapshot): string[] => {
   if (surface?.kind === "chromium" && contentElements === 0) {
     notes.push(
       surface.accessibilityWake === "no_tree"
-        ? `This window is a Chromium/CEF/Electron view whose accessibility tree stayed empty after Stella asked for it (the app likely turns renderer accessibility off), so it exposes no UI elements. Work from the screenshot: get_app_state with screenshot_policy: "always", then click/drag by x/y. Input goes through foreground delivery (the window comes to the front and gets real pointer and keyboard input).`
-        : `This window is a Chromium/CEF/Electron view that exposes no UI elements yet. Work from the screenshot (screenshot_policy: "always", click by x/y); input goes through foreground delivery.`,
+        ? `This window is a Chromium/CEF/Electron view whose accessibility tree stayed empty after Stella asked for it (the app likely turns renderer accessibility off), so it exposes no UI elements. Work from the screenshot: get_app_state with screenshot_policy: "always", then click/drag by x/y. Input stays in the background; where Windows would drop it, the action is refused with background_unavailable and the error says what you can do.`
+        : `This window is a Chromium/CEF/Electron view that exposes no UI elements yet. Work from the screenshot (screenshot_policy: "always", click by x/y). Input stays in the background; a refused action (background_unavailable) says what you can do.`,
     );
   } else if (surface?.kind === "opaque" || contentElements === 0) {
     notes.push(
-      `This window draws its own content (DirectX/OpenGL/game engine or a custom canvas) and exposes no UI elements. Work from the screenshot: get_app_state with screenshot_policy: "always", then click/drag by x/y and press_key/type_text. Input goes through foreground delivery (the window comes to the front and gets real pointer and keyboard input). If it animates constantly, pass stale_check: "window" on coordinate actions.`,
+      `This window draws its own content (DirectX/OpenGL/game engine or a custom canvas) and exposes no UI elements. Work from the screenshot: get_app_state with screenshot_policy: "always", then click/drag by x/y and press_key/type_text. Input is sent in the background; many such windows ignore it, and the next state says so when an action changed nothing. Real input needs delivery: "foreground", which takes over the screen: only when the user asked for that. If it animates constantly, pass stale_check: "window" on coordinate actions.`,
     );
   } else if (surface?.kind === "chromium" && surface.accessibilityWake === "woken") {
     notes.push(
@@ -1291,7 +1289,7 @@ export const windowsSurfaceNotes = (snapshot: WinSnapshot): string[] => {
   }
   if (surface?.fullscreen) {
     notes.push(
-      `The window is fullscreen. Foreground input leaves it in front; Stella does not switch back to the previous window after acting.`,
+      `The window is fullscreen. delivery: "foreground" (only when the user asked for the screen to be taken over) brings it forward for the action and then switches back to the user's window, which can minimize a fullscreen game.`,
     );
   }
   return notes;

@@ -20,10 +20,18 @@ export type LifecycleServerOptions = {
   interruptWork?: () => Promise<void>;
   shouldKeepAlive?: () => Promise<boolean> | boolean;
   runtimeBuildStamp?: string;
-  onShutdown: (reason: "idle" | "signal" | "restart") => Promise<void> | void;
+  onShutdown: (reason: WorkerShutdownReason) => Promise<void> | void;
 };
 
+/** "quit": the app quit and asked the runtime to stop its work and exit once it detached. */
+export type WorkerShutdownReason = "idle" | "quit" | "signal" | "restart";
+
 const DEFAULT_IDLE_SHUTDOWN_MS = 10_000;
+/**
+ * How long the runtime keeps its work going for an app that said it is relaunching (an Update that keeps the
+ * runtime). A relaunch takes seconds; one that never comes back still stops the work, like any app that disappears.
+ */
+const RELAUNCH_GRACE_MS = 2 * 60_000;
 const INTERRUPT_WORK_TIMEOUT_MS = 4_000;
 
 export class WorkerLifecycleServer {
@@ -34,6 +42,7 @@ export class WorkerLifecycleServer {
   private clientCount = 0;
   private shuttingDown = false;
   private quitRequested = false;
+  private relaunchGraceUntil = 0;
   private readonly idleShutdownMs: number;
 
   constructor(private readonly options: LifecycleServerOptions) {
@@ -102,6 +111,7 @@ export class WorkerLifecycleServer {
   noteClientConnected() {
     this.clientCount += 1;
     this.quitRequested = false;
+    this.relaunchGraceUntil = 0;
     if (this.idleTimer) {
       this.idleTimer.cancel();
       this.idleTimer = null;
@@ -118,6 +128,17 @@ export class WorkerLifecycleServer {
       return;
     }
     this.scheduleIdleShutdown();
+  }
+
+  /**
+   * The app is relaunching and attaches again in a moment: the work goes on, and the runtime waits for it longer
+   * than for an app that disappeared.
+   */
+  noteRelaunching() {
+    if (this.shuttingDown) return;
+    this.quitRequested = false;
+    this.relaunchGraceUntil = Date.now() + RELAUNCH_GRACE_MS;
+    getFileLogger()?.process("worker.relaunch-announced", { graceMs: RELAUNCH_GRACE_MS });
   }
 
   async requestQuit(): Promise<void> {
@@ -158,7 +179,8 @@ export class WorkerLifecycleServer {
   private scheduleIdleShutdown() {
     if (this.shuttingDown) return;
     this.idleTimer?.cancel();
-    this.idleTimer = forkDelayed(this.idleShutdownMs, () => {
+    const wait = Math.max(this.idleShutdownMs, this.relaunchGraceUntil - Date.now());
+    this.idleTimer = forkDelayed(wait, () => {
       this.idleTimer = null;
       void this.evaluateIdleShutdown();
     });
@@ -166,6 +188,11 @@ export class WorkerLifecycleServer {
 
   private async evaluateIdleShutdown() {
     if (this.shuttingDown || this.clientCount > 0) return;
+    const quit = this.quitRequested;
+    if (!quit && this.relaunchGraceUntil > 0) {
+      getFileLogger()?.process("worker.relaunch-not-back", { graceMs: RELAUNCH_GRACE_MS });
+      this.relaunchGraceUntil = 0;
+    }
     await this.interruptWork();
     if (this.shuttingDown || this.clientCount > 0) return;
     const keepAlive = await Promise.resolve(
@@ -184,12 +211,14 @@ export class WorkerLifecycleServer {
       return;
     }
     this.logStream?.write(
-      `[${new Date().toISOString()}] worker idle for ${this.idleShutdownMs}ms with no active work, shutting down\n`,
+      quit
+        ? `[${new Date().toISOString()}] the app quit; work interrupted, shutting down\n`
+        : `[${new Date().toISOString()}] no app attached for ${this.idleShutdownMs}ms; work interrupted, shutting down\n`,
     );
-    await this.shutdown("idle");
+    await this.shutdown(quit ? "quit" : "idle");
   }
 
-  async shutdown(reason: "idle" | "signal" | "restart"): Promise<void> {
+  async shutdown(reason: WorkerShutdownReason): Promise<void> {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
     getFileLogger()?.process("worker.shutdown", {

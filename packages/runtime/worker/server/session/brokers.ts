@@ -73,6 +73,7 @@ export const layer = Layer.effect(
             ...(options?.rejectedConfigDir !== undefined
               ? { rejectedConfigDir: options.rejectedConfigDir }
               : {}),
+            ...(options?.retryRefused ? { retryRefused: true } : {}),
           });
           if (!result.ok || !("signedIn" in result)) {
             return { configDir: null, signedIn: true };

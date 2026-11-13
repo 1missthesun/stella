@@ -14,6 +14,7 @@ import {
 } from 'effect'
 import {
   ensurePrivateDirSync,
+  readPrivateJsonFileSync,
   writePrivateFileSync,
 } from './shared/private-fs.js'
 import {
@@ -108,6 +109,26 @@ const resolveScriptAuthEnv = async (
 }
 
 type LocalSchedulerRunner = ReturnType<StellaHostRunnerTarget['getRunner']>
+
+const ORPHAN_SCRIPT_MIN_AGE_MS = 7 * 24 * 60 * 60_000
+const ORPHANED_SCRIPT_KEEP_MS = 30 * 24 * 60 * 60_000
+
+/** Every `scriptPath` string anywhere in a parsed state file, resolved. */
+const scriptPathsNamedIn = (value: unknown): Set<string> => {
+  const found = new Set<string>()
+  const visit = (node: unknown, depth: number) => {
+    if (depth > 12 || !node || typeof node !== 'object') return
+    for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+      if (key === 'scriptPath' && typeof child === 'string' && child) {
+        found.add(path.resolve(child))
+      } else {
+        visit(child, depth + 1)
+      }
+    }
+  }
+  visit(value, 0)
+  return found
+}
 
 const createEmptyState = (): LocalSchedulerState => ({
   version: STATE_VERSION,
@@ -684,6 +705,18 @@ export class LocalSchedulerService {
   private tickFiber: Fiber.Fiber<void, unknown> | null = null
   private started = false
   private tickInFlight = false
+  /**
+   * Script paths named anywhere in the state file as last read whole, even by
+   * entries this build drops; null when it was not read whole (missing,
+   * unreadable or damaged), and then no script counts as orphaned.
+   */
+  private scriptsNamedInFile: Set<string> | null = null
+  /** Set when this start found the state file damaged: what came back, and from where. */
+  private damage: {
+    damagedCopy: string | null
+    from: 'file' | 'last-good' | null
+    conversationIds: string[]
+  } | null = null
 
   constructor(private readonly options: LocalSchedulerServiceOptions) {
     this.statePath = path.join(options.stellaDataDir, 'local-scheduler.json')
@@ -701,12 +734,13 @@ export class LocalSchedulerService {
     this.started = true
     this.serviceScope = Scope.makeUnsafe()
     this.state = this.readState()
-    if (!fs.existsSync(this.statePath)) {
+    if (!fs.existsSync(this.statePath) || this.damage) {
       this.persistState()
     }
     if (this.clearRecoveredRunningFlags()) {
       this.persistState()
     }
+    this.reportDamage()
     this.collectOrphanScripts()
     this.scheduleNextTick(250)
   }
@@ -993,29 +1027,134 @@ export class LocalSchedulerService {
     return events.slice(events.length - normalizedMax).map(cloneGeneratedEvent)
   }
 
+  private get lastGoodPath() {
+    return `${this.statePath}.last-good`
+  }
+
+  /**
+   * A damaged state file is never taken for an empty one (two schedules
+   * silently stopped for two weeks that way): the damaged file is kept beside
+   * it, the newest whole state at its start comes back (else the copy last
+   * read whole at a start), and the user and Stella are told.
+   */
   private readState(): LocalSchedulerState {
+    this.damage = null
+    this.scriptsNamedInFile = null
+    let read
     try {
-      const raw = fs.readFileSync(this.statePath, 'utf-8')
-      return sanitizeState(JSON.parse(raw), this.scriptsDir)
-    } catch {
+      read = readPrivateJsonFileSync(this.statePath, 'local-scheduler.json')
+    } catch (error) {
+      console.error('[local-scheduler] Could not read local-scheduler.json:', error)
       return createEmptyState()
+    }
+    if (read.kind === 'missing') return createEmptyState()
+    if (read.kind === 'ok') {
+      this.keepLastGood(read.value)
+      this.scriptsNamedInFile = scriptPathsNamedIn(read.value)
+      return sanitizeState(read.value, this.scriptsDir)
+    }
+    let from: 'file' | 'last-good' | null = null
+    let state = createEmptyState()
+    if (read.recovered !== undefined) {
+      state = sanitizeState(read.recovered, this.scriptsDir)
+      from = 'file'
+    } else {
+      try {
+        const lastGood = readPrivateJsonFileSync(this.lastGoodPath, 'local-scheduler.json.last-good')
+        if (lastGood.kind === 'ok') {
+          state = sanitizeState(lastGood.value, this.scriptsDir)
+          from = 'last-good'
+        }
+      } catch {
+        // No usable last-good copy: what was lost is reported as lost.
+      }
+    }
+    const conversationIds = new Set(state.cronJobs.map((job) => job.conversationId))
+    if (read.damagedCopy) {
+      try {
+        const raw = fs.readFileSync(read.damagedCopy, 'utf-8')
+        for (const match of raw.matchAll(/"conversationId"\s*:\s*"([^"\\]{1,200})"/g)) {
+          conversationIds.add(match[1]!)
+        }
+      } catch {
+        // The copy is only used to find who to tell.
+      }
+    }
+    this.damage = { damagedCopy: read.damagedCopy, from, conversationIds: [...conversationIds] }
+    console.error(
+      `[local-scheduler] local-scheduler.json was damaged; ${
+        from ? `recovered ${state.cronJobs.length} schedule(s) from ${from === 'file' ? 'the file' : 'the last good copy'}` : 'no schedules could be recovered'
+      }.`,
+    )
+    return state
+  }
+
+  /** The state as last read whole at a start: what a damaged file falls back to when nothing at its start parses. */
+  private keepLastGood(value: unknown) {
+    try {
+      const body = JSON.stringify(value)
+      const current = fs.existsSync(this.lastGoodPath) ? fs.readFileSync(this.lastGoodPath, 'utf-8') : null
+      if (current !== body) writePrivateFileSync(this.lastGoodPath, body)
+    } catch (error) {
+      console.warn('[local-scheduler] Could not keep a last-good copy of local-scheduler.json:', error)
     }
   }
 
+  private reportDamage() {
+    const damage = this.damage
+    if (!damage) return
+    const names = this.state.cronJobs.map((job) => job.name?.trim() || job.id)
+    const kept = damage.damagedCopy ? ` The damaged file is kept at ${damage.damagedCopy}.` : ''
+    const text = damage.from
+      ? `[Schedules recovered] This computer's schedules file (local-scheduler.json) was damaged. ${
+          names.length
+        } schedule(s) came back from ${
+          damage.from === 'file' ? 'the file itself' : 'the copy kept at the last start, so changes made since then are missing'
+        }${names.length ? `: ${names.join(', ')}` : ''}. Check with schedule_list that nothing is missing and recreate anything that is.${kept}`
+      : `[Schedules lost] This computer's schedules file (local-scheduler.json) was damaged and none of its schedules could be recovered. Recreate them with schedule_add; the user may need to say which they had.${kept}`
+    for (const conversationId of damage.conversationIds) {
+      this.appendGeneratedAssistantMessage(conversationId, { text, source: 'cron' })
+    }
+    // The notification reaches the user even when the file named no
+    // conversation to tell (nothing in it could be read).
+    this.fireOsNotification({
+      title: damage.from ? 'Schedules recovered' : 'Schedules lost',
+      body: damage.from
+        ? `This computer's schedules file was damaged; ${names.length} schedule(s) came back.`
+        : "This computer's schedules file was damaged and its schedules could not be recovered.",
+      conversationId: damage.conversationIds[0] ?? '',
+      source: 'cron',
+      refId: 'local-scheduler-damage',
+    })
+    this.persistState()
+    this.emitChange()
+  }
+
+  /**
+   * Moves aside scripts no schedule uses. Only after a start that read the
+   * state file whole (a missing, unreadable or damaged file made every script
+   * look orphaned: the Mac lost a watch's script that way), only scripts
+   * untouched for a week (a fresh ScriptDraft script is registered moments
+   * later), and into `.orphaned/` (emptied after 30 days), never deleted.
+   */
   private collectOrphanScripts() {
+    const named = this.scriptsNamedInFile
+    if (!named) return
     let entries: string[]
     try {
       entries = fs.readdirSync(this.scriptsDir)
     } catch {
       return
     }
-    const referenced = new Set<string>()
+    const referenced = new Set<string>(named)
     for (const job of this.state.cronJobs) {
       const scriptPath = payloadScriptPath(job.payload)
       if (scriptPath) {
         referenced.add(path.resolve(scriptPath))
       }
     }
+    const now = Date.now()
+    const orphanedDir = path.join(this.scriptsDir, '.orphaned')
     for (const entry of entries) {
       if (!entry.endsWith('.ts') && !entry.endsWith('.state.json')) {
         continue
@@ -1028,10 +1167,25 @@ export class LocalSchedulerService {
         continue
       }
       try {
-        fs.rmSync(abs, { force: true })
+        if (now - fs.statSync(abs).mtimeMs < ORPHAN_SCRIPT_MIN_AGE_MS) continue
+        fs.mkdirSync(orphanedDir, { recursive: true })
+        const kept = path.join(orphanedDir, entry)
+        fs.renameSync(abs, kept)
+        // Its 30 days start now, not at its last edit.
+        fs.utimesSync(kept, new Date(now), new Date(now))
       } catch {
-        // Ignore — best-effort cleanup.
+        // Best effort: a script that can't be moved stays where it is.
       }
+    }
+    try {
+      for (const entry of fs.readdirSync(orphanedDir)) {
+        const abs = path.join(orphanedDir, entry)
+        if (now - fs.statSync(abs).mtimeMs > ORPHANED_SCRIPT_KEEP_MS) {
+          fs.rmSync(abs, { force: true })
+        }
+      }
+    } catch {
+      // No orphans kept yet.
     }
   }
 

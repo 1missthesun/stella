@@ -46,6 +46,8 @@ export type RuntimeClientServerOptions = {
   clientWaitMs?: number;
   onShutdownRequested?: () => void;
   onQuitRequested?: () => Promise<void>;
+  /** The attached app is relaunching and will attach again; the runtime keeps its work going until it does. */
+  onRelaunching?: () => void;
   identity?: RuntimeServerIdentity;
 };
 
@@ -138,6 +140,13 @@ export class RuntimeClientServer {
         return { ok: true };
       }
       setImmediate(() => this.options.onShutdownRequested?.());
+      return { ok: true };
+    });
+    peer.registerRequestHandler(RUNTIME_CLIENT_METHODS.RELAUNCHING, async () => {
+      if (!this.clients.includes(peer)) {
+        throw invalidParams("Attach before relaunching.");
+      }
+      this.options.onRelaunching?.();
       return { ok: true };
     });
     peer.on("closed", () => {

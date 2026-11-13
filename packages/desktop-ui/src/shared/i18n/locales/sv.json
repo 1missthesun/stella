@@ -23,6 +23,7 @@
         "statusDone": "Klar",
         "statusError": "Kunde inte slutföra",
         "statusRunning": "Uppgift pågår",
+        "statusWaiting": "Väntar",
         "tasksInProgress": {
           "one": "{count} uppgift pågår",
           "other": "{count} uppgifter pågår"

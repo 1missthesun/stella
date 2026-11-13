@@ -23,6 +23,7 @@
         "statusDone": "Finished",
         "statusError": "Couldn’t finish",
         "statusRunning": "Task in progress",
+        "statusWaiting": "Waiting",
         "tasksInProgress": {
           "one": "{count} task in progress",
           "other": "{count} tasks in progress"

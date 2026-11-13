@@ -23,6 +23,7 @@
         "statusDone": "Завершено",
         "statusError": "Не удалось завершить",
         "statusRunning": "Задача выполняется",
+        "statusWaiting": "Ожидает",
         "tasksInProgress": {
           "few": "{count} задачи выполняются",
           "many": "{count} задач выполняются",

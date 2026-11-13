@@ -23,6 +23,7 @@
         "statusDone": "Zakończono",
         "statusError": "Nie udało się dokończyć",
         "statusRunning": "Zadanie w toku",
+        "statusWaiting": "Czeka",
         "tasksInProgress": {
           "few": "{count} zadania w toku",
           "many": "{count} zadań w toku",

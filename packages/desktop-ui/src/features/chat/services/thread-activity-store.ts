@@ -20,7 +20,7 @@ export const listThreadActivity = async (
 ): Promise<ThreadActivityRecord[]> => {
   if (!piChatAvailable()) return EMPTY_RECORDS;
   const records = await piChatAgents(conversationId);
-  if (records.some((record) => record.status === "running")) {
+  if (records.some((record) => record.status === "running" && !record.waitingFor)) {
     piAgentsRunning.add(conversationId);
   } else {
     piAgentsRunning.delete(conversationId);

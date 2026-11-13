@@ -23,6 +23,7 @@
         "statusDone": "Concluído",
         "statusError": "Não foi possível concluir",
         "statusRunning": "Tarefa em andamento",
+        "statusWaiting": "Aguardando",
         "tasksInProgress": {
           "many": "{count} tarefas em andamento",
           "one": "{count} tarefa em andamento",

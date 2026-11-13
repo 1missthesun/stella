@@ -96,6 +96,8 @@ export type TaskItem = {
   assistantMessagesUpdatedAtMs?: number
   assistantMessagesUpdatedSequence?: number
   workingHelpers?: number
+  /** Ended its turn waiting for this: live but nothing running, no report yet. */
+  waitingFor?: string
 }
 
 export type TaskLiveDecoration = {
@@ -139,7 +141,11 @@ export function buildActivityTasks(
         latestAttempt,
       )
       const running = status === 'running'
-      const decoration = running ? candidateDecoration : undefined
+      const waitingFor =
+        running && !latestAttemptSupersedesAuthoritative(authoritative, latestAttempt)
+          ? record.waitingFor?.trim() || undefined
+          : undefined
+      const decoration = running && !waitingFor ? candidateDecoration : undefined
       const latestAttemptOwns = latestAttemptSupersedesAuthoritative(
         authoritative,
         latestAttempt,
@@ -163,7 +169,10 @@ export function buildActivityTasks(
           : {}),
         anchorTurnId: decoration?.anchorTurnId,
         parentAgentId: record.parentAgentId,
-        statusText: running
+        ...(waitingFor ? { waitingFor } : {}),
+        statusText: waitingFor
+          ? `Waiting for ${waitingFor}`
+          : running
           ? (normalizeDisplayStatusText(decoration?.statusText) ??
             (isGenericTaskDescription(record.description)
               ? undefined

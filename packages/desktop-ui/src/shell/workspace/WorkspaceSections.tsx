@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ChevronRight } from "@/ui/icons";
+import { ChevronRight, Clock } from "@/ui/icons";
 import { AgentLifecycleStatusIcon } from "@/features/chat/components/AgentLifecycleStatusIcon";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useT, useTPlural } from "@/shared/i18n";
@@ -174,7 +174,17 @@ function WorkspaceSection({
 const taskSourceLabel = (task: TaskItem): string | undefined =>
   task.source === "claude-native" ? "Claude · read-only" : undefined;
 
-function TaskStatusIcon({ status }: { status: TaskItem["status"] }) {
+function TaskStatusIcon({ status, waiting }: { status: TaskItem["status"]; waiting?: boolean }) {
+  if (waiting) {
+    return (
+      <Clock
+        className="chat-workspace-strip__task-icon chat-workspace-strip__task-icon--waiting"
+        size={15}
+        strokeWidth={2}
+        aria-hidden="true"
+      />
+    );
+  }
   const suffix =
     status === "completed" ? "done" : status === "error" ? "error" : status;
   return (
@@ -221,6 +231,7 @@ const TaskRow = memo(function TaskRow({
   const label = task.description.trim();
   const sourceLabel = taskSourceLabel(task);
   const hasSubagents = Boolean(compactChildren);
+  const waiting = Boolean(task.waitingFor);
   const agentUpdates =
     !hasSubagents && task.status === "running"
       ? getTaskAgentUpdates(task)
@@ -262,10 +273,10 @@ const TaskRow = memo(function TaskRow({
       {...motionProps}
       className="chat-workspace-strip__task-row"
       ref={rowRef}
-      data-status={task.status}
+      data-status={waiting ? "waiting" : task.status}
       data-source={task.source}
       data-expanded={expanded ? "true" : undefined}
-      title={label}
+      title={waiting && task.statusText ? `${label} — ${task.statusText}` : label}
       data-continuous-animation={compactMotionActive ? "true" : undefined}
     >
       <div className="chat-workspace-strip__task-row-head">
@@ -287,7 +298,7 @@ const TaskRow = memo(function TaskRow({
                   className="chat-workspace-strip__task-icon-wrap"
                   aria-hidden="true"
                 >
-                  <TaskStatusIcon status={task.status} />
+                  <TaskStatusIcon status={task.status} waiting={waiting} />
                 </span>
                 <span className="chat-workspace-strip__task-label">
                   <ActivityTaskShimmer
@@ -315,7 +326,7 @@ const TaskRow = memo(function TaskRow({
                 className="chat-workspace-strip__task-icon-wrap"
                 aria-hidden="true"
               >
-                <TaskStatusIcon status={task.status} />
+                <TaskStatusIcon status={task.status} waiting={waiting} />
               </span>
               <span className="chat-workspace-strip__task-label">
                 <ActivityTaskShimmer
@@ -480,6 +491,7 @@ const TasksList = memo(function TasksList({
   onOpenFile: (entry: ConversationFileEntry) => void;
   nested?: boolean;
 }) {
+  const t = useT();
   const tPlural = useTPlural();
   const [gap, setGap] = useState(0);
   const measureGap = useCallback((list: HTMLUListElement | null) => {
@@ -514,7 +526,9 @@ const TasksList = memo(function TasksList({
                         "app.chat.activityPill.workingHelpers",
                         row.task.workingHelpers,
                       )
-                    : undefined
+                    : row.task.waitingFor
+                      ? t("app.chat.activityPill.statusWaiting")
+                      : undefined
                 }
               />
             ) : (

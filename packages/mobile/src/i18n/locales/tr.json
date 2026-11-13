@@ -23,6 +23,7 @@
         "statusDone": "Tamamlandı",
         "statusError": "Tamamlanamadı",
         "statusRunning": "Görev sürüyor",
+        "statusWaiting": "Bekliyor",
         "tasksInProgress": {
           "one": "{count} görev sürüyor",
           "other": "{count} görev sürüyor"

@@ -23,6 +23,7 @@
         "statusDone": "Finalizat",
         "statusError": "Nu s-a putut finaliza",
         "statusRunning": "Sarcină în curs",
+        "statusWaiting": "În așteptare",
         "tasksInProgress": {
           "few": "{count} sarcini în curs",
           "one": "{count} sarcină în curs",

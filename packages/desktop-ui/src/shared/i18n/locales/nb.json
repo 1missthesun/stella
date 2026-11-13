@@ -23,6 +23,7 @@
         "statusDone": "Fullført",
         "statusError": "Kunne ikke fullføre",
         "statusRunning": "Oppgave pågår",
+        "statusWaiting": "Venter",
         "tasksInProgress": {
           "one": "{count} oppgave pågår",
           "other": "{count} oppgaver pågår"

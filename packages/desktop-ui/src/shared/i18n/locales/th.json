@@ -23,6 +23,7 @@
         "statusDone": "เสร็จแล้ว",
         "statusError": "ทำไม่สำเร็จ",
         "statusRunning": "งานกำลังดำเนินการ",
+        "statusWaiting": "กำลังรอ",
         "tasksInProgress": {
           "other": "{count} งานกำลังดำเนินการ"
         },

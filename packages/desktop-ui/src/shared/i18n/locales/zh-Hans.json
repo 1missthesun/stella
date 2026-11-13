@@ -23,6 +23,7 @@
         "statusDone": "已完成",
         "statusError": "无法完成",
         "statusRunning": "任务进行中",
+        "statusWaiting": "等待中",
         "tasksInProgress": {
           "other": "{count} 个任务进行中"
         },

@@ -23,6 +23,7 @@
         "statusDone": "Completata",
         "statusError": "Impossibile completare",
         "statusRunning": "Attività in corso",
+        "statusWaiting": "In attesa",
         "tasksInProgress": {
           "many": "{count} attività in corso",
           "one": "{count} attività in corso",

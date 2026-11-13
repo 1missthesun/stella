@@ -23,6 +23,7 @@
         "statusDone": "Valmis",
         "statusError": "Ei voitu viimeistellä",
         "statusRunning": "Tehtävä käynnissä",
+        "statusWaiting": "Odottaa",
         "tasksInProgress": {
           "one": "{count} tehtävä käynnissä",
           "other": "{count} tehtävää käynnissä"

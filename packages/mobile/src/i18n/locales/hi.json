@@ -23,6 +23,7 @@
         "statusDone": "पूरा हुआ",
         "statusError": "पूरा नहीं हो सका",
         "statusRunning": "कार्य प्रगति पर",
+        "statusWaiting": "प्रतीक्षा में",
         "tasksInProgress": {
           "one": "{count} कार्य प्रगति पर",
           "other": "{count} कार्य प्रगति पर"

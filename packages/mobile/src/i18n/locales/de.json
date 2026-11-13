@@ -23,6 +23,7 @@
         "statusDone": "Fertig",
         "statusError": "Konnte nicht abgeschlossen werden",
         "statusRunning": "Aufgabe läuft",
+        "statusWaiting": "Wartet",
         "tasksInProgress": {
           "one": "{count} Aufgabe läuft",
           "other": "{count} Aufgaben laufen"

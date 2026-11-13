@@ -23,6 +23,7 @@
         "statusDone": "הסתיים",
         "statusError": "לא ניתן היה לסיים",
         "statusRunning": "משימה בתהליך",
+        "statusWaiting": "ממתין",
         "tasksInProgress": {
           "one": "משימה {count} בתהליך",
           "other": "{count} משימות בתהליך",

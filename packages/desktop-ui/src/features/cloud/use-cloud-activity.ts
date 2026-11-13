@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ledgerThreadTaskStatus } from "@stella/contracts/agent-ledger";
+import { resultWaitingFor } from "@stella/contracts/agent-waiting";
 import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
 import { isPlacementThreadId, placementAliases } from "@stella/contracts/placement-thread-id";
 import {
@@ -35,6 +36,8 @@ export const cloudThreadReport = (
 export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
   const status = ledgerThreadTaskStatus(thread.status);
   const report = cloudThreadReport(thread);
+  const waitingFor =
+    thread.status === "waiting" ? resultWaitingFor(thread.resultJson) ?? "a message" : undefined;
   return {
     id: thread.threadId,
     description: thread.description,
@@ -42,6 +45,7 @@ export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
     ...(thread.parentThreadId ? { parentAgentId: thread.parentThreadId } : {}),
     source: "stella",
     status,
+    ...(waitingFor ? { waitingFor, statusText: `Waiting for ${waitingFor}` } : {}),
     startedAtMs: thread.createdAt,
     lastUpdatedAtMs: thread.updatedAt,
     ...(status === "running" ? {} : { completedAtMs: thread.updatedAt }),
@@ -230,9 +234,11 @@ export const mergeCloudConversationTasks = (
   const merged = canonical.map((task) => {
     const overlay = operationalById.get(task.id);
     if (!overlay || task.status !== "running") return task;
+    const waitingFor = task.waitingFor ?? overlay.waitingFor;
     return {
       ...task,
       ...(overlay.statusText ? { statusText: overlay.statusText } : {}),
+      ...(waitingFor ? { waitingFor, statusText: `Waiting for ${waitingFor}` } : {}),
       ...(overlay.reasoningText
         ? { reasoningText: overlay.reasoningText }
         : {}),

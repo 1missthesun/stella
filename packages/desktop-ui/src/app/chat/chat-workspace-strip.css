@@ -503,6 +503,10 @@
   color: var(--text-strong);
 }
 
+.chat-workspace-strip__task-icon--waiting {
+  color: var(--text-base);
+}
+
 .chat-workspace-strip__task-icon--done {
   color: var(--text-base);
 }

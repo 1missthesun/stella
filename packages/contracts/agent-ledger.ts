@@ -65,7 +65,7 @@ export type TopLevelAgentActivity<T> = {
  * helpers count under it, never as rows of their own.
  */
 export const topLevelAgentActivity = <
-  T extends { id: string; parentAgentId?: string; status: TaskLifecycleStatus },
+  T extends { id: string; parentAgentId?: string; status: TaskLifecycleStatus; waitingFor?: string },
 >(
   tasks: readonly T[],
 ): TopLevelAgentActivity<T>[] => {
@@ -88,7 +88,7 @@ export const topLevelAgentActivity = <
       helpers.push(next);
       pending.push(...(childrenByParent.get(next.id) ?? []));
     }
-    const workingHelpers = helpers.filter((helper) => helper.status === "running").length;
+    const workingHelpers = helpers.filter((helper) => helper.status === "running" && !helper.waitingFor).length;
     return {
       task,
       status: task.status === "completed" && workingHelpers > 0 ? "running" : task.status,

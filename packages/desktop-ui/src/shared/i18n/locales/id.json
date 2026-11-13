@@ -23,6 +23,7 @@
         "statusDone": "Selesai",
         "statusError": "Tidak dapat menyelesaikan",
         "statusRunning": "Tugas sedang berjalan",
+        "statusWaiting": "Menunggu",
         "tasksInProgress": {
           "other": "{count} tugas sedang berjalan"
         },

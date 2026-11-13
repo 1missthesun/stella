@@ -85,6 +85,8 @@ export type ThreadActivityRecord = {
   assistantMessagesUpdatedAt?: number;
   assistantMessagesUpdatedSequence?: number;
   updatedAt: number;
+  /** It ended its turn waiting for this (end_turn_waiting): not finished, nothing running. */
+  waitingFor?: string;
 };
 
 export type WebSearchResultHit = {

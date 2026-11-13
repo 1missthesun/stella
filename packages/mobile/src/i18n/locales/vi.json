@@ -23,6 +23,7 @@
         "statusDone": "Đã xong",
         "statusError": "Không hoàn thành được",
         "statusRunning": "Tác vụ đang chạy",
+        "statusWaiting": "Đang chờ",
         "tasksInProgress": {
           "other": "{count} tác vụ đang chạy"
         },

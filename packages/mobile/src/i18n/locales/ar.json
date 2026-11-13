@@ -23,6 +23,7 @@
         "statusDone": "انتهى",
         "statusError": "تعذّر الإنهاء",
         "statusRunning": "مهمة قيد التنفيذ",
+        "statusWaiting": "في الانتظار",
         "tasksInProgress": {
           "few": "{count} مهام قيد التنفيذ",
           "many": "{count} مهمة قيد التنفيذ",

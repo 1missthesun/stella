@@ -23,6 +23,7 @@
         "statusDone": "Terminado",
         "statusError": "No se pudo terminar",
         "statusRunning": "Tarea en curso",
+        "statusWaiting": "En espera",
         "tasksInProgress": {
           "many": "{count} tareas en curso",
           "one": "{count} tarea en curso",

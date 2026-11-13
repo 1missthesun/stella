@@ -23,6 +23,7 @@
         "statusDone": "Klaar",
         "statusError": "Kon niet afronden",
         "statusRunning": "Taak bezig",
+        "statusWaiting": "Wacht",
         "tasksInProgress": {
           "one": "{count} taak bezig",
           "other": "{count} taken bezig"

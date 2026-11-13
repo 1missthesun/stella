@@ -23,6 +23,7 @@
         "statusDone": "Dokončeno",
         "statusError": "Nepodařilo se dokončit",
         "statusRunning": "Úloha probíhá",
+        "statusWaiting": "Čeká",
         "tasksInProgress": {
           "few": "probíhají {count} úlohy",
           "many": "probíhá {count} úlohy",

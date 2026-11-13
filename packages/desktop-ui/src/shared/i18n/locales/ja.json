@@ -23,6 +23,7 @@
         "statusDone": "完了しました",
         "statusError": "完了できませんでした",
         "statusRunning": "タスクを実行中",
+        "statusWaiting": "待機中",
         "tasksInProgress": {
           "other": "{count} 件のタスクを実行中"
         },

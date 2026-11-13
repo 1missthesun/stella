@@ -23,6 +23,7 @@
         "statusDone": "Befejezve",
         "statusError": "Nem sikerült befejezni",
         "statusRunning": "Feladat folyamatban",
+        "statusWaiting": "Várakozik",
         "tasksInProgress": {
           "one": "{count} feladat folyamatban",
           "other": "{count} feladat folyamatban"

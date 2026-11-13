@@ -23,6 +23,7 @@
         "statusDone": "Ολοκληρώθηκε",
         "statusError": "Δεν ολοκληρώθηκε",
         "statusRunning": "Εργασία σε εξέλιξη",
+        "statusWaiting": "Σε αναμονή",
         "tasksInProgress": {
           "one": "{count} εργασία σε εξέλιξη",
           "other": "{count} εργασίες σε εξέλιξη"

@@ -23,6 +23,7 @@
         "statusDone": "Færdig",
         "statusError": "Kunne ikke fuldføres",
         "statusRunning": "Opgave i gang",
+        "statusWaiting": "Venter",
         "tasksInProgress": {
           "one": "{count} opgave i gang",
           "other": "{count} opgaver i gang"

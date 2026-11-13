@@ -13,13 +13,13 @@ import "./attachment-strip.css";
 
 const useOnscreenTiles = (
   rowRef: React.RefObject<HTMLDivElement | null>,
-  count: number,
+  tileIds: string,
   wrapped: boolean,
 ): Set<string> => {
   const [visible, setVisible] = useState<Set<string>>(new Set());
   useEffect(() => {
     const row = rowRef.current;
-    if (!row || count === 0 || typeof IntersectionObserver === "undefined") return;
+    if (!row || !tileIds || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
         setVisible((previous) => {
@@ -46,7 +46,7 @@ const useOnscreenTiles = (
       observer.observe(tile);
     }
     return () => observer.disconnect();
-  }, [rowRef, count, wrapped]);
+  }, [rowRef, tileIds, wrapped]);
   return visible;
 };
 
@@ -190,7 +190,11 @@ export const MessageAttachments = ({
   const shownCount = wrapped ? cappedCount : rowCount;
   const shown = media.slice(0, shownCount);
   const hiddenCount = media.length - shownCount;
-  const visible = useOnscreenTiles(rowRef, part === "media" ? shown.length : 0, wrapped);
+  const visible = useOnscreenTiles(
+    rowRef,
+    part === "media" ? shown.map((card) => card.id).join("\n") : "",
+    wrapped,
+  );
   const setExpanded = (next: boolean) => {
     if (expansionKey) chooseExpansion(expansionKey, next);
     if (!next) setShowEverything(false);

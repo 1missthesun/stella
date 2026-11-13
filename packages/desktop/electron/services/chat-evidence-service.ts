@@ -658,7 +658,7 @@ export const createChatEvidenceService = (options: {
         unique.slice(0, EVIDENCE_CARD_CAP),
         GENERATION_CONCURRENCY,
         async (file): Promise<EvidenceCard | null> => {
-          const cacheKey = `${CACHE_SCHEMA}:drive:${file.drivePath}:${file.sizeBytes}`;
+          const cacheKey = `${CACHE_SCHEMA}:drive:${file.drivePath}:${file.version}`;
           const cached = await readCached(cacheKey);
           if (cached) return cached;
           const pending = driveInFlight.get(cacheKey);

@@ -106,6 +106,7 @@ import {
   resolveCloudDriveFileUri,
 } from "../lib/use-cloud-drive-file-uri";
 import { notifyError, notifySuccess, tapLight } from "../lib/haptics";
+import { useDriveFileRevision } from "../lib/drive-file-versions";
 import {
   SwipeArea,
   ZoomableImageView,
@@ -512,10 +513,15 @@ export function ArtifactViewerContent({
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const cacheKey = useMemo(
-    () => viewerCacheKey(artifact, preferDeviceId, colors.background),
-    [artifact, colors.background, preferDeviceId],
-  );
+  const viewedDrivePath =
+    "driveBacked" in artifact.payload && artifact.payload.driveBacked === true
+      ? artifactPrimaryFilePath(artifact.payload)
+      : null;
+  const driveRevision = useDriveFileRevision(viewedDrivePath);
+  const cacheKey = useMemo(() => {
+    const key = viewerCacheKey(artifact, preferDeviceId, colors.background);
+    return key && driveRevision ? `${key}|${driveRevision}` : key;
+  }, [artifact, colors.background, driveRevision, preferDeviceId]);
   const cachedEntry = useMemo(
     () => cachedViewerEntry<LoadedArtifact>(cacheKey, loadedStillThere),
     [cacheKey],

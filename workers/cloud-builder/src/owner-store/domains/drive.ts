@@ -1,9 +1,12 @@
 import { PLAN_CATALOG, planLabel, type BillingPlan } from "@stella/contracts/billing-plans";
-import type {
-  DeviceFileLocation,
-  DriveFile,
-  DriveFileRecord,
-  DriveFileUrl,
+import { createHash } from "node:crypto";
+import {
+  DRIVE_VERSIONS_MAX_PATHS,
+  type DeviceFileLocation,
+  type DriveFile,
+  type DriveFileRecord,
+  type DriveFileUrl,
+  type DriveFileVersions,
 } from "@stella/contracts/backend/drive";
 import { DEVICE_FILE_COPY_LIMITS } from "@stella/contracts/device-files";
 import {
@@ -695,6 +698,37 @@ const finalizeUpload = async (
   return { path, name, sizeBytes: stagedBytes, contentType, updatedAt: now };
 };
 
+/** Every write stores its bytes under a fresh R2 key, so the key names the content. */
+const fileVersion = (r2Key: string): string =>
+  createHash("sha256").update(r2Key).digest("base64url").slice(0, 22);
+
+const fileVersions = (
+  db: OwnerDbReader,
+  space: string,
+  paths: string[],
+): DriveFileVersions => {
+  const versions: DriveFileVersions = {};
+  const lookup = new Map<string, string>();
+  for (const requested of paths) {
+    versions[requested] = null;
+    try {
+      lookup.set(requested, normalizeDrivePath(requested));
+    } catch {
+      continue;
+    }
+  }
+  const normalized = [...new Set(lookup.values())];
+  if (normalized.length === 0) return versions;
+  const rows = db.all<{ path: string; r2_key: string }>(
+    `SELECT path, r2_key FROM drive_files WHERE space = ? AND path IN (${normalized.map(() => "?").join(", ")})`,
+    space,
+    ...normalized,
+  );
+  const byPath = new Map(rows.map((row) => [row.path, fileVersion(row.r2_key)]));
+  for (const [requested, path] of lookup) versions[requested] = byPath.get(path) ?? null;
+  return versions;
+};
+
 const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<DriveFileUrl> => {
   const path = normalizeDrivePath(args.path);
   const row = getFile(ctx.db, spaceOf(ctx), path);
@@ -707,6 +741,7 @@ const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<Drive
     contentType: row.content_type,
     url: await signGet(signerOf(ctx), row.r2_key, DOWNLOAD_URL_EXPIRES_SECONDS, row.name, now),
     expiresAt: now + DOWNLOAD_URL_EXPIRES_SECONDS * 1_000,
+    version: fileVersion(row.r2_key),
   };
 };
 
@@ -1866,6 +1901,12 @@ export const driveDomain = {
         limit: optional(number({ min: 1, max: 100_000 })),
       }),
       read: (ctx, args) => listFiles(ctx.db, PERSONAL_DRIVE_SPACE, args),
+    },
+    "drive.versions": {
+      parse: object({
+        paths: array(string({ min: 1, max: 4_000 }), { max: DRIVE_VERSIONS_MAX_PATHS }),
+      }),
+      read: (ctx, args) => fileVersions(ctx.db, PERSONAL_DRIVE_SPACE, args.paths),
     },
   },
   internal: {

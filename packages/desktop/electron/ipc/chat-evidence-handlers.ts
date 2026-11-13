@@ -39,6 +39,8 @@ const driveSourcesFrom = (value: unknown): DriveEvidenceSource[] => {
           ? Math.max(0, file.sizeBytes)
           : 0,
       contentType: typeof file.contentType === "string" ? file.contentType : "",
+      version:
+        typeof file.version === "string" && file.version ? file.version : url.pathname,
     });
   }
   return sources;

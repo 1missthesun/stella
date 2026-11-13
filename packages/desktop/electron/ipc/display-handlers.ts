@@ -1093,6 +1093,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       }
       const locator = options.deviceFileLocator;
       if (!locator) throw new Error("Your Drive isn't available right now.");
+      locator.forgetCopyUrls(drivePath.slice(0, drivePath.lastIndexOf("/") + 1));
       const file = await locator.copyUrl(drivePath);
       if (file.sizeBytes > MAX_CANVAS_HTML_BYTES) {
         throw new Error(

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DriveFileUrl } from "@stella/contracts/backend/drive";
 import { getBackendClient } from "./backend";
+import { driveFileVersions, useDriveFileVersion } from "./drive-file-versions";
 
 const REFRESH_MARGIN_MS = 30_000;
 
@@ -8,21 +9,37 @@ const cache = new Map<string, DriveFileUrl>();
 const inflight = new Map<string, Promise<DriveFileUrl>>();
 let generation = 0;
 
-const fresh = (entry: DriveFileUrl | undefined): entry is DriveFileUrl =>
-  entry !== undefined && entry.expiresAt > Date.now() + REFRESH_MARGIN_MS;
+const isCurrent = (path: string, entry: DriveFileUrl): boolean => {
+  const current = driveFileVersions.version(path);
+  return current === undefined || current === entry.version;
+};
+
+const fresh = (
+  path: string,
+  entry: DriveFileUrl | undefined,
+): entry is DriveFileUrl =>
+  entry !== undefined &&
+  entry.expiresAt > Date.now() + REFRESH_MARGIN_MS &&
+  isCurrent(path, entry);
 
 export const resolveCloudDriveFile = async (
   path: string,
 ): Promise<DriveFileUrl> => {
   const cached = cache.get(path);
-  if (fresh(cached)) return cached;
+  if (fresh(path, cached)) return cached;
   const pending = inflight.get(path);
-  if (pending) return await pending;
+  if (pending) {
+    const settled = await pending;
+    if (isCurrent(path, settled)) return settled;
+  }
   const owner = generation;
   const request: Promise<DriveFileUrl> = getBackendClient()
     .call("drive.fileUrl", { path })
     .then((entry) => {
-      if (owner === generation) cache.set(path, entry);
+      if (owner === generation) {
+        cache.set(path, entry);
+        driveFileVersions.track(path);
+      }
       return entry;
     })
     .finally(() => {
@@ -52,13 +69,14 @@ export const clearCloudDriveFileUris = (): void => {
 export const useCloudDriveFileUri = (
   path: string | null,
 ): { uri: string | null; failed: boolean } => {
+  const version = useDriveFileVersion(path);
   const [state, setState] = useState<{
     path: string | null;
     uri: string | null;
     failed: boolean;
   }>(() => {
     const cached = path ? cache.get(path) : undefined;
-    return { path, uri: fresh(cached) ? cached.url : null, failed: false };
+    return { path, uri: path && fresh(path, cached) ? cached.url : null, failed: false };
   });
 
   useEffect(() => {
@@ -83,11 +101,11 @@ export const useCloudDriveFileUri = (
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [path]);
+  }, [path, version]);
 
   if (state.path !== path) {
     const cached = path ? cache.get(path) : undefined;
-    return { uri: fresh(cached) ? cached.url : null, failed: false };
+    return { uri: path && fresh(path, cached) ? cached.url : null, failed: false };
   }
   return { uri: state.uri, failed: state.failed };
 };

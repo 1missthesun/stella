@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
+import { useDriveFileRevision } from "@/features/cloud/drive-file-versions";
 import { useCloudDriveHtml } from "@/features/cloud/use-cloud-drive-html";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { deviceFileMissingMessage } from "@stella/contracts/device-files";
@@ -76,7 +77,8 @@ const LocalFileCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => 
     return <CanvasHeroFrameDocument item={item} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
 };
 const DriveCanvasHeroFrameContent = ({ item, drivePath }: { item: CanvasHtmlItem; drivePath: string }) => {
-    const key = `${drivePath}\0${item.createdAt}`;
+    const revision = useDriveFileRevision(drivePath);
+    const key = `${drivePath}\0${item.createdAt}\0${revision}`;
     const [resolved, setResolved] = useState<{
         key: string;
         src: string | null;
@@ -146,7 +148,8 @@ const BytesCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     return <HtmlCanvasHeroFrameContent item={item} html={embedded.html} error={error} loading={loading || embedded.loading} limited={truncated} {...(fileSource?.drivePath ? { drivePath: fileSource.drivePath } : {})}/>;
 };
 const CloudCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
-    const { html, error, loading } = useCloudDriveHtml(item.filePath, item.createdAt);
+    const revision = useDriveFileRevision(item.filePath.replace(/^\/+/u, ""));
+    const { html, error, loading } = useCloudDriveHtml(item.filePath, `${item.createdAt}:${revision}`);
     const documentPath = item.filePath.startsWith("/") ? item.filePath : `/${item.filePath}`;
     const embedded = useEmbeddedCanvasAssets(html ?? "", documentPath, canvasUrlApi() ? null : "drive");
     return <HtmlCanvasHeroFrameContent item={item} html={embedded.html} error={error} loading={loading || embedded.loading} drivePath={item.filePath}/>;

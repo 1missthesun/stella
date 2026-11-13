@@ -2,6 +2,7 @@ import { useId, useMemo, type ReactNode } from "react";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { backendClient } from "@/platform/backend/backend-client";
+import { useDriveFileRevision } from "./drive-file-versions";
 import {
   fetchWithInactivity,
   REQUEST_BUDGET_MS,
@@ -17,8 +18,9 @@ const drivePathFor = (documentPath: string, filePath: string): string => {
 
 export function CloudFileSource({ path, children }: { path: string; children: ReactNode }) {
   const id = useId();
+  const revision = useDriveFileRevision(path);
   const source = useMemo(() => ({
-    key: `drive:${id}:${path}`,
+    key: `drive:${id}:${path}:${revision}`,
     drivePath: path,
     async mediaUrl() {
       const { url } = await backendClient.call("drive.fileUrl", { path });
@@ -55,6 +57,6 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
       return { bytes, truncated, mimeType: response.headers.get("content-type") ?? "application/octet-stream" };
     },
-  }), [id, path]);
+  }), [id, path, revision]);
   return <DisplayFileSourceContext.Provider value={source}>{children}</DisplayFileSourceContext.Provider>;
 }

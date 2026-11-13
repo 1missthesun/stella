@@ -12,6 +12,7 @@ import {
 } from "@stella/contracts/chat-evidence-thumbnails";
 import type { EvidenceSourceKind } from "@stella/contracts/chat-evidence-naming";
 import { resolveCloudDriveFile } from "./use-cloud-drive-file-uri";
+import { driveFileVersions } from "./drive-file-versions";
 import { downloadFileWithinIdle } from "./cloud-request";
 import { assertReadableOnPairedComputer } from "./desktop-artifact-data";
 import {
@@ -107,7 +108,7 @@ const writeManifest = (contentKey: string, preview: EvidencePreview): void => {
   }
 };
 
-const drivePathFor = (filePath: string): string | null => {
+export const evidenceDrivePath = (filePath: string): string | null => {
   const trimmed = filePath.trim();
   const linked = driveLinkPath(trimmed);
   if (linked) return linked;
@@ -124,14 +125,14 @@ type RemoteSource = {
 };
 
 const remoteSourceFor = async (filePath: string): Promise<RemoteSource | null> => {
-  const drivePath = drivePathFor(filePath);
+  const drivePath = evidenceDrivePath(filePath);
   if (!drivePath) return null;
   const entry = await resolveCloudDriveFile(drivePath);
   return {
     drivePath,
     url: entry.url,
     sizeBytes: entry.sizeBytes,
-    identity: `${CACHE_SCHEMA}:drive:${drivePath}:${entry.sizeBytes}`,
+    identity: `${CACHE_SCHEMA}:drive:${drivePath}:${entry.version}`,
   };
 };
 
@@ -143,12 +144,14 @@ const localSourceFor = async (
 ): Promise<LocalSource> => {
   const target = new File(
     directoryFor("source"),
-    `${stableKey(request.filePath)}${extensionOf(request.filePath)}`,
+    `${stableKey(remote?.identity ?? request.filePath)}${extensionOf(request.filePath)}`,
   );
   if (remote) {
-    await downloadFileWithinIdle(remote.url, target, {
-      label: "Downloading a preview from your Drive",
-    });
+    if (!target.exists || target.size !== remote.sizeBytes) {
+      await downloadFileWithinIdle(remote.url, target, {
+        label: "Downloading a preview from your Drive",
+      });
+    }
   } else {
     assertReadableOnPairedComputer(request.filePath);
     const source = await resolveLinkedFile(
@@ -194,7 +197,7 @@ const driveThumbnailFor = async (
   if (!entry || entry.sizeBytes <= 0 || entry.sizeBytes > EVIDENCE_THUMBNAIL_MAX_BYTES) {
     return null;
   }
-  const identity = `${CACHE_SCHEMA}:thumbnail:${thumbnailPath}:${entry.sizeBytes}`;
+  const identity = `${CACHE_SCHEMA}:thumbnail:${thumbnailPath}:${entry.version}`;
   const cached = readManifest(identity);
   if (cached?.kind === "image") return cached;
   const target = new File(directoryFor("thumbnail"), `${stableKey(identity)}.jpg`);
@@ -362,7 +365,9 @@ const inFlight = new Map<string, Promise<EvidencePreview>>();
 export const requestEvidencePreview = (
   request: EvidencePreviewRequest,
 ): Promise<EvidencePreview> => {
-  const key = `${request.kind}:${request.filePath}`;
+  const drivePath = evidenceDrivePath(request.filePath);
+  const version = drivePath ? (driveFileVersions.version(drivePath) ?? "") : "";
+  const key = `${request.kind}:${request.filePath}:${version}`;
   const pending = inFlight.get(key);
   if (pending) return pending;
   const work = withSlot(async () => {

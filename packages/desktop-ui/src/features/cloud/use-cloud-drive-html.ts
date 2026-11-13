@@ -14,7 +14,7 @@ type State = {
 
 export const useCloudDriveHtml = (
   drivePath: string | null,
-  version?: number,
+  version?: number | string,
 ): { html: string | null; error: string | null; loading: boolean } => {
   const key = drivePath ? `${drivePath}:${version ?? 0}` : null;
   const [state, setState] = useState<State>({

@@ -84,4 +84,5 @@ export type DriveEvidenceSource = {
   url: string;
   sizeBytes: number;
   contentType: string;
+  version: string;
 };

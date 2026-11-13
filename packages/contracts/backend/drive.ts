@@ -23,7 +23,13 @@ export type DriveFileUrl = {
   contentType: string;
   url: string;
   expiresAt: number;
+  version: string;
 };
+
+/** Each path's current content version; null when the path holds no file. */
+export type DriveFileVersions = Record<string, string | null>;
+
+export const DRIVE_VERSIONS_MAX_PATHS = 200;
 
 export type DeviceFileLocation = {
   sourcePath: string;
@@ -78,5 +84,9 @@ export type DriveViews = {
   "drive.files": {
     args: { prefix?: string; limit?: number };
     result: DriveFile[];
+  };
+  "drive.versions": {
+    args: { paths: string[] };
+    result: DriveFileVersions;
   };
 };

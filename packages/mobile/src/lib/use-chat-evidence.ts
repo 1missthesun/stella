@@ -16,9 +16,11 @@ import {
   type EvidenceSource,
 } from "./chat-evidence-sources";
 import {
+  evidenceDrivePath,
   requestEvidencePreview,
   type EvidencePreview,
 } from "./chat-evidence-previews";
+import { useDriveFileVersions } from "./drive-file-versions";
 import type { StoredPhoneAccess } from "./phone-access";
 
 export const EVIDENCE_MEDIA_CARD_HEIGHT = EVIDENCE_TILE_HEIGHT;
@@ -108,6 +110,14 @@ export const useChatEvidence = (args: {
     () => sources.filter((source) => isReplyMediaKind(source.kind)),
     [sources],
   );
+  const drivePaths = useMemo(
+    () =>
+      mediaSources
+        .slice(0, EVIDENCE_MEDIA_CAP)
+        .flatMap((source) => evidenceDrivePath(source.filePath) ?? []),
+    [mediaSources],
+  );
+  const driveVersions = useDriveFileVersions(drivePaths).join("\n");
   const [previews, setPreviews] = useState<Record<string, PreviewState>>({});
 
   useEffect(() => {
@@ -146,7 +156,7 @@ export const useChatEvidence = (args: {
     return () => {
       alive = false;
     };
-  }, [mediaSources, conversationId, access]);
+  }, [mediaSources, conversationId, access, driveVersions]);
 
   return useMemo(() => {
     if (sources.length === 0) return EMPTY;

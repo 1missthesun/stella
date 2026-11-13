@@ -73,6 +73,24 @@ export type ComputerUseAction =
   | Readonly<{ type: "set_value"; elementId: string; value: string }>
   | Readonly<{ type: "type_text"; text: string }>;
 
+/**
+ * How input reaches the window. "background" posts window messages without
+ * moving the user's pointer or focus; "foreground" brings the window to the
+ * front and sends real OS input at the pointer; "auto" (default) picks
+ * foreground only where background input is known to be ignored. Honoured
+ * on Windows; other platforms deliver input their own way.
+ */
+export type ComputerUseInputDelivery = "auto" | "background" | "foreground";
+
+/**
+ * What must be unchanged since the observation for the action to go ahead.
+ * "auto" (default): element and keyboard actions need the same UI tree,
+ * screenshot-coordinate actions need the same window size and the same
+ * pixels around their points. "window": only the same window and size, for
+ * windows that never stop changing (games, video). Honoured on Windows.
+ */
+export type ComputerUseStaleCheck = "auto" | "window";
+
 export type ComputerUseActionCommand = Readonly<{
   target: ComputerUseTarget;
   action: ComputerUseAction;
@@ -80,6 +98,8 @@ export type ComputerUseActionCommand = Readonly<{
   observedStateId?: string;
   observedVisualStateId?: string;
   observedResourceGeneration?: number;
+  delivery?: ComputerUseInputDelivery;
+  staleCheck?: ComputerUseStaleCheck;
 }>;
 
 type ComputerUseRequestEnvelope = Readonly<{
@@ -500,9 +520,21 @@ const assertActionCommand = (value: unknown, context: string) => {
       "observedStateId",
       "observedVisualStateId",
       "observedResourceGeneration",
+      "delivery",
+      "staleCheck",
     ],
     context,
   );
+  if (candidate.delivery !== undefined) {
+    oneOf(
+      candidate.delivery,
+      ["auto", "background", "foreground"],
+      `${context}.delivery`,
+    );
+  }
+  if (candidate.staleCheck !== undefined) {
+    oneOf(candidate.staleCheck, ["auto", "window"], `${context}.staleCheck`);
+  }
   assertComputerUseTarget(candidate.target, `${context}.target`);
   assertComputerUseAction(candidate.action, `${context}.action`);
   if (candidate.observedObservationId !== undefined) {

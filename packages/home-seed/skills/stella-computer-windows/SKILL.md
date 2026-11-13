@@ -129,7 +129,40 @@ await sky.click({
 });
 ```
 
-Coordinates are screenshot pixels and require a state captured with `screenshot_policy: "always"`, its semantic `state_id`, and its immutable `observation_id`. Never reuse coordinates with a later observation, even when its semantic `state_id` is unchanged. Windows background input varies by framework. Prefer UI Automation elements first. Coordinate and keyboard delivery may briefly require foreground dispatch; verify the result with one final settled state.
+Coordinates are screenshot pixels and require a state captured with `screenshot_policy: "always"`, its semantic `state_id`, and its immutable `observation_id` from the latest observation of that window. They are relative to the window, so they still land right if the window moved. Before sending, Stella checks that the window has the same size and that the pixels around each point (and most of the window) look the same as in that screenshot; small animations pass, a dialog over the point or a different screen does not.
+
+For a window that never stops changing (a game, a video, an animated launcher), pass `stale_check: "window"`: only the same window at the same size is required. You accept that what is under the point may have moved, so observe again after each action.
+
+```js
+await sky.click({ window_id: 123456, x: 512, y: 300, state_id: state.state_id, observation_id: state.observation_id, stale_check: "window" });
+```
+
+### Delivery
+
+`delivery` picks how input reaches the window: `"auto"` (default), `"background"` or `"foreground"`.
+
+- Background posts window messages: your pointer and focus stay with the user.
+- Foreground brings the window to the front and sends real OS input at the pointer; Stella leaves the window in front and the pointer where it acted.
+- Auto uses foreground for windows that ignore background input: Chromium/CEF/Electron content (mouse; keyboard too when the Chromium view is embedded in another app's window), and windows that draw their own content (DirectX/OpenGL/game engines, custom canvases). If a background click changed nothing, the next state says so and later auto actions on that window go foreground.
+- Pass `delivery: "foreground"` when a background action visibly did nothing; it also skips UI Automation shortcuts and clicks with the real pointer.
+
+### Windows that expose no elements
+
+When the state says the window draws its own content or its Chromium accessibility tree stayed empty, element indices will not appear: work from `screenshot_policy: "always"` screenshots with x/y clicks, drags, `press_key` and `type_text`. Stella already asked Chromium windows to turn their accessibility tree on; when that works the web content is listed as elements and you should use them.
+
+A state without a screenshot says why (minimized, off-screen, or black pixels from exclusive fullscreen or protected content). Do not guess coordinates without a screenshot.
+
+### Errors that mean input was refused
+
+These come back as errors with a specific `code`; nothing (or only what the message says) was delivered. Do not retry them blindly and never work around them with your own input tools:
+
+- `input_refused` / `input_partially_injected`: Windows' SendInput accepted fewer events than sent (the message has the count and the Windows error). Commonly a game's anti-cheat filtering injected input. Tell the user; Stella cannot drive that part of the app.
+- `pointer_not_moved`: the pointer was intercepted on the way to the point; no button was pressed.
+- `uipi_blocked`: the app runs as administrator; Windows drops Stella's input to it.
+- `foreground_refused`: Windows would not bring the window to the front; the message names the window that kept focus.
+- `point_covered`: another app's window covers the point; the message names it.
+- `input_desktop_unavailable`: the screen is locked or a UAC/secure prompt is showing.
+- `background_unavailable`: you forced `delivery: "background"` on a window that ignores it.
 
 Do not add sleeps. `get_app_state` performs adaptive settling and extends its wait only while UI Automation events indicate continued changes.
 

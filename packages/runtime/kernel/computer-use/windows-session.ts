@@ -10,6 +10,8 @@ import {
   type ComputerUseActionCommand,
   type ComputerUseActionReceipt,
   type ComputerUseAppState,
+  type ComputerUseInputDelivery,
+  type ComputerUsePoint,
   type ComputerUseRequest,
   type ComputerUseResponse,
   type ComputerUseTarget,
@@ -17,6 +19,7 @@ import {
   type JsonObject,
 } from "./contract.js";
 import { runComputerUseEffect } from "./effect-runtime.js";
+import { decodePng, type DecodedPng } from "../shared/png-decode.js";
 import type { ComputerUseSession } from "./session.js";
 import {
   ComputerUseResourceArbiter,
@@ -70,6 +73,7 @@ type WindowsComputerHelperBatchResult = Readonly<{
   ok: boolean;
   result?: WinHelperResponse;
   error?: string;
+  code?: string;
 }>;
 
 type WindowsComputerHelperBatchResponse = WinHelperResponse &
@@ -174,6 +178,155 @@ const targetDetails = (target: ComputerUseTarget) => {
   };
 };
 
+const isCoordinateAction = (command: ComputerUseActionCommand) =>
+  command.action.type === "click_point" || command.action.type === "drag";
+
+const actionPoints = (
+  command: ComputerUseActionCommand,
+): readonly ComputerUsePoint[] => {
+  const action = command.action;
+  if (action.type === "click_point") return [action.point];
+  if (action.type === "drag") return [action.from, action.to];
+  return [];
+};
+
+/** A pixel counts as changed when any channel moved by more than this. */
+const PIXEL_CHANGE_THRESHOLD = 48;
+/** Share of changed pixels around a point that means "something else is there now". */
+const POINT_AREA_CHANGE_LIMIT = 0.4;
+/** Share of changed pixels in the whole window that means "a different screen". */
+const WINDOW_CHANGE_LIMIT = 0.75;
+
+const changedPixelShare = (
+  before: DecodedPng,
+  after: DecodedPng,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+  step: number,
+) => {
+  let total = 0;
+  let changed = 0;
+  for (let y = top; y < bottom; y += step) {
+    for (let x = left; x < right; x += step) {
+      const offset = (y * before.width + x) * 4;
+      total += 1;
+      if (
+        Math.abs(before.rgba[offset]! - after.rgba[offset]!) >
+          PIXEL_CHANGE_THRESHOLD ||
+        Math.abs(before.rgba[offset + 1]! - after.rgba[offset + 1]!) >
+          PIXEL_CHANGE_THRESHOLD ||
+        Math.abs(before.rgba[offset + 2]! - after.rgba[offset + 2]!) >
+          PIXEL_CHANGE_THRESHOLD
+      ) {
+        changed += 1;
+      }
+    }
+  }
+  return total === 0 ? 0 : changed / total;
+};
+
+/**
+ * Whether a screenshot-coordinate action may still go ahead: the pixels
+ * around each of its points and most of the window must look the same as in
+ * the observation. Small animations (a spinner, a pulsing button, a ticking
+ * timer) pass; a dialog over the point or a different screen does not.
+ */
+const coordinatePixelChange = (
+  observed: DecodedPng,
+  current: DecodedPng,
+  points: readonly ComputerUsePoint[],
+): string | null => {
+  if (
+    observed.width !== current.width ||
+    observed.height !== current.height
+  ) {
+    return `the screenshot size changed from ${observed.width}x${observed.height} to ${current.width}x${current.height}`;
+  }
+  const radius = Math.max(
+    12,
+    Math.round(Math.max(observed.width, observed.height) * 0.035),
+  );
+  for (const point of points) {
+    const x = Math.round(point.x);
+    const y = Math.round(point.y);
+    if (x < 0 || y < 0 || x >= observed.width || y >= observed.height) {
+      return `the point (${x}, ${y}) is outside the ${observed.width}x${observed.height} screenshot`;
+    }
+    const share = changedPixelShare(
+      observed,
+      current,
+      Math.max(0, x - radius),
+      Math.max(0, y - radius),
+      Math.min(observed.width, x + radius + 1),
+      Math.min(observed.height, y + radius + 1),
+      1,
+    );
+    if (share > POINT_AREA_CHANGE_LIMIT) {
+      return `the area around (${x}, ${y}) changed (${Math.round(share * 100)}% of its pixels)`;
+    }
+  }
+  const windowShare = changedPixelShare(
+    observed,
+    current,
+    0,
+    0,
+    observed.width,
+    observed.height,
+    4,
+  );
+  if (windowShare > WINDOW_CHANGE_LIMIT) {
+    return `most of the window changed (${Math.round(windowShare * 100)}% of its pixels)`;
+  }
+  return null;
+};
+
+const COORDINATE_STALE_HINT =
+  'Take a fresh get_app_state with screenshot_policy: "always" and pick the point again from that screenshot. If this window never stops animating (a game, a video, a live background), pass stale_check: "window" on the click or drag: Stella then only checks that it is still the same window at the same size.';
+
+const decodeSnapshotScreenshot = (snapshot: WinSnapshot) => {
+  if (!snapshot.screenshotPngBase64) return null;
+  try {
+    return decodePng(Buffer.from(snapshot.screenshotPngBase64, "base64"));
+  } catch {
+    return null;
+  }
+};
+
+/** Helper error codes that mean input was refused or not delivered. */
+const WINDOWS_INPUT_ERROR_CODES = new Set([
+  "background_unavailable",
+  "foreground_refused",
+  "input_desktop_unavailable",
+  "input_partially_injected",
+  "input_refused",
+  "point_covered",
+  "pointer_not_moved",
+  "target_not_responding",
+  "target_window_gone",
+  "uipi_blocked",
+]);
+
+class WindowsInputError extends Error {
+  readonly retryable = false;
+
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "WindowsInputError";
+  }
+}
+
+const helperActionError = (response: WinHelperResponse, fallback: string) => {
+  const message = response.error?.trim() || fallback;
+  return response.code && WINDOWS_INPUT_ERROR_CODES.has(response.code)
+    ? new WindowsInputError(response.code, message)
+    : new Error(message);
+};
+
 const requireSnapshot = (sessionId: string, target: ComputerUseTarget) => {
   const details = targetDetails(target);
   const snapshot = readWindowsComputerSnapshot(
@@ -191,9 +344,30 @@ const requireSnapshot = (sessionId: string, target: ComputerUseTarget) => {
 const actionOperation = (
   sessionId: string,
   command: ComputerUseActionCommand,
+  options: {
+    dispatch: ComputerUseInputDelivery;
+    liveSnapshot?: WinSnapshot;
+  },
 ): WinHelperRequest => {
   const { details, snapshot } = requireSnapshot(sessionId, command.target);
-  if (command.observedStateId) {
+  if (isCoordinateAction(command)) {
+    // Coordinates are read against the screenshot of the latest observation,
+    // so the action must come from that observation, not an earlier one.
+    const latestVisualStateId = windowsVisualStateId(snapshot);
+    if (
+      command.observedVisualStateId &&
+      latestVisualStateId !== command.observedVisualStateId
+    ) {
+      throw new ComputerUseResourceStaleError(
+        command.observedVisualStateId,
+        latestVisualStateId ?? "visual_state_unavailable",
+        {
+          nativeReason: "a newer observation of this window exists",
+          hint: "Use the observation_id and coordinates from the latest get_app_state of this window.",
+        },
+      );
+    }
+  } else if (command.observedStateId) {
     const currentStateId = windowsSnapshotStateId(snapshot);
     if (currentStateId !== command.observedStateId) {
       throw new ComputerUseResourceStaleError(
@@ -205,8 +379,11 @@ const actionOperation = (
   const shared = {
     app: details.app,
     windowId: details.windowId ?? snapshot.windowId,
-    windowBounds: snapshot.windowBounds ?? null,
-    dispatch: "background" as const,
+    // Window-relative coordinates follow the window if it moved since the
+    // observation; the live check already refused a resized window.
+    windowBounds:
+      options.liveSnapshot?.windowBounds ?? snapshot.windowBounds ?? null,
+    dispatch: options.dispatch,
     defer_observation: true,
     screenshot_policy: "auto" as const,
   };
@@ -299,11 +476,22 @@ const observationPrecondition = (
     ...(snapshot.windowId != null ? { window_id: snapshot.windowId } : {}),
     revision: snapshot.revision!,
     materialized_revision: snapshot.materializedRevision!,
+    ...(isCoordinateAction(command) || command.staleCheck === "window"
+      ? { scope: "window" as const }
+      : {}),
   };
 };
 
 const jsonObject = (value: unknown): JsonObject =>
   JSON.parse(JSON.stringify(value)) as JsonObject;
+
+const receiptDelivery = (response: WinHelperResponse) =>
+  response.receipt?.delivery ??
+  (response.receipt?.route?.startsWith("hwnd.postmessage.")
+    ? "background"
+    : response.receipt?.route?.startsWith("foreground.")
+      ? "foreground"
+      : undefined);
 
 const actionReceipt = (
   command: ComputerUseActionCommand,
@@ -320,6 +508,7 @@ const actionReceipt = (
       receipt: response.receipt ?? null,
       revision: response.revision ?? null,
       deferred,
+      delivery: receiptDelivery(response) ?? null,
     }),
   };
 };
@@ -388,6 +577,7 @@ const snapshotState = (
     previous?: WinSnapshot | null;
     disableDiff?: boolean;
     wait?: ComputerUseWaitProvenance;
+    notes?: readonly string[];
   } = {},
 ): ComputerUseAppState => {
   const canonicalApp =
@@ -424,9 +614,12 @@ const snapshotState = (
       : undefined;
   return {
     app: canonicalApp,
-    text: useDiff
-      ? formatStateDiffBlock(diff!).trim()
-      : windowsComputerSnapshotLines(snapshot).join("\n"),
+    text: [
+      useDiff
+        ? formatStateDiffBlock(diff!).trim()
+        : windowsComputerSnapshotLines(snapshot).join("\n"),
+      ...(options.notes ?? []).map((note) => `Note: ${note}`),
+    ].join("\n"),
     stateId,
     semanticStateId: stateId,
     ...(visualStateId ? { visualStateId } : {}),
@@ -476,6 +669,44 @@ export const createWindowsComputerUseSession = (
   const committedStateKeys = new Set<string>();
   const committedStateKey = (sessionId: string, alias: string) =>
     `${sessionId}\u0000${alias}`;
+  // Windows that ignored a background-delivered action: later "auto"
+  // actions on them use foreground delivery.
+  const backgroundIneffective = new Set<string>();
+  // The state right before a background-delivered action, compared with the
+  // next observation to tell whether the action had any effect.
+  const backgroundProbes = new Map<
+    string,
+    { stateId: string; visualStateId: string; action: string }
+  >();
+  const deliveryFor = (
+    sessionId: string,
+    command: ComputerUseActionCommand,
+  ): ComputerUseInputDelivery => {
+    const requested = command.delivery ?? "auto";
+    if (requested !== "auto") return requested;
+    const alias = targetDetails(command.target).snapshotAlias;
+    return backgroundIneffective.has(committedStateKey(sessionId, alias))
+      ? "foreground"
+      : "auto";
+  };
+  const backgroundEffectNotes = (
+    stateKey: string,
+    snapshot: WinSnapshot,
+  ): string[] => {
+    const probe = backgroundProbes.get(stateKey);
+    if (!probe) return [];
+    backgroundProbes.delete(stateKey);
+    if (
+      windowsSnapshotStateId(snapshot) !== probe.stateId ||
+      windowsVisualStateId(snapshot) !== probe.visualStateId
+    ) {
+      return [];
+    }
+    backgroundIneffective.add(stateKey);
+    return [
+      `The last ${probe.action} was delivered in the background (posted window messages) and nothing in the window changed, so this window probably ignores background input. Later actions on it use foreground delivery (it comes to the front and gets real pointer/keyboard input). Repeat the ${probe.action} if it was meant to change something; pass delivery: "background" to opt out.`,
+    ];
+  };
   const requestHelper =
     options.requestHelper ??
     ((sessionId, operation, signal) =>
@@ -633,6 +864,7 @@ export const createWindowsComputerUseSession = (
                   response.snapshot,
                 );
                 committedStateKeys.add(stateKey);
+                const notes = backgroundEffectNotes(stateKey, response.snapshot);
                 return {
                   ...responseEnvelope(typedRequest),
                   type: "app_state" as const,
@@ -643,6 +875,7 @@ export const createWindowsComputerUseSession = (
                     {
                       previous,
                       disableDiff: typedRequest.disableDiff,
+                      notes,
                     },
                   ),
                 };
@@ -802,16 +1035,21 @@ export const createWindowsComputerUseSession = (
                     `${command.action.type} requires observedStateId before Windows dispatch.`,
                   );
                 }
+                const coordinates = isCoordinateAction(command);
+                const windowOnly = command.staleCheck === "window";
                 const target = targetDetails(command.target);
+                const observed = readWindowsComputerSnapshot(
+                  typedRequest.sessionId,
+                  target.snapshotAlias,
+                );
                 const response = await requestHelper(
                   typedRequest.sessionId,
                   {
                     tool: "get_app_state",
                     app: target.app,
                     windowId: target.windowId,
-                    screenshot_policy: command.observedVisualStateId
-                      ? "always"
-                      : "never",
+                    screenshot_policy:
+                      coordinates && !windowOnly ? "always" : "never",
                   },
                   signal,
                 );
@@ -823,27 +1061,91 @@ export const createWindowsComputerUseSession = (
                     ),
                   );
                 }
-                const currentStateId = windowsSnapshotStateId(
-                  response.snapshot,
-                );
-                if (currentStateId !== observedStateId) {
-                  throw new ComputerUseResourceStaleError(
-                    observedStateId,
-                    currentStateId,
-                  );
-                }
+                const live = response.snapshot;
                 if (
-                  command.observedVisualStateId &&
-                  windowsVisualStateId(response.snapshot) !==
-                    command.observedVisualStateId
+                  observed &&
+                  (observed.app.pid !== live.app.pid ||
+                    (observed.windowId ?? null) !== (live.windowId ?? null))
                 ) {
                   throw new ComputerUseResourceStaleError(
-                    command.observedVisualStateId,
-                    windowsVisualStateId(response.snapshot) ??
-                      "visual_state_unavailable",
+                    observedStateId,
+                    windowsSnapshotStateId(live),
+                    {
+                      nativeReason: "the target window was replaced",
+                      hint: "Call get_app_state again and act on the new window.",
+                    },
                   );
                 }
-                return response.snapshot;
+                if (!coordinates) {
+                  if (windowOnly) return live;
+                  const currentStateId = windowsSnapshotStateId(live);
+                  if (currentStateId !== observedStateId) {
+                    throw new ComputerUseResourceStaleError(
+                      observedStateId,
+                      currentStateId,
+                    );
+                  }
+                  return live;
+                }
+
+                // Screenshot coordinates: the pixels are the evidence, not the
+                // accessibility tree. The window must have the same size, and
+                // unless the caller accepts any change, the same pixels around
+                // the points.
+                const observedBounds = observed?.windowBounds;
+                const liveBounds = live.windowBounds;
+                if (
+                  observedBounds &&
+                  liveBounds &&
+                  (Math.abs(observedBounds.width - liveBounds.width) > 1 ||
+                    Math.abs(observedBounds.height - liveBounds.height) > 1)
+                ) {
+                  throw new ComputerUseResourceStaleError(
+                    command.observedVisualStateId ?? observedStateId,
+                    windowsSnapshotStateId(live),
+                    {
+                      nativeReason: `the window was resized from ${Math.round(observedBounds.width)}x${Math.round(observedBounds.height)} to ${Math.round(liveBounds.width)}x${Math.round(liveBounds.height)}`,
+                      hint: COORDINATE_STALE_HINT,
+                    },
+                  );
+                }
+                if (windowOnly) return live;
+                if (!live.screenshotPngBase64) {
+                  throw new Error(
+                    `Stella could not take the screenshot needed to check the window before this ${command.action.type}: ${live.capture?.warning ?? live.warnings?.join(" ") ?? "Windows returned no pixels."} Pass stale_check: "window" to act on window-relative coordinates without that check.`,
+                  );
+                }
+                const observedImage = observed
+                  ? decodeSnapshotScreenshot(observed)
+                  : null;
+                const liveImage = decodeSnapshotScreenshot(live);
+                if (!observedImage || !liveImage) {
+                  // Unreadable pixels: fall back to the exact comparison.
+                  if (
+                    command.observedVisualStateId &&
+                    windowsVisualStateId(live) !== command.observedVisualStateId
+                  ) {
+                    throw new ComputerUseResourceStaleError(
+                      command.observedVisualStateId,
+                      windowsVisualStateId(live) ?? "visual_state_unavailable",
+                      { hint: COORDINATE_STALE_HINT },
+                    );
+                  }
+                  return live;
+                }
+                const change = coordinatePixelChange(
+                  observedImage,
+                  liveImage,
+                  actionPoints(command),
+                );
+                if (change) {
+                  throw new ComputerUseResourceStaleError(
+                    command.observedVisualStateId ?? observedStateId,
+                    windowsVisualStateId(live) ?? "visual_state_unavailable",
+                    { nativeReason: change, hint: COORDINATE_STALE_HINT },
+                  );
+                }
+                return live;
               };
 
               const throwIfAtomicStateIsStale = (
@@ -859,6 +1161,34 @@ export const createWindowsComputerUseSession = (
                 );
               };
 
+              const recordBackgroundProbe = (
+                command: ComputerUseActionCommand,
+                before: WinSnapshot,
+                response: WinHelperResponse,
+              ) => {
+                const stateKey = committedStateKey(
+                  typedRequest.sessionId,
+                  targetDetails(command.target).snapshotAlias,
+                );
+                backgroundProbes.delete(stateKey);
+                const visualStateId = windowsVisualStateId(before);
+                if (
+                  receiptDelivery(response) !== "background" ||
+                  (command.delivery ?? "auto") !== "auto" ||
+                  !visualStateId
+                ) {
+                  return;
+                }
+                backgroundProbes.set(stateKey, {
+                  stateId: windowsSnapshotStateId(before),
+                  visualStateId,
+                  action:
+                    command.action.type === "click_point"
+                      ? "click"
+                      : command.action.type.replaceAll("_", " "),
+                });
+              };
+
               const executeAction = async (
                 command: ComputerUseActionCommand,
               ) => {
@@ -867,20 +1197,22 @@ export const createWindowsComputerUseSession = (
                   typedRequest.sessionId,
                   {
                     tool: "atomic_action",
-                    command: actionOperation(typedRequest.sessionId, command),
+                    command: actionOperation(typedRequest.sessionId, command, {
+                      dispatch: deliveryFor(typedRequest.sessionId, command),
+                      liveSnapshot: snapshot,
+                    }),
                     precondition: observationPrecondition(command, snapshot),
                   },
                   signal,
                 );
                 if (!response.ok) {
                   throwIfAtomicStateIsStale(command, response);
-                  throw new Error(
-                    helperFailure(
-                      response,
-                      `Windows runtime failed to execute ${command.action.type}.`,
-                    ),
+                  throw helperActionError(
+                    response,
+                    `Windows runtime failed to execute ${command.action.type}.`,
                   );
                 }
+                recordBackgroundProbe(command, snapshot, response);
                 return actionReceipt(command, response);
               };
 
@@ -898,7 +1230,10 @@ export const createWindowsComputerUseSession = (
               }
               const operations = typedRequest.commands.map(
                 (command, index) => ({
-                  command: actionOperation(typedRequest.sessionId, command),
+                  command: actionOperation(typedRequest.sessionId, command, {
+                    dispatch: deliveryFor(typedRequest.sessionId, command),
+                    liveSnapshot: snapshots[index]!,
+                  }),
                   precondition: observationPrecondition(
                     command,
                     snapshots[index]!,
@@ -935,10 +1270,13 @@ export const createWindowsComputerUseSession = (
                   );
                 }
                 if (!item.ok || !item.result?.ok) {
-                  throw new Error(
-                    item.error?.trim() ||
-                      item.result?.error?.trim() ||
-                      `Windows runtime failed batch command ${index}.`,
+                  throw helperActionError(
+                    {
+                      ok: false,
+                      code: item.code ?? item.result?.code,
+                      error: item.error?.trim() || item.result?.error?.trim(),
+                    },
+                    `Windows runtime failed batch command ${index} of ${typedRequest.commands.length}${index > 0 ? `; commands 0-${index - 1} were already delivered` : ""}.`,
                   );
                 }
                 return actionReceipt(command, item.result);
@@ -967,6 +1305,7 @@ export const createWindowsComputerUseSession = (
               const stale = error instanceof ComputerUseResourceStaleError;
               const waitTimeout =
                 error instanceof WindowsComputerWaitTimeoutError;
+              const inputError = error instanceof WindowsInputError;
               return errorResponse(
                 typedRequest,
                 aborted
@@ -975,7 +1314,9 @@ export const createWindowsComputerUseSession = (
                     ? error.code
                     : waitTimeout
                       ? error.code
-                      : "windows_session_failed",
+                      : inputError
+                        ? error.code
+                        : "windows_session_failed",
                 error instanceof Error ? error.message : String(error),
                 stale || waitTimeout,
                 stale

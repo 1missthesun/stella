@@ -80,7 +80,17 @@ export type WinSnapshot = {
   capture?: {
     method?: string;
     occluded?: boolean;
+    /** No usable pixels (black, minimized, off-screen); screenshot omitted. */
+    blank?: boolean;
     warning?: string;
+  };
+  /** What the window is made of; absent from helpers older than 2026-11-13. */
+  surface?: {
+    kind?: "chromium" | "opaque" | "native";
+    contentElements?: number;
+    accessibilityWake?: "not_needed" | "woken" | "no_tree";
+    fullscreen?: boolean;
+    minimized?: boolean;
   };
   appInstructions?: string | null;
   revision?: number;
@@ -110,6 +120,8 @@ export type WinHelperObservationPrecondition = {
   window_id?: number;
   revision: number;
   materialized_revision: number;
+  /** "window": only process and window identity must match (pixel-checked coordinate actions). */
+  scope?: "window";
 };
 
 export type WinHelperAtomicCommand = {
@@ -166,6 +178,9 @@ export type WinHelperResponse = {
     session?: string;
     reason?: string;
     dispatch?: string;
+    /** "background" (posted messages), "foreground" (real input) or "uia". */
+    delivery?: string;
+    delivery_reason?: string;
     settle?: {
       observed?: boolean;
       quietMs?: number;
@@ -265,7 +280,7 @@ Notes:
   - Windows uses the bundled stella-computer-helper.exe native helper
   - Windows keeps one helper daemon per Stella computer-use session when possible
   - the helper uses UI Automation patterns first and Win32 window messages as fallback
-  - --dispatch background is strict, foreground uses real input, auto chooses foreground for known background-drop cases
+  - --dispatch auto (default) chooses foreground for windows that ignore posted input, background is strict, foreground uses real input
   - SetFocus and UIA text fallback are opt-in via STELLA_COMPUTER_WINDOWS_ALLOW_* env flags
 `;
 
@@ -1091,7 +1106,7 @@ const appFromActionArgs = (sessionId: string, args: string[]) => {
 const getDispatchOption = (
   args: string[],
 ): "background" | "foreground" | "auto" => {
-  const value = getOptionValue(args, "--dispatch") ?? "background";
+  const value = getOptionValue(args, "--dispatch") ?? "auto";
   if (value === "background" || value === "foreground" || value === "auto") {
     return value;
   }
@@ -1248,6 +1263,40 @@ const formatScreenshotMarker = (
   });
 };
 
+/**
+ * What the agent needs to know about a window that exposes no usable UI
+ * elements, so it goes straight to screenshots and coordinates instead of
+ * hunting for element indices that will never appear.
+ */
+export const windowsSurfaceNotes = (snapshot: WinSnapshot): string[] => {
+  const notes: string[] = [];
+  const surface = snapshot.surface;
+  const contentElements =
+    surface?.contentElements ??
+    (snapshot.elements && snapshot.elements.length <= 1 ? 0 : undefined);
+  if (surface?.kind === "chromium" && contentElements === 0) {
+    notes.push(
+      surface.accessibilityWake === "no_tree"
+        ? `This window is a Chromium/CEF/Electron view whose accessibility tree stayed empty after Stella asked for it (the app likely turns renderer accessibility off), so it exposes no UI elements. Work from the screenshot: get_app_state with screenshot_policy: "always", then click/drag by x/y. Input goes through foreground delivery (the window comes to the front and gets real pointer and keyboard input).`
+        : `This window is a Chromium/CEF/Electron view that exposes no UI elements yet. Work from the screenshot (screenshot_policy: "always", click by x/y); input goes through foreground delivery.`,
+    );
+  } else if (surface?.kind === "opaque" || contentElements === 0) {
+    notes.push(
+      `This window draws its own content (DirectX/OpenGL/game engine or a custom canvas) and exposes no UI elements. Work from the screenshot: get_app_state with screenshot_policy: "always", then click/drag by x/y and press_key/type_text. Input goes through foreground delivery (the window comes to the front and gets real pointer and keyboard input). If it animates constantly, pass stale_check: "window" on coordinate actions.`,
+    );
+  } else if (surface?.kind === "chromium" && surface.accessibilityWake === "woken") {
+    notes.push(
+      `Stella turned on this Chromium/CEF/Electron window's accessibility tree; its web content is listed below.`,
+    );
+  }
+  if (surface?.fullscreen) {
+    notes.push(
+      `The window is fullscreen. Foreground input leaves it in front; Stella does not switch back to the previous window after acting.`,
+    );
+  }
+  return notes;
+};
+
 export const windowsComputerSnapshotLines = (snapshot: WinSnapshot) => {
   const lines: string[] = ["<app_state>"];
   const appRef = snapshot.app.bundleIdentifier || snapshot.app.name;
@@ -1267,6 +1316,9 @@ export const windowsComputerSnapshotLines = (snapshot: WinSnapshot) => {
   }
   for (const warning of snapshot.warnings ?? []) {
     lines.push(`Warning: ${warning}`);
+  }
+  for (const note of windowsSurfaceNotes(snapshot)) {
+    lines.push(`Note: ${note}`);
   }
   for (const line of snapshot.treeLines ?? []) {
     lines.push(line);

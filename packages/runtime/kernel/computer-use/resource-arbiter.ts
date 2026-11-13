@@ -408,6 +408,8 @@ export class ComputerUseResourceStaleError extends Error {
       nativeObserved?: JsonObject;
       nativeCurrent?: JsonObject;
       nativeReason?: string;
+      /** Replaces the generic advice at the end of the message. */
+      hint?: string;
     } = {},
   ) {
     const reason = details.nativeReason
@@ -418,7 +420,7 @@ export class ComputerUseResourceStaleError extends Error {
           ? "another action changed this app"
           : "the accessibility tree changed";
     super(
-      `The app changed after the state this action was based on (${reason}; observed_state_id=${observedStateId}, current_state_id=${currentStateId}). Nothing was sent. Call get_app_state again, re-derive the element_index from that state, and act with its new state_id right away. If the app keeps changing (animations, live content, a busy page), use wait_for_change first so it settles, or pass the state from the observation made immediately before the action.`,
+      `The app changed after the state this action was based on (${reason}; observed_state_id=${observedStateId}, current_state_id=${currentStateId}). Nothing was sent. ${details.hint ?? "Call get_app_state again, re-derive the element_index from that state, and act with its new state_id right away. If the app keeps changing (animations, live content, a busy page), use wait_for_change first so it settles, or pass the state from the observation made immediately before the action."}`,
     );
     this.name = "ComputerUseResourceStaleError";
     this.resourceKeys = details.resourceKeys;

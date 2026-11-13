@@ -8,7 +8,9 @@ import {
   type ComputerUseAppState,
   type ComputerUseAppPolicy,
   type ComputerUseAppSelector,
+  type ComputerUseInputDelivery,
   type ComputerUseRequest,
+  type ComputerUseStaleCheck,
   type ComputerUseTarget,
 } from "./contract.js";
 import {
@@ -21,6 +23,10 @@ type CommonAction = {
   window_id?: string | number;
   state_id?: string;
   observation_id?: string;
+  /** Windows: "auto" (default), "background" or "foreground". */
+  delivery?: ComputerUseInputDelivery;
+  /** Windows: "auto" (default) or "window" for never-still windows. */
+  stale_check?: ComputerUseStaleCheck;
 };
 
 export type SkyAction =
@@ -288,6 +294,22 @@ const dragAction = (args: DragArgs): ComputerUseAction => {
   };
 };
 
+const deliveryOption = (value: unknown): ComputerUseInputDelivery => {
+  if (value === "auto" || value === "background" || value === "foreground") {
+    return value;
+  }
+  throw new Error(
+    `delivery must be "auto", "background" or "foreground", not ${JSON.stringify(value)}.`,
+  );
+};
+
+const staleCheckOption = (value: unknown): ComputerUseStaleCheck => {
+  if (value === "auto" || value === "window") return value;
+  throw new Error(
+    `stale_check must be "auto" or "window", not ${JSON.stringify(value)}.`,
+  );
+};
+
 const actionCommand = (entry: SkyAction): ComputerUseActionCommand => {
   if (!entry || typeof entry !== "object") {
     throw new Error("Each batch action must be an object.");
@@ -306,6 +328,12 @@ const actionCommand = (entry: SkyAction): ComputerUseActionCommand => {
     ...(entry.state_id === undefined
       ? {}
       : { observedStateId: requireString(entry.state_id, "state_id") }),
+    ...(entry.delivery === undefined
+      ? {}
+      : { delivery: deliveryOption(entry.delivery) }),
+    ...(entry.stale_check === undefined
+      ? {}
+      : { staleCheck: staleCheckOption(entry.stale_check) }),
   });
   switch (entry.type) {
     case "click":

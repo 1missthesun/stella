@@ -171,7 +171,7 @@ const main = async () => {
           reason,
           elapsedMs: Date.now() - startedAt,
         });
-        if (reason === "idle" || reason === "restart") {
+        if (reason === "idle" || reason === "quit" || reason === "restart") {
           setImmediate(() => process.exit(0));
         }
       },
@@ -258,6 +258,7 @@ const main = async () => {
                 void runtimeLifecycle.shutdown("restart");
               },
               onQuitRequested: () => runtimeLifecycle.requestQuit(),
+              onRelaunching: () => runtimeLifecycle.noteRelaunching(),
             }),
         ),
         (acquired) => Effect.promise(() => acquired.close()),

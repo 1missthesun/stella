@@ -4,6 +4,7 @@ import {
   isAgentStopReason,
 } from "@stella/contracts/agent-status";
 import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
+import { waitingResultJson } from "@stella/contracts/agent-waiting";
 import { createHash } from "node:crypto";
 import type { BackendClient } from "@stella/contracts/backend/client";
 import {
@@ -102,6 +103,7 @@ export type ExecutionPlacementRunResult = {
   stopped?: boolean;
   finalText?: string;
   error?: string;
+  waitingFor?: string;
 };
 
 export type ExecutionPlacementClient = Pick<BackendClient, "call">;
@@ -238,9 +240,11 @@ const withOmissionNote = (text: string, omittedChars: number) =>
 const boundedResult = (value: string | undefined) =>
   value ? fitWithinBytes(value, withOmissionNote) : undefined;
 
-const terminalResultJson = (finalText: string) =>
+const terminalResultJson = (finalText: string, waitingFor?: string) =>
   fitWithinBytes(finalText, (text, omittedChars) =>
-    JSON.stringify({ finalText: withOmissionNote(text, omittedChars) }),
+    waitingFor
+      ? waitingResultJson(withOmissionNote(text, omittedChars), waitingFor)
+      : JSON.stringify({ finalText: withOmissionNote(text, omittedChars) }),
   );
 
 const isOwnerLifecycleFenceError = (error: unknown) => {
@@ -2004,7 +2008,7 @@ export class ExecutionPlacementBridge {
       const failed = result.status === "error";
       const resultJson =
         result.status === "ok"
-          ? terminalResultJson(result.finalText ?? "")
+          ? terminalResultJson(result.finalText ?? "", result.waitingFor)
           : undefined;
       this.inbox.markTerminalPending(row.dispatchId, {
         outcome: canceled ? "canceled" : failed ? "failed" : "completed",

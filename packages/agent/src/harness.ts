@@ -17,6 +17,7 @@ import { CLAUDE_CODE_ENGINE_EXTENSION, engineExtensionChange } from "./engine/se
 import { STELLA_PROVIDER_ID, stellaModelId } from "./provider/stella.ts";
 import {
   stellaAgents,
+  STELLA_AGENT_WAITING_EXTENSION,
   type AgentOrigin,
   type PlacedAgentResult,
   type PlacedAgentRun,
@@ -50,12 +51,18 @@ export const stellaHarnessSettings = (overrides: Partial<HarnessSettings> = {}):
 export const orchestratorAgent = (model: ModelRef) => ({
   model,
   tools: null,
-  extensions: { remove: [StellaCoding, { name: STELLA_AGENT_TOOLS }], ...engineExtensionChange(model) },
+  extensions: {
+    remove: [StellaCoding, { name: STELLA_AGENT_TOOLS }, { name: STELLA_AGENT_WAITING_EXTENSION }],
+    ...engineExtensionChange(model),
+  },
 });
 
 export const offersAgentTools = (agent: Agent): boolean =>
   agent.extensions.some(
-    (extension) => extension.name === STELLA_CODING_EXTENSION || extension.name === STELLA_AGENT_TOOLS,
+    (extension) =>
+      extension.name === STELLA_CODING_EXTENSION ||
+      extension.name === STELLA_AGENT_TOOLS ||
+      extension.name === STELLA_AGENT_WAITING_EXTENSION,
   );
 
 export type StellaHarnessOptions = {
@@ -102,6 +109,7 @@ export type OpenStellaHarness = {
         agentStatus: StellaAgentRecord["agentStatus"];
         attempt: number;
         lastText?: string;
+        waitingFor?: string;
       }
     | undefined
   >;
@@ -120,6 +128,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   registry.install(stellaPromptExtension(options.sources, imageBudget.hook));
   const agents = stellaAgents(options.agents);
   registry.install(agents.extension);
+  registry.install(agents.waitingExtension);
   registry.install(StellaCoding);
   const refreshTools = () => {
     for (const extension of stellaToolExtensions(options.tools)) registry.install(extension);

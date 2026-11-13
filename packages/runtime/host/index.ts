@@ -878,6 +878,7 @@ export class StellaRuntimeHost {
             finalText?: string;
             error?: string;
             stopped?: boolean;
+            waitingFor?: string;
           }>(
             METHOD_NAMES.INTERNAL_WORKER_RUN_BLOCKING_AGENT,
             {
@@ -908,7 +909,11 @@ export class StellaRuntimeHost {
             },
           );
           if (result.status === "ok") {
-            return { status: "ok", finalText: result.finalText };
+            return {
+              status: "ok",
+              finalText: result.finalText,
+              ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
+            };
           }
           if (result.status === "canceled") {
             return {

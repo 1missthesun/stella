@@ -287,6 +287,15 @@ export type DesktopChatsOptions = {
     waiting: boolean;
     report?: string;
   }): void;
+  /** A task here ended its turn waiting (end_turn_waiting): recorded as waiting, never reported. */
+  agentWaiting?(agent: {
+    conversationId: string;
+    threadId: string;
+    parentThreadId?: string;
+    attempt: number;
+    text: string;
+    waitingFor: string;
+  }): void;
   subagentEnded?(agent: {
     conversationId: string;
     threadId: string;
@@ -1372,7 +1381,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               cloudStored: !conversationId.startsWith("local_"),
             }),
             agents: (() => {
-              const { agentStarted, agentReported, agentStopped, subagentEnded, agentRunEnded } = options;
+              const { agentStarted, agentReported, agentStopped, subagentEnded, agentRunEnded, agentWaiting } = options;
               const attempts = async (threadId: string) => {
                 if (!opened) return 1;
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
@@ -1430,7 +1439,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                     attempt: await attempts(run.threadId),
                   });
                 },
-                ...(subagentEnded || agentRunEnded
+                ...(subagentEnded || agentRunEnded || agentWaiting
                   ? {
                       endAgentRun: async (run, _context, end) => {
                         const outcome = agentRunOutcome(end);
@@ -1441,6 +1450,22 @@ export function desktopChats(options: DesktopChatsOptions) {
                           waiting: end?.waiting === true,
                           ...(end?.answer ? { report: end.answer } : {}),
                         });
+                        if (end?.waitingFor !== undefined && agentWaiting && opened) {
+                          const state =
+                            run.parentConversationId === opened.root.id
+                              ? await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context)
+                              : undefined;
+                          if (!isAnotherHostsAgent(state, run.threadId)) {
+                            agentWaiting({
+                              conversationId,
+                              threadId: run.threadId,
+                              ...(run.parentThreadId ? { parentThreadId: run.parentThreadId } : {}),
+                              attempt: run.attempt,
+                              text: end.answer ?? "",
+                              waitingFor: end.waitingFor,
+                            });
+                          }
+                        }
                         if (!run.parentThreadId || !outcome || end?.waiting || !subagentEnded) return;
                         subagentEnded({
                           conversationId,
@@ -2536,7 +2561,14 @@ export function desktopChats(options: DesktopChatsOptions) {
     async agentStatus(
       threadId: string,
     ): Promise<
-      { conversationId: string; status: "running" | "completed" | "error" | "canceled"; attempt: number; lastText?: string } | undefined
+      | {
+          conversationId: string;
+          status: "running" | "waiting" | "completed" | "error" | "canceled";
+          attempt: number;
+          lastText?: string;
+          waitingFor?: string;
+        }
+      | undefined
     > {
       const conversationId = (await threadIndex())[threadId];
       if (!conversationId) return undefined;
@@ -2553,6 +2585,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               : record.status,
         attempt: record.attempt,
         ...(record.lastText ? { lastText: record.lastText } : {}),
+        ...(record.waitingFor ? { waitingFor: record.waitingFor } : {}),
       };
     },
     busy(): boolean {

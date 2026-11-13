@@ -23,6 +23,7 @@ type ComputerAgentTerminalPayload = {
   status: LocalTerminalStatus;
   result?: string;
   error?: string;
+  waitingFor?: string;
   fallback?: UnrecordedReport;
 };
 
@@ -74,6 +75,7 @@ export type ComputerAgentCloudRecords = {
     status: LocalTerminalStatus;
     result?: string;
     error?: string;
+    waitingFor?: string;
     ownerGeneration: string;
     fallback?: UnrecordedReport;
   }) => Promise<void>;
@@ -354,6 +356,14 @@ export const createComputerAgentCloudRecords = (
     });
   };
 
+  const waitingTerminal = (payloadJson: string): boolean => {
+    try {
+      return Boolean(parsePayload<ComputerAgentTerminalPayload>(payloadJson).waitingFor);
+    } catch {
+      return false;
+    }
+  };
+
   const scheduleDrain = (delayMs = 0): void => {
     if (stopped) return;
     if (cancelRetryDelay) cancelRetryDelay();
@@ -408,6 +418,7 @@ export const createComputerAgentCloudRecords = (
           status: payload.status === "error" ? "failed" : payload.status,
           ...(payload.result ? { result: payload.result } : {}),
           ...(payload.error ? { error: payload.error } : {}),
+          ...(payload.waitingFor ? { waitingFor: payload.waitingFor } : {}),
         }),
       );
       return;
@@ -575,6 +586,12 @@ export const createComputerAgentCloudRecords = (
               });
           options.store.deleteComputerAgentCloudOutbox(entry.id);
           settleStartAdmission(entry.id, "rejected", rejected);
+          continue;
+        }
+        // A backend from before end_turn_waiting refuses the field: the
+        // cloud keeps the attempt running, which also sends no report.
+        if (entry.kind === "terminal" && asRecord(error)?.code === "BAD_REQUEST" && waitingTerminal(entry.payloadJson)) {
+          options.store.deleteComputerAgentCloudOutbox(entry.id);
           continue;
         }
         if (entry.kind !== "start" && asRecord(error)?.code === "NOT_FOUND") {
@@ -748,6 +765,7 @@ export const createComputerAgentCloudRecords = (
           status: args.status,
           ...(args.result ? { result: args.result } : {}),
           ...(args.error ? { error: args.error } : {}),
+          ...(args.waitingFor ? { waitingFor: args.waitingFor } : {}),
           ...(args.fallback ? { fallback: args.fallback } : {}),
         } satisfies ComputerAgentTerminalPayload,
       });

@@ -43,6 +43,8 @@ export type SnapshotNode = {
   title?: string | null;
   description?: string | null;
   value?: string | null;
+  /** Identity of the full value when `value` was cut at the helper's limit. */
+  valueDigest?: string | null;
   valueType?: string | null;
   settable?: boolean | null;
   details?: string | null;
@@ -640,11 +642,27 @@ export const appStateLines = (snapshot: SnapshotDocument) => {
   return lines;
 };
 
-export const snapshotStateId = (snapshot: SnapshotDocument): string =>
-  `state_${createHash("sha256")
+const appendNodeValueIdentity = (node: SnapshotNode, out: string[]) => {
+  if (node.role === "AXMenuBarItem") return;
+  out.push(`${node.value ?? ""}\u001f${node.valueDigest ?? ""}`);
+  for (const child of node.children) appendNodeValueIdentity(child, out);
+};
+
+/**
+ * The rendered lines cut long text, so the full values (and the helper's
+ * digest of values past its own limit) are part of the identity: an edit
+ * past the displayed cutoff is still a state change.
+ */
+export const snapshotStateId = (snapshot: SnapshotDocument): string => {
+  const values: string[] = [];
+  for (const node of snapshot.nodes) appendNodeValueIdentity(node, values);
+  return `state_${createHash("sha256")
     .update(appSemanticStateLines(snapshot).join("\n"))
+    .update("\u001e")
+    .update(values.join("\u001d"))
     .digest("hex")
     .slice(0, 20)}`;
+};
 
 export const snapshotVisualStateId = (
   snapshot: SnapshotDocument,

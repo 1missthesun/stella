@@ -89,6 +89,7 @@ export type TypedAutomationAction = {
     raise?: boolean;
     showOverlay?: boolean;
     deferObservation?: boolean;
+    quickGlide?: boolean;
   };
 };
 
@@ -126,6 +127,16 @@ type TypedAutomationDaemonResponsePayload = {
   result?: unknown;
   error?: { code: string; message: string; details?: JsonObject };
 };
+
+export class AutomationDaemonOperationError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | undefined,
+  ) {
+    super(message);
+    this.name = "AutomationDaemonOperationError";
+  }
+}
 
 const TYPED_AUTOMATION_SCHEMA_VERSION = 2;
 const TYPED_AUTOMATION_PROTOCOL_VERSION = 2;
@@ -885,9 +896,10 @@ export const runAutomationDaemonTypedOperation = async (
             return;
           }
           settle(
-            new Error(
+            new AutomationDaemonOperationError(
               response.error?.message ||
                 `desktop_automation typed request failed with status ${response.status}`,
+              response.error?.code,
             ),
           );
           return;

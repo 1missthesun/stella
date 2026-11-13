@@ -48,8 +48,10 @@ import {
   hasOption,
   isTruthyEnv,
   normalizeTargetKey,
+  pidIsRunning,
   pruneComputerSessions,
   readJsonFile,
+  readPidFile,
   stripOptionValue,
   targetStatePathForKey,
   writeJsonAtomic,
@@ -72,7 +74,9 @@ import {
   type SnapshotDocument,
 } from "./mac/ax-format.js";
 import {
+  AutomationDaemonOperationError,
   automationDaemonRequestTimeoutMs,
+  automationPidPath,
   automationSocketsDir,
   parseJson,
   runAutomationDaemonCommand,
@@ -1068,22 +1072,75 @@ const policyForMacTarget = (app: ListedAppPayload): ComputerUseAppPolicy => {
   };
 };
 
+type NativeFeature = "running_apps" | "quick_glide";
+
+// Features a published helper may predate, remembered per daemon process so a
+// helper update (a new daemon) is tried again.
+const unsupportedNativeFeatures = new Map<number, Set<NativeFeature>>();
+
+const nativeFeatureUnsupported = (
+  sessionPaths: SessionPaths,
+  feature: NativeFeature,
+) => {
+  const pid = readPidFile(automationPidPath(sessionPaths));
+  return pid !== null && unsupportedNativeFeatures.get(pid)?.has(feature) === true;
+};
+
+const markNativeFeatureUnsupported = (
+  sessionPaths: SessionPaths,
+  feature: NativeFeature,
+) => {
+  const pid = readPidFile(automationPidPath(sessionPaths));
+  if (pid === null) return;
+  if (unsupportedNativeFeatures.size > 64) unsupportedNativeFeatures.clear();
+  const features = unsupportedNativeFeatures.get(pid) ?? new Set();
+  features.add(feature);
+  unsupportedNativeFeatures.set(pid, features);
+};
+
+const isOlderHelperRefusal = (error: unknown, codes: readonly string[]) =>
+  error instanceof AutomationDaemonOperationError &&
+  error.code !== undefined &&
+  codes.includes(error.code);
+
+const listRunningApps = async (
+  sessionPaths: SessionPaths,
+): Promise<ListAppsPayload> => {
+  if (!nativeFeatureUnsupported(sessionPaths, "running_apps")) {
+    try {
+      return (await runAutomationDaemonTypedOperation(sessionPaths, {
+        type: "running_apps",
+      })) as ListAppsPayload;
+    } catch (error) {
+      if (!isOlderHelperRefusal(error, ["unsupported_operation"])) throw error;
+      markNativeFeatureUnsupported(sessionPaths, "running_apps");
+    }
+  }
+  return (await runAutomationDaemonTypedOperation(sessionPaths, {
+    type: "list_apps",
+  })) as ListAppsPayload;
+};
+
 const targetSelectorLabel = (target: ComputerUseTarget) =>
   target.type === "app" ? target.app : `window ${target.windowId}`;
+
+type MacTargetResolution = {
+  target: TypedAutomationTarget;
+  policy: ComputerUseAppPolicy;
+};
 
 const resolveMacTypedTarget = async (
   sessionPaths: SessionPaths,
   target: ComputerUseTarget,
-): Promise<{
-  target: TypedAutomationTarget;
-  policy: ComputerUseAppPolicy;
-}> => {
-  const apps = (await runAutomationDaemonTypedOperation(sessionPaths, {
-    type: "list_apps",
-  })) as ListAppsPayload;
-  if (!apps?.ok || !Array.isArray(apps.apps)) {
+): Promise<MacTargetResolution> => {
+  const listed = await listRunningApps(sessionPaths);
+  if (!listed?.ok || !Array.isArray(listed.apps)) {
     throw new Error("desktop_automation returned an invalid application list.");
   }
+  const apps = {
+    ...listed,
+    apps: listed.apps.filter((app) => app.isRunning !== false && app.pid > 0),
+  };
 
   let visibleWindows: ListWindowsPayload | undefined;
   const windows = async () => {
@@ -1153,6 +1210,62 @@ const resolveMacTypedTarget = async (
       ...(matched.bundleId ? { bundleId: matched.bundleId } : {}),
     },
     policy: policyForMacTarget(matched),
+  };
+};
+
+// The sky client authorizes every call with a resolve_target request and then
+// sends the call itself. The call takes over that resolution instead of
+// listing the running apps a second time, so the app it acts on is the one
+// that was authorized.
+const RESOLUTION_HANDOFF_MS = 5_000;
+const resolutionHandoffs = new Map<
+  string,
+  Map<string, { resolution: MacTargetResolution; at: number }>
+>();
+
+const targetSelectorKey = (target: ComputerUseTarget) =>
+  JSON.stringify(
+    target.type === "app"
+      ? { type: "app", app: target.app }
+      : { type: "window", windowId: String(target.windowId) },
+  );
+
+const handOffResolution = (
+  sessionPaths: SessionPaths,
+  target: ComputerUseTarget,
+  resolution: MacTargetResolution,
+) => {
+  const handoffs = resolutionHandoffs.get(sessionPaths.sessionId) ?? new Map();
+  handoffs.set(targetSelectorKey(target), { resolution, at: Date.now() });
+  resolutionHandoffs.set(sessionPaths.sessionId, handoffs);
+};
+
+type MacTargetResolver = (
+  target: ComputerUseTarget,
+) => Promise<MacTargetResolution>;
+
+const requestTargetResolver = (sessionPaths: SessionPaths): MacTargetResolver => {
+  const handedOff = resolutionHandoffs.get(sessionPaths.sessionId);
+  resolutionHandoffs.delete(sessionPaths.sessionId);
+  const resolved = new Map<string, MacTargetResolution>();
+  const now = Date.now();
+  for (const [key, entry] of handedOff ?? []) {
+    const pid = entry.resolution.target.pid;
+    if (
+      now - entry.at <= RESOLUTION_HANDOFF_MS &&
+      typeof pid === "number" &&
+      pidIsRunning(pid)
+    ) {
+      resolved.set(key, entry.resolution);
+    }
+  }
+  return async (target) => {
+    const key = targetSelectorKey(target);
+    const known = resolved.get(key);
+    if (known) return known;
+    const resolution = await resolveMacTypedTarget(sessionPaths, target);
+    resolved.set(key, resolution);
+    return resolution;
   };
 };
 
@@ -1283,13 +1396,14 @@ const typedNativeAction = (
 const typedActionOperation = async (
   sessionPaths: SessionPaths,
   command: ComputerUseActionCommand,
+  resolveTarget: MacTargetResolver,
 ): Promise<TypedAutomationOperation> => {
   if (!command.observedStateId) {
     throw new Error(
       `${command.action.type} requires observedStateId before native dispatch.`,
     );
   }
-  const resolved = await resolveMacTypedTarget(sessionPaths, command.target);
+  const resolved = await resolveTarget(command.target);
   const state = actionState(sessionPaths, resolved.target);
   const validationPath = `${state.path}.validation`;
   let precondition: TypedAutomationObservationPrecondition;
@@ -1354,6 +1468,50 @@ const typedActionOperation = async (
     action: typedNativeAction(command.action, state.path),
     precondition,
   };
+};
+
+const withQuickGlide = (
+  operation: TypedAutomationOperation,
+): TypedAutomationOperation =>
+  operation.action
+    ? {
+        ...operation,
+        action: {
+          ...operation.action,
+          options: { ...operation.action.options, quickGlide: true },
+        },
+      }
+    : operation;
+
+// After the first action of a batch the software cursor glides quickly. The
+// helper validates the whole batch before running any of it, so an older
+// helper's refusal of the option is retried without it.
+const runMacBatch = async (
+  sessionPaths: SessionPaths,
+  operations: TypedAutomationOperation[],
+): Promise<TypedAutomationBatchPayload> => {
+  const run = async (batch: TypedAutomationOperation[]) =>
+    (await runAutomationDaemonTypedOperation(sessionPaths, {
+      type: "batch",
+      operations: batch,
+    })) as TypedAutomationBatchPayload;
+  if (
+    operations.length < 2 ||
+    nativeFeatureUnsupported(sessionPaths, "quick_glide")
+  ) {
+    return await run(operations);
+  }
+  try {
+    return await run(
+      operations.map((operation, index) =>
+        index === 0 ? operation : withQuickGlide(operation),
+      ),
+    );
+  } catch (error) {
+    if (!isOlderHelperRefusal(error, ["unknown_field"])) throw error;
+    markNativeFeatureUnsupported(sessionPaths, "quick_glide");
+    return await run(operations);
+  }
 };
 
 const actionReceiptFromNative = (
@@ -1459,12 +1617,19 @@ const renderMacState = (input: {
   const baseVisualStateId =
     useDiff && previous ? snapshotVisualStateId(previous) : undefined;
   const imagePath = snapshot.screenshot?.path ?? snapshot.screenshotPath;
+  const changedPastCutoff =
+    useDiff && diff!.status === "unchanged" && baseStateId !== stateId;
   return {
     app: input.app,
     text: [
       useDiff
         ? formatStateDiffBlock(diff!).trim()
         : appStateLines(snapshot).join("\n"),
+      ...(changedPastCutoff
+        ? [
+            "[note] Text changed past the cut-off of a long value shown above (shown values end in \"...\"). Pass disable_diff: true for the full state, or read the field's value another way if you need its end.",
+          ]
+        : []),
       ...(snapshot.warnings ?? []).map((warning) => `[warning] ${warning}`),
     ].join("\n"),
     stateId,
@@ -1544,10 +1709,12 @@ const executeMacComputerUseRequest = async (
       sessionPaths,
       request.selector,
     );
+    handOffResolution(sessionPaths, request.selector, resolved);
     return { ...envelope, type: "target_policy", policy: resolved.policy };
   }
+  const resolveTarget = requestTargetResolver(sessionPaths);
   if (request.type === "get_app_state") {
-    const resolved = await resolveMacTypedTarget(sessionPaths, request.target);
+    const resolved = await resolveTarget(request.target);
     const statePath = macStatePath(sessionPaths, resolved.target);
     const previous = readSnapshotDocument(statePath);
     const snapshot = await captureMacState(
@@ -1570,7 +1737,7 @@ const executeMacComputerUseRequest = async (
     };
   }
   if (request.type === "wait_for_change") {
-    const resolved = await resolveMacTypedTarget(sessionPaths, request.target);
+    const resolved = await resolveTarget(request.target);
     const statePath = macStatePath(sessionPaths, resolved.target);
     const baseline = readSnapshotDocument(statePath);
     if (!baseline) {
@@ -1687,7 +1854,11 @@ const executeMacComputerUseRequest = async (
     }
   }
   if (request.type === "action") {
-    const operation = await typedActionOperation(sessionPaths, request.command);
+    const operation = await typedActionOperation(
+      sessionPaths,
+      request.command,
+      resolveTarget,
+    );
     const payload = (await runAutomationDaemonTypedOperation(
       sessionPaths,
       operation,
@@ -1701,12 +1872,11 @@ const executeMacComputerUseRequest = async (
 
   const operations: TypedAutomationOperation[] = [];
   for (const command of request.commands) {
-    operations.push(await typedActionOperation(sessionPaths, command));
+    operations.push(
+      await typedActionOperation(sessionPaths, command, resolveTarget),
+    );
   }
-  const batchPayload = (await runAutomationDaemonTypedOperation(sessionPaths, {
-    type: "batch",
-    operations,
-  })) as TypedAutomationBatchPayload;
+  const batchPayload = await runMacBatch(sessionPaths, operations);
   const payloads = batchPayload?.results?.map(
     (entry) => entry.result as ActionPayload,
   );
@@ -1808,7 +1978,18 @@ export const releaseMacStellaComputerSession = async (
   if (sanitized !== sessionId) {
     macComputerUseResourceArbiter.forgetSession(sanitized);
   }
-  return await stopAutomationDaemonGracefully(resolveSessionPaths(sanitized));
+  const sessionPaths = resolveSessionPaths(sanitized);
+  resolutionHandoffs.delete(sanitized);
+  const stopped = await stopAutomationDaemonGracefully(sessionPaths);
+  removeEndedSessionDirectory(sessionPaths);
+  return stopped;
+};
+
+// A session's saved states and screenshots belong to the run that made them;
+// a later run of the same agent observes again before acting.
+const removeEndedSessionDirectory = (sessionPaths: SessionPaths) => {
+  if (pidIsRunning(readPidFile(automationPidPath(sessionPaths)))) return;
+  fs.rmSync(sessionPaths.sessionDir, { recursive: true, force: true });
 };
 
 export const shutdownMacStellaComputerSession = (

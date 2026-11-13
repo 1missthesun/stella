@@ -5,8 +5,8 @@
 // ensure-electron-binary try that mirror first and fall back to GitHub, whose
 // release downloads time out or answer 502/504 for minutes at a time.
 //
-// Run it after changing a pinned Bun/PortableGit URL in launcher/ or the
-// Electron version in package.json. Every file is checked against the sha256
+// Run it after changing a pinned Bun/PortableGit URL in launcher/ or
+// packages/desktop/launcher.json, or the Electron version in package.json. Every file is checked against the sha256
 // pinned in this repo before upload, and files already mirrored are skipped.
 //
 //   env -u CLOUDFLARE_API_TOKEN node scripts/mirror-runtimes.mjs [--dry-run]
@@ -37,6 +37,8 @@ const launcherAssets = () => {
   for (const file of files) {
     for (const [, url, sha256] of read(file).matchAll(pattern)) assets.set(url, sha256);
   }
+  const requested = JSON.parse(read("packages/desktop/launcher.json")).bun?.assets ?? {};
+  for (const { url, sha256 } of Object.values(requested)) assets.set(url, sha256);
   return assets;
 };
 

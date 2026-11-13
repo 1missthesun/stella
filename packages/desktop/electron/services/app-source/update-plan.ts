@@ -4,10 +4,15 @@ const RESTART_PREFIX = "packages/desktop/electron/";
 export const installs = (paths: string[]) =>
   paths.some((file) => file === "bun.lock" || file.endsWith("package.json"));
 const RUNTIME_PREFIXES = ["packages/runtime/", "packages/contracts/", "packages/agent/"];
+/** Names the Bun the launcher starts the runtime with; only a relaunch through the launcher picks it up. */
+const LAUNCHER_MANIFEST = "packages/desktop/launcher.json";
 export const restartsRuntime = (paths: string[]) =>
-  paths.some((file) => RUNTIME_PREFIXES.some((prefix) => file.startsWith(prefix)));
+  paths.some(
+    (file) => file === LAUNCHER_MANIFEST || RUNTIME_PREFIXES.some((prefix) => file.startsWith(prefix)),
+  );
 export const relaunches = (paths: string[]) =>
-  installs(paths) || paths.some((file) => file.startsWith(RESTART_PREFIX));
+  installs(paths) ||
+  paths.some((file) => file === LAUNCHER_MANIFEST || file.startsWith(RESTART_PREFIX));
 
 const INTERFACE_PREFIX = "packages/desktop-ui/src/";
 /** Only the interface's own source: nothing the main process, the runtime or an install reads. */

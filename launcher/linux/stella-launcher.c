@@ -41,7 +41,7 @@ extern char **environ;
 #ifndef LAUNCHER_VERSION
 #define LAUNCHER_VERSION 0
 #endif
-#define BUN_VERSION "1.4.0"
+#define BUN_VERSION "1.4.4"
 #ifndef DEFAULT_BACKEND_URL
 #define DEFAULT_BACKEND_URL "https://stella-v2-cloud-builder-prod.fromyou.workers.dev"
 #endif
@@ -68,12 +68,12 @@ typedef struct {
 } Asset;
 
 static const Asset BUN_ASSETS[] = {
-    {"linux-x64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip",
-     "2d03fb5fb83ac8b567aca0a281b2ce1a1a19d488f56c2968d88c3f25e92fe452", "bun-linux-x64/bun"},
-    {"linux-x64-baseline", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64-baseline.zip",
-     "184fb4595f0d401a217cf7c78c1bc430ba83314dab7a8b94805babbf7fa7097f", "bun-linux-x64-baseline/bun"},
-    {"linux-arm64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-aarch64.zip",
-     "4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e", "bun-linux-aarch64/bun"},
+    {"linux-x64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64.zip",
+     "bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c", "bun-linux-x64/bun"},
+    {"linux-x64-baseline", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip",
+     "e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76", "bun-linux-x64-baseline/bun"},
+    {"linux-arm64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip",
+     "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e", "bun-linux-aarch64/bun"},
 };
 
 static const char *platform_key(void) {

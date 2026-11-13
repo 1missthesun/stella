@@ -56,10 +56,13 @@ without asking.
   cleanup). Never put a secret in a message or an ask card: collect a code,
   key or password with `request_secure_input` (sensitive field, with any
   sign-in link in its `detail`) and pass it with `use_secure_value`.
-- **Bun 1.4.x.** CI runs 1.4.2 and `eas.json` pins 1.4.0. Some shells default
-  to an older bun (mise's 1.3.14 on omarchy); Stella's own is
-  `~/.local/share/stella/runtimes/bun-1.4.0/bun`. EAS builds and OTAs need
-  exactly the pin (`bun run eas:check-bun` in `packages/mobile`).
+- **Bun 1.4.x.** CI, the workers, the sandbox image and the desktop runtime
+  run 1.4.4 (the desktop's comes from `packages/desktop/launcher.json`, which
+  overrides the launcher's built-in pin); `eas.json` still pins 1.4.0 so the
+  mobile fingerprint stays matched to the store builds. Some shells default to
+  an older bun; Stella's own is `~/.local/share/stella/runtimes/bun-<version>/bun`.
+  EAS builds and OTAs need exactly the `eas.json` pin (`bun run eas:check-bun`
+  in `packages/mobile`).
 - **Comments are exceptions.** Prefer names, types and structure; keep only
   non-obvious external/platform/security constraints and public API
   contracts. No narration, history or TODOs; fix internal workarounds rather

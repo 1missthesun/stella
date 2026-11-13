@@ -102,15 +102,15 @@ enum Pins {
         #endif
     }
 
-    static let bunVersion = "1.4.0"
+    static let bunVersion = "1.4.4"
     static let bun: [String: Asset] = [
         "darwin-arm64": Asset(
-            url: "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-aarch64.zip",
-            sha256: "c669e97f6164e1c96e0701748db98dfa77492908cbd8394c7557134a735de381",
+            url: "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-aarch64.zip",
+            sha256: "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510",
             member: "bun-darwin-aarch64/bun"),
         "darwin-x64": Asset(
-            url: "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-x64.zip",
-            sha256: "1d0211b8f1dc991182344687ad15e72ee86f154845a5f7fa477994cd341dd9b0",
+            url: "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-x64.zip",
+            sha256: "50a3491f73abc2fe81673171a85762d3bc2cc1680ccecadd983de99adf77977e",
             member: "bun-darwin-x64/bun"),
     ]
 

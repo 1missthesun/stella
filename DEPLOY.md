@@ -772,8 +772,9 @@ store paths, so if the builders' bun differs from the one that resolved `bun.loc
 every build dies in `CONFIGURE_EXPO_UPDATES` with a local-vs-EAS runtime mismatch. Keep
 the pin equal to the bun that owns the lockfile, and install and build with exactly
 that bun: `bun run eas:check-bun` in `packages/mobile` checks it (`publish-ota.sh`
-runs it) and prints the fix. Shells on omarchy default to mise's bun 1.3.14; Stella's
-own 1.4.0 is at `~/.local/share/stella/runtimes/bun-1.4.0/bun`.
+runs it) and prints the fix. The pin stays 1.4.0 (the store builds' bun) while the rest
+of Stella runs 1.4.4; 1.4.0 installs the 1.4.4-written `bun.lock` with the same store
+paths. A copy is at `~/.local/share/stella/runtimes/bun-1.4.0/bun` on machines that ran it.
 
 `publish-ota.sh` invokes `bunx`, which Stella's bundled bun does not ship; put a shim
 on `PATH` rather than editing the script.

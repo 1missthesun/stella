@@ -57,7 +57,7 @@ using std::string;
 using std::vector;
 using std::wstring;
 
-static const char *kBunVersion = "1.4.0";
+static const char *kBunVersion = "1.4.4";
 #ifndef STELLA_DEFAULT_BACKEND_URL
 #define STELLA_DEFAULT_BACKEND_URL "https://stella-v2-cloud-builder-prod.fromyou.workers.dev"
 #endif
@@ -90,12 +90,12 @@ struct Asset {
 };
 
 static const Asset kBunAssets[] = {
-    {"win-x64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-x64.zip",
-     "e6f093d39da486b20262ca8cdd5ed6a9e8bc9c2f275b78e6d3a0c5b28cc95901", "bun-windows-x64/bun.exe"},
-    {"win-x64-baseline", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-x64-baseline.zip",
-     "b929c54a9badb104a16dedd23aab6152c86793ae653d4e6b13983ffd0c882a66", "bun-windows-x64-baseline/bun.exe"},
-    {"win-arm64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-aarch64.zip",
-     "f473bfe2df73ee770548c93dd5d380aea7120c218ec2aa1afdd0bbba7bf18c47", "bun-windows-aarch64/bun.exe"},
+    {"win-x64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-windows-x64.zip",
+     "cd2c0fccc78f3ede1f50ca827a15f063eda13d4d150a3d0674f4f6e323d864a5", "bun-windows-x64/bun.exe"},
+    {"win-x64-baseline", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-windows-x64-baseline.zip",
+     "0f20ce6674d4f2dbcc8c5d59fdf99f7ba45f8c3b367e0f5781cbfa30a1c78d99", "bun-windows-x64-baseline/bun.exe"},
+    {"win-arm64", "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-windows-aarch64.zip",
+     "2d57a0eec0cb44d95c918c3f9734f60455a1306ae5085d76fc68f44e3ee30d09", "bun-windows-aarch64/bun.exe"},
 };
 
 static const char *kGitVersion = "2.53.0";

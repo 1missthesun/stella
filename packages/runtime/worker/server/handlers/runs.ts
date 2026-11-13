@@ -158,7 +158,12 @@ export const runsHandlers: WorkerRpcHandlers = {
         }
         if (result.status === "moved") return { status: "ok" as const, finalText: "", threadId: result.threadId };
         return result.status === "ok"
-          ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
+          ? {
+              status: "ok" as const,
+              finalText: result.finalText,
+              threadId: result.threadId,
+              ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
+            }
           : {
               status: result.status,
               finalText: "" as const,

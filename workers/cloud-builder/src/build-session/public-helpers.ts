@@ -1,3 +1,4 @@
+import { WAITING_FOR_MAX_CHARS } from "@stella/contracts/agent-waiting";
 import type { TurnBrokerTurnStateCheckpointReceipt } from "@stella/contracts/turn-credential-broker";
 import type { AgentExecutorResult } from "./shared/types.js";
 import { parseTurnStateCheckpointRequest } from "../turn-state-checkpoint.js";
@@ -61,6 +62,7 @@ export const parseAgentExecutorResult = (
     "ok",
     "finalText",
     "error",
+    "waitingFor",
     "usage",
     "checkpointPolicy",
     "checkpointMs",
@@ -77,6 +79,8 @@ export const parseAgentExecutorResult = (
     typeof result.ok !== "boolean" ||
     (result.finalText !== undefined && !boundedOutput(result.finalText)) ||
     (result.error !== undefined && !boundedOutput(result.error)) ||
+    (result.waitingFor !== undefined &&
+      (typeof result.waitingFor !== "string" || result.waitingFor.length > WAITING_FOR_MAX_CHARS)) ||
     (result.usage !== undefined &&
       (!result.usage ||
         typeof result.usage !== "object" ||

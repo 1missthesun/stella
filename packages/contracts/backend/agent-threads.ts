@@ -308,6 +308,8 @@ export type AgentThreadCalls = {
       status: AgentAttemptOutcome | "paused";
       result?: string;
       error?: string;
+      /** It ended its turn waiting (end_turn_waiting): recorded with its result, never reported. */
+      waitingFor?: string;
     };
     result: { updated: boolean; status: string };
   };

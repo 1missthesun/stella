@@ -513,6 +513,21 @@ export const piChatsFor = (
           });
         })().catch((error) => console.warn("[pi-chat] computer thread start failed", error));
       },
+      agentWaiting: (agent) => {
+        if (agent.conversationId.startsWith("local_")) return;
+        void (async () => {
+          const runner = session.runnerCell.get();
+          if (!runner) return;
+          await runner.computerAgents.complete({
+            agentId: agent.threadId,
+            attemptGeneration: agent.attempt,
+            ownerGeneration: await runner.cloudJournal.ownerGeneration(),
+            status: "completed",
+            waitingFor: agent.waitingFor,
+            ...(agent.text.trim() ? { result: agent.text.slice(0, AGENT_REPORT_MAX_CHARS) } : {}),
+          });
+        })().catch((error) => console.warn("[pi-chat] computer thread waiting record failed", error));
+      },
       subagentEnded: (agent) => {
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
@@ -718,6 +733,7 @@ const piAgentStanding = async (
       attempt: status.attempt,
       ...(status.status === "canceled" ? { error: AGENT_STOPPED_REASON } : {}),
       ...(status.lastText ? { lastText: status.lastText } : {}),
+      ...(status.waitingFor ? { waitingFor: status.waitingFor } : {}),
     }
   );
 };

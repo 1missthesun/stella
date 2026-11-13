@@ -51,6 +51,14 @@ import { createBrokerCloudBrowser } from "./cloud-browser-client.js";
 import { CODE_TOOL_CLOUD_AGENT_DESCRIPTION } from "@stella/runtime/kernel/tools/defs/code-def.js";
 import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
 import {
+  END_TURN_WAITING_DESCRIPTION,
+  END_TURN_WAITING_MISSING,
+  END_TURN_WAITING_PARAMETERS,
+  END_TURN_WAITING_TOOL,
+  endTurnWaitingResult,
+  parseWaitingFor,
+} from "@stella/contracts/agent-waiting";
+import {
   toolStateDir,
   worldDriveWorkspace,
   WORLD_ROOT,
@@ -122,6 +130,7 @@ export type AgentTurnTerminalResult = {
   ok: boolean;
   finalText: string;
   error?: string;
+  waitingFor?: string;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   usage: { inputTokens: number; outputTokens: number; llmCalls: number };
   checkpointMs?: number;
@@ -564,6 +573,12 @@ export const runAgentTurn = (
         }),
       ];
       const byName = new Map(catalog.map((tool) => [tool.name, tool]));
+      let waitingFor: string | undefined;
+      const endTurnWaitingTool: ToolMetadata = {
+        name: END_TURN_WAITING_TOOL,
+        description: END_TURN_WAITING_DESCRIPTION,
+        parameters: END_TURN_WAITING_PARAMETERS as unknown as ToolMetadata["parameters"],
+      };
       const cloudToolMetadata = [
         ...cloudGeneralToolNames()
           .filter((name) => name !== "web")
@@ -575,6 +590,7 @@ export const runAgentTurn = (
               : tool,
           ),
         cloudAgentMoveTool,
+        endTurnWaitingTool,
       ];
       const executeCloudTool = async (
         toolCallId: string,
@@ -586,6 +602,12 @@ export const runAgentTurn = (
         markTurnStep("firstToolCall");
         if (name === CLOUD_AGENT_MOVE_TOOL) {
           return await runCloudAgentMove(postJson, input.turnId, params);
+        }
+        if (name === END_TURN_WAITING_TOOL) {
+          const waiting = parseWaitingFor(params);
+          if (!waiting) return { error: END_TURN_WAITING_MISSING };
+          waitingFor = waiting;
+          return { result: endTurnWaitingResult(waiting) };
         }
         const result = await toolHost.executeTool(
           name,
@@ -959,11 +981,13 @@ export const runAgentTurn = (
 
       const finalText = execution.finalText;
       const error = execution.errorMessage;
+      const waiting = error ? undefined : waitingFor;
       return {
         ok: !error,
         finalText:
-          `${finalText || (error ? "" : "The agent finished without a report.")}${outputs.notice}`.trim(),
+          `${finalText || (error || waiting ? "" : "The agent finished without a report.")}${outputs.notice}`.trim(),
         ...(error ? { error } : {}),
+        ...(waiting ? { waitingFor: waiting } : {}),
         usage: { inputTokens, outputTokens, llmCalls },
         checkpointMs,
         ...(turnStateCheckpoint ? { turnStateCheckpoint } : {}),

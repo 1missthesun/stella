@@ -23,6 +23,7 @@ type ComputerAgentTerminalPayload = {
   status: LocalTerminalStatus;
   result?: string;
   error?: string;
+  waitingFor?: string;
   fallback?: UnrecordedReport;
 };
 
@@ -74,6 +75,7 @@ export type ComputerAgentCloudRecords = {
     status: LocalTerminalStatus;
     result?: string;
     error?: string;
+    waitingFor?: string;
     ownerGeneration: string;
     fallback?: UnrecordedReport;
   }) => Promise<void>;
@@ -408,6 +410,7 @@ export const createComputerAgentCloudRecords = (
           status: payload.status === "error" ? "failed" : payload.status,
           ...(payload.result ? { result: payload.result } : {}),
           ...(payload.error ? { error: payload.error } : {}),
+          ...(payload.waitingFor ? { waitingFor: payload.waitingFor } : {}),
         }),
       );
       return;
@@ -748,6 +751,7 @@ export const createComputerAgentCloudRecords = (
           status: args.status,
           ...(args.result ? { result: args.result } : {}),
           ...(args.error ? { error: args.error } : {}),
+          ...(args.waitingFor ? { waitingFor: args.waitingFor } : {}),
           ...(args.fallback ? { fallback: args.fallback } : {}),
         } satisfies ComputerAgentTerminalPayload,
       });

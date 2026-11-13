@@ -1,10 +1,11 @@
 import { silentRunReport } from "@stella/contracts/backend/agent-reports";
 
 export type ComputerAgentStanding = {
-  status: "running" | "completed" | "error" | "canceled";
+  status: "running" | "waiting" | "completed" | "error" | "canceled";
   attempt: number;
   error?: string;
   lastText?: string;
+  waitingFor?: string;
 };
 
 type RunningComputerThread = {
@@ -24,6 +25,7 @@ export const reconcileComputerAgents = async (args: {
     status: "completed" | "failed" | "canceled";
     result?: string;
     error?: string;
+    waitingFor?: string;
   }): Promise<unknown>;
   pending(threadId: string): boolean;
   cancel(input: { threadId: string; attemptGeneration: number; reason: string }): Promise<unknown>;
@@ -42,6 +44,14 @@ export const reconcileComputerAgents = async (args: {
         threadId: thread.threadId,
         attemptGeneration: thread.attemptGeneration,
         reason: INTERRUPTED_AGENT_REASON,
+      });
+    } else if (here.status === "waiting") {
+      await args.complete({
+        threadId: thread.threadId,
+        attemptGeneration: thread.attemptGeneration,
+        status: "completed",
+        waitingFor: here.waitingFor?.trim() || "a message",
+        ...(here.lastText?.trim() ? { result: here.lastText.trim() } : {}),
       });
     } else {
       await args.complete({

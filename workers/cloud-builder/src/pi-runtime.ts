@@ -257,7 +257,7 @@ export type PiAgentLedgerEvent = {
   depth: number;
   turnId: string;
   authority: PiAuthority;
-  ended?: { outcome: import("@stella/contracts/agent-status").AgentAttemptOutcome; text?: string };
+  ended?: { outcome: import("@stella/contracts/agent-status").AgentAttemptOutcome; text?: string; waitingFor?: string };
 };
 
 export type PiAgentInfo = {
@@ -352,6 +352,7 @@ export type PiRuntimeOptions = {
   deliverThreadReport?(report: PiThreadReport): Promise<void>;
   agentStarted?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   agentStopped?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
+  agentWaiting?(event: PiAgentInfo & { threadId: string; turnId: string; waitingFor: string }): void;
   agentsChanged?(): void;
   agentLedger?(event: PiAgentLedgerEvent): void;
   deviceAgents?: PiDeviceAgents;
@@ -1130,10 +1131,19 @@ export class PiConversationRuntime {
         const authority = ended?.authority ?? this.#state?.authority;
         if (!authority) return;
         const outcome = agentRunOutcome(end);
-        if (outcome && !end?.waiting) {
-          await this.#recordAgentRun(run, authority, ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}`, context, outcome).catch(
-            (error: unknown) => this.#options.report(error),
-          );
+        if (outcome && (!end?.waiting || end.waitingFor !== undefined)) {
+          await this.#recordAgentRun(
+            run,
+            authority,
+            ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}`,
+            context,
+            end?.waitingFor !== undefined ? { ...outcome, waitingFor: end.waitingFor } : outcome,
+          ).catch((error: unknown) => this.#options.report(error));
+        }
+        if (end?.waitingFor !== undefined && run.parentConversationId === (await this.open()).root.id) {
+          const info = await this.#agentInfo(run.threadId, context);
+          const cardTurnId = this.#cardTurnId(run.threadId, info);
+          if (cardTurnId) this.#options.agentWaiting?.({ threadId: run.threadId, turnId: cardTurnId, ...info, waitingFor: end.waitingFor });
         }
         await this.#gate(authority)
           .release({ turnId: ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}` })

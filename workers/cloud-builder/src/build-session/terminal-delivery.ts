@@ -1,3 +1,4 @@
+import { waitingResultJson } from "@stella/contracts/agent-waiting";
 import { isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentAttemptOutcomeOf } from "@stella/contracts/agent-status";
 import { Effect } from "effect";
@@ -165,9 +166,15 @@ export const deliverTerminal = async (
           ? pending.payload.finalText
           : "";
       const completedAt = pending.completedAt ?? Date.now();
+      const waitingFor =
+        typeof pending.payload.waitingFor === "string" && pending.payload.waitingFor.trim()
+          ? pending.payload.waitingFor.trim()
+          : undefined;
       const resultJson =
         pending.kind === "completed"
-          ? JSON.stringify({ finalText })
+          ? waitingFor
+            ? waitingResultJson(finalText, waitingFor)
+            : JSON.stringify({ finalText })
           : undefined;
       const errorMessage =
         pending.kind === "completed"

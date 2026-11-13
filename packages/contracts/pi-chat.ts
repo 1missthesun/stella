@@ -242,12 +242,13 @@ export type PiChatOlderResult = { entries: PiEntry[]; hasOlder: boolean };
 export type PiChatAgent = {
   threadId: string;
   description: string;
-  status: "running" | "completed" | "error";
+  status: "running" | "waiting" | "completed" | "error";
   startedAt: number;
   updatedAt: number;
   assistantMessages: string[];
   error?: string;
   agentStatus?: AgentStatus;
+  waitingFor?: string;
 };
 
 export type PiChatAgentsResult = { agents: PiChatAgent[] };

@@ -8,6 +8,7 @@ import {
 } from "@stella/executor-cloud/cloud-code-connect-protocol";
 import { cloudGeneralToolNames } from "@stella/executor-cloud/cloud-general-tools";
 import { CLOUD_AGENT_MOVE_TOOL } from "@stella/executor-cloud/cloud-agent-move-protocol";
+import { END_TURN_WAITING_TOOL } from "@stella/contracts/agent-waiting";
 import { invokeCloudConnect, type CloudConnectClient } from "../cloud-code-tool.js";
 import {
   CloudConnectorDirectory,
@@ -37,6 +38,7 @@ type AgentConnectTurn = Pick<
 const RESERVED_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...cloudGeneralToolNames(),
   CLOUD_AGENT_MOVE_TOOL,
+  END_TURN_WAITING_TOOL,
 ]);
 
 const CLIENT_CACHE_LIMIT = 8;

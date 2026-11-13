@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import { FullWindowController } from './full-window.js';
 import { getMainLogger } from '../observability/main-logger.js';
+import { RendererHealthMonitor } from '../observability/renderer-health.js';
 const TRANSIENT_NET_ERROR_CODES = new Set([
     -3, -7, -21, -100, -101, -102, -103, -104, -105, -106, -118,
 ]);
@@ -18,14 +19,26 @@ const TRANSIENT_RELOAD_MAX_ATTEMPTS = 4;
 const TRANSIENT_RELOAD_BASE_DELAY_MS = 350;
 const RELOAD_RETRY_RESET_MS = 5_000;
 const UNRESPONSIVE_RECOVERY_THRESHOLD_MS = 10_000;
+// When the window's renderer dies (crash, OOM, or killed because it hung),
+// load a fresh one instead of leaving a dead window. More exits than this
+// within the window below means it keeps dying: show the recovery page.
+const RENDERER_AUTO_RELOAD_MAX = 2;
+const RENDERER_AUTO_RELOAD_WINDOW_MS = 5 * 60_000;
+const RENDERER_AUTO_RELOAD_DELAY_MS = 500;
 export class WindowManager {
     options;
     fullWindowController;
     observedWindows = new WeakSet();
     transientReloadState = null;
     unresponsiveTimer = null;
+    rendererExits = [];
+    rendererHealth;
     constructor(options) {
         this.options = options;
+        this.rendererHealth = new RendererHealthMonitor(() => ({
+            focused: this.isWindowFocused(),
+            visible: this.isWindowVisible(),
+        }));
         this.fullWindowController = new FullWindowController({
             electronDir: options.electronDir,
             preloadPath: options.preloadPath,
@@ -37,7 +50,7 @@ export class WindowManager {
             onRenderProcessGone: (details) => {
                 console.error('Renderer process gone:', details.reason);
                 this.cancelUnresponsiveWatchdog();
-                this.fullWindowController.loadRecoveryPage();
+                this.handleRendererGone(details);
             },
             onDidFailLoad: (details) => {
                 if (this.handleTransientReload(details)) {
@@ -127,6 +140,37 @@ export class WindowManager {
             this.fullWindowController.loadRecoveryPage();
         }, UNRESPONSIVE_RECOVERY_THRESHOLD_MS);
     }
+    handleRendererGone(details) {
+        const health = this.rendererHealth.snapshot();
+        this.rendererHealth.resetProbe();
+        if (this.options.isQuitting?.())
+            return;
+        const now = Date.now();
+        this.rendererExits = this.rendererExits.filter((at) => now - at < RENDERER_AUTO_RELOAD_WINDOW_MS);
+        this.rendererExits.push(now);
+        const reload = details.reason !== 'launch-failed' &&
+            details.reason !== 'integrity-failure' &&
+            this.rendererExits.length <= RENDERER_AUTO_RELOAD_MAX;
+        getMainLogger()?.error('main.renderer-gone', {
+            mode: 'full',
+            reason: details.reason,
+            exitCode: details.exitCode,
+            recovery: reload ? 'reload' : 'recovery-page',
+            exitsLast5m: this.rendererExits.length,
+            ...health,
+        });
+        if (!reload) {
+            this.fullWindowController.loadRecoveryPage();
+            return;
+        }
+        setTimeout(() => {
+            const window = this.getFullWindow();
+            if (!window || window.isDestroyed())
+                return;
+            console.warn(`[recovery] renderer ${details.reason}; loading a fresh one`);
+            this.fullWindowController.reloadMainWindow();
+        }, RENDERER_AUTO_RELOAD_DELAY_MS);
+    }
     cancelUnresponsiveWatchdog() {
         if (!this.unresponsiveTimer)
             return;
@@ -136,6 +180,7 @@ export class WindowManager {
     createFullWindow(createOptions) {
         const window = this.fullWindowController.create(createOptions);
         this.observeFullWindow(window);
+        this.rendererHealth.attach(window.webContents);
         return window;
     }
     ensureFullWindow(options) {

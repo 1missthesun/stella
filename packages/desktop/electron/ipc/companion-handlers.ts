@@ -128,7 +128,11 @@ export const registerCompanionHandlers = (
     if (win && win.webContents.id === event.sender.id) {
       const firstPublish = !readyBrains.has(event.sender.id);
       readyBrains.add(event.sender.id);
-      event.sender.once("destroyed", () => readyBrains.delete(event.sender.id));
+      if (firstPublish) {
+        // Once per renderer: adding it on every publish leaked listeners.
+        const senderId = event.sender.id;
+        event.sender.once("destroyed", () => readyBrains.delete(senderId));
+      }
       if (firstPublish && pending.length > 0) flushPending(win);
     }
     controller?.setState(state);

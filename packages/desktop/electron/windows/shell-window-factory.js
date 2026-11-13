@@ -71,6 +71,18 @@ const resolveRecoveryHtmlPath = (electronDir) => {
  * navigation from an `http://` (dev) origin — Chromium blocks that as
  * "Not allowed to load local resource", which used to leave the window blank.
  */
+// The exact recovery page URL each window was given, so its Reload button can
+// be trusted: it runs from a data: URL, not the app origin that privileged
+// IPC normally requires.
+const recoverySurfaceUrls = new WeakMap();
+export const isShellRecoverySurface = (event) => {
+    const sender = event?.sender;
+    const frame = event?.senderFrame;
+    if (!sender || !frame || frame !== sender.mainFrame)
+        return false;
+    const url = recoverySurfaceUrls.get(sender);
+    return Boolean(url) && frame.url === url;
+};
 export const loadShellRecoveryPage = (window, electronDir) => {
     if (!window || window.isDestroyed()) {
         return;
@@ -83,6 +95,7 @@ export const loadShellRecoveryPage = (window, electronDir) => {
     try {
         const html = fs.readFileSync(recoveryPath, 'utf-8');
         const dataUrl = `data:text/html;charset=utf-8;base64,${Buffer.from(html, 'utf-8').toString('base64')}`;
+        recoverySurfaceUrls.set(window.webContents, dataUrl);
         void window.loadURL(dataUrl);
     }
     catch (error) {

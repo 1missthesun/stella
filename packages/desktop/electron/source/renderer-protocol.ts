@@ -238,6 +238,14 @@ const startSourceWorker = (options: {
 };
 
 const NO_CACHE = { "cache-control": "no-cache" };
+// Lets the main process read the JavaScript stack of a hung page
+// (WebFrameMain.collectJavaScriptCallStack, see renderer-health.ts).
+const HTML_HEADERS = {
+  ...NO_CACHE,
+  "document-policy": "include-js-call-stacks-in-crash-reports",
+};
+const headersFor = (contentType: string) =>
+  contentType.startsWith("text/html") ? HTML_HEADERS : NO_CACHE;
 
 export const serveRendererSource = (options: {
   partition: string;
@@ -328,7 +336,7 @@ export const serveRendererSource = (options: {
             statusCode: response.status,
             mimeType: mimeType!.trim(),
             ...(charset ? { charset: charset.slice("charset=".length) } : {}),
-            headers: NO_CACHE,
+            headers: headersFor(response.contentType),
             data: Buffer.isBuffer(body) ? body : Buffer.from(body.buffer, body.byteOffset, body.byteLength),
           });
         });
@@ -338,7 +346,7 @@ export const serveRendererSource = (options: {
       const response = await answer(request.url).catch(failure);
       return new Response(response.body as Uint8Array<ArrayBuffer>, {
         status: response.status,
-        headers: { "content-type": response.contentType, ...NO_CACHE },
+        headers: { "content-type": response.contentType, ...headersFor(response.contentType) },
       });
     });
   }

@@ -14,6 +14,7 @@ import {
   IPC_APP_RELAUNCH,
 } from "@stella/contracts/desktop/ipc-channels";
 import { relaunchApp } from "../launcher-client.js";
+import { isShellRecoverySurface } from "../windows/shell-window-factory.js";
 import {
   handleIpc,
   onIpc,
@@ -80,7 +81,8 @@ export const registerUiHandlers = (options) => {
         options.windowManager.showWindow();
     });
     onIpc(IPC_APP_RELOAD, (event) => {
-        if (!options.assertPrivilegedSender(event, IPC_APP_RELOAD))
+        if (!isShellRecoverySurface(event) &&
+            !options.assertPrivilegedSender(event, IPC_APP_RELOAD))
             return;
         options.windowManager.reloadFullWindow();
     });

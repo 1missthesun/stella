@@ -424,11 +424,16 @@ export const registerDictationHandlers = (options) => {
         }
         return { enabled: nextEnabled };
     });
+    // One cleanup listener per renderer, not one per dictation start (which
+    // piled up and tripped Node's MaxListeners warning on long sessions).
+    const dictationSenders = new WeakSet();
     onPrivilegedIpc(options, IPC_DICTATION_ACTIVE_CHANGED, (event, payload) => {
-        const source = `renderer:${event.sender.id}`;
+        const sender = event.sender;
+        const source = `renderer:${sender.id}`;
         setDictationSourceActive(source, payload?.active === true);
-        if (payload?.active === true) {
-            event.sender.once("destroyed", () => setDictationSourceActive(source, false));
+        if (payload?.active === true && !dictationSenders.has(sender)) {
+            dictationSenders.add(sender);
+            sender.once("destroyed", () => setDictationSourceActive(source, false));
         }
     });
     onPrivilegedIpc(options, IPC_DICTATION_PLAY_SOUND, (_event, payload) => {

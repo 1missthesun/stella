@@ -67,6 +67,14 @@ export interface CreateStellaMarkOptions {
   paused?: boolean;
 
   visibilityGate?: boolean;
+  /**
+   * Upper bound on redraws per second. The loop runs on requestAnimationFrame,
+   * which fires at the display's refresh rate (240Hz on some monitors); every
+   * redraw rewrites SVG geometry and repaints, so an uncapped mark in an
+   * always-visible place (the top bar while tasks run) keeps the renderer's
+   * main thread busy. Defaults to 30 for marks of 48px or less, 60 otherwise.
+   */
+  maxFps?: number;
 }
 
 export interface StellaMarkHandle {
@@ -388,8 +396,13 @@ export function createStellaMark(
     interactive: false,
     paused: false,
     visibilityGate: true,
+    maxFps: null as number | null,
     ...opts,
   };
+  const maxFps =
+    o.maxFps && o.maxFps > 0 ? o.maxFps : o.size && o.size <= 48 ? 30 : 60;
+  // Small slack so a 60Hz display still draws every frame at a 60fps cap.
+  const minFrameMs = 1000 / maxFps - 1.5;
   const id = `sm${++uid}`;
   const reduced =
     typeof matchMedia === "function" &&
@@ -403,7 +416,10 @@ export function createStellaMark(
 
   const frameEl = document.createElement("span");
   frameEl.setAttribute("aria-hidden", "true");
-  frameEl.style.cssText = "display:block;position:relative;width:100%";
+  // Own compositing layer and layout containment: per-frame SVG changes then
+  // repaint only the mark instead of invalidating and repainting the page.
+  frameEl.style.cssText =
+    "display:block;position:relative;width:100%;contain:layout style;will-change:transform";
   if (o.size) {
     frameEl.style.width = `${o.size}px`;
     frameEl.style.height = `${o.size}px`;
@@ -656,6 +672,7 @@ export function createStellaMark(
   let painted = false;
   let running = false,
     raf = 0,
+    idleTimer = 0,
     last = 0,
     clock = 0;
   let boxW = o.size ?? 28,
@@ -909,6 +926,26 @@ export function createStellaMark(
 
   function frame(now: number) {
     if (destroyed) return;
+    if (last && now - last < minFrameMs) {
+      if (suspended() && painted) {
+        running = false;
+        raf = 0;
+        return;
+      }
+      // Sleep until shortly before the next allowed redraw instead of waking
+      // on every display refresh in between.
+      const wait = minFrameMs - (now - last) - 4;
+      if (wait > 1) {
+        raf = 0;
+        idleTimer = window.setTimeout(() => {
+          idleTimer = 0;
+          if (!destroyed) raf = requestAnimationFrame(frame);
+        }, wait);
+      } else {
+        raf = requestAnimationFrame(frame);
+      }
+      return;
+    }
     const dtReal = Math.min((now - (last || now)) / 1000, 0.1);
     last = now;
     const dt = paused ? 0 : dtReal;
@@ -1371,6 +1408,7 @@ export function createStellaMark(
     destroy() {
       destroyed = true;
       cancelAnimationFrame(raf);
+      window.clearTimeout(idleTimer);
       for (const a of bounce) a.cancel();
       bounce = [];
       sizeObserver?.disconnect();

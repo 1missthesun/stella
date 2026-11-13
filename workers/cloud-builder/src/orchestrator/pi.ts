@@ -1,5 +1,6 @@
 import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { AGENT_STOP_WIRE_REASON, AGENT_STOPPED_REASON } from "@stella/contracts/agent-status";
+import { waitingResultJson } from "@stella/contracts/agent-waiting";
 import {
   agentAttemptOutcomeOf,
   type AgentAttemptOutcome,
@@ -321,6 +322,15 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                   agentType: "general",
                   ...(event.attempt > 1 ? { isFollowUp: true } : {}),
                 },
+              },
+            }),
+          agentWaiting: (event) =>
+            this.publishAgentLifecycleCard(event.turnId, Date.now(), {
+              type: "agent-lifecycle",
+              eventId: `pi-agent:${event.threadId}:${event.attempt}:waiting`,
+              event: {
+                type: "agent-progress",
+                payload: { agentId: event.threadId, attemptGeneration: event.attempt, statusText: `Waiting for ${event.waitingFor}` },
               },
             }),
           agentStopped: (event) =>
@@ -737,9 +747,11 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         turnId: event.turnId,
         attemptGeneration: event.attempt,
         status: outcome,
-        ...(outcome === "completed" && text
-          ? { resultJson: JSON.stringify({ finalText: text.slice(0, 30_000) }) }
-          : {}),
+        ...(outcome === "completed" && event.ended.waitingFor
+          ? { resultJson: waitingResultJson((text ?? "").slice(0, 30_000), event.ended.waitingFor) }
+          : outcome === "completed" && text
+            ? { resultJson: JSON.stringify({ finalText: text.slice(0, 30_000) }) }
+            : {}),
         ...(outcome === "failed"
           ? { errorMessage: (text || "The agent failed.").slice(0, 2_000) }
           : {}),

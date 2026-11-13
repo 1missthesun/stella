@@ -80,7 +80,8 @@ import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
-import { boundReportText, heldAncestorIds, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
+import { boundReportText, endedWaiting, heldAncestorIds, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
+import { WAITING_FOR_MAX_CHARS, resultWaitingFor, waitingResultJson } from "@stella/contracts/agent-waiting";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
@@ -393,9 +394,19 @@ const CARD_REPORT_MAX_CHARS = 2_000;
  */
 const agentLifecycleCard = (
   row: ThreadRow,
-  outcome: { kind: "started" } | { kind: TerminalStatus; text?: string | null },
+  outcome: { kind: "started" } | { kind: TerminalStatus; text?: string | null } | { kind: "waiting"; waitingFor: string },
 ): { sourceTurnId: string; card: CloudAgentLifecycleCard } => {
   const identity = { agentId: row.thread_id, attemptGeneration: row.attempt_generation };
+  if (outcome.kind === "waiting") {
+    return {
+      sourceTurnId: `thread:${row.thread_id}:${row.attempt_generation}`,
+      card: {
+        type: "agent-lifecycle",
+        eventId: `thread:${row.thread_id}:${row.attempt_generation}:waiting`,
+        event: { type: "agent-progress", payload: { ...identity, statusText: `Waiting for ${outcome.waitingFor}` } },
+      },
+    };
+  }
   const eventId = `thread:${row.thread_id}:${row.attempt_generation}:${outcome.kind === "started" ? "started" : "terminal"}`;
   const text =
     outcome.kind === "started"
@@ -1773,7 +1784,12 @@ const agentDirectory = async (
   const agents = [...rows.values()].map((row): AgentDirectoryAgentRow => {
     const deviceId = threadDeviceId(row);
     const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
-    const status = reportHeldForHelpers(ctx.db, row) ? "waiting_for_helpers" : normalizeAgentDirectoryStatus(row.status);
+    const waitingFor = endedWaiting(row) ? resultWaitingFor(row.result_json) : undefined;
+    const status = reportHeldForHelpers(ctx.db, row)
+      ? "waiting_for_helpers"
+      : waitingFor !== undefined
+        ? "waiting"
+        : normalizeAgentDirectoryStatus(row.status);
     const live = isLiveAgentStatus(status);
     return {
       threadId: row.thread_id,
@@ -1786,8 +1802,11 @@ const agentDirectory = async (
       ...(deviceId && devices.size > 0 && !device?.online
         ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
         : {}),
-      ...(live && device?.online && device.remoteExecution !== "enabled" ? { awaitingConsent: true as const } : {}),
+      ...(live && status !== "waiting" && device?.online && device.remoteExecution !== "enabled"
+        ? { awaitingConsent: true as const }
+        : {}),
       ...(live && row.hold_reason !== null ? { pausedBy: "usage-limit" as const } : {}),
+      ...(waitingFor !== undefined ? { waitingFor } : {}),
     };
   });
   const sessions = (isSlackConversationId(args.conversationId)
@@ -3474,24 +3493,33 @@ const completeComputerThread = async (
   }
   const status = agentThreadTerminalStatus(args.status);
   const error = status === "completed" ? null : endedError({ status: args.status, errorMessage: args.error ?? null });
+  const waitingFor = status === "completed" ? args.waitingFor?.trim().slice(0, WAITING_FOR_MAX_CHARS) || undefined : undefined;
   recordAgentChange(
     ctx.db,
-    { threadId: row.thread_id, kind: endedKind, outcome: status, source: `device:${args.originDeviceId}`, now: ctx.now },
+    {
+      threadId: row.thread_id,
+      kind: endedKind,
+      outcome: status,
+      source: `device:${args.originDeviceId}`,
+      ...(waitingFor ? { detail: { waitingFor } } : {}),
+      now: ctx.now,
+    },
     () =>
       ctx.db.run(
         `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, updated_at = ?
           WHERE thread_id = ?`,
         status,
-        result !== undefined ? JSON.stringify({ finalText: result }) : null,
+        waitingFor ? waitingResultJson(result ?? "", waitingFor) : result !== undefined ? JSON.stringify({ finalText: result }) : null,
         error,
         ctx.now,
         row.thread_id,
       ),
   );
-  await postAgentLifecycleCard(ctx, row, {
-    kind: status,
-    text: status === "completed" ? result : error,
-  });
+  await postAgentLifecycleCard(
+    ctx,
+    row,
+    waitingFor ? { kind: "waiting", waitingFor } : { kind: status, text: status === "completed" ? result : error },
+  );
   return { updated: true, status };
 };
 
@@ -4286,7 +4314,9 @@ export const applyAgentThreadEvent = (
           ownerGeneration: thread.owner_generation,
           ...agentLifecycleCard(
             { ...thread, attempt_generation: event.attemptGeneration },
-            { kind: status, text: status === "completed" ? null : errorMessage },
+            status === "completed" && resultWaitingFor(event.resultJson)
+              ? { kind: "waiting", waitingFor: resultWaitingFor(event.resultJson)! }
+              : { kind: status, text: status === "completed" ? null : errorMessage },
           ),
         });
       }
@@ -4333,7 +4363,9 @@ const conversationThreadRows = (
 const presentedSummary = (db: OwnerDbReader, row: ThreadRow, ownerId: string): AgentThreadSummary =>
   reportHeldForHelpers(db, row)
     ? { ...summary(row, ownerId), status: "waiting_for_helpers" }
-    : summary(row, ownerId);
+    : endedWaiting(row)
+      ? { ...summary(row, ownerId), status: "waiting" }
+      : summary(row, ownerId);
 
 const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] => {
   const live = conversationThreadRows(
@@ -4709,6 +4741,7 @@ export const agentThreadsDomain = {
         status: literal("completed", "failed", "canceled", "paused"),
         result: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
         error: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
+        waitingFor: optional(string({ max: 1_000 })),
       }),
       handler: completeComputerThread,
     },

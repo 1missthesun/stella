@@ -7,6 +7,7 @@ import {
   AGENT_REPORT_MAX_CHARS,
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
+import { resultWaitingFor } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -254,12 +255,17 @@ const scheduleAudit = (
   );
 };
 
+/** An attempt that ended its turn waiting (end_turn_waiting): it keeps its task and is never reported. */
+export const endedWaiting = (thread: Pick<ThreadRow, "status" | "result_json">): boolean =>
+  thread.status === "completed" && resultWaitingFor(thread.result_json) !== undefined;
+
 /** A finished agent whose report waits for its own agents still at work. */
 export const reportHeldForHelpers = (
   db: OwnerDbReader,
-  thread: Pick<ThreadRow, "thread_id" | "attempt_generation" | "status" | "origin_delivery_ack_at">,
+  thread: Pick<ThreadRow, "thread_id" | "attempt_generation" | "status" | "result_json" | "origin_delivery_ack_at">,
 ): boolean =>
   thread.status === "completed" &&
+  !endedWaiting(thread) &&
   thread.origin_delivery_ack_at === null &&
   !readOutbox(db, agentReportId(thread.thread_id, thread.attempt_generation)) &&
   liveDescendants(db, thread.thread_id).length > 0;
@@ -290,7 +296,7 @@ export const deriveAgentReport = (
   now: number,
 ): void => {
   const thread = readThread(db, threadId);
-  if (!thread || !REPORTABLE.has(thread.status)) return;
+  if (!thread || !REPORTABLE.has(thread.status) || endedWaiting(thread)) return;
   if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
   if (thread.origin_delivery_ack_at !== null) return;
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
@@ -675,7 +681,7 @@ const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> =
   if (typeof args?.threadId !== "string" || typeof args.attemptGeneration !== "number") return;
   const checks = typeof args.checks === "number" ? args.checks : 0;
   const thread = readThread(ctx.db, args.threadId);
-  if (!thread || thread.attempt_generation !== args.attemptGeneration || !REPORTABLE.has(thread.status)) return;
+  if (!thread || thread.attempt_generation !== args.attemptGeneration || !REPORTABLE.has(thread.status) || endedWaiting(thread)) return;
   if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
   if (thread.origin_delivery_ack_at !== null) return;
   const again = () => {

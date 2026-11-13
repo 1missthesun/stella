@@ -136,6 +136,7 @@ import { importAgentLogIntoThread } from "./agent-log-bridge.js";
 import { agentDevicesSection, takeAgentMove } from "./agent-move.js";
 import { agentRulesSection } from "./agent-rules.js";
 import { CLOUD_AGENT_MOVE_TOOL } from "@stella/executor-cloud/cloud-agent-move-protocol";
+import { END_TURN_WAITING_TOOL } from "@stella/contracts/agent-waiting";
 
 export type ContainerTurnHost = Pick<
   BuildSessionInternals,
@@ -996,6 +997,7 @@ export const runContainerAgentTurn = async (
         kind: "completed",
         payload: {
           finalText: result.finalText ?? "",
+          ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
           usage: result.usage,
           coldContainerStartMs,
           restoreMs,
@@ -1588,7 +1590,7 @@ export const runAgentAttempt = async (
       role: "agent",
       systemPrompt: [
         renderCloudAgentPrompt("agents/general.md", {
-          names: [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL],
+          names: [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL, END_TURN_WAITING_TOOL],
           history: true,
         }),
         ...(rulesSection ? [rulesSection] : []),

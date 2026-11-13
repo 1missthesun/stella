@@ -27,6 +27,7 @@ import {
   ACTIVITY_INDICATOR_SETTLE_SPRING,
   ACTIVITY_INDICATOR_SPAWN_BEAT_MS,
   activityIndicatorTransition,
+  selectActivityIndicatorHelpers,
   selectActivityIndicatorLabel,
   type ActivityIndicatorPhase,
 } from "@stella/contracts/activity-indicator";
@@ -113,6 +114,11 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
   const label = selectActivityIndicatorLabel(running, (total) =>
     tPlural("app.chat.activityPill.tasksInProgress", total),
   );
+  const workingHelpers = selectActivityIndicatorHelpers(running);
+  const helpersLabel =
+    workingHelpers > 0
+      ? tPlural("app.chat.activityPill.workingHelpers", workingHelpers)
+      : null;
 
   const [phase, setPhase] = useState<ActivityIndicatorPhase>(
     count > 0 ? "working" : "idle",
@@ -271,7 +277,9 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
             onFocus={preloadActivityOverview}
             aria-label={
               busy && label
-                ? t("app.chat.activityPill.openActivity", { label })
+                ? t("app.chat.activityPill.openActivity", {
+                    label: helpersLabel ? `${label}, ${helpersLabel}` : label,
+                  })
                 : t("app.chat.activityPill.idle")
             }
           >
@@ -317,6 +325,11 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
                     exclusiveGroup={CHAT_ACTIVITY_SHIMMER_GROUP}
                     exclusivePriority={30}
                   />
+                  {helpersLabel ? (
+                    <span className="shell-topbar-activity__helpers">
+                      {helpersLabel}
+                    </span>
+                  ) : null}
                 </motion.span>
               ) : null}
             </AnimatePresence>

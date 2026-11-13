@@ -25,6 +25,9 @@
         "statusRunning": "งานกำลังดำเนินการ",
         "tasksInProgress": {
           "other": "{count} งานกำลังดำเนินการ"
+        },
+        "workingHelpers": {
+          "other": "ผู้ช่วย {count} คน"
         }
       },
       "addMenu": {

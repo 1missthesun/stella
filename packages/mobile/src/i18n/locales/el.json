@@ -26,6 +26,10 @@
         "tasksInProgress": {
           "one": "{count} εργασία σε εξέλιξη",
           "other": "{count} εργασίες σε εξέλιξη"
+        },
+        "workingHelpers": {
+          "one": "{count} βοηθός",
+          "other": "{count} βοηθοί"
         }
       },
       "addMenu": {

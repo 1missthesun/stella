@@ -25,6 +25,9 @@
         "statusRunning": "タスクを実行中",
         "tasksInProgress": {
           "other": "{count} 件のタスクを実行中"
+        },
+        "workingHelpers": {
+          "other": "ヘルパー {count} 人"
         }
       },
       "addMenu": {

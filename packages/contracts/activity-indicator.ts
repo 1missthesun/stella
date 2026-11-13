@@ -1,6 +1,7 @@
 export type ActivityIndicatorEntry = {
   id: string;
   title: string;
+  workingHelpers?: number;
 };
 
 export const ACTIVITY_INDICATOR_MENU_MAX_ROWS = 9;
@@ -47,6 +48,11 @@ export const selectActivityIndicatorLabel = (
   if (running.length === 1) return running[0]!.title;
   return formatCount(running.length);
 };
+
+export const selectActivityIndicatorHelpers = (
+  running: readonly ActivityIndicatorEntry[],
+): number =>
+  running.length === 1 ? (running[0]!.workingHelpers ?? 0) : 0;
 
 export const activityIndicatorMenuEntries = (
   running: readonly ActivityIndicatorEntry[],

@@ -27,6 +27,11 @@
           "one": "משימה {count} בתהליך",
           "other": "{count} משימות בתהליך",
           "two": "{count} משימות בתהליך"
+        },
+        "workingHelpers": {
+          "one": "עוזר אחד",
+          "other": "{count} עוזרים",
+          "two": "{count} עוזרים"
         }
       },
       "addMenu": {

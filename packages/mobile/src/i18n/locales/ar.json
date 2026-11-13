@@ -30,6 +30,14 @@
           "other": "{count} مهمة قيد التنفيذ",
           "two": "{count} مهمتان قيد التنفيذ",
           "zero": "{count} مهمة قيد التنفيذ"
+        },
+        "workingHelpers": {
+          "few": "{count} مساعدين",
+          "many": "{count} مساعدًا",
+          "one": "مساعد واحد",
+          "other": "{count} مساعد",
+          "two": "مساعدان",
+          "zero": "{count} مساعد"
         }
       },
       "addMenu": {

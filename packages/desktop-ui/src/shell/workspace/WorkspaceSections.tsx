@@ -32,6 +32,7 @@ import {
 import {
   activityRowKey,
   compareActivityRowsByLifecycleStart,
+  deriveTopLevelActivityTasks,
   flattenActivityTasks,
   getActivityRowCompletedAtMs,
   getActivityRowSearchText,
@@ -66,7 +67,6 @@ import { AgentAssistantUpdates } from "@/shell/AgentAssistantUpdates";
 import { CompactChildState } from "@/features/chat/components/CompactSubagentSummary";
 import { useContinuousAnimationGate } from "@/shared/hooks/use-continuous-animation-gate";
 import { ACTIVITY_INDICATOR_MENU_MAX_ROWS } from "@stella/contracts/activity-indicator";
-import { isTopLevelAgent } from "@stella/contracts/agent-ledger";
 import "@/app/chat/chat-workspace-strip.css";
 
 const SECTION_CAPS = {
@@ -480,6 +480,7 @@ const TasksList = memo(function TasksList({
   onOpenFile: (entry: ConversationFileEntry) => void;
   nested?: boolean;
 }) {
+  const tPlural = useTPlural();
   const [gap, setGap] = useState(0);
   const measureGap = useCallback((list: HTMLUListElement | null) => {
     if (list) setGap(parseFloat(getComputedStyle(list).rowGap) || 0);
@@ -507,6 +508,14 @@ const TasksList = memo(function TasksList({
                 onOpenFile={onOpenFile}
                 orderIndex={index}
                 isTopLevel={!nested}
+                metaText={
+                  row.task.workingHelpers
+                    ? tPlural(
+                        "app.chat.activityPill.workingHelpers",
+                        row.task.workingHelpers,
+                      )
+                    : undefined
+                }
               />
             ) : (
               <TaskRow
@@ -681,7 +690,7 @@ export const WorkspaceSections = memo(function WorkspaceSections({
   }, [expansion, tasksLoaded]);
 
   const groupedRows = useMemo(
-    () => groupActivityTasks(allTasks.filter(isTopLevelAgent)),
+    () => groupActivityTasks(deriveTopLevelActivityTasks(allTasks)),
     [allTasks],
   );
 

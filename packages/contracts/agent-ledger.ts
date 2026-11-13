@@ -52,6 +52,52 @@ export const ledgerAgentFromThread = (
 export const isTopLevelAgent = (agent: { parentAgentId?: string }): boolean =>
   !agent.parentAgentId;
 
+export type TopLevelAgentActivity<T> = {
+  task: T;
+  status: TaskLifecycleStatus;
+  workingHelpers: number;
+  helpers: readonly T[];
+};
+
+/**
+ * Stella's own agents as the user sees their work: a finished agent whose
+ * helpers are still working reads as running until they finish, and its
+ * helpers count under it, never as rows of their own.
+ */
+export const topLevelAgentActivity = <
+  T extends { id: string; parentAgentId?: string; status: TaskLifecycleStatus },
+>(
+  tasks: readonly T[],
+): TopLevelAgentActivity<T>[] => {
+  const ids = new Set(tasks.map((task) => task.id));
+  const childrenByParent = new Map<string, T[]>();
+  for (const task of tasks) {
+    const parentId = task.parentAgentId;
+    if (!parentId || parentId === task.id || !ids.has(parentId)) continue;
+    const children = childrenByParent.get(parentId);
+    if (children) children.push(task);
+    else childrenByParent.set(parentId, [task]);
+  }
+  return tasks.filter(isTopLevelAgent).map((task) => {
+    const helpers: T[] = [];
+    const seen = new Set([task.id]);
+    const pending = [...(childrenByParent.get(task.id) ?? [])];
+    for (let next = pending.pop(); next; next = pending.pop()) {
+      if (seen.has(next.id)) continue;
+      seen.add(next.id);
+      helpers.push(next);
+      pending.push(...(childrenByParent.get(next.id) ?? []));
+    }
+    const workingHelpers = helpers.filter((helper) => helper.status === "running").length;
+    return {
+      task,
+      status: task.status === "completed" && workingHelpers > 0 ? "running" : task.status,
+      workingHelpers,
+      helpers,
+    };
+  });
+};
+
 export const agentTaskStatus = (status: AgentStatus): TaskLifecycleStatus => {
   switch (status) {
     case "completed":

@@ -28,6 +28,12 @@
           "many": "{count} zadań w toku",
           "one": "{count} zadanie w toku",
           "other": "{count} zadania w toku"
+        },
+        "workingHelpers": {
+          "few": "{count} pomocników",
+          "many": "{count} pomocników",
+          "one": "{count} pomocnik",
+          "other": "{count} pomocnika"
         }
       },
       "addMenu": {

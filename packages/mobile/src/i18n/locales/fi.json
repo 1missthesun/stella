@@ -26,6 +26,10 @@
         "tasksInProgress": {
           "one": "{count} tehtävä käynnissä",
           "other": "{count} tehtävää käynnissä"
+        },
+        "workingHelpers": {
+          "one": "{count} apulainen",
+          "other": "{count} apulaista"
         }
       },
       "addMenu": {

@@ -27,6 +27,11 @@
           "many": "{count} tareas en curso",
           "one": "{count} tarea en curso",
           "other": "{count} tareas en curso"
+        },
+        "workingHelpers": {
+          "many": "{count} ayudantes",
+          "one": "{count} ayudante",
+          "other": "{count} ayudantes"
         }
       },
       "addMenu": {

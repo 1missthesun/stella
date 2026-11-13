@@ -27,6 +27,11 @@
           "many": "{count} attività in corso",
           "one": "{count} attività in corso",
           "other": "{count} attività in corso"
+        },
+        "workingHelpers": {
+          "many": "{count} aiutanti",
+          "one": "{count} aiutante",
+          "other": "{count} aiutanti"
         }
       },
       "addMenu": {

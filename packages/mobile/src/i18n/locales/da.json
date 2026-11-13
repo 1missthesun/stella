@@ -26,6 +26,10 @@
         "tasksInProgress": {
           "one": "{count} opgave i gang",
           "other": "{count} opgaver i gang"
+        },
+        "workingHelpers": {
+          "one": "{count} hjælper",
+          "other": "{count} hjælpere"
         }
       },
       "addMenu": {

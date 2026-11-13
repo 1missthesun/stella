@@ -27,6 +27,11 @@
           "many": "{count} tarefas em andamento",
           "one": "{count} tarefa em andamento",
           "other": "{count} tarefas em andamento"
+        },
+        "workingHelpers": {
+          "many": "{count} ajudantes",
+          "one": "{count} ajudante",
+          "other": "{count} ajudantes"
         }
       },
       "addMenu": {

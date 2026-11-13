@@ -25,6 +25,9 @@
         "statusRunning": "Tác vụ đang chạy",
         "tasksInProgress": {
           "other": "{count} tác vụ đang chạy"
+        },
+        "workingHelpers": {
+          "other": "{count} trợ lý"
         }
       },
       "addMenu": {

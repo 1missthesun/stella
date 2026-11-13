@@ -27,6 +27,11 @@
           "few": "{count} sarcini în curs",
           "one": "{count} sarcină în curs",
           "other": "{count} de sarcini în curs"
+        },
+        "workingHelpers": {
+          "few": "{count} ajutoare",
+          "one": "{count} ajutor",
+          "other": "{count} de ajutoare"
         }
       },
       "addMenu": {

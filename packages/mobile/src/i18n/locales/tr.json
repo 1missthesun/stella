@@ -26,6 +26,10 @@
         "tasksInProgress": {
           "one": "{count} görev sürüyor",
           "other": "{count} görev sürüyor"
+        },
+        "workingHelpers": {
+          "one": "{count} yardımcı",
+          "other": "{count} yardımcı"
         }
       },
       "addMenu": {

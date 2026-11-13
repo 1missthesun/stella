@@ -25,6 +25,9 @@
         "statusRunning": "Tugas sedang berjalan",
         "tasksInProgress": {
           "other": "{count} tugas sedang berjalan"
+        },
+        "workingHelpers": {
+          "other": "{count} pembantu"
         }
       },
       "addMenu": {

@@ -28,6 +28,12 @@
           "many": "{count} задач выполняются",
           "one": "{count} задача выполняется",
           "other": "{count} задачи выполняются"
+        },
+        "workingHelpers": {
+          "few": "{count} помощника",
+          "many": "{count} помощников",
+          "one": "{count} помощник",
+          "other": "{count} помощника"
         }
       },
       "addMenu": {

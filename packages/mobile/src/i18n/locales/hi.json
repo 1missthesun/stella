@@ -26,6 +26,10 @@
         "tasksInProgress": {
           "one": "{count} कार्य प्रगति पर",
           "other": "{count} कार्य प्रगति पर"
+        },
+        "workingHelpers": {
+          "one": "{count} सहायक",
+          "other": "{count} सहायक"
         }
       },
       "addMenu": {

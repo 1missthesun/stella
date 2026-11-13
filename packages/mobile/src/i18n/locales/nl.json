@@ -26,6 +26,10 @@
         "tasksInProgress": {
           "one": "{count} taak bezig",
           "other": "{count} taken bezig"
+        },
+        "workingHelpers": {
+          "one": "{count} helper",
+          "other": "{count} helpers"
         }
       },
       "addMenu": {

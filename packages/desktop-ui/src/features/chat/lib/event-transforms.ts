@@ -4,7 +4,7 @@ import {
 } from "@stella/contracts/agent-runtime"
 import type { AgentModelConfigSnapshot } from "@stella/contracts/agent-engine"
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator"
-import { isTopLevelAgent } from "@stella/contracts/agent-ledger"
+import { topLevelAgentActivity } from "@stella/contracts/agent-ledger"
 import { normalizeDisplayStatusText } from '@stella/contracts/working-status'
 import type {
   Attachment,
@@ -95,6 +95,7 @@ export type TaskItem = {
   assistantMessages?: string[]
   assistantMessagesUpdatedAtMs?: number
   assistantMessagesUpdatedSequence?: number
+  workingHelpers?: number
 }
 
 export type TaskLiveDecoration = {
@@ -437,18 +438,43 @@ export type TopLevelActivityWorkUnit = {
   status: TaskLifecycleStatus
 }
 
+export const deriveTopLevelActivityTasks = (
+  tasks: readonly TaskItem[],
+): TaskItem[] =>
+  topLevelAgentActivity(tasks).map(({ task, status, workingHelpers, helpers }) => {
+    const completedAtMs =
+      status === 'running'
+        ? undefined
+        : helpers.reduce<number | undefined>(
+            (latest, helper) =>
+              helper.completedAtMs !== undefined &&
+              (latest === undefined || helper.completedAtMs > latest)
+                ? helper.completedAtMs
+                : latest,
+            task.completedAtMs,
+          )
+    if (
+      status === task.status &&
+      workingHelpers === (task.workingHelpers ?? 0) &&
+      completedAtMs === task.completedAtMs
+    ) {
+      return task
+    }
+    const { completedAtMs: _completedAtMs, workingHelpers: _workingHelpers, ...rest } = task
+    return {
+      ...rest,
+      status,
+      ...(workingHelpers > 0 ? { workingHelpers } : {}),
+      ...(completedAtMs !== undefined ? { completedAtMs } : {}),
+    }
+  })
+
 const latestTopLevelActivityRows = (
   tasks: readonly TaskItem[],
 ): ActivityRow[] => {
   const latestById = new Map<string, TaskItem>()
   for (const task of tasks) {
-    if (
-      !isActivityFeedTask(task) ||
-      !isManagedActivityTask(task) ||
-      !isTopLevelAgent(task)
-    ) {
-      continue
-    }
+    if (!isActivityFeedTask(task) || !isManagedActivityTask(task)) continue
     const current = latestById.get(task.id)
     if (
       !current ||
@@ -461,7 +487,7 @@ const latestTopLevelActivityRows = (
       latestById.set(task.id, task)
     }
   }
-  return groupActivityTasks([...latestById.values()])
+  return groupActivityTasks(deriveTopLevelActivityTasks([...latestById.values()]))
 }
 
 export const deriveTopLevelActivityWorkUnits = (
@@ -485,13 +511,14 @@ export const deriveRunningActivityIndicatorEntries = (
   latestTopLevelActivityRows(tasks)
     .filter((row) => getActivityRowStatus(row) === 'running')
     .sort(compareActivityRowsByLifecycleStart)
-    .map((row) => ({
-      id: activityRowKey(row),
-      title: (row.kind === 'task'
-        ? row.task.description
-        : row.hierarchy.owner.description
-      ).trim(),
-    }))
+    .map((row) => {
+      const task = row.kind === 'task' ? row.task : row.hierarchy.owner
+      return {
+        id: activityRowKey(row),
+        title: task.description.trim(),
+        ...(task.workingHelpers ? { workingHelpers: task.workingHelpers } : {}),
+      }
+    })
 
 export const getActivityRowStatus = (row: ActivityRow): TaskLifecycleStatus =>
   row.kind === 'task' ? row.task.status : row.hierarchy.status

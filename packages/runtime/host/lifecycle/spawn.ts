@@ -4,6 +4,7 @@ import { delimiter, join } from "node:path";
 import { Cause, Effect, Exit, type Scope } from "effect";
 import { runtimeIpcListenUrl, type RuntimePaths } from "../../worker/runtime-paths.js";
 import { rotateLogIfOversized } from "../../observability/rotate-file.js";
+import { getFileLogger } from "../../observability/file-logger.js";
 import { killWorkerProcess } from "./kill.js";
 import type { LifecycleStartOptions } from "./options.js";
 
@@ -126,6 +127,12 @@ const spawnDetachedWorkerProcess = (
     closeSync(logFd);
   }
   child.unref();
+  // A worker that dies without quitting (a signal, a native crash) leaves
+  // nothing in its own log; record how it ended while this app is its parent.
+  const pid = child.pid;
+  child.once("exit", (code, signal) => {
+    getFileLogger()?.process("worker.exited", { pid, code, signal });
+  });
   return { child, bunBinaryPath };
 };
 

@@ -109,6 +109,7 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
           : [];
         return {
           ...(typeof parsed.cliSessionId === "string" ? { cliSessionId: parsed.cliSessionId } : {}),
+          ...(parsed.open === true ? { open: true as const } : {}),
           seen: Array.isArray(parsed.seen) ? parsed.seen.filter((entry): entry is string => typeof entry === "string") : [],
           ...(undelivered.length > 0 ? { undelivered } : {}),
           ...(typeof parsed.context === "string" ? { context: parsed.context } : {}),

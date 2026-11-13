@@ -164,6 +164,11 @@ export type ClaudeCodeTransport = {
 
 export type ClaudeCodeSessionRecord = {
   cliSessionId?: string;
+  /**
+   * A turn of this session is under way. Left set when Stella stops mid-turn (an update, a restart, a crash), so the
+   * turn that picks the task back up knows it was cut off, even when nothing was mid-call.
+   */
+  open?: true;
   seen: string[];
   undelivered?: string[];
   context?: string;
@@ -237,6 +242,8 @@ type Session = {
   turn?: Turn;
   cliSessionId?: string;
   wakes?: Set<string>;
+  /** Stella is closing this session (quitting): its turn ends cut off, not finished, and resumes on the next start. */
+  closing?: true;
 };
 
 const ZERO_USAGE = (): Usage => ({
@@ -471,23 +478,53 @@ const cliToolName =
       ? name
       : `${MCP_PREFIX}${name}`;
 
-const deltaPrompt = (delta: readonly Message[], context?: string): { text: string; images: ImageContent[] } => {
+/**
+ * What a tool result says when the call was cut off by Stella stopping (an update, a restart, a crash): pi-durable's
+ * recovery of a call that may have run, and this engine's own for a call Claude Code never finished.
+ */
+const RESTART_MARKS = ["was interrupted and may have partially run", "Stella restarted before Claude Code finished it"];
+
+const cutByRestart = (message: Message): boolean =>
+  message.role === "toolResult" && RESTART_MARKS.some((mark) => textOf(message.content).includes(mark));
+
+/**
+ * Claude Code writes its own record of the interruption into the session when Stella stops it mid-step: "The user
+ * doesn't want to proceed with this tool use… STOP what you are doing and wait for the user", "[Request interrupted
+ * by user]", "No response requested." Read as written, a resumed task stops and reports that the user turned it
+ * down, though nobody did. The resume says what really happened.
+ */
+const RESUMED_AFTER_RESTART =
+  "Stella stopped while you were in the middle of this step (an update, a restart or a crash on this computer) and has picked your task back up. Nobody stopped you or turned anything down: notes in your history that the user rejected a tool use, interrupted the request, or that no response was requested come from that restart, not from the user. A call marked interrupted was cut off and may have partly run: run it again when that is safe, otherwise first check what it already did. Calls with results finished; don't repeat those. What happened since:";
+
+/** The same, when nothing happened in the conversation since the step that was cut off. */
+const RESUMED_NOTHING_SINCE =
+  "Stella stopped while you were in the middle of this step (an update, a restart or a crash on this computer) and has picked your task back up. Nobody stopped you or turned anything down: notes in your history that the user rejected a tool use, interrupted the request, or that no response was requested come from that restart, not from the user. If a command was cut off, run it again when that is safe, otherwise first check what it already did.";
+
+const deltaPrompt = (
+  delta: readonly Message[],
+  context?: string,
+  cutOff = false,
+): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(delta);
   const before = delta.slice(0, start);
   const resident = context ?? userPrompt(before.filter((message) => !notResident(message))).text;
   const rest = before.filter(notResident);
   const request = userPrompt(users);
   const interrupted = rest.some((message) => message.role === "toolResult");
+  const restarted = rest.some(cutByRestart) || (cutOff && users.length === 0);
   const update = rest.length > 0 ? renderBounded(rest, REBUILD_MAX_CHARS) : "";
   const text = [
     resident,
     update
       ? `<conversation_updates>\n${
-          interrupted
-            ? "Your previous step was interrupted (stopped, or Stella restarted). What happened since, including the results of the tool calls you made; do not repeat them:"
-            : "What happened in this conversation since you last saw it:"
+          restarted
+            ? RESUMED_AFTER_RESTART
+            : interrupted
+              ? "Your previous step was interrupted. What happened since, including the results of the tool calls you made; do not repeat them:"
+              : "What happened in this conversation since you last saw it:"
         }\n\n${update}\n</conversation_updates>`
       : "",
+    !update && restarted ? RESUMED_NOTHING_SINCE : "",
     request.text || (users.length === 0 ? "Continue the task from here." : ""),
   ]
     .filter(Boolean)
@@ -687,6 +724,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (turn.done) return;
     turn.done = true;
     turn.outcome = outcome;
+    const record = turn.session.record;
+    if (record?.open && !turn.session.closing) {
+      delete record.open;
+      void saveRecord(turn.session);
+    }
     turn.settle();
     for (const [id, record] of calls) {
       if (record.turn !== turn) continue;
@@ -809,6 +851,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     await options.transport.preflight?.(binding.session);
     session.record ??= (await options.sessions.read(session.piSessionId).catch(() => undefined)) ?? { seen: [] };
     const record = session.record;
+    // The last turn never ended here: Stella stopped in the middle of it and this one picks the task back up.
+    const cutOff = record.open === true && !relaunched;
     const conversation = request.messages.filter((message) => message.role !== "system");
     const held = session.cliSessionId ?? record.cliSessionId;
     let lastReplyAt = -1;
@@ -923,7 +967,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const asked = steering
       ? request.prompt!
       : delta
-        ? deltaPrompt(delta, missed)
+        ? deltaPrompt(delta, missed, cutOff)
         : hydrated
           ? hydratedPrompt(conversation.slice(promptAt))
           : rebuild;
@@ -961,6 +1005,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       ...(relaunched ? { relaunched: true as const } : {}),
     };
     session.turn = turn;
+    if (!record.open) {
+      record.open = true;
+      void saveRecord(session);
+    }
     const answered = () => {
       if (!turn.prompted) return;
       noteSeen(session, turn.prompted);
@@ -1712,6 +1760,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     close(conversationId: string) {
       for (const [id, session] of sessions) {
         if (session.binding.session.conversationId !== conversationId) continue;
+        session.closing = true;
         abortTurn(session.turn, "Closed.");
         options.transport.close?.(session.binding.session);
         sessions.delete(id);

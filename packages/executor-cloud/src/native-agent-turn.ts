@@ -35,6 +35,7 @@ import {
 } from "@stella/contracts/claude-login";
 import {
   claudeCliCanResume,
+  claudeCliResumesAtMessage,
   claudeCliVersion,
   claudeSessionProjectDir,
   resolveClaudeWorkingFolder,
@@ -596,6 +597,7 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   systemPrompt: string;
   mcpConfigPath: string;
   resume: boolean;
+  resumeAt?: string;
   sessionId: string;
   inputPrompt?: string;
   includePartialMessages?: boolean;
@@ -635,7 +637,7 @@ export const buildCloudClaudeTakeoverArgs = (options: {
     ? ["--system-prompt", options.systemPrompt, "--system-prompt-snapshot", "off"]
     : []),
   ...(options.resume
-    ? ["--resume", options.sessionId]
+    ? ["--resume", options.sessionId, ...(options.resumeAt ? ["--resume-session-at", options.resumeAt] : [])]
     : ["--session-id", options.sessionId]),
   ...(options.inputPrompt !== undefined ? [options.inputPrompt] : []),
 ];
@@ -748,6 +750,14 @@ export const runCloudClaude = async (options: {
     () => undefined,
   );
   const resume = marked !== undefined;
+  const quietReplyPath = path.join(stateRoot, QUIET_REPLY_MARKER);
+  const resumeAt = resume && (await claudeCliResumesAtMessage())
+    ? await readFile(quietReplyPath, "utf8").then(
+        (text) => text.trim() || undefined,
+        () => undefined,
+      )
+    : undefined;
+  await rm(quietReplyPath, { force: true });
   const sessionId =
     marked && isClaudeSessionId(marked)
       ? marked
@@ -761,6 +771,7 @@ export const runCloudClaude = async (options: {
       systemPrompt: options.systemPrompt,
       mcpConfigPath,
       resume: resumeSession,
+      ...(resumeSession && resumeAt ? { resumeAt } : {}),
       sessionId,
       includePartialMessages: profile.includePartialMessages,
       streamInput: Boolean(inbox),
@@ -900,9 +911,12 @@ export const runCloudClaude = async (options: {
     let compacting = false;
     let compactions = 0;
     let quieted: Error | undefined;
+    let lastAssistantUuid: string | undefined;
+    let quietReplyUuid: string | undefined;
     const onJson = (event: ClaudeStreamJsonEvent): void => {
         options.onStreamEvent?.(event);
         const type = event.type;
+        if (type === "assistant" && typeof event.uuid === "string") lastAssistantUuid = event.uuid;
         if (type === "system" && event.subtype === "init") {
           markTurnStep("claudeInit");
           initialized = true;
@@ -917,6 +931,7 @@ export const runCloudClaude = async (options: {
         if (options.quiet && isClaudeCodeVisibleOutputNudge(event)) {
           if (!cancellation.aborted) {
             quieted = new Error("The turn ended with no reply.");
+            quietReplyUuid = lastAssistantUuid;
             cancellation.abort(quieted);
           }
           return;
@@ -1097,6 +1112,7 @@ export const runCloudClaude = async (options: {
     const quiet = quieted !== undefined && cancellation.reason === quieted;
     if (quiet) {
       finalText = "";
+      if (quietReplyUuid) await writeFile(quietReplyPath, `${quietReplyUuid}\n`, { mode: 0o600 });
     } else if (cancellation.aborted && !error) {
       error = cancellation.reason?.message || "Claude Code turn was canceled.";
     }
@@ -1160,6 +1176,8 @@ export const cloudAgentProgressFromStream =
   };
 
 const NATIVE_SESSION_MARKER = "session-started";
+/** The reply a quiet turn ended on; the next turn resumes there, leaving Claude Code's no-visible-output nudge behind. */
+const QUIET_REPLY_MARKER = "quiet-reply";
 
 const settleHydratedLines = async (file: string, cwd: string): Promise<void> => {
   const version = await claudeCliVersion();

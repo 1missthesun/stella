@@ -156,6 +156,12 @@ export const compareClaudeCliVersions = (left: string, right: string): number =>
   return 0;
 };
 
+/** `--resume-session-at` is a print-mode option Claude Code leaves out of `--help`; 2.1.296 is the oldest seen with it. */
+export const claudeCliResumesAtMessage = async (): Promise<boolean> => {
+  const version = await claudeCliVersion();
+  return version !== "unknown" && compareClaudeCliVersions(version, "2.1.296") >= 0;
+};
+
 export const claudeCliCanResume = (local: string, origin: string): boolean => {
   if (local === "unknown" || origin === "unknown") return true;
   if (compareClaudeCliVersions(local, origin) >= 0) return true;

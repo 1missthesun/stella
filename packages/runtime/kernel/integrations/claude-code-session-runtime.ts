@@ -47,6 +47,7 @@ import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 import {
   claudeCliHasOption,
   claudeCliIdentity,
+  claudeCliResumesAtMessage,
   claudeSessionProjectDir,
   resolveClaudeWorkingFolder,
   stripClaudeThinkingFromSessionFile,
@@ -243,6 +244,7 @@ type ClaudeCodeProcessState = {
   launchConfig: string;
   cliIdentity: string | null;
   claudeConfigDir: string | null;
+  lastAssistantUuid?: string;
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
   adrift?: {
     lines: ClaudeStreamEvent[];
@@ -309,6 +311,10 @@ type ClaudeCodeSession = {
   /** The config directory the current CLI process signs in with (null: Claude Code's own). */
   claudeLoginConfigDir?: string | null;
   thinkingStripped?: boolean;
+  /** The reply a quiet turn ended on before Claude Code's no-visible-output nudge. */
+  quietReplyUuid?: string;
+  /** Resume the next spawned CLI at this message, leaving the nudge behind. */
+  resumeAtNextSpawn?: string;
 };
 type ClaudeCodeError = Error & { code?: string; status?: number };
 const CLAUDE_CODE_MODEL_PREFIX = "claude-code/";
@@ -2499,6 +2505,7 @@ class ClaudeCodeSessionRuntime {
     promptImages: ClaudeCodeImage[],
     observedMcpCalls: McpCallRecord[] = [],
   ) {
+    this.leaveQuietNudgeBehind(request.sessionKey, session);
     return await this.executeStepWithMode(
       session,
       request,
@@ -2509,6 +2516,20 @@ class ClaudeCodeSessionRuntime {
       promptImages,
       observedMcpCalls,
     );
+  }
+  /**
+   * A quiet turn that ended silent leaves Claude Code's nudge in the live
+   * CLI's memory and transcript, where the next turn would read it as a
+   * reprimand. Respawn and resume at the reply before it (the transcript
+   * stays append-only). A process with background work keeps running.
+   */
+  leaveQuietNudgeBehind(sessionKey: string, session: ClaudeCodeSession) {
+    const replyUuid = session.quietReplyUuid;
+    session.quietReplyUuid = undefined;
+    if (!replyUuid || !session.resumeReady) return;
+    if (session.backgroundShellStarted || (session.backgroundTasks ?? 0) > 0) return;
+    this.resetStreamingProcess(sessionKey, session);
+    session.resumeAtNextSpawn = replyUuid;
   }
   /**
    * `observedMcpCalls` carries side effects already applied by earlier
@@ -2879,16 +2900,24 @@ class ClaudeCodeSessionRuntime {
     const cliHasSystemPromptSnapshot = await claudeCliHasOption(
       "--system-prompt-snapshot",
     );
+    const resumeAt =
+      useResume && session.resumeAtNextSpawn && (await claudeCliResumesAtMessage())
+        ? session.resumeAtNextSpawn
+        : undefined;
+    session.resumeAtNextSpawn = undefined;
     const child = spawn(
       executablePath,
-      this.buildClaudeCodeArgs(
-        session,
-        request,
-        effectiveSystemPrompt,
-        useResume,
-        mcpHost,
-        cliHasSystemPromptSnapshot,
-      ),
+      [
+        ...this.buildClaudeCodeArgs(
+          session,
+          request,
+          effectiveSystemPrompt,
+          useResume,
+          mcpHost,
+          cliHasSystemPromptSnapshot,
+        ),
+        ...(resumeAt ? ["--resume-session-at", resumeAt] : []),
+      ],
       {
         stdio: ["pipe", "pipe", "pipe"],
         detached: process.platform !== "win32",
@@ -2938,6 +2967,9 @@ class ClaudeCodeSessionRuntime {
         this.noteInjectionConsumed(session, processState, parsedLine.uuid);
         return undefined;
       }
+      if (parsedLine.type === "assistant" && typeof parsedLine.uuid === "string") {
+        processState.lastAssistantUuid = parsedLine.uuid;
+      }
       if (isClaudeCodeVisibleOutputNudge(parsedLine)) {
         const quiet = processState.pending[0];
         if (
@@ -2946,6 +2978,7 @@ class ClaudeCodeSessionRuntime {
           ![...(quiet.injections?.values() ?? [])].some((entry) => !entry.consumed)
         ) {
           processState.child.stdin.write(`${buildClaudeCodeInterruptRequest()}\n`, () => {});
+          session.quietReplyUuid = processState.lastAssistantUuid;
         }
       }
       if (

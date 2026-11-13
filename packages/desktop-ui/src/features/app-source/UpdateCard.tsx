@@ -8,8 +8,8 @@ import {
 } from "react";
 import { springEasing } from "@stella/contracts/desktop/spring";
 import { AlertCircle, RefreshCw } from "@/ui/icons";
-import { useT, useTPlural } from "@/shared/i18n";
-import { appSourceApi, useAppSourceState } from "./app-source-store";
+import { useT } from "@/shared/i18n";
+import { useAppSourceState } from "./app-source-store";
 import "./update-card.css";
 
 export type UpdateCardTone = "update" | "done" | "attention";
@@ -17,8 +17,6 @@ export type UpdateCardTone = "update" | "done" | "attention";
 export type UpdateCardAction = {
   label: string;
   primary?: boolean;
-  /** Shown on hover: what pressing it does when the label alone doesn't say. */
-  hint?: string;
   onClick: () => void;
 };
 
@@ -146,7 +144,6 @@ const UpdateButton = ({
       data-update-transition={ring ? "live" : undefined}
       aria-busy={busy}
       disabled={busy || disabled}
-      title={action.hint}
       onClick={action.onClick}
     >
       {ring ? (
@@ -188,33 +185,14 @@ export const UpdateCard = ({
   placement?: "message" | "composer";
 }) => {
   const t = useT();
-  const tPlural = useTPlural();
   const state = useAppSourceState();
-  const tasks = state?.heldForTasks ?? 0;
   const shownDetail = !busy
     ? detail
     : state?.heldForRecording === true
       ? t("shell.appSource.afterRecording")
-      : tasks > 0
-        ? tPlural("shell.appSource.waitsForTasks", tasks)
-        : state?.heldForReply === true
-          ? t("shell.appSource.afterReply")
-          : detail;
-  // An update waiting for Stella's reply or the tasks running here: the user may go ahead anyway.
-  const updateNow = appSourceApi()?.updateNow;
-  const held =
-    busy &&
-    action !== null &&
-    state?.heldForRecording !== true &&
-    (tasks > 0 || state?.heldForReply === true) &&
-    typeof updateNow === "function";
-  const shownAction: UpdateCardAction | null = held
-    ? {
-        label: t("shell.appSource.updateNow"),
-        hint: t("shell.appSource.updateNowHint"),
-        onClick: () => void updateNow?.(),
-      }
-    : action;
+      : state?.heldForReply === true
+        ? t("shell.appSource.afterReply")
+        : detail;
   return (
   <div
     className={`app-update-card app-update-card--${placement}`}
@@ -238,9 +216,7 @@ export const UpdateCard = ({
         </div>
       )}
     </div>
-    {shownAction ? (
-      <UpdateButton action={shownAction} busy={busy && !held} disabled={disabled && !held} />
-    ) : null}
+    {action ? <UpdateButton action={action} busy={busy} disabled={disabled} /> : null}
   </div>
   );
 };

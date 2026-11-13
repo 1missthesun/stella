@@ -65,8 +65,7 @@ const NotificationRow = ({
   const t = useT();
   const locale = useLocale();
   const running = useNotificationRunning().has(item.id);
-  // The source's own word wins: an action may still be under way while the notification already offers the next step.
-  const busy = item.busy ?? running;
+  const busy = running || item.busy === true;
   const Icon = KIND_ICON[item.kind];
   const actions = item.actions ?? [];
   return (

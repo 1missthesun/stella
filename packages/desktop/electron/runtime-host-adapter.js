@@ -145,14 +145,6 @@ export class RuntimeHostAdapter {
         const health = await this.host.health().catch(() => null);
         return health?.replying === true;
     }
-    /** Tasks the runtime is working on now (0 when it can't say). */
-    async tasksRunning() {
-        if (!this.started) {
-            return 0;
-        }
-        const health = await this.host.health().catch(() => null);
-        return typeof health?.tasksRunning === "number" ? health.tasksRunning : 0;
-    }
     queueRuntimeConfigPatch(patch) {
         this.pendingConfig = {
             ...this.pendingConfig,

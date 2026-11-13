@@ -6,7 +6,6 @@ import {
   IPC_APP_SOURCE_GET_STATE,
   IPC_APP_SOURCE_SKIP,
   IPC_APP_SOURCE_UNDO,
-  IPC_APP_SOURCE_UPDATE_NOW,
 } from "@stella/contracts/desktop/ipc-channels";
 import type { AppSourceActionResult } from "@stella/contracts/desktop/app-source";
 import type { AppSourceService } from "../services/app-source/app-source-service.js";
@@ -69,11 +68,6 @@ export const registerAppSourceHandlers = (
         targets.every((target) => typeof target === "string" && target.length > 0 && target.length <= 256))
         ? (service(event)?.applyUpstream((targets as string[] | null | undefined) ?? null) ?? unavailable)
         : unavailable,
-  );
-  registerPrivilegedHandle(
-    options,
-    IPC_APP_SOURCE_UPDATE_NOW,
-    (event) => service(event)?.updateNow() ?? unavailable,
   );
   registerPrivilegedHandle(
     options,

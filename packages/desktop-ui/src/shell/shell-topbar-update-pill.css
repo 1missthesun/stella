@@ -31,16 +31,6 @@
   cursor: default;
 }
 
-.shell-topbar-update-pill[data-state="held"] {
-  background: color-mix(in oklch, var(--primary) 12%, transparent);
-  border-color: color-mix(in oklch, var(--primary) 36%, transparent);
-  color: var(--text-strong);
-}
-
-.shell-topbar-update-pill[data-state="held"] .shell-topbar-update-pill__main {
-  opacity: 0.7;
-}
-
 .shell-topbar-update-pill[data-state="updating"]:hover {
   background: color-mix(in oklch, var(--primary) 12%, transparent);
   border-color: color-mix(in oklch, var(--primary) 36%, transparent);
@@ -118,33 +108,6 @@
 }
 
 .shell-topbar-update-pill__more:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.shell-topbar-update-pill__now {
-  display: inline-flex;
-  align-items: center;
-  height: 100%;
-  padding: 0 12px 0 9px;
-  border: none;
-  border-left: 1px solid color-mix(in oklch, var(--primary) 26%, transparent);
-  background: transparent;
-  color: inherit;
-  font-size: var(--font-size-2xs);
-  font-weight: var(--weight-semibold);
-  line-height: 1;
-  white-space: nowrap;
-  cursor: default;
-  -webkit-app-region: no-drag;
-  transition: background 0.12s ease;
-}
-
-.shell-topbar-update-pill__now:hover {
-  background: color-mix(in oklch, var(--primary) 10%, transparent);
-}
-
-.shell-topbar-update-pill__now:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

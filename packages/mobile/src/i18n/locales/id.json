@@ -2828,14 +2828,6 @@
       "updating": "Memperbarui…",
       "afterRecording": "Setelah rekaman Anda",
       "afterReply": "Setelah Stella selesai membalas",
-      "afterTasks": {
-        "other": "Setelah {count} tugas"
-      },
-      "waitsForTasks": {
-        "other": "Menunggu {count} tugas yang berjalan selesai"
-      },
-      "updateNow": "Perbarui sekarang",
-      "updateNowHint": "Tugas dijeda dan lanjut dari posisi terakhir setelah Stella dimulai ulang",
       "devices": {
         "choose": "Pilih komputer",
         "thisComputer": "Komputer ini",

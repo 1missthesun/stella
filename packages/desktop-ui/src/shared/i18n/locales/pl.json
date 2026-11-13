@@ -2861,20 +2861,6 @@
       "updating": "Aktualizowanie…",
       "afterRecording": "Po nagraniu",
       "afterReply": "Gdy Stella skończy odpowiadać",
-      "afterTasks": {
-        "one": "Po 1 zadaniu",
-        "few": "Po {count} zadaniach",
-        "many": "Po {count} zadaniach",
-        "other": "Po {count} zadaniach"
-      },
-      "waitsForTasks": {
-        "one": "Czeka na zakończenie trwającego zadania",
-        "few": "Czeka na zakończenie {count} trwających zadań",
-        "many": "Czeka na zakończenie {count} trwających zadań",
-        "other": "Czeka na zakończenie {count} trwających zadań"
-      },
-      "updateNow": "Zaktualizuj teraz",
-      "updateNowHint": "Zadania wstrzymają się i po ponownym uruchomieniu Stelli wrócą do miejsca, w którym były",
       "devices": {
         "choose": "Wybierz komputery",
         "thisComputer": "Ten komputer",

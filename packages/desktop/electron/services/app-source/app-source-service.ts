@@ -108,8 +108,6 @@ type AppSourceServiceOptions = {
   recordingOpen?: () => boolean;
   /** Stella is mid-reply on this computer; a restart of the runtime would cut it off. */
   replying?: () => Promise<boolean>;
-  /** Tasks this computer is working on now; a restart of the runtime would pause them mid-step. */
-  tasksRunning?: () => Promise<number>;
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
@@ -265,12 +263,6 @@ const failureOf = (error: unknown): { reason: AppSourceFailure; detail?: string 
 const RECORDING_HOLD_MAX_MS = 20 * 60_000;
 /** Longest an update that restarts the runtime waits for Stella to finish her reply. */
 const REPLY_HOLD_MAX_MS = 3 * 60_000;
-/**
- * Longest an update that restarts the runtime waits for the tasks running here to finish. Past it (or when the user
- * says Update now) it goes ahead, and the tasks pause and pick up where they were after the restart.
- */
-const TASKS_HOLD_MAX_MS = 30 * 60_000;
-const HOLD_POLL_MS = 1_000;
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms).unref?.());
@@ -307,10 +299,6 @@ export class AppSourceService {
   private busy = false;
   private heldForRecording = false;
   private heldForReply = false;
-  /** Tasks running here that an update waits for; 0 when it isn't waiting for any. */
-  private heldForTasks = 0;
-  /** The user said Update now: the update stops waiting for the reply or tasks. */
-  private holdReleased = false;
   private refreshing: Promise<void> | null = null;
   private refreshAgain = false;
   private syncing = false;
@@ -989,7 +977,7 @@ export class AppSourceService {
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;
     let phase: ApplyPhase = "planned";
     let holding: Promise<RelaunchHold | null> | null = null;
-    if (restart && (install || restartsRuntime(paths)) && (await this.waitForWork())) this.mark("work");
+    if (restart && (install || restartsRuntime(paths)) && (await this.waitForReply())) this.mark("reply");
     try {
       await this.moveHead(cwd, from, to);
       phase = "signed";
@@ -1247,63 +1235,24 @@ export class AppSourceService {
   }
 
   /**
-   * An update that restarts the runtime waits while Stella is mid-reply here (the restart would cut the reply off
-   * between a tool call and its result) and while tasks run here (they would pause mid-step, and the commands they run
-   * would stop). Bounded, so a reply or task that never ends can't hold updates forever: then, or when the user says
-   * Update now, it goes ahead, and what it cut off picks up where it was after the restart.
+   * An update that restarts the runtime waits while Stella is mid-reply here: the restart would cut the reply off
+   * between a tool call and its result. Bounded, so a reply that never ends can't hold updates forever; one cut off
+   * then resumes after the restart.
    */
-  private async waitForWork() {
-    const replying = async () => (await this.options.replying?.().catch(() => false)) === true;
-    const tasks = async () => Math.max(0, (await this.options.tasksRunning?.().catch(() => 0)) ?? 0);
-    this.holdReleased = false;
-    let reply = await replying();
-    let running = await tasks();
-    if (!reply && running === 0) return false;
+  private async waitForReply() {
+    const replying = this.options.replying;
+    if (!replying || !(await replying().catch(() => false))) return false;
+    this.heldForReply = true;
+    this.publish({ ...this.state, heldForReply: true });
+    this.options.log("app-source.held-for-reply", {});
     const startedAt = Date.now();
-    let waitedFor = 0;
-    let why = "";
-    this.options.log("app-source.held-for-work", { replying: reply, tasks: running });
-    while (!this.disposed && !this.holdReleased) {
-      const elapsed = Date.now() - startedAt;
-      // Tasks get the longer wait; a reply alone the shorter one.
-      if (running > 0 ? elapsed >= TASKS_HOLD_MAX_MS : !reply || elapsed >= REPLY_HOLD_MAX_MS) break;
-      waitedFor = Math.max(waitedFor, running);
-      this.heldForReply = reply && running === 0;
-      this.heldForTasks = running;
-      const { heldForReply: _reply, heldForTasks: _tasks, ...rest } = this.state;
-      this.publish({
-        ...rest,
-        ...(this.heldForReply ? { heldForReply: true } : {}),
-        ...(running > 0 ? { heldForTasks: running } : {}),
-      });
-      await delay(HOLD_POLL_MS);
-      [reply, running] = await Promise.all([replying(), tasks()]);
-      why = this.holdReleased ? "update-now" : running > 0 ? "tasks-bound" : reply ? "reply-bound" : "finished";
-    }
+    const until = startedAt + REPLY_HOLD_MAX_MS;
+    while (!this.disposed && Date.now() < until && (await replying().catch(() => false))) await delay(500);
     this.heldForReply = false;
-    this.heldForTasks = 0;
-    const { heldForReply: _reply, heldForTasks: _tasks, ...rest } = this.state;
+    const { heldForReply: _held, ...rest } = this.state;
     this.publish(rest);
-    this.options.log("app-source.work-hold-ended", {
-      ms: Date.now() - startedAt,
-      ended: this.disposed ? "disposed" : why || "finished",
-      tasks: waitedFor,
-      stillRunning: running,
-    });
+    this.options.log("app-source.reply-hold-ended", { ms: Date.now() - startedAt });
     return true;
-  }
-
-  /**
-   * Update now: an update waiting for Stella's reply or the tasks running here goes ahead; what it cuts off picks up
-   * where it was after the restart.
-   */
-  updateNow(): AppSourceActionResult {
-    if (!this.heldForReply && this.heldForTasks === 0) {
-      return { ok: false, error: "No update is waiting.", reason: "nothing" };
-    }
-    this.holdReleased = true;
-    this.options.log("app-source.update-now", { tasks: this.heldForTasks });
-    return { ok: true };
   }
 
   private setBusy(busy: boolean) {
@@ -1335,7 +1284,6 @@ export class AppSourceService {
             busy: this.busy,
             ...(this.heldForRecording ? { heldForRecording: true } : {}),
             ...(this.heldForReply ? { heldForReply: true } : {}),
-            ...(this.heldForTasks > 0 ? { heldForTasks: this.heldForTasks } : {}),
           });
           this.considerAutoApply(this.state);
           this.considerWanted(this.state);

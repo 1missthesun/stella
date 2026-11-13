@@ -2850,18 +2850,6 @@
       "updating": "מעדכן…",
       "afterRecording": "אחרי ההקלטה",
       "afterReply": "אחרי ש-Stella תסיים לענות",
-      "afterTasks": {
-        "one": "אחרי משימה אחת",
-        "two": "אחרי שתי משימות",
-        "other": "אחרי {count} משימות"
-      },
-      "waitsForTasks": {
-        "one": "ממתין לסיום משימה שרצה",
-        "two": "ממתין לסיום שתי משימות שרצות",
-        "other": "ממתין לסיום {count} משימות שרצות"
-      },
-      "updateNow": "לעדכן עכשיו",
-      "updateNowHint": "המשימות נעצרות וממשיכות מאותה נקודה אחרי ש-Stella מופעלת מחדש",
       "devices": {
         "choose": "בחירת מחשבים",
         "thisComputer": "המחשב הזה",

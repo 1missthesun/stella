@@ -2828,14 +2828,6 @@
       "updating": "업데이트 중…",
       "afterRecording": "녹화가 끝나면",
       "afterReply": "Stella의 답장이 끝나면",
-      "afterTasks": {
-        "other": "작업 {count}개 후"
-      },
-      "waitsForTasks": {
-        "other": "실행 중인 작업 {count}개가 끝나기를 기다리는 중"
-      },
-      "updateNow": "지금 업데이트",
-      "updateNowHint": "작업이 일시 중지되었다가 Stella가 다시 시작되면 멈춘 곳부터 이어서 진행합니다",
       "devices": {
         "choose": "컴퓨터 선택",
         "thisComputer": "이 컴퓨터",

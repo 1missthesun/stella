@@ -2839,16 +2839,6 @@
       "updating": "Updating…",
       "afterRecording": "After your recording",
       "afterReply": "After Stella's reply",
-      "afterTasks": {
-        "one": "After 1 task",
-        "other": "After {count} tasks"
-      },
-      "waitsForTasks": {
-        "one": "Waiting for a running task to finish",
-        "other": "Waiting for {count} running tasks to finish"
-      },
-      "updateNow": "Update now",
-      "updateNowHint": "Tasks pause and pick up where they were after Stella restarts",
       "devices": {
         "choose": "Choose computers",
         "thisComputer": "This computer",

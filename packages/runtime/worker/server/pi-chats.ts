@@ -256,23 +256,6 @@ export const piChatsBusy = (session: OpenSession): boolean => loadedBySession.ge
 export const piChatsReplying = async (session: OpenSession): Promise<boolean> =>
   (await loadedBySession.get(session)?.replying().catch(() => false)) ?? false;
 
-/**
- * Tasks this computer is working on now. Before the chats are loaded (just after a start, before they resume), each
- * chat that had work running counts as one.
- */
-export const piChatsTasksRunning = async (session: OpenSession): Promise<number> => {
-  const loaded = loadedBySession.get(session);
-  if (loaded) return await loaded.tasksRunning().catch(() => 0);
-  try {
-    const ids = JSON.parse(
-      readFileSync(path.join(session.config.get().stellaDataDirPath, "agent", "active.json"), "utf8"),
-    ) as unknown;
-    return Array.isArray(ids) ? ids.length : 0;
-  } catch {
-    return 0;
-  }
-};
-
 export const closePiChats = async (session: OpenSession): Promise<void> => {
   const chats = chatsBySession.get(session);
   chatsBySession.delete(session);

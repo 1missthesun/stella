@@ -2297,7 +2297,6 @@ export class StellaRuntimeHost {
         : {}),
       busy: workerHealth?.piBusy === true,
       replying: workerHealth?.piReplying === true,
-      tasksRunning: workerHealth?.piTasksRunning ?? 0,
     };
   }
   fenceWorkerPeer(peer: JsonRpcPeer): WorkerPeerRegistrar {

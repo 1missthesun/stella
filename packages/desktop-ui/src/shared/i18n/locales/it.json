@@ -2850,16 +2850,6 @@
       "updating": "Aggiornamento…",
       "afterRecording": "Dopo la registrazione",
       "afterReply": "Quando Stella ha finito di rispondere",
-      "afterTasks": {
-        "one": "Dopo 1 attività",
-        "other": "Dopo {count} attività"
-      },
-      "waitsForTasks": {
-        "one": "In attesa che finisca un'attività in corso",
-        "other": "In attesa che finiscano {count} attività in corso"
-      },
-      "updateNow": "Aggiorna ora",
-      "updateNowHint": "Le attività si mettono in pausa e riprendono da dove erano dopo il riavvio di Stella",
       "devices": {
         "choose": "Scegli i computer",
         "thisComputer": "Questo computer",

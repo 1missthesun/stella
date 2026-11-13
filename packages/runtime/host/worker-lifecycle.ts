@@ -45,8 +45,6 @@ export type WorkerHealthSnapshot = {
   piBusy?: boolean;
   /** Stella is mid-reply in a chat here. */
   piReplying?: boolean;
-  /** Tasks this computer is working on now (not ones waiting or done). */
-  piTasksRunning?: number;
 };
 
 const waitForWorkerProcessExitEffect = (

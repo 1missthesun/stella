@@ -26,7 +26,6 @@ import {
   IPC_APP_SOURCE_SKIP,
   IPC_APP_SOURCE_STATE,
   IPC_APP_SOURCE_UNDO,
-  IPC_APP_SOURCE_UPDATE_NOW,
   IPC_AUTH_APPLY_SESSION_TOKEN,
   IPC_AUTH_DELETE_USER,
   IPC_AUTH_FORGET_ACCOUNT_HINT,
@@ -521,7 +520,6 @@ export const createElectronApi = (
       applyRemote: invoker(IPC_APP_SOURCE_APPLY_REMOTE),
       applyUpstream: invoker(IPC_APP_SOURCE_APPLY_UPSTREAM),
       skip: invoker(IPC_APP_SOURCE_SKIP),
-      updateNow: invoker(IPC_APP_SOURCE_UPDATE_NOW),
     },
 
     capture: {

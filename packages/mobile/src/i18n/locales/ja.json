@@ -2828,14 +2828,6 @@
       "updating": "アップデート中…",
       "afterRecording": "録画の終了後",
       "afterReply": "Stellaの返信が終わったら",
-      "afterTasks": {
-        "other": "{count}件のタスクの後"
-      },
-      "waitsForTasks": {
-        "other": "実行中の{count}件のタスクの完了を待っています"
-      },
-      "updateNow": "今すぐアップデート",
-      "updateNowHint": "タスクは一時停止し、Stellaの再起動後に中断したところから再開します",
       "devices": {
         "choose": "コンピュータを選ぶ",
         "thisComputer": "このコンピュータ",

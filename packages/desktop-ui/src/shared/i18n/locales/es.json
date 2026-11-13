@@ -2020,6 +2020,7 @@
           "nextTry": "Próximo intento {time}",
           "off": "La memoria está desactivada, así que no se sincroniza nada.",
           "refused": "Demasiado largo para sincronizar, así que se queda solo en este ordenador: {files}",
+          "refusedTitle": "Parte de la memoria no se sincroniza",
           "signedOut": "Inicia sesión para mantener la misma memoria en este ordenador y en la nube.",
           "synced": "Igual en este ordenador y en la nube. Un cambio en cualquiera de los dos lados se sincroniza con el otro.",
           "syncing": "Sincronizando con la nube…"

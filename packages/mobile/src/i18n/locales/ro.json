@@ -2020,6 +2020,7 @@
           "nextTry": "Următoarea încercare {time}",
           "off": "Memoria este dezactivată, așa că nu se sincronizează nimic.",
           "refused": "Prea lung pentru sincronizare, așa că rămâne doar pe acest computer: {files}",
+          "refusedTitle": "O parte din memorie nu se sincronizează",
           "signedOut": "Conectează-te ca memoria să rămână la fel pe acest computer și în cloud.",
           "synced": "La fel pe acest computer și în cloud. O modificare pe oricare parte se sincronizează cu cealaltă.",
           "syncing": "Se sincronizează cu cloudul…"

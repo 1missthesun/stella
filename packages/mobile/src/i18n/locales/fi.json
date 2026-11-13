@@ -2010,6 +2010,7 @@
           "nextTry": "Seuraava yritys {time}",
           "off": "Muisti on pois päältä, joten mitään ei synkronoida.",
           "refused": "Liian pitkä synkronoitavaksi, joten se säilyy vain tällä tietokoneella: {files}",
+          "refusedTitle": "Osa muistista ei synkronoidu",
           "signedOut": "Kirjaudu sisään, jotta muisti pysyy samana tällä tietokoneella ja pilvessä.",
           "synced": "Sama tällä tietokoneella ja pilvessä. Muutos kummalla tahansa puolella synkronoidaan toiselle.",
           "syncing": "Synkronoidaan pilven kanssa…"

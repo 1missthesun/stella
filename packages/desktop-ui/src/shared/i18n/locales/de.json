@@ -2010,6 +2010,7 @@
           "nextTry": "Nächster Versuch {time}",
           "off": "Erinnerungen sind ausgeschaltet, daher wird nichts synchronisiert.",
           "refused": "Zu lang zum Synchronisieren, daher nur auf diesem Computer: {files}",
+          "refusedTitle": "Ein Teil des Gedächtnisses wird nicht synchronisiert",
           "signedOut": "Melde dich an, damit deine Erinnerungen auf diesem Computer und in der Cloud gleich bleiben.",
           "synced": "Auf diesem Computer und in der Cloud gleich. Eine Änderung auf einer Seite wird mit der anderen synchronisiert.",
           "syncing": "Wird mit der Cloud synchronisiert…"

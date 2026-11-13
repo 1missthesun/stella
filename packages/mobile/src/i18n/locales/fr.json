@@ -2020,6 +2020,7 @@
           "nextTry": "Prochain essai {time}",
           "off": "La mémoire est désactivée, donc rien n'est synchronisé.",
           "refused": "Trop long pour être synchronisé, conservé uniquement sur cet ordinateur : {files}",
+          "refusedTitle": "Une partie de la mémoire ne se synchronise pas",
           "signedOut": "Connectez-vous pour garder la même mémoire sur cet ordinateur et dans le cloud.",
           "synced": "Identique sur cet ordinateur et dans le cloud. Un changement d'un côté est synchronisé de l'autre.",
           "syncing": "Synchronisation avec le cloud…"

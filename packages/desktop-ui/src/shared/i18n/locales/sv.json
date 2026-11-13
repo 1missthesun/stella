@@ -2010,6 +2010,7 @@
           "nextTry": "Nästa försök {time}",
           "off": "Minne är avstängt, så inget synkroniseras.",
           "refused": "För långt för att synkronisera, så det finns bara på den här datorn: {files}",
+          "refusedTitle": "En del av minnet synkroniseras inte",
           "signedOut": "Logga in för att hålla minnet likadant på den här datorn och i molnet.",
           "synced": "Samma på den här datorn och i molnet. En ändring på ena sidan synkroniseras till den andra.",
           "syncing": "Synkroniserar med molnet…"

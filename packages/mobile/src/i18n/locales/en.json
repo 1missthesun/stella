@@ -2009,7 +2009,8 @@
           "merging": "Merging changes from both sides…",
           "nextTry": "Next try {time}",
           "off": "Memory is off.",
-          "refused": "Too large to sync: {files}",
+          "refused": "Too large to sync, so it stays on this computer only: {files}",
+          "refusedTitle": "Some memory isn't syncing",
           "signedOut": "Sign in to sync.",
           "synced": "Synced",
           "syncing": "Syncing…"

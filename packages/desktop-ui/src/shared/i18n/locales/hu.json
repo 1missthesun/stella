@@ -2010,6 +2010,7 @@
           "nextTry": "Következő próbálkozás: {time}",
           "off": "A memória ki van kapcsolva, ezért semmi sem szinkronizálódik.",
           "refused": "Túl hosszú a szinkronizáláshoz, ezért csak ezen a számítógépen marad: {files}",
+          "refusedTitle": "A memória egy része nem szinkronizálódik",
           "signedOut": "Jelentkezz be, hogy a memória ugyanaz maradjon ezen a számítógépen és a felhőben.",
           "synced": "Ugyanaz ezen a számítógépen és a felhőben. Bármelyik oldalon történt változás szinkronizálódik a másikra.",
           "syncing": "Szinkronizálás a felhővel…"

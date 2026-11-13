@@ -2000,6 +2000,7 @@
           "nextTry": "Lần thử tiếp theo {time}",
           "off": "Bộ nhớ đang tắt nên không có gì được đồng bộ.",
           "refused": "Quá dài để đồng bộ nên chỉ được giữ trên máy tính này: {files}",
+          "refusedTitle": "Một phần bộ nhớ không được đồng bộ",
           "signedOut": "Đăng nhập để giữ bộ nhớ giống nhau trên máy tính này và trên đám mây.",
           "synced": "Giống nhau trên máy tính này và trên đám mây. Thay đổi ở bên nào cũng được đồng bộ sang bên kia.",
           "syncing": "Đang đồng bộ với đám mây…"

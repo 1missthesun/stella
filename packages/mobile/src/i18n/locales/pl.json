@@ -2030,6 +2030,7 @@
           "nextTry": "Następna próba {time}",
           "off": "Pamięć jest wyłączona, więc nic nie jest synchronizowane.",
           "refused": "Za długie do synchronizacji, więc pozostaje tylko na tym komputerze: {files}",
+          "refusedTitle": "Część pamięci się nie synchronizuje",
           "signedOut": "Zaloguj się, aby pamięć była taka sama na tym komputerze i w chmurze.",
           "synced": "Taka sama na tym komputerze i w chmurze. Zmiana po jednej stronie jest synchronizowana z drugą.",
           "syncing": "Synchronizowanie z chmurą…"

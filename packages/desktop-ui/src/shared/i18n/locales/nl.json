@@ -2010,6 +2010,7 @@
           "nextTry": "Volgende poging {time}",
           "off": "Geheugen staat uit, dus er wordt niets gesynchroniseerd.",
           "refused": "Te lang om te synchroniseren, dus alleen op deze computer bewaard: {files}",
+          "refusedTitle": "Een deel van het geheugen wordt niet gesynchroniseerd",
           "signedOut": "Log in om het geheugen gelijk te houden op deze computer en in de cloud.",
           "synced": "Hetzelfde op deze computer en in de cloud. Een wijziging aan de ene kant wordt naar de andere gesynchroniseerd.",
           "syncing": "Synchroniseren met de cloud…"

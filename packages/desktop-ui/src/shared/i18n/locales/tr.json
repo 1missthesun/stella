@@ -2010,6 +2010,7 @@
           "nextTry": "Sonraki deneme {time}",
           "off": "Bellek kapalı, bu yüzden hiçbir şey senkronize edilmiyor.",
           "refused": "Senkronize etmek için fazla uzun, bu yüzden yalnızca bu bilgisayarda tutuluyor: {files}",
+          "refusedTitle": "Belleğin bir kısmı eşitlenmiyor",
           "signedOut": "Belleğin bu bilgisayarda ve bulutta aynı kalması için oturum açın.",
           "synced": "Bu bilgisayarda ve bulutta aynı. Herhangi bir taraftaki değişiklik diğerine senkronize edilir.",
           "syncing": "Bulutla senkronize ediliyor…"

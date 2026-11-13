@@ -2030,6 +2030,7 @@
           "nextTry": "Další pokus {time}",
           "off": "Paměť je vypnutá, takže se nic nesynchronizuje.",
           "refused": "Příliš dlouhé na synchronizaci, proto zůstává jen v tomto počítači: {files}",
+          "refusedTitle": "Část paměti se nesynchronizuje",
           "signedOut": "Přihlaste se, aby paměť zůstala stejná v tomto počítači i v cloudu.",
           "synced": "Stejná v tomto počítači i v cloudu. Změna na kterékoli straně se synchronizuje na druhou.",
           "syncing": "Synchronizace s cloudem…"

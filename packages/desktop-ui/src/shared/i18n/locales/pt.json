@@ -2020,6 +2020,7 @@
           "nextTry": "Próxima tentativa {time}",
           "off": "A memória está desativada, então nada é sincronizado.",
           "refused": "Longo demais para sincronizar, então fica só neste computador: {files}",
+          "refusedTitle": "Parte da memória não está sincronizando",
           "signedOut": "Entre para manter a mesma memória neste computador e na nuvem.",
           "synced": "Igual neste computador e na nuvem. Uma alteração em qualquer lado é sincronizada com o outro.",
           "syncing": "Sincronizando com a nuvem…"

@@ -2010,6 +2010,7 @@
           "nextTry": "Neste forsøk {time}",
           "off": "Minne er slått av, så ingenting synkroniseres.",
           "refused": "For lang til å synkroniseres, så den blir bare på denne datamaskinen: {files}",
+          "refusedTitle": "Noe av minnet synkroniseres ikke",
           "signedOut": "Logg på for å holde minnet likt på denne datamaskinen og i skyen.",
           "synced": "Det samme på denne datamaskinen og i skyen. En endring på den ene siden synkroniseres til den andre.",
           "syncing": "Synkroniserer med skyen…"

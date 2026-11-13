@@ -201,6 +201,11 @@ export type HostLlmCredentialsRequest =
       cached?: boolean;
       /** The login in this config directory was refused by Anthropic in a turn. */
       rejectedConfigDir?: string | null;
+      /**
+       * A turn waiting for a sign-in tries again: logins Anthropic refused
+       * that still read as signed in here are put back into use.
+       */
+      retryRefused?: boolean;
     };
 
 export type HostLlmCredentialsResult =

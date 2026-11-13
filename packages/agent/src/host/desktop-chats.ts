@@ -177,6 +177,8 @@ const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
 /** A sign-in made right away (the notice in the chat) needs no note to Stella. */
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
+/** A hold that comes back within this long (a refused login tried again) is the same episode. */
+const CLAUDE_SIGN_IN_EPISODE_GRACE_MS = 45 * 60_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
@@ -237,7 +239,7 @@ export const claudeSignInNoteText = (
     `Claude Code on ${where} can't answer since ${new Date(since).toISOString()}: its Claude sign-in${held.email ? ` (${held.email})` : ""} there has ended or was refused, so work there that runs on Claude waits for a sign-in instead of failing. Waiting there:`,
     ...held.tasks.map((task) => `- ${task.description} (thread_id: ${task.threadId})`),
     ...(held.reply ? ["- your own reply in this chat"] : []),
-    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › Account › Claude there), and give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
+    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › Account › Claude there), or when the login answers again (that computer tries it every few minutes, in case Anthropic refused it by mistake); they give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
     "Only the user can sign in, so tell them when they're next around if it matters to them. A task that can't wait can be carried on elsewhere with send_message's destination (the cloud or another computer), or stopped.",
   ].join("\n");
 };
@@ -804,7 +806,12 @@ export function desktopChats(options: DesktopChatsOptions) {
   // reply) with when it began. agent_status shows them as waiting, and Stella
   // gets one note per chat once a hold outlasts a sign-in made right away.
   const loginHeldSince = new Map<string, Map<string, number>>();
-  const loginNoteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // One note per episode: a hold that ends while the computer tries a
+  // refused login again and comes straight back is the same episode.
+  const loginEpisodes = new Map<
+    string,
+    { since: number; note?: ReturnType<typeof setTimeout>; end?: ReturnType<typeof setTimeout> }
+  >();
   const claudeSignInHeld = (conversationId: string, threadId: string): boolean =>
     loginHeldSince.get(conversationId)?.has(threadId) ?? false;
   const noteLoginHold = (
@@ -819,23 +826,31 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!holds) loginHolds.set(conversationId, (holds = new Map()));
       holds.set(key, { text: status.text, ...(status.email ? { email: status.email } : {}) });
       if (!held) loginHeldSince.set(conversationId, (held = new Map()));
-      if (!held.has(threadId ?? "")) held.set(threadId ?? "", Date.now());
-      if (!loginNoteTimers.has(conversationId)) {
-        const timer = setTimeout(() => {
+      let episode = loginEpisodes.get(conversationId);
+      if (!episode) loginEpisodes.set(conversationId, (episode = { since: Date.now() }));
+      clearTimeout(episode.end);
+      episode.end = undefined;
+      if (!held.has(threadId ?? "")) held.set(threadId ?? "", episode.since);
+      if (!episode.note) {
+        episode.note = setTimeout(() => {
           void sendClaudeSignInNote(conversationId).catch((error: unknown) => options.report(error));
         }, CLAUDE_SIGN_IN_NOTE_AFTER_MS);
-        timer.unref?.();
-        loginNoteTimers.set(conversationId, timer);
+        episode.note.unref?.();
       }
     } else {
       holds?.delete(key);
       if (holds?.size === 0) loginHolds.delete(conversationId);
       held?.delete(threadId ?? "");
-      if (held?.size === 0) {
-        loginHeldSince.delete(conversationId);
-        // The episode is over: a later sign-in loss gets its own note.
-        clearTimeout(loginNoteTimers.get(conversationId));
-        loginNoteTimers.delete(conversationId);
+      if (held?.size === 0) loginHeldSince.delete(conversationId);
+      const episode = loginEpisodes.get(conversationId);
+      if (episode && !loginHeldSince.has(conversationId) && !episode.end) {
+        // Over once nothing has waited again for a while; a later sign-in
+        // loss then gets its own note.
+        episode.end = setTimeout(() => {
+          clearTimeout(episode.note);
+          loginEpisodes.delete(conversationId);
+        }, CLAUDE_SIGN_IN_EPISODE_GRACE_MS);
+        episode.end.unref?.();
       }
     }
     const event: PiChatEvent | undefined =
@@ -1353,7 +1368,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   const sendClaudeSignInNote = async (conversationId: string) => {
     const held = loginHeldSince.get(conversationId);
     if (!held?.size) return;
-    const since = Math.min(...held.values());
+    const since = loginEpisodes.get(conversationId)?.since ?? Math.min(...held.values());
     const chat = await open(conversationId);
     const descriptions = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record.description]));
     const email = [...(loginHolds.get(conversationId)?.values() ?? [])].find((hold) => hold.email)?.email;

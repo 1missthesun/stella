@@ -594,6 +594,27 @@ const isClaudeRefreshLockBusy = (error: unknown) =>
   /another Claude Code process is (?:refreshing|holding the refresh lock)/i.test(
     error instanceof Error ? error.message : String(error ?? ""),
   );
+/**
+ * Anthropic's side failing rather than the login: a 5xx from the API (its
+ * "503 credential validation failed" included), or a 403 that is Cloudflare's
+ * HTML page in front of the API ("Attention Required! | Cloudflare") instead
+ * of the API's own JSON refusal. The CLI words these "Failed to
+ * authenticate", so they are told apart before the login is blamed: on
+ * 2026-11-13 five minutes of them marked a live login as ended and held every
+ * task on that computer for seven hours.
+ */
+export const isTransientClaudeAuthError = (error: unknown): boolean =>
+  /\bapi error:?\s*5\d\d\b|\b5\d\d\s+(?:credential validation failed|service unavailable|bad gateway|gateway time-?out|internal server error)\b|\bcredential validation failed\b|\battention required!?\s*\|\s*cloudflare\b|\b403\b[^{\n]{0,160}?(?:cloudflare|<html|<!doctype)/i.test(
+    error instanceof Error ? error.message : String(error ?? ""),
+  );
+/** Waits between tries while Anthropic fails that way, then the login is checked as usual. */
+const TRANSIENT_AUTH_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000];
+/**
+ * While a turn waits for a sign-in, a login this computer still holds but
+ * Anthropic refused is tried again on this growing beat: a refusal can be
+ * Anthropic's mistake, and only a person could end the wait otherwise.
+ */
+const CLAUDE_LOGIN_REPROBE_DELAYS_MS = [2 * 60_000, 5 * 60_000, 10 * 60_000, 20 * 60_000, 30 * 60_000];
 const CLAUDE_REFRESH_LOCK_WAIT_MS = 15_000;
 const CLAUDE_REFRESH_LOCK_RETRIES = 2;
 const CLAUDE_LOGIN_POLL_MS = 10_000;
@@ -617,6 +638,7 @@ export const claudeCodeSubscriptionLimitOf = (
 export const claudeCodeAuthFailureOf = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (claudeCodeSubscriptionLimitOf(error)) return null;
+  if (isTransientClaudeAuthError(error)) return null;
   if (
     !/\bOAuth access token has been revoked\b|\btoken_(?:expired|revoked)\b|\bfailed to authenticate\b|\bauthentication_error\b|\bapi error:?\s*401\b|\b401\s+unauthorized\b|\binvalid bearer token\b|\bnot logged in\b|\bOAuth authentication (?:failed|is currently not supported)\b/i.test(
       message,
@@ -2236,6 +2258,7 @@ class ClaudeCodeSessionRuntime {
     let loginRechecks = 0;
     let loginRefusals = 0;
     let refreshLockWaits = 0;
+    let transientAuthRetries = 0;
     await this.awaitClaudeLogin(request);
 
     for (;;) {
@@ -2278,7 +2301,28 @@ class ClaudeCodeSessionRuntime {
           if (backgroundStopped) currentPrompt = `${USAGE_LIMIT_BACKGROUND_NOTE}\n\n${currentPrompt}`;
           continue;
         }
-        if (claudeCodeAuthFailureOf(error)) {
+        if (isTransientClaudeAuthError(error) && transientAuthRetries < TRANSIENT_AUTH_RETRY_DELAYS_MS.length) {
+          // Anthropic is failing, not the login: wait and try again, and
+          // never mark the login as ended for it.
+          const delay = TRANSIENT_AUTH_RETRY_DELAYS_MS[transientAuthRetries]!;
+          transientAuthRetries += 1;
+          console.warn("[claude-code] Anthropic is failing; retrying", {
+            attempt: transientAuthRetries,
+            delayMs: delay,
+            detail: normalizeErrorMessage(error).slice(0, 400),
+          });
+          const backgroundStopped = session.backgroundShellStarted === true;
+          this.resetStreamingProcess(request.sessionKey, session);
+          await waitUntil(Date.now() + delay, request.abortSignal, new Promise<void>(() => {}));
+          if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
+          if (failedAttemptMcpCalls.length > 0) {
+            currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
+            currentPromptImages = [];
+          }
+          if (backgroundStopped) currentPrompt = `${USAGE_LIMIT_BACKGROUND_NOTE}\n\n${currentPrompt}`;
+          continue;
+        }
+        if (claudeCodeAuthFailureOf(error) || isTransientClaudeAuthError(error)) {
           // The login this step ran on was refused. Read the logins again
           // (another one here may answer, or another process renewed this
           // one) and try once more; when none can answer, wait for a
@@ -2306,7 +2350,11 @@ class ClaudeCodeSessionRuntime {
               detail: normalizeErrorMessage(error).slice(0, 400),
             });
             await this.awaitClaudeLogin(request, { email: session.claudeLoginEmail ?? next.email, force: true });
+            // A fresh try after the wait: a sign-in, or a refused login
+            // that answers again.
             loginRechecks = 0;
+            loginRefusals = 0;
+            transientAuthRetries = 0;
           }
           if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
           if (failedAttemptMcpCalls.length > 0) {
@@ -2386,10 +2434,12 @@ class ClaudeCodeSessionRuntime {
     });
     const deadline = Date.now() + CLAUDE_LOGIN_HOLD_MAX_MS;
     let resumed = false;
+    let reprobes = 0;
+    let reprobeAt = Date.now() + CLAUDE_LOGIN_REPROBE_DELAYS_MS[0]!;
     try {
       for (;;) {
         await waitUntil(
-          Math.min(deadline, Date.now() + CLAUDE_LOGIN_POLL_MS),
+          Math.min(deadline, Date.now() + CLAUDE_LOGIN_POLL_MS, reprobeAt),
           request.abortSignal,
           new Promise<void>(() => {}),
         );
@@ -2397,6 +2447,20 @@ class ClaudeCodeSessionRuntime {
         if (config.signedIn) {
           resumed = true;
           return;
+        }
+        if (Date.now() >= reprobeAt) {
+          // Put back into use a login Anthropic refused that still reads as
+          // signed in here; the step then tries it for real, and comes back
+          // here if it is refused again.
+          reprobes += 1;
+          reprobeAt =
+            Date.now() +
+            CLAUDE_LOGIN_REPROBE_DELAYS_MS[Math.min(reprobes, CLAUDE_LOGIN_REPROBE_DELAYS_MS.length - 1)]!;
+          config = await getClaudeCodeConfig({ retryRefused: true });
+          if (config.signedIn) {
+            resumed = true;
+            return;
+          }
         }
         if (Date.now() >= deadline) {
           throw withClaudeLoginRejected("Waited for a Claude sign-in.", email);

@@ -104,7 +104,7 @@ const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
 
 const claudeSignInStatus = (row: AgentDirectoryAgentRow): string =>
-  `waiting for a Claude sign-in on ${row.where} (its Claude login there ended; it continues by itself once someone signs in there)`;
+  `waiting for a Claude sign-in on ${row.where} (Anthropic refused the Claude login there; it continues by itself once someone signs in there or the login answers again)`;
 
 const statusText = (row: AgentDirectoryAgentRow): string =>
   row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status)

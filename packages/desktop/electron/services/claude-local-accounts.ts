@@ -254,6 +254,18 @@ export class ClaudeLocalAccounts {
     void this.reportIfChanged();
   }
 
+  /**
+   * A turn waiting for a sign-in tries the logins Anthropic refused again: a
+   * refusal can be Anthropic failing rather than the login ending, and a
+   * login that really ended reads as ended from its own file anyway. True
+   * when there was one to try (the caller then reads the logins again).
+   */
+  retryRefused(): boolean {
+    if (this.rejected.size === 0) return false;
+    this.rejected.clear();
+    return true;
+  }
+
   state(): ClaudeLocalAccountsState {
     const active = this.activeConfig();
     const chosenEmail = this.chosenAccount()?.email;

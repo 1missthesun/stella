@@ -216,9 +216,10 @@ export const createHostRunnerHandlers = (context, options) => ({
             if (request.rejectedConfigDir !== undefined) {
                 accounts.noteRejected(request.rejectedConfigDir ?? null);
             }
+            const retried = request.retryRefused === true && accounts.retryRefused();
             const config = await accounts.configForTurn({
-                recheck: request.recheck === true,
-                cached: request.cached === true,
+                recheck: request.recheck === true || retried,
+                cached: request.cached === true && !retried,
             });
             return { ok: true, ...config };
         }

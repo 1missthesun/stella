@@ -1810,6 +1810,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         return {
           ...row,
           status: there.status,
+          ...(there.waitingFor ? { waitingFor: there.waitingFor } : {}),
           where: there.where,
           updatedAt: there.updatedAt,
           ...(there.offline ? { offline: there.offline } : {}),

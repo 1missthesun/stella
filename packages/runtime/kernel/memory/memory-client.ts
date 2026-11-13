@@ -11,6 +11,13 @@ import {
 } from "./memory-layout.js";
 
 export const MEMORY_FILE_MAX_CHARS = 32_000;
+/**
+ * The most a memory file can be and still sync between the user's computers
+ * and the cloud (UTF-8 bytes). The character caps above are how big Stella
+ * keeps files she writes through `memory.write`; sync carries any memory file
+ * up to this, however it was written.
+ */
+export const MEMORY_SYNC_MAX_BYTES = 512 * 1024;
 export const MEMORY_LIST_MAX_FILES = 500;
 
 const MAX_PATH_CHARS = 240;
@@ -174,6 +181,24 @@ export const prepareMemoryWrite = async (
   const bytes = encoder.encode(text);
   return { bytes, sha: await memorySha(bytes) };
 };
+
+/** What `memory.files.write` stores: redacted, and refused only past what sync carries. */
+export const prepareMemorySync = async (
+  path: string,
+  content: string,
+): Promise<{ bytes: Uint8Array; sha: string }> => {
+  const bytes = encoder.encode(redactMemoryText(content));
+  if (bytes.byteLength > MEMORY_SYNC_MAX_BYTES) {
+    throw new Error(memorySyncTooLargeMessage(path, bytes.byteLength));
+  }
+  return { bytes, sha: await memorySha(bytes) };
+};
+
+const kib = (bytes: number): string =>
+  `${Math.ceil(bytes / 1024).toLocaleString("en-US")} KB`;
+
+export const memorySyncTooLargeMessage = (path: string, bytes: number): string =>
+  `${path} is ${kib(bytes)}; memory files over ${kib(MEMORY_SYNC_MAX_BYTES)} don't sync to the cloud or the user's other computers, so it stays on this one.`;
 
 const residentRank = (path: string): number =>
   path === MAIN_MEMORY_RELATIVE_PATH ? 0 : path === RULES_MEMORY_RELATIVE_PATH ? 1 : 2;

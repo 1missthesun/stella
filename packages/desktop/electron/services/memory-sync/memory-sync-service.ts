@@ -20,6 +20,10 @@ import type {
   MemorySyncStatus,
 } from "@stella/contracts/desktop/memory-sync";
 import {
+  MEMORY_SYNC_MAX_BYTES,
+  memorySyncTooLargeMessage,
+} from "@stella/runtime/kernel/memory/memory-client.js";
+import {
   MEMORIES_DIR,
   PERSONALITY_FILE,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
@@ -47,6 +51,11 @@ const ERROR_RETRY_MIN_MS = 60_000;
 const ERROR_RETRY_MAX_MS = 30 * 60_000;
 const NOT_READY_RETRY_MS = 30_000;
 const MERGE_SHOWN_MS = 24 * 60 * 60_000;
+// A file the cloud refused is offered again after this even if unchanged: the
+// refusal can come from an older backend whose limits have since moved.
+const REFUSED_RETRY_MS = 6 * 60 * 60_000;
+
+type Refusal = { sha: string; at: number; reason: string };
 
 type PendingMerge = MemoryMerge & { dispatchedAt: number | null };
 
@@ -55,7 +64,10 @@ type SyncState = {
   owner: string | null;
   epoch: string | null;
   files: Record<string, SyncedPair>;
+  /** Files the cloud would not take, by the local sha it refused. */
   refused: Record<string, string>;
+  /** When and why each refused file was refused (absent in older state files). */
+  refusals?: Record<string, Omit<Refusal, "sha">>;
   merges: PendingMerge[];
   lastSyncedAt: number | null;
 };
@@ -66,6 +78,7 @@ const emptyState = (): SyncState => ({
   epoch: null,
   files: {},
   refused: {},
+  refusals: {},
   merges: [],
   lastSyncedAt: null,
 });
@@ -84,8 +97,16 @@ const parseState = (raw: string): SyncState => {
     if (isPair(pair)) files[file] = { local: pair.local, cloud: pair.cloud };
   }
   const refused: Record<string, string> = {};
+  const refusals: Record<string, Omit<Refusal, "sha">> = {};
   for (const [file, sha] of Object.entries(value.refused ?? {})) {
-    if (typeof sha === "string") refused[file] = sha;
+    if (typeof sha !== "string") continue;
+    refused[file] = sha;
+    const detail = value.refusals?.[file];
+    refusals[file] = {
+      // A refusal recorded before `refusals` existed is retried at once.
+      at: typeof detail?.at === "number" ? detail.at : 0,
+      reason: typeof detail?.reason === "string" ? detail.reason : "",
+    };
   }
   return {
     version: 1,
@@ -93,6 +114,7 @@ const parseState = (raw: string): SyncState => {
     epoch: typeof value.epoch === "string" ? value.epoch : null,
     files,
     refused,
+    refusals,
     merges: Array.isArray(value.merges)
       ? value.merges.filter(
           (merge): merge is PendingMerge =>
@@ -168,6 +190,17 @@ const failureOf = (
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+const refusedStatus = (
+  refusals: Record<string, Omit<Refusal, "sha">>,
+): Pick<MemorySyncStatus, "refused" | "refusedReasons"> => {
+  const refused = Object.keys(refusals).sort();
+  const refusedReasons: Record<string, string> = {};
+  for (const file of refused) {
+    if (refusals[file]!.reason) refusedReasons[file] = refusals[file]!.reason;
+  }
+  return { refused, refusedReasons };
+};
 
 export type MemorySyncServiceOptions = {
   stellaDataDir: string;
@@ -536,13 +569,19 @@ export class MemorySyncService {
     const cloud = new Map(listing.files.map((file) => [file.path, file.sha]));
     const files: Record<string, SyncedPair> = { ...state.files };
     const refused: Record<string, string> = {};
+    const refusals: Record<string, Omit<Refusal, "sha">> = {};
+    const now = Date.now();
     for (const [file, sha] of Object.entries(state.refused)) {
-      if (local.get(file) === sha) refused[file] = sha;
+      if (local.get(file) !== sha) continue;
+      refused[file] = sha;
+      refusals[file] = state.refusals?.[file] ?? { at: 0, reason: "" };
     }
     const merges = [...state.merges];
     const actions = planMemorySync(state.files, local, cloud).filter(
       (action) =>
-        action.kind !== "push" || refused[action.path] !== action.localSha,
+        action.kind !== "push" ||
+        refused[action.path] !== action.localSha ||
+        now - (refusals[action.path]?.at ?? 0) >= REFUSED_RETRY_MS,
     );
     if (actions.length > 0) this.publish({ phase: "syncing" });
     const context = {
@@ -551,6 +590,7 @@ export class MemorySyncService {
       importing,
       files,
       refused,
+      refusals,
       merges,
     };
     let settled = true;
@@ -593,12 +633,12 @@ export class MemorySyncService {
       }
     } catch (error) {
       if (error instanceof PassStopped) {
-        await this.saveState({ ...state, files, refused, merges });
+        await this.saveState({ ...state, files, refused, refusals, merges });
         this.log("memory_sync.stopped", { reason: error.reason });
         this.request("full", UNSETTLED_RETRY_MS);
         return;
       }
-      await this.saveState({ ...state, files, refused, merges });
+      await this.saveState({ ...state, files, refused, refusals, merges });
       throw error;
     }
 
@@ -608,6 +648,7 @@ export class MemorySyncService {
       epoch: listing.memoryEpoch,
       files,
       refused,
+      refusals,
       merges: await this.handOffMerges(merges),
       lastSyncedAt:
         settled && failed.length === 0 ? Date.now() : state.lastSyncedAt,
@@ -628,7 +669,7 @@ export class MemorySyncService {
       phase: "synced",
       lastSyncedAt: state.lastSyncedAt,
       merging: state.merges.length,
-      refused: Object.keys(refused).sort(),
+      ...refusedStatus(refusals),
     });
     if (settled) {
       this.unsettledRuns = 0;
@@ -699,6 +740,7 @@ export class MemorySyncService {
       importing: boolean;
       files: Record<string, SyncedPair>;
       refused: Record<string, string>;
+      refusals: Record<string, Omit<Refusal, "sha">>;
       merges: PendingMerge[];
     },
   ): Promise<boolean> {
@@ -714,6 +756,19 @@ export class MemorySyncService {
       case "push": {
         const bytes = await this.local.read(action.path);
         if (bytes === null || sha256Hex(bytes) !== action.localSha) return false;
+        const refuse = (reason: string) => {
+          context.refused[action.path] = action.localSha;
+          context.refusals[action.path] = { at: Date.now(), reason };
+          this.log("memory_sync.refused", {
+            path: action.path,
+            bytes: bytes.byteLength,
+            reason,
+          });
+          return true;
+        };
+        if (bytes.byteLength > MEMORY_SYNC_MAX_BYTES) {
+          return refuse(memorySyncTooLargeMessage(action.path, bytes.byteLength));
+        }
         try {
           const outcome = await this.callCloud(() =>
             backend.call("memory.files.write", {
@@ -727,15 +782,14 @@ export class MemorySyncService {
           if (outcome.status === "conflict") return false;
           files[action.path] = { local: action.localSha, cloud: outcome.sha };
           delete context.refused[action.path];
+          delete context.refusals[action.path];
           return true;
         } catch (error) {
           if (
             error instanceof BackendRequestError &&
             error.reason === "CLOUD_MEMORY_FILE_REFUSED"
           ) {
-            context.refused[action.path] = action.localSha;
-            this.log("memory_sync.refused", { path: action.path });
-            return true;
+            return refuse(error.message);
           }
           throw error;
         }
@@ -872,6 +926,7 @@ export class MemorySyncService {
     if (next.phase !== "held") delete next.heldReason;
     if (next.heldReason !== "local_choice") delete next.waitingFiles;
     if (next.phase !== "error") delete next.failure;
+    if (next.refused.length === 0) delete next.refusedReasons;
     if (JSON.stringify(next) === JSON.stringify(this.status)) return;
     this.status = next;
     this.options.broadcast(next);

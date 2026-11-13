@@ -23,10 +23,12 @@
 
 import {
   MEMORY_LIST_MAX_FILES,
+  MEMORY_SYNC_MAX_BYTES,
   createMemoryClient,
   isSyncedMemoryPath,
   memorySha,
-  prepareMemoryWrite,
+  memorySyncTooLargeMessage,
+  prepareMemorySync,
   type MemoryClient,
   type MemoryFileInfo,
   type MemoryFileStore,
@@ -245,7 +247,7 @@ export const createWorldMemoryFile = async (
   return outcome.ok ? sha : null;
 };
 
-export const MEMORY_SYNC_READ_MAX_BYTES = 512 * 1024;
+export const MEMORY_SYNC_READ_MAX_BYTES = MEMORY_SYNC_MAX_BYTES;
 
 export class MemorySyncFileError extends Error {}
 
@@ -280,7 +282,7 @@ export const createWorldMemorySync = (
       const entry = await (await world()).stat(worldStellaPath(path));
       if (!entry || entry.kind !== "file") return null;
       if (entry.size > MEMORY_SYNC_READ_MAX_BYTES) {
-        throw new MemorySyncFileError(`${path} is too large to sync.`);
+        throw new MemorySyncFileError(memorySyncTooLargeMessage(path, entry.size));
       }
       const bytes = await store.read(path);
       if (bytes === null) return null;
@@ -295,9 +297,13 @@ export const createWorldMemorySync = (
       | { status: "conflict"; actualSha: string | null }
     > => {
       const path = syncedPath(input);
+      // Sync carries a file as the user's computer has it. The character caps
+      // are how big Stella keeps the files she writes through `memory.write`;
+      // applying them here left any bigger file (an area file a task grew past
+      // 32,000 characters with its file tools) on one computer for good.
       let prepared: { bytes: Uint8Array; sha: string };
       try {
-        prepared = await prepareMemoryWrite(path, content);
+        prepared = await prepareMemorySync(path, content);
       } catch (error) {
         throw new MemorySyncFileError(
           error instanceof Error ? error.message : String(error),

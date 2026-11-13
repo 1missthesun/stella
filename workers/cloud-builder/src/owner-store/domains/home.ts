@@ -14,7 +14,10 @@ import type {
   MemoryPolicy,
   MemoryPolicyChange,
 } from "@stella/contracts/turn-plane/memory-policy";
-import { isSyncedMemoryPath } from "@stella/runtime/kernel/memory/memory-client.js";
+import {
+  MEMORY_SYNC_MAX_BYTES,
+  isSyncedMemoryPath,
+} from "@stella/runtime/kernel/memory/memory-client.js";
 import { sha256BytesHex, sha256Hex } from "../../hash.js";
 import {
   MemorySyncFileError,
@@ -1354,7 +1357,9 @@ export const homeDomain = {
       parse: object({
         path: syncPathArg,
         expectedMemoryEpoch: syncEpochArg,
-        content: string({ max: 200_000 }),
+        // UTF-16 units; at most one per UTF-8 byte, so this admits every file
+        // `prepareMemorySync` does.
+        content: string({ max: MEMORY_SYNC_MAX_BYTES }),
         expectSha: nullable(syncShaArg),
         importing: boolean(),
       }),

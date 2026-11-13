@@ -13,7 +13,10 @@ export type MemorySyncStatus = {
   waitingFiles?: number;
   lastSyncedAt: number | null;
   merging: number;
+  /** Memory files on this computer that the cloud won't take; they stay here. */
   refused: string[];
+  /** Why, per refused file, when known. */
+  refusedReasons?: Record<string, string>;
   failure?: MemorySyncFailure;
 };
 

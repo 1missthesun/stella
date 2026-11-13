@@ -22,9 +22,9 @@
     "effect": "4.0.0"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.4",
     "@types/node": "^26.6.4",
-    "bun-types": "1.4.2",
+    "bun-types": "1.4.4",
     "typescript": "npm:typescript@^7.0.2"
   }
 }

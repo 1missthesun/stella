@@ -46,7 +46,7 @@ and nothing else breaks.
   connected in the app. No API key is required. An **OpenRouter API key is
   optional**: it turns on Stella's managed models, read-aloud and
   record-then-transcribe dictation (Part 2).
-- **Tools:** git, [Bun](https://bun.sh) 1.4.0, Node.js 22+, Docker
+- **Tools:** git, [Bun](https://bun.sh) 1.4.4, Node.js 22+, Docker
   (cloud-builder builds its sandbox image on deploy), and `openssl`. Wrangler
   comes from the repo (`bunx wrangler`).
 

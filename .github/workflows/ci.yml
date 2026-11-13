@@ -28,13 +28,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Restore Bun package cache
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-install-v1-1.4.4-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         env:
@@ -66,13 +66,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Restore Bun package cache
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-install-v1-1.4.4-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         env:
@@ -92,13 +92,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Restore Bun package cache
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-install-v1-1.4.4-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         env:
@@ -148,13 +148,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Restore Bun package cache
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-install-v1-1.4.4-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         env:
@@ -190,13 +190,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Restore Bun package cache
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-install-v1-1.4.4-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         env:
@@ -222,13 +222,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Restore Bun package cache
         uses: actions/cache@v4
         with:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: bun-install-v1-1.4.4-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         env:

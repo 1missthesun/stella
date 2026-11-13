@@ -14,7 +14,7 @@
     "@stella/contracts": "workspace:*"
   },
   "devDependencies": {
-    "bun-types": "1.4.2",
+    "bun-types": "1.4.4",
     "typescript": "npm:typescript@^7.0.2"
   }
 }

@@ -1,4 +1,4 @@
-FROM docker.io/oven/bun:1.4.2-debian@sha256:4f6e31d1a54d6a3dd312daef655fc998101b5043d52e12592ac293ef04b9bc73 AS bun-runtime
+FROM docker.io/oven/bun:1.4.4-debian@sha256:93d5032fe06d163427822dc1598f420363759bb18155c9cc90eb1be05a64a19e AS bun-runtime
 FROM docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS node-runtime
 FROM docker.io/cloudflare/sandbox:1.0.0@sha256:5bc187515bad0d9d486a4f1476f7d8ad39fe97c57965f044e4b0a0dcc93eac06 AS sandbox-tools
 
@@ -51,7 +51,7 @@ COPY .image/package.json ./
 COPY .image/bun.lock ./bun.lock
 COPY .image/image-build.json ./image-build.json
 RUN node --input-type=commonjs -e \
-      'const fs = require("node:fs"); const crypto = require("node:crypto"); const childProcess = require("node:child_process"); const metadata = JSON.parse(fs.readFileSync("image-build.json", "utf8")); const digest = `sha256:${crypto.createHash("sha256").update(fs.readFileSync("bun.lock")).digest("hex")}`; const bunVersion = childProcess.execFileSync("bun", ["--version"], { encoding: "utf8" }).trim(); if (metadata.dependencyLockSha256 !== digest) throw new Error("Sandbox image lock digest mismatch"); if (metadata.sandboxSdkVersion !== "1.0.0") throw new Error("Sandbox SDK and sandbox-tools image versions differ"); if (bunVersion !== "1.4.2") throw new Error("Sandbox image Bun version differs from the pinned lock runtime");' \
+      'const fs = require("node:fs"); const crypto = require("node:crypto"); const childProcess = require("node:child_process"); const metadata = JSON.parse(fs.readFileSync("image-build.json", "utf8")); const digest = `sha256:${crypto.createHash("sha256").update(fs.readFileSync("bun.lock")).digest("hex")}`; const bunVersion = childProcess.execFileSync("bun", ["--version"], { encoding: "utf8" }).trim(); if (metadata.dependencyLockSha256 !== digest) throw new Error("Sandbox image lock digest mismatch"); if (metadata.sandboxSdkVersion !== "1.0.0") throw new Error("Sandbox SDK and sandbox-tools image versions differ"); if (bunVersion !== "1.4.4") throw new Error("Sandbox image Bun version differs from the pinned lock runtime");' \
   && bun install --production --frozen-lockfile --linker isolated \
   && rm -rf node_modules/.bun/@anthropic-ai+claude-code-linux-x64-musl@* \
   && rm -rf /root/.bun/install/cache

@@ -95,7 +95,7 @@ const firmware = (access: SlackWorkspaceRepo["access"]): SlackWorkspaceRepo => (
     network: "limited",
     allowedHosts: ["api.acme-robotics.dev"],
     secrets: [{ id: "s1", name: "ACME_API_TOKEN", host: "api.acme-robotics.dev", header: "Authorization" }],
-    setupScript: 'set -euo pipefail\ncurl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"\nexport PATH="$HOME/.bun/bin:$PATH"',
+    setupScript: 'set -euo pipefail\ncurl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4"\nexport PATH="$HOME/.bun/bin:$PATH"',
     envVars: "NODE_ENV=development\nFIRMWARE_TARGET=stm32",
     lastSetup: {
       status: "failed",

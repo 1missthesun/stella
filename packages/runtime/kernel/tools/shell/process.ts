@@ -51,7 +51,7 @@ type PtyShellCallbacks = {
   onData: (data: string) => void;
   onExit: (
     exitCode: number | null,
-    signalCode: number | null,
+    signalCode: NodeJS.Signals | number | null,
     error?: Error,
   ) => void;
   onTerminalExit: (exitCode: number) => void;

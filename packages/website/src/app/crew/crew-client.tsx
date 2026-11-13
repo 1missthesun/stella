@@ -1774,7 +1774,7 @@ function EnvironmentSection({
             value={draft.setupScript}
             spellCheck={false}
             placeholder={
-              'set -euo pipefail\n\nif ! command -v bun >/dev/null || [ "$(bun --version)" != "1.4.2" ]; then\n  curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"\nfi\nexport PATH="$HOME/.bun/bin:$PATH"\nbun install'
+              'set -euo pipefail\n\nif ! command -v bun >/dev/null || [ "$(bun --version)" != "1.4.4" ]; then\n  curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4"\nfi\nexport PATH="$HOME/.bun/bin:$PATH"\nbun install'
             }
             aria-label="Setup script"
             aria-invalid={draft.setupScript.length > SLACK_SETUP_SCRIPT_MAX_CHARS || undefined}

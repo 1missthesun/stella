@@ -759,16 +759,14 @@ export class ExecutionPlacementBridge {
     });
     const expiresAt = jwtExpiryMs(token);
     if (expiresAt !== null) {
-      const delay = Math.max(
-        MIN_TOKEN_REFRESH_DELAY_MS,
-        expiresAt - TOKEN_REFRESH_MARGIN_MS - this.now(),
+      this.armTokenRefresh(
+        socket,
+        token,
+        Math.max(
+          MIN_TOKEN_REFRESH_DELAY_MS,
+          expiresAt - TOKEN_REFRESH_MARGIN_MS - this.now(),
+        ),
       );
-      this.socketTokenTimer?.cancel();
-      this.socketTokenTimer = forkDelayed(delay, () => {
-        if (this.socket !== socket) return;
-        this.leases.resetReconnectBackoff();
-        socket.close(1000, "token_refresh");
-      });
     }
 
     socket.on("message", (data: unknown) => {
@@ -811,6 +809,31 @@ export class ExecutionPlacementBridge {
     socket.on("close", () => this.dropSocket(socket));
     socket.on("error", (error: unknown) => {
       this.log("warn", "The device presence socket disconnected.", error);
+    });
+  }
+
+  /**
+   * Reopens the socket with a fresh sign-in shortly before its token expires.
+   * Only a different token is worth a reconnect: while the sign-in still hands
+   * out the one this socket opened with (it hasn't refreshed yet, or this
+   * computer's clock runs ahead of the token's), the socket stays up and the
+   * check repeats, instead of dropping presence every 30 s for nothing.
+   */
+  private armTokenRefresh(
+    socket: ExecutionPlacementSocket,
+    token: string,
+    delayMs: number,
+  ) {
+    this.socketTokenTimer?.cancel();
+    this.socketTokenTimer = forkDelayed(delayMs, () => {
+      if (this.socket !== socket) return;
+      const current = this.options.getAuthToken?.()?.trim();
+      if (!current || current === token) {
+        this.armTokenRefresh(socket, token, MIN_TOKEN_REFRESH_DELAY_MS);
+        return;
+      }
+      this.leases.resetReconnectBackoff();
+      socket.close(1000, "token_refresh");
     });
   }
 

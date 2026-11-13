@@ -1909,6 +1909,9 @@ static StrList electron_environment(void) {
     env_set(&env, "STELLA_LAUNCHER", "1");
     env_set(&env, "VITE_STELLA_BACKEND_URL", backend_url());
     env_set(&env, "STELLA_LAUNCHER_DATA_DIR", P.root);
+    char version[24];
+    snprintf(version, sizeof version, "%d", LAUNCHER_VERSION);
+    env_set(&env, "STELLA_LAUNCHER_VERSION", version);
     env_unset(&env, "STELLA_LAUNCHER_SERVER_ID");
     env_unset(&env, "STELLA_LAUNCHER_SERVER_NAME");
     if (!O.backend && g_server) {

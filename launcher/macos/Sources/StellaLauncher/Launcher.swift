@@ -358,6 +358,7 @@ final class Launcher {
         env["STELLA_LAUNCHER"] = "1"
         env["VITE_STELLA_BACKEND_URL"] = backend
         env["STELLA_LAUNCHER_DATA_DIR"] = paths.root.path
+        env["STELLA_LAUNCHER_VERSION"] = String(LauncherUpdater.ownVersion)
         env.removeValue(forKey: "STELLA_LAUNCHER_SERVER_ID")
         env.removeValue(forKey: "STELLA_LAUNCHER_SERVER_NAME")
         if options.backend == nil, let server = paths.server {

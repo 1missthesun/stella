@@ -1227,6 +1227,7 @@ static Env electronEnvironment(const wstring &pipeName) {
     env[L"STELLA_LAUNCHER"] = L"1";
     env[L"VITE_STELLA_BACKEND_URL"] = backendURL();
     env[L"STELLA_LAUNCHER_DATA_DIR"] = P.root;
+    env[L"STELLA_LAUNCHER_VERSION"] = std::to_wstring(kLauncherVersion);
     env.erase(L"STELLA_LAUNCHER_SERVER_ID");
     env.erase(L"STELLA_LAUNCHER_SERVER_NAME");
     if (!O.backendOverride && gHasServer) {

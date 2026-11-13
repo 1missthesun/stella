@@ -50,9 +50,13 @@ $lines += "> `"$done`" echo %ERRORLEVEL%"
 New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\links-temp" | Out-Null
 Set-Content -Path $cmd -Value $lines -Encoding ascii
 
-# Let a Basic User token write where the check works.
+# Let a Basic User token write where the check works. The grant is
+# inheritable, so setting it on each top folder is enough: Windows passes it
+# down to everything inside. `/T` would walk the tree itself and follow bun's
+# package junctions round in circles (packages\agent\node_modules\@stella\runtime
+# -> ...\@stella\agent -> ...) until paths get too long, which took ~10 min.
 foreach ($dir in @($Root, $Out, "$env:RUNNER_TEMP\links-temp")) {
-  icacls $dir /grant "*S-1-5-32-545:(OI)(CI)M" /T /Q | Out-Null
+  icacls $dir /grant "*S-1-5-32-545:(OI)(CI)M" /Q | Out-Null
 }
 New-Item -ItemType Directory -Force -Path $scratch | Out-Null
 icacls $scratch /grant "*S-1-5-32-545:(OI)(CI)M" /Q | Out-Null

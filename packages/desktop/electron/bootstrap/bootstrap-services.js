@@ -135,6 +135,7 @@ export const createBootstrapServices = (options) => {
         environment: config.telemetryEnvironment,
         isSignedIn: async () => Boolean((await authService.getAuthToken())?.trim()),
         isSelfHosted: () => Boolean(launcherServerId()),
+        getStellaAppDir: () => state.stellaAppDir ?? config.stellaAppDir,
     });
     anonymousCounts.start();
     const userAskService = new UserAskService({

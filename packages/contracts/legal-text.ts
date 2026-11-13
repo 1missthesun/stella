@@ -12,11 +12,11 @@ const SIGNED_OUT_SECTION_9_LINE = ANONYMOUS_COUNTS_ENABLED
 const ANONYMOUS_COUNTS_PARAGRAPH = ANONYMOUS_COUNTS_ENABLED
   ? `
 
-Anonymous usage counts. Unless you turn off "Send anonymous usage counts" in Settings → Privacy (it is on by default), the desktop app sends a few counts, signed in or not: that it was started for the first time, which kind of AI you chose during setup (for example Stella, Claude Code, ChatGPT, an API key, or a local model), that it gave its first successful reply and with which kind of AI, that it was opened on a given day (at most once a day), and your answer to the optional "How did you find Stella?" question. Each count carries the app version, the operating system family, and a random identifier created on your computer, which we replace with a keyed hash before storing. Counts never include your messages, files, file paths, account identifiers, or IP address; your IP address is used only briefly to limit abuse and is not stored. Self-hosted servers do not send these counts.`
+Anonymous usage counts. Unless you turn off "Send anonymous usage counts" in Settings → Privacy (it is on by default), the desktop app sends a few counts, signed in or not: that it was started for the first time, which kind of AI you chose during setup (for example Stella, Claude Code, ChatGPT, an API key, or a local model), that it gave its first successful reply and with which kind of AI, that it was opened on a given day (at most once a day), and your answer to the optional "How did you find Stella?" question. Each count carries the app version (which published version of Stella it is built from and the version of its launcher), the operating system family, and a random identifier created on your computer, which we replace with a keyed hash before storing. Counts never include your messages, files, file paths, account identifiers, or IP address; your IP address is used only briefly to limit abuse and is not stored. Self-hosted servers do not send these counts.`
   : "";
 
 export const LEGAL_TITLES: Record<LegalDocument, string> = { terms: "Terms of Service", privacy: "Privacy Policy" };
-export const LEGAL_LAST_UPDATED = "November 10, 2026";
+export const LEGAL_LAST_UPDATED = "November 13, 2026";
 export const PRIVACY_LAST_UPDATED = LEGAL_LAST_UPDATED;
 
 export const TERMS_OF_SERVICE = `Stella — FROMYOU, LLC

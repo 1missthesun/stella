@@ -911,12 +911,14 @@ export const runCloudClaude = async (options: {
     let compacting = false;
     let compactions = 0;
     let quieted: Error | undefined;
-    let lastAssistantUuid: string | undefined;
-    let quietReplyUuid: string | undefined;
+    let lastEntryUuid: string | undefined;
+    let quietResumeAt: string | undefined;
     const onJson = (event: ClaudeStreamJsonEvent): void => {
         options.onStreamEvent?.(event);
         const type = event.type;
-        if (type === "assistant" && typeof event.uuid === "string") lastAssistantUuid = event.uuid;
+        if ((type === "assistant" || (type === "user" && event.isMeta !== true && event.isSynthetic !== true)) && typeof event.uuid === "string") {
+          lastEntryUuid = event.uuid;
+        }
         if (type === "system" && event.subtype === "init") {
           markTurnStep("claudeInit");
           initialized = true;
@@ -931,7 +933,7 @@ export const runCloudClaude = async (options: {
         if (options.quiet && isClaudeCodeVisibleOutputNudge(event)) {
           if (!cancellation.aborted) {
             quieted = new Error("The turn ended with no reply.");
-            quietReplyUuid = lastAssistantUuid;
+            quietResumeAt = lastEntryUuid;
             cancellation.abort(quieted);
           }
           return;
@@ -1112,7 +1114,7 @@ export const runCloudClaude = async (options: {
     const quiet = quieted !== undefined && cancellation.reason === quieted;
     if (quiet) {
       finalText = "";
-      if (quietReplyUuid) await writeFile(quietReplyPath, `${quietReplyUuid}\n`, { mode: 0o600 });
+      if (quietResumeAt) await writeFile(quietReplyPath, `${quietResumeAt}\n`, { mode: 0o600 });
     } else if (cancellation.aborted && !error) {
       error = cancellation.reason?.message || "Claude Code turn was canceled.";
     }
@@ -1176,7 +1178,7 @@ export const cloudAgentProgressFromStream =
   };
 
 const NATIVE_SESSION_MARKER = "session-started";
-/** The reply a quiet turn ended on; the next turn resumes there, leaving Claude Code's no-visible-output nudge behind. */
+/** The entry a quiet turn ended on; the next turn resumes there, leaving Claude Code's no-visible-output nudge behind. */
 const QUIET_REPLY_MARKER = "quiet-reply";
 
 const settleHydratedLines = async (file: string, cwd: string): Promise<void> => {

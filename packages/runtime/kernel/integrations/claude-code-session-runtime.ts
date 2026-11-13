@@ -229,6 +229,8 @@ type PendingStep = {
   safeguardBlock?: ClaudeCodeSafeguardBlock;
   answeredMcpCallCount?: number;
   stellaToolsRunning?: number;
+  /** Stella interrupted this quiet step at Claude Code's nudge: whatever result follows ends it silent. */
+  quietInterrupted?: boolean;
 };
 type ClaudeCodeChild = ChildProcessByStdio<Writable, Readable, Readable>;
 type ClaudeCodeProcessState = {
@@ -244,7 +246,8 @@ type ClaudeCodeProcessState = {
   launchConfig: string;
   cliIdentity: string | null;
   claudeConfigDir: string | null;
-  lastAssistantUuid?: string;
+  /** The newest transcript entry (a prompt, tool result or reply) this process streamed. */
+  lastEntryUuid?: string;
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
   adrift?: {
     lines: ClaudeStreamEvent[];
@@ -311,8 +314,8 @@ type ClaudeCodeSession = {
   /** The config directory the current CLI process signs in with (null: Claude Code's own). */
   claudeLoginConfigDir?: string | null;
   thinkingStripped?: boolean;
-  /** The reply a quiet turn ended on before Claude Code's no-visible-output nudge. */
-  quietReplyUuid?: string;
+  /** The entry a quiet turn ended on before Claude Code's no-visible-output nudge. */
+  quietResumeAt?: string;
   /** Resume the next spawned CLI at this message, leaving the nudge behind. */
   resumeAtNextSpawn?: string;
 };
@@ -2520,16 +2523,17 @@ class ClaudeCodeSessionRuntime {
   /**
    * A quiet turn that ended silent leaves Claude Code's nudge in the live
    * CLI's memory and transcript, where the next turn would read it as a
-   * reprimand. Respawn and resume at the reply before it (the transcript
+   * reprimand. Respawn and resume at the entry before it, so the quiet
+   * turn's input stays and only the nudge is left behind (the transcript
    * stays append-only). A process with background work keeps running.
    */
   leaveQuietNudgeBehind(sessionKey: string, session: ClaudeCodeSession) {
-    const replyUuid = session.quietReplyUuid;
-    session.quietReplyUuid = undefined;
-    if (!replyUuid || !session.resumeReady) return;
+    const resumeAt = session.quietResumeAt;
+    session.quietResumeAt = undefined;
+    if (!resumeAt || !session.resumeReady) return;
     if (session.backgroundShellStarted || (session.backgroundTasks ?? 0) > 0) return;
     this.resetStreamingProcess(sessionKey, session);
-    session.resumeAtNextSpawn = replyUuid;
+    session.resumeAtNextSpawn = resumeAt;
   }
   /**
    * `observedMcpCalls` carries side effects already applied by earlier
@@ -2963,12 +2967,15 @@ class ClaudeCodeSessionRuntime {
         session.resumeReady = true;
         request.onSessionId?.(session.sessionId);
       }
+      if (
+        (parsedLine.type === "assistant" || (parsedLine.type === "user" && parsedLine.isMeta !== true && parsedLine.isSynthetic !== true)) &&
+        typeof parsedLine.uuid === "string"
+      ) {
+        processState.lastEntryUuid = parsedLine.uuid;
+      }
       if (parsedLine.type === "user" && parsedLine.isReplay === true) {
         this.noteInjectionConsumed(session, processState, parsedLine.uuid);
         return undefined;
-      }
-      if (parsedLine.type === "assistant" && typeof parsedLine.uuid === "string") {
-        processState.lastAssistantUuid = parsedLine.uuid;
       }
       if (isClaudeCodeVisibleOutputNudge(parsedLine)) {
         const quiet = processState.pending[0];
@@ -2978,7 +2985,8 @@ class ClaudeCodeSessionRuntime {
           ![...(quiet.injections?.values() ?? [])].some((entry) => !entry.consumed)
         ) {
           processState.child.stdin.write(`${buildClaudeCodeInterruptRequest()}\n`, () => {});
-          session.quietReplyUuid = processState.lastAssistantUuid;
+          quiet.quietInterrupted = true;
+          session.quietResumeAt = processState.lastEntryUuid;
         }
       }
       if (
@@ -3150,6 +3158,14 @@ class ClaudeCodeSessionRuntime {
           }
         }
         this.detachAbortListener(completed);
+        if (completed.quietInterrupted) {
+          // The interrupt can land while the nudged request is in flight, which
+          // ends the step as an error; either way the quiet turn said nothing.
+          session.turnCount += 1;
+          session.lastUsedAt = Date.now();
+          completed.resolve({ message: "", sessionId: session.sessionId, usage: undefined });
+          return undefined;
+        }
         const blocked = claudeCodeSafeguardBlockOfResult(
           parsedLine,
           completed.safeguardBlock,

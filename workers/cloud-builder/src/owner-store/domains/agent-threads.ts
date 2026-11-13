@@ -42,6 +42,7 @@ import {
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import { DEVICE_OFFLINE_REASON, deviceOfflineText } from "@stella/contracts/device-offline";
+import { deviceEngineSignIns } from "@stella/contracts/execution-context";
 import {
   findDeviceDestination,
   SELECTED_DEVICE_NEEDS_CONSENT,
@@ -1543,6 +1544,19 @@ const moveReplay = (ctx: OwnerContext, args: MoveArgs): MoveResult | null => {
   };
 };
 
+/** A task on Claude Code (spawned with a `claude-code/…` model): it can't run where Claude Code isn't signed in. */
+const runsOnClaudeCode = (thread: ThreadRow): boolean => /^claude-code(?:\/|$)/u.test(thread.requested_model?.trim() ?? "");
+
+/**
+ * A Claude Code task's computer is online but reports its Claude sign-in gone
+ * (computers that report their sign-ins at all): the task waits there for
+ * someone to sign in again.
+ */
+const claudeSignInGone = (device: DeviceDestination | undefined, thread: ThreadRow): boolean =>
+  device?.online === true &&
+  runsOnClaudeCode(thread) &&
+  deviceEngineSignIns(device.availability?.capabilities)?.includes("claude-code") === false;
+
 const unavailableBecause = (
   device: DeviceDestination | undefined,
   thread: ThreadRow,
@@ -1552,6 +1566,8 @@ const unavailableBecause = (
   if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) return "declined";
   if (device.availability && !device.availability.ready) return "not_ready";
   if (thread.hold_reason !== null) return "usage_limit";
+  // Its run waits there for a Claude sign-in (the computer can't take Claude work).
+  if (claudeSignInGone(device, thread)) return "not_ready";
   return null;
 };
 
@@ -1805,7 +1821,11 @@ const agentDirectory = async (
       ...(live && status !== "waiting" && device?.online && device.remoteExecution !== "enabled"
         ? { awaitingConsent: true as const }
         : {}),
-      ...(live && row.hold_reason !== null ? { pausedBy: "usage-limit" as const } : {}),
+      ...(live && row.hold_reason !== null
+        ? { pausedBy: "usage-limit" as const }
+        : live && claudeSignInGone(device, row)
+          ? { pausedBy: "claude-sign-in" as const }
+          : {}),
       ...(waitingFor !== undefined ? { waitingFor } : {}),
     };
   });

@@ -175,6 +175,8 @@ const MODELS_READY_WAIT_MS = 30_000;
 const PLACED_MODELS_WAIT_MS = 120_000;
 const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
+/** A sign-in made right away (the notice in the chat) needs no note to Stella. */
+const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
@@ -219,11 +221,34 @@ export const restartNoteText = (
   ].join("\n");
 };
 
+/**
+ * The hidden note Stella gets when work on this computer has been waiting a
+ * while for a Claude sign-in: which login ended, what waits, and what she can
+ * do. Only a person can sign in, so nothing here resolves it by itself.
+ */
+export const claudeSignInNoteText = (
+  computer: { name: string; deviceId?: string },
+  since: number,
+  held: { email?: string; reply: boolean; tasks: ReadonlyArray<ResumedTask> },
+): string => {
+  const where = computer.deviceId ? `${computer.name} (device_id: ${computer.deviceId})` : computer.name;
+  return [
+    "[Claude sign-in needed]",
+    `Claude Code on ${where} can't answer since ${new Date(since).toISOString()}: its Claude sign-in${held.email ? ` (${held.email})` : ""} there has ended or was refused, so work there that runs on Claude waits for a sign-in instead of failing. Waiting there:`,
+    ...held.tasks.map((task) => `- ${task.description} (thread_id: ${task.threadId})`),
+    ...(held.reply ? ["- your own reply in this chat"] : []),
+    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › Account › Claude there), and give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
+    "Only the user can sign in, so tell them when they're next around if it matters to them. A task that can't wait can be carried on elsewhere with send_message's destination (the cloud or another computer), or stopped.",
+  ].join("\n");
+};
+
 export type DesktopChatsOptions = {
   dataDir: string;
   /** Resolves once the desktop has reconciled the tasks placed here with the server after this start. */
   placementSettled?(): Promise<void>;
   deviceId?: string;
+  /** This computer's name, as Stella's notes name it. */
+  computerName?: string;
   workspace: string;
   siteAuth(): { baseUrl: string; authToken: string } | null;
   refreshAuthToken?(): Promise<string | null | undefined>;
@@ -775,18 +800,43 @@ export function desktopChats(options: DesktopChatsOptions) {
       ? { type: "engine_status", state: "login-required", text: first.text, ...(first.email ? { email: first.email } : {}) }
       : undefined;
   };
+  // What waits for a sign-in, by chat: each task's thread id ("" for the
+  // reply) with when it began. agent_status shows them as waiting, and Stella
+  // gets one note per chat once a hold outlasts a sign-in made right away.
+  const loginHeldSince = new Map<string, Map<string, number>>();
+  const loginNoteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const claudeSignInHeld = (conversationId: string, threadId: string): boolean =>
+    loginHeldSince.get(conversationId)?.has(threadId) ?? false;
   const noteLoginHold = (
     conversationId: string,
     key: string,
     status: Extract<ClaudeCodeStatus, { state: "login-required" | "login-required-end" }>,
+    threadId?: string,
   ) => {
     let holds = loginHolds.get(conversationId);
+    let held = loginHeldSince.get(conversationId);
     if (status.state === "login-required") {
       if (!holds) loginHolds.set(conversationId, (holds = new Map()));
       holds.set(key, { text: status.text, ...(status.email ? { email: status.email } : {}) });
+      if (!held) loginHeldSince.set(conversationId, (held = new Map()));
+      if (!held.has(threadId ?? "")) held.set(threadId ?? "", Date.now());
+      if (!loginNoteTimers.has(conversationId)) {
+        const timer = setTimeout(() => {
+          void sendClaudeSignInNote(conversationId).catch((error: unknown) => options.report(error));
+        }, CLAUDE_SIGN_IN_NOTE_AFTER_MS);
+        timer.unref?.();
+        loginNoteTimers.set(conversationId, timer);
+      }
     } else {
       holds?.delete(key);
       if (holds?.size === 0) loginHolds.delete(conversationId);
+      held?.delete(threadId ?? "");
+      if (held?.size === 0) {
+        loginHeldSince.delete(conversationId);
+        // The episode is over: a later sign-in loss gets its own note.
+        clearTimeout(loginNoteTimers.get(conversationId));
+        loginNoteTimers.delete(conversationId);
+      }
     }
     const event: PiChatEvent | undefined =
       loginHoldEvent(conversationId) ??
@@ -813,7 +863,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         return;
       }
       if (status.state === "login-required" || status.state === "login-required-end") {
-        noteLoginHold(session.conversationId, session.sessionKey, status);
+        noteLoginHold(session.conversationId, session.sessionKey, status, session.threadId);
         return;
       }
       if (session.threadId) return;
@@ -1149,6 +1199,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     return {
       conversationId: async () => conversationId,
       usageLimitPaused: (threadId) => usageLimitPaused(conversationId, threadId),
+      claudeSignInHeld: (threadId) => claudeSignInHeld(conversationId, threadId),
       list: async (_context, listOptions) => {
         const local = localSessions();
         if (!cloud) return { agents: [], sessions: local };
@@ -1265,6 +1316,60 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (!stopped) return "not_found";
     for (const local of stopped.local) claudeCodeEngine?.abort(conversationId, { threadId: local });
     return { elsewhere: stopped.elsewhere };
+  };
+
+  /** One hidden note in a chat for Stella's next turn (it runs none itself). */
+  const appendHiddenNote = async (chat: Chat, conversationId: string, appendId: string, text: string, at: number) => {
+    const message = { role: "user" as const, content: [{ type: "text" as const, text }], timestamp: at };
+    if (conversationId.startsWith("local_")) {
+      await chat.modelsReady;
+      await chat.root.submit(
+        {
+          type: "write",
+          requestId: appendId,
+          entry: {
+            kind: "pi.user",
+            model: [{ ...message, content: [{ type: "text", text, stella: { hidden: true } } as TextContent] }],
+          },
+        },
+        context,
+      );
+      return;
+    }
+    const journal = options.journal?.(conversationId);
+    if (!journal?.appendNote) return;
+    // Just after a start, the cloud connection may still be on its way.
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await journal.appendNote({ appendId, payloadJson: JSON.stringify(message) });
+        return;
+      } catch (error) {
+        if (attempt >= NOTE_APPEND_ATTEMPTS) throw error;
+        await new Promise((resolve) => setTimeout(resolve, NOTE_APPEND_RETRY_MS));
+      }
+    }
+  };
+
+  const sendClaudeSignInNote = async (conversationId: string) => {
+    const held = loginHeldSince.get(conversationId);
+    if (!held?.size) return;
+    const since = Math.min(...held.values());
+    const chat = await open(conversationId);
+    const descriptions = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record.description]));
+    const email = [...(loginHolds.get(conversationId)?.values() ?? [])].find((hold) => hold.email)?.email;
+    const text = claudeSignInNoteText(
+      { name: options.computerName ?? "this computer", ...(options.deviceId ? { deviceId: options.deviceId } : {}) },
+      since,
+      {
+        ...(email ? { email } : {}),
+        reply: held.has(""),
+        tasks: [...held.keys()]
+          .filter((threadId) => threadId !== "")
+          .map((threadId) => ({ threadId, description: descriptions.get(threadId) ?? threadId })),
+      },
+    );
+    const appendId = `claude-sign-in-${since}-${createHash("sha256").update(`${conversationId}\0${options.deviceId ?? ""}`).digest("hex").slice(0, 12)}`;
+    await appendHiddenNote(chat, conversationId, appendId, text, Date.now());
   };
 
   const open = (conversationId: string): Promise<Chat> => {
@@ -2645,34 +2750,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           };
           const text = restartNoteText(computer, at, agents.map((agent) => ({ ...agent, now: now(agent.threadId) })));
           const appendId = `restart-${at}-${createHash("sha256").update(`${conversationId}\0${computer.deviceId ?? computer.name}`).digest("hex").slice(0, 12)}`;
-          const message = { role: "user" as const, content: [{ type: "text" as const, text }], timestamp: at };
-          if (conversationId.startsWith("local_")) {
-            await chat.modelsReady;
-            await chat.root.submit(
-              {
-                type: "write",
-                requestId: appendId,
-                entry: {
-                  kind: "pi.user",
-                  model: [{ ...message, content: [{ type: "text", text, stella: { hidden: true } } as TextContent] }],
-                },
-              },
-              context,
-            );
-            continue;
-          }
-          const journal = options.journal?.(conversationId);
-          if (!journal?.appendNote) continue;
-          // Just after a start, the cloud connection may still be on its way.
-          for (let attempt = 1; ; attempt += 1) {
-            try {
-              await journal.appendNote({ appendId, payloadJson: JSON.stringify(message) });
-              break;
-            } catch (error) {
-              if (attempt >= NOTE_APPEND_ATTEMPTS) throw error;
-              await new Promise((resolve) => setTimeout(resolve, NOTE_APPEND_RETRY_MS));
-            }
-          }
+          await appendHiddenNote(chat, conversationId, appendId, text, at);
         } catch (error) {
           options.report(error);
         }

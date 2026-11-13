@@ -412,6 +412,8 @@ export type AgentDirectoryHost = {
   conversationId(context: Context): Promise<string>;
   /** A usage limit holds this agent's run on this computer right now. */
   usageLimitPaused?(threadId: string): boolean;
+  /** This agent's run waits for a Claude sign-in on this computer right now. */
+  claudeSignInHeld?(threadId: string): boolean;
   list(
     context: Context,
     options?: { threadIds?: string[] },
@@ -653,6 +655,9 @@ const senderOf = (self: StellaAgentRole, stellaThreadId: string): AgentMessageSe
   self.agentType === "orchestrator" || !self.threadId
     ? { threadId: stellaThreadId, label: "Stella" }
     : { threadId: self.threadId, label: self.description ?? "An agent" };
+
+const CLAUDE_SIGN_IN_HELD_NOTE =
+  "But its run is waiting for a Claude sign-in on this computer (the Claude login here ended), so it reads your message only once someone signs in to Claude here.";
 
 const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDelivery["outcome"] | "answered"; note?: string }) => ({
   content: [
@@ -1631,7 +1636,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
         state.calls[String(api.taskId)] = { threadId, reporter };
       }, context);
-      return deliveredResult({ threadId, outcome: answering ? "answered" : running ? "steered" : "resumed" });
+      const signInHeld = running && !answering && host.directory?.claudeSignInHeld?.(threadId) === true;
+      return deliveredResult({
+        threadId,
+        outcome: answering ? "answered" : running ? "steered" : "resumed",
+        ...(signInHeld ? { note: CLAUDE_SIGN_IN_HELD_NOTE } : {}),
+      });
     },
   });
 
@@ -1859,7 +1869,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
       ...(live?.run !== undefined && host.directory?.usageLimitPaused?.(agent.threadId)
         ? { pausedBy: "usage-limit" as const }
-        : {}),
+        : live?.run !== undefined && host.directory?.claudeSignInHeld?.(agent.threadId)
+          ? { pausedBy: "claude-sign-in" as const }
+          : {}),
     };
   };
 

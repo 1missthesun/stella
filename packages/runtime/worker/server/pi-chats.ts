@@ -315,6 +315,7 @@ export const piChatsFor = (
       dataDir: session.config.get().stellaDataDirPath,
       placementSettled: () => placementReconciled(RESTART_NOTE_WAIT_MS),
       deviceId: session.config.deviceId,
+      computerName: os.hostname().trim().slice(0, 96) || "this computer",
       workspace: os.homedir(),
       siteAuth: () => session.runnerCell.get()?.getStellaSiteAuth() ?? null,
       memoryEnabled: () => loadLocalPreferences(session.config.get().stellaDataDirPath).memoryEnabled,

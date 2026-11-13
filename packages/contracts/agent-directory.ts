@@ -26,8 +26,12 @@ export type AgentDirectoryAgentRow = {
   updatedAt: number;
   offline?: { lastSeenAt?: number };
   awaitingConsent?: true;
-  /** A usage limit paused it mid-run; Resume on the chat's card continues it. */
-  pausedBy?: "usage-limit";
+  /**
+   * Why its run is held mid-way: a usage limit (Resume on the chat's card
+   * continues it), or its computer's Claude sign-in ended (it continues by
+   * itself once someone signs in to Claude there).
+   */
+  pausedBy?: "usage-limit" | "claude-sign-in";
   /** It ended its turn waiting for this, with no report; a message resumes it. */
   waitingFor?: string;
 };
@@ -99,12 +103,17 @@ const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
 
+const claudeSignInStatus = (row: AgentDirectoryAgentRow): string =>
+  `waiting for a Claude sign-in on ${row.where} (its Claude login there ended; it continues by itself once someone signs in there)`;
+
 const statusText = (row: AgentDirectoryAgentRow): string =>
   row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status)
     ? USAGE_LIMIT_PAUSED_STATUS
-    : row.status === "waiting" && row.waitingFor
-      ? `waiting for ${oneLine(row.waitingFor)}`
-      : row.status;
+    : row.pausedBy === "claude-sign-in" && isLiveAgentStatus(row.status)
+      ? claudeSignInStatus(row)
+      : row.status === "waiting" && row.waitingFor
+        ? `waiting for ${oneLine(row.waitingFor)}`
+        : row.status;
 
 const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
 

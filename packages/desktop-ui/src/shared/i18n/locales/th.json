@@ -2828,6 +2828,14 @@
       "updating": "กำลังอัปเดต…",
       "afterRecording": "หลังการบันทึกของคุณ",
       "afterReply": "หลังจาก Stella ตอบเสร็จ",
+      "afterTasks": {
+        "other": "หลังงาน {count} รายการ"
+      },
+      "waitsForTasks": {
+        "other": "กำลังรองานที่ทำอยู่ {count} รายการให้เสร็จ"
+      },
+      "updateNow": "อัปเดตเลย",
+      "updateNowHint": "งานจะหยุดชั่วคราวและทำต่อจากจุดเดิมหลังจาก Stella เริ่มใหม่",
       "devices": {
         "choose": "เลือกคอมพิวเตอร์",
         "thisComputer": "คอมพิวเตอร์เครื่องนี้",

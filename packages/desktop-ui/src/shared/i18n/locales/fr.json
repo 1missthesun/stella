@@ -2850,6 +2850,16 @@
       "updating": "Mise à jour…",
       "afterRecording": "Après votre enregistrement",
       "afterReply": "Quand Stella aura fini de répondre",
+      "afterTasks": {
+        "one": "Après 1 tâche",
+        "other": "Après {count} tâches"
+      },
+      "waitsForTasks": {
+        "one": "En attente de la fin d'une tâche en cours",
+        "other": "En attente de la fin de {count} tâches en cours"
+      },
+      "updateNow": "Mettre à jour maintenant",
+      "updateNowHint": "Les tâches se mettent en pause et reprennent là où elles en étaient après le redémarrage de Stella",
       "devices": {
         "choose": "Choisir les ordinateurs",
         "thisComputer": "Cet ordinateur",

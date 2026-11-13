@@ -26,7 +26,10 @@ export type NotificationInput = {
   title: string;
   detail?: string;
   createdAt?: number;
-  /** An action of this notification is under way (e.g. "Adding…"). */
+  /**
+   * An action of this notification is under way (e.g. "Adding…"). Unset: busy while one of its actions runs; false:
+   * not busy even then (an update that waits offers Update now while its own Update is still under way).
+   */
   busy?: boolean;
   busyLabel?: string;
   actions?: NotificationAction[];
@@ -162,18 +165,30 @@ export const clearNotifications = (): void => {
   for (const item of [...state.items]) dismissNotification(item.id);
 };
 
+/**
+ * Actions under way, per notification and action: the same action never runs twice at once, but another one of the
+ * notification may (an update waiting for tasks offers Update now while its own Update is still under way).
+ */
+const actionsUnderWay = new Map<string, Set<string>>();
+
 export const runNotificationAction = async (
   id: string,
   action: NotificationAction,
 ): Promise<void> => {
-  if (state.running.has(id)) return;
-  set({ running: new Set([...state.running, id]) });
+  const underWay = actionsUnderWay.get(id) ?? new Set<string>();
+  if (underWay.has(action.label)) return;
+  actionsUnderWay.set(id, underWay.add(action.label));
+  if (!state.running.has(id)) set({ running: new Set([...state.running, id]) });
   try {
     await action.run();
   } finally {
-    const running = new Set(state.running);
-    running.delete(id);
-    set({ running });
+    underWay.delete(action.label);
+    if (underWay.size === 0) {
+      actionsUnderWay.delete(id);
+      const running = new Set(state.running);
+      running.delete(id);
+      set({ running });
+    }
   }
   if (!action.keep) remove(id);
 };

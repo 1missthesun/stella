@@ -2839,6 +2839,16 @@
       "updating": "Opdaterer…",
       "afterRecording": "Efter din optagelse",
       "afterReply": "Når Stella har svaret færdigt",
+      "afterTasks": {
+        "one": "Efter 1 opgave",
+        "other": "Efter {count} opgaver"
+      },
+      "waitsForTasks": {
+        "one": "Venter på, at en kørende opgave bliver færdig",
+        "other": "Venter på, at {count} kørende opgaver bliver færdige"
+      },
+      "updateNow": "Opdater nu",
+      "updateNowHint": "Opgaverne holder pause og fortsætter, hvor de slap, når Stella er genstartet",
       "devices": {
         "choose": "Vælg computere",
         "thisComputer": "Denne computer",

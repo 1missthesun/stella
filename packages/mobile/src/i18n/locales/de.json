@@ -2839,6 +2839,16 @@
       "updating": "Wird aktualisiert…",
       "afterRecording": "Nach deiner Aufnahme",
       "afterReply": "Wenn Stella fertig geantwortet hat",
+      "afterTasks": {
+        "one": "Nach 1 Aufgabe",
+        "other": "Nach {count} Aufgaben"
+      },
+      "waitsForTasks": {
+        "one": "Wartet, bis eine laufende Aufgabe fertig ist",
+        "other": "Wartet, bis {count} laufende Aufgaben fertig sind"
+      },
+      "updateNow": "Jetzt aktualisieren",
+      "updateNowHint": "Aufgaben pausieren und machen nach dem Neustart von Stella dort weiter, wo sie waren",
       "devices": {
         "choose": "Computer auswählen",
         "thisComputer": "Dieser Computer",

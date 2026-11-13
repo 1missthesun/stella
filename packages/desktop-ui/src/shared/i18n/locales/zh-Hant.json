@@ -2828,6 +2828,14 @@
       "updating": "正在更新…",
       "afterRecording": "錄製結束後",
       "afterReply": "等 Stella 回覆完",
+      "afterTasks": {
+        "other": "{count} 個任務完成後"
+      },
+      "waitsForTasks": {
+        "other": "正在等待 {count} 個執行中的任務完成"
+      },
+      "updateNow": "立即更新",
+      "updateNowHint": "任務會暫停，Stella 重新啟動後從原處繼續",
       "devices": {
         "choose": "選擇電腦",
         "thisComputer": "這台電腦",

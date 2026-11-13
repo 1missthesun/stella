@@ -2850,6 +2850,18 @@
       "updating": "Se actualizează…",
       "afterRecording": "După înregistrare",
       "afterReply": "După ce Stella termină răspunsul",
+      "afterTasks": {
+        "one": "După 1 sarcină",
+        "few": "După {count} sarcini",
+        "other": "După {count} de sarcini"
+      },
+      "waitsForTasks": {
+        "one": "Așteaptă să se termine o sarcină în curs",
+        "few": "Așteaptă să se termine {count} sarcini în curs",
+        "other": "Așteaptă să se termine {count} de sarcini în curs"
+      },
+      "updateNow": "Actualizează acum",
+      "updateNowHint": "Sarcinile se opresc temporar și continuă de unde au rămas după ce Stella repornește",
       "devices": {
         "choose": "Alege computerele",
         "thisComputer": "Acest computer",

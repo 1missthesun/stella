@@ -2861,6 +2861,20 @@
       "updating": "Aktualizace…",
       "afterRecording": "Po dokončení záznamu",
       "afterReply": "Až Stella dokončí odpověď",
+      "afterTasks": {
+        "one": "Po 1 úkolu",
+        "few": "Po {count} úkolech",
+        "many": "Po {count} úkolu",
+        "other": "Po {count} úkolech"
+      },
+      "waitsForTasks": {
+        "one": "Čeká na dokončení běžícího úkolu",
+        "few": "Čeká na dokončení {count} běžících úkolů",
+        "many": "Čeká na dokončení {count} běžícího úkolu",
+        "other": "Čeká na dokončení {count} běžících úkolů"
+      },
+      "updateNow": "Aktualizovat teď",
+      "updateNowHint": "Úkoly se pozastaví a po restartu Stelly pokračují tam, kde skončily",
       "devices": {
         "choose": "Vybrat počítače",
         "thisComputer": "Tento počítač",

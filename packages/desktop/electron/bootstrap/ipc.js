@@ -462,6 +462,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             },
             recordingOpen: () => Boolean(state.showStella?.isActive()),
             replying: async () => (await state.stellaHostRunner?.replying?.()) === true,
+            tasksRunning: async () => (await state.stellaHostRunner?.tasksRunning?.()) ?? 0,
             isUserAway: () => {
                 if (state.showStella?.isActive()) return false;
                 const window = state.windowManager?.getFullWindow() ?? null;

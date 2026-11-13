@@ -2828,6 +2828,14 @@
       "updating": "Đang cập nhật…",
       "afterRecording": "Sau khi ghi xong",
       "afterReply": "Sau khi Stella trả lời xong",
+      "afterTasks": {
+        "other": "Sau {count} tác vụ"
+      },
+      "waitsForTasks": {
+        "other": "Đang chờ {count} tác vụ đang chạy hoàn tất"
+      },
+      "updateNow": "Cập nhật ngay",
+      "updateNowHint": "Các tác vụ tạm dừng và tiếp tục từ chỗ cũ sau khi Stella khởi động lại",
       "devices": {
         "choose": "Chọn máy tính",
         "thisComputer": "Máy tính này",

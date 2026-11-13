@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { currentDeviceDestinations } from "@stella/contracts/turn-plane/placement";
 import { friendlyDeviceName } from "@stella/contracts/device-files";
 import { ChevronDown, Download } from "@/ui/icons";
-import { useT } from "@/shared/i18n";
+import { useT, useTPlural } from "@/shared/i18n";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -145,6 +145,7 @@ const UpdateTargets = ({
 
 export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   const t = useT();
+  const tPlural = useTPlural();
   const state = useAppSourceState();
   const { pending, run } = useAppSourceAction();
   const offer = state ? versionOffer(state) : null;
@@ -154,22 +155,28 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
     offer.adding ||
     pending === offer.key ||
     state.merging !== undefined;
+  const tasks = state.heldForTasks ?? 0;
   const label = updating
     ? state.heldForRecording
       ? t("shell.appSource.afterRecording")
-      : state.heldForReply
-        ? t("shell.appSource.afterReply")
-        : t("shell.appSource.updating")
+      : tasks > 0
+        ? tPlural("shell.appSource.afterTasks", tasks)
+        : state.heldForReply
+          ? t("shell.appSource.afterReply")
+          : t("shell.appSource.updating")
     : t("shell.appSource.update");
   const blocked = updating || state.busy || pending !== null;
   const choose = !updating && !offer.draft && computers.length > 0 && appSourceApi() !== null;
+  // Waiting for Stella's reply or the tasks running here: the user may go ahead anyway.
+  const updateNow = appSourceApi()?.updateNow;
+  const held = updating && !state.heldForRecording && (tasks > 0 || state.heldForReply === true) && typeof updateNow === "function";
 
   return (
     <div
       className="shell-topbar-update-pill"
-      data-state={updating ? "updating" : "ready"}
+      data-state={held ? "held" : updating ? "updating" : "ready"}
       data-update-transition={updating ? "live" : undefined}
-      data-split={choose ? "" : undefined}
+      data-split={choose || held ? "" : undefined}
     >
       <button
         type="button"
@@ -192,6 +199,17 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         />
         <span className="shell-topbar-update-pill__label">{label}</span>
       </button>
+      {held ? (
+        <button
+          type="button"
+          className="shell-topbar-update-pill__now"
+          onClick={() => void updateNow?.()}
+          title={t("shell.appSource.updateNowHint")}
+          data-testid="topbar-update-now"
+        >
+          {t("shell.appSource.updateNow")}
+        </button>
+      ) : null}
       {choose ? (
         <UpdateTargets
           computers={computers}

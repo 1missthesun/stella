@@ -2839,6 +2839,16 @@
       "updating": "Uppdaterar…",
       "afterRecording": "Efter din inspelning",
       "afterReply": "När Stella har svarat klart",
+      "afterTasks": {
+        "one": "Efter 1 uppgift",
+        "other": "Efter {count} uppgifter"
+      },
+      "waitsForTasks": {
+        "one": "Väntar på att en pågående uppgift blir klar",
+        "other": "Väntar på att {count} pågående uppgifter blir klara"
+      },
+      "updateNow": "Uppdatera nu",
+      "updateNowHint": "Uppgifterna pausas och fortsätter där de var när Stella har startat om",
       "devices": {
         "choose": "Välj datorer",
         "thisComputer": "Den här datorn",

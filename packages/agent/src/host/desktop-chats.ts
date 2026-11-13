@@ -2756,6 +2756,23 @@ export function desktopChats(options: DesktopChatsOptions) {
       return false;
     },
     /**
+     * How many tasks this computer is working on now, in every chat with work. A chat with work that isn't open yet
+     * (Stella just started and hasn't resumed it) counts as one: opening it here would resume it early.
+     */
+    async tasksRunning(): Promise<number> {
+      let count = 0;
+      for (const conversationId of await activeSet()) {
+        const pending = chats.get(conversationId);
+        if (!pending) {
+          count += 1;
+          continue;
+        }
+        const chat = await pending.catch(() => undefined);
+        if (chat) count += (await tasksRunningHere(chat).catch(() => [])).length;
+      }
+      return count;
+    },
+    /**
      * Reopens the chats that had work running when Stella last stopped, which
      * resumes it, and says which tasks were running then (they are resuming).
      */

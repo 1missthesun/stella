@@ -2839,6 +2839,16 @@
       "updating": "Päivitetään…",
       "afterRecording": "Tallenteesi jälkeen",
       "afterReply": "Kun Stella on vastannut",
+      "afterTasks": {
+        "one": "1 tehtävän jälkeen",
+        "other": "{count} tehtävän jälkeen"
+      },
+      "waitsForTasks": {
+        "one": "Odottaa käynnissä olevan tehtävän valmistumista",
+        "other": "Odottaa {count} käynnissä olevan tehtävän valmistumista"
+      },
+      "updateNow": "Päivitä nyt",
+      "updateNowHint": "Tehtävät keskeytyvät ja jatkavat siitä, mihin jäivät, kun Stella on käynnistynyt uudelleen",
       "devices": {
         "choose": "Valitse tietokoneet",
         "thisComputer": "Tämä tietokone",

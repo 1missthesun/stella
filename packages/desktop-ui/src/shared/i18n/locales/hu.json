@@ -2839,6 +2839,16 @@
       "updating": "Frissítés…",
       "afterRecording": "A felvétel után",
       "afterReply": "Miután Stella befejezte a választ",
+      "afterTasks": {
+        "one": "1 feladat után",
+        "other": "{count} feladat után"
+      },
+      "waitsForTasks": {
+        "one": "Vár, amíg egy futó feladat befejeződik",
+        "other": "Vár, amíg {count} futó feladat befejeződik"
+      },
+      "updateNow": "Frissítés most",
+      "updateNowHint": "A feladatok szünetelnek, és Stella újraindulása után ott folytatják, ahol tartottak",
       "devices": {
         "choose": "Számítógépek kiválasztása",
         "thisComputer": "Ez a számítógép",

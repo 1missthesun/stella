@@ -2839,6 +2839,16 @@
       "updating": "Bijwerken…",
       "afterRecording": "Na je opname",
       "afterReply": "Zodra Stella klaar is met antwoorden",
+      "afterTasks": {
+        "one": "Na 1 taak",
+        "other": "Na {count} taken"
+      },
+      "waitsForTasks": {
+        "one": "Wacht tot een lopende taak klaar is",
+        "other": "Wacht tot {count} lopende taken klaar zijn"
+      },
+      "updateNow": "Nu bijwerken",
+      "updateNowHint": "Taken pauzeren en gaan verder waar ze waren zodra Stella opnieuw is gestart",
       "devices": {
         "choose": "Computers kiezen",
         "thisComputer": "Deze computer",

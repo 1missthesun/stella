@@ -64,6 +64,27 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
   if (state && api) {
     const merging = state.merging !== undefined;
     const blocked = state.busy || pending !== null || merging;
+    // A change being added that waits for Stella's reply or the tasks running here says so, and may go ahead anyway.
+    const heldForTasks = state.heldForTasks ?? 0;
+    const updateNow = api.updateNow;
+    const held =
+      !state.heldForRecording &&
+      (heldForTasks > 0 || state.heldForReply === true) &&
+      typeof updateNow === "function";
+    const heldDetail =
+      heldForTasks > 0
+        ? tPlural("shell.appSource.waitsForTasks", heldForTasks)
+        : t("shell.appSource.afterReply");
+    const goNow = [
+      {
+        label: t("shell.appSource.updateNow"),
+        primary: true,
+        keep: true,
+        run: async () => {
+          await updateNow?.();
+        },
+      },
+    ];
     const arrived = state.arrived;
     if (
       arrived &&
@@ -131,10 +152,10 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
           title: offer.device
             ? t("shell.appSource.updates.fromDevice", { device: deviceLabel(offer.device) })
             : t("shell.appSource.updates.fromOtherComputer"),
-          detail: describeChange(t, offer.summary),
-          busy: adding,
+          detail: adding && held ? heldDetail : describeChange(t, offer.summary),
+          busy: adding && !held,
           busyLabel: t("shell.appSource.updates.adding"),
-          actions: [
+          actions: adding && held ? goNow : [
             {
               label: t("shell.appSource.updates.get"),
               primary: true,
@@ -155,12 +176,14 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
         kind: "update",
         title: offer.summary,
         detail:
-          offer.problem ??
-          (offer.stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`),
+          adding && held
+            ? heldDetail
+            : offer.problem ??
+              (offer.stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`),
         toast: !offer.interfaceOnly || Boolean(offer.problem),
-        busy: adding,
+        busy: adding && !held,
         busyLabel: t("shell.appSource.updating"),
-        actions: [
+        actions: adding && held ? goNow : [
           {
             label: t("shell.appSource.update"),
             primary: true,

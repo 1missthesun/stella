@@ -2839,6 +2839,16 @@
       "updating": "Güncelleniyor…",
       "afterRecording": "Kaydınızdan sonra",
       "afterReply": "Stella yanıtını bitirince",
+      "afterTasks": {
+        "one": "1 görevden sonra",
+        "other": "{count} görevden sonra"
+      },
+      "waitsForTasks": {
+        "one": "Çalışan bir görevin bitmesi bekleniyor",
+        "other": "Çalışan {count} görevin bitmesi bekleniyor"
+      },
+      "updateNow": "Şimdi güncelle",
+      "updateNowHint": "Görevler duraklar ve Stella yeniden başladıktan sonra kaldıkları yerden devam eder",
       "devices": {
         "choose": "Bilgisayarları seç",
         "thisComputer": "Bu bilgisayar",

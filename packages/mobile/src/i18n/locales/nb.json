@@ -2839,6 +2839,16 @@
       "updating": "Oppdaterer…",
       "afterRecording": "Etter opptaket ditt",
       "afterReply": "Når Stella har svart ferdig",
+      "afterTasks": {
+        "one": "Etter 1 oppgave",
+        "other": "Etter {count} oppgaver"
+      },
+      "waitsForTasks": {
+        "one": "Venter på at en oppgave som kjører, blir ferdig",
+        "other": "Venter på at {count} oppgaver som kjører, blir ferdige"
+      },
+      "updateNow": "Oppdater nå",
+      "updateNowHint": "Oppgavene settes på pause og fortsetter der de var når Stella har startet på nytt",
       "devices": {
         "choose": "Velg datamaskiner",
         "thisComputer": "Denne datamaskinen",

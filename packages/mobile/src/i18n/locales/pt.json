@@ -2850,6 +2850,16 @@
       "updating": "Atualizando…",
       "afterRecording": "Depois da sua gravação",
       "afterReply": "Quando a Stella terminar de responder",
+      "afterTasks": {
+        "one": "Depois de 1 tarefa",
+        "other": "Depois de {count} tarefas"
+      },
+      "waitsForTasks": {
+        "one": "Aguardando uma tarefa em andamento terminar",
+        "other": "Aguardando {count} tarefas em andamento terminarem"
+      },
+      "updateNow": "Atualizar agora",
+      "updateNowHint": "As tarefas pausam e continuam de onde estavam depois que a Stella reiniciar",
       "devices": {
         "choose": "Escolher computadores",
         "thisComputer": "Este computador",

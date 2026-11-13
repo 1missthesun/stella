@@ -149,6 +149,7 @@ import {
   IPC_APP_SOURCE_SKIP,
   IPC_APP_SOURCE_STATE,
   IPC_APP_SOURCE_UNDO,
+  IPC_APP_SOURCE_UPDATE_NOW,
   IPC_AUTH_APPLY_SESSION_TOKEN,
   IPC_AUTH_DELETE_USER,
   IPC_AUTH_FORGET_ACCOUNT_HINT,
@@ -959,6 +960,8 @@ export type IpcInvokeContract = {
   /** `targets`: the other computers that update too; null is every one, [] only this one. */
   [IPC_APP_SOURCE_APPLY_UPSTREAM]: Invoke<[targets?: string[] | null], AppSourceActionResult>;
   [IPC_APP_SOURCE_SKIP]: Invoke<[key: string], AppSourceActionResult>;
+  /** An update waiting for Stella's reply or the tasks running here goes ahead now. */
+  [IPC_APP_SOURCE_UPDATE_NOW]: Invoke<[], AppSourceActionResult>;
 
   [IPC_CHAT_CONTEXT_GET]: Invoke<[], ChatContext | null>;
   [IPC_SCREENSHOT_CAPTURE]: Invoke<

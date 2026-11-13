@@ -86,6 +86,11 @@ export type AppSourceState = {
   /** An update that restarts Stella's runtime waits until she finishes the reply she's in the middle of. */
   heldForReply?: boolean;
   /**
+   * An update that restarts Stella's runtime waits for this many tasks running on this computer to finish (bounded),
+   * unless the user says Update now (`appSource.updateNow`).
+   */
+  heldForTasks?: number;
+  /**
    * The last version that was applied by itself: because the user pressed
    * Update on another computer (`from` names it), or here before it was ready.
    */

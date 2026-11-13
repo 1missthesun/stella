@@ -231,6 +231,9 @@ type PendingStep = {
   stellaToolsRunning?: number;
   /** Stella interrupted this quiet step at Claude Code's nudge: whatever result follows ends it silent. */
   quietInterrupted?: boolean;
+  /** The uuid this step's prompt was written with; Claude Code replays it when it takes the prompt. */
+  promptUuid?: string;
+  promptReplayed?: boolean;
 };
 type ClaudeCodeChild = ChildProcessByStdio<Writable, Readable, Readable>;
 type ClaudeCodeProcessState = {
@@ -1539,6 +1542,16 @@ const withConsumedSteering = (session: ClaudeCodeSession, prompt: string) =>
   session.consumedSteeringTexts?.length
     ? [prompt, ...session.consumedSteeringTexts].join("\n\n")
     : prompt;
+/**
+ * A result Claude Code produced for a query it started itself (its `origin`,
+ * e.g. `task-notification`) before it took the step's prompt, which it
+ * replays first (`--replay-user-messages`) and answers after. Only results
+ * marked with an origin count, so a CLI that marks none behaves as before.
+ */
+const isOwnQueryBeforePrompt = (pending: PendingStep, line: ClaudeStreamEvent) =>
+  pending.promptUuid !== undefined &&
+  pending.promptReplayed !== true &&
+  typeof asObject(line.origin)?.kind === "string";
 const hasUnconsumedInjection = (pending: PendingStep) => {
   for (const injection of pending.injections?.values() ?? []) {
     if (!injection.consumed) return true;
@@ -2974,6 +2987,11 @@ class ClaudeCodeSessionRuntime {
         processState.lastEntryUuid = parsedLine.uuid;
       }
       if (parsedLine.type === "user" && parsedLine.isReplay === true) {
+        for (const pending of processState.pending) {
+          if (pending.promptUuid !== undefined && pending.promptUuid === parsedLine.uuid) {
+            pending.promptReplayed = true;
+          }
+        }
         this.noteInjectionConsumed(session, processState, parsedLine.uuid);
         return undefined;
       }
@@ -3131,6 +3149,14 @@ class ClaudeCodeSessionRuntime {
       }
       if (parsedLine.type === "result") {
         const current = processState.pending[0];
+        if (current && isOwnQueryBeforePrompt(current, parsedLine)) {
+          // Claude Code ran a query of its own before taking this step's
+          // prompt: after a resume it first answers its notice about
+          // background commands the previous process left behind ("No
+          // response requested.", empty result). Settling the step on it
+          // ended the task's run silently while its real turn went on.
+          return undefined;
+        }
         if (
           current &&
           parsedLine.is_error !== true &&
@@ -3454,11 +3480,12 @@ class ClaudeCodeSessionRuntime {
         pending.injections.set(steeringId, { consumed: false, text: "" });
       }
       if (sendsPrompt) {
+        pending.promptUuid = steeringId ?? crypto.randomUUID();
         const payload = buildStreamJsonUserMessage(
           session.sessionId,
           prompt,
           promptImages,
-          steeringId,
+          pending.promptUuid,
         );
         processState.child.stdin.write(`${payload}\n`, (error) => {
           if (!error) {

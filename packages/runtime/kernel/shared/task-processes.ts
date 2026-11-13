@@ -47,15 +47,22 @@ const GRACE_MS = 1_500;
 const KILL_CONFIRM_MS = 1_000;
 const POLL_MS = 50;
 const LIST_TIMEOUT_MS = 4_000;
+/** A stopped task resumes with the environment it had, so its empty ledger stays a while. */
+const EMPTY_LEDGER_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
 const ownerName = (owner: string) => owner.replace(/[^A-Za-z0-9_.-]/g, "_");
 
 export const taskProcessLedgerDir = (stellaDataDir: string, owner: string) =>
   path.join(path.resolve(stellaDataDir), LEDGER_DIRECTORY, ownerName(owner));
 
-const RECORD_GROUP = `if [ -n "$${TASK_PROCESS_LEDGER_ENV}" ] && : >|"$${TASK_PROCESS_LEDGER_ENV}/$$" 2>/dev/null; then
-  : >|"$${TASK_PROCESS_LEDGER_ENV}/$$${END_SUFFIX}" 2>/dev/null
-  trap ': >|"$${TASK_PROCESS_LEDGER_ENV}/'"$$"'${END_SUFFIX}" 2>/dev/null' EXIT
+// Redirections apply left to right, so `2>/dev/null` comes first to keep a
+// failed write quiet. The folder is made again when a prune removed it.
+const RECORD_GROUP = `if [ -n "$${TASK_PROCESS_LEDGER_ENV}" ]; then
+  [ -d "$${TASK_PROCESS_LEDGER_ENV}" ] || mkdir -p "$${TASK_PROCESS_LEDGER_ENV}" 2>/dev/null
+  if true 2>/dev/null >|"$${TASK_PROCESS_LEDGER_ENV}/$$"; then
+    true 2>/dev/null >|"$${TASK_PROCESS_LEDGER_ENV}/$$${END_SUFFIX}"
+    trap 'true 2>/dev/null >|"$${TASK_PROCESS_LEDGER_ENV}/'"$$"'${END_SUFFIX}"' EXIT
+  fi
 fi
 `;
 
@@ -529,7 +536,9 @@ export const pruneTaskProcessLedgers = async (stellaDataDir: string): Promise<vo
       if (!live.has(entry.pgid)) forgetEntry(ledger, entry.pgid);
     }
     try {
-      if (readdirSync(ledger).length === 0) rmSync(ledger, { recursive: true, force: true });
+      if (readdirSync(ledger).length === 0 && Date.now() - statSync(ledger).mtimeMs > EMPTY_LEDGER_KEEP_MS) {
+        rmSync(ledger, { recursive: true, force: true });
+      }
     } catch {
       // Not a ledger directory.
     }

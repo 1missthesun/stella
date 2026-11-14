@@ -281,6 +281,7 @@ export class RemoteRuntimeHost {
     } catch (error) {
       connection.retired = true;
       handle.dispose();
+      attached.socket.destroy();
       throw error;
     }
     if (connection.retired) {

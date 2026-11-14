@@ -273,5 +273,11 @@ export const connectReadySocket = (
     yield* Effect.addFinalizer((exit) =>
       Exit.isSuccess(exit) ? Effect.void : Effect.sync(() => destroyQuietly(socket)),
     );
+    // A runtime that dies during or after the handshake (killed, crashed, an
+    // Update restarting it) resets this socket. Whoever holds it reports and
+    // handles that through its own listeners, but between them, and after one
+    // has detached, an "error" with no listener is an uncaught exception that
+    // takes the whole app down (read ECONNRESET in Electron's main process).
+    socket.on("error", () => undefined);
     return { status: "ready", socket, identity: probed.identity };
   });

@@ -38,7 +38,7 @@ export const NICHES: Niche[] = [
     h1: "Photos and files, put in order.",
     title: "Photos and files: convert, resize, de-duplicate, sort, rename",
     description:
-      "Convert HEIC, WebP or TIFF to JPG, remove backgrounds, split scans, watermark or date-stamp photos, fix dates and duplicates, with free tools or Stella (stella.sh).",
+      "Convert HEIC, WebP, TIFF or RAW to JPG, remove backgrounds, split scans, watermark or date-stamp photos, fix dates and duplicates, with free tools or Stella (stella.sh).",
     intro:
       "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
   },
@@ -78,7 +78,7 @@ export const NICHES: Niche[] = [
       },
       {
         title: "Edit, sign and protect PDFs.",
-        slugs: ["edit-text-in-pdf", "add-signature-to-pdf", "fill-pdf-form-from-spreadsheet", "redact-pdf", "remove-password-from-pdf"],
+        slugs: ["edit-text-in-pdf", "add-signature-to-pdf", "fill-pdf-form-from-spreadsheet", "add-watermark-to-pdf", "redact-pdf", "remove-password-from-pdf"],
       },
       {
         title: "Get text, tables and pictures out of PDFs.",
@@ -180,7 +180,7 @@ export const NICHES: Niche[] = [
     h1: "Study materials, made from what you have.",
     title: "Study how-tos: flashcards, study guides, puzzles, timetables",
     description:
-      "Turn notes into Anki cards or a study guide, print flashcards, word searches and crosswords, build a class timetable from your files, by hand or with Stella (stella.sh).",
+      "Turn notes into Anki cards or a study guide, print flashcards, word searches and crosswords, build a class timetable or an APA reference list from your files, by hand or with Stella (stella.sh).",
     intro:
       "Making study material is mostly copying: terms into cards, highlights into notes. Each guide gives the manual way, and Stella (stella.sh) doing it from your own files on a real computer.",
   },

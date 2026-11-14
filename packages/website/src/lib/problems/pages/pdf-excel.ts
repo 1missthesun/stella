@@ -800,7 +800,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "[Remove the password](/how/pdf-excel/remove-password-from-pdf) first with the one you have, then redact the unlocked copy. Photos have their own privacy leak: [remove the location from photos](/how/photos-files/remove-location-from-photos) before you post them.",
       },
     ],
-    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos", "pdf-excel/edit-text-in-pdf"],
+    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos", "pdf-excel/edit-text-in-pdf", "pdf-excel/add-watermark-to-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Intego: Securely redact text in PDFs with Preview", href: "https://www.intego.com/mac-security-blog/securely-redact-text-in-pdfs-with-apple-preview-on-mac" },
@@ -4412,6 +4412,123 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         label: "Microsoft Support: Opening CSV UTF-8 files correctly in Excel",
         href: "https://support.microsoft.com/en-us/office/opening-csv-utf-8-files-correctly-in-excel-8a935af5-3416-4edd-ba7e-3dfd2bc4a032",
       },
+    ],
+  },
+  {
+    slug: "add-watermark-to-pdf",
+    niche: "pdf-excel",
+    searchPhrases: ["add watermark to pdf", "watermark pdf", "add watermark to pdf free", "watermark id documents for rental application", "add watermark to scanned pdf"],
+    title: "Add a watermark to a PDF, scanned ID pages included",
+    description:
+      "Watermark copies of a passport scan, payslip and bank statement before you send them, with the mark on top of scans too: PDF24, Preview, pdftk or Stella (stella.sh).",
+    h1: "Add a watermark to a PDF before you send it",
+    short: "Add a watermark to a PDF",
+    lede: "A passport scan, a payslip and a bank statement, each marked for one letting agent.",
+    answer:
+      "On Windows the free PDF24 Creator adds a text watermark to every page and saves a copy; on a Mac, Preview can only add a text box page by page. For a scanned passport or ID, put the mark in front of the page, not behind it: a watermark behind a scan is hidden by the picture. Stella (stella.sh) watermarked all three documents for a rental application on your own computer, kept the originals, and left the payslip and statement text selectable.",
+    stellaSteps: [
+      "Finds the passport scan, the October payslip and the three-page bank statement in Downloads",
+      "Draws “Only for Fernhill Lettings rental application” on top of every page in large, see-through red letters running corner to corner",
+      "Repeats the wording in smaller rows across the whole page, so there's no clean corner to crop out and reuse",
+      "Puts the mark over the passport picture, where a watermark behind the page would have been hidden",
+      "Saves the copies, named “… - Fernhill Lettings copy”, in a new folder in Downloads; the originals stay as they were",
+      "Says plainly that someone with PDF editing software could still remove the mark, and offers flattened picture-only copies as a harder-to-strip option",
+    ],
+    prompt:
+      "I have to send copies of my passport, payslip and bank statement to a letting agent. Put a watermark across every page saying \"Only for Fernhill Lettings rental application\" so they can't be reused, and keep my originals as they are.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Three watermarked copies in about a minute and a half. Checked afterwards against an answer key written before the run: one copy of each document, the wording on all five pages, the mark visible on top of the image-only passport scan, the payslip and statement text still selectable, and the originals unchanged.",
+      note: "The passport is a drawn specimen for a fictitious person, and the payslip and statement were made up for this run. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/add-watermark-to-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/add-watermark-to-pdf"),
+        poster: `${PROOFS}/pdf-excel/add-watermark-to-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.5,
+        speed: 4,
+        realDuration: 96,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A passport scan, a payslip and a bank statement are in Downloads." },
+        { at: 1.6, text: "The prompt: a watermark on every page for the letting agent, originals kept as they are." },
+        { at: 13.9, text: "Stella replies it will make watermarked copies and won't touch the originals or send anything." },
+        { at: 20.2, text: "Adding the watermark to each page, sped up 4×." },
+        { at: 31, text: "Done: three copies in a new folder in Downloads, text still selectable, with a note that the mark can't be made impossible to remove." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/pdf-excel/add-watermark-to-pdf/passport.jpg`,
+          alt: "The watermarked passport scan: a large diagonal red “Only for Fernhill Lettings rental application” across the specimen passport, with smaller copies of the same wording in rows over the whole page. The name and dates stay readable.",
+          width: 910,
+          height: 1287,
+          caption: "The passport copy Stella made. The scan is a single picture, so the mark had to go on top of it.",
+        },
+      ],
+    },
+    manualTitle: "Watermark them yourself",
+    manualSteps: [
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator, which works offline, and open its watermark tool. Add the PDFs, type the wording, pick a large size, a light colour and a diagonal angle, and save the copies under new names so the originals stay clean.",
+      },
+      {
+        title: "On a Mac: Preview, page by page",
+        body: "Preview has no watermark tool. Open the PDF, choose Tools › Annotate › Text, type the wording, make it large and pale, and drag it across the page. Repeat on every page, then File › Export as PDF under a new name.",
+      },
+      {
+        title: "Scans and photos of ID: put the mark in front",
+        body: "A passport or licence scan is one picture filling the page. Tools that place the watermark behind the content hide it completely there. If the tool asks (Acrobat's watermark dialog calls it location), choose on top of the page, then open the copy and look.",
+      },
+      {
+        title: "Command line, many files",
+        body: "Make a one-page PDF with just the wording, then use the free pdftk: `pdftk statement.pdf stamp mark.pdf output statement-marked.pdf` puts it on top of every page. `background` instead of `stamp` puts it behind, which a scan would hide.",
+      },
+      {
+        title: "Check before you send",
+        body: "Open each copy, look at every page, and try selecting text in the payslip. Send the copies, not the originals, and keep the agency's name in the wording so a reused copy shows where it came from.",
+      },
+    ],
+    limits: [
+      "A watermark discourages reuse; it doesn't prevent it. Anyone with PDF editing software can try to cover or remove it, which Stella said in its reply.",
+      "Stella kept the text selectable. If you'd rather have flattened picture-only pages, which are harder to strip, ask for them; the text then can't be selected or searched.",
+      "Stella reads the documents to find and mark them, so their names and text go to the AI model you use. The watermarking runs on your computer and nothing goes to a PDF website.",
+      "Recorded on Linux, where Stella used a PDF library already set up there. On a Mac or Windows PC it may install a similar free PDF tool first; the copies come out the same.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What should a watermark on ID documents say?",
+        a: "Who it's for and why, for example “Only for Fernhill Lettings rental application”, sometimes with the date. A specific mark is much less useful to anyone who gets hold of the copy.",
+      },
+      {
+        q: "Is it safe to use an online watermark site for a passport?",
+        a: "Those sites upload the very documents you're protecting. A desktop tool or Stella does the watermarking on your own computer.",
+      },
+      {
+        q: "Can I hide parts of the document too, like account numbers?",
+        a: "Yes, but that's redaction, not a watermark. See [redact a PDF](/how/pdf-excel/redact-pdf), which removes the text underneath instead of just covering it.",
+      },
+      {
+        q: "Can I watermark photos instead of PDFs?",
+        a: "Yes: see [add a watermark to photos](/how/photos-files/add-watermark-to-photos) for a name in the corner of a whole folder of pictures.",
+      },
+      {
+        q: "The copies are too big to email. What now?",
+        a: "See [compress a PDF that's too large to email](/how/pdf-excel/compress-pdf-too-large-to-email).",
+      },
+    ],
+    related: ["photos-files/add-watermark-to-photos", "pdf-excel/redact-pdf", "pdf-excel/add-signature-to-pdf", "pdf-excel/compress-pdf-too-large-to-email"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "PDF24 Creator (free, offline, Windows)", href: "https://tools.pdf24.org/en/creator" },
+      { label: "Apple: Annotate a PDF in Preview", href: "https://support.apple.com/guide/preview/annotate-a-pdf-prvw11580/mac" },
+      { label: "pdftk manual: stamp and background", href: "https://www.pdflabs.com/docs/pdftk-man-page/" },
     ],
   },
 ];

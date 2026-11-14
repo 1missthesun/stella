@@ -370,7 +370,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf", "photos-files/convert-webp-to-jpg"],
+    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf", "photos-files/convert-webp-to-jpg", "photos-files/convert-raw-to-jpg"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
@@ -1032,7 +1032,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Resize them for the shop: see [resize images in bulk](/how/photos-files/resize-images-in-bulk). And [remove the location from photos](/how/photos-files/remove-location-from-photos) before posting.",
       },
     ],
-    related: ["photos-files/resize-images-in-bulk", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg", "photos-files/remove-background-from-photos"],
+    related: ["photos-files/resize-images-in-bulk", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg", "photos-files/remove-background-from-photos", "pdf-excel/add-watermark-to-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "XnConvert", href: "https://www.xnview.com/en/xnconvert/" },
@@ -1461,7 +1461,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "See [convert WebP to JPG](/how/photos-files/convert-webp-to-jpg) and [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
       },
     ],
-    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet", "photos-files/split-scanned-photos"],
+    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet", "photos-files/split-scanned-photos", "photos-files/convert-raw-to-jpg"],
     lastChecked: "2026-11-14",
     sources: [
       { label: "Apple: Convert image file types using Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1012/mac" },
@@ -2008,6 +2008,118 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     sources: [
       { label: "XnConvert (free batch image converter)", href: "https://www.xnview.com/en/xnconvert/" },
       { label: "ImageMagick: annotate", href: "https://imagemagick.org/script/command-line-options.php#annotate" },
+    ],
+  },
+  {
+    slug: "convert-raw-to-jpg",
+    niche: "photos-files",
+    searchPhrases: ["convert raw to jpg", "cr2 to jpg", "nef to jpg", "arw to jpg", "dng to jpg", "convert raw to jpg free", "cr2 to jpg bulk converter"],
+    title: "Convert RAW photos to JPG at full size, in bulk",
+    description:
+      "Turn camera RAW files (CR2, NEF, ARW, DNG) into full-size JPGs with natural colour and portrait shots upright: Preview, Photos, darktable, or Stella (stella.sh).",
+    h1: "Convert RAW photos to JPG at full size",
+    short: "Convert RAW to JPG",
+    lede: "Six camera RAW photos as full-size JPGs, colours natural and the portrait shot upright.",
+    answer:
+      "On a Mac, open the RAW files in Preview and use File › Export Selected Images as JPEG. On Windows, add Microsoft's free Raw Image Extension and save from Photos one at a time, or batch-export with the free darktable or XnConvert. Watch out for converters that only pull out the small preview stored inside the RAW file. Stella (stella.sh) developed six RAW photos to full-size JPGs on your own computer, with the camera's colours and the turned shot upright.",
+    stellaSteps: [
+      "Finds the six lake trip RAW files in Pictures (DNG, the open RAW format many cameras and phones use)",
+      "Develops each one from the full sensor data with the camera's white balance, rather than taking the small preview inside the file",
+      "Reads the rotation tag the camera saved with the shot taken sideways, so that photo comes out standing upright",
+      "Saves high-quality JPGs with the same names next to the RAW files, which aren't changed",
+      "Makes a contact sheet of all six so you can see at a glance that they look right",
+    ],
+    prompt: "My camera saved the lake trip photos in Pictures as RAW files that I can't open. Make full-size JPG copies of them.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Six JPGs in about two minutes. Checked afterwards against an answer key written before the run: one JPG per RAW file, all at the full 2400×1600 (not a preview), the portrait shot upright at 1600×2400, colours matching a proper RAW development, normal brightness, and the RAW files unchanged.",
+      note: "The photos are drawn lake scenes saved as real 12-bit RAW files for this run, one stored sideways with a rotation tag the way cameras save a turned shot. The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/photos-files/convert-raw-to-jpg/proof.mp4`,
+        cuts: webCuts("photos-files/convert-raw-to-jpg"),
+        poster: `${PROOFS}/photos-files/convert-raw-to-jpg/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.2,
+        speed: 6,
+        realDuration: 122,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Six RAW photos from a lake trip are in Pictures." },
+        { at: 1.6, text: "The prompt: make full-size JPG copies of the RAW photos." },
+        { at: 12.8, text: "Stella replies it will make the copies and leave the RAW files unchanged." },
+        { at: 18.5, text: "Developing the RAW files, sped up 6×." },
+        { at: 31.1, text: "Done: six full-size JPGs in Pictures/Lake trip, the turned shot standing upright, with a contact sheet." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/photos-files/convert-raw-to-jpg/lake.jpg`,
+          alt: "The six JPGs side by side: five wide lake scenes with green hills, a sun and red, blue and white patches, and one tall shot standing upright.",
+          width: 1414,
+          height: 648,
+          caption: "The six JPGs Stella made, shown small. The tall one was stored sideways in the RAW file.",
+        },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Preview",
+        body: "Select the RAW files in Finder and open them in Preview. Click in the sidebar, press Cmd-A, then File › Export Selected Images, and choose JPEG. Preview uses Apple's own camera support, so very new cameras may need a macOS update first.",
+      },
+      {
+        title: "On Windows: Photos, one at a time",
+        body: "Install Microsoft's free Raw Image Extension from the Store so Photos can open RAW files. Open a photo, choose ⋯ › Save as, and pick JPG. That's fine for a few photos and slow for a card full.",
+      },
+      {
+        title: "Many photos: darktable or XnConvert",
+        body: "The free darktable (Windows, Mac, Linux) imports a folder, lets you select all and export as JPEG at full size. The free XnConvert does a batch convert too. Check the export size setting isn't capped.",
+      },
+      {
+        title: "Command line, tested",
+        body: "On a computer with ImageMagick, `magick HX2_1041.DNG -auto-orient -quality 92 HX2_1041.jpg` develops a RAW file through LibRaw and turns it upright. We ran it on the same test photos and it passed.",
+      },
+      {
+        title: "Check what you got",
+        body: "Open a JPG's details. If it's around 1600 pixels wide or smaller from a modern camera, the tool took the embedded preview. A very dark or green picture means the RAW data wasn't developed properly.",
+      },
+    ],
+    limits: [
+      "Every RAW developer renders colour a little differently, so these JPGs may not match the camera's own JPEG exactly. For edits like exposure or white balance, a RAW editor gives you more control.",
+      "The test files were DNG, an open RAW format. Canon CR2/CR3, Nikon NEF and Sony ARW files go through the same free RAW library, but a camera newer than that library may not open yet.",
+      "Stella works out the steps with the AI model you use, but the photos are developed on your computer; nothing goes to a converter website.",
+      "Recorded on Linux, where the RAW tools were already installed. On a Mac or Windows PC Stella may install a free RAW tool first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why can't I open my RAW files?",
+        a: "RAW is the camera's unprocessed sensor data, a different format per maker. Windows needs the Raw Image Extension; a Mac opens most, except cameras newer than your macOS.",
+      },
+      {
+        q: "Why are my converted JPGs small?",
+        a: "Many quick converters save the small preview the camera stores inside the RAW file. Use a tool that develops the full RAW, as Stella did here.",
+      },
+      {
+        q: "My photos are HEIC or TIFF, not RAW.",
+        a: "See [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg) for iPhone photos and [convert TIFF to JPG](/how/photos-files/convert-tiff-to-jpg) for scans.",
+      },
+      {
+        q: "Can it also resize them for sharing?",
+        a: "Yes, in the same chat. See [resize images in bulk](/how/photos-files/resize-images-in-bulk).",
+      },
+    ],
+    related: ["photos-files/convert-heic-to-jpg", "photos-files/convert-tiff-to-jpg", "photos-files/resize-images-in-bulk", "photos-files/make-a-contact-sheet"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft Store: Raw Image Extension", href: "https://apps.microsoft.com/detail/9nctdw2w1bh8" },
+      { label: "darktable (free RAW developer)", href: "https://www.darktable.org/" },
+      { label: "XnConvert (free batch image converter)", href: "https://www.xnview.com/en/xnconvert/" },
+      { label: "LibRaw: supported cameras", href: "https://www.libraw.org/supported-cameras" },
     ],
   },
 ];

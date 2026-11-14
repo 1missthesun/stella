@@ -94,7 +94,7 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "See [convert EPUB to PDF](/how/pdf-excel/convert-epub-to-pdf) for reading on other devices.",
       },
     ],
-    related: ["study/make-anki-flashcards-from-notes", "study/print-flashcards-double-sided", "pdf-excel/convert-epub-to-pdf", "chats-data-exports/see-your-spotify-listening-history"],
+    related: ["study/make-anki-flashcards-from-notes", "study/print-flashcards-double-sided", "pdf-excel/convert-epub-to-pdf", "chats-data-exports/see-your-spotify-listening-history", "study/make-a-bibliography-from-a-list-of-sources"],
     lastChecked: "2026-11-13",
     sources: [{ label: "Amazon Kindle notebook (web)", href: "https://read.amazon.com/notebook" }],
   },
@@ -188,7 +188,7 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "Yes. First [export the highlights](/how/study/export-kindle-highlights), then ask for cards from the book's file.",
       },
     ],
-    related: ["study/print-flashcards-double-sided", "study/export-kindle-highlights", "pdf-excel/make-scanned-pdf-searchable", "study/make-a-study-guide-from-notes"],
+    related: ["study/print-flashcards-double-sided", "study/export-kindle-highlights", "pdf-excel/make-scanned-pdf-searchable", "study/make-a-study-guide-from-notes", "study/make-a-bibliography-from-a-list-of-sources"],
     lastChecked: "2026-11-13",
     sources: [{ label: "Anki Manual: Importing text files", href: "https://docs.ankiweb.net/importing/text-files.html" }],
   },
@@ -576,7 +576,7 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "Yes: see [make a class timetable](/how/study/make-a-class-timetable) from your registration PDF.",
       },
     ],
-    related: ["study/make-anki-flashcards-from-notes", "study/print-flashcards-double-sided", "study/make-a-class-timetable", "pdf-excel/make-scanned-pdf-searchable"],
+    related: ["study/make-anki-flashcards-from-notes", "study/print-flashcards-double-sided", "study/make-a-class-timetable", "pdf-excel/make-scanned-pdf-searchable", "study/make-a-bibliography-from-a-list-of-sources"],
     lastChecked: "2026-11-14",
     sources: [{ label: "UNC Learning Center: Studying 101", href: "https://learningcenter.unc.edu/tips-and-tools/studying-101-study-smarter-not-harder/" }],
   },
@@ -675,6 +675,120 @@ export const STUDY_PAGES: ProblemPage[] = [
     lastChecked: "2026-11-14",
     sources: [
       { label: "Microsoft Support: Merge and unmerge cells", href: "https://support.microsoft.com/en-us/office/merge-and-unmerge-cells-5cbd15d5-9375-4540-907f-c673a93fcedf" },
+    ],
+  },
+  {
+    slug: "make-a-bibliography-from-a-list-of-sources",
+    niche: "study",
+    searchPhrases: ["apa reference list generator", "bibliography generator", "create bibliography", "reference list generator", "generate reference list apa 7"],
+    title: "Make an APA 7 reference list from your messy notes",
+    description:
+      "Turn sources pasted from your notes into an APA 7 reference list in Word, sorted and formatted, with gaps flagged: Zotero, Word's References tab, or Stella (stella.sh).",
+    h1: "Make an APA reference list from your list of sources",
+    short: "APA reference list from notes",
+    lede: "Twelve sources written twelve different ways, as one sorted APA 7 list in Word.",
+    answer:
+      "Citation sites and Word's References tab take one source at a time through a form. With a list already in your notes, Zotero can fetch most details from DOIs, and you type the rest. Either way, sort by surname then year and check every entry. Stella (stella.sh) turned a messy list of twelve sources into an APA 7 reference list in Word, and highlighted the two entries where the notes lacked details instead of making them up.",
+    stellaSteps: [
+      "Reads sources.txt in Documents: twelve sources in twelve styles, plus a note about a podcast that isn't being used",
+      "Formats each as APA 7: surname and initials, the year in brackets, sentence-case titles, volume(issue) and pages, and DOIs as https://doi.org/ links",
+      "Sorts them the APA way, so Lindqvist alone comes before Lindqvist & Osei, and an author's 2015 book before their 2019 one",
+      "Saves `APA References - Sleep Essay.docx` with journal and book titles in italics and hanging indents",
+      "Highlights two entries in yellow where the notes lacked details, and says so in its reply",
+      "Notices that every DOI and web address in the notes is a placeholder that won't open, so it built the entries from the notes alone",
+    ],
+    prompt: "My essay sources are listed in sources.txt in Documents. Turn them into a proper APA 7 reference list in a Word document, in the right order.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: MODEL,
+      result:
+        "A reference list in under two minutes. Checked afterwards against an answer key written before the run: a new Word document with all 12 sources, each with its year after the authors, in APA order, with DOI links, volume(issue), pages, “&” and URLs right, titles in italics, hanging indents, the podcast left out, no placeholder text, and sources.txt unchanged.",
+      note:
+        "The sources are fictitious, written for this run. Their DOIs use a test prefix (10.5555) and their web addresses end in .example, so none of them open; Stella checked and said so. The answer key, set before this run, accepts a surname-only “Osei” that Stella flags (the notes give no initials) and “(n.d.)” for the report whose only year is in its title. An earlier run with the same Stella prompts left “[initials]” in the finished document; it was highlighted and Stella told the user, but it failed the key. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/proof.mp4`,
+        cuts: webCuts("study/make-a-bibliography-from-a-list-of-sources"),
+        poster: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43,
+        speed: 5,
+        realDuration: 101,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A list of essay sources, sources.txt, is in Documents." },
+        { at: 1.7, text: "The prompt: a proper APA 7 reference list in a Word document, in the right order." },
+        { at: 12.1, text: "Stella replies it will build the list and say if any source is missing details." },
+        { at: 18.2, text: "Formatting and sorting the sources, sped up 5×." },
+        { at: 28.8, text: "Done: 12 entries, the podcast left out, two entries flagged for missing details, and a note that the links in the notes are placeholders." },
+      ],
+      shots: [
+        {
+          src: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/references.jpg`,
+          alt: "The first page of the Word reference list: “References” centred, then entries from Achterberg 2015 to Wakefield & Patel 2016 with hanging indents and italic titles. “Osei” in the Lindqvist & Osei 2021 entry and “n.d.” in the Ministry of Student Affairs entry are highlighted yellow.",
+          width: 910,
+          height: 1110,
+          caption: "The first page of the Word file Stella made. Yellow marks the two gaps it flagged.",
+        },
+      ],
+    },
+    manualTitle: "Make it yourself",
+    manualSteps: [
+      {
+        title: "Fetch what you can from DOIs",
+        body: "In the free Zotero, or ZoteroBib in a browser, use Add item by identifier and paste each DOI. It fills in authors, title, journal, volume and pages. Books can come in by ISBN; type the rest by hand.",
+      },
+      {
+        title: "Or use Word's References tab",
+        body: "In Word on Windows, choose References › Style: APA, then Manage Sources › New for each source, and Bibliography › References to insert the list. It's one form per source, so slow for a long list.",
+      },
+      {
+        title: "Sort it the APA way",
+        body: "Order by the first author's surname. One author alone comes before the same author with co-authors, and two works by the same author go oldest first. Ignore “The” and “A” at the start of a group author or title.",
+      },
+      {
+        title: "Format the details",
+        body: "Initials after surnames, “&” before the last author, the year in brackets, journal names and volume numbers in italics, then (issue), pages and the DOI as a link. Titles of articles and books take sentence case.",
+      },
+      {
+        title: "Fill gaps honestly",
+        body: "If there's no date, APA uses (n.d.). If you lack an author's initials, find the original article rather than guessing. Then set a hanging indent of 0.5 inch in the paragraph settings (Special: Hanging).",
+      },
+    ],
+    limits: [
+      "Stella formats what's in your notes. Where they lack details, it may leave a highlighted gap, such as a surname without initials or (n.d.), rather than make something up. Check every flagged entry and fill it in from the original source before you submit.",
+      "In an earlier run with the same Stella prompts, the gap was left as the text “[initials]” in the document, highlighted and mentioned in Stella's reply. Search the finished list for brackets before you hand it in.",
+      "It can look sources up online when the DOIs and links are real. Here they were made up for the test, so Stella checked, found they don't open, and worked from the notes.",
+      "Check the list against your course's style sheet, since some courses change APA details. It set the page to A4 here; ask for US Letter if your class uses it.",
+      "Your list of sources goes to the AI model you use in Stella. Recorded on Linux, where Stella wrote the Word file with a tool it set up there; on a Mac or Windows PC it may install a similar one first.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can it do MLA or Chicago instead of APA?",
+        a: "Yes, say which style and edition in the prompt. The same rule applies: it formats what's in your notes and flags what's missing.",
+      },
+      {
+        q: "Will it invent a missing date or author?",
+        a: "In this run it didn't: it used (n.d.) where the notes had no publication date and left Osei's initials blank and highlighted. It did reuse M. E. for Lindqvist from the other sources and said that was a guess to check.",
+      },
+      {
+        q: "Can it check that my DOIs are real?",
+        a: "It tries. Here it found that every DOI used a test prefix and the web addresses ended in .example, and said none would open.",
+      },
+      {
+        q: "Can it turn my notes into study material too?",
+        a: "Yes: see [make a study guide from notes](/how/study/make-a-study-guide-from-notes) and [make Anki flashcards from notes](/how/study/make-anki-flashcards-from-notes).",
+      },
+    ],
+    related: ["study/make-a-study-guide-from-notes", "study/make-anki-flashcards-from-notes", "study/export-kindle-highlights", "documents/merge-word-documents"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "APA Style: Reference examples", href: "https://apastyle.apa.org/style-grammar-guidelines/references/examples" },
+      { label: "APA Style: Missing reference information", href: "https://apastyle.apa.org/style-grammar-guidelines/references/missing-information" },
+      { label: "Zotero: Creating bibliographies", href: "https://www.zotero.org/support/creating_bibliographies" },
     ],
   },
 ];

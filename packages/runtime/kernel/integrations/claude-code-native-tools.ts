@@ -10,11 +10,19 @@ export const CLAUDE_CODE_ORCHESTRATOR_NATIVE_TOOLS: readonly string[] = [
   ...CLAUDE_CODE_WEB_NATIVE_TOOLS,
 ];
 
+/**
+ * The CLI's companions to its `Bash`: a command past its time limit moves to
+ * the background and the CLI tells the model to stop it with `TaskStop`; it
+ * refuses a long foreground `sleep` and points to `Monitor` instead.
+ */
+const CLAUDE_CODE_BACKGROUND_COMMAND_TOOLS: readonly string[] = ["TaskStop", "Monitor"];
+
 export const CLAUDE_CODE_WORKER_NATIVE_TOOLS: readonly string[] = [
   "Read",
   "Edit",
   "Write",
   "Bash",
+  ...CLAUDE_CODE_BACKGROUND_COMMAND_TOOLS,
   "Grep",
   "Glob",
   ...CLAUDE_CODE_WEB_NATIVE_TOOLS,
@@ -51,6 +59,8 @@ const STELLA_TOOLS_GRANTING_NATIVE: Readonly<
   Edit: ["Edit", "apply_patch"],
   Write: ["Write", "apply_patch"],
   Bash: ["Bash", "exec_command", "write_stdin"],
+  TaskStop: ["Bash", "exec_command", "write_stdin"],
+  Monitor: ["Bash", "exec_command", "write_stdin"],
   Grep: ["Grep"],
   Glob: ["Glob", "Grep", "Read"],
   WebSearch: ["web"],

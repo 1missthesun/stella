@@ -57,9 +57,20 @@ export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionC
 export const CLAUDE_CODE_API = "claude-code-cli";
 const CLOUD_CLAUDE_CODE_API = "claude-code";
 
-export const CLAUDE_CODE_BUILTIN_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob", "WebSearch", "WebFetch"] as const;
+export const CLAUDE_CODE_BUILTIN_TOOLS = [
+  "Read",
+  "Edit",
+  "Write",
+  "Bash",
+  "TaskStop",
+  "Monitor",
+  "Grep",
+  "Glob",
+  "WebSearch",
+  "WebFetch",
+] as const;
 const CLI_WEB_TOOLS: readonly string[] = ["WebSearch", "WebFetch"];
-const ENGINE_ONLY_TOOLS = ["Grep", "Glob", "WebSearch", "WebFetch"] as const;
+const ENGINE_ONLY_TOOLS = ["TaskStop", "Monitor", "Grep", "Glob", "WebSearch", "WebFetch"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
 const MCP_PREFIX = "mcp__stella__";
 

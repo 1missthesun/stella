@@ -11,6 +11,9 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       "google takeout json fixer",
       "what to do with json files from google takeout",
       "google takeout photos metadata",
+      "google takeout photos all have the same date",
+      "google takeout supplemental-metadata.json",
+      "google takeout json to exif mac",
     ],
     title: "Google Takeout photos have the wrong date? Fix them",
     description:
@@ -69,6 +72,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     manualTitle: "Fix the dates yourself (free)",
     manualSteps: [
       {
+        title: "Export only Google Photos",
+        body: "At takeout.google.com, select \u201cDeselect all\u201d, tick Google Photos, and choose .zip with the largest file size (50 GB) so the export is split into as few parts as possible. Google emails the download links when the export is ready; they work for about 7 days, and each part can be downloaded up to 5 times.",
+      },
+      {
         title: "Unzip every part into one folder",
         body: "Big Takeout exports come as several zip files, and a photo and its JSON can land in different parts. Extract all of them into the same folder, keep the original zips until you've checked the result, and don't delete any JSON yet: it's the only copy of the dates.",
       },
@@ -86,7 +93,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Check a few, then remove the JSON files",
-        body: "Open a handful of photos from different years in your photo app and check the dates. Once they're right, delete the .json files (on Windows, search the folder for *.json and delete the results), or move them to a folder of their own if you'd rather keep the GPS and descriptions.",
+        body: "Open a handful of photos from different years in your photo app and check the dates, including a screenshot and a photo saved from a chat app, since those never had a camera date of their own. Once they're right, delete the .json files (on Windows, search the folder for *.json; in Finder, search for .json with the folder selected), or move them to a folder of their own if you'd rather keep the GPS and descriptions.",
       },
     ],
     limits: [
@@ -111,12 +118,32 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Google shortens long names, so you'll see `.supplemental-metada.json`, `.sup.json` or a shortened photo name. Numbered copies are swapped too: `photo(1).jpg` goes with `photo.jpg(1).json`. That's why simple one-line scripts miss some files.",
       },
       {
+        q: "Why do all my Takeout photos have the same date?",
+        a: "The date your computer shows is the file's date, which becomes the day you unzipped the export. Camera photos usually still carry their own date taken inside the file, so a photo app that reads it looks fine. Screenshots, photos saved from chats, scans and some edited copies never had one, and for those the JSON is the only record.",
+      },
+      {
+        q: "Does Google Takeout remove metadata from my photos?",
+        a: "It doesn't strip what's already in the file, but anything you changed inside Google Photos, like a corrected date, a location you added or a description, lives only in the JSON. That's why the fix copies from the JSON rather than trusting the file.",
+      },
+      {
+        q: "Is the date in the JSON in my time zone?",
+        a: "No. photoTakenTime is a timestamp in UTC, while the date-taken field inside a photo has no time zone. Tools convert it to your computer's local time, so photos taken while travelling can come out a few hours off. That rarely moves a photo to a different day, but check any taken near midnight.",
+      },
+      {
+        q: "Why are some photos in two folders?",
+        a: "A photo that's in an album can appear twice: once in its \u201cPhotos from\u201d year folder and once in the album's folder. Fix the dates in both, then remove the extra copies with [a duplicate finder](/how/photos-files/find-duplicate-photos) if you only want one.",
+      },
+      {
+        q: "Will Apple Photos or Windows Photos show the right dates afterwards?",
+        a: "Yes. Both sort by the date taken inside each file, so import the folder after the fix, not before. Videos use their own creation time, which the fix sets too. To file everything by year and month as well, see [sorting photos into folders by date](/how/photos-files/sort-photos-into-folders-by-date).",
+      },
+      {
         q: "Is there a paid tool that does this?",
         a: "Yes. MetadataFixer is a paid app built for exactly this, and GPTH is free and open source. Stella is free with the ChatGPT or Claude plan you already have, and does the same matching. It also handles the next job, like sorting the photos by year or [tidying the Downloads folder](/how/pc-cleanup/organize-downloads-folder) they arrived in.",
       },
     ],
     related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "photos-files/rename-pdf-files-based-on-content"],
-    lastChecked: "2026-11-10",
+    lastChecked: "2026-11-13",
     sources: [
       { label: "Google: Download your Google Photos data (Takeout)", href: "https://support.google.com/accounts/answer/3024190" },
       { label: "Google Photos Takeout Helper (GPTH)", href: "https://github.com/Xentraxx/GooglePhotosTakeoutHelper" },

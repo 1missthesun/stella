@@ -137,9 +137,7 @@ export const transcribeDictationWav = async (
       );
     }
     throw new DictationTranscribeError(
-      error instanceof Error && error.message
-        ? error.message
-        : "Stella couldn't reach dictation. Try again.",
+      "Stella couldn't reach dictation. Check your connection and try again.",
       null,
     );
   }

@@ -16,9 +16,13 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Text as NativeText,
   TextInput,
+  type StyleProp,
   type TextInputProps,
+  type TextStyle,
   View,
+  type ViewStyle,
 } from "react-native";
 import { Text } from "../Text";
 import { useT } from "../../i18n";
@@ -95,24 +99,101 @@ export type ComposerModelPickerConfig = {
   onSelectModel: (id: string) => void;
 };
 
+type InputHeightBounds = { min: number; max: number };
+
+const mirrorTextOf = (draft: string) =>
+  draft.length === 0 || draft.endsWith("\n") ? `${draft} ` : draft;
+
+/**
+ * iOS Fabric sizes a TextInput from the text its native view last reported,
+ * which only changes when the user types; text set from JS (a dictation
+ * result, a cleared or restored draft) is measured as the old text. A hidden
+ * copy of the draft with the same text style is measured instead and gives
+ * the input its height.
+ */
 function ComposerTextInput({
   draftStore,
   ref,
+  style,
+  containerStyle,
+  heightBounds,
+  onContentHeight,
   ...props
-}: Omit<TextInputProps, "value" | "onChangeText"> & {
+}: Omit<TextInputProps, "value" | "onChangeText" | "style"> & {
   draftStore: ChatDraftStore;
   ref?: Ref<TextInput>;
+  style: StyleProp<TextStyle>;
+  containerStyle?: StyleProp<ViewStyle>;
+  heightBounds: InputHeightBounds;
+  onContentHeight?: (height: number) => void;
 }) {
   const value = useChatDraft(draftStore);
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const onContentHeightRef = useRef(onContentHeight);
+  onContentHeightRef.current = onContentHeight;
+  const handleMirrorLayout = useCallback((e: LayoutChangeEvent) => {
+    const height = e.nativeEvent.layout.height;
+    setContentHeight(height);
+    onContentHeightRef.current?.(height);
+  }, []);
+  const mirrorStyle = useMemo(() => {
+    const {
+      height: _height,
+      minHeight: _minHeight,
+      maxHeight: _maxHeight,
+      flex: _flex,
+      ...text
+    } = StyleSheet.flatten(style) ?? {};
+    return [text, composerInputMirror];
+  }, [style]);
+  const sizedStyle =
+    Platform.OS === "ios" && contentHeight !== null
+      ? [
+          style,
+          {
+            height: Math.min(
+              heightBounds.max,
+              Math.max(heightBounds.min, contentHeight),
+            ),
+          },
+        ]
+      : style;
   return (
-    <TextInput
-      ref={ref}
-      {...props}
-      value={value}
-      onChangeText={draftStore.set}
-    />
+    <View style={containerStyle}>
+      <NativeText
+        style={mirrorStyle}
+        onLayout={handleMirrorLayout}
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {mirrorTextOf(value)}
+      </NativeText>
+      <TextInput
+        ref={ref}
+        {...props}
+        style={sizedStyle}
+        value={value}
+        onChangeText={draftStore.set}
+      />
+    </View>
   );
 }
+
+const composerInputMirror: TextStyle = {
+  left: 0,
+  opacity: 0,
+  position: "absolute",
+  right: 0,
+  top: 0,
+};
+
+const PILL_INPUT_HEIGHT: InputHeightBounds = { min: 0, max: 32 };
+const EXPANDED_INPUT_HEIGHT: InputHeightBounds = {
+  min: 46,
+  max: COMPOSER_INPUT_MAX_HEIGHT,
+};
+const EXPANDED_EMPTY_INPUT_HEIGHT: InputHeightBounds = { min: 46, max: 46 };
 
 function AnimatedSubmitButton({
   canSubmit,
@@ -325,20 +406,10 @@ export const Composer = memo(function Composer({
   // 1 line in expanded shape — flipping back to pill would re-wrap and
   // oscillate forever. Collapse happens only when the parent clears the
   // draft (see the `useEffect` above) or via dedicated dictation handlers.
-  const handleContentSizeChange = useCallback(
-    (e: { nativeEvent: { contentSize: { height: number } } }) => {
-      if (expanded) return;
-      // Ignore measurements once the draft is empty. On send the draft clears
-      // and the collapse effect drops us back to the pill, but the native
-      // TextInput can still emit one more `onContentSizeChange` carrying the
-      // *old* tall height before it renders the cleared value. Acting on that
-      // would re-expand an empty composer, the collapse effect would collapse
-      // it again, and the two LayoutAnimation springs ping-pong — the composer
-      // (and the working indicator stacked above it) shake violently. An empty
-      // composer is never expanded, so there is nothing to grow for here.
-      if (draftStore.get().length === 0) return;
-      const h = e.nativeEvent.contentSize.height;
-      if (h > EXPAND_THRESHOLD) {
+  const growForPillHeight = useCallback(
+    (height: number) => {
+      if (expanded || draftStore.get().length === 0) return;
+      if (height > EXPAND_THRESHOLD) {
         LayoutAnimation.configureNext(LAYOUT_SPRING);
         setExpanded(true);
       }
@@ -583,7 +654,19 @@ export const Composer = memo(function Composer({
                   draftStore={draftStore}
                   multiline
                   scrollEnabled={isExpandedComposed || compact}
-                  onContentSizeChange={handleContentSizeChange}
+                  containerStyle={
+                    isExpandedComposed ? undefined : styles.inputPillSlot
+                  }
+                  heightBounds={
+                    isExpandedComposed
+                      ? draftEmpty
+                        ? EXPANDED_EMPTY_INPUT_HEIGHT
+                        : EXPANDED_INPUT_HEIGHT
+                      : PILL_INPUT_HEIGHT
+                  }
+                  onContentHeight={
+                    isExpandedComposed ? undefined : growForPillHeight
+                  }
                   onFocus={onInputFocus}
                   blurOnSubmit={false}
                   placeholder={
@@ -794,9 +877,9 @@ const makeComposerStyles = (colors: Colors) =>
       paddingVertical: 11,
     },
     expandedInputBlock: { flexDirection: "column" },
+    inputPillSlot: { flex: 1 },
     inputPill: {
       color: colors.text,
-      flex: 1,
       fontFamily: fonts.sans.regular,
       fontSize: 16,
       letterSpacing: -0.2,

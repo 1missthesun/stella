@@ -24,6 +24,7 @@ import { stopReadAloudForDictation } from "./read-aloud";
 import {
   DICTATION_MAX_PCM_BYTES,
   DICTATION_SAMPLE_RATE,
+  DictationTranscribeError,
   loadDictationStreamingAvailable,
   transcribeDictationWav,
   wavFromPcm16,
@@ -44,6 +45,9 @@ import {
 
 const MIN_RECORDING_MS = 300;
 const MIN_PCM_BYTES = DICTATION_SAMPLE_RATE / 5;
+const PCM_BYTES_PER_MS = (DICTATION_SAMPLE_RATE * 2) / 1000;
+const LOST_AUDIO_NOTICE_MS = 2_000;
+const LIVE_BACKLOG_LIMIT_MS = 5_000;
 
 export type DictationStatus = "idle" | "recording" | "transcribing";
 
@@ -67,11 +71,13 @@ export type UseDictationResult = {
 type DictationCapture = {
   chunks: ArrayBuffer[];
   bytes: number;
+  silencedBytes: number;
   full: boolean;
   live: DictationLive | null;
   routed: Promise<void>;
   pressedAt: number;
   firstAudioAt: number;
+  leftApp: boolean;
   marks: Record<string, number>;
 };
 
@@ -96,6 +102,56 @@ const finishLive = async (live: DictationLive): Promise<string> => {
   stream.throwIfFailed();
   return await stream.finish();
 };
+
+const isSilenced = (bytes: ArrayBuffer): boolean => {
+  const samples = new Int16Array(bytes);
+  for (let i = 0; i < samples.length; i += 1) {
+    if (samples[i] !== 0) return false;
+  }
+  return true;
+};
+
+/**
+ * Speech the microphone never delivered: wall-clock time the recorder sent
+ * nothing for (iOS stops the engine on an interruption), plus digital
+ * silence, which is what Android hands a backgrounded app instead of audio.
+ */
+const lostAudioMs = (capture: DictationCapture, stoppedAt: number): number => {
+  if (capture.firstAudioAt === 0) return 0;
+  const capturedMs = capture.bytes / PCM_BYTES_PER_MS;
+  const uncoveredMs = stoppedAt - capture.firstAudioAt - capturedMs;
+  return Math.max(0, uncoveredMs) + capture.silencedBytes / PCM_BYTES_PER_MS;
+};
+
+const transcribeCaptured = async (
+  capture: DictationCapture,
+): Promise<{ text: string; complete: boolean }> => {
+  const live = capture.live;
+  if (live && live.pacer.queuedMs <= LIVE_BACKLOG_LIMIT_MS) {
+    try {
+      return { text: await finishLive(live), complete: true };
+    } catch (error) {
+      console.warn("[dictation] live transcription ended early", error);
+    }
+  }
+  const wav = wavFromPcm16(capture.chunks, capture.bytes);
+  try {
+    return { text: await transcribeDictationWav(wav), complete: true };
+  } catch (error) {
+    const partial = live?.stream.partialTranscript.trim() ?? "";
+    if (!partial) throw error;
+    console.warn("[dictation] recorded audio failed to transcribe", error);
+    return { text: partial, complete: false };
+  }
+};
+
+const lostSpeechMessage = (leftApp: boolean): string =>
+  leftApp
+    ? "Stella couldn't hear you while you were in another app, so part of what you said is missing."
+    : "Stella couldn't hear part of what you said, so some of it is missing.";
+
+const UNFINISHED_TRANSCRIPT_MESSAGE =
+  "Stella couldn't finish transcribing, so the end of what you said is missing.";
 
 export function useDictation(options: UseDictationOptions): UseDictationResult {
   const [status, setStatus] = useState<DictationStatus>("idle");
@@ -166,9 +222,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       captureRef.current?.live === live &&
       statusRef.current === "recording";
     const stream = new DictationStream(
-      () => {
-        if (isCurrent()) void stopRecordingRef.current?.();
-      },
+      () => live.pacer.stop(),
       () => {
         if (isCurrent()) void stopRecordingRef.current?.();
       },
@@ -187,7 +241,8 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         }
       },
       () => {
-        if (isCurrent()) void stopRecordingRef.current?.();
+        live.pacer.stop();
+        if (stream.refused && isCurrent()) void stopRecordingRef.current?.();
       },
     );
     return live;
@@ -234,16 +289,17 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     }
     const prewarmed = recorder === "prewarmed";
     const prewarmMark = prewarmed ? 1 : 0;
-    let phase: "permission" | "audio-session" | "relay" | "recorder" =
-      "permission";
+    let phase: "permission" | "audio-session" | "recorder" = "permission";
     const current: DictationCapture = {
       chunks: [],
       bytes: 0,
+      silencedBytes: 0,
       full: false,
       live: null,
       routed: Promise.resolve(),
       pressedAt,
       firstAudioAt: 0,
+      leftApp: false,
       marks: { prewarmed: prewarmMark, pressedAt },
     };
     let capture: DictationCapture | null = current;
@@ -266,7 +322,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
           current.marks.socket = Date.now() - pressedAt;
         });
       }
-      for (const chunk of current.chunks.splice(0)) live.pacer.send(chunk);
+      for (const chunk of current.chunks) live.pacer.send(chunk);
     });
     try {
       const perm = await permission;
@@ -349,13 +405,10 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         }
         pushDictationLevel(meterLevels(bytes));
         if (current.full) return;
-        if (current.live) {
-          current.bytes += bytes.byteLength;
-          current.live.pacer.send(bytes);
-        } else {
-          current.chunks.push(bytes);
-          current.bytes += bytes.byteLength;
-        }
+        current.chunks.push(bytes);
+        current.bytes += bytes.byteLength;
+        if (isSilenced(bytes)) current.silencedBytes += bytes.byteLength;
+        current.live?.pacer.send(bytes);
         if (current.bytes < DICTATION_MAX_PCM_BYTES) return;
         current.full = true;
         if (statusRef.current === "recording") void stopRecordingRef.current?.();
@@ -378,8 +431,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         await releaseAudioMode();
         return abandon();
       }
-      phase = "relay";
-      current.live?.stream.throwIfFailed();
       cancelledRef.current = false;
       startedAtRef.current = Date.now();
       startDictationMeter(startedAtRef.current);
@@ -389,7 +440,10 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       if (startingRef.current === starting) startingRef.current = null;
       if (starting.stop) {
         void finalizeRef.current?.(starting.stop === "commit");
-      } else if (current.live?.stream.isComplete) {
+      } else if (
+        current.live?.stream.isComplete ||
+        current.live?.stream.refused
+      ) {
         void stopRecordingRef.current?.();
       }
       return true;
@@ -407,9 +461,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       if (mountedRef.current && !userStopped) {
         Alert.alert(
           "Voice input",
-          phase === "relay" && error instanceof Error && error.message
-            ? error.message
-            : "Couldn't start recording. Try again in a moment.",
+          "Couldn't start recording. Try again in a moment.",
         );
       }
       return false;
@@ -432,6 +484,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       tapLight();
       safeSetStatus(commit ? "transcribing" : "idle");
 
+      const stoppedAt = Date.now();
       let uri: string | null = null;
       try {
         const recording = (await AudioStudioModule.stopRecording()) as {
@@ -449,9 +502,9 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       const stoppedCapture = captureRef.current;
       if (__DEV__ && stoppedCapture) {
         const heldMs = Date.now() - stoppedCapture.pressedAt;
-        const capturedMs = Math.round(stoppedCapture.bytes / 32);
+        const capturedMs = Math.round(stoppedCapture.bytes / PCM_BYTES_PER_MS);
         console.info(
-          `[dictation] held ${heldMs}ms captured ${capturedMs}ms missing ${heldMs - capturedMs}ms`,
+          `[dictation] held ${heldMs}ms captured ${capturedMs}ms missing ${heldMs - capturedMs}ms lost ${Math.round(lostAudioMs(stoppedCapture, stoppedAt))}ms silenced ${Math.round(stoppedCapture.silencedBytes / PCM_BYTES_PER_MS)}ms leftApp ${stoppedCapture.leftApp} live ${stoppedCapture.live ? (stoppedCapture.live.stream.failure?.message ?? "ok") : "none"}`,
         );
       }
       await releaseAudioMode();
@@ -472,13 +525,16 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       }
 
       const pcmBytes = capture?.bytes ?? 0;
-      const tooShort = live
-        ? durationMs < MIN_RECORDING_MS &&
-          !live.stream.isComplete &&
-          !live.stream.failure
-        : pcmBytes < MIN_PCM_BYTES ||
-          (durationMs < MIN_RECORDING_MS && !capture?.full);
-      if (!commit || !mountedRef.current || tooShort) {
+      const tooShort =
+        live && !live.stream.failure
+          ? durationMs < MIN_RECORDING_MS && !live.stream.isComplete
+          : pcmBytes < MIN_PCM_BYTES ||
+            (durationMs < MIN_RECORDING_MS && !capture?.full);
+      if (!commit || !mountedRef.current || !capture || tooShort) {
+        const refusal = live?.stream.refused ? live.stream.failure : null;
+        if (refusal && commit && mountedRef.current) {
+          Alert.alert("Voice input", refusal.message);
+        }
         discardCapture(capture);
         safeSetStatus("idle");
         operationInFlightRef.current = false;
@@ -486,44 +542,24 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return null;
       }
 
+      const lostSpeech = lostAudioMs(capture, stoppedAt) >= LOST_AUDIO_NOTICE_MS;
       try {
-        let text: string;
-        if (live) {
-          try {
-            text = await finishLive(live);
-          } catch (error) {
-            const failure =
-              live.stream.failure ??
-              (error instanceof Error
-                ? error
-                : new Error("Could not transcribe that audio. Try again."));
-            text = live.stream.partialTranscript.trim();
-            console.warn("[dictation] transcription failed", failure);
-            if (mountedRef.current && !cancelledRef.current) {
-              Alert.alert(
-                "Voice input",
-                text
-                  ? `Dictation stopped early. ${failure.message}`
-                  : failure.message,
-              );
-            }
-          }
-        } else {
-          const wav = wavFromPcm16(capture!.chunks, pcmBytes);
-          discardCapture(capture);
-          text = await transcribeDictationWav(wav);
+        const { text, complete } = await transcribeCaptured(capture);
+        if (cancelledRef.current || !mountedRef.current) return null;
+        if (lostSpeech) {
+          Alert.alert("Voice input", lostSpeechMessage(capture.leftApp));
+        } else if (!complete) {
+          Alert.alert("Voice input", UNFINISHED_TRANSCRIPT_MESSAGE);
         }
-        if (text && !cancelledRef.current && mountedRef.current) {
-          onTranscriptRef.current(text);
-          return text;
-        }
-        return null;
+        if (!text) return null;
+        onTranscriptRef.current(text);
+        return text;
       } catch (error) {
         console.warn("[dictation] transcription failed", error);
         if (mountedRef.current && !cancelledRef.current) {
           Alert.alert(
             "Voice input",
-            error instanceof Error && error.message
+            error instanceof DictationTranscribeError
               ? error.message
               : "Stella couldn't transcribe that recording. Try again.",
           );
@@ -574,6 +610,16 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     };
   }, [prewarm, prewarmEnabled]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      const capture = captureRef.current;
+      if (!capture || statusRef.current !== "recording") return;
+      if (next === "background") capture.leftApp = true;
+      else if (next === "active") resumeInterruptedRecorder();
+    });
+    return () => subscription.remove();
+  }, []);
+
   const isStarting = useCallback(() => startingRef.current !== null, []);
 
   const toggle = useCallback(async () => {
@@ -622,6 +668,21 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     isStarting,
   };
 }
+
+const resumeInterruptedRecorder = (): void => {
+  try {
+    const recorder = AudioStudioModule.status() as {
+      isRecording?: boolean;
+      isPaused?: boolean;
+    };
+    if (!recorder.isRecording || !recorder.isPaused) return;
+    void Promise.resolve(AudioStudioModule.resumeRecording()).catch(
+      (error: unknown) => console.warn("[dictation] resume failed", error),
+    );
+  } catch (error) {
+    console.warn("[dictation] resume failed", error);
+  }
+};
 
 const audioEventToPcm16 = (
   data: string | Float32Array | Int16Array | number[],

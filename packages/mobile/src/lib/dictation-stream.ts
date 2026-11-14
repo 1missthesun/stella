@@ -32,6 +32,7 @@ export const describeDictationProviderError = (message: string): string => {
   return trimmed || "Dictation failed.";
 };
 const WARM_SOCKET_TTL_MS = 50_000;
+const FINISH_TIMEOUT_MS = 8_000;
 const OPEN_TIMEOUT_MS = 10_000;
 
 const connectRelay = async (): Promise<WebSocket> => {
@@ -162,6 +163,7 @@ export class DictationStream {
   private finalTranscript = "";
   private hasFinalTranscript = false;
   private streamError: Error | null = null;
+  private refusedToStart = false;
   private cancelled = false;
   private rejectOpening: ((error: Error) => void) | null = null;
   private rejectFinishing: ((error: Error) => void) | null = null;
@@ -177,6 +179,11 @@ export class DictationStream {
 
   get failure(): Error | null {
     return this.streamError;
+  }
+
+  /** The relay answered the start with an error (a usage limit, no service). */
+  get refused(): boolean {
+    return this.refusedToStart;
   }
 
   get partialTranscript(): string {
@@ -286,6 +293,7 @@ export class DictationStream {
             if (!this.cancelled && this.socket === socket) this.onFinal?.();
           }
         } else if (frame.type === "error") {
+          if (this.rejectOpening) this.refusedToStart = true;
           this.fail(
             new Error(
               describeDictationProviderError(
@@ -377,7 +385,7 @@ export class DictationStream {
       };
       const timer = setTimeout(() => {
         complete(new Error("Dictation took too long to finish."));
-      }, 15_000);
+      }, FINISH_TIMEOUT_MS);
       this.rejectFinishing = (error) => complete(error);
       socket.onclose = (event) => {
         if (this.streamError) complete(this.streamError);

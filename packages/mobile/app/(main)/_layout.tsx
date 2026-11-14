@@ -84,6 +84,7 @@ import {
   useTopBarAccessory,
 } from "../../src/lib/main-shell-store";
 import { useT } from "../../src/i18n";
+import { topBarCover, useTopBarCovered } from "../../src/lib/top-bar-cover";
 
 export const unstable_settings = { anchor: "chat" };
 
@@ -246,13 +247,11 @@ export default function MainLayout() {
   const endHandedOff = onChatSurface && drawerLive && drawerSide === "end";
 
   const topBarFade = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      drawerProgress.value,
-      [0, 0.22],
-      [1, 0],
-      Extrapolation.CLAMP,
-    ),
+    opacity:
+      interpolate(drawerProgress.value, [0, 0.22], [1, 0], Extrapolation.CLAMP) *
+      (1 - topBarCover.value),
   }));
+  const topBarCovered = useTopBarCovered();
 
   const topBarHeight = insets.top + TOP_BAR_BAR_HEIGHT;
 
@@ -355,7 +354,11 @@ export default function MainLayout() {
               (`useShellTopInset`). Taps between its controls pass through
               to the page. */}
           <Animated.View
-            pointerEvents="box-none"
+            pointerEvents={topBarCovered ? "none" : "box-none"}
+            accessibilityElementsHidden={topBarCovered}
+            importantForAccessibility={
+              topBarCovered ? "no-hide-descendants" : "auto"
+            }
             style={[styles.topBar, { height: topBarHeight }, topBarFade]}
           >
             {search.isOpen ? (

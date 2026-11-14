@@ -109,6 +109,7 @@ import {
   draftHasText,
   isDraftEmpty,
 } from "./chat/Composer";
+import type { AskRoom } from "./chat/ask-slot";
 import { CatchUpPill, ScrollToBottomFab } from "./chat/FloatingControls";
 import {
   SummaryPill,
@@ -632,6 +633,16 @@ export function ChatPane({
   const inputRef = useRef<TextInput>(null);
   const { height: keyboardHeight, composerBottomPad } = useKeyboardInset();
   const keyboardHeightNow = useSharedValue(0);
+  const keyboardOpenLift = useSharedValue(0);
+  const keyboardMovingRef = useRef(false);
+  const pendingFooterHeightRef = useRef<number | null>(null);
+  const settleKeyboardMove = useCallback((moving: boolean) => {
+    keyboardMovingRef.current = moving;
+    if (moving) return;
+    const pending = pendingFooterHeightRef.current;
+    pendingFooterHeightRef.current = null;
+    if (pending !== null) setFooterHeight(pending);
+  }, []);
   const listAtBottom = useSharedValue(1);
   const listRidesKeyboard = useSharedValue(1);
   const [listLiftedWithKeyboard, setListLiftedWithKeyboard] = useState(true);
@@ -646,7 +657,14 @@ export function ChatPane({
             runOnJS(setListLiftedWithKeyboard)(rides === 1);
           }
         }
-        if (e.duration === 0) keyboardHeightNow.value = e.height;
+        if (e.height > 0) {
+          keyboardOpenLift.value = Math.max(0, e.height - bottomInset);
+        }
+        if (e.duration === 0) {
+          keyboardHeightNow.value = e.height;
+        } else {
+          runOnJS(settleKeyboardMove)(true);
+        }
       },
       onMove: (e) => {
         "worklet";
@@ -659,9 +677,10 @@ export function ChatPane({
       onEnd: (e) => {
         "worklet";
         keyboardHeightNow.value = e.height;
+        runOnJS(settleKeyboardMove)(false);
       },
     },
-    [],
+    [bottomInset, settleKeyboardMove],
   );
   const keyboardLift = useDerivedValue(() =>
     Math.max(0, keyboardHeightNow.value - bottomInset),
@@ -686,7 +705,12 @@ export function ChatPane({
   const listTrailingSlackPx = listBottomInsetPx + CHAT_TAIL_GAP;
 
   const onFooterLayout = useCallback((e: LayoutChangeEvent) => {
-    setFooterHeight(Math.round(e.nativeEvent.layout.height));
+    const height = Math.round(e.nativeEvent.layout.height);
+    if (keyboardMovingRef.current) {
+      pendingFooterHeightRef.current = height;
+      return;
+    }
+    setFooterHeight(height);
   }, []);
   useEffect(() => {
     onFooterHeightChange?.(footerHeight);
@@ -1827,10 +1851,18 @@ export function ChatPane({
       setAskCollapsed(true);
     }
   }, [prewarmDictation]);
-  const interventionRoom =
-    paneHeight > 0
-      ? paneHeight - topInset - ASK_TOP_GAP - keyboardExtra
-      : undefined;
+  const askRoom = useMemo<AskRoom | undefined>(
+    () =>
+      paneHeight > 0
+        ? {
+            belowTopBar: paneHeight - topInset - ASK_TOP_GAP,
+            topBar: Math.max(0, topInset - safeAreaTop),
+            keyboardLift,
+            keyboardOpenLift,
+          }
+        : undefined,
+    [keyboardLift, keyboardOpenLift, paneHeight, safeAreaTop, topInset],
+  );
 
   const listContentContainerStyle = useMemo(
     () => [
@@ -2061,7 +2093,7 @@ export function ChatPane({
             compact={askActive && !askCollapsed}
             askCollapsed={askActive && askCollapsed}
             onExpandAsk={expandAsk}
-            interventionRoom={interventionRoom}
+            askRoom={askRoom}
             bottomPad={composerBottomPad}
             draftEmpty={draftEmpty}
             hasText={hasText}

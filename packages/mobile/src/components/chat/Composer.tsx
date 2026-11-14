@@ -10,6 +10,12 @@ import {
   useState,
 } from "react";
 import {
+  runOnJS,
+  useAnimatedReaction,
+  useDerivedValue,
+  useSharedValue,
+} from "react-native-reanimated";
+import {
   Animated,
   LayoutAnimation,
   type LayoutChangeEvent,
@@ -43,7 +49,8 @@ import { DictationRecordingBar } from "../DictationRecordingBar";
 import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
 import { useServerFeatures } from "../../lib/server-features";
-import { AskSlotContext, type AskSlot } from "./ask-slot";
+import { setTopBarCovered, topBarCover } from "../../lib/top-bar-cover";
+import { AskSlotContext, type AskRoom, type AskSlot } from "./ask-slot";
 import {
   AttachmentFailedMark,
   AttachmentTileRow,
@@ -59,6 +66,9 @@ const EXPAND_THRESHOLD = 30;
 const COMPOSER_INPUT_MAX_HEIGHT = 200;
 const ASK_SLOT_CHROME = 20;
 const ASK_MIN_HEIGHT = 160;
+const ASK_UNBOUNDED = 100_000;
+/** How far an ask card reaches into the top bar before the bar is gone. */
+const TOP_BAR_COVER_RAMP = 16;
 export const LAYOUT_SPRING = {
   duration: 350,
   update: { type: LayoutAnimation.Types.spring, springDamping: 1 },
@@ -326,7 +336,7 @@ export const Composer = memo(function Composer({
   compact = false,
   askCollapsed = false,
   onExpandAsk,
-  interventionRoom,
+  askRoom,
   bottomPad,
   draftEmpty,
   hasText,
@@ -361,7 +371,7 @@ export const Composer = memo(function Composer({
   compact?: boolean;
   askCollapsed?: boolean;
   onExpandAsk?: () => void;
-  interventionRoom?: number;
+  askRoom?: AskRoom;
   bottomPad: number;
   draftEmpty: boolean;
   hasText: boolean;
@@ -505,20 +515,59 @@ export const Composer = memo(function Composer({
   const onShellLayout = useCallback((e: LayoutChangeEvent) => {
     setShellHeight(Math.round(e.nativeEvent.layout.height));
   }, []);
-  const askMaxHeight =
-    interventionRoom === undefined || shellHeight === 0
+  const askNaturalHeight = useSharedValue(0);
+  const askBase =
+    askRoom === undefined || shellHeight === 0
       ? null
-      : Math.max(
-          ASK_MIN_HEIGHT,
-          interventionRoom - shellHeight - bottomPad - ASK_SLOT_CHROME,
-        );
+      : askRoom.belowTopBar - shellHeight - bottomPad - ASK_SLOT_CHROME;
+  const askTopBar = askRoom?.topBar ?? 0;
+  const keyboardLift = askRoom?.keyboardLift;
+  const keyboardOpenLift = askRoom?.keyboardOpenLift;
+  const askBelowTopBar = useDerivedValue(() => {
+    if (askBase === null) return ASK_UNBOUNDED;
+    return askBase - (keyboardLift?.value ?? 0);
+  });
+  const askMaxHeight = useDerivedValue(() => {
+    const below = askBelowTopBar.value;
+    if (below === ASK_UNBOUNDED) return below;
+    const lift = keyboardLift?.value ?? 0;
+    const openLift = keyboardOpenLift?.value ?? 0;
+    const opened = openLift > 0 ? Math.min(1, lift / openLift) : 0;
+    return Math.max(ASK_MIN_HEIGHT, below + askTopBar * opened);
+  });
+  const askShowing = compact;
+  useAnimatedReaction(
+    () => {
+      if (!askShowing || askNaturalHeight.value <= 0) return 0;
+      const below = askBelowTopBar.value;
+      if (below === ASK_UNBOUNDED) return 0;
+      const height = Math.min(askNaturalHeight.value, askMaxHeight.value);
+      return Math.min(1, Math.max(0, (height - below) / TOP_BAR_COVER_RAMP));
+    },
+    (cover, previous) => {
+      topBarCover.value = cover;
+      const covered = cover > 0.5;
+      if (previous === null || covered !== previous > 0.5) {
+        runOnJS(setTopBarCovered)(covered);
+      }
+    },
+    [askShowing],
+  );
+  useEffect(
+    () => () => {
+      topBarCover.value = 0;
+      setTopBarCovered(false);
+    },
+    [],
+  );
   const askSlot = useMemo<AskSlot>(
     () => ({
       collapsed: askCollapsed,
-      maxHeight: askMaxHeight,
+      maxHeight: askRoom === undefined ? null : askMaxHeight,
+      naturalHeight: askNaturalHeight,
       expand: onExpandAsk ?? (() => {}),
     }),
-    [askCollapsed, askMaxHeight, onExpandAsk],
+    [askCollapsed, askMaxHeight, askNaturalHeight, askRoom, onExpandAsk],
   );
 
   const showAttachmentStrip = !compact && (attachments?.length ?? 0) > 0;

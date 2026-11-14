@@ -1,21 +1,26 @@
 import {
+  createContext,
   Fragment,
   type ReactNode,
+  type Ref,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   Keyboard,
   type LayoutChangeEvent,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
 import { Text } from "./Text";
 import type {
@@ -51,6 +56,14 @@ import Reanimated, {
   FadeOut,
   FadeOutDown,
   LinearTransition,
+  runOnJS,
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useDerivedValue,
+  useScrollViewOffset,
+  useSharedValue,
 } from "react-native-reanimated";
 import { tapLight } from "../lib/haptics";
 import {
@@ -205,12 +218,50 @@ function DeckTiming({
   );
 }
 
+const CARD_BORDER = StyleSheet.hairlineWidth * 2;
+const UNBOUNDED_CARD = 100_000;
+
+type AskFieldFocus = {
+  focus: (target: View | null) => void;
+  blur: (target: View | null) => void;
+};
+
+const AskFieldFocusContext = createContext<AskFieldFocus>({
+  focus: () => {},
+  blur: () => {},
+});
+
+/** Keeps the field wrapped by `ref` in view inside the card while its input has focus. */
+function useAskFieldAnchor() {
+  const { focus, blur } = useContext(AskFieldFocusContext);
+  const ref = useRef<View>(null);
+  const onFocus = useCallback(() => focus(ref.current), [focus]);
+  const onBlur = useCallback(() => blur(ref.current), [blur]);
+  return { ref, onFocus, onBlur };
+}
+
+function AskFieldRow({
+  style,
+  children,
+}: {
+  style: StyleProp<ViewStyle>;
+  children: (anchor: ReturnType<typeof useAskFieldAnchor>) => ReactNode;
+}) {
+  const anchor = useAskFieldAnchor();
+  return (
+    <View ref={anchor.ref} style={style}>
+      {children(anchor)}
+    </View>
+  );
+}
+
 function AskCardFrame({
   summary,
   progress,
   leading,
   body,
   footer,
+  footerDivider = true,
   colors,
   styles,
 }: {
@@ -219,19 +270,121 @@ function AskCardFrame({
   leading?: ReactNode;
   body: ReactNode;
   footer: ReactNode;
+  footerDivider?: boolean;
   colors: Colors;
   styles: AskStyles;
 }) {
-  const { collapsed, maxHeight, expand } = useAskSlot();
-  const [viewportHeight, setViewportHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const overflowing = contentHeight > viewportHeight + 1;
-  const onViewportLayout = useCallback((e: LayoutChangeEvent) => {
-    setViewportHeight(Math.round(e.nativeEvent.layout.height));
-  }, []);
-  const onContentSizeChange = useCallback((_: number, height: number) => {
-    setContentHeight(Math.round(height));
-  }, []);
+  const { collapsed, maxHeight, naturalHeight, expand } = useAskSlot();
+  const scrollRef = useAnimatedRef<Reanimated.ScrollView>();
+  const scrollOffset = useScrollViewOffset(scrollRef);
+  const contentRef = useRef<View>(null);
+  const focusedRef = useRef<View | null>(null);
+  const contentHeight = useSharedValue(0);
+  const footerHeight = useSharedValue(0);
+  const focusTop = useSharedValue(0);
+  const focusBottom = useSharedValue(0);
+  const focusActive = useSharedValue(false);
+  const [overflowing, setOverflowing] = useState(false);
+
+  const viewportHeight = useDerivedValue(() => {
+    const limit = maxHeight ? maxHeight.value : UNBOUNDED_CARD;
+    return Math.min(
+      contentHeight.value,
+      limit - footerHeight.value - CARD_BORDER,
+    );
+  });
+
+  const cardHeightStyle = useAnimatedStyle(() => ({
+    maxHeight: maxHeight ? maxHeight.value : UNBOUNDED_CARD,
+  }));
+
+  useAnimatedReaction(
+    () => contentHeight.value > viewportHeight.value + 1,
+    (next, previous) => {
+      if (next !== previous) runOnJS(setOverflowing)(next);
+    },
+  );
+
+  useAnimatedReaction(
+    () => contentHeight.value + footerHeight.value + CARD_BORDER,
+    (next) => {
+      if (naturalHeight) naturalHeight.value = next;
+    },
+  );
+  useEffect(
+    () => () => {
+      if (naturalHeight) naturalHeight.value = 0;
+    },
+    [naturalHeight],
+  );
+
+  useAnimatedReaction(
+    () =>
+      focusActive.value
+        ? {
+            viewport: viewportHeight.value,
+            content: contentHeight.value,
+            top: focusTop.value,
+            bottom: focusBottom.value,
+          }
+        : null,
+    (anchor) => {
+      if (!anchor || anchor.viewport <= 0) return;
+      const offset = scrollOffset.value;
+      let next = offset;
+      if (anchor.bottom > next + anchor.viewport) {
+        next = anchor.bottom - anchor.viewport;
+      }
+      if (anchor.top < next) next = anchor.top;
+      next = Math.min(
+        Math.max(0, next),
+        Math.max(0, anchor.content - anchor.viewport),
+      );
+      if (Math.abs(next - offset) > 0.5) scrollTo(scrollRef, 0, next, false);
+    },
+  );
+
+  const measureFocused = useCallback(() => {
+    const target = focusedRef.current;
+    const content = contentRef.current;
+    if (!target || !content) return;
+    target.measureLayout(content, (_x, y, _width, height) => {
+      if (focusedRef.current !== target) return;
+      focusTop.value = y;
+      focusBottom.value = y + height;
+      focusActive.value = true;
+    });
+  }, [focusActive, focusBottom, focusTop]);
+
+  const fieldFocus = useMemo<AskFieldFocus>(
+    () => ({
+      focus: (target) => {
+        focusedRef.current = target;
+        measureFocused();
+      },
+      blur: (target) => {
+        if (focusedRef.current !== target) return;
+        focusedRef.current = null;
+        focusActive.value = false;
+      },
+    }),
+    [focusActive, measureFocused],
+  );
+
+  const onContentLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      contentHeight.value = e.nativeEvent.layout.height;
+      if (focusedRef.current) measureFocused();
+    },
+    [contentHeight, measureFocused],
+  );
+  const onFooterLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      footerHeight.value = e.nativeEvent.layout.height;
+    },
+    [footerHeight],
+  );
+
   return (
     <>
       {collapsed ? (
@@ -261,32 +414,42 @@ function AskCardFrame({
           </Pressable>
         </Reanimated.View>
       ) : null}
-      <View
+      <Reanimated.View
         accessibilityRole="summary"
         style={[
           styles.card,
-          maxHeight !== null && { maxHeight },
+          cardHeightStyle,
           collapsed && styles.cardCollapsed,
         ]}
       >
-        <ScrollView
-          alwaysBounceVertical={false}
-          contentContainerStyle={styles.cardScrollContent}
-          keyboardShouldPersistTaps="handled"
-          onContentSizeChange={onContentSizeChange}
-          onLayout={onViewportLayout}
-          scrollEnabled={overflowing}
-          showsVerticalScrollIndicator={overflowing}
-          style={styles.cardScroll}
-        >
-          {body}
-        </ScrollView>
-        <View
-          style={[styles.cardFooter, overflowing && styles.cardFooterDivided]}
-        >
-          {footer}
-        </View>
-      </View>
+        <AskFieldFocusContext.Provider value={fieldFocus}>
+          <Reanimated.ScrollView
+            ref={scrollRef}
+            alwaysBounceVertical={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={overflowing}
+            showsVerticalScrollIndicator={overflowing}
+            style={styles.cardScroll}
+          >
+            <View
+              ref={contentRef}
+              onLayout={onContentLayout}
+              style={styles.cardScrollContent}
+            >
+              {body}
+            </View>
+          </Reanimated.ScrollView>
+          <View
+            onLayout={onFooterLayout}
+            style={[
+              styles.cardFooter,
+              footerDivider && overflowing && styles.cardFooterDivided,
+            ]}
+          >
+            {footer}
+          </View>
+        </AskFieldFocusContext.Provider>
+      </Reanimated.View>
     </>
   );
 }
@@ -450,53 +613,61 @@ function QuestionDeck({
             ]}
           />
 
-          <View style={[styles.other, textChosen && styles.optionSelected]}>
-            <AskTextInput
-              accessibilityLabel={t("userAsk.question.somethingElse")}
-              colors={colors}
-              editable={!busy}
-              multiline
-              onChangeText={(text) =>
-                setDrafts((current) => ({
-                  ...current,
-                  [entry.key]: typeUserAskText(text),
-                }))
-              }
-              placeholder={t("userAsk.question.somethingElse")}
-              style={styles.otherInput}
-              submitBehavior="blurAndSubmit"
-              onSubmitEditing={() => {
-                if (typed) commit(typeUserAskText(draft.text));
-              }}
-              returnKeyType="done"
-              value={draft.text}
-            />
-            {typed ? (
-              <Reanimated.View
-                entering={FadeIn.duration(140)}
-                exiting={FadeOut.duration(120)}
-              >
-                <Pressable
-                  accessibilityLabel={t("userAsk.question.confirm")}
-                  accessibilityRole="button"
-                  disabled={busy}
-                  hitSlop={6}
-                  onPress={() => commit(typeUserAskText(draft.text))}
-                  style={({ pressed }) => [
-                    styles.otherConfirm,
-                    busy && styles.disabled,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Icon
-                    color={colors.accentForeground}
-                    name="check"
-                    size={18}
-                  />
-                </Pressable>
-              </Reanimated.View>
-            ) : null}
-          </View>
+          <AskFieldRow
+            style={[styles.other, textChosen && styles.optionSelected]}
+          >
+            {(anchor) => (
+              <>
+                <AskTextInput
+                  accessibilityLabel={t("userAsk.question.somethingElse")}
+                  onBlur={anchor.onBlur}
+                  onFocus={anchor.onFocus}
+                  colors={colors}
+                  editable={!busy}
+                  multiline
+                  onChangeText={(text) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      [entry.key]: typeUserAskText(text),
+                    }))
+                  }
+                  placeholder={t("userAsk.question.somethingElse")}
+                  style={styles.otherInput}
+                  submitBehavior="blurAndSubmit"
+                  onSubmitEditing={() => {
+                    if (typed) commit(typeUserAskText(draft.text));
+                  }}
+                  returnKeyType="done"
+                  value={draft.text}
+                />
+                {typed ? (
+                  <Reanimated.View
+                    entering={FadeIn.duration(140)}
+                    exiting={FadeOut.duration(120)}
+                  >
+                    <Pressable
+                      accessibilityLabel={t("userAsk.question.confirm")}
+                      accessibilityRole="button"
+                      disabled={busy}
+                      hitSlop={6}
+                      onPress={() => commit(typeUserAskText(draft.text))}
+                      style={({ pressed }) => [
+                        styles.otherConfirm,
+                        busy && styles.disabled,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Icon
+                        color={colors.accentForeground}
+                        name="check"
+                        size={18}
+                      />
+                    </Pressable>
+                  </Reanimated.View>
+                ) : null}
+              </>
+            )}
+          </AskFieldRow>
         </View>
       </Reanimated.View>
 
@@ -631,15 +802,30 @@ function SecureAskSurface({
   const [busy, setBusy] = useState(false);
   const [issue, setIssue] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const offersRemember = userAskOffersRemember(detail);
+  const [remember, setRemember] = useState(true);
   const remaining = useRemaining(ask.blocking ? undefined : ask.deadlineAt);
+  const sealable = canSealUserAskValue(ask.recipientKey);
+  const originLabel = useUserAskOriginLabel(ask.originDeviceId);
+  const needsComputer =
+    !sealable && detail.fields.some((field) => field.sensitive);
+  const missing = detail.fields.some(
+    (field) => !field.optional && !(values[field.id] ?? "").trim(),
+  );
+  const inputRefs = useRef(new Map<string, TextInput>());
+  const typedFieldIds = detail.fields
+    .filter((field) => field.type !== "choice")
+    .map((field) => field.id);
 
-  const submit = useCallback(
-    async (run: () => Promise<void>, failureKey: string) => {
+  const run = useCallback(
+    async (work: () => Promise<void>, failureKey: string) => {
       if (busy) return;
       setBusy(true);
       setIssue(null);
       try {
-        await run();
+        await work();
       } catch {
         setIssue(t(failureKey));
       } finally {
@@ -652,14 +838,66 @@ function SecureAskSurface({
   const decline = useCallback(() => {
     tapLight();
     const trimmed = note.trim();
-    void submit(async () => {
+    void run(async () => {
       await cancelUserAsk(ask.askId, trimmed);
       recordUserAskAnswer(
         ask.conversationId,
         userAskSecureRecord(ask, "declined", trimmed),
       );
     }, "mobile.userAsk.cancelFailed");
-  }, [ask, note, submit]);
+  }, [ask, note, run]);
+
+  const send = useCallback(() => {
+    setIssue(null);
+    const payload: UserAskAnswerFieldValue[] = [];
+    for (const field of detail.fields) {
+      const raw = (values[field.id] ?? "").trim();
+      if (!raw) {
+        if (field.optional) continue;
+        setIssue(t("mobile.userAsk.missingFields"));
+        return;
+      }
+      if (!ask.recipientKey || !sealable) {
+        if (field.sensitive) {
+          setIssue(t("mobile.userAsk.sensitiveUnavailable"));
+          return;
+        }
+        payload.push({ fieldId: field.id, kind: "plain", value: raw });
+        continue;
+      }
+      try {
+        payload.push({
+          fieldId: field.id,
+          kind: "sealed",
+          sealed: sealUserAskValue({
+            askId: ask.askId,
+            fieldId: field.id,
+            value: raw,
+            recipientKey: ask.recipientKey,
+          }),
+        });
+      } catch {
+        setIssue(t("mobile.userAsk.sealFailed"));
+        return;
+      }
+    }
+    tapLight();
+    const trimmedNote = note.trim();
+    void run(async () => {
+      await answerUserAsk({
+        askId: ask.askId,
+        revision: ask.revision,
+        kind: "fields",
+        fields: payload,
+        ...(offersRemember ? { remember } : {}),
+        ...(trimmedNote ? { note: trimmedNote } : {}),
+      });
+      recordUserAskAnswer(
+        ask.conversationId,
+        userAskSecureRecord(ask, "provided", trimmedNote),
+      );
+    }, "mobile.userAsk.answerFailed");
+  }, [ask, note, detail.fields, offersRemember, remember, run, sealable, t, values]);
 
   const body = (
     <>
@@ -702,174 +940,7 @@ function SecureAskSurface({
         ) : null}
       </View>
 
-      <SecureInputBody
-        ask={ask}
-        detail={detail}
-        busy={busy}
-        styles={styles}
-        colors={colors}
-        t={t}
-        note={note}
-        onNoteChange={setNote}
-        onAnswer={submit}
-      />
-
-      {issue ? <Text style={styles.issue}>{issue}</Text> : null}
-    </>
-  );
-
-  return (
-    <AskCardFrame
-      body={body}
-      colors={colors}
-      footer={
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy}
-          onPress={decline}
-          style={({ pressed }) => [
-            styles.declineRow,
-            pressed && styles.pressed,
-            busy && styles.disabled,
-          ]}
-        >
-          <Text style={styles.declineText}>
-            {t("mobile.userAsk.cantRightNow")}
-          </Text>
-        </Pressable>
-      }
-      leading={
-        <Icon
-          color={ask.blocking ? colors.accent : colors.textMuted}
-          name="eye-off"
-          size={15}
-        />
-      }
-      styles={styles}
-      summary={detail.purpose}
-    />
-  );
-}
-
-function SecureInputBody({
-  ask,
-  detail,
-  busy,
-  styles,
-  colors,
-  t,
-  note,
-  onNoteChange,
-  onAnswer,
-}: {
-  ask: UserAsk;
-  detail: UserAskSecureInputDetail;
-  busy: boolean;
-  styles: AskStyles;
-  colors: Colors;
-  t: Translate;
-  note: string;
-  onNoteChange: (next: string) => void;
-  onAnswer: (run: () => Promise<void>, failureKey: string) => Promise<void>;
-}) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const [issue, setIssue] = useState<string | null>(null);
-  const offersRemember = userAskOffersRemember(detail);
-  const [remember, setRemember] = useState(true);
-
-  const sealable = canSealUserAskValue(ask.recipientKey);
-  const originLabel = useUserAskOriginLabel(ask.originDeviceId);
-
-  const missing = detail.fields.some(
-    (field) => !field.optional && !(values[field.id] ?? "").trim(),
-  );
-  const needsComputer =
-    !sealable && detail.fields.some((field) => field.sensitive);
-
-  const send = useCallback(() => {
-    setIssue(null);
-    const payload: UserAskAnswerFieldValue[] = [];
-    for (const field of detail.fields) {
-      const raw = (values[field.id] ?? "").trim();
-      if (!raw) {
-        if (field.optional) continue;
-        setIssue(t("mobile.userAsk.missingFields"));
-        return;
-      }
-      if (!ask.recipientKey || !sealable) {
-        if (field.sensitive) {
-          setIssue(t("mobile.userAsk.sensitiveUnavailable"));
-          return;
-        }
-        payload.push({ fieldId: field.id, kind: "plain", value: raw });
-        continue;
-      }
-      try {
-        payload.push({
-          fieldId: field.id,
-          kind: "sealed",
-          sealed: sealUserAskValue({
-            askId: ask.askId,
-            fieldId: field.id,
-            value: raw,
-            recipientKey: ask.recipientKey,
-          }),
-        });
-      } catch {
-        setIssue(t("mobile.userAsk.sealFailed"));
-        return;
-      }
-    }
-    tapLight();
-    const trimmedNote = note.trim();
-    void onAnswer(async () => {
-      await answerUserAsk({
-        askId: ask.askId,
-        revision: ask.revision,
-        kind: "fields",
-        fields: payload,
-        ...(offersRemember ? { remember } : {}),
-        ...(trimmedNote ? { note: trimmedNote } : {}),
-      });
-      recordUserAskAnswer(
-        ask.conversationId,
-        userAskSecureRecord(ask, "provided", trimmedNote),
-      );
-    }, "mobile.userAsk.answerFailed");
-  }, [
-    ask,
-    note,
-    detail.fields,
-    offersRemember,
-    remember,
-    onAnswer,
-    sealable,
-    t,
-    values,
-  ]);
-
-  const noteInput = (
-    <View style={styles.note}>
-      <AskTextInput
-        accessibilityLabel={t("userAsk.secureInput.note")}
-        colors={colors}
-        editable={!busy}
-        maxLength={USER_ASK_MAX_NOTE}
-        multiline
-        onChangeText={onNoteChange}
-        placeholder={t("userAsk.secureInput.note")}
-        style={styles.noteInput}
-        submitBehavior="blurAndSubmit"
-        returnKeyType="done"
-        value={note}
-      />
-    </View>
-  );
-
-  if (needsComputer) {
-    return (
-      <View style={styles.body}>
+      {needsComputer ? (
         <View style={styles.redirect}>
           <Text style={styles.redirectTitle}>
             {originLabel
@@ -893,173 +964,275 @@ function SecureInputBody({
             ))}
           </View>
         </View>
-        {noteInput}
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.body}>
-      {detail.save?.replacing ? (
-        <Text style={styles.rememberHint}>
-          {t("mobile.userAsk.replacing", { label: detail.save.label })}
-        </Text>
-      ) : null}
-      {detail.fields.map((field) => {
-        const value = values[field.id] ?? "";
-        const show = revealed[field.id] === true;
-        return (
-          <View key={field.id} style={styles.field}>
-            <View style={styles.fieldHeader}>
-              <Text style={styles.fieldLabel}>{field.label}</Text>
-              {field.optional ? (
-                <Text style={styles.fieldOptional}>
-                  {t("mobile.userAsk.optional")}
-                </Text>
-              ) : null}
-              {sealable && field.sensitive ? (
-                <View style={styles.fieldSensitive}>
-                  <Text style={styles.sensitiveText}>
-                    {t("mobile.userAsk.sensitive")}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            {field.hint ? (
-              <Text style={styles.fieldHint}>{field.hint}</Text>
-            ) : null}
-
-            {field.type === "choice" ? (
-              <View style={styles.choiceRow}>
-                {(field.choices ?? []).map((choice) => {
-                  const selected = value === choice.id;
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      disabled={busy}
-                      key={choice.id}
-                      onPress={() => {
-                        tapLight();
-                        setValues((prev) => ({
-                          ...prev,
-                          [field.id]: choice.id,
-                        }));
-                      }}
-                      style={({ pressed }) => [
-                        styles.choice,
-                        selected && styles.choiceSelected,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.choiceText,
-                          selected && styles.choiceTextSelected,
-                        ]}
-                      >
-                        {choice.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={styles.inputRow}>
-                <AskTextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  colors={colors}
-                  {...nativeInputPropsForField(field)}
-                  accessibilityLabel={field.label}
-                  onChangeText={(next) =>
-                    setValues((prev) => ({ ...prev, [field.id]: next }))
-                  }
-                  placeholder={field.placeholder ?? ""}
-                  secureTextEntry={field.type === "secret" && !show}
-                  spellCheck={false}
-                  style={[
-                    styles.input,
-                    userAskFieldInputKind(field) === "one_time_code" &&
-                      styles.inputCode,
-                  ]}
-                  value={value}
-                />
-                {field.type === "secret" ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      show
-                        ? t("mobile.userAsk.hideSecret", { label: field.label })
-                        : t("mobile.userAsk.revealSecret", {
-                            label: field.label,
-                          })
-                    }
-                    onPress={() =>
-                      setRevealed((prev) => ({ ...prev, [field.id]: !show }))
-                    }
-                    style={({ pressed }) => [
-                      styles.reveal,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Icon
-                      color={colors.textMuted}
-                      name={show ? "eye-off" : "eye"}
-                      size={16}
-                    />
-                  </Pressable>
-                ) : null}
-              </View>
-            )}
-          </View>
-        );
-      })}
-
-      {noteInput}
-
-      {issue ? <Text style={styles.issue}>{issue}</Text> : null}
-
-      <View style={styles.secureActions}>
-        {offersRemember ? (
-          <View style={styles.rememberRow}>
-            <Switch
-              accessibilityHint={
-                remember
-                  ? t("mobile.userAsk.rememberOn", {
-                      label: detail.save?.label ?? "",
-                    })
-                  : t("mobile.userAsk.rememberOff")
-              }
-              accessibilityLabel={t("mobile.userAsk.remember")}
-              disabled={busy}
-              onValueChange={setRemember}
-              style={styles.rememberSwitch}
-              value={remember}
-            />
-            <Text style={styles.rememberLabel}>
-              {t("mobile.userAsk.remember")}
+      ) : (
+        <View style={styles.body}>
+          {detail.save?.replacing ? (
+            <Text style={styles.rememberHint}>
+              {t("mobile.userAsk.replacing", { label: detail.save.label })}
             </Text>
-          </View>
-        ) : null}
+          ) : null}
+          {detail.fields.map((field) => {
+            const nextId =
+              typedFieldIds[typedFieldIds.indexOf(field.id) + 1] ?? null;
+            return (
+              <SecureField
+                busy={busy}
+                inputRef={(input) => {
+                  if (input) inputRefs.current.set(field.id, input);
+                  else inputRefs.current.delete(field.id);
+                }}
+                onSubmitNext={
+                  nextId
+                    ? () => inputRefs.current.get(nextId)?.focus()
+                    : null
+                }
+                colors={colors}
+                field={field}
+                key={field.id}
+                onChange={(next) =>
+                  setValues((prev) => ({ ...prev, [field.id]: next }))
+                }
+                onToggleReveal={() =>
+                  setRevealed((prev) => ({
+                    ...prev,
+                    [field.id]: prev[field.id] !== true,
+                  }))
+                }
+                revealed={revealed[field.id] === true}
+                sealable={sealable}
+                styles={styles}
+                t={t}
+                value={values[field.id] ?? ""}
+              />
+            );
+          })}
+        </View>
+      )}
+    </>
+  );
+
+  const footer = (
+    <View style={styles.secureFooter}>
+      <View style={styles.noteRow}>
+        <AskTextInput
+          accessibilityLabel={t("userAsk.secureInput.note")}
+          colors={colors}
+          editable={!busy}
+          maxLength={USER_ASK_MAX_NOTE}
+          multiline
+          onChangeText={setNote}
+          placeholder={t("userAsk.secureInput.note")}
+          style={styles.noteInput}
+          submitBehavior="blurAndSubmit"
+          returnKeyType="done"
+          value={note}
+        />
         <Pressable
           accessibilityRole="button"
-          disabled={busy || missing}
-          onPress={send}
+          disabled={busy}
+          onPress={decline}
           style={({ pressed }) => [
-            styles.primaryAction,
-            !offersRemember && styles.primaryActionWide,
+            styles.declineButton,
             pressed && styles.pressed,
-            (busy || missing) && styles.disabled,
+            busy && styles.disabled,
           ]}
         >
-          <Text style={styles.primaryActionText}>
-            {busy
-              ? t("mobile.userAsk.sending")
-              : t("mobile.userAsk.sendSecurely")}
+          <Text numberOfLines={1} style={styles.declineText}>
+            {t("mobile.userAsk.cantRightNow")}
           </Text>
         </Pressable>
       </View>
+
+      {issue ? <Text style={styles.issue}>{issue}</Text> : null}
+
+      {needsComputer ? null : (
+        <View style={styles.secureActions}>
+          {offersRemember ? (
+            <View style={styles.rememberRow}>
+              <Switch
+                accessibilityHint={
+                  remember
+                    ? t("mobile.userAsk.rememberOn", {
+                        label: detail.save?.label ?? "",
+                      })
+                    : t("mobile.userAsk.rememberOff")
+                }
+                accessibilityLabel={t("mobile.userAsk.remember")}
+                disabled={busy}
+                onValueChange={setRemember}
+                style={styles.rememberSwitch}
+                value={remember}
+              />
+              <Text style={styles.rememberLabel}>
+                {t("mobile.userAsk.remember")}
+              </Text>
+            </View>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy || missing}
+            onPress={send}
+            style={({ pressed }) => [
+              styles.primaryAction,
+              !offersRemember && styles.primaryActionWide,
+              pressed && styles.pressed,
+              (busy || missing) && styles.disabled,
+            ]}
+          >
+            <Text style={styles.primaryActionText}>
+              {busy
+                ? t("mobile.userAsk.sending")
+                : t("mobile.userAsk.sendSecurely")}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+
+  return (
+    <AskCardFrame
+      body={body}
+      colors={colors}
+      footer={footer}
+      footerDivider={false}
+      leading={
+        <Icon
+          color={ask.blocking ? colors.accent : colors.textMuted}
+          name="eye-off"
+          size={15}
+        />
+      }
+      styles={styles}
+      summary={detail.purpose}
+    />
+  );
+}
+
+function SecureField({
+  field,
+  inputRef,
+  onSubmitNext,
+  value,
+  revealed,
+  sealable,
+  busy,
+  onChange,
+  onToggleReveal,
+  styles,
+  colors,
+  t,
+}: {
+  field: UserAskField;
+  inputRef: (input: TextInput | null) => void;
+  onSubmitNext: (() => void) | null;
+  value: string;
+  revealed: boolean;
+  sealable: boolean;
+  busy: boolean;
+  onChange: (next: string) => void;
+  onToggleReveal: () => void;
+  styles: AskStyles;
+  colors: Colors;
+  t: Translate;
+}) {
+  const anchor = useAskFieldAnchor();
+  return (
+    <View ref={anchor.ref} style={styles.field}>
+      <View style={styles.fieldHeader}>
+        <Text style={styles.fieldLabel}>{field.label}</Text>
+        {field.optional ? (
+          <Text style={styles.fieldOptional}>
+            {t("mobile.userAsk.optional")}
+          </Text>
+        ) : null}
+        {sealable && field.sensitive ? (
+          <View style={styles.fieldSensitive}>
+            <Text style={styles.sensitiveText}>
+              {t("mobile.userAsk.sensitive")}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      {field.hint ? <Text style={styles.fieldHint}>{field.hint}</Text> : null}
+
+      {field.type === "choice" ? (
+        <View style={styles.choiceRow}>
+          {(field.choices ?? []).map((choice) => {
+            const selected = value === choice.id;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                disabled={busy}
+                key={choice.id}
+                onPress={() => {
+                  tapLight();
+                  onChange(choice.id);
+                }}
+                style={({ pressed }) => [
+                  styles.choice,
+                  selected && styles.choiceSelected,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.choiceText,
+                    selected && styles.choiceTextSelected,
+                  ]}
+                >
+                  {choice.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={styles.inputRow}>
+          <AskTextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            colors={colors}
+            {...nativeInputPropsForField(field)}
+            accessibilityLabel={field.label}
+            onBlur={anchor.onBlur}
+            ref={inputRef}
+            returnKeyType={onSubmitNext ? "next" : "done"}
+            submitBehavior={onSubmitNext ? "submit" : "blurAndSubmit"}
+            onSubmitEditing={onSubmitNext ?? undefined}
+            onChangeText={onChange}
+            onFocus={anchor.onFocus}
+            placeholder={field.placeholder ?? ""}
+            secureTextEntry={field.type === "secret" && !revealed}
+            spellCheck={false}
+            style={[
+              styles.input,
+              userAskFieldInputKind(field) === "one_time_code" &&
+                styles.inputCode,
+            ]}
+            value={value}
+          />
+          {field.type === "secret" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                revealed
+                  ? t("mobile.userAsk.hideSecret", { label: field.label })
+                  : t("mobile.userAsk.revealSecret", { label: field.label })
+              }
+              onPress={onToggleReveal}
+              style={({ pressed }) => [styles.reveal, pressed && styles.pressed]}
+            >
+              <Icon
+                color={colors.textMuted}
+                name={revealed ? "eye-off" : "eye"}
+                size={16}
+              />
+            </Pressable>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
@@ -1106,10 +1279,12 @@ const nativeInputPropsForKind = (
 
 function AskTextInput({
   colors,
+  ref,
   ...props
-}: TextInputProps & { colors: Colors }) {
+}: TextInputProps & { colors: Colors; ref?: Ref<TextInput> }) {
   return (
     <TextInput
+      ref={ref}
       placeholderTextColor={colors.textWeaker}
       selectionColor={colors.accent}
       {...props}
@@ -1187,14 +1362,14 @@ const makeStyles = (colors: Colors) =>
       display: "none",
     },
     cardFooter: {
+      borderTopColor: "transparent",
+      borderTopWidth: StyleSheet.hairlineWidth,
       paddingBottom: 12,
       paddingHorizontal: 16,
-      paddingTop: 14,
+      paddingTop: 12,
     },
     cardFooterDivided: {
       borderTopColor: colors.border,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      paddingTop: 10,
     },
     cardScroll: {
       flexGrow: 0,
@@ -1264,9 +1439,10 @@ const makeStyles = (colors: Colors) =>
       fontFamily: fonts.sans.regular,
       fontSize: 13,
     },
-    declineRow: {
-      alignSelf: "flex-start",
-      paddingVertical: 4,
+    declineButton: {
+      justifyContent: "center",
+      minHeight: 38,
+      paddingLeft: 4,
     },
     declineText: {
       color: colors.textMuted,
@@ -1453,12 +1629,16 @@ const makeStyles = (colors: Colors) =>
       justifyContent: "center",
       width: 36,
     },
-    note: {
+    noteRow: {
+      alignItems: "center",
       borderTopColor: colors.border,
       borderTopWidth: StyleSheet.hairlineWidth,
+      flexDirection: "row",
+      gap: 12,
     },
     noteInput: {
       color: colors.text,
+      flex: 1,
       fontFamily: fonts.sans.regular,
       fontSize: 15,
       lineHeight: 20,
@@ -1503,7 +1683,7 @@ const makeStyles = (colors: Colors) =>
       fontSize: 15,
     },
     primaryActionWide: {
-      alignSelf: "stretch",
+      flex: 1,
       minHeight: 46,
     },
     progress: {
@@ -1571,6 +1751,9 @@ const makeStyles = (colors: Colors) =>
     },
     rememberSwitch: {
       transform: [{ scale: 0.8 }],
+    },
+    secureFooter: {
+      gap: 6,
     },
     secureActions: {
       alignItems: "center",

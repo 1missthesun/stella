@@ -573,7 +573,7 @@ export function buildRoleMatcherScript(role, name, nth) {
       const hasExplicitIndex = ${matcher.nth !== undefined};
       if (!hasExplicitIndex && matches.length > 1) {
         throw new Error(
-          'Strict mode violation: ${description} matched ' + matches.length +
+          ${JSON.stringify(`Strict mode violation: ${description} matched `)} + matches.length +
           ' visible elements; refine the locator or use nth()/first()/last()',
         );
       }

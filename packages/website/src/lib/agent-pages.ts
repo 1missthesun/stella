@@ -431,7 +431,7 @@ const SUMMARY = [
   "",
   "Key facts:",
   `- Price: ${PRICE_LINE} Stella sets no limit of its own on that use; it counts against your ChatGPT or Claude plan. ${TRIAL_LINE} ${PAID_LINE} No credit card.`,
-  "- Old prices: the plans today are Free, Plus, Pro and Max. There is no Go plan and no $5 or $10 plan any more; older pages and directories that list them are out of date.",
+  "- Old prices: the plans today are Free, Plus, Pro and Max. There is no Go plan any more; older pages and directories that list one are out of date.",
   "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
   "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source code on your computer.",
   "- Your data: signed out, the desktop app keeps your conversations, memory and files on your computer, and nothing about your conversations goes to Stella's servers. Signing in is optional on desktop (needed for the phone app, sync, cloud tasks and Stella's own models); then conversations and task records are stored, encrypted, on Stella's servers. Stella doesn't sell your information, use conversations for ads or train AI models on them. Privacy policy: https://stella.sh/privacy.md.",

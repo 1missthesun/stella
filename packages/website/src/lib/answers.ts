@@ -17,7 +17,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella free?",
-    a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude Pro or Max plan through Claude Code, and Stella costs nothing on top and sets no limit of its own; that use counts against your own plan, not a Stella budget. Your own API keys and local models are free to use too. ${TRIAL_LINE} ${PAID_LINE} There is no Go plan and no $5 or $10 plan any more; pages that list them are out of date.`,
+    a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude Pro or Max plan through Claude Code, and Stella costs nothing on top and sets no limit of its own; that use counts against your own plan, not a Stella budget. Your own API keys and local models are free to use too. ${TRIAL_LINE} ${PAID_LINE} Older pages that list a Go plan are out of date.`,
   },
   {
     q: "Is Stella safe?",

@@ -1,3 +1,5 @@
+import { isSilentReplyText } from "./reply-refs.js";
+
 type ChatEventLike = {
   type: string;
   payload?: Record<string, unknown>;
@@ -58,4 +60,15 @@ export const isUiDisplayableChatEvent = (
     return true;
   }
   return !isUiHiddenChatMessagePayload(getMessagePayload(event));
+};
+
+/**
+ * An assistant message stored with a "nothing to post" placeholder as its
+ * whole text (before replies like that were dropped when written): shown as
+ * no message at all.
+ */
+export const isSilentAssistantChatEvent = (event: ChatEventLike): boolean => {
+  if (event.type !== "assistant_message") return false;
+  const text = getMessagePayload(event)?.text;
+  return typeof text === "string" && text.trim() !== "" && isSilentReplyText(text);
 };

@@ -1,6 +1,9 @@
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
-import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
+import {
+  isSilentAssistantChatEvent,
+  isUiHiddenChatMessagePayload,
+} from "@stella/contracts/chat-event-visibility";
 import {
   isMapRouteArtifact,
   type MapRouteArtifact,
@@ -1086,6 +1089,7 @@ export const buildMobileSyncMessages = (
   }
   for (const message of messages) {
     if (isUiHiddenChatMessagePayload(message.payload ?? null)) continue;
+    if (isSilentAssistantChatEvent(message)) continue;
     const role = message.type === "user_message" ? "user" : "assistant";
     if (role !== "user" && role !== "assistant") continue;
     const text = textFromPayload(message.payload);

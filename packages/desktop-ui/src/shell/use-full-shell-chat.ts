@@ -72,6 +72,7 @@ import {
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
 import type { EventRecord } from "@stella/contracts/local-chat";
+import { isSilentAssistantChatEvent } from "@stella/contracts/chat-event-visibility";
 import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
 
 const composerOwner = viewAtom("composer.owner", "");
@@ -299,13 +300,15 @@ export function useFullShellChat({
     recordLoaded,
     recordStartMs,
   ]);
-  const persistedMessages = useMemo(
-    () =>
+  const persistedMessages = useMemo(() => {
+    const all =
       piPending.messages.length > 0
         ? [...cloudChat.persistedMessages, ...piPending.messages]
-        : cloudChat.persistedMessages,
-    [cloudChat.persistedMessages, piPending.messages],
-  );
+        : cloudChat.persistedMessages;
+    return all.some(isSilentAssistantChatEvent)
+      ? all.filter((message) => !isSilentAssistantChatEvent(message))
+      : all;
+  }, [cloudChat.persistedMessages, piPending.messages]);
   useEffect(() => {
     acknowledgeLocalMessages(persistedMessages);
   }, [acknowledgeLocalMessages, persistedMessages, localOptimisticEvents]);

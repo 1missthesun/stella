@@ -355,13 +355,13 @@ export const automaticExecutionResultText = (
     const parsed = JSON.parse(raw) as unknown;
     if (parsed && typeof parsed === "object") {
       const finalText = (parsed as { finalText?: unknown }).finalText;
-      if (typeof finalText === "string" && finalText.trim()) {
+      if (typeof finalText === "string" && visible(finalText)) {
         return visible(finalText);
       }
     }
-    if (typeof parsed === "string" && parsed.trim()) return visible(parsed);
+    if (typeof parsed === "string" && visible(parsed)) return visible(parsed);
   } catch {
-    return visible(raw);
+    return visible(raw) || "Done.";
   }
   return "Done.";
 };

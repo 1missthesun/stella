@@ -1,0 +1,288 @@
+.player {
+  --swap: 900ms;
+  --bubble-size: clamp(17px, 1.45vw, 22px);
+  --bubble-sink: 14px;
+  --overhang: calc(var(--bubble-size) * 1.36 + var(--bubble-size) * 0.86 - var(--bubble-sink) + 14px);
+  --spring: cubic-bezier(0.2, 1.1, 0.4, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: calc(clamp(52px, 8svh, 104px) + var(--overhang));
+}
+
+@supports (animation-timing-function: linear(0, 1)) {
+  .player {
+    --spring: linear(0, 0.069, 0.222, 0.403, 0.577, 0.725, 0.841, 0.924, 0.979, 1.012, 1.029, 1.034, 1.033, 1.028, 1.022, 1.016, 1.011, 1.006, 1);
+  }
+}
+
+.frame {
+  --k: 0.75;
+  position: relative;
+  width: min(1180px, 90vw, calc((100svh - 220px) * 1480 / 900));
+  aspect-ratio: 1480 / 900;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 50px 120px -30px rgba(0, 0, 0, 0.8);
+  cursor: default;
+}
+
+.look {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: inherit;
+  container-type: size;
+  background: #0b0c10;
+}
+
+.drawn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: scale(var(--k));
+  transform-origin: 0 0;
+}
+
+/* The desktop's hot-reload focus pull (update-transition.ts focusPull): the old
+   window blurs to 12px and dissolves at peak blur while the new one, held at
+   12px underneath, pulls back into focus. */
+.look[data-role="enter"] {
+  animation: focus-in var(--swap) linear both;
+}
+
+.look[data-role="leaving"] {
+  z-index: 2;
+  animation: focus-out var(--swap) linear both;
+}
+
+.look[data-role="pending"] {
+  z-index: 0;
+  visibility: hidden;
+}
+
+.asks {
+  position: absolute;
+  z-index: 3;
+  right: clamp(14px, 4.5%, 56px);
+  left: clamp(14px, 4.5%, 56px);
+  bottom: calc(100% - var(--bubble-sink));
+  height: 0;
+  pointer-events: none;
+}
+
+/* Stella's own user message (full-shell.chat.css .event-item.user) at reading size. */
+.bubble {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  max-width: min(100%, 30em);
+  width: max-content;
+  margin: 0;
+  padding: 0.43em 0.78em 0.45em;
+  border-radius: 1.08em;
+  background: #2871c9;
+  color: #f2fbff;
+  font-family: var(--l-sans), system-ui, sans-serif;
+  font-size: var(--bubble-size);
+  font-weight: 500;
+  line-height: 1.36;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.12),
+    0 14px 34px -10px rgba(0, 0, 0, 0.55);
+  transform-origin: right bottom;
+  animation:
+    bubble-pop 380ms var(--spring) both,
+    bubble-fade 140ms ease-out both;
+}
+
+.bubble[data-out="1"] {
+  animation: bubble-leave 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.player[data-paused="1"] .look,
+.player[data-paused="1"] .bubble {
+  animation-play-state: paused;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: clamp(20px, 3svh, 32px);
+}
+
+.steps {
+  display: flex;
+  gap: 5px;
+}
+
+.seg {
+  position: relative;
+  width: 22px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.seg::before,
+.fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+}
+
+.seg::before {
+  content: "";
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 200ms ease;
+}
+
+.seg[data-done="1"]::before {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.seg:hover::before,
+.seg:focus-visible::before {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.fill {
+  background: #fff;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+.pause {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+.pause svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pause:hover,
+.pause:focus-visible {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #fff;
+}
+
+@keyframes bubble-pop {
+  from {
+    transform: translate3d(0, 14px, 0) scale(0.84);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes bubble-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes bubble-leave {
+  to {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.96);
+  }
+}
+
+@keyframes focus-out {
+  0% {
+    opacity: 1;
+    filter: blur(0px);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  40% {
+    opacity: 1;
+    filter: blur(12px);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  60%,
+  100% {
+    opacity: 0;
+    filter: blur(14px);
+  }
+}
+
+@keyframes focus-in {
+  0%,
+  55% {
+    filter: blur(12px);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  100% {
+    filter: blur(0px);
+  }
+}
+
+@media (max-width: 700px), (max-aspect-ratio: 5/6) {
+  .player {
+    --bubble-size: clamp(16px, 2.5vw, 20px);
+    --bubble-sink: 12px;
+    --overhang: calc(var(--bubble-size) * 1.36 * 2 + var(--bubble-size) * 0.88 - var(--bubble-sink) + 10px);
+  }
+
+  .frame {
+    width: min(92vw, calc((100svh - 200px) * 840 / 1400));
+    aspect-ratio: 840 / 1400;
+    border-radius: 12px;
+  }
+
+  .bubble {
+    max-width: 100%;
+  }
+
+  .seg {
+    width: 16px;
+  }
+
+  .steps {
+    gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble,
+  .bubble[data-out="1"],
+  .look[data-role="enter"] {
+    animation: none;
+  }
+
+  .look[data-role="leaving"] {
+    animation: crossfade 400ms ease both;
+  }
+}
+
+@keyframes crossfade {
+  to {
+    opacity: 0;
+  }
+}

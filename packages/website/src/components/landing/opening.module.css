@@ -3,7 +3,7 @@
   --hero-top: clamp(92px, 14.5svh, 170px);
   /* Height-capped so the subtitle and button clear the window that peeks up
      from the next section on short laptop screens. */
-  --title: clamp(50px, min(14.6vw, 23svh), 290px);
+  --title: clamp(44px, min(10.8vw, 15.4svh), 200px);
   --cta-gap: clamp(30px, 5svh, 56px);
   --cta-h: 64px;
   position: relative;
@@ -121,6 +121,10 @@
   animation-delay: 110ms;
 }
 
+.titleLine + .titleLine + .titleLine {
+  animation-delay: 220ms;
+}
+
 .sub {
   max-width: 48ch;
   margin: clamp(16px, 2.6svh, 30px) 0 0;
@@ -181,7 +185,7 @@
 
 @media (max-width: 700px) {
   .hero {
-    --title: 17.4vw;
+    --title: 14.6vw;
     --h: max(92svh, 640px);
     --cta-gap: clamp(22px, 3.4svh, 34px);
     display: flex;

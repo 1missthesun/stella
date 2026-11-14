@@ -91,8 +91,9 @@ export function Opening() {
 
       <div className={o.copy}>
         <h1 id="hero-title" className={o.title}>
-          <span className={o.titleLine}>Ask for</span>
-          <span className={o.titleLine}>anything.</span>
+          <span className={o.titleLine}>Stella, your</span>
+          <span className={o.titleLine}>personal</span>
+          <span className={o.titleLine}>assistant.</span>
         </h1>
         <p className={o.sub}>The easy way to use ChatGPT or Claude on your computer.</p>
         <div className={o.cta}>

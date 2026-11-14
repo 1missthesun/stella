@@ -1,4 +1,7 @@
-import type { Effect } from "effect";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+
+import { Effect } from "effect";
 
 import {
   createDirectoryEntryAdapter,
@@ -38,6 +41,32 @@ const isBundledSkillIncludedForPlatform = (
   return PLATFORM_SKILL_IDS[platform]?.includes(skillId) === true;
 };
 
+/** Written beside `skills/` by the app-source publish (scripts/shipped-skill-hashes.ts); absent in a dev checkout. */
+export const SHIPPED_SKILL_HASHES_FILENAME = "shipped-skill-hashes.json";
+
+const readShippedSkillHashes = async (
+  bundledSkillsDir: string,
+): Promise<Record<string, string[]>> => {
+  try {
+    const parsed = JSON.parse(
+      await fs.readFile(
+        path.join(path.dirname(bundledSkillsDir), SHIPPED_SKILL_HASHES_FILENAME),
+        "utf-8",
+      ),
+    ) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string[]] =>
+          Array.isArray(entry[1]) &&
+          entry[1].every((hash) => typeof hash === "string"),
+      ),
+    );
+  } catch {
+    return {};
+  }
+};
+
 const bundledSkillAdapter = createDirectoryEntryAdapter(
   (id) => id !== USER_PROFILE_SKILL_ID,
 );
@@ -59,16 +88,22 @@ export const reconcileBundledSkillsEffect = (
   options: SkillsSyncOptions = {},
 ): Effect.Effect<SkillsSyncReport, unknown> => {
   const platform = options.platform ?? process.platform;
-  return reconcileBundledEntriesEffect(
-    bundledSkillsDir,
-    homeSkillsDir,
-    bundledSkillAdapter,
-    {
-      includeBundledId: (id) => isBundledSkillIncludedForPlatform(id, platform),
-      // Manifests seeded before the generic rename stored hashes under
-      // `skills`; read them so already-installed users still get updates.
-      legacyEntriesKey: "skills",
-    },
+  return Effect.flatMap(
+    Effect.promise(() => readShippedSkillHashes(bundledSkillsDir)),
+    (previouslyShipped) =>
+      reconcileBundledEntriesEffect(
+        bundledSkillsDir,
+        homeSkillsDir,
+        bundledSkillAdapter,
+        {
+          includeBundledId: (id) =>
+            isBundledSkillIncludedForPlatform(id, platform),
+          // Manifests seeded before the generic rename stored hashes under
+          // `skills`; read them so already-installed users still get updates.
+          legacyEntriesKey: "skills",
+          previouslyShipped,
+        },
+      ),
   );
 };
 

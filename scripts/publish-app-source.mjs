@@ -90,6 +90,15 @@ try {
   for (const excluded of EXCLUDED_PATHS) {
     rmSync(path.join(workDir, excluded), { recursive: true, force: true });
   }
+  if (run("git", ["rev-parse", "--is-shallow-repository"], { cwd: repoRoot }) === "true") {
+    throw new Error("Publishing needs the full history to list earlier skill versions: git fetch --unshallow");
+  }
+  const shippedSkills = spawnSync("bun", [
+    "scripts/shipped-skill-hashes.ts",
+    "--ref", sourceSha,
+    "--out", path.join(workDir, "packages/home-seed/shipped-skill-hashes.json"),
+  ], { cwd: repoRoot, stdio: "inherit" });
+  if (shippedSkills.status !== 0) throw new Error("Listing earlier skill versions failed");
   run("bun", ["install", "--lockfile-only"], { cwd: workDir });
 
   let upstream = wrangler(["repos", "get", UPSTREAM_REPO, "--namespace", namespace]);

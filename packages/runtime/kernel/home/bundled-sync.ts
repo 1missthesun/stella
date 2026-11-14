@@ -45,6 +45,8 @@ export type BundledSyncOptions = {
    */
   legacyEntriesKey?: string;
   sourceRevision?: string;
+  /** Hashes of every earlier version Stella shipped for each entry; a home copy equal to one of them is untouched. */
+  previouslyShipped?: Readonly<Record<string, readonly Sha256Hex[]>>;
   seedMissingOnly?: boolean;
   removeObsolete?: boolean;
 };
@@ -229,11 +231,10 @@ export const reconcileBundledEntriesEffect = (
         continue;
       }
 
-      if (
-        !seedMissingOnly &&
-        recordedHash !== undefined &&
-        recordedHash === homeHash
-      ) {
+      const untouched =
+        (recordedHash !== undefined && recordedHash === homeHash) ||
+        options.previouslyShipped?.[id]?.includes(homeHash) === true;
+      if (!seedMissingOnly && untouched) {
         yield* tryIO(() => adapter.copy(bundledDir, homeDir, id));
         nextEntries[id] = {
           lastSyncedHash: bundledHash,
@@ -378,22 +379,30 @@ const pathExists = async (target: string): Promise<boolean> => {
   }
 };
 
+export const hashBundledUnitFiles = async (
+  relativePaths: readonly string[],
+  read: (relativePath: string) => Promise<Uint8Array>,
+): Promise<Sha256Hex> => {
+  const hash = createHash("sha256");
+  for (const rel of [...relativePaths].sort((a, b) => a.localeCompare(b))) {
+    hash.update(rel, "utf8");
+    hash.update("\0");
+    hash.update(await read(rel));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+};
+
 const hashDirectoryUnit = async (
   dir: string,
   id: string,
 ): Promise<Sha256Hex | null> => {
   const unitDir = path.join(dir, id);
   if (!(await pathExists(unitDir))) return null;
-  const files = await listDirectoryFilesRelative(unitDir);
-  const hash = createHash("sha256");
-  for (const rel of files) {
-    const content = await fs.readFile(path.join(unitDir, rel));
-    hash.update(rel, "utf8");
-    hash.update("\0");
-    hash.update(content);
-    hash.update("\0");
-  }
-  return hash.digest("hex");
+  return hashBundledUnitFiles(
+    await listDirectoryFilesRelative(unitDir),
+    (rel) => fs.readFile(path.join(unitDir, rel)),
+  );
 };
 
 export const createDirectoryEntryAdapter = (

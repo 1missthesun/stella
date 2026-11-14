@@ -11,6 +11,8 @@ export type ShellStateOptions = {
   getStellaSiteAuth?: () => { baseUrl: string; authToken: string } | null;
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
   cliBridgeSocketPath?: string;
+  /** The host stops every command when the turn ends, so nothing reports an exit afterwards. */
+  shellsEndWithTurn?: boolean;
 };
 
 const WINDOWS_CLI_SHIMS = [

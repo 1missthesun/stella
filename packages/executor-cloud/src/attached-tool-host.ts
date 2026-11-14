@@ -442,6 +442,7 @@ export const runAttachedToolHost = (
             stellaDataDir: CLOUD_HOST_STATE,
             recoverStaleSecrets: false,
             enableShellShims: false,
+            shellsEndWithTurn: true,
             ...(officeBinPath ? { stellaOfficeBinPath: officeBinPath } : {}),
           }),
         ),

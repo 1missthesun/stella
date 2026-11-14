@@ -143,6 +143,8 @@ export type ToolHostOptions = {
   stellaAppDir: string;
   recoverStaleSecrets?: boolean;
   enableShellShims?: boolean;
+  /** The host is shut down when each turn ends, stopping every command still running. */
+  shellsEndWithTurn?: boolean;
   allowCloudCode?: boolean;
   cloudBrowser?: CloudBrowserBridge;
   browserSessionFactory?: import("../browser-use/client.js").BrowserSessionFactory;

@@ -2,7 +2,7 @@ export const EXEC_COMMAND_TOOL_NAME = "Bash";
 export const LEGACY_EXEC_COMMAND_TOOL_NAME = "exec_command";
 
 export const EXEC_COMMAND_TOOL_DESCRIPTION =
-  "Run a shell command and wait for it to finish, returning its full output in one result. Waits up to timeout_ms (default 120000, max 600000); a command still running at the timeout keeps running and the result carries a session_id for write_stdin. Set run_in_background: true for a job you do not need to wait on: the call returns right away with a session_id, and if your turn ends while it runs, its exit code and output are delivered to you automatically, so never poll just to wait. By default stdin/stdout/stderr use ordinary pipes; set tty: true for a real Unix PTY on macOS/Linux or ConPTY on supported Windows when a program needs a terminal. Required: cmd. Node.js and Stella CLIs (stella-browser, stella-office, stella-computer, stella-media, stella-x-api) are auto-injected into PATH.";
+  "Run a shell command and wait for it to finish, returning its full output in one result. Waits up to timeout_ms (default 120000, max 600000); a command still running at the timeout keeps running and the result carries a session_id for write_stdin. Set run_in_background: true for a job you do not need to wait on: the call returns right away with a session_id to check on it or stop it with write_stdin. By default stdin/stdout/stderr use ordinary pipes; set tty: true for a real Unix PTY on macOS/Linux or ConPTY on supported Windows when a program needs a terminal. Required: cmd. Node.js and Stella CLIs (stella-browser, stella-office, stella-computer, stella-media, stella-x-api) are auto-injected into PATH.";
 
 export const EXEC_COMMAND_TOOL_PROMPT_SNIPPET =
   "Execute shell commands (git, build, package managers, file scripts)";
@@ -34,7 +34,7 @@ export const EXEC_COMMAND_TOOL_PARAMETERS: Record<string, unknown> = {
     run_in_background: {
       type: "boolean",
       description:
-        "True starts the command and returns immediately with a session_id instead of waiting. Its completion reaches you automatically once your turn ends. Use for servers, watchers, and long jobs whose result you do not need right now.",
+        "True starts the command and returns immediately with a session_id instead of waiting. Use for servers, watchers, and long jobs whose result you do not need right now.",
     },
     max_output_tokens: {
       type: "integer",

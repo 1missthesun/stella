@@ -158,6 +158,7 @@ export const createToolHost = ({
   stellaAppDir,
   recoverStaleSecrets = true,
   enableShellShims = true,
+  shellsEndWithTurn = false,
   allowCloudCode = false,
   browserSessionFactory,
   stellaDataDir,
@@ -189,6 +190,7 @@ export const createToolHost = ({
 
   const shellState: ShellState = createShellState(stateRoot, {
     enableShellShims,
+    shellsEndWithTurn,
     stellaBrowserBinPath: _stellaBrowserBinPath,
     stellaOfficeBinPath: _stellaOfficeBinPath,
     stellaComputerCliPath,

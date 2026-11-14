@@ -53,6 +53,7 @@ export type ShellState = {
   getStellaSiteAuth?: () => { baseUrl: string; authToken: string } | null;
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
   cliBridgeSocketPath?: string;
+  shellsEndWithTurn: boolean;
   lastDeferredDeleteSweepAt: number;
 };
 
@@ -114,6 +115,8 @@ type PrunedShellSession = {
 };
 
 export const MAX_RETAINED_COMPLETED_SHELLS = 64;
+export const SHELL_MAX_LIFETIME_MS = 2 * 60 * 60_000;
+const SHELL_LIFETIME_REACHED = `\n[Stopped: it ran for ${SHELL_MAX_LIFETIME_MS / 3_600_000} hours, the longest a command may run. To keep something running longer, start it detached (\`nohup … &\`) and stop it yourself when you're done.]\n`;
 const MAX_PRUNED_SESSION_RECEIPTS = 16;
 export const COMPLETED_SHELL_TTL_MS = 30 * 60_000;
 export const PRUNED_SHELL_RECEIPT_TTL_MS = 10 * 60_000;
@@ -212,6 +215,7 @@ export function createShellState(
     getCloudBackendAuth: options?.getCloudBackendAuth,
     ...(windowsCliShimDir ? { windowsCliShimDir } : {}),
     cliBridgeSocketPath: options?.cliBridgeSocketPath,
+    shellsEndWithTurn: options?.shellsEndWithTurn === true,
     lastDeferredDeleteSweepAt: 0,
   };
 }
@@ -643,8 +647,16 @@ export const startShell = (
     onActivity?.(record, delta);
   };
 
+  const lifetime = setTimeout(() => {
+    if (!record.running) return;
+    append(SHELL_LIFETIME_REACHED, true);
+    void record.kill();
+  }, SHELL_MAX_LIFETIME_MS);
+  lifetime.unref?.();
+
   const finish = (exitCode: number | null) => {
     if (!record.running) return;
+    clearTimeout(lifetime);
     record.running = false;
     record.exitCode = exitCode;
     record.completedAt = Date.now();

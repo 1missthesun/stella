@@ -1,7 +1,7 @@
 export const WRITE_STDIN_TOOL_NAME = "write_stdin";
 
 export const WRITE_STDIN_TOOL_DESCRIPTION =
-  "Interact with a still-running Bash session owned by the current conversation/agent thread: send input, wait for more output, or stop it. Do not use it merely to wait for a background job to finish; if your turn ends while a session runs, its exit and output are delivered to you automatically. Same-session interactions are serialized; different sessions remain parallel. Omit operation to write when chars is nonempty or poll when empty. Optional write_id makes retried writes idempotent within the session's bounded receipt window. Explicit operations also support terminate, pipe-only close_stdin, and PTY-only resize. Result details include stable interaction/chunk receipts and retain shell_session_id after completion. Required: session_id.";
+  "Interact with a still-running Bash session owned by the current conversation/agent thread: send input, wait for more output, or stop it. Same-session interactions are serialized; different sessions remain parallel. Omit operation to write when chars is nonempty or poll when empty. Optional write_id makes retried writes idempotent within the session's bounded receipt window. Explicit operations also support terminate, pipe-only close_stdin, and PTY-only resize. Result details include stable interaction/chunk receipts and retain shell_session_id after completion. Required: session_id.";
 
 export const WRITE_STDIN_TOOL_PROMPT_SNIPPET =
   "Continue or poll a long-running Bash session";

@@ -169,11 +169,14 @@ const buildExecToolDetails = (
 };
 
 const formatExecToolResult = (
+  state: ShellState,
   payload: ExecToolPayload,
   drained: DrainedOutput,
 ): string => {
   const status = payload.running
-    ? `Process still running with session ID ${payload.session_id}. If your turn ends while it runs, its exit and output are delivered to you automatically; use write_stdin only to interact with it or to wait for it within this turn.`
+    ? state.shellsEndWithTurn
+      ? `Process still running with session ID ${payload.session_id}. It is stopped when your turn ends, so poll it with write_stdin until it's done.`
+      : `Process still running with session ID ${payload.session_id}. If your turn ends while it runs, its exit and output are delivered to you automatically; use write_stdin only to interact with it or to wait for it within this turn.`
     : `Process exited with code ${payload.exit_code ?? "unknown"}`;
   return [
     `Wall time: ${payload.wall_time_seconds.toFixed(4)} seconds`,
@@ -278,7 +281,7 @@ export const handleExecCommand = async (
     const payload = buildExecToolPayload(state, record, drained, callStartedAt);
     try {
       onUpdate({
-        result: formatExecToolResult(payload, drained),
+        result: formatExecToolResult(state, payload, drained),
         details: buildExecToolDetails(payload, drained),
         modelOutputTokens,
       });
@@ -357,7 +360,7 @@ export const handleExecCommand = async (
     const drained = drainUnreadOutput(record);
     const payload = buildExecToolPayload(state, record, drained, callStartedAt);
     return {
-      result: formatExecToolResult(payload, drained),
+      result: formatExecToolResult(state, payload, drained),
       details: buildExecToolDetails(payload, drained),
       modelOutputTokens,
     };
@@ -570,7 +573,7 @@ export const handleWriteStdin = async (
       receipt,
     );
     return {
-      result: formatExecToolResult(payload, drained),
+      result: formatExecToolResult(state, payload, drained),
       details: buildExecToolDetails(payload, drained),
       modelOutputTokens,
     };

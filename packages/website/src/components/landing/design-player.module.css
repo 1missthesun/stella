@@ -2,6 +2,7 @@
   --swap: 900ms;
   --bubble-size: clamp(17px, 1.45vw, 22px);
   --bubble-sink: 14px;
+  --send-scale: 1.13;
   --overhang: calc(var(--bubble-size) * 1.36 + var(--bubble-size) * 0.86 - var(--bubble-sink) + 14px);
   --spring: cubic-bezier(0.2, 1.1, 0.4, 1);
   display: flex;
@@ -96,7 +97,7 @@
     0 14px 34px -10px rgba(0, 0, 0, 0.55);
   transform-origin: right bottom;
   animation:
-    bubble-pop 380ms var(--spring) both,
+    bubble-send var(--send) linear both,
     bubble-fade 140ms ease-out both;
 }
 
@@ -196,11 +197,22 @@
   color: #fff;
 }
 
-@keyframes bubble-pop {
-  from {
-    transform: translate3d(0, 14px, 0) scale(0.84);
+/* Sent: the app's bubble-pop (rise 14px, 0.84 -> 1 on the spring) just above the
+   composer at a slightly larger size, a beat of rest, then it travels to the corner. */
+@keyframes bubble-send {
+  0% {
+    transform: translate3d(var(--send-x), calc(var(--send-y) + 14px), 0) scale(calc(var(--send-scale) * 0.84));
+    animation-timing-function: var(--spring);
   }
-  to {
+  34% {
+    transform: translate3d(var(--send-x), var(--send-y), 0) scale(var(--send-scale));
+    animation-timing-function: linear;
+  }
+  48% {
+    transform: translate3d(var(--send-x), var(--send-y), 0) scale(var(--send-scale));
+    animation-timing-function: cubic-bezier(0.6, 0, 0.18, 1);
+  }
+  100% {
     transform: none;
   }
 }
@@ -251,6 +263,7 @@
   .player {
     --bubble-size: clamp(16px, 2.5vw, 20px);
     --bubble-sink: 12px;
+    --send-scale: 1.05;
     --overhang: calc(var(--bubble-size) * 1.36 * 2 + var(--bubble-size) * 0.88 - var(--bubble-sink) + 10px);
   }
 

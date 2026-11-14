@@ -10,20 +10,8 @@ const FACES = {
     ["RK Comic Italic", "ComicNeueBoldItalic", "700"],
   ],
   press: [["RK Press Start", "PressStart2P", "400"]],
-  silk: [["RK Silkscreen", "Silkscreen", "400"]],
   bangers: [["RK Bangers", "Bangers", "400"]],
-  saira: [
-    ["RK Saira", "SairaCondensed500", "500"],
-    ["RK Saira", "SairaCondensed700", "700"],
-    ["RK Saira", "SairaCondensed900", "900"],
-  ],
   kid: [["RK Schoolbell", "Schoolbell", "400"]],
-  nunito: [["RK Nunito", "Nunito", "400 900"]],
-  b612: [
-    ["RK B612", "B612", "400"],
-    ["RK B612", "B612Bold", "700"],
-    ["RK B612 Mono", "B612Mono", "400"],
-  ],
   barlow: [
     ["RK Barlow", "BarlowSC500", "500"],
     ["RK Barlow", "BarlowSC600", "600"],
@@ -33,7 +21,15 @@ const FACES = {
   manrope: [["RK Manrope", "Manrope", "200 800"]],
 } as const;
 
-export type FontSet = keyof typeof FACES;
+export type FontSet = keyof typeof FACES | "serif";
+
+/** The page's own serif (next/font, not preloaded), fetched before a look that uses it. */
+function loadPageSerif() {
+  const root = document.querySelector<HTMLElement>("[data-landing-root]") ?? document.documentElement;
+  const family = getComputedStyle(root).getPropertyValue("--l-serif").trim();
+  if (!family) return Promise.resolve();
+  return Promise.all([document.fonts.load(`400 20px ${family}`), document.fonts.load(`italic 400 20px ${family}`)]).catch(() => undefined);
+}
 
 const requested = new Map<FontSet, Promise<unknown>>();
 
@@ -44,6 +40,11 @@ export function loadFonts(sets: readonly FontSet[]): Promise<unknown> {
     sets.map((set) => {
       const hit = requested.get(set);
       if (hit) return hit;
+      if (set === "serif") {
+        const serif = loadPageSerif();
+        requested.set(set, serif);
+        return serif;
+      }
       const loads = FACES[set].map(([family, file, weight]) => {
         const face = new FontFace(family, `url(${FONT_DIR}${file}.woff2) format("woff2")`, { weight, display: "block" });
         document.fonts.add(face);
@@ -61,13 +62,8 @@ export const F = {
   comic: '"RK Comic", "Comic Sans MS", sans-serif',
   comicI: '"RK Comic Italic", "RK Comic", sans-serif',
   press: '"RK Press Start", monospace',
-  silk: '"RK Silkscreen", monospace',
   bangers: '"RK Bangers", Impact, sans-serif',
-  saira: '"RK Saira", "Arial Narrow", sans-serif',
   kid: '"RK Schoolbell", "Comic Sans MS", cursive',
-  nunito: '"RK Nunito", system-ui, sans-serif',
-  b612: '"RK B612", system-ui, sans-serif',
-  b612mono: '"RK B612 Mono", ui-monospace, monospace',
   barlow: '"RK Barlow", "Arial Narrow", sans-serif',
   barlowI: '"RK Barlow Italic", "RK Barlow", sans-serif',
   manrope: '"RK Manrope", system-ui, sans-serif',

@@ -9,27 +9,30 @@ type Redesigns = typeof import("./redesigns");
 
 type Step = { look: string; ask: string; hold: number };
 
-/** Each ask is said, then the window changes under it; the long asks get a little longer to read. */
+/** Small tweaks, then new abilities, then whole redesigns: each ask is sent, then the window changes under it. */
 const STEPS: Step[] = [
-  { look: "cockpit", ask: "I fly gliders. Make yourself my glass cockpit.", hold: 1500 },
-  { look: "trail", ask: "I run trails. Make yourself my trail map.", hold: 1400 },
-  { look: "crayon", ask: "Make it look like my kid drew it.", hold: 1300 },
-  { look: "beats", ask: "Now build me a beat maker.", hold: 1500 },
-  { look: "racedash", ask: "I sim race. Make it my wheel display.", hold: 1300 },
-  { look: "anime", ask: "90s anime.", hold: 1100 },
-  { look: "synth", ask: "My old synth.", hold: 1100 },
-  { look: "stitch", ask: "Cross-stitch it.", hold: 1000 },
+  { look: "tangerine", ask: "Make your accent tangerine.", hold: 700 },
+  { look: "paper", ask: "Light mode. Warm, like paper.", hold: 700 },
+  { look: "serif", ask: "Now set it in a serif.", hold: 700 },
+  { look: "letter", ask: "Lose the bubbles. Make it read like a letter.", hold: 900 },
+  { look: "pin", ask: "Stay on top. Fade when I'm not using you.", hold: 1700 },
+  { look: "pet", ask: "Make a little you that lives on my desktop.", hold: 2000 },
+  { look: "pen", ask: "Give me a pen so I can draw right on you.", hold: 1150 },
+  { look: "penReal", ask: "Make this real.", hold: 900 },
+  { look: "trail", ask: "I run trails. Make yourself my trail map.", hold: 1300 },
+  { look: "crayon", ask: "Make it look like my kid drew it.", hold: 1100 },
+  { look: "anime", ask: "Make it a 90s anime opening.", hold: 1100 },
   { look: "nodes", ask: "Node graph, please.", hold: 1000 },
-  { look: "aquarium", ask: "Put it in my fish tank.", hold: 1100 },
   { look: "platformer", ask: "Make it a platformer.", hold: 1000 },
-  { look: "keycaps", ask: "Make it out of keycaps.", hold: 1000 },
-  { look: "y2kplayer", ask: "Like my old music player.", hold: 1000 },
-  { look: "blocks", ask: "Build it out of blocks.", hold: 1900 },
+  { look: "ops", ask: "Now a 90s anime command center.", hold: 1200 },
+  { look: "blocks", ask: "Build it out of blocks.", hold: 1700 },
 ];
 
 const SWAP_MS = 900;
-const leadOf = (step: Step) => (step.ask.length > 28 ? 950 : 700);
-const durOf = (step: Step) => leadOf(step) + SWAP_MS + step.hold;
+/** The ask is sent from the composer and rises to the window's corner; the swap starts as it settles. */
+const SEND_MS = 1100;
+const LEAD_MS = SEND_MS - 50;
+const durOf = (step: Step) => LEAD_MS + SWAP_MS + step.hold;
 const SKIN_T0 = 1.2;
 const STILL_T = 2.6;
 const DESIGN = { wide: { w: 1480, h: 900 }, tall: { w: 840, h: 1400 } } as const;
@@ -220,7 +223,19 @@ export function DesignPlayer() {
   useLayoutEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
-    const fit = () => frame.style.setProperty("--k", String(frame.clientWidth / DESIGN[layout].w));
+    const fit = () => {
+      const fw = frame.clientWidth;
+      const fh = frame.clientHeight;
+      const { w } = DESIGN[layout];
+      const k = fw / w;
+      const sink = parseFloat(getComputedStyle(frame).getPropertyValue("--bubble-sink")) || 0;
+      const inset = Math.min(56, Math.max(14, fw * 0.045));
+      const chatRight = layout === "wide" ? (w - 760 * 1.22) / 2 : 50;
+      const composerTop = (layout === "wide" ? 112 : 130) * k;
+      frame.style.setProperty("--k", String(k));
+      frame.style.setProperty("--send-x", `${-Math.max(0, chatRight * k - inset).toFixed(1)}px`);
+      frame.style.setProperty("--send-y", `${(fh - sink - composerTop).toFixed(1)}px`);
+    };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(frame);
@@ -274,7 +289,7 @@ export function DesignPlayer() {
       last = now;
       const v = viewRef.current;
       const step = STEPS[v.step];
-      const lead = leadOf(step);
+      const lead = LEAD_MS;
       time.total += dt;
       time.elapsed += dt;
       const ready = readyRef.current.has(step.look);
@@ -303,7 +318,7 @@ export function DesignPlayer() {
       return;
     }
     setHeld(false);
-    say(i, leadOf(STEPS[i]) - 320);
+    say(i);
   };
 
   const lookAt = (i: number): Look | null => (mod ? (i < 0 ? mod.START : mod.LOOKS[STEPS[i].look]) : null);
@@ -321,6 +336,7 @@ export function DesignPlayer() {
       ref={rootRef}
       className={p.player}
       data-layout={layout}
+      style={{ ["--send" as string]: `${SEND_MS}ms`, ["--swap" as string]: `${SWAP_MS}ms` }}
       data-paused={paused && !reduced ? "1" : "0"}
     >
       <div ref={frameRef} className={p.frame} aria-hidden="true" onClick={() => !reduced && setHeld((h) => !h)}>

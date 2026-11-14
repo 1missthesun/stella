@@ -1,21 +1,15 @@
 import type { ComponentType } from "react";
 import { BlocksSkin } from "../skin-blocks";
+import { OpsSkin } from "../skin-ops";
 import { AnimeSkin } from "./AnimeSkin";
-import { AquariumSkin } from "./AquariumSkin";
-import { BeatSkin } from "./BeatSkin";
-import { CockpitSkin } from "./CockpitSkin";
+import { LetterSkin, PaperSkin, PlainSkin, SerifSkin, TangerineSkin } from "./ChatLooks";
 import type { SkinProps } from "./content";
 import { CrayonSkin } from "./CrayonSkin";
-import { DefaultSkin } from "./DefaultSkin";
-import { KeycapsSkin } from "./KeycapsSkin";
+import { PenRealSkin, PenSkin, PetSkin, PinSkin } from "./FeatureSkins";
+import type { FontSet } from "./kit";
 import { NodesSkin } from "./NodesSkin";
 import { PlatformerSkin } from "./PlatformerSkin";
-import { RaceDashSkin } from "./RaceDashSkin";
-import { StitchSkin, warmStitch } from "./StitchSkin";
-import { SynthSkin } from "./SynthSkin";
 import { TrailSkin, trailContours } from "./TrailSkin";
-import { Y2KPlayerSkin } from "./Y2KPlayerSkin";
-import type { FontSet } from "./kit";
 
 export { loadFonts } from "./kit";
 export type { SkinProps } from "./content";
@@ -30,21 +24,22 @@ export type Look =
   | { kind: "drawn"; Skin: ComponentType<SkinProps>; fonts: readonly FontSet[]; warm?: (w: number, h: number) => void }
   | { kind: "fluid"; Skin: ComponentType; fonts: readonly FontSet[] };
 
-export const START: Look = { kind: "fluid", Skin: DefaultSkin, fonts: [] };
+export const START: Look = { kind: "drawn", Skin: PlainSkin, fonts: ["manrope"] };
 
 export const LOOKS: Record<string, Look> = {
-  cockpit: { kind: "drawn", Skin: CockpitSkin, fonts: ["b612"] },
+  tangerine: { kind: "drawn", Skin: TangerineSkin, fonts: ["manrope"] },
+  paper: { kind: "drawn", Skin: PaperSkin, fonts: ["manrope"] },
+  serif: { kind: "drawn", Skin: SerifSkin, fonts: ["manrope", "serif"] },
+  letter: { kind: "drawn", Skin: LetterSkin, fonts: ["manrope", "serif"] },
+  pin: { kind: "drawn", Skin: PinSkin, fonts: ["manrope", "serif"] },
+  pet: { kind: "drawn", Skin: PetSkin, fonts: ["manrope"] },
+  pen: { kind: "drawn", Skin: PenSkin, fonts: ["manrope", "kid"] },
+  penReal: { kind: "drawn", Skin: PenRealSkin, fonts: ["manrope"] },
   trail: { kind: "drawn", Skin: TrailSkin, fonts: ["barlow"], warm: trailContours },
   crayon: { kind: "drawn", Skin: CrayonSkin, fonts: ["kid"] },
-  beats: { kind: "drawn", Skin: BeatSkin, fonts: [] },
-  racedash: { kind: "drawn", Skin: RaceDashSkin, fonts: ["saira"] },
   anime: { kind: "drawn", Skin: AnimeSkin, fonts: ["dela", "comic", "bangers"] },
-  synth: { kind: "drawn", Skin: SynthSkin, fonts: [] },
-  stitch: { kind: "drawn", Skin: StitchSkin, fonts: [], warm: warmStitch },
   nodes: { kind: "drawn", Skin: NodesSkin, fonts: ["manrope"] },
-  aquarium: { kind: "drawn", Skin: AquariumSkin, fonts: ["nunito"] },
   platformer: { kind: "drawn", Skin: PlatformerSkin, fonts: ["press"] },
-  keycaps: { kind: "drawn", Skin: KeycapsSkin, fonts: [] },
-  y2kplayer: { kind: "drawn", Skin: Y2KPlayerSkin, fonts: ["nunito"] },
+  ops: { kind: "fluid", Skin: OpsSkin, fonts: [] },
   blocks: { kind: "fluid", Skin: BlocksSkin, fonts: [] },
 };

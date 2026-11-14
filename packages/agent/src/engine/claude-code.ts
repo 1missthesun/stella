@@ -1533,6 +1533,13 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const asInnerArguments = (inner: ToolRegistration, args: unknown): unknown => {
     const value = asRecord(args);
     const properties = asRecord(asRecord(inner.parameters)?.properties) ?? {};
+    if (value && typeof value.command === "string" && !("cmd" in value) && "cmd" in properties) {
+      return {
+        cmd: value.command,
+        ...(typeof value.timeout === "number" ? { timeout_ms: value.timeout } : {}),
+        ...(value.run_in_background === true ? { run_in_background: true } : {}),
+      };
+    }
     if (!value || typeof value.file_path !== "string" || "path" in value || !("path" in properties)) return args;
     const { file_path, old_string, new_string, replace_all: _replaceAll, ...rest } = value;
     return {

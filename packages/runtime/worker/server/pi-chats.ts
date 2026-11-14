@@ -501,6 +501,8 @@ export const piChatsFor = (
         if (runningSessionIds.length === 0) return;
         runner.backgroundExits.arm({ ...owner, runningSessionIds, ...(interrupted ? { interrupted: true } : {}) });
       },
+      endAgentShells: async (threadId) =>
+        (await session.runnerCell.get()?.backgroundExits.endAgentSessions(threadId)) ?? 0,
       agentStarted: (agent) => {
         session.runnerCell.get()?.backgroundExits.disarm({ conversationId: agent.conversationId, agentId: agent.threadId });
         session.runnerCell.get()?.piTools.agentBrowserStarted(agent.threadId);

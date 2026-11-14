@@ -358,6 +358,12 @@ export const createStellaHostRunner = (
       arm: (args) => context.state.backgroundExitWake?.arm(args) ?? [],
       disarm: (owner) => context.state.backgroundExitWake?.disarm(owner),
       runningSessions: (owner) => context.toolHost.listRunningShellSessionsOwnedBy(owner),
+      endAgentSessions: async (agentId) => {
+        context.state.backgroundExitWake?.disarm(agentId);
+        const owned = context.toolHost.listRunningTaskShells().filter((shell) => shell.agentId === agentId);
+        await Promise.all(owned.map((shell) => context.toolHost.killShell(shell.sessionId)));
+        return owned.length;
+      },
     },
     piCloudAgentThreads: context.piCloudAgentThreads,
     deliverOrchestratorNote,

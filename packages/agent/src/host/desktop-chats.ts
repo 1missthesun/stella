@@ -353,6 +353,8 @@ export type DesktopChatsOptions = {
   }): void;
   agentReportRelayed?(agent: { conversationId: string; description: string }): void;
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
+  /** Ends the shell sessions a stopped task left running here; resolves with how many. */
+  endAgentShells?(threadId: string): Promise<number>;
   localLog?(conversationId: string): DesktopLocalLog | undefined;
   /** Records this computer's usage-limit pauses in the cloud and resumes a chat's paused work. */
   usageLimits?: {
@@ -1617,6 +1619,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 engine: (id) => (id === CLOUD_THREAD_ENGINE ? cloud : undefined),
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
+                ...(options.endAgentShells ? { endAgentShells: options.endAgentShells } : {}),
                 execution: execution.host,
                 ...(agentLog && agentLogTransport
                   ? {
@@ -1752,7 +1755,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                   : {}),
               });
             })(),
-            ...(options.tools ? { tools: options.tools(conversationId) } : {}),
+            ...(options.tools ? { tools: options.tools(conversationId), hostShell: true } : {}),
             extensions: [
               journalTurnGate(standing, () => resumedRun),
               ...(options.placementSettled

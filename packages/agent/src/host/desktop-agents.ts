@@ -34,6 +34,7 @@ export function desktopAgentsHost(
     reportsFromLedger?: StellaAgentsHost["reportsFromLedger"];
     directory?: StellaAgentsHost["directory"];
     dataDir?: string;
+    endAgentShells?: (threadId: string) => Promise<number>;
     execution?: StellaAgentsHost["execution"];
     agentLog?: StellaAgentsHost["agentLog"];
   } = {},
@@ -54,7 +55,10 @@ export function desktopAgentsHost(
     ...(options.dataDir ? { agentDirectory: (threadId: string) => defaultAgentDirectory(options.dataDir!, threadId) } : {}),
     ...(options.dataDir
       ? {
-          endAgentProcesses: (threadId: string) => endTaskProcesses({ owner: threadId, stellaDataDir: options.dataDir! }),
+          endAgentProcesses: async (threadId: string) => {
+            const shells = (await options.endAgentShells?.(threadId).catch(() => 0)) ?? 0;
+            return shells + (await endTaskProcesses({ owner: threadId, stellaDataDir: options.dataDir! }));
+          },
         }
       : {}),
     ...(options.execution ? { execution: options.execution } : {}),

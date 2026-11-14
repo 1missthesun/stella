@@ -277,6 +277,8 @@ export type RunnerPublicApi = {
     }) => string[];
     disarm: (owner: { conversationId: string; agentId: string }) => void;
     runningSessions: (owner: { conversationId: string; agentId: string }) => string[];
+    /** Ends the shell sessions an agent left running; resolves with how many. */
+    endAgentSessions: (agentId: string) => Promise<number>;
   };
   deliverOrchestratorNote: PiReportDelivery;
   setBackendUrl: (value: string | null) => void;

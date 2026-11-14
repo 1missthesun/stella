@@ -24,7 +24,7 @@ import {
   type StellaAgentRecord,
   type StellaAgentsHost,
 } from "./stella/agents.ts";
-import { STELLA_CODING_EXTENSION, StellaCoding } from "./stella/coding.ts";
+import { STELLA_CODING_EXTENSION, StellaCoding, StellaCodingFiles } from "./stella/coding.ts";
 import type { StellaContextSources } from "./stella/context.ts";
 import { STELLA_AGENT_TOOLS, stellaToolExtensions, type StellaToolHost } from "./stella/host-tools.ts";
 import { createImageBudget } from "./stella/image-budget.ts";
@@ -76,6 +76,8 @@ export type StellaHarnessOptions = {
   settings?: HarnessSettings;
   /** Test builds only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
   simulateSafeguardBlocks?: boolean;
+  /** `tools` runs agents' `Bash` and `write_stdin`, so pi's own `Bash` stays out. */
+  hostShell?: boolean;
   onReport?: (error: unknown) => void;
 };
 
@@ -129,7 +131,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   const agents = stellaAgents(options.agents);
   registry.install(agents.extension);
   registry.install(agents.waitingExtension);
-  registry.install(StellaCoding);
+  registry.install(options.hostShell ? StellaCodingFiles : StellaCoding);
   const refreshTools = () => {
     for (const extension of stellaToolExtensions(options.tools)) registry.install(extension);
   };

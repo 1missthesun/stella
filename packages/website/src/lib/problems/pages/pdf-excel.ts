@@ -800,7 +800,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "[Remove the password](/how/pdf-excel/remove-password-from-pdf) first with the one you have, then redact the unlocked copy. Photos have their own privacy leak: [remove the location from photos](/how/photos-files/remove-location-from-photos) before you post them.",
       },
     ],
-    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos", "pdf-excel/edit-text-in-pdf", "pdf-excel/add-watermark-to-pdf"],
+    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/add-watermark-to-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos", "pdf-excel/edit-text-in-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Intego: Securely redact text in PDFs with Preview", href: "https://www.intego.com/mac-security-blog/securely-redact-text-in-pdfs-with-apple-preview-on-mac" },

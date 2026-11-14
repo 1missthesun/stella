@@ -370,7 +370,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf", "photos-files/convert-webp-to-jpg", "photos-files/convert-raw-to-jpg"],
+    related: ["photos-files/find-duplicate-photos", "photos-files/convert-raw-to-jpg", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf", "photos-files/convert-webp-to-jpg"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
@@ -1032,7 +1032,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Resize them for the shop: see [resize images in bulk](/how/photos-files/resize-images-in-bulk). And [remove the location from photos](/how/photos-files/remove-location-from-photos) before posting.",
       },
     ],
-    related: ["photos-files/resize-images-in-bulk", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg", "photos-files/remove-background-from-photos", "pdf-excel/add-watermark-to-pdf"],
+    related: ["photos-files/resize-images-in-bulk", "pdf-excel/add-watermark-to-pdf", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg", "photos-files/remove-background-from-photos"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "XnConvert", href: "https://www.xnview.com/en/xnconvert/" },
@@ -1461,7 +1461,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "See [convert WebP to JPG](/how/photos-files/convert-webp-to-jpg) and [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
       },
     ],
-    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet", "photos-files/split-scanned-photos", "photos-files/convert-raw-to-jpg"],
+    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-raw-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet", "photos-files/split-scanned-photos"],
     lastChecked: "2026-11-14",
     sources: [
       { label: "Apple: Convert image file types using Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1012/mac" },

@@ -29,10 +29,10 @@
           "other": "{count} משימות בתהליך",
           "two": "{count} משימות בתהליך"
         },
-        "workingHelpers": {
-          "one": "עוזר אחד",
-          "other": "{count} עוזרים",
-          "two": "{count} עוזרים"
+        "tasksPaused": {
+          "one": "משימה {count} מושהית",
+          "other": "{count} משימות מושהות",
+          "two": "{count} משימות מושהות"
         }
       },
       "addMenu": {

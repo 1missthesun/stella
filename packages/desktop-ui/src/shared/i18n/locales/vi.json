@@ -27,8 +27,8 @@
         "tasksInProgress": {
           "other": "{count} tác vụ đang chạy"
         },
-        "workingHelpers": {
-          "other": "{count} trợ lý"
+        "tasksPaused": {
+          "other": "{count} tác vụ đang tạm dừng"
         }
       },
       "addMenu": {

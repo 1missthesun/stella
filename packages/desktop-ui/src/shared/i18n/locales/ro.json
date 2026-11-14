@@ -29,10 +29,10 @@
           "one": "{count} sarcină în curs",
           "other": "{count} de sarcini în curs"
         },
-        "workingHelpers": {
-          "few": "{count} ajutoare",
-          "one": "{count} ajutor",
-          "other": "{count} de ajutoare"
+        "tasksPaused": {
+          "few": "{count} sarcini în pauză",
+          "one": "{count} sarcină în pauză",
+          "other": "{count} de sarcini în pauză"
         }
       },
       "addMenu": {

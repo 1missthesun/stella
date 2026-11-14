@@ -29,10 +29,10 @@
           "one": "{count} attività in corso",
           "other": "{count} attività in corso"
         },
-        "workingHelpers": {
-          "many": "{count} aiutanti",
-          "one": "{count} aiutante",
-          "other": "{count} aiutanti"
+        "tasksPaused": {
+          "many": "{count} attività in pausa",
+          "one": "{count} attività in pausa",
+          "other": "{count} attività in pausa"
         }
       },
       "addMenu": {

@@ -1,3 +1,4 @@
+import type { AgentPause } from "@stella/contracts/agent-pause";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ToolStep } from "./lib/tool-activity";
@@ -264,6 +265,12 @@ export type MobileTask = {
   parentAgentId?: string;
   status: "running" | "completed" | "error" | "canceled";
   authoritativeRunning?: true;
+  /** Ended its turn waiting for this: live but nothing running. */
+  waitingFor?: string;
+  /** Its own turn is over and its report waits for its helpers. */
+  waitingForHelpers?: boolean;
+  /** Not ended but held, so nothing of it runs now. */
+  paused?: AgentPause;
   updatedAt?: number;
   statusText?: string;
   resultText?: string;

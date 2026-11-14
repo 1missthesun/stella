@@ -14,6 +14,8 @@ import {
   type AgentLedger,
   type LedgerAgent,
 } from "@stella/contracts/agent-ledger";
+import { agentThreadPause } from "@stella/contracts/agent-pause";
+import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 
 export const agentSnapshotTasks = (
   agents: readonly AgentActivityEntry[],
@@ -118,16 +120,28 @@ export const collectJournalTasks = (
   return [...state.entries.values()].map((entry) => journalTask(entry, listed));
 };
 
-const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask => {
+const ledgerTask = (
+  id: string,
+  row: LedgerAgent,
+  base: MobileTask | undefined,
+  devices: readonly DeviceDestination[] | undefined,
+): MobileTask => {
   const status = agentTaskStatus(row.status);
   const {
     statusText,
     authoritativeRunning: _authoritativeRunning,
     completedAt,
     errorMessage,
+    waitingFor: _waitingFor,
+    waitingForHelpers: _waitingForHelpers,
+    paused: _paused,
     ...rest
   } = base ?? { id, title: row.title, createdAt: row.createdAtMs };
   const failure = status === "error" ? (row.errorMessage ?? errorMessage) : undefined;
+  const paused = agentThreadPause(
+    { status: row.status, placement: row.placement ?? "", runsOnDeviceId: row.runsOnDeviceId },
+    devices,
+  );
   return {
     ...rest,
     id,
@@ -138,7 +152,13 @@ const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask
     createdAt: base?.createdAt ?? row.createdAtMs,
     updatedAt: Math.max(row.updatedAtMs, base?.updatedAt ?? 0),
     ...(status === "running"
-      ? { authoritativeRunning: true as const, ...(statusText ? { statusText } : {}) }
+      ? {
+          authoritativeRunning: true as const,
+          ...(statusText ? { statusText } : {}),
+          ...(row.status === "waiting" ? { waitingFor: "a message" } : {}),
+          ...(row.status === "waiting_for_helpers" ? { waitingForHelpers: true } : {}),
+          ...(paused ? { paused } : {}),
+        }
       : { completedAt: completedAt ?? row.updatedAtMs }),
     ...(failure ? { errorMessage: failure } : {}),
   };
@@ -147,6 +167,7 @@ const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask
 export const applyAgentLedger = (
   tasks: readonly MobileTask[],
   ledger: AgentLedger,
+  devices?: readonly DeviceDestination[],
 ): MobileTask[] => {
   if (!ledger.ready) return [...tasks];
   const covered = new Set<string>();
@@ -154,12 +175,12 @@ export const applyAgentLedger = (
     const row = ledger.agents.get(task.id);
     if (!row) return task;
     covered.add(row.agentId);
-    return ledgerTask(task.id, row, task);
+    return ledgerTask(task.id, row, task, devices);
   });
   for (const row of ledger.agents.values()) {
     if (!row || covered.has(row.agentId)) continue;
     covered.add(row.agentId);
-    merged.push(ledgerTask(row.agentId, row));
+    merged.push(ledgerTask(row.agentId, row, undefined, devices));
   }
   return merged;
 };

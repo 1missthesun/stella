@@ -134,6 +134,8 @@ export type AgentThreadSummary = {
   parentTurnId?: string;
   parentThreadId?: string;
   executorDeviceId?: string;
+  /** The computer that runs it: where it was dispatched, or for a computer task, where it started. */
+  runsOnDeviceId?: string;
   description: string;
   placement: AgentThreadPlacement;
   agentType: string;

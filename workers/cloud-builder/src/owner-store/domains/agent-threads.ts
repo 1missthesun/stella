@@ -4544,12 +4544,18 @@ const conversationThreadRows = (
     .slice(0, limit);
 };
 
-const presentedSummary = (db: OwnerDbReader, row: ThreadRow, ownerId: string): AgentThreadSummary =>
-  reportHeldForHelpers(db, row)
-    ? { ...summary(row, ownerId), status: "waiting_for_helpers" }
+const presentedSummary = (db: OwnerDbReader, row: ThreadRow, ownerId: string): AgentThreadSummary => {
+  const deviceId = threadDeviceId(row);
+  const presented = {
+    ...summary(row, ownerId),
+    ...(deviceId ? { runsOnDeviceId: resolveCurrentDeviceId(db, deviceId) } : {}),
+  };
+  return reportHeldForHelpers(db, row)
+    ? { ...presented, status: "waiting_for_helpers" }
     : endedWaiting(row)
-      ? { ...summary(row, ownerId), status: "waiting" }
-      : summary(row, ownerId);
+      ? { ...presented, status: "waiting" }
+      : presented;
+};
 
 const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] => {
   const live = conversationThreadRows(

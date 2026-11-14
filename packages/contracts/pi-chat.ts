@@ -1,4 +1,5 @@
 import type { AgentStatus } from "./agent-status.js";
+import type { LocalAgentPause } from "./agent-pause.js";
 import type { ChatContext } from "./index.js";
 import { parseAgentReportEnvelope, type AgentReportEnvelope } from "./agent-wake-prompt.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
@@ -249,6 +250,7 @@ export type PiChatAgent = {
   error?: string;
   agentStatus?: AgentStatus;
   waitingFor?: string;
+  paused?: LocalAgentPause;
 };
 
 export type PiChatAgentsResult = { agents: PiChatAgent[] };

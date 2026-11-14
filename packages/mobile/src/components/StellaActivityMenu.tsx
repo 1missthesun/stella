@@ -8,7 +8,6 @@ import { TopSheet } from "./TopSheet";
 import { TOP_BAR_BAR_HEIGHT } from "./AppBackdrop";
 import type { Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
-import { useTPlural } from "../i18n";
 
 export function StellaActivityMenu({
   visible,
@@ -20,7 +19,6 @@ export function StellaActivityMenu({
   onClose: () => void;
 }) {
   const colors = useColors();
-  const tPlural = useTPlural();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const entries = useMemo(
@@ -45,11 +43,6 @@ export function StellaActivityMenu({
             <AgentActivityRow
               key={entry.id}
               title={entry.title}
-              meta={
-                entry.workingHelpers
-                  ? tPlural("app.chat.activityPill.workingHelpers", entry.workingHelpers)
-                  : undefined
-              }
               lifecycleStatus="running"
               working
               roomy

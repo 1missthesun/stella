@@ -28,9 +28,9 @@
           "one": "{count} feladat folyamatban",
           "other": "{count} feladat folyamatban"
         },
-        "workingHelpers": {
-          "one": "{count} segítő",
-          "other": "{count} segítő"
+        "tasksPaused": {
+          "one": "{count} szüneteltetett feladat",
+          "other": "{count} szüneteltetett feladat"
         }
       },
       "addMenu": {

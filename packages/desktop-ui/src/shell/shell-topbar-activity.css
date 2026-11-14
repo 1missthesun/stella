@@ -16,12 +16,6 @@
   }
 }
 
-@container shell-topbar-activity (max-width: 200px) {
-  .shell-topbar-activity__helpers {
-    display: none;
-  }
-}
-
 @container shell-topbar-activity (max-width: 34px) {
   .shell-topbar-activity__trigger {
     visibility: hidden;
@@ -70,9 +64,6 @@
 }
 
 .shell-topbar-activity__label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -85,15 +76,8 @@
 }
 
 .shell-topbar-activity__label .text-shimmer {
-  min-width: 0;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.shell-topbar-activity__helpers {
-  flex-shrink: 0;
-  color: var(--text-weak);
-  font-weight: var(--weight-regular);
 }
 
 [data-component="popover-content"].shell-topbar-activity-menu-popover {

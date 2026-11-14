@@ -28,9 +28,9 @@
           "one": "{count} tehtävä käynnissä",
           "other": "{count} tehtävää käynnissä"
         },
-        "workingHelpers": {
-          "one": "{count} apulainen",
-          "other": "{count} apulaista"
+        "tasksPaused": {
+          "one": "{count} tehtävä tauolla",
+          "other": "{count} tehtävää tauolla"
         }
       },
       "addMenu": {

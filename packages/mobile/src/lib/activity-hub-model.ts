@@ -27,21 +27,15 @@ export const sortHubTasksByRecency = (
 export const runningActivityIndicatorEntries = (
   tasks: readonly MobileTask[],
 ): ActivityIndicatorEntry[] => {
-  const helpersById = new Map<string, number>();
   const running: MobileTask[] = [];
-  for (const { task, status, workingHelpers } of topLevelAgentActivity(tasks)) {
-    if (status !== "running") continue;
+  for (const { task, status, working } of topLevelAgentActivity(tasks)) {
+    if (status !== "running" || !working) continue;
     running.push(task.status === status ? task : { ...task, status });
-    if (workingHelpers > 0) helpersById.set(task.id, workingHelpers);
   }
-  return sortHubTasksByRecency(running).map((task) => {
-    const workingHelpers = helpersById.get(task.id);
-    return {
-      id: task.id,
-      title: task.title.trim(),
-      ...(workingHelpers ? { workingHelpers } : {}),
-    };
-  });
+  return sortHubTasksByRecency(running).map((task) => ({
+    id: task.id,
+    title: task.title.trim(),
+  }));
 };
 
 const NO_ARTIFACTS: readonly ChatArtifact[] = [];

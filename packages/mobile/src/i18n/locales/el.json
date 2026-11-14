@@ -28,9 +28,9 @@
           "one": "{count} εργασία σε εξέλιξη",
           "other": "{count} εργασίες σε εξέλιξη"
         },
-        "workingHelpers": {
-          "one": "{count} βοηθός",
-          "other": "{count} βοηθοί"
+        "tasksPaused": {
+          "one": "{count} εργασία σε παύση",
+          "other": "{count} εργασίες σε παύση"
         }
       },
       "addMenu": {

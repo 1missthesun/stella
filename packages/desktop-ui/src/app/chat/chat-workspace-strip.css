@@ -507,6 +507,10 @@
   color: var(--text-base);
 }
 
+.chat-workspace-strip__task-icon--paused {
+  color: var(--text-weak);
+}
+
 .chat-workspace-strip__task-icon--done {
   color: var(--text-base);
 }
@@ -551,6 +555,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-workspace-strip__paused-group:not(:first-child) {
+  margin-top: 12px;
+}
+
+.chat-workspace-strip__paused-reason {
+  margin: 0 0 2px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+  color: var(--text-weak);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-workspace-strip__list--tasks + .chat-workspace-strip__done-group {
+  margin-top: 2px;
+}
+
+.chat-workspace-strip__paused-group + .chat-workspace-strip__done-group {
+  margin-top: 12px;
 }
 
 .chat-workspace-strip__list.chat-workspace-strip__group-members {

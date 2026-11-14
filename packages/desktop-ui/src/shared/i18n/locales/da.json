@@ -28,9 +28,9 @@
           "one": "{count} opgave i gang",
           "other": "{count} opgaver i gang"
         },
-        "workingHelpers": {
-          "one": "{count} hjælper",
-          "other": "{count} hjælpere"
+        "tasksPaused": {
+          "one": "{count} opgave sat på pause",
+          "other": "{count} opgaver sat på pause"
         }
       },
       "addMenu": {

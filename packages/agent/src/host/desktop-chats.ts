@@ -39,6 +39,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
+import type { LocalAgentPause } from "@stella/contracts/agent-pause";
 import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { PLACED_AGENT_STOPPED } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
@@ -2589,8 +2590,17 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     const chat = await open(conversationId);
     const records = await chat.agentRecords(context);
+    const pausedBy = (threadId: string): LocalAgentPause | undefined =>
+      usageLimitPaused(conversationId, threadId)
+        ? "usage-limit"
+        : claudeSignInHeld(conversationId, threadId)
+          ? "sign-in"
+          : undefined;
     return {
-      agents: records.map(({ placement: _placement, stopped: _stopped, ...agent }) => agent),
+      agents: records.map(({ placement: _placement, stopped: _stopped, ...agent }) => {
+        const paused = agent.status === "running" ? pausedBy(agent.threadId) : undefined;
+        return paused ? { ...agent, paused } : agent;
+      }),
     };
   };
 

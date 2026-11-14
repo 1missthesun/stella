@@ -17,6 +17,8 @@ export type CloudAgentThread = {
   conversationId: string;
   parentTurnId?: string;
   parentThreadId?: string;
+  executorDeviceId?: string;
+  runsOnDeviceId?: string;
   description: string;
   placement: string;
   agentType: string;

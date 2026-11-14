@@ -30,11 +30,11 @@
           "one": "{count} задача выполняется",
           "other": "{count} задачи выполняются"
         },
-        "workingHelpers": {
-          "few": "{count} помощника",
-          "many": "{count} помощников",
-          "one": "{count} помощник",
-          "other": "{count} помощника"
+        "tasksPaused": {
+          "few": "{count} задачи приостановлены",
+          "many": "{count} задач приостановлено",
+          "one": "{count} задача приостановлена",
+          "other": "{count} задачи приостановлены"
         }
       },
       "addMenu": {

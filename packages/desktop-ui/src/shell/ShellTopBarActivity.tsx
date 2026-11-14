@@ -27,7 +27,6 @@ import {
   ACTIVITY_INDICATOR_SETTLE_SPRING,
   ACTIVITY_INDICATOR_SPAWN_BEAT_MS,
   activityIndicatorTransition,
-  selectActivityIndicatorHelpers,
   selectActivityIndicatorLabel,
   type ActivityIndicatorPhase,
 } from "@stella/contracts/activity-indicator";
@@ -36,7 +35,10 @@ import {
   TextShimmer,
 } from "@/app/chat/TextShimmer";
 import { useChatRuntime } from "@/context/use-chat-runtime";
-import { deriveRunningActivityIndicatorEntries } from "@/features/chat/lib/event-transforms";
+import {
+  countPausedActivityRows,
+  deriveRunningActivityIndicatorEntries,
+} from "@/features/chat/lib/event-transforms";
 import { pickWorkingIndicatorToolPose } from "@/features/chat/working-indicator-state";
 import { useWindowFocus } from "@/shared/hooks/use-window-focus";
 import { useT, useTPlural } from "@/shared/i18n";
@@ -114,11 +116,7 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
   const label = selectActivityIndicatorLabel(running, (total) =>
     tPlural("app.chat.activityPill.tasksInProgress", total),
   );
-  const workingHelpers = selectActivityIndicatorHelpers(running);
-  const helpersLabel =
-    workingHelpers > 0
-      ? tPlural("app.chat.activityPill.workingHelpers", workingHelpers)
-      : null;
+  const pausedCount = useMemo(() => countPausedActivityRows(tasks), [tasks]);
 
   const [phase, setPhase] = useState<ActivityIndicatorPhase>(
     count > 0 ? "working" : "idle",
@@ -155,6 +153,7 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
   }, [count, popScale, reduceMotion]);
 
   const busy = phase !== "idle" && label !== null;
+  const hasActivity = busy || pausedCount > 0;
   const markState =
     busy && phase === "working"
       ? pickWorkingIndicatorToolPose(running[0]?.id ?? "stella")
@@ -183,8 +182,8 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
   }, [clearHoverTimer]);
 
   useEffect(() => {
-    if (!busy && open) closeMenu();
-  }, [busy, open, closeMenu]);
+    if (!hasActivity && open) closeMenu();
+  }, [hasActivity, open, closeMenu]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -205,14 +204,14 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
       if (event.pointerType !== "mouse") return;
       preloadActivityOverview();
       clearHoverTimer();
-      if (open || !busy) return;
+      if (open || !hasActivity) return;
       hoverTimer.current = window.setTimeout(() => {
         hoverTimer.current = null;
         openedByHover.current = true;
         setOpen(true);
       }, HOVER_OPEN_DELAY_MS);
     },
-    [busy, clearHoverTimer, open],
+    [clearHoverTimer, hasActivity, open],
   );
 
   const handlePointerLeave = useCallback(
@@ -270,17 +269,19 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
             transition={settle}
             className="shell-topbar-activity__trigger"
             data-open={open || undefined}
-            disabled={!busy}
+            disabled={!hasActivity}
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
             onClick={handleTriggerClick}
             onFocus={preloadActivityOverview}
             aria-label={
               busy && label
-                ? t("app.chat.activityPill.openActivity", {
-                    label: helpersLabel ? `${label}, ${helpersLabel}` : label,
-                  })
-                : t("app.chat.activityPill.idle")
+                ? t("app.chat.activityPill.openActivity", { label })
+                : pausedCount > 0
+                  ? t("app.chat.activityPill.openActivity", {
+                      label: tPlural("app.chat.activityPill.tasksPaused", pausedCount),
+                    })
+                  : t("app.chat.activityPill.idle")
             }
           >
             <motion.span
@@ -325,11 +326,6 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
                     exclusiveGroup={CHAT_ACTIVITY_SHIMMER_GROUP}
                     exclusivePriority={30}
                   />
-                  {helpersLabel ? (
-                    <span className="shell-topbar-activity__helpers">
-                      {helpersLabel}
-                    </span>
-                  ) : null}
                 </motion.span>
               ) : null}
             </AnimatePresence>

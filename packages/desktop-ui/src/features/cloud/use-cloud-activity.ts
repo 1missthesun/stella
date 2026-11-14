@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ledgerThreadTaskStatus } from "@stella/contracts/agent-ledger";
+import { agentThreadPause } from "@stella/contracts/agent-pause";
+import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { resultWaitingFor } from "@stella/contracts/agent-waiting";
 import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
 import { isPlacementThreadId, placementAliases } from "@stella/contracts/placement-thread-id";
@@ -33,11 +35,15 @@ export const cloudThreadReport = (
   return thread.errorMessage?.trim() || undefined;
 };
 
-export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
+export const cloudThreadToTask = (
+  thread: CloudAgentThread,
+  devices?: readonly DeviceDestination[],
+): TaskItem => {
   const status = ledgerThreadTaskStatus(thread.status);
   const report = cloudThreadReport(thread);
   const waitingFor =
     thread.status === "waiting" ? resultWaitingFor(thread.resultJson) ?? "a message" : undefined;
+  const paused = agentThreadPause(thread, devices);
   return {
     id: thread.threadId,
     description: thread.description,
@@ -46,6 +52,8 @@ export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
     source: "stella",
     status,
     ...(waitingFor ? { waitingFor, statusText: `Waiting for ${waitingFor}` } : {}),
+    ...(thread.status === "waiting_for_helpers" ? { waitingForHelpers: true } : {}),
+    ...(paused ? { paused } : {}),
     startedAtMs: thread.createdAt,
     lastUpdatedAtMs: thread.updatedAt,
     ...(status === "running" ? {} : { completedAtMs: thread.updatedAt }),
@@ -76,13 +84,14 @@ const EMPTY_ACTIVITY: CloudActivity = {
 
 const projectCloudActivity = (
   threads: readonly CloudAgentThread[] | undefined,
+  devices: readonly DeviceDestination[] | undefined,
 ): CloudActivity => {
   if (!threads?.length) return EMPTY_ACTIVITY;
   const tasks: TaskItem[] = [];
   const placements = new Map<string, string>();
   const threadsById = new Map<string, CloudAgentThread>();
   for (const thread of threads) {
-    tasks.push(cloudThreadToTask(thread));
+    tasks.push(cloudThreadToTask(thread, devices));
     placements.set(thread.threadId, cloudPlacementLabel(thread.placement));
     threadsById.set(thread.threadId, thread);
   }
@@ -146,6 +155,9 @@ export const useCloudConversationActivity = (
     "agentThreads.running",
     enabled && conversationId ? { conversationId } : "skip",
   );
+  const devices = useBackendView("devices.list", enabled ? {} : "skip", {
+    keepPreviousValue: true,
+  }).value?.devices;
   const pageThreads = page.value?.threads;
   const runningThreads = running.value;
   const ownedThreads = useMemo(
@@ -207,14 +219,14 @@ export const useCloudConversationActivity = (
   }, [canLoadMore, pageScopeIsCurrent]);
   return useMemo(
     () => ({
-      ...projectCloudActivity(threads),
+      ...projectCloudActivity(threads, devices),
       hasLoaded,
       ledgerReady,
       hasOlder,
       isLoadingOlder,
       loadOlder,
     }),
-    [hasLoaded, hasOlder, isLoadingOlder, ledgerReady, loadOlder, threads],
+    [devices, hasLoaded, hasOlder, isLoadingOlder, ledgerReady, loadOlder, threads],
   );
 };
 
@@ -235,8 +247,10 @@ export const mergeCloudConversationTasks = (
     const overlay = operationalById.get(task.id);
     if (!overlay || task.status !== "running") return task;
     const waitingFor = task.waitingFor ?? overlay.waitingFor;
+    const paused = task.paused ?? overlay.paused;
     return {
       ...task,
+      ...(paused ? { paused } : {}),
       ...(overlay.statusText ? { statusText: overlay.statusText } : {}),
       ...(waitingFor ? { waitingFor, statusText: `Waiting for ${waitingFor}` } : {}),
       ...(overlay.reasoningText

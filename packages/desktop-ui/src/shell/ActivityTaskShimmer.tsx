@@ -1,17 +1,25 @@
-import type { TaskItem } from "@/features/chat/lib/event-transforms";
+import {
+  isActivityTaskWorking,
+  type TaskItem,
+} from "@/features/chat/lib/event-transforms";
 import { TextShimmer } from "@/app/chat/TextShimmer";
 
+type ShimmerTask = Pick<
+  TaskItem,
+  "status" | "waitingFor" | "waitingForHelpers" | "paused" | "helpersWorking"
+>;
+
 export const isTopLevelActivityShimmerEligible = (
-  task: Pick<TaskItem, "status" | "waitingFor">,
+  task: ShimmerTask,
   isTopLevel: boolean,
-): boolean => isTopLevel && task.status === "running" && !task.waitingFor;
+): boolean => isTopLevel && isActivityTaskWorking(task);
 
 export function ActivityTaskShimmer({
   task,
   text,
   isTopLevel,
 }: {
-  task: Pick<TaskItem, "agentType" | "status" | "waitingFor">;
+  task: ShimmerTask;
   text: string;
   isTopLevel: boolean;
 }) {

@@ -27,8 +27,8 @@
         "tasksInProgress": {
           "other": "{count} tugas sedang berjalan"
         },
-        "workingHelpers": {
-          "other": "{count} pembantu"
+        "tasksPaused": {
+          "other": "{count} tugas dijeda"
         }
       },
       "addMenu": {

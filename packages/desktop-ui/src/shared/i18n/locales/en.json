@@ -28,9 +28,9 @@
           "one": "{count} task in progress",
           "other": "{count} tasks in progress"
         },
-        "workingHelpers": {
-          "one": "{count} helper",
-          "other": "{count} helpers"
+        "tasksPaused": {
+          "one": "{count} paused task",
+          "other": "{count} paused tasks"
         }
       },
       "addMenu": {

@@ -27,7 +27,6 @@ import {
   ACTIVITY_INDICATOR_POP_SETTLE_SPRING,
   ACTIVITY_INDICATOR_SPAWN_BEAT_MS,
   activityIndicatorTransition,
-  selectActivityIndicatorHelpers,
   selectActivityIndicatorLabel,
   type ActivityIndicatorEntry,
   type ActivityIndicatorPhase,
@@ -55,7 +54,6 @@ const LABEL_GAP = 8;
 const LABEL_TRAILING = 16;
 const SIDE_CLEARANCE = 10 + 44 + 8;
 const SLOT_SETTLE_MS = 560;
-const HELPERS_SEPARATOR = " · ";
 
 const NO_RUNNING_AGENTS: ActivityIndicatorEntry[] = [];
 
@@ -67,12 +65,7 @@ const sameRunning = (
   b: readonly ActivityIndicatorEntry[],
 ): boolean =>
   a.length === b.length &&
-  a.every(
-    (entry, index) =>
-      entry.id === b[index]!.id &&
-      entry.title === b[index]!.title &&
-      entry.workingHelpers === b[index]!.workingHelpers,
-  );
+  a.every((entry, index) => entry.id === b[index]!.id && entry.title === b[index]!.title);
 
 export function StellaStatusHeader({
   onPress,
@@ -86,13 +79,6 @@ export function StellaStatusHeader({
   const label = selectActivityIndicatorLabel(running, (total) =>
     tPlural("app.chat.activityPill.tasksInProgress", total),
   );
-  const workingHelpers = selectActivityIndicatorHelpers(running);
-  const helpersLabel =
-    workingHelpers > 0
-      ? tPlural("app.chat.activityPill.workingHelpers", workingHelpers)
-      : null;
-  const fullLabel =
-    label !== null && helpersLabel ? `${label}${HELPERS_SEPARATOR}${helpersLabel}` : label;
 
   const [phase, setPhase] = useState<ActivityIndicatorPhase>(
     count > 0 ? "working" : "idle",
@@ -137,9 +123,7 @@ export function StellaStatusHeader({
     null,
   );
   const labelWidth =
-    busy && fullLabel !== null && measured?.label === fullLabel
-      ? measured.width
-      : null;
+    busy && label !== null && measured?.label === label ? measured.width : null;
 
   const maxWidth = Math.max(STATUS_PILL_HEIGHT, laneWidth - SIDE_CLEARANCE * 2);
   const [settledBusyWidth, setSettledBusyWidth] = useState(STATUS_PILL_HEIGHT);
@@ -192,21 +176,18 @@ export function StellaStatusHeader({
 
   return (
     <View pointerEvents="box-none" style={styles.lane} onLayout={onLaneLayout}>
-      {fullLabel !== null ? (
+      {label !== null ? (
         <Text
-          key={fullLabel}
+          key={label}
           numberOfLines={1}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           style={[styles.label, styles.measure]}
           onLayout={(event) =>
-            setMeasured({
-              label: fullLabel,
-              width: event.nativeEvent.layout.width,
-            })
+            setMeasured({ label, width: event.nativeEvent.layout.width })
           }
         >
-          {fullLabel}
+          {label}
         </Text>
       ) : null}
       <StatusPill
@@ -215,7 +196,7 @@ export function StellaStatusHeader({
         onPress={() => {
           if (busy) onPress(running);
         }}
-        accessibilityLabel={busy && fullLabel ? fullLabel : "Stella"}
+        accessibilityLabel={busy && label ? label : "Stella"}
       >
         <Animated.View style={[styles.mark, markStyle]}>
           {posed ? (
@@ -251,23 +232,17 @@ export function StellaStatusHeader({
           <View
             style={[styles.labelSlot, { left: labelLeft, width: labelSpace }]}
           >
-            <Animated.View
+            <Animated.Text
               key={label}
               entering={FadeIn.duration(ACTIVITY_INDICATOR_LABEL_IN_MS).delay(
                 ACTIVITY_INDICATOR_LABEL_IN_DELAY_MS,
               )}
               exiting={FadeOut.duration(ACTIVITY_INDICATOR_LABEL_OUT_MS)}
-              style={styles.labelRow}
+              numberOfLines={1}
+              style={styles.label}
             >
-              <Text numberOfLines={1} style={[styles.label, styles.labelTitle]}>
-                {label}
-              </Text>
-              {helpersLabel ? (
-                <Text numberOfLines={1} style={[styles.label, styles.helpers]}>
-                  {`${HELPERS_SEPARATOR}${helpersLabel}`}
-                </Text>
-              ) : null}
-            </Animated.View>
+              {label}
+            </Animated.Text>
           </View>
         ) : null}
       </StatusPill>
@@ -295,17 +270,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) =>
       justifyContent: "center",
       position: "absolute",
       top: 0,
-    },
-    labelRow: {
-      alignItems: "center",
-      flexDirection: "row",
-    },
-    labelTitle: {
-      flexShrink: 1,
-    },
-    helpers: {
-      color: colors.textMuted,
-      flexShrink: 0,
     },
     label: {
       color: colors.text,

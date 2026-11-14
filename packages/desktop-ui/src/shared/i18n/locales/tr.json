@@ -28,9 +28,9 @@
           "one": "{count} görev sürüyor",
           "other": "{count} görev sürüyor"
         },
-        "workingHelpers": {
-          "one": "{count} yardımcı",
-          "other": "{count} yardımcı"
+        "tasksPaused": {
+          "one": "{count} görev duraklatıldı",
+          "other": "{count} görev duraklatıldı"
         }
       },
       "addMenu": {

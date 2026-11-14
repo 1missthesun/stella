@@ -27,8 +27,8 @@
         "tasksInProgress": {
           "other": "{count} 件のタスクを実行中"
         },
-        "workingHelpers": {
-          "other": "ヘルパー {count} 人"
+        "tasksPaused": {
+          "other": "{count} 件のタスクを一時停止中"
         }
       },
       "addMenu": {

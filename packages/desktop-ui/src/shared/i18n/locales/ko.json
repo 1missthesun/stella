@@ -27,8 +27,8 @@
         "tasksInProgress": {
           "other": "작업 {count}개 진행 중"
         },
-        "workingHelpers": {
-          "other": "도우미 {count}명"
+        "tasksPaused": {
+          "other": "작업 {count}개 일시 중지됨"
         }
       },
       "addMenu": {

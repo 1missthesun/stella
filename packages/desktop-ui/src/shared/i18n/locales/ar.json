@@ -32,13 +32,13 @@
           "two": "{count} مهمتان قيد التنفيذ",
           "zero": "{count} مهمة قيد التنفيذ"
         },
-        "workingHelpers": {
-          "few": "{count} مساعدين",
-          "many": "{count} مساعدًا",
-          "one": "مساعد واحد",
-          "other": "{count} مساعد",
-          "two": "مساعدان",
-          "zero": "{count} مساعد"
+        "tasksPaused": {
+          "few": "{count} مهام متوقفة مؤقتًا",
+          "many": "{count} مهمة متوقفة مؤقتًا",
+          "one": "{count} مهمة متوقفة مؤقتًا",
+          "other": "{count} مهمة متوقفة مؤقتًا",
+          "two": "{count} مهمتان متوقفتان مؤقتًا",
+          "zero": "{count} مهمة متوقفة مؤقتًا"
         }
       },
       "addMenu": {

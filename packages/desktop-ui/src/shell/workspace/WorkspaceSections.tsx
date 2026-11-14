@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ChevronRight, Clock } from "@/ui/icons";
+import { ChevronRight, Clock, Pause } from "@/ui/icons";
 import { AgentLifecycleStatusIcon } from "@/features/chat/components/AgentLifecycleStatusIcon";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useT, useTPlural } from "@/shared/i18n";
@@ -35,6 +35,7 @@ import {
   deriveTopLevelActivityTasks,
   flattenActivityTasks,
   getActivityRowCompletedAtMs,
+  getActivityRowPause,
   getActivityRowSearchText,
   getActivityRowStatus,
   groupActivityTasks,
@@ -67,6 +68,11 @@ import { AgentAssistantUpdates } from "@/shell/AgentAssistantUpdates";
 import { CompactChildState } from "@/features/chat/components/CompactSubagentSummary";
 import { useContinuousAnimationGate } from "@/shared/hooks/use-continuous-animation-gate";
 import { ACTIVITY_INDICATOR_MENU_MAX_ROWS } from "@stella/contracts/activity-indicator";
+import {
+  agentPauseKey,
+  agentPauseLabel,
+  type AgentPause,
+} from "@stella/contracts/agent-pause";
 import "@/app/chat/chat-workspace-strip.css";
 
 const SECTION_CAPS = {
@@ -174,7 +180,25 @@ function WorkspaceSection({
 const taskSourceLabel = (task: TaskItem): string | undefined =>
   task.source === "claude-native" ? "Claude · read-only" : undefined;
 
-function TaskStatusIcon({ status, waiting }: { status: TaskItem["status"]; waiting?: boolean }) {
+function TaskStatusIcon({
+  status,
+  waiting,
+  paused,
+}: {
+  status: TaskItem["status"];
+  waiting?: boolean;
+  paused?: boolean;
+}) {
+  if (paused) {
+    return (
+      <Pause
+        className="chat-workspace-strip__task-icon chat-workspace-strip__task-icon--paused"
+        size={15}
+        strokeWidth={2}
+        aria-hidden="true"
+      />
+    );
+  }
   if (waiting) {
     return (
       <Clock
@@ -231,7 +255,8 @@ const TaskRow = memo(function TaskRow({
   const label = task.description.trim();
   const sourceLabel = taskSourceLabel(task);
   const hasSubagents = Boolean(compactChildren);
-  const waiting = Boolean(task.waitingFor);
+  const paused = task.status === "running" && Boolean(task.paused);
+  const waiting = !paused && Boolean(task.waitingFor);
   const agentUpdates =
     !hasSubagents && task.status === "running"
       ? getTaskAgentUpdates(task)
@@ -273,10 +298,16 @@ const TaskRow = memo(function TaskRow({
       {...motionProps}
       className="chat-workspace-strip__task-row"
       ref={rowRef}
-      data-status={waiting ? "waiting" : task.status}
+      data-status={paused ? "paused" : waiting ? "waiting" : task.status}
       data-source={task.source}
       data-expanded={expanded ? "true" : undefined}
-      title={waiting && task.statusText ? `${label} — ${task.statusText}` : label}
+      title={
+        paused && task.paused
+          ? `${label} — ${agentPauseLabel(task.paused)}`
+          : waiting && task.statusText
+            ? `${label} — ${task.statusText}`
+            : label
+      }
       data-continuous-animation={compactMotionActive ? "true" : undefined}
     >
       <div className="chat-workspace-strip__task-row-head">
@@ -298,7 +329,7 @@ const TaskRow = memo(function TaskRow({
                   className="chat-workspace-strip__task-icon-wrap"
                   aria-hidden="true"
                 >
-                  <TaskStatusIcon status={task.status} waiting={waiting} />
+                  <TaskStatusIcon status={task.status} waiting={waiting} paused={paused} />
                 </span>
                 <span className="chat-workspace-strip__task-label">
                   <ActivityTaskShimmer
@@ -326,7 +357,7 @@ const TaskRow = memo(function TaskRow({
                 className="chat-workspace-strip__task-icon-wrap"
                 aria-hidden="true"
               >
-                <TaskStatusIcon status={task.status} waiting={waiting} />
+                <TaskStatusIcon status={task.status} waiting={waiting} paused={paused} />
               </span>
               <span className="chat-workspace-strip__task-label">
                 <ActivityTaskShimmer
@@ -492,7 +523,6 @@ const TasksList = memo(function TasksList({
   nested?: boolean;
 }) {
   const t = useT();
-  const tPlural = useTPlural();
   const [gap, setGap] = useState(0);
   const measureGap = useCallback((list: HTMLUListElement | null) => {
     if (list) setGap(parseFloat(getComputedStyle(list).rowGap) || 0);
@@ -521,14 +551,9 @@ const TasksList = memo(function TasksList({
                 orderIndex={index}
                 isTopLevel={!nested}
                 metaText={
-                  row.task.workingHelpers
-                    ? tPlural(
-                        "app.chat.activityPill.workingHelpers",
-                        row.task.workingHelpers,
-                      )
-                    : row.task.waitingFor
-                      ? t("app.chat.activityPill.statusWaiting")
-                      : undefined
+                  row.task.waitingFor && !getActivityRowPause(row)
+                    ? t("app.chat.activityPill.statusWaiting")
+                    : undefined
                 }
               />
             ) : (
@@ -670,7 +695,7 @@ export const WorkspaceSections = memo(function WorkspaceSections({
   const isTaskExpanded = useCallback(
     (task: TaskItem): boolean =>
       expandOverrides.get(task.id) ??
-      (task.status === "running" || seenTaskIds.has(task.id)),
+      (!task.paused && (task.status === "running" || seenTaskIds.has(task.id))),
     [expandOverrides, seenTaskIds],
   );
   const isCompactTaskExpanded = useCallback(
@@ -738,6 +763,19 @@ export const WorkspaceSections = memo(function WorkspaceSections({
       : ordered;
     return visible;
   }, [groupedRows, matchingActivityKeys]);
+
+  const pausedGroups = useMemo(() => {
+    const groups = new Map<string, { pause: AgentPause; rows: ActivityRow[] }>();
+    for (const row of runningRows) {
+      const pause = getActivityRowPause(row);
+      if (!pause) continue;
+      const key = agentPauseKey(pause);
+      const group = groups.get(key);
+      if (group) group.rows.push(row);
+      else groups.set(key, { pause, rows: [row] });
+    }
+    return [...groups.entries()].map(([key, group]) => ({ key, ...group }));
+  }, [runningRows]);
 
   const doneRows = useMemo(
     () =>
@@ -835,10 +873,20 @@ export const WorkspaceSections = memo(function WorkspaceSections({
           ),
     [doneRows, caps.activity, runningRows.length, searching, nowMs],
   );
-  const visibleActivityRows = useMemo(() => {
-    const rows = [...runningRows, ...visibleDoneRows];
-    return quickSearch ? rows.slice(0, caps.activity) : rows;
-  }, [caps.activity, quickSearch, runningRows, visibleDoneRows]);
+  const visibleActivity = useMemo(() => {
+    let room = quickSearch ? caps.activity : Number.POSITIVE_INFINITY;
+    const take = (rows: readonly ActivityRow[]): ActivityRow[] => {
+      const taken = rows.slice(0, Math.max(0, room));
+      room -= taken.length;
+      return taken;
+    };
+    const active = take(runningRows.filter((row) => !getActivityRowPause(row)));
+    const paused = pausedGroups
+      .map((group) => ({ ...group, rows: take(group.rows) }))
+      .filter((group) => group.rows.length > 0);
+    const done = take(visibleDoneRows);
+    return { active, paused, done };
+  }, [caps.activity, pausedGroups, quickSearch, runningRows, visibleDoneRows]);
   const visibleFiles = useMemo(
     () => filteredFiles.slice(0, caps.files),
     [caps.files, filteredFiles],
@@ -848,7 +896,10 @@ export const WorkspaceSections = memo(function WorkspaceSections({
     [filteredSchedules, caps.schedule],
   );
 
-  const hasActivity = visibleActivityRows.length > 0;
+  const hasActivity =
+    visibleActivity.active.length > 0 ||
+    visibleActivity.paused.length > 0 ||
+    visibleActivity.done.length > 0;
   const hasNeedsYou = visibleBrowserInteractions.length > 0;
   const hasFiles = searching && visibleFiles.length > 0;
   const hasSchedule = upNext.length > 0;
@@ -903,15 +954,46 @@ export const WorkspaceSections = memo(function WorkspaceSections({
         ) : null}
         {hasActivity && (
           <WorkspaceSection title="Activity" sectionId="activity" hideHeader>
-            <TasksList
-              rows={visibleActivityRows}
-              isTaskExpanded={isTaskExpanded}
-              isCompactTaskExpanded={isCompactTaskExpanded}
-              onToggleTask={toggleTask}
-              onSelectTask={handleSelectTask}
-              agentFiles={agentFiles}
-              onOpenFile={handleOpenFile}
-            />
+            {visibleActivity.active.length > 0 ? (
+              <TasksList
+                rows={visibleActivity.active}
+                isTaskExpanded={isTaskExpanded}
+                isCompactTaskExpanded={isCompactTaskExpanded}
+                onToggleTask={toggleTask}
+                onSelectTask={handleSelectTask}
+                agentFiles={agentFiles}
+                onOpenFile={handleOpenFile}
+              />
+            ) : null}
+            {visibleActivity.paused.map((group) => (
+              <div key={group.key} className="chat-workspace-strip__paused-group">
+                <p className="chat-workspace-strip__paused-reason">
+                  {agentPauseLabel(group.pause)}
+                </p>
+                <TasksList
+                  rows={group.rows}
+                  isTaskExpanded={isTaskExpanded}
+                  isCompactTaskExpanded={isCompactTaskExpanded}
+                  onToggleTask={toggleTask}
+                  onSelectTask={handleSelectTask}
+                  agentFiles={agentFiles}
+                  onOpenFile={handleOpenFile}
+                />
+              </div>
+            ))}
+            {visibleActivity.done.length > 0 ? (
+              <div className="chat-workspace-strip__done-group">
+                <TasksList
+                  rows={visibleActivity.done}
+                  isTaskExpanded={isTaskExpanded}
+                  isCompactTaskExpanded={isCompactTaskExpanded}
+                  onToggleTask={toggleTask}
+                  onSelectTask={handleSelectTask}
+                  agentFiles={agentFiles}
+                  onOpenFile={handleOpenFile}
+                />
+              </div>
+            ) : null}
           </WorkspaceSection>
         )}
 

@@ -28,9 +28,9 @@
           "one": "{count} uppgift pågår",
           "other": "{count} uppgifter pågår"
         },
-        "workingHelpers": {
-          "one": "{count} hjälpare",
-          "other": "{count} hjälpare"
+        "tasksPaused": {
+          "one": "{count} uppgift pausad",
+          "other": "{count} uppgifter pausade"
         }
       },
       "addMenu": {

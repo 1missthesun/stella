@@ -1,4 +1,5 @@
 import type { TaskLifecycleStatus } from "./agent-runtime.js";
+import type { AgentPause } from "./agent-pause.js";
 import {
   agentStatusOf,
   type AgentStatus,
@@ -15,6 +16,8 @@ export type LedgerAgent = {
   status: AgentStatus;
   agentType: string;
   parentAgentId?: string;
+  placement?: string;
+  runsOnDeviceId?: string;
   attemptGeneration: number;
   createdAtMs: number;
   updatedAtMs: number;
@@ -41,6 +44,10 @@ export const ledgerAgentFromThread = (
   status: agentStatusOf(thread.status) ?? "failed",
   agentType: thread.agentType || "general",
   ...(thread.parentThreadId ? { parentAgentId: thread.parentThreadId } : {}),
+  placement: thread.placement,
+  ...((thread.runsOnDeviceId ?? thread.executorDeviceId)
+    ? { runsOnDeviceId: thread.runsOnDeviceId ?? thread.executorDeviceId }
+    : {}),
   attemptGeneration: thread.attemptGeneration,
   createdAtMs: thread.createdAt,
   updatedAtMs: thread.updatedAt,
@@ -55,18 +62,33 @@ export const isTopLevelAgent = (agent: { parentAgentId?: string }): boolean =>
 export type TopLevelAgentActivity<T> = {
   task: T;
   status: TaskLifecycleStatus;
-  workingHelpers: number;
+  /** Something of it runs now: its own turn or a helper's. */
+  working: boolean;
+  /** Not ended, nothing of it runs, and a hold (its own or a helper's) is why. */
+  paused?: AgentPause;
   helpers: readonly T[];
 };
 
+type ActivityAgent = {
+  id: string;
+  parentAgentId?: string;
+  status: TaskLifecycleStatus;
+  waitingFor?: string;
+  waitingForHelpers?: boolean;
+  paused?: AgentPause;
+};
+
+export const isAgentWorking = (agent: ActivityAgent): boolean =>
+  agent.status === "running" && !agent.waitingFor && !agent.waitingForHelpers && !agent.paused;
+
 /**
  * Stella's own agents as the user sees their work: a finished agent whose
- * helpers are still working reads as running until they finish, and its
- * helpers count under it, never as rows of their own.
+ * helpers are still live reads as running until they finish, and its helpers
+ * are read with it, never as rows of their own. Only an agent that runs
+ * something now, itself or through a helper, is working; one whose remaining
+ * work is held carries that hold.
  */
-export const topLevelAgentActivity = <
-  T extends { id: string; parentAgentId?: string; status: TaskLifecycleStatus; waitingFor?: string },
->(
+export const topLevelAgentActivity = <T extends ActivityAgent>(
   tasks: readonly T[],
 ): TopLevelAgentActivity<T>[] => {
   const ids = new Set(tasks.map((task) => task.id));
@@ -88,13 +110,14 @@ export const topLevelAgentActivity = <
       helpers.push(next);
       pending.push(...(childrenByParent.get(next.id) ?? []));
     }
-    const workingHelpers = helpers.filter((helper) => helper.status === "running" && !helper.waitingFor).length;
-    return {
-      task,
-      status: task.status === "completed" && workingHelpers > 0 ? "running" : task.status,
-      workingHelpers,
-      helpers,
-    };
+    const helperWorking = helpers.some(isAgentWorking);
+    const helperPause = helpers.find((helper) => helper.status === "running" && helper.paused)?.paused;
+    const status: TaskLifecycleStatus =
+      task.status === "completed" && (helperWorking || helperPause) ? "running" : task.status;
+    const working = isAgentWorking(task) || helperWorking;
+    const paused =
+      status === "running" && !working ? (task.paused ?? (task.waitingFor ? undefined : helperPause)) : undefined;
+    return { task, status, working, ...(paused ? { paused } : {}), helpers };
   });
 };
 

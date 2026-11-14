@@ -29,10 +29,10 @@
           "one": "{count} tâche en cours",
           "other": "{count} tâches en cours"
         },
-        "workingHelpers": {
-          "many": "{count} aides",
-          "one": "{count} aide",
-          "other": "{count} aides"
+        "tasksPaused": {
+          "many": "{count} tâches en pause",
+          "one": "{count} tâche en pause",
+          "other": "{count} tâches en pause"
         }
       },
       "addMenu": {

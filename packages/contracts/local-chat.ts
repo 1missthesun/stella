@@ -1,4 +1,5 @@
 import type { OfficePreviewRef } from "./office-preview.js";
+import type { LocalAgentPause } from "./agent-pause.js";
 import type { AgentModelConfigSnapshot } from "./agent-engine.js";
 
 export type EventRecord = {
@@ -87,6 +88,8 @@ export type ThreadActivityRecord = {
   updatedAt: number;
   /** It ended its turn waiting for this (end_turn_waiting): not finished, nothing running. */
   waitingFor?: string;
+  /** Its run on this computer is held right now. */
+  paused?: LocalAgentPause;
 };
 
 export type WebSearchResultHit = {

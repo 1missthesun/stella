@@ -30,11 +30,11 @@
           "one": "{count} zadanie w toku",
           "other": "{count} zadania w toku"
         },
-        "workingHelpers": {
-          "few": "{count} pomocników",
-          "many": "{count} pomocników",
-          "one": "{count} pomocnik",
-          "other": "{count} pomocnika"
+        "tasksPaused": {
+          "few": "{count} zadania wstrzymane",
+          "many": "{count} zadań wstrzymanych",
+          "one": "{count} zadanie wstrzymane",
+          "other": "{count} zadania wstrzymane"
         }
       },
       "addMenu": {

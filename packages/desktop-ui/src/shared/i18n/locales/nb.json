@@ -28,9 +28,9 @@
           "one": "{count} oppgave pågår",
           "other": "{count} oppgaver pågår"
         },
-        "workingHelpers": {
-          "one": "{count} hjelper",
-          "other": "{count} hjelpere"
+        "tasksPaused": {
+          "one": "{count} oppgave satt på pause",
+          "other": "{count} oppgaver satt på pause"
         }
       },
       "addMenu": {

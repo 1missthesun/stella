@@ -5,6 +5,7 @@ import {
 import type { AgentModelConfigSnapshot } from "@stella/contracts/agent-engine"
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator"
 import { topLevelAgentActivity } from "@stella/contracts/agent-ledger"
+import { localAgentPause, type AgentPause } from "@stella/contracts/agent-pause"
 import { normalizeDisplayStatusText } from '@stella/contracts/working-status'
 import type {
   Attachment,
@@ -95,9 +96,14 @@ export type TaskItem = {
   assistantMessages?: string[]
   assistantMessagesUpdatedAtMs?: number
   assistantMessagesUpdatedSequence?: number
-  workingHelpers?: number
   /** Ended its turn waiting for this: live but nothing running, no report yet. */
   waitingFor?: string
+  /** Its own turn is over and its report waits for its helpers. */
+  waitingForHelpers?: boolean
+  /** Not ended but held, so nothing of it runs now. */
+  paused?: AgentPause
+  /** A helper of this top-level task runs now. */
+  helpersWorking?: boolean
 }
 
 export type TaskLiveDecoration = {
@@ -146,6 +152,10 @@ export function buildActivityTasks(
           ? record.waitingFor?.trim() || undefined
           : undefined
       const decoration = running && !waitingFor ? candidateDecoration : undefined
+      const paused =
+        running && !waitingFor && !latestAttemptSupersedesAuthoritative(authoritative, latestAttempt)
+          ? localAgentPause(record.paused)
+          : undefined
       const latestAttemptOwns = latestAttemptSupersedesAuthoritative(
         authoritative,
         latestAttempt,
@@ -170,6 +180,7 @@ export function buildActivityTasks(
         anchorTurnId: decoration?.anchorTurnId,
         parentAgentId: record.parentAgentId,
         ...(waitingFor ? { waitingFor } : {}),
+        ...(paused ? { paused } : {}),
         statusText: waitingFor
           ? `Waiting for ${waitingFor}`
           : running
@@ -445,12 +456,23 @@ export const activityRowKey = (row: ActivityRow): string =>
 export type TopLevelActivityWorkUnit = {
   id: string
   status: TaskLifecycleStatus
+  working: boolean
 }
+
+export const isActivityTaskWorking = (
+  task: Pick<
+    TaskItem,
+    'status' | 'waitingFor' | 'waitingForHelpers' | 'paused' | 'helpersWorking'
+  >,
+): boolean =>
+  task.status === 'running' &&
+  (task.helpersWorking === true ||
+    (!task.waitingFor && !task.waitingForHelpers && !task.paused))
 
 export const deriveTopLevelActivityTasks = (
   tasks: readonly TaskItem[],
 ): TaskItem[] =>
-  topLevelAgentActivity(tasks).map(({ task, status, workingHelpers, helpers }) => {
+  topLevelAgentActivity(tasks).map(({ task, status, working, paused, helpers }) => {
     const completedAtMs =
       status === 'running'
         ? undefined
@@ -462,18 +484,27 @@ export const deriveTopLevelActivityTasks = (
                 : latest,
             task.completedAtMs,
           )
+    const helpersWorking =
+      working && status === 'running' && !isActivityTaskWorking(task)
     if (
       status === task.status &&
-      workingHelpers === (task.workingHelpers ?? 0) &&
+      paused === task.paused &&
+      helpersWorking === (task.helpersWorking ?? false) &&
       completedAtMs === task.completedAtMs
     ) {
       return task
     }
-    const { completedAtMs: _completedAtMs, workingHelpers: _workingHelpers, ...rest } = task
+    const {
+      completedAtMs: _completedAtMs,
+      paused: _paused,
+      helpersWorking: _helpersWorking,
+      ...rest
+    } = task
     return {
       ...rest,
       status,
-      ...(workingHelpers > 0 ? { workingHelpers } : {}),
+      ...(paused ? { paused } : {}),
+      ...(helpersWorking ? { helpersWorking } : {}),
       ...(completedAtMs !== undefined ? { completedAtMs } : {}),
     }
   })
@@ -499,35 +530,48 @@ const latestTopLevelActivityRows = (
   return groupActivityTasks(deriveTopLevelActivityTasks([...latestById.values()]))
 }
 
+export const isActivityRowWorking = (row: ActivityRow): boolean =>
+  row.kind === 'task'
+    ? isActivityTaskWorking(row.task)
+    : row.hierarchy.status === 'running' &&
+      isActivityTaskWorking({ ...row.hierarchy.owner, status: 'running' })
+
+export const getActivityRowPause = (row: ActivityRow): AgentPause | undefined =>
+  getActivityRowStatus(row) === 'running' && !isActivityRowWorking(row)
+    ? (row.kind === 'task' ? row.task : row.hierarchy.owner).paused
+    : undefined
+
 export const deriveTopLevelActivityWorkUnits = (
   tasks: readonly TaskItem[],
 ): TopLevelActivityWorkUnit[] =>
   latestTopLevelActivityRows(tasks).map((row) => ({
     id: activityRowKey(row),
     status: getActivityRowStatus(row),
+    working: isActivityRowWorking(row),
   }))
 
 export const countActiveTopLevelActivityWorkUnits = (
   tasks: readonly TaskItem[],
 ): number =>
-  deriveTopLevelActivityWorkUnits(tasks).filter(
-    (unit) => unit.status === 'running',
-  ).length
+  latestTopLevelActivityRows(tasks).filter(isActivityRowWorking).length
 
 export const deriveRunningActivityIndicatorEntries = (
   tasks: readonly TaskItem[],
 ): ActivityIndicatorEntry[] =>
   latestTopLevelActivityRows(tasks)
-    .filter((row) => getActivityRowStatus(row) === 'running')
+    .filter(isActivityRowWorking)
     .sort(compareActivityRowsByLifecycleStart)
-    .map((row) => {
-      const task = row.kind === 'task' ? row.task : row.hierarchy.owner
-      return {
-        id: activityRowKey(row),
-        title: task.description.trim(),
-        ...(task.workingHelpers ? { workingHelpers: task.workingHelpers } : {}),
-      }
-    })
+    .map((row) => ({
+      id: activityRowKey(row),
+      title: (row.kind === 'task'
+        ? row.task.description
+        : row.hierarchy.owner.description
+      ).trim(),
+    }))
+
+export const countPausedActivityRows = (tasks: readonly TaskItem[]): number =>
+  latestTopLevelActivityRows(tasks).filter((row) => getActivityRowPause(row))
+    .length
 
 export const getActivityRowStatus = (row: ActivityRow): TaskLifecycleStatus =>
   row.kind === 'task' ? row.task.status : row.hierarchy.status

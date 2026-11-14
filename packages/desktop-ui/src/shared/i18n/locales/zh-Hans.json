@@ -27,8 +27,8 @@
         "tasksInProgress": {
           "other": "{count} 个任务进行中"
         },
-        "workingHelpers": {
-          "other": "{count} 个助手"
+        "tasksPaused": {
+          "other": "{count} 个任务已暂停"
         }
       },
       "addMenu": {

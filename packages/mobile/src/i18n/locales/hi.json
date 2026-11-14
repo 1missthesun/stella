@@ -28,9 +28,9 @@
           "one": "{count} कार्य प्रगति पर",
           "other": "{count} कार्य प्रगति पर"
         },
-        "workingHelpers": {
-          "one": "{count} सहायक",
-          "other": "{count} सहायक"
+        "tasksPaused": {
+          "one": "{count} कार्य रुका हुआ",
+          "other": "{count} कार्य रुके हुए"
         }
       },
       "addMenu": {

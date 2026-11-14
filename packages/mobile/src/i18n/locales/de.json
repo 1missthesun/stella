@@ -28,9 +28,9 @@
           "one": "{count} Aufgabe läuft",
           "other": "{count} Aufgaben laufen"
         },
-        "workingHelpers": {
-          "one": "{count} Helfer",
-          "other": "{count} Helfer"
+        "tasksPaused": {
+          "one": "{count} Aufgabe pausiert",
+          "other": "{count} Aufgaben pausiert"
         }
       },
       "addMenu": {

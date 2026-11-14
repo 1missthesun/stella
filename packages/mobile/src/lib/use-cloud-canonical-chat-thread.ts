@@ -58,7 +58,7 @@ import {
   rebindCanonicalCloudMessages,
 } from "./cloud-journal-projection";
 import { journalIndex } from "./journal-index";
-import { getBackendClient } from "./backend";
+import { getBackendClient, useBackendView } from "./backend";
 import { env } from "../config/env";
 import {
   AUTOMATIC_EXECUTION_TARGET,
@@ -999,9 +999,13 @@ export const useCloudCanonicalChatThread = (
     authority.conversationId || null,
     ledgerCheckIds,
   );
+  const devices = useBackendView(
+    "devices.list",
+    authority.conversationId ? {} : "skip",
+  ).value?.devices;
   const conversationTasks = useMemo(
-    () => applyAgentLedger(foldedTasks, agentLedger),
-    [agentLedger, foldedTasks],
+    () => applyAgentLedger(foldedTasks, agentLedger, devices),
+    [agentLedger, devices, foldedTasks],
   );
   const canonicalCancellationRef = useRef<{
     dispatchId: string;

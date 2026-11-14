@@ -30,11 +30,11 @@
           "one": "probíhá {count} úloha",
           "other": "probíhá {count} úloh"
         },
-        "workingHelpers": {
-          "few": "{count} pomocníci",
-          "many": "{count} pomocníka",
-          "one": "{count} pomocník",
-          "other": "{count} pomocníků"
+        "tasksPaused": {
+          "few": "{count} pozastavené úlohy",
+          "many": "{count} pozastavené úlohy",
+          "one": "{count} pozastavená úloha",
+          "other": "{count} pozastavených úloh"
         }
       },
       "addMenu": {

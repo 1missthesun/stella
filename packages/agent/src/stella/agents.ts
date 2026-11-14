@@ -17,6 +17,7 @@ import {
   type EntryId,
   type Harness,
   type Tx,
+  type LiveState,
   type ModelRef,
   type TaskRuntime,
   type ToolExecutionApi,
@@ -60,6 +61,7 @@ import {
 } from "@stella/contracts/agent-waiting";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
+import { longToolCall, longToolCallText, type CurrentToolCall } from "@stella/contracts/long-tool-call";
 import {
   isSafeguardBlock,
   isSafeguardBlockText,
@@ -191,6 +193,8 @@ const noteRemote = (state: StellaAgents, threadId: string, event: RemoteEvent): 
 
 export type StellaAgentRecord = {
   threadId: string;
+  /** Running, and on one tool call past every time limit. */
+  longCall?: CurrentToolCall;
   description: string;
   placement: AgentRecord["placement"];
   status: "running" | "waiting" | "completed" | "error";
@@ -495,6 +499,36 @@ const RUNNING_STATUS_NOTE =
 const STARTED_NOTE = "Its report arrives on its own as [Agent completed]; there is nothing to check before then.";
 
 const LATEST_PREVIEW_CHARS = 300;
+const LONG_CALL_OUTPUT_CHARS = 400;
+
+/** The longest-running call of an agent's current tool round, with what it has printed so far. */
+const currentToolCall = async (
+  store: { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+  live: LiveState | undefined,
+  context: Context,
+): Promise<(CurrentToolCall & { output?: string }) | undefined> => {
+  const running = live?.tools?.filter((slot) => slot.status === "running" && slot.taskId !== undefined) ?? [];
+  if (running.length === 0) return undefined;
+  const started = await store.commit(
+    async (tx) => await Promise.all(running.map(async (slot) => ({ slot, since: (await tx.task(slot.taskId!))?.startedAt }))),
+    context,
+  );
+  let oldest: { slot: (typeof running)[number]; since: number } | undefined;
+  for (const { slot, since } of started) {
+    if (since !== undefined && (oldest === undefined || since < oldest.since)) oldest = { slot, since };
+  }
+  if (!oldest) return undefined;
+  return { tool: oldest.slot.name, since: oldest.since, ...(oldest.slot.output ? { output: oldest.slot.output } : {}) };
+};
+
+const longCallOf = async (
+  store: { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+  live: LiveState | undefined,
+  context: Context,
+): Promise<CurrentToolCall | undefined> => {
+  const call = longToolCall(await currentToolCall(store, live, context).catch(() => undefined));
+  return call ? { tool: call.tool, since: call.since } : undefined;
+};
 
 const MAX_REPORT_CHARS = AGENT_REPORT_MAX_CHARS;
 const bounded = (text: string): string =>
@@ -1751,8 +1785,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     const message = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
     const text = textOf(message);
     const call = message?.content.find((part) => part.type === "toolCall");
+    const long = longToolCall(await currentToolCall(api, live, context).catch(() => undefined));
     return {
       ...(running.length ? { running_tools: running } : {}),
+      ...(long
+        ? {
+            long_call: longToolCallText(long),
+            ...(long.output ? { long_call_output_tail: long.output.slice(-LONG_CALL_OUTPUT_CHARS) } : {}),
+          }
+        : {}),
       ...(text ? { latest_message_preview: text.length > LATEST_PREVIEW_CHARS ? `${text.slice(0, LATEST_PREVIEW_CHARS)}…` : text } : {}),
       ...(call && call.type === "toolCall" ? { latest_tool_call: call.name } : {}),
       ...(agent.held?.length ? { held_messages: agent.held.length } : {}),
@@ -1866,6 +1907,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 ? "failed"
                 : "completed",
       ...(waitingFor !== undefined ? { waitingFor } : {}),
+      ...(live?.run !== undefined ? await longCallOf(api, live, context).then((longCall) => (longCall ? { longCall } : {})) : {}),
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
       ...(live?.run !== undefined && host.directory?.usageLimitPaused?.(agent.threadId)
         ? { pausedBy: "usage-limit" as const }
@@ -2044,7 +2086,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const agentStatus = defineTool({
     name: "agent_status",
     description:
-      "Read-only; for when the user asks how work is going or you need a failure's detail. Without thread_id: everyone you can reach, one line each (thread_id · status · where, when not this computer · last active — name): your agents, teammates, other Stella sessions and cloud sessions; the newest are listed, and older ones stay resumable by a thread_id from history. With thread_id: its status, where it runs, who started it, a short preview of its latest message (not its result) and its latest tool call. An agent's full report arrives on its own as [Agent completed]. reachable: false means neither send_message nor stop_agent can reach it from here.",
+      "Read-only; for when the user asks how work is going or you need a failure's detail. Without thread_id: everyone you can reach, one line each (thread_id · status · where, when not this computer · last active — name): your agents, teammates, other Stella sessions and cloud sessions; the newest are listed, and older ones stay resumable by a thread_id from history. With thread_id: its status, where it runs, who started it, a short preview of its latest message (not its result) and its latest tool call. A running agent on one call past every time limit says so (status and `long_call`, with that call's latest output): it may be stuck, and stop_agent ends it. An agent's full report arrives on its own as [Agent completed]. reachable: false means neither send_message nor stop_agent can reach it from here.",
     parameters: Type.Object({
       thread_id: Type.Optional(Type.String({ description: "Optional: the agent to inspect." })),
     }),
@@ -2369,8 +2411,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
       const stopped = !running && idleStopped;
       const waitingFor = !running && !stopped ? agent.waiting?.waitingFor : undefined;
+      const longCall = running ? await longCallOf(harness, live, context) : undefined;
       records.push({
         threadId,
+        ...(longCall ? { longCall } : {}),
         description: agent.description,
         placement: agent.placement,
         status: running ? "running" : waitingFor !== undefined ? "waiting" : latest?.stopReason === "error" ? "error" : "completed",

@@ -306,6 +306,7 @@ export const piChatAgents = async (conversationId: string): Promise<DesktopThrea
       status: agent.agentStatus === "canceled" ? "canceled" : agent.status === "waiting" ? "running" : agent.status,
       ...(agent.status === "waiting" ? { waitingFor: agent.waitingFor?.trim() || "a message" } : {}),
       ...(agent.status === "running" && agent.paused ? { paused: agent.paused } : {}),
+      ...(agent.status === "running" && agent.longCall ? { longCall: agent.longCall } : {}),
       startedAt: agent.startedAt,
       updatedAt: agent.updatedAt,
       ...(agent.status === "running" || agent.status === "waiting" ? {} : { completedAt: agent.updatedAt }),

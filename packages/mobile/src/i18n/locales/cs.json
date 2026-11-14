@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Aktivita",
+        "longCall": "{minutes} min na jednom kroku",
         "openActivity": "{label} — otevřít aktivitu",
         "statusCanceled": "Zastaveno",
         "statusDone": "Dokončeno",

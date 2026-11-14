@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "गतिविधि",
+        "longCall": "एक चरण पर {minutes} मिनट",
         "openActivity": "{label} — गतिविधि खोलें",
         "statusCanceled": "रोका गया",
         "statusDone": "पूरा हुआ",

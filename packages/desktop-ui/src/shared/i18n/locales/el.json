@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Δραστηριότητα",
+        "longCall": "{minutes} λ. σε ένα βήμα",
         "openActivity": "{label} — άνοιγμα δραστηριότητας",
         "statusCanceled": "Διακόπηκε",
         "statusDone": "Ολοκληρώθηκε",

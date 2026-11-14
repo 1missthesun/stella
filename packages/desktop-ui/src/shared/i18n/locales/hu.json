@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Tevékenység",
+        "longCall": "{minutes} perc egy lépésnél",
         "openActivity": "{label} — tevékenység megnyitása",
         "statusCanceled": "Leállítva",
         "statusDone": "Befejezve",

@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Aktivitas",
+        "longCall": "{minutes} mnt di satu langkah",
         "openActivity": "{label} — buka aktivitas",
         "statusCanceled": "Dihentikan",
         "statusDone": "Selesai",

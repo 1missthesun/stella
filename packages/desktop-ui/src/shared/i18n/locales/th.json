@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "กิจกรรม",
+        "longCall": "{minutes} นาทีที่ขั้นตอนเดียว",
         "openActivity": "{label} — เปิดกิจกรรม",
         "statusCanceled": "หยุดแล้ว",
         "statusDone": "เสร็จแล้ว",

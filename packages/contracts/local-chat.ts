@@ -90,6 +90,8 @@ export type ThreadActivityRecord = {
   waitingFor?: string;
   /** Its run on this computer is held right now. */
   paused?: LocalAgentPause;
+  /** Running, and on one tool call past every time limit. */
+  longCall?: { tool: string; since: number };
 };
 
 export type WebSearchResultHit = {

@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Attività",
+        "longCall": "{minutes} min su un passaggio",
         "openActivity": "{label} — apri attività",
         "statusCanceled": "Interrotta",
         "statusDone": "Completata",

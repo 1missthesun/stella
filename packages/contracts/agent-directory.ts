@@ -1,5 +1,6 @@
 import { agentStatusOf, isLiveAgentStatus, type AgentStatus } from "./agent-status.js";
 import { USAGE_LIMIT_PAUSED_STATUS } from "./claude-usage-limit.js";
+import { longToolCallText, type CurrentToolCall } from "./long-tool-call.js";
 
 export const STELLA_MESSAGE_TARGET = "stella";
 
@@ -34,6 +35,8 @@ export type AgentDirectoryAgentRow = {
   pausedBy?: "usage-limit" | "claude-sign-in";
   /** It ended its turn waiting for this, with no report; a message resumes it. */
   waitingFor?: string;
+  /** Running, and on one tool call past every time limit (`LONG_TOOL_CALL_MS`). */
+  longCall?: CurrentToolCall;
 };
 
 export type AgentDirectorySessionRow = {
@@ -106,14 +109,16 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200)
 const claudeSignInStatus = (row: AgentDirectoryAgentRow): string =>
   `waiting for a Claude sign-in on ${row.where} (Anthropic refused the Claude login there; it continues by itself once someone signs in there or the login answers again)`;
 
-const statusText = (row: AgentDirectoryAgentRow): string =>
+const statusText = (row: AgentDirectoryAgentRow, now: number): string =>
   row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status)
     ? USAGE_LIMIT_PAUSED_STATUS
     : row.pausedBy === "claude-sign-in" && isLiveAgentStatus(row.status)
       ? claudeSignInStatus(row)
       : row.status === "waiting" && row.waitingFor
         ? `waiting for ${oneLine(row.waitingFor)}`
-        : row.status;
+        : row.status === "running" && row.longCall
+          ? `running, ${longToolCallText(row.longCall, now)}`
+          : row.status;
 
 const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
 
@@ -129,7 +134,7 @@ const rosterLine = (
       ? `${row.status}, computer offline`
       : row.awaitingConsent && row.pausedBy === undefined
         ? "waiting for consent on that computer"
-        : statusText(row),
+        : statusText(row, now),
     ...placeOf(row.where),
     `last active ${formatAge(row.updatedAt, now)}`,
     ...(options?.startedYou
@@ -177,7 +182,7 @@ export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now(
   return {
     thread_id: row.threadId,
     description: row.description,
-    status: statusText(row),
+    status: statusText(row, now),
     where: row.where,
     last_active: formatAge(row.updatedAt, now),
     started_by: row.parentThreadId ?? STELLA_MESSAGE_TARGET,

@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Toiminta",
+        "longCall": "{minutes} min yhdessä vaiheessa",
         "openActivity": "{label} — avaa toiminta",
         "statusCanceled": "Pysäytetty",
         "statusDone": "Valmis",

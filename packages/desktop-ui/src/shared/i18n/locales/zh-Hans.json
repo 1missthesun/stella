@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "活动",
+        "longCall": "在同一步骤上已 {minutes} 分钟",
         "openActivity": "{label} — 打开活动",
         "statusCanceled": "已停止",
         "statusDone": "已完成",

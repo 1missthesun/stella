@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "활동",
+        "longCall": "한 단계에서 {minutes}분",
         "openActivity": "{label} — 활동 열기",
         "statusCanceled": "중지됨",
         "statusDone": "완료됨",

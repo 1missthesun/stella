@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Aktivitet",
+        "longCall": "{minutes} min på ét trin",
         "openActivity": "{label} — åbn aktivitet",
         "statusCanceled": "Stoppet",
         "statusDone": "Færdig",

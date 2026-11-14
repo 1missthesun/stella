@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Activitate",
+        "longCall": "{minutes} min la un pas",
         "openActivity": "{label} — deschide activitatea",
         "statusCanceled": "Oprit",
         "statusDone": "Finalizat",

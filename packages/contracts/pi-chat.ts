@@ -1,6 +1,7 @@
 import type { AgentStatus } from "./agent-status.js";
 import type { LocalAgentPause } from "./agent-pause.js";
 import type { ChatContext } from "./index.js";
+import type { CurrentToolCall } from "./long-tool-call.js";
 import { parseAgentReportEnvelope, type AgentReportEnvelope } from "./agent-wake-prompt.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
 import { isSafeguardBlock, SAFEGUARD_TERMINAL_NOTICE, type SafeguardAction, type SafeguardNotice } from "./safeguard-block.js";
@@ -251,6 +252,8 @@ export type PiChatAgent = {
   agentStatus?: AgentStatus;
   waitingFor?: string;
   paused?: LocalAgentPause;
+  /** Running, and on one tool call past every time limit. */
+  longCall?: CurrentToolCall;
 };
 
 export type PiChatAgentsResult = { agents: PiChatAgent[] };

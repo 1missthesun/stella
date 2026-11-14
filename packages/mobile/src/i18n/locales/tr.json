@@ -18,6 +18,7 @@
     "chat": {
       "activityPill": {
         "idle": "Etkinlik",
+        "longCall": "Tek adımda {minutes} dk",
         "openActivity": "{label} — etkinliği aç",
         "statusCanceled": "Durduruldu",
         "statusDone": "Tamamlandı",

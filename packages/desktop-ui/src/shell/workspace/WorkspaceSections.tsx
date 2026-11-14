@@ -20,6 +20,7 @@ import {
   type ScheduleEntry,
 } from "@/global/schedule/use-conversation-schedules";
 import { formatNextRun } from "@stella/contracts/schedule-format";
+import { toolCallMinutes } from "@stella/contracts/long-tool-call";
 import { matchesQuery } from "@/features/workspace-display/display-search-store";
 import {
   sectionCollapseStore,
@@ -306,7 +307,9 @@ const TaskRow = memo(function TaskRow({
           ? `${label} — ${agentPauseLabel(task.paused)}`
           : waiting && task.statusText
             ? `${label} — ${task.statusText}`
-            : label
+            : task.longCall && metaText
+              ? `${label} — ${metaText}`
+              : label
       }
       data-continuous-animation={compactMotionActive ? "true" : undefined}
     >
@@ -553,7 +556,11 @@ const TasksList = memo(function TasksList({
                 metaText={
                   row.task.waitingFor && !getActivityRowPause(row)
                     ? t("app.chat.activityPill.statusWaiting")
-                    : undefined
+                    : row.task.longCall && !getActivityRowPause(row)
+                      ? t("app.chat.activityPill.longCall", {
+                          minutes: toolCallMinutes(row.task.longCall),
+                        })
+                      : undefined
                 }
               />
             ) : (

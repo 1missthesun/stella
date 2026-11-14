@@ -253,6 +253,7 @@ export const mergeCloudConversationTasks = (
       ...(paused ? { paused } : {}),
       ...(overlay.statusText ? { statusText: overlay.statusText } : {}),
       ...(waitingFor ? { waitingFor, statusText: `Waiting for ${waitingFor}` } : {}),
+      ...(!waitingFor && !paused && overlay.longCall ? { longCall: overlay.longCall } : {}),
       ...(overlay.reasoningText
         ? { reasoningText: overlay.reasoningText }
         : {}),

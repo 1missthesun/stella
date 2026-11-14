@@ -7,6 +7,7 @@ import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicato
 import { topLevelAgentActivity } from "@stella/contracts/agent-ledger"
 import { localAgentPause, type AgentPause } from "@stella/contracts/agent-pause"
 import { normalizeDisplayStatusText } from '@stella/contracts/working-status'
+import type { CurrentToolCall } from '@stella/contracts/long-tool-call'
 import type {
   Attachment,
   ChannelEnvelope,
@@ -104,6 +105,8 @@ export type TaskItem = {
   paused?: AgentPause
   /** A helper of this top-level task runs now. */
   helpersWorking?: boolean
+  /** Running, and on one tool call past every time limit. */
+  longCall?: CurrentToolCall
 }
 
 export type TaskLiveDecoration = {
@@ -156,6 +159,10 @@ export function buildActivityTasks(
         running && !waitingFor && !latestAttemptSupersedesAuthoritative(authoritative, latestAttempt)
           ? localAgentPause(record.paused)
           : undefined
+      const longCall =
+        running && !waitingFor && !paused && !latestAttemptSupersedesAuthoritative(authoritative, latestAttempt)
+          ? record.longCall
+          : undefined
       const latestAttemptOwns = latestAttemptSupersedesAuthoritative(
         authoritative,
         latestAttempt,
@@ -181,6 +188,7 @@ export function buildActivityTasks(
         parentAgentId: record.parentAgentId,
         ...(waitingFor ? { waitingFor } : {}),
         ...(paused ? { paused } : {}),
+        ...(longCall ? { longCall } : {}),
         statusText: waitingFor
           ? `Waiting for ${waitingFor}`
           : running

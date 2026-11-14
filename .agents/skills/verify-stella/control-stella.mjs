@@ -555,18 +555,7 @@ const homeJail = (run, env) => {
     const relative = path.relative(realStella, candidate);
     return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
   };
-  if (process.env.STELLA_VERIFY_FULL_HOME_JAIL === "1" && run.homeDir) {
-    // LOCAL ONLY (not for commit): proof-run variant from how-runs.
-    const tools = [repoRoot, ".local/share/mise", ".local/state/mise", ".config/mise", ".local/share/stella", ".local/share/uv", ".bun", ".cargo", ".rustup", ".cache"]
-      .map((entry) => (path.isAbsolute(entry) ? entry : path.join(realHome, entry)))
-      .filter((entry) => existsSync(entry));
-    const full = ["--dev-bind", "/", "/", "--bind", run.homeDir, realHome];
-    for (const entry of tools) full.push("--bind", entry, entry);
-    const probeFull = spawnSync(bwrap, [...full, "true"], { encoding: "utf8", timeout: 10_000 });
-    if (probeFull.status !== 0) return { prefix: [], status: `bwrap (full) failed: ${(probeFull.stderr || "").trim()}` };
-    return { prefix: [bwrap, ...full], status: "on (full home)" };
-  }
-  const keep =[...new Set([repoRoot, run.runDir, run.userDataDir, env.TMPDIR].filter(Boolean).map((entry) => path.resolve(entry)))]
+  const keep = [...new Set([repoRoot, run.runDir, run.userDataDir, env.TMPDIR].filter(Boolean).map((entry) => path.resolve(entry)))]
     .filter((entry) => inside(entry) && existsSync(entry));
   const args = ["--dev-bind", "/", "/", "--bind", run.dataDir, realStella];
   for (const entry of keep) args.push("--bind", entry, entry);

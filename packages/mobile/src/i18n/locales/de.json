@@ -3393,6 +3393,63 @@
           "one": "Jeden Tag",
           "other": "Alle {count} Tage"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} Aufgabe geplant",
+              "other": "{count} Aufgaben geplant"
+            },
+            "reminder": {
+              "one": "{count} Erinnerung gesetzt",
+              "other": "{count} Erinnerungen gesetzt"
+            },
+            "watch": {
+              "one": "{count} Überwachung eingerichtet",
+              "other": "{count} Überwachungen eingerichtet"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} Aufgabe geändert",
+              "other": "{count} Aufgaben geändert"
+            },
+            "reminder": {
+              "one": "{count} Erinnerung geändert",
+              "other": "{count} Erinnerungen geändert"
+            },
+            "watch": {
+              "one": "{count} Überwachung geändert",
+              "other": "{count} Überwachungen geändert"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} Aufgabe entfernt",
+              "other": "{count} Aufgaben entfernt"
+            },
+            "reminder": {
+              "one": "{count} Erinnerung entfernt",
+              "other": "{count} Erinnerungen entfernt"
+            },
+            "watch": {
+              "one": "{count} Überwachung entfernt",
+              "other": "{count} Überwachungen entfernt"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} Ausführung",
+          "other": "{count} Ausführungen"
+        },
+        "undone": "Geplant, dann entfernt",
+        "fromAgents": {
+          "one": "Für eine Hintergrundaufgabe",
+          "other": "Für {count} Hintergrundaufgaben"
+        },
+        "showAll": "Alle anzeigen",
+        "showLess": "Weniger anzeigen"
       }
     }
   },

@@ -3414,6 +3414,74 @@
           "two": "כל יומיים",
           "other": "כל {count} ימים"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "משימה {count} תוזמנה",
+              "two": "{count} משימות תוזמנו",
+              "other": "{count} משימות תוזמנו"
+            },
+            "reminder": {
+              "one": "תזכורת {count} הוגדרה",
+              "two": "{count} תזכורות הוגדרו",
+              "other": "{count} תזכורות הוגדרו"
+            },
+            "watch": {
+              "one": "מעקב {count} הוגדר",
+              "two": "{count} מעקבים הוגדרו",
+              "other": "{count} מעקבים הוגדרו"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "משימה {count} שונתה",
+              "two": "{count} משימות שונו",
+              "other": "{count} משימות שונו"
+            },
+            "reminder": {
+              "one": "תזכורת {count} שונתה",
+              "two": "{count} תזכורות שונו",
+              "other": "{count} תזכורות שונו"
+            },
+            "watch": {
+              "one": "מעקב {count} שונה",
+              "two": "{count} מעקבים שונו",
+              "other": "{count} מעקבים שונו"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "משימה {count} הוסרה",
+              "two": "{count} משימות הוסרו",
+              "other": "{count} משימות הוסרו"
+            },
+            "reminder": {
+              "one": "תזכורת {count} הוסרה",
+              "two": "{count} תזכורות הוסרו",
+              "other": "{count} תזכורות הוסרו"
+            },
+            "watch": {
+              "one": "מעקב {count} הוסר",
+              "two": "{count} מעקבים הוסרו",
+              "other": "{count} מעקבים הוסרו"
+            }
+          }
+        },
+        "runs": {
+          "one": "הרצה אחת",
+          "two": "{count} הרצות",
+          "other": "{count} הרצות"
+        },
+        "undone": "תוזמנה ואז הוסרה",
+        "fromAgents": {
+          "one": "עבור משימת רקע",
+          "two": "עבור {count} משימות רקע",
+          "other": "עבור {count} משימות רקע"
+        },
+        "showAll": "הצג הכול",
+        "showLess": "הצג פחות"
       }
     }
   },

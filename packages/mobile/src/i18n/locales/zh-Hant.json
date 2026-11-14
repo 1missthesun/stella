@@ -3370,6 +3370,52 @@
         "everyDays": {
           "other": "每 {count} 天"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "other": "已排定 {count} 個任務"
+            },
+            "reminder": {
+              "other": "已設定 {count} 個提醒"
+            },
+            "watch": {
+              "other": "已設定 {count} 個監看"
+            }
+          },
+          "updated": {
+            "task": {
+              "other": "已變更 {count} 個任務"
+            },
+            "reminder": {
+              "other": "已變更 {count} 個提醒"
+            },
+            "watch": {
+              "other": "已變更 {count} 個監看"
+            }
+          },
+          "removed": {
+            "task": {
+              "other": "已移除 {count} 個任務"
+            },
+            "reminder": {
+              "other": "已移除 {count} 個提醒"
+            },
+            "watch": {
+              "other": "已移除 {count} 個監看"
+            }
+          }
+        },
+        "runs": {
+          "other": "{count} 次執行"
+        },
+        "undone": "已排定，之後移除",
+        "fromAgents": {
+          "other": "用於 {count} 個背景任務"
+        },
+        "showAll": "全部顯示",
+        "showLess": "收合"
       }
     }
   },

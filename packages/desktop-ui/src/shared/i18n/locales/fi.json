@@ -3393,6 +3393,63 @@
           "one": "Joka päivä",
           "other": "{count} päivän välein"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} tehtävä ajastettu",
+              "other": "{count} tehtävää ajastettu"
+            },
+            "reminder": {
+              "one": "{count} muistutus asetettu",
+              "other": "{count} muistutusta asetettu"
+            },
+            "watch": {
+              "one": "{count} seuranta luotu",
+              "other": "{count} seurantaa luotu"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} tehtävä muutettu",
+              "other": "{count} tehtävää muutettu"
+            },
+            "reminder": {
+              "one": "{count} muistutus muutettu",
+              "other": "{count} muistutusta muutettu"
+            },
+            "watch": {
+              "one": "{count} seuranta muutettu",
+              "other": "{count} seurantaa muutettu"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} tehtävä poistettu",
+              "other": "{count} tehtävää poistettu"
+            },
+            "reminder": {
+              "one": "{count} muistutus poistettu",
+              "other": "{count} muistutusta poistettu"
+            },
+            "watch": {
+              "one": "{count} seuranta poistettu",
+              "other": "{count} seurantaa poistettu"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} ajo",
+          "other": "{count} ajoa"
+        },
+        "undone": "Ajastettu ja sitten poistettu",
+        "fromAgents": {
+          "one": "Taustatehtävälle",
+          "other": "{count} taustatehtävälle"
+        },
+        "showAll": "Näytä kaikki",
+        "showLess": "Näytä vähemmän"
       }
     }
   },

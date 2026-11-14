@@ -3370,6 +3370,52 @@
         "everyDays": {
           "other": "Setiap {count} hari"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "other": "{count} tugas dijadwalkan"
+            },
+            "reminder": {
+              "other": "{count} pengingat dipasang"
+            },
+            "watch": {
+              "other": "{count} pemantauan disiapkan"
+            }
+          },
+          "updated": {
+            "task": {
+              "other": "{count} tugas diubah"
+            },
+            "reminder": {
+              "other": "{count} pengingat diubah"
+            },
+            "watch": {
+              "other": "{count} pemantauan diubah"
+            }
+          },
+          "removed": {
+            "task": {
+              "other": "{count} tugas dihapus"
+            },
+            "reminder": {
+              "other": "{count} pengingat dihapus"
+            },
+            "watch": {
+              "other": "{count} pemantauan dihapus"
+            }
+          }
+        },
+        "runs": {
+          "other": "{count} kali jalan"
+        },
+        "undone": "Dijadwalkan, lalu dihapus",
+        "fromAgents": {
+          "other": "Untuk {count} tugas latar belakang"
+        },
+        "showAll": "Tampilkan semua",
+        "showLess": "Tampilkan lebih sedikit"
       }
     }
   },

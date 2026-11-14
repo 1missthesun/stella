@@ -77,6 +77,8 @@ export type AssistantRowViewModel = {
   voiceSession?: VoiceSessionSummaryMetadata;
   reminder?: ReminderMark;
   scheduleNotice?: ScheduleNoticeCard;
+  /** Consecutive schedule notices shown as one card; starts with `scheduleNotice`. */
+  scheduleNoticeRun?: ScheduleNoticeCard[];
   toolActivity?: ToolActivityGroup;
   backgroundWork?: {
     threadIds: string[];

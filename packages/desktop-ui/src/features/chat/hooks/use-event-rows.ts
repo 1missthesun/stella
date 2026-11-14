@@ -1,4 +1,4 @@
-import { assistantRowHasOwnContent } from "../lib/assistant-row-content";
+import { assistantRowHasOwnContent, eventRowRendersContent } from "../lib/assistant-row-content";
 import { withReplyContext } from "../lib/reply-context";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import {
@@ -491,6 +491,45 @@ const coalesceVoiceSessionRows = (
       continue;
     }
     out.push(row);
+  }
+  return out;
+};
+
+const isScheduleNoticeOnlyRow = (row: EventRowViewModel): row is AssistantRowViewModel =>
+  row.kind === "assistant" &&
+  Boolean(row.scheduleNotice) &&
+  row.text.trim().length === 0 &&
+  !row.backgroundWork &&
+  !row.agentCompletion?.sections.length &&
+  !row.askRecords?.length &&
+  !row.reminder;
+
+/**
+ * Schedule notices in a row (nothing visible between them) become one row
+ * holding the whole run, keyed by its first notice so it stays put as more
+ * arrive. Rows that draw nothing don't break a run.
+ */
+const coalesceScheduleNoticeRows = (
+  rows: EventRowViewModel[],
+): EventRowViewModel[] => {
+  const out: EventRowViewModel[] = [];
+  let lastVisible = -1;
+  for (const row of rows) {
+    if (isScheduleNoticeOnlyRow(row)) {
+      const head = lastVisible >= 0 ? out[lastVisible] : undefined;
+      if (head && isScheduleNoticeOnlyRow(head)) {
+        out[lastVisible] = {
+          ...head,
+          scheduleNoticeRun: [
+            ...(head.scheduleNoticeRun ?? [head.scheduleNotice!]),
+            row.scheduleNotice!,
+          ],
+        };
+        continue;
+      }
+    }
+    out.push(row);
+    if (eventRowRendersContent(row)) lastVisible = out.length - 1;
   }
   return out;
 };
@@ -1030,7 +1069,9 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
     const visible = deduped;
 
     return withReplyContext(
-      coalesceVoiceSessionRows(coalesceInlineImageRows(visible)),
+      coalesceScheduleNoticeRows(
+        coalesceVoiceSessionRows(coalesceInlineImageRows(visible)),
+      ),
       { agentTitles, agentParents },
     );
   }, [agentParents, agentTitles, developerResourcePreviewsEnabled, displayMessages, lifecycleIndex]);

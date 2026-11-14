@@ -3435,6 +3435,85 @@
           "many": "Co {count} dni",
           "other": "Co {count} dnia"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} zadanie zaplanowane",
+              "few": "{count} zadania zaplanowane",
+              "many": "{count} zadań zaplanowanych",
+              "other": "{count} zadania zaplanowanego"
+            },
+            "reminder": {
+              "one": "{count} przypomnienie ustawione",
+              "few": "{count} przypomnienia ustawione",
+              "many": "{count} przypomnień ustawionych",
+              "other": "{count} przypomnienia ustawionego"
+            },
+            "watch": {
+              "one": "{count} obserwacja ustawiona",
+              "few": "{count} obserwacje ustawione",
+              "many": "{count} obserwacji ustawionych",
+              "other": "{count} obserwacji ustawionej"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} zadanie zmienione",
+              "few": "{count} zadania zmienione",
+              "many": "{count} zadań zmienionych",
+              "other": "{count} zadania zmienionego"
+            },
+            "reminder": {
+              "one": "{count} przypomnienie zmienione",
+              "few": "{count} przypomnienia zmienione",
+              "many": "{count} przypomnień zmienionych",
+              "other": "{count} przypomnienia zmienionego"
+            },
+            "watch": {
+              "one": "{count} obserwacja zmieniona",
+              "few": "{count} obserwacje zmienione",
+              "many": "{count} obserwacji zmienionych",
+              "other": "{count} obserwacji zmienionej"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} zadanie usunięte",
+              "few": "{count} zadania usunięte",
+              "many": "{count} zadań usuniętych",
+              "other": "{count} zadania usuniętego"
+            },
+            "reminder": {
+              "one": "{count} przypomnienie usunięte",
+              "few": "{count} przypomnienia usunięte",
+              "many": "{count} przypomnień usuniętych",
+              "other": "{count} przypomnienia usuniętego"
+            },
+            "watch": {
+              "one": "{count} obserwacja usunięta",
+              "few": "{count} obserwacje usunięte",
+              "many": "{count} obserwacji usuniętych",
+              "other": "{count} obserwacji usuniętej"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} uruchomienie",
+          "few": "{count} uruchomienia",
+          "many": "{count} uruchomień",
+          "other": "{count} uruchomienia"
+        },
+        "undone": "Zaplanowane, potem usunięte",
+        "fromAgents": {
+          "one": "Dla zadania w tle",
+          "few": "Dla {count} zadań w tle",
+          "many": "Dla {count} zadań w tle",
+          "other": "Dla {count} zadania w tle"
+        },
+        "showAll": "Pokaż wszystko",
+        "showLess": "Pokaż mniej"
       }
     }
   },

@@ -29,6 +29,8 @@ export type ScheduleNoticeCard = {
   nextRunAt?: number;
   /** A reminder's own words, when they differ from its name. */
   message?: string;
+  /** The agent thread a task or watch wakes, when it isn't the user's chat: a background task's own follow-up. */
+  threadId?: string;
 };
 
 const ACTIONS: readonly ScheduleNoticeAction[] = ["created", "updated", "paused", "resumed", "removed", "waiting"];
@@ -75,6 +77,7 @@ export const parseScheduleNoticeCard = (value: unknown): ScheduleNoticeCard | nu
   const zone = nonEmpty(raw.zone);
   const nextRunAt = finite(raw.nextRunAt);
   const message = nonEmpty(raw.message);
+  const threadId = kind === "reminder" ? null : nonEmpty(raw.threadId);
   return {
     type: SCHEDULE_NOTICE_CARD_TYPE,
     action,
@@ -85,6 +88,7 @@ export const parseScheduleNoticeCard = (value: unknown): ScheduleNoticeCard | nu
     ...(zone ? { zone } : {}),
     ...(nextRunAt !== undefined ? { nextRunAt } : {}),
     ...(message ? { message } : {}),
+    ...(threadId ? { threadId } : {}),
   };
 };
 

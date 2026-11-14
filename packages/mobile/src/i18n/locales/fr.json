@@ -3414,6 +3414,74 @@
           "many": "Tous les {count} jours",
           "other": "Tous les {count} jours"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} tâche planifiée",
+              "many": "{count} tâches planifiées",
+              "other": "{count} tâches planifiées"
+            },
+            "reminder": {
+              "one": "{count} rappel créé",
+              "many": "{count} rappels créés",
+              "other": "{count} rappels créés"
+            },
+            "watch": {
+              "one": "{count} surveillance configurée",
+              "many": "{count} surveillances configurées",
+              "other": "{count} surveillances configurées"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} tâche modifiée",
+              "many": "{count} tâches modifiées",
+              "other": "{count} tâches modifiées"
+            },
+            "reminder": {
+              "one": "{count} rappel modifié",
+              "many": "{count} rappels modifiés",
+              "other": "{count} rappels modifiés"
+            },
+            "watch": {
+              "one": "{count} surveillance modifiée",
+              "many": "{count} surveillances modifiées",
+              "other": "{count} surveillances modifiées"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} tâche supprimée",
+              "many": "{count} tâches supprimées",
+              "other": "{count} tâches supprimées"
+            },
+            "reminder": {
+              "one": "{count} rappel supprimé",
+              "many": "{count} rappels supprimés",
+              "other": "{count} rappels supprimés"
+            },
+            "watch": {
+              "one": "{count} surveillance supprimée",
+              "many": "{count} surveillances supprimées",
+              "other": "{count} surveillances supprimées"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} exécution",
+          "many": "{count} exécutions",
+          "other": "{count} exécutions"
+        },
+        "undone": "Planifiée, puis supprimée",
+        "fromAgents": {
+          "one": "Pour une tâche en arrière-plan",
+          "many": "Pour {count} tâches en arrière-plan",
+          "other": "Pour {count} tâches en arrière-plan"
+        },
+        "showAll": "Tout afficher",
+        "showLess": "Afficher moins"
       }
     }
   },

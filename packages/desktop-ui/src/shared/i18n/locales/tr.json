@@ -3393,6 +3393,63 @@
           "one": "Her gün",
           "other": "{count} günde bir"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} görev planlandı",
+              "other": "{count} görev planlandı"
+            },
+            "reminder": {
+              "one": "{count} anımsatıcı kuruldu",
+              "other": "{count} anımsatıcı kuruldu"
+            },
+            "watch": {
+              "one": "{count} izleme kuruldu",
+              "other": "{count} izleme kuruldu"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} görev değişti",
+              "other": "{count} görev değişti"
+            },
+            "reminder": {
+              "one": "{count} anımsatıcı değişti",
+              "other": "{count} anımsatıcı değişti"
+            },
+            "watch": {
+              "one": "{count} izleme değişti",
+              "other": "{count} izleme değişti"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} görev kaldırıldı",
+              "other": "{count} görev kaldırıldı"
+            },
+            "reminder": {
+              "one": "{count} anımsatıcı kaldırıldı",
+              "other": "{count} anımsatıcı kaldırıldı"
+            },
+            "watch": {
+              "one": "{count} izleme kaldırıldı",
+              "other": "{count} izleme kaldırıldı"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} çalıştırma",
+          "other": "{count} çalıştırma"
+        },
+        "undone": "Planlandı, sonra kaldırıldı",
+        "fromAgents": {
+          "one": "Bir arka plan görevi için",
+          "other": "{count} arka plan görevi için"
+        },
+        "showAll": "Tümünü göster",
+        "showLess": "Daha az göster"
       }
     }
   },

@@ -168,6 +168,8 @@ export type ChatMessage = {
   askRecords?: readonly UserAskRecord[];
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };
   scheduleNotice?: import("@stella/contracts/schedule-notice").ScheduleNoticeCard;
+  /** Schedule notices that arrived in a row, shown as one card; starts with `scheduleNotice`. */
+  scheduleNoticeRun?: readonly import("@stella/contracts/schedule-notice").ScheduleNoticeCard[];
   replyRefs?: ReplyRef[];
   reaction?: string;
   reactionAt?: number;

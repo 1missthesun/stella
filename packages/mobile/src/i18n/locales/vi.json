@@ -3370,6 +3370,52 @@
         "everyDays": {
           "other": "Mỗi {count} ngày"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "other": "Đã lên lịch {count} tác vụ"
+            },
+            "reminder": {
+              "other": "Đã đặt {count} lời nhắc"
+            },
+            "watch": {
+              "other": "Đã thiết lập {count} theo dõi"
+            }
+          },
+          "updated": {
+            "task": {
+              "other": "Đã đổi {count} tác vụ"
+            },
+            "reminder": {
+              "other": "Đã đổi {count} lời nhắc"
+            },
+            "watch": {
+              "other": "Đã đổi {count} theo dõi"
+            }
+          },
+          "removed": {
+            "task": {
+              "other": "Đã xóa {count} tác vụ"
+            },
+            "reminder": {
+              "other": "Đã xóa {count} lời nhắc"
+            },
+            "watch": {
+              "other": "Đã xóa {count} theo dõi"
+            }
+          }
+        },
+        "runs": {
+          "other": "{count} lần chạy"
+        },
+        "undone": "Đã lên lịch rồi xóa",
+        "fromAgents": {
+          "other": "Cho {count} tác vụ nền"
+        },
+        "showAll": "Hiện tất cả",
+        "showLess": "Thu gọn"
       }
     }
   },

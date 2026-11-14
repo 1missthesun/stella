@@ -70,18 +70,37 @@ const hiddenWithContext = (
   );
 };
 
+const isScheduleNoticeOnly = (message: ChatMessage): boolean =>
+  message.role !== "user" &&
+  Boolean(message.scheduleNotice) &&
+  !messageHasText(message) &&
+  (message.askRecords?.length ?? 0) === 0;
+
+/**
+ * Adds a visible row to the list, folding a schedule notice into the run of
+ * notices right before it: the run is one row, keyed by its first notice.
+ */
+const pushVisible = (visible: ChatMessage[], message: ChatMessage): void => {
+  const head = visible[visible.length - 1];
+  if (head && isScheduleNoticeOnly(message) && isScheduleNoticeOnly(head)) {
+    visible[visible.length - 1] = {
+      ...head,
+      scheduleNoticeRun: [...(head.scheduleNoticeRun ?? [head.scheduleNotice!]), message.scheduleNotice!],
+    };
+    return;
+  }
+  visible.push(message);
+};
+
 export const visibleChatMessages = (
   messages: ChatMessage[],
   options: VisibleOptions = {},
 ): ChatMessage[] => {
-  const isHidden = (message: ChatMessage) => hiddenVerdict(message, options).hidden;
-  const firstHidden = messages.findIndex(isHidden);
-  if (firstHidden === -1) return messages;
-  const visible = messages.slice(0, firstHidden);
-  for (let i = firstHidden + 1; i < messages.length; i += 1) {
-    if (!isHidden(messages[i])) visible.push(messages[i]);
+  const visible: ChatMessage[] = [];
+  for (const message of messages) {
+    if (!hiddenVerdict(message, options).hidden) pushVisible(visible, message);
   }
-  return visible;
+  return visible.length === messages.length ? messages : visible;
 };
 
 /**
@@ -97,6 +116,8 @@ export const createVisibleChatMessages = () => {
     consulted: number[];
     contextAt: Map<number, { kind: string } | undefined>;
     visibleBefore: number[];
+    /** The last visible row after each message: a notice run grows in place. */
+    tailBefore: (ChatMessage | undefined)[];
     visible: ChatMessage[];
   } | null = null;
   return (messages: ChatMessage[], options: VisibleOptions = {}): ChatMessage[] => {
@@ -128,7 +149,9 @@ export const createVisibleChatMessages = () => {
       }
     }
     const visibleBefore = previous ? previous.visibleBefore.slice(0, kept + 1) : [0];
+    const tailBefore = previous ? previous.tailBefore.slice(0, kept + 1) : [undefined];
     const visible = previous ? previous.visible.slice(0, visibleBefore[kept]) : [];
+    if (visible.length > 0) visible[visible.length - 1] = tailBefore[kept]!;
     for (let at = kept; at < messages.length; at += 1) {
       const message = messages[at]!;
       const verdict = hiddenVerdict(message, options);
@@ -136,8 +159,9 @@ export const createVisibleChatMessages = () => {
         consulted.push(at);
         contextAt.set(at, verdict.context);
       }
-      if (!verdict.hidden) visible.push(message);
+      if (!verdict.hidden) pushVisible(visible, message);
       visibleBefore.push(visible.length);
+      tailBefore.push(visible[visible.length - 1]);
     }
     const result = visible.length === messages.length ? messages : visible;
     previous = {
@@ -147,6 +171,7 @@ export const createVisibleChatMessages = () => {
       consulted,
       contextAt,
       visibleBefore,
+      tailBefore,
       visible: result,
     };
     return result;

@@ -3370,6 +3370,52 @@
         "everyDays": {
           "other": "{count}日ごと"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "other": "{count}件のタスクを予定しました"
+            },
+            "reminder": {
+              "other": "{count}件のリマインダーを設定しました"
+            },
+            "watch": {
+              "other": "{count}件の監視を設定しました"
+            }
+          },
+          "updated": {
+            "task": {
+              "other": "{count}件のタスクを変更しました"
+            },
+            "reminder": {
+              "other": "{count}件のリマインダーを変更しました"
+            },
+            "watch": {
+              "other": "{count}件の監視を変更しました"
+            }
+          },
+          "removed": {
+            "task": {
+              "other": "{count}件のタスクを削除しました"
+            },
+            "reminder": {
+              "other": "{count}件のリマインダーを削除しました"
+            },
+            "watch": {
+              "other": "{count}件の監視を削除しました"
+            }
+          }
+        },
+        "runs": {
+          "other": "{count}回"
+        },
+        "undone": "予定したあと削除",
+        "fromAgents": {
+          "other": "{count}件のバックグラウンドタスク用"
+        },
+        "showAll": "すべて表示",
+        "showLess": "閉じる"
       }
     }
   },

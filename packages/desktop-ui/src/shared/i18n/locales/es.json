@@ -3414,6 +3414,74 @@
           "many": "Cada {count} días",
           "other": "Cada {count} días"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} tarea programada",
+              "many": "{count} tareas programadas",
+              "other": "{count} tareas programadas"
+            },
+            "reminder": {
+              "one": "{count} recordatorio creado",
+              "many": "{count} recordatorios creados",
+              "other": "{count} recordatorios creados"
+            },
+            "watch": {
+              "one": "{count} vigilancia configurada",
+              "many": "{count} vigilancias configuradas",
+              "other": "{count} vigilancias configuradas"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} tarea modificada",
+              "many": "{count} tareas modificadas",
+              "other": "{count} tareas modificadas"
+            },
+            "reminder": {
+              "one": "{count} recordatorio modificado",
+              "many": "{count} recordatorios modificados",
+              "other": "{count} recordatorios modificados"
+            },
+            "watch": {
+              "one": "{count} vigilancia modificada",
+              "many": "{count} vigilancias modificadas",
+              "other": "{count} vigilancias modificadas"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} tarea eliminada",
+              "many": "{count} tareas eliminadas",
+              "other": "{count} tareas eliminadas"
+            },
+            "reminder": {
+              "one": "{count} recordatorio eliminado",
+              "many": "{count} recordatorios eliminados",
+              "other": "{count} recordatorios eliminados"
+            },
+            "watch": {
+              "one": "{count} vigilancia eliminada",
+              "many": "{count} vigilancias eliminadas",
+              "other": "{count} vigilancias eliminadas"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} ejecución",
+          "many": "{count} ejecuciones",
+          "other": "{count} ejecuciones"
+        },
+        "undone": "Programada y luego eliminada",
+        "fromAgents": {
+          "one": "Para una tarea en segundo plano",
+          "many": "Para {count} tareas en segundo plano",
+          "other": "Para {count} tareas en segundo plano"
+        },
+        "showAll": "Ver todo",
+        "showLess": "Ver menos"
       }
     }
   },

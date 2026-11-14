@@ -3393,6 +3393,63 @@
           "one": "Hver dag",
           "other": "Hver {count}. dag"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} oppgave planlagt",
+              "other": "{count} oppgaver planlagt"
+            },
+            "reminder": {
+              "one": "{count} påminnelse satt",
+              "other": "{count} påminnelser satt"
+            },
+            "watch": {
+              "one": "{count} overvåking satt opp",
+              "other": "{count} overvåkinger satt opp"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} oppgave endret",
+              "other": "{count} oppgaver endret"
+            },
+            "reminder": {
+              "one": "{count} påminnelse endret",
+              "other": "{count} påminnelser endret"
+            },
+            "watch": {
+              "one": "{count} overvåking endret",
+              "other": "{count} overvåkinger endret"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} oppgave fjernet",
+              "other": "{count} oppgaver fjernet"
+            },
+            "reminder": {
+              "one": "{count} påminnelse fjernet",
+              "other": "{count} påminnelser fjernet"
+            },
+            "watch": {
+              "one": "{count} overvåking fjernet",
+              "other": "{count} overvåkinger fjernet"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} kjøring",
+          "other": "{count} kjøringer"
+        },
+        "undone": "Planlagt, så fjernet",
+        "fromAgents": {
+          "one": "For en bakgrunnsoppgave",
+          "other": "For {count} bakgrunnsoppgaver"
+        },
+        "showAll": "Vis alle",
+        "showLess": "Vis færre"
       }
     }
   },

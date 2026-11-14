@@ -3393,6 +3393,63 @@
           "one": "Varje dag",
           "other": "Var {count}:e dag"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} uppgift schemalagd",
+              "other": "{count} uppgifter schemalagda"
+            },
+            "reminder": {
+              "one": "{count} påminnelse inställd",
+              "other": "{count} påminnelser inställda"
+            },
+            "watch": {
+              "one": "{count} bevakning skapad",
+              "other": "{count} bevakningar skapade"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} uppgift ändrad",
+              "other": "{count} uppgifter ändrade"
+            },
+            "reminder": {
+              "one": "{count} påminnelse ändrad",
+              "other": "{count} påminnelser ändrade"
+            },
+            "watch": {
+              "one": "{count} bevakning ändrad",
+              "other": "{count} bevakningar ändrade"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} uppgift borttagen",
+              "other": "{count} uppgifter borttagna"
+            },
+            "reminder": {
+              "one": "{count} påminnelse borttagen",
+              "other": "{count} påminnelser borttagna"
+            },
+            "watch": {
+              "one": "{count} bevakning borttagen",
+              "other": "{count} bevakningar borttagna"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} körning",
+          "other": "{count} körningar"
+        },
+        "undone": "Schemalagd och sedan borttagen",
+        "fromAgents": {
+          "one": "För en bakgrundsuppgift",
+          "other": "För {count} bakgrundsuppgifter"
+        },
+        "showAll": "Visa alla",
+        "showLess": "Visa färre"
       }
     }
   },

@@ -3370,6 +3370,52 @@
         "everyDays": {
           "other": "ทุก {count} วัน"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "other": "กำหนดเวลางาน {count} รายการแล้ว"
+            },
+            "reminder": {
+              "other": "ตั้งการเตือน {count} รายการแล้ว"
+            },
+            "watch": {
+              "other": "ตั้งการเฝ้าดู {count} รายการแล้ว"
+            }
+          },
+          "updated": {
+            "task": {
+              "other": "เปลี่ยนงาน {count} รายการแล้ว"
+            },
+            "reminder": {
+              "other": "เปลี่ยนการเตือน {count} รายการแล้ว"
+            },
+            "watch": {
+              "other": "เปลี่ยนการเฝ้าดู {count} รายการแล้ว"
+            }
+          },
+          "removed": {
+            "task": {
+              "other": "นำงานออก {count} รายการแล้ว"
+            },
+            "reminder": {
+              "other": "นำการเตือนออก {count} รายการแล้ว"
+            },
+            "watch": {
+              "other": "นำการเฝ้าดูออก {count} รายการแล้ว"
+            }
+          }
+        },
+        "runs": {
+          "other": "{count} ครั้ง"
+        },
+        "undone": "กำหนดเวลาแล้วนำออก",
+        "fromAgents": {
+          "other": "สำหรับงานเบื้องหลัง {count} งาน"
+        },
+        "showAll": "แสดงทั้งหมด",
+        "showLess": "แสดงน้อยลง"
       }
     }
   },

@@ -210,3 +210,137 @@ button.schedule-card:focus-visible {
   row-gap: 8px;
   font-size: var(--font-size-base, 13px);
 }
+
+/* A run of schedule notices: one card whose head summarises the run and
+   opens in place to every notice. */
+.schedule-card.schedule-run {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.schedule-run__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 14px 9px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.schedule-card.schedule-run .schedule-run__head:hover {
+  background: color-mix(in oklch, var(--chat-assistant-bubble-fill) 92%, var(--foreground));
+}
+
+.schedule-run__head:focus-visible {
+  outline: 2px solid var(--ring, var(--text-strong));
+  outline-offset: 2px;
+}
+
+.schedule-run__head:hover .schedule-card__button {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.schedule-run__head[data-undone="true"] .schedule-card__headline,
+.schedule-run__item[data-action="removed"] .schedule-run__name {
+  color: var(--text-weak);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklch, var(--text-weak) 60%, transparent);
+}
+
+.schedule-run__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 14px 8px 56px;
+  list-style: none;
+}
+
+.schedule-run__item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-base, 13px);
+  line-height: 18px;
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.schedule-run__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-run__status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-weak);
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-run__item:hover .schedule-run__name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.schedule-run__item:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+/* A background task's own follow-ups: the same lines on the page, without
+   the bubble or the tile's fill. */
+.schedule-run--quiet {
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  max-width: 85%;
+  min-width: 0;
+  color: var(--text-base, inherit);
+}
+
+.schedule-run--quiet .schedule-run__head {
+  gap: 8px;
+  padding: 2px 0;
+  border-radius: var(--radius-md);
+}
+
+.schedule-run--quiet .schedule-card__tile {
+  width: 16px;
+  height: 16px;
+  background: none;
+}
+
+.schedule-run--quiet .schedule-card__headline {
+  color: var(--text-base);
+}
+
+.schedule-run--quiet .schedule-run__head:hover .schedule-card__headline {
+  color: var(--text-strong);
+}
+
+.schedule-run--quiet .schedule-run__list {
+  padding: 2px 0 0 24px;
+}

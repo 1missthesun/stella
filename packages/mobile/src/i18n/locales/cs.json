@@ -3435,6 +3435,85 @@
           "many": "Každých {count} dne",
           "other": "Každých {count} dní"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} úkol naplánován",
+              "few": "{count} úkoly naplánovány",
+              "many": "{count} úkolu naplánováno",
+              "other": "{count} úkolů naplánováno"
+            },
+            "reminder": {
+              "one": "{count} připomínka nastavena",
+              "few": "{count} připomínky nastaveny",
+              "many": "{count} připomínky nastaveno",
+              "other": "{count} připomínek nastaveno"
+            },
+            "watch": {
+              "one": "{count} hlídání nastaveno",
+              "few": "{count} hlídání nastavena",
+              "many": "{count} hlídání nastaveno",
+              "other": "{count} hlídání nastaveno"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} úkol změněn",
+              "few": "{count} úkoly změněny",
+              "many": "{count} úkolu změněno",
+              "other": "{count} úkolů změněno"
+            },
+            "reminder": {
+              "one": "{count} připomínka změněna",
+              "few": "{count} připomínky změněny",
+              "many": "{count} připomínky změněno",
+              "other": "{count} připomínek změněno"
+            },
+            "watch": {
+              "one": "{count} hlídání změněno",
+              "few": "{count} hlídání změněna",
+              "many": "{count} hlídání změněno",
+              "other": "{count} hlídání změněno"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} úkol odstraněn",
+              "few": "{count} úkoly odstraněny",
+              "many": "{count} úkolu odstraněno",
+              "other": "{count} úkolů odstraněno"
+            },
+            "reminder": {
+              "one": "{count} připomínka odstraněna",
+              "few": "{count} připomínky odstraněny",
+              "many": "{count} připomínky odstraněno",
+              "other": "{count} připomínek odstraněno"
+            },
+            "watch": {
+              "one": "{count} hlídání odstraněno",
+              "few": "{count} hlídání odstraněna",
+              "many": "{count} hlídání odstraněno",
+              "other": "{count} hlídání odstraněno"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} spuštění",
+          "few": "{count} spuštění",
+          "many": "{count} spuštění",
+          "other": "{count} spuštění"
+        },
+        "undone": "Naplánováno, pak odstraněno",
+        "fromAgents": {
+          "one": "Pro úkol na pozadí",
+          "few": "Pro {count} úkoly na pozadí",
+          "many": "Pro {count} úkolu na pozadí",
+          "other": "Pro {count} úkolů na pozadí"
+        },
+        "showAll": "Zobrazit vše",
+        "showLess": "Zobrazit méně"
       }
     }
   },

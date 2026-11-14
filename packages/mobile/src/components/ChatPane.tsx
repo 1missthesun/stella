@@ -1,4 +1,5 @@
 import type { ReplyRef } from "@stella/contracts/reply-refs";
+import { isAgentScheduleNotice } from "@stella/contracts/schedule-notice-group";
 import { agentIdsOf, type AgentLabelRow } from "@stella/contracts/agent-labels";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import {
@@ -986,8 +987,13 @@ export function ChatPane({
       setUnread(false);
       return;
     }
-    if (grew && scroll.awayFromBottom) setUnread(true);
-  }, [visibleMessages.length, scroll.awayFromBottom]);
+    const tail = visibleMessages[visibleMessages.length - 1];
+    // A background task's own follow-ups don't call the reader down.
+    const quietTail =
+      tail?.scheduleNotice !== undefined &&
+      (tail.scheduleNoticeRun ?? [tail.scheduleNotice]).every(isAgentScheduleNotice);
+    if (grew && scroll.awayFromBottom && !quietTail) setUnread(true);
+  }, [visibleMessages, scroll.awayFromBottom]);
 
   useEffect(() => {
     if (!scroll.awayFromBottom) setUnread(false);

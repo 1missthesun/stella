@@ -3393,6 +3393,63 @@
           "one": "Hver dag",
           "other": "Hver {count}. dag"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} opgave planlagt",
+              "other": "{count} opgaver planlagt"
+            },
+            "reminder": {
+              "one": "{count} påmindelse sat",
+              "other": "{count} påmindelser sat"
+            },
+            "watch": {
+              "one": "{count} overvågning oprettet",
+              "other": "{count} overvågninger oprettet"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} opgave ændret",
+              "other": "{count} opgaver ændret"
+            },
+            "reminder": {
+              "one": "{count} påmindelse ændret",
+              "other": "{count} påmindelser ændret"
+            },
+            "watch": {
+              "one": "{count} overvågning ændret",
+              "other": "{count} overvågninger ændret"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} opgave fjernet",
+              "other": "{count} opgaver fjernet"
+            },
+            "reminder": {
+              "one": "{count} påmindelse fjernet",
+              "other": "{count} påmindelser fjernet"
+            },
+            "watch": {
+              "one": "{count} overvågning fjernet",
+              "other": "{count} overvågninger fjernet"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} kørsel",
+          "other": "{count} kørsler"
+        },
+        "undone": "Planlagt og derefter fjernet",
+        "fromAgents": {
+          "one": "Til en baggrundsopgave",
+          "other": "Til {count} baggrundsopgaver"
+        },
+        "showAll": "Vis alle",
+        "showLess": "Vis færre"
       }
     }
   },

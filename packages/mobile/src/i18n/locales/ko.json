@@ -3370,6 +3370,52 @@
         "everyDays": {
           "other": "{count}일마다"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "other": "작업 {count}개 예약됨"
+            },
+            "reminder": {
+              "other": "리마인더 {count}개 설정됨"
+            },
+            "watch": {
+              "other": "감시 {count}개 설정됨"
+            }
+          },
+          "updated": {
+            "task": {
+              "other": "작업 {count}개 변경됨"
+            },
+            "reminder": {
+              "other": "리마인더 {count}개 변경됨"
+            },
+            "watch": {
+              "other": "감시 {count}개 변경됨"
+            }
+          },
+          "removed": {
+            "task": {
+              "other": "작업 {count}개 삭제됨"
+            },
+            "reminder": {
+              "other": "리마인더 {count}개 삭제됨"
+            },
+            "watch": {
+              "other": "감시 {count}개 삭제됨"
+            }
+          }
+        },
+        "runs": {
+          "other": "{count}회 실행"
+        },
+        "undone": "예약 후 삭제됨",
+        "fromAgents": {
+          "other": "백그라운드 작업 {count}개용"
+        },
+        "showAll": "모두 보기",
+        "showLess": "접기"
       }
     }
   },

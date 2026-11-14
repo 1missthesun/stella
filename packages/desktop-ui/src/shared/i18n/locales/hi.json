@@ -3393,6 +3393,63 @@
           "one": "हर दिन",
           "other": "हर {count} दिन"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} कार्य शेड्यूल हुआ",
+              "other": "{count} कार्य शेड्यूल हुए"
+            },
+            "reminder": {
+              "one": "{count} रिमाइंडर सेट हुआ",
+              "other": "{count} रिमाइंडर सेट हुए"
+            },
+            "watch": {
+              "one": "{count} निगरानी सेट हुई",
+              "other": "{count} निगरानियाँ सेट हुईं"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} कार्य बदला",
+              "other": "{count} कार्य बदले"
+            },
+            "reminder": {
+              "one": "{count} रिमाइंडर बदला",
+              "other": "{count} रिमाइंडर बदले"
+            },
+            "watch": {
+              "one": "{count} निगरानी बदली",
+              "other": "{count} निगरानियाँ बदलीं"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} कार्य हटाया गया",
+              "other": "{count} कार्य हटाए गए"
+            },
+            "reminder": {
+              "one": "{count} रिमाइंडर हटाया गया",
+              "other": "{count} रिमाइंडर हटाए गए"
+            },
+            "watch": {
+              "one": "{count} निगरानी हटाई गई",
+              "other": "{count} निगरानियाँ हटाई गईं"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} बार",
+          "other": "{count} बार"
+        },
+        "undone": "शेड्यूल हुआ, फिर हटाया गया",
+        "fromAgents": {
+          "one": "एक बैकग्राउंड कार्य के लिए",
+          "other": "{count} बैकग्राउंड कार्यों के लिए"
+        },
+        "showAll": "सब दिखाएँ",
+        "showLess": "कम दिखाएँ"
       }
     }
   },

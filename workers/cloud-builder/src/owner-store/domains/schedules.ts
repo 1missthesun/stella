@@ -352,6 +352,7 @@ const noticeCardOf = (row: Row, action: ScheduleNoticeAction, zone?: string): Sc
               : message,
         }
       : {}),
+    ...(kind !== "reminder" && row.target_thread_id ? { threadId: row.target_thread_id } : {}),
   };
 };
 

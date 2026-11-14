@@ -3393,6 +3393,63 @@
           "one": "Naponta",
           "other": "{count} naponta"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} feladat ütemezve",
+              "other": "{count} feladat ütemezve"
+            },
+            "reminder": {
+              "one": "{count} emlékeztető beállítva",
+              "other": "{count} emlékeztető beállítva"
+            },
+            "watch": {
+              "one": "{count} figyelés beállítva",
+              "other": "{count} figyelés beállítva"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} feladat módosítva",
+              "other": "{count} feladat módosítva"
+            },
+            "reminder": {
+              "one": "{count} emlékeztető módosítva",
+              "other": "{count} emlékeztető módosítva"
+            },
+            "watch": {
+              "one": "{count} figyelés módosítva",
+              "other": "{count} figyelés módosítva"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} feladat eltávolítva",
+              "other": "{count} feladat eltávolítva"
+            },
+            "reminder": {
+              "one": "{count} emlékeztető eltávolítva",
+              "other": "{count} emlékeztető eltávolítva"
+            },
+            "watch": {
+              "one": "{count} figyelés eltávolítva",
+              "other": "{count} figyelés eltávolítva"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} futás",
+          "other": "{count} futás"
+        },
+        "undone": "Ütemezve, majd eltávolítva",
+        "fromAgents": {
+          "one": "Egy háttérfeladathoz",
+          "other": "{count} háttérfeladathoz"
+        },
+        "showAll": "Összes",
+        "showLess": "Kevesebb"
       }
     }
   },

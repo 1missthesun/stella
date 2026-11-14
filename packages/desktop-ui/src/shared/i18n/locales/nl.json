@@ -3393,6 +3393,63 @@
           "one": "Elke dag",
           "other": "Elke {count} dagen"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} taak gepland",
+              "other": "{count} taken gepland"
+            },
+            "reminder": {
+              "one": "{count} herinnering ingesteld",
+              "other": "{count} herinneringen ingesteld"
+            },
+            "watch": {
+              "one": "{count} bewaking ingesteld",
+              "other": "{count} bewakingen ingesteld"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} taak gewijzigd",
+              "other": "{count} taken gewijzigd"
+            },
+            "reminder": {
+              "one": "{count} herinnering gewijzigd",
+              "other": "{count} herinneringen gewijzigd"
+            },
+            "watch": {
+              "one": "{count} bewaking gewijzigd",
+              "other": "{count} bewakingen gewijzigd"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} taak verwijderd",
+              "other": "{count} taken verwijderd"
+            },
+            "reminder": {
+              "one": "{count} herinnering verwijderd",
+              "other": "{count} herinneringen verwijderd"
+            },
+            "watch": {
+              "one": "{count} bewaking verwijderd",
+              "other": "{count} bewakingen verwijderd"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} keer",
+          "other": "{count} keer"
+        },
+        "undone": "Gepland en daarna verwijderd",
+        "fromAgents": {
+          "one": "Voor een achtergrondtaak",
+          "other": "Voor {count} achtergrondtaken"
+        },
+        "showAll": "Alles tonen",
+        "showLess": "Minder tonen"
       }
     }
   },

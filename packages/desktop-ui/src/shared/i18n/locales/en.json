@@ -3393,6 +3393,63 @@
           "one": "Every day",
           "other": "Every {count} days"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} task scheduled",
+              "other": "{count} tasks scheduled"
+            },
+            "reminder": {
+              "one": "{count} reminder set",
+              "other": "{count} reminders set"
+            },
+            "watch": {
+              "one": "{count} watch set up",
+              "other": "{count} watches set up"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} task changed",
+              "other": "{count} tasks changed"
+            },
+            "reminder": {
+              "one": "{count} reminder changed",
+              "other": "{count} reminders changed"
+            },
+            "watch": {
+              "one": "{count} watch changed",
+              "other": "{count} watches changed"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} task removed",
+              "other": "{count} tasks removed"
+            },
+            "reminder": {
+              "one": "{count} reminder removed",
+              "other": "{count} reminders removed"
+            },
+            "watch": {
+              "one": "{count} watch removed",
+              "other": "{count} watches removed"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} run",
+          "other": "{count} runs"
+        },
+        "undone": "Scheduled, then removed",
+        "fromAgents": {
+          "one": "For a background task",
+          "other": "For {count} background tasks"
+        },
+        "showAll": "Show all",
+        "showLess": "Show less"
       }
     }
   },

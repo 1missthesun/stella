@@ -3414,6 +3414,74 @@
           "many": "Ogni {count} giorni",
           "other": "Ogni {count} giorni"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} attività programmata",
+              "many": "{count} attività programmate",
+              "other": "{count} attività programmate"
+            },
+            "reminder": {
+              "one": "{count} promemoria impostato",
+              "many": "{count} promemoria impostati",
+              "other": "{count} promemoria impostati"
+            },
+            "watch": {
+              "one": "{count} monitoraggio attivato",
+              "many": "{count} monitoraggi attivati",
+              "other": "{count} monitoraggi attivati"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} attività modificata",
+              "many": "{count} attività modificate",
+              "other": "{count} attività modificate"
+            },
+            "reminder": {
+              "one": "{count} promemoria modificato",
+              "many": "{count} promemoria modificati",
+              "other": "{count} promemoria modificati"
+            },
+            "watch": {
+              "one": "{count} monitoraggio modificato",
+              "many": "{count} monitoraggi modificati",
+              "other": "{count} monitoraggi modificati"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} attività rimossa",
+              "many": "{count} attività rimosse",
+              "other": "{count} attività rimosse"
+            },
+            "reminder": {
+              "one": "{count} promemoria rimosso",
+              "many": "{count} promemoria rimossi",
+              "other": "{count} promemoria rimossi"
+            },
+            "watch": {
+              "one": "{count} monitoraggio rimosso",
+              "many": "{count} monitoraggi rimossi",
+              "other": "{count} monitoraggi rimossi"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} esecuzione",
+          "many": "{count} esecuzioni",
+          "other": "{count} esecuzioni"
+        },
+        "undone": "Programmata e poi rimossa",
+        "fromAgents": {
+          "one": "Per un'attività in background",
+          "many": "Per {count} attività in background",
+          "other": "Per {count} attività in background"
+        },
+        "showAll": "Mostra tutto",
+        "showLess": "Mostra meno"
       }
     }
   },

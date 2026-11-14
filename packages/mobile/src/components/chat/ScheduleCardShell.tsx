@@ -29,6 +29,7 @@ export function ScheduleCardShell({
   accessibilityHint,
   testID,
   children,
+  bare,
 }: {
   colors: Colors;
   headline: string;
@@ -49,21 +50,30 @@ export function ScheduleCardShell({
   testID?: string;
   /** Content under the status (a list); the tile then sits at the top. */
   children?: ReactNode;
+  /** A quiet line on the page: no bubble, no tile fill, smaller type. */
+  bare?: boolean;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const body = (
     <>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[colors.assistantBubbleFillTop, colors.assistantBubbleFillBottom]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.tile}>
-        <Icon name={icon} size={17} color={iconColor ?? colors.textMuted} />
+      {bare ? null : (
+        <LinearGradient
+          pointerEvents="none"
+          colors={[colors.assistantBubbleFillTop, colors.assistantBubbleFillBottom]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <View style={bare ? styles.bareTile : styles.tile}>
+        <Icon name={icon} size={bare ? 16 : 17} color={iconColor ?? colors.textMuted} />
       </View>
       <View style={[styles.body, children ? styles.bodyList : null]}>
         <Text
-          style={[styles.headline, struck && styles.struck, onDismiss && styles.headlineDismiss]}
+          style={[
+            styles.headline,
+            bare && styles.bareHeadline,
+            struck && styles.struck,
+            onDismiss && styles.headlineDismiss,
+          ]}
           numberOfLines={wrap ? undefined : 1}
           maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
         >
@@ -71,7 +81,11 @@ export function ScheduleCardShell({
         </Text>
         {status || trailing ? (
           <View style={[styles.meta, onDismiss && styles.metaDismiss]}>
-            <Text style={styles.status} numberOfLines={wrap ? undefined : 1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            <Text
+              style={[styles.status, bare && styles.bareStatus]}
+              numberOfLines={wrap ? undefined : 1}
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            >
               {status}
             </Text>
             {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
@@ -96,7 +110,7 @@ export function ScheduleCardShell({
   if (!onPress) {
     return (
       <View
-        style={[styles.card, children ? styles.cardList : null]}
+        style={[styles.card, children ? styles.cardList : null, bare && styles.bareCard]}
         testID={testID}
         accessibilityLabel={accessibilityLabel}
       >
@@ -111,7 +125,7 @@ export function ScheduleCardShell({
       accessibilityHint={accessibilityHint}
       testID={testID}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, bare && styles.bareCard, pressed && styles.pressed]}
     >
       {body}
     </Pressable>
@@ -134,6 +148,10 @@ const makeStyles = (colors: Colors) =>
       paddingTop: 9,
     },
     cardList: { alignItems: "flex-start", alignSelf: "stretch" },
+    bareCard: { gap: 8, paddingHorizontal: 2, paddingBottom: 2, paddingTop: 2 },
+    bareTile: { alignItems: "center", height: 20, justifyContent: "center", width: 20 },
+    bareHeadline: { color: colors.text, fontSize: 15, letterSpacing: -0.2, lineHeight: 20 },
+    bareStatus: { fontSize: 13, letterSpacing: -0.1, lineHeight: 18 },
     pressed: { opacity: 0.75 },
     tile: {
       alignItems: "center",

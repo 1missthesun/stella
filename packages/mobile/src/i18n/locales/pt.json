@@ -3414,6 +3414,74 @@
           "many": "A cada {count} dias",
           "other": "A cada {count} dias"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} tarefa agendada",
+              "many": "{count} tarefas agendadas",
+              "other": "{count} tarefas agendadas"
+            },
+            "reminder": {
+              "one": "{count} lembrete criado",
+              "many": "{count} lembretes criados",
+              "other": "{count} lembretes criados"
+            },
+            "watch": {
+              "one": "{count} monitoramento configurado",
+              "many": "{count} monitoramentos configurados",
+              "other": "{count} monitoramentos configurados"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} tarefa alterada",
+              "many": "{count} tarefas alteradas",
+              "other": "{count} tarefas alteradas"
+            },
+            "reminder": {
+              "one": "{count} lembrete alterado",
+              "many": "{count} lembretes alterados",
+              "other": "{count} lembretes alterados"
+            },
+            "watch": {
+              "one": "{count} monitoramento alterado",
+              "many": "{count} monitoramentos alterados",
+              "other": "{count} monitoramentos alterados"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} tarefa removida",
+              "many": "{count} tarefas removidas",
+              "other": "{count} tarefas removidas"
+            },
+            "reminder": {
+              "one": "{count} lembrete removido",
+              "many": "{count} lembretes removidos",
+              "other": "{count} lembretes removidos"
+            },
+            "watch": {
+              "one": "{count} monitoramento removido",
+              "many": "{count} monitoramentos removidos",
+              "other": "{count} monitoramentos removidos"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} execução",
+          "many": "{count} execuções",
+          "other": "{count} execuções"
+        },
+        "undone": "Agendada e depois removida",
+        "fromAgents": {
+          "one": "Para uma tarefa em segundo plano",
+          "many": "Para {count} tarefas em segundo plano",
+          "other": "Para {count} tarefas em segundo plano"
+        },
+        "showAll": "Ver tudo",
+        "showLess": "Ver menos"
       }
     }
   },

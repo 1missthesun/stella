@@ -3414,6 +3414,74 @@
           "few": "La fiecare {count} zile",
           "other": "La fiecare {count} de zile"
         }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} sarcină programată",
+              "few": "{count} sarcini programate",
+              "other": "{count} de sarcini programate"
+            },
+            "reminder": {
+              "one": "{count} memento setat",
+              "few": "{count} mementouri setate",
+              "other": "{count} de mementouri setate"
+            },
+            "watch": {
+              "one": "{count} monitorizare configurată",
+              "few": "{count} monitorizări configurate",
+              "other": "{count} de monitorizări configurate"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} sarcină modificată",
+              "few": "{count} sarcini modificate",
+              "other": "{count} de sarcini modificate"
+            },
+            "reminder": {
+              "one": "{count} memento modificat",
+              "few": "{count} mementouri modificate",
+              "other": "{count} de mementouri modificate"
+            },
+            "watch": {
+              "one": "{count} monitorizare modificată",
+              "few": "{count} monitorizări modificate",
+              "other": "{count} de monitorizări modificate"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} sarcină eliminată",
+              "few": "{count} sarcini eliminate",
+              "other": "{count} de sarcini eliminate"
+            },
+            "reminder": {
+              "one": "{count} memento eliminat",
+              "few": "{count} mementouri eliminate",
+              "other": "{count} de mementouri eliminate"
+            },
+            "watch": {
+              "one": "{count} monitorizare eliminată",
+              "few": "{count} monitorizări eliminate",
+              "other": "{count} de monitorizări eliminate"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} rulare",
+          "few": "{count} rulări",
+          "other": "{count} de rulări"
+        },
+        "undone": "Programată, apoi eliminată",
+        "fromAgents": {
+          "one": "Pentru o sarcină în fundal",
+          "few": "Pentru {count} sarcini în fundal",
+          "other": "Pentru {count} de sarcini în fundal"
+        },
+        "showAll": "Arată tot",
+        "showLess": "Arată mai puțin"
       }
     }
   },

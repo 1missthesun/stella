@@ -57,7 +57,7 @@ import { AppPreviewCard } from "@/features/cloud/AppPreviewCard";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
 import { ReminderFireCard } from "@/features/reminders/ReminderFireCard";
-import { ScheduleNoticeCard } from "@/features/schedule/ScheduleNoticeCard";
+import { ScheduleNotices } from "@/features/schedule/ScheduleNotices";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { AgentUpdateCard } from "@/features/app-source/AppSourceCards";
@@ -794,7 +794,7 @@ export const AssistantMessageRow = memo(
             <UserAskRecordCard key={record.id} record={record} />
           ))}
           {row.scheduleNotice ? (
-            <ScheduleNoticeCard card={row.scheduleNotice} />
+            <ScheduleNotices first={row.scheduleNotice} run={row.scheduleNoticeRun} />
           ) : null}
           {hasBody && (
             <div className="message-line message-line--assistant">

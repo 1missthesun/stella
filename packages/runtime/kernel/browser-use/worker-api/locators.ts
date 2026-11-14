@@ -33,6 +33,7 @@ import {
   serializeArgument,
   timeoutParam,
 } from "./validation.js";
+import { createPageSettle } from "./settle.js";
 
 export type LocatorState = {
   backend: BrowserWorkerBackend;
@@ -101,6 +102,7 @@ const locatorKey = (
 
 export const createLocators = (context: BrowserWorkerContext) => {
   const { assertCurrentTabGeneration, command, sendChain } = context;
+  const settlePage = createPageSettle(command);
   const locatorState = new WeakMap<object, LocatorState>();
   const locatorCache = new Map<string, WeakRef<BrowserWorkerLocator>>();
   const locatorFinalizer = new FinalizationRegistry<{
@@ -467,11 +469,20 @@ export const createLocators = (context: BrowserWorkerContext) => {
     }
 
     async click(): Promise<unknown> {
-      return await this.action("click");
+      const result = await this.action("click");
+      await this.settle();
+      return result;
     }
 
     async dblclick(): Promise<unknown> {
-      return await this.action("dblclick");
+      const result = await this.action("dblclick");
+      await this.settle();
+      return result;
+    }
+
+    private async settle(): Promise<void> {
+      const { backend, tabId } = this.state();
+      await settlePage(backend, tabId, "interaction");
     }
 
     async fill(value: string): Promise<unknown> {
@@ -487,7 +498,11 @@ export const createLocators = (context: BrowserWorkerContext) => {
     }
 
     async press(key: string): Promise<unknown> {
-      return await this.action("press", { key: requireString(key, "key") });
+      const result = await this.action("press", {
+        key: requireString(key, "key"),
+      });
+      if (/^(?:Enter|NumpadEnter)$/.test(key)) await this.settle();
+      return result;
     }
 
     async hover(): Promise<unknown> {

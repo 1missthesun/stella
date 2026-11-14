@@ -69,6 +69,8 @@ await page.waitForURL("**/dashboard");
 ({ url: await tab.url(), title: await tab.title() });
 ```
 
+`goto()`, `click()` and Enter presses already wait for the page to settle (loaded and quiet, up to 3 s). Never add fixed sleeps (`setTimeout`, `waitForTimeout`); if what you need is still loading, wait for it: `await locator.waitFor()`.
+
 Do not spend one `code` call per action. Keep sequential awaits together when no intermediate result changes the plan. Split at a real decision point, return the cheapest useful value, then continue with the same handles in the next cell:
 
 ```js

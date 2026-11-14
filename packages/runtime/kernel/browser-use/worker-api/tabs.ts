@@ -41,6 +41,7 @@ import {
   snapshotParams,
   timeoutParam,
 } from "./validation.js";
+import { createPageSettle } from "./settle.js";
 
 const DEFAULT_EXPECT_NEW_TAB_TIMEOUT_MS = 10_000;
 const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
@@ -180,6 +181,8 @@ const normalizeTabId = (value: unknown, name: string): number => {
   return requirePositiveInteger(numeric, name);
 };
 
+const SUBMIT_KEY = /^(?:Enter|NumpadEnter)$/;
+
 export const createTabs = (
   context: BrowserWorkerContext,
   { locatorBuilders }: BrowserWorkerLocators,
@@ -192,6 +195,7 @@ export const createTabs = (
     rememberTabGeneration,
   } = context;
   let nextAxSnapshot = 1;
+  const settlePage = createPageSettle(command);
   const currentTabId = (state: TabState): number => {
     assertCurrentTabGeneration(state.id, state.generation, state.backend);
     return state.id;
@@ -520,12 +524,17 @@ export const createTabs = (
         params: Record<string, unknown>,
       ) => command(action, params, state.backend);
       state.keyboard = Object.freeze({
-        press: async (key: string) =>
-          await boundCommand("press", {
+        press: async (key: string) => {
+          const data = await boundCommand("press", {
             tabId: currentTabId(state),
             ...tabGenerationParams(state.generation),
             key: requireString(key, "key", { maxLength: 64 }),
-          }),
+          });
+          if (SUBMIT_KEY.test(key)) {
+            await settlePage(state.backend, state.id, "interaction");
+          }
+          return data;
+        },
         // Raw text insertion at the current focus (Input.insertText): no
         // per-character key events, works for emoji/CJK.
         type: async (text: string) =>
@@ -559,6 +568,9 @@ export const createTabs = (
         params.timeout = timeoutParam(value.timeout, "timeout");
       }
       const data = await this.run("navigate", params);
+      if (params.waitUntil === undefined || params.waitUntil === "load") {
+        await settlePage(this.state().backend, this.id, "navigation");
+      }
       if (isPlainObject(data)) updateTabMetadata(this, data);
       return data;
     }
@@ -574,6 +586,7 @@ export const createTabs = (
         params.timeout = timeoutParam(value.timeout, "timeout");
       }
       const data = await this.run(action, params);
+      await settlePage(this.state().backend, this.id, "navigation");
       if (isPlainObject(data)) updateTabMetadata(this, data);
       return data;
     }

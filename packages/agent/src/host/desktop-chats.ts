@@ -2631,8 +2631,24 @@ export function desktopChats(options: DesktopChatsOptions) {
     try {
       let runsOn: RunsOn | undefined;
       if (model) {
-        const choice = await agentModel(conversationId, model);
-        if (!("runsOn" in choice)) throw new Error(`"${model}" runs on Claude Code, not on Stella's own agents.`);
+        // Only a model this computer can't run fails the task, with the
+        // reason. Anything else (the runtime shutting down for an update or
+        // restart: "Harness is closed") throws, so the placement runs it
+        // again once the runtime is back and it picks up where it was.
+        const choice = await agentModel(conversationId, model).catch((error: unknown) => error instanceof Error ? error : new Error(String(error)));
+        const problem =
+          choice instanceof Error
+            ? choice.message
+            : !("runsOn" in choice)
+              ? `"${model}" runs on Claude Code, not on Stella's own agents.`
+              : undefined;
+        if (problem !== undefined || choice instanceof Error || !("runsOn" in choice)) {
+          return {
+            threadId: run.threadId ?? run.agentKey,
+            status: "error",
+            error: `This device couldn't run the agent on "${model}": ${problem}`,
+          };
+        }
         runsOn = choice.runsOn;
       }
       // Work placed here only comes while this computer is signed in to the

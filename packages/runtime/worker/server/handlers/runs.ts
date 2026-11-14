@@ -142,13 +142,6 @@ export const runsHandlers: WorkerRpcHandlers = {
           description: payload.description,
           prompt: withAttachedFiles(payload.prompt, attachments),
           ...(pickedModel ? { model: pickedModel } : {}),
-        }).catch((error: unknown) => {
-          if (!pickedModel) throw error;
-          return {
-            threadId: agentKey,
-            status: "error" as const,
-            error: `This device couldn't run the agent on "${pickedModel}": ${error instanceof Error ? error.message : String(error)}`,
-          };
         });
         if (result.status === "ok" && result.finalText) {
           await session.runner

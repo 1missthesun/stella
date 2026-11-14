@@ -38,3 +38,5 @@ For the manual reference, see [SELF_HOSTING.md](SELF_HOSTING.md).
 ## Credits
 
 Record screen's capture builder (keyframes, marks, auto-crop and contact sheets) is adapted from [Scrawl](https://github.com/kitlangton/scrawl) by Kit Langton, under the MIT license ([notice](packages/native/show/LICENSE-scrawl)).
+
+Linux computer use (reading and acting on apps through AT-SPI, matching a window's accessibility root by process and title, window-relative coordinates, per-window Hyprland capture, the wlr virtual pointer for foreground input, and which toolkits and compositors drop which background input) follows [Cua](https://github.com/trycua/cua)'s Linux driver by Cua AI, Inc., under the MIT license ([notice](packages/runtime/kernel/computer-use/linux/LICENSE-cua)).

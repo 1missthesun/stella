@@ -43,7 +43,10 @@ import {
   sanitizeToolResult,
   sanitizeToolVisibleText,
 } from "./safety.js";
-import { redactSecureValues, redactSecureValuesInText } from "../shared/secure-value-redaction.js";
+import {
+  redactSecureValues,
+  redactSecureValuesInText,
+} from "../shared/secure-value-redaction.js";
 import { describeToolCatalogEntry, searchToolCatalog } from "./code-catalog.js";
 import {
   LEGACY_NODE_REPL_TOOL_NAME,
@@ -58,6 +61,10 @@ import {
   releaseMacStellaComputerSession,
 } from "../computer-use/stella-computer-executor.js";
 import { createWindowsComputerUseSession } from "../computer-use/windows-session.js";
+import {
+  createLinuxComputerUseSession,
+  releaseLinuxComputerSession,
+} from "../computer-use/linux-session.js";
 import { createComputerUseSession } from "../computer-use/session.js";
 import { cleanupWindowsStellaComputerSessionDaemon } from "../cli/stella-computer-windows.js";
 import { createReplConnectClient } from "../connectors/connect-service.js";
@@ -140,9 +147,7 @@ export const collectReplSearchableTools = (
     if (!allowedNames.has(tool.name)) continue;
     if (toolRequiresExplicitApproval(tool.approval)) continue;
     if (!isAgentAllowedForTool(tool, context.agentType)) continue;
-    if (
-      isAgentControlToolWithheld(tool.name, Boolean(context.parentAgentId))
-    ) {
+    if (isAgentControlToolWithheld(tool.name, Boolean(context.parentAgentId))) {
       continue;
     }
     const requiredProvider = tool.demoted?.requiredConnectorProvider;
@@ -247,9 +252,13 @@ export const createToolHost = ({
   };
   const queryCodeHistory =
     codeHistoryQuery ??
-    (async (args: Record<string, unknown>, context: ToolContext): Promise<unknown> => {
+    (async (
+      args: Record<string, unknown>,
+      context: ToolContext,
+    ): Promise<unknown> => {
       if (context.agentType && context.agentType !== AGENT_IDS.ORCHESTRATOR) {
-        if (!agentHistoryQuery) throw new Error("Your history is unavailable in this session.");
+        if (!agentHistoryQuery)
+          throw new Error("Your history is unavailable in this session.");
         return await agentHistoryQuery(args, context);
       }
       const auth = getCloudBackendAuth?.();
@@ -298,7 +307,11 @@ export const createToolHost = ({
   const nodeReplRegistry = new NodeReplKernelRegistry({
     browserBinPath: _stellaBrowserBinPath,
     ...(stellaDataDir
-      ? { taskTabs: new TaskTabs(path.join(stellaDataDir, "browser-task-tabs.json")) }
+      ? {
+          taskTabs: new TaskTabs(
+            path.join(stellaDataDir, "browser-task-tabs.json"),
+          ),
+        }
       : {}),
     ...(requestBrowserExtensionConnect
       ? { requestBrowserExtensionConnect }
@@ -318,6 +331,9 @@ export const createToolHost = ({
       if (browserSessionFactory) {
         return createBrowserOnlyComputerUseSession();
       }
+      if (process.platform === "linux") {
+        return createLinuxComputerUseSession();
+      }
       return createComputerUseSession(async () => {
         throw new Error(
           `Typed Computer Use is not available on ${process.platform}.`,
@@ -330,10 +346,13 @@ export const createToolHost = ({
         await cleanupWindowsStellaComputerSessionDaemon(sessionId);
       } else if (process.platform === "darwin") {
         await releaseMacStellaComputerSession(sessionId);
+      } else if (process.platform === "linux") {
+        await releaseLinuxComputerSession(sessionId);
       }
     },
     executeTool: executeNestedToolCall,
-    toolAwaitsUser: (toolName) => toolCatalog.get(toolName)?.awaitsUser === true,
+    toolAwaitsUser: (toolName) =>
+      toolCatalog.get(toolName)?.awaitsUser === true,
     searchTools: async (query, context, limit) =>
       searchToolCatalog(
         [
@@ -591,7 +610,9 @@ export const createToolHost = ({
     } catch (error) {
       const duration = Date.now() - startedAt;
       const message = await redactSecureValuesInText(
-        sanitizeToolError(`Tool ${toolName} failed: ${(error as Error).message}`),
+        sanitizeToolError(
+          `Tool ${toolName} failed: ${(error as Error).message}`,
+        ),
       );
       const stack = await redactSecureValuesInText(
         sanitizeToolVisibleText(String((error as Error)?.stack ?? "")),

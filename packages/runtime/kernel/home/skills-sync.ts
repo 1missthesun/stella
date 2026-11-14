@@ -20,6 +20,7 @@ const PLATFORM_SKILL_IDS: Partial<Record<NodeJS.Platform, readonly string[]>> =
   {
     darwin: ["stella-computer-macos"],
     win32: ["stella-computer-windows"],
+    linux: ["stella-computer-linux"],
   };
 const PLATFORM_EXCLUSIVE_SKILL_IDS = new Set(
   Object.values(PLATFORM_SKILL_IDS).flat(),
@@ -50,7 +51,10 @@ const readShippedSkillHashes = async (
   try {
     const parsed = JSON.parse(
       await fs.readFile(
-        path.join(path.dirname(bundledSkillsDir), SHIPPED_SKILL_HASHES_FILENAME),
+        path.join(
+          path.dirname(bundledSkillsDir),
+          SHIPPED_SKILL_HASHES_FILENAME,
+        ),
         "utf-8",
       ),
     ) as unknown;

@@ -186,6 +186,19 @@ export const scheduleNoticeStatusText = (
     .filter(Boolean)
     .join(" · ");
 
+/**
+ * A notice's line in an opened run: the time alone for a schedule that was
+ * made (the run's summary already says so), the change and time otherwise.
+ */
+export const scheduleNoticeRunRowText = (
+  card: ScheduleNoticeCard,
+  i18n: ScheduleNoticeI18n,
+  nowMs: number,
+): string =>
+  card.action === "created"
+    ? (scheduleNoticeWhenText(card, i18n, nowMs) ?? scheduleNoticeStatusText(card, i18n, nowMs))
+    : scheduleNoticeStatusText(card, i18n, nowMs);
+
 const sameYear = (atMs: number): boolean => new Date(atMs).getFullYear() === new Date().getFullYear();
 
 const monthDay = (locale: string, atMs: number): string => {

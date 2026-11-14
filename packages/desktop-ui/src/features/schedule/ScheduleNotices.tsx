@@ -1,7 +1,7 @@
 import { memo, useId, useMemo, useState } from "react";
 import type { ScheduleNoticeCard as ScheduleNotice } from "@stella/contracts/schedule-notice";
 import {
-  scheduleNoticeStatusText,
+  scheduleNoticeRunRowText,
   scheduleNoticeSummaryText,
   showsAsSingleScheduleCard,
   summarizeScheduleNotices,
@@ -49,7 +49,7 @@ const ScheduleNoticeGroup = memo(function ScheduleNoticeGroup({
   const rows = useMemo(
     () =>
       open
-        ? cards.map((card) => ({ card, status: scheduleNoticeStatusText(card, i18n, nowMs) }))
+        ? cards.map((card) => ({ card, status: scheduleNoticeRunRowText(card, i18n, nowMs) }))
         : [],
     [cards, i18n, nowMs, open],
   );

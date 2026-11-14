@@ -240,6 +240,14 @@ button.schedule-card:focus-visible {
   background: color-mix(in oklch, var(--chat-assistant-bubble-fill) 92%, var(--foreground));
 }
 
+/* A run's headline can take two lines: its series and dates are the point. */
+.schedule-run .schedule-card__headline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
 .schedule-run__head:focus-visible {
   outline: 2px solid var(--ring, var(--text-strong));
   outline-offset: 2px;
@@ -291,7 +299,8 @@ button.schedule-card:focus-visible {
 }
 
 .schedule-run__status {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  max-width: 70%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

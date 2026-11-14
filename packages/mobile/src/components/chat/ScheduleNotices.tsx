@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { ScheduleNoticeCard as ScheduleNotice } from "@stella/contracts/schedule-notice";
 import {
-  scheduleNoticeStatusText,
+  scheduleNoticeRunRowText,
   scheduleNoticeSummaryText,
   showsAsSingleScheduleCard,
   summarizeScheduleNotices,
@@ -57,7 +57,7 @@ const ScheduleNoticeGroup = memo(function ScheduleNoticeGroup({
   const summary = useMemo(() => summarizeScheduleNotices(cards, nowMs), [cards, nowMs]);
   const text = useMemo(() => scheduleNoticeSummaryText(summary, i18n, nowMs), [i18n, nowMs, summary]);
   const rows = useMemo(
-    () => (open ? cards.map((card) => ({ card, status: scheduleNoticeStatusText(card, i18n, nowMs) })) : []),
+    () => (open ? cards.map((card) => ({ card, status: scheduleNoticeRunRowText(card, i18n, nowMs) })) : []),
     [cards, i18n, nowMs, open],
   );
   const bare = summary.agentOnly;
@@ -76,6 +76,7 @@ const ScheduleNoticeGroup = memo(function ScheduleNoticeGroup({
     <ScheduleCardShell
       colors={colors}
       bare={bare}
+      wrap
       headline={text.headline}
       status={text.status}
       struck={text.undone}
@@ -108,9 +109,19 @@ const ScheduleNoticeGroup = memo(function ScheduleNoticeGroup({
               onPress={() => openSchedule(card)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
             >
-              <Text style={styles.rowText} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-                <Text style={[styles.rowName, card.action === "removed" && styles.struck]}>{card.name}</Text>
-                <Text style={styles.rowStatus}>{`  ${status}`}</Text>
+              <Text
+                style={[styles.rowText, styles.rowName, card.action === "removed" && styles.struck]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                {card.name}
+              </Text>
+              <Text
+                style={[styles.rowText, styles.rowStatus]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                {status}
               </Text>
             </Pressable>
           ))}
@@ -123,7 +134,7 @@ const ScheduleNoticeGroup = memo(function ScheduleNoticeGroup({
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     list: { marginTop: 6, paddingBottom: 2 },
-    row: { paddingVertical: 4 },
+    row: { alignItems: "baseline", flexDirection: "row", gap: 8, paddingVertical: 4 },
     pressed: { opacity: 0.6 },
     rowText: {
       fontFamily: fonts.sans.regular,
@@ -131,7 +142,7 @@ const makeStyles = (colors: Colors) =>
       letterSpacing: -0.15,
       lineHeight: 19,
     },
-    rowName: { color: colors.assistantBubbleText },
-    rowStatus: { color: colors.textMuted, fontVariant: ["tabular-nums"] },
+    rowName: { color: colors.assistantBubbleText, flexShrink: 1 },
+    rowStatus: { color: colors.textMuted, flexShrink: 0, fontVariant: ["tabular-nums"], maxWidth: "70%" },
     struck: { color: colors.textMuted, textDecorationLine: "line-through" },
   });

@@ -128,7 +128,7 @@ Read a request the way the user means it: "my Word documents" are the documents 
 
 A copy or conversion you make keeps everything the user didn't ask to change: text stays selectable text, and pictures keep their full size and details. What the user typed on purpose (names, addresses, titles, figures) is theirs: use it as written, even where you would write it another way, and raise anything that looks wrong in your report rather than rewriting it.
 
-A finished file holds no placeholders such as "[initials]" or "TBD". Complete it from what you have, including what the rest of the user's material shows, and say in your report what you filled in that way and what you couldn't find.
+A finished file never contains a placeholder ("[initials]", "TBD", a highlighted blank), even one your report points out. Complete it from what you have, including what the rest of the user's material shows; what you still don't have is left out of the file and named in your report, along with what you filled in.
 
 ## Deliverables
 

@@ -101,7 +101,11 @@
 }
 
 .bubble[data-out="1"] {
-  animation: bubble-leave 220ms cubic-bezier(0.4, 0, 1, 1) both;
+  animation: bubble-leave 150ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.bubble[data-follows="1"] {
+  animation-delay: 130ms;
 }
 
 .player[data-paused="1"] .look,

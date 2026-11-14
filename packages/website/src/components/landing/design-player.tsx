@@ -98,7 +98,7 @@ function LookLayer({ look, layout, clock, still }: { look: Look; layout: Layout;
 }
 
 /** The user's message, shrunk to its longest line the way a chat bubble hugs wrapped text. */
-function Bubble({ text, leaving = false }: { text: string; leaving?: boolean }) {
+function Bubble({ text, leaving = false, follows = false }: { text: string; leaving?: boolean; follows?: boolean }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -114,7 +114,7 @@ function Bubble({ text, leaving = false }: { text: string; leaving?: boolean }) 
     el.style.width = `${Math.ceil(line + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)) + 1}px`;
   }, [text]);
   return (
-    <p ref={ref} className={p.bubble} data-out={leaving ? "1" : undefined}>
+    <p ref={ref} className={p.bubble} data-out={leaving ? "1" : undefined} data-follows={follows ? "1" : undefined}>
       <span>{text}</span>
     </p>
   );
@@ -338,7 +338,7 @@ export function DesignPlayer() {
             <Bubble key={`a${current.prevStep}-out`} text={STEPS[current.prevStep].ask} leaving />
           ) : null}
           {current.step >= 0 ? (
-            <Bubble key={`a${current.step}`} text={STEPS[current.step].ask} />
+            <Bubble key={`a${current.step}`} text={STEPS[current.step].ask} follows={current.prevStep !== null} />
           ) : null}
         </div>
       </div>

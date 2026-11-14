@@ -9,6 +9,7 @@ import {
   readFileSync,
   readSync,
   closeSync,
+  renameSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -87,6 +88,12 @@ const sync = () => {
 };
 
 const readRun = () => JSON.parse(readFileSync(pointerFile, "utf8"));
+// Replaced by rename: the harness's orphan sweep reads pointers at any moment.
+const writeRun = (run) => {
+  const temp = `${pointerFile}.${process.pid}.tmp`;
+  writeFileSync(temp, JSON.stringify(run, null, 2));
+  renameSync(temp, pointerFile);
+};
 
 const harness = (harnessArgs, extraEnv = {}) => {
   const result = spawnSync(process.execPath, [skillCli, ...harnessArgs], {
@@ -166,7 +173,7 @@ const launch = async () => {
   const run = readRun();
   run.benchMode = mode;
   run.benchSha = git(appDir, ["rev-parse", "HEAD"]);
-  writeFileSync(pointerFile, JSON.stringify(run, null, 2));
+  writeRun(run);
   log(`launched (${mode} renderer) on CDP ${run.cdpPort}`);
   await waitForLive(run, Date.now() + 60_000);
   const label = option("label");
@@ -692,7 +699,7 @@ const iterate = async (variation) => {
     };
     const pid = starting.fields.pid;
     run = { ...readRun(), electronPid: pid };
-    writeFileSync(pointerFile, JSON.stringify(run, null, 2));
+    writeRun(run);
     if (variation === "main") {
       const bundle = readFileSync(path.join(appDir, "packages/desktop/dist-electron/electron/main.js"), "utf8");
       if (!bundle.includes(nonce)) throw new Error("the relaunched main does not hold the change");

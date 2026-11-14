@@ -147,10 +147,18 @@ export const registerRun = (run, pointerPath, tempRoot) => {
 export const unregisterRun = (runId) => rmSync(registryFile(runId), { force: true });
 
 const pointerNamesRun = (pointerPath, runId) => {
+  let text;
   try {
-    return JSON.parse(readFileSync(pointerPath, "utf8"))?.runId === runId;
+    text = readFileSync(pointerPath, "utf8");
+  } catch (error) {
+    return error?.code !== "ENOENT";
+  }
+  try {
+    return JSON.parse(text)?.runId === runId;
   } catch {
-    return false;
+    // A pointer that exists but doesn't parse is being written by someone
+    // else; reaping on it would stop a live run. The next sweep decides.
+    return true;
   }
 };
 

@@ -118,7 +118,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. Transcribe in the spoken language, translate the .srt (Stella can translate it and keep the timings), then burn in the translated file the same way.",
       },
     ],
-    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "audio/transcribe-voice-memos-to-text"],
+    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "audio/transcribe-voice-memos-to-text", "video/make-srt-subtitle-file"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Whisper on GitHub", href: "https://github.com/openai/whisper" },
@@ -247,7 +247,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Not automatically. For multicam edits, export a cut list from one angle into your editor and apply it there.",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "video/speed-up-video"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "auto-editor", href: "https://auto-editor.com" },
@@ -485,7 +485,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. A media server such as Plex or Jellyfin converts on the fly while you watch, and a cheap streaming stick (Chromecast, Fire TV, Apple TV with Infuse) plays most MKVs directly.",
       },
     ],
-    related: ["video/compress-video-for-discord", "video/burn-subtitles-into-video-for-tiktok", "video/combine-videos-into-one"],
+    related: ["video/compress-video-for-discord", "video/burn-subtitles-into-video-for-tiktok", "video/combine-videos-into-one", "video/convert-mov-to-mp4"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "HandBrake documentation: subtitles", href: "https://handbrake.fr/docs/en/latest/advanced/subtitles.html" },
@@ -709,6 +709,759 @@ export const VIDEO_PAGES: ProblemPage[] = [
       { label: "Apple: Create slideshows in Photos on Mac", href: "https://support.apple.com/guide/photos/phtae8c6d40/mac" },
       { label: "Apple: iMovie User Guide", href: "https://support.apple.com/guide/imovie/welcome/mac" },
       { label: "Clipchamp: How to make a slideshow", href: "https://clipchamp.com/en/resources/how-to-make-a-slideshow/" },
+    ],
+  },
+  {
+    slug: "convert-mov-to-mp4",
+    niche: "video",
+    searchPhrases: [
+      "convert mov to mp4",
+      "mov to mp4",
+      "convert mov to mp4 mac",
+      "convert mov to mp4 without losing quality",
+      "iphone video won't play on tv",
+    ],
+    title: "Convert MOV to MP4 so phone videos play on a TV or Windows",
+    description:
+      "iPhone MOV videos won't play on a TV or Windows laptop? Convert them to H.264 MP4 with HandBrake, QuickTime, ffmpeg, or Stella (stella.sh) on your computer.",
+    h1: "Convert MOV to MP4 so your phone videos play anywhere",
+    short: "Convert MOV to MP4",
+    lede: "Five phone videos as MP4s that TVs and Windows play, upright clips kept upright.",
+    answer:
+      "Renaming .mov to .mp4 rarely helps: recent iPhones record HEVC (H.265), which many TVs and Windows PCs can't play without an add-on. Convert to H.264 MP4 instead, with the free HandBrake (preset Fast 1080p30) on Mac or Windows, or ffmpeg. Stella (stella.sh) converted a folder of phone MOVs to H.264 MP4s, kept upright clips upright, and left the originals alone.",
+    stellaSteps: [
+      "Finds the From my phone folder in Videos: five MOV clips, four of them HEVC (one 10-bit HDR) and one already H.264",
+      "Spots that two clips were filmed upright and only marked to be turned at playback, which many TVs ignore",
+      "Re-encodes the four HEVC clips to H.264 MP4 at high quality, turning the upright ones' picture itself so they show upright everywhere, and keeps the sound",
+      "Repackages the clip that was already H.264 as MP4 without re-encoding it",
+      "Plays every new file through, compares picture quality with the originals, saves the MP4s next to the MOVs with the same names and leaves the MOVs untouched",
+    ],
+    prompt:
+      "My TV won't play the videos from my phone in the 'From my phone' folder in Videos. They're MOV files. Convert them to MP4 so they play on the TV and on my sister's Windows laptop.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Five MP4s in about 1 minute 35 seconds. Checked afterwards against an answer key written before the run: one MP4 per MOV, all H.264 8-bit (which TVs and Windows play), sound kept as AAC, the same length and picture, portrait clips still portrait, no file over 4× its MOV's size, and the MOVs unchanged.",
+      note: "The clips were made for this run in the formats iPhones record, including a 10-bit HDR clip and two rotated portrait clips. Our check script was fixed after the run to count files that kept their original dates, and re-scored; the answer key didn't change. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/video/convert-mov-to-mp4/proof.mp4`,
+        cuts: webCuts("video/convert-mov-to-mp4"),
+        poster: `${PROOFS}/video/convert-mov-to-mp4/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.43,
+        realDuration: 95,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Five MOV videos from a phone are in Videos." },
+        { at: 1.67, text: "The prompt: convert them to MP4 so they play on the TV and a Windows laptop." },
+        { at: 12.67, text: "Stella replies it's using the format most TVs and Windows laptops play, keeping the MOVs." },
+        { at: 18.67, text: "Converting four HEVC clips and checking each result." },
+        { at: 30.07, text: "Done: five MP4s; four were HEVC, two upright clips were turned for good, sizes only slightly bigger." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "HandBrake (Windows, Mac, Linux)",
+        body: "Install the free HandBrake and open the folder (File, Open Source, choose the folder). Pick the preset Fast 1080p30 (or Fast 2160p60 for 4K), make sure the format is MP4 and the video encoder H.264, then Add All to the queue and Start Queue.",
+      },
+      {
+        title: "Mac: QuickTime Player",
+        body: "Open the clip and choose File, Export As, 1080p, then tick Greater Compatibility (H.264). It still saves a .mov, but an H.264 one most TVs play. For a real .mp4, use HandBrake.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i IMG_4101.MOV -c:v libx264 -crf 20 -pix_fmt yuv420p -c:a aac IMG_4101.mp4` makes an H.264 MP4. ffmpeg applies the phone's rotation flag, so upright clips come out upright. `-c copy` alone keeps the HEVC video and won't fix playback.",
+      },
+      {
+        title: "Change the iPhone setting for next time",
+        body: "In Settings, Camera, Formats, choose Most Compatible to record H.264 instead of HEVC. Files are bigger, but play everywhere. Turning off HDR Video avoids washed-out colours on non-HDR screens.",
+      },
+      {
+        title: "Or add HEVC to Windows",
+        body: "Windows can play HEVC with Microsoft's HEVC Video Extensions from the Microsoft Store (a small charge) or a player like VLC. TVs usually can't be updated this way.",
+      },
+    ],
+    limits: [
+      "Converting re-encodes the video. H.264 files are a little bigger than HEVC at the same quality; here they grew by a few hundred KB each.",
+      "HDR clips become standard dynamic range so ordinary screens show them correctly.",
+      "File names and each clip's format details go to the AI model you use in Stella; the videos are converted on your computer and aren't uploaded.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown. It can't test playback on your TV.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why won't my iPhone videos play on my TV?",
+        a: "Most likely they're HEVC (H.265). Many TVs, especially older ones, and Windows PCs without the HEVC extension can't decode it. Converting to H.264 fixes it.",
+      },
+      {
+        q: "Can I convert MOV to MP4 without losing quality?",
+        a: "If the MOV is already H.264, yes: it can be repackaged as MP4 without re-encoding, as Stella did for one clip. HEVC clips need re-encoding, which at a high-quality setting looks the same.",
+      },
+      {
+        q: "Why is my video sideways after converting?",
+        a: "The phone stored it sideways with a flag saying how to turn it, and the converter dropped the flag. Stella turned the picture itself. For a clip that was filmed sideways, see [rotate a video](/how/video/rotate-video).",
+      },
+      {
+        q: "What about MKV files?",
+        a: "See [convert MKV to MP4](/how/video/convert-mkv-to-mp4). To make a video small enough to send, see [compress a video for Discord](/how/video/compress-video-for-discord).",
+      },
+    ],
+    related: ["video/convert-mkv-to-mp4", "video/rotate-video", "photos-files/convert-heic-to-jpg"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "HandBrake documentation", href: "https://handbrake.fr/docs/en/latest/" },
+      { label: "Apple: Export movies in QuickTime Player on Mac", href: "https://support.apple.com/guide/quicktime-player/qtp20e395859/mac" },
+    ],
+  },
+  {
+    slug: "convert-srt-to-vtt",
+    niche: "video",
+    searchPhrases: [
+      "srt to vtt",
+      "convert srt to vtt",
+      "subtitle converter",
+      "convert subtitles to utf 8",
+      "srt file",
+    ],
+    title: "Convert SRT to VTT for a website video player, timings kept",
+    description:
+      "Turn .srt subtitles into WebVTT for an HTML5 video player, with exact timings and accents that don't break: Subtitle Edit, ffmpeg, or Stella (stella.sh).",
+    h1: "Convert SRT subtitles to VTT",
+    short: "Convert SRT to VTT",
+    lede: "Eight subtitle files as .vtt with every timing identical and the accents fixed.",
+    answer:
+      "WebVTT is SRT with a `WEBVTT` line at the top and full stops instead of commas in the timestamps. For one file, a text editor will do; for a folder, the free Subtitle Edit batch-converts, and ffmpeg converts one file per command. The trap is old SRTs saved in a Windows encoding, whose accents turn to garbage. Stella (stella.sh) converted eight SRTs, kept all 260 timings exactly, and fixed one file's broken encoding.",
+    stellaSteps: [
+      "Finds the eight .srt files in the Garden series folder in Videos and reads them",
+      "Notices episode 3 isn't valid UTF-8 and checks it: it was saved in an older Windows encoding, so accents like café and jardín would break",
+      "Writes a .vtt next to each .srt: the WEBVTT header, commas in timestamps changed to full stops, and nothing else in the text changed",
+      "Reads episode 3 in its real encoding, removes an invisible byte-order mark from episode 5, and makes line endings consistent",
+      "Compares every timestamp in all 260 subtitles against the originals, keeps italics, and leaves the .srt files unchanged",
+    ],
+    prompt:
+      "The subtitle files in the Garden series folder in my Videos are .srt, but my website's video player needs .vtt. Convert all eight and keep the timings exactly the same.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Eight .vtt files in about 1 minute. Checked afterwards against an answer key written before the run: 8 files that start with WEBVTT and keep every cue's exact timing and text, the Windows-encoded episode's accents (café, jardín, crème) right, italic tags kept, no byte-order mark, and the .srt files unchanged.",
+      note: "The subtitles were written for this run, with three files saved the awkward ways real ones often are. The recording plays at normal speed.",
+      video: {
+        src: `${PROOFS}/video/convert-srt-to-vtt/proof.mp4`,
+        cuts: webCuts("video/convert-srt-to-vtt"),
+        poster: `${PROOFS}/video/convert-srt-to-vtt/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 41.67,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Eight .srt subtitle files are in a Garden series folder in Videos." },
+        { at: 1.67, text: "The prompt: convert all eight to .vtt for a website player, timings exactly the same." },
+        { at: 17.67, text: "Stella notes episode 3 isn't valid UTF-8, probably an old Windows encoding, and checks it." },
+        { at: 27.67, text: "Done: eight .vtt files, all 260 timings compared and matching, episode 3's accents fixed." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "One file in a text editor",
+        body: "Open the .srt in a plain-text editor (TextEdit in plain-text mode, Notepad). Add `WEBVTT` and an empty line at the very top. In each timing line, change the comma before the milliseconds to a full stop (`00:00:01,250` becomes `00:00:01.250`). Leave commas in the dialogue alone. Save as UTF-8 with a .vtt extension.",
+      },
+      {
+        title: "A folder: Subtitle Edit",
+        body: "In the free Subtitle Edit (Windows, with a newer cross-platform build for Mac and Linux), open Tools, Batch convert, add the .srt files, set Format to WebVTT and press Convert. If accents look wrong, set the input encoding to Windows-1252 and try again.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i \"Garden series E01.srt\" \"Garden series E01.vtt\"` converts one file. For a file in an old Windows encoding, add `-sub_charenc CP1252` before `-i` or the accents break.",
+      },
+      {
+        title: "Check the encoding",
+        body: "If you see Ã© where é should be, or a question mark in a diamond, the file was read in the wrong encoding. Reopen it as Windows-1252 (or Latin-1) and save it as UTF-8 before converting.",
+      },
+      {
+        title: "Hook it up on the page",
+        body: "In HTML, add `<track kind=\"subtitles\" src=\"E01.vtt\" srclang=\"en\" label=\"English\">` inside the `<video>` element. The .vtt must be served from the same site, or with CORS allowed.",
+      },
+    ],
+    limits: [
+      "It converts files; it doesn't upload them to your site or edit your player's code unless you ask.",
+      "Styling beyond italics and bold may not show the same in every player.",
+      "The subtitle text was read by the AI model you use in Stella to work out encodings and check the conversion. Fine for most subtitles; keep in mind for unreleased material.",
+      "Recorded on Linux. The conversion used Stella's built-in scripting, nothing installed, so it works the same on a Mac or Windows PC.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What's the difference between SRT and VTT?",
+        a: "Almost nothing for plain subtitles: VTT starts with a WEBVTT line and uses full stops in timestamps. VTT also supports positioning and styling, and it's the format HTML5 video players read.",
+      },
+      {
+        q: "Will converting change my subtitle timings?",
+        a: "It shouldn't. Only the separator character changes. Stella compared all 260 timestamps after converting and every one matched.",
+      },
+      {
+        q: "Can I convert VTT back to SRT?",
+        a: "Yes, the same way in reverse, or with `ffmpeg -i in.vtt out.srt`. Ask Stella and it will do the folder.",
+      },
+      {
+        q: "Can it make subtitles from scratch?",
+        a: "Yes: see [make an SRT subtitle file](/how/video/make-srt-subtitle-file). To burn them into the picture for social media, see [burn subtitles into a video](/how/video/burn-subtitles-into-video-for-tiktok).",
+      },
+    ],
+    related: ["video/make-srt-subtitle-file", "video/burn-subtitles-into-video-for-tiktok", "video/convert-mov-to-mp4"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "W3C: WebVTT format", href: "https://www.w3.org/TR/webvtt1/" },
+      { label: "Subtitle Edit command line (seconv)", href: "https://niksedk.github.io/subtitleedit-avalonia/reference/command-line.html" },
+      { label: "MDN: the track element", href: "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/track" },
+    ],
+  },
+  {
+    slug: "extract-frames-from-video",
+    niche: "video",
+    searchPhrases: [
+      "extract frames from video",
+      "video to jpg",
+      "extract frames from video ffmpeg",
+      "save frames from video as images",
+      "video to jpg converter high quality",
+    ],
+    title: "Extract frames from a video as full-quality JPGs",
+    description:
+      "Save one picture per second from a video as full-resolution JPGs, to pick the best shot: VLC's scene filter, ffmpeg, or Stella (stella.sh) on your own computer.",
+    h1: "Extract frames from a video as JPGs",
+    short: "Extract frames from video",
+    lede: "One full-size JPG for every second of a 40-second video, named by time.",
+    answer:
+      "ffmpeg does it in one line: `ffmpeg -i video.mp4 -vf fps=1 -q:v 2 frame_%03d.jpg` saves one JPG per second at full size. Without a command line, VLC's Scene video filter saves frames while the video plays. Online frame grabbers often shrink the pictures. Stella (stella.sh) saved 40 full-resolution JPGs from a bird-feeder video, one per second, named by their time in the video.",
+    stellaSteps: [
+      "Finds “Bird feeder” in Videos: 40 seconds at 1920×1080",
+      "Saves one frame for each second, 0 to 39, at the video's full resolution and the highest JPG quality",
+      "Names each file by its moment, from Bird feeder 00m00s.jpg to 00m39s.jpg, so they sort in order and you can find the moment in the video",
+      "Looks at a sample frame and reads the video's time code in several frames to confirm they're one second apart",
+      "Puts them in a new Bird feeder frames folder next to the video, leaves the video unchanged, and says it didn't search for the woodpecker itself",
+    ],
+    prompt:
+      "Save a picture for every second of the 'Bird feeder' video in my Videos folder, as full-quality JPGs, so I can pick the best shot of the woodpecker.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "40 JPGs in about 1 minute 25 seconds. Checked afterwards against an answer key written before the run, using a time code drawn into each frame: 40 JPGs at the full 1920×1080, exactly one second apart in file-name order, covering the whole video from 0 to 39 seconds, and the video unchanged.",
+      note: "The video is a drawn animation made for this run, with a small time code in the corner for checking. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/video/extract-frames-from-video/proof.mp4`,
+        cuts: webCuts("video/extract-frames-from-video"),
+        poster: `${PROOFS}/video/extract-frames-from-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.27,
+        realDuration: 84,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 40-second bird-feeder video is in Videos." },
+        { at: 1.63, text: "The prompt: a full-quality JPG for every second, to pick the best shot of the woodpecker." },
+        { at: 9.63, text: "Stella replies: one frame per second at full resolution, in a new folder next to the video." },
+        { at: 15.63, text: "Saving 40 frames and checking their timing." },
+        { at: 27.83, text: "Done: 40 full-size JPGs named 00m00s to 00m39s; the woodpecker is yours to find." },
+      ],
+    },
+    manualTitle: "Extract them yourself",
+    manualSteps: [
+      {
+        title: "ffmpeg (Windows, Mac, Linux)",
+        body: "`ffmpeg -i \"Bird feeder.mp4\" -vf fps=1 -q:v 2 \"frame_%03d.jpg\"` saves one frame per second, numbered 001, 002 and so on. `-q:v 2` is near-top JPG quality (1 is the highest). Use `fps=5` for five per second, or PNG for no compression.",
+      },
+      {
+        title: "VLC's Scene filter",
+        body: "In VLC's preferences, choose Show settings: All, then Video, Filters, Scene filter. Set the image format to jpg, a folder, and the recording ratio to the video's frame rate (25 for one picture per second at 25 fps). Tick Scene video filter under Video, Filters, play the video through, then untick it.",
+      },
+      {
+        title: "One frame at a time",
+        body: "Pause on the moment and use VLC's Video, Take Snapshot, or QuickTime's Edit, Copy on a Mac, which copies the paused frame at full size. Fine for one or two shots, not forty.",
+      },
+      {
+        title: "Zoom in around the moment",
+        body: "If the action is quick, first save one per second, find the right second, then extract every frame of just that stretch: `ffmpeg -ss 22 -t 4 -i video.mp4 -q:v 2 woodpecker_%03d.jpg`.",
+      },
+      {
+        title: "Know the limit",
+        body: "A video frame is only as sharp as the video. Fast movement is often blurred in a single frame, and phone video is compressed, so frames look softer than a photo taken at the same resolution.",
+      },
+    ],
+    limits: [
+      "One picture per second can miss a split-second moment. Ask for more per second around the part you care about.",
+      "It didn't pick the best shot for you. It looked at one sample frame to check its work; it can look through them for the woodpecker if you ask, which sends those pictures to the AI model.",
+      "File names, the video's details and that one sample frame went to the AI model you use in Stella; the frames were saved on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I get a high-quality still from a video?",
+        a: "Extract the frame directly from the file at full resolution rather than taking a screenshot of the player. ffmpeg with `-q:v 1` or `-q:v 2`, or PNG output, keeps the most detail.",
+      },
+      {
+        q: "How many frames does a video have?",
+        a: "Its frame rate times its length: a 40-second video at 25 fps has 1,000. One per second is usually plenty to find a moment; then extract every frame near it.",
+      },
+      {
+        q: "Can I turn the frames into a GIF instead?",
+        a: "Yes: see [make a GIF from a video](/how/video/make-gif-from-video).",
+      },
+      {
+        q: "Can it sort or rename the pictures afterwards?",
+        a: "Yes, in the same chat. For photo collections, see [find duplicate photos](/how/photos-files/find-duplicate-photos) and [resize images in bulk](/how/photos-files/resize-images-in-bulk).",
+      },
+    ],
+    related: ["video/make-gif-from-video", "photos-files/resize-images-in-bulk", "video/speed-up-video"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "FFmpeg filters: fps", href: "https://ffmpeg.org/ffmpeg-filters.html#fps" },
+      { label: "VLC media player", href: "https://www.videolan.org/vlc/" },
+    ],
+  },
+  {
+    slug: "make-gif-from-video",
+    niche: "video",
+    searchPhrases: [
+      "make a gif from a video",
+      "video to gif",
+      "make gif",
+      "how to make a gif",
+      "make gif under 5mb",
+    ],
+    title: "Make a GIF from a video clip, under a size limit",
+    description:
+      "Turn five seconds of a video into a smooth GIF small enough for a group chat: Shortcuts on Mac, Clipchamp on Windows, ffmpeg, or Stella (stella.sh) on your computer.",
+    h1: "Make a GIF from a video clip",
+    short: "Make a GIF from a video",
+    lede: "Five exact seconds of a video as a smooth 478 KB GIF, ready for a group chat.",
+    answer:
+      "Trim the clip to the seconds you want, then convert it with a good colour palette. On a Mac, QuickTime trims and the Shortcuts app's Make GIF action converts; on Windows, Clipchamp exports clips up to 15 seconds as GIF. ffmpeg does both in one command. Stella (stella.sh) made a GIF of exactly 0:42 to 0:47 of a video at 720 pixels wide and 20 frames a second, at 478 KB.",
+    stellaSteps: [
+      "Finds “Park day” in Videos and checks its size and frame rate",
+      "Makes a first GIF of 0:42 to 0:47 at 480 pixels wide, with a palette built from the clip so colours don't band",
+      "Looks at frames from it and, since it's far under 5 MB, remakes it sharper: 720 pixels wide at 20 frames a second",
+      "Checks a contact sheet of the frames, saves Park day - Biscuit catches the frisbee.gif next to the video and leaves the video unchanged",
+      "Reports 478 KB, notes GIFs have no sound, and points out the catch lands at about 0:46.8, offering to run it to 0:48",
+    ],
+    prompt:
+      "Make a GIF of the bit in 'Park day' in my Videos folder where Biscuit catches the frisbee, from 0:42 to 0:47. Keep it under 5 MB so I can send it in the family group chat.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The GIF in about 1 minute 15 seconds. Checked afterwards against an answer key written before the run, using a time code drawn into the video: an animated GIF of exactly 0:42 to 0:47, 100 frames at 20 per second playing forwards, 720×405 (not squashed), 0.49 MB, and the video unchanged.",
+      note: "The park video is a drawn animation made for this run, with a small time code in the corner for checking. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/video/make-gif-from-video/proof.mp4`,
+        cuts: webCuts("video/make-gif-from-video"),
+        poster: `${PROOFS}/video/make-gif-from-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 39.8,
+        realDuration: 74,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 75-second Park day video is in Videos." },
+        { at: 1.63, text: "The prompt: a GIF of 0:42 to 0:47, under 5 MB for the family group chat." },
+        { at: 9.63, text: "Stella replies it's cutting 0:42 to 0:47 into a GIF under 5 MB." },
+        { at: 15.63, text: "Making the GIF, checking frames, and remaking it sharper." },
+        { at: 25.7, text: "Done: a 478 KB GIF of exactly 0:42 to 0:47, with an offer to run it to 0:48 so the catch has a beat." },
+      ],
+    },
+    manualTitle: "Make it yourself",
+    manualSteps: [
+      {
+        title: "Mac: QuickTime, then Shortcuts",
+        body: "Open the video in QuickTime Player, choose Edit, Trim, drag the yellow handles to 0:42 and 0:47 and save. In the Shortcuts app, make a shortcut with the Make GIF action fed by that video and a Save File action, then run it.",
+      },
+      {
+        title: "Windows: Clipchamp",
+        body: "In Clipchamp (built into Windows 11), add the video to the timeline, split it at 0:42 and 0:47 and delete the rest. Choose Export, then GIF. The clip must be 15 seconds or shorter.",
+      },
+      {
+        title: "ffmpeg with a proper palette",
+        body: "`ffmpeg -ss 42 -t 5 -i \"Park day.mp4\" -vf \"fps=15,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse\" out.gif` builds a palette from the clip itself, so colours look clean instead of blotchy.",
+      },
+      {
+        title: "Get under the size limit",
+        body: "Size grows with width, frame rate and length. To shrink a GIF, cut it shorter first, then lower the width (480 or 360 pixels), then the frame rate (12 to 15). Detailed, busy scenes make much bigger GIFs than simple ones.",
+      },
+      {
+        title: "Consider a short MP4",
+        body: "Most chat apps play short videos inline, often with better colour, sound and a smaller file than a GIF. Send a GIF when the app or the joke needs one.",
+      },
+    ],
+    limits: [
+      "GIFs have no sound and only 256 colours per frame, so gradients can band a little. A short MP4 often looks better where the chat app allows one.",
+      "It cut the times you gave. If the moment lands at the very end, say so and it will extend the clip.",
+      "File names, the video's details and a few frames from the GIF (to check it) went to the AI model you use in Stella; the GIF was made on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I make a GIF from a video on iPhone?",
+        a: "In Photos, a Live Photo can be set to Loop or Bounce, which shares as a GIF-like animation. For a normal video, the Shortcuts app's Make GIF action works on the phone too.",
+      },
+      {
+        q: "Why is my GIF so big?",
+        a: "GIF compresses poorly. Long clips, full-HD width and high frame rates add up quickly. Keep it to a few seconds at 480 to 720 pixels wide.",
+      },
+      {
+        q: "Why does my GIF look grainy or blotchy?",
+        a: "The converter used a generic 256-colour palette. Building the palette from the clip itself (ffmpeg's palettegen) fixes most of it.",
+      },
+      {
+        q: "Can it pull still pictures out instead?",
+        a: "Yes: see [extract frames from a video](/how/video/extract-frames-from-video). To make a whole video smaller to send, see [compress a video for Discord](/how/video/compress-video-for-discord).",
+      },
+    ],
+    related: ["video/extract-frames-from-video", "video/compress-video-for-discord", "video/speed-up-video"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Clipchamp: convert a video to a GIF", href: "https://clipchamp.com/en/blog/convert-video-gif/" },
+      { label: "FFmpeg filters: palettegen", href: "https://ffmpeg.org/ffmpeg-filters.html#palettegen" },
+    ],
+  },
+  {
+    slug: "make-srt-subtitle-file",
+    niche: "video",
+    searchPhrases: [
+      "create srt file from video",
+      "srt generator",
+      "subtitle generator",
+      "generate srt file from video",
+      "make subtitles",
+    ],
+    title: "Create an SRT subtitle file from a video, free and local",
+    description:
+      "Make a separate .srt subtitle file for a video without burning captions in or uploading it: Subtitle Edit with Whisper, or Stella (stella.sh) on your own computer.",
+    h1: "Create an SRT subtitle file from a video",
+    short: "Make an SRT subtitle file",
+    lede: "A timed .srt file for a 73-second interview, separate from the video and checked.",
+    answer:
+      "Speech recognition can write the subtitles for you. On Windows, the free Subtitle Edit has Video, Audio to text (Whisper), then saves an .srt. Whisper-based apps do the same on a Mac. Caption sites and CapCut work too, but upload the video or burn the words in. Stella (stella.sh) made an .srt for an interview with a free Whisper model running on the computer, left the video untouched, and flagged two words to check.",
+    stellaSteps: [
+      "Finds the interview video in Videos and pulls its sound out for transcription",
+      "Runs the free faster-whisper speech recognition on the computer, with the large Whisper model and word-level timings, so nothing is sent to a transcription service",
+      "Tries smaller models on the guest's name, which is hard to hear, and settles on its best guess",
+      "Builds subtitles of at most two short lines each, timed to the words, saves Interview with Dr Okonjo.srt next to the video, then re-listens to each subtitle's stretch of audio to check it",
+      "Leaves the video unchanged and names the two spots to check before uploading: the guest's first name and one phrase",
+    ],
+    prompt:
+      "Make an SRT subtitle file for the interview video in my Videos folder. Don't put the subtitles on the video. I just need the separate file to upload with it.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The .srt in about 4 minutes 10 seconds, including downloading the speech models. Checked afterwards against an answer key written before the run: a valid SRT with 19 numbered subtitles, 1.2% of words wrong (20% allowed), all 14 spoken lines shown while they're said, nothing on screen over 7 seconds, lines of 47 characters or fewer, named like the video, and the video untouched.",
+      note: "The interview was written for this run and voiced by two synthetic voices; the people and podcast are fictitious. The work is sped up 17×.",
+      video: {
+        src: `${PROOFS}/video/make-srt-subtitle-file/proof.mp4`,
+        cuts: webCuts("video/make-srt-subtitle-file"),
+        poster: `${PROOFS}/video/make-srt-subtitle-file/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.7,
+        realDuration: 252,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 73-second interview video is in Videos." },
+        { at: 1.63, text: "The prompt: a separate SRT subtitle file, not subtitles on the video." },
+        { at: 13.63, text: "Stella replies it will transcribe on this computer and save the .srt next to the video, which won't change." },
+        { at: 19.63, text: "Downloading a speech model, transcribing and timing the subtitles." },
+        { at: 32.1, text: "Done: the .srt next to the video, made for free on the computer, with two words to double-check." },
+      ],
+    },
+    manualTitle: "Make the subtitles yourself",
+    manualSteps: [
+      {
+        title: "Windows: Subtitle Edit",
+        body: "Install the free Subtitle Edit and open the video. Choose Video, Audio to text (Whisper), pick a model (larger is more accurate but slower) and let it download. When it's done, check the text, then File, Save as, SubRip (.srt).",
+      },
+      {
+        title: "Mac: a Whisper app",
+        body: "macOS has no built-in subtitle maker. Free and paid apps built on OpenAI's open-source Whisper run on the Mac and export SRT; whisper.cpp does it from the Terminal with `-osrt`.",
+      },
+      {
+        title: "Read it through",
+        body: "Automatic transcripts get names, places and jargon wrong. Play the video with the subtitles on and fix anything odd; Subtitle Edit shows the waveform so you can nudge timings too.",
+      },
+      {
+        title: "Keep lines short",
+        body: "Aim for two lines of about 42 characters at most, on screen for 1 to 7 seconds each. Long blocks of text are hard to read and some platforms reject them.",
+      },
+      {
+        title: "Name it like the video",
+        body: "Save it as the video's name with .srt (Interview.mp4 and Interview.srt). Players like VLC load it automatically, and upload pages for YouTube or Vimeo take it as a separate caption file.",
+      },
+    ],
+    limits: [
+      "Names and rare words are best guesses. Stella flagged the guest's first name and one phrase to check; read the file before uploading.",
+      "Speaker labels aren't added. Ask if you want them.",
+      "The speech models are big: about 5 GB downloaded, since Stella tried three sizes on the hard-to-hear name, and transcription on a processor is slow for long videos. The sound stayed on the computer; the transcript text went to the AI model you use in Stella to build and check the subtitles.",
+      "Recorded on Linux. On a Mac or Windows PC Stella would set up the same free speech tool, which wasn't recorded.",
+    ],
+    costNote:
+      "Yes. The recording was on Stella's free plan, so the speech recognition ran on the computer with a free model and nothing was paid; it's just slower than a hosted service.",
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I make an SRT file for free?",
+        a: "Use Subtitle Edit with Whisper on Windows, a Whisper app on a Mac, or type one by hand in a text editor for a short clip. Stella made one with a free local model.",
+      },
+      {
+        q: "Will it put the subtitles on my video?",
+        a: "No, not unless you ask. The .srt is a separate text file and the video stayed byte-for-byte the same. To burn captions into the picture, see [burn subtitles into a video](/how/video/burn-subtitles-into-video-for-tiktok).",
+      },
+      {
+        q: "How accurate is it?",
+        a: "On this clear interview, 1.2% of words were wrong. Expect more errors with background noise, crosstalk or strong accents.",
+      },
+      {
+        q: "My site needs .vtt, not .srt. What now?",
+        a: "See [convert SRT to VTT](/how/video/convert-srt-to-vtt). For text you can read instead of captions, see [transcribe voice memos to text](/how/audio/transcribe-voice-memos-to-text).",
+      },
+    ],
+    related: ["video/convert-srt-to-vtt", "video/burn-subtitles-into-video-for-tiktok", "audio/transcribe-voice-memos-to-text"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "OpenAI Whisper on GitHub", href: "https://github.com/openai/whisper" },
+      { label: "faster-whisper on GitHub", href: "https://github.com/SYSTRAN/faster-whisper" },
+      { label: "Subtitle Edit", href: "https://www.nikse.dk/subtitleedit" },
+    ],
+  },
+  {
+    slug: "rotate-video",
+    niche: "video",
+    searchPhrases: [
+      "rotate video",
+      "how to rotate a video",
+      "rotate video 90 degrees",
+      "rotate video mac",
+      "video plays sideways",
+    ],
+    title: "Rotate a sideways video and save it the right way up",
+    description:
+      "Fix a phone video that plays sideways and save it upright for every app: QuickTime on Mac, Clipchamp on Windows, ffmpeg, or Stella (stella.sh) on your computer.",
+    h1: "Rotate a video that plays sideways",
+    short: "Rotate a video",
+    lede: "A sideways school-play video saved upright, sound and quality kept.",
+    answer:
+      "On a Mac, QuickTime Player's Edit, Rotate Left (or Right) then File, Save fixes it. On Windows, Clipchamp's rotate button turns the clip before you export. The common mistake is turning it the wrong way, or only changing a rotation flag some players ignore. Stella (stella.sh) looked at frames to work out which way the scene was turned, rotated the picture itself a quarter turn left, and checked the result.",
+    stellaSteps: [
+      "Finds “School play” in Videos and finds no rotation flag: the picture itself is sideways",
+      "Looks at two frames from the video to see which way the stage and children are turned",
+      "Rotates the picture a quarter turn to the left (anticlockwise), re-saving at a very high quality setting and copying the sound unchanged",
+      "Looks at a frame of the new copy to confirm the children are standing upright on the stage",
+      "Saves School play (upright).mp4 next to the original and leaves the original unchanged",
+    ],
+    prompt:
+      "I filmed my daughter's school play with my phone on its side, and now the video in my Videos folder plays sideways. Turn it the right way up.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The upright copy in about 1 minute. Checked afterwards against an answer key written before the run: a portrait 720×1280 video, right way up and not mirrored (matched against the upright scene), the same 20 seconds, sound kept, the picture really turned rather than just flagged, and the original unchanged.",
+      note: "The school play is a drawn scene made for this run, with lopsided props so a wrong turn or mirror image would show. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/video/rotate-video/proof.mp4`,
+        cuts: webCuts("video/rotate-video"),
+        poster: `${PROOFS}/video/rotate-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 40.73,
+        realDuration: 63,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A sideways school-play video is in Videos." },
+        { at: 1.63, text: "The prompt: turn it the right way up." },
+        { at: 9.63, text: "Stella replies it will look at the frames to decide which way to turn it, and keep the original." },
+        { at: 15.63, text: "Checking frames, rotating and checking the result." },
+        { at: 25.93, text: "Done: a quarter turn left; the children stand upright in the new copy, sound unchanged." },
+      ],
+    },
+    manualTitle: "Rotate it yourself",
+    manualSteps: [
+      {
+        title: "Mac: QuickTime Player",
+        body: "Open the video, choose Edit, Rotate Left or Rotate Right until it's upright, then File, Save (or Export As to keep the original). On iPhone, the Photos app's Edit, Crop tool has a rotate button too.",
+      },
+      {
+        title: "Windows: Clipchamp",
+        body: "In Clipchamp, add the video to the timeline, select it and press the rotate button on the floating toolbar until it's upright, then Export. The Photos app's video editor on older Windows versions has a similar Rotate button.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i \"School play.mp4\" -vf transpose=2 -c:a copy \"School play (upright).mp4\"` turns it 90° anticlockwise; `transpose=1` turns it clockwise. Two transposes, or `-vf hflip,vflip`, turn it upside down.",
+      },
+      {
+        title: "Work out the direction first",
+        body: "Look at where the floor is. If the floor is on the right of the frame, turn it clockwise; on the left, anticlockwise. Upside down needs a half turn, and writing that reads backwards means the clip is mirrored, which needs a flip, not a rotation.",
+      },
+      {
+        title: "VLC only rotates while playing",
+        body: "VLC's Tools, Effects and Filters, Geometry, Transform rotates the picture during playback, but doesn't change the file unless you also run it through Convert / Save with that filter on.",
+      },
+    ],
+    limits: [
+      "Rotating doesn't add picture. A portrait video shows with black bars on a landscape TV.",
+      "Turning the picture means re-encoding it. Stella used a very high quality setting, so it looks the same, but the file is a fresh copy.",
+      "To decide which way to turn it, Stella looked at frames from the video, so those few pictures went to the AI model you use in Stella. The video itself was rotated on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my video play sideways on one app but not another?",
+        a: "Phones often save the picture sideways with a flag telling players to turn it. Some apps read the flag and some ignore it. Turning the picture itself, as Stella did, makes it upright everywhere.",
+      },
+      {
+        q: "Does rotating a video lose quality?",
+        a: "Changing only the flag doesn't, but not every player respects it. Rotating the picture means re-encoding; at a high-quality setting the difference is invisible.",
+      },
+      {
+        q: "Can I make a portrait video fill a landscape screen?",
+        a: "Only by cropping it or adding blurred edges. Ask Stella for a 16:9 version with blurred sides if you need one.",
+      },
+      {
+        q: "My phone videos won't play on the TV at all. Is that the same problem?",
+        a: "Usually not; it's the video format. See [convert MOV to MP4](/how/video/convert-mov-to-mp4).",
+      },
+    ],
+    related: ["video/convert-mov-to-mp4", "video/speed-up-video", "video/combine-videos-into-one"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Rotate or flip a clip in QuickTime Player on Mac", href: "https://support.apple.com/guide/quicktime-player/qtp5a6251741/mac" },
+      { label: "Microsoft: How to rotate videos in Clipchamp", href: "https://support.microsoft.com/en-gb/topic/how-to-rotate-videos-images-and-other-visual-elements-in-clipchamp-4043e70f-7fd0-4371-885f-c95639b8ddbf" },
+      { label: "FFmpeg filters: transpose", href: "https://ffmpeg.org/ffmpeg-filters.html#transpose-1" },
+    ],
+  },
+  {
+    slug: "speed-up-video",
+    niche: "video",
+    searchPhrases: [
+      "speed up video",
+      "speed up a video",
+      "speed up video without chipmunk voice",
+      "fast forward video",
+      "speed up video keep pitch",
+    ],
+    title: "Speed up a video 2× without a chipmunk voice",
+    description:
+      "Make a video twice as fast for Instagram while your voice keeps its normal pitch: iMovie, Clipchamp, ffmpeg, or Stella (stella.sh) on your own computer.",
+    h1: "Speed up a video without the chipmunk voice",
+    short: "Speed up a video",
+    lede: "A 68-second video at 2× in 34 seconds, the voice fast but at its normal pitch.",
+    answer:
+      "Use a speed control that preserves pitch. iMovie on a Mac keeps the pitch by default (Preserve pitch is ticked), and Clipchamp's speed setting does the same on Windows. Tools that simply play the sound faster raise it into a chipmunk voice. Stella (stella.sh) made a 2× copy of a cake-decorating video with the voice at its normal pitch and the sound in step with the picture.",
+    stellaSteps: [
+      "Finds “Cake decorating” in Videos: 68 seconds, landscape, with a spoken voice-over",
+      "Doubles the speed of the picture and speeds up the sound with a tempo change that keeps the pitch, at a smooth 30 frames a second",
+      "Saves Cake decorating (2x for Instagram).mp4 next to the original, ready to post",
+      "Compares the voice's pitch before and after, and looks at a frame from the new copy",
+      "Reports it's 34 seconds, half of 68, leaves the original unchanged, and points out a landscape video will have bars in an Instagram Reel, offering a vertical version",
+    ],
+    prompt:
+      "Make my cake decorating video in Videos twice as fast for Instagram, but keep my voice sounding normal, not like a chipmunk.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The 2× copy in about 1 minute 15 seconds. Checked afterwards against an answer key written before the run, using a time code drawn into the video: 34.0 seconds (half of 68), the picture at 2× all the way through, the voice at its normal pitch (208 Hz against 205 Hz), the sound in step with the picture, 30 frames a second, and the original unchanged.",
+      note: "The cake video is a drawn animation made for this run with a synthetic voice-over and a time code in the corner. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/video/speed-up-video/proof.mp4`,
+        cuts: webCuts("video/speed-up-video"),
+        poster: `${PROOFS}/video/speed-up-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.07,
+        realDuration: 74,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 68-second cake-decorating video with a voice-over is in Videos." },
+        { at: 1.63, text: "The prompt: twice as fast for Instagram, with the voice sounding normal." },
+        { at: 10.63, text: "Stella replies it's making a 2× copy with the voice at its normal pitch, keeping the original." },
+        { at: 16.63, text: "Speeding up the video and comparing the voice's pitch." },
+        { at: 27.9, text: "Done: 34 seconds, voice at the same pitch, with an offer of a vertical version for Reels." },
+      ],
+    },
+    manualTitle: "Speed it up yourself",
+    manualSteps: [
+      {
+        title: "Mac: iMovie",
+        body: "Add the clip to an iMovie project, select it and click the speedometer button above the viewer. Choose Fast, 2×, and keep Preserve pitch ticked. Then Share, File to export.",
+      },
+      {
+        title: "Windows: Clipchamp",
+        body: "Add the clip to the timeline, select it, open Speed in the property panel on the right and set it to 2×. Clipchamp keeps the voice's pitch. Then Export.",
+      },
+      {
+        title: "On the phone",
+        body: "Instagram's and TikTok's editors have a speed setting, and CapCut has Speed with a pitch option. Check the voice after: some apps raise the pitch unless you turn that off.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i in.mp4 -filter_complex \"[0:v]setpts=0.5*PTS[v];[0:a]atempo=2.0[a]\" -map \"[v]\" -map \"[a]\" out.mp4` doubles the speed of both, keeping the voice's pitch. For 4×, chain `atempo=2.0,atempo=2.0`.",
+      },
+      {
+        title: "Fit the platform",
+        body: "Reels and TikTok are vertical (9:16). A landscape video will show with bars or be cropped; reframe it to vertical in the editor, and add captions, since fast speech is easier to follow with them.",
+      },
+    ],
+    limits: [
+      "At 2× speech is fast but clear. Above about 3× it gets hard to follow, whichever tool you use.",
+      "It doesn't post to Instagram or reframe to vertical unless you ask; Stella offered both.",
+      "File names, the video's details and one frame from the new copy went to the AI model you use in Stella; the video was processed on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my voice sound like a chipmunk when I speed up a video?",
+        a: "The tool plays the sound faster without correcting the pitch, which raises it. Use a speed setting that preserves pitch, as iMovie and Clipchamp do.",
+      },
+      {
+        q: "Can I speed up only part of a video?",
+        a: "Yes. In iMovie or Clipchamp, split the clip and change the speed of one piece. Ask Stella for a time range and it will speed up only that stretch.",
+      },
+      {
+        q: "Can I slow a song down the same way?",
+        a: "Yes: see [slow down a song without changing pitch](/how/audio/slow-down-song-without-changing-pitch).",
+      },
+      {
+        q: "What else helps a video for Instagram?",
+        a: "Captions and a vertical frame. See [burn subtitles into a video for TikTok](/how/video/burn-subtitles-into-video-for-tiktok) and [cut silences from a video](/how/video/cut-silences-from-video).",
+      },
+    ],
+    related: ["video/cut-silences-from-video", "video/burn-subtitles-into-video-for-tiktok", "audio/slow-down-song-without-changing-pitch"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Slow down and speed up clips in iMovie on Mac", href: "https://support.apple.com/guide/imovie/mov6c442b2eb/mac" },
+      { label: "Clipchamp: speed up and slow down videos", href: "https://clipchamp.com/en/blog/speed-up-slow-down-video/" },
+      { label: "FFmpeg filters: atempo", href: "https://ffmpeg.org/ffmpeg-filters.html#atempo" },
     ],
   },
 ];

@@ -16,9 +16,9 @@ export const NICHES: Niche[] = [
     slug: "video",
     name: "Video editing",
     h1: "Video edits, done on your computer.",
-    title: "Video how-tos: subtitles, silences, merging, MKV to MP4",
+    title: "Video how-tos: subtitles, GIFs, rotating, converting",
     description:
-      "Burn in subtitles, cut silences, join clips into one video, shrink a video for Discord and convert MKV to MP4, with free tools or Stella (stella.sh).",
+      "Make or convert subtitles, cut silences, rotate, speed up, turn clips into GIFs, and convert MOV or MKV to MP4, with free tools or Stella (stella.sh).",
     intro:
       "Most quick video jobs (captions, trimming dead air, resizing for vertical) are a few commands in free tools. Each guide gives you those, and shows Stella (stella.sh) doing it on a real file.",
   },
@@ -38,7 +38,7 @@ export const NICHES: Niche[] = [
     h1: "Photos and files, put in order.",
     title: "Photos and files: convert, resize, de-duplicate, sort, rename",
     description:
-      "Convert HEIC to JPG, resize photos in bulk, remove their location, find duplicates, sort by date taken and rename PDFs, with free tools or Stella (stella.sh).",
+      "Convert HEIC or WebP to JPG, watermark or resize photos in bulk, fix wrong dates, sort out duplicates and screenshots, with free tools or Stella (stella.sh).",
     intro:
       "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
   },
@@ -75,12 +75,12 @@ export const NICHES: Niche[] = [
   {
     slug: "audio",
     name: "Audio and music",
-    h1: "Music and audio files, fixed in bulk.",
-    title: "Audio how-tos: MP3 tags, FLAC to MP3, voice memos to text",
+    h1: "Music and recordings, sorted and ready to play.",
+    title: "Audio and music how-tos: convert, join, split, practise",
     description:
-      "Fix MP3s that show Unknown Artist, add album art, convert FLAC to MP3 for the car and turn voice memos into text, with free tools or Stella (stella.sh).",
+      "Convert to MP3, fix tags, even out volume, make ringtones and audiobooks, or practice tracks (slower, new key, no vocals), with free tools or Stella (stella.sh).",
     intro:
-      "Music and recordings go wrong in batches: a whole album with no tags, a format the car won't play, memos you'd rather read than replay. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files.",
+      "Audio goes wrong in batches: memos the car won't play, lessons in the wrong order, songs at different volumes. Musicians want practice copies: slower, in their key, without the singer. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files, with what it installed and how good the result is.",
   },
   {
     slug: "contacts-calendar-email",

@@ -142,7 +142,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. MetadataFixer is a paid app built for exactly this, and GPTH is free and open source. Stella is free with the ChatGPT or Claude plan you already have, and does the same matching. It also handles the next job, like sorting the photos by year or [tidying the Downloads folder](/how/pc-cleanup/organize-downloads-folder) they arrived in.",
       },
     ],
-    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "photos-files/rename-pdf-files-based-on-content"],
+    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "photos-files/rename-pdf-files-based-on-content", "photos-files/fix-wrong-date-on-photos"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Google: Download your Google Photos data (Takeout)", href: "https://support.google.com/accounts/answer/3024190" },
@@ -370,7 +370,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf"],
+    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf", "photos-files/convert-webp-to-jpg"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
@@ -493,7 +493,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "The open-source ones (dupeGuru, Czkawka) are. Be wary of “PC cleaner” apps that scan for free and then charge to delete. Whatever you use, review the groups and send deletions to the Trash.",
       },
     ],
-    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder"],
+    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder", "photos-files/separate-screenshots-from-photos"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "dupeGuru", href: "https://dupeguru.voltaicideas.net" },
@@ -710,7 +710,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: [convert HEIC to JPG in bulk](/how/photos-files/convert-heic-to-jpg) and resize them in one go. Clear out repeats first with [find duplicate photos](/how/photos-files/find-duplicate-photos).",
       },
     ],
-    related: ["photos-files/remove-location-from-photos", "photos-files/convert-heic-to-jpg", "photos-files/find-duplicate-photos"],
+    related: ["photos-files/remove-location-from-photos", "photos-files/convert-heic-to-jpg", "photos-files/find-duplicate-photos", "photos-files/add-watermark-to-photos"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Microsoft: PowerToys Image Resizer", href: "https://learn.microsoft.com/en-us/windows/powertoys/image-resizer" },
@@ -930,6 +930,435 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     sources: [
       { label: "Apple: Perform quick actions in Finder on Mac", href: "https://support.apple.com/guide/mac-help/mchl97ff9142/mac" },
       { label: "PDF24 Creator", href: "https://tools.pdf24.org/en/creator" },
+    ],
+  },
+  {
+    slug: "add-watermark-to-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "add watermark to photos",
+      "watermark photos",
+      "batch watermark photos",
+      "add watermark to photos in bulk",
+      "add text watermark to multiple photos",
+    ],
+    title: "Add a watermark to photos in bulk, in the right corner",
+    description:
+      "Put your shop name in the bottom-right corner of every photo, upright ones included, as new copies: XnConvert, Preview, or Stella (stella.sh) on your own computer.",
+    h1: "Add a watermark to all your photos at once",
+    short: "Add a watermark to photos",
+    lede: "Sixteen shop photos with your name in the bottom-right corner, originals untouched.",
+    answer:
+      "For a whole folder, the free XnConvert (Windows, Mac, Linux) adds a Text action in a chosen corner to every photo and saves copies. Preview on a Mac does one photo at a time. Watch portrait phone photos: many tools draw on the sideways-stored picture, so the mark lands in the wrong corner. Stella (stella.sh) watermarked sixteen product photos in the bottom-right as you see them, sized to each photo, and saved copies in a new folder.",
+    stellaSteps: [
+      "Finds the Shop photos folder in Pictures: 16 product photos, three of them stored sideways with a flag that turns them upright when shown",
+      "Turns each photo upright first, so the watermark lands bottom-right as you see the picture",
+      "Writes “Fernhollow Ceramics” in soft white serif text with a light shadow, sized to each photo, in the bottom-right corner",
+      "Saves the copies with the same file names in a new Shop photos (watermarked) folder, then looks at a few to check placement",
+      "Confirms the originals are unchanged and keeps the watermark recipe so new shop photos can get the same mark later",
+    ],
+    prompt:
+      "Put 'Fernhollow Ceramics' as a watermark in the bottom right corner of every photo in my Shop photos folder in Pictures. Save them as new copies and leave the originals alone.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "16 watermarked copies in about 1 minute 30 seconds. Checked afterwards against an answer key written before the run: one copy per photo, the same size and right way up, a watermark in the bottom-right corner of each photo as displayed (the three sideways-stored ones included), the rest of each photo unchanged, and the originals untouched.",
+      note: "The shop and its photos are fictitious, drawn for this run; three were saved sideways with a rotation flag, the way phones store portrait shots. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/photos-files/add-watermark-to-photos/proof.mp4`,
+        cuts: webCuts("photos-files/add-watermark-to-photos"),
+        poster: `${PROOFS}/photos-files/add-watermark-to-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.9,
+        realDuration: 92,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A Shop photos folder in Pictures holds 16 product photos." },
+        { at: 1.63, text: "The prompt: “Fernhollow Ceramics” in the bottom-right corner of every photo, as new copies." },
+        { at: 14.63, text: "Stella replies it's saving watermarked copies and leaving the originals alone." },
+        { at: 20.63, text: "Turning photos upright, adding the watermark and checking a few." },
+        { at: 32.63, text: "Done: all 16 in Shop photos (watermarked); three stored sideways were saved upright so the mark sits bottom-right." },
+      ],
+    },
+    manualTitle: "Watermark them yourself",
+    manualSteps: [
+      {
+        title: "XnConvert (Windows, Mac, Linux)",
+        body: "Install the free XnConvert and add the folder on the Input tab. On Actions, add Image, Text: type the name, choose the font and size, set the position to bottom-right and the opacity to about 60%. On Output, choose a new folder and keep the original names, then Convert.",
+      },
+      {
+        title: "Turn portrait photos upright first",
+        body: "Phones save upright photos sideways with an orientation flag. In XnConvert, add Image, Rotate, Auto (or tick the option to use the EXIF orientation) before the Text action, so the mark lands in the corner you see.",
+      },
+      {
+        title: "Mac: Preview, one at a time",
+        body: "Open a photo in Preview, show the Markup toolbar, click the Text tool, type the name and drag it into the corner. Set the colour and font with the text style button, then File, Export to save a copy.",
+      },
+      {
+        title: "Size it to the photo",
+        body: "A fixed font size looks huge on small photos and tiny on large ones. Aim for text about 4% of the shorter side, with a margin of about 3%. White text with a soft dark shadow reads on both light and dark backgrounds.",
+      },
+      {
+        title: "Keep the originals",
+        body: "Always write to a new folder. You'll want clean photos later for print, a marketplace that forbids watermarks, or a new logo.",
+      },
+    ],
+    limits: [
+      "A visible watermark deters casual reuse, but it can be cropped or edited out.",
+      "This run used text. A logo image works the same way, but wasn't part of the test.",
+      "To check placement, Stella looked at a few of the watermarked copies, so those images went to the AI model you use in Stella, along with file names. The watermarking itself ran on your computer.",
+      "Recorded on Linux, where ImageMagick and the font were already installed. On a Mac or Windows PC Stella would usually install ImageMagick or use Python first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I watermark many photos at once for free?",
+        a: "XnConvert's Text action, applied to a folder, is the free desktop route. Stella did sixteen in one go and saved them as copies.",
+      },
+      {
+        q: "Why did my watermark end up in the wrong corner on some photos?",
+        a: "Those photos are stored sideways with a rotation flag. The tool drew on the stored picture, and when the photo turns upright the mark moves. Turning photos upright first fixes it.",
+      },
+      {
+        q: "Will the watermarked copy lose quality?",
+        a: "JPG copies are re-saved once. At high quality (Stella used 92) the difference isn't visible; the check found the rest of each photo unchanged.",
+      },
+      {
+        q: "What else can it do before I upload them?",
+        a: "Resize them for the shop: see [resize images in bulk](/how/photos-files/resize-images-in-bulk). And [remove the location from photos](/how/photos-files/remove-location-from-photos) before posting.",
+      },
+    ],
+    related: ["photos-files/resize-images-in-bulk", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "XnConvert", href: "https://www.xnview.com/en/xnconvert/" },
+      { label: "Apple: Annotate an image in Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1501/mac" },
+    ],
+  },
+  {
+    slug: "convert-webp-to-jpg",
+    niche: "photos-files",
+    searchPhrases: [
+      "convert webp to jpg",
+      "webp to jpg",
+      "avif to jpg",
+      "png to jpg",
+      "webp to jpg bulk",
+    ],
+    title: "Convert WebP, AVIF and PNG to JPG in bulk, no black backgrounds",
+    description:
+      "Turn pictures saved from websites (WebP, AVIF, PNG) into JPGs a printing site accepts, with see-through areas white: Preview, XnConvert, or Stella (stella.sh).",
+    h1: "Convert WebP (and AVIF, PNG) to JPG",
+    short: "Convert WebP to JPG",
+    lede: "Fifteen WebP, AVIF and PNG pictures as full-size JPGs, transparent bits made white.",
+    answer:
+      "On a Mac, open the pictures in Preview, select them all and use File, Export Selected Images as JPEG. On Windows, Paint saves one WebP as JPG; for many files and AVIF, use the free XnConvert. The usual snag is transparency: stickers and logos often come out on black. Stella (stella.sh) converted fifteen WebP, AVIF and PNG files to full-size JPGs in a new folder, with transparent areas white, and warned which would only print small.",
+    stellaSteps: [
+      "Finds the pictures in Downloads: 8 WebP, 3 AVIF and 4 PNG files, plus a JPG and a PDF that don't need converting",
+      "Checks each one's size and whether it has transparency or animation",
+      "Converts each to a high-quality JPG at the same width and height, putting a white background behind see-through areas",
+      "Saves them with the same names in a new JPG for printing folder in Downloads, then looks at a contact sheet of all fifteen to check them",
+      "Leaves the originals, the JPG and the PDF alone, and says they're website-sized, so the biggest is sharp only up to about a 6×4 print",
+    ],
+    prompt:
+      "I saved a bunch of pictures from websites into my Downloads and they're WebP, AVIF and PNG files. The photo printing site I use only takes JPG. Can you make JPG versions of all of them?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "15 JPGs in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run: all 15 converted with the same names, really JPEG inside, the same width and height, looking the same as the originals, the three transparent pictures on white rather than black, the JPG and PDF left alone, and the originals unchanged.",
+      note: "The pictures were drawn for this run; three have see-through backgrounds with soft edges. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/photos-files/convert-webp-to-jpg/proof.mp4`,
+        cuts: webCuts("photos-files/convert-webp-to-jpg"),
+        poster: `${PROOFS}/photos-files/convert-webp-to-jpg/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.7,
+        realDuration: 79,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Downloads holds WebP, AVIF and PNG pictures saved from websites." },
+        { at: 1.63, text: "The prompt: make JPG versions of all of them for a photo printing site." },
+        { at: 12.63, text: "Stella replies: full-resolution JPGs in a new folder, see-through areas white, originals unchanged." },
+        { at: 18.63, text: "Converting fifteen pictures and checking a contact sheet." },
+        { at: 28.7, text: "Done: 15 JPGs in JPG for printing, with a note that they're website-sized and will only print small." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "Mac: Preview",
+        body: "Select the pictures in Finder and open them together in Preview. In the sidebar press Cmd+A, then File, Export Selected Images. Click Options, choose JPEG and a folder. Recent macOS reads WebP and AVIF; check one transparent picture comes out white.",
+      },
+      {
+        title: "Windows: Paint for one file",
+        body: "Open the WebP in Paint and choose File, Save as, JPEG picture. Paint fills transparent areas with white when it saves. Older Windows versions may need the free WebP or AVIF extensions from the Microsoft Store to open them.",
+      },
+      {
+        title: "Many files: XnConvert",
+        body: "In the free XnConvert, add the files, set Output format to JPG at quality 90 or more, and add Actions, Image, Flatten (or set a white background) so transparency doesn't turn black. Choose an output folder and Convert.",
+      },
+      {
+        title: "Command line: ImageMagick",
+        body: "`magick sticker.webp -background white -alpha remove -quality 92 sticker.jpg` converts one with a white background. Without `-background white -alpha remove`, transparent areas often come out black.",
+      },
+      {
+        title: "Check the print size",
+        body: "For a sharp print you need about 300 pixels per inch: a 1800×1200 picture prints well at 6×4 inches. Pictures saved from websites are often smaller, so look for a larger original before ordering big prints.",
+      },
+    ],
+    limits: [
+      "JPG has no transparency, so stickers and logos get a solid white background.",
+      "JPG is lossy. Keep the originals if you might edit the pictures again.",
+      "File names, picture sizes and a small contact sheet of the results went to the AI model you use in Stella; the conversion ran on your computer, not on a converter website.",
+      "Recorded on Linux, where ImageMagick was already installed. On a Mac or Windows PC Stella would usually install a converter first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why do my converted PNGs have a black background?",
+        a: "The converter dropped the transparency without filling it, and empty pixels became black. Flatten onto white first, as Stella did for the two stickers and the logo.",
+      },
+      {
+        q: "How do I convert AVIF to JPG?",
+        a: "Preview on recent macOS, XnConvert, or ImageMagick all read AVIF. Paint on Windows needs the AV1 extension from the Microsoft Store.",
+      },
+      {
+        q: "Will converting reduce quality?",
+        a: "Slightly, as JPG compresses. At quality 90 to 95 the difference isn't visible; the check found every JPG matching its original closely.",
+      },
+      {
+        q: "What about iPhone HEIC photos?",
+        a: "See [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg). To make them smaller for upload, see [resize images in bulk](/how/photos-files/resize-images-in-bulk).",
+      },
+    ],
+    related: ["photos-files/convert-heic-to-jpg", "photos-files/resize-images-in-bulk", "photos-files/add-watermark-to-photos"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Convert image file types using Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1012/mac" },
+      { label: "XnConvert", href: "https://www.xnview.com/en/xnconvert/" },
+      { label: "ImageMagick command-line options", href: "https://imagemagick.org/script/command-line-options.php" },
+    ],
+  },
+  {
+    slug: "fix-wrong-date-on-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "change date taken on photos",
+      "how to change date on photos",
+      "change photo date",
+      "change date taken on photos batch",
+      "camera clock wrong photo dates",
+    ],
+    title: "Fix the wrong date on camera photos (shift date taken)",
+    description:
+      "Camera clock reset? Shift every photo's date taken by the same amount so they sort with your phone photos: Photos on Mac, ExifTool, or Stella (stella.sh).",
+    h1: "Change the date taken on photos with a wrong camera clock",
+    short: "Fix the wrong date on photos",
+    lede: "24 camera photos moved from 2019 to the right afternoon, gaps between them kept.",
+    answer:
+      "Don't set every photo to the same time: shift them all by the camera's clock error, using one photo whose real time you know. On a Mac, select the photos in Photos and choose Image, Adjust Date and Time, which shifts the rest by the same amount. ExifTool does it to the files on any computer. Stella (stella.sh) shifted 24 wedding photos from a camera stuck in 2019 to the right afternoon, left the phone photos alone and kept backups.",
+    stellaSteps: [
+      "Finds the wedding folder in Pictures: 24 camera photos dated 1 January 2019 and 8 phone photos with the right dates",
+      "Tells them apart by the camera that took them, and works out the clock error from the first camera photo and the real time you gave, 2:15 pm on 5 September 2026",
+      "Copies the camera photos into a backup folder, then shifts each one's date taken, date digitised and date modified by that same amount, so gaps between shots stay the same",
+      "Writes a list of every old and new time beside the backup, and doesn't re-save the pictures themselves",
+      "Checks the camera shots now run 2:15 to 4:51 pm among the phone shots, and notes they still group apart when sorted by name rather than date",
+    ],
+    prompt:
+      "My camera's clock reset after the battery died, so all my camera photos from Ana and Tomas's wedding in Pictures say 1 January 2019. The first one was actually taken at 2:15 pm on 5 September 2026. Fix the dates so they sort properly with the phone photos in the same folder.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "24 photos fixed in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run: every camera photo's date taken shifted by exactly the clock error, its date digitised too, the pictures themselves unchanged, the 8 phone photos left with their dates, and no stray copies with the wrong date mixed in.",
+      note: "The wedding, the couple and the photos are fictitious, drawn for this run with a camera clock set wrong on purpose. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/photos-files/fix-wrong-date-on-photos/proof.mp4`,
+        cuts: webCuts("photos-files/fix-wrong-date-on-photos"),
+        poster: `${PROOFS}/photos-files/fix-wrong-date-on-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.43,
+        realDuration: 80,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A wedding folder in Pictures mixes camera photos dated 2019 with phone photos." },
+        { at: 1.63, text: "The prompt: the first camera photo was really 2:15 pm on 5 September 2026; fix the dates." },
+        { at: 13.63, text: "Stella replies every camera shot moves by the same amount, phone photos untouched, originals backed up first." },
+        { at: 19.63, text: "Backing up and shifting 24 photos' dates." },
+        { at: 31.83, text: "Done: the camera photos run 2:15 to 4:51 pm among the phone photos; sort by date, not name." },
+      ],
+    },
+    manualTitle: "Fix the dates yourself",
+    manualSteps: [
+      {
+        title: "Work out the clock error",
+        body: "Pick one camera photo whose real time you know, or one taken at the same moment as a phone photo. The difference between its wrong time and the real time is the shift for every photo from that camera.",
+      },
+      {
+        title: "Mac: Photos",
+        body: "Import the folder into Photos, select only the camera photos, and choose Image, Adjust Date and Time. Set the first selected photo's real date and time; Photos shifts the rest by the same amount. To get files with the new date, use File, Export, Export Unmodified Original with the metadata option ticked.",
+      },
+      {
+        title: "Any computer: ExifTool",
+        body: "With the free ExifTool, in the photo folder, `exiftool \"-AllDates+=7:8:4 14:10:23\" -if '$Make eq \"Halvorsen\"' .` adds 7 years, 8 months, 4 days, 14 hours, 10 minutes and 23 seconds to that camera's photos only. It keeps `_original` backups. Swap in your own camera's make and shift.",
+      },
+      {
+        title: "Windows: one photo at a time",
+        body: "File Explorer's Properties, Details, Date taken lets you type a date for one photo. It doesn't shift by an amount, so for more than a handful use ExifTool.",
+      },
+      {
+        title: "Fix the camera for next time",
+        body: "Set the date and time in the camera's menu after a battery change, ideally from your phone's clock to the minute. Some cameras sync time from a phone app.",
+      },
+    ],
+    limits: [
+      "It needs one photo whose real time you know; everything else shifts by the same amount.",
+      "Videos from the same camera need the same shift in their own date fields; there were none in this test.",
+      "File names, camera details and dates went to the AI model you use in Stella; the photos weren't opened as pictures and their dates were changed on your computer.",
+      "Recorded on Linux, where the exiv2 photo-data tool was already installed. On a Mac or Windows PC Stella would usually install ExifTool or a similar tool first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I change the date taken on many photos at once?",
+        a: "Yes, by shifting them. Photos on a Mac does it inside its library; ExifTool changes the files on any computer. Stella shifted 24 in one go and kept backups.",
+      },
+      {
+        q: "Will changing the date affect photo quality?",
+        a: "No. The date lives in the photo's metadata. Stella rewrote only those fields, and the check confirmed the pictures themselves were unchanged.",
+      },
+      {
+        q: "Why do my photos still not line up when sorted by name?",
+        a: "Camera files (DSC_…) and phone files (PXL_…) have different names, so name order groups them. Sort by date taken, or ask Stella to rename them all to start with the date.",
+      },
+      {
+        q: "My Google Photos download has wrong dates. Is that the same?",
+        a: "It's a different cause: see [fix Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates). To file photos by month, see [sort photos into folders by date](/how/photos-files/sort-photos-into-folders-by-date).",
+      },
+    ],
+    related: ["photos-files/fix-google-takeout-photo-dates", "photos-files/sort-photos-into-folders-by-date", "photos-files/separate-screenshots-from-photos"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Photos on Mac, titles, captions and date and time", href: "https://support.apple.com/guide/photos/phta4e5a733f/mac" },
+      { label: "ExifTool: Date/Time Shift", href: "https://exiftool.org/Shift.html" },
+    ],
+  },
+  {
+    slug: "separate-screenshots-from-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "separate screenshots from photos",
+      "move screenshots to folder",
+      "how to separate screenshots from photos",
+      "screenshots folder",
+      "delete screenshots",
+    ],
+    title: "Separate screenshots from photos into their own folder",
+    description:
+      "Move screenshots out of a photo folder, including iPhone ones named like photos, without touching the real photos: Finder, File Explorer, or Stella (stella.sh).",
+    h1: "Separate screenshots from your photos",
+    short: "Separate screenshots from photos",
+    lede: "Fourteen screenshots moved to their own folder, 26 real photos left where they were.",
+    answer:
+      "Searching for “Screenshot” in file names misses iPhone screenshots, which are named IMG_1234.PNG like photos. On a Mac, Finder can find them with a search for Is Screen Capture; on Windows, sorting by type and dimensions helps. Stella (stella.sh) told 14 screenshots from 26 photos by screen-sized dimensions and missing camera details, moved them to a Screenshots folder, and left a list to undo it.",
+    stellaSteps: [
+      "Lists the 40 pictures in Pictures with each one's size, format and camera details",
+      "Finds 14 screenshots: Android, Mac and Windows ones named “Screenshot…”, plus 5 iPhone ones named like photos (IMG_2204.PNG) that are exactly a phone screen's size with no camera details",
+      "Looks at one of the iPhone ones to confirm it's a screenshot",
+      "Moves the 14 into a new Screenshots folder inside Pictures without deleting anything, keeping real photos that share a number (IMG_2204.JPG) where they were",
+      "Writes moved-files.txt in the Screenshots folder listing everything it moved, so you can put any back",
+    ],
+    prompt:
+      "My Pictures folder is a mess of real photos and screenshots all mixed together. Move the screenshots into their own folder so only the real photos are left.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Sorted in about 1 minute 15 seconds. Checked afterwards against an answer key written before the run: all 26 photos still in Pictures and unchanged, all 14 screenshots moved out (including the 5 iPhone ones named like photos), none deleted, and all of them in one folder with no photos in it.",
+      note: "The photos and screenshots were made for this run, with real-looking names, sizes and camera details. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/photos-files/separate-screenshots-from-photos/proof.mp4`,
+        cuts: webCuts("photos-files/separate-screenshots-from-photos"),
+        poster: `${PROOFS}/photos-files/separate-screenshots-from-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.5,
+        realDuration: 75,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Pictures holds 40 files: photos and screenshots mixed together." },
+        { at: 1.63, text: "The prompt: move the screenshots into their own folder so only real photos are left." },
+        { at: 10.63, text: "Stella replies it's moving screenshots to a new Screenshots folder, deleting nothing." },
+        { at: 16.63, text: "Checking each file's size and camera details, then moving the screenshots." },
+        { at: 29.37, text: "Done: 14 screenshots moved, 26 photos left, including five iPhone screenshots with photo-style names." },
+      ],
+    },
+    manualTitle: "Sort them yourself",
+    manualSteps: [
+      {
+        title: "Mac: Finder search",
+        body: "Open Pictures and press Cmd+F. Click the first criterion menu, choose Other and tick Is Screen Capture, then set it to Yes. Select the results, make a new folder and drag them into it. This finds Mac screenshots; iPhone ones copied over may need the next steps.",
+      },
+      {
+        title: "Spot iPhone screenshots",
+        body: "iPhone screenshots are PNG files named IMG_xxxx.PNG at exactly the phone's screen size (for example 1179×2556), while photos are HEIC or JPG with a camera model in their details. In Finder's list view, add the Kind and Dimensions columns and sort by them.",
+      },
+      {
+        title: "Windows: File Explorer",
+        body: "New screenshots from Print Screen or the Snipping Tool already go to Pictures, Screenshots. For older mixed ones, switch to Details view, right-click the column header to add Dimensions and Camera model, sort, and move the screen-sized PNGs without a camera model into a new folder.",
+      },
+      {
+        title: "On the phone",
+        body: "iPhone and Android Photos apps keep a Screenshots album automatically. Delete or export screenshots there before syncing, so they don't mix into your photo folders.",
+      },
+      {
+        title: "Move, don't delete",
+        body: "Put screenshots in their own folder first and look through them later. Some hold receipts, tickets or confirmation numbers you may still need.",
+      },
+    ],
+    limits: [
+      "A photo of a screen taken with a camera counts as a photo, and a screenshot that somehow carries camera details can't be told apart.",
+      "Pictures sent through chat apps lose their camera details and may look like screenshots; check the moved list if you save a lot from chats.",
+      "File names, sizes and camera details went to the AI model you use in Stella, plus the one screenshot it opened to check. It moved files only; nothing was deleted.",
+      "Recorded on Linux, where ImageMagick was already installed to read the picture details. On a Mac or Windows PC Stella would usually install a similar tool first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I separate screenshots from photos on iPhone?",
+        a: "On the phone, the Photos app's Screenshots album already does it. On a computer, after importing, screenshots mix in with photos, which is what this guide sorts out.",
+      },
+      {
+        q: "Why didn't searching for “Screenshot” find them all?",
+        a: "iPhone screenshots are named IMG_xxxx.PNG, just like photos. Stella found five of them by their screen-sized dimensions and missing camera details.",
+      },
+      {
+        q: "Can I undo the move?",
+        a: "Yes. The Screenshots folder has moved-files.txt listing every file; move them back to Pictures, or ask Stella to.",
+      },
+      {
+        q: "Can it tidy the rest of my pictures too?",
+        a: "Yes: [find duplicate photos](/how/photos-files/find-duplicate-photos) or [sort photos into folders by date](/how/photos-files/sort-photos-into-folders-by-date). For Downloads, see [organize your Downloads folder](/how/pc-cleanup/organize-downloads-folder).",
+      },
+    ],
+    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "pc-cleanup/organize-downloads-folder"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Microsoft: Use Snipping Tool to capture screenshots", href: "https://support.microsoft.com/en-us/windows/use-snipping-tool-to-capture-screenshots-00246869-1843-655f-f220-97299b865f6b" },
+      { label: "Apple: Take a screenshot on iPhone", href: "https://support.apple.com/en-us/102616" },
     ],
   },
 ];

@@ -108,7 +108,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Sodium, Iris and Mod Menu only change graphics and menus on your side, and they're allowed on most servers. Some servers ban client mods outright, so read their rules first.",
       },
     ],
-    related: ["game-mods/minecraft-modpack-exit-code-1", "pc-cleanup/organize-downloads-folder", "game-mods/install-minecraft-resource-pack"],
+    related: ["game-mods/minecraft-modpack-exit-code-1", "pc-cleanup/organize-downloads-folder", "game-mods/install-minecraft-resource-pack", "game-mods/install-minecraft-shaders"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Fabric installer", href: "https://fabricmc.net/use/installer/" },
@@ -226,7 +226,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Install a loader first, then add mods made for the same Minecraft version. The guide to [install Fabric, Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) walks through it, and Stella can do it in the same chat.",
       },
     ],
-    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "pc-cleanup/organize-downloads-folder", "game-mods/allocate-more-ram-to-minecraft"],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "pc-cleanup/organize-downloads-folder", "game-mods/allocate-more-ram-to-minecraft", "game-mods/install-minecraft-mods"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Minecraft Wiki: Java Edition system requirements and Java versions", href: "https://minecraft.wiki/w/Tutorial:Update_Java" },
@@ -526,7 +526,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Yes. See [install Sodium and Iris on 1.21](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) for shaders and performance mods, or [give Minecraft more RAM](/how/game-mods/allocate-more-ram-to-minecraft) if a modpack runs out of memory.",
       },
     ],
-    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/allocate-more-ram-to-minecraft", "game-mods/minecraft-modpack-exit-code-1"],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/allocate-more-ram-to-minecraft", "game-mods/minecraft-modpack-exit-code-1", "game-mods/install-minecraft-shaders"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Minecraft Wiki: Tutorial: Loading a resource pack", href: "https://minecraft.wiki/w/Tutorial:Loading_a_resource_pack" },
@@ -638,6 +638,655 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     sources: [
       { label: "Nodecraft: How to allocate more RAM to Minecraft launchers", href: "https://nodecraft.com/support/games/minecraft/how-to-allocate-more-ram-to-minecraft-launchers" },
       { label: "CurseForge: How to allocate more RAM to Minecraft", href: "https://blog.curseforge.com/how-to-allocate-more-ram-to-minecraft/" },
+    ],
+  },
+  // ---- batch 3 (writer 2) ----
+  {
+    slug: "install-minecraft-mods",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install minecraft mods",
+      "minecraft mods not showing up",
+      "how to install fabric mods",
+      "minecraft mods folder",
+      "minecraft duplicate mods found",
+    ],
+    title: "Install Minecraft mods (and why they don't show up)",
+    description:
+      "Mods only load from the mods folder, built for your loader and game version, one copy each. Sort the jars by hand or let Stella (stella.sh) install the ones that work.",
+    h1: "How to install Minecraft mods, and why yours don't show up",
+    short: "Install Minecraft mods",
+    lede: "A Downloads folder of mixed jars sorted: what installs, what can't, and why.",
+    answer:
+      "Minecraft only loads mods from the `mods` folder of the profile you launch, and only jars built for that profile's loader (Fabric or Forge) and exact game version. Put each mod in once, remove older copies, and add the library mods they need. Stella (stella.sh) reads every jar in your Downloads, installs the ones that match your Fabric version, moves out the duplicates and tells you which ones can't work and why.",
+    stellaSteps: [
+      "Opens each downloaded jar and reads its built-in description (`fabric.mod.json` or Forge's `mods.toml`) for the loader, Minecraft version and required mods",
+      "Installs the five that fit Fabric 1.21.4, one copy each: AppleCore HUD had been downloaded twice",
+      "Moves the old Swift Render 0.5.1 into a backup folder so it doesn't clash with the new 0.6.2, which would stop Fabric from starting",
+      "Spots that one zip is a texture pack, not a mod, and puts it with your resource packs",
+      "Leaves out the Forge-only mod and the one built for 1.20.1, says why for each, and reminds you to launch the Fabric profile",
+    ],
+    prompt:
+      "I downloaded a bunch of Minecraft mods into my Downloads for my Fabric 1.21.4 game but they don't show up. Install the ones that will work and tell me which ones won't.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Sorted in under a minute and a half. Checked afterwards against an answer key written before the run, by reading the mods folder: exactly one jar each of Fabric API, Swift Render (0.6.2 only), Lantern Lights, Cloth Config, Hearth Menu and AppleCore HUD; the Forge mod, the 1.20.1 mod and the resource pack kept out of it. Stella named both mods that won't work and why.",
+      note: "File-level check only: the test computer had no Minecraft account and the game was never launched. The mods are fictitious stand-ins with real mod metadata inside, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/game-mods/install-minecraft-mods/proof.mp4`,
+        cuts: webCuts("game-mods/install-minecraft-mods"),
+        poster: `${PROOFS}/game-mods/install-minecraft-mods/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.9,
+        realDuration: 88,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Downloads holds a mix of mod jars, a duplicate and a texture pack." },
+        { at: 1.7, text: "The prompt: install the mods that work with Fabric 1.21.4 and say which won't." },
+        { at: 12.7, text: "Stella replies that it will check each mod against Fabric 1.21.4 first." },
+        { at: 19.4, text: "Reading every jar and installing, sped up 3×." },
+        { at: 31.2, text: "Done: five mods and the texture pack installed, the old Swift Render moved aside, and the Forge and 1.20.1 mods explained." },
+      ],
+    },
+    manualTitle: "Install them yourself",
+    manualSteps: [
+      {
+        title: "Know your loader and version",
+        body: "Open the Minecraft Launcher, Installations, and look at the profile you play: it says something like `fabric-loader-1.21.4`. Every mod you add must say Fabric (or Quilt) and 1.21.4 on its download page. A Forge or NeoForge mod won't load on Fabric, and the reverse.",
+      },
+      {
+        title: "Open the mods folder",
+        body: "Windows: press Win+R and paste `%appdata%\\.minecraft\\mods`. Mac: in Finder, Go, Go to Folder, `~/Library/Application Support/minecraft/mods`. Linux: `~/.minecraft/mods`. Create the folder if it's missing. Launchers like Prism or CurseForge have their own mods folder per instance.",
+      },
+      {
+        title: "Copy in one jar per mod",
+        body: "Drag in the right jars from Downloads. Files named `something (1).jar` are second downloads; leave them out. If you're updating a mod, delete or move its old version out first: two copies stop Fabric with a “Duplicate mods found” error.",
+      },
+      {
+        title: "Add what they depend on",
+        body: "Most Fabric mods need Fabric API, and many need a library such as Cloth Config. The mod's page lists these under Dependencies. Download the versions for the same game version.",
+      },
+      {
+        title: "Launch the right profile",
+        body: "Pick the Fabric profile in the launcher, not the plain Latest release one, and press Play. If it stops with “Incompatible mods found”, the message names the mod and what it wanted; remove or replace that one and try again.",
+      },
+    ],
+    limits: [
+      "This was checked at file level only: no Minecraft account was used and the game wasn't launched, so a mod that is broken inside would only show when you play.",
+      "Forge-only mods can't run on Fabric. Stella says so instead of forcing them in; you need a Fabric build or a Forge profile.",
+      "Stella installs the files you downloaded. To fetch new mods, it uses Modrinth, CurseForge or the project's own site, never re-upload sites.",
+      "Recorded on Linux, where the game folder is `~/.minecraft`. On Windows it's `%appdata%\\.minecraft`, on a Mac `~/Library/Application Support/minecraft`; Stella finds it either way.",
+      "Only file names and the mods' built-in descriptions go to the AI model you use in Stella.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why don't my Minecraft mods show up?",
+        a: "Usually they're still in Downloads, in the wrong profile's folder, or you launched the plain profile instead of Fabric or Forge. A jar for another loader or game version is also skipped or stops the game.",
+      },
+      {
+        q: "What does “Duplicate mods found” mean?",
+        a: "Two jars with the same mod inside are in the mods folder, often an old and a new version or a `(1)` second download. Keep one.",
+      },
+      {
+        q: "Can I use Forge mods with Fabric?",
+        a: "No. They're built for different loaders. Look for a Fabric version of the mod, or make a separate Forge profile for it.",
+      },
+      {
+        q: "Do I need Sodium and Iris too?",
+        a: "Only for better performance and shaders. See [Sodium and Iris on 1.21](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric), and if the game crashes at start, [exit code 1](/how/game-mods/minecraft-modpack-exit-code-1).",
+      },
+    ],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/minecraft-modpack-exit-code-1", "game-mods/install-minecraft-shaders"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Fabric documentation: Installing mods", href: "https://docs.fabricmc.net/players/installing-mods" },
+      { label: "Minecraft Wiki: .minecraft folder", href: "https://minecraft.wiki/w/.minecraft" },
+    ],
+  },
+  {
+    slug: "install-minecraft-shaders",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install minecraft shaders",
+      "minecraft shaders not showing up",
+      "shaders not showing up in shader packs iris",
+      "minecraft shaderpacks folder",
+      "minecraft shaders not working",
+    ],
+    title: "Minecraft shaders not showing up? Install them right",
+    description:
+      "A shader pack only appears in Iris if its zip sits in the shaderpacks folder, not resourcepacks, with shaders/ at the top. Fix it by hand or let Stella (stella.sh) do it.",
+    h1: "Minecraft shaders not showing up in the Shader Packs list",
+    short: "Install Minecraft shaders",
+    lede: "A shader zip in the wrong folder, moved where Iris looks and switched on.",
+    answer:
+      "Shader packs go in `.minecraft/shaderpacks` as the zip you downloaded, not in `resourcepacks` and not unzipped one folder too deep. Iris lists a pack only when the `shaders` folder is at the top of the zip. In the game: Options, Video Settings, Shader Packs, Open Shader Pack Folder, drop the zip in, select it and Apply. Stella (stella.sh) finds where the pack ended up, moves it, and switches it on in Iris's settings file.",
+    stellaSteps: [
+      "Looks for the Lumen pack and finds it in the resource packs folder, where Iris never looks",
+      "Checks the zip has the `shaders` folder at its top level, so it doesn't need re-packing",
+      "Moves it into `shaderpacks` and removes the stray copy from resource packs",
+      "Edits Iris's settings file to select Lumen and turn shaders on, leaving the other settings and your mods alone",
+      "Tells you to start the game with the Fabric profile, and that it hasn't launched the game to see it running",
+    ],
+    prompt:
+      "I put the Lumen shaders zip in Minecraft but it doesn't show up in the Shader Packs list. Iris is already installed. Can you fix it and turn the shader on?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Fixed in about 75 seconds. Checked afterwards against an answer key written before the run: the pack in `shaderpacks` with `shaders/` at its top and all 7 shader files; Iris set to use it with shaders switched on and its other settings kept; mods and game options untouched; the stray copy gone from resource packs.",
+      note: "File-level check only: no Minecraft account was used and the game was never launched, so the shader wasn't seen rendering. The Lumen pack is a stand-in made for this run. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/game-mods/install-minecraft-shaders/proof.mp4`,
+        cuts: webCuts("game-mods/install-minecraft-shaders"),
+        poster: `${PROOFS}/game-mods/install-minecraft-shaders/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.1,
+        realDuration: 78,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer with a Fabric 1.21.4 setup and Iris installed." },
+        { at: 2.2, text: "The prompt: the Lumen shader doesn't appear in Shader Packs; fix it and turn it on." },
+        { at: 17.2, text: "Stella replies that it's looking into why Iris doesn't list the pack." },
+        { at: 23, text: "Finding and moving the pack, sped up 2×." },
+        { at: 32.9, text: "Done: the zip was in resource packs; it's now in shaderpacks and switched on for the next launch." },
+      ],
+    },
+    manualTitle: "Fix it yourself",
+    manualSteps: [
+      {
+        title: "Make sure Iris (or OptiFine) is running",
+        body: "Shaders need a shader mod. In the game, Options, Video Settings should have a Shader Packs button. If it doesn't, you launched a profile without Iris: pick the Fabric profile, or [install Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) first.",
+      },
+      {
+        title: "Open the shaderpacks folder from the game",
+        body: "Options, Video Settings, Shader Packs, Open Shader Pack Folder. This opens the right folder for the profile you're in, which matters with launchers that keep separate instances.",
+      },
+      {
+        title: "Drop the zip in, unopened",
+        body: "Move the shader .zip from Downloads (or from `resourcepacks`, if you put it there) into this folder. Don't unzip it. If you did unzip it, the folder you keep must contain a `shaders` folder directly inside it, not another folder first.",
+      },
+      {
+        title: "Check what's inside an odd download",
+        body: "Some sites wrap the real pack in a second zip or folder with a readme. Open it: if you see `shaders` at the top, that's the pack. If you see another folder or zip, that inner one is the pack to use.",
+      },
+      {
+        title: "Select it and apply",
+        body: "Back in Shader Packs, click the pack name, then Apply and Done. If it's still missing, press the refresh by closing and reopening the menu. Lower render distance or shader quality if frames drop.",
+      },
+    ],
+    limits: [
+      "Checked at file level only: no Minecraft account was used and the game wasn't launched, so we didn't see the shader render.",
+      "Shaders need a capable graphics card. Stella can switch a pack on and choose lighter settings, but it can't make a weak laptop run one smoothly.",
+      "Iris rewrites its settings file when the game closes, so quit Minecraft before asking Stella to change shader settings.",
+      "Recorded on Linux (`~/.minecraft`). On Windows the folder is `%appdata%\\.minecraft\\shaderpacks`, on a Mac `~/Library/Application Support/minecraft/shaderpacks`.",
+      "Only folder and file names and Iris's small settings file go to the AI model you use in Stella.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why is my shader in the resource packs list instead?",
+        a: "You put it in `resourcepacks`. Resource packs change textures; shader packs change lighting and need Iris or OptiFine. Move the zip to `shaderpacks`.",
+      },
+      {
+        q: "Do I need to unzip shaders?",
+        a: "No. Leave the zip as it is. Iris reads zips directly, as long as `shaders` is the first folder inside.",
+      },
+      {
+        q: "Why is there no Shader Packs button?",
+        a: "Iris isn't loaded: you launched the plain profile, or Iris doesn't match your game version. See [install Minecraft mods](/how/game-mods/install-minecraft-mods) for how loaders and versions must match.",
+      },
+      {
+        q: "What's the difference between shaders and resource packs?",
+        a: "Resource packs swap textures and sounds and need no mods: see [install a resource pack](/how/game-mods/install-minecraft-resource-pack). Shaders add lighting, shadows and water effects and need a shader mod.",
+      },
+    ],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/install-minecraft-resource-pack", "game-mods/install-minecraft-mods"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Iris Shaders", href: "https://irisshaders.dev/" },
+      { label: "Iris on GitHub", href: "https://github.com/IrisShaders/Iris" },
+    ],
+  },
+  {
+    slug: "install-minecraft-map",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install minecraft maps",
+      "how to download minecraft maps",
+      "how to import minecraft worlds",
+      "minecraft world download not showing up",
+      "how to install minecraft worlds java",
+    ],
+    title: "Install a downloaded Minecraft map (Java) so it shows up",
+    description:
+      "A downloaded map only appears in Singleplayer when its folder with level.dat sits directly in saves. Unzip it the right way by hand, or let Stella (stella.sh) put it in.",
+    h1: "Install a downloaded Minecraft map so it shows up in Singleplayer",
+    short: "Install a Minecraft map",
+    lede: "A Skyblock map zipped one folder too deep, put where Singleplayer lists it.",
+    answer:
+      "Unzip the download and find the folder that contains `level.dat`: that folder, not the one around it, goes into `.minecraft/saves`. Many map zips wrap it in an extra folder with a readme (and a `__MACOSX` folder from a Mac), so the game never lists it. Stella (stella.sh) unpacks the map, finds the real world folder, copies just that into saves, and tells you which game version the map was made for.",
+    stellaSteps: [
+      "Finds the Skyblock Classic zip in Downloads and looks inside: the world sits a folder deeper than the game expects, next to a readme and Mac junk files",
+      "Finds your game folder; with more than one Minecraft install, it uses the one played most recently",
+      "Copies only the real world folder (the one holding `level.dat`) into saves, without the wrapper, readme or `__MACOSX` files",
+      "Reads the map's level.dat for the version it was made for (Java 1.21.4) and checks your launcher has it",
+      "Leaves your existing worlds and the original zip as they were",
+    ],
+    prompt:
+      "I downloaded a Minecraft map called Skyblock Classic. It's in my Downloads. Can you put it in so it shows up in my singleplayer worlds?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Installed in about 70 seconds. Checked afterwards against an answer key written before the run: the map sits one level below saves with its level.dat, all 8 map files intact, the two existing worlds untouched, no `__MACOSX` junk and no empty wrapper folder in saves.",
+      note: "File-level check only: no Minecraft account was used and the game was never launched. The map is a stand-in made for this run, zipped the way many map sites ship them. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/game-mods/install-minecraft-map/proof.mp4`,
+        cuts: webCuts("game-mods/install-minecraft-map"),
+        poster: `${PROOFS}/game-mods/install-minecraft-map/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.1,
+        realDuration: 72,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A downloaded map zip is in Downloads." },
+        { at: 1.7, text: "The prompt: put Skyblock Classic in so it shows up in Singleplayer." },
+        { at: 15.7, text: "Stella replies that it will unpack it, copy the world into saves and say which version it's for." },
+        { at: 21.5, text: "Unpacking and installing, sped up 2×." },
+        { at: 30.8, text: "Done: the map will show as “Skyblock Classic”, made for 1.21.4, and the other worlds weren't changed." },
+      ],
+    },
+    manualTitle: "Install it yourself",
+    manualSteps: [
+      {
+        title: "Unzip the download",
+        body: "Windows: right-click the zip, Extract All. Mac: double-click it. You get a folder; open it.",
+      },
+      {
+        title: "Find the folder with level.dat",
+        body: "Keep opening folders until you see `level.dat` alongside a `region` folder. The folder that holds those is the world. Ignore readme files, changelogs and any `__MACOSX` folder.",
+      },
+      {
+        title: "Open your saves folder",
+        body: "Windows: Win+R, `%appdata%\\.minecraft\\saves`. Mac: Finder, Go, Go to Folder, `~/Library/Application Support/minecraft/saves`. Linux: `~/.minecraft/saves`. Launchers with instances (Prism, CurseForge) have a `saves` folder inside each instance.",
+      },
+      {
+        title: "Copy in the world folder",
+        body: "Drag the folder that contains `level.dat` into saves. If a world with the same folder name already exists, rename the new one first so nothing is overwritten.",
+      },
+      {
+        title: "Open Singleplayer",
+        body: "Start the game (or go back to the title screen) and open Singleplayer. The map is listed by its own name. If the game warns the world was made in a newer version, update the game or choose a version of the map that matches.",
+      },
+    ],
+    limits: [
+      "Checked at file level only: no Minecraft account was used and the game wasn't launched.",
+      "Java maps only. Bedrock maps come as `.mcworld` files, which you open by double-clicking.",
+      "A map built for a newer version may not load in an older game. Stella reads the version from the map and tells you.",
+      "Only download maps from sites you trust. Stella installs the file you give it; it doesn't vet the map maker.",
+      "Recorded on Linux. On Windows and Mac the saves folder is in a different place (above); Stella looks in the usual places for each.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why doesn't my downloaded map show up in Minecraft?",
+        a: "Almost always it's one folder too deep: saves contains a folder that contains the world folder. Move the inner folder, the one with `level.dat`, directly into saves.",
+      },
+      {
+        q: "Do I need to unzip a Minecraft map?",
+        a: "Yes, for Java. The game reads world folders, not zips. (Bedrock's `.mcworld` files are the exception: double-click to import.)",
+      },
+      {
+        q: "Can I play a map made for an older version?",
+        a: "Usually yes; the game upgrades it when you open it. Make a [backup of the world](/how/game-mods/back-up-minecraft-worlds) first, because you can't go back to the older version after.",
+      },
+      {
+        q: "How do I turn on cheats in a downloaded map?",
+        a: "Most adventure maps want cheats off. If you want them on for good, see [turn on cheats in an existing world](/how/game-mods/turn-on-cheats-in-minecraft-world).",
+      },
+    ],
+    related: ["game-mods/back-up-minecraft-worlds", "game-mods/turn-on-cheats-in-minecraft-world", "game-mods/install-minecraft-resource-pack"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Minecraft Wiki: Tutorial: Map downloads", href: "https://minecraft.wiki/w/Tutorial:Map_downloads" },
+      { label: "Minecraft Wiki: .minecraft folder", href: "https://minecraft.wiki/w/.minecraft" },
+    ],
+  },
+  {
+    slug: "back-up-minecraft-worlds",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to backup minecraft worlds",
+      "how to transfer minecraft worlds from pc to pc",
+      "minecraft saves folder",
+      "how to restore minecraft world from backup",
+      "back up minecraft worlds java",
+    ],
+    title: "Back up Minecraft worlds and move them to a new PC",
+    description:
+      "Back up every Minecraft Java world, including ones inside Prism or CurseForge instances, as zips you can move to a new computer: by hand, or with Stella (stella.sh).",
+    h1: "Back up all your Minecraft worlds and move them to a new computer",
+    short: "Back up Minecraft worlds",
+    lede: "Every world zipped, including the modded one hidden inside a launcher instance.",
+    answer:
+      "Close Minecraft, open your saves folder, and zip each world folder (right-click, Send to, Compressed folder on Windows; Compress on a Mac). Don't forget launchers like Prism, CurseForge or the Modrinth App: each instance has its own saves folder, which is where modded worlds live. Stella (stella.sh) finds every world on the computer, zips each one, checks the zips open, and leaves the originals alone.",
+    stellaSteps: [
+      "Searches for worlds in the regular game folder and in other launchers' instances; it found three regular worlds and a modded one inside a Prism instance",
+      "Zips each world on its own, so you can restore one without the others, into a dated Minecraft Backups folder in your home folder",
+      "Opens each zip again to check it isn't damaged, and leaves the original worlds unchanged",
+      "Because the new computer wasn't connected to Stella yet, also uploads the zips to your Stella Drive and checks the uploaded copies match",
+      "Explains where each world goes on the new computer, including that the modded world needs an instance with the same mods",
+    ],
+    prompt: "Back up all my Minecraft worlds so I don't lose them. I want to copy the backups to my new computer.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Four worlds backed up in about 90 seconds. Checked afterwards against an answer key written before the run: each of the four worlds, including the one inside the Prism instance, is in a zip outside the game folders with every file byte-identical to the original, and the original worlds are unchanged.",
+      note: "File-level check only: no Minecraft account was used and the game was never launched. The worlds are stand-ins made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/game-mods/back-up-minecraft-worlds/proof.mp4`,
+        cuts: webCuts("game-mods/back-up-minecraft-worlds"),
+        poster: `${PROOFS}/game-mods/back-up-minecraft-worlds/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 49.6,
+        realDuration: 92,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer with three regular Minecraft worlds and a modded one in a Prism instance." },
+        { at: 1.7, text: "The prompt: back up all my worlds; I want to copy them to my new computer." },
+        { at: 17.7, text: "Stella replies that it will look in every launcher, and that the backups will also go to the Stella Drive for the new computer." },
+        { at: 23.7, text: "Finding, zipping and checking the worlds, sped up 3×." },
+        { at: 35.4, text: "Done: four worlds, one zip each, on this computer and in the Drive, with steps for the new computer." },
+      ],
+    },
+    manualTitle: "Back them up yourself",
+    manualSteps: [
+      {
+        title: "Quit Minecraft",
+        body: "Close the game completely so no world is half-saved while you copy it.",
+      },
+      {
+        title: "Open the saves folder",
+        body: "Windows: Win+R, paste `%appdata%\\.minecraft\\saves`. Mac: Finder, Go, Go to Folder, `~/Library/Application Support/minecraft/saves`. Linux: `~/.minecraft/saves`. Each folder in there is one world.",
+      },
+      {
+        title: "Zip each world",
+        body: "Windows: right-click a world folder, Send to, Compressed (zipped) folder. Mac: right-click, Compress. Zipping each world separately lets you restore just one later.",
+      },
+      {
+        title: "Check your launchers",
+        body: "Prism, CurseForge, the Modrinth App and others keep worlds per instance. In the launcher, right-click the instance and open its folder; the worlds are in `saves` (or `minecraft/saves`). Zip those too, and note which instance each came from.",
+      },
+      {
+        title: "Copy to the new computer",
+        body: "Put the zips on a USB stick or cloud drive. On the new computer, unzip each into the saves folder there, so `saves/<world>/level.dat` exists. Modded worlds go into an instance with the same mods and game version.",
+      },
+    ],
+    limits: [
+      "Checked at file level only: no Minecraft account was used and the game wasn't launched.",
+      "In this run Stella uploaded the backup zips to the user's own Stella Drive so the new computer could download them. If you'd rather keep them local, say “only on this computer” or name a USB drive.",
+      "Close Minecraft first. A world that's open while it's copied can be caught mid-save.",
+      "Stella copies backups between your own computers once both are signed in to Stella; it can't reach a computer that isn't.",
+      "Recorded on Linux; on Windows and Mac the game folder is elsewhere (above). Only folder names go to the AI model; the world files themselves aren't read by it.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Where are my Minecraft worlds saved?",
+        a: "In the `saves` folder inside `.minecraft` (paths above), plus a separate `saves` folder in each launcher instance if you use Prism, CurseForge or the Modrinth App.",
+      },
+      {
+        q: "How do I restore a world from a backup?",
+        a: "Quit the game, unzip the backup into saves so the folder with `level.dat` sits directly inside, and open Singleplayer. The same steps as [installing a downloaded map](/how/game-mods/install-minecraft-map).",
+      },
+      {
+        q: "Can Bedrock worlds be backed up the same way?",
+        a: "Bedrock worlds export from the game itself: Edit world, Export World, which makes a `.mcworld` file. This page covers Java Edition.",
+      },
+      {
+        q: "My world won't load. Will a backup help?",
+        a: "If you have one, yes. If not, the game keeps its own backup of the world's settings file, which fixes most crashes after a power cut: see [fix a corrupted Minecraft world](/how/game-mods/fix-corrupted-minecraft-world).",
+      },
+    ],
+    related: ["game-mods/fix-corrupted-minecraft-world", "game-mods/install-minecraft-map", "game-mods/turn-on-cheats-in-minecraft-world"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Minecraft Wiki: .minecraft folder (saves)", href: "https://minecraft.wiki/w/.minecraft" },
+      { label: "Prism Launcher wiki", href: "https://prismlauncher.org/wiki/" },
+    ],
+  },
+  {
+    slug: "fix-corrupted-minecraft-world",
+    niche: "game-mods",
+    searchPhrases: [
+      "minecraft world corrupted",
+      "how to fix corrupted minecraft world",
+      "minecraft world won't load after crash",
+      "minecraft level.dat_old",
+      "how to restore minecraft world to previous save",
+    ],
+    title: "Fix a corrupted Minecraft world after a crash",
+    description:
+      "World won't load after a crash or power cut? Usually level.dat was wiped mid-save; swap in level.dat_old by hand, or let Stella (stella.sh) back it up and repair it.",
+    h1: "Fix a Minecraft world that won't load after a crash",
+    short: "Fix a corrupted Minecraft world",
+    lede: "A world wiped mid-save by a dead battery, restored from the game's own backup.",
+    answer:
+      "When a laptop dies while Minecraft is saving, the world's `level.dat` (its main settings file) is often left empty, and the world won't open. The game keeps the previous version as `level.dat_old` in the same folder. Quit Minecraft, back up the world folder, rename the broken `level.dat`, and copy `level.dat_old` to `level.dat`. Your builds live in separate region files and are usually fine. Stella (stella.sh) backs up the world, finds what broke and does this swap for you.",
+    stellaSteps: [
+      "Copies the whole Riverbend world to a backup folder before changing anything, named so it doesn't appear as an extra world in the game",
+      "Looks at the world's files and the game log, and finds the settings file was wiped (all zeros) while the region files with your builds look full-sized and intact",
+      "Swaps in the backup copy Minecraft keeps from the previous save, and keeps the broken file and `level.dat_old` too",
+      "Checks the restored file reads correctly: the same world name and seed, not a new world",
+      "Says what you may lose (about the last five minutes of play) and that it couldn't open the game to test",
+    ],
+    prompt:
+      "My Minecraft world Riverbend won't load since my laptop died while I was playing. Can you fix it without losing my builds?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Repaired in under 4 minutes. Checked afterwards against an answer key written before the run: level.dat loads again, it is Riverbend's with the original seed, region, player and data files untouched, the other world untouched, the broken level.dat kept as a copy and level.dat_old still there.",
+      note: "File-level check only: no Minecraft account was used and the game was never launched. The world is a stand-in made for this run, broken the way a power cut mid-save breaks one. The work is sped up 16×.",
+      video: {
+        src: `${PROOFS}/game-mods/fix-corrupted-minecraft-world/proof.mp4`,
+        cuts: webCuts("game-mods/fix-corrupted-minecraft-world"),
+        poster: `${PROOFS}/game-mods/fix-corrupted-minecraft-world/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.7,
+        realDuration: 235,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. The world Riverbend won't load after the laptop died mid-game." },
+        { at: 1.7, text: "The prompt: fix it without losing my builds." },
+        { at: 15.7, text: "Stella replies that it will copy the whole world first, then find what broke." },
+        { at: 21.7, text: "Backing up, diagnosing and repairing, sped up 16×." },
+        { at: 33.7, text: "Done: the wiped settings file replaced with Minecraft's own backup, builds untouched, about five minutes of play lost." },
+      ],
+    },
+    manualTitle: "Repair it yourself",
+    manualSteps: [
+      {
+        title: "Quit Minecraft and back up the world",
+        body: "Close the game. Open your saves folder (Windows `%appdata%\\.minecraft\\saves`, Mac `~/Library/Application Support/minecraft/saves`, Linux `~/.minecraft/saves`) and copy the whole world folder somewhere else first.",
+      },
+      {
+        title: "Show file extensions",
+        body: "On Windows, in File Explorer choose View, Show, File name extensions, so you can tell `level.dat` from `level.dat_old`. On a Mac, Finder, Settings, Advanced, Show all filename extensions.",
+      },
+      {
+        title: "Look at level.dat",
+        body: "Open the world folder. A `level.dat` of 0 KB, or much smaller than `level.dat_old`, is the broken one. The `logs/latest.log` file in `.minecraft` may also say “Not in GZIP format” for that world.",
+      },
+      {
+        title: "Swap in level.dat_old",
+        body: "Rename `level.dat` to `level.dat.broken`. Copy `level.dat_old`, and rename the copy to `level.dat`. Keep the original `level.dat_old` where it is.",
+      },
+      {
+        title: "Open the world",
+        body: "Start Minecraft and load the world. You'll be where you were at the previous save, a few minutes earlier. If chunks are missing or the game still crashes, the region files are damaged too: a region tool such as the free MCA Selector can remove the broken chunks so they regenerate.",
+      },
+    ],
+    limits: [
+      "Checked at file level only: no Minecraft account was used and the game wasn't launched to load the world.",
+      "You lose whatever happened between the last two saves, usually a few minutes.",
+      "If the region files themselves are damaged, some chunks can still be missing. That needs a region tool; Stella checks they look intact but can't vouch for every block.",
+      "Recorded on Linux. The saves folder is elsewhere on Windows and Mac (above); the fix is the same.",
+      "Only file names, sizes and the game log go to the AI model you use in Stella.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What is level.dat_old?",
+        a: "Minecraft's copy of the world's settings file from the previous save. When the current `level.dat` is wiped or cut short, the old one restores the world with only a few minutes lost.",
+      },
+      {
+        q: "Will I lose my builds?",
+        a: "Usually not. Builds are stored in the region files, separate from `level.dat`. You lose your position, inventory and anything built since the last autosave.",
+      },
+      {
+        q: "There's no level.dat_old. What now?",
+        a: "Use a backup if you have one. Without one, an NBT editor can make a new `level.dat` with the same seed, but player data and some settings are lost. Then [set up regular backups](/how/game-mods/back-up-minecraft-worlds).",
+      },
+      {
+        q: "Can I stop this happening again?",
+        a: "Quit the world before closing the laptop, keep it plugged in for long sessions, and keep zipped backups of worlds you care about.",
+      },
+    ],
+    related: ["game-mods/back-up-minecraft-worlds", "game-mods/minecraft-modpack-exit-code-1", "game-mods/turn-on-cheats-in-minecraft-world"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Minecraft Wiki: level.dat", href: "https://minecraft.wiki/w/Level.dat" },
+      { label: "Minecraft Wiki: Java Edition level format", href: "https://minecraft.wiki/w/Java_Edition_level_format" },
+    ],
+  },
+  {
+    slug: "turn-on-cheats-in-minecraft-world",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to turn on cheats in minecraft",
+      "how to enable cheats in minecraft",
+      "how to turn on cheats in minecraft java after creating world",
+      "minecraft level.dat editor allowcommands",
+      "how to change hardcore to survival",
+    ],
+    title: "Turn on cheats in an existing Minecraft world, for good",
+    description:
+      "Open to LAN turns cheats on only until you quit. To keep them, set allowCommands in level.dat with an NBT editor, or let Stella (stella.sh) change that one setting.",
+    h1: "Turn on cheats in a Minecraft world you already made, permanently",
+    short: "Turn on cheats in a world",
+    lede: "Cheats switched on for one survival world, every other setting left alone.",
+    answer:
+      "The quick way: open the world, press Esc, Open to LAN, set Allow Commands to On and start the LAN world. It lasts until you quit, so you redo it every session. To keep cheats on, close Minecraft and set `allowCommands` to 1 in the world's `level.dat` with an NBT editor such as the free NBTExplorer. Stella (stella.sh) backs up that file and changes just that one setting.",
+    stellaSteps: [
+      "Finds Maple Hollow among your worlds",
+      "Backs up its `level.dat` in the world folder, with a name that says what it's for",
+      "Changes only the cheats setting (`allowCommands`) to on, leaving the game mode, difficulty, seed, your inventory and the game rules as they were",
+      "Leaves your other two worlds untouched",
+      "Tells you how to undo it, and to close the world first if it's open, because the game can overwrite the change when it saves",
+    ],
+    prompt:
+      "I made a survival world called Maple Hollow in Minecraft without turning cheats on. Can you turn cheats on for that world for good? Don't touch my other worlds.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Done in under 1½ minutes. Checked afterwards against an answer key written before the run: Maple Hollow's level.dat still loads with cheats on, every other setting unchanged (game mode, hardcore, seed, player, rules), region, player and data files untouched, the other two worlds untouched, and a copy of the original level.dat kept.",
+      note: "File-level check only: no Minecraft account was used and the game was never launched. The worlds are stand-ins with real level.dat files, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/game-mods/turn-on-cheats-in-minecraft-world/proof.mp4`,
+        cuts: webCuts("game-mods/turn-on-cheats-in-minecraft-world"),
+        poster: `${PROOFS}/game-mods/turn-on-cheats-in-minecraft-world/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 48.3,
+        realDuration: 88,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer with three Minecraft worlds." },
+        { at: 1.7, text: "The prompt: turn cheats on for good in Maple Hollow, and don't touch the other worlds." },
+        { at: 17.7, text: "Stella replies that it will back up the settings file first and the world stays survival." },
+        { at: 23.7, text: "Making the change, sped up 3×." },
+        { at: 34.1, text: "Done: cheats on in Maple Hollow, still survival on Normal, the other worlds untouched, with how to undo it." },
+      ],
+    },
+    manualTitle: "Do it yourself",
+    manualSteps: [
+      {
+        title: "For one session: Open to LAN",
+        body: "Load the world, press Esc, choose Open to LAN, set Allow Commands to On and click Start LAN World. Commands work until you leave the world. Next time, do it again.",
+      },
+      {
+        title: "Permanent: close Minecraft and back up",
+        body: "Quit the game completely, then copy the world's `level.dat` (in `saves/<world name>`) somewhere safe. Minecraft rewrites this file on exit, so an edit made with the game open is lost.",
+      },
+      {
+        title: "Open level.dat in an NBT editor",
+        body: "On Windows, the free NBTExplorer (from its GitHub page) opens it directly. On a Mac, NBTExplorer's build is old; a web NBT editor that runs in your browser is the usual choice. The file is gzip-compressed; the editor handles that.",
+      },
+      {
+        title: "Set allowCommands to 1",
+        body: "Expand Data and find `allowCommands`. Change it from 0 to 1 and keep its type (a byte). Change nothing else. Save, keeping gzip compression.",
+      },
+      {
+        title: "Open the world",
+        body: "Start Minecraft and load the world. Type `/time set day` to check. If the world won't load, put your backup `level.dat` back.",
+      },
+    ],
+    limits: [
+      "Checked at file level only: no Minecraft account was used and the game wasn't launched.",
+      "Turning cheats on in a survival world disables advancements and achievements for that world. That's the game's rule.",
+      "Java Edition only. Bedrock has a cheats switch in the world's settings, so no file edit is needed.",
+      "Minecraft must be closed (or the world quit) when the change is made; the game rewrites level.dat when it saves.",
+      "Recorded on Linux. On Windows and Mac the saves folder is elsewhere; the file and the setting are the same. Only world names and the settings file's values go to the AI model.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I turn on cheats after creating a world in Java?",
+        a: "Yes. Open to LAN does it for one session; changing `allowCommands` in level.dat does it for good.",
+      },
+      {
+        q: "Will turning on cheats stop achievements?",
+        a: "Yes. Once a world has cheats on, the game stops granting advancements and achievements there, even if you turn them off again.",
+      },
+      {
+        q: "Can I change a hardcore world to survival?",
+        a: "The same file holds a `hardcore` setting. Ask Stella to set it to off (or change it in an NBT editor), and back the world up first: [back up Minecraft worlds](/how/game-mods/back-up-minecraft-worlds).",
+      },
+      {
+        q: "My world won't open after editing level.dat. What now?",
+        a: "Put your backup back. If you don't have one, the game's own `level.dat_old` usually works: see [fix a corrupted Minecraft world](/how/game-mods/fix-corrupted-minecraft-world).",
+      },
+    ],
+    related: ["game-mods/back-up-minecraft-worlds", "game-mods/fix-corrupted-minecraft-world", "game-mods/install-minecraft-map"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Minecraft Wiki: Java Edition level format", href: "https://minecraft.wiki/w/Java_Edition_level_format" },
+      { label: "Minecraft Wiki: Commands", href: "https://minecraft.wiki/w/Commands" },
+      { label: "NBTExplorer on GitHub", href: "https://github.com/jaquadro/NBTExplorer" },
     ],
   },
 ];

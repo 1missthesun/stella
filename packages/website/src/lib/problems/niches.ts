@@ -65,12 +65,12 @@ export const NICHES: Niche[] = [
   {
     slug: "documents",
     name: "Word and documents",
-    h1: "Letters and documents, filled in.",
-    title: "Document how-tos: mail merge and Word letters",
+    h1: "Word documents, letters and PDFs, sorted.",
+    title: "Document how-tos: Word, PDF, invoices and mail merge",
     description:
-      "Make one Word letter per person from an Excel sheet, with Word's own mail merge or Stella (stella.sh) filling your template on your own computer.",
+      "Mail merge from Excel, merge or bulk-convert Word files, PDF to Word, slides with notes, invoices and a cookbook, by hand or with Stella (stella.sh) on your computer.",
     intro:
-      "Documents eat time in the repetitive parts: the same letter for sixteen people, each with their own name, fee and date. Each guide shows the way to do it in Word, and Stella (stella.sh) doing it on a real computer.",
+      "Documents eat time in the repetitive parts: the same letter for sixteen people, a name to change in ten templates, a folder to turn into PDFs, a PDF you need to edit. Each guide shows the way to do it in Word or a free tool, and Stella (stella.sh) doing it on a real computer.",
   },
   {
     slug: "audio",

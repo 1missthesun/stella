@@ -110,7 +110,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf"],
+    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf", "pdf-excel/find-subscriptions-in-bank-statement"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -349,7 +349,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat, for example totals by store and month on a second sheet. The same approach turns [bank statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/compare-two-excel-files"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/compare-two-excel-files", "pdf-excel/merge-two-spreadsheets-by-matching-column"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft: Import data from a folder with multiple files (Power Query)", href: "https://support.microsoft.com/en-us/office/import-data-from-a-folder-with-multiple-files-power-query-94b8023c-2e66-4f6b-8c78-6a00041c90e4" },
@@ -474,7 +474,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Ask for a CSV, which Google Sheets opens directly, or for an .xlsx you upload to Google Drive. If your bank statements need the same treatment, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/combine-excel-files-into-one-sheet", "photos-files/rename-pdf-files-based-on-content"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/combine-excel-files-into-one-sheet", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/summarize-spreadsheet-by-category"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Support: Insert data from picture", href: "https://support.microsoft.com/office/insert-data-from-picture-3c1bb58d-2c59-4bc0-b04a-a671a6868fd7" },
@@ -581,7 +581,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "It named them in the same step. To rename PDFs you already have by what's in them, see [rename PDF files by content](/how/photos-files/rename-pdf-files-based-on-content). If one is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email) in the same chat.",
       },
     ],
-    related: ["photos-files/rename-pdf-files-based-on-content", "pdf-excel/add-page-numbers-to-pdf", "pdf-excel/compress-pdf-too-large-to-email"],
+    related: ["photos-files/rename-pdf-files-based-on-content", "pdf-excel/add-page-numbers-to-pdf", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/reorder-pdf-pages"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
@@ -1012,7 +1012,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "To stack many files into one sheet, see [combine Excel files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet). To turn each row into a letter, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word).",
       },
     ],
-    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/receipts-to-spreadsheet", "documents/mail-merge-excel-to-word"],
+    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/receipts-to-spreadsheet", "documents/mail-merge-excel-to-word", "pdf-excel/remove-duplicate-rows-in-excel"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -1122,7 +1122,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "A little: the text layer is small next to the page images. In the recording the copy stayed within three times the original. If it's too big to send, [compress the PDF](/how/pdf-excel/compress-pdf-too-large-to-email); to pull figures into a sheet, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/redact-pdf"],
+    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/redact-pdf", "pdf-excel/rotate-pdf-pages"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "OCRmyPDF documentation", href: "https://ocrmypdf.readthedocs.io/en/latest/" },
@@ -1230,11 +1230,1407 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Anything you'd do with a PDF: [add page numbers](/how/pdf-excel/add-page-numbers-to-pdf) in a different style, or [split it into parts](/how/pdf-excel/split-pdf-into-multiple-files) to print a chapter at a time.",
       },
     ],
-    related: ["pdf-excel/add-page-numbers-to-pdf", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable"],
+    related: ["pdf-excel/add-page-numbers-to-pdf", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/convert-mobi-to-epub"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Calibre: E-book conversion", href: "https://manual.calibre-ebook.com/conversion.html" },
       { label: "Calibre download", href: "https://calibre-ebook.com/download" },
+    ],
+  },
+  // ---- batch 3 (writer 2) ----
+  {
+    slug: "convert-excel-to-pdf-without-cutting-off",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert excel to pdf without cutting off",
+      "excel to pdf columns on separate pages",
+      "excel to pdf fit to one page",
+      "convert excel to pdf landscape",
+      "excel to pdf",
+    ],
+    title: "Convert Excel to PDF without cutting off columns",
+    description:
+      "Excel to PDF spilling columns onto extra pages? Set landscape and fit to one page wide on every sheet, or let Stella (stella.sh) make the PDF with each sheet fitted.",
+    h1: "Convert Excel to PDF without the columns being cut off",
+    short: "Excel to PDF, nothing cut off",
+    lede: "A four-week staff rota as four landscape pages, every day of the week together.",
+    answer:
+      "Excel prints what fits on a portrait page and moves the rest of the columns to extra pages. On each sheet, set Page Layout, Orientation to Landscape and Scale to Fit to Width 1 page, Height Automatic, then export the entire workbook as PDF. Stella (stella.sh) does that for every sheet on a copy, makes the PDF on your computer, and checks that every row sits on a page with all its columns.",
+    stellaSteps: [
+      "Finds the rota workbook in Documents: four sheets, one per week, 16 columns from Name and Role to Sun PM",
+      "Sets each sheet to landscape and one page wide, working on a copy so your spreadsheet's own print settings stay as they were",
+      "Makes one PDF of all four weeks and checks every staff member's row is on a page that also has Monday and Sunday",
+      "Saves Staff rota November.pdf next to the spreadsheet",
+      "Points out something in the data worth checking: some people's roles change week to week, which may be a typing slip",
+    ],
+    prompt:
+      "When I save my staff rota spreadsheet as a PDF the right-hand columns end up on separate pages. Make a PDF of it where each week fits across one page, with all the days together.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 4-page PDF in about a minute and a half. Checked afterwards against an answer key written before the run: all 4 weeks in the PDF, all 88 staff rows each on a page with every day up to Sun PM, one page per week (a plain export makes 12), the smallest text 8.2 pt, and the spreadsheet unchanged.",
+      note: "The shop, its staff and the rota are fictitious, made for this run. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-excel-to-pdf-without-cutting-off/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-excel-to-pdf-without-cutting-off"),
+        poster: `${PROOFS}/pdf-excel/convert-excel-to-pdf-without-cutting-off/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.8,
+        realDuration: 92,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A four-week staff rota workbook is in Documents." },
+        { at: 1.6, text: "The prompt: make a PDF where each week fits across one page." },
+        { at: 13.6, text: "Stella replies that the spreadsheet won't change and the PDF will go in the same folder." },
+        { at: 19.6, text: "Fitting the sheets and making the PDF, sped up 4×." },
+        { at: 31.3, text: "Done: four landscape pages, one per week, all seven days and 22 staff on each, plus a note about roles that change between weeks." },
+      ],
+    },
+    manualTitle: "Fit it yourself in Excel",
+    manualSteps: [
+      {
+        title: "Check what's spilling",
+        body: "Open File, Print and page through the preview. If the last columns appear on their own pages, the sheet is wider than the paper at 100% scale.",
+      },
+      {
+        title: "Switch to landscape",
+        body: "On the Page Layout tab, choose Orientation, Landscape. For wide sheets this alone often brings most columns back.",
+      },
+      {
+        title: "Fit to one page wide",
+        body: "Still on Page Layout, in the Scale to Fit group set Width to 1 page and Height to Automatic. Excel shrinks the sheet just enough for every column to fit across, and lets long sheets continue down onto more pages.",
+      },
+      {
+        title: "Repeat on every sheet",
+        body: "Page setup is per sheet. Click each tab and set it again, or select all the tabs first (right-click a tab, Select All Sheets) and change them together; ungroup afterwards so later edits don't go to every sheet.",
+      },
+      {
+        title: "Export the whole workbook",
+        body: "Windows: File, Export, Create PDF/XPS, Options, Entire workbook. Mac: File, Save As, File Format PDF, and choose Workbook. Open the PDF and check the last column is on every page.",
+      },
+    ],
+    limits: [
+      "Very wide sheets shrink a lot when squeezed onto one page. Here the smallest text was 8.2 pt; for something wider, Stella can say a sheet really needs two pages or suggest A3.",
+      "Stella left the spreadsheet's own print settings alone. Ask it to change them if you want Excel's Print to come out the same way.",
+      "The PDF is made on your computer; nothing goes to a converter site. Stella read the rota to check the PDF, so staff names went to the AI model you use.",
+      "Recorded on Linux without Excel: Stella set the page layout on a copy and exported with the free LibreOffice. On Windows or a Mac it may use Excel instead, if you have it.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my Excel PDF split columns onto separate pages?",
+        a: "At 100% scale on portrait paper, the sheet is wider than the page, so Excel prints the overflow columns on their own pages after the rest. Landscape plus Fit to 1 page wide fixes it.",
+      },
+      {
+        q: "How do I fit an Excel sheet on one page as a PDF?",
+        a: "Page Layout, Scale to Fit: Width 1 page, Height 1 page. For long lists, keep Height on Automatic so the rows stay readable over several pages.",
+      },
+      {
+        q: "Why is only one sheet in my PDF?",
+        a: "Excel exports the active sheet by default. Choose Entire workbook in the export options, or select all the sheet tabs before saving.",
+      },
+      {
+        q: "Can I combine the rota PDF with other PDFs?",
+        a: "Yes, and you can put pages in any order after: see [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages). To send it as pictures instead, [convert the PDF to JPG](/how/pdf-excel/convert-pdf-to-jpg).",
+      },
+    ],
+    related: ["pdf-excel/convert-pdf-to-jpg", "pdf-excel/reorder-pdf-pages", "pdf-excel/fix-dates-in-excel"],
+    lastChecked: "2026-11-13",
+    sources: [{ label: "Microsoft: Scale a worksheet", href: "https://support.microsoft.com/en-us/Excel/scale-a-worksheet" }],
+  },
+  {
+    slug: "convert-mobi-to-epub",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "mobi to epub",
+      "azw3 to epub",
+      "convert mobi to epub calibre",
+      "convert kindle books to epub",
+      "mobi to epub free",
+    ],
+    title: "Convert MOBI and AZW3 ebooks to EPUB (free)",
+    description:
+      "Turn old Kindle-format .mobi and .azw3 ebooks into EPUB for Kobo and other e-readers with the free Calibre, or let Stella (stella.sh) install it and convert the batch.",
+    h1: "Convert MOBI and AZW3 ebooks to EPUB",
+    short: "MOBI to EPUB",
+    lede: "Three old Kindle-format books turned into EPUBs, titles and covers kept.",
+    answer:
+      "Install the free Calibre, drag the .mobi and .azw3 files into it, select them, click Convert books and choose EPUB as the output format. Calibre keeps the title, author and cover. Renaming the file to .epub doesn't work: the inside is a different format. Books bought from Amazon usually carry DRM and won't convert. Stella (stella.sh) installs Calibre's converter if needed and converts the whole batch on your computer.",
+    stellaSteps: [
+      "Finds the .mobi and .azw3 files in Downloads",
+      "Installs Calibre, the free ebook tool, into your home folder because it wasn't on the computer",
+      "Converts each book to EPUB with Calibre's converter, keeping title, author and cover",
+      "Saves each EPUB next to its original, which stays where it was",
+      "Reports that none were DRM-locked or damaged, and that the books still need a check on your e-reader",
+    ],
+    prompt:
+      "I've got some old Kindle-format ebooks in my Downloads (.mobi and .azw3) that my new e-reader won't open. Convert them to EPUB.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Three EPUBs in about a minute and a half, including installing Calibre. Checked afterwards against an answer key written before the run: three valid EPUB files with every chapter's text, title and author kept, covers kept, and the original ebooks unchanged.",
+      note: "The three books are fictitious and DRM-free, made for this run and converted to MOBI and AZW3 with Calibre. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-mobi-to-epub/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-mobi-to-epub"),
+        poster: `${PROOFS}/pdf-excel/convert-mobi-to-epub/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 49.3,
+        realDuration: 98,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Two .mobi books and one .azw3 are in Downloads." },
+        { at: 1.7, text: "The prompt: convert them to EPUB for a new e-reader." },
+        { at: 18.7, text: "Stella replies that each EPUB will sit next to its original, and DRM-locked books will be listed separately." },
+        { at: 24.5, text: "Installing Calibre and converting, sped up 4×." },
+        { at: 35.7, text: "Done: all three are EPUBs with title, author and cover kept; none were locked." },
+      ],
+    },
+    manualTitle: "Convert them yourself with Calibre",
+    manualSteps: [
+      {
+        title: "Install Calibre",
+        body: "Download it free from [calibre-ebook.com](https://calibre-ebook.com/download) for Windows, Mac or Linux and run the installer. On first start it asks where to keep its library; the default is fine.",
+      },
+      {
+        title: "Add the books",
+        body: "Drag the .mobi and .azw3 files into Calibre's window. They appear in the list with their covers. Check the title and author columns; double-click to fix them before converting if they're wrong.",
+      },
+      {
+        title: "Convert to EPUB",
+        body: "Select the books (Ctrl+A or Cmd+A for all), click Convert books, set Output format (top right) to EPUB and click OK. The Jobs counter at the bottom right shows progress.",
+      },
+      {
+        title: "Find the EPUB files",
+        body: "Right-click a book, Open containing folder. The EPUB sits in Calibre's library folder next to the original. Copy it to your e-reader, or connect the reader and use Send to device.",
+      },
+      {
+        title: "Command line, for many books",
+        body: "Calibre includes `ebook-convert`. In a terminal: `ebook-convert \"book.mobi\" \"book.epub\"`, one line per book, or loop over a folder.",
+      },
+    ],
+    limits: [
+      "Books bought from the Kindle store are usually DRM-protected. Stella won't remove DRM, so those can't be converted; it lists them separately.",
+      "Comics, picture books and fixed-layout ebooks may not convert well. Ordinary novels and non-fiction convert cleanly.",
+      "Stella installed Calibre (about 100 MB) in the home folder to do this. It stays there for next time; ask Stella to remove it if you'd rather.",
+      "The conversion runs on your computer. Only file names and the books' metadata go to the AI model you use; it doesn't need to read the books.",
+      "Recorded on Linux. On Windows and Mac Stella uses the same Calibre converter from its normal installer.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I just rename .mobi to .epub?",
+        a: "No. The file inside is still MOBI, and the e-reader will reject it or show nothing. It has to be converted.",
+      },
+      {
+        q: "What's the difference between MOBI, AZW3 and EPUB?",
+        a: "MOBI and AZW3 are Amazon's Kindle formats (AZW3 is the newer). EPUB is the open format that Kobo, Apple Books, Google Play Books and most other readers use.",
+      },
+      {
+        q: "Why won't my Kindle book convert?",
+        a: "It almost certainly has DRM, which locks it to your Amazon account. Calibre won't convert it, and neither will Stella.",
+      },
+      {
+        q: "Can I get a PDF instead?",
+        a: "Yes: choose PDF as the output in Calibre, or ask Stella. See [convert EPUB to PDF](/how/pdf-excel/convert-epub-to-pdf) for the settings that matter.",
+      },
+    ],
+    related: ["pdf-excel/convert-epub-to-pdf", "pdf-excel/extract-images-from-pdf", "pdf-excel/convert-pdf-to-jpg"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Calibre download", href: "https://calibre-ebook.com/download" },
+      { label: "ebook-convert manual", href: "https://manual.calibre-ebook.com/generated/en/ebook-convert.html" },
+    ],
+  },
+  {
+    slug: "convert-pdf-to-jpg",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "pdf to jpg",
+      "convert pdf to jpg",
+      "convert pdf to images",
+      "convert pdf to jpg high quality",
+      "convert all pages of pdf to jpg",
+    ],
+    title: "Convert every PDF page to a JPG, sharp and in order",
+    description:
+      "Turn each page of a PDF into a JPG sharp enough to read on a phone, without uploading it: Preview, PDF24 Creator, or Stella (stella.sh) doing every page at once.",
+    h1: "Convert a PDF to JPG, one sharp picture per page",
+    short: "PDF to JPG",
+    lede: "A 12-page newsletter as 12 JPGs, readable on a phone and named in page order.",
+    answer:
+      "On a Mac, Preview exports the page you select as a JPEG (set Resolution to 150 or more), one page at a time. Windows has nothing built in; the free PDF24 Creator converts every page offline. Online converters work but upload the file. Stella (stella.sh) turns every page into a JPG on your computer at a resolution that reads well on a phone, with names that sort in page order.",
+    stellaSteps: [
+      "Finds the newsletter PDF in Downloads (12 pages)",
+      "Renders each page as a JPG large enough to zoom in and read on a phone",
+      "Names them page-01 to page-12, so page 10 sorts after page 9 rather than after page 1",
+      "Saves them in a new folder next to the PDF and leaves the PDF unchanged",
+      "Tells you the size: about 450 KB a picture, 5 MB for the set, easy to send",
+    ],
+    prompt:
+      "Turn every page of the Larkfield Village News PDF in my Downloads into a JPG I can share, one picture per page, sharp enough to read on a phone.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "12 JPGs in about 80 seconds. Checked afterwards against an answer key written before the run: exactly 12 real JPEG files, one matching each page, each at least 1,600 pixels on its long side, file names sorting in page order, and the PDF unchanged.",
+      note: "The village newsletter and its pictures are fictitious, made for this run. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-pdf-to-jpg/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-pdf-to-jpg"),
+        poster: `${PROOFS}/pdf-excel/convert-pdf-to-jpg/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 49.1,
+        realDuration: 81,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 12-page newsletter PDF is in Downloads." },
+        { at: 1.7, text: "The prompt: one JPG per page, sharp enough to read on a phone." },
+        { at: 16.7, text: "Stella replies that it's turning each page into a JPG." },
+        { at: 22.6, text: "Rendering the pages, sped up 2×." },
+        { at: 34.9, text: "Done: 12 JPGs in page order in a new folder in Downloads, about 5 MB together." },
+      ],
+    },
+    manualTitle: "Convert it yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Preview",
+        body: "Open the PDF in Preview, show thumbnails (View, Thumbnails), click a page, then File, Export. Choose JPEG, set Resolution to 150 or higher, and save. Repeat for each page. 72 is the default and too blurry for small print.",
+      },
+      {
+        title: "On a Mac, many pages: Shortcuts",
+        body: "The Shortcuts app can split a PDF into pages and convert each to JPEG in one go. Build it once (Split PDF Into Pages, Convert Image to JPEG, Save File) and run it from the Finder's Quick Actions.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator (it works offline), open its PDF to Images tool, add the file, choose JPG and 150 dpi or more, and convert. Every page becomes its own image.",
+      },
+      {
+        title: "Command line: pdftoppm",
+        body: "With poppler installed (built into most Linux systems, `brew install poppler` on a Mac): `pdftoppm -jpeg -r 200 newsletter.pdf page` writes page-01.jpg, page-02.jpg and so on.",
+      },
+      {
+        title: "Check names and size",
+        body: "Sort the folder by name: page 10 should follow page 9. Open one image on your phone and zoom in on small print. If it's soft, redo it at 200 dpi.",
+      },
+    ],
+    limits: [
+      "Large pages at high resolution make big files. Stella aims for phone-readable sizes unless you ask for print quality.",
+      "Every page becomes a flat picture: the text is no longer selectable or searchable in the JPGs.",
+      "The conversion runs on your computer and nothing is uploaded. Stella may look at a page or two to check sharpness, so page content goes to the AI model you use.",
+      "Recorded on Linux with poppler's free tools. On Windows or a Mac Stella uses the same kind of tool, installing it if needed.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I convert a PDF to JPG without losing quality?",
+        a: "Export at 150 to 300 dpi rather than the 72 dpi default, and use high JPEG quality. For pictures inside the PDF at their original size, [extract the images](/how/pdf-excel/extract-images-from-pdf) instead.",
+      },
+      {
+        q: "Can I convert only some pages?",
+        a: "Yes. In Preview, export just the pages you want; with pdftoppm add `-f 3 -l 5` for pages 3 to 5; or name the pages in your prompt to Stella.",
+      },
+      {
+        q: "Why do my page images sort 1, 10, 11, 2?",
+        a: "The numbers aren't padded. Names like page-01, page-02 sort correctly. Stella used padded numbers here.",
+      },
+      {
+        q: "JPG or PNG?",
+        a: "JPG is smaller and fine for photos and sharing. PNG keeps text edges crisper and is bigger. Ask for PNG if you'll print or edit the pages.",
+      },
+    ],
+    related: ["pdf-excel/extract-images-from-pdf", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/rotate-pdf-pages"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "PDF24 Creator (free, offline, Windows)", href: "https://tools.pdf24.org/en/creator" },
+      { label: "pdftoppm manual", href: "https://manpages.debian.org/testing/poppler-utils/pdftoppm.1.en.html" },
+    ],
+  },
+  {
+    slug: "extract-images-from-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "extract images from pdf",
+      "extract images from pdf mac",
+      "extract images from pdf full resolution",
+      "save pictures from pdf",
+      "get photos out of a pdf",
+    ],
+    title: "Extract images from a PDF at full quality",
+    description:
+      "Get the original photos out of a PDF at full size, not page screenshots, without uploading it: pdfimages, PDF24, or Stella (stella.sh) pulling them out for you.",
+    h1: "Extract the images from a PDF at full quality",
+    short: "Extract images from a PDF",
+    lede: "Eight brochure photos pulled out at their original size, not screenshots.",
+    answer:
+      "Screenshots and Preview's copy give you the picture at screen size. To get the stored original, use a tool that extracts embedded images: the free `pdfimages -all` command, PDF24's Extract images tool, or LibreOffice Draw (right-click a picture, Save). Stella (stella.sh) pulls every photo out of the PDF on your computer at its full stored size, skips repeats and logos, and names each one after its caption.",
+    stellaSteps: [
+      "Finds the brochure PDF in Downloads and lists every picture stored inside it",
+      "Copies the photos out as their original files, without re-compressing them, at full size (1200×1600 up to 2000×1125 here)",
+      "Keeps the transparent oval cut-out of one photo by saving it as a PNG",
+      "Leaves out the small logo repeated on every page and a second copy of the cover photo",
+      "Names each file by page, position and its caption from the brochure, like “p1-1 Harbour at dawn.jpg”, in a new folder next to the PDF",
+    ],
+    prompt:
+      "There's a brochure PDF in my Downloads with photos in it. Get all the photos out as separate picture files at full quality, not screenshots of the pages.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "8 photos in under 2 minutes. Checked afterwards against an answer key written before the run: each of the 8 photos found at its full original size and matching it, the cut-out picture keeping its transparency, no flood of duplicates or page renders (exactly 8 files), and the brochure unchanged.",
+      note: "The walking club, its brochure and photos are fictitious, drawn for this run. The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/extract-images-from-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/extract-images-from-pdf"),
+        poster: `${PROOFS}/pdf-excel/extract-images-from-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.2,
+        realDuration: 109,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A six-page brochure PDF is in Downloads." },
+        { at: 1.6, text: "The prompt: all the photos as separate files at full quality, not page screenshots." },
+        { at: 13.6, text: "Stella replies that it will pull out the original image files into a new folder." },
+        { at: 19.6, text: "Finding and extracting the pictures, sped up 6×." },
+        { at: 30.8, text: "Done: 8 photos named by caption, seven original JPEGs and one PNG with its see-through corners; the repeated logo left out." },
+      ],
+    },
+    manualTitle: "Extract them yourself",
+    manualSteps: [
+      {
+        title: "Command line: pdfimages",
+        body: "With poppler installed (most Linux systems; `brew install poppler` on a Mac; on Windows via the poppler builds or WSL), run `pdfimages -list brochure.pdf` to see every picture and its real size, then `pdfimages -all brochure.pdf photo` to save them in their original format.",
+      },
+      {
+        title: "On Windows: PDF24",
+        body: "The free PDF24 Creator has an Extract images tool that runs offline. Add the PDF and it saves every embedded picture to a folder.",
+      },
+      {
+        title: "Any computer: LibreOffice Draw",
+        body: "Open the PDF in the free LibreOffice Draw, right-click a picture, choose Save (or Export), and save it as a file. One picture at a time, but at its stored size.",
+      },
+      {
+        title: "Tidy the results",
+        body: "Extractors save everything: logos, page decorations, masks as separate black-and-white images, and the same photo twice if it's used twice. Sort by size and delete the small ones and repeats.",
+      },
+      {
+        title: "Avoid screenshots and copy",
+        body: "Copying a picture in Preview or Acrobat, or screenshotting it, gives you what's on screen, often a fraction of the stored size. Use those only if nothing above is available.",
+      },
+    ],
+    limits: [
+      "This gets the pictures stored in the PDF. In a scanned PDF each whole page is one picture, so the photos would have to be cropped out of the page instead.",
+      "Some PDFs store pictures already shrunk; full quality means the size stored in the file, which may be smaller than the original photo.",
+      "Extraction runs on your computer, nothing uploaded. Stella reads the brochure's captions to name the files, so that text goes to the AI model you use.",
+      "Recorded on Linux with free tools. On a Mac or Windows Stella uses the same kind of tool, installing it if needed.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I extract images from a PDF on a Mac?",
+        a: "Preview can't save embedded pictures at full size. Use `pdfimages` after `brew install poppler`, LibreOffice Draw, or Stella.",
+      },
+      {
+        q: "Why are my extracted images black or inside out?",
+        a: "Some pictures are stored with a separate mask for transparency, or in CMYK colour. Extractors may save the mask as its own black image; pick the other one, or use a tool that combines them (as Stella did for the oval photo).",
+      },
+      {
+        q: "Can I get every page as a picture instead?",
+        a: "Yes, that's a different job: [convert PDF to JPG](/how/pdf-excel/convert-pdf-to-jpg) makes one image per page.",
+      },
+      {
+        q: "Is it legal to extract images from a PDF?",
+        a: "Extracting is fine for your own files or with permission. Reusing someone else's photos needs their permission, whichever way you get them out.",
+      },
+    ],
+    related: ["pdf-excel/convert-pdf-to-jpg", "photos-files/combine-photos-into-one-pdf", "pdf-excel/compress-pdf-too-large-to-email"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "pdfimages manual", href: "https://manpages.debian.org/testing/poppler-utils/pdfimages.1.en.html" },
+      { label: "PDF24 Creator (free, offline, Windows)", href: "https://tools.pdf24.org/en/creator" },
+    ],
+  },
+  {
+    slug: "fill-pdf-form-from-spreadsheet",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "fill pdf form with excel data",
+      "fill pdf form from spreadsheet",
+      "batch fill pdf forms",
+      "fill pdf form",
+      "fillable pdf form not saving text",
+    ],
+    title: "Fill a PDF form for each row of a spreadsheet",
+    description:
+      "Fill one copy of a fillable PDF form per person from an Excel list, with ticks and dates right: by hand in Preview or Edge, or with Stella (stella.sh).",
+    h1: "Fill in a PDF form for everyone on a spreadsheet",
+    short: "Fill PDF forms from a spreadsheet",
+    lede: "Ten trip consent forms filled from a list of kids, ticks only where the list says yes.",
+    answer:
+      "By hand, open the blank form in Preview (Mac) or Edge (Windows), type each person's details into the fields, tick the boxes and save a copy under their name; repeat for everyone. Bulk tools exist but are paid or aimed at developers. Stella (stella.sh) reads your list and fills a separate copy of the form for each person on your computer, with dates written properly and the text visible in any PDF reader.",
+    stellaSteps: [
+      "Finds the blank consent form and the kids' list in Downloads, and reads the form's fields: eight text boxes and two tick boxes",
+      "Fills one copy per child with name, date of birth (as day/month/year, not 2014-03-09 00:00:00), parent, phones, allergies and medical needs",
+      "Ticks “can swim 25 m” and “photo consent” only for the children the list says Yes for",
+      "Saves each as “Consent form - <child>.pdf” in a new folder, including names like O'Donnell and Saint-Clair, opens two to check they look right, and leaves the blank form and list unchanged",
+      "Lists what it left blank (signatures; medical needs the list didn't cover) and what a trip leader should know, such as the two children marked as unable to swim 25 m",
+    ],
+    prompt:
+      "The swimming club needs a consent form filled in for each of the kids going on the Lakeside trip. The blank form and the list of kids are in my Downloads. Fill in a separate form for each child.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "10 forms in about a minute and a half. Checked afterwards against an answer key written before the run: one form per child, named after them, every detail filled in correctly, both tick boxes ticked only where the list says Yes, the filled-in text visible when the PDF is opened, and the blank form and list unchanged.",
+      note: "The swimming club, the children and their details are fictitious, made for this run. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/fill-pdf-form-from-spreadsheet/proof.mp4`,
+        cuts: webCuts("pdf-excel/fill-pdf-form-from-spreadsheet"),
+        poster: `${PROOFS}/pdf-excel/fill-pdf-form-from-spreadsheet/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 41.5,
+        realDuration: 92,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A blank fillable consent form and a list of 10 children are in Downloads." },
+        { at: 1.7, text: "The prompt: fill in a separate form for each child." },
+        { at: 10.7, text: "Stella replies that anything the list doesn't cover, like signatures, will be left blank and listed." },
+        { at: 16.6, text: "Filling the forms, sped up 4×." },
+        { at: 27.8, text: "Done: 10 forms in a new folder, with what was left blank and the two children who can't swim 25 m." },
+      ],
+    },
+    manualTitle: "Fill them yourself",
+    manualSteps: [
+      {
+        title: "Check the form is fillable",
+        body: "Open the blank form and click where a name goes. If a box highlights and you can type, it has real fields. If not, it's a flat form: you'd add text boxes with Preview's Markup or Acrobat's Fill & Sign instead.",
+      },
+      {
+        title: "On a Mac: Preview",
+        body: "Open the form in Preview, click each field and type the first person's details, click the tick boxes that apply, then File, Duplicate (or Save As with Option held) and save with their name. Close it and open the blank again for the next person.",
+      },
+      {
+        title: "On Windows: Edge or a free PDF reader",
+        body: "Open the form in Microsoft Edge (or Adobe's free reader), fill the fields, tick the boxes, then use Save as to keep a copy named after the person. Reopen the blank for the next one, so you never type over a filled form.",
+      },
+      {
+        title: "Type dates the way the form asks",
+        body: "Copying a date from Excel can paste it as 2014-03-09 00:00:00. Type it in the form's format (DD/MM/YYYY here), or in Excel format the date column as text first.",
+      },
+      {
+        title: "Check each saved form",
+        body: "Open a few saved copies in a different PDF reader. Some apps save field values without drawing them, so the form looks blank elsewhere. If that happens, print to PDF to flatten it.",
+      },
+    ],
+    limits: [
+      "Works on fillable forms with real fields. A flat or scanned form needs text placed onto the page, which Stella can do but takes more checking.",
+      "Stella doesn't sign forms. In this run the form said parents sign on paper, so signatures were left blank.",
+      "Blank cells stay blank. Stella listed the five children with nothing under medical needs rather than guessing.",
+      "The children's details go to the AI model you use in Stella. The forms are filled on your computer and nothing is uploaded to a form service.",
+      "Recorded on Linux with a free Python PDF library. On Windows or a Mac Stella uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Excel fill a PDF form automatically?",
+        a: "Not on its own. Acrobat Pro can import data into a form, some paid tools batch it, and Stella does it from your list.",
+      },
+      {
+        q: "Why does my filled PDF form look blank in another app?",
+        a: "The values were saved but not drawn into the fields. Re-save in a reader that draws them (Preview, Edge, Adobe's reader) or print to PDF. Stella's forms were checked for visible text.",
+      },
+      {
+        q: "Can I get one PDF with everyone's forms?",
+        a: "Yes, ask for a combined PDF as well, which is easier to print. To put pages in a set order after, see [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages).",
+      },
+      {
+        q: "What about letters instead of forms?",
+        a: "For one Word letter per person, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word); for invoices grouped by customer, [invoices from a spreadsheet](/how/documents/generate-invoices-from-spreadsheet).",
+      },
+    ],
+    related: ["documents/mail-merge-excel-to-word", "documents/generate-invoices-from-spreadsheet", "pdf-excel/fix-dates-in-excel"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Fill out and sign PDF forms in Preview", href: "https://support.apple.com/guide/preview/fill-out-and-sign-pdf-forms-prvw35725/mac" },
+    ],
+  },
+  {
+    slug: "find-subscriptions-in-bank-statement",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "find subscriptions in bank statement",
+      "how to find all my subscriptions",
+      "track subscriptions free",
+      "find recurring payments",
+      "cancel subscriptions",
+    ],
+    title: "Find every subscription in your bank statements",
+    description:
+      "List every subscription and regular payment in a year of bank and card exports, with its yearly cost, in Excel or with Stella (stella.sh), without linking your bank.",
+    h1: "Find every subscription and regular payment in your bank statements",
+    short: "Find subscriptions in statements",
+    lede: "A year of bank and card exports turned into a list of what comes out, and how often.",
+    answer:
+      "Download a year of transactions as CSV from your bank and card, open them in Excel, and make a PivotTable with the description in Rows and the count and average amount in Values: names that repeat with steady amounts are your subscriptions. Watch for weekly, fortnightly and yearly ones, and price rises. Stella (stella.sh) reads the exports on your computer and builds a spreadsheet of each subscription and bill with its current price, how often it's charged and its yearly cost, without logging in to your bank.",
+    stellaSteps: [
+      "Reads both exports in Downloads, a checking account and a credit card with different column layouts, 968 transactions over 12 months",
+      "Groups charges by merchant, including ones written two ways on the statement, and looks at how regularly they come out and how much they vary",
+      "Finds monthly, weekly, every-two-weeks and yearly charges, plus rent, utilities that vary, and a free trial that turned paid",
+      "Uses today's price for each (StreamView after its June rise), and leaves groceries, coffee, fuel, salary and card payments out",
+      "Saves a spreadsheet with yearly costs, totals for bills and subscriptions, and a second tab of every matching charge, and points out overlaps such as paying for two fitness services",
+    ],
+    prompt:
+      "Go through my two bank exports in Downloads and find every subscription and regular payment I'm paying. Make me a spreadsheet with what each one is, how much it is, how often it comes out and what it costs me a year.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "About 3 minutes. Checked afterwards against an answer key written before the run: all 13 subscriptions and regular payments listed (including the weekly, every-two-weeks and yearly ones, the trial that turned paid, rent and utilities), the current amount right for each, a yearly cost for each, no everyday spending or salary listed, and both exports unchanged. One optional point was marked missed: see the limits.",
+      note: "The bank, card, merchants and transactions are fictitious, made for this run, in US dollars. The work is sped up 11×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/find-subscriptions-in-bank-statement/proof.mp4`,
+        cuts: webCuts("pdf-excel/find-subscriptions-in-bank-statement"),
+        poster: `${PROOFS}/pdf-excel/find-subscriptions-in-bank-statement/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.2,
+        realDuration: 179,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A year of checking-account and credit-card exports are in Downloads." },
+        { at: 1.7, text: "The prompt: every subscription and regular payment, what each costs and how often." },
+        { at: 11.7, text: "Stella replies that it will send the spreadsheet with a yearly total and anything that looks off." },
+        { at: 17.7, text: "Going through 968 transactions, sped up 11×." },
+        { at: 30.7, text: "Done: the yearly cost split into bills and subscriptions, a trial that turned paid, a price rise, and a membership that looks cancelled." },
+      ],
+    },
+    manualTitle: "Find them yourself",
+    manualSteps: [
+      {
+        title: "Download a year as CSV",
+        body: "In online banking, look for Export or Download transactions on each account and card, and choose CSV for the last 12 months. A full year catches yearly renewals. If you only have PDFs, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel) first.",
+      },
+      {
+        title: "Put everything in one sheet",
+        body: "Open the files in Excel or Numbers and paste them under one set of headers: Date, Description, Amount, Account. Make money out one sign (negative) so totals make sense.",
+      },
+      {
+        title: "Make a PivotTable",
+        body: "In Excel, select the data, Insert, PivotTable, put Description in Rows and Amount in Values twice, set to Count and Average. Sort by Count. Merchants with 12 charges are probably monthly; 52 weekly; 26 every two weeks.",
+      },
+      {
+        title: "Look for the sneaky ones",
+        body: "Search the descriptions for “annual”, “yearly”, “trial” and “renew”. Compare the first and last charge of each subscription to spot price rises. Check your phone's App Store or Google Play subscriptions too, since those appear under the store's name.",
+      },
+      {
+        title: "Work out the yearly cost",
+        body: "For each one, multiply the current amount by how often it's charged in a year (12, 52, 26 or 1). Variable bills like utilities: add up the last 12 months instead.",
+      },
+    ],
+    limits: [
+      "The answer key had one optional point marked missed: a gaming membership that stopped in February should be left out or marked cancelled. Stella's summary did mark it “Stopped, looks cancelled” and left it out of the totals, but its old charges are listed unmarked on the second tab, which the check counted against it.",
+      "Stella finds and lists. Cancelling happens on each service's own site or app; Stella can open the page for you.",
+      "Your transactions go to the AI model you use in Stella. Remove account numbers from the exports first if you prefer; Stella never needs your banking login.",
+      "Charges billed through someone else (app stores, PayPal) show under that name, so the service behind them may need checking.",
+      "Recorded on Linux with free tools. Works the same with exports on Windows or a Mac; the spreadsheet opens in Excel, Numbers or Google Sheets.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I find all my subscriptions?",
+        a: "Go through 12 months of bank and card transactions for names that repeat at regular gaps, then check your phone's app store subscriptions and your email for “renewal” receipts.",
+      },
+      {
+        q: "Do I need a subscription tracker app?",
+        a: "Not to find them. Tracker apps link to your bank and some charge a fee. A downloaded CSV and a PivotTable, or Stella, finds the same things without sharing your login.",
+      },
+      {
+        q: "How do I spot a free trial that turned into a paid plan?",
+        a: "Look for a new merchant with a £0 or tiny first charge followed by regular full charges. Stella flagged one here that started in July and began charging in August.",
+      },
+      {
+        q: "Can I see my spending by category too?",
+        a: "Yes: see [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category). To split shared bills, [split bills with roommates](/how/pdf-excel/split-bills-with-roommates).",
+      },
+    ],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/split-bills-with-roommates"],
+    lastChecked: "2026-11-13",
+    sources: [
+      {
+        label: "Microsoft: Create a PivotTable to analyze worksheet data",
+        href: "https://support.microsoft.com/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576",
+      },
+      { label: "Apple: See or cancel your subscriptions", href: "https://support.apple.com/118428" },
+    ],
+  },
+  {
+    slug: "fix-dates-in-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "change dates in excel from us to uk",
+      "excel dates wrong format",
+      "convert text to date in excel",
+      "excel american dates to uk",
+      "excel csv dates wrong way round",
+    ],
+    title: "Fix American dates in Excel (wrong way round or won't sort)",
+    description:
+      "US-style CSV dates in a UK Excel come out swapped or stuck as text. Import them as MDY and show them as dd/mm/yyyy, or let Stella (stella.sh) make a clean Excel file.",
+    h1: "Change dates in Excel from US to UK when they come out wrong",
+    short: "Fix US dates in Excel",
+    lede: "80 bookings from an American site, every date real, day first, and sorting properly.",
+    answer:
+      "An American CSV writes dates month first (3/4/2026 is 4 March). A UK-set Excel reads it day first, so dates with a day of 12 or less swap and the rest stay as text that won't sort. Don't double-click the CSV: import it with Data, From Text/CSV, and set the date columns' type Using Locale, English (United States). Then format them as dd/mm/yyyy. Stella (stella.sh) makes the Excel file from the CSV with every date read the right way.",
+    stellaSteps: [
+      "Reads the bookings CSV and works out that the site writes dates month first",
+      "Turns check-in, check-out and booked-on into real Excel dates shown as day/month/year (booked-on with a 24-hour time)",
+      "Cross-checks every booking: the number of nights matches the gap between check-in and check-out, so no date was guessed",
+      "Keeps booking references' leading zeros and turns “$1,250.00” text into numbers you can add up",
+      "Saves an .xlsx next to the CSV and leaves the CSV unchanged",
+    ],
+    prompt:
+      "I downloaded our bookings from an American booking site (the CSV in my Downloads). When I open it in Excel half the dates come out the wrong way round and the rest won't sort. Make me an Excel file with proper dates in day/month/year that sort correctly.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Fixed in about 2 minutes. Checked afterwards against an answer key written before the run: all 80 bookings in a new Excel file, check-in and check-out real dates with the right day and month (none swapped), shown as dd/mm/yyyy, amounts as numbers, booking references with their leading zeros, and the CSV unchanged.",
+      note: "The holiday let, its guests and bookings are fictitious, made for this run. The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/fix-dates-in-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/fix-dates-in-excel"),
+        poster: `${PROOFS}/pdf-excel/fix-dates-in-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.3,
+        realDuration: 122,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A bookings CSV from an American site is in Downloads." },
+        { at: 1.7, text: "The prompt: an Excel file with proper day/month/year dates that sort." },
+        { at: 13.7, text: "Stella replies with the cause: the site writes dates month first, so days of 12 or under get flipped." },
+        { at: 19.3, text: "Converting and checking, sped up 6×." },
+        { at: 31.3, text: "Done: real dates shown day first, none guessed (nights match every stay), leading zeros kept, amounts as numbers." },
+      ],
+    },
+    manualTitle: "Fix it yourself in Excel",
+    manualSteps: [
+      {
+        title: "Don't open the CSV by double-clicking",
+        body: "Double-clicking makes Excel guess with your computer's date settings, which is what swaps the dates and drops leading zeros. Start from a blank workbook instead.",
+      },
+      {
+        title: "Windows: import with the US locale",
+        body: "Data, From Text/CSV, pick the file, click Transform Data. Right-click each date column's header, Change Type, Using Locale, choose Date and English (United States). Set the booking reference column to Text. Close & Load.",
+      },
+      {
+        title: "Mac: the import wizard",
+        body: "In Excel for Mac choose File, Import, CSV file, Delimited, comma. In the last step click each date column and set Column data format to Date: MDY; set reference columns to Text. Finish.",
+      },
+      {
+        title: "Show them day first",
+        body: "Select the date columns, press Ctrl+1 (Cmd+1 on a Mac), choose Custom and type `dd/mm/yyyy`. They now sort as dates. Save as .xlsx so the fix sticks.",
+      },
+      {
+        title: "Already opened it the wrong way?",
+        body: "Text dates that won't sort can be turned into dates with Data, Text to Columns, Next, Next, Column data format Date: MDY. Swapped dates are harder: they look like valid dates, so you can't tell which ones flipped. Re-import from the original CSV instead.",
+      },
+    ],
+    limits: [
+      "Stella needs to know which order the file uses. Here the nights column proved it for every booking; for a file that mixes both orders, it lists the rows it can't decide.",
+      "It makes a new Excel file. Re-exports from the site have the same problem; give Stella the next one too.",
+      "The bookings, including guest names, go to the AI model you use in Stella. The conversion runs on your computer.",
+      "Recorded on Linux, where Stella wrote the .xlsx with a free Python library. The file opens the same in Excel on Windows or Mac.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does Excel swap the day and month?",
+        a: "It reads the CSV with your computer's regional settings. A UK setting reads 3/4/2026 as 3 April; the American file meant 4 March. Dates like 10/23/2026 can't be a UK date, so they stay as text.",
+      },
+      {
+        q: "How do I convert text to dates in Excel?",
+        a: "Re-import with the column type set (above), or use Data, Text to Columns, Next, Next, Date: MDY on the column. Formulas like DATEVALUE also use your regional order, so they repeat the swap.",
+      },
+      {
+        q: "Why are my dates showing as numbers?",
+        a: "Excel stores dates as numbers (46000 is a day in 2025). Format the cells as a date to see them; the number means they're real dates, which is good.",
+      },
+      {
+        q: "Can I merge this with another sheet by booking reference?",
+        a: "Yes, now that references keep their zeros: see [merge two spreadsheets by a matching column](/how/pdf-excel/merge-two-spreadsheets-by-matching-column).",
+      },
+    ],
+    related: ["pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/remove-duplicate-rows-in-excel", "pdf-excel/summarize-spreadsheet-by-category"],
+    lastChecked: "2026-11-13",
+    sources: [
+      {
+        label: "Microsoft: Import or export text (.txt or .csv) files",
+        href: "https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba",
+      },
+    ],
+  },
+  {
+    slug: "merge-two-spreadsheets-by-matching-column",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "merge two excel sheets based on one column",
+      "join two excel sheets on a column",
+      "vlookup two sheets",
+      "vlookup not working leading zeros",
+      "match data from two spreadsheets",
+    ],
+    title: "Merge two spreadsheets by a matching column (ID or number)",
+    description:
+      "Add columns from one sheet to another by a shared ID, even when one side has leading zeros or spaces, with XLOOKUP or Stella (stella.sh), and mark rows that don't match.",
+    h1: "Merge two Excel sheets based on one matching column",
+    short: "Merge sheets by a matching column",
+    lede: "150 orders given each customer's email and phone, and four strays marked not found.",
+    answer:
+      "In the sheet you're adding to, use XLOOKUP: `=XLOOKUP(C2, Customers!A:A, Customers!C:C, \"not found\")` brings in the matching value, or “not found”. It fails silently when the IDs are stored differently, such as the number 1042 on one side and the text 001042 on the other, or a trailing space; wrap the lookup value in TEXT and TRIM to match them. Stella (stella.sh) matches on the number itself, adds the columns to a copy, and lists the rows with no match.",
+    stellaSteps: [
+      "Opens both spreadsheets in Downloads: 150 orders, and 60 customers stored in a different order",
+      "Notices the customer numbers are written differently on each side: plain numbers in the orders, six-digit text with leading zeros in the customer list, and some with a stray space",
+      "Matches on the number itself, so 1042, “1042 ” and 001042 all find the same customer",
+      "Adds email and phone to every order in a new file, and writes “not found” on the four orders whose customer number isn't in the list",
+      "Names those four orders and their numbers, and leaves both original files unchanged",
+    ],
+    prompt:
+      "I have an October orders spreadsheet and a Customers spreadsheet in Downloads. Add each customer's email and phone number to every order, matching on the customer number, and write 'not found' on any order whose customer number isn't in the customer list.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Merged in under a minute and a half. Checked afterwards against an answer key written before the run: all 150 orders kept, all 146 matched orders with the right email and phone (including customer numbers with leading zeros or spaces), the 4 unknown customer numbers given nobody's details and marked not found, and both original spreadsheets unchanged.",
+      note: "The shop, its orders and customers are fictitious, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/merge-two-spreadsheets-by-matching-column/proof.mp4`,
+        cuts: webCuts("pdf-excel/merge-two-spreadsheets-by-matching-column"),
+        poster: `${PROOFS}/pdf-excel/merge-two-spreadsheets-by-matching-column/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 48.7,
+        realDuration: 82,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. An orders spreadsheet and a customer list are in Downloads." },
+        { at: 1.7, text: "The prompt: add each customer's email and phone to every order, and write “not found” where there's no match." },
+        { at: 16.7, text: "Stella replies that it will report how many matched and how many weren't found." },
+        { at: 22.7, text: "Matching the two sheets, sped up 3×." },
+        { at: 34.9, text: "Done: 146 matched, 4 not found and named; 47 customer numbers stored as text that a plain lookup would have missed." },
+      ],
+    },
+    manualTitle: "Merge them yourself with XLOOKUP",
+    manualSteps: [
+      {
+        title: "Put both sheets in one workbook",
+        body: "Copy the customer list into a new tab of the orders workbook (call it Customers). Lookups across two open files work too, but break if one moves.",
+      },
+      {
+        title: "Check how the IDs are stored",
+        body: "Click an ID on each side. If one side shows 001042 or is left-aligned, it's text; 1042 right-aligned is a number. They won't match each other as they are. Also look for spaces at the end.",
+      },
+      {
+        title: "Write the lookup",
+        body: "In a new column next to the first order: `=XLOOKUP(TEXT(TRIM(C2),\"000000\"), Customers!A:A, Customers!C:C, \"not found\")` brings in the email. TRIM drops spaces, TEXT pads the number to six digits like the customer list. Make a second column with `Customers!D:D` for the phone.",
+      },
+      {
+        title: "Fill down and check",
+        body: "Double-click the fill handle to copy the formulas down. Filter the new column for “not found” and look at those rows: are they test entries or real missing customers? Spot-check a few matches by hand.",
+      },
+      {
+        title: "Freeze the results",
+        body: "Copy the new columns and Paste Special, Values, so the file no longer depends on the Customers tab. Older Excel without XLOOKUP: use `=IFERROR(VLOOKUP(…, Customers!A:D, 3, FALSE), \"not found\")`.",
+      },
+    ],
+    limits: [
+      "Stella matches on the column you name. If the two sheets use different kinds of IDs (an account number on one, an email on the other), say what to match on.",
+      "It added the details to a new file and left both originals alone. It also offered to tidy the ID column; that's your call.",
+      "Both spreadsheets' contents, including customer emails and phone numbers, go to the AI model you use in Stella. The merge runs on your computer.",
+      "Recorded on Linux with a free Python library. The result is an ordinary .xlsx for Excel on Windows or Mac.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does VLOOKUP return #N/A when the value is there?",
+        a: "Usually a type mismatch (number vs text, often leading zeros) or a hidden space. Use TRIM and TEXT (or VALUE) so both sides are the same kind, as above.",
+      },
+      {
+        q: "XLOOKUP or VLOOKUP?",
+        a: "XLOOKUP is simpler: it can look left, has a built-in “not found” value and defaults to exact match. VLOOKUP needs FALSE as the last argument and a column number.",
+      },
+      {
+        q: "Can I merge more than two files?",
+        a: "For stacking files with the same columns, see [combine Excel files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet). To see what changed between two versions, [compare two Excel files](/how/pdf-excel/compare-two-excel-files).",
+      },
+      {
+        q: "What if a customer appears twice in the list?",
+        a: "Lookups take the first match. [Remove duplicate rows](/how/pdf-excel/remove-duplicate-rows-in-excel) from the customer list first.",
+      },
+    ],
+    related: ["pdf-excel/remove-duplicate-rows-in-excel", "pdf-excel/fix-dates-in-excel", "pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/compare-two-excel-files"],
+    lastChecked: "2026-11-13",
+    sources: [{ label: "Microsoft: XLOOKUP function", href: "https://support.microsoft.com/en-us/office/xlookup-function-b7fd680e-6d10-43e6-84f9-88eae8bf5929" }],
+  },
+  {
+    slug: "remove-duplicate-rows-in-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "remove duplicates in excel",
+      "remove duplicate rows excel",
+      "remove duplicates excel not working",
+      "remove duplicates ignoring case and spaces",
+      "remove duplicates in csv",
+    ],
+    title: "Remove duplicate rows in Excel, even near-duplicates",
+    description:
+      "Remove Duplicates misses copies that differ by capitals or spaces. Normalise first with LOWER and TRIM, or let Stella (stella.sh) make a clean copy, one row per person.",
+    h1: "Remove duplicate rows in Excel, including the ones it misses",
+    short: "Remove duplicate rows",
+    lede: "A 229-row mailing list down to its 180 real people, phone numbers kept.",
+    answer:
+      "Data, Remove Duplicates only removes rows that match exactly, so “Jo@Mail.com ” and “jo@mail.com” both stay. Add a helper column with `=LOWER(TRIM(C2))` on the email, then run Remove Duplicates on that column only, on a copy of the file. Stella (stella.sh) makes a clean copy where each email appears once, keeps the details from whichever duplicate had them, and keeps different people who share a name.",
+    stellaSteps: [
+      "Opens the mailing list in Documents (229 rows) and treats emails that differ only by capitals or spaces as the same person",
+      "Merges each person's copies into one row, keeping the phone number from whichever copy had it and the name that isn't in all capitals",
+      "Keeps each person's earliest sign-up date, which also dropped five dates set in the future",
+      "Keeps people who share a name but have different emails, such as two Sam Taylors, as separate people",
+      "Saves “Newsletter mailing list (deduplicated).xlsx” next to the original, with emails tidied to lower case, and lists names worth a human look",
+    ],
+    prompt:
+      "My newsletter mailing list spreadsheet in Documents has loads of people on it twice, sometimes with their email in capitals or with a space in it. Make me a clean copy where everyone is only on it once.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "180 people from 229 rows in under 2 minutes. Checked afterwards against an answer key written before the run: exactly 180 people, everyone still there, nobody twice, both Sam Taylors kept, no phone number lost when only a duplicate had it, emails tidied, and the original list unchanged.",
+      note: "The newsletter, its subscribers and their details are fictitious, made for this run. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/remove-duplicate-rows-in-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/remove-duplicate-rows-in-excel"),
+        poster: `${PROOFS}/pdf-excel/remove-duplicate-rows-in-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.5,
+        realDuration: 109,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A newsletter mailing list with many people on it twice is in Documents." },
+        { at: 1.7, text: "The prompt: a clean copy with everyone on it once." },
+        { at: 15.7, text: "Stella replies that it will treat emails differing only by capitals or spaces as one person and leave the original alone." },
+        { at: 21.7, text: "Finding and merging duplicates, sped up 5×." },
+        { at: 33.2, text: "Done: 180 people, down from 229, emails tidied, phone numbers kept, and names to check." },
+      ],
+    },
+    manualTitle: "Remove them yourself in Excel",
+    manualSteps: [
+      {
+        title: "Work on a copy",
+        body: "Save the file under a new name first. Remove Duplicates deletes rows, and once you save there's no undo.",
+      },
+      {
+        title: "Decide what makes a duplicate",
+        body: "For a mailing list, the email address. Names aren't safe: two different people can share one. Dates and phone formats vary between copies of the same person.",
+      },
+      {
+        title: "Add a clean key column",
+        body: "Next to the data, add a column with `=LOWER(TRIM(C2))` (C being the email) and fill it down. This removes leading and trailing spaces and capitals. For spaces inside an email, wrap it in `SUBSTITUTE(…,\" \",\"\")`.",
+      },
+      {
+        title: "Keep the best copy",
+        body: "Sort so the most complete copy of each person comes first (for example, sort the Phone column so filled cells come before blanks). Remove Duplicates keeps the first row it meets.",
+      },
+      {
+        title: "Remove Duplicates on the key",
+        body: "Select the data, Data, Remove Duplicates, untick every column except the key, and click OK. Excel says how many it removed. Delete the key column after, or keep it to check.",
+      },
+    ],
+    limits: [
+      "Stella decided who is the same person by email address. People with no email, or one person with two addresses, need a rule from you; it listed eight same-name, different-email pairs rather than guess.",
+      "It made a copy and left the original as it was. Ask for the duplicates on a separate tab if you want to see what was merged.",
+      "The list's names, emails and phone numbers go to the AI model you use in Stella. The clean-up runs on your computer.",
+      "Recorded on Linux with a free Python library; the clean copy is a normal .xlsx for Excel or Numbers. The same works for CSV files.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why isn't Remove Duplicates removing my duplicates?",
+        a: "The rows aren't exactly the same: a capital letter, a space or a different phone format makes Excel treat them as different. Normalise a key column first (above).",
+      },
+      {
+        q: "How do I remove duplicates based on one column?",
+        a: "In the Remove Duplicates box, untick every column except that one. Excel keeps the first row for each value and deletes the rest of the row.",
+      },
+      {
+        q: "How do I just highlight duplicates instead?",
+        a: "Home, Conditional Formatting, Highlight Cells Rules, Duplicate Values. It has the same exact-match limit, so use the clean key column.",
+      },
+      {
+        q: "Can I combine two lists and then de-duplicate?",
+        a: "Yes: [combine the files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet) first.",
+      },
+    ],
+    related: ["pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/compare-two-excel-files"],
+    lastChecked: "2026-11-13",
+    sources: [
+      {
+        label: "Microsoft: Filter for unique values or remove duplicate values",
+        href: "https://support.microsoft.com/en-us/topic/ccf664b0-81d6-449b-bbe1-8daaec1e83c2",
+      },
+    ],
+  },
+  {
+    slug: "reorder-pdf-pages",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "reorder pdf pages",
+      "fix double sided scan order pdf",
+      "merge odd and even pages pdf",
+      "remove blank pages from pdf",
+      "rearrange pdf pages free",
+    ],
+    title: "Reorder PDF pages from a double-sided scan, blanks removed",
+    description:
+      "Scanned fronts, then backs? Interleave them, reverse the backs and drop blank pages in Preview or PDF24, or let Stella (stella.sh) fix the order by the page numbers.",
+    h1: "Reorder the pages of a double-sided scan and remove the blanks",
+    short: "Reorder PDF pages",
+    lede: "A 16-page jumbled contract scan put back as 13 pages in order, blank backs gone.",
+    answer:
+      "Scan all the fronts and then the pile flipped over, and the PDF runs fronts 1, 3, 5 … then backs in reverse. To fix it, interleave: front 1, last page, front 2, second-to-last, and so on, then delete the blank backs. In Preview (Mac) drag thumbnails into place; on Windows, the free PDF24 Creator sorts pages offline. Stella (stella.sh) works out the order from the page numbers printed on each page, removes blanks even when they have scanner grain, and saves a new PDF.",
+    stellaSteps: [
+      "Finds the contract scan in Downloads: 16 sides, image only, with no text to select",
+      "Reads the page numbers and headings on each scanned page to set the order, instead of relying only on how the pile was flipped",
+      "Finds three blank backs that aren't pure white (scanner grain, an edge shadow, a dust speck) and checks them closely for writing, stamps or initials before removing them",
+      "Saves “Kitchen contract (ordered).pdf” next to the original, which is unchanged",
+      "Reports the result: Page 1 of 13 through Page 13 of 13, nothing missing or repeated, sections running in order",
+    ],
+    prompt:
+      "I scanned a double-sided contract on a scanner that only does one side, so I did all the fronts and then turned the pile over and did the backs. Now the PDF in my Downloads has the pages all out of order and some blank ones. Put the pages in the right order, take out the blank pages, and save it as a new PDF.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Fixed in about 4½ minutes. Checked afterwards against an answer key written before the run: a new PDF with exactly 13 pages (the 3 blank backs removed), every page in reading order 1 to 13, and the original scan unchanged.",
+      note: "The kitchen-refit contract is fictitious, printed and “scanned” as images for this run. The work is sped up 19×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/reorder-pdf-pages/proof.mp4`,
+        cuts: webCuts("pdf-excel/reorder-pdf-pages"),
+        poster: `${PROOFS}/pdf-excel/reorder-pdf-pages/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.8,
+        realDuration: 278,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 16-page contract scan, fronts then backs, is in Downloads." },
+        { at: 1.6, text: "The prompt: put the pages in order, take out the blanks, save a new PDF." },
+        { at: 13.6, text: "Stella replies that the backs probably came out reversed, and it will check the order against the page numbers before saving." },
+        { at: 19.3, text: "Reading each page and rebuilding the order, sped up 19×." },
+        { at: 32, text: "Done: 13 pages, Page 1 of 13 to Page 13 of 13, three blank backs removed, the original unchanged." },
+      ],
+    },
+    manualTitle: "Put them in order yourself",
+    manualSteps: [
+      {
+        title: "Work out the pattern",
+        body: "With 8 sheets, the file runs F1 F2 … F8 then B8 B7 … B1 (the pile was flipped). The right order is F1, B1, F2, B2 … So pages go 1, 16, 2, 15, 3, 14 and so on. Write that list down.",
+      },
+      {
+        title: "On a Mac: Preview",
+        body: "Open the PDF, View, Thumbnails. Drag pages in the sidebar into the order above. Click a blank page and press Delete. Then File, Export as PDF under a new name, so the scan stays as it was.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator (it works offline) and open its Sort pages tool. Drag thumbnails into order, delete blanks, and save. Its Merge tool can also interleave two separate scans of fronts and backs.",
+      },
+      {
+        title: "Check blank pages before deleting",
+        body: "Zoom in on each “blank” back. Scanner shadows and dust are fine to remove; initials, a stamp or “this page intentionally left blank” on a contract may matter.",
+      },
+      {
+        title: "Next time: scan as two files",
+        body: "Scan fronts and backs as separate PDFs. Many tools (PDF24, Acrobat) have a merge that alternates pages and reverses the second file in one step.",
+      },
+    ],
+    limits: [
+      "Here the order came from page numbers printed on each page. Pages without numbers are put back by the fronts-then-backs pattern, which assumes the pile went through in one go.",
+      "A blank page with faint marks is a judgement call. Stella checked each one up close; for legal documents, look at what was removed yourself.",
+      "Stella looked at the scanned pages to read their numbers, so page images go to the AI model you use. The new PDF is made on your computer.",
+      "Recorded on Linux with free PDF tools. On Windows or a Mac Stella uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I merge odd and even scanned pages into one PDF?",
+        a: "Interleave them with the even pages reversed: Acrobat's Combine and PDF24's merge have an option for it, or put them in order by hand in Preview.",
+      },
+      {
+        q: "How do I remove blank pages from a scanned PDF?",
+        a: "Delete them in Preview or PDF24 one by one. Automatic blank-page removal in scanner software often misses grainy pages or removes faint ones, so check.",
+      },
+      {
+        q: "Some pages are sideways too. Can that be fixed?",
+        a: "Yes: see [rotate PDF pages](/how/pdf-excel/rotate-pdf-pages). To make the scan's text searchable afterwards, [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable).",
+      },
+      {
+        q: "Can I split the PDF into separate documents afterwards?",
+        a: "Yes: [split a PDF into multiple files](/how/pdf-excel/split-pdf-into-multiple-files).",
+      },
+    ],
+    related: ["pdf-excel/rotate-pdf-pages", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/convert-excel-to-pdf-without-cutting-off"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
+      { label: "PDF24 Creator (free, offline, Windows)", href: "https://tools.pdf24.org/en/creator" },
+    ],
+  },
+  {
+    slug: "rotate-pdf-pages",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "rotate pdf pages and save",
+      "rotate pdf",
+      "rotate pdf pages permanently",
+      "fix sideways pdf",
+      "scanned pdf pages upside down",
+    ],
+    title: "Rotate PDF pages and save them that way",
+    description:
+      "Turn sideways and upside-down pages of a scanned PDF upright so the fix sticks: Preview on a Mac, PDF24 on Windows, or Stella (stella.sh) finding the wrong pages for you.",
+    h1: "Rotate PDF pages and save them so they stay that way",
+    short: "Rotate PDF pages",
+    lede: "A 10-page scan with pages sideways and upside down, all upright in a saved copy.",
+    answer:
+      "Rotating in a browser or a reader's view only turns your view, not the file. On a Mac, Preview's Rotate button followed by File, Save keeps the change; on Windows, the free PDF24 Creator's rotate tool saves a fixed copy. You still have to find each wrong page. Stella (stella.sh) checks every page itself, turns the sideways and upside-down ones, and saves a copy that opens upright in any viewer.",
+    stellaSteps: [
+      "Finds the scan in Downloads: 10 image-only pages of meeting minutes",
+      "Checks the orientation of every page, including one that looks fine as a picture but carries a wrong rotation setting, so viewers show it sideways",
+      "Turns pages 3, 4 and 9 (sideways) and 7 (upside down), without re-compressing the pages, so quality and size don't change",
+      "Saves a copy named “(pages rotated)” next to the original, which is unchanged",
+      "Offers to replace the original with the fixed copy if you'd rather keep one file",
+    ],
+    prompt:
+      "A PDF in my Downloads came out of the scanner with some pages sideways and one upside down. Turn the pages the right way up and save it so they stay that way.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Fixed in about 2½ minutes. Checked afterwards against an answer key written before the run: a fixed PDF with all 10 pages in the same order, every page upright (including the sideways, upside-down and wrongly flagged pages), and the scan still there.",
+      note: "The residents' association minutes are fictitious, “scanned” as images for this run. The work is sped up 9×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/rotate-pdf-pages/proof.mp4`,
+        cuts: webCuts("pdf-excel/rotate-pdf-pages"),
+        poster: `${PROOFS}/pdf-excel/rotate-pdf-pages/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.6,
+        realDuration: 157,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 10-page scan with sideways and upside-down pages is in Downloads." },
+        { at: 1.7, text: "The prompt: turn the pages the right way up and save it so they stay that way." },
+        { at: 14.7, text: "Stella replies that it will check each page and leave the original as it is." },
+        { at: 20.7, text: "Checking and turning pages, sped up 9×." },
+        { at: 32.1, text: "Done: pages 3, 4 and 9 turned from sideways, page 7 from upside down, quality and size unchanged." },
+      ],
+    },
+    manualTitle: "Rotate them yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Preview",
+        body: "Open the PDF, View, Thumbnails. Click a wrong page (Cmd-click to pick several) and press the Rotate button in the toolbar, or Cmd+R; Option-click turns the other way. File, Save keeps the rotation in the file.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator, open its Rotate pages tool, add the file, click the rotate arrows on each wrong page and save. Rotating in Edge or a reader's View menu doesn't change the file.",
+      },
+      {
+        title: "Find every wrong page",
+        body: "Scroll through the thumbnails at a size where you can read headings. Upside-down pages are easy to miss at a glance in a long scan.",
+      },
+      {
+        title: "Check in another viewer",
+        body: "Open the saved PDF in a different app (a browser, your phone). If a page is sideways only there, the page has a rotation setting that one app ignores; rotate it again and re-save.",
+      },
+      {
+        title: "Command line, for many files",
+        body: "The free qpdf can rotate given pages: `qpdf in.pdf --rotate=+90:3,9 --rotate=180:7 -- out.pdf` turns pages 3 and 9 a quarter turn clockwise and page 7 upside down.",
+      },
+    ],
+    limits: [
+      "Stella turns whole pages by quarter turns. It doesn't straighten pages that were scanned slightly crooked; that needs a deskew tool.",
+      "It saved a fixed copy. It can replace the original instead, if you say so.",
+      "To decide which way is up, Stella looks at the pages, so page images go to the AI model you use. The rotation runs on your computer.",
+      "Recorded on Linux with free PDF tools. On Windows or a Mac Stella uses the same kind of tool; the fixed PDF opens upright everywhere.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why doesn't my PDF stay rotated?",
+        a: "Most viewers (Edge, Chrome, Adobe's reader) rotate the view only. Use a tool that saves the change: Preview, PDF24, Acrobat, or Stella.",
+      },
+      {
+        q: "Can I rotate just one page?",
+        a: "Yes. Select only that page's thumbnail before rotating. Rotating with nothing selected may turn every page.",
+      },
+      {
+        q: "The pages are also out of order. What now?",
+        a: "See [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages), which also removes blank backs from a double-sided scan.",
+      },
+      {
+        q: "Will rotating reduce the quality?",
+        a: "No, if the tool just changes the page's rotation setting, which Stella did here. Tools that re-render pages can soften them.",
+      },
+    ],
+    related: ["pdf-excel/reorder-pdf-pages", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/convert-pdf-to-jpg"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Rotate a PDF in Preview", href: "https://support.apple.com/guide/preview/prvw11567/mac" },
+      { label: "PDF24 Creator (free, offline, Windows)", href: "https://tools.pdf24.org/en/creator" },
+      { label: "qpdf manual: page rotation", href: "https://qpdf.readthedocs.io/en/stable/cli.html" },
+    ],
+  },
+  {
+    slug: "split-bills-with-roommates",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "split bills with roommates",
+      "bill splitter",
+      "who owes who spreadsheet",
+      "settle up shared expenses fewest payments",
+      "house expenses spreadsheet split",
+    ],
+    title: "Split bills with roommates: who owes who, in fewest payments",
+    description:
+      "Work out who owes who from a shared house expenses spreadsheet, uneven splits and refunds included, with SUMIF or Stella (stella.sh), settled in the fewest payments.",
+    h1: "Split bills with roommates and settle up in the fewest payments",
+    short: "Split bills with roommates",
+    lede: "Ten months of house expenses settled in three payments, uneven splits included.",
+    answer:
+      "For each person, add up what they paid and subtract their share of every cost they were part of; positive means they're owed, negative means they owe. Then have each person who owes pay someone who's owed, biggest first, which keeps the payments to a minimum. Stella (stella.sh) does this from the sheet you already keep, following the “split between” column, notes, refunds and repayments, and saves the payments in a file.",
+    stellaSteps: [
+      "Reads House expenses 2026 in Documents: 66 rows from January to October, with names typed inconsistently (“ben”, “Ana ”)",
+      "Splits each cost only between the people named in its “Split between” column, and follows the note under the table that Dev was away in August for electric and water",
+      "Counts Ben's $200 to Ana as a repayment and cancels the vacuum purchase against its refund",
+      "Works out each person's balance and settles them in three payments, all to Ana, who paid the rent",
+      "Saves a settle-up spreadsheet with the payments, balances and a line-by-line ledger, and flags two things to check: no November entries yet, and concert tickets that look personal",
+    ],
+    prompt:
+      "Four of us share a house and we log who paid for what in House expenses 2026 in my Documents. Work out who owes who, with the fewest payments to settle up, and save it as a file.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Settled in about 2½ minutes: Dev pays Ana $6,222.04, Ben pays Ana $5,689.60, Chloe pays Ana $5,131.56. Checked afterwards against an answer key written before the run: the payments settle every balance exactly in no more than 3 payments, each person's balance is shown, and the expenses spreadsheet is unchanged.",
+      note: "The house, its four sharers and their expenses are fictitious, made for this run, in US dollars. The work is sped up 8×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/split-bills-with-roommates/proof.mp4`,
+        cuts: webCuts("pdf-excel/split-bills-with-roommates"),
+        poster: `${PROOFS}/pdf-excel/split-bills-with-roommates/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 48.3,
+        realDuration: 147,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A shared house expenses spreadsheet is in Documents." },
+        { at: 1.7, text: "The prompt: who owes who, with the fewest payments, saved as a file." },
+        { at: 16.7, text: "Stella replies that it will work out balances and save the result next to the original." },
+        { at: 22.5, text: "Going through the expenses, sped up 8×." },
+        { at: 34.2, text: "Done: three payments to Ana, with how uneven splits, August, a repayment and a refund were handled." },
+      ],
+    },
+    manualTitle: "Work it out yourself",
+    manualSteps: [
+      {
+        title: "Tidy the sheet",
+        body: "Make sure every row has Amount, Paid by and Split between, with names spelled the same every time (Find and Replace “ben” with “Ben”). Refunds go in as negative amounts. Write “All” where everyone shares.",
+      },
+      {
+        title: "Add a share column per person",
+        body: "For Ana: `=IF(OR($E2=\"All\",ISNUMBER(SEARCH(\"Ana\",$E2))),$C2/IF($E2=\"All\",4,LEN($E2)-LEN(SUBSTITUTE($E2,\",\",\"\"))+1),0)`, where C is the amount and E the split. Copy it for each person, changing the name, and fill down.",
+      },
+      {
+        title: "Work out each balance",
+        body: "For each person: `=SUMIF(D:D,\"Ana\",C:C) - SUM(F:F)`, what they paid minus their share column. The four balances should add up to zero (within a cent or two).",
+      },
+      {
+        title: "Settle with as few payments as possible",
+        body: "List who owes (negative) and who's owed (positive). Have the biggest debtor pay the biggest creditor as much as one of them needs, cross off whoever reaches zero, and repeat. That never takes more payments than people minus one.",
+      },
+      {
+        title: "Handle the exceptions",
+        body: "Money one sharer paid another directly (a repayment) is a row paid by the payer, split to the receiver only. Months when someone was away need the split column changed for those rows.",
+      },
+    ],
+    limits: [
+      "Stella works out the payments; it doesn't send money or request it.",
+      "It follows the “Split between” column and notes as written, and says how it read anything ambiguous. Here it counted concert tickets because they were logged, and showed what changes if they shouldn't count.",
+      "The expenses and names go to the AI model you use in Stella. The sums are worked out on your computer.",
+      "Recorded on Linux with a free Python library; the settle-up file is an ordinary .xlsx that opens in Excel, Numbers or Google Sheets.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What's the fewest number of payments to settle up?",
+        a: "At most one fewer than the number of people. Often fewer: here everyone owed the same person, so three payments settled four people.",
+      },
+      {
+        q: "Do I need a bill-splitting app?",
+        a: "Not if you already log expenses in a sheet. Apps need everyone to sign up. A spreadsheet with SUMIF, or Stella reading your sheet, gives the same answer.",
+      },
+      {
+        q: "How do I split a bill when someone was away?",
+        a: "Change that row's split to the people who were there. Stella followed a note saying exactly that for August.",
+      },
+      {
+        q: "Can I see spending by category as well?",
+        a: "Yes: [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category). For bills that come out every month, [find subscriptions in your statements](/how/pdf-excel/find-subscriptions-in-bank-statement).",
+      },
+    ],
+    related: ["pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/receipts-to-spreadsheet"],
+    lastChecked: "2026-11-13",
+    sources: [{ label: "Microsoft: SUMIF function", href: "https://support.microsoft.com/office/sumif-function-169b8c99-c05c-4483-a712-1697a653039b" }],
+  },
+  {
+    slug: "summarize-spreadsheet-by-category",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "summarize excel data by category",
+      "pivot table by category and month",
+      "monthly spending by category excel",
+      "pivot table",
+      "summarize excel data without pivot table",
+    ],
+    title: "Summarize a spreadsheet by category and month",
+    description:
+      "Total spending per category per month with a PivotTable, after fixing the categories and text amounts that make it wrong, or let Stella (stella.sh) build the summary.",
+    h1: "Summarize a spreadsheet by category and month, with totals",
+    short: "Summarize by category",
+    lede: "314 spending rows turned into a category-by-month table, every total to the penny.",
+    answer:
+      "A PivotTable does it: Insert, PivotTable, Category in Rows, Date in Columns grouped by month, Amount in Values as Sum. It goes wrong on messy data: “groceries” and “Groceries ” become separate rows, and amounts typed as “£12.50” are silently left out. Clean those first. Stella (stella.sh) merges the category spellings, counts text amounts, and saves a summary with totals per category, per month and for the year.",
+    stellaSteps: [
+      "Finds the spending spreadsheet in Documents: 314 rows from January to 28 October",
+      "Merges 22 spellings of categories (capitals, stray spaces) into the 8 real ones",
+      "Counts 8 amounts typed as text with a £ sign, which a PivotTable would skip, and takes refunds off the month and category they're in",
+      "Saves “Spending summary 2026.xlsx” next to the original with a category-by-month grid, category totals, month totals and the year total",
+      "Sums it up in plain words (biggest categories, dearest month) and flags a possible double broadband charge and some very low bills",
+    ],
+    prompt:
+      "My spending spreadsheet for this year is in Documents. Make me a summary of how much I spent in each category in each month, with totals.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A summary in about 3 minutes. Checked afterwards against an answer key written before the run: all 80 category-by-month totals correct to the penny, exactly the 8 real categories, the year's total (£21,695.61) and a total per category shown, and the original data still there.",
+      note: "The household and its spending are fictitious, made for this run. The work is sped up 11×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/summarize-spreadsheet-by-category/proof.mp4`,
+        cuts: webCuts("pdf-excel/summarize-spreadsheet-by-category"),
+        poster: `${PROOFS}/pdf-excel/summarize-spreadsheet-by-category/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.6,
+        realDuration: 177,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A year of household spending is in a spreadsheet in Documents." },
+        { at: 1.7, text: "The prompt: how much I spent in each category each month, with totals." },
+        { at: 14.7, text: "Stella replies that it will make the summary and leave the original alone." },
+        { at: 20.7, text: "Cleaning categories and adding up, sped up 11×." },
+        { at: 32.3, text: "Done: £21,695.61 so far this year, 22 category spellings merged into 8, text amounts counted, and two bills to check." },
+      ],
+    },
+    manualTitle: "Build it yourself",
+    manualSteps: [
+      {
+        title: "Clean the categories",
+        body: "Add a column with `=PROPER(TRIM(C2))` and fill down: it removes stray spaces and fixes capitals, so “groceries” and “Groceries ” become one. Use this column instead of the original in the PivotTable.",
+      },
+      {
+        title: "Make every amount a number",
+        body: "Amounts typed with a £ sign or as text are left-aligned. Add `=VALUE(SUBSTITUTE(D2,\"£\",\"\"))` and fill down, or select the column and use Data, Text to Columns, Finish. Check the column's SUM matches what you expect.",
+      },
+      {
+        title: "Insert the PivotTable",
+        body: "Select the data, Insert, PivotTable, New Worksheet. Drag the clean category to Rows, Date to Columns, the clean amount to Values (it should say Sum of). Excel groups dates by month; if not, right-click a date, Group, Months.",
+      },
+      {
+        title: "Add totals",
+        body: "PivotTables show row and column grand totals by default (Design, Grand Totals). Format the values as currency with Ctrl+1.",
+      },
+      {
+        title: "Without a PivotTable",
+        body: "Type the categories down the side and months across the top, then use `=SUMIFS(Amount, Category, $A2, Date, \">=\"&B$1, Date, \"<\"&EDATE(B$1,1))` with the first of each month in row 1.",
+      },
+    ],
+    limits: [
+      "Stella summarises the categories in your sheet. It can suggest new ones but won't invent them.",
+      "Refunds reduce the category in the month they happened, so a month can show a negative total (Fun was −£32 in October here).",
+      "The spending data goes to the AI model you use in Stella. The summary is built on your computer.",
+      "Recorded on Linux with a free Python library; the summary is an ordinary .xlsx for Excel, Numbers or Google Sheets.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my PivotTable show the same category twice?",
+        a: "The two aren't identical: a trailing space or different capitals. Clean the column with TRIM and PROPER first.",
+      },
+      {
+        q: "Why is my PivotTable total too low?",
+        a: "Some amounts are text, which Sum skips. Convert them to numbers. Stella counted 8 such amounts here.",
+      },
+      {
+        q: "Can I get a chart too?",
+        a: "Yes: in Excel, select the PivotTable and Insert, PivotChart. Or ask Stella for a chart sheet in the same file.",
+      },
+      {
+        q: "My data is still in bank PDFs. Where do I start?",
+        a: "Get it into a sheet first: [bank statement PDFs to Excel](/how/pdf-excel/bank-statement-pdf-to-excel) or [receipts to a spreadsheet](/how/pdf-excel/receipts-to-spreadsheet). Then [find your subscriptions](/how/pdf-excel/find-subscriptions-in-bank-statement).",
+      },
+    ],
+    related: ["pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/split-bills-with-roommates"],
+    lastChecked: "2026-11-13",
+    sources: [
+      {
+        label: "Microsoft: Create a PivotTable to analyze worksheet data",
+        href: "https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576",
+      },
+      { label: "Microsoft: SUMIFS function", href: "https://support.microsoft.com/en-us/office/sumifs-function-c9e748f5-7ea7-455d-9406-611cebce642b" },
     ],
   },
 ];

@@ -296,7 +296,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         a: "Yes. For any spreadsheet, see [compare two Excel files](/how/pdf-excel/compare-two-excel-files) or ask for duplicate rows to be removed.",
       },
     ],
-    related: ["contacts-calendar-email/convert-vcf-to-excel", "contacts-calendar-email/convert-csv-to-vcf", "pdf-excel/compare-two-excel-files"],
+    related: ["contacts-calendar-email/convert-vcf-to-excel", "contacts-calendar-email/convert-csv-to-vcf", "pdf-excel/compare-two-excel-files", "pdf-excel/fix-garbled-characters-in-csv"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Google: Merge duplicate contacts", href: "https://support.google.com/contacts/answer/7078226" },
@@ -496,11 +496,122 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         a: "Yes: [find every file that mentions a name](/how/files-folders/find-files-containing-text). To blank out details before sending, [redact the PDF](/how/pdf-excel/redact-pdf).",
       },
     ],
-    related: ["files-folders/find-files-containing-text", "pdf-excel/redact-pdf", "contacts-calendar-email/convert-ics-to-excel"],
+    related: ["files-folders/find-files-containing-text", "pdf-excel/redact-pdf", "contacts-calendar-email/convert-ics-to-excel", "contacts-calendar-email/open-mbox-file"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Save emails as files or PDFs in Mail on Mac", href: "https://support.apple.com/guide/mail/mlhlp1044/mac" },
       { label: "Apple Community: Mail export as PDF cuts off right side", href: "https://discussions.apple.com/thread/251140151" },
+    ],
+  },
+  {
+    slug: "open-mbox-file",
+    niche: "contacts-calendar-email",
+    searchPhrases: [
+      "how to open mbox file",
+      "mbox viewer",
+      "open mbox file google takeout",
+      "mbox to csv",
+      "extract attachments from mbox",
+      "thunderbird export emails",
+    ],
+    title: "Open an mbox file: every email listed, every attachment saved",
+    description:
+      "Open the mbox from Google Takeout or Thunderbird: list every email with date, sender and subject and save all the attachments, with Thunderbird or Stella (stella.sh).",
+    h1: "How to open an mbox file",
+    short: "Open an mbox file",
+    lede: "A mailbox download as a spreadsheet of every email and one folder of its attachments.",
+    answer:
+      "An mbox is one big text file holding a whole mailbox, as Google Takeout gives you Gmail. To read it, import it into a mail program: the free Thunderbird with the ImportExportTools NG add-on on Windows, Mac or Linux, or Apple Mail's Import Mailboxes on a Mac. Stella (stella.sh) opens it without any mail program: a spreadsheet with a row for every email and a folder of all the attachments, with readable subjects and no file overwritten by another of the same name.",
+    stellaSteps: [
+      "Opens the Google Takeout zip in Downloads and finds the mbox of 45 emails inside it",
+      "Decodes the subjects and file names that are stored in encoded form, so “Café de Flore – réservation confirmée” and “Reçu Novembre.pdf” read right",
+      "Writes `Email list.xlsx` with the date, sender name and address, recipient, subject, Gmail labels and attachments of every email",
+      "Saves all 12 attachments into one Attachments folder, keeping two different files both called invoice.pdf as `invoice.pdf` and `invoice (2).pdf`",
+      "Notes that one attachment was already damaged in the original email, puts it all in a new Old Gmail export folder and leaves the zip unchanged",
+    ],
+    prompt:
+      "I downloaded my old email from Google and got a zip in my Downloads with an mbox file I can't open. Make me a spreadsheet listing every email with the date, who it's from and the subject, and save all the attachments into one folder.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: MODEL,
+      result:
+        "About a minute. Checked afterwards against an answer key written before the run: a row for each of the 45 emails with sender address, readable subject and date, all 12 attachments saved as files including both different invoice.pdf files, and the accented attachment name readable.",
+      note: "The mailbox is made up, written in the format of a Gmail Takeout mbox, including encoded subjects and two attachments with the same name. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/contacts-calendar-email/open-mbox-file/proof.mp4`,
+        cuts: webCuts("contacts-calendar-email/open-mbox-file"),
+        poster: `${PROOFS}/contacts-calendar-email/open-mbox-file/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.2,
+        realDuration: 105,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A Google Takeout zip with an mbox of old email is in Downloads." },
+        { at: 2, text: "The prompt: a spreadsheet of every email and all the attachments in one folder." },
+        { at: 10.8, text: "Stella replies: one row per email, every attachment kept even when two share a name." },
+        { at: 16.7, text: "Reading the mailbox, sped up 5×." },
+        { at: 28.2, text: "Done: 45 emails listed and 12 attachments saved, with one file that was damaged in the original email." },
+      ],
+    },
+    manualTitle: "Open it yourself",
+    manualSteps: [
+      {
+        title: "Get the mbox out of the zip",
+        body: "Google Takeout puts Gmail in `Takeout/Mail/` as a file such as `All mail Including Spam and Trash.mbox`. Unzip the download first; the mbox can be several gigabytes for a big mailbox.",
+      },
+      {
+        title: "Mac: import into Apple Mail",
+        body: "In Mail, File, Import Mailboxes, choose Files in mbox format and pick the folder holding the .mbox. The emails appear under On My Mac. Select messages and use File, Save Attachments to save their files.",
+      },
+      {
+        title: "Windows, Mac or Linux: Thunderbird",
+        body: "Install the free Thunderbird and its ImportExportTools NG add-on (Tools, Add-ons). Right-click Local Folders, ImportExportTools NG, Import mbox file, and pick the .mbox. No email account is needed for this.",
+      },
+      {
+        title: "List the emails and save attachments",
+        body: "Right-click the imported folder, ImportExportTools NG, Export all messages in the folder, Spreadsheet (CSV) for a list. To save attachments, select all messages and use the add-on's save attachments option. Check for files with the same name, which some tools overwrite or skip.",
+      },
+    ],
+    limits: [
+      "A mailbox of many gigabytes takes a while; Stella works through it on your computer, so allow time and disk space.",
+      "Stella reads the mailbox to build the list, and the headers and email text it reads go to the AI model you use in Stella.",
+      "It can't repair an attachment that was already broken in the email; in the run it said which one and who to ask for it.",
+      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What is an mbox file?",
+        a: "A plain text file with a whole mail folder in it, one email after another. Google Takeout, Thunderbird and Apple Mail all use it for exports.",
+      },
+      {
+        q: "Can I open an mbox file without installing an email program?",
+        a: "Not usefully on its own: a text editor shows raw headers and encoded attachments. Stella reads it directly and gives you a spreadsheet and the files.",
+      },
+      {
+        q: "Can I turn some of the emails into a PDF?",
+        a: "Yes: see [convert EML to PDF](/how/contacts-calendar-email/convert-eml-to-pdf), which puts one person's emails in one PDF by date.",
+      },
+      {
+        q: "Can it do the same with chat downloads?",
+        a: "Yes: see [read Facebook messages from your data download](/how/chats-data-exports/read-facebook-messages-from-data-download) and [export a WhatsApp chat to PDF](/how/chats-data-exports/export-whatsapp-chat-to-pdf).",
+      },
+    ],
+    related: [
+      "contacts-calendar-email/convert-eml-to-pdf",
+      "chats-data-exports/read-facebook-messages-from-data-download",
+      "files-folders/find-files-containing-text",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Google Account Help: Download your data", href: "https://support.google.com/accounts/answer/3024190" },
+      {
+        label: "ImportExportTools NG add-on for Thunderbird",
+        href: "https://addons.thunderbird.net/en-US/thunderbird/addon/importexporttools-ng/",
+      },
     ],
   },
 ];

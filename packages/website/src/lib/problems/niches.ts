@@ -114,6 +114,7 @@ export const NICHES: Niche[] = [
           "compare-two-excel-files",
           "remove-duplicate-rows-in-excel",
           "fix-dates-in-excel",
+          "fix-garbled-characters-in-csv",
           "summarize-spreadsheet-by-category",
         ],
       },
@@ -122,6 +123,16 @@ export const NICHES: Niche[] = [
         slugs: ["bank-statement-pdf-to-excel", "find-subscriptions-in-bank-statement", "receipts-to-spreadsheet", "split-bills-with-roommates"],
       },
     ],
+  },
+  {
+    slug: "money-household",
+    name: "Money and household",
+    h1: "Your money files, added up properly.",
+    title: "Money how-tos: budgets, bank files, double charges, mileage",
+    description:
+      "Make a budget from bank downloads, find double charges, open OFX and QIF files, total mileage or timesheets, and see your Amazon spending, with Stella (stella.sh).",
+    intro:
+      "Bank downloads, order histories and logs already hold the answer; the work is adding them up without counting anything twice. Each guide gives the spreadsheet route, and Stella (stella.sh) doing it from files you download yourself, with no bank login shared. None of it is financial or tax advice.",
   },
   {
     slug: "documents",
@@ -152,6 +163,16 @@ export const NICHES: Niche[] = [
       "Convert contacts between CSV and VCF, merge duplicate contacts, turn a calendar into a spreadsheet and saved emails into one PDF, with free tools or Stella (stella.sh).",
     intro:
       "Moving contacts to a new phone or getting a calendar into a spreadsheet means odd file formats and garbled names. Each guide gives the free route, usually through Google or Outlook, and Stella (stella.sh) doing it on your own computer instead of an upload site.",
+  },
+  {
+    slug: "chats-data-exports",
+    name: "Chats and data exports",
+    h1: "Read the data apps give you.",
+    title: "Chat and data exports: WhatsApp, Messenger, Instagram, Spotify",
+    description:
+      "Turn a WhatsApp or Messenger export into a readable PDF, see who doesn't follow you back on Instagram, or your all-time Spotify stats, from your own data download.",
+    intro:
+      "Apps let you download your data, then hand you a zip of text and JSON files nobody can read. You request the download from the service yourself; each guide shows how, the free manual route, and Stella (stella.sh) turning the files into an answer or a PDF on your computer, with no login or upload site.",
   },
   {
     slug: "study",

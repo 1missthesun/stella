@@ -142,7 +142,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. MetadataFixer is a paid app built for exactly this, and GPTH is free and open source. Stella is free with the ChatGPT or Claude plan you already have, and does the same matching. It also handles the next job, like sorting the photos by year or [tidying the Downloads folder](/how/pc-cleanup/organize-downloads-folder) they arrived in.",
       },
     ],
-    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "photos-files/rename-pdf-files-based-on-content", "photos-files/fix-wrong-date-on-photos"],
+    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "photos-files/rename-pdf-files-based-on-content", "photos-files/fix-wrong-date-on-photos", "chats-data-exports/read-facebook-messages-from-data-download"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Google: Download your Google Photos data (Takeout)", href: "https://support.google.com/accounts/answer/3024190" },
@@ -493,7 +493,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "The open-source ones (dupeGuru, Czkawka) are. Be wary of “PC cleaner” apps that scan for free and then charge to delete. Whatever you use, review the groups and send deletions to the Trash.",
       },
     ],
-    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder", "photos-files/separate-screenshots-from-photos"],
+    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder", "photos-files/separate-screenshots-from-photos", "files-folders/compare-two-folders", "pc-cleanup/find-duplicate-files"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "dupeGuru", href: "https://dupeguru.voltaicideas.net" },

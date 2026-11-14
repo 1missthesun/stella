@@ -110,7 +110,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf", "pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/extract-table-from-pdf-to-excel"],
+    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf", "pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/extract-table-from-pdf-to-excel", "money-household/convert-ofx-to-excel"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -474,7 +474,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Ask for a CSV, which Google Sheets opens directly, or for an .xlsx you upload to Google Drive. If your bank statements need the same treatment, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/combine-excel-files-into-one-sheet", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/summarize-spreadsheet-by-category"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/combine-excel-files-into-one-sheet", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/summarize-spreadsheet-by-category", "money-household/mileage-log-for-taxes"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Support: Insert data from picture", href: "https://support.microsoft.com/office/insert-data-from-picture-3c1bb58d-2c59-4bc0-b04a-a671a6868fd7" },
@@ -1872,7 +1872,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes: see [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category). To split shared bills, [split bills with roommates](/how/pdf-excel/split-bills-with-roommates).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/split-bills-with-roommates"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/split-bills-with-roommates", "money-household/make-a-budget-from-bank-statement"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -1982,7 +1982,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, now that references keep their zeros: see [merge two spreadsheets by a matching column](/how/pdf-excel/merge-two-spreadsheets-by-matching-column).",
       },
     ],
-    related: ["pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/remove-duplicate-rows-in-excel", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/convert-excel-to-csv"],
+    related: ["pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/remove-duplicate-rows-in-excel", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/convert-excel-to-csv", "pdf-excel/fix-garbled-characters-in-csv"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -2519,7 +2519,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes: [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category). For bills that come out every month, [find subscriptions in your statements](/how/pdf-excel/find-subscriptions-in-bank-statement).",
       },
     ],
-    related: ["pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/receipts-to-spreadsheet"],
+    related: ["pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/receipts-to-spreadsheet", "money-household/make-a-budget-from-bank-statement"],
     lastChecked: "2026-11-13",
     sources: [{ label: "Microsoft: SUMIF function", href: "https://support.microsoft.com/office/sumif-function-169b8c99-c05c-4483-a712-1697a653039b" }],
   },
@@ -4300,6 +4300,118 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     lastChecked: "2026-11-14",
     sources: [
       { label: "Microsoft: Filter data in a range or table", href: "https://support.microsoft.com/en-us/office/filter-data-in-a-range-or-table-01832226-31b5-4568-8806-38c37dcc180e" },
+    ],
+  },
+  {
+    slug: "fix-garbled-characters-in-csv",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "fix garbled characters in csv",
+      "garbled text",
+      "csv special characters excel",
+      "csv utf 8 excel",
+      "excel csv encoding",
+    ],
+    title: "Fix garbled characters in a CSV (Ã© instead of é) for Excel",
+    description:
+      "Repair names like JosÃ© and â€™ in a CSV, cell by cell, without breaking real accents, and save a copy Excel opens right by double-click. Excel, or Stella (stella.sh).",
+    h1: "Fix garbled characters in a CSV file",
+    short: "Fix garbled characters in CSV",
+    lede: "150 contacts with JosÃ© and â€™ in them, repaired and saved so Excel shows them right.",
+    answer:
+      "First check whether the file is really broken: if it reads fine in a text editor, Excel just opened it with the wrong encoding, and Data, From Text/CSV with File origin UTF-8 fixes the view. If the garble is saved in the file, it has to be reversed cell by cell, and a find-and-replace list can break names where the Ã is real. Stella (stella.sh) repairs each cell on your computer, leaves correct ones alone and saves a copy Excel opens right by double-click.",
+    stellaSteps: [
+      "Reads `Contacts export.csv` in Documents: 150 contacts with names, companies, cities and notes",
+      "Reverses the mix-up cell by cell, so JosÃ© becomes José and â€™ an apostrophe, including entries garbled twice over",
+      "Leaves entries that were already right untouched, such as a Portuguese company name whose Ã is a real letter",
+      "Saves `Contacts export (clean).csv` as UTF-8 with the marker Excel looks for, so a double-click shows the accents",
+      "Checks the whole file for leftover garble, keeps the original, and points out email addresses that are missing accented letters rather than garbled",
+    ],
+    prompt:
+      "The names in the contacts CSV in my Documents have gone weird, like 'JosÃ©' instead of 'José' and 'â€™' where apostrophes should be. Fix all the garbled characters and save a clean copy that opens properly in Excel.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "About half a minute. Checked afterwards against an answer key written before the run: all 150 contacts kept, every cell reading exactly as it should (José, Zoë Brontë-Hale, O’Connor’s, Łódź, €45), rows that were already right untouched, and a CSV saved with the UTF-8 marker so Excel opens it correctly.",
+      note: "The contacts are made up, garbled for this run the way a UTF-8 file gets when it's opened as Windows text and saved again. The run was checked in the file; Excel itself wasn't opened. Shown at normal speed.",
+      video: {
+        src: `${PROOFS}/pdf-excel/fix-garbled-characters-in-csv/proof.mp4`,
+        cuts: webCuts("pdf-excel/fix-garbled-characters-in-csv"),
+        poster: `${PROOFS}/pdf-excel/fix-garbled-characters-in-csv/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.8,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A contacts CSV with garbled names is in Documents." },
+        { at: 2, text: "The prompt: fix the garbled characters and save a clean copy that opens properly in Excel." },
+        { at: 4, text: "Stella works on it straight away in the chat, at normal speed." },
+        { at: 30.8, text: "Done: every garbled entry fixed, correct ones left alone, saved so Excel keeps the accents." },
+      ],
+    },
+    manualTitle: "Fix it yourself",
+    manualSteps: [
+      {
+        title: "Check whether the file or the view is wrong",
+        body: "Open the CSV in Notepad or TextEdit. If names read right there, the file is fine and only Excel misread it: skip to the import step. If you see JosÃ© there too, the garble is saved in the file.",
+      },
+      {
+        title: "Import with the right encoding",
+        body: "Windows Excel: Data, From Text/CSV, set File origin to 65001: Unicode (UTF-8), Load. Excel for Mac: File, Import, CSV file, File origin Unicode (UTF-8).",
+      },
+      {
+        title: "Replace the garbled patterns",
+        body: "For text saved garbled, use Find and Replace (Ctrl+H) per pattern: `Ã©` to é, `Ã¨` to è, `Ã¶` to ö, `â€™` to ’, `â€œ` and `â€` to quotes, `â‚¬` to €. Search for `Ã` alone afterwards to find what's left.",
+      },
+      {
+        title: "Watch the real Ã",
+        body: "Portuguese and some other names use Ã as a real letter (SÃO JOÃO). Don't run a blanket replace on Ã; fix those cells by eye.",
+      },
+      {
+        title: "Save so Excel reads it next time",
+        body: "File, Save As, CSV UTF-8 (Comma delimited). That version starts with a marker (a BOM) that tells Excel the encoding, so a double-click opens it correctly.",
+      },
+    ],
+    limits: [
+      "Characters already turned into `?` or `�` are gone from the file. Stella can only guess them from context and should say which ones it guessed; none came up in this run.",
+      "It saved a clean copy and kept the original; ask if you want the file fixed in place.",
+      "Email addresses that simply lack accented letters aren't garbled, so Stella left them and flagged them to check.",
+      "The file's contents go to the AI model you use in Stella while it checks them.",
+      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does Excel show Ã© instead of é?",
+        a: "The file is UTF-8 but Excel opened it as older Windows text, so each accented letter's two bytes show as two characters. Importing with UTF-8 fixes the view; if someone saved it in that state, the garble is now in the file.",
+      },
+      {
+        q: "What does â€™ mean?",
+        a: "It's a curly apostrophe (’) read with the wrong encoding. `â€œ` and `â€` are curly double quotes, `â€“` a dash and `â‚¬` the euro sign.",
+      },
+      {
+        q: "How do I save a CSV that Excel opens with accents?",
+        a: "Save it as CSV UTF-8 (Comma delimited). The BOM at the start tells Excel to read it as UTF-8 on double-click.",
+      },
+      {
+        q: "Can it tidy the contacts too?",
+        a: "Yes: see [merge duplicate contacts](/how/contacts-calendar-email/merge-duplicate-contacts) and [convert CSV to VCF](/how/contacts-calendar-email/convert-csv-to-vcf) for a phone.",
+      },
+    ],
+    related: [
+      "pdf-excel/fix-dates-in-excel",
+      "contacts-calendar-email/merge-duplicate-contacts",
+      "contacts-calendar-email/convert-csv-to-vcf",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      {
+        label: "Microsoft Support: Opening CSV UTF-8 files correctly in Excel",
+        href: "https://support.microsoft.com/en-us/office/opening-csv-utf-8-files-correctly-in-excel-8a935af5-3416-4edd-ba7e-3dfd2bc4a032",
+      },
     ],
   },
 ];

@@ -308,7 +308,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         a: "Moving within the same drive keeps the modified date. Photos keep their date taken, which is stored inside the file. To go the other way, [sort photos into folders by date](/how/photos-files/sort-photos-into-folders-by-date).",
       },
     ],
-    related: ["files-folders/rename-multiple-files-at-once", "pc-cleanup/delete-empty-folders", "photos-files/sort-photos-into-folders-by-date"],
+    related: ["files-folders/rename-multiple-files-at-once", "pc-cleanup/delete-empty-folders", "photos-files/sort-photos-into-folders-by-date", "files-folders/compare-two-folders"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Search for files on Mac", href: "https://support.apple.com/guide/mac-help/mchlp1236/mac" },
@@ -938,6 +938,120 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     sources: [
       { label: "Google Earth Help: Import GPS data", href: "https://support.google.com/earth/answer/148095" },
       { label: "GPSBabel", href: "https://www.gpsbabel.org/" },
+    ],
+  },
+  {
+    slug: "compare-two-folders",
+    niche: "files-folders",
+    searchPhrases: [
+      "compare two folders",
+      "copy missing files from one folder to another",
+      "sync two folders",
+      "compare two folders and copy differences",
+      "compare two folders windows 11",
+    ],
+    title: "Compare two folders and copy only the missing files",
+    description:
+      "Compare an old and a new copy of a folder and copy across only what's missing, without overwriting anything: robocopy, rsync, or Stella (stella.sh) by file content.",
+    h1: "Compare two folders and copy what's missing",
+    short: "Compare two folders",
+    lede: "Two copies of the family photos merged: 11 missing files copied in, nothing overwritten.",
+    answer:
+      "Free tools compare folders by file name: robocopy on Windows or rsync on a Mac copies files that aren't there yet without overwriting, and WinMerge shows the differences side by side. Names mislead, though: a photo renamed in one copy gets copied again, and two different photos with the same name get skipped. Stella (stella.sh) compares by what's inside the files, copies only what's truly missing into the matching subfolders, keeps both photos when names clash, and never overwrites.",
+    stellaSteps: [
+      "Compares Family photos in Pictures with the older copy in Documents by file content, not names",
+      "Recognises six photos that were only renamed or moved in the newer copy, so they aren't copied twice",
+      "Copies the 11 files only in the old copy into the matching subfolders, including a whole 2018 Wedding folder and a video",
+      "Keeps both versions where two different photos share a name, adding “(old laptop)” to the older one's name",
+      "Skips two Windows and Mac system files, leaves the old copy untouched and saves a list of what was added",
+    ],
+    prompt:
+      "I have two copies of our family photos: the Family photos folder in my Pictures, and an older copy from my old laptop in my Documents called 'Family photos (old laptop)'. Compare them and copy anything that's only in the old copy into the Pictures one, so nothing gets lost. Don't overwrite anything.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: MODEL,
+      result:
+        "About a minute. Checked afterwards against an answer key written before the run: all 11 files only in the old copy now in the Pictures folder, in their matching subfolders, both same-name-but-different photos kept, every photo already there unchanged, renamed photos not copied again, no Thumbs.db copied, and the old copy untouched.",
+      note: "The photos are made up for this run, in two folders laid out like an old and a new copy. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/files-folders/compare-two-folders/proof.mp4`,
+        cuts: webCuts("files-folders/compare-two-folders"),
+        poster: `${PROOFS}/files-folders/compare-two-folders/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.2,
+        realDuration: 90,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Family photos in Pictures, and an older copy from an old laptop in Documents." },
+        { at: 2, text: "The prompt: copy anything only in the old copy into Pictures, and don't overwrite anything." },
+        { at: 14, text: "Stella replies: it will compare by what's in the files, so renamed photos don't count as new." },
+        { at: 19.9, text: "Comparing the two folders, sped up 4×." },
+        { at: 30.2, text: "Done: 11 files added, two name clashes kept side by side, 36 already there under other names." },
+      ],
+    },
+    manualTitle: "Compare them yourself",
+    manualSteps: [
+      {
+        title: "Back up first",
+        body: "Before merging, copy the newer folder somewhere safe, or make sure it's in your backup. A wrong copy command can overwrite photos, and an overwritten file doesn't go to the Trash.",
+      },
+      {
+        title: "Windows: robocopy",
+        body: "In Command Prompt: `robocopy \"%USERPROFILE%\\Documents\\Family photos (old laptop)\" \"%USERPROFILE%\\Pictures\\Family photos\" /E /XC /XN /XO` copies files whose name isn't there yet, with subfolders, and skips any that exist. Add `/L` first to only list what it would do.",
+      },
+      {
+        title: "Mac: rsync",
+        body: "In Terminal: `rsync -av --ignore-existing ~/Documents/'Family photos (old laptop)'/ ~/Pictures/'Family photos'/`. Add `-n` to try it without copying. It also matches by name, so renamed photos come across again.",
+      },
+      {
+        title: "Or see the differences side by side",
+        body: "WinMerge (free, Windows) compares two folders and shows files only on the left, only on the right, or different. Filter to left-only and copy those across. Turn on content comparison to catch same-name files that differ.",
+      },
+      {
+        title: "Check the same-name files",
+        body: "Name-based tools skip a file that exists in both places even if the photos are different. Look at those by eye and copy any different ones across with a new name.",
+      },
+    ],
+    limits: [
+      "It copies one way, as asked. Two-way syncing, where deletions are mirrored too, is a different job; say so if that's what you want.",
+      "A photo that was edited in one copy (rotated, cropped) counts as different, so both versions are kept.",
+      "File names and folder structure go to the AI model you use in Stella; the photos themselves are compared on your computer.",
+      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I compare two folders on Windows 11?",
+        a: "Windows has no built-in folder compare. Use robocopy with `/L` to list differences without copying, or the free WinMerge to see them side by side.",
+      },
+      {
+        q: "How do I compare two folders on a Mac?",
+        a: "`diff -rq folder1 folder2` in Terminal lists files only in one or different in both. Apple's FileMerge does it with windows but comes with Xcode.",
+      },
+      {
+        q: "Will it delete the old copy?",
+        a: "No. It copies and leaves the old copy alone, and says when it looks safe to delete. For duplicates within one folder, see [find duplicate photos](/how/photos-files/find-duplicate-photos).",
+      },
+      {
+        q: "Can it put everything from many subfolders into one?",
+        a: "Yes: see [move files from subfolders into one folder](/how/files-folders/move-files-from-subfolders-into-one-folder).",
+      },
+    ],
+    related: [
+      "photos-files/find-duplicate-photos",
+      "files-folders/move-files-from-subfolders-into-one-folder",
+      "photos-files/sort-photos-into-folders-by-date",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      {
+        label: "Microsoft Learn: robocopy",
+        href: "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy",
+      },
+      { label: "WinMerge (free folder and file compare)", href: "https://winmerge.org/" },
     ],
   },
 ];

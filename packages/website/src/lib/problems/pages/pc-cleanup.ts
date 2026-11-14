@@ -332,7 +332,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         a: "Often. [Compress a video](/how/video/compress-video-for-discord) or [compress a PDF](/how/pdf-excel/compress-pdf-too-large-to-email), keeping the originals until you've checked the copies.",
       },
     ],
-    related: ["pc-cleanup/organize-downloads-folder", "pc-cleanup/delete-empty-folders", "photos-files/find-duplicate-photos"],
+    related: ["pc-cleanup/organize-downloads-folder", "pc-cleanup/delete-empty-folders", "photos-files/find-duplicate-photos", "pc-cleanup/find-duplicate-files"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Change Storage settings on Mac", href: "https://support.apple.com/guide/mac-help/mchl3d437fbc/mac" },
@@ -439,6 +439,113 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         href: "https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder",
       },
       { label: "WizTree", href: "https://diskanalyzer.com" },
+    ],
+  },
+  {
+    slug: "find-duplicate-files",
+    niche: "pc-cleanup",
+    searchPhrases: [
+      "find duplicate files",
+      "find duplicate files windows 11",
+      "find duplicate files mac",
+      "remove duplicate files",
+      "delete duplicate files",
+    ],
+    title: "Find duplicate files and move the extra copies to the Trash",
+    description:
+      "Find exact duplicate files in Documents and Downloads, even renamed ones, keep one of each and send the rest to the Trash, with PowerShell or Stella (stella.sh).",
+    h1: "Find duplicate files and clear the extra copies",
+    short: "Find duplicate files",
+    lede: "Two folders checked by content: 16 extra copies in the Trash, one of each file kept.",
+    answer:
+      "Exact duplicates have identical contents, whatever their names, so compare files by a fingerprint (a hash), not by name or size. PowerShell's `Get-FileHash` on Windows or `shasum` in the Mac Terminal lists files that match, and you move the extras to the Recycle Bin or Trash yourself. Stella (stella.sh) does the comparison on your computer, keeps the copy with the tidiest name, moves the rest to the Trash so you can restore them, and leaves look-alikes that aren't really the same alone.",
+    stellaSteps: [
+      "Goes through Documents and Downloads, subfolders included, 60 files, and compares them by content, not name",
+      "Finds 12 sets of identical files, including renamed ones such as a phone photo saved again as Holiday 1.jpg",
+      "Keeps the copy with the clearer name, or the one in Documents, and moves 16 extra copies to the Trash after checking each byte for byte",
+      "Leaves alone files that only look alike: two different Notes.txt, a budget that differs by a row, a photo re-saved smaller",
+      "Leaves three empty files in place and offers to trash them, and saves a list of what went to the Trash and the copy each matched",
+    ],
+    prompt:
+      "My Documents and Downloads folders are full of the same files saved twice. Find all the exact duplicates and get rid of the extra copies, keeping one of each. Put the extras in the Trash rather than deleting them.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Under a minute. Checked afterwards against an answer key written before the run: exactly one copy left of each of the 12 duplicated files, all 29 files that aren't duplicates kept (look-alikes included), all 16 extra copies recoverable in the Trash, and the tidy copy kept each time.",
+      note: "The files are made up for this run, with renamed copies and look-alikes on purpose. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/pc-cleanup/find-duplicate-files/proof.mp4`,
+        cuts: webCuts("pc-cleanup/find-duplicate-files"),
+        poster: `${PROOFS}/pc-cleanup/find-duplicate-files/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.8,
+        realDuration: 79,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Documents and Downloads hold the same files saved twice, some under new names." },
+        { at: 2, text: "The prompt: find exact duplicates, keep one of each, extras to the Trash." },
+        { at: 13.2, text: "Stella replies: it compares contents, keeps the cleaner name and sends every extra to the Trash." },
+        { at: 19.1, text: "Comparing the files, sped up 3×." },
+        { at: 29.8, text: "Done: 16 extra copies in the Trash from 12 sets, look-alikes left, and a list of what moved." },
+      ],
+    },
+    manualTitle: "Find them yourself",
+    manualSteps: [
+      {
+        title: "Windows: list duplicates with PowerShell",
+        body: "Open PowerShell and run `Get-ChildItem $HOME\\Documents,$HOME\\Downloads -Recurse -File | Get-FileHash | Group-Object Hash | Where-Object Count -gt 1`. Each group is a set of files with identical contents; expand a group's Group property to see the paths.",
+      },
+      {
+        title: "Mac: list duplicates in Terminal",
+        body: "Finder has no duplicate finder. In Terminal: `find ~/Documents ~/Downloads -type f -exec shasum -a 256 {} + | sort | uniq -w64 -D` prints files with the same fingerprint next to each other. (`uniq -w` needs GNU uniq; on a stock Mac, sort the list and read down it.)",
+      },
+      {
+        title: "Decide which copy to keep",
+        body: "Keep the one with the clearest name in the folder you actually use. Names with (1), copy or a camera number are usually the extras.",
+      },
+      {
+        title: "Move extras to the Trash, not away for good",
+        body: "Delete them in File Explorer or Finder so they go to the Recycle Bin or Trash. Leave it a few days before emptying, in case something was needed.",
+      },
+    ],
+    limits: [
+      "Only exact copies. An edited version or a photo re-saved at another quality is a different file and is kept; for similar-looking photos see [find duplicate photos](/how/photos-files/find-duplicate-photos).",
+      "Files in a cloud-synced folder can come back from the cloud copy, or the deletion can sync to your other devices. Check how your sync service handles the Trash.",
+      "File names and folder layout go to the AI model you use in Stella; the files themselves are compared on your computer.",
+      "Recorded on Linux, where the Trash is a folder in your home. On a Mac or Windows PC Stella uses the Trash or Recycle Bin and may install Python first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Does Windows 11 have a duplicate file finder?",
+        a: "No. Storage Sense clears temporary files but doesn't look for duplicates. PowerShell's `Get-FileHash` does it without installing anything.",
+      },
+      {
+        q: "Are two files with the same name duplicates?",
+        a: "Not necessarily. Two different Notes.txt files share a name but not their contents. Only identical contents make a duplicate, and renamed copies count too.",
+      },
+      {
+        q: "Will it free a lot of space?",
+        a: "Only as much as the extras take up. In the run it was about 156 KB of small documents. For space, see [find large files taking up space](/how/pc-cleanup/find-large-files-taking-up-space).",
+      },
+      {
+        q: "What about two copies of a whole folder?",
+        a: "See [compare two folders](/how/files-folders/compare-two-folders), which merges an old copy into a new one without losing anything.",
+      },
+    ],
+    related: [
+      "photos-files/find-duplicate-photos",
+      "pc-cleanup/find-large-files-taking-up-space",
+      "files-folders/compare-two-folders",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft Learn: Get-FileHash", href: "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-filehash" },
+      { label: "Apple Support: Free up storage space on your Mac", href: "https://support.apple.com/en-us/102624" },
     ],
   },
 ];

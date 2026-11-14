@@ -644,7 +644,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes, that's each invoice's total. For a summary sheet by customer or job type, see [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category).",
       },
     ],
-    related: ["documents/mail-merge-excel-to-word", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/fill-pdf-form-from-spreadsheet", "printing-labels/make-packing-slips-from-orders"],
+    related: ["documents/mail-merge-excel-to-word", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/fill-pdf-form-from-spreadsheet", "printing-labels/make-packing-slips-from-orders", "money-household/calculate-hours-worked-from-timesheet"],
     lastChecked: "2026-11-13",
     sources: [
       {

@@ -1,10 +1,12 @@
 import type { ProblemPage } from "../types";
 import { AUDIO_PAGES } from "./audio";
+import { CHATS_DATA_EXPORTS_PAGES } from "./chats-data-exports";
 import { CONTACTS_CALENDAR_EMAIL_PAGES } from "./contacts-calendar-email";
 import { DOCUMENT_PAGES } from "./documents";
 import { FILES_FOLDERS_PAGES } from "./files-folders";
 import { GAME_MOD_PAGES } from "./game-mods";
 import { LOCAL_AI_PAGES } from "./local-ai";
+import { MONEY_HOUSEHOLD_PAGES } from "./money-household";
 import { PC_CLEANUP_PAGES } from "./pc-cleanup";
 import { PDF_EXCEL_PAGES } from "./pdf-excel";
 import { PHOTOS_FILES_PAGES } from "./photos-files";
@@ -28,4 +30,6 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...STUDY_PAGES,
   ...PRINTING_LABELS_PAGES,
   ...WEDDINGS_EVENTS_PAGES,
+  ...MONEY_HOUSEHOLD_PAGES,
+  ...CHATS_DATA_EXPORTS_PAGES,
 ];

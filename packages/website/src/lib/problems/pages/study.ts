@@ -94,7 +94,7 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "See [convert EPUB to PDF](/how/pdf-excel/convert-epub-to-pdf) for reading on other devices.",
       },
     ],
-    related: ["study/make-anki-flashcards-from-notes", "study/print-flashcards-double-sided", "pdf-excel/convert-epub-to-pdf"],
+    related: ["study/make-anki-flashcards-from-notes", "study/print-flashcards-double-sided", "pdf-excel/convert-epub-to-pdf", "chats-data-exports/see-your-spotify-listening-history"],
     lastChecked: "2026-11-13",
     sources: [{ label: "Amazon Kindle notebook (web)", href: "https://read.amazon.com/notebook" }],
   },

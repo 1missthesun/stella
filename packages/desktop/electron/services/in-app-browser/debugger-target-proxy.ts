@@ -20,7 +20,9 @@ type DrawableLease = {
   count: number;
   mountedInHiddenHost: boolean;
   expired: boolean;
+  layoutReadyAt: number;
   expiryTimer?: ReturnType<typeof setTimeout>;
+  lingerTimer?: ReturnType<typeof setTimeout>;
 };
 
 export type FileChooserOpened = {
@@ -54,6 +56,12 @@ const DEFAULT_DEBUGGER_RECOVERY_TIMEOUT_MS = 1_000;
 // Longest a tab stays in the hidden host under one lease. A command that never
 // settles would otherwise keep the tab there, and out of the panel, for good.
 const HIDDEN_MOUNT_LIMIT_MS = 30_000;
+// A freshly mounted view needs one frame to get its layout viewport.
+const HIDDEN_MOUNT_LAYOUT_MS = 16;
+// Agent commands come in bursts (one locator action is several CDP calls), so
+// the tab stays mounted briefly between them instead of paying a mount and a
+// layout frame on every call.
+const HIDDEN_MOUNT_LINGER_MS = 1_000;
 
 // Chromium hands debugger events and replies to JS from inside its own call
 // stacks, and Node drains microtasks before returning to them. A debugger call
@@ -268,7 +276,12 @@ export class DebuggerTargetProxy {
     const attachedView = this.options.getAttachedView();
     let lease = this.drawableLeases.get(tabId);
     if (lease) {
+      if (lease.lingerTimer) {
+        clearTimeout(lease.lingerTimer);
+        lease.lingerTimer = undefined;
+      }
       lease.count += 1;
+      if (lease.mountedInHiddenHost) this.armHiddenMountExpiry(tab, lease);
       if (
         attachedView !== tab.view &&
         !lease.expired &&
@@ -278,7 +291,12 @@ export class DebuggerTargetProxy {
         this.mountLeaseInHiddenHost(tab, lease);
       }
     } else {
-      lease = { count: 1, mountedInHiddenHost: false, expired: false };
+      lease = {
+        count: 1,
+        mountedInHiddenHost: false,
+        expired: false,
+        layoutReadyAt: 0,
+      };
       this.drawableLeases.set(tabId, lease);
       if (attachedView !== tab.view) this.mountLeaseInHiddenHost(tab, lease);
     }
@@ -304,9 +322,15 @@ export class DebuggerTargetProxy {
     return () => this.lifecycleListeners.delete(listener);
   }
 
+  announceOpenedTab(tab: ManagedTab, openerTabId: string) {
+    for (const listener of this.lifecycleListeners) {
+      listener({ tabId: tab.id, ownerId: tab.ownerId, kind: "opened", openerTabId });
+    }
+  }
+
   forwardEvents(tab: ManagedTab) {
     const contents = tab.view.webContents;
-    const emit = (kind: InAppBrowserTabLifecycleEvent["kind"]) => {
+    const emit = (kind: "navigating" | "debugger-detached" | "gone") => {
       for (const listener of this.lifecycleListeners) {
         listener({ tabId: tab.id, ownerId: tab.ownerId, kind });
       }
@@ -530,13 +554,17 @@ export class DebuggerTargetProxy {
   forgetTab(tabId: string) {
     this.forgetPageGuard(tabId);
     const lease = this.drawableLeases.get(tabId);
-    if (lease) clearTimeout(lease.expiryTimer);
+    if (lease) {
+      clearTimeout(lease.expiryTimer);
+      clearTimeout(lease.lingerTimer);
+    }
     this.drawableLeases.delete(tabId);
   }
 
   dispose() {
     for (const lease of this.drawableLeases.values()) {
       clearTimeout(lease.expiryTimer);
+      clearTimeout(lease.lingerTimer);
     }
     this.drawableLeases.clear();
     const drawableHost = this.drawableHost;
@@ -669,13 +697,17 @@ export class DebuggerTargetProxy {
     host.contentView.addChildView(tab.view);
     tab.view.setBounds(this.drawableBounds());
     lease.mountedInHiddenHost = true;
-    if (!lease.expiryTimer) {
-      lease.expiryTimer = setTimeout(
-        () => this.expireHiddenMount(tab.id, lease),
-        HIDDEN_MOUNT_LIMIT_MS,
-      );
-      lease.expiryTimer.unref?.();
-    }
+    lease.layoutReadyAt = Date.now() + HIDDEN_MOUNT_LAYOUT_MS;
+    this.armHiddenMountExpiry(tab, lease);
+  }
+
+  private armHiddenMountExpiry(tab: ManagedTab, lease: DrawableLease) {
+    if (lease.expiryTimer) return;
+    lease.expiryTimer = setTimeout(
+      () => this.expireHiddenMount(tab.id, lease),
+      HIDDEN_MOUNT_LIMIT_MS,
+    );
+    lease.expiryTimer.unref?.();
   }
 
   private expireHiddenMount(tabId: string, lease: DrawableLease) {
@@ -704,24 +736,38 @@ export class DebuggerTargetProxy {
     if (!lease) return;
     lease.count -= 1;
     if (lease.count > 0) return;
+    clearTimeout(lease.expiryTimer);
+    lease.expiryTimer = undefined;
+    if (!lease.mountedInHiddenHost || lease.expired) {
+      this.endDrawableLease(tabId, lease);
+      return;
+    }
+    lease.lingerTimer = setTimeout(() => {
+      lease.lingerTimer = undefined;
+      if (lease.count === 0) this.endDrawableLease(tabId, lease);
+    }, HIDDEN_MOUNT_LINGER_MS);
+    lease.lingerTimer.unref?.();
+  }
+
+  private endDrawableLease(tabId: string, lease: DrawableLease) {
+    if (this.drawableLeases.get(tabId) !== lease) return;
     const tab = this.options.tabs.get(tabId);
     if (tab) this.unmountDrawableLease(tab);
-    clearTimeout(lease.expiryTimer);
     this.drawableLeases.delete(tabId);
     this.options.attachActiveView();
   }
 
   private async settleDrawableHost(tabId: string) {
-    const wait = (delayMs: number) => this.delay(delayMs);
-    await wait(16);
-    const tab = this.options.tabs.get(tabId);
     const lease = this.drawableLeases.get(tabId);
+    const layoutWait = (lease?.layoutReadyAt ?? 0) - Date.now();
+    if (layoutWait > 0) await this.delay(layoutWait);
+    const tab = this.options.tabs.get(tabId);
     if (!tab || !lease || this.options.getAttachedView() === tab.view) return;
     if (lease.expired) return;
     if (!lease.mountedInHiddenHost || this.drawableHost?.isDestroyed()) {
       lease.mountedInHiddenHost = false;
       this.mountLeaseInHiddenHost(tab, lease);
-      await wait(16);
+      await this.delay(HIDDEN_MOUNT_LAYOUT_MS);
     }
   }
 }

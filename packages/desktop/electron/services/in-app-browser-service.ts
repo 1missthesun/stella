@@ -507,7 +507,12 @@ export class InAppBrowserService {
   }
 
   async createTab(
-    options: { url?: string; ownerId?: string; activate?: boolean } = {},
+    options: {
+      url?: string;
+      ownerId?: string;
+      activate?: boolean;
+      openerTabId?: string;
+    } = {},
   ): Promise<BrowserViewState> {
     await this.ensureSessionInitialized();
     const browserSession = this.browserSession;
@@ -550,7 +555,12 @@ export class InAppBrowserService {
       activate: options.activate,
       offscreen: offscreen !== undefined,
     });
-    if (agentOwned) await this.debuggerProxy.prepareTab(tab).catch(() => {});
+    if (agentOwned) {
+      await this.debuggerProxy.prepareTab(tab).catch(() => {});
+      if (options.openerTabId) {
+        this.debuggerProxy.announceOpenedTab(tab, options.openerTabId);
+      }
+    }
     try {
       const url = normalizeWebUrl(options.url);
       await view.webContents.loadURL(url);
@@ -1171,7 +1181,11 @@ export class InAppBrowserService {
         };
       }
       if (isAllowedNavigationUrl(url)) {
-        void this.createTab({ url, ownerId: tab.ownerId }).catch((error) => {
+        void this.createTab({
+          url,
+          ownerId: tab.ownerId,
+          openerTabId: tab.id,
+        }).catch((error) => {
           this.setError(errorMessage(error), tab.ownerId);
         });
       }

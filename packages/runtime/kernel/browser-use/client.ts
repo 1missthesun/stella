@@ -327,6 +327,7 @@ type ResolvedExecutionConfig = Readonly<{
 type PendingResponse = {
   socket: Socket;
   requestId: string;
+  maxResponseBytes: number;
   resolve: (result: BrowserCommandResult) => void;
   reject: (error: Error) => void;
   cancelTimeout: () => void;
@@ -386,7 +387,8 @@ const RESERVED_PARAM_KEYS = new Set([
   "ownerLeaseId",
   "ownerLeaseIssuedAt",
 ]);
-const EMPTY_BUFFER = Buffer.alloc(0);
+const IMAGE_RESPONSE_ACTIONS = new Set<string>(["screenshot", "chain"]);
+const IMAGE_RESPONSE_MAX_BYTES = 64 * 1024 * 1024;
 
 const canReplayAfterManagedReplacement = (
   action: string,
@@ -1167,7 +1169,8 @@ export class BrowserSession implements BrowserSessionClient {
   private usedInApp = false;
   private socket?: Socket;
   private connectingSocket?: Socket;
-  private readBuffer = EMPTY_BUFFER;
+  private readChunks: Buffer[] = [];
+  private readBytes = 0;
   private pending?: PendingResponse;
   private fallbackAttempted = false;
   private route: OwnerRouteState = { kind: "unbound" };
@@ -2601,7 +2604,7 @@ export class BrowserSession implements BrowserSessionClient {
       );
     }
     this.socket = socket;
-    this.readBuffer = EMPTY_BUFFER;
+    this.resetReadBuffer();
     socket.on("data", (chunk: Buffer) => this.onSocketData(socket, chunk));
     socket.on("error", (cause) =>
       this.invalidateSocket(
@@ -2678,6 +2681,9 @@ export class BrowserSession implements BrowserSessionClient {
       this.pending = {
         socket,
         requestId,
+        maxResponseBytes: IMAGE_RESPONSE_ACTIONS.has(String(request.action))
+          ? Math.max(this.maxOutputBytes, IMAGE_RESPONSE_MAX_BYTES)
+          : this.maxOutputBytes,
         resolve,
         reject,
         cancelTimeout,
@@ -2712,40 +2718,40 @@ export class BrowserSession implements BrowserSessionClient {
       );
       return;
     }
-    this.readBuffer = Buffer.concat([this.readBuffer, chunk]);
-    const newline = this.readBuffer.indexOf(0x0a);
-    if (newline < 0) {
-      if (this.readBuffer.byteLength > this.maxOutputBytes) {
+    const limit = this.pending.maxResponseBytes;
+    const chunkNewline = chunk.indexOf(0x0a);
+    if (chunkNewline < 0) {
+      this.readChunks.push(chunk);
+      this.readBytes += chunk.byteLength;
+      if (this.readBytes > limit) {
         this.invalidateSocket(
           socket,
           new BrowserTransportError(
             "output_limit",
-            `Browser daemon response exceeded the ${this.maxOutputBytes}-byte limit.`,
+            `Browser daemon response exceeded the ${limit}-byte limit.`,
           ),
         );
       }
       return;
     }
-    if (newline > this.maxOutputBytes) {
+    if (this.readBytes + chunkNewline > limit) {
       this.invalidateSocket(
         socket,
         new BrowserTransportError(
           "output_limit",
-          `Browser daemon response exceeded the ${this.maxOutputBytes}-byte limit.`,
+          `Browser daemon response exceeded the ${limit}-byte limit.`,
         ),
       );
       return;
     }
 
-    const responseFrame = this.readBuffer
-      .subarray(0, newline)
+    this.readChunks.push(chunk.subarray(0, chunkNewline));
+    const responseFrame = Buffer.concat(this.readChunks).toString("utf8").trim();
+    const remainder = chunk
+      .subarray(chunkNewline + 1)
       .toString("utf8")
       .trim();
-    const remainder = this.readBuffer
-      .subarray(newline + 1)
-      .toString("utf8")
-      .trim();
-    this.readBuffer = EMPTY_BUFFER;
+    this.resetReadBuffer();
     if (remainder) {
       this.invalidateSocket(
         socket,
@@ -2777,6 +2783,11 @@ export class BrowserSession implements BrowserSessionClient {
     }
   }
 
+  private resetReadBuffer(): void {
+    this.readChunks = [];
+    this.readBytes = 0;
+  }
+
   private takePending(): PendingResponse | undefined {
     const pending = this.pending;
     if (!pending) return undefined;
@@ -2796,7 +2807,7 @@ export class BrowserSession implements BrowserSessionClient {
     if (socket !== this.socket) return;
     this.socket = undefined;
     if (!preserveCapability) this.transitionRoute({ type: "socket-lost" });
-    this.readBuffer = EMPTY_BUFFER;
+    this.resetReadBuffer();
     const pending = this.takePending();
     socket.removeAllListeners();
     if (!socket.destroyed) socket.destroy();

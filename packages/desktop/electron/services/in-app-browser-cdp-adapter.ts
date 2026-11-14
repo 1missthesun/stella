@@ -23,11 +23,18 @@ export type InAppBrowserDebuggerEvent = {
 
 export type InAppBrowserDebuggerRecovery = "terminated" | "reloaded";
 
-export type InAppBrowserTabLifecycleEvent = {
-  tabId: string;
-  ownerId: string;
-  kind: "navigating" | "debugger-detached" | "gone";
-};
+export type InAppBrowserTabLifecycleEvent =
+  | {
+      tabId: string;
+      ownerId: string;
+      kind: "navigating" | "debugger-detached" | "gone";
+    }
+  | {
+      tabId: string;
+      ownerId: string;
+      kind: "opened";
+      openerTabId: string;
+    };
 
 export type InAppBrowserDebuggerController = {
   getDebuggerUserAgent?: () => string;
@@ -757,6 +764,10 @@ export class InAppBrowserCdpAdapter {
   }
 
   private handleTabLifecycle(event: InAppBrowserTabLifecycleEvent) {
+    if (event.kind === "opened") {
+      void this.announceOpenedTarget(event);
+      return;
+    }
     for (const client of this.clients) {
       if (event.kind === "navigating") {
         // A cross-document navigation discards every frame of the old page.
@@ -787,6 +798,19 @@ export class InAppBrowserCdpAdapter {
         event.ownerId,
       );
     }
+  }
+
+  private async announceOpenedTarget(
+    event: Extract<InAppBrowserTabLifecycleEvent, { kind: "opened" }>,
+  ) {
+    const targets = await this.controller.listDebuggerTargets(event.ownerId);
+    const target = targets.find((candidate) => candidate.id === event.tabId);
+    if (!target) return;
+    this.broadcastTargetEvent(
+      "Target.targetCreated",
+      { targetInfo: { ...targetInfo(target), openerId: event.openerTabId } },
+      event.ownerId,
+    );
   }
 
   private broadcastTargetEvent(

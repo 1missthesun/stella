@@ -46,6 +46,7 @@ const DEFAULT_EXPECT_NEW_TAB_TIMEOUT_MS = 10_000;
 const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
 const MAX_DOWNLOAD_TIMEOUT_MS = 600_000;
 const DOWNLOAD_POLL_MS = 250;
+const LAST_TAB_CLOSE_REFUSAL = /^(?:Error: )?Cannot close the last tab\b/;
 
 type TabState = {
   backend: BrowserWorkerBackend;
@@ -590,7 +591,13 @@ export const createTabs = (
     }
 
     async close(): Promise<unknown> {
-      return await this.run("tab_close", { tabId: this.id });
+      try {
+        return await this.run("tab_close", { tabId: this.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!LAST_TAB_CLOSE_REFUSAL.test(message)) throw error;
+        return { closed: false, kept: true, reason: message };
+      }
     }
 
     async markDeliverable(): Promise<unknown> {

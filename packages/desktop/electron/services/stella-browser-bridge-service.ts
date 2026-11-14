@@ -87,6 +87,7 @@ const DAEMON_READY_TIMEOUT_MS = 10_000;
 const COMMAND_TIMEOUT_MS = 10_000;
 const DAEMON_SHUTDOWN_TIMEOUT_MS = 2_000;
 const DAEMON_READY_PROBE_TIMEOUT_MS = 1_000;
+const DAEMON_READY_POLL_MS = 10;
 const AGENT_DAEMON_IDLE_TIMEOUT_MS = 30 * 60_000;
 const AGENT_CAPABILITY_TTL_MS = 24 * 60 * 60_000;
 
@@ -1066,7 +1067,7 @@ export class StellaBrowserBridgeService {
         );
         return;
       } catch {
-        await delay(100);
+        await delay(DAEMON_READY_POLL_MS);
       }
     }
     throw new Error("Agent browser daemon did not become ready in time.");
@@ -1137,7 +1138,7 @@ export class StellaBrowserBridgeService {
         STELLA_BROWSER_BRIDGE_SESSION,
       );
       if (answeringPid !== this.daemonProcess?.pid) {
-        await delay(100);
+        await delay(DAEMON_READY_POLL_MS);
         continue;
       }
 
@@ -1151,7 +1152,7 @@ export class StellaBrowserBridgeService {
         );
         return;
       } catch {
-        await delay(100);
+        await delay(DAEMON_READY_POLL_MS);
       }
     }
 

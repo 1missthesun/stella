@@ -375,7 +375,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: trim it to the best part, [cut out silent pauses](/how/video/cut-silences-from-video) or [burn in subtitles](/how/video/burn-subtitles-into-video-for-tiktok) before it's compressed.",
       },
     ],
-    related: ["video/cut-silences-from-video", "video/convert-mkv-to-mp4", "video/burn-subtitles-into-video-for-tiktok"],
+    related: ["video/cut-silences-from-video", "video/convert-mkv-to-mp4", "video/burn-subtitles-into-video-for-tiktok", "video/combine-videos-into-one"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "HandBrake", href: "https://handbrake.fr" },
@@ -485,7 +485,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. A media server such as Plex or Jellyfin converts on the fly while you watch, and a cheap streaming stick (Chromecast, Fire TV, Apple TV with Infuse) plays most MKVs directly.",
       },
     ],
-    related: ["video/compress-video-for-discord", "video/burn-subtitles-into-video-for-tiktok"],
+    related: ["video/compress-video-for-discord", "video/burn-subtitles-into-video-for-tiktok", "video/combine-videos-into-one"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "HandBrake documentation: subtitles", href: "https://handbrake.fr/docs/en/latest/advanced/subtitles.html" },
@@ -493,6 +493,114 @@ export const VIDEO_PAGES: ProblemPage[] = [
       { label: "VideoLAN: VLC media player", href: "https://www.videolan.org/vlc/" },
       { label: "Samsung Developers: TV video specifications", href: "https://developer.samsung.com/smarttv/develop/specifications/media-specifications/2025-tv-video-specifications.html" },
       { label: "NASA: Artemis I Launch from NASA Causeway (source footage)", href: "https://images.nasa.gov/details/GX010506" },
+    ],
+  },
+  {
+    slug: "combine-videos-into-one",
+    niche: "video",
+    searchPhrases: [
+      "merge videos",
+      "combine videos into one",
+      "combine videos on mac",
+      "merge videos in the order they were filmed",
+      "join video clips together",
+    ],
+    title: "Combine videos into one, in filming order (Mac, Windows)",
+    description:
+      "Join phone clips into one video in the order they were filmed, portrait and landscape mixed: QuickTime, Clipchamp, ffmpeg, or Stella (stella.sh) on your computer.",
+    h1: "Merge videos into one, in the order they were filmed",
+    short: "Combine videos into one",
+    lede: "Six mixed phone clips joined into one 30-second video, nothing stretched.",
+    answer:
+      "On a Mac, open the first clip in QuickTime Player and use Edit, Add Clip to End for each of the others, then File, Export As. On Windows 11, Clipchamp joins clips on a timeline. Mixed clips are where it goes wrong: a portrait clip gets stretched, or a silent one breaks the sound. Stella (stella.sh) puts the clips in filming order, fits each into one frame size and joins them.",
+    stellaSteps: [
+      "Finds the beach day clips in Movies and orders them by the recording time saved in each file, not just by file name",
+      "Fits every clip into one 1920 × 1080 frame, with black bars beside the portrait clip instead of stretching it",
+      "Converts the mix of frame rates and formats (one clip at 25 fps, one HEVC at 60 fps) into one 30 fps H.264 video",
+      "Puts silence under the clip that had no sound, so the audio runs the whole way through",
+      "Saves Beach day.mp4 next to the clips and leaves them unchanged; it also noticed the clips were plain test cards, not beach footage, and said so",
+    ],
+    prompt: "Join the beach day clips in my Movies folder into one video, in the order they were filmed.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "One 30-second video from six clips in about 1 minute 40 seconds. Checked afterwards against an answer key written before the run: it plays without errors, all six clips are there in filming order, the audio runs the full length, the portrait clip isn't stretched (a round disc in it stays round), and the six clips are unchanged.",
+      note: "The clips are plain coloured test cards with tones, made for this run and mixed on purpose: portrait and landscape, 25, 30 and 60 fps, H.264 and HEVC, one with no sound. Stella spotted they weren't real beach footage and said so. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/video/combine-videos-into-one/proof.mp4`,
+        cuts: webCuts("video/combine-videos-into-one"),
+        poster: `${PROOFS}/video/combine-videos-into-one/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.7,
+        realDuration: 99,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Six beach day clips are in Movies, filmed on different settings." },
+        { at: 2, text: "The prompt: join them into one video, in the order they were filmed." },
+        { at: 15.3, text: "Stella replies: it'll order the clips by when they were filmed and save the video next to them." },
+        { at: 21.1, text: "Ordering and joining six mixed clips, sped up 4×." },
+        { at: 32.7, text: "Done: Beach day.mp4, 30 seconds, in filming order, the portrait clip with black bars and the silent clip kept silent." },
+      ],
+    },
+    manualTitle: "Join them yourself",
+    manualSteps: [
+      {
+        title: "Put the clips in order",
+        body: "Sort the clips by when they were filmed, not by name: in Finder use View, as List with the Date Created column; in File Explorer use Details view and add Media created. Phone file numbers usually match, but clips from two phones won't.",
+      },
+      {
+        title: "On a Mac: QuickTime Player",
+        body: "Open the first clip in QuickTime Player, choose Edit, Add Clip to End and pick the next one; repeat in order, dragging clips in the strip to reorder. Then File, Export As, 1080p saves the joined video. Portrait clips get black bars.",
+      },
+      {
+        title: "On Windows: Clipchamp",
+        body: "Open Clipchamp (built into Windows 11), create a new video, import the clips and drag them onto the timeline in order. If a portrait clip is cropped, use the fit option on it, then export at 1080p.",
+      },
+      {
+        title: "Or iMovie on a Mac",
+        body: "Create a new Movie project, import the clips, drag them to the timeline in order and choose File, Share, File. iMovie also lets you add titles, transitions or a music track if you want them.",
+      },
+      {
+        title: "Command line: ffmpeg",
+        body: "ffmpeg's concat demuxer joins clips without re-encoding only if every clip has the same size, frame rate and codec. Phone clips rarely do, so scale and pad each to one size and frame rate first, or use the concat filter, which re-encodes them all together.",
+      },
+    ],
+    limits: [
+      "It joins clips and makes them fit one frame. Transitions, titles, music and trimming weren't asked for; say so in the prompt if you want them.",
+      "Clips are re-encoded to match, which takes longer for long or 4K footage and costs a little quality.",
+      "To describe the clips it looked at frames from them, which go to the AI model you use in Stella along with file details. The video itself is joined on your computer.",
+      "Recorded on Linux, where ffmpeg was already installed. On a Mac or Windows PC Stella would download it first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I merge videos without losing quality?",
+        a: "If every clip shares the same size, frame rate and codec, ffmpeg can join them without re-encoding. Mixed phone clips need re-encoding to match; at a good quality setting the loss is hard to see.",
+      },
+      {
+        q: "Why is my portrait clip stretched after merging?",
+        a: "The joiner forced it into a landscape frame. Fit it with black bars, as QuickTime and Stella did, or crop it, but don't scale it to fill the frame.",
+      },
+      {
+        q: "Can I add music or cut it down afterwards?",
+        a: "Yes, ask in the same chat, or add a track in iMovie or Clipchamp. To [cut out silences](/how/video/cut-silences-from-video) or [shrink the result for Discord](/how/video/compress-video-for-discord), see those guides.",
+      },
+      {
+        q: "Does it work with iPhone videos in HEVC?",
+        a: "Yes. One of the test clips was HEVC at 60 fps and joined fine. Older Windows PCs may need the HEVC extension to play the originals, but the joined file is H.264, which plays almost anywhere.",
+      },
+    ],
+    related: ["video/compress-video-for-discord", "video/cut-silences-from-video", "video/convert-mkv-to-mp4"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Add a movie or clip to another in QuickTime Player", href: "https://support.apple.com/guide/quicktime-player/qtp00386594f/mac" },
+      { label: "Apple: iMovie User Guide", href: "https://support.apple.com/guide/imovie/welcome/mac" },
+      { label: "Clipchamp: How to combine videos", href: "https://clipchamp.com/en/resources/how-to-combine-videos/" },
+      { label: "FFmpeg wiki: Concatenate", href: "https://trac.ffmpeg.org/wiki/Concatenate" },
     ],
   },
 ];

@@ -108,7 +108,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Sodium, Iris and Mod Menu only change graphics and menus on your side, and they're allowed on most servers. Some servers ban client mods outright, so read their rules first.",
       },
     ],
-    related: ["game-mods/minecraft-modpack-exit-code-1", "pc-cleanup/organize-downloads-folder"],
+    related: ["game-mods/minecraft-modpack-exit-code-1", "pc-cleanup/organize-downloads-folder", "game-mods/install-minecraft-resource-pack"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Fabric installer", href: "https://fabricmc.net/use/installer/" },
@@ -226,7 +226,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Install a loader first, then add mods made for the same Minecraft version. The guide to [install Fabric, Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) walks through it, and Stella can do it in the same chat.",
       },
     ],
-    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "pc-cleanup/organize-downloads-folder"],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "pc-cleanup/organize-downloads-folder", "game-mods/allocate-more-ram-to-minecraft"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Minecraft Wiki: Java Edition system requirements and Java versions", href: "https://minecraft.wiki/w/Tutorial:Update_Java" },
@@ -423,6 +423,221 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       { label: "REDmod 2.5 Deploy Fix (Nexus)", href: "https://www.nexusmods.com/cyberpunk2077/mods/36429" },
       { label: "Cyber Engine Tweaks", href: "https://github.com/maximegmd/CyberEngineTweaks" },
       { label: "redscript", href: "https://github.com/jac3km4/redscript" },
+    ],
+  },
+  {
+    slug: "install-minecraft-resource-pack",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install resource packs minecraft",
+      "how to install texture packs minecraft",
+      "minecraft resource pack not showing up",
+      "resource pack not showing in minecraft list",
+      "texture pack zip inside folder minecraft",
+    ],
+    title: "Install a Minecraft resource pack (not showing up? Fix it)",
+    description:
+      "Put a resource or texture pack in the right folder and fix the usual reason it doesn't appear, a zip with an extra folder inside, or let Stella (stella.sh) do it.",
+    h1: "How to install a Minecraft resource pack that isn't showing up",
+    short: "Install a Minecraft resource pack",
+    lede: "A pack that wouldn't appear, unpacked properly and switched on.",
+    answer:
+      "In Minecraft Java, go to Options, Resource Packs, Open Pack Folder, drop the pack's .zip in and move it to Selected. If it doesn't appear, open the zip: when pack.mcmeta sits inside another folder, Minecraft ignores the pack, so move that inner folder into resourcepacks instead. A pack made for another version shows as incompatible. Stella (stella.sh) finds the download, fixes the folder, installs the pack and switches it on.",
+    stellaSteps: [
+      "Finds the downloaded zip, still sitting in Downloads, and the game folder, and checks which Minecraft version you have (1.21.4 in the test)",
+      "Opens the zip and spots the problem: everything was inside an extra folder, so pack.mcmeta wasn't at the top",
+      "Checks the pack is only images and a settings file, with nothing that runs, and that it's made for your version",
+      "Puts the pack in the resourcepacks folder with pack.mcmeta at its top level",
+      "Backs up options.txt, then adds the pack to the enabled list, layered over the default textures, leaving every other setting alone",
+    ],
+    prompt:
+      "I downloaded the Mossy Stone texture pack but it doesn't show up in Minecraft's resource pack list. Can you install it properly and turn it on?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The pack installed and switched on in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run, at file level: the pack sits in resourcepacks with pack.mcmeta at its top, pack format 46 and all 8 textures intact, and options.txt lists it after vanilla with every other line unchanged. The download in Downloads was left as it was.",
+      note: "Checked in the files only. The test computer has a Minecraft folder for version 1.21.4 but no copy of the game, so Minecraft wasn't launched and the pack wasn't seen in game. The pack is a small one made for this run. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/game-mods/install-minecraft-resource-pack/proof.mp4`,
+        cuts: webCuts("game-mods/install-minecraft-resource-pack"),
+        poster: `${PROOFS}/game-mods/install-minecraft-resource-pack/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 49.1,
+        realDuration: 83,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. The Mossy Stone pack zip is in Downloads, and Minecraft doesn't list it." },
+        { at: 2.1, text: "The prompt: install it properly and turn it on." },
+        { at: 16.9, text: "Stella replies with the usual causes (a folder too deep, the wrong version, the wrong game folder) and asks for the game to be closed first." },
+        { at: 22.8, text: "Finding and installing the pack, sped up 2×." },
+        { at: 35.1, text: "Done: two problems fixed, the zip was never moved and had an extra folder inside. The pack is installed and on, with settings backed up." },
+      ],
+    },
+    manualTitle: "Install it yourself",
+    manualSteps: [
+      {
+        title: "Open the resource pack folder",
+        body: "Start Minecraft Java, go to Options, Resource Packs, and click Open Pack Folder. It opens `%APPDATA%\\.minecraft\\resourcepacks` on Windows, `~/Library/Application Support/minecraft/resourcepacks` on a Mac and `~/.minecraft/resourcepacks` on Linux.",
+      },
+      {
+        title: "Drop the pack in",
+        body: "Drag the downloaded .zip into that folder without unzipping it. Back in the game it appears under Available; click its arrow to move it to Selected, then Done. Packs higher in the Selected list win over those below.",
+      },
+      {
+        title: "Not listed? Look inside the zip",
+        body: "Open the zip. pack.mcmeta and the assets folder must be at the top. If you see a single folder that contains them, the pack is nested: unzip it and move that inner folder, the one holding pack.mcmeta, into resourcepacks. Minecraft loads folders as well as zips.",
+      },
+      {
+        title: "“Made for an older or newer version”",
+        body: "That warning comes from the pack format number in pack.mcmeta. Download the release made for your game version. Editing the number hides the warning but doesn't make missing or renamed textures appear.",
+      },
+      {
+        title: "Still nothing? Check which game folder",
+        body: "Launchers like CurseForge, Prism or Modrinth keep each instance in its own folder with its own resourcepacks. Use Open Pack Folder from inside the game you actually play, so the pack lands in the right place.",
+      },
+    ],
+    limits: [
+      "Checked in the files only: the test computer had no copy of Minecraft, so the game wasn't started and the textures weren't seen in game.",
+      "Java Edition only. Bedrock packs (.mcpack files) install by opening them, and weren't covered.",
+      "If Minecraft is open while options.txt is edited, the game can overwrite the change when it quits. Close it first, or switch the pack on in the menu yourself.",
+      "Stella installs packs you've already downloaded, and checked this one held only images and a settings file. Get packs from the creator's page or a site like Modrinth or CurseForge.",
+      "Recorded on Linux, where the game folder is ~/.minecraft. On a Mac or Windows PC the folder is different, as listed above, but the fix is the same.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why is my resource pack not showing up in Minecraft?",
+        a: "Most often the zip has an extra folder inside, so pack.mcmeta isn't at the top. Otherwise it's in another launcher instance's folder, or it's a Bedrock .mcpack. Packs for the wrong version still show, marked incompatible.",
+      },
+      {
+        q: "Should I unzip resource packs?",
+        a: "Not normally: Minecraft reads the zip directly. Unzip only to fix a nested pack, then move the inner folder that holds pack.mcmeta.",
+      },
+      {
+        q: "Is a texture pack the same as a resource pack?",
+        a: "Yes. Texture packs were renamed resource packs in Java 1.6, and they can change sounds, fonts and models as well as textures. Shader packs are different and need a mod such as Iris.",
+      },
+      {
+        q: "Can Stella install shaders or mods too?",
+        a: "Yes. See [install Sodium and Iris on 1.21](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) for shaders and performance mods, or [give Minecraft more RAM](/how/game-mods/allocate-more-ram-to-minecraft) if a modpack runs out of memory.",
+      },
+    ],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/allocate-more-ram-to-minecraft", "game-mods/minecraft-modpack-exit-code-1"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Minecraft Wiki: Tutorial: Loading a resource pack", href: "https://minecraft.wiki/w/Tutorial:Loading_a_resource_pack" },
+      { label: "Minecraft Wiki: Pack format", href: "https://minecraft.wiki/w/Pack_format" },
+    ],
+  },
+  {
+    slug: "allocate-more-ram-to-minecraft",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to allocate more ram to minecraft",
+      "minecraft out of memory error",
+      "allocate more ram to minecraft modpack",
+      "how to allocate more ram to minecraft curseforge",
+      "minecraft java heap space crash",
+    ],
+    title: "Allocate more RAM to Minecraft for a modpack",
+    description:
+      "Fix a modpack that crashes out of memory: raise -Xmx in the launcher's JVM arguments or CurseForge's memory slider, or let Stella (stella.sh) set a safe amount.",
+    h1: "How to allocate more RAM to Minecraft and stop out of memory crashes",
+    short: "Allocate more RAM to Minecraft",
+    lede: "A modpack's memory raised from 2 GB to 6 GB, every other launcher setting kept.",
+    answer:
+      "In the official Minecraft Launcher, go to Installations, hover the modpack, click the three dots, Edit, More Options, and change `-Xmx2G` in JVM Arguments to `-Xmx6G`. In CurseForge, use Settings, Minecraft, Java Settings, Allocated Memory. 6 to 8 GB suits most modpacks; never give it more than half your computer's memory. Stella (stella.sh) reads the crash log to confirm memory is the cause, then raises it to a safe amount.",
+    stellaSteps: [
+      "Finds the launcher that runs the modpack and reads the crash report: the pack hit its 2 GB cap while loading the world",
+      "Checks how much memory the computer has (about 62 GB on the test computer) and how big the pack is (20 mods) before choosing a number",
+      "Changes `-Xmx2G` to `-Xmx6G` on the modpack's profile only, keeping its other Java flags and every other profile as they were",
+      "Backs up the launcher settings first, so the change is easy to undo",
+      "Doesn't start the game, and tells you to keep the launcher closed until you play, because it can overwrite the change when it closes",
+    ],
+    prompt: "Minecraft keeps crashing with an out of memory error when I play my modpack. Can you give it more RAM?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The modpack's profile raised from 2 GB to 6 GB in about 1 minute 30 seconds. Checked afterwards against an answer key written before the run, at file level: launcher_profiles.json is still valid, the modpack profile has exactly one -Xmx, at 6 GB, with its original G1 flags kept, and the other profiles and launcher settings are unchanged.",
+      note: "Checked in the files only. The test computer has a realistic launcher folder with a 20-mod pack, a crash report and an out-of-memory log, but no copy of the game, so Minecraft wasn't launched to confirm the crash is gone. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/game-mods/allocate-more-ram-to-minecraft/proof.mp4`,
+        cuts: webCuts("game-mods/allocate-more-ram-to-minecraft"),
+        poster: `${PROOFS}/game-mods/allocate-more-ram-to-minecraft/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 57.7,
+        realDuration: 87,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer, with a Minecraft folder whose modpack crashed out of memory." },
+        { at: 2.1, text: "The prompt: it keeps crashing with an out of memory error, give it more RAM." },
+        { at: 25.7, text: "Stella replies: it'll check the crash log to confirm low memory is the cause, raise the limit to a safe amount, and not start the game." },
+        { at: 31.6, text: "Reading the crash log and editing the launcher profile, sped up 2×." },
+        { at: 43.7, text: "Done: 2 GB to 6 GB for the modpack, why 6 GB, what to do before playing, and what a crash at 6 GB would mean." },
+      ],
+    },
+    manualTitle: "Change it yourself",
+    manualSteps: [
+      {
+        title: "Make sure it's really memory",
+        body: "Open the newest file in the pack's crash-reports folder, or logs/latest.log, and search for OutOfMemoryError or “Java heap space”. If the crash names a mod or a missing dependency instead, more RAM won't help.",
+      },
+      {
+        title: "Official launcher: edit the JVM arguments",
+        body: "Open the Minecraft Launcher, choose Installations, hover over the modpack's installation, click the three dots, Edit, then More Options. In JVM Arguments, change the number in `-Xmx2G` to `-Xmx6G`, leave the rest of the line alone, and click Save.",
+      },
+      {
+        title: "CurseForge, Prism and other launchers",
+        body: "In the CurseForge app, go to Settings, Minecraft, Java Settings and move the Allocated Memory slider; it applies to all its modpacks. Prism Launcher and the Modrinth app set memory per instance in that instance's settings.",
+      },
+      {
+        title: "Pick a sensible amount",
+        body: "About 4 GB is plenty for unmodded play and 6 to 8 GB for most modpacks; go higher only for very large packs. Leave at least half your computer's memory for everything else: on an 8 GB laptop, 4 GB is the ceiling. Far too much can cause longer stutters.",
+      },
+      {
+        title: "Test it",
+        body: "Start the modpack and load the world that crashed. Press F3: the Mem line shows the new maximum. If it still crashes with memory to spare, a mod is probably leaking memory; check that mod's issue tracker.",
+      },
+    ],
+    limits: [
+      "Checked in the files only: the test computer had no copy of Minecraft, so the game wasn't launched and the fix wasn't play-tested.",
+      "More RAM only fixes out-of-memory crashes. Stella read the crash log first for that reason; a crash from a broken or mismatched mod needs a different fix.",
+      "It edits the official launcher's settings file, which the launcher can overwrite if it's open at the time. Close it before asking.",
+      "Recorded on Linux, where the game folder is ~/.minecraft. On Windows it's %APPDATA%\\.minecraft and on a Mac ~/Library/Application Support/minecraft; other launchers keep their own settings, which this run didn't cover.",
+      "The crash log and launcher settings go to the AI model you use in Stella while it reads them.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How much RAM should I give Minecraft?",
+        a: "About 2 to 4 GB for unmodded play, 6 to 8 GB for most modpacks, and never more than half your computer's memory. Past that point more isn't better: it can make the game pause for longer.",
+      },
+      {
+        q: "Why does it still run out of memory after I added RAM?",
+        a: "Either the change didn't stick (the launcher was open and overwrote it), it went on a different installation, or a mod is leaking memory. The F3 screen's Mem line tells you whether the new limit is in effect.",
+      },
+      {
+        q: "Do I need 64-bit Java?",
+        a: "Only if you set a custom Java path: 32-bit Java can't use more than about 1.5 GB. The official launcher's bundled Java is 64-bit, so most players never need to think about it.",
+      },
+      {
+        q: "What if the modpack crashes with exit code 1 instead?",
+        a: "Then it's usually a missing or mismatched mod, not memory. See [modpack crashing with exit code 1](/how/game-mods/minecraft-modpack-exit-code-1). Textures not loading is a different fix: [install a resource pack](/how/game-mods/install-minecraft-resource-pack).",
+      },
+    ],
+    related: ["game-mods/minecraft-modpack-exit-code-1", "game-mods/install-minecraft-resource-pack", "game-mods/install-sodium-iris-minecraft-1-21-fabric"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Nodecraft: How to allocate more RAM to Minecraft launchers", href: "https://nodecraft.com/support/games/minecraft/how-to-allocate-more-ram-to-minecraft-launchers" },
+      { label: "CurseForge: How to allocate more RAM to Minecraft", href: "https://blog.curseforge.com/how-to-allocate-more-ram-to-minecraft/" },
     ],
   },
 ];

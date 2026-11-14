@@ -8,7 +8,7 @@ export const NICHES: Niche[] = [
     h1: "Game mods, installed and working.",
     title: "Game mods: install guides and fixes after updates",
     description:
-      "Install Minecraft mods (Fabric, Sodium, Iris) and fix a modpack that crashes with exit code 1. The manual steps, or Stella (stella.sh) doing it for you.",
+      "Install Minecraft mods and resource packs, give a modpack more RAM and fix exit code 1 crashes. The manual steps, or Stella (stella.sh) doing it for you.",
     intro:
       "Mods break when a game updates, and installing them by hand means matching versions, folders and loaders. Each guide gives the manual way, and Stella (stella.sh) doing it on a real computer where we could record it.",
   },
@@ -16,9 +16,9 @@ export const NICHES: Niche[] = [
     slug: "video",
     name: "Video editing",
     h1: "Video edits, done on your computer.",
-    title: "Video how-tos: subtitles, silences, file size, MKV to MP4",
+    title: "Video how-tos: subtitles, silences, merging, MKV to MP4",
     description:
-      "Burn in subtitles, cut silences, shrink a video for Discord and convert MKV to MP4 for your TV, with free tools or Stella (stella.sh) on your own files.",
+      "Burn in subtitles, cut silences, join clips into one video, shrink a video for Discord and convert MKV to MP4, with free tools or Stella (stella.sh).",
     intro:
       "Most quick video jobs (captions, trimming dead air, resizing for vertical) are a few commands in free tools. Each guide gives you those, and shows Stella (stella.sh) doing it on a real file.",
   },
@@ -36,9 +36,9 @@ export const NICHES: Niche[] = [
     slug: "photos-files",
     name: "Photos and files",
     h1: "Photos and files, put in order.",
-    title: "Photos and files: convert, de-duplicate, sort by date, rename",
+    title: "Photos and files: convert, resize, de-duplicate, sort, rename",
     description:
-      "Convert HEIC to JPG, find duplicate photos, sort photos into folders by date taken, fix Takeout dates and rename PDFs, with free tools or Stella (stella.sh).",
+      "Convert HEIC to JPG, resize photos in bulk, remove their location, find duplicates, sort by date taken and rename PDFs, with free tools or Stella (stella.sh).",
     intro:
       "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
   },
@@ -46,11 +46,31 @@ export const NICHES: Niche[] = [
     slug: "pdf-excel",
     name: "PDFs and Excel",
     h1: "PDFs and spreadsheets, sorted.",
-    title: "PDF and Excel how-tos: compress, convert, combine, receipts",
+    title: "PDF and Excel how-tos: split, redact, compress, compare",
     description:
-      "Shrink a PDF to email, get bank statements and receipts into Excel and combine Excel files into one sheet, with free tools or Stella (stella.sh), no uploads.",
+      "Split, redact, unlock and number PDFs, get statements and receipts into Excel, and compare or combine spreadsheets, with free tools or Stella (stella.sh).",
     intro:
       "PDFs are where office jobs get fiddly: files too big to send, numbers stuck in tables you can't copy. Each guide shows the free route first, then Stella (stella.sh) doing it with a real file.",
+  },
+  {
+    slug: "documents",
+    name: "Word and documents",
+    h1: "Letters and documents, filled in.",
+    title: "Document how-tos: mail merge and Word letters",
+    description:
+      "Make one Word letter per person from an Excel sheet, with Word's own mail merge or Stella (stella.sh) filling your template on your own computer.",
+    intro:
+      "Documents eat time in the repetitive parts: the same letter for sixteen people, each with their own name, fee and date. Each guide shows the way to do it in Word, and Stella (stella.sh) doing it on a real computer.",
+  },
+  {
+    slug: "audio",
+    name: "Audio and music",
+    h1: "Music and audio files, fixed in bulk.",
+    title: "Audio how-tos: MP3 tags, album art, FLAC to MP3",
+    description:
+      "Fix MP3s that show Unknown Artist, add album art, and convert FLAC to MP3 for the car, with free tools or Stella (stella.sh) on your own files.",
+    intro:
+      "Music and recordings go wrong in batches: a whole album with no tags, a format the car won't play. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files.",
   },
   {
     slug: "local-ai",

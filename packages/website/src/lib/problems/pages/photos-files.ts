@@ -260,7 +260,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "renamer.ai is built for renaming and has a desktop app with watched folders. Stella has no per-file limit beyond your plan's usage and runs on your own computer; it's free with the ChatGPT or Claude plan you already have, and it does the next job too.",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pc-cleanup/organize-downloads-folder"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pc-cleanup/organize-downloads-folder", "pdf-excel/split-pdf-into-multiple-files"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Microsoft: Extract text from PDF (Power Automate Desktop)", href: "https://learn.microsoft.com/en-us/power-automate/desktop-flows/actions-reference/pdf" },
@@ -370,7 +370,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates"],
+    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
@@ -608,6 +608,222 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       { label: "ExifTool: Writing FileName and Directory tags", href: "https://exiftool.org/filename.html" },
       { label: "digiKam", href: "https://www.digikam.org" },
       { label: "Adobe: Import photos in Lightroom Classic", href: "https://helpx.adobe.com/lightroom-classic/help/photo-video-import-options.html" },
+    ],
+  },
+  {
+    slug: "resize-images-in-bulk",
+    niche: "photos-files",
+    searchPhrases: [
+      "resize images in bulk",
+      "batch resize images",
+      "batch resize images mac",
+      "reduce image size for website",
+      "resize photos to under 300kb",
+    ],
+    title: "Resize images in bulk to a set size and file size",
+    description:
+      "Batch resize product photos to 1600 px and under 300 KB each with Preview, PowerToys Image Resizer, or Stella (stella.sh), keeping the originals as they were.",
+    h1: "Resize images in bulk for your website",
+    short: "Resize images in bulk",
+    lede: "40 camera photos at 1600 px and about 100 KB each, the right way up.",
+    answer:
+      "On a Mac, open the photos in Preview, select them all and use Tools, Adjust Size to fit 1600 × 1600; on Windows, the free PowerToys Image Resizer does a whole selection from the right-click menu. Neither aims at a file size, so check a few and lower the JPEG quality if they're over your limit. Stella (stella.sh) makes resized copies at the size and weight you ask for, turned upright, and keeps the originals.",
+    stellaSteps: [
+      "Finds the Shop photos folder on the Desktop: 40 camera photos at 6000 × 4000, about 4 MB each",
+      "Makes copies in a new Web 1600px folder inside it, 1600 px on the longest side",
+      "Picks a JPEG quality that lands every file well under the 300 KB you asked for; they came out at about 100 KB",
+      "Spots three photos stored sideways with a rotate tag, which some websites ignore, and turns those copies upright",
+      "Removes camera and location details from the copies to keep them small, and tells you the originals still have them",
+    ],
+    prompt:
+      "Make the product photos in the Shop photos folder on my Desktop smaller for my website: 1600 pixels on the longest side and under 300 KB each. Keep the originals.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "40 resized copies in about 2 minutes. Checked afterwards against an answer key written before the run: all 40 are 1600 px on the long side, every one is under 300 KB (the largest is 105 KB), the three sideways photos come out portrait, and the 40 originals are unchanged.",
+      note: "The product photos are generated test images with camera-like texture and noise, made for this run. The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/photos-files/resize-images-in-bulk/proof.mp4`,
+        cuts: webCuts("photos-files/resize-images-in-bulk"),
+        poster: `${PROOFS}/photos-files/resize-images-in-bulk/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.4,
+        realDuration: 121,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 40 full-size product photos are in Shop photos on the Desktop." },
+        { at: 2.1, text: "The prompt: 1600 pixels on the longest side, under 300 KB each, keep the originals." },
+        { at: 13.7, text: "Stella replies: resized copies at that size and weight, originals unchanged." },
+        { at: 19.6, text: "Resizing 40 photos and checking each one, sped up 6×." },
+        { at: 31.4, text: "Done: all 40 in Web 1600px at about 100 KB each, three sideways photos turned upright, camera and location details removed from the copies." },
+      ],
+    },
+    manualTitle: "Resize them yourself",
+    manualSteps: [
+      {
+        title: "Copy the folder first",
+        body: "Duplicate the folder (Option-drag on a Mac, copy and paste on Windows) and work on the copies. Preview saves over the files you open, so resizing the originals by mistake is easy.",
+      },
+      {
+        title: "On a Mac: Preview",
+        body: "Open all the copies in Preview, click a thumbnail in the sidebar and press Cmd-A to select every one, then choose Tools, Adjust Size. Pick Fit into, 1600 × 1600 pixels, keep Scale proportionally and Resample image ticked, click OK and save.",
+      },
+      {
+        title: "On Windows: PowerToys Image Resizer",
+        body: "Install Microsoft PowerToys (free), select the photos in File Explorer, right-click and choose Resize with Image Resizer (under Show more options on Windows 11). Set a custom 1600 × 1600 size with Fit, and tick the option to make copies instead of replacing the originals.",
+      },
+      {
+        title: "Get under the file-size limit",
+        body: "Neither tool aims at a number of KB. In PowerToys, lower the JPEG quality under Settings, Image Resizer, Encoding and run it again; in Preview, use File, Export with a lower Quality slider, one photo at a time. At 1600 px, a quality around 80 usually lands well under 300 KB.",
+      },
+      {
+        title: "Check for sideways photos",
+        body: "Cameras and phones often store photos sideways with a tag telling viewers to turn them. If a resized copy shows sideways on your site, rotate it in Preview or the Photos app and save, so the pixels themselves are upright.",
+      },
+    ],
+    limits: [
+      "JPEGs are re-saved, so a little quality is lost. Stella aimed well under the limit (about 100 KB each); ask for “as close to 300 KB as possible” if you'd rather keep more detail.",
+      "It removed camera and location details from the copies without being asked. That's usually what you want on a website, but say so if you need them kept.",
+      "The resizing runs on your computer with ordinary image tools, so the photos aren't uploaded to a resizing site.",
+      "Recorded on Linux, where Stella used image tools that were already installed. A Mac has the built-in sips tool for this; on Windows it may install a small image library first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I resize many photos at once on a Mac?",
+        a: "Open them all in Preview, select every thumbnail, then Tools, Adjust Size. It applies the same size to each, keeping proportions. For a target file size you still need to lower the quality per photo, or ask Stella.",
+      },
+      {
+        q: "What size should product photos be for a website?",
+        a: "Most shop platforms suggest somewhere between 1600 and 2048 px on the long side; check yours. Keeping each under about 300 KB helps pages load fast. Square crops are a separate step, so ask if your theme needs them.",
+      },
+      {
+        q: "Will resizing remove the location from my photos?",
+        a: "Some tools keep it, some don't. Stella's copies had camera and location details removed. To remove only the location and keep the date taken, see [remove location from photos](/how/photos-files/remove-location-from-photos).",
+      },
+      {
+        q: "Can it convert iPhone HEIC photos too?",
+        a: "Yes, in the same chat: [convert HEIC to JPG in bulk](/how/photos-files/convert-heic-to-jpg) and resize them in one go. Clear out repeats first with [find duplicate photos](/how/photos-files/find-duplicate-photos).",
+      },
+    ],
+    related: ["photos-files/remove-location-from-photos", "photos-files/convert-heic-to-jpg", "photos-files/find-duplicate-photos"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Microsoft: PowerToys Image Resizer", href: "https://learn.microsoft.com/en-us/windows/powertoys/image-resizer" },
+      { label: "Apple: Resize, rotate or flip an image in Preview", href: "https://support.apple.com/guide/preview/prvw2015/mac" },
+    ],
+  },
+  {
+    slug: "remove-location-from-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "remove location from photos",
+      "remove exif data",
+      "remove metadata from photos",
+      "remove location from photo before posting",
+      "remove gps from photos but keep date",
+    ],
+    title: "Remove location from photos but keep the date taken",
+    description:
+      "Strip the GPS location from a batch of photos before you post them, keeping the date taken: Photos, Preview, ExifTool, or Stella (stella.sh) on your computer.",
+    h1: "Remove location from photos before you post them",
+    short: "Remove location from photos",
+    lede: "24 photos with no location left, the same dates, and the same pixels.",
+    answer:
+      "On a Mac, Photos can leave the location out when you share (Options, untick Location), and Preview's Inspector removes it one photo at a time. Windows' Remove Properties strips location in a copy but takes the dates with it. The free ExifTool does exactly the job: `exiftool -gps:all= *.jpg` removes location only. Stella (stella.sh) makes location-free copies of a whole folder, keeps the date taken and leaves the pictures untouched.",
+    stellaSteps: [
+      "Finds the garden party photos (24 in Pictures/Garden party) and reads their details: date taken, camera and GPS position",
+      "Makes copies in a new Garden party (no location) folder with the GPS removed and the date and time taken kept",
+      "Rewrites only the details, not the pictures, so nothing is re-compressed",
+      "Checks that no copy has any location left and every date is intact",
+      "Reminds you the originals still contain your home location, and that the copies still name the camera",
+    ],
+    prompt:
+      "I want to post the garden party photos online, but they have my home location in them. Remove the location but keep the dates they were taken.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "24 clean copies in about 1 minute 30 seconds. Checked afterwards against an answer key written before the run: none of the 24 has any location data, each keeps its date taken and orientation, and the pictures are pixel-for-pixel identical to the originals.",
+      note: "The photos are generated test images with made-up camera details and a test location, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/photos-files/remove-location-from-photos/proof.mp4`,
+        cuts: webCuts("photos-files/remove-location-from-photos"),
+        poster: `${PROOFS}/photos-files/remove-location-from-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.7,
+        realDuration: 90,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 24 garden party photos with a home location saved in them are in Pictures." },
+        { at: 2, text: "The prompt: remove the location but keep the dates they were taken." },
+        { at: 15.2, text: "Stella replies: cleaned copies in a new folder next to the originals, which stay unchanged." },
+        { at: 21.1, text: "Removing GPS from 24 photos and checking them, sped up 3×." },
+        { at: 33.6, text: "Done: 24 copies with no location and the same dates, and a reminder to post from the new folder." },
+      ],
+    },
+    manualTitle: "Remove it yourself",
+    manualSteps: [
+      {
+        title: "Share without location from Photos (Mac and iPhone)",
+        body: "When you share from the Photos app, click or tap Options and turn off Location before sending. To hide it on photos in your library, select them and choose Image, Location, Hide Location. Files you exported earlier still carry it.",
+      },
+      {
+        title: "Preview, one photo at a time (Mac)",
+        body: "Open the photo in Preview, choose Tools, Show Inspector, click the info tab and then GPS, and click Remove Location Info. Save. It's reliable, but slow for a whole album.",
+      },
+      {
+        title: "Windows: Remove Properties",
+        body: "Select the photos in File Explorer, right-click, Properties, Details, Remove Properties and Personal Information, and choose Create a copy with all possible properties removed. This takes the date taken too; open one copy's Details afterwards to be sure the location is gone.",
+      },
+      {
+        title: "ExifTool for exactly this job",
+        body: "The free [ExifTool](https://exiftool.org/) removes only the location and keeps everything else: `exiftool -gps:all= -xmp:geotag= -o cleaned/ *.jpg` writes cleaned copies into a folder called cleaned. Without `-o` it edits in place and keeps backups ending in _original.",
+      },
+      {
+        title: "Check before you post",
+        body: "Open a cleaned copy's info (Preview's Inspector, or Properties, Details on Windows) and look for latitude and longitude. Some sites strip location when you upload, but email, messaging apps and your own website usually pass the file on as it is.",
+      },
+    ],
+    limits: [
+      "It only changes files on your computer. Photos already posted, or still in a cloud library with their location, keep it there.",
+      "The originals still have the location. Post from the cleaned folder; Stella left the originals alone for you to keep or delete.",
+      "It kept the camera model, because it was only asked to remove location. Ask if you also want camera details or all metadata removed.",
+      "The details Stella reads while working, which include the coordinates, go to the AI model you use in Stella. The photos are cleaned on your computer.",
+      "Recorded on Linux. On a Mac or Windows PC Stella may install ExifTool or a small Python library first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Do social networks remove location from photos?",
+        a: "The big ones generally strip it from the image when you upload, but email, messaging apps, forums and personal websites often pass the original file on. Cleaning the files yourself means you don't have to know which is which.",
+      },
+      {
+        q: "Can I remove the location but keep the date taken?",
+        a: "Yes. Location and date are separate fields. ExifTool's `-gps:all=` and Stella both remove location only, while Windows' Remove Properties and many online strippers remove both.",
+      },
+      {
+        q: "Does removing metadata reduce photo quality?",
+        a: "Not if only the metadata is rewritten: in the recording the pictures were pixel-for-pixel identical. Tools that re-save the JPEG lose a little quality. To make web-sized copies anyway, [resize them in bulk](/how/photos-files/resize-images-in-bulk).",
+      },
+      {
+        q: "How do I stop my iPhone adding location?",
+        a: "Go to Settings, Privacy & Security, Location Services, Camera and choose Never. New photos then have no location; older ones still do. For documents, [redact a PDF](/how/pdf-excel/redact-pdf) before you share it.",
+      },
+    ],
+    related: ["photos-files/resize-images-in-bulk", "photos-files/sort-photos-into-folders-by-date", "pdf-excel/redact-pdf"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Change and view location information in Photos on Mac", href: "https://support.apple.com/guide/photos/phta4e5a733f/mac" },
+      { label: "Apple Personal Safety: Manage location metadata in Photos", href: "https://support.apple.com/guide/personal-safety/ips0d7a5df82/web" },
+      { label: "ExifTool", href: "https://exiftool.org/" },
     ],
   },
 ];

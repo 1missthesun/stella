@@ -110,7 +110,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder"],
+    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -231,7 +231,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat. It can [rename PDFs by what's in them](/how/photos-files/rename-pdf-files-based-on-content), merge several into one, or pull the numbers out of [bank statements into Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/split-pdf-into-multiple-files"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Apple: Reduce the size of a PDF in Preview", href: "https://support.apple.com/guide/preview/reduce-the-size-of-a-pdf-prvw1509/mac" },
@@ -349,7 +349,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat, for example totals by store and month on a second sheet. The same approach turns [bank statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/compare-two-excel-files"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft: Import data from a folder with multiple files (Power Query)", href: "https://support.microsoft.com/en-us/office/import-data-from-a-folder-with-multiple-files-power-query-94b8023c-2e66-4f6b-8c78-6a00041c90e4" },
@@ -479,6 +479,548 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     sources: [
       { label: "Microsoft Support: Insert data from picture", href: "https://support.microsoft.com/office/insert-data-from-picture-3c1bb58d-2c59-4bc0-b04a-a671a6868fd7" },
       { label: "Microsoft Support: Use AutoSum to sum numbers", href: "https://support.microsoft.com/office/use-autosum-to-sum-numbers-543941e7-e783-44ef-8317-7d1bb85fe706" },
+    ],
+  },
+  {
+    slug: "split-pdf-into-multiple-files",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "split pdf into multiple files",
+      "split pdf",
+      "split a scanned pdf into separate documents",
+      "extract pages from pdf",
+      "separate pdf pages into different files",
+    ],
+    title: "Split a PDF into multiple files, one per document",
+    description:
+      "Split one big scanned PDF into separate files, one per letter or bill, named for what each is: Preview, print to PDF, or Stella (stella.sh) on your own computer.",
+    h1: "Split a PDF into multiple files (one per document)",
+    short: "Split a PDF into separate files",
+    lede: "A 17-page scan of mixed post turned into 7 named PDFs, the original untouched.",
+    answer:
+      "If you know the page ranges it's quick: on a Mac, drag a document's page thumbnails out of Preview's sidebar into a folder; on Windows, print the range to Microsoft Print to PDF, or use a free offline splitter such as PDF24 Creator. The slow part is working out where each document starts and naming the files. Stella (stella.sh) reads every page, splits the PDF where each document ends and names each file by sender and what it is.",
+    stellaSteps: [
+      "Finds the scan you describe (in the recording, “the Scan 2026-11-03 one in Downloads”) and reads all 17 pages",
+      "Works out where each document starts and ends from what's printed on the pages: here, a footer on every page naming its document and page number",
+      "Writes one PDF per document into a new folder next to the scan, named by sender and what it is, like “Halden Logistics - payslip October 2026”",
+      "Leaves dates out of the names when a letter doesn't show one, rather than inventing them, and turns the slash in “2026/27” into a dash so the name is valid",
+      "Lists what needs doing: an invoice to pay with its reference, and two letters whose deadlines the scan doesn't show",
+    ],
+    prompt:
+      "My scanner app put a whole pile of letters and bills into one PDF (the Scan 2026-11-03 one in Downloads). Split it into separate PDFs, one per document, with names that say what each one is.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "macOS 15",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Seven PDFs from one 17-page scan in about 2 minutes 20 seconds. Checked afterwards against an answer key written before the run: exactly 7 files, each holding only its own document's pages in the right order (invoice 2 pages, council tax bill 1, insurance renewal 4, payslip 1, tenancy agreement 6, dental receipt 1, gym cancellation 2), each named for what it is, and the original scan unchanged.",
+      note: "The scan is a sample PDF of fictitious letters and bills made for this run, with selectable text rather than page images. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/split-pdf-into-multiple-files/proof.mp4`,
+        cuts: webCuts("pdf-excel/split-pdf-into-multiple-files"),
+        poster: `${PROOFS}/pdf-excel/split-pdf-into-multiple-files/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 39.8,
+        realDuration: 140,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Mac. A 17-page scan of mixed letters and bills is in Downloads." },
+        { at: 3.3, text: "The prompt: split it into separate PDFs, one per document, with names that say what each one is." },
+        { at: 12, text: "Stella replies: a new folder in Downloads, files named by sender and type, the original scan left alone." },
+        { at: 13, text: "Reading the pages and splitting the scan, sped up 4×." },
+        { at: 22.7, text: "Done: 7 PDFs listed by sender, dates left out because the letters don't show them, and the three that need action." },
+      ],
+    },
+    manualTitle: "Split it yourself",
+    manualSteps: [
+      {
+        title: "Find where each document starts",
+        body: "Scroll through the PDF and note the page range of each letter or bill (for example 1–2, 3, 4–7). A new letterhead or a footer reading “Page 1 of 4” gives it away. Doing this first saves splitting at the wrong page.",
+      },
+      {
+        title: "On a Mac: drag pages out of Preview",
+        body: "Open the PDF in Preview and choose View, Thumbnails. Click the first page of a document, Shift-click its last page, and drag the selection to a Finder folder or the desktop: Preview saves those pages as a new PDF. Rename it, then repeat for the next document.",
+      },
+      {
+        title: "On Windows: print a page range to PDF",
+        body: "Open the PDF in Microsoft Edge or Chrome, press Ctrl+P, choose Microsoft Print to PDF (Save as PDF in Chrome), type the range under Pages, such as 4-7, and save it under a name that says what it is. Repeat per document. It's a re-print, so links and form fields may not survive.",
+      },
+      {
+        title: "Or use an offline splitter",
+        body: "PDF24 Creator (free, Windows) splits by several page ranges in one go without uploading anything, and the free qpdf tool does it from the command line on any system. Online splitters like iLovePDF work too, but a pile of bills and payslips is exactly what you'd rather not upload.",
+      },
+      {
+        title: "Check and name every file",
+        body: "Open each new PDF and check its first and last pages belong together. Name it sender, then what it is, then date, for example “Brightwater Plumbing - invoice - 2026-10”. File names can't contain a slash, so write “2026-27”, not “2026/27”.",
+      },
+    ],
+    limits: [
+      "The test scan had selectable text and a footer on every page naming its document, which made the split certain. A real scan that's only pictures, with no footers, is harder: Stella has to look at each page image, which is slower and worth checking by eye.",
+      "It didn't put dates in the file names, because none of the letters showed one. If yours do, ask for the date in the name.",
+      "The pages' text goes to the AI model you use in Stella (here Claude) so it can tell the documents apart. For very private paperwork, choose your model accordingly.",
+      "This one was recorded on a Mac (macOS 15). The same job works on Windows and Linux; it just wasn't recorded there for this guide.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Preview split a PDF into separate files?",
+        a: "Yes, by dragging selected page thumbnails out of the sidebar into a folder; each drag makes a new PDF. There's no “split every N pages” button, so a long file means many drags.",
+      },
+      {
+        q: "How do I split a PDF into single pages?",
+        a: "With the free qpdf, `qpdf --split-pages scan.pdf page.pdf` writes page-01.pdf, page-02.pdf and so on. PDF24 Creator has the same option. Ask Stella for single pages instead of documents and it does that.",
+      },
+      {
+        q: "Will splitting change the original PDF?",
+        a: "Not with Preview's drag method or the print route, and not in the recording: Stella wrote the new files into a separate folder and the scan was byte-for-byte unchanged afterwards.",
+      },
+      {
+        q: "Can it rename or shrink the pieces too?",
+        a: "It named them in the same step. To rename PDFs you already have by what's in them, see [rename PDF files by content](/how/photos-files/rename-pdf-files-based-on-content). If one is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email) in the same chat.",
+      },
+    ],
+    related: ["photos-files/rename-pdf-files-based-on-content", "pdf-excel/add-page-numbers-to-pdf", "pdf-excel/compress-pdf-too-large-to-email"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
+      { label: "Apple: Combine PDFs and move pages between them in Preview", href: "https://support.apple.com/guide/preview/prvw846b61d3/mac" },
+      { label: "PDF24 Creator (free Windows PDF tools)", href: "https://tools.pdf24.org/en/creator" },
+      { label: "qpdf command-line options", href: "https://qpdf.readthedocs.io/en/stable/cli.html" },
+    ],
+  },
+  {
+    slug: "remove-password-from-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "remove password from pdf",
+      "unlock pdf",
+      "remove password from pdf mac",
+      "remove password from pdf free",
+      "pdf asks for password every time",
+    ],
+    title: "Remove a password from a PDF you can open (Mac, Windows)",
+    description:
+      "Make copies of password-protected PDFs, like bank statements, that open without the password: Preview's Export, print to PDF, qpdf, or Stella (stella.sh).",
+    h1: "Remove the password from a PDF you already know",
+    short: "Remove a password from a PDF",
+    lede: "Six statements that open without the password, the locked originals kept.",
+    answer:
+      "You need the password; removing it just saves an unlocked copy. On a Mac, open the PDF in Preview, type the password and use File, Export (not Export as PDF, which is greyed out for protected files on macOS 15). On Windows, print it to Microsoft Print to PDF from Edge, or use Acrobat's No Security. Stella (stella.sh) unlocks a whole batch with the password you give it, keeps the text exactly and leaves the originals alone.",
+    stellaSteps: [
+      "Finds the protected statements in Downloads, six months of them in the recording",
+      "Opens each with the password from your message and saves a copy without it, next to the original",
+      "Names each copy after its original with “(unlocked)” added, so Statement_2026-05 becomes Statement_2026-05 (unlocked)",
+      "Opens every copy afterwards to check it needs no password, and confirms the originals are unchanged",
+      "Points out that anyone using the computer can now open the copies, and offers to delete the locked originals (it didn't, without being told to)",
+    ],
+    prompt:
+      "My bank statements in Downloads ask for a password every time I open them. The password is Maple2026. Can you make copies that open without it?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Six unlocked copies (May to October 2026) in about a minute. Checked afterwards against an answer key written before the run: each copy opens without a password and has the same page and exactly the same text as its original, each keeps the month in its name, and all six locked originals were still there, unchanged.",
+      note: "The statements are sample PDFs from a fictitious bank, each locked with AES-256 encryption and the password in the prompt, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/remove-password-from-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/remove-password-from-pdf"),
+        poster: `${PROOFS}/pdf-excel/remove-password-from-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 37,
+        realDuration: 64,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Six password-protected bank statements are in Downloads." },
+        { at: 1.9, text: "The prompt, with the password: make copies that open without it." },
+        { at: 10.7, text: "Stella replies: copies saved next to the originals, which won't be changed." },
+        { at: 11.5, text: "Unlocking and checking six files, sped up 3×." },
+        { at: 18.2, text: "Done: six unlocked copies, each opened to check, and a reminder that anyone using this computer can now open them." },
+      ],
+    },
+    manualTitle: "Unlock it yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Preview's Export",
+        body: "Open the statement in Preview and type the password. Choose File, Export (the plain Export…, because Export as PDF… is greyed out for protected files on macOS 15), keep Format set to PDF, give it a new name and save. On macOS 15.6 the exported copy opens without a password. Repeat for each file.",
+      },
+      {
+        title: "On Windows: print to PDF",
+        body: "Open the PDF in Microsoft Edge or Chrome and enter the password. Press Ctrl+P, choose Microsoft Print to PDF (Save as PDF in Chrome) and save. The new file has no password, but this only works if the PDF allows printing, and links or bookmarks may be lost in the re-print.",
+      },
+      {
+        title: "With Adobe Acrobat",
+        body: "In Acrobat (paid), open the file with its password, then choose File, Properties, Security and set Security Method to No Security. If the file also has a permissions password, Acrobat asks for that too. This keeps everything in the file exactly as it was.",
+      },
+      {
+        title: "From the command line, on any system",
+        body: "The free qpdf removes it in one line and keeps everything else: `qpdf --password=YOURPASSWORD --decrypt locked.pdf unlocked.pdf`. Run it once per file, or loop over the folder to do a year of statements at once.",
+      },
+      {
+        title: "Or skip the PDF next time",
+        body: "If your bank locks every statement, look in its online banking for a transaction download as CSV or Excel. The same numbers arrive without a password and are easier to work with than the PDF anyway.",
+      },
+    ],
+    limits: [
+      "Stella needs the password. It won't guess, crack or get around one, and it's only for files you're entitled to open.",
+      "The password is part of your message, so it reaches the AI model you use in Stella along with the rest of the chat. Change it afterwards if you use it anywhere else.",
+      "Unlocked copies open for anyone with access to the computer or the folder. Stella said so and offered to delete the locked ones; keep the originals if the copies are for a one-off job.",
+      "Recorded on Linux, where the PDF tools Stella used were already installed. On a Mac or Windows PC it may install a small PDF tool first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why is “Export as PDF” greyed out in Preview?",
+        a: "On macOS 15, Preview disables Export as PDF for password-protected files. File, Export with the format set to PDF still works and, on macOS 15.6, saves a copy without the password.",
+      },
+      {
+        q: "Can I remove a password I don't know?",
+        a: "Not with any of these methods: every one starts by opening the file with its password. If it's your own statement, download it again from your bank or ask the bank what the password is built from.",
+      },
+      {
+        q: "Is it OK to remove a PDF password?",
+        a: "Saving an unlocked copy of your own document with the password you were given is an everyday thing to do. Breaking into a file you weren't given access to is not, and Stella won't try.",
+      },
+      {
+        q: "What can I do with the unlocked statements?",
+        a: "Anything that needs the text: search them, or [turn bank statements into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel). Before sharing one, you can [black out account numbers](/how/pdf-excel/redact-pdf) properly.",
+      },
+    ],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/redact-pdf", "pdf-excel/split-pdf-into-multiple-files"],
+    lastChecked: "2026-11-13",
+    sources: [
+      {
+        label: "Microsoft Community: removing a PDF password you know on Windows",
+        href: "https://techcommunity.microsoft.com/discussions/windows10space/how-do-you-remove-password-protection-from-a-pdf/4536775/replies/4536796",
+      },
+      { label: "qpdf command-line options", href: "https://qpdf.readthedocs.io/en/stable/cli.html" },
+    ],
+  },
+  {
+    slug: "redact-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "redact pdf",
+      "how to redact a pdf",
+      "redact pdf free",
+      "redact pdf mac",
+      "black out text in pdf permanently",
+    ],
+    title: "Redact a PDF properly, free on Mac and Windows",
+    description:
+      "Black out SSNs and account numbers in a PDF so they're really gone, not just covered: Preview's Redact, PDF24 or Acrobat, or Stella (stella.sh), checked.",
+    h1: "How to redact a PDF so the text is really gone",
+    short: "Redact a PDF properly",
+    lede: "Every SSN and account number deleted from the file, not just hidden under a box.",
+    answer:
+      "Use a real redaction tool, not a black rectangle: a drawn box leaves the text underneath, where anyone can copy it out. On a Mac, Preview's Tools, Redact removes the text it covers; on Windows, the free PDF24 Creator or Acrobat's Redact tool does. Then search the saved copy for a number to prove it's gone. Stella (stella.sh) finds every number you name, deletes it from a copy and checks it can't be pulled back out.",
+    stellaSteps: [
+      "Opens the PDF you describe (“the new hires PDF in my Downloads”) and finds every Social Security and bank account number on all five pages",
+      "Deletes them from a copy of the file rather than painting over them, so nobody can copy or search them out from under the black boxes",
+      "Keeps everything else readable: names, roles and start dates",
+      "Checks its own work: tries to pull the numbers back out of the file, and renders page 1 to see that the boxes sit in the right places",
+      "Leaves the bank routing number visible and explains why (it's the same for all 18 people and only identifies the bank), offering to black it out too",
+    ],
+    prompt:
+      "I need to share the new hires PDF in my Downloads with our team leads, but they shouldn't see anyone's social security number or bank account number. Black those out.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "36 numbers removed, a Social Security number and an account number for each of 18 new hires, in about 1 minute 40 seconds. Checked afterwards against an answer key written before the run: none of the numbers can be found in the copy's text or anywhere in the file's bytes, every spot is covered by a black box, all 18 names and the other details are still readable, the page count is the same and the original is unchanged.",
+      note: "The payroll PDF is made up for this run: a fictitious company, and SSN-shaped numbers from a range that's never issued. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/redact-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/redact-pdf"),
+        poster: `${PROOFS}/pdf-excel/redact-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.7,
+        realDuration: 98,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 5-page payroll PDF listing 18 new hires is in Downloads." },
+        { at: 2, text: "The prompt: team leads shouldn't see anyone's social security or bank account number. Black those out." },
+        { at: 15.6, text: "Stella replies: a blacked-out copy, with the numbers deleted from the file, not just covered with boxes." },
+        { at: 21.6, text: "Finding, removing and checking the numbers, sped up 4×." },
+        { at: 32.6, text: "Done: 36 numbers gone across 5 pages, names and dates kept, and a preview of page 1 with the black boxes." },
+      ],
+    },
+    manualTitle: "Redact it yourself",
+    manualSteps: [
+      {
+        title: "Work on a copy",
+        body: "Duplicate the PDF first (File, Duplicate in Preview, or copy and paste it in File Explorer). Redaction can't be undone in the saved file, so keep the original somewhere safe and only share the copy.",
+      },
+      {
+        title: "On a Mac: Preview's Redact tool",
+        body: "Open the copy in Preview (macOS 11 or later), choose Tools, Redact, and drag across each number. Preview marks the areas and, when you save, removes the text under them. Go page by page: there's no way to search and redact every match at once.",
+      },
+      {
+        title: "On Windows: PDF24 or Acrobat",
+        body: "The free PDF24 Creator has a Redact tool that works offline: draw boxes over the numbers and save. In Adobe Acrobat (paid), choose Redact, mark each number or use Find text & redact to mark every match of a pattern, then Apply.",
+      },
+      {
+        title: "Never just draw a black box",
+        body: "Rectangles, a black highlighter or black text shading only hide the number on screen. The text is still in the file, and select-all, copy and paste reveals it. Printing to an image PDF does flatten it, but every page loses its searchable text.",
+      },
+      {
+        title: "Prove it's gone",
+        body: "Open the saved copy, press Cmd-F or Ctrl+F and search for the last four digits of a few numbers. Then select the text around a box and paste it into a note. If any digit turns up, the redaction didn't take.",
+      },
+    ],
+    limits: [
+      "The test PDF had real text. Scanned pages are pictures, so Stella would need to read them with OCR before it could find the numbers, which wasn't part of this run; check scanned pages by eye.",
+      "It decides what to remove from your description. In the recording it kept the routing number on purpose and said so. Name everything you want gone (dates of birth, home addresses) to be safe.",
+      "The PDF's text goes to the AI model you use in Stella so it can find the numbers, which is the very data you're protecting. For highly sensitive files, choose your model accordingly.",
+      "Recorded on Linux. Stella installed a PDF library (PyMuPDF) for the redaction, and does the same on a Mac or Windows PC, which adds a little time the first run.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why doesn't a black box redact a PDF?",
+        a: "Because the box is a separate layer drawn on top. The text under it is still in the file, so anyone can select, copy or search it. Real redaction deletes the content under the box and then burns the box into the page.",
+      },
+      {
+        q: "Can I redact a PDF for free?",
+        a: "Yes. Preview on a Mac and PDF24 Creator on Windows both redact for free and offline. Stella is free with the ChatGPT or Claude plan you already have.",
+      },
+      {
+        q: "Does redaction remove hidden data too?",
+        a: "Preview and PDF24 remove the marked text. Acrobat also has Remove Hidden Information for metadata, comments and attachments. In the recording only the numbers were removed; ask if you want the file's metadata cleared as well.",
+      },
+      {
+        q: "What if the PDF has a password?",
+        a: "[Remove the password](/how/pdf-excel/remove-password-from-pdf) first with the one you have, then redact the unlocked copy. Photos have their own privacy leak: [remove the location from photos](/how/photos-files/remove-location-from-photos) before you post them.",
+      },
+    ],
+    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Intego: Securely redact text in PDFs with Preview", href: "https://www.intego.com/mac-security-blog/securely-redact-text-in-pdfs-with-apple-preview-on-mac" },
+      { label: "PDF24: Redact PDF", href: "https://tools.pdf24.org/en/redact-pdf" },
+    ],
+  },
+  {
+    slug: "add-page-numbers-to-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "add page numbers to pdf",
+      "add page numbers to pdf free",
+      "add page numbers to pdf mac",
+      "add page numbers to pdf in preview",
+    ],
+    title: "Add page numbers to a PDF, free on Mac and Windows",
+    description:
+      "Number every page of a PDF at the bottom: Preview can't, so use the original file, a free offline tool, Acrobat's Header & Footer, or Stella (stella.sh).",
+    h1: "Add page numbers to a PDF",
+    short: "Add page numbers to a PDF",
+    lede: "A 16-page report numbered at the bottom of every page, in its own font.",
+    answer:
+      "Preview on a Mac can't add page numbers, which is where many people get stuck. If you still have the Word or Pages file, add numbers there and export the PDF again. Otherwise use a free offline tool such as PDF24 Creator on Windows, or Acrobat's Header & Footer if you pay for it. Stella (stella.sh) adds the numbers to a copy, matches the document's font and checks that none of them sit on top of text.",
+    stellaSteps: [
+      "Finds the annual report in Downloads: 16 pages, no numbers yet",
+      "Adds a small grey number centred at the bottom of every page, in the report's own font",
+      "Numbers the first page too, because this report has no separate cover; say so if yours does and should be skipped",
+      "Checks that no number covers any of the report's text",
+      "Saves a new file with “- numbered” added to the name and leaves the original as it was",
+    ],
+    prompt: "Add page numbers to the bottom of every page of the annual report PDF in my Downloads.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "All 16 pages numbered in about 1 minute 40 seconds. Checked afterwards against an answer key written before the run: every page shows its own number in the bottom 15% of the page, the page count is still 16, and all 16 original headings are still there.",
+      note: "The report is a fictitious charity's annual report, made for this run. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/add-page-numbers-to-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/add-page-numbers-to-pdf"),
+        poster: `${PROOFS}/pdf-excel/add-page-numbers-to-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.3,
+        realDuration: 99,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 16-page annual report with no page numbers is in Downloads." },
+        { at: 2.1, text: "The prompt: page numbers at the bottom of every page." },
+        { at: 13.4, text: "Stella replies: the numbered version will be a new file next to the original." },
+        { at: 19.3, text: "Adding and checking the numbers, sped up 4×." },
+        { at: 31.4, text: "Done: small grey numbers centred at the bottom of all 16 pages, in the report's font, covering no text." },
+      ],
+    },
+    manualTitle: "Number the pages yourself",
+    manualSteps: [
+      {
+        title: "Start from the original document if you have it",
+        body: "In Word, choose Insert, Page Number, Bottom of Page; in Pages, click in the footer and choose Insert, Page Number. Then export a new PDF. The numbers become part of the layout, so they can't collide with text.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator, open its Add page numbers tool, drop in the PDF, choose the bottom centre position and the first number, and save. It runs on your computer, so the report isn't uploaded anywhere.",
+      },
+      {
+        title: "With Adobe Acrobat",
+        body: "In Acrobat (paid), choose Edit PDF, Header & Footer, Add. Click into the centre footer box, use Insert Page Number, set the font size and bottom margin, and use Page Range Options if the cover should stay unnumbered.",
+      },
+      {
+        title: "On a Mac without Acrobat",
+        body: "Preview has no page number tool on any current macOS. Use a free offline PDF editor that has a header and footer or page number feature (PDFgear is one). Online tools like iLovePDF and Smallpdf do it too, but upload the file.",
+      },
+      {
+        title: "Check the bottom of every page",
+        body: "Page through the result at full size. Numbers can land on footnotes, table rows or an existing footer; if they do, raise the bottom margin setting or shrink the font and run it again.",
+      },
+    ],
+    limits: [
+      "It added plain numbers (1, 2, 3) centred at the bottom. For “Page 3 of 16”, another position, Roman numerals for front matter or an unnumbered cover, say so in the prompt.",
+      "The numbers are stamped onto the pages of the PDF. If you later change the original Word file and export again, the new PDF needs numbering again.",
+      "The report's text goes to the AI model you use in Stella while it works on the layout. For confidential documents, choose your model accordingly.",
+      "Recorded on Linux, where Stella had the PDF tools it needed. On a Mac or Windows PC it may install a small PDF library first; that step wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Preview add page numbers to a PDF?",
+        a: "No. Preview can rotate, reorder, sign and redact pages, but it has no header, footer or page-number tool. Use the original document, a free PDF editor, or Stella.",
+      },
+      {
+        q: "How do I start numbering on page 2?",
+        a: "In Acrobat's Header & Footer, use Page Range Options and set the start number. In Word, tick Different First Page in the footer settings. With Stella, ask it to “skip the cover and start at 1 on page 2”.",
+      },
+      {
+        q: "Will adding page numbers change my PDF?",
+        a: "Acrobat and PDF24 write the numbers into whichever file you save. In the recording Stella saved a new copy with “- numbered” in the name, and the original was unchanged.",
+      },
+      {
+        q: "Can it also split or combine the PDF?",
+        a: "Yes, in the same chat. You can [split a scanned pile into one PDF per document](/how/pdf-excel/split-pdf-into-multiple-files), or number a merged file after combining. If the result is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email).",
+      },
+    ],
+    related: ["pdf-excel/split-pdf-into-multiple-files", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/redact-pdf"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "PDF24: Add page numbers to a PDF", href: "https://tools.pdf24.org/en/add-page-numbers" },
+      { label: "Microsoft: Insert page numbers in Word", href: "https://support.microsoft.com/en-us/office/insert-page-numbers-9f366518-0500-4b45-903d-987d3827c007" },
+    ],
+  },
+  {
+    slug: "compare-two-excel-files",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "compare two excel sheets",
+      "compare two excel files",
+      "compare two excel sheets and highlight differences",
+      "compare two excel files for differences",
+      "compare two price lists in excel",
+    ],
+    title: "Compare two Excel files for differences, even re-sorted",
+    description:
+      "Find new, removed and changed rows between two Excel files, even when one was re-sorted: XLOOKUP by ID, Spreadsheet Compare, or Stella (stella.sh), checked.",
+    h1: "Compare two Excel sheets and list what changed",
+    short: "Compare two Excel files",
+    lede: "Every new, removed and repriced item in one workbook, with old and new prices.",
+    answer:
+      "Match the rows by an ID column, not by position: if the supplier re-sorted the list, a row-by-row compare flags almost everything. In Excel, add an XLOOKUP that fetches each item's old price by its code, then filter for missing and changed values, and repeat the other way round to catch removed items. Stella (stella.sh) compares both files by item code and builds a new spreadsheet of what changed.",
+    stellaSteps: [
+      "Finds both price lists in Downloads and matches items by their SKU code, so the October list being re-sorted by description doesn't matter",
+      "Builds a new workbook that opens on a Summary tab, with separate tabs for price changes, new items, removed items and other changes",
+      "Shows the March price, October price, change in pounds and change in percent on every repriced row",
+      "Picks out what's worth asking the supplier about: a pack size that doubled at the same price, and two new items with the same name at different prices",
+      "Treats renamed items that kept their code as the same product, and says so",
+    ],
+    prompt:
+      "Our supplier sent a new price list. Compare it with the March one (both are in Downloads) and make me a spreadsheet of what changed: new items, removed items and price changes.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "All 19 differences found in about 2 minutes 50 seconds: 9 price changes, 4 new items, 3 removed, two changed descriptions and one changed pack size. Checked afterwards against an answer key written before the run: nothing missed, no unchanged item listed as changed, the old and new price on every price-change row, and both price lists unchanged.",
+      note: "The two price lists (240 items each) are fictitious, made for this run, and the October one was re-sorted on purpose. The work is sped up 10×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/compare-two-excel-files/proof.mp4`,
+        cuts: webCuts("pdf-excel/compare-two-excel-files"),
+        poster: `${PROOFS}/pdf-excel/compare-two-excel-files/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.6,
+        realDuration: 169,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Two supplier price lists, March and October, are in Downloads." },
+        { at: 2, text: "The prompt: compare them and make a spreadsheet of new items, removed items and price changes." },
+        { at: 13.4, text: "Stella replies: old and new prices side by side, with the % difference, and a short summary at the end." },
+        { at: 19.2, text: "Comparing 240 items by code, sped up 10×." },
+        { at: 31.6, text: "Done: 9 price changes, 4 new items, 3 removed, 225 unchanged, plus three things to ask the supplier about." },
+      ],
+    },
+    manualTitle: "Compare them yourself",
+    manualSteps: [
+      {
+        title: "Put both lists in one workbook",
+        body: "Open both files and copy the old list into the new workbook as a second sheet (right-click its tab, Move or Copy, tick Create a copy). Name the sheets March and October so the formulas below read clearly.",
+      },
+      {
+        title: "Look up each item's old price",
+        body: "On the October sheet, in a new column E, enter `=XLOOKUP(A2, March!A:A, March!D:D, \"new\")`, where column A holds the item code and D the price, and fill it down. Items that weren't in March show “new”. In column F, `=IF(E2=\"new\", \"new\", IF(D2<>E2, \"changed\", \"\"))` labels each row.",
+      },
+      {
+        title: "Do it the other way round for removed items",
+        body: "On the March sheet, the same XLOOKUP pointed at October's codes returns your fallback text, say “removed”, for anything dropped from the new list. Filter both sheets on these columns and copy the results to a new sheet.",
+      },
+      {
+        title: "Or use Spreadsheet Compare (Windows)",
+        body: "With Microsoft 365 Apps for enterprise or Office Professional Plus, open Spreadsheet Compare from the Start menu and choose Compare Files. It compares cell by cell, so sort both files by item code first or every row after the first difference shows as changed.",
+      },
+      {
+        title: "Highlight instead of list",
+        body: "To see differences in place, select the October prices, choose Conditional Formatting, New Rule, Use a formula, and enter `=D2<>XLOOKUP(A2, March!A:A, March!D:D, D2)` with a fill colour. It only works when both sheets share an ID column.",
+      },
+    ],
+    limits: [
+      "Stella matched on the SKU column. If your files have no unique ID, it has to match on names or several columns together; ask it to say which columns it used.",
+      "It compared values, not formatting, formulas or comments. Ask separately if a colour or a formula change matters to you.",
+      "Recorded on Linux with no Excel installed. The result is an ordinary .xlsx with several tabs, which opens in Excel, Numbers or Google Sheets.",
+      "The rows of both lists go to the AI model you use in Stella while it compares them. For commercially sensitive price lists, choose your model accordingly.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does comparing two sheets show everything as different?",
+        a: "The rows aren't in the same order, so row 5 in one file is a different item from row 5 in the other. Compare by an ID column with XLOOKUP, or sort both by that ID first.",
+      },
+      {
+        q: "Is there a built-in way to compare two Excel files?",
+        a: "Spreadsheet Compare comes only with Microsoft 365 Apps for enterprise and Office Professional Plus on Windows. Home and Business plans and Excel for Mac don't include it, so the XLOOKUP route is the usual one.",
+      },
+      {
+        q: "Does XLOOKUP work in my version of Excel?",
+        a: "It's in Microsoft 365 and Excel 2021 or later on Windows and Mac, and in Google Sheets. In older Excel use `=VLOOKUP(A2, March!A:D, 4, FALSE)`, which shows #N/A for new items.",
+      },
+      {
+        q: "Can it combine the files instead?",
+        a: "To stack many files into one sheet, see [combine Excel files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet). To turn each row into a letter, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word).",
+      },
+    ],
+    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/receipts-to-spreadsheet", "documents/mail-merge-excel-to-word"],
+    lastChecked: "2026-11-13",
+    sources: [
+      {
+        label: "Microsoft: Compare two versions of a workbook by using Spreadsheet Compare",
+        href: "https://support.microsoft.com/en-us/office/compare-two-versions-of-a-workbook-by-using-spreadsheet-compare-0e1627fd-ce14-4c33-9ab1-8ea82c6a5a7e",
+      },
+      { label: "Microsoft: XLOOKUP function", href: "https://support.microsoft.com/en-us/office/xlookup-function-b7fd680e-6d10-43e6-84f9-88eae8bf5929" },
+      { label: "Exceldemy: Compare two Excel sheets and highlight differences", href: "https://www.exceldemy.com/compare-two-excel-sheets-and-highlight-differences/" },
     ],
   },
 ];

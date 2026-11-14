@@ -62,9 +62,9 @@ const copyRuntimeDirectory = (directory, extension) => {
 };
 
 try {
-  if (manifest.version !== "1.2.15") {
+  if (manifest.version !== "1.2.16") {
     throw new Error(
-      `Expected extension version 1.2.15, found ${manifest.version}.`,
+      `Expected extension version 1.2.16, found ${manifest.version}.`,
     );
   }
   for (const file of rootFiles) {

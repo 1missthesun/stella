@@ -28,9 +28,9 @@ export const NICHES: Niche[] = [
     h1: "Get your space back, safely.",
     title: "PC cleanup: free up disk space and tidy folders",
     description:
-      "Sort a messy Downloads folder, find true duplicates and clear space safely on Windows or Mac, by hand or with Stella (stella.sh), told not to delete anything without asking.",
+      "Sort a messy Downloads folder, find what's taking up space, delete empty folders and clear duplicates on Windows or Mac, by hand or with Stella (stella.sh).",
     intro:
-      "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and the Stella (stella.sh) way, with a prompt that tells it to ask before deleting anything.",
+      "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and the Stella (stella.sh) way, and says exactly what Stella deleted in the recorded run and what it left for you to decide.",
   },
   {
     slug: "photos-files",
@@ -41,6 +41,16 @@ export const NICHES: Niche[] = [
       "Convert HEIC to JPG, resize photos in bulk, remove their location, find duplicates, sort by date taken and rename PDFs, with free tools or Stella (stella.sh).",
     intro:
       "Big batches of photos and documents are where hand-sorting stops being practical. Each guide shows the free manual route, and Stella (stella.sh) doing it on your own computer instead of a converter website.",
+  },
+  {
+    slug: "files-folders",
+    name: "Files and folders",
+    h1: "Files and folders, opened and tidied.",
+    title: "Files and folders: open RAR and 7z, unzip, rename, search",
+    description:
+      "Open RAR and 7z files, unzip many zips at once, rename files in bulk, search inside documents and split folders for email, with free tools or Stella (stella.sh).",
+    intro:
+      "Archives that won't open, hundreds of files with the wrong names, a document you know mentions someone but can't find. Each guide gives the free route on Windows and Mac, and shows Stella (stella.sh) doing it on a real folder.",
   },
   {
     slug: "pdf-excel",
@@ -71,6 +81,26 @@ export const NICHES: Niche[] = [
       "Fix MP3s that show Unknown Artist, add album art, convert FLAC to MP3 for the car and turn voice memos into text, with free tools or Stella (stella.sh).",
     intro:
       "Music and recordings go wrong in batches: a whole album with no tags, a format the car won't play, memos you'd rather read than replay. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files.",
+  },
+  {
+    slug: "contacts-calendar-email",
+    name: "Contacts, calendars and email",
+    h1: "Contacts, calendars and email, converted.",
+    title: "Contacts, calendar and email files: VCF, CSV, ICS, EML",
+    description:
+      "Convert contacts between CSV and VCF, merge duplicate contacts, turn a calendar into a spreadsheet and saved emails into one PDF, with free tools or Stella (stella.sh).",
+    intro:
+      "Moving contacts to a new phone or getting a calendar into a spreadsheet means odd file formats and garbled names. Each guide gives the free route, usually through Google or Outlook, and Stella (stella.sh) doing it on your own computer instead of an upload site.",
+  },
+  {
+    slug: "study",
+    name: "Study",
+    h1: "Study materials, made from what you have.",
+    title: "Study how-tos: Anki cards, printable flashcards, Kindle highlights",
+    description:
+      "Turn notes into Anki flashcards, print double-sided flashcards that line up and export Kindle highlights into one file per book, by hand or with Stella (stella.sh).",
+    intro:
+      "Making study material is mostly copying: terms into cards, highlights into notes. Each guide gives the manual way, and Stella (stella.sh) doing it from your own files on a real computer.",
   },
   {
     slug: "local-ai",

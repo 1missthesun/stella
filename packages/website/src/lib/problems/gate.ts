@@ -22,7 +22,8 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Copy rules from the brief, enforced so they hold at a few hundred pages. */
 const BANNED: { pattern: RegExp; why: string }[] = [
-  { pattern: /\bagents?\b/i, why: "say “tasks”, not “agents”" },
+  // “letting agent” and “estate agent” are trades, not the product.
+  { pattern: /(?<!\b(?:letting|estate) )\bagents?\b/i, why: "say “tasks”, not “agents”" },
   { pattern: /\brahul\b/i, why: "no personal names" },
   { pattern: /\b(flights?|restaurants?)\b/i, why: "demo tasks are never flights or restaurants" },
   { pattern: /free forever|actually free|try stella/i, why: "banned price wording" },

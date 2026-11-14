@@ -117,7 +117,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/fix-google-takeout-photo-dates", "pdf-excel/bank-statement-pdf-to-excel"],
+    related: ["photos-files/find-duplicate-photos", "pc-cleanup/find-large-files-taking-up-space", "pdf-excel/bank-statement-pdf-to-excel"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -125,6 +125,219 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         href: "https://support.microsoft.com/en-us/windows/manage-drive-space-with-storage-sense-654f6ada-7bfc-45e5-966b-e24aded96ad5",
       },
       { label: "Apple: Organize files in folders on Mac", href: "https://support.apple.com/guide/mac-help/organize-files-in-folders-mh26885/mac" },
+    ],
+  },
+  {
+    slug: "delete-empty-folders",
+    niche: "pc-cleanup",
+    searchPhrases: [
+      "delete empty folders",
+      "remove empty folders windows 11",
+      "delete empty folders mac",
+      "find and delete empty folders",
+    ],
+    title: "Delete empty folders in one go, including nested ones",
+    description:
+      "Delete every empty folder, including ones that only hold other empty folders, without touching anything with a file in it: Terminal, PowerShell or Stella (stella.sh).",
+    h1: "Delete all empty folders at once",
+    short: "Delete empty folders",
+    lede: "28 empty folders gone from Documents, every file left where it was.",
+    answer:
+      "On a Mac, `find ~/Documents -type d -empty -delete` in Terminal removes empty folders from the bottom up, so a folder that held only empty folders goes too. On Windows, a one-line PowerShell command does the same, or a free tool such as Remove Empty Directories. The catch: a folder holding only a hidden `.DS_Store` or `Thumbs.db` isn't empty to these tools. Stella (stella.sh) clears every empty folder level by level and leaves any folder with a file in it.",
+    stellaSteps: [
+      "Scans every folder in Documents, hidden files included",
+      "Deletes folders with nothing in them, like the old “New folder (2)” leftovers, and then the parents they leave empty, such as `Work/Old/Archive`",
+      "Keeps every folder with a file in it, including one whose only file is an empty `placeholder.txt`",
+      "Leaves four folders whose only contents are hidden system files (`.DS_Store`, `Thumbs.db`), because the prompt said not to touch anything with files, and offers to remove them",
+      "Reports how many folders went and that all 31 files are where they were",
+    ],
+    prompt:
+      "My Documents folder is full of empty folders left over from years of moving things around. Delete all the empty ones, but don't touch anything that has files in it.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "28 empty folders deleted in under 30 seconds. Checked afterwards against an answer key written before the run: all 28 are gone, including those that only held other empty folders, all 33 folders with files are still there, and no file was deleted or changed. One optional check missed: the four folders holding only hidden system files were kept. Stella said why and offered to remove them.",
+      note: "The Documents folder is a test folder made for this run. The run isn't sped up.",
+      video: {
+        src: `${PROOFS}/pc-cleanup/delete-empty-folders/proof.mp4`,
+        cuts: webCuts("pc-cleanup/delete-empty-folders"),
+        poster: `${PROOFS}/pc-cleanup/delete-empty-folders/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.8,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Documents is full of empty leftover folders." },
+        { at: 2.1, text: "The prompt: delete the empty ones, but don't touch anything with files in it." },
+        { at: 12.9, text: "Stella replies: no files moved or deleted, folders holding only empty folders removed too, Documents itself kept." },
+        { at: 28.9, text: "Done: 28 empty folders deleted, all 31 files in place, four folders with only hidden system files left for you to decide." },
+      ],
+    },
+    manualTitle: "Delete them yourself",
+    manualSteps: [
+      {
+        title: "Mac: list them first",
+        body: "Open Terminal and run `find ~/Documents -type d -empty -print`. Read the list to be sure nothing you want is on it.",
+      },
+      {
+        title: "Mac: delete them",
+        body: "Run `find ~/Documents -type d -empty -delete`. It works from the deepest level up, so a folder that only contained empty folders is removed too. They're deleted outright, not moved to the Trash.",
+      },
+      {
+        title: "Mac: folders with only .DS_Store",
+        body: "Finder leaves hidden `.DS_Store` files that make a folder look non-empty to `find`. To clear those too, first run `find ~/Documents -name .DS_Store -delete` (Finder recreates them as needed), then the delete command again.",
+      },
+      {
+        title: "Windows: PowerShell",
+        body: "Open PowerShell and run `Get-ChildItem $HOME\\Documents -Directory -Recurse | Sort-Object { $_.FullName.Length } -Descending | Where-Object { -not (Get-ChildItem $_.FullName -Force) } | Remove-Item`. Add `-WhatIf` at the end first to see what would go.",
+      },
+      {
+        title: "Windows: a free tool",
+        body: "Remove Empty Directories and similar free tools show a list of empty folders before deleting, and can treat `Thumbs.db` and `desktop.ini` as junk. Check the list before you click delete.",
+      },
+    ],
+    limits: [
+      "Stella counts any file as a file, hidden system files included, unless you say they're junk. Here it kept four folders holding only `.DS_Store` or `Thumbs.db` and asked; add “ignore .DS_Store and Thumbs.db” to the prompt to clear those too.",
+      "Empty folders are deleted outright, not moved to the Trash or Recycle Bin. There was nothing in them, but say so if you'd rather they went to the Trash.",
+      "Folder names are seen by the AI model you use in Stella. The work happens on your computer.",
+      "Cloud-synced folders (OneDrive, iCloud Drive, Dropbox) may bring placeholders back.",
+      "Recorded on Linux. On a Mac Stella can use the same built-in tools; on Windows it uses PowerShell, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Is it safe to delete empty folders?",
+        a: "In your own Documents, Desktop or Pictures, yes. Don't clear empty folders inside program folders, game folders or system locations: some apps expect them and recreate errors if they're missing.",
+      },
+      {
+        q: "Why does a folder look empty but won't count as empty?",
+        a: "It holds a hidden file, usually `.DS_Store` from a Mac or `Thumbs.db` and `desktop.ini` from Windows. Show hidden files (Cmd-Shift-. on a Mac; View, Show, Hidden items on Windows) to see them.",
+      },
+      {
+        q: "Where do all these empty folders come from?",
+        a: "Moving files out of folders, unzipping, and apps that create folders they never use. Flattening a folder tree leaves many: see [move files from subfolders into one folder](/how/files-folders/move-files-from-subfolders-into-one-folder).",
+      },
+      {
+        q: "What else frees up space?",
+        a: "Empty folders take almost no space. For real gains, [find the large files taking up space](/how/pc-cleanup/find-large-files-taking-up-space) and [sort out the Downloads folder](/how/pc-cleanup/organize-downloads-folder).",
+      },
+    ],
+    related: ["pc-cleanup/find-large-files-taking-up-space", "files-folders/move-files-from-subfolders-into-one-folder", "pc-cleanup/organize-downloads-folder"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Microsoft Learn: Remove-Item", href: "https://learn.microsoft.com/powershell/module/microsoft.powershell.management/remove-item" },
+      { label: "GNU findutils manual: -empty and -delete", href: "https://www.gnu.org/software/findutils/manual/html_mono/find.html" },
+    ],
+  },
+  {
+    slug: "find-large-files-taking-up-space",
+    niche: "pc-cleanup",
+    searchPhrases: [
+      "what is taking up space on my pc",
+      "find large files windows 11",
+      "find large files on mac",
+      "disk space analyzer",
+      "folder size",
+    ],
+    title: "Find the large files and folders taking up space",
+    description:
+      "See which files and folders take the most space, biggest first, without a cleaner app: Storage settings, WinDirStat, Terminal, or Stella (stella.sh) saving you a list.",
+    h1: "Find what's taking up space on your computer",
+    short: "Find large files taking up space",
+    lede: "A saved report of the biggest files and folders, with nothing deleted.",
+    answer:
+      "Windows: Settings, System, Storage, Cleanup recommendations, Large or unused files; for a folder-by-folder map, the free WinDirStat or WizTree. Mac: System Settings, General, Storage, then the info button next to Documents for Large Files. Both list single files, so a folder of thousands of small files (an old phone backup) can hide. Stella (stella.sh) measures files and folders, saves a report of the biggest, and deletes nothing unless you ask.",
+    stellaSteps: [
+      "Scans your home folder, hidden folders included, and measures every file and folder",
+      "Finds the biggest single files (videos, backups, archives, audio) and folders full of small files, like an old phone backup of 1,200 photos",
+      "Checks the whole disk too, and says when your own folders aren't what's filling it",
+      "Saves `Disk space report.html` on the Desktop: folders by size, what's usually safe to clear, and the biggest personal files with sizes",
+      "Deletes nothing, and offers a read-only scan of the whole drive",
+    ],
+    prompt:
+      "My computer keeps saying it's running out of space. Find what's taking up the most room in my user folders and save me a list of the biggest files and folders on my Desktop. Don't delete anything.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A report in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: the report names all 10 large files hidden around the folders and the Old phone backup folder (the biggest folder, made of 1,200 small files), shows sizes, and nothing was deleted or changed. One optional check missed: the report opens with folder totals and cleanup tips that mention some downloads, so the single biggest file isn't the first file it names. Its list of big personal files is biggest first.",
+      note: "The test home folder sat on a shared test computer, so the disk totals in Stella's answer (1.3 TB used) and a 1.5 GB set of programming tools are that computer's, not part of the test files. The search is sped up 5×.",
+      video: {
+        src: `${PROOFS}/pc-cleanup/find-large-files-taking-up-space/proof.mp4`,
+        cuts: webCuts("pc-cleanup/find-large-files-taking-up-space"),
+        poster: `${PROOFS}/pc-cleanup/find-large-files-taking-up-space/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.3,
+        realDuration: 106,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer, with large files spread over the user folders." },
+        { at: 2, text: "The prompt: find what's taking the most room, save a list on the Desktop, delete nothing." },
+        { at: 11.3, text: "Stella replies: it will scan the home folder, hidden caches included, and point out what's usually safe to clear." },
+        { at: 17.2, text: "Measuring files and folders, sped up 5×." },
+        { at: 29.3, text: "Done: the report on the Desktop, the biggest folders and files listed, nothing deleted, and an offer to scan the whole drive." },
+      ],
+    },
+    manualTitle: "Find them yourself",
+    manualSteps: [
+      {
+        title: "Windows: Cleanup recommendations",
+        body: "Open Settings, System, Storage, Cleanup recommendations, and expand Large or unused files. It lists big files with their sizes; tick only what you're sure about.",
+      },
+      {
+        title: "Windows: see folders too",
+        body: "Storage settings shows categories, not a ranked list of folders. The free WinDirStat or WizTree scans a drive and shows every folder by size, so a folder of thousands of small files stands out.",
+      },
+      {
+        title: "Mac: Storage settings",
+        body: "Apple menu, System Settings, General, Storage. Click the info button next to Documents and open Large Files to see the biggest first.",
+      },
+      {
+        title: "Mac: folder sizes in Terminal",
+        body: "Large Files lists files only. For folders, open Terminal and run `du -sh ~/* ~/*/* 2>/dev/null | sort -h | tail -20` to see the 20 biggest folders in your home folder.",
+      },
+      {
+        title: "Decide what goes",
+        body: "Copy old videos and backups to an external drive before deleting them. Installers and zips you've already extracted can usually go straight away.",
+      },
+    ],
+    limits: [
+      "Stella scanned your user folders, as asked; system files, apps and other users' folders aren't covered unless you ask for the whole drive.",
+      "It suggests what's usually safe to clear but deletes nothing until you say which.",
+      "File and folder names and sizes go to the AI model you use in Stella. The scan itself runs on your computer.",
+      "Recorded on Linux. On a Mac or Windows PC Stella uses their own tools to measure folders, which wasn't recorded, and the system folders worth checking differ.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why is my disk full when my folders look small?",
+        a: "The space may be outside your folders: system files, updates, restore points, app caches or other users. Stella said exactly that in the recording and offered a read-only scan of the whole drive.",
+      },
+      {
+        q: "Are disk cleaner apps worth it?",
+        a: "Most aren't needed. The built-in Storage settings plus a free size map like WinDirStat show the same thing, and you decide what goes.",
+      },
+      {
+        q: "How do I find duplicate files taking space?",
+        a: "See [find duplicate photos](/how/photos-files/find-duplicate-photos), which compares contents rather than names, and [organize the Downloads folder](/how/pc-cleanup/organize-downloads-folder).",
+      },
+      {
+        q: "Can it shrink big files instead of deleting them?",
+        a: "Often. [Compress a video](/how/video/compress-video-for-discord) or [compress a PDF](/how/pdf-excel/compress-pdf-too-large-to-email), keeping the originals until you've checked the copies.",
+      },
+    ],
+    related: ["pc-cleanup/organize-downloads-folder", "pc-cleanup/delete-empty-folders", "photos-files/find-duplicate-photos"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Change Storage settings on Mac", href: "https://support.apple.com/guide/mac-help/mchl3d437fbc/mac" },
+      { label: "Microsoft: Free up drive space in Windows", href: "https://support.microsoft.com/help/17421" },
+      { label: "Pureinfotech: Cleanup recommendations on Windows 11", href: "https://pureinfotech.com/free-up-space-cleanup-recommendations-windows-11/" },
     ],
   },
   {

@@ -1,11 +1,14 @@
 import type { ProblemPage } from "../types";
 import { AUDIO_PAGES } from "./audio";
+import { CONTACTS_CALENDAR_EMAIL_PAGES } from "./contacts-calendar-email";
 import { DOCUMENT_PAGES } from "./documents";
+import { FILES_FOLDERS_PAGES } from "./files-folders";
 import { GAME_MOD_PAGES } from "./game-mods";
 import { LOCAL_AI_PAGES } from "./local-ai";
 import { PC_CLEANUP_PAGES } from "./pc-cleanup";
 import { PDF_EXCEL_PAGES } from "./pdf-excel";
 import { PHOTOS_FILES_PAGES } from "./photos-files";
+import { STUDY_PAGES } from "./study";
 import { VIDEO_PAGES } from "./video";
 
 /** Every problem page, drafts included, one file per niche. A new niche's file goes here. */
@@ -18,4 +21,7 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...DOCUMENT_PAGES,
   ...AUDIO_PAGES,
   ...LOCAL_AI_PAGES,
+  ...FILES_FOLDERS_PAGES,
+  ...CONTACTS_CALENDAR_EMAIL_PAGES,
+  ...STUDY_PAGES,
 ];

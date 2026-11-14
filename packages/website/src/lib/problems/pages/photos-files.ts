@@ -260,7 +260,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "renamer.ai is built for renaming and has a desktop app with watched folders. Stella has no per-file limit beyond your plan's usage and runs on your own computer; it's free with the ChatGPT or Claude plan you already have, and it does the next job too.",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pc-cleanup/organize-downloads-folder", "pdf-excel/split-pdf-into-multiple-files"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pc-cleanup/organize-downloads-folder", "files-folders/rename-multiple-files-at-once"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Microsoft: Extract text from PDF (Power Automate Desktop)", href: "https://learn.microsoft.com/en-us/power-automate/desktop-flows/actions-reference/pdf" },

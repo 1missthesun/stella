@@ -1230,7 +1230,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Anything you'd do with a PDF: [add page numbers](/how/pdf-excel/add-page-numbers-to-pdf) in a different style, or [split it into parts](/how/pdf-excel/split-pdf-into-multiple-files) to print a chapter at a time.",
       },
     ],
-    related: ["pdf-excel/add-page-numbers-to-pdf", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/convert-mobi-to-epub"],
+    related: ["pdf-excel/add-page-numbers-to-pdf", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/convert-mobi-to-epub", "reading-writing/convert-pdf-to-epub"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Calibre: E-book conversion", href: "https://manual.calibre-ebook.com/conversion.html" },
@@ -1443,7 +1443,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes: choose PDF as the output in Calibre, or ask Stella. See [convert EPUB to PDF](/how/pdf-excel/convert-epub-to-pdf) for the settings that matter.",
       },
     ],
-    related: ["pdf-excel/convert-epub-to-pdf", "pdf-excel/extract-images-from-pdf", "pdf-excel/convert-pdf-to-jpg"],
+    related: ["pdf-excel/convert-epub-to-pdf", "pdf-excel/extract-images-from-pdf", "pdf-excel/convert-pdf-to-jpg", "reading-writing/convert-pdf-to-epub", "reading-writing/merge-epub-files"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Calibre download", href: "https://calibre-ebook.com/download" },

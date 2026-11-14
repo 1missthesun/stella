@@ -1177,7 +1177,7 @@ export const AUDIO_PAGES: ProblemPage[] = [
         a: "Yes: see [slow down a song without changing pitch](/how/audio/slow-down-song-without-changing-pitch). To sing without the original vocal, see [make a karaoke version of a song](/how/audio/make-karaoke-version-of-song).",
       },
     ],
-    related: ["audio/slow-down-song-without-changing-pitch", "audio/make-karaoke-version-of-song", "audio/convert-midi-to-mp3"],
+    related: ["audio/slow-down-song-without-changing-pitch", "audio/make-karaoke-version-of-song", "audio/convert-midi-to-mp3", "hobbies/transpose-chords"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Audacity manual: Change Pitch", href: "https://manual.audacityteam.org/man/change_pitch.html" },

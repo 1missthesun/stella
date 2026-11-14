@@ -216,7 +216,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes. Save the merged document as a PDF from Word (File, Save As, PDF), or ask Stella for a PDF alongside the .docx. If you only have a PDF and need to edit it, [convert the PDF to Word](/how/documents/convert-pdf-to-word) first.",
       },
     ],
-    related: ["documents/find-and-replace-in-multiple-word-documents", "documents/convert-word-documents-to-pdf-in-bulk", "documents/make-a-cookbook-from-your-recipes", "documents/convert-pdf-to-word", "documents/compare-two-word-documents", "documents/accept-tracked-changes-in-word"],
+    related: ["documents/find-and-replace-in-multiple-word-documents", "documents/convert-word-documents-to-pdf-in-bulk", "documents/make-a-cookbook-from-your-recipes", "documents/convert-pdf-to-word", "documents/compare-two-word-documents", "documents/accept-tracked-changes-in-word", "reading-writing/convert-markdown-to-word"],
     lastChecked: "2026-11-13",
     sources: [{ label: "Microsoft: Insert a document in Word", href: "https://support.microsoft.com/en-us/word/insert-a-document-in-word" }],
   },
@@ -864,7 +864,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes, ask for a .docx as well. To join several Word files yourself, see [merge Word documents](/how/documents/merge-word-documents).",
       },
     ],
-    related: ["documents/merge-word-documents", "documents/convert-word-documents-to-pdf-in-bulk", "pdf-excel/convert-mobi-to-epub"],
+    related: ["documents/merge-word-documents", "documents/convert-word-documents-to-pdf-in-bulk", "pdf-excel/convert-mobi-to-epub", "hobbies/scale-a-recipe"],
     lastChecked: "2026-11-14",
     sources: [
       {

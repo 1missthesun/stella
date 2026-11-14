@@ -526,7 +526,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Yes. See [install Sodium and Iris on 1.21](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) for shaders and performance mods, or [give Minecraft more RAM](/how/game-mods/allocate-more-ram-to-minecraft) if a modpack runs out of memory.",
       },
     ],
-    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/allocate-more-ram-to-minecraft", "game-mods/minecraft-modpack-exit-code-1", "game-mods/install-minecraft-shaders"],
+    related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "game-mods/allocate-more-ram-to-minecraft", "game-mods/minecraft-modpack-exit-code-1", "game-mods/install-minecraft-shaders", "game-mods/install-minecraft-datapacks"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Minecraft Wiki: Tutorial: Loading a resource pack", href: "https://minecraft.wiki/w/Tutorial:Loading_a_resource_pack" },
@@ -1065,7 +1065,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "If you have one, yes. If not, the game keeps its own backup of the world's settings file, which fixes most crashes after a power cut: see [fix a corrupted Minecraft world](/how/game-mods/fix-corrupted-minecraft-world).",
       },
     ],
-    related: ["game-mods/fix-corrupted-minecraft-world", "game-mods/install-minecraft-map", "game-mods/turn-on-cheats-in-minecraft-world"],
+    related: ["game-mods/fix-corrupted-minecraft-world", "game-mods/install-minecraft-map", "game-mods/turn-on-cheats-in-minecraft-world", "game-mods/find-all-minecraft-screenshots"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Minecraft Wiki: .minecraft folder (saves)", href: "https://minecraft.wiki/w/.minecraft" },
@@ -1287,6 +1287,207 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       { label: "Minecraft Wiki: Java Edition level format", href: "https://minecraft.wiki/w/Java_Edition_level_format" },
       { label: "Minecraft Wiki: Commands", href: "https://minecraft.wiki/w/Commands" },
       { label: "NBTExplorer on GitHub", href: "https://github.com/jaquadro/NBTExplorer" },
+    ],
+  },
+  {
+    slug: "install-minecraft-datapacks",
+    niche: "game-mods",
+    searchPhrases: ["how to install minecraft datapacks", "minecraft datapacks", "how to install datapacks", "how to add datapacks to existing world", "minecraft datapack not working"],
+    title: "Install Minecraft datapacks in an existing world (and fix them)",
+    description:
+      "Add datapacks to a Minecraft Java world, and fix the downloads that won't load: wrapper folders, zips of zips, wrong versions. By hand, or Stella (stella.sh) does it.",
+    h1: "How to install Minecraft datapacks in an existing world",
+    short: "Install Minecraft datapacks",
+    lede: "Four datapacks installed in a 1.21.4 world, the broken downloads fixed, one turned away.",
+    answer:
+      "Quit Minecraft, open the world's folder (saves, then the world name) and drop each datapack's .zip into its `datapacks` folder. A pack only loads if `pack.mcmeta` and the `data` folder sit at the top of the zip and its pack format matches your game version, so check inside each download first. Stella (stella.sh) opens every download, fixes wrapped and bundled packs, installs the ones that will work and tells you which won't.",
+    stellaSteps: [
+      "Finds the world Maple Hollow in the Minecraft saves folder and seven downloads in Downloads",
+      "Opens each one and reads its `pack.mcmeta`: 1.21.4 needs pack format 61, and Sky Islands Generator is format 6, made for 1.16.5, so it's left out",
+      "Finds the problems: Treecapitator's files sit inside an extra folder, Glow Ores is a zip holding a datapack and a resource pack, Graves Plus was downloaded twice (identical), Mob Heads is already unzipped, and one file is a holiday photo",
+      "Installs Graves Plus once, Treecapitator from inside its wrapper, Mob Heads as a folder and the Glow Ores datapack, all into Maple Hollow's `datapacks` folder next to the existing Coordinates HUD",
+      "Puts the Glow Ores resource pack in `resourcepacks` and tells you to switch it on in Options, Resource Packs; the other world and the downloads are left as they were",
+    ],
+    prompt:
+      "I downloaded some datapacks into my Downloads for my Minecraft world Maple Hollow (Java 1.21.4). Install the ones that will work in that world and tell me which ones won't.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Four datapacks installed in under a minute and a half. Checked afterwards against an answer key written before the run, at file level: Graves Plus, Treecapitator, Mob Heads and the Glow Ores datapack each present exactly once in Maple Hollow's datapacks folder as a valid pack, Coordinates HUD still there, the 1.16.5 pack not installed, no wrapped folders, zips of zips or resource packs in datapacks, the Glow Ores resource pack in resourcepacks, the world's level.dat and region files unchanged, and the other world untouched.",
+      note: "File-level check only: no Minecraft account was used and the game was never launched, so the packs weren't seen loading in game. The world and packs are stand-ins made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/game-mods/install-minecraft-datapacks/proof.mp4`,
+        cuts: webCuts("game-mods/install-minecraft-datapacks"),
+        poster: `${PROOFS}/game-mods/install-minecraft-datapacks/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.1,
+        speed: 3,
+        realDuration: 84,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Datapack downloads are in Downloads, and the world Maple Hollow is in the saves folder." },
+        { at: 2.1, text: "The prompt: install the ones that will work in Maple Hollow (Java 1.21.4) and say which won't." },
+        { at: 14.2, text: "Stella replies it will check each pack against 1.21.4." },
+        { at: 20, text: "Checking and installing, sped up 3×." },
+        { at: 31.1, text: "Done: four installed, Sky Islands turned away as a 1.16.5 pack, the wrapper and the bundle fixed, the duplicate installed once." },
+      ],
+    },
+    manualTitle: "Install them yourself",
+    manualSteps: [
+      {
+        title: "Open the world's datapacks folder",
+        body: "Quit Minecraft. Open `%APPDATA%\\.minecraft\\saves\\<world>\\datapacks` on Windows (Win+R and paste it), `~/Library/Application Support/minecraft/saves/<world>/datapacks` on a Mac, or `~/.minecraft/saves/<world>/datapacks` on Linux. Launchers like Prism or Modrinth keep saves inside each instance's folder instead.",
+      },
+      {
+        title: "Look inside each download",
+        body: "Open the zip. You should see `pack.mcmeta` and a `data` folder straight away. If you see one folder instead, unzip it and zip the contents of that inner folder again (or copy the inner folder in as it is: folders work too).",
+      },
+      {
+        title: "Split bundles",
+        body: "Some downloads hold two zips: a datapack and a resource pack. Put the datapack zip in `datapacks` and the resource pack in `.minecraft/resourcepacks`, then switch it on in Options, Resource Packs.",
+      },
+      {
+        title: "Check the version",
+        body: "Open `pack.mcmeta` in a text editor and look at `pack_format`: 1.21.4 uses 61. A pack built for a much older version usually won't work even if you change the number; get the release made for your version.",
+      },
+      {
+        title: "Load the world and check",
+        body: "Start the world (with cheats on, or as a server operator) and run `/datapack list`. Your packs should be under enabled. If one's missing, run `/reload` and look for an error in the chat.",
+      },
+    ],
+    limits: [
+      "Checked in the files only: the test computer had no copy of Minecraft, so the world wasn't opened and `/datapack list` wasn't run.",
+      "Stella checks a pack's structure and version, not whether its own commands are bug-free.",
+      "A pack made for a much older version can't be fixed by changing its number; Stella says so and leaves it out.",
+      "Java Edition only. Bedrock add-ons (.mcaddon, .mcpack) install differently and weren't covered.",
+      "Recorded on Linux, where the game folder is ~/.minecraft. On a Mac or Windows PC the folder is in the place listed above; nothing needs installing.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why is my datapack not working?",
+        a: "Usually the zip has an extra folder inside, so `pack.mcmeta` isn't at the top; or it's made for another game version; or it's in another world's folder. A zip containing other zips also won't load.",
+      },
+      {
+        q: "Can I add datapacks to an existing world?",
+        a: "Yes. Drop them in that world's `datapacks` folder and reload. Packs that change world generation only affect chunks generated after they're added.",
+      },
+      {
+        q: "Are datapacks mods?",
+        a: "No. Datapacks use the game's own commands and data files and need no mod loader. For Fabric or Forge mods, see [install Minecraft mods](/how/game-mods/install-minecraft-mods).",
+      },
+      {
+        q: "Should I back up the world first?",
+        a: "It's a good idea before adding packs that change terrain or mobs. See [back up Minecraft worlds](/how/game-mods/back-up-minecraft-worlds).",
+      },
+    ],
+    related: ["game-mods/install-minecraft-resource-pack", "game-mods/back-up-minecraft-worlds", "game-mods/install-minecraft-mods", "game-mods/turn-on-cheats-in-minecraft-world"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Minecraft Wiki: Data pack", href: "https://minecraft.wiki/w/Data_pack" },
+      { label: "Minecraft Wiki: Pack format", href: "https://minecraft.wiki/w/Pack_format" },
+    ],
+  },
+  {
+    slug: "find-all-minecraft-screenshots",
+    niche: "game-mods",
+    searchPhrases: ["minecraft screenshots folder", "where are minecraft screenshots saved", "minecraft screenshots location", "find minecraft screenshots", "prism launcher screenshots folder"],
+    title: "Where Minecraft screenshots are saved, from every launcher",
+    description:
+      "Find Minecraft screenshots in the game folder and in Prism, Modrinth or CurseForge instances, and gather them in one folder, oldest first: by hand, or Stella (stella.sh).",
+    h1: "Where are Minecraft screenshots saved? Find them all",
+    short: "Find all Minecraft screenshots",
+    lede: "13 screenshots from three launchers copied into one folder, oldest first, none lost.",
+    answer:
+      "Screenshots taken with F2 go in the `screenshots` folder of the game folder: `%APPDATA%\\.minecraft\\screenshots` on Windows, `~/Library/Application Support/minecraft/screenshots` on a Mac, `~/.minecraft/screenshots` on Linux. Launchers like Prism, Modrinth and CurseForge give each instance its own folder with its own screenshots. Stella (stella.sh) finds all of them, copies them into one folder and keeps both when two have the same name.",
+    stellaSteps: [
+      "Searches the home folder and any connected drives for Minecraft game folders",
+      "Finds screenshots in three places: 6 in the regular `.minecraft`, 4 in a Prism Launcher instance and 3 in a Modrinth App profile, and skips world icons, launcher icons and texture files",
+      "Notices two different pictures named `2026-01-10_20.15.33.png` and keeps both, adding the launcher name to tell them apart",
+      "Copies all 13 into a new `Minecraft Screenshots` folder in Pictures, named by date so they sort oldest first, with file dates set to match",
+      "Leaves every original where it was",
+    ],
+    prompt:
+      "Find all my Minecraft screenshots and put copies in one folder in my Pictures, oldest first. I've played with a few different launchers.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "13 screenshots gathered in about a minute and a half. Checked afterwards against an answer key written before the run: every one of the 13 screenshots from .minecraft, Prism and Modrinth copied into one folder in Pictures, both same-named screenshots kept, no world icons or textures copied, name order oldest first, and the originals left in the game folders.",
+      note: "Checked in the files only; no game was launched. The screenshots are pictures drawn for this run and placed in each launcher's real folder layout. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/game-mods/find-all-minecraft-screenshots/proof.mp4`,
+        cuts: webCuts("game-mods/find-all-minecraft-screenshots"),
+        poster: `${PROOFS}/game-mods/find-all-minecraft-screenshots/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44,
+        speed: 4,
+        realDuration: 99,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer, with Minecraft screenshots spread across three launchers' folders." },
+        { at: 2, text: "The prompt: copy every screenshot into one folder in Pictures, oldest first." },
+        { at: 11.2, text: "Stella replies it will search every launcher's folders and name the copies by date." },
+        { at: 17, text: "Searching and copying, sped up 4×." },
+        { at: 30, text: "Done: 13 screenshots from three launchers, oldest first, and both same-named pictures kept." },
+      ],
+    },
+    manualTitle: "Gather them yourself",
+    manualSteps: [
+      {
+        title: "Open the main screenshots folder",
+        body: "On Windows press Win+R and type `%APPDATA%\\.minecraft\\screenshots`. On a Mac, in Finder choose Go, Go to Folder and type `~/Library/Application Support/minecraft/screenshots`. In game, Options, Resource Packs, Open Pack Folder opens the game folder too; screenshots is next to resourcepacks.",
+      },
+      {
+        title: "Check each launcher",
+        body: "In Prism Launcher, right-click an instance and choose Folder, then open `minecraft/screenshots`. In the Modrinth App or CurseForge, open the profile and choose Open folder; each has a `screenshots` folder. Repeat for every instance you've played.",
+      },
+      {
+        title: "Copy into one folder",
+        body: "Make a folder in Pictures and copy each screenshots folder's contents in. When asked about a file that already exists, choose Keep Both (Mac) or keep both files (Windows), because the same name can be a different picture.",
+      },
+      {
+        title: "Sort oldest first",
+        body: "Minecraft names screenshots by date and time (`2025-06-02_19.04.11.png`), so sorting by name puts them oldest first. Copies renamed with “(1)” or “2” still sort close to their date.",
+      },
+    ],
+    limits: [
+      "Stella finds screenshots saved on this computer. Ones only shared to Discord, Xbox or a cloud service aren't on the disk.",
+      "Bedrock Edition and console screenshots are stored differently and weren't covered.",
+      "Only file names and folder paths go to the AI model you use in Stella; it doesn't need to look at the pictures.",
+      "Recorded on Linux. On a Mac or Windows PC the game and launcher folders are in the places listed above; nothing needs installing.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Where does Minecraft save screenshots?",
+        a: "In the `screenshots` folder inside the game folder: `%APPDATA%\\.minecraft` on Windows, `~/Library/Application Support/minecraft` on a Mac and `~/.minecraft` on Linux. Launcher instances each have their own.",
+      },
+      {
+        q: "I pressed F2 but there's no screenshot.",
+        a: "On some laptops F2 needs the Fn key. Look in the instance you were actually playing; with a third-party launcher the picture is in that instance's folder, not the main one.",
+      },
+      {
+        q: "Can it move them instead of copying?",
+        a: "Yes, if you ask. Copying is safer: the launcher's folders stay as they were.",
+      },
+      {
+        q: "Can it back up my worlds too?",
+        a: "Yes: see [back up Minecraft worlds](/how/game-mods/back-up-minecraft-worlds). For other photo sorting, see [separate screenshots from photos](/how/photos-files/separate-screenshots-from-photos).",
+      },
+    ],
+    related: ["game-mods/back-up-minecraft-worlds", "photos-files/separate-screenshots-from-photos", "photos-files/sort-photos-into-folders-by-date", "game-mods/install-minecraft-datapacks"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Minecraft Wiki: Screenshot", href: "https://minecraft.wiki/w/Screenshot" },
+      { label: "Prism Launcher wiki", href: "https://prismlauncher.org/wiki/" },
     ],
   },
 ];

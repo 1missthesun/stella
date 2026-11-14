@@ -178,9 +178,9 @@ export const NICHES: Niche[] = [
     slug: "study",
     name: "Study",
     h1: "Study materials, made from what you have.",
-    title: "Study how-tos: Anki cards, printable flashcards, Kindle highlights",
+    title: "Study how-tos: flashcards, study guides, puzzles, timetables",
     description:
-      "Turn notes into Anki flashcards, print double-sided flashcards that line up and export Kindle highlights into one file per book, by hand or with Stella (stella.sh).",
+      "Turn notes into Anki cards or a study guide, print flashcards, word searches and crosswords, build a class timetable from your files, by hand or with Stella (stella.sh).",
     intro:
       "Making study material is mostly copying: terms into cards, highlights into notes. Each guide gives the manual way, and Stella (stella.sh) doing it from your own files on a real computer.",
   },
@@ -203,6 +203,26 @@ export const NICHES: Niche[] = [
       "Count RSVPs when guests replied twice, make a seating chart and place cards from your guest list, and number raffle tickets, in Excel or with Stella (stella.sh).",
     intro:
       "Event planning runs on one spreadsheet that never quite agrees with itself. Each guide shows the Excel or Word way, and Stella (stella.sh) turning a real guest list or form export into the headcount and the printables.",
+  },
+  {
+    slug: "reading-writing",
+    name: "Reading and writing",
+    h1: "Books, comics and writing in the format you need.",
+    title: "Reading and writing: ebooks, comics, Markdown and manuscripts",
+    description:
+      "Convert PDF and Word to EPUB, merge ebooks, turn comics into PDFs, Markdown notes into Word or PDF, and format a manuscript, with free tools or Stella (stella.sh).",
+    intro:
+      "Ebooks for your e-reader, comics for your tablet, notes and manuscripts in the format someone asked for. Each guide gives the free route, usually Calibre, pandoc or Word, and shows Stella (stella.sh) doing it on a real file on your own computer.",
+  },
+  {
+    slug: "hobbies",
+    name: "Hobbies",
+    h1: "Hobby files, rewritten or ready to print.",
+    title: "Hobby how-tos: transpose chords, scale recipes, family trees",
+    description:
+      "Transpose a folder of chord sheets, scale recipes for a crowd and print a family tree chart from a GEDCOM file, by hand or with Stella (stella.sh) on your computer.",
+    intro:
+      "Chord sheets, recipes and family records are small jobs that are easy to get slightly wrong by hand. Each guide gives the manual way, and shows Stella (stella.sh) doing it on real files, with what it changed and what it left alone.",
   },
   {
     slug: "local-ai",

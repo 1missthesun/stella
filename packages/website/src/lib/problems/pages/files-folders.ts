@@ -523,7 +523,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         a: "See [open a 7z file, even in parts](/how/files-folders/open-7z-file) and [extract many zips at once](/how/files-folders/extract-multiple-zip-files-at-once).",
       },
     ],
-    related: ["files-folders/open-7z-file", "files-folders/extract-multiple-zip-files-at-once", "files-folders/zip-file-too-large-to-email"],
+    related: ["files-folders/open-7z-file", "files-folders/extract-multiple-zip-files-at-once", "files-folders/zip-file-too-large-to-email", "reading-writing/convert-cbr-to-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Pureinfotech: How to extract Zip, TAR, 7z and RAR files on Windows 11", href: "https://pureinfotech.com/extract-zip-rar-7z-tar-windows-11/" },

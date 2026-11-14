@@ -9,6 +9,8 @@ import { LOCAL_AI_PAGES } from "./local-ai";
 import { MONEY_HOUSEHOLD_PAGES } from "./money-household";
 import { PC_CLEANUP_PAGES } from "./pc-cleanup";
 import { PDF_EXCEL_PAGES } from "./pdf-excel";
+import { READING_WRITING_PAGES } from "./reading-writing";
+import { HOBBIES_PAGES } from "./hobbies";
 import { PHOTOS_FILES_PAGES } from "./photos-files";
 import { PRINTING_LABELS_PAGES } from "./printing-labels";
 import { STUDY_PAGES } from "./study";
@@ -32,4 +34,6 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...WEDDINGS_EVENTS_PAGES,
   ...MONEY_HOUSEHOLD_PAGES,
   ...CHATS_DATA_EXPORTS_PAGES,
+  ...READING_WRITING_PAGES,
+  ...HOBBIES_PAGES,
 ];

@@ -8,6 +8,7 @@ on:
     branches: [master]
     paths:
       - "packages/stella-browser/cli/**"
+      - "packages/stella-browser/extension/lib/snapshot.js"
       - "packages/stella-browser/package.json"
       - "packages/stella-browser/scripts/**"
       - ".github/workflows/build-stella-browser.yml"

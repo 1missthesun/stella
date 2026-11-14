@@ -118,7 +118,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. Transcribe in the spoken language, translate the .srt (Stella can translate it and keep the timings), then burn in the translated file the same way.",
       },
     ],
-    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder"],
+    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "audio/transcribe-voice-memos-to-text"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Whisper on GitHub", href: "https://github.com/openai/whisper" },
@@ -594,13 +594,121 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. One of the test clips was HEVC at 60 fps and joined fine. Older Windows PCs may need the HEVC extension to play the originals, but the joined file is H.264, which plays almost anywhere.",
       },
     ],
-    related: ["video/compress-video-for-discord", "video/cut-silences-from-video", "video/convert-mkv-to-mp4"],
+    related: ["video/compress-video-for-discord", "video/cut-silences-from-video", "video/convert-mkv-to-mp4", "video/make-slideshow-with-music"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Add a movie or clip to another in QuickTime Player", href: "https://support.apple.com/guide/quicktime-player/qtp00386594f/mac" },
       { label: "Apple: iMovie User Guide", href: "https://support.apple.com/guide/imovie/welcome/mac" },
       { label: "Clipchamp: How to combine videos", href: "https://clipchamp.com/en/resources/how-to-combine-videos/" },
       { label: "FFmpeg wiki: Concatenate", href: "https://trac.ffmpeg.org/wiki/Concatenate" },
+    ],
+  },
+  {
+    slug: "make-slideshow-with-music",
+    niche: "video",
+    searchPhrases: [
+      "how to make a slideshow with music",
+      "make a slideshow with music",
+      "slideshow with music on mac",
+      "photo slideshow video with my own song",
+      "make a slideshow video from photos",
+    ],
+    title: "Make a slideshow with music from your photos (Mac, Windows)",
+    description:
+      "Turn a folder of photos and your own song into a slideshow video with set time per photo: Photos, iMovie, Clipchamp, or Stella (stella.sh), no watermark or sign-up.",
+    h1: "How to make a slideshow with music from your own photos",
+    short: "Make a slideshow with music",
+    lede: "20 trip photos and a song as an 80-second MP4, 4 seconds a photo, nothing stretched.",
+    answer:
+      "On a Mac, the Photos app makes a slideshow project from selected photos; you pick a song and a time per slide, then export it. iMovie and Windows' Clipchamp do the same on a timeline with more control. Online makers often add a watermark or want an account. Stella (stella.sh) puts your photos in order with your song, at the time per photo you ask for, and saves an MP4.",
+    stellaSteps: [
+      "Finds the Lake trip photos (20, four of them portrait) and the song in Downloads",
+      "Shows each photo for 4 seconds in the order they were saved, making an 80-second video",
+      "Fits portrait photos into the frame the right way up instead of stretching them",
+      "Lays the song under the whole video, cutting it at 80 seconds with a fade-out, since the song is 100 seconds long",
+      "Saves an MP4 in your Videos folder, leaves the photos and song unchanged, and offers to stretch it to about 5 seconds a photo so the whole song plays",
+    ],
+    prompt: "Make a slideshow video of my Lake trip photos with the song in my Downloads, about 4 seconds per photo.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "An 80-second H.264 MP4 in about 2 minutes 40 seconds. Checked afterwards against an answer key written before the run: all 20 photos appear in order, each on screen for at least 3 seconds, the portrait photos aren't stretched, the music plays for the whole video, it plays without errors, and the photos and song are unchanged.",
+      note: "The photos are drawn lake scenes and the song an instrumental synthesised for this run. Stella saved the video in Videos, the Linux equivalent of the Mac's Movies folder; our check looked there after the run, with the answer key unchanged. The work is sped up 10×.",
+      video: {
+        src: `${PROOFS}/video/make-slideshow-with-music/proof.mp4`,
+        cuts: webCuts("video/make-slideshow-with-music"),
+        poster: `${PROOFS}/video/make-slideshow-with-music/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.9,
+        realDuration: 162,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 20 Lake trip photos are in Pictures and a song is in Downloads." },
+        { at: 2, text: "The prompt: a slideshow video with the song, about 4 seconds per photo." },
+        { at: 14, text: "Stella replies that it's finding the photos and song and putting them together." },
+        { at: 19.8, text: "Building the slideshow, sped up 10×." },
+        { at: 31.9, text: "Done: 80 seconds, 20 photos at 4 seconds each, the song fading out at the end, with the video right there in the chat." },
+      ],
+    },
+    manualTitle: "Make it yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Photos",
+        body: "Select the photos in the Photos app, then File, Create, Slideshow, Photos, and name it. In the slideshow project, click the Music button to choose a song from your Music library, and the Duration button to set a custom time per slide. File, Export, Export Slideshow saves a video.",
+      },
+      {
+        title: "On a Mac with more control: iMovie",
+        body: "Create a new Movie, import the photos and drag them to the timeline in order. Select them all and set the clip duration (for example 4 seconds) in the clip inspector, drag the song under them, then File, Share, File.",
+      },
+      {
+        title: "On Windows: Clipchamp",
+        body: "Open Clipchamp (built into Windows 11), create a video, import the photos and the song, and drag the photos onto the timeline. Set each photo's length, drag the song onto the audio track below, trim it to the end of the last photo, and export at 1080p.",
+      },
+      {
+        title: "Match the music to the photos",
+        body: "Photos times song length is the trick: 20 photos at 4 seconds is 80 seconds, so a 100-second song gets cut. Either fade the music out at the end or set about 5 seconds a photo so the whole song plays.",
+      },
+      {
+        title: "Mind portrait photos",
+        body: "Mixed portrait and landscape photos either get black bars or are cropped to fill the frame. Both are fine; stretching is not. Check one portrait photo in the preview before exporting.",
+      },
+    ],
+    limits: [
+      "It made a plain slideshow with cuts between photos. Pan-and-zoom effects, titles and transitions weren't asked for; describe them in the prompt if you want them.",
+      "It used the photos' saved order. If they're out of order, say “in the order they were taken” or name the order.",
+      "Use music you're allowed to share if you post the video online; platforms may mute or remove videos with copyrighted songs.",
+      "Recorded on Linux, where ffmpeg was already installed. On a Mac or Windows PC Stella would download it first, which wasn't recorded. It saved to Videos here; on a Mac that's Movies.",
+      "File names and details go to the AI model you use in Stella; the photos and song are put together on your computer.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I use my own song in a Photos slideshow on Mac?",
+        a: "Yes, if the song is in your Music library: the slideshow's Music button lists it. Songs that are only in Downloads need adding to Music first. Stella uses any audio file directly.",
+      },
+      {
+        q: "How long should each photo be on screen?",
+        a: "3 to 5 seconds suits most slideshows. Shorter feels rushed, longer drags. Work backwards from the song: its length divided by the number of photos.",
+      },
+      {
+        q: "Will it put a watermark on the video?",
+        a: "No. Photos, iMovie, Clipchamp's free tier at 1080p, and Stella make videos without a watermark. Many online slideshow makers add one unless you pay.",
+      },
+      {
+        q: "Can it join video clips into the slideshow too?",
+        a: "Yes, in the same chat. For clips on their own, see [combine videos into one](/how/video/combine-videos-into-one); to send the result, [compress it for Discord](/how/video/compress-video-for-discord).",
+      },
+    ],
+    related: ["video/combine-videos-into-one", "video/compress-video-for-discord", "photos-files/resize-images-in-bulk"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Create slideshows in Photos on Mac", href: "https://support.apple.com/guide/photos/phtae8c6d40/mac" },
+      { label: "Apple: iMovie User Guide", href: "https://support.apple.com/guide/imovie/welcome/mac" },
+      { label: "Clipchamp: How to make a slideshow", href: "https://clipchamp.com/en/resources/how-to-make-a-slideshow/" },
     ],
   },
 ];

@@ -102,7 +102,7 @@ export const AUDIO_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat. If the album is FLAC and your car won't play it, see [convert FLAC to MP3](/how/audio/convert-flac-to-mp3), which keeps the tags and art.",
       },
     ],
-    related: ["audio/convert-flac-to-mp3", "pc-cleanup/organize-downloads-folder"],
+    related: ["audio/convert-flac-to-mp3", "pc-cleanup/organize-downloads-folder", "audio/transcribe-voice-memos-to-text"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Change song and CD info in Music on Mac", href: "https://support.apple.com/guide/music/mus1c6803257/mac" },
@@ -215,6 +215,116 @@ export const AUDIO_PAGES: ProblemPage[] = [
       { label: "fre:ac", href: "https://www.freac.org/" },
       { label: "XLD (X Lossless Decoder)", href: "https://tmkk.undo.jp/xld/index_e.html" },
       { label: "ffmpeg documentation", href: "https://ffmpeg.org/ffmpeg.html" },
+    ],
+  },
+  {
+    slug: "transcribe-voice-memos-to-text",
+    niche: "audio",
+    searchPhrases: [
+      "transcribe voice memos to text",
+      "transcribe audio to text",
+      "transcribe audio to text free",
+      "transcribe voice memos",
+      "transcribe audio on my computer without uploading",
+    ],
+    title: "Transcribe voice memos to text, free and on your computer",
+    description:
+      "Turn voice memos into readable text without uploading them: Voice Memos' transcripts, Word's Transcribe, or Stella (stella.sh) with a free local speech tool.",
+    h1: "Transcribe voice memos to text",
+    short: "Transcribe voice memos to text",
+    lede: "Four voice memos as readable text, word for word, without the audio leaving the computer.",
+    answer:
+      "On a Mac with macOS 15 or an iPhone with iOS 18, Voice Memos shows a transcript for each memo that you can copy out, one at a time. Microsoft Word for the web can transcribe uploaded recordings with Microsoft 365. Online services like Otter work but upload the audio and cap free minutes. Stella (stella.sh) transcribed a folder of memos with a free speech tool it installed on the computer, so the audio wasn't sent to a transcription service.",
+    stellaSteps: [
+      "Finds the four voice memos in Downloads, including a two-minute lecture",
+      "On the free plan, installs a free speech-recognition tool that runs on the computer itself (about 2 GB) instead of a paid transcription service",
+      "Writes one text file per memo, named after it, in a new Voice memo transcripts folder",
+      "Makes one page with every transcript and a one-line summary of each at the top, and lists what each memo says in the chat",
+      "Says that names and place names are best guesses, and offers to keep the speech tool for next time or delete it",
+    ],
+    prompt: "Turn the voice memos in my Downloads into text I can read.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Four transcripts in about 3 minutes 50 seconds, including installing the speech tool. Checked afterwards against the scripts the memos were recorded from: three transcripts word for word (0% word error rate) and the fourth at 3.6%, with every key name and fact present, and the recordings unchanged.",
+      note: "The memos were voiced from scripts written for this run, with a light room tone; the people and places are fictitious. Our check script needed a fix to run on Linux and was re-scored after the run, with the answer key unchanged. The work is sped up 15×.",
+      video: {
+        src: `${PROOFS}/audio/transcribe-voice-memos-to-text/proof.mp4`,
+        cuts: webCuts("audio/transcribe-voice-memos-to-text"),
+        poster: `${PROOFS}/audio/transcribe-voice-memos-to-text/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 50.6,
+        realDuration: 230,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Four voice memos are in Downloads." },
+        { at: 2, text: "The prompt: turn the voice memos into text I can read." },
+        { at: 18, text: "Stella replies that the transcription will run on this computer, free but slower, with one transcript per memo plus a combined one." },
+        { at: 23.8, text: "Installing a local speech tool and transcribing four memos, sped up 15×." },
+        { at: 36.6, text: "Done: all four memos as text, a summary of what each says, and a note that name spellings are best guesses." },
+      ],
+    },
+    manualTitle: "Transcribe them yourself",
+    manualSteps: [
+      {
+        title: "Mac or iPhone: Voice Memos",
+        body: "On macOS 15 or iOS 18 and later, open a memo in Voice Memos and click or tap the transcript button (a speech bubble) to see the text. Select it and copy it into Notes or a document. It works one memo at a time, in English and a few other languages.",
+      },
+      {
+        title: "Windows or the web: Word's Transcribe",
+        body: "With Microsoft 365, open Word for the web, choose Home, Dictate, Transcribe, then Upload audio. It returns a transcript with speakers marked that you can add to the document. The audio goes to Microsoft, and there's a monthly limit on uploaded minutes.",
+      },
+      {
+        title: "Free and local: Whisper",
+        body: "OpenAI's open-source Whisper model runs on your own computer through free apps and tools (whisper.cpp, faster-whisper, or desktop apps built on them). The bigger models are more accurate but download a gigabyte or more and run slowly without a good graphics card.",
+      },
+      {
+        title: "Online services",
+        body: "Otter, TurboScribe and similar sites are quick and add speaker labels, but they upload your recordings and cap the free minutes. Fine for a public lecture; think twice for private notes.",
+      },
+      {
+        title: "Fix the names",
+        body: "Speech recognition guesses at names, places and jargon. Skim each transcript for capitalised words and correct them; most tools let you add a vocabulary list or prompt to get them right next time.",
+      },
+    ],
+    limits: [
+      "Names and unusual words are best guesses. Stella said so; tell it the right spellings and it can correct them.",
+      "The free local tool is slower than a hosted service and takes about 2 GB of disk space. Stella offered to delete it afterwards.",
+      "The audio stayed on the computer, but the finished transcripts go to the AI model you use in Stella when it summarises them. Ask for transcripts only if you'd rather it didn't read them.",
+      "The test memos were clear speech with light background noise. Noisy rooms, several people talking at once or strong accents will be less accurate. Labelling who is speaking wasn't part of this test.",
+      "Recorded on Linux. On a Mac or Windows PC Stella installs a similar local tool, which wasn't recorded.",
+    ],
+    costNote:
+      "Yes. In the recording the account was on Stella's free plan, so Stella installed a free speech tool on the computer and nothing was paid; it's just slower. Stella's own built-in transcription isn't part of the free plan.",
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I transcribe voice memos for free?",
+        a: "Yes. Voice Memos on macOS 15 and iOS 18 shows transcripts for free, one memo at a time. Whisper-based tools run free on your computer, and Stella used one for a whole folder.",
+      },
+      {
+        q: "Does my audio get uploaded?",
+        a: "Not in the recording: the speech tool ran on the computer. Word's Transcribe and online services do upload it. The text Stella then summarised does go to the AI model you use in Stella.",
+      },
+      {
+        q: "How accurate is it?",
+        a: "On these clear test memos, three came out word for word and the fourth at 96% of words right. Expect more mistakes on phone calls, noisy rooms and crosstalk.",
+      },
+      {
+        q: "Can I transcribe a video or a long lecture?",
+        a: "Yes, the same way; longer audio just takes longer locally. To put the words on a video as captions, see [burn subtitles into a video](/how/video/burn-subtitles-into-video-for-tiktok). For music files, see [edit MP3 tags in bulk](/how/audio/edit-mp3-tags-in-bulk).",
+      },
+    ],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "audio/edit-mp3-tags-in-bulk", "local-ai/run-ai-offline-on-your-computer"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: View a transcript in Voice Memos on Mac", href: "https://support.apple.com/guide/voice-memos/vm4a03609f0d/mac" },
+      { label: "Microsoft: Transcribe your recordings", href: "https://support.microsoft.com/en-us/office/transcribe-your-recordings-7fc2efec-245e-45f0-b053-2a97531ecf57" },
+      { label: "OpenAI Whisper on GitHub", href: "https://github.com/openai/whisper" },
     ],
   },
 ];

@@ -231,7 +231,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat. It can [rename PDFs by what's in them](/how/photos-files/rename-pdf-files-based-on-content), merge several into one, or pull the numbers out of [bank statements into Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/split-pdf-into-multiple-files"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Apple: Reduce the size of a PDF in Preview", href: "https://support.apple.com/guide/preview/reduce-the-size-of-a-pdf-prvw1509/mac" },
@@ -905,7 +905,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat. You can [split a scanned pile into one PDF per document](/how/pdf-excel/split-pdf-into-multiple-files), or number a merged file after combining. If the result is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email).",
       },
     ],
-    related: ["pdf-excel/split-pdf-into-multiple-files", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/redact-pdf"],
+    related: ["pdf-excel/split-pdf-into-multiple-files", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/redact-pdf", "pdf-excel/convert-epub-to-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "PDF24: Add page numbers to a PDF", href: "https://tools.pdf24.org/en/add-page-numbers" },
@@ -1021,6 +1021,220 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       { label: "Microsoft: XLOOKUP function", href: "https://support.microsoft.com/en-us/office/xlookup-function-b7fd680e-6d10-43e6-84f9-88eae8bf5929" },
       { label: "Exceldemy: Compare two Excel sheets and highlight differences", href: "https://www.exceldemy.com/compare-two-excel-sheets-and-highlight-differences/" },
+    ],
+  },
+  {
+    slug: "make-scanned-pdf-searchable",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "make scanned pdf searchable",
+      "ocr pdf",
+      "make pdf searchable free",
+      "scanned pdf to text",
+      "ocr pdf mac",
+    ],
+    title: "Make a scanned PDF searchable (free OCR, no upload)",
+    description:
+      "Ctrl+F finds nothing in a scanned PDF? Add a text layer with OCR: OCRmyPDF, PDF24, Acrobat, or Stella (stella.sh) on your own computer, the scan kept as it was.",
+    h1: "Make a scanned PDF searchable",
+    short: "Make a scanned PDF searchable",
+    lede: "A 6-page scanned lease you can search, looking exactly like the scan.",
+    answer:
+      "A scan is a picture of text, so search finds nothing until OCR (text recognition) adds an invisible text layer. Free routes: OCRmyPDF from the command line on any system, or PDF24 Creator's OCR tool on Windows; Acrobat's Scan & OCR does it if you pay. Preview on a Mac can't. Stella (stella.sh) runs OCR on your computer, saves a searchable copy next to the scan and checks that searches work.",
+    stellaSteps: [
+      "Finds the scanned lease in Downloads: 6 pages of page images with no text in them",
+      "Installs OCRmyPDF, a free text-recognition tool, and runs it on a copy, not the original",
+      "Keeps each page looking exactly like the scan, with the recognised text laid invisibly underneath so you can search and select it",
+      "Checks the result by searching for the names, the address and the dates",
+      "Warns you about a catch it found: the rent is written only in words, so searching “14,200” won't find it",
+    ],
+    prompt: "The scanned lease in my Downloads isn't searchable. I can't find anything in it with Ctrl+F. Can you make it searchable?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A searchable copy of the 6-page lease in about 1 minute 40 seconds. Checked afterwards against an answer key written before the run: every page has a text layer, all 15 key phrases can be found by search, the pages look identical to the scan, the page count is the same and the file (2.6 MB) is no more than three times the original's size.",
+      note: "The lease is fictitious, scanned for this run as greyscale page images with slight skew, blur and noise. The prompt says Ctrl+F because it ran on Linux. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/make-scanned-pdf-searchable/proof.mp4`,
+        cuts: webCuts("pdf-excel/make-scanned-pdf-searchable"),
+        poster: `${PROOFS}/pdf-excel/make-scanned-pdf-searchable/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.1,
+        realDuration: 101,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 6-page scanned lease with no text layer is in Downloads." },
+        { at: 2, text: "The prompt: I can't find anything in it with Ctrl+F. Can you make it searchable?" },
+        { at: 15.2, text: "Stella replies: it'll run text recognition and save a searchable copy next to the original." },
+        { at: 21, text: "Installing an OCR tool and reading six pages, sped up 4×." },
+        { at: 33, text: "Done: a searchable copy that looks the same as the scan, and a warning that the rent is only written in words." },
+      ],
+    },
+    manualTitle: "Run OCR yourself",
+    manualSteps: [
+      {
+        title: "Check whether it really is a scan",
+        body: "Open the PDF and try to select a line of text. If you can't, or the whole page highlights as one block, it's a picture. A PDF you can select but still can't search may use an odd font encoding; OCR fixes that too.",
+      },
+      {
+        title: "Any system: OCRmyPDF",
+        body: "The free [OCRmyPDF](https://ocrmypdf.readthedocs.io) adds a text layer and keeps the page images: `ocrmypdf --language eng scan.pdf searchable.pdf`. Add `--deskew` for crooked pages. On a Mac it usually comes from Homebrew (`brew install ocrmypdf`), on Linux from your package manager.",
+      },
+      {
+        title: "Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator, open its OCR tool, add the PDF, choose the document's language and start. It saves a new searchable PDF and runs on your computer, so the scan isn't uploaded.",
+      },
+      {
+        title: "Mac without Terminal",
+        body: "Preview can't add a text layer. A free PDF app with OCR, such as PDFgear (its OCR to Searchable PDF option), does it in a few clicks. Acrobat (paid) has Scan & OCR, Recognize text, In this file.",
+      },
+      {
+        title: "Test the result",
+        body: "Search for a name, a date and a number from different pages. OCR misreads small print and smudged figures (1 and 7, 0 and O), so check any amount that matters against the page itself.",
+      },
+    ],
+    limits: [
+      "OCR can misread small print, handwriting and smudged numbers. The test scan was clean enough that every search worked, but check figures that matter on your own documents.",
+      "Handwritten notes and signatures stay as pictures; they aren't turned into text.",
+      "Recorded on Linux, where the Tesseract text-recognition engine was already installed and Stella added OCRmyPDF. A Mac usually has neither, and installing them normally needs Homebrew, so Stella would take a different route there, such as macOS's built-in text recognition; that wasn't recorded.",
+      "Recognition runs on your computer, but the recognised text goes to the AI model you use in Stella when it checks the result. For confidential papers, choose your model accordingly.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why can't I search my scanned PDF?",
+        a: "A scanner or phone app saves each page as a photo. There's no text in the file for search to find until OCR adds a hidden text layer behind the picture.",
+      },
+      {
+        q: "Can Preview make a PDF searchable?",
+        a: "No. Preview can search and copy text that's already in a PDF, but it can't recognise the text in a scan and save it into the file. Use one of the tools above.",
+      },
+      {
+        q: "Is there a free way to OCR a PDF without uploading it?",
+        a: "Yes: OCRmyPDF on any system, PDF24 Creator on Windows, or Stella with the plan you already have. Online OCR sites work, but a lease or medical letter is exactly what you'd rather keep on your computer.",
+      },
+      {
+        q: "Will OCR make the file bigger?",
+        a: "A little: the text layer is small next to the page images. In the recording the copy stayed within three times the original. If it's too big to send, [compress the PDF](/how/pdf-excel/compress-pdf-too-large-to-email); to pull figures into a sheet, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
+      },
+    ],
+    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/redact-pdf"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "OCRmyPDF documentation", href: "https://ocrmypdf.readthedocs.io/en/latest/" },
+      { label: "PDFgear: Make a PDF searchable on Mac", href: "https://www.pdfgear.com/mac-user-guide/make-pdf-searchable.htm" },
+      { label: "PDF24 Creator", href: "https://tools.pdf24.org/en/creator" },
+    ],
+  },
+  {
+    slug: "convert-epub-to-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert epub to pdf",
+      "epub to pdf",
+      "epub to pdf converter",
+      "convert epub to pdf free",
+      "print an epub book",
+    ],
+    title: "Convert EPUB to PDF to print it (free, no upload)",
+    description:
+      "Turn a DRM-free EPUB ebook into a printable PDF with the chapters, cover and pictures kept: Calibre, or Stella (stella.sh) on your own computer, no converter site.",
+    h1: "Convert an EPUB to PDF so you can print it",
+    short: "Convert EPUB to PDF",
+    lede: "A whole ebook as a 19-page printable PDF, with contents, page numbers and pictures.",
+    answer:
+      "The free Calibre app is the usual route: add the book, choose Convert books, set the output format to PDF and pick your paper size. Online converters work too, but upload the book. Apple Books and most ebook apps can't export a PDF. Stella (stella.sh) converts a DRM-free EPUB on your computer, keeps every chapter, the cover and the illustrations, and adds a contents page and page numbers.",
+    stellaSteps: [
+      "Finds the ebook in Downloads and reads its chapters, cover, illustrations and styles",
+      "Lays the book out as printable pages with a contents page and page numbers, using a browser engine already on the computer",
+      "Keeps all 8 chapters, the cover and the map, moving the map to the top of a page instead of splitting it across two",
+      "Saves the PDF next to the ebook, with the same name",
+      "Says the pages are US Letter and offers an A4 copy if your printer uses A4",
+    ],
+    prompt: "Convert the lighthouse ebook in my Downloads to a PDF so I can print it.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 19-page PDF of the whole book in about 2 minutes 15 seconds. Checked afterwards against an answer key written before the run: the text is real, selectable text, all 8 chapter headings are there in order, all 72 paragraphs are present, and the cover and the map are included. It missed one optional check: the PDF has no chapter bookmarks in the sidebar.",
+      note: "The ebook is a short book written for this run by a fictitious author, DRM-free. The work is sped up 7×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-epub-to-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-epub-to-pdf"),
+        poster: `${PROOFS}/pdf-excel/convert-epub-to-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.4,
+        realDuration: 136,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. An EPUB ebook is in Downloads." },
+        { at: 2.1, text: "The prompt: convert it to a PDF so I can print it." },
+        { at: 14.1, text: "Stella replies that it's converting the book and will mention anything that didn't convert cleanly." },
+        { at: 19.8, text: "Laying out and checking the book, sped up 7×." },
+        { at: 32.4, text: "Done: 19 pages with all 8 chapters, the cover, the map, a contents page and page numbers, on US Letter with an A4 copy offered." },
+      ],
+    },
+    manualTitle: "Convert it yourself",
+    manualSteps: [
+      {
+        title: "Install Calibre",
+        body: "Download the free Calibre from calibre-ebook.com (Windows, Mac and Linux) and add the book with Add books. It works on DRM-free EPUBs; books bought from Kindle, Apple Books or Kobo are usually locked to their apps.",
+      },
+      {
+        title: "Convert to PDF",
+        body: "Select the book, click Convert books, and set Output format to PDF in the top right. Under PDF output, choose the paper size (A4 or Letter), and tick the options to add a page-number footer if you want one. Click OK.",
+      },
+      {
+        title: "Find the PDF",
+        body: "When the job finishes, click the book, then the PDF link under Formats on the right, or right-click and Open containing folder. Calibre keeps it in its library folder, not next to the EPUB.",
+      },
+      {
+        title: "Check the layout before printing",
+        body: "Look at a page with a picture and a chapter start. If the margins or font size are off, change them under Convert books, Page setup and Look & feel, and convert again. Print a single page first.",
+      },
+      {
+        title: "Short book? Print from a reader",
+        body: "Some desktop ebook readers can print a chapter at a time, and on a Mac you can choose PDF in the print dialog to save it. It's slower than Calibre for a whole book but needs nothing installed beyond the reader.",
+      },
+    ],
+    limits: [
+      "No chapter bookmarks: the PDF has a contents page and page numbers, but no clickable chapter list in the PDF viewer's sidebar. Ask for bookmarks if you'll read it on screen.",
+      "It made US Letter pages. Ask for A4 if that's your paper; Stella offered to make an A4 copy.",
+      "It only works on DRM-free ebooks. Stella won't remove DRM from books bought on Kindle, Apple Books or Kobo; many shops sell DRM-free EPUBs, and public-domain books are DRM-free.",
+      "Recorded on Linux, where a browser engine was already installed for the layout. On a Mac or Windows PC Stella may need to install a converter first, which wasn't recorded.",
+      "The book's text goes to the AI model you use in Stella while it lays out and checks the pages.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Apple Books save an EPUB as PDF?",
+        a: "No. Apple Books has no export to PDF, and books bought there are protected. For a DRM-free EPUB, use Calibre or Stella.",
+      },
+      {
+        q: "Will the PDF look like the ebook?",
+        a: "Close to it: chapters, headings, italics and pictures carry over, but an EPUB has no fixed pages, so the layout is new. In the recording the map moved to the top of a page rather than being split.",
+      },
+      {
+        q: "Can I convert a Kindle book to PDF?",
+        a: "Only if it's DRM-free, which most Kindle purchases aren't. Stella won't strip DRM. Many authors and shops sell DRM-free EPUBs you can convert.",
+      },
+      {
+        q: "What else can I do with the PDF?",
+        a: "Anything you'd do with a PDF: [add page numbers](/how/pdf-excel/add-page-numbers-to-pdf) in a different style, or [split it into parts](/how/pdf-excel/split-pdf-into-multiple-files) to print a chapter at a time.",
+      },
+    ],
+    related: ["pdf-excel/add-page-numbers-to-pdf", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Calibre: E-book conversion", href: "https://manual.calibre-ebook.com/conversion.html" },
+      { label: "Calibre download", href: "https://calibre-ebook.com/download" },
     ],
   },
 ];

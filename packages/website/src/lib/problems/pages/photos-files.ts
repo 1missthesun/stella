@@ -370,7 +370,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: by year and month from the date taken. If the dates themselves are wrong, as they often are after a Google Photos export, see [fixing Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates).",
       },
     ],
-    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk"],
+    related: ["photos-files/find-duplicate-photos", "photos-files/sort-photos-into-folders-by-date", "photos-files/fix-google-takeout-photo-dates", "photos-files/resize-images-in-bulk", "photos-files/combine-photos-into-one-pdf"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft Store: HEIF Image Extensions", href: "https://apps.microsoft.com/detail/9pmmsr1cgpwg" },
@@ -824,6 +824,112 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       { label: "Apple: Change and view location information in Photos on Mac", href: "https://support.apple.com/guide/photos/phta4e5a733f/mac" },
       { label: "Apple Personal Safety: Manage location metadata in Photos", href: "https://support.apple.com/guide/personal-safety/ips0d7a5df82/web" },
       { label: "ExifTool", href: "https://exiftool.org/" },
+    ],
+  },
+  {
+    slug: "combine-photos-into-one-pdf",
+    niche: "photos-files",
+    searchPhrases: [
+      "combine photos into one pdf",
+      "convert images to pdf",
+      "combine jpg into one pdf",
+      "photos of document pages to pdf",
+      "combine photos into one pdf small enough to email",
+    ],
+    title: "Combine photos into one PDF, in order and small enough to email",
+    description:
+      "Turn phone photos of a document's pages into one PDF in page order, upright and small enough to email: Finder's Create PDF, print to PDF, or Stella (stella.sh).",
+    h1: "Combine photos into one PDF, in page order",
+    short: "Combine photos into one PDF",
+    lede: "12 phone photos of a contract as one 2.5 MB PDF, every page upright and in order.",
+    answer:
+      "On a Mac, select the photos in Finder in page order, right-click and choose Quick Actions, Create PDF. On Windows, select them, right-click, Print, and choose Microsoft Print to PDF. Watch for sideways photos, iPhone HEIC files some tools reject, and a PDF too big to email. Stella (stella.sh) reads the page numbers to get the order right, turns sideways pages upright and makes one small PDF.",
+    stellaSteps: [
+      "Finds the 12 page photos in Downloads, including two iPhone HEIC files mixed in with the JPGs",
+      "Puts them in order by reading the “Page N of 12” printed on each page, rather than trusting the file names, and checks none are missing or repeated",
+      "Turns the two photos that were taken sideways the right way up",
+      "Compresses the pages so the PDF is 2.5 MB while the small print stays readable",
+      "Names the PDF after the document (“Rental Agreement - 12 Orchard Row”), leaves the photos unchanged, and offers to crop and straighten the slightly tilted pages",
+    ],
+    prompt:
+      "I photographed every page of my rental agreement with my phone. The photos are in Downloads. Make them into one PDF, in page order, small enough to email.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "One 12-page PDF of 2.6 MB in about 1 minute 30 seconds. Checked afterwards against an answer key written before the run: page n is photo n with none missing or repeated, every page is upright including the two sideways photos, the file is well under the 20 MB email limit, and the photos are unchanged.",
+      note: "The photos are generated pictures of a fictitious tenancy agreement on a desk, at phone resolution; two are stored sideways and two are HEIC, on purpose. The work is sped up 4×.",
+      video: {
+        src: `${PROOFS}/photos-files/combine-photos-into-one-pdf/proof.mp4`,
+        cuts: webCuts("photos-files/combine-photos-into-one-pdf"),
+        poster: `${PROOFS}/photos-files/combine-photos-into-one-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.3,
+        realDuration: 93,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. 12 phone photos of a rental agreement's pages are in Downloads." },
+        { at: 2.1, text: "The prompt: one PDF, in page order, small enough to email." },
+        { at: 11.3, text: "Stella replies: it'll put the pages in order by reading them and make one compressed PDF that's easy to read." },
+        { at: 17.1, text: "Ordering, rotating and combining the photos, sped up 4×." },
+        { at: 28.4, text: "Done: 12 pages in order, 2.5 MB, two sideways photos turned upright, the photos unchanged." },
+      ],
+    },
+    manualTitle: "Combine them yourself",
+    manualSteps: [
+      {
+        title: "Get the order right first",
+        body: "Rename the photos or sort them so they're in page order: phone file names usually follow the order you took them, but a retaken page lands at the end. Check the page numbers on the paper if there are any.",
+      },
+      {
+        title: "On a Mac: Create PDF in Finder",
+        body: "Select the photos in Finder (click the first, Shift-click the last), right-click and choose Quick Actions, Create PDF. Finder makes one PDF in the same folder and respects the rotation stored in each photo. HEIC files work too.",
+      },
+      {
+        title: "On Windows: print to PDF",
+        body: "Select the photos in File Explorer, right-click and choose Print (under Show more options on Windows 11), pick Microsoft Print to PDF and a full-page layout, and untick Fit picture to frame if edges get cut off. HEIC photos need the HEIF Image Extensions from the Microsoft Store.",
+      },
+      {
+        title: "Shrink it to email",
+        body: "Phone photos make big PDFs, often 30 MB or more. On a Mac, open the PDF in Preview, File, Export, and choose Reduce File Size in Quartz Filter; on Windows, PDF24 Creator's Compress tool works offline. Check the small print afterwards.",
+      },
+      {
+        title: "Scanning next time",
+        body: "The Notes app on iPhone (Scan Documents) and Google Drive on Android scan pages straight into one PDF, cropped and flattened, which saves this whole job.",
+      },
+    ],
+    limits: [
+      "It didn't crop or straighten the pages, so a bit of desk shows at the edges and some pages are slightly tilted. It said so and offered to fix it; ask for it in the prompt if you want a clean scan look.",
+      "Stella read each page to find its page number, so the page images or their text go to the AI model you use in Stella (here Claude). For very private documents, choose your model accordingly.",
+      "Recorded on Linux, where the image tools it needed, including HEIC support, were available. A Mac has the built-in sips tool for HEIC; on Windows Stella may install an image library first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I combine photos into one PDF on iPhone?",
+        a: "Select the photos in the Photos app, tap Share, then Print, and pinch out on the preview to get a PDF you can save to Files. Or scan the pages from the start with Notes, Scan Documents.",
+      },
+      {
+        q: "Why are some pages sideways in my PDF?",
+        a: "Phones often save photos sideways with a tag telling viewers to turn them. Tools that ignore the tag put those pages sideways. Finder's Create PDF and Stella both read it.",
+      },
+      {
+        q: "How small does the PDF need to be for email?",
+        a: "Under about 20 MB to be safe: Gmail allows 25 MB and Outlook suggests 20. For forms and portals with a 2 to 5 MB limit, see [compress a PDF](/how/pdf-excel/compress-pdf-too-large-to-email).",
+      },
+      {
+        q: "Can I make the PDF searchable?",
+        a: "Yes. The pages are photos, so search finds nothing until OCR runs: [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable). If the photos are HEIC and you need JPGs too, [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
+      },
+    ],
+    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/make-scanned-pdf-searchable", "photos-files/convert-heic-to-jpg"],
+    lastChecked: "2026-11-13",
+    sources: [
+      { label: "Apple: Perform quick actions in Finder on Mac", href: "https://support.apple.com/guide/mac-help/mchl97ff9142/mac" },
+      { label: "PDF24 Creator", href: "https://tools.pdf24.org/en/creator" },
     ],
   },
 ];

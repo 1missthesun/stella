@@ -66,11 +66,11 @@ export const NICHES: Niche[] = [
     slug: "audio",
     name: "Audio and music",
     h1: "Music and audio files, fixed in bulk.",
-    title: "Audio how-tos: MP3 tags, album art, FLAC to MP3",
+    title: "Audio how-tos: MP3 tags, FLAC to MP3, voice memos to text",
     description:
-      "Fix MP3s that show Unknown Artist, add album art, and convert FLAC to MP3 for the car, with free tools or Stella (stella.sh) on your own files.",
+      "Fix MP3s that show Unknown Artist, add album art, convert FLAC to MP3 for the car and turn voice memos into text, with free tools or Stella (stella.sh).",
     intro:
-      "Music and recordings go wrong in batches: a whole album with no tags, a format the car won't play. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files.",
+      "Music and recordings go wrong in batches: a whole album with no tags, a format the car won't play, memos you'd rather read than replay. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files.",
   },
   {
     slug: "local-ai",

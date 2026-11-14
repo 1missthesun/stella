@@ -92,7 +92,7 @@ import { fonts } from "../../theme/fonts";
 import type { ChatArtifact, ChatMessage } from "../../types";
 import { UserAskRecordView } from "../UserAskCard";
 import { ReminderFireCard } from "./ReminderFireCard";
-import { ScheduleNotices } from "./ScheduleNotices";
+import { ScheduleNoticeCard } from "./ScheduleNoticeCard";
 
 export type MessageRowStyles = ReturnType<typeof makeMessageRowStyles>;
 
@@ -1151,9 +1151,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           <UserAskRecordView record={record} />
         </View>
       ))}
-      {item.scheduleNotice ? (
-        <ScheduleNotices first={item.scheduleNotice} run={item.scheduleNoticeRun} colors={colors} />
-      ) : null}
+      {item.scheduleNotice ? <ScheduleNoticeCard card={item.scheduleNotice} colors={colors} /> : null}
       {hasText ? (
         <View
           ref={bubbleRef}

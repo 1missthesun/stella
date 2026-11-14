@@ -161,4 +161,9 @@ export type Niche = {
   description: string;
   /** One or two sentences opening the hub. */
   intro: string;
+  /**
+   * Optional headed groups for a large hub, in display order. Each lists page
+   * slugs in this niche; published pages not listed land in a final "More" group.
+   */
+  sections?: { title: string; slugs: string[] }[];
 };

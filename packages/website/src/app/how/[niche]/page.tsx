@@ -14,6 +14,7 @@ import {
   getNiche,
   nichePages,
   nichePath,
+  nicheSections,
   problemPath,
   publishedNiches,
 } from "@/lib/problems";
@@ -92,9 +93,26 @@ export default async function NicheHub({ params }: Params) {
             <HeroCta />
           </header>
 
-          <section className={h.group} aria-label={`${niche.name} guides`}>
-            <GuideGrid pages={pages} />
-          </section>
+          {nicheSections(niche).map((group, i) =>
+            group.title ? (
+              <section
+                key={group.title}
+                className={`${h.group} ${i > 0 ? h.groupTight : ""}`}
+                aria-labelledby={`section-${i}`}
+              >
+                <div className={h.groupHead}>
+                  <h2 id={`section-${i}`} className={h.h2}>
+                    {group.title}
+                  </h2>
+                </div>
+                <GuideGrid pages={group.pages} />
+              </section>
+            ) : (
+              <section key="all" className={h.group} aria-label={`${niche.name} guides`}>
+                <GuideGrid pages={group.pages} />
+              </section>
+            ),
+          )}
 
           {others.length ? (
             <nav className={h.group} aria-labelledby="others-title">

@@ -110,7 +110,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not as of November 2026: PDF import is in Excel for Microsoft 365 on Windows. On a Mac, use your bank's CSV, copy tables out of Preview, or have Stella build the sheet.",
       },
     ],
-    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf", "pdf-excel/find-subscriptions-in-bank-statement"],
+    related: ["pdf-excel/receipts-to-spreadsheet", "pdf-excel/combine-excel-files-into-one-sheet", "pc-cleanup/organize-downloads-folder", "pdf-excel/remove-password-from-pdf", "pdf-excel/find-subscriptions-in-bank-statement", "pdf-excel/extract-table-from-pdf-to-excel"],
     lastChecked: "2026-11-10",
     sources: [
       {
@@ -231,7 +231,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat. It can [rename PDFs by what's in them](/how/photos-files/rename-pdf-files-based-on-content), merge several into one, or pull the numbers out of [bank statements into Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable", "files-folders/zip-file-too-large-to-email"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/make-scanned-pdf-searchable", "files-folders/zip-file-too-large-to-email", "pdf-excel/merge-pdf-files"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Apple: Reduce the size of a PDF in Preview", href: "https://support.apple.com/guide/preview/reduce-the-size-of-a-pdf-prvw1509/mac" },
@@ -349,7 +349,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat, for example totals by store and month on a second sheet. The same approach turns [bank statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/compare-two-excel-files", "pdf-excel/merge-two-spreadsheets-by-matching-column"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/receipts-to-spreadsheet", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/compare-two-excel-files", "pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/split-excel-sheet-into-multiple-files", "pdf-excel/convert-word-table-to-excel"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "Microsoft: Import data from a folder with multiple files (Power Query)", href: "https://support.microsoft.com/en-us/office/import-data-from-a-folder-with-multiple-files-power-query-94b8023c-2e66-4f6b-8c78-6a00041c90e4" },
@@ -581,7 +581,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "It named them in the same step. To rename PDFs you already have by what's in them, see [rename PDF files by content](/how/photos-files/rename-pdf-files-based-on-content). If one is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email) in the same chat.",
       },
     ],
-    related: ["photos-files/rename-pdf-files-based-on-content", "pdf-excel/add-page-numbers-to-pdf", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/reorder-pdf-pages"],
+    related: ["photos-files/rename-pdf-files-based-on-content", "pdf-excel/add-page-numbers-to-pdf", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/reorder-pdf-pages", "pdf-excel/merge-pdf-files", "pdf-excel/extract-pages-from-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
@@ -690,7 +690,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Anything that needs the text: search them, or [turn bank statements into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel). Before sharing one, you can [black out account numbers](/how/pdf-excel/redact-pdf) properly.",
       },
     ],
-    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/redact-pdf", "pdf-excel/split-pdf-into-multiple-files"],
+    related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/redact-pdf", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/merge-pdf-files"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -800,7 +800,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "[Remove the password](/how/pdf-excel/remove-password-from-pdf) first with the one you have, then redact the unlocked copy. Photos have their own privacy leak: [remove the location from photos](/how/photos-files/remove-location-from-photos) before you post them.",
       },
     ],
-    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos"],
+    related: ["pdf-excel/remove-password-from-pdf", "pdf-excel/split-pdf-into-multiple-files", "photos-files/remove-location-from-photos", "pdf-excel/edit-text-in-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Intego: Securely redact text in PDFs with Preview", href: "https://www.intego.com/mac-security-blog/securely-redact-text-in-pdfs-with-apple-preview-on-mac" },
@@ -1122,7 +1122,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "A little: the text layer is small next to the page images. In the recording the copy stayed within three times the original. If it's too big to send, [compress the PDF](/how/pdf-excel/compress-pdf-too-large-to-email); to pull figures into a sheet, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
-    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/redact-pdf", "pdf-excel/rotate-pdf-pages"],
+    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/redact-pdf", "pdf-excel/rotate-pdf-pages", "pdf-excel/extract-text-from-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "OCRmyPDF documentation", href: "https://ocrmypdf.readthedocs.io/en/latest/" },
@@ -1765,7 +1765,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "For one Word letter per person, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word); for invoices grouped by customer, [invoices from a spreadsheet](/how/documents/generate-invoices-from-spreadsheet).",
       },
     ],
-    related: ["documents/mail-merge-excel-to-word", "documents/generate-invoices-from-spreadsheet", "pdf-excel/fix-dates-in-excel"],
+    related: ["documents/mail-merge-excel-to-word", "documents/generate-invoices-from-spreadsheet", "pdf-excel/fix-dates-in-excel", "pdf-excel/add-signature-to-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Fill out and sign PDF forms in Preview", href: "https://support.apple.com/guide/preview/fill-out-and-sign-pdf-forms-prvw35725/mac" },
@@ -1982,7 +1982,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, now that references keep their zeros: see [merge two spreadsheets by a matching column](/how/pdf-excel/merge-two-spreadsheets-by-matching-column).",
       },
     ],
-    related: ["pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/remove-duplicate-rows-in-excel", "pdf-excel/summarize-spreadsheet-by-category"],
+    related: ["pdf-excel/merge-two-spreadsheets-by-matching-column", "pdf-excel/remove-duplicate-rows-in-excel", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/convert-excel-to-csv"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -2304,7 +2304,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes: [split a PDF into multiple files](/how/pdf-excel/split-pdf-into-multiple-files).",
       },
     ],
-    related: ["pdf-excel/rotate-pdf-pages", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/convert-excel-to-pdf-without-cutting-off"],
+    related: ["pdf-excel/rotate-pdf-pages", "pdf-excel/make-scanned-pdf-searchable", "pdf-excel/split-pdf-into-multiple-files", "pdf-excel/convert-excel-to-pdf-without-cutting-off", "pdf-excel/delete-pages-from-pdf", "pdf-excel/split-pdf-pages-in-half"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
@@ -2631,6 +2631,1675 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         href: "https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576",
       },
       { label: "Microsoft: SUMIFS function", href: "https://support.microsoft.com/en-us/office/sumifs-function-c9e748f5-7ea7-455d-9406-611cebce642b" },
+    ],
+  },
+  {
+    slug: "merge-pdf-files",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "merge pdf files",
+      "merge pdf",
+      "combine pdf files into one",
+      "combine pdf files into one free",
+      "merge pdf files in order",
+      "combine pdf and jpg into one pdf",
+    ],
+    title: "Merge PDF files into one, in the order you need (free)",
+    description:
+      "Combine PDFs and photos into one file in the right order with Preview on a Mac or the free PDF24 Creator on Windows, or let Stella (stella.sh) follow a checklist.",
+    h1: "Merge PDF files into one, in the right order",
+    short: "Merge PDF files",
+    lede: "One PDF from a folder of documents and a phone photo, in the order a checklist asks for.",
+    answer:
+      "On a Mac, open the first PDF in Preview, show thumbnails, drag the other files (photos too) into the sidebar in the order you want and export a new PDF. On Windows, the free PDF24 Creator merges files offline: drop them in, drag them into order, save. Stella (stella.sh) does it from a description instead: it reads what each file is, follows a checklist, turns photos into pages and leaves out what doesn't belong.",
+    stellaSteps: [
+      "Reads the lender's checklist in the Mortgage application folder: seven items, in a set order",
+      "Opens every file to see what it is, since names like scan0042.pdf and IMG_4471.jpg don't say: the application form, a phone photo of a driving licence, a council tax bill, four payslips, a P60, three statements and a gift letter",
+      "Leaves out the May 2024 payslip, which isn't one of the last three, and the checklist itself",
+      "Puts the licence photo on its own A4 page, keeps the landscape P60 landscape, and runs payslips and statements oldest to newest",
+      "Saves “Mortgage application - Northgate.pdf” (16 pages) next to the originals, which are unchanged",
+      "Flags two things for you before sending: the council tax bill is just over three months old, and October's payslip and statement may now be due",
+    ],
+    prompt:
+      "I'm applying for a mortgage and the lender wants everything as one PDF. All the documents are in the Mortgage application folder in my Documents, along with their checklist. Combine them into a single PDF in the order the checklist asks for. Only include what's on the checklist.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "One 16-page PDF in about 1½ minutes. Checked afterwards against an answer key written before the run: every document in the checklist's order, the licence photo included as a page, the 2024 payslip left out, payslips and statements in date order, each document's own pages in order, every page there exactly once, and the original files unchanged. Missed one optional point: the PDF has no bookmarks for jumping between documents.",
+      note: "The mortgage application, the lender and every document (including the licence photo) are fictitious, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/merge-pdf-files/proof.mp4`,
+        cuts: webCuts("pdf-excel/merge-pdf-files"),
+        poster: `${PROOFS}/pdf-excel/merge-pdf-files/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43,
+        realDuration: 85,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A mortgage application folder holds 11 PDFs, a phone photo and the lender's checklist." },
+        { at: 1.6, text: "The prompt: combine them into one PDF in the checklist's order, only what the checklist asks for." },
+        { at: 9.6, text: "Stella replies that it's following the checklist and will say if any item has no matching file." },
+        { at: 14, text: "Reading every document and building the PDF, sped up 3×." },
+        { at: 28.5, text: "Done: 16 pages in checklist order, the old payslip left out, and two dates worth checking before sending." },
+      ],
+    },
+    manualTitle: "Merge them yourself",
+    manualSteps: [
+      {
+        title: "Decide the order first",
+        body: "Write the order down before you start, from the checklist or the way the reader will expect it. Put dated documents (payslips, statements) oldest to newest, and check each file is the one you think it is: scanned files often have names like scan0042.pdf.",
+      },
+      {
+        title: "On a Mac: Preview",
+        body: "Open the first PDF in Preview and choose View, Thumbnails. Drag the other PDFs, and any JPG or PNG photos, from Finder into the thumbnail sidebar where you want them, then drag thumbnails to fix the order. Choose File, Export as PDF and give it a new name so the originals stay as they were.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator (it works offline, so your documents aren't uploaded) and open its Merge PDF tool. Drop in the files, photos included, drag them into order and save. Microsoft Edge can open PDFs but can't combine them.",
+      },
+      {
+        title: "Photos of documents",
+        body: "A phone photo of an ID or a receipt goes in as its own page. If it comes out huge or sideways, rotate it before adding, or print it to PDF first (File, Print, Save as PDF on a Mac; Microsoft Print to PDF on Windows).",
+      },
+      {
+        title: "Check the result",
+        body: "Flick through the merged file once: page count, nothing upside down, nothing doubled. If a lender or office has a size limit, see the guide to [compressing a PDF that's too large to email](/how/pdf-excel/compress-pdf-too-large-to-email).",
+      },
+    ],
+    limits: [
+      "Stella follows the checklist or order it's given and says what it left out. If nothing says what belongs, it merges everything and tells you the order it chose.",
+      "This run made a plain PDF with no bookmarks, which was an optional point in the answer key. Ask for bookmarks per document if the reader will want to jump around.",
+      "Password-protected PDFs need the password first: see [remove a password from a PDF](/how/pdf-excel/remove-password-from-pdf).",
+      "Stella reads the documents to know what each one is, so their text (and the photo) goes to the AI model you use in Stella. The merging happens on your computer, and nothing is uploaded to a PDF website.",
+      "Recorded on Linux with free Python PDF tools. On a Mac or Windows PC Stella uses the same kind of tool, installing it if needed.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I merge PDF files for free without uploading them?",
+        a: "Preview on a Mac and the free PDF24 Creator on Windows both merge on your own computer. Online merge sites are convenient but they upload the files, which matters for payslips, statements and ID.",
+      },
+      {
+        q: "Can I combine PDFs and JPG photos into one PDF?",
+        a: "Yes. Preview and PDF24 both accept images and make each one a page. For a whole set of photos, see [combine photos into one PDF](/how/photos-files/combine-photos-into-one-pdf).",
+      },
+      {
+        q: "How do I get the pages in the right order?",
+        a: "Drag the thumbnails before saving. If pages are already merged in the wrong order, [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages) covers fixing it afterwards.",
+      },
+      {
+        q: "The merged PDF is too big to send. What now?",
+        a: "Compress it: [make a PDF small enough to email](/how/pdf-excel/compress-pdf-too-large-to-email). To go the other way and break one PDF up, [split a PDF into multiple files](/how/pdf-excel/split-pdf-into-multiple-files).",
+      },
+    ],
+    related: [
+      "pdf-excel/split-pdf-into-multiple-files",
+      "pdf-excel/reorder-pdf-pages",
+      "pdf-excel/compress-pdf-too-large-to-email",
+      "photos-files/combine-photos-into-one-pdf",
+      "pdf-excel/delete-pages-from-pdf",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Combine PDFs in Preview on Mac", href: "https://support.apple.com/guide/preview/prvw43696/mac" },
+      { label: "PDF24: merge PDF (also in the free offline PDF24 Creator)", href: "https://tools.pdf24.org/en/merge-pdf" },
+    ],
+  },
+  {
+    slug: "delete-pages-from-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "delete pages from pdf",
+      "remove pages from pdf",
+      "delete pages from pdf free",
+      "delete pages from pdf mac",
+      "remove pages from multiple pdf files",
+    ],
+    title: "Delete pages from a PDF, or from a whole folder of PDFs",
+    description:
+      "Remove pages from a PDF in Preview or the free PDF24 Creator, or let Stella (stella.sh) drop the advert and terms pages from twelve bills at once and keep the rest.",
+    h1: "Delete pages from a PDF (or a folder of them)",
+    short: "Delete pages from a PDF",
+    lede: "Twelve phone bills with the adverts and small print gone and every call list kept.",
+    answer:
+      "For one file, open it in Preview on a Mac (View, Thumbnails, select the pages, press Delete, export under a new name) or in the free PDF24 Creator on Windows. When many files each have unwanted pages in different places, that's one file at a time. Stella (stella.sh) decides which pages to drop by what's on them, across a whole folder, and saves cleaned copies.",
+    stellaSteps: [
+      "Opens all 12 phone bills in the Phone bills folder: 4 to 7 pages each, with the bill, call lists, adverts and a terms and conditions page in a different place every month",
+      "Sorts every page by what it is, not by keywords: a call list that ends “Full terms and conditions are at …” stays, the actual terms page goes",
+      "Saves a cleaned copy of each bill in a new folder, Phone bills (cleaned), with the same file names",
+      "Reports the totals (30 pages kept, 27 dropped) and the one judgement call: July's summary page carries a one-line offer, and it was kept as part of the bill",
+      "Leaves the originals exactly as they were",
+    ],
+    prompt:
+      "My phone bills are PDFs in a folder called Phone bills in my Documents. Each one has pages of adverts and the terms and conditions mixed in with the actual bill. Make a cleaned-up copy of every bill with just the bill pages (keep the call lists), and leave the originals alone.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Twelve cleaned bills in about 1¼ minutes. Checked afterwards against an answer key written before the run: all 12 copies hold exactly the bill pages in their original order, with every advert and terms page gone and every call list kept, and no original bill deleted or changed.",
+      note: "The phone company and its bills are fictitious, made for this run. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/delete-pages-from-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/delete-pages-from-pdf"),
+        poster: `${PROOFS}/pdf-excel/delete-pages-from-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.6,
+        realDuration: 75,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A Phone bills folder holds 12 monthly bills padded with adverts and terms pages." },
+        { at: 1.6, text: "The prompt: make cleaned copies with just the bill pages, keep the call lists, leave the originals alone." },
+        { at: 15.6, text: "Stella replies that the copies will go in a new folder with the same names, and it will point out pages that were hard to call." },
+        { at: 20, text: "Sorting 57 pages across 12 files, sped up 3×." },
+        { at: 31.6, text: "Done: 30 pages kept, 27 dropped, one judgement call explained, originals untouched." },
+      ],
+    },
+    manualTitle: "Remove the pages yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Preview",
+        body: "Open the PDF and choose View, Thumbnails. Click the pages you don't want (Command-click to pick several) and press Delete. Then File, Export as PDF under a new name, so the original keeps every page.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator, which works offline, and open its Remove pages tool. Click the pages to drop, or type their numbers, and save. Repeat for each file.",
+      },
+      {
+        title: "Print only the pages you want",
+        body: "Any PDF viewer can do it in a pinch: File, Print, enter the pages to keep (for example 1-2, 4), and print to PDF (Save as PDF on a Mac, Microsoft Print to PDF on Windows). Links and searchable text may not survive this route.",
+      },
+      {
+        title: "Many files: look before deleting",
+        body: "When the unwanted pages move around from file to file, check each one in thumbnail view. Don't go by a word like “terms”: a page that matters can mention it in a footer.",
+      },
+    ],
+    limits: [
+      "Stella decides what counts as an advert or small print from what's on each page, and says what it dropped and any page it was unsure about. Tell it if something it removed should stay.",
+      "Scanned bills (pictures of pages) are read with OCR first, which is slower.",
+      "The text of each page goes to the AI model you use in Stella so it can sort them. The new PDFs are made on your computer.",
+      "Recorded on Linux with free Python PDF tools; on a Mac or Windows PC Stella uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I delete a page from a PDF on a Mac?",
+        a: "In Preview, View, Thumbnails, select the page and press Delete, then save or export. Export under a new name if you want to keep the original.",
+      },
+      {
+        q: "Can I take pages out into their own file instead of deleting them?",
+        a: "Yes: see [extract pages from a PDF](/how/pdf-excel/extract-pages-from-pdf), or [split a PDF into multiple files](/how/pdf-excel/split-pdf-into-multiple-files) to break it into parts.",
+      },
+      {
+        q: "How do I remove blank pages from a scan?",
+        a: "[Reorder PDF pages](/how/pdf-excel/reorder-pdf-pages) covers a double-sided scan with blank backs, including checking faint pages before removing them.",
+      },
+    ],
+    related: [
+      "pdf-excel/extract-pages-from-pdf",
+      "pdf-excel/split-pdf-into-multiple-files",
+      "pdf-excel/reorder-pdf-pages",
+      "pdf-excel/merge-pdf-files",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
+      { label: "PDF24: remove PDF pages (also in the free offline PDF24 Creator)", href: "https://tools.pdf24.org/en/remove-pdf-pages" },
+    ],
+  },
+  {
+    slug: "edit-text-in-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "edit text in pdf",
+      "change text in pdf",
+      "edit text in pdf free",
+      "edit pdf text mac",
+      "fix a typo in a pdf without the original",
+    ],
+    title: "Edit text in a PDF without the original file (free)",
+    description:
+      "Change a date or phone number in a PDF in the free LibreOffice Draw, or let Stella (stella.sh) replace the old text everywhere in the same font and size, not cover it up.",
+    h1: "Edit text in a PDF when you don't have the original",
+    short: "Edit text in a PDF",
+    lede: "A wrong date and phone number fixed in every place, with the page looking the same.",
+    answer:
+      "Preview and most free viewers can't change existing PDF text. The free LibreOffice Draw opens a PDF as editable text boxes: double-click, retype, then export as PDF, checking that fonts and spacing held. Many online editors only paint a white box over the old words and type on top, so the old text is still in the file. Stella (stella.sh) replaces it properly, in the same font, size and colour.",
+    stellaSteps: [
+      "Finds “Spring Fair 2027.pdf” in Documents: a cream poster with the date in large green bold, and a letter to parents",
+      "Finds every place the wrong date and phone number appear: five in total, two on the poster and three in the letter",
+      "Removes the old words from the page's text and writes the new ones in the same font, size and colour, without a white patch on the cream background",
+      "Compares each page before and after to confirm only those digits changed",
+      "Keeps an untouched copy as “Spring Fair 2027 (original).pdf” and saves the fix under the original name",
+      "Points out that 21 March 2027 is a Sunday (as was the old date, 14 March), and asks which day the fair is instead of guessing",
+    ],
+    prompt:
+      "The Spring Fair PDF in my Documents has the wrong date and phone number. It should say Saturday 21 March, not 14 March, and the phone number should end 181, not 118. Fix them everywhere in the PDF and keep it looking exactly the same. I don't have the original file it was made from.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Fixed in about 1½ minutes. Checked afterwards against an answer key written before the run: “21 March” three times and the new number twice, as real text; the old date and number gone from the file (not covered up); each correction where the old one was at the same size; every other line unchanged; no white patches or squeezed text.",
+      note: "The school fair, its letter and phone number are fictitious, made for this run as a text PDF. The work is sped up 3×. Stella's question about the weekday is real: the poster says Saturday, and 21 March 2027 is a Sunday.",
+      video: {
+        src: `${PROOFS}/pdf-excel/edit-text-in-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/edit-text-in-pdf"),
+        poster: `${PROOFS}/pdf-excel/edit-text-in-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.2,
+        realDuration: 83,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A two-page Spring Fair PDF in Documents has the wrong date and phone number." },
+        { at: 1.6, text: "The prompt: fix them everywhere and keep it looking exactly the same, with no original file to edit." },
+        { at: 15.6, text: "Stella replies that it will keep an untouched copy, compare pages before and after, and check the weekday." },
+        { at: 20, text: "Replacing the text in place, sped up 3×." },
+        { at: 32.2, text: "Done: five corrections, nothing else changed, and a question about whether the fair is Saturday 20 or Sunday 21 March." },
+      ],
+    },
+    manualTitle: "Edit it yourself",
+    manualSteps: [
+      {
+        title: "Free: LibreOffice Draw",
+        body: "Install LibreOffice (free, Mac, Windows and Linux) and open the PDF with Draw. Each line becomes a text box: double-click, retype, and repeat for every place the mistake appears. Then File, Export as PDF under a new name.",
+      },
+      {
+        title: "Check the look afterwards",
+        body: "Draw swaps in a similar font when the PDF doesn't carry the whole one, and a longer word can push past its box. Compare the export with the original side by side before you send it.",
+      },
+      {
+        title: "Online editors and PDF24",
+        body: "PDF24's Edit PDF and most web editors add new text on top. Cover the old word with a box matching the background, then type: it looks right printed, but the old text stays in the file and shows up in search and copy-paste.",
+      },
+      {
+        title: "Paid editors",
+        body: "Adobe Acrobat (paid) and similar editors change existing text in place and match the font when it's available. Worth it if you edit PDFs every week.",
+      },
+    ],
+    limits: [
+      "This works on PDFs that hold real text. On a scan (a picture of a page) Stella can only paint over the old words and letter the new ones to match, and it says so.",
+      "When a PDF carries only some letters of a font, a new digit or letter may need a close match; Stella compares the pages afterwards and tells you if anything looks different.",
+      "The PDF's text goes to the AI model you use in Stella; the edit happens on your computer.",
+      "Recorded on Linux with free Python PDF tools. On a Mac or Windows PC Stella uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I edit a PDF in Preview on a Mac?",
+        a: "You can add text, shapes and signatures, but not change words already there. LibreOffice Draw (free) or a paid editor can.",
+      },
+      {
+        q: "Is putting a white box over the text good enough?",
+        a: "For a printout, maybe. In the file, the old text is still there underneath. If it's something private, see [redact a PDF](/how/pdf-excel/redact-pdf), which removes the text for real.",
+      },
+      {
+        q: "Should I convert the PDF to Word instead?",
+        a: "For bigger rewrites, yes: [convert a PDF to Word](/how/documents/convert-pdf-to-word), edit it, then save it back as a PDF. For a few words, editing the PDF keeps the layout exactly.",
+      },
+    ],
+    related: [
+      "pdf-excel/redact-pdf",
+      "documents/convert-pdf-to-word",
+      "pdf-excel/add-signature-to-pdf",
+      "pdf-excel/extract-text-from-pdf",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "LibreOffice Draw (free, opens and edits PDFs)", href: "https://www.libreoffice.org/discover/draw/" },
+      { label: "PDF24: edit PDF", href: "https://tools.pdf24.org/en/edit-pdf" },
+    ],
+  },
+  {
+    slug: "extract-pages-from-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "extract pages from pdf",
+      "extract pages from pdf free",
+      "extract pages from pdf mac",
+      "save certain pages of a pdf as a new file",
+    ],
+    title: "Extract pages from a PDF into a new file (free)",
+    description:
+      "Save some pages of a PDF as their own file in Preview or the free PDF24 Creator, or tell Stella (stella.sh) whose pages you need and let it find them, receipts included.",
+    h1: "Extract pages from a PDF into their own file",
+    short: "Extract pages from a PDF",
+    lede: "One person's expense claims and receipts pulled out of a 28-page team pack.",
+    answer:
+      "If you know the page numbers, it's quick: in Preview on a Mac select the thumbnails and drag them to the desktop, and on Windows the free PDF24 Creator has an Extract pages tool. Most of the work is finding the pages first. Stella (stella.sh) finds them from a description, like one person's claims and their receipts, and saves just those pages as a new PDF.",
+    stellaSteps: [
+      "Opens “Team expenses October 2026.pdf”: 28 pages, a summary and 11 claims from 6 people, with continuation pages and receipts that only give a claim number",
+      "Finds Jordan Ellis's three claims (EXP-1043, 1051 and 1058) and follows each claim number to its continuation page and receipts",
+      "Leaves out Jordan Ellison's claim (a different person) and a claim by someone else that Jordan only approved",
+      "Saves the 7 pages in their original order as “Jordan Ellis expenses October 2026.pdf” next to the pack, which is unchanged, and sends nothing",
+      "Notes what Jordan will see (the old page footers, the approver's name) and that each claim's total is lower than its items add up to",
+    ],
+    prompt:
+      "In my Documents there's a PDF of everyone's expense claims for October. Pull out all the pages for Jordan Ellis's claims, including the receipts, into a separate PDF I can send to Jordan.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 7-page PDF in about 1¼ minutes. Checked afterwards against an answer key written before the run: exactly Jordan Ellis's pages (three claims, a continuation page and three receipts), not the similar name or the approved-only claim, in their original order, with the full pack unchanged.",
+      note: "The company, its staff and their expenses are fictitious, made for this run. The work is sped up 2×. The test pack's claim totals really don't match their items (a quirk of how it was made), and Stella noticed that without being asked.",
+      video: {
+        src: `${PROOFS}/pdf-excel/extract-pages-from-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/extract-pages-from-pdf"),
+        poster: `${PROOFS}/pdf-excel/extract-pages-from-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.4,
+        realDuration: 75,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 28-page PDF of the team's October expense claims is in Documents." },
+        { at: 1.6, text: "The prompt: pull out Jordan Ellis's claims and receipts into a separate PDF." },
+        { at: 10.6, text: "Stella replies that it will find the claims and receipts and save a new PDF next to the original." },
+        { at: 15, text: "Matching receipts to claim numbers, sped up 2×." },
+        { at: 29, text: "Done: 7 pages, three claims and their receipts, with the look-alike name and the approved-only claim left out." },
+      ],
+    },
+    manualTitle: "Extract them yourself",
+    manualSteps: [
+      {
+        title: "Find the pages first",
+        body: "Scroll through and write down the page numbers you need. Watch for pages that belong but don't repeat the name, like a continuation page or a receipt that only carries a claim or invoice number.",
+      },
+      {
+        title: "On a Mac: Preview",
+        body: "View, Thumbnails, then Command-click the pages you want. Drag the selection onto the desktop to make a new PDF of just those pages, or use File, Print with a page range and Save as PDF.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator (offline) and open Extract pages. Click the pages or type a list like 7-10, 18-19, 25, and save the new file.",
+      },
+      {
+        title: "Check before you send it",
+        body: "Open the new file and check each page belongs to the right person. Pages keep their old footers (“page 9 of 27”), and other names on the page, like an approver, go with them.",
+      },
+    ],
+    limits: [
+      "Stella ties pages to a person through their text: names, claim numbers, references. A scanned pack is read with OCR first, which takes longer.",
+      "The extracted pages are copies, so footers and any other names printed on them stay. Stella points these out but doesn't edit them unless you ask.",
+      "The pack's text goes to the AI model you use in Stella so it can find the pages; the new PDF is made on your computer.",
+      "Recorded on Linux with free Python PDF tools. On a Mac or Windows PC Stella uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What's the difference between extracting and splitting a PDF?",
+        a: "Extracting takes some pages into a new file; splitting breaks the whole PDF into parts. For that, see [split a PDF into multiple files](/how/pdf-excel/split-pdf-into-multiple-files).",
+      },
+      {
+        q: "Can I remove the pages from the original instead?",
+        a: "Yes: [delete pages from a PDF](/how/pdf-excel/delete-pages-from-pdf). Keep a copy of the full file first.",
+      },
+      {
+        q: "How do I extract pages from a PDF on Windows without Adobe?",
+        a: "PDF24 Creator is free and works offline. Or print the page range to “Microsoft Print to PDF” from any PDF viewer.",
+      },
+    ],
+    related: [
+      "pdf-excel/split-pdf-into-multiple-files",
+      "pdf-excel/delete-pages-from-pdf",
+      "pdf-excel/merge-pdf-files",
+      "pdf-excel/redact-pdf",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Add, delete and move PDF pages in Preview", href: "https://support.apple.com/guide/preview/prvw11793/mac" },
+      { label: "PDF24: extract PDF pages", href: "https://tools.pdf24.org/en/extract-pages" },
+    ],
+  },
+  {
+    slug: "add-signature-to-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "add signature to pdf",
+      "sign pdf",
+      "add signature to pdf on mac",
+      "sign pdf with a photo of my signature",
+      "insert signature image into pdf",
+    ],
+    title: "Add your signature to a PDF from a photo of it (free)",
+    description:
+      "Place your handwritten signature on a PDF with Preview or PDF24, or let Stella (stella.sh) clean up a photo of it. A signature image, not a certified e-signature.",
+    h1: "Add your signature to a PDF, from a photo of it",
+    short: "Add a signature to a PDF",
+    lede: "A phone photo of a signature, cleaned up and placed on the tenant's line of a lease.",
+    answer:
+      "On a Mac, Preview's Sign tool captures your signature from the trackpad or camera and lets you drop it on the line. On Windows, the free PDF24 Creator adds a signature image. Either way you place a picture of your handwriting, not a certified digital signature. Stella (stella.sh) takes a phone photo of your signature, removes the paper behind the ink and places it on the right line.",
+    stellaSteps: [
+      "Finds the 4-page tenancy renewal in Downloads and the signature photo in Pictures: blue ink on grey, unevenly lit paper",
+      "Removes the paper background so only the ink is left, with no grey box around it",
+      "Finds the Tenant signature line on page 4 and places the signature on it, leaving the Landlord line empty",
+      "Saves “Tenancy renewal - 14 Linden Row-signed.pdf” next to the original, which is unchanged, with the agreement still as real text",
+      "Leaves the Tenant date line blank and offers to fill it in, handwritten-style or as plain text",
+    ],
+    prompt:
+      "I need to sign the tenancy renewal PDF in my Downloads. There's a photo of my signature in my Pictures folder. Put my signature on the line where it says Tenant signature (not the landlord's line) so it looks like I signed it on paper, and save the signed copy as a new PDF.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A signed copy in about 2¼ minutes. Checked afterwards against an answer key written before the run: all 4 pages kept, signature ink on the Tenant line with no grey photo box around it, the Landlord line empty, the rest of page 4 and pages 1 to 3 unchanged, the text still real text, and the original PDF and photo kept.",
+      note: "The tenancy, the letting company and the signature are fictitious, made for this run; the signature photo was drawn to look like a phone picture of ink on paper. This was the second attempt at this guide; the work is sped up 7×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/add-signature-to-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/add-signature-to-pdf"),
+        poster: `${PROOFS}/pdf-excel/add-signature-to-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.6,
+        realDuration: 129,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A tenancy renewal PDF is in Downloads and a photo of a signature in Pictures." },
+        { at: 1.6, text: "The prompt: put the signature on the Tenant line, not the landlord's, and save a signed copy." },
+        { at: 12.6, text: "Stella replies that it will strip the paper from the photo so only the ink shows, and leave the landlord's line blank." },
+        { at: 17.0, text: "Cleaning up the signature and placing it, sped up 7×." },
+        { at: 30.4, text: "Done: the signature on the Tenant line in navy ink, the landlord's line blank, and a question about the date." },
+      ],
+    },
+    manualTitle: "Sign it yourself",
+    manualSteps: [
+      {
+        title: "On a Mac: Preview",
+        body: "Open the PDF in Preview, click the Markup button, then Sign. Create a signature with the trackpad, or hold your signature on white paper up to the camera. Click it to drop it on the page, drag it onto the line, resize, and choose File, Export as PDF.",
+      },
+      {
+        title: "On Windows: PDF24 Creator",
+        body: "Install the free PDF24 Creator (offline) and open its Sign PDF tool. Draw a signature or add a photo of one, drag it onto the line, and save. A photo works best cropped close, on plain white paper.",
+      },
+      {
+        title: "Make a clean signature image",
+        body: "Sign in dark ink on white paper and photograph it in even light, straight on. If the paper shows as a grey box, an image editor's background remover or a “make transparent” option clears it; save as PNG to keep the transparency.",
+      },
+      {
+        title: "When it must be a real e-signature",
+        body: "Some lenders, courts and employers need a certified digital signature or a signing service that records who signed and when. Ask the sender; if so, use the service they name.",
+      },
+    ],
+    limits: [
+      "This places a picture of your signature on the page, like signing a printout and scanning it. It isn't a certified digital signature: there's no certificate, no proof of who signed, and the PDF can still be edited. Where one is required, use the signing service the other side asks for.",
+      "Stella looks at the signature photo and the document to place it, so both go to the AI model you use in Stella. The signed PDF is made on your computer.",
+      "In this run Stella signed only the Tenant line and left the date blank, offering to fill it in. If you want the date or initials on every page, say so in the prompt.",
+      "Recorded on Linux, where Stella installed free Python image and PDF tools. On a Mac or Windows PC it uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Is a pasted signature image legally valid?",
+        a: "Often it's accepted for everyday agreements, but it depends on the document and where you live, and some organisations insist on a certified e-signature. If in doubt, ask the person who sent it.",
+      },
+      {
+        q: "How do I sign a PDF in Chrome or Edge?",
+        a: "Edge has a Draw tool for scribbling a signature; Chrome's built-in viewer can't sign. Preview, PDF24 or Stella give a cleaner result from a real signature.",
+      },
+      {
+        q: "Can I fill in the rest of the form too?",
+        a: "Yes. For filling many copies from a list, see [fill a PDF form from a spreadsheet](/how/pdf-excel/fill-pdf-form-from-spreadsheet). To change printed text, see [edit text in a PDF](/how/pdf-excel/edit-text-in-pdf).",
+      },
+    ],
+    related: [
+      "pdf-excel/fill-pdf-form-from-spreadsheet",
+      "pdf-excel/edit-text-in-pdf",
+      "pdf-excel/merge-pdf-files",
+      "pdf-excel/redact-pdf",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Fill out and sign PDF forms in Preview on Mac", href: "https://support.apple.com/guide/preview/fill-out-and-sign-pdf-forms-prvw35725/mac" },
+      { label: "PDF24: sign PDF", href: "https://tools.pdf24.org/en/sign-pdf" },
+    ],
+  },
+  {
+    slug: "split-pdf-pages-in-half",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "split pdf pages in half",
+      "split pdf pages in half vertically",
+      "split scanned book pages into single pages",
+      "split two page spread pdf",
+    ],
+    title: "Split PDF pages in half: scanned spreads to single pages",
+    description:
+      "Turn a scan of two-page spreads into single pages with mutool or Preview, or let Stella (stella.sh) split the spreads, keep covers whole and check the order.",
+    h1: "Split PDF pages in half, so each page stands alone",
+    short: "Split PDF pages in half",
+    lede: "A scanned recipe booklet of two-page spreads turned into 14 single pages, in order.",
+    answer:
+      "For a PDF where every page is a two-page spread, the free MuPDF tool does it in one command: `mutool poster -x 2 in.pdf out.pdf`. On a Mac, duplicate each page in Preview and crop one copy to each half. The catch is covers scanned on their own, which get cut in half too. Stella (stella.sh) splits only the spreads and checks the order from the page numbers.",
+    stellaSteps: [
+      "Opens the scanned booklet in Downloads: 8 image-only pages, the front cover alone, six two-page spreads with a gutter shadow, and the back cover alone",
+      "Splits each spread down the middle and leaves the two covers whole",
+      "Checks the reading order from the page numbers and recipes, in case the booklet was scanned in printer's order (it wasn't)",
+      "Saves “Nana's recipe booklet - single pages.pdf” with 14 pages at the original scan quality; the original is unchanged",
+      "Mentions two pages that looked odd (a Notes page holding an ingredient list, a two-step soup recipe) but are as printed",
+    ],
+    prompt:
+      "I scanned my nana's old recipe booklet and each page of the PDF in my Downloads has two booklet pages side by side. Split it so every booklet page is its own page, in the right reading order, and save it as a new PDF.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 14-page PDF in about 1¾ minutes. Checked afterwards against an answer key written before the run: every booklet page on its own page, matched to its reference picture, in reading order 1 to 14, with the covers not cut in half and the original scan unchanged.",
+      note: "The recipe booklet is fictitious, drawn and “scanned” as images for this run. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/split-pdf-pages-in-half/proof.mp4`,
+        cuts: webCuts("pdf-excel/split-pdf-pages-in-half"),
+        poster: `${PROOFS}/pdf-excel/split-pdf-pages-in-half/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.4,
+        realDuration: 104,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A scanned recipe booklet in Downloads has two booklet pages on each PDF page." },
+        { at: 1.6, text: "The prompt: split it so every booklet page is its own page, in reading order, as a new PDF." },
+        { at: 11.6, text: "Stella replies that it will check the order from the page numbers, since booklets are often scanned with the last page beside the first." },
+        { at: 16.0, text: "Splitting the spreads, sped up 5×." },
+        { at: 28.5, text: "Done: 14 single pages, covers kept whole, already in reading order." },
+      ],
+    },
+    manualTitle: "Split the pages yourself",
+    manualSteps: [
+      {
+        title: "All spreads: mutool poster",
+        body: "Install MuPDF (free, Mac, Windows and Linux) and run `mutool poster -x 2 in.pdf out.pdf`. Every page is cut into a left and a right half. Use `-y 2` instead for pages stacked top and bottom.",
+      },
+      {
+        title: "Covers on their own",
+        body: "If the first and last pages are single covers, take them out first (see extracting pages), split the rest, then merge the covers back at the start and end, or the covers get cut in half too.",
+      },
+      {
+        title: "On a Mac: Preview",
+        body: "In Preview, View, Thumbnails, select a spread and Edit, Duplicate. Drag a box over the left half of the first copy and Tools, Crop; crop the right half of the second copy. Repeat for each spread, then export as a PDF.",
+      },
+      {
+        title: "Check the order",
+        body: "A stapled booklet taken apart and scanned flat is in printer's order (the last page next to page 1). If the page numbers jump, reorder the halves after splitting.",
+      },
+    ],
+    limits: [
+      "This run's booklet was scanned in reading order. A stapled booklet taken apart (printer's order) also needs reordering; Stella checks the page numbers and does it if needed.",
+      "Spreads where the fold isn't in the middle, or a picture runs across both pages, may need the cut placed by eye; Stella says if it isn't sure.",
+      "Stella looks at the scanned pages to read their numbers, so page images go to the AI model you use in Stella. The new PDF is made on your computer.",
+      "Recorded on Linux, where Stella installed a free Python PDF library. On a Mac or Windows PC it uses the same kind of tool.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Does cropping in Preview remove the hidden half?",
+        a: "Not always: Preview's crop can hide the rest of the page rather than delete it. Export as PDF afterwards, and check the file size if it matters.",
+      },
+      {
+        q: "Can I make the scan searchable too?",
+        a: "Yes: [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable) adds a text layer you can search and copy from.",
+      },
+      {
+        q: "Some pages are sideways or out of order. Can that be fixed?",
+        a: "See [rotate PDF pages](/how/pdf-excel/rotate-pdf-pages) and [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages).",
+      },
+    ],
+    related: [
+      "pdf-excel/reorder-pdf-pages",
+      "pdf-excel/make-scanned-pdf-searchable",
+      "pdf-excel/rotate-pdf-pages",
+      "documents/make-a-cookbook-from-your-recipes",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "MuPDF: mutool poster", href: "https://mupdf.readthedocs.io/en/latest/tools/mutool-poster.html" },
+      { label: "Apple: Crop, resize, or rotate an image in Preview on Mac", href: "https://support.apple.com/guide/preview/prvw2015/mac" },
+    ],
+  },
+  {
+    slug: "extract-text-from-pdf",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "extract text from pdf",
+      "pdf to text",
+      "scanned pdf to text",
+      "extract text from multiple pdf files",
+      "extract text from pdf image",
+    ],
+    title: "Extract text from PDFs, scans included, into text files",
+    description:
+      "Get the text out of PDFs with Preview, Word or free OCR, or let Stella (stella.sh) do a whole folder, reading scans and two-column layouts in the right order.",
+    h1: "Extract text from PDFs, including scanned ones",
+    short: "Extract text from PDFs",
+    lede: "A text file for every PDF in a folder: typed letters, a two-column newsletter and scans.",
+    answer:
+      "For a PDF with real text, select all and copy, or open it in Word on Windows, which converts it to editable text. Scans are pictures, so they need OCR: on a Mac, Preview's Live Text lets you select words in the image; the free Tesseract does whole files. Stella (stella.sh) handles a whole folder: it copies the text where there is some, runs OCR on scans and saves a .txt next to each PDF.",
+    stellaSteps: [
+      "Opens all 9 PDFs in the Planning documents folder and sorts them: six have real text, three are image-only scans",
+      "Copies the text out of the six typed PDFs exactly, reading the two-column newsletter left column first, then right, so sentences don't interleave",
+      "Runs OCR on the three scans (a site visit note, a 1964 deeds extract and a signed consent) and checks the result against each page image",
+      "Saves a .txt file with the same name next to each PDF; the PDFs themselves are unchanged",
+      "Reports which ones were scans and that nothing came out garbled",
+    ],
+    prompt:
+      "I've got a folder of planning PDFs in my Downloads called Planning documents. Some are scans. Get the text out of every one of them, so I can search and copy it, and save it as a text file for each PDF.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Nine text files in about 2½ minutes. Checked afterwards against an answer key written before the run: the text of all 9 PDFs within tight error limits (scans included), the two-column newsletter read column by column, one file per PDF named after it, and every PDF unchanged.",
+      note: "The planning documents, the neighbours and the newsletter are fictitious, made for this run; the three scans were printed as slightly skewed, grainy images. The work is sped up 8×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/extract-text-from-pdf/proof.mp4`,
+        cuts: webCuts("pdf-excel/extract-text-from-pdf"),
+        poster: `${PROOFS}/pdf-excel/extract-text-from-pdf/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.7,
+        realDuration: 148,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A Planning documents folder in Downloads holds 9 PDFs, three of them scans." },
+        { at: 1.7, text: "The prompt: get the text out of every one and save a text file for each PDF." },
+        { at: 14.7, text: "Stella replies that it will run OCR on the scans and save a .txt next to each PDF." },
+        { at: 20, text: "Copying text and reading the scans, sped up 8×." },
+        { at: 33.4, text: "Done: nine text files, the scans read word for word, the newsletter's columns in reading order." },
+      ],
+    },
+    manualTitle: "Get the text out yourself",
+    manualSteps: [
+      {
+        title: "PDFs with real text",
+        body: "If you can select words in the PDF, the text is there: select all (Command-A or Ctrl-A), copy, and paste into a plain text editor. In a two-column layout check the order; some viewers copy across both columns line by line.",
+      },
+      {
+        title: "Windows: open the PDF in Word",
+        body: "Word opens PDFs and converts them to editable text (it says so when it opens). Then File, Save As, Plain Text. Scanned pages come through as text too, with mistakes on poor scans.",
+      },
+      {
+        title: "Mac: Live Text in Preview",
+        body: "On a scan, Preview lets you select text inside the page picture with Live Text. Select, copy and paste page by page. It's fine for a page or two, slow for a folder.",
+      },
+      {
+        title: "Many files: Tesseract",
+        body: "The free Tesseract OCR engine runs from the command line on Mac, Windows and Linux. It reads images, so turn each scanned page into a PNG first (or use a tool like OCRmyPDF that does it for you), then run `tesseract page.png out`.",
+      },
+    ],
+    limits: [
+      "Handwriting and very poor scans come out with mistakes; Stella checks OCR text against the page and says where it's unsure.",
+      "Tables come out as lines of text, not columns. For a spreadsheet, see [extract a table from a PDF to Excel](/how/pdf-excel/extract-table-from-pdf-to-excel).",
+      "Text and page images go to the AI model you use in Stella as it checks the result; the OCR itself runs on your computer.",
+      "Recorded on Linux, where the OCR engine and PDF tools were already installed. On a Mac or Windows PC Stella may install Tesseract first; scans in languages other than English need their language pack added.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I make a scanned PDF searchable instead of getting a text file?",
+        a: "Add a hidden text layer to the PDF itself: see [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable).",
+      },
+      {
+        q: "Why does copied text come out jumbled?",
+        a: "Usually columns: the copy runs straight across both. Or the PDF stores letters in an odd order. Extracting by column, as Stella did with the newsletter, fixes the first.",
+      },
+      {
+        q: "Can I get the text into Word with the layout?",
+        a: "Yes: [convert a PDF to Word](/how/documents/convert-pdf-to-word) keeps headings, tables and pictures, where a text file keeps only the words.",
+      },
+    ],
+    related: [
+      "pdf-excel/make-scanned-pdf-searchable",
+      "documents/convert-pdf-to-word",
+      "pdf-excel/extract-table-from-pdf-to-excel",
+      "files-folders/find-files-containing-text",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Interact with text in a photo using Live Text in Preview on Mac", href: "https://support.apple.com/guide/preview/prvw625a5b2c/mac" },
+      { label: "Microsoft: Opening PDFs in Word", href: "https://support.microsoft.com/office/opening-pdfs-in-word-1d1d2acc-afa0-46ef-891d-b76bcd83d9c8" },
+      { label: "Tesseract OCR: installation", href: "https://tesseract-ocr.github.io/tessdoc/Installation.html" },
+    ],
+  },
+  {
+    slug: "extract-table-from-pdf-to-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "extract table from pdf to excel",
+      "pdf table to excel",
+      "pdf to excel",
+      "extract tables from pdf",
+      "pdf table to excel mac",
+    ],
+    title: "Extract a table from a PDF to Excel, prices as numbers",
+    description:
+      "Get a multi-page PDF table into Excel with Tabula or Excel's Get Data, or let Stella (stella.sh) rebuild it as one clean sheet with prices as real numbers.",
+    h1: "Extract a table from a PDF to Excel",
+    short: "PDF table to Excel",
+    lede: "A 4-page supplier price list as one sortable sheet, with prices you can add up.",
+    answer:
+      "Excel for Windows (Microsoft 365) can import tables from a PDF: Data, Get Data, From File, From PDF. On a Mac, the free Tabula pulls tables out of text PDFs as CSV. Either way you usually still delete repeated headers, rejoin wrapped lines and turn prices back into numbers. Stella (stella.sh) does that clean-up too, so the sheet sorts and filters straight away.",
+    stellaSteps: [
+      "Opens the supplier's 4-page trade price list in Downloads: a header and footer on every page, category headings between products, long descriptions that wrap onto a second line",
+      "Rebuilds the table from the positions of the words, so a wrapped description joins its own row instead of becoming a stray one",
+      "Turns the category headings into a Category column you can filter, and stores trade price, RRP and pack size as numbers (prices over £1,000 included)",
+      "Saves the spreadsheet next to the PDF with a frozen, filterable header row, and checks the row count and prices against the PDF",
+      "Points out two pairs of products with the same description but very different prices, and a few descriptions that already look garbled in the PDF",
+    ],
+    prompt:
+      "There's a PDF price list from our garden supplier in my Downloads. Put the product table into an Excel spreadsheet so I can sort and filter it, with the prices as proper numbers.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "One spreadsheet of 131 products in about 2 minutes. Checked afterwards against an answer key written before the run: every product code exactly once, trade prices and RRPs right (including those over £1,000) and stored as numbers, full descriptions with wrapped lines joined, pack sizes right, and no header, footer or stray rows in the table.",
+      note: "The garden supplier and its price list are fictitious, made for this run as a text PDF. The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/extract-table-from-pdf-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/extract-table-from-pdf-to-excel"),
+        poster: `${PROOFS}/pdf-excel/extract-table-from-pdf-to-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.3,
+        realDuration: 122,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 4-page trade price list PDF from a garden supplier is in Downloads." },
+        { at: 1.7, text: "The prompt: put the product table in Excel so it sorts and filters, with prices as proper numbers." },
+        { at: 11.7, text: "Stella replies that it will save the file next to the PDF, with numeric prices and filters on the header." },
+        { at: 16, text: "Rebuilding the table across four pages, sped up 6×." },
+        { at: 30.7, text: "Done: 131 products, prices as numbers, a Category column, and two suspicious prices to ask the supplier about." },
+      ],
+    },
+    manualTitle: "Get the table out yourself",
+    manualSteps: [
+      {
+        title: "Windows: Excel's PDF import",
+        body: "In Excel for Microsoft 365, Data, Get Data, From File, From PDF. Pick the table for each page in the Navigator (or the one that spans pages), then Transform Data to remove repeated header rows, and Close & Load.",
+      },
+      {
+        title: "Mac (or anywhere): Tabula",
+        body: "Install the free Tabula, open the PDF, draw a box around the table on each page (or use Autodetect), and export as CSV. Open the CSV in Excel or Numbers.",
+      },
+      {
+        title: "Clean up the rows",
+        body: "Sort by the code column so repeated headers, category headings and stray wrapped lines bunch together. Delete them, but paste each wrapped line onto the end of the description it belongs to first.",
+      },
+      {
+        title: "Make prices numbers",
+        body: "If prices sit on the left of their cells or SUM gives 0, they're text. Use Find and Replace to remove “£” and the thousands commas, then Data, Text to Columns, Finish, which turns them into numbers.",
+      },
+    ],
+    limits: [
+      "This works on PDFs that hold real text. A scanned price list needs OCR first, which Stella can do, more slowly and with a closer check of every number.",
+      "Stella copies what the PDF says, mistakes included; it flags values that look wrong but doesn't change them.",
+      "The price list's text goes to the AI model you use in Stella; the spreadsheet is made on your computer.",
+      "Recorded on Linux with free Python tools. On a Mac or Windows PC Stella uses the same kind of tool; the .xlsx opens in Excel, Numbers or Google Sheets.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Does Excel for Mac have Get Data from PDF?",
+        a: "Not at the time of writing; the PDF connector is in Excel for Windows (Microsoft 365). On a Mac, use Tabula or another tool, then open the result in Excel.",
+      },
+      {
+        q: "What about bank statements?",
+        a: "Statements have their own catches (running balances, debits and credits). See [convert bank statement PDFs to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
+      },
+      {
+        q: "Can I get just the text, not a table?",
+        a: "Yes: [extract text from a PDF](/how/pdf-excel/extract-text-from-pdf), which also handles scans.",
+      },
+    ],
+    related: [
+      "pdf-excel/bank-statement-pdf-to-excel",
+      "pdf-excel/extract-text-from-pdf",
+      "pdf-excel/receipts-to-spreadsheet",
+      "pdf-excel/convert-word-table-to-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Tabula (free table extractor for text PDFs; Mac, Windows, Linux)", href: "https://tabula.technology/" },
+      { label: "Microsoft: Import data from a PDF (Power Query PDF connector)", href: "https://learn.microsoft.com/en-us/power-query/connectors/pdf" },
+    ],
+  },
+  {
+    slug: "convert-xml-to-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert xml to excel",
+      "xml to excel",
+      "open xml file in excel",
+      "how to open xml file",
+      "apple health export xml to excel",
+    ],
+    title: "Convert an XML file to Excel (the iPhone Health export)",
+    description:
+      "Open an XML file in Excel with Power Query, or let Stella (stella.sh) turn an iPhone Health export into a spreadsheet of daily step totals and weights, on your computer.",
+    h1: "Convert an XML file to Excel, totals and all",
+    short: "XML to Excel",
+    lede: "An iPhone Health export turned into daily step totals and every weight reading.",
+    answer:
+      "Excel for Windows reads XML through Data, Get Data, From File, From XML; you then filter and group the records yourself. For exports like the iPhone Health one, the catch is that the XML holds thousands of small records, so a day's steps are spread over many rows and need adding up. Stella (stella.sh) unzips the export, adds them up per day and lays the result out in a spreadsheet.",
+    stellaSteps: [
+      "Finds export.zip in Downloads and reads the export.xml inside, which Health writes as one long list of records grouped by type, not by date",
+      "Picks out the step-count records from among thousands of heart-rate and walking-distance ones, and checks whether a phone and a watch both counted steps (here only the iPhone did, so nothing needed removing)",
+      "Adds every step record of each day into one daily total, for all 92 days from 1 July to 30 September",
+      "Lists every weight reading with its date, in pounds as recorded",
+      "Saves “Apple Health - Steps and Weight.xlsx” next to the zip, with a tab for steps and one for weight, and mentions the highest and lowest days",
+    ],
+    prompt:
+      "I exported my health data from my iPhone, it's the zip in my Downloads, and inside is an XML file I can't open. Make me a spreadsheet with my total steps for each day and all my weight readings.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A two-tab spreadsheet in about 2 minutes. Checked afterwards against an answer key written before the run: total steps exactly right for all 92 days (every record of each day added up), and all 15 weight readings with their dates.",
+      note: "The health data is fictitious, generated for this run in the Health export's real structure (zip, export.xml, record types and dates). The work is sped up 7×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-xml-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-xml-to-excel"),
+        poster: `${PROOFS}/pdf-excel/convert-xml-to-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 48.1,
+        realDuration: 133,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. An iPhone Health export, export.zip, is in Downloads." },
+        { at: 1.7, text: "The prompt: a spreadsheet with total steps for each day and all the weight readings." },
+        { at: 15.7, text: "Stella replies that it will make a tab for steps and one for weight, without counting steps twice." },
+        { at: 20, text: "Reading the XML and adding up each day, sped up 7×." },
+        { at: 33.9, text: "Done: a total for every day from July to September and all 15 weight readings." },
+      ],
+    },
+    manualTitle: "Open it in Excel yourself",
+    manualSteps: [
+      {
+        title: "Get the export onto your computer",
+        body: "On the iPhone: Health app, your picture, Export All Health Data. Send the zip to your computer (AirDrop, Files, email to yourself if it's small) and unzip it. The data is in apple_health_export/export.xml.",
+      },
+      {
+        title: "Windows: Excel's XML import",
+        body: "Data, Get Data, From File, From XML, and pick export.xml. Choose the Record table and Transform Data. Filter the type column to HKQuantityTypeIdentifierStepCount.",
+      },
+      {
+        title: "Total each day",
+        body: "Add a column with the first 10 characters of startDate (the date), change the value column to a number, then Group By that date with Sum of value. Close & Load. Repeat with BodyMass for weight, without grouping.",
+      },
+      {
+        title: "On a Mac",
+        body: "Numbers can't read the export, and Excel for Mac's XML support is limited. The Power Query steps above work in recent Microsoft 365 builds of Excel for Mac (Data, Get Data); otherwise use a Windows PC or a script.",
+      },
+    ],
+    limits: [
+      "When an iPhone and a watch both count steps, the export holds both and a plain sum counts the overlap twice; the Health app hides that. Stella checks for two step sources and says what it did. In this run there was only one.",
+      "Real exports can be several GB after years of data. Stella reads them in a stream, but it takes a few minutes.",
+      "Stella looks at the structure and a sample of the records; the totals are worked out on your computer, so your full health history isn't sent to the AI model.",
+      "Recorded on Linux with Python's built-in XML reader. A Mac or Windows PC works the same way.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I open an XML file?",
+        a: "Any text editor or browser shows it, but as raw tags. To get a table, use Excel's Get Data, From XML on Windows, or ask Stella for the columns you want.",
+      },
+      {
+        q: "Can I do this for other XML files, not just Health?",
+        a: "Yes. Bank, accounting and shop exports often come as XML; the steps are the same: pick the repeating record, choose columns, and total where needed. For JSON exports, see [convert JSON to Excel](/how/pdf-excel/convert-json-to-excel).",
+      },
+      {
+        q: "Can it show weekly or monthly averages too?",
+        a: "Yes, ask for them. Or use [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category) on the daily totals.",
+      },
+    ],
+    related: [
+      "pdf-excel/convert-json-to-excel",
+      "pdf-excel/convert-text-file-to-excel",
+      "pdf-excel/summarize-spreadsheet-by-category",
+      "pdf-excel/fix-dates-in-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Share your health data (export) on iPhone", href: "https://support.apple.com/guide/iphone/share-your-health-data-iph5ede58c3d/ios" },
+      { label: "Microsoft: Import XML data", href: "https://support.microsoft.com/en-us/office/import-xml-data-6eca3906-d6c9-4f0d-b911-c736da817fa4" },
+    ],
+  },
+  {
+    slug: "convert-numbers-to-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert numbers to excel",
+      "convert numbers to excel on windows",
+      "open numbers file on pc",
+      "numbers file to excel free",
+    ],
+    title: "Convert a Numbers file to Excel without a Mac (free)",
+    description:
+      "Open an Apple Numbers file on Windows with the free LibreOffice and save it as .xlsx, or let Stella (stella.sh) convert it with every table, number and date intact.",
+    h1: "Convert a Numbers file to Excel, even without a Mac",
+    short: "Numbers to Excel",
+    lede: "A Mac user's wedding budget opened on a PC as an Excel file, every table included.",
+    answer:
+      "On a Mac, open the file in Numbers and choose File, Export To, Excel. Without a Mac, the free LibreOffice Calc opens .numbers files on Windows and Linux, and File, Save As, Excel saves it. Check that every table came across: a Numbers sheet can hold several. Stella (stella.sh) converts it on your own PC and checks every table, amount and date made it.",
+    stellaSteps: [
+      "Finds “Wedding budget.numbers” in Downloads and reads it on a computer without Numbers",
+      "Finds all three tables, including two that share the Budget sheet (Costs, and Payments made) and the 84-row guest list on its own sheet",
+      "Writes them to “Wedding budget.xlsx” with amounts as numbers and due dates as dates; accented names like Zoë and Bjørn intact",
+      "Adds total lines (quoted, paid, still to pay) that update when amounts change, since the original had only typed numbers",
+      "Says what's different: plain styling because the colours and fonts didn't come across, and a Paid so far column that's still typed by hand",
+    ],
+    prompt:
+      "My sister made our wedding budget on her Mac and sent me the Numbers file. It's in my Downloads and I can't open it. Turn it into an Excel file with everything in it.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "An Excel file in about 3 minutes. Checked afterwards against an answer key written before the run: all three tables (Costs, Payments made, Guest list) with every row, first columns matching row by row with accents intact, amounts as real numbers and dates as real dates, and the .numbers file unchanged.",
+      note: "The budget and guest names are fictitious, made for this run as a real Numbers document. The work is sped up 11×. Stella's first reply promised to keep the formatting; its final reply corrected that, saying the colours and fonts didn't come across.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-numbers-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-numbers-to-excel"),
+        poster: `${PROOFS}/pdf-excel/convert-numbers-to-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.7,
+        realDuration: 173,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer with no Numbers app. A Numbers file, Wedding budget.numbers, is in Downloads." },
+        { at: 1.6, text: "The prompt: turn it into an Excel file with everything in it." },
+        { at: 13.6, text: "Stella replies that it's converting the budget and will save it next to the original." },
+        { at: 18, text: "Reading the Numbers file and writing the workbook, sped up 11×." },
+        { at: 31, text: "Done: both sheets, all three tables and 533 filled cells, with totals added and the styling differences listed." },
+      ],
+    },
+    manualTitle: "Convert it yourself",
+    manualSteps: [
+      {
+        title: "With a Mac: export from Numbers",
+        body: "Open the file in Numbers, choose File, Export To, Excel, and pick whether each table gets its own worksheet. Save the .xlsx. This is also the fix to ask the sender for.",
+      },
+      {
+        title: "Windows or Linux: LibreOffice Calc",
+        body: "Install LibreOffice (free). Open the .numbers file in Calc, look over each sheet, then File, Save As, choose Excel 2007-365 (.xlsx) and Keep Current Format.",
+      },
+      {
+        title: "Check every table came across",
+        body: "Numbers lets one sheet hold several tables side by side. Make sure each one is there in the Excel file, and that amounts add up (a SUM that gives 0 means they came through as text).",
+      },
+      {
+        title: "iCloud in a browser",
+        body: "With an Apple Account, upload the file to iCloud.com, open it in Numbers for iCloud, and download a copy as Excel. This works from a PC but uploads the file to Apple.",
+      },
+    ],
+    limits: [
+      "Formulas come across as their values when the file only stores results, and colours, fonts, charts and pictures may not. Stella lists what changed, as it did here.",
+      "Password-protected Numbers files need the password.",
+      "Stella reads the file's content to check the conversion, so the budget's text and numbers go to the AI model you use. The conversion runs on your computer.",
+      "Recorded on Linux, where Stella installed a free Python library that reads Numbers files and also used LibreOffice. On Windows it does the same; on a Mac it can use Numbers itself.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can Excel open a .numbers file?",
+        a: "No. Excel on Windows or Mac can't read the format. Export from Numbers, use LibreOffice, or convert it first.",
+      },
+      {
+        q: "What about Pages and Keynote files?",
+        a: "Same idea: Pages exports to Word and Keynote to PowerPoint, and LibreOffice opens many of them on Windows. Stella can convert them too.",
+      },
+      {
+        q: "Can I send the file back to a Mac user?",
+        a: "Yes, Numbers opens .xlsx files directly. For a CSV per sheet instead, see [convert Excel to CSV](/how/pdf-excel/convert-excel-to-csv).",
+      },
+    ],
+    related: [
+      "pdf-excel/convert-excel-to-csv",
+      "pdf-excel/split-bills-with-roommates",
+      "pdf-excel/combine-excel-files-into-one-sheet",
+      "pdf-excel/convert-word-table-to-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Export to Excel or another file format (Numbers for Mac)", href: "https://support.apple.com/guide/numbers/tan3b922d4ad/mac" },
+      { label: "LibreOffice Calc (free, opens Numbers files)", href: "https://www.libreoffice.org/discover/calc/" },
+    ],
+  },
+  {
+    slug: "convert-word-table-to-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert word table to excel",
+      "word to excel",
+      "extract tables from word document to excel",
+      "convert word table to excel without splitting cells",
+    ],
+    title: "Convert Word tables to Excel without split cells or lost zeros",
+    description:
+      "Copy Word tables into Excel without split cells or phone numbers losing their 0, or let Stella (stella.sh) combine tables from many documents into one sheet.",
+    h1: "Convert Word tables to Excel (from one document or many)",
+    short: "Word tables to Excel",
+    lede: "Five sign-up sheets in Word turned into one clean list of 46 volunteers.",
+    answer:
+      "Copy the table in Word and paste it into Excel. Two things go wrong: a cell with a line break becomes two rows, and phone numbers lose their leading 0. Format the phone column as Text first, and fix split rows by hand. With several documents, repeat and add a column saying which each row came from. Stella (stella.sh) does the lot in one go and counts rows against each document.",
+    stellaSteps: [
+      "Opens the five sign-up sheets in the Volunteer sign-up sheets folder and finds the volunteer table in each, skipping an event-details table that comes first in one",
+      "Joins a table split over two pages (with its header repeated) back into one list and drops the empty rows at the end of each table",
+      "Keeps two-line cells like “Afternoon / Can bring a gazebo” in one cell, mobile numbers as text with their leading 0, and accented names as written",
+      "Saves “All volunteer sign-ups.xlsx” in the same folder with Event and date columns, and checks each event's count against its document",
+      "Flags two phone numbers each shared by two people, leaving them as they are; the Word files are unchanged",
+    ],
+    prompt:
+      "I've got five volunteer sign-up sheets as Word documents in a folder called Volunteer sign-up sheets in my Documents. Put everyone from all the sign-up tables into one Excel spreadsheet: one row per sign-up, all on one sheet, with a column saying which event it's for.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "One spreadsheet of 46 sign-ups in about 1½ minutes. Checked afterwards against an answer key written before the run: exactly the 46 sign-ups with no blank, header or event-detail rows, mobile numbers with their leading 0, names with accents intact, two-line cells kept whole, the event on every row, and the Word files unchanged.",
+      note: "The events and volunteers are fictitious, made for this run as ordinary .docx files. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-word-table-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-word-table-to-excel"),
+        poster: `${PROOFS}/pdf-excel/convert-word-table-to-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.8,
+        realDuration: 100,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Five Word sign-up sheets sit in a folder in Documents." },
+        { at: 1.6, text: "The prompt: everyone from all the sign-up tables in one Excel sheet, with a column for the event." },
+        { at: 9.6, text: "Stella replies that it will count the rows against each document so nobody gets missed." },
+        { at: 14, text: "Reading the tables, sped up 5×." },
+        { at: 28.6, text: "Done: 46 sign-ups across five events, with two shared phone numbers flagged." },
+      ],
+    },
+    manualTitle: "Copy the tables yourself",
+    manualSteps: [
+      {
+        title: "Prepare the Excel sheet",
+        body: "Before pasting, select the column that will hold phone numbers (or any codes with leading zeros) and format it as Text, so 07700 doesn't become 7700.",
+      },
+      {
+        title: "Copy and paste each table",
+        body: "In Word, click inside the table, use the table handle (top-left corner) to select it, copy, and paste into Excel. Use Paste, Match Destination Formatting if colours and borders get in the way.",
+      },
+      {
+        title: "Fix split cells",
+        body: "A Word cell with a line break pastes as two Excel rows. Rejoin them, or before copying, use Find and Replace in Word to swap line breaks (^l and ^p inside the table) for a slash or semicolon.",
+      },
+      {
+        title: "Several documents: add a source column",
+        body: "Add a column like Event and fill it for each pasted block before pasting the next one. Then delete blank rows and repeated header rows (sort by name; they bunch together).",
+      },
+    ],
+    limits: [
+      "Merged cells and tables inside tables need a look afterwards; Stella says where it found them.",
+      "Stella keeps cell text exactly as written: it flags likely typos and duplicates but doesn't fix them unless you ask.",
+      "The tables' text goes to the AI model you use in Stella; the spreadsheet is made on your computer.",
+      "Recorded on Linux without Word installed; Stella read the .docx files directly. A Mac or Windows PC works the same way.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I convert a whole Word document to Excel?",
+        a: "Only tables convert cleanly; paragraphs end up one per cell. Copy the tables, or ask Stella for the specific columns you need from the text.",
+      },
+      {
+        q: "What if the tables are in a PDF, not Word?",
+        a: "See [extract a table from a PDF to Excel](/how/pdf-excel/extract-table-from-pdf-to-excel).",
+      },
+      {
+        q: "Can I merge sheets from several Excel files the same way?",
+        a: "Yes: [combine Excel files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet).",
+      },
+    ],
+    related: [
+      "pdf-excel/extract-table-from-pdf-to-excel",
+      "pdf-excel/combine-excel-files-into-one-sheet",
+      "pdf-excel/remove-duplicate-rows-in-excel",
+      "documents/mail-merge-excel-to-word",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Copy a Word table into Excel", href: "https://support.microsoft.com/en-us/excel/copy-a-word-table-into-excel" },
+    ],
+  },
+  {
+    slug: "convert-json-to-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert json to excel",
+      "json to excel",
+      "open json file in excel",
+      "json to csv",
+      "how to open json file",
+    ],
+    title: "Convert a JSON file to Excel, one row per record",
+    description:
+      "Open a JSON export in Excel with Power Query, or let Stella (stella.sh) flatten a nested shop export into one row per order, with local dates and totals that match.",
+    h1: "Convert a JSON file to Excel you can actually read",
+    short: "JSON to Excel",
+    lede: "A nested shop export of 58 orders turned into one tidy row per order.",
+    answer:
+      "Excel reads JSON through Data, Get Data, From File, From JSON (Power Query). You then expand the nested records, like the customer inside each order, and pick the columns you want. Watch the dates: Power Query can shift times into your computer's zone. Stella (stella.sh) does the flattening for you from a plain description of the columns, keeping the data on your computer.",
+    stellaSteps: [
+      "Opens the shop's orders_export_2026-10.json in Downloads: 58 orders, each with a customer, a shipping address, line items, discounts and shipping nested inside",
+      "Builds one row per order with order number, date, customer name, city, number of items and total",
+      "Keeps each order's date as the shop's own local date, so an order at 10 pm on 31 October stays on 31 October",
+      "Uses the shipping name for three guest orders that have no customer record, and keeps refunded and cancelled orders with their status",
+      "Saves orders_2026-10.xlsx next to the export and checks that the item count and total ($4,513.00) match the JSON",
+    ],
+    prompt:
+      "My shop exported last month's orders as a JSON file, it's in my Downloads. Put it in Excel for me: one row per order with the order number, date, customer name, city, number of items and total.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A spreadsheet of 58 orders in about 1¾ minutes. Checked afterwards against an answer key written before the run: a row for every order with its exact total, customer name and city on every row, the shop's local order date (not shifted to UTC), the number of items, and the shipping name on guest orders. Missed one optional point: there's no second sheet listing every line item.",
+      note: "The pottery shop and its orders are fictitious, generated for this run in the shape of a common shop-platform export. This was the second attempt at this guide; the work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-json-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-json-to-excel"),
+        poster: `${PROOFS}/pdf-excel/convert-json-to-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.4,
+        realDuration: 111,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A shop's October orders export, a JSON file, is in Downloads." },
+        { at: 1.6, text: "The prompt: one row per order with number, date, customer, city, items and total." },
+        { at: 11.6, text: "Stella replies that it will link the file and point out anything odd in the data." },
+        { at: 16.0, text: "Flattening the nested orders, sped up 5×." },
+        { at: 30.3, text: "Done: 58 rows, totals matching the export, refunds and guest orders explained." },
+      ],
+    },
+    manualTitle: "Open it in Excel yourself",
+    manualSteps: [
+      {
+        title: "Windows: Get Data from JSON",
+        body: "In Excel, Data, Get Data, From File, From JSON, and pick the file. Power Query opens with a List or Record: click Into Table, then expand the column holding the orders (the double-arrow button) to get one row per order.",
+      },
+      {
+        title: "Expand what you need",
+        body: "Expand nested records like customer and shipping_address and tick only the fields you want (first_name, last_name, city). Leave line_items unexpanded if you want one row per order, or expand it to get one row per item.",
+      },
+      {
+        title: "Count items and fix dates",
+        body: "For items per order, expand line_items into a separate query and Group By the order number with Sum of quantity, then merge it back. Set the date column's type to Text or Date, not Date/Time/Timezone, so late-evening orders don't move to the next day.",
+      },
+      {
+        title: "On a Mac",
+        body: "Recent Microsoft 365 builds of Excel for Mac have Data, Get Data with a JSON option and the same steps. Numbers can't open JSON. A converter website works but uploads your customers' names and addresses.",
+      },
+    ],
+    limits: [
+      "This run made one row per order as asked, with no separate sheet of line items (an optional point in the answer key). Ask for one if you want item-level detail.",
+      "Very large exports (hundreds of MB) take longer, and Excel stops at 1,048,576 rows a sheet.",
+      "Stella reads the structure and some sample records, which go to the AI model you use; the conversion of the full file runs on your computer.",
+      "Recorded on Linux with Python's built-in JSON reader and a free spreadsheet library. A Mac or Windows PC works the same way.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I convert JSON to CSV instead?",
+        a: "The same steps, then save as CSV; or ask Stella for a CSV. If leading zeros or dates matter, see [convert Excel to CSV](/how/pdf-excel/convert-excel-to-csv).",
+      },
+      {
+        q: "Why are my order dates a day off?",
+        a: "The times were converted to UTC or your own time zone. Keep the date as written in the export, which carries the shop's offset.",
+      },
+      {
+        q: "What about XML exports?",
+        a: "See [convert XML to Excel](/how/pdf-excel/convert-xml-to-excel), which works through an iPhone Health export.",
+      },
+    ],
+    related: [
+      "pdf-excel/convert-xml-to-excel",
+      "pdf-excel/convert-text-file-to-excel",
+      "pdf-excel/summarize-spreadsheet-by-category",
+      "pdf-excel/fix-dates-in-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft Learn: Power Query JSON connector", href: "https://learn.microsoft.com/en-us/power-query/connectors/json" },
+    ],
+  },
+  {
+    slug: "convert-text-file-to-excel",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert text file to excel",
+      "convert text file to excel with columns",
+      "txt to excel",
+      "txt to csv",
+      "import fixed width text file into excel",
+    ],
+    title: "Convert a text file to Excel with proper columns",
+    description:
+      "Import a fixed-width text report into Excel with the Text Import Wizard, or let Stella (stella.sh) split it into clean columns with names, accents and minus signs intact.",
+    h1: "Convert a text file to Excel, each column in its own column",
+    short: "Text file to Excel",
+    lede: "An old system's printed member list turned into one clean row per member.",
+    answer:
+      "In Excel, Data, From Text/CSV opens a .txt file; for a report laid out in fixed columns, choose fixed width and set the breaks (on a Mac, File, Import). Set the file's encoding so accents survive. Then delete repeated page headers and fix numbers written with a trailing minus. Stella (stella.sh) does all of that and checks the totals against the report's footer.",
+    stellaSteps: [
+      "Opens “Member list.txt” in Documents: a 5-page printout of 212 rowing club members with a page header, column titles and dashes repeated on every page",
+      "Reads it in the old Windows text encoding, so names like García López and Nyström, Åsa keep their accents",
+      "Slices each line by column position instead of by spaces, so “van der Berg, Anna” stays one name",
+      "Turns balances like 184.82- into negative numbers, reads join dates as dates, and drops every page header and the footer",
+      "Saves Member list.xlsx in Documents with a frozen, filterable header, and checks the count and balance total against the printout's own totals",
+    ],
+    prompt:
+      "Our rowing club's old system printed the member list to a text file (Member list, in my Documents). Turn it into a proper Excel spreadsheet, one row per member and each column in its own column.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 212-row spreadsheet in about 2 minutes. Checked afterwards against an answer key written before the run: a row for every member, every name complete with accents, every balance right with money owed as a negative number, join dates as dates, no page headers or footer left as rows, and the text file kept.",
+      note: "The rowing club and its members are fictitious, made for this run as a fixed-width report in an old Windows encoding. This was the second attempt at this guide; the work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-text-file-to-excel/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-text-file-to-excel"),
+        poster: `${PROOFS}/pdf-excel/convert-text-file-to-excel/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.4,
+        realDuration: 117,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A text-file printout of a club's member list is in Documents." },
+        { at: 1.7, text: "The prompt: one row per member, each column in its own column, in Excel." },
+        { at: 11.7, text: "Stella replies that it will make the spreadsheet beside the text file and report how many members came through." },
+        { at: 16.1, text: "Reading the fixed columns, sped up 6×." },
+        { at: 29.8, text: "Done: 212 members, totals matching the printout, and the decisions it made listed." },
+      ],
+    },
+    manualTitle: "Import it yourself",
+    manualSteps: [
+      {
+        title: "Windows: From Text/CSV",
+        body: "Data, Get Data, From File, From Text/CSV, pick the file. Set File Origin to 1252: Western European (Windows) if accents look wrong. Click Transform Data, then Split Column, By Number of Characters (or By Positions) to match the report's columns.",
+      },
+      {
+        title: "Mac: File, Import",
+        body: "In Excel for Mac, File, Import, Text file. Choose Fixed width, click to set the column breaks, and set File origin to Windows (ANSI) for an old Windows file. Numbers can also open .txt files but has no fixed-width option.",
+      },
+      {
+        title: "Remove repeated headers",
+        body: "Sort by the first column: page headers, dashes and “Printed …” lines bunch together and can be deleted in one go. Or filter that column to numbers only.",
+      },
+      {
+        title: "Fix trailing minus signs",
+        body: "Old systems write money owed as 45.00-. In a new column use =IF(RIGHT(F2)=\"-\",-VALUE(SUBSTITUTE(F2,\"-\",\"\")),VALUE(F2)), fill down, then copy and Paste Values over the original column.",
+      },
+    ],
+    limits: [
+      "Works for text reports and exports. A paper printout that was scanned needs OCR first, which is slower and less exact.",
+      "When the report doesn't say what a negative balance means (owed or in credit), Stella reads the minus sign as written and says it couldn't tell.",
+      "A sample of the file's lines goes to the AI model you use in Stella to work out the layout; the conversion runs on your computer and the original is kept.",
+      "Recorded on Linux with free Python tools. A Mac or Windows PC works the same way; the .xlsx opens in Excel, Numbers or Google Sheets.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I convert a .txt file to CSV?",
+        a: "Import it as above and save as CSV, or ask Stella for a CSV. If the text is already separated by commas or tabs, Excel opens it directly.",
+      },
+      {
+        q: "Why do accented names turn into odd symbols?",
+        a: "The file was read in the wrong encoding. Old Windows programs write Windows-1252; set File Origin to that when importing.",
+      },
+      {
+        q: "Can it split names into first and last name?",
+        a: "Yes, ask for it. Stella kept “Surname, First names” in one column here because that's how the printout had it, and offered to split it.",
+      },
+    ],
+    related: [
+      "pdf-excel/convert-json-to-excel",
+      "pdf-excel/split-csv-file-into-multiple-files",
+      "pdf-excel/fix-dates-in-excel",
+      "pdf-excel/remove-duplicate-rows-in-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Import or export text (.txt or .csv) files", href: "https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba" },
+      { label: "Microsoft: Text Import Wizard", href: "https://support.microsoft.com/en-us/office/text-import-wizard-c5b02af6-fda1-4440-899f-f78bafe41857" },
+      { label: "Apple: Import an Excel or text file into Numbers on Mac", href: "https://support.apple.com/guide/numbers/import-an-excel-or-text-file-tan47c5d4b17/mac" },
+    ],
+  },
+  {
+    slug: "split-csv-file-into-multiple-files",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "split csv file into multiple files",
+      "csv too large for excel",
+      "split csv file",
+      "csv file too big to open in excel",
+      "split large csv with header",
+    ],
+    title: "Split a CSV that's too big for Excel, with headers kept",
+    description:
+      "A CSV over Excel's 1,048,576-row limit gets cut off. Split it into parts with the header in each, or let Stella (stella.sh) split it without breaking multi-line records.",
+    h1: "Split a CSV file into multiple files that open in Excel",
+    short: "Split a big CSV",
+    lede: "A 1.15-million-row export split into three parts that each open fully in Excel.",
+    answer:
+      "Excel stops at 1,048,576 rows and drops the rest. Split the CSV into parts under that size and copy the header row into each. On a Mac or Linux, `split -l` cuts by line, but breaks any record whose text has a line break inside quotes. Stella (stella.sh) splits by record instead, puts the header in every part and checks nothing is lost.",
+    stellaSteps: [
+      "Opens “Sales export 2019-2026.csv” in Downloads: 1,150,000 records, more than Excel's 1,048,576-row limit",
+      "Reads it record by record, so the 90 notes with a line break inside quotes stay whole instead of being cut in two",
+      "Writes three parts of 500,000, 500,000 and 150,000 rows, each starting with the header row, in a new folder next to the original",
+      "Checks that the parts together hold exactly the original records, none lost, repeated or changed, in the original order",
+      "Leaves the original export unchanged",
+    ],
+    prompt:
+      "The sales export CSV in my Downloads is too big for Excel, it cuts off the rows at the bottom. Split it into smaller files that each open fully in Excel, with the header row in every file.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Three CSV parts in about 1¼ minutes. Checked afterwards against an answer key written before the run: every part starts with the header and fits in Excel, together they hold exactly the 1,150,000 original records byte for byte (none broken by the multi-line notes), in the original order, and the original is unchanged.",
+      note: "The sales export is fictitious, generated for this run (67 MB, 8 columns). The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/split-csv-file-into-multiple-files/proof.mp4`,
+        cuts: webCuts("pdf-excel/split-csv-file-into-multiple-files"),
+        poster: `${PROOFS}/pdf-excel/split-csv-file-into-multiple-files/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.9,
+        realDuration: 68,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 1.15-million-row sales export CSV is in Downloads." },
+        { at: 1.6, text: "The prompt: split it into smaller files that each open fully in Excel, with the header in every file." },
+        { at: 11.6, text: "Stella replies that each part will keep the header and stay well under Excel's limit." },
+        { at: 16.0, text: "Splitting record by record, sped up 2×." },
+        { at: 30.2, text: "Done: three parts, every row accounted for, multi-line notes kept whole." },
+      ],
+    },
+    manualTitle: "Split it yourself",
+    manualSteps: [
+      {
+        title: "Check the size first",
+        body: "Excel holds 1,048,576 rows including the header. If Excel shows a “file not loaded completely” message or the last rows are missing, the file is bigger than that.",
+      },
+      {
+        title: "Mac or Linux: split",
+        body: "In Terminal: `tail -n +2 big.csv | split -l 1000000 - part_` makes parts without the header; then add it back with `for f in part_*; do (head -1 big.csv; cat $f) > $f.csv; done`. Only safe when no field contains a line break.",
+      },
+      {
+        title: "Windows: PowerShell",
+        body: "`Import-Csv` reads quoted line breaks correctly; a short script can export every million records with `Export-Csv`. It's slow on large files. Free CSV splitter programs exist too: check they keep the header.",
+      },
+      {
+        title: "Or don't split",
+        body: "If you only need totals, Excel can load the whole file into its Data Model: Data, From Text/CSV, Load To, Only Create Connection, and tick Add to Data Model. Then summarise it with a PivotTable.",
+      },
+    ],
+    limits: [
+      "Splitting doesn't add up or analyse anything; ask for a summary if that's what you need.",
+      "Very large files (several GB) take a few minutes and need free disk space for the parts.",
+      "Only the first lines go to the AI model you use in Stella to see the layout; the split itself runs on your computer.",
+      "Recorded on Linux with Python's built-in CSV reader. A Mac or Windows PC works the same way.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I split a CSV by a column's value instead of by size?",
+        a: "Yes, ask for one file per value. For an Excel sheet, see [split an Excel sheet into multiple files](/how/pdf-excel/split-excel-sheet-into-multiple-files).",
+      },
+      {
+        q: "Why does `split` break some rows?",
+        a: "It cuts on line breaks, and a quoted field (like a note) can contain one. A CSV-aware tool keeps the record whole.",
+      },
+      {
+        q: "How do I join the parts back together?",
+        a: "Ask Stella, or see [combine Excel files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet); the result still can't exceed Excel's row limit in one sheet.",
+      },
+    ],
+    related: [
+      "pdf-excel/split-excel-sheet-into-multiple-files",
+      "pdf-excel/combine-excel-files-into-one-sheet",
+      "pdf-excel/convert-text-file-to-excel",
+      "pdf-excel/remove-duplicate-rows-in-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Excel specifications and limits (1,048,576 rows)", href: "https://support.microsoft.com/en-us/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3" },
+    ],
+  },
+  {
+    slug: "convert-excel-to-csv",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "convert excel to csv",
+      "excel to csv",
+      "excel to csv keep leading zeros",
+      "convert excel to csv multiple sheets",
+    ],
+    title: "Convert Excel to CSV: every sheet, leading zeros kept",
+    description:
+      "Save each Excel sheet as CSV without losing leading zeros or turning dates into numbers, or let Stella (stella.sh) export every sheet at once and check each cell.",
+    h1: "Convert Excel to CSV, keeping leading zeros and dates",
+    short: "Excel to CSV",
+    lede: "A club spreadsheet saved as one CSV per sheet, ZIP codes and dates intact.",
+    answer:
+      "In Excel, File, Save As, CSV UTF-8 saves only the sheet you're on, so repeat for each sheet. Leading zeros that come from a number format (00417) can be lost, so make those columns Text first. Check the result in a text editor, because Excel hides the zeros again when it reopens a CSV. Stella (stella.sh) exports every sheet at once and checks each cell against the workbook.",
+    stellaSteps: [
+      "Opens “Swim club members.xlsx” in Downloads: a Members sheet (64 members, numbers and ZIP codes shown with leading zeros), a Payments sheet with a total row, and a short Read me sheet",
+      "Writes one CSV per sheet in UTF-8, so accented names come through, with addresses that contain commas quoted as one field",
+      "Keeps member numbers and ZIP codes as the five digits you see (00402, 01776) and writes dates as 2022-09-18",
+      "Leaves the blank row and the Total row out of Payments.csv so a website doesn't load the total as a payment, and checks the 40 payments still add up",
+      "Saves them in a new folder next to the workbook, which is unchanged, and flags eight $1,250.00 payments that look like typos for $125.00",
+    ],
+    prompt:
+      "The swim club's membership spreadsheet is in my Downloads and the new membership website needs it as CSV files, one for each sheet. The member numbers and zip codes have to keep their leading zeros, and the dates need to come out as proper dates.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Three CSV files in about 2¼ minutes. Checked afterwards against an answer key written before the run: Members and Payments each saved as CSV, all 64 members, member numbers and ZIP codes with their leading zeros, dates as real dates (not serial numbers), accented names right in UTF-8, addresses with commas kept in one field, every payment right, and the workbook unchanged.",
+      note: "The swim club and its members are fictitious, made for this run. The work is sped up 7×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/convert-excel-to-csv/proof.mp4`,
+        cuts: webCuts("pdf-excel/convert-excel-to-csv"),
+        poster: `${PROOFS}/pdf-excel/convert-excel-to-csv/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 50.8,
+        realDuration: 140,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A swim club membership workbook with three sheets is in Downloads." },
+        { at: 1.9, text: "The prompt: a CSV for each sheet, leading zeros kept, dates as proper dates." },
+        { at: 17.9, text: "Stella replies that it will write dates as YYYY-MM-DD and leave the original unchanged." },
+        { at: 22.3, text: "Exporting each sheet and checking every cell, sped up 7×." },
+        { at: 36.5, text: "Done: Members, Payments and Read me as CSV, zeros kept, and eight suspicious payments flagged." },
+      ],
+    },
+    manualTitle: "Save the CSVs yourself",
+    manualSteps: [
+      {
+        title: "Make zero-padded columns Text",
+        body: "If ZIP codes or member numbers show zeros only because of a number format, add a column with =TEXT(A2,\"00000\"), fill down, copy and Paste Values over the original. Now the zeros are part of the value.",
+      },
+      {
+        title: "Save each sheet",
+        body: "Click a sheet's tab, then File, Save As (or Save a Copy), and choose CSV UTF-8 (Comma delimited). Excel warns that only the active sheet is saved; that's expected. Repeat for every sheet under its own name.",
+      },
+      {
+        title: "Dates",
+        body: "A CSV stores dates as text in whatever format the cell shows. For a website, format date columns as yyyy-mm-dd first (Format Cells, Custom) so there's no doubt about day and month.",
+      },
+      {
+        title: "Check in a text editor",
+        body: "Open the CSV in Notepad or TextEdit, not Excel: Excel drops leading zeros again when it opens a CSV, even when they're in the file. Look for 00417 and a few dates.",
+      },
+    ],
+    limits: [
+      "A CSV holds values only: colours, formulas and several sheets in one file can't survive. Totals are written as their values, or left out if they'd be read as data.",
+      "Opening the CSV in Excel again hides the leading zeros on screen, even though they are in the file.",
+      "The workbook's content goes to the AI model you use in Stella as it checks the export; the files are written on your computer.",
+      "Recorded on Linux with free Python spreadsheet tools. A Mac or Windows PC works the same way.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I convert CSV back to Excel?",
+        a: "Open it with Data, From Text/CSV and set the zero-padded columns to Text in the preview, then save as .xlsx. For text reports, see [convert a text file to Excel](/how/pdf-excel/convert-text-file-to-excel).",
+      },
+      {
+        q: "Why do my dates become numbers like 45231?",
+        a: "That's Excel's internal date number, written by tools that ignore the cell's format. Save from Excel itself, or ask for ISO dates.",
+      },
+      {
+        q: "Can I convert a Numbers file instead?",
+        a: "Yes: [convert Numbers to Excel](/how/pdf-excel/convert-numbers-to-excel), then save as CSV.",
+      },
+    ],
+    related: [
+      "pdf-excel/convert-numbers-to-excel",
+      "pdf-excel/split-csv-file-into-multiple-files",
+      "pdf-excel/fix-dates-in-excel",
+      "contacts-calendar-email/convert-csv-to-vcf",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Import or export text (.txt or .csv) files", href: "https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba" },
+      { label: "Microsoft: Keeping leading zeros and large numbers", href: "https://support.microsoft.com/en-US/Excel/keeping-leading-zeros-and-large-numbers" },
+    ],
+  },
+  {
+    slug: "split-excel-sheet-into-multiple-files",
+    niche: "pdf-excel",
+    searchPhrases: [
+      "split excel sheet into multiple files",
+      "split excel sheet into multiple files based on column value",
+      "split excel sheet by column value",
+      "split excel sheet into multiple files without vba",
+    ],
+    title: "Split an Excel sheet into multiple files by column value",
+    description:
+      "Make one Excel file per salesperson, region or client with filters, or let Stella (stella.sh) split the sheet with no macros and catch names typed inconsistently.",
+    h1: "Split an Excel sheet into multiple files by column value",
+    short: "Split an Excel sheet into files",
+    lede: "620 orders split into one file per sales rep, mistyped names caught.",
+    answer:
+      "Turn on Filter, choose one value in the column (one rep, one region), copy the visible rows into a new workbook and save; repeat for each value. Tidy the column first, because “Dana Price” and “dana price ” count as different values. VBA macros automate it, if you trust them. Stella (stella.sh) does it without macros and merges names that are clearly the same person.",
+    stellaSteps: [
+      "Opens “Orders 2026.xlsx” in Documents: 620 orders for 6 sales reps, a TOTAL row at the bottom and a Reps contact sheet",
+      "Finds 44 orders where the rep's name was typed differently (extra spaces, lower case, all capitals) and matches each to the right rep",
+      "Writes six files, one per rep, each with only that rep's orders under the header and the dates still as dates",
+      "Gives each file only that rep's own row from the Reps sheet, so nobody gets colleagues' email addresses",
+      "Saves them in a new folder next to the original, which is unchanged, checks the totals add up to the original's, and sends nothing",
+    ],
+    prompt:
+      "I've got a spreadsheet of all our 2026 orders in my Documents. Split it into a separate Excel file for each sales rep, with only their orders, so I can send each rep their own.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Six files in about 2¼ minutes. Checked afterwards against an answer key written before the run: one file per rep with exactly that rep's orders (the mistyped names merged in), no file mixing reps, no extra files for a misspelt name, order dates still real dates, and the original workbook unchanged.",
+      note: "The company, its reps and orders are fictitious, made for this run. The work is sped up 7×.",
+      video: {
+        src: `${PROOFS}/pdf-excel/split-excel-sheet-into-multiple-files/proof.mp4`,
+        cuts: webCuts("pdf-excel/split-excel-sheet-into-multiple-files"),
+        poster: `${PROOFS}/pdf-excel/split-excel-sheet-into-multiple-files/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 51.8,
+        realDuration: 131,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A workbook of 620 orders for six sales reps is in Documents." },
+        { at: 1.6, text: "The prompt: a separate Excel file for each rep with only their orders." },
+        { at: 19.6, text: "Stella replies that the files will go in a folder next to the original, with a count per rep." },
+        { at: 24.0, text: "Grouping orders by rep, sped up 7×." },
+        { at: 37.4, text: "Done: six files, totals matching the original, 44 mistyped names merged, nothing sent." },
+      ],
+    },
+    manualTitle: "Split it yourself",
+    manualSteps: [
+      {
+        title: "Tidy the column first",
+        body: "Add a helper column with =PROPER(TRIM(D2)) next to the rep column and fill down. That folds extra spaces and odd capitals into one spelling. Check the unique values with the filter drop-down.",
+      },
+      {
+        title: "Filter and copy",
+        body: "Select the header row, Data, Filter. In the tidied column choose one name. Select the visible rows, copy, and paste into a new workbook (File, New); Excel copies only the visible rows.",
+      },
+      {
+        title: "Save and repeat",
+        body: "Save the new workbook under the rep's name. Back in the original, pick the next name in the filter and repeat. Leave out any total row at the bottom.",
+      },
+      {
+        title: "Check the counts",
+        body: "Add up the row counts of the new files; they should match the original. A PivotTable of the tidied column gives the count per rep to compare against.",
+      },
+    ],
+    limits: [
+      "Stella decides which spellings are the same person and lists the variants it merged; check that list if two staff have similar names.",
+      "The new files hold values: formulas that point at other sheets won't work in them.",
+      "The workbook's content goes to the AI model you use in Stella as it checks the split; the files are written on your computer.",
+      "Recorded on Linux with free Python spreadsheet tools. A Mac or Windows PC works the same way; the files open in Excel, Numbers or Google Sheets.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I split into sheets in one workbook instead of separate files?",
+        a: "Yes, ask for one sheet per value. In Excel, a PivotTable's Show Report Filter Pages does it for simple cases.",
+      },
+      {
+        q: "Can Stella email each rep their file?",
+        a: "It can if you ask and have email connected; in this run it didn't send anything. For one letter or invoice per row instead, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word).",
+      },
+      {
+        q: "What if the file is a huge CSV?",
+        a: "See [split a CSV file into multiple files](/how/pdf-excel/split-csv-file-into-multiple-files).",
+      },
+    ],
+    related: [
+      "pdf-excel/split-csv-file-into-multiple-files",
+      "pdf-excel/combine-excel-files-into-one-sheet",
+      "pdf-excel/summarize-spreadsheet-by-category",
+      "pdf-excel/remove-duplicate-rows-in-excel",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Filter data in a range or table", href: "https://support.microsoft.com/en-us/office/filter-data-in-a-range-or-table-01832226-31b5-4568-8806-38c37dcc180e" },
     ],
   },
 ];

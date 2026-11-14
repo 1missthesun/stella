@@ -555,6 +555,11 @@
   padding: clamp(96px, 14svh, 170px) var(--l-margin) 0;
 }
 
+/* Headed groups inside one hub sit closer together than separate blocks. */
+.group.groupTight {
+  padding-top: clamp(64px, 9svh, 110px);
+}
+
 .groupHead {
   display: flex;
   flex-wrap: wrap;

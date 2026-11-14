@@ -216,7 +216,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes. Save the merged document as a PDF from Word (File, Save As, PDF), or ask Stella for a PDF alongside the .docx. If you only have a PDF and need to edit it, [convert the PDF to Word](/how/documents/convert-pdf-to-word) first.",
       },
     ],
-    related: ["documents/find-and-replace-in-multiple-word-documents", "documents/convert-word-documents-to-pdf-in-bulk", "documents/make-a-cookbook-from-your-recipes", "documents/convert-pdf-to-word"],
+    related: ["documents/find-and-replace-in-multiple-word-documents", "documents/convert-word-documents-to-pdf-in-bulk", "documents/make-a-cookbook-from-your-recipes", "documents/convert-pdf-to-word", "documents/compare-two-word-documents", "documents/accept-tracked-changes-in-word"],
     lastChecked: "2026-11-13",
     sources: [{ label: "Microsoft: Insert a document in Word", href: "https://support.microsoft.com/en-us/word/insert-a-document-in-word" }],
   },
@@ -320,7 +320,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes, ask for that in the prompt. To put pages in a different order afterwards, see [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages).",
       },
     ],
-    related: ["documents/convert-pdf-to-word", "pdf-excel/reorder-pdf-pages", "documents/merge-word-documents"],
+    related: ["documents/convert-pdf-to-word", "pdf-excel/reorder-pdf-pages", "documents/merge-word-documents", "documents/merge-powerpoint-presentations", "documents/reduce-powerpoint-file-size"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -536,7 +536,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes: File, Save As, PDF in Word. For speaker notes from slides, see [PowerPoint to PDF with notes](/how/documents/convert-powerpoint-to-pdf-with-notes).",
       },
     ],
-    related: ["pdf-excel/make-scanned-pdf-searchable", "documents/find-and-replace-in-multiple-word-documents", "documents/merge-word-documents"],
+    related: ["pdf-excel/make-scanned-pdf-searchable", "documents/find-and-replace-in-multiple-word-documents", "documents/merge-word-documents", "pdf-excel/edit-text-in-pdf"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Microsoft: Opening PDFs in Word", href: "https://support.microsoft.com/office/opening-pdfs-in-word-1d1d2acc-afa0-46ef-891d-b76bcd83d9c8" },
@@ -871,6 +871,419 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         label: "Microsoft: Insert a table of contents",
         href: "https://support.microsoft.com/en-us/office/insert-a-table-of-contents-882e8564-0edb-435e-84b5-1d8552ccf0c0",
       },
+    ],
+  },
+  {
+    slug: "accept-tracked-changes-in-word",
+    niche: "documents",
+    searchPhrases: [
+      "accept all changes in word",
+      "remove track changes in word",
+      "remove comments from word document",
+      "accept all changes in word document",
+      "accept tracked changes in multiple word documents",
+    ],
+    title: "Accept all tracked changes in Word and remove comments",
+    description:
+      "Accept every tracked change and delete all comments in Word in four clicks, or let Stella (stella.sh) make clean final copies of a whole folder and keep the originals.",
+    h1: "Accept all changes in Word and remove the comments",
+    short: "Accept tracked changes in Word",
+    lede: "Clean final copies of three board papers, every change accepted, every comment gone.",
+    answer:
+      "In Word, Review, Accept, Accept All Changes, then Review, Delete, Delete All Comments in Document, and save under a new name. In LibreOffice, Edit, Track Changes, Manage, Accept All. It's quick for one file and repetitive for a folder. Stella (stella.sh) does a whole folder at once, formatting changes included, and saves clean copies next to the originals.",
+    stellaSteps: [
+      "Opens the three Word files in the Board papers folder, each with tracked insertions, deletions (some of whole sentences), a tracked bold change and two or three comments",
+      "Accepts every change, so insertions stay, deletions go and the formatting change takes effect, and removes every comment and its markers",
+      "Tidies the empty paragraphs left where a whole sentence was deleted",
+      "Saves each as “… - clean final.docx” next to its original; the originals are untouched",
+      "Points out that the Volunteer policy title still says “(draft 3)”, because that's typed text, not a tracked change",
+    ],
+    prompt:
+      "The Word files in the Board papers folder in my Documents are full of tracked changes and comments. Make clean final copies of each one with all the changes accepted and all the comments removed, and keep the originals as they are.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Three clean copies in about 1½ minutes. Checked afterwards against an answer key written before the run: in each file no tracked insertions, deletions or formatting changes left, no comments, and the text exactly the accepted version (insertions kept, deletions gone), with the originals unchanged.",
+      note: "The board papers, the charity and its people are fictitious, made for this run as ordinary .docx files with real tracked changes. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/documents/accept-tracked-changes-in-word/proof.mp4`,
+        cuts: webCuts("documents/accept-tracked-changes-in-word"),
+        poster: `${PROOFS}/documents/accept-tracked-changes-in-word/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.6,
+        realDuration: 101,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A Board papers folder holds three Word files full of tracked changes and comments." },
+        { at: 1.6, text: "The prompt: clean final copies with every change accepted and every comment removed, originals kept." },
+        { at: 13.6, text: "Stella replies that the clean versions will be saved next to the originals under a name marking them final." },
+        { at: 18, text: "Accepting changes and removing comments, sped up 5×." },
+        { at: 31.2, text: "Done: three clean finals, the blank lines from deleted sentences tidied, and a leftover “(draft 3)” pointed out." },
+      ],
+    },
+    manualTitle: "Clean them up yourself",
+    manualSteps: [
+      {
+        title: "Accept every change",
+        body: "Open the document in Word. On the Review tab, click the arrow under Accept and choose Accept All Changes (or Accept All Changes and Stop Tracking, so new edits aren't tracked).",
+      },
+      {
+        title: "Delete the comments",
+        body: "Still on Review, click the arrow under Delete in the Comments group and choose Delete All Comments in Document. Accepting changes doesn't remove comments; it's a separate step.",
+      },
+      {
+        title: "Check nothing is hiding",
+        body: "Set the view to All Markup before you start, so you see every change. Formatting changes and changes by other people can be hidden by the Show Markup filters, and Accept All only accepts what's shown.",
+      },
+      {
+        title: "Save as a new file",
+        body: "File, Save As with a name like “final”, so the version with the history stays. Repeat for each document. In LibreOffice it's Edit, Track Changes, Manage, Accept All, then delete comments from the Comments menu.",
+      },
+    ],
+    limits: [
+      "Accepting means agreeing to every change. Stella doesn't pick and choose unless you tell it which edits to reject.",
+      "Text that says “draft” or a version number is ordinary text, not a tracked change; Stella points it out but leaves it.",
+      "The documents' text goes to the AI model you use in Stella as it checks the result; the files are edited on your computer.",
+      "Recorded on Linux without Word installed; Stella edited the .docx files directly. On a Mac or Windows PC it works the same way, and the clean copies open in Word, Pages or Google Docs.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does Word still show changes after I accepted them?",
+        a: "Usually some were hidden by the markup filter, or tracking is still on and your next edit was tracked. Show All Markup, accept again, and turn Track Changes off.",
+      },
+      {
+        q: "How do I see what changed between two versions with no tracked changes?",
+        a: "Compare them: see [compare two Word documents](/how/documents/compare-two-word-documents).",
+      },
+      {
+        q: "Can I turn the clean copies into PDFs?",
+        a: "Yes: [convert Word documents to PDF in bulk](/how/documents/convert-word-documents-to-pdf-in-bulk).",
+      },
+    ],
+    related: [
+      "documents/compare-two-word-documents",
+      "documents/convert-word-documents-to-pdf-in-bulk",
+      "documents/find-and-replace-in-multiple-word-documents",
+      "documents/merge-word-documents",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Accept or reject tracked changes in Word", href: "https://support.microsoft.com/en-gb/word/accept-or-reject-tracked-changes-in-word" },
+      { label: "LibreOffice Help: Accepting or rejecting changes", href: "https://help.libreoffice.org/latest/en-US/text/shared/guide/redlining_accept.html" },
+    ],
+  },
+  {
+    slug: "compare-two-word-documents",
+    niche: "documents",
+    searchPhrases: [
+      "compare two word documents",
+      "compare two word documents for differences",
+      "compare two word documents and highlight differences",
+      "what changed in this contract",
+    ],
+    title: "Compare two Word documents and list every change",
+    description:
+      "Compare two versions of a Word document with Word's Compare tool, or let Stella (stella.sh) list every wording change, before and after, and flag the ones that matter.",
+    h1: "Compare two Word documents for differences",
+    short: "Compare two Word documents",
+    lede: "Every wording change between two versions of a contract, the one-word flip included.",
+    answer:
+      "Word has it built in: Review, Compare, Compare Documents, choose the original and the revised version, and Word makes a third document with every difference marked as a tracked change. LibreOffice has Edit, Track Changes, Compare Document. Stella (stella.sh) writes a plain list of each wording change, what it said before and after, and calls out the ones worth pushing back on.",
+    stellaSteps: [
+      "Opens both versions of the supply agreement in Documents (v3, and v4 sent back by the supplier) and checks v4 for tracked changes; there were none, so the edits were unmarked",
+      "Compares them clause by clause, setting aside differences in font and spacing that don't change the wording",
+      "Saves “Supply agreement - changes from v3 to v4.docx”: each change with its clause, the old wording struck out and the new underlined",
+      "Leads with the changes that matter: 10.1 now lets the Supplier end the agreement instead of the Client, the liability cap deleted, an automatic renewal added, notice cut to one month, a higher fee",
+      "Lists the smaller ones too (delivery time, payment days, a new account manager) and leaves both versions unchanged",
+    ],
+    prompt:
+      "Our supplier sent back the agreement as v4 and I need to know exactly what they changed from our v3. Both Word files are in my Documents. Compare them and save a list of every change in wording, showing what it said before and what it says now.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A list of changes in about 2¾ minutes. Checked afterwards against an answer key written before the run: all 8 planted wording changes found (fee, payment days, delivery time, notice, who may end the agreement, liability cap removed, renewal added, account manager), including the one-word swap in clause 10.1, with both versions unchanged.",
+      note: "The agreement and both companies are fictitious, made for this run. The answer key planted 8 changes; Stella listed 9 because it also counted the cover line changing from “Draft v3” to “Draft v4”. The work is sped up 10×.",
+      video: {
+        src: `${PROOFS}/documents/compare-two-word-documents/proof.mp4`,
+        cuts: webCuts("documents/compare-two-word-documents"),
+        poster: `${PROOFS}/documents/compare-two-word-documents/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.5,
+        realDuration: 164,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Two versions of a supply agreement, v3 and the supplier's v4, are in Documents." },
+        { at: 1.6, text: "The prompt: compare them and save a list of every wording change, before and after." },
+        { at: 10.6, text: "Stella replies that it will also check whether anything was changed without being marked." },
+        { at: 15, text: "Comparing the two versions clause by clause, sped up 10×." },
+        { at: 29.4, text: "Done: 9 wording changes, none marked, with the clause 10.1 swap and the deleted liability cap at the top." },
+      ],
+    },
+    manualTitle: "Compare them yourself",
+    manualSteps: [
+      {
+        title: "Word: Compare Documents",
+        body: "Open Word (desktop, not Word for the web). Review, Compare, Compare Documents. Pick the older file as Original and the newer as Revised, then OK. Word opens a new document with every difference as a tracked change.",
+      },
+      {
+        title: "Read the Revisions pane",
+        body: "Open the Revisions pane to step through the changes in order. Under More in the Compare dialog, untick Formatting if a font change floods the list with differences that don't matter.",
+      },
+      {
+        title: "LibreOffice (free)",
+        body: "Open the newer version in LibreOffice Writer, then Edit, Track Changes, Compare Document, and pick the older one. Use Edit, Track Changes, Manage to step through them.",
+      },
+      {
+        title: "Read single words closely",
+        body: "The changes that matter in a contract are often one word: who may do something, “may” against “must”, a number of days. Read every small change, not only the long ones.",
+      },
+    ],
+    limits: [
+      "Stella reports what changed in the wording and why it might matter; it isn't legal advice. Take anything important to whoever advises you on contracts.",
+      "Changes inside pictures or scanned pages aren't seen; a scanned contract needs OCR first.",
+      "Both documents' text goes to the AI model you use in Stella; the comparison file is made on your computer.",
+      "Recorded on Linux without Word installed; Stella read the .docx files directly. On a Mac or Windows PC it works the same way, and the list opens in Word, Pages or Google Docs.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I compare two Word documents in Word for the web?",
+        a: "Not at the time of writing; Compare is in the desktop Word apps. LibreOffice does it free on any computer.",
+      },
+      {
+        q: "Can I get a redline (tracked changes) instead of a list?",
+        a: "Yes, ask for one. Word's Compare makes one too. To then accept everything and produce a clean copy, see [accept all tracked changes in Word](/how/documents/accept-tracked-changes-in-word).",
+      },
+      {
+        q: "What about comparing two spreadsheets?",
+        a: "See [compare two Excel files](/how/pdf-excel/compare-two-excel-files).",
+      },
+    ],
+    related: [
+      "documents/accept-tracked-changes-in-word",
+      "pdf-excel/compare-two-excel-files",
+      "documents/merge-word-documents",
+      "documents/convert-pdf-to-word",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Compare and merge two versions of a document", href: "https://support.microsoft.com/en-us/word/compare-and-merge-two-versions-of-a-document" },
+      { label: "LibreOffice Help: Comparing versions of a document", href: "https://help.libreoffice.org/latest/en-US/text/shared/guide/redlining_doccompare.html" },
+    ],
+  },
+  {
+    slug: "merge-powerpoint-presentations",
+    niche: "documents",
+    searchPhrases: [
+      "merge powerpoint presentations",
+      "combine powerpoint presentations into one",
+      "merge powerpoint presentations with different templates",
+      "combine powerpoint presentations without changing format",
+    ],
+    title: "Merge PowerPoint presentations and keep each deck's design",
+    description:
+      "Combine PowerPoint decks into one with Keep Source Formatting, or let Stella (stella.sh) merge them in order with backgrounds, pictures and speaker notes kept.",
+    h1: "Merge PowerPoint presentations without losing their design",
+    short: "Merge PowerPoint presentations",
+    lede: "Three people's decks in one file, in running order, each keeping its own look and notes.",
+    answer:
+      "Open the first deck, copy all the slides of the next one, paste them at the end and choose Keep Source Formatting, then repeat. Without that option the pasted slides take on the first deck's theme. Reuse Slides works too, but Microsoft is retiring it. Stella (stella.sh) merges them for you in the order you give, keeping each deck's backgrounds, pictures and speaker notes.",
+    stellaSteps: [
+      "Finds the three decks in the Quarterly review folder (Sales, Operations, Finance), each with its own background colours, photos and speaker notes",
+      "Copies every slide into one new presentation in the running order you gave, keeping each deck's own slide order",
+      "Brings each slide's background, colours, pictures, the profit-and-loss table and its speaker notes across with it",
+      "Checks the finished file slide by slide against the originals and saves “Quarterly review - combined.pptx” in the same folder",
+      "Notes that the table on slide 11 is blue in the Finance original too, so the merge didn't cause it; the three originals are unchanged",
+    ],
+    prompt:
+      "In my Documents, the Quarterly review folder has three presentations from different people. Combine them into one presentation in the running order: Sales first, then Operations, then Finance. Each one should keep its own colours and pictures, and keep the speaker notes.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "One 14-slide presentation in about 1¾ minutes. Checked afterwards against an answer key written before the run: all 14 slides in the order Sales, Operations, Finance, speaker notes on every slide, photos and the table kept, every slide looking like its original when rendered and compared, and the three decks unchanged.",
+      note: "The company and its three quarterly decks are fictitious, made for this run. The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/documents/merge-powerpoint-presentations/proof.mp4`,
+        cuts: webCuts("documents/merge-powerpoint-presentations"),
+        poster: `${PROOFS}/documents/merge-powerpoint-presentations/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.4,
+        realDuration: 109,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Three decks from different people sit in a Quarterly review folder." },
+        { at: 1.6, text: "The prompt: one presentation, Sales then Operations then Finance, each keeping its colours, pictures and notes." },
+        { at: 9.6, text: "Stella replies that it will save the merged deck as a new file and leave the originals alone." },
+        { at: 14, text: "Copying slides with their backgrounds and notes, sped up 6×." },
+        { at: 27.6, text: "Done: 14 slides in three sections, each in its own colours, checked against the originals." },
+      ],
+    },
+    manualTitle: "Merge them yourself",
+    manualSteps: [
+      {
+        title: "Copy and paste with Keep Source Formatting",
+        body: "Open the deck that goes first and save it under a new name. Open the next deck, click in the slide thumbnails, select all (Ctrl-A or Command-A) and copy. Back in the first deck, click after the last slide, paste, and choose Keep Source Formatting from the paste options.",
+      },
+      {
+        title: "Or Reuse Slides",
+        body: "Home, New Slide, Reuse Slides, browse to the next deck, tick Keep source formatting (or Use source formatting) and click each slide or Insert All. Microsoft is phasing this pane out in newer versions, so copy and paste is the safer route.",
+      },
+      {
+        title: "Check the result",
+        body: "Run through the merged deck in Slide Sorter view. Look for slides that took on the wrong background, pictures that moved, and speaker notes (View, Notes) that didn't come across.",
+      },
+      {
+        title: "Keynote and Google Slides",
+        body: "In Keynote, drag slides from one presentation's navigator into the other's; they keep their own master. In Google Slides use File, Import slides and tick Keep original theme.",
+      },
+    ],
+    limits: [
+      "Animations, transitions and embedded videos are kept only as far as the copy method supports; Stella checks the result slide by slide and says if anything didn't carry over.",
+      "Fonts a deck uses but your computer lacks are swapped for similar ones when the merged file is shown elsewhere.",
+      "Slide text and notes go to the AI model you use in Stella as it checks the result; the merge happens on your computer.",
+      "Recorded on Linux without PowerPoint installed; Stella edited the .pptx files directly. On a Mac or Windows PC it works the same way, and the file opens in PowerPoint, Keynote or Google Slides.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why do my pasted slides change colour?",
+        a: "PowerPoint's default paste uses the destination theme. Choose Keep Source Formatting from the paste options (the clipboard icon) right after pasting.",
+      },
+      {
+        q: "The merged deck is huge. How do I make it smaller?",
+        a: "Photos are usually why: see [reduce PowerPoint file size](/how/documents/reduce-powerpoint-file-size).",
+      },
+      {
+        q: "How do I share it as a PDF with the notes?",
+        a: "See [convert PowerPoint to PDF with notes](/how/documents/convert-powerpoint-to-pdf-with-notes).",
+      },
+    ],
+    related: [
+      "documents/reduce-powerpoint-file-size",
+      "documents/convert-powerpoint-to-pdf-with-notes",
+      "documents/merge-word-documents",
+      "pdf-excel/merge-pdf-files",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Reuse (import) slides from another presentation", href: "https://support.microsoft.com/en-US/PowerPoint/reuse-import-slides-from-another-presentation" },
+      { label: "Microsoft: Copy and paste your slides", href: "https://support.microsoft.com/en-US/PowerPoint/copy-and-paste-your-slides" },
+    ],
+  },
+  {
+    slug: "reduce-powerpoint-file-size",
+    niche: "documents",
+    searchPhrases: [
+      "reduce powerpoint file size",
+      "compress powerpoint",
+      "reduce powerpoint file size for email",
+      "powerpoint too big to email",
+    ],
+    title: "Reduce PowerPoint file size to email it, photos still sharp",
+    description:
+      "Shrink a PowerPoint full of photos with Compress Pictures, or let Stella (stella.sh) bring a 27 MB deck under 10 MB and check every slide still looks the same.",
+    h1: "Reduce PowerPoint file size so you can email it",
+    short: "Reduce PowerPoint file size",
+    lede: "A 27 MB slideshow of phone photos down to 3.5 MB, every slide looking the same.",
+    answer:
+      "Photos are nearly always the reason. In PowerPoint, select a picture, Picture Format, Compress Pictures, untick “Apply only to this picture”, tick “Delete cropped areas”, pick 150 ppi, and save a copy. That shrinks every photo to what the slide needs. Stella (stella.sh) does the same on your computer, keeps logos with see-through backgrounds intact and compares every slide before and after.",
+    stellaSteps: [
+      "Opens “Winter Gala recap.pptx” in Documents: 27.7 MB, 13 slides with 11 full-resolution phone photos, one cropped inside PowerPoint, and a PNG logo with a transparent background",
+      "Shrinks each photo to a size that's still sharp at the size it's shown on its slide, allowing for the crop",
+      "Leaves the logo as a PNG so its background stays transparent",
+      "Saves “Winter Gala recap (compressed).pptx” at 3.5 MB next to the original, which is unchanged",
+      "Says what it gave up: the photos inside the copy are too small to print large, and their hidden camera details (date, location) were removed",
+    ],
+    prompt:
+      "The Winter Gala recap presentation in my Documents is 27 MB, which is too big to email. Make a copy under 10 MB without losing any slides and without the photos looking bad.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 3.5 MB copy in about 2 minutes. Checked afterwards against an answer key written before the run: under 10 MB with all 13 slides and all their text, every picture still there and sharp at the size shown, the logo's transparent background intact, every slide rendering the same as before, and the original kept.",
+      note: "The gala, its photos and logo are fictitious, made for this run (the photos are generated at phone-camera size). The work is sped up 6×.",
+      video: {
+        src: `${PROOFS}/documents/reduce-powerpoint-file-size/proof.mp4`,
+        cuts: webCuts("documents/reduce-powerpoint-file-size"),
+        poster: `${PROOFS}/documents/reduce-powerpoint-file-size/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 41.7,
+        realDuration: 114,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 27 MB Winter Gala recap presentation is in Documents." },
+        { at: 1.6, text: "The prompt: a copy under 10 MB, no slides lost, photos not looking bad." },
+        { at: 9.6, text: "Stella replies that it will keep every slide and the photos sharp at presentation size." },
+        { at: 14.0, text: "Resizing the photos and comparing slides, sped up 6×." },
+        { at: 27.3, text: "Done: 3.5 MB, down from 27.7 MB, all 13 slides, and the trade-off explained." },
+      ],
+    },
+    manualTitle: "Shrink it yourself",
+    manualSteps: [
+      {
+        title: "Compress Pictures",
+        body: "Select any picture, then Picture Format, Compress Pictures. Untick “Apply only to this picture”, tick “Delete cropped areas of pictures”, and choose 150 ppi (Web) or 220 ppi (Print). Then File, Save As a copy.",
+      },
+      {
+        title: "Change the default",
+        body: "On Windows, File, Options, Advanced, Image Size and Quality: set the default resolution and untick “Do not compress images in file”, so newly added photos are shrunk on save too.",
+      },
+      {
+        title: "Check logos and graphics",
+        body: "Compression can turn transparent PNG logos into JPEGs with a box behind them. If that happens, undo for that picture or re-insert the original logo.",
+      },
+      {
+        title: "Other things that bloat a deck",
+        body: "Embedded videos and fonts add a lot. Compress media (File, Info, Compress Media on Windows) and untick Embed fonts in Save options if the recipient has the fonts. Or send a link to the file in OneDrive, Google Drive or iCloud instead.",
+      },
+    ],
+    limits: [
+      "The smaller copy is meant for screens and projectors. Someone pulling a photo out of it to print large would get a lower-resolution version; keep the original for that.",
+      "Hidden camera details in the photos (date, location) were removed in this run; ask Stella to keep them if you need them.",
+      "Videos inside a deck need re-encoding, which takes longer.",
+      "Stella looks at slide renders to compare before and after, so slide images go to the AI model you use in Stella; the shrinking happens on your computer.",
+      "Recorded on Linux without PowerPoint installed; Stella resized the pictures inside the .pptx directly. A Mac or Windows PC works the same way.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What's a good size to email a presentation?",
+        a: "Under 10 MB is safe for most email; Gmail and Outlook.com allow about 20 to 25 MB. Bigger than that, share a link instead.",
+      },
+      {
+        q: "Does this work for Word documents too?",
+        a: "Yes, Word has the same Compress Pictures tool, and Stella can shrink a .docx the same way. For PDFs, see [compress a PDF that's too large to email](/how/pdf-excel/compress-pdf-too-large-to-email).",
+      },
+      {
+        q: "Should I send it as a PDF instead?",
+        a: "If they only need to read it, yes: see [convert PowerPoint to PDF with notes](/how/documents/convert-powerpoint-to-pdf-with-notes). A PDF of a photo-heavy deck can still be large, so shrink the photos first.",
+      },
+    ],
+    related: [
+      "documents/merge-powerpoint-presentations",
+      "pdf-excel/compress-pdf-too-large-to-email",
+      "documents/convert-powerpoint-to-pdf-with-notes",
+      "photos-files/resize-images-in-bulk",
+    ],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: Reduce the file size of your PowerPoint presentations", href: "https://support.microsoft.com/en-US/PowerPoint/reduce-the-file-size-of-your-powerpoint-presentations" },
     ],
   },
 ];

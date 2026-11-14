@@ -925,7 +925,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. The pages are photos, so search finds nothing until OCR runs: [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable). If the photos are HEIC and you need JPGs too, [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
       },
     ],
-    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/make-scanned-pdf-searchable", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet"],
+    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/make-scanned-pdf-searchable", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet", "pdf-excel/merge-pdf-files"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Perform quick actions in Finder on Mac", href: "https://support.apple.com/guide/mac-help/mchl97ff9142/mac" },

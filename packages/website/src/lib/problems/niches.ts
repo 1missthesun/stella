@@ -56,11 +56,72 @@ export const NICHES: Niche[] = [
     slug: "pdf-excel",
     name: "PDFs and Excel",
     h1: "PDFs and spreadsheets, sorted.",
-    title: "PDF and Excel how-tos: split, redact, compress, compare",
+    title: "PDF and Excel how-tos: merge, split, sign, convert",
     description:
-      "Split, redact, unlock and number PDFs, get statements and receipts into Excel, and compare or combine spreadsheets, with free tools or Stella (stella.sh).",
+      "Merge, split, sign and edit PDFs, pull text and tables out of them, and get JSON, XML, text or Numbers files into Excel, with free tools or Stella (stella.sh).",
     intro:
-      "PDFs are where office jobs get fiddly: files too big to send, numbers stuck in tables you can't copy. Each guide shows the free route first, then Stella (stella.sh) doing it with a real file.",
+      "Merge, split, sign or edit a PDF, get the numbers out of one, or turn an export Excel won't open into a sheet you can sort. Each guide shows the free route first, then Stella (stella.sh) doing it with a real file.",
+    sections: [
+      {
+        title: "Merge, split and tidy PDFs.",
+        slugs: [
+          "merge-pdf-files",
+          "split-pdf-into-multiple-files",
+          "extract-pages-from-pdf",
+          "delete-pages-from-pdf",
+          "reorder-pdf-pages",
+          "rotate-pdf-pages",
+          "split-pdf-pages-in-half",
+          "add-page-numbers-to-pdf",
+          "compress-pdf-too-large-to-email",
+        ],
+      },
+      {
+        title: "Edit, sign and protect PDFs.",
+        slugs: ["edit-text-in-pdf", "add-signature-to-pdf", "fill-pdf-form-from-spreadsheet", "redact-pdf", "remove-password-from-pdf"],
+      },
+      {
+        title: "Get text, tables and pictures out of PDFs.",
+        slugs: [
+          "extract-text-from-pdf",
+          "make-scanned-pdf-searchable",
+          "extract-table-from-pdf-to-excel",
+          "extract-images-from-pdf",
+          "convert-pdf-to-jpg",
+          "convert-excel-to-pdf-without-cutting-off",
+          "convert-epub-to-pdf",
+          "convert-mobi-to-epub",
+        ],
+      },
+      {
+        title: "Get files into Excel, and back out.",
+        slugs: [
+          "convert-json-to-excel",
+          "convert-xml-to-excel",
+          "convert-text-file-to-excel",
+          "convert-numbers-to-excel",
+          "convert-word-table-to-excel",
+          "convert-excel-to-csv",
+        ],
+      },
+      {
+        title: "Split, combine and clean spreadsheets.",
+        slugs: [
+          "split-excel-sheet-into-multiple-files",
+          "split-csv-file-into-multiple-files",
+          "combine-excel-files-into-one-sheet",
+          "merge-two-spreadsheets-by-matching-column",
+          "compare-two-excel-files",
+          "remove-duplicate-rows-in-excel",
+          "fix-dates-in-excel",
+          "summarize-spreadsheet-by-category",
+        ],
+      },
+      {
+        title: "Statements, receipts and bills.",
+        slugs: ["bank-statement-pdf-to-excel", "find-subscriptions-in-bank-statement", "receipts-to-spreadsheet", "split-bills-with-roommates"],
+      },
+    ],
   },
   {
     slug: "documents",

@@ -8,6 +8,7 @@ import {
   getNiche,
   neighbours,
   nichePages,
+  nicheSections,
   nichePath,
   problemPath,
   publishedNiches,
@@ -87,7 +88,10 @@ const listLine = (page: ProblemPage) => `- [${page.h1}](${abs(`${problemPath(pag
 /** /how/<niche>.md */
 export function renderNicheMarkdown(slug: string): string {
   const niche = getNiche(slug)!;
-  return `${header(niche.title, nichePath(niche), niche.description)}\n${niche.intro}\n\n${nichePages(slug).map(listLine).join("\n")}\n`;
+  const groups = nicheSections(niche)
+    .map((group) => `${group.title ? `## ${group.title}\n\n` : ""}${group.pages.map(listLine).join("\n")}`)
+    .join("\n\n");
+  return `${header(niche.title, nichePath(niche), niche.description)}\n${niche.intro}\n\n${groups}\n`;
 }
 
 /** /how.md */

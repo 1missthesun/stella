@@ -32,6 +32,26 @@ export function nichePages(niche: string): ProblemPage[] {
   return publishedProblemPages().filter((page) => page.niche === niche);
 }
 
+/** A hub's pages in its headed groups (one untitled group when the hub has none). */
+export function nicheSections(niche: Niche): { title?: string; pages: ProblemPage[] }[] {
+  const pages = nichePages(niche.slug);
+  if (!niche.sections?.length) return [{ pages }];
+  const bySlug = new Map(pages.map((page) => [page.slug, page]));
+  const placed = new Set<string>();
+  const groups: { title?: string; pages: ProblemPage[] }[] = niche.sections.map((section) => ({
+    title: section.title,
+    pages: section.slugs.flatMap((slug) => {
+      const page = bySlug.get(slug);
+      if (!page || placed.has(slug)) return [];
+      placed.add(slug);
+      return [page];
+    }),
+  }));
+  const rest = pages.filter((page) => !placed.has(page.slug));
+  if (rest.length) groups.push({ title: "Other guides.", pages: rest });
+  return groups.filter((group) => group.pages.length);
+}
+
 export function getProblemPage(niche: string, slug: string) {
   return publishedProblemPages().find((page) => page.niche === niche && page.slug === slug);
 }

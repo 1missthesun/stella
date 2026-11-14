@@ -99,6 +99,14 @@ export function checkProblemPages(
     }
   }
 
+  for (const niche of niches) {
+    for (const section of niche.sections ?? []) {
+      for (const slug of section.slugs) {
+        if (!ids.has(`${niche.slug}/${slug}`)) global.push(`hub ${niche.slug}: section “${section.title}” lists unknown page “${slug}”`);
+      }
+    }
+  }
+
   const stepsOnly = live.filter((page) => page.proof.kind === "steps-only");
   if (stepsOnly.length > MAX_STEPS_ONLY) {
     global.push(

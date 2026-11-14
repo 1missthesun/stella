@@ -42,6 +42,8 @@ const BLOCKER_LABELS: Record<DeviceExecutionBlocker, string> = {
   notReady: "Not ready",
 };
 
+const TRIGGER_LABEL = "Where Stella works";
+
 const moveErrorMessage = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error)).replace(
     /^Error invoking remote method '[^']*': (?:\w*Error: )?/u,
@@ -105,19 +107,7 @@ export function GlobalExecutionTargetControl() {
   const hasDeviceToEnable = otherDevices.some(
     (device) => !device.remoteExecutionEnabled,
   );
-  const selectedDevice =
-    target.mode === "device"
-      ? destinations?.find((device) => device.deviceId === target.deviceId)
-      : undefined;
 
-  const label =
-    target.mode === "cloud"
-      ? "Cloud"
-      : target.mode === "device"
-        ? (selectedDevice?.label ??
-          (brain && !brain.here ? brain.label : undefined) ??
-          "Computer")
-        : platformCapabilities.automaticExecutionLabel;
   const TriggerIcon = target.mode === "cloud" ? Globe : Monitor;
 
   const choose = (next: DesktopExecutionTarget) => {
@@ -146,7 +136,8 @@ export function GlobalExecutionTargetControl() {
           className="shell-topbar-icon-btn execution-target-button"
           data-active={open || undefined}
           aria-busy={moving || undefined}
-          aria-label={`Run on ${label}`}
+          aria-label={TRIGGER_LABEL}
+          title={TRIGGER_LABEL}
           aria-pressed={open}
         >
           <TriggerIcon size={18} strokeWidth={1.5} />

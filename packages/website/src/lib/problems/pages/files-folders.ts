@@ -827,18 +827,117 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       },
       {
         q: "Can it convert GPX to another format?",
-        a: "Yes, ask for KML, CSV or another format in the same chat. Stella reads and writes these on your computer; check the result in the app you use.",
+        a: "Yes: see [convert GPX to KML for Google Earth](/how/files-folders/convert-gpx-to-kml). CSV and other formats work the same way; ask in the same chat.",
       },
       {
         q: "What else can it tidy in a trip folder?",
         a: "Photos, for a start: [sort them into folders by date](/how/photos-files/sort-photos-into-folders-by-date) and [remove their location](/how/photos-files/remove-location-from-photos) before sharing.",
       },
     ],
-    related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/remove-location-from-photos", "files-folders/zip-file-too-large-to-email"],
+    related: ["files-folders/convert-gpx-to-kml", "photos-files/sort-photos-into-folders-by-date", "photos-files/remove-location-from-photos"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "GPSBabel", href: "https://www.gpsbabel.org/" },
       { label: "gpx.studio", href: "https://gpx.studio/" },
+    ],
+  },
+  {
+    slug: "convert-gpx-to-kml",
+    niche: "files-folders",
+    searchPhrases: ["gpx to kml", "gpx to kml converter", "gpx to google earth", "gpx to google maps", "combine gpx files into one kml"],
+    title: "Convert GPX to KML for Google Earth, one dated line per track",
+    description:
+      "Turn a folder of GPX tracks into one KML for Google Earth, each track its own line named by its date: Google Earth Pro, GPSBabel, or Stella (stella.sh).",
+    h1: "Convert GPX to KML for Google Earth, one line per track",
+    short: "Convert GPX to KML",
+    lede: "Eight GPX tracks as one KML, each its own line, named by its date.",
+    answer:
+      "Google Earth Pro (free) opens GPX files itself: open each one, drag the tracks into one folder under Places, rename them, then right-click the folder and Save Place As KML. GPSBabel converts GPX to KML in one step, and converter sites do one file at a time. Stella (stella.sh) turns a whole folder into one KML on your computer, one line per track named by the date inside the file, and checks the data as it goes.",
+    stellaSteps: [
+      "Reads the 8 GPX files in Downloads/Rides, whose export-style names (`Morning_Ride_48213977.gpx`) don't say when they were recorded",
+      "Takes each track's date from the times inside the file, whichever of two GPX layouts it uses",
+      "Writes `Rides.kml` next to the folder: 8 separate lines in date order, each named like 2026-04-05, with every point kept",
+      "Adds the original file name, distance and time to each line's pop-up, and timestamps so Google Earth's time slider can show them one by one",
+      "Checks the numbers and flags something odd: the tracks average about 4.5 km/h, walking pace rather than cycling, and four were tagged as hiking by the recording device",
+    ],
+    prompt:
+      "I have 8 bike rides as GPX files in the Rides folder in Downloads. Make one KML file I can open in Google Earth, with each ride as its own line named by its date.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-13",
+      platform: "Linux (Omarchy)",
+      model: MODEL,
+      result:
+        "One KML in about 30 seconds. Checked afterwards against an answer key written before the run: 8 separate lines, one per track, each keeping all its points with coordinates in the right order, each labelled with its date, and the GPX files unchanged.",
+      note: "The eight tracks are synthetic test files made for this run, generated at a walking pace, so Stella's remark that they don't look like bike rides is it checking the data and flagging an oddity, not a comment on anyone's real rides. The run isn't sped up; a long idle stretch after the answer is cut.",
+      video: {
+        src: `${PROOFS}/files-folders/convert-gpx-to-kml/proof.mp4`,
+        cuts: webCuts("files-folders/convert-gpx-to-kml"),
+        poster: `${PROOFS}/files-folders/convert-gpx-to-kml/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.8,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Eight GPX tracks with export-style names are in Downloads/Rides." },
+        { at: 2, text: "The prompt: one KML for Google Earth, each ride its own line named by its date." },
+        { at: 30.8, text: "Done: Rides.kml with 8 dated lines, plus a note that the speeds look like walking, not cycling." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "Install Google Earth Pro",
+        body: "Google Earth Pro for Mac and Windows is free and reads GPX directly. The web version of Google Earth imports KML files but not a folder of GPX.",
+      },
+      {
+        title: "Open each GPX",
+        body: "Choose File, Open, set the file type to GPS, and pick a GPX. In the import box choose to create KML line strings for tracks. Repeat for each file.",
+      },
+      {
+        title: "Gather and rename",
+        body: "In the Places panel, right-click My Places, Add, Folder. Drag each imported track into it, then right-click each one, Properties, and give it the ride's date as its name.",
+      },
+      {
+        title: "Save as one KML",
+        body: "Right-click the folder, choose Save Place As, and pick KML (or KMZ, which is smaller). That single file opens anywhere Google Earth runs.",
+      },
+      {
+        title: "Or use GPSBabel",
+        body: "In [GPSBabel](https://www.gpsbabel.org/), add the GPX files as input, choose Google Earth (Keyhole) Markup Language as output, and convert. Track names come from the GPX files, so you may still need to rename them by date.",
+      },
+    ],
+    limits: [
+      "Google My Maps limits how much you can import per layer. For a big archive, Google Earth Pro or a KMZ works better.",
+      "Stella kept full detail here. If you need a smaller file, ask and it simplifies the lines.",
+      "It flagged that the tracks looked like walks but still made the file as asked. Check the remarks it adds; they come from the data, not from guesswork about you.",
+      "What Stella reads while working, such as dates, distances and file names, goes to the AI model you use in Stella. The conversion runs on your computer.",
+      "Recorded on Linux, where Stella used only Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What's the difference between GPX and KML?",
+        a: "GPX is what GPS watches and apps record: points with times. KML is Google Earth's format for drawing lines, places and labels. Converting keeps the route and lets you style and name it.",
+      },
+      {
+        q: "Can I open a GPX in Google Maps?",
+        a: "Not directly. Google My Maps imports KML (and GPX via some routes), then shows it on a map you can share. Convert to KML first for the most reliable import.",
+      },
+      {
+        q: "Can it go back from KML to GPX?",
+        a: "Yes, ask for GPX. For several recordings of one trip, see [combine GPX files into one track](/how/files-folders/combine-gpx-files).",
+      },
+      {
+        q: "Will it upload my tracks anywhere?",
+        a: "No. The KML is written on your computer; opening it in Google Earth is up to you. Before sharing photos from the same trips, [remove their location](/how/photos-files/remove-location-from-photos).",
+      },
+    ],
+    related: ["files-folders/combine-gpx-files", "photos-files/remove-location-from-photos", "files-folders/zip-file-too-large-to-email"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Google Earth Help: Import GPS data", href: "https://support.google.com/earth/answer/148095" },
+      { label: "GPSBabel", href: "https://www.gpsbabel.org/" },
     ],
   },
 ];

@@ -1247,7 +1247,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "It's a different cause: see [fix Google Takeout photo dates](/how/photos-files/fix-google-takeout-photo-dates). To file photos by month, see [sort photos into folders by date](/how/photos-files/sort-photos-into-folders-by-date).",
       },
     ],
-    related: ["photos-files/fix-google-takeout-photo-dates", "photos-files/sort-photos-into-folders-by-date", "photos-files/separate-screenshots-from-photos"],
+    related: ["photos-files/fix-google-takeout-photo-dates", "photos-files/sort-photos-into-folders-by-date", "photos-files/separate-screenshots-from-photos", "photos-files/split-scanned-photos", "photos-files/add-date-stamp-to-photos"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Photos on Mac, titles, captions and date and time", href: "https://support.apple.com/guide/photos/phta4e5a733f/mac" },
@@ -1461,7 +1461,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "See [convert WebP to JPG](/how/photos-files/convert-webp-to-jpg) and [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
       },
     ],
-    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet"],
+    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet", "photos-files/split-scanned-photos"],
     lastChecked: "2026-11-14",
     sources: [
       { label: "Apple: Convert image file types using Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1012/mac" },
@@ -1791,6 +1791,223 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       { label: "Apple: Remove a background or extract an image in Preview on Mac", href: "https://support.apple.com/guide/preview/prvw15636/mac" },
       { label: "Windows Insider blog: Background removal in Paint", href: "https://blogs.windows.com/windows-insider/2023/09/07/background-removal-in-paint-begins-rolling-out-to-windows-insiders/" },
       { label: "rembg (free, local background removal)", href: "https://github.com/danielgatis/rembg" },
+    ],
+  },
+  {
+    slug: "split-scanned-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "split scanned photos",
+      "separate scanned photos",
+      "auto split scanned photos",
+      "crop and straighten scanned photos",
+      "scan multiple photos at once and separate",
+    ],
+    title: "Split a scan of several photos into separate pictures",
+    description:
+      "Scanned three or four prints at once? Cut each scan into separate, straightened photos: Image Capture, GIMP, OpenCV, or Stella (stella.sh) on your own computer.",
+    h1: "Split scanned photos into separate pictures",
+    short: "Split scanned photos",
+    lede: "Five flatbed scans of old prints cut into 16 separate, straightened photos.",
+    answer:
+      "On a Mac, Image Capture's Detect Separate Images does this while you scan, but not for scans you already have. Photoshop's Crop and Straighten Photos does it afterwards, and the free GIMP needs a plug-in. Otherwise it's cropping each print by hand. Stella (stella.sh) found the 16 prints on five scans, straightened the crooked ones, trimmed off the scanner bed and saved each as its own photo, including a pale snow scene close to the bed's colour.",
+    stellaSteps: [
+      "Finds the five scans in “Mum's old photos - scans” and looks at them side by side",
+      "Sets up the free OpenCV picture library in its own separate Python environment",
+      "Finds each print by its difference from the scanner bed, then straightens and crops it at full scan resolution",
+      "Looks at all 16 crops, measures the edges, and trims leftover slivers of scanner bed, taking care not to eat into the pale snow scene",
+      "Saves them as “Scan N - photo K” in a new “Mum's old photos - cut out” folder and confirms the scans are unchanged",
+    ],
+    prompt:
+      "I scanned my mum's old photos three or four at a time on the flatbed. The scans are in the Mum's old photos - scans folder in my Pictures. Can you cut each scan into the separate photos?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Sixteen separate photos in about 2¼ minutes. Checked afterwards against an answer key written before the run: every one of the 16 prints saved as its own picture, the right way up, none holding two prints, half a print or a whole scan, each cut tight at full resolution, straightened (the prints lay up to 4° crooked), and the scans unchanged.",
+      note: "The scans are A4 pages at 300 dpi with faded prints drawn for this run, laid slightly crooked on a light-grey bed, one of them a pale snow scene. The work is sped up 11×.",
+      video: {
+        src: `${PROOFS}/photos-files/split-scanned-photos/proof.mp4`,
+        cuts: webCuts("photos-files/split-scanned-photos"),
+        poster: `${PROOFS}/photos-files/split-scanned-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.4,
+        realDuration: 174,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Five flatbed scans of old prints are in Pictures." },
+        { at: 1.63, text: "The prompt: cut each scan into the separate photos." },
+        { at: 10.43, text: "Stella replies each photo will be cropped and straightened into a new folder." },
+        { at: 16.43, text: "Finding, straightening and trimming each print, then checking the crops (sped up)." },
+        { at: 28.97, text: "Done: 16 photos from 5 scans, straightened and trimmed; the pale snow scene came out whole." },
+      ],
+    },
+    manualTitle: "Split them yourself",
+    manualSteps: [
+      {
+        title: "Mac, while scanning: Image Capture",
+        body: "In Image Capture, click Show Details, set Size to Detect Separate Images, then Scan. Each print is saved as its own straightened file. Leave a finger's width between prints on the glass.",
+      },
+      {
+        title: "Mac, existing scans: Preview",
+        body: "Open the scan, drag the rectangle around one print, choose Tools, Crop, then File, Export to save it under a new name. Undo, and repeat for the next print. Straightening needs Tools, Rotate in small steps or another app.",
+      },
+      {
+        title: "Windows: GIMP with a plug-in",
+        body: "Windows has no built-in splitter. The free GIMP with the free gimp-scan-cutter plug-in adds a batch command that finds, straightens and saves each print. Otherwise, crop each one in Photos.",
+      },
+      {
+        title: "Scanner software",
+        body: "Many Epson and HP scanner programs have a mode (often called thumbnail or multi-photo) that finds separate prints while scanning. Check before scanning a whole album.",
+      },
+      {
+        title: "Scan for easy splitting",
+        body: "Leave space between prints, keep them away from the edge of the glass, and put a dark sheet behind pale or white-bordered prints so they stand out from the lid.",
+      },
+    ],
+    limits: [
+      "Prints that touch or overlap on the glass can't be separated reliably; leave a gap between them.",
+      "A thin strip is trimmed from each edge so no scanner bed shows. Stella said so; a print's very edge may be lost.",
+      "A white-bordered print on a white lid may be cut at its picture rather than its border.",
+      "Small previews of the scans and crops went to the AI model you use in Stella so it could check them. The photos were cut out on your computer.",
+      "Recorded on Linux. On a Mac or Windows PC Stella would install Python and OpenCV first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I scan several photos at once and have them separated automatically?",
+        a: "Yes. On a Mac, Image Capture's Detect Separate Images does it while scanning; for scans you already have, Stella or GIMP's scan-cutter plug-in splits them afterwards.",
+      },
+      {
+        q: "Will the separated photos be straight?",
+        a: "Stella straightened each print; the check confirmed it for all 16, which lay up to 4° crooked.",
+      },
+      {
+        q: "Do I lose resolution?",
+        a: "No. Each photo is cut from the full 300 dpi scan.",
+      },
+      {
+        q: "What next for old scans?",
+        a: "Sort or date them: see [fix the wrong date on photos](/how/photos-files/fix-wrong-date-on-photos), or [make a contact sheet](/how/photos-files/make-a-contact-sheet) to share them.",
+      },
+    ],
+    related: ["photos-files/fix-wrong-date-on-photos", "photos-files/convert-tiff-to-jpg", "photos-files/make-a-contact-sheet"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Scan images or documents using a scanner and your Mac", href: "https://support.apple.com/guide/mac-help/mh28032/mac" },
+      { label: "gimp-scan-cutter (free GIMP plug-in)", href: "https://github.com/dmig/gimp-scan-cutter" },
+      { label: "GIMP (free image editor)", href: "https://www.gimp.org/" },
+    ],
+  },
+  {
+    slug: "add-date-stamp-to-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "add date stamp to photos",
+      "add date to photos",
+      "date stamp photos like film camera",
+      "add date taken to photos",
+      "print date on photos",
+    ],
+    title: "Add the date taken to photos, film-camera style",
+    description:
+      "Stamp each photo with the date it was taken, in the corner like an old film camera, using the camera's date, not the file's: XnConvert, ImageMagick or Stella (stella.sh).",
+    h1: "Add a date stamp to photos, like old film cameras",
+    short: "Add a date stamp to photos",
+    lede: "Twelve holiday photos stamped with the day each was taken, in orange film-camera digits.",
+    answer:
+      "Use the date the camera saved inside each photo, not the file's date, which is usually the day you copied it off the camera. The free XnConvert can write that date in a corner of every photo in a folder, on Mac or Windows. Stella (stella.sh) stamped 12 holiday photos with the date each was taken, in glowing orange film-camera digits at the bottom right, as copies in a new folder.",
+    stellaSteps: [
+      "Finds the 12 photos in Pictures/Holiday 2026 and reads each one's date taken and rotation flag",
+      "Draws the date in orange seven-segment digits, like a film camera's imprint (for example ’26 8 14), at the bottom right of the upright picture",
+      "Saves stamped copies with the same names in a new “Holiday 2026 (dated)” folder next to the original",
+      "Looks at three of the copies, including a portrait, to check the stamp's place and readability",
+      "Confirms the originals are unchanged and that every photo had a real date taken, so nothing was guessed",
+    ],
+    prompt:
+      "Add the date each photo was taken in the bottom right corner, like old film cameras did, to all the photos in the Holiday 2026 folder in my Pictures. Keep the originals as they are.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Twelve stamped copies in about 1 minute. Checked afterwards against an answer key written before the run: a stamped copy of every photo at the same size and the right way up (three portraits are stored sideways), the stamp in the bottom-right corner, showing the date each was taken from 14 to 25 August rather than the 2 October file date, the rest of each photo untouched, and the originals unchanged.",
+      note: "The holiday photos are drawings made for this run, with dates taken in August and file dates in October. Stella chose a film-style orange stamp written as year, month, day (’26 8 14). The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/photos-files/add-date-stamp-to-photos/proof.mp4`,
+        cuts: webCuts("photos-files/add-date-stamp-to-photos"),
+        poster: `${PROOFS}/photos-files/add-date-stamp-to-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 43.5,
+        realDuration: 95,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Twelve holiday photos are in Pictures/Holiday 2026." },
+        { at: 1.63, text: "The prompt: add the date each was taken, bottom right, like old film cameras." },
+        { at: 12.43, text: "Stella replies it's stamping copies in orange film-camera digits into a new folder." },
+        { at: 18.43, text: "Reading each photo's date taken, stamping and checking three copies." },
+        { at: 29.1, text: "Done: all 12 stamped with their real dates, 14 to 25 August; originals unchanged." },
+      ],
+    },
+    manualTitle: "Stamp them yourself",
+    manualSteps: [
+      {
+        title: "Mac or Windows: XnConvert",
+        body: "In the free XnConvert, add the folder on the Input tab. On Actions, add Image, Text, and insert the EXIF date-taken variable from its menu, then set the position to bottom-right, the colour and size. On Output, choose a new folder, then Convert.",
+      },
+      {
+        title: "Check which date you're using",
+        body: "Look at a photo's details (Get Info on a Mac, Properties, Details on Windows). “Date taken” is the camera's; “Date modified” is often the day it was copied. Use date taken.",
+      },
+      {
+        title: "ImageMagick",
+        body: "`magick in.jpg -auto-orient -gravity southeast -fill orange -pointsize 80 -annotate +40+40 \"%[EXIF:DateTimeOriginal]\" out.jpg` writes the camera's date and time at the bottom right. Run it over the folder into a new one.",
+      },
+      {
+        title: "On the phone",
+        body: "Date-stamp camera and editing apps can add a stamp to existing photos, but many use the file date and add ads or watermarks. Check the first result.",
+      },
+      {
+        title: "Keep the originals",
+        body: "A stamp is part of the picture once it's saved. Always write stamped copies to a new folder.",
+      },
+    ],
+    limits: [
+      "Photos sent through chat apps often lose the date taken. Stella said it would report any photo without one and what date it used instead; here all 12 had one.",
+      "The stamp is burned into the copies. Stella kept the originals unchanged in their folder.",
+      "The style is a judgement: Stella went for the film look, year-month-day. Ask for another format, like 14/08/2026, if you prefer.",
+      "File names, the photos' dates and three stamped copies went to the AI model you use in Stella. The stamping was done on your computer.",
+      "Recorded on Linux with ImageMagick and Python already installed. On a Mac or Windows PC Stella would usually install them first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my date stamp show the wrong day?",
+        a: "The tool used the file's date, which changes when photos are copied, instead of the date taken saved by the camera. Stella read the camera's date.",
+      },
+      {
+        q: "Can I add the time as well?",
+        a: "Yes. Ask for date and time; the camera saves both.",
+      },
+      {
+        q: "My photos' dates are wrong in the first place. What now?",
+        a: "Fix them first: see [fix the wrong date on photos](/how/photos-files/fix-wrong-date-on-photos).",
+      },
+      {
+        q: "Can I add a name instead of a date?",
+        a: "Yes: see [add a watermark to photos](/how/photos-files/add-watermark-to-photos).",
+      },
+    ],
+    related: ["photos-files/fix-wrong-date-on-photos", "photos-files/add-watermark-to-photos", "photos-files/sort-photos-into-folders-by-date"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "XnConvert (free batch image converter)", href: "https://www.xnview.com/en/xnconvert/" },
+      { label: "ImageMagick: annotate", href: "https://imagemagick.org/script/command-line-options.php#annotate" },
     ],
   },
 ];

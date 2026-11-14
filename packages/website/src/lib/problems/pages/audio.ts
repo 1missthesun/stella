@@ -319,7 +319,7 @@ export const AUDIO_PAGES: ProblemPage[] = [
         a: "Yes, the same way; longer audio just takes longer locally. To put the words on a video as captions, see [burn subtitles into a video](/how/video/burn-subtitles-into-video-for-tiktok). For music files, see [edit MP3 tags in bulk](/how/audio/edit-mp3-tags-in-bulk).",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "audio/edit-mp3-tags-in-bulk", "local-ai/run-ai-offline-on-your-computer", "video/make-srt-subtitle-file"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "audio/edit-mp3-tags-in-bulk", "local-ai/run-ai-offline-on-your-computer", "video/make-srt-subtitle-file", "audio/trim-silence-from-recordings"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: View a transcript in Voice Memos on Mac", href: "https://support.apple.com/guide/voice-memos/vm4a03609f0d/mac" },
@@ -1615,6 +1615,114 @@ export const AUDIO_PAGES: ProblemPage[] = [
       { label: "fre:ac (free audio converter)", href: "https://www.freac.org/" },
       { label: "VLC media player", href: "https://www.videolan.org/vlc/" },
       { label: "FFmpeg MP3 encoding guide", href: "https://trac.ffmpeg.org/wiki/Encode/MP3" },
+    ],
+  },
+  {
+    slug: "trim-silence-from-recordings",
+    niche: "audio",
+    searchPhrases: [
+      "remove silence from audio",
+      "trim silence from audio",
+      "trim silence at start and end of audio",
+      "remove dead air from recording",
+      "trim silence from audio files in bulk",
+    ],
+    title: "Remove silence from the start and end of audio recordings",
+    description:
+      "Trim the dead air before and after each recording without shortening the pauses inside: Audacity, ffmpeg, or Stella (stella.sh) on a whole folder at once.",
+    h1: "Remove silence from the start and end of recordings",
+    short: "Trim silence from recordings",
+    lede: "Six phone recordings with the fumbling at both ends cut off and the talks untouched.",
+    answer:
+      "Cut only from the start to just before the first word, and from just after the last word to the end. In Audacity, select those parts and press Delete; avoid Truncate Silence, which also shortens the pauses inside the talk. Stella (stella.sh) trimmed six garden-club talks, removing the quiet lead-in, the tail and the phone clicks at both ends, with every pause in the middle kept to the hundredth of a second.",
+    stellaSteps: [
+      "Finds the six talks in Music/Garden club talks (four MP3s, two M4As) and measures where the sound is in each",
+      "Spots a phone click near each start and end, a long quiet lead-in and tail, and three spoken sections with 3–4-second pauses",
+      "Moves the untouched recordings into an originals subfolder, then cuts each file from about half a second before the first word to just under a second after the last, without re-encoding",
+      "Compares the pauses before and after to confirm none in the middle changed",
+      "Reports how much came off each one and points out the talks are only 17–21 seconds of speech, in case the recordings are incomplete",
+    ],
+    prompt:
+      "I recorded six talks for our garden club on my phone, and each one has a long bit of silence at the start and end while I fumbled with the phone. Trim the silence off the start and end of each recording in the Garden club talks folder in my Music, but don't cut anything out of the middle.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Six trimmed talks in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run: all six trimmed, each starting about half a second before the first word (the phone bump cut too) and ending under a second after the last, the first and last words intact, and nothing cut from the middle.",
+      note: "The talks are synthetic voices with room noise, a handling bump and a stop-button click, made for this run. Stella kept the trimmed files under their original names and moved the untouched recordings into an originals subfolder. The work is sped up 7×. Checked by measurement; nobody listened.",
+      video: {
+        src: `${PROOFS}/audio/trim-silence-from-recordings/proof.mp4`,
+        cuts: webCuts("audio/trim-silence-from-recordings"),
+        poster: `${PROOFS}/audio/trim-silence-from-recordings/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.03,
+        realDuration: 120,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Six phone recordings of garden-club talks are in Music." },
+        { at: 1.63, text: "The prompt: trim the silence at the start and end, nothing from the middle." },
+        { at: 13.23, text: "Stella replies only the ends will be trimmed and the originals kept in a subfolder." },
+        { at: 19.23, text: "Measuring where each talk starts and ends, trimming and comparing the pauses." },
+        { at: 30.63, text: "Done: six talks trimmed, middle pauses unchanged; the talks look short, worth a listen." },
+      ],
+    },
+    manualTitle: "Trim them yourself",
+    manualSteps: [
+      {
+        title: "Audacity, by hand",
+        body: "Open a recording in the free Audacity. Drag from the very start to just before the first word and press Delete; do the same from just after the last word to the end. File, Export, and repeat for each file.",
+      },
+      {
+        title: "Don't use Truncate Silence here",
+        body: "Audacity's Effect, Truncate Silence shortens every quiet gap, including the pauses between sentences. It's handy for tightening speech, but not when you want the talk itself untouched.",
+      },
+      {
+        title: "ffmpeg",
+        body: "Find the times first: `ffmpeg -i talk.mp3 -af silencedetect=noise=-45dB:d=0.5 -f null -` lists the quiet stretches. Then `ffmpeg -ss 11.5 -to 31.2 -i talk.mp3 -c copy trimmed.mp3` cuts without re-encoding.",
+      },
+      {
+        title: "Leave a little air",
+        body: "Keep about half a second before the first word and a bit more after the last. Cutting right to the edge clips soft consonants and makes the recording start abruptly.",
+      },
+      {
+        title: "Listen to the ends",
+        body: "Play the first and last few seconds of each trimmed file. A very quiet first word, or a handling noise loud enough to look like speech, is the usual way automatic trimming goes wrong.",
+      },
+    ],
+    limits: [
+      "A very quiet first or last word can be mistaken for silence. The check confirmed the words were intact here, but nobody listened; play the ends of each file.",
+      "Stella replaced the files in place under their own names and moved the originals into a subfolder. Say so if you'd rather keep the originals where they are and get trimmed copies.",
+      "File names and measurements of the sound went to the AI model you use in Stella. The recordings were trimmed on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I remove silence only at the start and end?",
+        a: "Delete from the start to the first word and from the last word to the end, and leave everything between alone. Stella did that for six files at once.",
+      },
+      {
+        q: "Does trimming lose sound quality?",
+        a: "Not if the audio is cut without re-encoding, as Stella did. Re-saving through an editor re-encodes MP3 and M4A slightly.",
+      },
+      {
+        q: "Can I take out the long pauses inside a talk too?",
+        a: "Yes, that's Truncate Silence in Audacity. For video, see [cut silences from a video](/how/video/cut-silences-from-video).",
+      },
+      {
+        q: "Can I get a transcript of the talks?",
+        a: "Yes: see [transcribe voice memos to text](/how/audio/transcribe-voice-memos-to-text).",
+      },
+    ],
+    related: ["video/cut-silences-from-video", "audio/transcribe-voice-memos-to-text", "audio/normalize-audio-volume"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Audacity manual: Edit menu (Delete)", href: "https://manual.audacityteam.org/man/edit_menu.html" },
+      { label: "Audacity manual: Truncate Silence", href: "https://manual.audacityteam.org/man/truncate_silence.html" },
+      { label: "FFmpeg filters: silencedetect", href: "https://ffmpeg.org/ffmpeg-filters.html#silencedetect" },
     ],
   },
 ];

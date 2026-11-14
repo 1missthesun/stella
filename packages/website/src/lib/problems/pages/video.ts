@@ -247,7 +247,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Not automatically. For multicam edits, export a cut list from one angle into your editor and apply it there.",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "video/speed-up-video", "video/cut-out-part-of-video"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "video/speed-up-video", "video/cut-out-part-of-video", "audio/trim-silence-from-recordings"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "auto-editor", href: "https://auto-editor.com" },
@@ -703,7 +703,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat. For clips on their own, see [combine videos into one](/how/video/combine-videos-into-one); to send the result, [compress it for Discord](/how/video/compress-video-for-discord).",
       },
     ],
-    related: ["video/combine-videos-into-one", "video/compress-video-for-discord", "photos-files/resize-images-in-bulk"],
+    related: ["video/combine-videos-into-one", "video/compress-video-for-discord", "photos-files/resize-images-in-bulk", "video/add-music-to-video"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Create slideshows in Photos on Mac", href: "https://support.apple.com/guide/photos/phtae8c6d40/mac" },
@@ -1348,7 +1348,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Usually not; it's the video format. See [convert MOV to MP4](/how/video/convert-mov-to-mp4).",
       },
     ],
-    related: ["video/convert-mov-to-mp4", "video/speed-up-video", "video/combine-videos-into-one", "video/crop-video-to-vertical"],
+    related: ["video/convert-mov-to-mp4", "video/speed-up-video", "video/combine-videos-into-one", "video/crop-video-to-vertical", "video/stabilize-shaky-video"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Rotate or flip a clip in QuickTime Player on Mac", href: "https://support.apple.com/guide/quicktime-player/qtp5a6251741/mac" },
@@ -1780,7 +1780,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes, see [burn subtitles into a video for TikTok](/how/video/burn-subtitles-into-video-for-tiktok).",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "video/rotate-video", "video/speed-up-video"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "video/rotate-video", "video/speed-up-video", "video/stabilize-shaky-video"],
     lastChecked: "2026-11-14",
     sources: [
       { label: "Microsoft: How to change the aspect ratio of a video (Clipchamp)", href: "https://support.microsoft.com/en-us/clipchamp/how-to-change-the-aspect-ratio-of-a-video" },
@@ -1996,7 +1996,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes: [normalize audio volume](/how/audio/normalize-audio-volume).",
       },
     ],
-    related: ["audio/normalize-audio-volume", "video/cut-out-part-of-video", "audio/extract-audio-from-video"],
+    related: ["audio/normalize-audio-volume", "video/cut-out-part-of-video", "audio/extract-audio-from-video", "video/add-music-to-video"],
     lastChecked: "2026-11-14",
     sources: [
       { label: "Apple: Add a soundtrack and sound effects to your iMovie project", href: "https://support.apple.com/101664" },
@@ -2110,6 +2110,223 @@ export const VIDEO_PAGES: ProblemPage[] = [
       { label: "Apple: Change clip speed in iMovie on Mac (Reverse)", href: "https://support.apple.com/guide/imovie/mov6c442b2eb/mac" },
       { label: "Shotcut (free video editor)", href: "https://shotcut.org/" },
       { label: "FFmpeg filters: reverse and areverse", href: "https://ffmpeg.org/ffmpeg-filters.html#reverse" },
+    ],
+  },
+  {
+    slug: "add-music-to-video",
+    niche: "video",
+    searchPhrases: [
+      "add music to video",
+      "add background music to video",
+      "add music to video and fade out",
+      "put song under video keep voices",
+      "add background music without losing original sound",
+    ],
+    title: "Add background music to a video, voices kept, fade out",
+    description:
+      "Put a song under your video quietly enough that voices stay clear, and fade it out at the end: iMovie, Clipchamp, ffmpeg, or Stella (stella.sh) on your own computer.",
+    h1: "Add background music to a video and keep the voices",
+    short: "Add music to a video",
+    lede: "A song mixed quietly under a beach video, voices on top and the music fading out.",
+    answer:
+      "Put the song on its own track under the video, turn it well down, trim it to the video's end and add a fade. iMovie's background music well does it on a Mac, and Clipchamp on Windows. The usual mistakes are music that drowns the voices, replaces them, or runs on past the end. Stella (stella.sh) mixed a 2½-minute song under a 40-second beach video, about 14 dB under the voices, and faded it out over the last 5 seconds.",
+    stellaSteps: [
+      "Finds “Sunny Days” in Music (2:30) and “Beach day” in Videos (40 seconds), the only match for each",
+      "Measures how loud the voices and the song are",
+      "Mixes the song from its start under the original sound at a low level, trimmed to the video's length and fading out over the last 5 seconds",
+      "Copies the picture across untouched and saves Beach day (with music).mp4 next to the original",
+      "Measures the mix and says the levels were checked by measurement, not by listening",
+    ],
+    prompt:
+      "Add the song Sunny Days from my Music folder as background music to the beach video in my Videos. Keep the sound of us talking, with the music quieter underneath, and fade the music out at the end.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The new video in under a minute. Checked afterwards against an answer key written before the run: 40 seconds (not stretched to the song), the picture unchanged, the song in the soundtrack, the voices kept and 14 dB louder than the music, the music faded to 12% of its level by the last second, and the original video and song unchanged.",
+      note: "The beach video has two synthetic voices over wave sounds, and the song is a synthesised instrumental by a made-up band; both were made for this run. The work is sped up 3×. Nobody listened to the mix; it was measured.",
+      video: {
+        src: `${PROOFS}/video/add-music-to-video/proof.mp4`,
+        cuts: webCuts("video/add-music-to-video"),
+        poster: `${PROOFS}/video/add-music-to-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.17,
+        realDuration: 86,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A beach video is in Videos and the song Sunny Days in Music." },
+        { at: 1.67, text: "The prompt: add the song quietly under the talking and fade it out at the end." },
+        { at: 14.87, text: "Stella replies the song will sit under the voices and fade out, saved as a new file." },
+        { at: 20.87, text: "Measuring the voices and the song, then mixing." },
+        { at: 31.8, text: "Done: the song under the voices, fading over the last 5 seconds; levels measured, not listened to." },
+      ],
+    },
+    manualTitle: "Add the music yourself",
+    manualSteps: [
+      {
+        title: "Mac: iMovie",
+        body: "Drag the video into a new project, then drag the song into the background music well below the clips. Click the song, use the Volume button to bring it well down, and drag the small fade handle at its end leftwards. Then File, Share, File.",
+      },
+      {
+        title: "Windows: Clipchamp",
+        body: "Drag the video and the song onto the timeline. Select the song, lower its volume in the Audio tab (try 20–30%), set a fade-out in the Fade tab, and drag the song's end to line up with the video's end. Export.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i video.mp4 -i song.mp3 -filter_complex \"[1:a]volume=0.08,afade=t=out:st=35:d=5[m];[0:a][m]amix=inputs=2:duration=first:normalize=0[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac out.mp4`. Set `st` to the video's length minus the fade.",
+      },
+      {
+        title: "Set the level by ear",
+        body: "Play the busiest talking part. If you have to strain to hear words, the music is too loud. Speech usually needs to sit 10–15 dB above background music, which is quieter than most people first guess.",
+      },
+      {
+        title: "Use music you can share",
+        body: "Instagram, TikTok and YouTube may mute or block videos with copyrighted songs. Their own music libraries, or royalty-free tracks, avoid that.",
+      },
+    ],
+    limits: [
+      "The music level was set by measurement. Stella said it hadn't listened and offered to make the music louder or softer.",
+      "The song started from its beginning; picking a different section of the song, or ducking it further while people talk, would be a follow-up request.",
+      "File names and measurements of the sound went to the AI model you use in Stella. The video and song were mixed on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I add music without losing the original sound?",
+        a: "Mix the song in as a second track under the existing sound rather than replacing it. iMovie, Clipchamp and Stella all keep the original voices.",
+      },
+      {
+        q: "How loud should background music be?",
+        a: "Well under the voices: about 10–15 dB quieter. In this run the voices came out 14 dB over the music.",
+      },
+      {
+        q: "What if the song is shorter than the video?",
+        a: "Loop it, or add a second song. Ask Stella to loop it with a crossfade.",
+      },
+      {
+        q: "Can I make a slideshow with music instead?",
+        a: "Yes: see [make a slideshow with music](/how/video/make-slideshow-with-music).",
+      },
+    ],
+    related: ["video/make-slideshow-with-music", "video/make-video-louder", "audio/normalize-audio-volume"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Add music and sound clips in iMovie on Mac", href: "https://support.apple.com/guide/imovie/mov91a895a64/mac" },
+      { label: "Microsoft: How to add audio or music to videos (Clipchamp)", href: "https://support.microsoft.com/en-us/clipchamp/how-to-add-audio-or-music-to-videos" },
+      { label: "FFmpeg filters: amix and afade", href: "https://ffmpeg.org/ffmpeg-filters.html#amix" },
+    ],
+  },
+  {
+    slug: "stabilize-shaky-video",
+    niche: "video",
+    searchPhrases: [
+      "stabilize video",
+      "stabilize shaky video",
+      "how to stabilize a shaky video",
+      "stabilize video free",
+      "fix shaky phone video",
+    ],
+    title: "Stabilize a shaky phone video, no black borders",
+    description:
+      "Steady a shaky video filmed while walking, keeping the natural movement and without black wobbling edges: iMovie, Shotcut, ffmpeg vid.stab, or Stella (stella.sh).",
+    h1: "Stabilize a shaky video filmed while walking",
+    short: "Stabilize a shaky video",
+    lede: "A wobbly carnival parade clip steadied, still moving with the walk, no black edges.",
+    answer:
+      "Use a stabiliser that tracks the shake, smooths it out and zooms in slightly to hide the edges: iMovie's Stabilize Shaky Video on a Mac, and the free Shotcut's Stabilize filter on Windows, where Clipchamp has none. Stella (stella.sh) ran a two-pass stabiliser on a parade video filmed while walking, keeping the slow walking movement, and left about a quarter of the shake with no black borders.",
+    stellaSteps: [
+      "Finds “Carnival parade” in Videos: 20 seconds, 1280×720, filmed while walking",
+      "Analyses the camera's movement frame by frame in a first pass",
+      "Smooths the movement in a second pass, so the view still follows the walk rather than looking like a tripod shot, zooming in about 4.5% to hide the edges and sharpening slightly",
+      "Measures the shake before and after, compares frames side by side, and checks for black edges",
+      "Saves Carnival parade (stabilized).mp4 next to the original, sound copied unchanged, and points out a few quick jolts left around 0:15 and at the end",
+    ],
+    prompt:
+      "My video of the carnival parade in my Videos is really shaky because I was walking with my phone. Can you steady it?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The steadied copy in about 2 minutes. Checked afterwards against an answer key written before the run: only 23% of the shake left (the key asked for 40% or less), the same 20 seconds, sound kept, still the same scene, no black wobbling borders, and the original unchanged.",
+      note: "The parade is a drawn street scene with drum music, made for this run with hand shake added on top of a slow pan. The first recorded attempt crashed because of a fault in our recording setup, not in Stella; this is the second. The work is sped up 8×.",
+      video: {
+        src: `${PROOFS}/video/stabilize-shaky-video/proof.mp4`,
+        cuts: webCuts("video/stabilize-shaky-video"),
+        poster: `${PROOFS}/video/stabilize-shaky-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 45.23,
+        realDuration: 147,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A shaky carnival-parade video is in Videos." },
+        { at: 1.63, text: "The prompt: it's shaky because I was walking with my phone, steady it." },
+        { at: 12.03, text: "Stella replies it's making a steadied copy that keeps the walking movement." },
+        { at: 18.03, text: "Analysing the camera's movement, stabilising and measuring the shake (sped up)." },
+        { at: 30.8, text: "Done: the shake much lower, still following the walk, a slight zoom and no black borders." },
+      ],
+    },
+    manualTitle: "Steady it yourself",
+    manualSteps: [
+      {
+        title: "Mac: iMovie",
+        body: "Add the clip to a project, select it and click the Stabilization button above the viewer. Tick Stabilize Shaky Video, wait for the analysis, then drag the slider: higher is steadier but zooms in more. File, Share, File.",
+      },
+      {
+        title: "Windows: Shotcut",
+        body: "Clipchamp has no stabiliser. In the free Shotcut, put the clip on the timeline, open Filters, add Stabilize, click Analyze and wait, then Export. Raise Smoothing for steadier, lower for more natural movement.",
+      },
+      {
+        title: "On the phone",
+        body: "Google Photos on Android has a stabilise button in its video editor. iPhone's Photos app doesn't; iMovie for iPhone or a free editor like CapCut does.",
+      },
+      {
+        title: "ffmpeg, two passes",
+        body: "`ffmpeg -i in.mp4 -vf vidstabdetect=shakiness=8:result=t.trf -f null -` then `ffmpeg -i in.mp4 -vf vidstabtransform=input=t.trf:smoothing=20:optzoom=1 -c:a copy out.mp4`. It needs an ffmpeg built with vid.stab, which most downloads are.",
+      },
+      {
+        title: "Keep the walk, lose the wobble",
+        body: "Very strong smoothing makes a walking shot float oddly and zooms in a lot. A moderate setting, like the one Stella chose, keeps the forward movement and removes the hand shake.",
+      },
+    ],
+    limits: [
+      "Stabilising crops in. Stella zoomed about 4.5%, so the edges of the picture are lost and it's a little less sharp.",
+      "Motion blur from the shaking stays; each frame is only moved, not un-blurred.",
+      "About a quarter of the shake remained, including a few quick jolts Stella pointed out. A stronger setting would remove more but zoom in further.",
+      "File names, the video's details and a few frames went to the AI model you use in Stella. The video was stabilised on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can you stabilize a video after it's filmed?",
+        a: "Yes. The software tracks how the camera moved, smooths that movement and shifts each frame to match, cropping a little to hide the edges.",
+      },
+      {
+        q: "Why does my stabilised video have black borders?",
+        a: "The frames were moved without zooming in to cover the gaps. Turn on zoom or crop in the stabiliser; Stella's copy had none.",
+      },
+      {
+        q: "Does stabilising lose quality?",
+        a: "Slightly, because it zooms in and re-encodes. Stella used a high-quality setting and a little sharpening.",
+      },
+      {
+        q: "Can I also make it vertical for Reels?",
+        a: "Yes: see [crop a video to vertical](/how/video/crop-video-to-vertical).",
+      },
+    ],
+    related: ["video/crop-video-to-vertical", "video/speed-up-video", "video/rotate-video"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Stabilize shaky clips in iMovie on Mac", href: "https://support.apple.com/guide/imovie/mov52b5a78a6/mac" },
+      { label: "Shotcut (free video editor)", href: "https://shotcut.org/" },
+      { label: "FFmpeg filters: vidstabdetect and vidstabtransform", href: "https://ffmpeg.org/ffmpeg-filters.html#vidstabdetect-1" },
     ],
   },
 ];

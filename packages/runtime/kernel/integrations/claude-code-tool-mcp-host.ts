@@ -39,7 +39,12 @@ import {
   forkCancelableTimeout,
 } from "./effect-runtime.js";
 import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redaction.js";
-import { CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS } from "./claude-code-mcp-timeouts.js";
+import { waitsForUser } from "@stella/contracts/long-tool-call";
+import {
+  CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS,
+  CLAUDE_CODE_STELLA_TOOL_CEILING_MS,
+  stellaToolCeilingText,
+} from "./claude-code-mcp-timeouts.js";
 
 const HOST = "127.0.0.1";
 
@@ -534,7 +539,14 @@ export const createClaudeCodeToolMcpHost = async (
         };
       }
 
-      const callSignal = AbortSignal.any([extra.signal, callGeneration.signal]);
+      const ceiling = waitsForUser(request.params.name)
+        ? undefined
+        : AbortSignal.timeout(CLAUDE_CODE_STELLA_TOOL_CEILING_MS);
+      const callSignal = AbortSignal.any([
+        extra.signal,
+        callGeneration.signal,
+        ...(ceiling ? [ceiling] : []),
+      ]);
 
       const onUpdate: ToolUpdateCallback = (update) => {
         turn.onToolUpdate?.({
@@ -576,6 +588,19 @@ export const createClaudeCodeToolMcpHost = async (
           callSignal,
         );
       } catch (error) {
+        if (
+          ceiling?.aborted &&
+          !extra.signal.aborted &&
+          !callGeneration.signal.aborted
+        ) {
+          const text = stellaToolCeilingText(request.params.name);
+          turn.onToolResult?.({
+            toolCallId,
+            toolName: request.params.name,
+            result: { error: text },
+          });
+          return { content: [{ type: "text", text }], isError: true };
+        }
         if (callSignal.aborted) throw error;
         return {
           content: [

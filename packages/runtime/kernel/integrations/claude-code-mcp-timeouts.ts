@@ -14,3 +14,13 @@ export const CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS = 30_000;
  * whose host stopped answering altogether.
  */
 export const CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS = 30 * 60_000;
+
+/**
+ * Heartbeats keep a call alive for as long as it runs, so one of Stella's
+ * tools that never answers is ended here instead. Calls that wait for the
+ * user have no ceiling.
+ */
+export const CLAUDE_CODE_STELLA_TOOL_CEILING_MS = 30 * 60_000;
+
+export const stellaToolCeilingText = (toolName: string): string =>
+  `${toolName} was stopped after ${CLAUDE_CODE_STELLA_TOOL_CEILING_MS / 60_000} minutes, the longest one call may take, so it is probably stuck. Run long work in the background (Bash with run_in_background, or a code cell you check on later) instead of waiting on it in one call.`;

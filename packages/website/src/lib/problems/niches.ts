@@ -164,6 +164,26 @@ export const NICHES: Niche[] = [
       "Making study material is mostly copying: terms into cards, highlights into notes. Each guide gives the manual way, and Stella (stella.sh) doing it from your own files on a real computer.",
   },
   {
+    slug: "printing-labels",
+    name: "Printing and labels",
+    h1: "Labels, badges and cards, printed from your own lists.",
+    title: "Printing how-tos: labels, name tags, certificates, QR codes",
+    description:
+      "Print address and barcode labels from Excel, name tags, certificates, QR codes, business cards, passport photos and posters, by hand or with Stella (stella.sh).",
+    intro:
+      "Printing from a list goes wrong in the details: ZIP codes that lose their zero, labels that drift off the sheet, a double sign-up with two badges. Each guide gives the Word or free-tool route, and Stella (stella.sh) making the print file from a real list on your computer.",
+  },
+  {
+    slug: "weddings-events",
+    name: "Weddings and events",
+    h1: "Guest lists into headcounts, seating charts and place cards.",
+    title: "Wedding and event how-tos: RSVPs, seating charts, place cards",
+    description:
+      "Count RSVPs when guests replied twice, make a seating chart and place cards from your guest list, and number raffle tickets, in Excel or with Stella (stella.sh).",
+    intro:
+      "Event planning runs on one spreadsheet that never quite agrees with itself. Each guide shows the Excel or Word way, and Stella (stella.sh) turning a real guest list or form export into the headcount and the printables.",
+  },
+  {
     slug: "local-ai",
     name: "AI on your computer",
     h1: "AI that runs on your own computer.",

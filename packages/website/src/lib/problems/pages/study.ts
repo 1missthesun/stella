@@ -287,7 +287,7 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "Yes. For photos of pages, see [combine photos into one PDF](/how/photos-files/combine-photos-into-one-pdf).",
       },
     ],
-    related: ["study/make-anki-flashcards-from-notes", "study/export-kindle-highlights", "photos-files/combine-photos-into-one-pdf"],
+    related: ["study/make-anki-flashcards-from-notes", "study/export-kindle-highlights", "photos-files/combine-photos-into-one-pdf", "printing-labels/print-business-cards-at-home"],
     lastChecked: "2026-11-13",
     sources: [
       {

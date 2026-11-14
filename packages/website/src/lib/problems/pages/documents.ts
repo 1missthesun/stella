@@ -103,7 +103,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes, download the sheet as .xlsx or .csv; Word's merge reads both, and so does Stella. If your list is spread over several files, [combine them into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet) first.",
       },
     ],
-    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/compare-two-excel-files", "pdf-excel/split-pdf-into-multiple-files", "documents/generate-invoices-from-spreadsheet"],
+    related: ["pdf-excel/combine-excel-files-into-one-sheet", "pdf-excel/compare-two-excel-files", "pdf-excel/split-pdf-into-multiple-files", "documents/generate-invoices-from-spreadsheet", "printing-labels/print-address-labels-from-excel", "printing-labels/make-certificates-from-excel"],
     lastChecked: "2026-11-13",
     sources: [
       {
@@ -644,7 +644,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes, that's each invoice's total. For a summary sheet by customer or job type, see [summarize a spreadsheet by category](/how/pdf-excel/summarize-spreadsheet-by-category).",
       },
     ],
-    related: ["documents/mail-merge-excel-to-word", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/fill-pdf-form-from-spreadsheet"],
+    related: ["documents/mail-merge-excel-to-word", "pdf-excel/summarize-spreadsheet-by-category", "pdf-excel/fill-pdf-form-from-spreadsheet", "printing-labels/make-packing-slips-from-orders"],
     lastChecked: "2026-11-13",
     sources: [
       {

@@ -8,8 +8,10 @@ import { LOCAL_AI_PAGES } from "./local-ai";
 import { PC_CLEANUP_PAGES } from "./pc-cleanup";
 import { PDF_EXCEL_PAGES } from "./pdf-excel";
 import { PHOTOS_FILES_PAGES } from "./photos-files";
+import { PRINTING_LABELS_PAGES } from "./printing-labels";
 import { STUDY_PAGES } from "./study";
 import { VIDEO_PAGES } from "./video";
+import { WEDDINGS_EVENTS_PAGES } from "./weddings-events";
 
 /** Every problem page, drafts included, one file per niche. A new niche's file goes here. */
 export const ALL_PROBLEM_PAGES: ProblemPage[] = [
@@ -24,4 +26,6 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...FILES_FOLDERS_PAGES,
   ...CONTACTS_CALENDAR_EMAIL_PAGES,
   ...STUDY_PAGES,
+  ...PRINTING_LABELS_PAGES,
+  ...WEDDINGS_EVENTS_PAGES,
 ];

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { AssistantMessage, ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
+import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
 
 export type ClaudeCodeTranscriptMeta = { sessionId: string; cwd: string; version: string };
 
@@ -28,6 +29,13 @@ const blocksOf = (content: string | readonly (TextContent | ImageContent)[]): Bl
             : []
           : [{ type: "image", source: { type: "base64", media_type: part.mimeType, data: part.data } }],
       );
+
+/**
+ * A reply that said only "nothing to post" in an older form (Claude Code's own
+ * "No response requested." placeholder, which models then copied) goes back as
+ * the marker, so the rebuilt session shows how a silent turn is written.
+ */
+const replyText = (text: string): string => (isSilentReplyText(text) ? SILENT_REPLY_MARKER : text);
 
 const turnsOf = (
   messages: readonly Message[],
@@ -89,7 +97,7 @@ const turnsOf = (
                 : { type: "thinking", thinking: part.thinking, signature: part.thinkingSignature },
             );
           }
-          if (part.type === "text" && part.text.trim()) blocks.push({ type: "text", text: part.text });
+          if (part.type === "text" && part.text.trim()) blocks.push({ type: "text", text: replyText(part.text) });
           if (part.type === "toolCall") {
             const id = toolId(part.id);
             pending.add(id);

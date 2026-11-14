@@ -699,7 +699,7 @@ const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDel
       type: "text" as const,
       text: `Delivered to ${delivery.threadId}. ${
         delivery.outcome === "answered"
-          ? "It was waiting on your answer to its question and has it now. The user sees none of this, so there is nothing to tell them: unless you were in the middle of answering them, end your turn here without writing anything."
+          ? "It was waiting on your answer to its question and has it now. The user sees none of this, so there is nothing to tell them: unless you were in the middle of answering them, your reply is `<no-reply/>`."
           : delivery.outcome === "steered"
           ? "It is working and reads your message before its next step."
           : delivery.outcome === "resumed"

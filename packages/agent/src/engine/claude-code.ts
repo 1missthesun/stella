@@ -41,6 +41,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
+import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
 import { createHash } from "node:crypto";
 import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
@@ -352,7 +353,9 @@ const renderMessage = (message: Message): string | undefined => {
       return `[user]\n${clip(text, UPDATE_MAX_MESSAGE_CHARS)}${images ? `\n[${images} image(s)]` : ""}`;
     }
     case "assistant": {
-      const text = textOf(message.content).trim();
+      const said = textOf(message.content).trim();
+      // An older "nothing to post" placeholder reads as the marker it stands for.
+      const text = said && isSilentReplyText(said) ? SILENT_REPLY_MARKER : said;
       const calls = message.content.filter((part): part is ToolCall => part.type === "toolCall");
       const lines = [
         ...(text ? [clip(text, UPDATE_MAX_MESSAGE_CHARS)] : []),

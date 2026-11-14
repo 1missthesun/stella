@@ -150,7 +150,7 @@ const queuedInput = (db: OwnerDbReader, thread: ThreadRow): boolean =>
     ),
   );
 
-const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
+export const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
   db
     .all<{ thread_id: string }>(
       `WITH RECURSIVE tree(thread_id, depth) AS (

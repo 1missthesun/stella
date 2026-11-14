@@ -42,3 +42,14 @@ export const resultWaitingFor = (resultJson: string | null | undefined): string 
     return undefined;
   }
 };
+
+/**
+ * What an agent that ended its turn waiting hears when its last helper still
+ * at work was stopped: a stopped agent sends no report, so without this it
+ * would wait for good.
+ */
+export const helperStoppedText = (helper: { threadId: string; description: string }): string =>
+  [
+    `Your helper "${helper.description.replace(/\s+/g, " ").trim().slice(0, 120)}" (thread_id: ${helper.threadId}) was stopped, so no report will come from it, and none of your helpers is still at work.`,
+    "Carry on without it: do that part yourself, start another helper, or report what you have. End your turn waiting again only if you are waiting for something else.",
+  ].join(" ");

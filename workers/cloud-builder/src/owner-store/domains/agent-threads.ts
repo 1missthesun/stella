@@ -81,8 +81,8 @@ import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
-import { boundReportText, endedWaiting, heldAncestorIds, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
-import { WAITING_FOR_MAX_CHARS, resultWaitingFor, waitingResultJson } from "@stella/contracts/agent-waiting";
+import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
+import { WAITING_FOR_MAX_CHARS, helperStoppedText, resultWaitingFor, waitingResultJson } from "@stella/contracts/agent-waiting";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
@@ -2566,6 +2566,18 @@ const routeStop = async (
     await markWaitingThreadStopped(ctx, thread, input.source, input.commandId);
     return { outcome: "stopped" };
   }
+  if (endedWaiting(thread)) {
+    // Its turn ended waiting (end_turn_waiting): nothing runs, but it still
+    // holds its task, so the stop is what ends it. Its computer hears too, so
+    // the task shows as stopped there and its leftover processes end.
+    if (executor.kind === "local" && deviceId) {
+      await ctx.host
+        .stopLocalAgent({ deviceId, threadId: thread.thread_id, ownerGeneration: input.ownerGeneration, commandId: input.commandId })
+        .catch(() => undefined);
+    }
+    await markEndedWaitingStopped(ctx, thread, input.source, input.commandId);
+    return { outcome: "stopped" };
+  }
   if (!ACTIVE_STATUSES.has(thread.status)) {
     return {
       outcome: "not_running",
@@ -3260,6 +3272,85 @@ const markWaitingThreadStopped = async (
   }
 };
 
+/** An agent whose turn ended waiting, stopped: it no longer waits, and shows as stopped everywhere. */
+const markEndedWaitingStopped = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  source: string,
+  commandId: string,
+): Promise<void> => {
+  const said = (() => {
+    try {
+      const parsed = JSON.parse(thread.result_json ?? "null") as { finalText?: unknown } | null;
+      return typeof parsed?.finalText === "string" ? parsed.finalText : "";
+    } catch {
+      return "";
+    }
+  })();
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      kind: endedKind,
+      outcome: "canceled",
+      source,
+      detail: { commandId, wasWaiting: resultWaitingFor(thread.result_json) ?? true, stopped: true },
+      now: ctx.now,
+    },
+    () =>
+      ctx.db.run(
+        `UPDATE agent_threads SET status = 'canceled', result_json = ?, error_message = ?, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'completed'`,
+        JSON.stringify({ finalText: said }),
+        AGENT_STOPPED_REASON,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      ),
+  );
+  const stopped = readThread(ctx.db, thread.thread_id);
+  if (stopped?.status === "canceled" && stopped.attempt_generation === thread.attempt_generation) {
+    await postAgentLifecycleCard(ctx, stopped, { kind: "canceled", text: AGENT_STOPPED_REASON });
+  }
+};
+
+/**
+ * A stopped agent sends no report, so a starter whose turn ended waiting with
+ * this as its last helper at work would wait for good: it hears that the
+ * helper was stopped, which starts its next turn like any message.
+ */
+const wakeWaitingStarter = async (
+  ctx: OwnerContext,
+  stopped: ThreadRow,
+  input: { commandId: string; ownerGeneration: string; source: string; from: AgentMessageSender },
+): Promise<void> => {
+  if (!stopped.parent_thread_id) return;
+  const starter = readThread(ctx.db, stopped.parent_thread_id);
+  if (!starter || !endedWaiting(starter) || liveDescendants(ctx.db, starter.thread_id).length > 0) return;
+  try {
+    await controlAgent(ctx, {
+      commandId: `${input.commandId}>wake:${starter.thread_id}`,
+      kind: "message",
+      thread: starter,
+      ownerGeneration: input.ownerGeneration,
+      text: formatAgentMessage(
+        input.from,
+        helperStoppedText({ threadId: stopped.thread_id, description: stopped.description }),
+        sentByStarter(starter, input.from) ? { starter: true } : undefined,
+      ),
+      source: input.source,
+      detail: { from: input.from.threadId, helperStopped: stopped.thread_id },
+      next: { clientMsgId: `${input.commandId}>wake`, fingerprint: "agent-message" },
+    });
+  } catch (error) {
+    logCommand(ctx, starter.thread_id, "command_dropped", `command_dropped:${input.commandId}>wake`, input.source, {
+      commandId: `${input.commandId}>wake`,
+      command: "message",
+      reason: errorReason(error),
+    });
+  }
+};
+
 const deviceStanding = async (
   ctx: OwnerContext,
   deviceId: string,
@@ -3361,14 +3452,26 @@ const stopAgent = async (ctx: OwnerContext, args: StopArgs): Promise<StopResult>
       { reason: "stop_target_not_started_by_requester" },
     );
   }
+  const source = `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`;
   const { result, descendants } = await stopTree(ctx, {
     commandId,
     thread,
     ownerGeneration: args.ownerGeneration,
     text: "",
-    source: `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`,
+    source,
     detail: { requester: args.requesterThreadId ?? args.conversationId },
   });
+  if (result.outcome !== "not_running") {
+    const requester = args.requesterThreadId ? readThread(ctx.db, args.requesterThreadId) : null;
+    await wakeWaitingStarter(ctx, readThread(ctx.db, thread.thread_id) ?? thread, {
+      commandId,
+      ownerGeneration: args.ownerGeneration,
+      source,
+      from: args.requesterThreadId
+        ? { threadId: args.requesterThreadId, label: requester?.description || "An agent" }
+        : { threadId: args.conversationId, label: "Stella" },
+    });
+  }
   return {
     ...stopResult(result),
     ...(descendants.length

@@ -57,6 +57,7 @@ import {
   END_TURN_WAITING_PARAMETERS,
   END_TURN_WAITING_TOOL,
   endTurnWaitingResult,
+  helperStoppedText,
   parseWaitingFor,
 } from "@stella/contracts/agent-waiting";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
@@ -660,6 +661,44 @@ const agentsBusy = async (read: BusyReader, conversationId: ConversationId, dept
   return false;
 };
 
+/**
+ * A stopped agent sends no report, so a starter whose turn ended waiting with
+ * it as its last helper at work would wait for good: it hears that the helper
+ * was stopped instead, which starts its next turn like a helper's report.
+ * Nothing when the starter was stopped too (a stop marks the whole subtree
+ * before aborting any of it) or still runs.
+ */
+const wakeWaitingStarter = async (
+  runtime: Pick<TaskRuntime<unknown, { phase: string }, unknown, object>, "snapshot"> & { conversationId: number },
+  read: BusyReader,
+  starter: StellaAgentRole,
+  helperThreadId: string,
+  wake: (to: { threadId: string; conversationId: ConversationId; home: ConversationId }, message: string) => Promise<void>,
+  context: Context,
+): Promise<void> => {
+  const home = starter.parentConversationId as ConversationId | undefined;
+  if (starter.agentType === "orchestrator" || home === undefined || !starter.threadId) return;
+  const own = runtime.conversationId as ConversationId;
+  if ((await runtime.snapshot(LiveDoc, own, context))?.run !== undefined) return;
+  // Its record says it ended its turn waiting (the turn's own marker is gone by then).
+  const record = (await runtime.snapshot(StellaAgentsDoc, home, context))?.agents[starter.threadId];
+  if (!record?.waiting || wasStopped(record)) return;
+  const others = Object.entries((await read.agents(own))?.agents ?? {}).filter(([threadId]) => threadId !== helperThreadId);
+  // A helper elsewhere may still be at work; only a stopped one is known not to be.
+  if (others.some(([, agent]) => agent.remote && !wasStopped(agent))) return;
+  const helpers = others.filter(([, agent]) => !agent.remote && agent.conversationId >= 0);
+  const carrying = new Set((await read.reporters(own)).map((reporter) => reporter.input.threadId));
+  for (const [threadId, agent] of helpers) {
+    const id = agent.conversationId as ConversationId;
+    if (carrying.has(threadId) || (await read.running(id)) || (await agentsBusy(read, id, 1))) return;
+  }
+  const description = (await runtime.snapshot(StellaAgentsDoc, own, context))?.agents[helperThreadId]?.description ?? helperThreadId;
+  await wake(
+    { threadId: starter.threadId, conversationId: own, home },
+    `[Helper stopped]\n${helperStoppedText({ threadId: helperThreadId, description })}`,
+  );
+};
+
 const busyReader = (
   store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
   context: Context,
@@ -1053,6 +1092,37 @@ export function stellaAgents(host: StellaAgentsHost) {
             ? undefined
             : reportStatusOf({ status: reporter.state.checkpoint.status, text: report });
         const self = await roleOf(runtime, runtime.conversationId, context);
+        if (stopped && report === undefined) {
+          const reporters: BusyReader["reporters"] = async (id) => {
+            let found: Awaited<ReturnType<BusyReader["reporters"]>> = [];
+            await runtime.commit(async (tx) => {
+              found = await liveReporters(tx, id);
+              return undefined;
+            }, context);
+            return found;
+          };
+          await wakeWaitingStarter(
+            runtime,
+            {
+              agents: (id) => runtime.snapshot(StellaAgentsDoc, id, context),
+              running: async (id) => (await runtime.snapshot(LiveDoc, id, context))?.run !== undefined,
+              reporters,
+            },
+            self,
+            reporter.input.threadId,
+            async (to, message) => {
+              await runtime.commit(async (tx) => {
+                await tx.createTask(
+                  Reporter,
+                  { threadId: to.threadId, conversationId: to.conversationId, message, report: true },
+                  { ownership: { kind: "conversation" }, background: true, conversationId: to.home },
+                );
+                return undefined;
+              }, context);
+            },
+            context,
+          ).catch((error: unknown) => console.warn(`[agents] waking a waiting starter failed: ${error instanceof Error ? error.message : String(error)}`));
+        }
         if (stopped && host.agentStopped && (self.agentType === "orchestrator" || self.parentConversationId === undefined)) {
           const live = await runtime.snapshot(LiveDoc, reporter.input.conversationId as ConversationId, context);
           if (live?.run === undefined) {
@@ -2165,7 +2235,14 @@ export function stellaAgents(host: StellaAgentsHost) {
     const local: string[] = [];
     const elsewhere: AgentStopResult[] = [];
     let endedProcesses = 0;
-    for (const agent of [...below.reverse(), target]) {
+    const order = [...below.reverse(), target];
+    // Everything in the subtree is marked stopped before any of it is aborted:
+    // a helper's stop must find its starter already stopped, or it would wake
+    // a starter that waits for it (see wakeWaitingStarter).
+    for (const agent of order) {
+      if (!agent.record.remote) await markStopped(store, agent.parentConversationId, agent.threadId, context);
+    }
+    for (const agent of order) {
       const { record } = agent;
       if (record.remote) {
         const stop = remoteHostOf(record)?.stop;
@@ -2179,7 +2256,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       const waiting =
         (await store.snapshot(LiveDoc, id, context))?.run === undefined &&
         (await agentsBusy(busyReader(store, context), id).catch(() => false));
-      await markStopped(store, agent.parentConversationId, agent.threadId, context);
       await (await store.conversation(id, context))?.abort(context);
       endedProcesses += (await host.endAgentProcesses?.(agent.threadId).catch(() => 0)) ?? 0;
       local.push(agent.threadId);

@@ -67,8 +67,17 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MIN_TOKEN_REFRESH_DELAY_MS = 30_000;
 const HTTP_TIMEOUT_MS = 15_000;
 const CANCELLATION_RPC_TIMEOUT_MS = 60_000;
-const AGENT_RUN_ATTEMPTS = 4;
+/**
+ * A task whose local run was lost (the runtime restarting for an Update,
+ * crashing, or slow to come back) is run again, joining the same durable work,
+ * with growing waits for up to this long. An Update restart can take well over
+ * 20 seconds on a loaded computer.
+ */
+const AGENT_RUN_RETRY_WINDOW_MS = 10 * 60_000;
 const AGENT_RUN_RETRY_MS = 3_000;
+const AGENT_RUN_RETRY_MAX_MS = 60_000;
+/** Ends a task whose runtime never came back: paused where it was, not failed. */
+export const AGENT_RUN_INTERRUPTED_ERROR_CODE = "LOCAL_RUN_INTERRUPTED";
 const DISPATCH_WATCH_POLL_MS = 750;
 const DEVICE_PRESENCE_SILENCE_MS = 3 * DEVICE_PRESENCE_PING_INTERVAL_MS + 2_000;
 
@@ -101,6 +110,8 @@ const remoteCancellation = (
 export type ExecutionPlacementRunResult = {
   status: "ok" | "error" | "canceled";
   stopped?: boolean;
+  /** Its runtime never came back to finish it: it keeps its context and a message carries it on. */
+  interrupted?: boolean;
   finalText?: string;
   error?: string;
   waitingFor?: string;
@@ -2038,6 +2049,7 @@ export class ExecutionPlacementBridge {
         ...(resultJson ? { resultJson } : {}),
         ...(failed ? { errorCode: "LOCAL_EXECUTION_FAILED" } : {}),
         ...(stopped ? { errorCode: AGENT_STOPPED_ERROR_CODE } : {}),
+        ...(canceled && result.interrupted ? { errorCode: AGENT_RUN_INTERRUPTED_ERROR_CODE } : {}),
         ...((failed || canceled) && (result.error || result.finalText)
           ? { errorMessage: boundedResult(result.error || result.finalText) }
           : {}),
@@ -2101,6 +2113,7 @@ export class ExecutionPlacementBridge {
     payload: Record<string, unknown>,
     epoch: number,
   ): Promise<ExecutionPlacementRunResult | null> {
+    let firstLostAt: number | undefined;
     for (let attempt = 1; ; attempt += 1) {
       try {
         const result = await this.options.runExecution({
@@ -2109,18 +2122,35 @@ export class ExecutionPlacementBridge {
           ownerGeneration: row.ownerGeneration,
         });
         if (row.kind === "agent" && !this.isLiveEpoch(epoch)) return null;
+        if (firstLostAt !== undefined) {
+          this.log("warn", `Execution placement task ${row.dispatchId} resumed after ${attempt - 1} lost run(s) over ${Math.round((Date.now() - firstLostAt) / 1000)}s.`);
+        }
         return result;
       } catch (error) {
         if (row.kind !== "agent") throw error;
         if (!this.isLiveEpoch(epoch)) return null;
         if (this.inbox.get(row.dispatchId)?.cancelRpcPending) throw error;
-        if (attempt >= AGENT_RUN_ATTEMPTS) throw error;
+        firstLostAt ??= Date.now();
+        const elapsed = Date.now() - firstLostAt;
+        if (elapsed >= AGENT_RUN_RETRY_WINDOW_MS) {
+          this.log(
+            "warn",
+            `Execution placement task ${row.dispatchId} lost its local run ${attempt} times over ${Math.round(elapsed / 1000)}s; ending it as interrupted.`,
+            error,
+          );
+          return {
+            status: "canceled",
+            interrupted: true,
+            error: `It was interrupted on this computer: Stella's runtime here stopped (an update, restart or crash) and didn't come back within ${Math.round(AGENT_RUN_RETRY_WINDOW_MS / 60_000)} minutes to carry it on (last error: ${error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300)}). It keeps its context: send it a message to carry on where it was.`,
+          };
+        }
+        const wait = Math.min(AGENT_RUN_RETRY_MS * 2 ** (attempt - 1), AGENT_RUN_RETRY_MAX_MS, AGENT_RUN_RETRY_WINDOW_MS - elapsed);
         this.log(
           "warn",
-          `Execution placement task ${row.dispatchId} lost its local run (attempt ${attempt}/${AGENT_RUN_ATTEMPTS}); resuming it.`,
+          `Execution placement task ${row.dispatchId} lost its local run (attempt ${attempt}, ${Math.round(elapsed / 1000)}s since the first); resuming it in ${Math.round(wait / 1000)}s.`,
           error,
         );
-        await new Promise((resolve) => setTimeout(resolve, AGENT_RUN_RETRY_MS * attempt));
+        await new Promise((resolve) => setTimeout(resolve, wait));
         if (!this.isLiveEpoch(epoch)) return null;
       }
     }

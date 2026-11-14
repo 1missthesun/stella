@@ -925,7 +925,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. The pages are photos, so search finds nothing until OCR runs: [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable). If the photos are HEIC and you need JPGs too, [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
       },
     ],
-    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/make-scanned-pdf-searchable", "photos-files/convert-heic-to-jpg"],
+    related: ["pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/make-scanned-pdf-searchable", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Perform quick actions in Finder on Mac", href: "https://support.apple.com/guide/mac-help/mchl97ff9142/mac" },
@@ -1032,7 +1032,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Resize them for the shop: see [resize images in bulk](/how/photos-files/resize-images-in-bulk). And [remove the location from photos](/how/photos-files/remove-location-from-photos) before posting.",
       },
     ],
-    related: ["photos-files/resize-images-in-bulk", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg"],
+    related: ["photos-files/resize-images-in-bulk", "photos-files/remove-location-from-photos", "photos-files/convert-webp-to-jpg", "photos-files/remove-background-from-photos"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "XnConvert", href: "https://www.xnview.com/en/xnconvert/" },
@@ -1139,7 +1139,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "See [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg). To make them smaller for upload, see [resize images in bulk](/how/photos-files/resize-images-in-bulk).",
       },
     ],
-    related: ["photos-files/convert-heic-to-jpg", "photos-files/resize-images-in-bulk", "photos-files/add-watermark-to-photos"],
+    related: ["photos-files/convert-heic-to-jpg", "photos-files/resize-images-in-bulk", "photos-files/add-watermark-to-photos", "photos-files/convert-tiff-to-jpg"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Convert image file types using Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1012/mac" },
@@ -1359,6 +1359,438 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     sources: [
       { label: "Microsoft: Use Snipping Tool to capture screenshots", href: "https://support.microsoft.com/en-us/windows/use-snipping-tool-to-capture-screenshots-00246869-1843-655f-f220-97299b865f6b" },
       { label: "Apple: Take a screenshot on iPhone", href: "https://support.apple.com/en-us/102616" },
+    ],
+  },
+  {
+    slug: "convert-tiff-to-jpg",
+    niche: "photos-files",
+    searchPhrases: [
+      "tiff to jpg",
+      "convert tiff to jpg",
+      "convert multi page tiff to jpg",
+      "tiff to jpg without losing quality",
+      "convert tiff to jpg on mac",
+    ],
+    title: "Convert TIFF scans to JPG, every page, colours kept",
+    description:
+      "Make JPG copies of TIFF scans for a website, including every page of multi-page TIFFs and CMYK or 16-bit files: Preview, XnConvert, ImageMagick or Stella (stella.sh).",
+    h1: "Convert TIFF to JPG, including multi-page scans",
+    short: "Convert TIFF to JPG",
+    lede: "Six scanner TIFFs, one of them three pages long, turned into eight web-ready JPGs.",
+    answer:
+      "Open the TIFFs in Preview on a Mac and use File, Export Selected Images as JPEG, or use the free XnConvert on Windows for a whole folder. The traps are scanner extras: multi-page TIFFs where most converters keep only page 1, print-shop CMYK colours and 16-bit files. Stella (stella.sh) made JPGs of six scans, one JPG per page of a three-page letter, turned a sideways slide upright and fixed a CMYK postcard's colours for the web.",
+    stellaSteps: [
+      "Finds the six TIFFs in Documents/Scans and reads each one's pages, colour type and rotation flag",
+      "Spots a three-page letter, a CMYK postcard, a 16-bit photo, a black-and-white certificate and a slide stored sideways",
+      "Converts each page to its own high-quality JPG next to its TIFF, upright and in normal web colours",
+      "Puts the JPGs on one sheet and looks at it to check every picture came out right",
+      "Confirms the TIFFs are unchanged by comparing checksums before and after, and reports 8 JPGs from 6 files",
+    ],
+    prompt:
+      "My scanner saved everything in the Scans folder in my Documents as TIFF files, and the family website only takes JPGs. Make JPG copies of all of them.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Eight JPGs in under a minute. Checked afterwards against an answer key written before the run: one JPG for each single-page scan and for each page of the three-page letter, each a real JPEG at full size, the right way up and with the same colours (CMYK and 16-bit files included), no stray extras, and the TIFFs unchanged.",
+      note: "The scans are pictures and letters made for this run in the TIFF types scanners write: LZW, 16-bit, CMYK, 1-bit fax-style and multi-page, plus one stored sideways. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/photos-files/convert-tiff-to-jpg/proof.mp4`,
+        cuts: webCuts("photos-files/convert-tiff-to-jpg"),
+        poster: `${PROOFS}/photos-files/convert-tiff-to-jpg/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 46.03,
+        realDuration: 86,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Six TIFF scans are in Documents/Scans." },
+        { at: 1.57, text: "The prompt: make JPG copies of all of them for the family website." },
+        { at: 14.07, text: "Stella replies it's making high-quality JPGs next to the originals, leaving the TIFFs alone." },
+        { at: 20.07, text: "Reading each TIFF's pages and colours, converting, and checking a sheet of the results." },
+        { at: 31.6, text: "Done: 8 JPGs from 6 scans (the letter has 3 pages); the sideways slide is upright and the postcard's colours fixed." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "Mac: Preview",
+        body: "Select the TIFFs in Finder and open them in Preview. In the sidebar, select all the thumbnails (each page of a multi-page TIFF has its own), then File, Export Selected Images, click Options and set Format to JPEG.",
+      },
+      {
+        title: "Windows or Mac: XnConvert",
+        body: "In the free XnConvert, add the Scans folder on the Input tab, choose JPG on the Output tab with quality around 90, and click Convert. Check that a multi-page TIFF came out as one JPG per page.",
+      },
+      {
+        title: "Windows: one at a time",
+        body: "The Photos app opens a TIFF; choose the … menu, Save as, and pick JPG. It only saves the page you're looking at, so it's slow for multi-page scans.",
+      },
+      {
+        title: "ImageMagick",
+        body: "`magick \"Letter.tif\" -auto-orient -colorspace sRGB -depth 8 -quality 92 \"Letter.jpg\"` writes Letter-0.jpg, Letter-1.jpg and so on for each page, turns sideways scans upright and converts CMYK to screen colours.",
+      },
+      {
+        title: "Keep the TIFFs",
+        body: "JPG is smaller because it throws away detail. Keep the TIFFs as your archive copies and upload the JPGs.",
+      },
+    ],
+    limits: [
+      "JPG is lossy and 8-bit. The copies look the same on screen, but the TIFFs remain the better archive.",
+      "CMYK scans are converted with a generic colour profile, so colours can differ slightly from the printed original.",
+      "File names, the scans' technical details and a small sheet of thumbnails went to the AI model you use in Stella. The scans were converted on your computer.",
+      "Recorded on Linux with ImageMagick already installed. On a Mac or Windows PC Stella would usually download a converter first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why did only the first page of my TIFF convert?",
+        a: "Many converters read just page 1 of a multi-page TIFF. Preview shows every page as a thumbnail; Stella made one JPG per page.",
+      },
+      {
+        q: "Does converting TIFF to JPG lose quality?",
+        a: "A little, but at quality 90 or so you won't see it on a website. Keep the TIFFs for reprints.",
+      },
+      {
+        q: "Why do my colours look wrong after converting?",
+        a: "The TIFF is probably CMYK, made for printing. Converting to sRGB, as Stella did with the postcard, fixes it.",
+      },
+      {
+        q: "What about WebP or HEIC pictures?",
+        a: "See [convert WebP to JPG](/how/photos-files/convert-webp-to-jpg) and [convert HEIC to JPG](/how/photos-files/convert-heic-to-jpg).",
+      },
+    ],
+    related: ["photos-files/convert-webp-to-jpg", "photos-files/convert-heic-to-jpg", "photos-files/make-a-contact-sheet"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Convert image file types using Preview on Mac", href: "https://support.apple.com/guide/preview/prvw1012/mac" },
+      { label: "XnConvert (free batch image converter)", href: "https://www.xnview.com/en/xnconvert/" },
+      { label: "ImageMagick command-line options", href: "https://imagemagick.org/script/command-line-options.php" },
+    ],
+  },
+  {
+    slug: "make-a-contact-sheet",
+    niche: "photos-files",
+    searchPhrases: [
+      "contact sheet",
+      "make a contact sheet",
+      "print contact sheet of photos",
+      "contact sheet with file names",
+      "contact sheet maker",
+    ],
+    title: "Make a printable contact sheet of photos with file names",
+    description:
+      "Print all your photos as thumbnails with each file name underneath, to circle the ones to order: Apple Photos, XnView MP, ImageMagick or Stella (stella.sh).",
+    h1: "Make a contact sheet of photos with file names",
+    short: "Make a contact sheet",
+    lede: "Thirty photos from a family shoot on three printable pages, each with its file name.",
+    answer:
+      "On a Mac, select the photos in Photos, choose File, Print, pick Contact Sheet and tick Filename under captions. Windows' own contact sheet print layout shows no names, so use the free XnView MP's Create, Contact sheet. Stella (stella.sh) laid 30 photos out on three Letter pages in shooting order, each name in bold underneath with room to circle it, and turned the photos stored sideways upright.",
+    stellaSteps: [
+      "Finds the 30 photos in “Ellis family shoot”, reads their sizes and rotation flags, and checks none are duplicates",
+      "Looks at a preview of them all, and at the ones stored sideways to see which way they belong",
+      "Lays them out 12 to a Letter page in shooting order, about 2.3 inches wide, with each file name in bold underneath and space to circle",
+      "Saves “Ellis family shoot - contact sheet.pdf” in the same folder and renders the pages to check them",
+      "Points out the photos look like drawings rather than real photos, in case the real shoot is in another folder",
+    ],
+    prompt:
+      "I've got 30 photos from a family photo shoot in the Ellis family shoot folder in my Pictures. Make a contact sheet I can print, with each photo's file name under it, so we can circle the ones we want to order.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "A 3-page PDF in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: all 30 photos on it, every one the right way up (including those stored sideways with a rotation flag), every file name readable, on three printable pages, and the photos unchanged.",
+      note: "The 30 photos are simple drawings of people with camera-style file names, made for this run. Stella noticed and said so, which is why its reply suggests the real photos might be elsewhere. The work is sped up 5×.",
+      video: {
+        src: `${PROOFS}/photos-files/make-a-contact-sheet/proof.mp4`,
+        cuts: webCuts("photos-files/make-a-contact-sheet"),
+        poster: `${PROOFS}/photos-files/make-a-contact-sheet/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.87,
+        realDuration: 104,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Thirty photos are in Pictures/Ellis family shoot." },
+        { at: 1.63, text: "The prompt: a printable contact sheet with each file name under its photo." },
+        { at: 10.83, text: "Stella replies it's making a PDF with names under each photo and room to circle." },
+        { at: 16.83, text: "Checking the photos and rotations, laying out the pages and rendering them (sped up)." },
+        { at: 28.43, text: "Done: 3 Letter pages, 30 photos in shooting order, sideways ones turned upright; print at 100%." },
+      ],
+    },
+    manualTitle: "Make one yourself",
+    manualSteps: [
+      {
+        title: "Mac: Photos",
+        body: "Select the photos, choose File, Print, and pick Contact Sheet on the right. Set the number of columns, tick Filename under Captions, then print, or choose PDF, Save as PDF to keep a copy.",
+      },
+      {
+        title: "Windows: XnView MP",
+        body: "In the free XnView MP (free for private use), select the photos and choose Create, Contact sheet. Turn on the file-name label, set the page size and layout, then save it as an image or print it.",
+      },
+      {
+        title: "Windows: Print Pictures",
+        body: "Select the photos in File Explorer, right-click, Print, and pick the Contact sheet layout (35 per page). It's quick, but it shows no file names, so you can't tell which photo to order.",
+      },
+      {
+        title: "ImageMagick",
+        body: "`magick montage -label '%f' *.jpg -auto-orient -thumbnail 400x400 -geometry +10+30 -tile 4x5 sheet.jpg`. Put `-label` before the file names or montage draws none, and keep `-auto-orient` or phone photos lie on their side.",
+      },
+      {
+        title: "Print at actual size",
+        body: "Print at 100% or Actual size, not Fit to page, so the thumbnails stay the size you chose and names stay readable.",
+      },
+    ],
+    limits: [
+      "Thumbnails are small by design. Check sharpness and closed eyes on the full photo before ordering.",
+      "It shows file names only. Dates or captions under each photo would be a follow-up request.",
+      "A low-resolution preview of the photos went to the AI model you use in Stella so it could check them. The PDF was made on your computer.",
+      "Recorded on Linux with ImageMagick and Python's picture libraries already installed. On a Mac or Windows PC Stella would usually install them first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What is a contact sheet?",
+        a: "A page of small prints of many photos, each labelled, used to choose which ones to print or order. Photographers made them from film; now they're a PDF.",
+      },
+      {
+        q: "How many photos fit on a page?",
+        a: "Up to about 35 if you only need to recognise them; 12 per Letter page, as Stella chose, leaves faces big enough to judge and room to circle.",
+      },
+      {
+        q: "Why are some thumbnails sideways?",
+        a: "Phones and cameras often store photos sideways with a flag to turn them. Tools that ignore the flag print them on their side; Stella turned them upright.",
+      },
+      {
+        q: "Can I put all the full-size photos in one PDF instead?",
+        a: "Yes: see [combine photos into one PDF](/how/photos-files/combine-photos-into-one-pdf).",
+      },
+    ],
+    related: ["photos-files/combine-photos-into-one-pdf", "photos-files/find-duplicate-photos", "photos-files/put-photos-side-by-side"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Print your own photos on Mac (Contact Sheet)", href: "https://support.apple.com/guide/photos/pht6e15dbdb/mac" },
+      { label: "XnView MP (free for private use)", href: "https://www.xnview.com/en/xnviewmp/" },
+      { label: "ImageMagick: montage", href: "https://imagemagick.org/script/montage.php" },
+    ],
+  },
+  {
+    slug: "put-photos-side-by-side",
+    niche: "photos-files",
+    searchPhrases: [
+      "put two photos side by side",
+      "combine two photos into one",
+      "before and after photo side by side",
+      "put pictures side by side",
+      "merge two pictures together side by side",
+    ],
+    title: "Put two photos side by side in one picture (before/after)",
+    description:
+      "Join a before and after photo side by side in one picture, the same height and nothing stretched: Paint, Preview, ImageMagick, or Stella (stella.sh) on your computer.",
+    h1: "Put two photos side by side in one picture",
+    short: "Put two photos side by side",
+    lede: "Garden before and after photos joined side by side, both the right way up.",
+    answer:
+      "Make both photos the same height, then place them next to each other on one canvas. Paint on Windows and Preview on a Mac can do it by hand, and collage apps do it with a template. Watch for a stretched photo, and a phone photo that shows upside down because its rotation flag was ignored. Stella (stella.sh) joined a garden's before and after photos, before on the left, at the same height with nothing stretched, and turned the upside-down after photo the right way up.",
+    stellaSteps: [
+      "Finds the two photos in Pictures/Garden makeover: Garden before (3264×2448) and Garden after (4032×3024)",
+      "Notices the after photo carries a flag saying it's stored upside down, and looks at both to confirm which way is up",
+      "Scales both to the same height, puts them side by side with a thin white line between, before on the left",
+      "Removes the hidden camera details, like location, from the new picture so they don't go out when it's posted",
+      "Saves “Garden before and after.jpg” next to the originals, looks at it, and confirms the originals are unchanged",
+    ],
+    prompt:
+      "Put my garden before and after photos (they're in my Pictures folder) side by side in one picture, before on the left and after on the right, so I can post it.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The combined picture in about 40 seconds. Checked afterwards against an answer key written before the run: both photos in it unstretched, the after photo the right way up (its camera stored it upside down), before on the left and after on the right, both large (2,753 pixels wide each) and the same size, and the originals unchanged.",
+      note: "The garden photos are drawings made for this run at two different camera sizes, with the after photo stored upside down with a rotation flag. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/photos-files/put-photos-side-by-side/proof.mp4`,
+        cuts: webCuts("photos-files/put-photos-side-by-side"),
+        poster: `${PROOFS}/photos-files/put-photos-side-by-side/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.77,
+        realDuration: 74,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Garden before and after photos are in Pictures." },
+        { at: 1.63, text: "The prompt: put them side by side, before on the left, to post." },
+        { at: 10.43, text: "Stella replies it's making the picture next to the originals and leaving them unchanged." },
+        { at: 16.43, text: "Turning the upside-down after photo upright and joining the two." },
+        { at: 28.4, text: "Done: same height, thin white line between, nothing stretched, location details removed." },
+      ],
+    },
+    manualTitle: "Do it yourself",
+    manualSteps: [
+      {
+        title: "Windows: Paint",
+        body: "Open the before photo and drag the small handle on the right edge of the canvas to make it about twice as wide. Open the after photo in a second Paint window, Select all, Copy, then Paste into the first and drag it into the empty half. If the heights differ, Resize the after photo first.",
+      },
+      {
+        title: "Mac: Keynote",
+        body: "Preview can resize a photo (Tools, Adjust Size) but can't widen the canvas. Instead, drop both photos onto a blank Keynote slide, set them to the same height in the Format panel, line them up, then File, Export To, Images.",
+      },
+      {
+        title: "Free editors",
+        body: "In GIMP, open the before photo, use Image, Canvas Size to double the width, then File, Open as Layers for the after photo and move it to the right. Export as JPG.",
+      },
+      {
+        title: "ImageMagick",
+        body: "`magick before.jpg after.jpg -auto-orient -resize x2000 +append out.jpg` scales both to 2,000 pixels tall and joins them left to right. Without `-auto-orient`, a phone photo can come out sideways or upside down.",
+      },
+      {
+        title: "Check before posting",
+        body: "Look at the result at full size: neither photo should look squashed, the order should read before then after, and if the photos carry location data you may want to remove it.",
+      },
+    ],
+    limits: [
+      "The photos are matched in height. A portrait next to a landscape leaves very different widths; making them match means cropping one, which Stella didn't need to do here.",
+      "No “Before” and “After” labels unless you ask; Stella can add them.",
+      "Small previews of both photos went to the AI model you use in Stella so it could check which way was up. The picture was made on your computer.",
+      "Recorded on Linux with ImageMagick already installed. On a Mac or Windows PC Stella would usually download it first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I put two photos side by side without stretching them?",
+        a: "Resize both to the same height while keeping their proportions, then join them. Changing only the width is what stretches a photo.",
+      },
+      {
+        q: "Why is one of my photos upside down when I combine them?",
+        a: "Phones often save the picture rotated with a flag telling apps to turn it. Tools that ignore the flag show it as stored. Stella applied the flag.",
+      },
+      {
+        q: "Can I put more than two photos together?",
+        a: "Yes, ask for a grid. For many photos with names, see [make a contact sheet](/how/photos-files/make-a-contact-sheet).",
+      },
+      {
+        q: "Should I remove location data before posting?",
+        a: "It's wise for photos taken at home. Stella stripped it from the new picture; see [remove location from photos](/how/photos-files/remove-location-from-photos) for the originals.",
+      },
+    ],
+    related: ["photos-files/make-a-contact-sheet", "photos-files/remove-location-from-photos", "photos-files/add-watermark-to-photos"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "GIMP (free image editor)", href: "https://www.gimp.org/" },
+      { label: "ImageMagick: appending images", href: "https://imagemagick.org/script/command-line-options.php#append" },
+    ],
+  },
+  {
+    slug: "remove-background-from-photos",
+    niche: "photos-files",
+    searchPhrases: [
+      "remove background from image",
+      "remove background from multiple images",
+      "remove background from product photos",
+      "remove background from image free no sign up",
+      "transparent background product photo",
+    ],
+    title: "Remove the background from many photos at once, offline",
+    description:
+      "Cut product photos out onto a transparent background, a whole folder at full size, without uploading: Preview, Paint, rembg, or Stella (stella.sh) on your computer.",
+    h1: "Remove the background from multiple images at once",
+    short: "Remove background from photos",
+    lede: "Eight ceramics photos cut out onto transparent backgrounds, handle holes included.",
+    answer:
+      "For one photo, recent Macs have Remove Background in Preview and Windows 11's Paint has a Remove background button. For a folder, the free rembg tool runs a background-removal model on your own computer, so nothing is uploaded and there are no credits. Stella (stella.sh) set rembg up, cut out eight product photos as transparent PNGs, checked the edges up close and confirmed the gaps inside mug and teapot handles were see-through.",
+    stellaSteps: [
+      "Finds the eight photos in Pictures/Shop photos and looks at them: soft studio backdrop, drop shadows, and handles with gaps",
+      "Installs the free rembg tool in its own separate Python environment, which downloads a background-removal model of about 170 MB",
+      "Cuts out every photo onto a transparent background at full size, on this computer",
+      "Checks the cut-outs on a bright magenta background and zooms in on handles, spouts and rims, then counts stray specks and holes",
+      "Saves the PNGs in a new Transparent background folder with the same names, confirms the originals are unchanged, and flags that most file names don't match the colours shown",
+    ],
+    prompt:
+      "I sell ceramics online. Remove the background from the product photos in the Shop photos folder in my Pictures so each one is on a transparent background, and keep the originals.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Eight transparent PNGs in about 2½ minutes, including the model download. Checked afterwards against an answer key written before the run: a real transparent cut-out of every photo at the same size, the outline matching each product (99–100% overlap with the true shape), the gaps inside the mug and teapot handles see-through, the products' own colours untouched, and the originals unchanged.",
+      note: "The product photos are rendered ceramics on a studio backdrop, made for this run. Their colours didn't match their file names, which Stella pointed out. The work is sped up 12×.",
+      video: {
+        src: `${PROOFS}/photos-files/remove-background-from-photos/proof.mp4`,
+        cuts: webCuts("photos-files/remove-background-from-photos"),
+        poster: `${PROOFS}/photos-files/remove-background-from-photos/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 47.3,
+        realDuration: 196,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Eight ceramics product photos are in Pictures/Shop photos." },
+        { at: 1.63, text: "The prompt: remove the backgrounds onto transparent, keeping the originals." },
+        { at: 14.43, text: "Stella replies the PNGs will go in a subfolder and it will check handles and rims." },
+        { at: 20.43, text: "Installing a background-removal tool, cutting out the photos and checking the edges (sped up)." },
+        { at: 32.87, text: "Done: 8 transparent PNGs, shadows gone, handle holes clear; most file names don't match the colours." },
+      ],
+    },
+    manualTitle: "Remove it yourself",
+    manualSteps: [
+      {
+        title: "Mac: Preview or Finder",
+        body: "On recent macOS (Sonoma or later), open a photo in Preview and choose Tools, Remove Background, then File, Export as PNG. For several at once, select them in Finder, right-click, Quick Actions, Remove Background; it makes PNG copies.",
+      },
+      {
+        title: "Windows 11: Paint",
+        body: "Open the photo in Paint, click Remove background in the Image group on the toolbar, then File, Save as, PNG picture. One photo at a time, and it needs an up-to-date Paint.",
+      },
+      {
+        title: "A whole folder: rembg",
+        body: "With Python installed, `pip install \"rembg[cpu,cli]\"` then `rembg p \"Shop photos\" \"Transparent background\"` cuts out every photo in the folder. The first run downloads the model; after that it works offline.",
+      },
+      {
+        title: "Check the hard parts",
+        body: "View each cut-out on a bright colour, not white. Look at handles, gaps between arms, glass and fur: holes that should be see-through can stay filled, and shiny edges can be nibbled.",
+      },
+      {
+        title: "Save as PNG or WebP",
+        body: "JPG has no transparency, so a JPG “cut-out” comes back with a white or black box. Save as PNG, or WebP if your shop accepts it.",
+      },
+    ],
+    limits: [
+      "Edges came out crisp rather than softened. Stella said that looks right at full size, but small thumbnails on a dark background may show a slightly jagged outline, and offered to soften them.",
+      "Hair, fur, glass and very fine detail are harder than ceramics; expect to touch some of those up.",
+      "The drop shadow goes with the background. Add one back in your shop's editor if you want it.",
+      "Stella downloaded and ran a background-removal model (about 170 MB) on your computer, so the photos weren't uploaded. A small preview sheet and close-ups did go to the AI model you use in Stella so it could check the edges.",
+      "Recorded on Linux. On a Mac or Windows PC the same tool runs, after Stella installs Python and it, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I remove backgrounds from multiple images at once for free?",
+        a: "Yes. Finder's Remove Background quick action on a Mac handles a selection, and rembg handles a whole folder on any computer. Neither uploads your photos.",
+      },
+      {
+        q: "Why is the gap in my mug's handle still filled in?",
+        a: "Some tools only find the outer outline. Check holes on a coloured background; Stella confirmed each handle gap was see-through.",
+      },
+      {
+        q: "Will the photos lose quality?",
+        a: "No. The cut-outs are full size, and the product pixels are unchanged; only the background became transparent.",
+      },
+      {
+        q: "Can I watermark the product photos too?",
+        a: "Yes, see [add a watermark to photos](/how/photos-files/add-watermark-to-photos), or [resize images in bulk](/how/photos-files/resize-images-in-bulk) for your shop's size.",
+      },
+    ],
+    related: ["photos-files/add-watermark-to-photos", "photos-files/resize-images-in-bulk", "photos-files/convert-webp-to-jpg"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Remove a background or extract an image in Preview on Mac", href: "https://support.apple.com/guide/preview/prvw15636/mac" },
+      { label: "Windows Insider blog: Background removal in Paint", href: "https://blogs.windows.com/windows-insider/2023/09/07/background-removal-in-paint-begins-rolling-out-to-windows-insiders/" },
+      { label: "rembg (free, local background removal)", href: "https://github.com/danielgatis/rembg" },
     ],
   },
 ];

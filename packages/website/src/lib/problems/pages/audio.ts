@@ -427,7 +427,7 @@ export const AUDIO_PAGES: ProblemPage[] = [
         a: "Yes. See [edit MP3 tags in bulk](/how/audio/edit-mp3-tags-in-bulk). If you're converting a FLAC album rather than recordings, [convert FLAC to MP3](/how/audio/convert-flac-to-mp3) keeps the tags and cover.",
       },
     ],
-    related: ["audio/convert-flac-to-mp3", "audio/extract-audio-from-video", "audio/merge-mp3-files"],
+    related: ["audio/convert-flac-to-mp3", "audio/extract-audio-from-video", "audio/merge-mp3-files", "audio/convert-wma-to-mp3"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Convert a song to a different file format in Music", href: "https://support.apple.com/en-us/108961" },
@@ -963,7 +963,7 @@ export const AUDIO_PAGES: ProblemPage[] = [
         a: "Yes, in the same chat: see [edit MP3 tags in bulk](/how/audio/edit-mp3-tags-in-bulk). To merge the mix into one file, see [merge MP3 files](/how/audio/merge-mp3-files).",
       },
     ],
-    related: ["audio/edit-mp3-tags-in-bulk", "audio/merge-mp3-files", "audio/make-ringtone"],
+    related: ["audio/edit-mp3-tags-in-bulk", "audio/merge-mp3-files", "audio/make-ringtone", "video/make-video-louder"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Audacity manual: Loudness Normalization", href: "https://manual.audacityteam.org/man/loudness_normalization.html" },
@@ -1507,6 +1507,114 @@ export const AUDIO_PAGES: ProblemPage[] = [
     sources: [
       { label: "Audacity manual: Change Tempo", href: "https://manual.audacityteam.org/man/change_tempo.html" },
       { label: "FFmpeg filters: atempo", href: "https://ffmpeg.org/ffmpeg-filters.html#atempo" },
+    ],
+  },
+  {
+    slug: "convert-wma-to-mp3",
+    niche: "audio",
+    searchPhrases: [
+      "wma to mp3",
+      "convert wma to mp3",
+      "convert wma to mp3 keep tags",
+      "car stereo won't play wma",
+      "convert wma to mp3 windows 11",
+    ],
+    title: "Convert WMA to MP3 and keep song names and album info",
+    description:
+      "Car stereo won't play your WMA music? Convert the whole collection to MP3 with titles, artists, albums and track numbers kept: fre:ac, VLC, ffmpeg or Stella (stella.sh).",
+    h1: "Convert WMA to MP3 and keep the song info",
+    short: "Convert WMA to MP3",
+    lede: "Two albums of old Windows Media Player WMAs turned into tagged MP3s for the car.",
+    answer:
+      "Use a converter that copies the tags across and keeps each album in its own folder: the free fre:ac does a whole collection on Mac or Windows, while VLC does one file at a time and often drops the song names. Watch for two tracks with the same name, like two Intros, overwriting each other. Stella (stella.sh) converted ten WMA songs to MP3 with title, artist, album, track, year and genre kept, and added each album's cover.",
+    stellaSteps: [
+      "Finds the “From the old PC” folder in Music: two albums, ten WMA songs at 128 kbps, each with tags and a Folder.jpg cover",
+      "Converts every song to a high-quality MP3, keeping the artist and album folders and the file names, so both “01 Intro” tracks survive",
+      "Copies the title, artist, album, album artist, track number, year and genre into tags car stereos read, and adds each album's cover from its folder picture",
+      "Checks the tags, the tag version and each song's length",
+      "Saves everything in a new “From the old PC (MP3)” folder next to the original, ready to copy to a USB stick, with the WMAs untouched",
+    ],
+    prompt:
+      "My old music collection in the From the old PC folder in my Music is all WMA files from Windows Media Player, and my car stereo won't play them. Convert them to MP3 and keep the song names, artists and album info.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Ten MP3s in under a minute. Checked afterwards against an answer key written before the run: all ten songs converted with both “Intro” tracks kept, real MP3 at about 145–170 kbps, title, artist, album and track number in every file, year and genre too, each whole song sounding the same as its WMA, and the WMAs unchanged.",
+      note: "The two albums are synthesised music by made-up bands, saved as WMA with tags and covers for this run. The work is sped up 3×. We didn't play the MP3s on a real car stereo.",
+      video: {
+        src: `${PROOFS}/audio/convert-wma-to-mp3/proof.mp4`,
+        cuts: webCuts("audio/convert-wma-to-mp3"),
+        poster: `${PROOFS}/audio/convert-wma-to-mp3/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.97,
+        realDuration: 84,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Two albums of WMA songs are in Music/From the old PC." },
+        { at: 1.63, text: "The prompt: convert them to MP3 for the car and keep the song info." },
+        { at: 13.63, text: "Stella replies it's converting them with names, artists, albums and covers, keeping the WMAs." },
+        { at: 19.63, text: "Converting and checking the tags of every song." },
+        { at: 30.57, text: "Done: 10 MP3s in a new folder, every tag kept, album covers added." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "Mac or Windows: fre:ac",
+        body: "In the free fre:ac, add the folder, choose the LAME MP3 encoder (VBR quality 2 is a good setting), set an output folder and a file-name pattern like <artist>/<album>/<track> - <title>, then Start. It copies the tags across.",
+      },
+      {
+        title: "VLC, one file at a time",
+        body: "Choose Media, Convert / Save, add a WMA, pick the Audio - MP3 profile and a new file name, then Start. Check the song's title and artist afterwards; VLC doesn't always keep them.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i \"01 Intro.wma\" -map_metadata 0 -id3v2_version 3 -c:a libmp3lame -q:a 2 \"01 Intro.mp3\"` keeps the tags in a form car stereos read. Run it in each album's folder so same-named tracks don't collide.",
+      },
+      {
+        title: "Windows Media Player can't do it",
+        body: "Windows Media Player and the newer Media Player app can rip CDs to MP3 but don't convert WMA files you already have to MP3. Use one of the tools above.",
+      },
+      {
+        title: "Copy to the car",
+        body: "Most car stereos read a FAT32 USB stick and show the ID3 tags. Copy the whole converted folder across; keeping the artist and album folders makes browsing easier on the dashboard.",
+      },
+    ],
+    limits: [
+      "WMA files with copy protection (DRM), often bought from old online music stores, can't be converted. Stella said it would list any; none of these had it.",
+      "Converting one lossy format to another can't improve the sound. The MP3s sound the same as the 128 kbps WMAs, not better.",
+      "File and folder names and the songs' tags went to the AI model you use in Stella. The music was converted on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Can I convert WMA to MP3 without losing the song names?",
+        a: "Yes, with a converter that copies the tags, like fre:ac or ffmpeg with `-map_metadata 0`. Stella kept every tag and added album covers.",
+      },
+      {
+        q: "Why did one of my songs disappear after converting?",
+        a: "Two tracks with the same name, like two Intros, went into one folder and the second overwrote the first. Keep album folders, as Stella did.",
+      },
+      {
+        q: "What MP3 quality should I use?",
+        a: "VBR quality 2 (about 190 kbps) or 192 kbps is plenty, and can't make a 128 kbps WMA sound better than it did.",
+      },
+      {
+        q: "What about M4A or FLAC files?",
+        a: "See [convert M4A to MP3](/how/audio/convert-m4a-to-mp3) and [convert FLAC to MP3](/how/audio/convert-flac-to-mp3).",
+      },
+    ],
+    related: ["audio/convert-m4a-to-mp3", "audio/convert-flac-to-mp3", "audio/edit-mp3-tags-in-bulk"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "fre:ac (free audio converter)", href: "https://www.freac.org/" },
+      { label: "VLC media player", href: "https://www.videolan.org/vlc/" },
+      { label: "FFmpeg MP3 encoding guide", href: "https://trac.ffmpeg.org/wiki/Encode/MP3" },
     ],
   },
 ];

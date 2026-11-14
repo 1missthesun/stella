@@ -118,7 +118,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. Transcribe in the spoken language, translate the .srt (Stella can translate it and keep the timings), then burn in the translated file the same way.",
       },
     ],
-    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "audio/transcribe-voice-memos-to-text", "video/make-srt-subtitle-file"],
+    related: ["video/cut-silences-from-video", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "audio/transcribe-voice-memos-to-text", "video/make-srt-subtitle-file", "video/crop-video-to-vertical"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "Whisper on GitHub", href: "https://github.com/openai/whisper" },
@@ -247,7 +247,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Not automatically. For multicam edits, export a cut list from one angle into your editor and apply it there.",
       },
     ],
-    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "video/speed-up-video"],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "video/speed-up-video", "video/cut-out-part-of-video"],
     lastChecked: "2026-11-10",
     sources: [
       { label: "auto-editor", href: "https://auto-editor.com" },
@@ -485,7 +485,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. A media server such as Plex or Jellyfin converts on the fly while you watch, and a cheap streaming stick (Chromecast, Fire TV, Apple TV with Infuse) plays most MKVs directly.",
       },
     ],
-    related: ["video/compress-video-for-discord", "video/burn-subtitles-into-video-for-tiktok", "video/combine-videos-into-one", "video/convert-mov-to-mp4"],
+    related: ["video/compress-video-for-discord", "video/burn-subtitles-into-video-for-tiktok", "video/combine-videos-into-one", "video/convert-mov-to-mp4", "video/convert-webm-to-mp4"],
     lastChecked: "2026-11-12",
     sources: [
       { label: "HandBrake documentation: subtitles", href: "https://handbrake.fr/docs/en/latest/advanced/subtitles.html" },
@@ -811,7 +811,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "See [convert MKV to MP4](/how/video/convert-mkv-to-mp4). To make a video small enough to send, see [compress a video for Discord](/how/video/compress-video-for-discord).",
       },
     ],
-    related: ["video/convert-mkv-to-mp4", "video/rotate-video", "photos-files/convert-heic-to-jpg"],
+    related: ["video/convert-mkv-to-mp4", "video/rotate-video", "photos-files/convert-heic-to-jpg", "video/convert-avi-to-mp4"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "HandBrake documentation", href: "https://handbrake.fr/docs/en/latest/" },
@@ -1348,7 +1348,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Usually not; it's the video format. See [convert MOV to MP4](/how/video/convert-mov-to-mp4).",
       },
     ],
-    related: ["video/convert-mov-to-mp4", "video/speed-up-video", "video/combine-videos-into-one"],
+    related: ["video/convert-mov-to-mp4", "video/speed-up-video", "video/combine-videos-into-one", "video/crop-video-to-vertical"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Rotate or flip a clip in QuickTime Player on Mac", href: "https://support.apple.com/guide/quicktime-player/qtp5a6251741/mac" },
@@ -1456,12 +1456,660 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Captions and a vertical frame. See [burn subtitles into a video for TikTok](/how/video/burn-subtitles-into-video-for-tiktok) and [cut silences from a video](/how/video/cut-silences-from-video).",
       },
     ],
-    related: ["video/cut-silences-from-video", "video/burn-subtitles-into-video-for-tiktok", "audio/slow-down-song-without-changing-pitch"],
+    related: ["video/cut-silences-from-video", "video/burn-subtitles-into-video-for-tiktok", "audio/slow-down-song-without-changing-pitch", "video/reverse-video"],
     lastChecked: "2026-11-13",
     sources: [
       { label: "Apple: Slow down and speed up clips in iMovie on Mac", href: "https://support.apple.com/guide/imovie/mov6c442b2eb/mac" },
       { label: "Clipchamp: speed up and slow down videos", href: "https://clipchamp.com/en/blog/speed-up-slow-down-video/" },
       { label: "FFmpeg filters: atempo", href: "https://ffmpeg.org/ffmpeg-filters.html#atempo" },
+    ],
+  },
+  {
+    slug: "convert-avi-to-mp4",
+    niche: "video",
+    searchPhrases: [
+      "convert avi to mp4",
+      "wmv to mp4",
+      "3gp to mp4",
+      "vob to mp4",
+      "convert old videos to mp4",
+    ],
+    title: "Convert AVI, WMV, 3GP and VOB videos to MP4 (no squashing)",
+    description:
+      "Turn old camera and phone clips (AVI, WMV, 3GP, VOB) into MP4s that play on any phone or TV, without squashing the picture: HandBrake, VLC, ffmpeg or Stella (stella.sh).",
+    h1: "Convert old AVI, WMV, 3GP and VOB videos to MP4",
+    short: "Convert AVI, WMV, 3GP, VOB to MP4",
+    lede: "Five old family clips in four formats, now MP4s that play on a phone and a TV.",
+    answer:
+      "Re-encode each clip to H.264 video with AAC sound in an MP4: the free HandBrake does it on Mac and Windows with its Fast 1080p30 preset, and VLC's Convert / Save works for one file at a time. The catch with old footage is shape: DV camcorder and DVD clips use stretched pixels, so a careless conversion squashes or stretches people. Stella (stella.sh) converted five clips in four formats and fixed the shape of the two that needed it.",
+    stellaSteps: [
+      "Finds the five clips in “Old family videos”: two AVIs, a WMV, a 3GP from an old phone and a VOB from a DVD",
+      "Reads each clip's codec, size, frame rate and pixel shape, and checks for interlacing",
+      "Grabs a frame from each and lays them side by side to see how they should look",
+      "Converts every clip to H.264 with AAC sound, turning the DV camcorder clip and the widescreen DVD clip into square pixels so nothing is squashed",
+      "Saves the MP4s in a new MP4 folder inside the original one, copies each file's date across, and checks every new file plays to the end with sound",
+    ],
+    prompt:
+      "My Old family videos folder in Videos has clips in AVI, WMV, 3GP and VOB from old cameras and phones. Convert them all to MP4 so they play on my phone and TV.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Five MP4s in under a minute. Checked afterwards against an answer key written before the run: an MP4 for every clip, H.264 with AAC sound, the DV clip 4:3 and the DVD clip 16:9 widescreen with nothing squashed, full length, the same picture at the same moment, sound kept, and the originals unchanged.",
+      note: "The five clips were made for this run in the formats old cameras and phones wrote: Motion JPEG and DV AVIs, WMV with WMA sound, a 3GP with AMR sound and a DVD VOB with AC-3 sound. A time code in each picture let the check compare moments. The work is sped up 4×. We didn't play the files on a real phone or TV.",
+      video: {
+        src: `${PROOFS}/video/convert-avi-to-mp4/proof.mp4`,
+        cuts: webCuts("video/convert-avi-to-mp4"),
+        poster: `${PROOFS}/video/convert-avi-to-mp4/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 42.77,
+        realDuration: 84,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Old family clips in AVI, WMV, 3GP and VOB are in Videos." },
+        { at: 1.63, text: "The prompt: convert them all to MP4 for a phone and TV." },
+        { at: 11.23, text: "Stella replies it's converting them and keeping the originals." },
+        { at: 17.23, text: "Checking each clip's shape and converting." },
+        { at: 28.33, text: "Done: five MP4s, two clips fixed so they no longer look squashed, dates kept." },
+      ],
+    },
+    manualTitle: "Convert them yourself",
+    manualSteps: [
+      {
+        title: "Mac or Windows: HandBrake",
+        body: "Open the free HandBrake, drag in a clip and pick the Fast 1080p30 preset (H.264 and AAC in an MP4). On the Dimensions tab leave Anamorphic on Automatic so DV and DVD clips keep their real shape, then Start. Add the others to the queue.",
+      },
+      {
+        title: "One file: VLC",
+        body: "In VLC choose Media, Convert / Save, add the file, click Convert / Save and pick the Video - H.264 + MP3 (MP4) profile. Play the result and check that the DVD clip is still widescreen.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i \"Camping trip 2006.avi\" -vf \"scale=trunc(iw*sar/2)*2:ih,setsar=1\" -c:v libx264 -crf 18 -pix_fmt yuv420p -c:a aac \"Camping trip 2006.mp4\"` converts one clip and turns stretched pixels into square ones. Loop it over the folder for the rest.",
+      },
+      {
+        title: "Check the shape",
+        body: "Look at a face or a round object in each new file. DVD clips are usually 16:9 even though the file says 720×480, and DV camcorder clips are 4:3 at 720×576. Forcing everything to 640×480 squashes the widescreen ones.",
+      },
+      {
+        title: "Keep the originals",
+        body: "Store the AVI, WMV, 3GP and VOB files somewhere safe after converting. Converting is lossy, and the originals are what you'd go back to if a better tool or setting comes along.",
+      },
+    ],
+    limits: [
+      "Converting doesn't add detail. A 2009 phone clip at 352×288 still looks soft on a big TV, and low frame rates still look choppy; Stella pointed both out.",
+      "Copy-protected DVDs aren't covered. This is for VOB files you already have on your computer.",
+      "File names and the clips' technical details, plus one frame from each clip, went to the AI model you use in Stella. The videos were converted on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my converted DVD video look squashed?",
+        a: "DVD video is stored at 720×480 and stretched to 16:9 when played. A converter that ignores that flag, or forces 4:3, squeezes everyone thin. Keep the shape (HandBrake's Automatic anamorphic) or scale to square pixels as Stella did.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. HandBrake has a queue, and Stella converted all five clips in one go into a separate MP4 folder.",
+      },
+      {
+        q: "Will my converted videos be in the right order on my phone?",
+        a: "Phones sort by date. Stella copied each original's date onto its MP4 so they land in the right place in the gallery.",
+      },
+      {
+        q: "What about MOV or MKV files?",
+        a: "See [convert MOV to MP4](/how/video/convert-mov-to-mp4) and [convert MKV to MP4](/how/video/convert-mkv-to-mp4).",
+      },
+    ],
+    related: ["video/convert-mov-to-mp4", "video/convert-mkv-to-mp4", "video/convert-webm-to-mp4"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "HandBrake documentation", href: "https://handbrake.fr/docs/en/latest/" },
+      { label: "VLC media player", href: "https://www.videolan.org/vlc/" },
+      { label: "FFmpeg filters: scale and setsar", href: "https://ffmpeg.org/ffmpeg-filters.html#scale-1" },
+    ],
+  },
+  {
+    slug: "convert-webm-to-mp4",
+    niche: "video",
+    searchPhrases: [
+      "webm to mp4",
+      "convert webm to mp4",
+      "webm won't play on iphone",
+      "convert webm to mp4 mac",
+      "webm to mp4 no limit",
+    ],
+    title: "Convert WebM to MP4 so it plays on an iPhone",
+    description:
+      "WebM won't play on your iPhone? Re-encode it to H.264 MP4 (renaming isn't enough) with HandBrake, VLC, ffmpeg, or let Stella (stella.sh) convert them all.",
+    h1: "Convert WebM to MP4 that plays on an iPhone",
+    short: "Convert WebM to MP4",
+    lede: "Four WebM downloads, one with an odd size and no length, turned into iPhone MP4s.",
+    answer:
+      "Re-encode it: WebM holds VP8, VP9 or AV1 video with Opus or Vorbis sound, and an iPhone wants H.264 or HEVC with AAC. Renaming the file or copying the streams into an .mp4 box doesn't help. The free HandBrake on Mac or Windows does it with its Fast 1080p30 preset. Stella (stella.sh) converted four WebMs, including a browser screen recording with an odd height and no length in its header.",
+    stellaSteps: [
+      "Finds the four WebM files in Downloads and reads their codecs: VP8, VP9 and AV1 video with Vorbis or Opus sound",
+      "Notices the screen recording is 767 pixels tall (H.264 needs an even number) and has no length in its header",
+      "Decodes every source to the end to make sure none is damaged, and counts its frames",
+      "Re-encodes each to H.264 with AAC sound, set to start playing straight away, rounding the odd height to 766",
+      "Checks each MP4 has every frame of its original and saves it next to the WebM with the same name, keeping the WebMs",
+    ],
+    prompt: "I have some WebM videos in my Downloads that won't play on my iPhone. Can you turn them into MP4s that will?",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "Four MP4s in under a minute. Checked afterwards against an answer key written before the run: an MP4 for each WebM, H.264 with AAC inside (not VP9 or Opus renamed), the same picture size, full length including the screen recording with no length in its header, the same picture at the same moment, sound kept, set to start playing straight away, and the WebMs and an unrelated PDF untouched.",
+      note: "The four WebMs were made for this run as browsers and sites write them: VP9 with Opus, VP8 with Vorbis and AV1 with Opus, with a time code in each picture. The work is sped up 3×. We didn't play them on a real iPhone; the check confirmed the format iPhones play.",
+      video: {
+        src: `${PROOFS}/video/convert-webm-to-mp4/proof.mp4`,
+        cuts: webCuts("video/convert-webm-to-mp4"),
+        poster: `${PROOFS}/video/convert-webm-to-mp4/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 40.57,
+        realDuration: 78,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. Four WebM videos are in Downloads." },
+        { at: 1.63, text: "The prompt: turn them into MP4s that play on an iPhone." },
+        { at: 9.63, text: "Stella replies it's converting them next to the originals and keeping the WebMs." },
+        { at: 15.63, text: "Checking each file and converting to H.264 with AAC sound." },
+        { at: 26.17, text: "Done: four MP4s, every frame there; the screen recording is one pixel shorter." },
+      ],
+    },
+    manualTitle: "Convert it yourself",
+    manualSteps: [
+      {
+        title: "Mac or Windows: HandBrake",
+        body: "Open the free HandBrake, drag in the WebM and pick the Fast 1080p30 preset, which makes H.264 video with AAC sound in an MP4. Click Start, or Add to Queue for several files and then Start Queue.",
+      },
+      {
+        title: "VLC",
+        body: "Choose Media, Convert / Save, add the WebM, click Convert / Save and pick the Video - H.264 + MP3 (MP4) profile. One file at a time, but it works offline.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i clip.webm -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\" -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart clip.mp4`. The scale part rounds odd sizes to even ones, which H.264 needs.",
+      },
+      {
+        title: "Don't just rename it",
+        body: "Renaming .webm to .mp4, or copying the streams with `-c copy`, leaves VP9 or AV1 video and Opus sound inside. Some players cope, but iPhones and many editors won't. The video has to be re-encoded.",
+      },
+      {
+        title: "Screen recordings from a browser",
+        body: "Browser recorders often write WebMs with no length in the header, so players show 0:00 or can't seek. A full re-encode fixes that, because the new file gets a proper length.",
+      },
+    ],
+    limits: [
+      "Re-encoding takes time and is slightly lossy. Stella used a high-quality setting, which is invisible on short clips; long films take minutes each.",
+      "A WebM with transparency loses it in MP4, which has no see-through video.",
+      "File names and the videos' technical details went to the AI model you use in Stella. The videos were converted on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why won't WebM play on my iPhone?",
+        a: "Newer iPhones play some WebM in Safari, but not in Photos, Files or Messages, and VP8 or AV1 can fail. An H.264 MP4 plays everywhere.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Not on your own computer. Online converters cap file size; HandBrake, VLC, ffmpeg and Stella don't.",
+      },
+      {
+        q: "Can I convert to a GIF instead?",
+        a: "Yes, see [make a GIF from a video](/how/video/make-gif-from-video).",
+      },
+      {
+        q: "What about old AVI or WMV clips?",
+        a: "Same idea, different traps. See [convert AVI, WMV, 3GP and VOB to MP4](/how/video/convert-avi-to-mp4).",
+      },
+    ],
+    related: ["video/convert-avi-to-mp4", "video/convert-mov-to-mp4", "video/make-gif-from-video"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "HandBrake documentation", href: "https://handbrake.fr/docs/en/latest/" },
+      { label: "VLC media player", href: "https://www.videolan.org/vlc/" },
+      { label: "FFmpeg H.264 encoding guide", href: "https://trac.ffmpeg.org/wiki/Encode/H.264" },
+    ],
+  },
+  {
+    slug: "crop-video-to-vertical",
+    niche: "video",
+    searchPhrases: [
+      "convert horizontal video to vertical",
+      "crop video to vertical",
+      "make video vertical for reels",
+      "convert video to 9:16",
+      "horizontal to vertical video without black bars",
+    ],
+    title: "Convert a horizontal video to vertical 9:16, no black bars",
+    description:
+      "Turn a landscape video into a 9:16 vertical one for Reels, TikTok or Shorts that fills the screen and keeps you in shot: Clipchamp, Shotcut, ffmpeg or Stella (stella.sh).",
+    h1: "Convert a horizontal video to vertical, keeping you in shot",
+    short: "Crop a video to vertical 9:16",
+    lede: "A landscape pancake tutorial cropped to a full-screen 9:16 Reel, cook and pan in shot.",
+    answer:
+      "Crop a 9:16 slice out of the landscape picture and scale it up, placing the slice where the person is, not in the middle. Clipchamp on Windows does it with the 9:16 ratio, Fill and a drag; on a Mac the free Shotcut has a vertical mode. Stella (stella.sh) tracked where the cook and pan were in every frame of a pancake tutorial, chose a crop that keeps both in for all 21 seconds, and made a 1080×1920 Reel.",
+    stellaSteps: [
+      "Finds “Pancake tutorial” in Videos: 21 seconds, 1280×720, with speech",
+      "Makes a sheet of frames from across the video to see the kitchen: the cook and pan stand right of centre",
+      "Measures where the cook and pan are in all 525 frames, and finds they barely move, so one fixed crop fits",
+      "Crops a 9:16 slice around them with room on each side, nudging it to leave out an on-screen strip at the top left",
+      "Scales it to 1080×1920, keeps the sound, saves it next to the original, and checks frames from across the new video",
+    ],
+    prompt:
+      "Turn my pancake tutorial in my Videos into a vertical 9:16 video for Reels. Fill the whole screen, no black bars, and keep me and the pan in the shot.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The Reel in about 4½ minutes, most of it spent measuring every frame. Checked afterwards against an answer key written before the run: 1080×1920 (9:16), every sampled frame a true crop of the original with no bars, squashing or blurred fill, the cook and pan inside the frame all the way through (a centre crop would cut them off), the same 21 seconds, sound kept, and the original unchanged.",
+      note: "The pancake tutorial is a drawn scene with a synthetic voice, made for this run, with the cook placed off-centre so a lazy centre crop would fail. The long frame-by-frame measuring is sped up as much as 22×.",
+      video: {
+        src: `${PROOFS}/video/crop-video-to-vertical/proof.mp4`,
+        cuts: webCuts("video/crop-video-to-vertical"),
+        poster: `${PROOFS}/video/crop-video-to-vertical/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44,
+        realDuration: 304,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A landscape pancake tutorial is in Videos." },
+        { at: 1.63, text: "The prompt: a full-screen 9:16 Reel that keeps the cook and pan in shot." },
+        { at: 11.23, text: "Stella replies it's checking the whole video so the crop follows them, not just the middle." },
+        { at: 17.23, text: "Measuring where the cook and pan are in every frame (sped up)." },
+        { at: 29.63, text: "Done: 1080×1920, no bars, both in shot; the kitchen's left side is cut and the picture is a little softer." },
+      ],
+    },
+    manualTitle: "Make it vertical yourself",
+    manualSteps: [
+      {
+        title: "Windows: Clipchamp",
+        body: "Add the video to the timeline, click the 16:9 button by the preview and choose 9:16. Select the clip, choose Fill in the floating toolbar, then drag the picture sideways in the preview until you and the subject are in frame. Scrub through to check, then Export.",
+      },
+      {
+        title: "Mac: Shotcut",
+        body: "iMovie can't make 9:16 projects. In the free Shotcut, set Settings, Video Mode to Vertical HD 30 fps, add the video to the timeline, then use the Size, Position & Rotate filter to fill the frame and slide the picture until the subject is in shot. Export as H.264.",
+      },
+      {
+        title: "On the phone",
+        body: "CapCut and Instagram's own editor have a 9:16 canvas: pinch the video to fill it and drag it into place. Check the whole clip, because a subject who walks out of the slice disappears.",
+      },
+      {
+        title: "ffmpeg",
+        body: "For a 1280×720 video, `ffmpeg -i in.mp4 -vf \"crop=405:720:722:0,scale=1080:1920\" -c:a copy out.mp4` takes a 405-pixel-wide slice starting 722 pixels from the left. Change that number to where your subject is; find it by pausing on a frame.",
+      },
+      {
+        title: "Pick the slice by watching",
+        body: "A vertical crop keeps only about a third of a landscape frame. Watch the whole video first and note how far left and right the subject goes; if it's wider than the slice, split the clip and frame each part separately.",
+      },
+    ],
+    limits: [
+      "A vertical slice keeps about a third of the width, so the rest of the scene is lost. Here the shelf and window on the left went.",
+      "The slice is enlarged to fill a phone screen, so a 720p source looks a little softer than video filmed upright. Stella said so.",
+      "Stella used one fixed crop because the cook barely moved. For someone walking around the room the crop would need to follow them, which this run didn't test.",
+      "Frames from the video went to the AI model you use in Stella so it could see the scene. The video was cropped on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I make a horizontal video vertical without black bars?",
+        a: "Crop it instead of shrinking it: take a 9:16 slice of the picture and scale it up to 1080×1920. Shrinking the whole frame to fit is what leaves bars.",
+      },
+      {
+        q: "Why not just crop the middle?",
+        a: "If the person isn't in the middle, a centre crop cuts them off. In this run the cook stood right of centre, so Stella measured where they were first.",
+      },
+      {
+        q: "What size should a Reel or TikTok be?",
+        a: "1080×1920 pixels (9:16). Stella made exactly that.",
+      },
+      {
+        q: "Can I add captions too?",
+        a: "Yes, see [burn subtitles into a video for TikTok](/how/video/burn-subtitles-into-video-for-tiktok).",
+      },
+    ],
+    related: ["video/burn-subtitles-into-video-for-tiktok", "video/rotate-video", "video/speed-up-video"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Microsoft: How to change the aspect ratio of a video (Clipchamp)", href: "https://support.microsoft.com/en-us/clipchamp/how-to-change-the-aspect-ratio-of-a-video" },
+      { label: "Shotcut (free video editor)", href: "https://shotcut.org/" },
+      { label: "FFmpeg filters: crop", href: "https://ffmpeg.org/ffmpeg-filters.html#crop" },
+    ],
+  },
+  {
+    slug: "cut-out-part-of-video",
+    niche: "video",
+    searchPhrases: [
+      "cut out part of a video",
+      "remove part of video",
+      "trim middle of video",
+      "cut a section out of a video",
+      "delete part of video and join",
+    ],
+    title: "Cut out part of a video and join the rest, frame-exact",
+    description:
+      "Remove a section from the middle of a video and keep the rest as one clip, cut at the exact second, sound in sync: QuickTime, Clipchamp, ffmpeg or Stella (stella.sh).",
+    h1: "Cut out part of a video and keep the rest",
+    short: "Cut out part of a video",
+    lede: "35 seconds of grass cut from a football final, the rest joined into one video.",
+    answer:
+      "Split the clip at the start and end of the bad part, delete the middle piece and save. QuickTime Player's Split Clip does it on a Mac and Clipchamp's split does it on Windows. Fast “lossless” cutters can snap to the nearest keyframe, seconds off, or leave the sound out of step after the join. Stella (stella.sh) cut 1:10 to 1:45 out of a football final at the exact second and joined the rest with the sound in sync.",
+    stellaSteps: [
+      "Finds “Under-9s cup final” in Videos: 3 minutes, with keyframes only every 10 seconds",
+      "Looks at frames either side of 1:10 and 1:45 to confirm that's where the camera points at the grass",
+      "Cuts out 1:10 to 1:45 and joins the two halves, re-encoding at a very high quality so the cut lands on the exact frame, not the nearest keyframe",
+      "Checks frames at the join and the new length: 2:25, down from 3:00",
+      "Saves it as a new file next to the original and suggests a quick listen at the join",
+    ],
+    prompt:
+      "In the video of my son's football final in my Videos folder, the camera was pointing at the grass from 1:10 to 1:45. Cut that part out and keep the rest as one video.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The edited video in about 40 seconds. Checked afterwards against an answer key written before the run, using a time code drawn on every frame: 2:25 long (3:00 minus 35 seconds), not one frame from 1:10–1:45 left, everything else kept in order and cut at the exact second, the sound in step with the picture before and after the join, and the original unchanged.",
+      note: "The football final is a drawn match with crowd and whistle sounds, made for this run with keyframes 10 seconds apart so a quick keyframe cut would land at 1:40 instead of 1:45. The work is sped up 3×.",
+      video: {
+        src: `${PROOFS}/video/cut-out-part-of-video/proof.mp4`,
+        cuts: webCuts("video/cut-out-part-of-video"),
+        poster: `${PROOFS}/video/cut-out-part-of-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 38.7,
+        realDuration: 74,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 3-minute football final is in Videos." },
+        { at: 1.63, text: "The prompt: cut out 1:10 to 1:45 and keep the rest as one video." },
+        { at: 8.83, text: "Stella replies it's cutting that part and saving a new file, keeping the original." },
+        { at: 14.83, text: "Checking frames at the cut points and joining the two halves." },
+        { at: 24.3, text: "Done: 2:25 long, a plain cut from 1:09 into the action, picture and sound in step." },
+      ],
+    },
+    manualTitle: "Cut it yourself",
+    manualSteps: [
+      {
+        title: "Mac: QuickTime Player",
+        body: "Open the video, choose View, Show Clips, move the playhead to 1:10 and choose Edit, Split Clip. Do the same at 1:45. Click the middle clip, press Delete, then File, Save (or Export As) to write the joined video.",
+      },
+      {
+        title: "Windows: Clipchamp",
+        body: "Drag the video onto the timeline, move the playhead to 1:10 and press S to split, then again at 1:45. Select the middle piece, press Delete, close the gap if one is left, and Export.",
+      },
+      {
+        title: "ffmpeg, frame-exact",
+        body: "`ffmpeg -i in.mp4 -filter_complex \"[0:v]trim=0:70,setpts=PTS-STARTPTS[v0];[0:a]atrim=0:70,asetpts=PTS-STARTPTS[a0];[0:v]trim=start=105,setpts=PTS-STARTPTS[v1];[0:a]atrim=start=105,asetpts=PTS-STARTPTS[a1];[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]\" -map \"[v]\" -map \"[a]\" -crf 18 out.mp4`. Times are in seconds.",
+      },
+      {
+        title: "Why quick cuts land in the wrong place",
+        body: "Tools that cut without re-encoding (LosslessCut, `-c copy`) can only start a piece on a keyframe. If keyframes are 10 seconds apart, a cut at 1:45 starts at 1:40 instead. Fine for rough trims; re-encode when the second matters.",
+      },
+      {
+        title: "Check the join",
+        body: "Play a few seconds either side of the cut. The sound should match the picture, and nothing from the removed part should flash up.",
+      },
+    ],
+    limits: [
+      "An exact cut means re-encoding the video. Stella used a very high quality setting, so it looks the same, but the file is a fresh copy.",
+      "Checked by measurement, not by ear. Stella said nobody had listened to the join and suggested checking it.",
+      "File names, the video's details and a few frames around the cut went to the AI model you use in Stella. The video was cut on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I cut out the middle of a video?",
+        a: "Split it at the start and end of the part you don't want, delete the middle piece and save. Every editor works this way; Stella does it from the times you give.",
+      },
+      {
+        q: "Why is my sound out of sync after cutting?",
+        a: "Usually a no-re-encode cut joined two pieces that don't start on clean boundaries, so the sound drifts. Re-encoding the join, as Stella did, keeps it in step.",
+      },
+      {
+        q: "Can I cut out several parts at once?",
+        a: "Yes. Give Stella all the time ranges; it removes each and joins what's left.",
+      },
+      {
+        q: "What about cutting out pauses in a talk?",
+        a: "That's a different job: see [cut silences from a video](/how/video/cut-silences-from-video).",
+      },
+    ],
+    related: ["video/cut-silences-from-video", "video/combine-videos-into-one", "video/speed-up-video"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Split a movie into clips in QuickTime Player on Mac", href: "https://support.apple.com/guide/quicktime-player/qtpa2d90df3d/mac" },
+      { label: "Microsoft: How to split or cut videos and audio assets (Clipchamp)", href: "https://support.microsoft.com/en-us/clipchamp/how-to-split-or-cut-videos-and-audio-assets" },
+      { label: "FFmpeg filters: trim and concat", href: "https://ffmpeg.org/ffmpeg-filters.html#trim" },
+    ],
+  },
+  {
+    slug: "make-video-louder",
+    niche: "video",
+    searchPhrases: [
+      "increase volume of video",
+      "make video louder",
+      "make audio louder in video",
+      "boost audio volume in video",
+      "video sound too quiet",
+    ],
+    title: "Make a quiet video louder without crackle or clipping",
+    description:
+      "Video sound too quiet? Raise it to normal volume without loud moments crackling: iMovie, Clipchamp, ffmpeg's loudnorm, or Stella (stella.sh) on your own computer.",
+    h1: "Increase the volume of a quiet video without distortion",
+    short: "Make a video louder",
+    lede: "A barely audible birthday speech raised 20 dB, without the glass clinks crackling.",
+    answer:
+      "Turning the volume up evenly makes the loud moments clip, so raise the quiet speech and hold the peaks down: iMovie's Normalize clip volume does that on a Mac, Clipchamp goes to 200% on Windows, and ffmpeg's loudnorm filter does it properly. Stella (stella.sh) brought a speech recorded from the back of a hall up to normal video loudness, about 20 dB louder, with two glass clinks near the start still clean.",
+    stellaSteps: [
+      "Finds “Nan's 90th - speech” in Videos and measures its sound: very quiet speech, with two loud peaks near the start",
+      "Gently evens out the voice, takes out low rumble and some background hiss, then raises it to normal video loudness with a limit on peaks",
+      "Copies the picture across untouched, so only the sound changes",
+      "Measures the result: about 20 dB louder, no clipping, and the picture identical",
+      "Saves a louder copy next to the original and says it was checked by measurement, not by listening",
+    ],
+    prompt:
+      "The sound on the video of my nan's 90th birthday speech in my Videos is so quiet you can barely hear her. Make it louder.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The louder copy in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: the speech went from −40 to −15 LUFS (normal video loudness), nothing at full scale and the glass clinks not flattened, the same speech in time, the same length, the picture unchanged and still H.264.",
+      note: "The speech is a synthetic voice recorded quietly, with two near-full-scale glass clinks and applause, made for this run so a plain volume boost would clip. The work is sped up 5×. Everything was measured; nobody listened to it.",
+      video: {
+        src: `${PROOFS}/video/make-video-louder/proof.mp4`,
+        cuts: webCuts("video/make-video-louder"),
+        poster: `${PROOFS}/video/make-video-louder/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 44.23,
+        realDuration: 108,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A very quiet birthday-speech video is in Videos." },
+        { at: 1.63, text: "The prompt: the sound is so quiet you can barely hear her, make it louder." },
+        { at: 12.03, text: "Stella replies it's making a louder copy and leaving the original alone." },
+        { at: 18.03, text: "Measuring the sound, raising the speech and cutting back hiss." },
+        { at: 29.87, text: "Done: about 20 dB louder, no distortion, picture untouched; give it a listen." },
+      ],
+    },
+    manualTitle: "Make it louder yourself",
+    manualSteps: [
+      {
+        title: "Mac: iMovie",
+        body: "Add the clip to a project, select it and click the Volume button above the viewer. Drag the slider up (it goes to 400%) and turn on Normalize clip volume in the audio settings. Then File, Share, File.",
+      },
+      {
+        title: "Windows: Clipchamp",
+        body: "Add the clip to the timeline, select it, open Audio in the property panel and drag the volume up to 200%. For a very quiet recording that may not be enough; ffmpeg or Audacity can go further.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i in.mp4 -c:v copy -af loudnorm=I=-16:TP=-1.5:LRA=11 -c:a aac out.mp4` brings the sound to normal video loudness and keeps peaks under the limit, without touching the picture.",
+      },
+      {
+        title: "Don't just add decibels",
+        body: "A plain `volume=24dB` (or dragging a gain slider to the top) makes any loud moment, a clink, a laugh, a bump, hit the ceiling and crackle. Loudness normalisation or a limiter raises the quiet parts while holding peaks down.",
+      },
+      {
+        title: "Only playing it louder",
+        body: "VLC can play up to 125% (200% in some versions), but that changes nothing in the file. To share it, you need a louder copy.",
+      },
+    ],
+    limits: [
+      "Raising the voice raises the room noise too. Stella cut back some hiss, but a distant recording won't sound like a close microphone.",
+      "Checked by measurement only. Stella said it hadn't listened and suggested a quick listen, noting the last few seconds stayed about 10 dB quieter.",
+      "File names and measurements of the sound went to the AI model you use in Stella. The video was processed on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I make a quiet video louder without distortion?",
+        a: "Normalise the loudness with a peak limit (loudnorm in ffmpeg, Normalize in iMovie) instead of adding a fixed amount of gain.",
+      },
+      {
+        q: "Will the picture lose quality?",
+        a: "No. Stella copied the picture across untouched; only the sound was re-encoded.",
+      },
+      {
+        q: "How loud should a video be?",
+        a: "Around −14 to −16 LUFS is what phones and YouTube play at. Stella's copy came out at −15.",
+      },
+      {
+        q: "My audio files are uneven, not a video. Is there a guide?",
+        a: "Yes: [normalize audio volume](/how/audio/normalize-audio-volume).",
+      },
+    ],
+    related: ["audio/normalize-audio-volume", "video/cut-out-part-of-video", "audio/extract-audio-from-video"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Add a soundtrack and sound effects to your iMovie project", href: "https://support.apple.com/101664" },
+      { label: "Microsoft: How to change the volume of a video or audio clip (Clipchamp)", href: "https://support.microsoft.com/en-us/Clipchamp/how-to-change-the-volume-of-a-video-or-audio-clip" },
+      { label: "FFmpeg filters: loudnorm", href: "https://ffmpeg.org/ffmpeg-filters.html#loudnorm" },
+    ],
+  },
+  {
+    slug: "reverse-video",
+    niche: "video",
+    searchPhrases: [
+      "reverse video",
+      "how to reverse a video",
+      "play video backwards",
+      "reverse video iphone",
+      "reverse video on mac",
+    ],
+    title: "Reverse a video so it plays backwards (stays upright)",
+    description:
+      "Make a reversed copy of a video so it plays backwards, without it turning sideways: iMovie, Shotcut, ffmpeg, or Stella (stella.sh) on your own computer.",
+    h1: "Reverse a video so it plays backwards",
+    short: "Reverse a video",
+    lede: "Kids jumping into a pool, reversed so they fly back out of the water.",
+    answer:
+      "On a Mac, iMovie's speed controls have a Reverse tick box; on Windows, Clipchamp can't reverse, but the free Shotcut can. Phone videos are often stored sideways with a rotation flag, and some tools drop it, so the reversed copy plays on its side. Stella (stella.sh) made a reversed copy of a 12-second pool video, picture and sound both backwards, still upright as a portrait video.",
+    stellaSteps: [
+      "Finds “Pool jump” in Videos: 12 seconds, a portrait phone video",
+      "Reverses the picture and the sound in one pass, keeping the video upright",
+      "Saves Pool jump (reversed).mp4 next to the original",
+      "Compares frames from the start, middle and end of both videos to confirm the new one runs backwards",
+      "Reports it starts on the splash and ends with the kid back on the edge, and suggests listening to the reversed sound",
+    ],
+    prompt:
+      "Make a reversed version of the video of the kids jumping into the pool in my Videos, so it plays backwards, like they're flying out of the water.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-14",
+      platform: "Linux (Omarchy)",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The reversed copy in about 30 seconds. Checked afterwards against an answer key written before the run, using a time code drawn in the corner: the same 12 seconds, still an upright 720×1280 portrait video (the phone stored it sideways with a rotation flag), every sampled moment showing the right frame from the other end, and the original unchanged.",
+      note: "The pool video is a drawn scene with splash sounds, made for this run and stored sideways with a rotation flag as phones do. The work is sped up 2×.",
+      video: {
+        src: `${PROOFS}/video/reverse-video/proof.mp4`,
+        cuts: webCuts("video/reverse-video"),
+        poster: `${PROOFS}/video/reverse-video/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 39.13,
+        realDuration: 63,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Linux computer. A 12-second pool video is in Videos." },
+        { at: 1.63, text: "The prompt: make a reversed version so the kids fly out of the water." },
+        { at: 9.63, text: "Stella replies it's saving a reversed copy next to the original." },
+        { at: 15.63, text: "Reversing the picture and sound and comparing frames." },
+        { at: 24.73, text: "Done: starts on the splash, ends with the kid back on the edge; same 12 seconds." },
+      ],
+    },
+    manualTitle: "Reverse it yourself",
+    manualSteps: [
+      {
+        title: "Mac: iMovie",
+        body: "Add the clip to a project, select it and click the speedometer button above the viewer. Tick Reverse, then File, Share, File to save the reversed video.",
+      },
+      {
+        title: "Windows: Shotcut",
+        body: "Clipchamp has no reverse. In the free Shotcut, open the video and click Reverse… in its Properties panel, which writes a reversed copy. Add that to the timeline and Export.",
+      },
+      {
+        title: "On the phone",
+        body: "CapCut and several free phone editors have a Reverse button. iPhone's Photos app doesn't. Check the result plays upright; some apps lose the rotation.",
+      },
+      {
+        title: "ffmpeg",
+        body: "`ffmpeg -i in.mp4 -vf reverse -af areverse -crf 18 out.mp4` reverses picture and sound. Add `-an` instead of `-af areverse` for silence. ffmpeg keeps the rotation by default; don't turn autorotate off.",
+      },
+      {
+        title: "Long videos",
+        body: "Reversing holds every frame in memory. For anything over a minute or two, cut out just the moment you want first, or split it into pieces, reverse each and join them in reverse order.",
+      },
+    ],
+    limits: [
+      "Reversed speech is gibberish. Stella reversed the sound too and suggested listening; for a clip with talking you may prefer to mute it or add music.",
+      "Long videos need a lot of memory to reverse. This was a 12-second clip; for long ones, cut the moment you want first.",
+      "File names, the video's details and a few frames went to the AI model you use in Stella. The video was reversed on your computer.",
+      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "Why does my reversed video play sideways?",
+        a: "Phones often save the picture sideways with a flag telling players to turn it. Some reversers drop the flag. Stella's copy stayed upright.",
+      },
+      {
+        q: "Can I reverse just part of a video?",
+        a: "Yes. Give Stella the times, or cut the moment out first: see [cut out part of a video](/how/video/cut-out-part-of-video).",
+      },
+      {
+        q: "Can I make a boomerang (forwards then backwards)?",
+        a: "Yes: ask Stella to join the clip and its reversed copy, or see [combine videos into one](/how/video/combine-videos-into-one).",
+      },
+      {
+        q: "Can I slow it down too?",
+        a: "Yes, ask for both. The speed-up guide works the other way: [speed up a video](/how/video/speed-up-video).",
+      },
+    ],
+    related: ["video/speed-up-video", "video/make-gif-from-video", "video/rotate-video"],
+    lastChecked: "2026-11-14",
+    sources: [
+      { label: "Apple: Change clip speed in iMovie on Mac (Reverse)", href: "https://support.apple.com/guide/imovie/mov6c442b2eb/mac" },
+      { label: "Shotcut (free video editor)", href: "https://shotcut.org/" },
+      { label: "FFmpeg filters: reverse and areverse", href: "https://ffmpeg.org/ffmpeg-filters.html#reverse" },
     ],
   },
 ];

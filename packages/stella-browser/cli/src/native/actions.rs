@@ -1103,7 +1103,8 @@ impl DaemonState {
                             {
                                 if (te.target_info.target_type == "page"
                                     || te.target_info.target_type == "webview")
-                                    && !te.target_info.url.is_empty()
+                                    && (!te.target_info.url.is_empty()
+                                        || te.target_info.opener_id.is_some())
                                 {
                                     let already_tracked = self
                                         .browser

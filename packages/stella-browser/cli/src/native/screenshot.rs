@@ -183,8 +183,8 @@ async fn capture_screenshot_base64(
             .await?;
 
         let content_size = metrics
-            .get("contentSize")
-            .or_else(|| metrics.get("cssContentSize"));
+            .get("cssContentSize")
+            .or_else(|| metrics.get("contentSize"));
         if let Some(size) = content_size {
             let width = size.get("width").and_then(|v| v.as_f64()).unwrap_or(1280.0);
             let height = size.get("height").and_then(|v| v.as_f64()).unwrap_or(720.0);

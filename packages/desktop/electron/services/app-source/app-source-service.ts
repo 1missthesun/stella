@@ -192,6 +192,8 @@ const CHANGE_TAG_PREFIX = `refs/tags/${CHANGE_TAG}`;
 const FORK_CHANGES_PREFIX = "refs/stella/fork-changes/";
 const BOOTSTRAP_PATH = "/api/app-source/bootstrap";
 const RESULT_REF = "refs/stella/update-result";
+/** Where a fetch lands first: the tracked ref only moves to history this checkout shares. */
+const INCOMING_REF = "refs/stella/incoming";
 /** How often a computer asks to be the one that merges a version in the background. */
 const CLAIM_RETRY_MS = 5 * 60_000;
 const PLAN_TTL_MS = 10 * 60_000;
@@ -329,6 +331,9 @@ export class AppSourceService {
   private sharing = false;
   private shareAgain = false;
   private upstreamTracked = false;
+  /** Whether this checkout is a linked worktree of another one; unknown until checked. */
+  private linkedCheckout: boolean | null = null;
+  private linkedCheck: Promise<void> | null = null;
   private merge: MergeRecord | null | undefined;
   private offers = new Map<string, Offer>();
   private catchingUp = false;
@@ -389,7 +394,7 @@ export class AppSourceService {
     this.timers = [poll];
     this.syncNotBefore = Date.now() + LAUNCH_SYNC_DELAY_MS;
     this.wantSync("launch");
-    this.followBackend();
+    void this.checkLinkedCheckout().then(() => this.followBackend());
     void installCheckoutGuard(this.options.stellaAppDir, this.options.log).catch(
       (error: unknown) =>
         this.options.log("app-source.checkout-guard-failed", {
@@ -398,6 +403,35 @@ export class AppSourceService {
     );
     void this.rememberResolutions();
     void this.refresh();
+  }
+
+  /**
+   * A linked worktree shares its main checkout's refs and git files, so a
+   * Stella run from one (a test copy beside the installed app) would rewrite
+   * the installed copy's view of its updates when it fetches, shares or
+   * announces, even from another account or backend. Such a copy keeps to
+   * itself: its drafts work, nothing is synced.
+   */
+  private checkLinkedCheckout(): Promise<void> {
+    this.linkedCheck ??= this.readLinkedCheckout();
+    return this.linkedCheck;
+  }
+
+  private async readLinkedCheckout() {
+    const dirs = await gitRaw(this.options.stellaAppDir, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-dir",
+      "--git-common-dir",
+    ]).catch(() => null);
+    const [gitDir = "", commonDir = ""] = dirs?.code === 0 ? dirs.stdout.trim().split("\n") : [];
+    this.linkedCheckout = Boolean(gitDir && commonDir && path.resolve(gitDir) !== path.resolve(commonDir));
+    if (this.linkedCheckout) this.options.log("app-source.linked-worktree", { commonDir });
+  }
+
+  /** The backend this checkout syncs its updates with; none for a linked worktree or before that is known. */
+  private backendUrl(): string | null {
+    return this.linkedCheckout === false ? this.options.getBackendUrl() : null;
   }
 
   /**
@@ -1732,7 +1766,7 @@ export class AppSourceService {
 
   private async paidPlan(): Promise<boolean | null> {
     if (this.plan && Date.now() - this.plan.at < PLAN_TTL_MS) return this.plan.paid;
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     if (!baseUrl || !this.options.hasConnectedAccount()) return null;
     try {
       const status = await this.backendClient(baseUrl).read("billing.status", {}, { timeoutMs: 15_000 });
@@ -1768,7 +1802,7 @@ export class AppSourceService {
 
   private async mayMergeInBackground(version: string, head: string) {
     const me = this.options.getDeviceId?.();
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     if (!me || !baseUrl || !this.options.hasConnectedAccount()) return false;
     if ((await this.paidPlan()) !== true) return false;
     if (this.ownsMerge(version)) return true;
@@ -1816,7 +1850,7 @@ export class AppSourceService {
   /** A version merged here goes to the account, so other computers with the same changes take it as is. */
   private async shareResult(version: string, head: string, record: PreparedUpdate) {
     const me = this.options.getDeviceId?.();
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     if (!me || !baseUrl || !this.options.hasConnectedAccount()) return;
     const merged = Boolean(record.to && record.resolvedBy);
     const gaveUp = !record.to && record.resolve === "model";
@@ -1833,7 +1867,7 @@ export class AppSourceService {
 
   private async publishResult(version: string, base: string, to: string | null, unresolved?: string[]) {
     const me = this.options.getDeviceId?.();
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     if (!me || !baseUrl || !this.options.hasConnectedAccount()) return false;
     try {
       if (to) {
@@ -1924,7 +1958,7 @@ export class AppSourceService {
   private async announceApply(version: string, targets: string[] | null) {
     if (targets && targets.length === 0) return;
     const me = this.options.getDeviceId?.();
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     if (!me || !baseUrl || !this.options.hasConnectedAccount()) return;
     try {
       const call = this.backendClient(baseUrl).call("appSource.applyUpdate", {
@@ -2435,7 +2469,7 @@ export class AppSourceService {
 
   private followBackend() {
     if (this.disposed) return;
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     this.releases.follow(baseUrl);
     const watchFork = baseUrl && this.options.hasConnectedAccount() ? baseUrl : null;
     this.followUpdates(watchFork);
@@ -2620,12 +2654,12 @@ export class AppSourceService {
         "--no-tags",
         "--no-write-fetch-head",
         fork.remote,
-        `+refs/heads/${fork.branch}:${ref}`,
+        `+refs/heads/${fork.branch}:${INCOMING_REF}`,
         `+${CHANGE_TAG_PREFIX}*:${FORK_CHANGES_PREFIX}*`,
       ],
       { env: fetchEnv(fork.token), timeoutMs: 5 * 60_000 },
     );
-    if ((await gitRaw(cwd, ["merge-base", "HEAD", ref])).code !== 0) {
+    if (!(await this.adoptFetched(cwd, ref))) {
       this.forkUnrelated = true;
       this.forkBranch = null;
       this.options.log("app-source.fork-unrelated", {});
@@ -2644,16 +2678,31 @@ export class AppSourceService {
         "--no-tags",
         "--no-write-fetch-head",
         upstream.remote,
-        `+refs/heads/main:${UPSTREAM_REF}`,
+        `+refs/heads/main:${INCOMING_REF}`,
       ],
       { env: fetchEnv(upstream.token), timeoutMs: 5 * 60_000 },
     );
-    if ((await gitRaw(cwd, ["merge-base", "HEAD", UPSTREAM_REF])).code !== 0) {
+    if (!(await this.adoptFetched(cwd, UPSTREAM_REF))) {
       this.upstreamTracked = false;
       this.options.log("app-source.upstream-unrelated", {});
       return;
     }
     this.upstreamTracked = true;
+  }
+
+  /**
+   * Moves `ref` to what was just fetched, only when that shares history with
+   * this checkout: unrelated history (another backend's copy) never replaces
+   * what is tracked here.
+   */
+  private async adoptFetched(cwd: string, ref: string) {
+    try {
+      if ((await gitRaw(cwd, ["merge-base", "HEAD", INCOMING_REF])).code !== 0) return false;
+      await git(cwd, ["update-ref", ref, INCOMING_REF]);
+      return true;
+    } finally {
+      await gitRaw(cwd, ["update-ref", "-d", INCOMING_REF]).catch(() => undefined);
+    }
   }
 
   private pushToFork() {
@@ -2820,7 +2869,7 @@ export class AppSourceService {
   }
 
   private reportForkPush(tip: string) {
-    const baseUrl = this.options.getBackendUrl();
+    const baseUrl = this.backendUrl();
     if (!baseUrl || !this.options.hasConnectedAccount()) return;
     this.forkReports += 1;
     void this.backendClient(baseUrl)
@@ -2876,7 +2925,8 @@ export class AppSourceService {
   }
 
   private async sourceAccess(): Promise<SourceAccess | null> {
-    const baseUrl = this.options.getBackendUrl();
+    await this.checkLinkedCheckout();
+    const baseUrl = this.backendUrl();
     if (!baseUrl) return null;
     const owner = await this.currentOwner();
     const cached = this.access;

@@ -8,6 +8,7 @@ import type { ToolDefinition } from "../types.js";
 import { CODE_TOOL_NAME } from "../code-tool.js";
 import { browserApiHint } from "../../browser-use/api-hints.js";
 import {
+  CODE_MAX_WAIT_MS,
   CODE_TOOL_DESCRIPTION,
   CODE_TOOL_PARAMETERS,
   CODE_TOOL_PROMPT_SNIPPET,
@@ -136,13 +137,13 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
         typeof args.yield_time_ms === "number" &&
         Number.isFinite(args.yield_time_ms) &&
         args.yield_time_ms >= 0
-          ? Math.floor(args.yield_time_ms)
+          ? Math.min(Math.floor(args.yield_time_ms), CODE_MAX_WAIT_MS)
           : undefined;
       const waitMs =
         typeof args.wait_ms === "number" &&
         Number.isFinite(args.wait_ms) &&
         args.wait_ms >= 0
-          ? Math.floor(args.wait_ms)
+          ? Math.min(Math.floor(args.wait_ms), CODE_MAX_WAIT_MS)
           : undefined;
       const cursor =
         typeof args.cursor === "number" &&

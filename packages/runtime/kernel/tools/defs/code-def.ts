@@ -24,6 +24,9 @@ export const CODE_TOOL_CLOUD_AGENT_DESCRIPTION =
 export const CODE_TOOL_PROMPT_SNIPPET =
   "Run persistent JavaScript, orchestrate allowed Stella tools and connected services' actions, and control apps through the sky/browser globals";
 
+/** Longest one `code` call waits on a cell before handing back its cell_id. */
+export const CODE_MAX_WAIT_MS = 600_000;
+
 export const CODE_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
   properties: {
@@ -38,7 +41,7 @@ export const CODE_TOOL_PARAMETERS: Record<string, unknown> = {
     yield_time_ms: {
       type: "number",
       description:
-        "How long to await a new cell before returning a resumable cell_id. Defaults to 30000ms.",
+        "How long to await a new cell before returning a resumable cell_id. Defaults to 30000ms; at most 600000. The cell keeps running after that.",
     },
     cell_id: {
       type: "string",
@@ -47,7 +50,7 @@ export const CODE_TOOL_PARAMETERS: Record<string, unknown> = {
     wait_ms: {
       type: "number",
       description:
-        "How long to observe cell_id for terminal output. Defaults to 10000ms.",
+        "How long to observe cell_id for terminal output. Defaults to 10000ms; at most 600000.",
     },
     terminate: {
       type: "boolean",

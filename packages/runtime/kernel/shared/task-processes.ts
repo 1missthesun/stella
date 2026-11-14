@@ -32,6 +32,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { readProcessIdentity, type RecordedProcess, signalRecordedProcess } from "./process-identity.js";
 
 export const TASK_PROCESS_OWNER_ENV = "STELLA_TASK_PROCESS_OWNER";
 export const TASK_PROCESS_LEDGER_ENV = "STELLA_TASK_PROCESS_LEDGER";
@@ -364,22 +365,31 @@ const descendantsOf = (rows: readonly ProcessRow[], roots: Iterable<number>) => 
   return found;
 };
 
-type Targets = { pids: Set<number>; groups: Set<number> };
+/**
+ * What a stop will signal, each with the start time it had when found: a
+ * signal goes only to that same process, never to a pid handed on since.
+ * A group is signalled as a group only while its leader is that same
+ * leader; otherwise its members are signalled one by one.
+ */
+type Targets = { pids: Map<number, string | null>; groups: Map<number, string | null> };
 
 const collectPosix = async (owner: string, ledger: string | undefined): Promise<Targets | null> => {
   const rows = await listPosix();
   if (!rows) return null;
   const kept = protectedPids(rows);
   const ownGroup = rows.find((row) => row.pid === process.pid)?.pgid;
-  const pids = new Set<number>();
-  const groups = new Set<number>();
+  const pids = new Map<number, string | null>();
+  const groups = new Map<number, string | null>();
+  const addPid = (pid: number) => {
+    if (!pids.has(pid)) pids.set(pid, readProcessIdentity(pid));
+  };
   const addGroup = (pgid: number) => {
-    if (pgid <= 1 || pgid === ownGroup || kept.has(pgid)) return;
-    groups.add(pgid);
+    if (pgid <= 1 || pgid === ownGroup || kept.has(pgid) || groups.has(pgid)) return;
+    groups.set(pgid, rows.some((row) => row.pid === pgid) ? readProcessIdentity(pgid) : null);
   };
   for (const pid of await markedPids(owner, rows)) {
     if (kept.has(pid)) continue;
-    pids.add(pid);
+    addPid(pid);
     const row = rows.find((candidate) => candidate.pid === pid);
     if (row) addGroup(row.pgid);
   }
@@ -394,21 +404,14 @@ const collectPosix = async (owner: string, ledger: string | undefined): Promise<
     }
   }
   for (const row of rows) {
-    if (groups.has(row.pgid) && !kept.has(row.pid)) pids.add(row.pid);
+    if (groups.has(row.pgid) && !kept.has(row.pid)) addPid(row.pid);
   }
-  for (const pid of descendantsOf(rows, pids)) {
-    if (!kept.has(pid)) pids.add(pid);
+  for (const pid of descendantsOf(rows, pids.keys())) {
+    if (!kept.has(pid)) addPid(pid);
   }
   return { pids, groups };
 };
 
-const signal = (target: number, name: NodeJS.Signals) => {
-  try {
-    process.kill(target, name);
-  } catch {
-    // Gone already, or not ours to signal.
-  }
-};
 
 const alive = (pid: number) => {
   try {
@@ -433,7 +436,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const waitGone = async (targets: Targets, ms: number) => {
   const deadline = Date.now() + ms;
   for (;;) {
-    const remaining = [...targets.pids].some(alive) || [...targets.groups].some(groupAlive);
+    const remaining =
+      [...targets.pids].some(([pid, identity]) => alive(pid) && readProcessIdentity(pid) === identity) ||
+      [...targets.groups.keys()].some(groupAlive);
     if (!remaining) return true;
     if (Date.now() >= deadline) return false;
     await sleep(POLL_MS);
@@ -442,16 +447,23 @@ const waitGone = async (targets: Targets, ms: number) => {
 
 const merge = (into: Targets, from: Targets | null) => {
   if (!from) return;
-  for (const pid of from.pids) into.pids.add(pid);
-  for (const pgid of from.groups) into.groups.add(pgid);
+  for (const [pid, identity] of from.pids) if (!into.pids.has(pid)) into.pids.set(pid, identity);
+  for (const [pgid, identity] of from.groups) if (!into.groups.has(pgid)) into.groups.set(pgid, identity);
 };
 
 const endPosix = async (owner: string, ledger: string | undefined): Promise<number> => {
   const targets = await collectPosix(owner, ledger);
   if (!targets || (targets.pids.size === 0 && targets.groups.size === 0)) return 0;
+  const reason = `stopping task ${owner}: a process it started`;
   const all = (name: NodeJS.Signals) => {
-    for (const pgid of targets.groups) signal(-pgid, name);
-    for (const pid of targets.pids) signal(pid, name);
+    for (const [pgid, identity] of targets.groups) {
+      if (identity === null) continue;
+      const leader: RecordedProcess = { pid: pgid, identity };
+      signalRecordedProcess(leader, name, { reason, group: true });
+    }
+    for (const [pid, identity] of targets.pids) {
+      signalRecordedProcess({ pid, identity }, name, { reason });
+    }
   };
   // Frozen first, so nothing forks (and escapes with setsid) between the
   // snapshot and the signal; a second snapshot takes what forked before.
@@ -466,7 +478,7 @@ const endPosix = async (owner: string, ledger: string | undefined): Promise<numb
     await waitGone(targets, KILL_CONFIRM_MS);
   }
   if (ledger) {
-    for (const pgid of targets.groups) if (!groupAlive(pgid)) forgetEntry(ledger, pgid);
+    for (const pgid of targets.groups.keys()) if (!groupAlive(pgid)) forgetEntry(ledger, pgid);
   }
   return targets.pids.size;
 };

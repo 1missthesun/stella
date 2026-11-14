@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { recordProcess, signalRecordedProcess, stopRecordedProcess } from "./process-safety.mjs";
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(skillRoot, "../../..");
@@ -40,22 +41,14 @@ const spawnDetached = (command, args, { env, logPath, cwd }) => {
   return child;
 };
 
-export const killGroup = async (pid) => {
-  if (!isAlive(pid)) return;
-  for (const signal of ["SIGTERM", "SIGKILL"]) {
-    try {
-      process.kill(-pid, signal);
-    } catch {
-      try {
-        process.kill(pid, signal);
-      } catch {
-        return;
-      }
-    }
-    const deadline = Date.now() + (signal === "SIGTERM" ? 4_000 : 2_000);
-    while (Date.now() < deadline && isAlive(pid)) await delay(100);
-    if (!isAlive(pid)) return;
-  }
+/**
+ * Stops a process the run recorded (and its group while it leads one), only
+ * while it is still that process. `recorded` is `{ pid, identity,
+ * commandIncludes? }`; a bare pid is never signalled.
+ */
+export const killGroup = async (recorded, reason) => {
+  if (!recorded?.pid) return;
+  await stopRecordedProcess(recorded, { reason });
 };
 
 const SHELLS = new Set(["sh", "bash", "zsh", "fish", "dash", "ksh", "tcsh", "csh", "env", "timeout", "nohup"]);
@@ -85,19 +78,14 @@ export const runOwnedProcesses = (runId) => {
 };
 
 export const stopRunOwnedProcesses = async (runId) => {
-  const owned = runOwnedProcesses(runId);
-  for (const { pid } of owned) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {}
-  }
+  const marker = `stella-verify-${runId}`;
+  const reason = `verify-stella: stopping run ${runId}'s marked processes`;
+  const owned = runOwnedProcesses(runId).map((entry) => ({ ...entry, recorded: recordProcess(entry.pid, [marker]) }));
+  for (const { recorded } of owned) signalRecordedProcess(recorded, "SIGTERM", { reason });
   const deadline = Date.now() + 4_000;
   while (Date.now() < deadline && owned.some(({ pid }) => isAlive(pid))) await delay(150);
-  for (const { pid } of owned) {
-    if (!isAlive(pid)) continue;
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {}
+  for (const { pid, recorded } of owned) {
+    if (isAlive(pid)) signalRecordedProcess(recorded, "SIGKILL", { reason });
   }
   return owned.map(({ pid, command }) => ({ pid, command: command.slice(0, 160) }));
 };
@@ -140,12 +128,13 @@ export const startXvfb = async ({ runDir }) => {
       logPath: path.join(runDir, "xvfb.log"),
       cwd: runDir,
     });
+    const recorded = recordProcess(child.pid, [binary, `:${n} `]);
     const deadline = Date.now() + 5_000;
     while (Date.now() < deadline && isAlive(child.pid) && !existsSync(`/tmp/.X11-unix/X${n}`)) await delay(100);
     if (isAlive(child.pid) && existsSync(`/tmp/.X11-unix/X${n}`)) {
-      return { mode: "xvfb", display: `:${n}`, pid: child.pid, binary };
+      return { mode: "xvfb", display: `:${n}`, pid: child.pid, identity: recorded.identity, binary };
     }
-    await killGroup(child.pid);
+    await killGroup(recorded, "verify-stella: Xvfb did not come up on a free display");
   }
   return { mode: "host", reason: "No free X display between :90 and :159." };
 };
@@ -272,9 +261,10 @@ export const startTestBrowser = async ({ runDir, extension, display, softwareGl 
   const env = { ...process.env, ...(display ? { DISPLAY: display } : {}) };
   delete env.WAYLAND_DISPLAY;
   const child = spawnDetached(chromium, args, { env, logPath: path.join(runDir, "browser-extension", "chromium.log"), cwd: runDir });
+  const identity = recordProcess(child.pid).identity;
   await delay(1_500);
   if (!isAlive(child.pid)) throw new Error(`The test Chromium exited at start; see ${path.join(runDir, "browser-extension", "chromium.log")}.`);
-  return { pid: child.pid, chromium };
+  return { pid: child.pid, identity, chromium };
 };
 
 const claudeSourceDirs = () => [

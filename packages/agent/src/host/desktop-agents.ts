@@ -5,6 +5,7 @@ import type { EnvTarget } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { defaultAgentDirectory } from "@stella/runtime/kernel/agents/agent-directory";
 import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree";
+import { isOwnUnreapedChild } from "@stella/runtime/kernel/shared/process-identity";
 import { endTaskProcesses, pruneTaskProcessLedgers } from "@stella/runtime/kernel/shared/task-processes";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import type { RemoteAgentHost, StellaAgentsHost } from "../stella/agents.ts";
@@ -88,14 +89,6 @@ export function desktopAgentsHost(
   };
 }
 
-const isPidAlive = (pid: number) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException)?.code === "EPERM";
-  }
-};
 
 export function desktopEnvironments(
   defaultCwd: string,
@@ -103,8 +96,16 @@ export function desktopEnvironments(
 ) {
   const envs = new Map<string, NodeExecutionEnv>();
   const terminations = new Set<Promise<void>>();
+  // pi keeps a command's pid until its output closes, which a background
+  // child holding stdout can delay long after the shell itself exited and
+  // was reaped; by then the pid may be another program's (on 2026-11-14 an
+  // unexplained SIGKILL took Stella's own window processes). The shell is
+  // only ours while it is still our unreaped child.
   const killCommandTree = (pid: number) => {
-    const termination = terminateProcessTree(pid, { isRootRunning: () => isPidAlive(pid) }).finally(() => {
+    const termination = terminateProcessTree(pid, {
+      isRootRunning: () => isOwnUnreapedChild(pid),
+      reason: "ending a task's shell command (stop, abort or timeout)",
+    }).finally(() => {
       terminations.delete(termination);
     });
     terminations.add(termination);

@@ -13,6 +13,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
+import { readProcessIdentity, signalRecordedProcess } from "../cli/process-safety.mjs";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -81,11 +82,12 @@ if (dryRun || victims.length === 0) {
   process.stdout.write(`${JSON.stringify({ dryRun, processes: summary })}\n`);
   process.exit(0);
 }
-for (const { pid } of victims) {
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch {}
-}
+// Start times taken now, right after matching, guard every signal below.
+const reason = orphans
+  ? "verify-stella iOS: reaping processes of deleted staging folders or checkouts"
+  : `verify-stella iOS: stopping processes of ${target}`;
+for (const victim of victims) victim.identity = readProcessIdentity(victim.pid);
+for (const victim of victims) signalRecordedProcess(victim, "SIGTERM", { reason });
 const stillRunning = () => {
   const now = new Map(table().map((row) => [row.pid, row]));
   return victims.filter((victim) => now.get(victim.pid)?.started === victim.started);
@@ -94,9 +96,6 @@ const deadline = Date.now() + 4_000;
 while (Date.now() < deadline && stillRunning().length > 0) await delay(250);
 const killed = [];
 for (const victim of stillRunning()) {
-  try {
-    process.kill(victim.pid, "SIGKILL");
-    killed.push(victim.pid);
-  } catch {}
+  if (signalRecordedProcess(victim, "SIGKILL", { reason }) === "sent") killed.push(victim.pid);
 }
 process.stdout.write(`${JSON.stringify({ stopped: summary, forceKilled: killed })}\n`);

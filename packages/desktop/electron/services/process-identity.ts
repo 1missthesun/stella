@@ -1,6 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  logProcessSignal,
+  readProcessCommand,
+  readProcessIdentity,
+  type SignalOutcome,
+} from "@stella/runtime/kernel/shared/process-identity";
 
 export type ProcessIdentity = Readonly<{
   pid: number;
@@ -133,16 +139,31 @@ export const pidRunsExecutable = (
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Stops a process this app recorded, re-checking `stillOwned` before each
+ * signal and the start time before the SIGKILL so a PID reused during the
+ * grace period is left alone. Every signal is logged to the kill log.
+ */
 export const terminateOwnedProcess = async (
   pid: number,
   stillOwned: () => boolean,
   graceMs: number,
+  reason: string,
 ): Promise<boolean> => {
   if (!pidIsAlive(pid)) return true;
-  if (!stillOwned()) return false;
+  const identity = readProcessIdentity(pid);
+  const command = readProcessCommand(pid);
+  const log = (signal: NodeJS.Signals, outcome: SignalOutcome, detail?: string) =>
+    logProcessSignal({ pid, signal, reason, outcome, command, identity, detail });
+  if (!stillOwned()) {
+    log("SIGTERM", "mismatch", "ownership check failed");
+    return false;
+  }
   try {
     process.kill(pid, "SIGTERM");
-  } catch {
+    log("SIGTERM", "sent");
+  } catch (error) {
+    log("SIGTERM", pidIsAlive(pid) ? "failed" : "gone", String(error));
     return !pidIsAlive(pid);
   }
   const deadline = Date.now() + graceMs;
@@ -151,10 +172,16 @@ export const terminateOwnedProcess = async (
     await delay(25);
   }
   if (!pidIsAlive(pid)) return true;
-  if (!stillOwned()) return false;
+  if (identity !== null && readProcessIdentity(pid) !== identity) return true;
+  if (!stillOwned()) {
+    log("SIGKILL", "mismatch", "ownership check failed after SIGTERM");
+    return false;
+  }
   try {
     process.kill(pid, "SIGKILL");
-  } catch {
+    log("SIGKILL", "sent");
+  } catch (error) {
+    log("SIGKILL", pidIsAlive(pid) ? "failed" : "gone", String(error));
   }
   return !pidIsAlive(pid);
 };

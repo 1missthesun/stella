@@ -6,6 +6,10 @@ import { runtimeIpcListenUrl, type RuntimePaths } from "../../worker/runtime-pat
 import { rotateLogIfOversized } from "../../observability/rotate-file.js";
 import { getFileLogger } from "../../observability/file-logger.js";
 import { killWorkerProcess } from "./kill.js";
+import { readProcessIdentity } from "../../kernel/shared/process-identity.js";
+
+/** Start time of each worker this host spawned, read as soon as it started. */
+const spawnedIdentity = new WeakMap<ChildProcess, string | null>();
 import type { LifecycleStartOptions } from "./options.js";
 
 let cachedBunBinaryPath: string | null = null;
@@ -142,6 +146,7 @@ const waitForWorkerSpawn = ({
 }: ReturnType<typeof spawnDetachedWorkerProcess>): Promise<ChildProcess> =>
   new Promise<ChildProcess>((resolve, reject) => {
     const onSpawn = () => {
+      if (child.pid) spawnedIdentity.set(child, readProcessIdentity(child.pid));
       child.off("error", onError);
       child.on("error", (error) => {
         console.error("[runtime-host] Detached worker process error:", error);
@@ -191,6 +196,12 @@ export const spawnAdoptedWorker = (
       const interrupted =
         Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause);
       if (!interrupted || !child.pid) return Effect.void;
-      return Effect.asVoid(killWorkerProcess(child.pid, 750));
+      return Effect.asVoid(
+        killWorkerProcess(
+          { pid: child.pid, identity: spawnedIdentity.get(child) ?? null },
+          750,
+          "attach interrupted before the new runtime worker was adopted",
+        ),
+      );
     },
   );

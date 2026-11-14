@@ -4,6 +4,14 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { sleepMs } from "./effect-runtime.js";
+import {
+  readProcessGroup,
+  readProcessIdentity,
+  recordedProcessIsLive,
+  type RecordedProcess,
+  signalOwnChild,
+  signalRecordedProcess,
+} from "../shared/process-identity.js";
 import { getConnectorStateRoot } from "./state.js";
 
 const execFileAsync = promisify(execFile);
@@ -68,39 +76,46 @@ const stopWindowsProcessTree = async (pid: number) => {
   });
 };
 
+/**
+ * Stop a connector bridge: SIGTERM, then SIGKILL. `ownChild` for a bridge
+ * this process spawned and still holds; otherwise the start time read when
+ * its stored record was checked, so neither signal reaches a pid that has
+ * been handed to another process since.
+ */
 export const stopConnectorBridgeProcess = async (
-  pid: number | undefined,
-  options?: { processGroup?: boolean },
+  target: { pid: number | undefined; ownChild: true } | RecordedProcess,
+  options: { processGroup?: boolean; reason: string },
 ) => {
+  const pid = target.pid;
   if (!pid || !Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
     return;
   }
   if (process.platform === "win32") {
-    await stopWindowsProcessTree(pid);
+    if ("ownChild" in target ? pidIsAliveNow(pid) : recordedProcessIsLive(target)) {
+      await stopWindowsProcessTree(pid);
+    }
     return;
   }
 
-  const target = options?.processGroup ? -pid : pid;
-  try {
-    process.kill(target, "SIGTERM");
-  } catch {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      return;
-    }
-  }
+  const send = (signal: NodeJS.Signals) =>
+    "ownChild" in target
+      ? signalOwnChild(pid, signal, { reason: options.reason, group: options.processGroup })
+      : signalRecordedProcess(target, signal, {
+          reason: options.reason,
+          group: Boolean(options.processGroup) && readProcessGroup(pid) === pid,
+        });
 
+  if (send("SIGTERM") !== "sent") return;
   if (await waitForPidExit(pid)) return;
+  send("SIGKILL");
+};
 
+const pidIsAliveNow = (pid: number) => {
   try {
-    process.kill(target, "SIGKILL");
+    process.kill(pid, 0);
+    return true;
   } catch {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // Best-effort stale connector cleanup.
-    }
+    return false;
   }
 };
 
@@ -349,9 +364,13 @@ export const sweepStaleConnectorBridgeProcesses = async (
       continue;
     }
 
-    await stopConnectorBridgeProcess(record.pid, {
-      processGroup: record.processGroup,
-    });
+    await stopConnectorBridgeProcess(
+      { pid: record.pid, identity: readProcessIdentity(record.pid) },
+      {
+        processGroup: record.processGroup,
+        reason: `stale connector bridge ${record.displayName} (its Stella runtime is gone)`,
+      },
+    );
     await removeConnectorBridgeProcessRecord(filePath);
     stopped += 1;
     removed += 1;

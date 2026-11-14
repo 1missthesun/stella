@@ -42,12 +42,14 @@ import {
   stopRunOwnedProcesses,
 } from "./cli/isolation.mjs";
 import {
+  processTableWithStart,
   reapRecordedProcesses,
   recordProcesses,
   registerRun,
   sweepOrphanedRuns,
   unregisterRun,
 } from "./cli/run-processes.mjs";
+import { readProcessIdentity, stopRecordedProcess } from "./cli/process-safety.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const skillRoot = path.dirname(scriptPath);
@@ -203,29 +205,49 @@ const waitForExit = async (pid, timeoutMs = 5_000) => {
   }
 };
 
-const stopPid = async (pid) => {
-  if (!isAlive(pid)) return;
-  try {
-    process.kill(-pid, "SIGTERM");
-  } catch {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      return;
-    }
-  }
-  await waitForExit(pid, 4_000);
-  if (!isAlive(pid)) return;
-  try {
-    process.kill(-pid, "SIGKILL");
-  } catch {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      return;
-    }
-  }
-  await waitForExit(pid, 2_000);
+// What the run recorded about each process it started. Older pointers have
+// no start time; their processes are matched by the run marker or their
+// distinctive arguments instead, and never by pid alone.
+const stillRecorded = (run, pid, identity) => {
+  if (!pid || !isAlive(pid)) return false;
+  if (identity) return readProcessIdentity(pid) === identity;
+  const started = processTableWithStart().find((row) => row.pid === pid)?.started;
+  return Boolean(started) && (run.ownedProcesses ?? []).some((entry) => entry.pid === pid && entry.started === started);
+};
+
+const electronRecord = (run) => {
+  if (!run.electronPid) return null;
+  if (run.electronIdentity) return { pid: run.electronPid, identity: run.electronIdentity };
+  // Older pointer: the run's own process record (pid + ps start time) vouches for it.
+  return stillRecorded(run, run.electronPid, null)
+    ? { pid: run.electronPid, identity: readProcessIdentity(run.electronPid) }
+    : null;
+};
+
+const chromiumRecord = (run) => {
+  const browser = run.browserExtension;
+  if (!browser?.chromiumPid) return null;
+  return {
+    pid: browser.chromiumPid,
+    identity: browser.chromiumIdentity ?? null,
+    commandIncludes: browser.chromiumIdentity || !browser.profileDir ? [] : [`--user-data-dir=${browser.profileDir}`],
+  };
+};
+
+const xvfbRecord = (run) =>
+  run.display?.mode === "xvfb" && run.display.pid
+    ? {
+        pid: run.display.pid,
+        identity: run.display.identity ?? null,
+        commandIncludes: run.display.identity ? [] : ["Xvfb", `${run.display.display} `],
+      }
+    : null;
+
+const stopElectron = async (run, reason) => {
+  const recorded = electronRecord(run);
+  if (!recorded) return;
+  await stopRecordedProcess(recorded, { reason });
+  await waitForExit(recorded.pid, 2_000);
 };
 
 const currentRun = () => {
@@ -266,8 +288,13 @@ const removeTemporaryUserData = (run) => {
 
 /** Adds everything now running under the run's Electron and test browser. */
 const recordRunProcesses = (run) => {
-  let recorded = recordProcesses(run.ownedProcesses ?? [], run.electronPid, runOwnedProcesses(run.runId));
-  if (run.browserExtension?.chromiumPid) recorded = recordProcesses(recorded, run.browserExtension.chromiumPid);
+  // A stored pid roots the tree only while it is still the process the run
+  // started; a reused pid's tree belongs to someone else.
+  const electronRoot = stillRecorded(run, run.electronPid, run.electronIdentity) ? run.electronPid : null;
+  let recorded = recordProcesses(run.ownedProcesses ?? [], electronRoot, runOwnedProcesses(run.runId));
+  const browser = run.browserExtension;
+  if (browser?.chromiumPid && stillRecorded(run, browser.chromiumPid, browser.chromiumIdentity))
+    recorded = recordProcesses(recorded, browser.chromiumPid);
   run.ownedProcesses = recorded;
   registerRun(run, POINTER_PATH, runTempRoot(run));
 };
@@ -918,6 +945,7 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
     logPath: path.join(runDir, "electron.log"),
   });
   run.electronPid = electron.pid;
+  run.electronIdentity = electron.pid ? readProcessIdentity(electron.pid) : null;
   writeJson(POINTER_PATH, run);
   writeJson(path.join(runDir, "run.json"), run);
 
@@ -1133,7 +1161,7 @@ const startRunTestBrowser = async (run) => {
     display: run.display?.display ?? null,
     softwareGl: run.display?.mode === "xvfb" || linuxSoftwareGl(),
   });
-  run.browserExtension = { ...run.browserExtension, chromiumPid: browser.pid, chromium: browser.chromium };
+  run.browserExtension = { ...run.browserExtension, chromiumPid: browser.pid, chromiumIdentity: browser.identity, chromium: browser.chromium };
   writeJson(POINTER_PATH, run);
   writeJson(path.join(run.runDir, "run.json"), run);
   const deadline = Date.now() + 30_000;
@@ -1160,11 +1188,12 @@ const teardownRun = async (run) => {
     }
   };
   await step("record", () => recordRunProcesses(run));
-  await step("browser", () => killGroup(run.browserExtension?.chromiumPid));
-  await step("electron", () => stopPid(run.electronPid));
+  const reason = `verify-stella: session stop of run ${run.runId}`;
+  await step("browser", () => killGroup(chromiumRecord(run), reason));
+  await step("electron", () => stopElectron(run, reason));
   const strays = (await step("marked", () => stopRunOwnedProcesses(run.runId))) ?? [];
   const detached = (await step("recorded", () => reapRecordedProcesses(run.ownedProcesses ?? []))) ?? [];
-  if (run.display?.mode === "xvfb") await step("xvfb", () => killGroup(run.display.pid));
+  if (run.display?.mode === "xvfb") await step("xvfb", () => killGroup(xvfbRecord(run), reason));
   const claudeLoginRemoved = await step("claude-login", () =>
     removeBorrowedClaudeLogin(run.claudeLogin ? run.providerHomes?.CLAUDE_CONFIG_DIR : null),
   );
@@ -1188,8 +1217,9 @@ const cmdRelaunch = async () => {
       recovery: "Run `session launch` first.",
     });
   recordRunProcesses(run);
-  await killGroup(run.browserExtension?.chromiumPid);
-  await stopPid(run.electronPid);
+  const reason = `verify-stella: relaunch of run ${run.runId}`;
+  await killGroup(chromiumRecord(run), reason);
+  await stopElectron(run, reason);
   const stoppedRuntime = await stopRunOwnedProcesses(run.runId);
   await reapRecordedProcesses(run.ownedProcesses ?? []);
   run.ownedProcesses = [];
@@ -1199,6 +1229,7 @@ const cmdRelaunch = async () => {
   }
   run.cdpPort = await allocatePort();
   run.electronPid = null;
+  run.electronIdentity = null;
   run.relaunchedAt = new Date().toISOString();
   if (!run.homeDir) run.homeDir = ensureRunHome(run);
   run.display = await ensureDisplay(run, run.displayMode ?? "host");

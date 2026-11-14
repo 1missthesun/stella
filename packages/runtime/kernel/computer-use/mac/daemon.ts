@@ -35,6 +35,7 @@ import {
 import type { Rect } from "./ax-format.js";
 import type { SessionPaths } from "./session-paths.js";
 import { withoutTaskProcessOwnership } from "../../shared/task-processes.js";
+import { signalRecordedProcess } from "../../shared/process-identity.js";
 
 type AutomationDaemonRequestPayload = {
   seq: number;
@@ -206,6 +207,11 @@ const automationLogPath = (sessionPaths: SessionPaths) =>
  * daemon spawned by a host that has since exited loses its "Stella"
  * Accessibility attribution — it must be restarted by the current live host.
  */
+/** A daemon is spawned with `--pid-file <its pid file>`: that names it uniquely. */
+const daemonTarget = (sessionPaths: SessionPaths) => ({
+  commandIncludes: ["--pid-file", automationPidPath(sessionPaths)],
+});
+
 export const automationHostPidPath = (sessionPaths: SessionPaths) =>
   path.join(sessionPaths.sessionDir, "automation.host-pid");
 
@@ -217,14 +223,16 @@ const resetAutomationDaemonFiles = (sessionPaths: SessionPaths) => {
 
 export const recoverAutomationDaemon = (sessionPaths: SessionPaths) => {
   const pid = readPidFile(automationPidPath(sessionPaths));
-  killProcessGroup(pid);
+  killProcessGroup(pid, daemonTarget(sessionPaths), "recovering the desktop automation daemon");
   resetAutomationDaemonFiles(sessionPaths);
   return pid;
 };
 
 export const stopAutomationDaemon = (sessionPaths: SessionPaths) => {
   const pid = readPidFile(automationPidPath(sessionPaths));
-  if (pid && pidIsRunning(pid)) killProcessGroup(pid);
+  if (pid && pidIsRunning(pid)) {
+    killProcessGroup(pid, daemonTarget(sessionPaths), "stopping the desktop automation daemon");
+  }
   resetAutomationDaemonFiles(sessionPaths);
   return pid !== null;
 };
@@ -242,15 +250,15 @@ export const stopAutomationDaemonGracefully = async (
     resetAutomationDaemonFiles(sessionPaths);
     return false;
   }
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch {
-    // Already gone.
+  const target = { pid, identity: null, commandIncludes: daemonTarget(sessionPaths).commandIncludes };
+  if (signalRecordedProcess(target, "SIGTERM", { reason: "stopping the desktop automation daemon" }) === "sent") {
+    for (let waited = 0; waited < graceMs && pidIsRunning(pid); waited += 50) {
+      await delayMs(50);
+    }
+    if (pidIsRunning(pid)) {
+      killProcessGroup(pid, daemonTarget(sessionPaths), "desktop automation daemon ignored SIGTERM");
+    }
   }
-  for (let waited = 0; waited < graceMs && pidIsRunning(pid); waited += 50) {
-    await delayMs(50);
-  }
-  if (pidIsRunning(pid)) killProcessGroup(pid);
   if (readPidFile(automationPidPath(sessionPaths)) === pid) {
     resetAutomationDaemonFiles(sessionPaths);
   }
@@ -565,11 +573,11 @@ const ensureAutomationDaemon = async (
     if (!helperNewerThanDaemon(helperPath, pidPath) && !staleHost) {
       return { ok: true };
     }
-    killProcessGroup(existingPid);
+    killProcessGroup(existingPid, daemonTarget(sessionPaths), "replacing an outdated desktop automation daemon");
     resetAutomationDaemonFiles(sessionPaths);
   }
   if (existingPid && pidIsRunning(existingPid) && !fs.existsSync(socketPath)) {
-    killProcessGroup(existingPid);
+    killProcessGroup(existingPid, daemonTarget(sessionPaths), "desktop automation daemon lost its socket");
   }
   resetAutomationDaemonFiles(sessionPaths);
   fs.mkdirSync(automationSocketsDir(), { recursive: true });
@@ -848,7 +856,7 @@ export const runAutomationDaemonTypedOperation = async (
           response.seq !== seq
         ) {
           const pid = readPidFile(automationPidPath(sessionPaths));
-          killProcessGroup(pid);
+          killProcessGroup(pid, daemonTarget(sessionPaths), "desktop automation daemon did not come up");
           resetAutomationDaemonFiles(sessionPaths);
           settle(
             new Error(
@@ -907,7 +915,7 @@ export const runAutomationDaemonTypedOperation = async (
         settle(undefined, response.result);
       } catch (error) {
         const pid = readPidFile(automationPidPath(sessionPaths));
-        killProcessGroup(pid);
+        killProcessGroup(pid, daemonTarget(sessionPaths), "desktop automation daemon did not come up");
         resetAutomationDaemonFiles(sessionPaths);
         settle(
           error instanceof Error
@@ -922,7 +930,7 @@ export const runAutomationDaemonTypedOperation = async (
     });
     socket.on("error", (error) => {
       const pid = readPidFile(automationPidPath(sessionPaths));
-      killProcessGroup(pid);
+      killProcessGroup(pid, daemonTarget(sessionPaths), "desktop automation daemon did not come up");
       resetAutomationDaemonFiles(sessionPaths);
       settle(
         new Error(

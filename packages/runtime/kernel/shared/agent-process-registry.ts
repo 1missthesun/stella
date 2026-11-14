@@ -8,7 +8,11 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { terminateProcessTree } from "./process-tree.js";
-import { pidIsAlive as isAlive, readProcessIdentity } from "./process-identity.js";
+import {
+  pidIsAlive as isAlive,
+  readProcessIdentity,
+  signalRecordedProcess,
+} from "./process-identity.js";
 
 export type AgentProcessRecord = {
   pid: number;
@@ -88,12 +92,12 @@ export const killAgentProcessesSync = (
 ): number => {
   let signalled = 0;
   for (const record of live.values()) {
-    try {
-      process.kill(record.processGroup ? -record.pid : record.pid, signal);
-      signalled += 1;
-    } catch {
-      // Already gone.
-    }
+    const outcome = signalRecordedProcess(
+      { pid: record.pid, identity: record.identity },
+      signal,
+      { reason: `runtime exiting: stopping ${record.label}`, group: record.processGroup },
+    );
+    if (outcome === "sent") signalled += 1;
   }
   live.clear();
   persist();
@@ -134,14 +138,14 @@ export const reapAgentProcesses = async (
     records.map((record) =>
       record.processGroup
         ? terminateProcessTree(record.pid, {
-            isRootRunning: () => isAlive(record.pid),
+            isRootRunning: () =>
+              isAlive(record.pid) && readProcessIdentity(record.pid) === record.identity,
+            reason: `reaping ${record.label} left by a previous runtime`,
           })
         : Promise.resolve().then(() => {
-            try {
-              process.kill(record.pid, "SIGKILL");
-            } catch {
-              // Already gone.
-            }
+            signalRecordedProcess({ pid: record.pid, identity: record.identity }, "SIGKILL", {
+              reason: `reaping ${record.label} left by a previous runtime`,
+            });
           }),
     ),
   );

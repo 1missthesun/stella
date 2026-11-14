@@ -16,6 +16,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readProcessIdentity, recordProcess, signalRecordedProcess } from "../cli/process-safety.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const RUN_NAME = "update-bench";
@@ -110,8 +111,15 @@ const harness = (harnessArgs, extraEnv = {}) => {
   }
 };
 
+// The sandbox's Stella processes, each recorded (start time) as it is found
+// by a tag only that sandbox carries: its own user-data dir in the
+// environment on Linux, its own checkout path in the command line elsewhere.
 const runElectronPids = (run) => {
-  if (process.platform !== "linux") return run.electronPid ? [run.electronPid] : [];
+  if (process.platform !== "linux") {
+    return run.electronPid
+      ? [{ pid: run.electronPid, identity: run.electronIdentity ?? null, commandIncludes: [appDir] }]
+      : [];
+  }
   const pids = [];
   for (const entry of readdirSync("/proc")) {
     if (!/^\d+$/.test(entry)) continue;
@@ -119,7 +127,7 @@ const runElectronPids = (run) => {
       const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
       if (cmdline.includes("--type=")) continue;
       const environ = readFileSync(`/proc/${entry}/environ`, "utf8");
-      if (environ.includes(`STELLA_V2_DEV_USER_DATA_DIR=${run.userDataDir}\0`)) pids.push(Number(entry));
+      if (environ.includes(`STELLA_V2_DEV_USER_DATA_DIR=${run.userDataDir}\0`)) pids.push(recordProcess(Number(entry)));
     } catch {
       // Gone, or not ours.
     }
@@ -146,19 +154,20 @@ const runMainPid = async (run) => {
     }).finally(() => ws.close());
     return info?.processInfo?.find((entry) => entry.type === "browser")?.id;
   } catch {
-    return process.platform === "linux" ? undefined : run.electronPid;
+    return undefined;
   }
 };
 
 const stop = async () => {
   if (!existsSync(pointerFile)) return;
   const run = readRun();
-  for (const pid of new Set([...runElectronPids(run), await runMainPid(run)].filter(Boolean))) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      // Already gone.
-    }
+  const targets = new Map(runElectronPids(run).map((recorded) => [recorded.pid, recorded]));
+  // CDP names the browser process on the pointer's port; a stale port may
+  // now be someone else's, so it must also run from the sandbox checkout.
+  const main = await runMainPid(run);
+  if (main && !targets.has(main)) targets.set(main, { pid: main, identity: readProcessIdentity(main), commandIncludes: [appDir] });
+  for (const recorded of targets.values()) {
+    signalRecordedProcess(recorded, "SIGTERM", { reason: "update-bench: stopping the sandbox's Stella" });
   }
   harness(["cleanup", "apply"]);
 };

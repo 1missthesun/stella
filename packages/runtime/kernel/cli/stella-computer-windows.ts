@@ -369,7 +369,7 @@ const stopWindowsDaemonUnlocked = async (
 ) => {
   const pidPath = windowsDaemonPidPath(sessionId);
   const pid = readPidFile(pidPath) ?? fallbackPid;
-  killProcess(pid);
+  killProcess(pid, { commandIncludes: [pidPath] }, "stopping the Windows stella-computer daemon");
   await waitForWindowsDaemonTeardown(pid, windowsDaemonPipeName(sessionId));
   fs.rmSync(pidPath, { force: true });
   return pid !== null;
@@ -646,7 +646,7 @@ export const spawnWindowsDaemonProcess = async (
       if (settled) return;
       settled = true;
       cleanup();
-      killProcess(child.pid ?? null);
+      killProcess(child.pid ?? null, { ownChild: true }, "Windows stella-computer daemon start cancelled");
       reject(windowsCancellationError(signal));
     };
 

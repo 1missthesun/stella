@@ -19,9 +19,17 @@
 
 import { execFile } from "node:child_process";
 import { Effect } from "effect";
+import { logProcessSignal, readProcessCommand, readProcessIdentity } from "./process-identity.js";
 
 export type TerminateProcessTreeOptions = {
+  /**
+   * Whether the root is still the process the caller started: from its
+   * ChildProcess handle, or a recorded identity. Never just "the pid is
+   * alive": a pid held after its process ended may name someone else's.
+   */
   isRootRunning: () => boolean;
+  /** Why, for the process-kill log. */
+  reason?: string;
   graceSignal?: NodeJS.Signals;
   forceAfterMs?: number;
 };
@@ -143,7 +151,26 @@ const terminatePosixTree = async (
   rootPid: number,
   options: Required<TerminateProcessTreeOptions>,
 ) => {
-  if (!options.isRootRunning() && !isGroupAlive(rootPid)) return;
+  if (!options.isRootRunning()) {
+    if (isPidAlive(rootPid)) {
+      // Someone else's process holds the pid now; its group and children
+      // are not ours either.
+      logProcessSignal({
+        pid: rootPid,
+        signal: options.graceSignal,
+        group: true,
+        reason: options.reason,
+        outcome: "mismatch",
+        command: readProcessCommand(rootPid),
+        identity: readProcessIdentity(rootPid),
+        detail: "pid no longer belongs to the process tree being stopped",
+      });
+      return;
+    }
+    // The root is gone; a group under its id can only be its own leftovers
+    // while that id has not been handed out again.
+    if (!isGroupAlive(rootPid)) return;
+  }
 
   const targets = new Set<number>();
   const collectTargets = async () => {
@@ -160,11 +187,37 @@ const terminatePosixTree = async (
     targets.delete(process.pid);
   };
 
+  const logged = new Set<string>();
+  const logOnce = (pid: number, signal: NodeJS.Signals, group = false) => {
+    if (signal === "SIGSTOP" || signal === "SIGCONT") return;
+    const key = `${group ? -pid : pid}:${signal}`;
+    if (logged.has(key)) return;
+    logged.add(key);
+    logProcessSignal({
+      pid,
+      signal,
+      group,
+      reason: options.reason,
+      outcome: "sent",
+      command: readProcessCommand(pid),
+      identity: readProcessIdentity(pid),
+      ...(pid === rootPid || group ? {} : { detail: `in the tree of ${rootPid}` }),
+    });
+  };
   const signalAll = (signal: NodeJS.Signals) => {
-    signalTarget(-rootPid, signal);
-    if (options.isRootRunning()) signalTarget(rootPid, signal);
+    if (isGroupAlive(rootPid)) {
+      logOnce(rootPid, signal, true);
+      signalTarget(-rootPid, signal);
+    }
+    if (options.isRootRunning()) {
+      logOnce(rootPid, signal);
+      signalTarget(rootPid, signal);
+    }
     for (const pid of targets) {
-      if (isPidAlive(pid)) signalTarget(pid, signal);
+      if (isPidAlive(pid)) {
+        logOnce(pid, signal);
+        signalTarget(pid, signal);
+      }
     }
   };
   const anyAlive = () =>
@@ -249,6 +302,7 @@ export const terminateProcessTree = async (
 ): Promise<void> => {
   if (!rootPid || rootPid <= 0 || rootPid === process.pid) return;
   const resolved: Required<TerminateProcessTreeOptions> = {
+    reason: options.reason ?? "stopping a process tree",
     graceSignal: options.graceSignal ?? "SIGTERM",
     forceAfterMs: options.forceAfterMs ?? 1_500,
     isRootRunning: options.isRootRunning,

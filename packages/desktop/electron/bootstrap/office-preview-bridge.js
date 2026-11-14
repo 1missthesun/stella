@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { IPC_OFFICE_PREVIEW_UPDATE } from "@stella/contracts/desktop/ipc-channels";
 import { broadcastToWindows } from "./context.js";
+import { readProcessGroup, readProcessIdentity, signalRecordedProcess, } from "@stella/runtime/kernel/shared/process-identity";
 const PREVIEW_ROOT_DIRNAME = "office-previews";
 const SESSION_MANIFEST_NAME = "session.json";
 const SESSION_HTML_NAME = "preview.html";
@@ -86,10 +87,13 @@ const waitForProcessExit = async (pid, timeoutMs = 2_500) => {
         }
     }
 };
-const stopPreviewProcess = async (pid) => {
+/** Stop a preview found moments ago, only while it is still that process. */
+const stopPreviewProcess = async (preview) => {
+    const pid = preview.pid;
     if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
         return;
     }
+    const reason = "stopping an Office preview session";
     try {
         if (process.platform === "win32") {
             await execFileAsync("taskkill", ["/pid", String(pid), "/T", "/F"], {
@@ -97,25 +101,12 @@ const stopPreviewProcess = async (pid) => {
             });
             return;
         }
-        try {
-            process.kill(-pid, "SIGTERM");
-        }
-        catch {
-            process.kill(pid, "SIGTERM");
-        }
-        await waitForProcessExit(pid);
-        try {
-            process.kill(pid, 0);
-        }
-        catch {
+        const group = readProcessGroup(pid) === pid;
+        if (signalRecordedProcess(preview, "SIGTERM", { reason, group }) !== "sent") {
             return;
         }
-        try {
-            process.kill(-pid, "SIGKILL");
-        }
-        catch {
-            process.kill(pid, "SIGKILL");
-        }
+        await waitForProcessExit(pid);
+        signalRecordedProcess(preview, "SIGKILL", { reason: `${reason}; it ignored SIGTERM`, group });
     }
     catch {
         // Best-effort preview cleanup.
@@ -182,9 +173,14 @@ const findPreviewProcessIds = async (sessionId) => {
 export const stopOfficePreviewSessions = async (stellaDataDir) => {
     const snapshots = await listOfficePreviewSnapshots(stellaDataDir).catch(() => []);
     const activeSnapshots = snapshots.filter((snapshot) => snapshot.status === "starting" || snapshot.status === "ready");
-    const pidGroups = await Promise.all(activeSnapshots.map((snapshot) => findPreviewProcessIds(snapshot.sessionId)));
-    const pids = [...new Set(pidGroups.flat())];
-    await Promise.allSettled(pids.map(stopPreviewProcess));
+    const found = await Promise.all(activeSnapshots.map(async (snapshot) => (await findPreviewProcessIds(snapshot.sessionId)).map((pid) => ({
+        pid,
+        identity: readProcessIdentity(pid),
+        commandIncludes: ["__run-preview-session", snapshot.sessionId],
+    }))));
+    const seen = new Set();
+    const previews = found.flat().filter((preview) => !seen.has(preview.pid) && seen.add(preview.pid));
+    await Promise.allSettled(previews.map(stopPreviewProcess));
 };
 export const startOfficePreviewBridge = (context) => {
     const stellaDataDir = context.state.stellaDataDirPath;

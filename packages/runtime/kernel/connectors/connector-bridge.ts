@@ -317,9 +317,13 @@ class StdioConnectorBridgeSession {
     this.processRecordPromise = null;
     this.initialized = false;
     if (child) {
-      await stopConnectorBridgeProcess(child.pid, {
-        processGroup: process.platform !== "win32",
-      });
+      await stopConnectorBridgeProcess(
+        { pid: child.pid, ownChild: true },
+        {
+          processGroup: process.platform !== "win32",
+          reason: `disconnecting connector ${this.server.displayName}`,
+        },
+      );
     }
     await recordPromise?.then(removeConnectorBridgeProcessRecord);
   }

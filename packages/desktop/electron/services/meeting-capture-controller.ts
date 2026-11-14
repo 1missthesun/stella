@@ -298,6 +298,11 @@ export class MeetingCaptureController {
     if (!child || pid === undefined) return;
     const exited = () =>
       child.exitCode !== null || child.signalCode !== null || !pidIsAlive(pid);
-    await terminateOwnedProcess(pid, () => !exited(), CHILD_EXIT_GRACE_MS);
+    await terminateOwnedProcess(
+      pid,
+      () => !exited(),
+      CHILD_EXIT_GRACE_MS,
+      "meeting capture helper did not exit after shutdown",
+    );
   }
 }

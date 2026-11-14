@@ -1,4 +1,5 @@
 import { Deferred, Effect } from "effect";
+import { signalOwnChild } from "../../shared/process-identity.js";
 import { createHash } from "node:crypto";
 import { StringDecoder } from "node:string_decoder";
 import type {
@@ -956,14 +957,10 @@ export const resizeShellPty = (
   // Notify the detached group explicitly so interactive children observe the
   // new dimensions just as they do in a native terminal emulator.
   if (process.platform !== "win32") {
-    const pid = record.pty.process.pid;
-    if (pid) {
-      try {
-        process.kill(-pid, "SIGWINCH");
-      } catch {
-        process.kill(pid, "SIGWINCH");
-      }
-    }
+    signalOwnChild(record.pty.process.pid, "SIGWINCH", {
+      reason: "terminal resized",
+      group: true,
+    });
   }
 };
 

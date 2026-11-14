@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readProcessGroup, signalRecordedProcess } from "@stella/runtime/kernel/shared/process-identity.js";
 import { createHash } from "node:crypto";
 import { closeSync, openSync, statSync, truncateSync } from "node:fs";
 import { chmod, mkdir, readFile } from "node:fs/promises";
@@ -66,19 +67,13 @@ const killKeeper = async (socketPath: string): Promise<void> => {
     (await readFile(`${socketPath}.pid`, "utf8").catch(() => "")).trim(),
   );
   if (!Number.isSafeInteger(pid) || pid <= 1) return;
-  const commandLine = await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "");
-  if (!commandLine.includes(KEEPER_ENTRY) || !commandLine.includes(socketPath)) {
-    return;
-  }
-  try {
-    process.kill(-pid, "SIGKILL");
-  } catch {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // Already gone.
-    }
-  }
+  // The pid file may outlive the keeper: signal only a process whose own
+  // arguments name this keeper and its socket.
+  signalRecordedProcess(
+    { pid, identity: null, commandIncludes: [KEEPER_ENTRY, socketPath] },
+    "SIGKILL",
+    { reason: "replacing the Claude keeper", group: readProcessGroup(pid) === pid },
+  );
 };
 
 const startKeeper = (socketPath: string): void => {

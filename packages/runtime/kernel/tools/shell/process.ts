@@ -195,6 +195,7 @@ const terminateShellTree = (
   const termination = terminateProcessTree(pid, {
     isRootRunning,
     forceAfterMs: 1_000,
+    reason: "ending a shell tool command (stop, abort or timeout)",
   }).finally(() => {
     shellTerminations.delete(key);
   });

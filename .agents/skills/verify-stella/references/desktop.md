@@ -135,7 +135,7 @@ node .agents/skills/verify-stella/control-stella.mjs cleanup apply --dry-run
 node .agents/skills/verify-stella/control-stella.mjs cleanup apply
 ```
 
-Cleanup targets only what the run recorded: the Electron PID (its process group), the test Chromium, the run's Xvfb, processes whose command line carries the run's own `stella-verify-<runId>` path (the detached Bun runtime worker, Electron helpers, crashpad), a borrowed Claude login, the verifier pointer, and the temporary Chromium profile. It preserves the isolated durable data and proof artifacts. Do not kill by process name or a broad `pkill -f` pattern; the developer's own Stella shares the `stella-v2` window class, and a pattern that matches your own shell kills it.
+Cleanup targets only what the run recorded: the Electron PID (its process group), the test Chromium, the run's Xvfb, processes whose command line carries the run's own `stella-verify-<runId>` path (the detached Bun runtime worker, Electron helpers, crashpad), a borrowed Claude login, the verifier pointer, and the temporary Chromium profile. It preserves the isolated durable data and proof artifacts. A stored PID is signalled only while it is still the process the run recorded (same start time, or for older records the run marker or its own arguments), never on the PID alone, and every signal sent or refused is logged with its target's command and reason to `~/.stella/logs/process-kills.log` (`cli/process-safety.mjs`). Do not kill by process name or a broad `pkill -f` pattern; the developer's own Stella shares the `stella-v2` window class, and a pattern that matches your own shell kills it.
 
 
 ## Observation and interaction results

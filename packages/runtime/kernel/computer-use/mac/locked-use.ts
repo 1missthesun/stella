@@ -250,7 +250,7 @@ const runProcessCapture = async (
       resolve(result);
     };
     const cancelTimer = forkCancelableTimeout(timeoutMs, () => {
-      killProcessGroup(child.pid);
+      killProcessGroup(child.pid, { ownChild: true }, `${command} timed out`);
       settle({
         status: 1,
         stdout: Buffer.concat(stdoutChunks).toString("utf8").trim(),

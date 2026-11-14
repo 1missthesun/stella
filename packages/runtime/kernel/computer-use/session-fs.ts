@@ -3,6 +3,11 @@ import path from "node:path";
 import { resolveStatePath } from "../cli/shared.js";
 import { sanitizeStellaComputerSessionId } from "../tools/stella-computer-session.js";
 import { getComputerExecutionEnv } from "./execution-context.js";
+import {
+  readProcessGroup,
+  signalOwnChild,
+  signalRecordedProcess,
+} from "../shared/process-identity.js";
 
 export const DEFAULT_COMPUTER_SESSION_ID = "manual";
 
@@ -48,33 +53,43 @@ export const pidIsRunning = (pid: number | null | undefined) => {
   }
 };
 
-export const killProcessGroup = (pid: number | null | undefined) => {
-  if (!pid || !Number.isInteger(pid) || pid <= 0) {
+/**
+ * What a pid must still be before it is signalled: our own unreaped child,
+ * or a process whose command line holds these parts (for pids read back
+ * from a pid file, which may name someone else's process by now).
+ */
+export type KillTarget = { ownChild: true } | { commandIncludes: readonly string[] };
+
+const sigkill = (
+  pid: number | null | undefined,
+  target: KillTarget,
+  reason: string,
+  group: boolean,
+) => {
+  if (!pid || !Number.isInteger(pid) || pid <= 0) return;
+  if ("ownChild" in target) {
+    signalOwnChild(pid, "SIGKILL", { reason, group });
     return;
   }
-  try {
-    if (process.platform !== "win32") {
-      process.kill(-pid, "SIGKILL");
-      return;
-    }
-  } catch {
-    // fall through to direct pid kill
-  }
-  try {
-    process.kill(pid, "SIGKILL");
-  } catch {
-    // ignore kill failures
-  }
+  const leads = group && process.platform !== "win32" && readProcessGroup(pid) === pid;
+  signalRecordedProcess(
+    { pid, identity: null, commandIncludes: target.commandIncludes },
+    "SIGKILL",
+    { reason, group: leads },
+  );
 };
 
-export const killProcess = (pid: number | null | undefined) => {
-  if (!pid) return;
-  try {
-    process.kill(pid, "SIGKILL");
-  } catch {
-    // ignore stale pid files
-  }
-};
+export const killProcessGroup = (
+  pid: number | null | undefined,
+  target: KillTarget,
+  reason: string,
+) => sigkill(pid, target, reason, true);
+
+export const killProcess = (
+  pid: number | null | undefined,
+  target: KillTarget,
+  reason: string,
+) => sigkill(pid, target, reason, false);
 
 export const helperNewerThanDaemon = (helperPath: string, pidPath: string) => {
   try {

@@ -15,6 +15,7 @@ import {
   getComputerExecutionSignal,
 } from "../computer-use/execution-context.js";
 import { forkTimeoutFiber } from "./effect-runtime.js";
+import { signalOwnChild } from "../shared/process-identity.js";
 
 // NOT named `__dirname`: the CLI/electron esbuild bundles prepend a banner
 // that already declares a top-level `const __dirname`, and esbuild cannot
@@ -98,23 +99,8 @@ const cleanupTempDir = (tempDir: string) => {
   }
 };
 
-const killDetachedProcess = (pid: number | undefined) => {
-  if (!pid) {
-    return;
-  }
-  try {
-    if (process.platform !== "win32") {
-      process.kill(-pid, "SIGKILL");
-      return;
-    }
-  } catch {
-    // fall through to direct pid kill
-  }
-  try {
-    process.kill(pid, "SIGKILL");
-  } catch {
-    // ignore kill failures
-  }
+const killDetachedProcess = (pid: number | undefined, reason: string) => {
+  signalOwnChild(pid, "SIGKILL", { reason, group: true });
 };
 
 export const runNativeHelper = async (args: {
@@ -156,7 +142,7 @@ export const runNativeHelper = async (args: {
         resolve(result);
       };
       const onAbort = () => {
-        killDetachedProcess(child.pid);
+        killDetachedProcess(child.pid, "native helper cancelled");
         const reason = signal?.reason;
         const error =
           reason instanceof Error
@@ -191,7 +177,7 @@ export const runNativeHelper = async (args: {
 
       const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       const cancelTimeout = forkTimeoutFiber(timeoutMs, () => {
-        killDetachedProcess(child.pid);
+        killDetachedProcess(child.pid, "native helper timed out");
         const stdout = readTrimmedFile(stdoutPath);
         const stderr = readTrimmedFile(stderrPath);
         const message =

@@ -18,6 +18,7 @@ export const stopChildProcessTree = async (
   options: {
     graceSignal?: NodeJS.Signals;
     forceAfterMs?: number;
+    reason?: string;
   } = {},
 ) => {
   if (!child?.pid) {
@@ -27,6 +28,7 @@ export const stopChildProcessTree = async (
     isRootRunning: () => child.exitCode === null && child.signalCode === null,
     graceSignal: options.graceSignal,
     forceAfterMs: options.forceAfterMs,
+    reason: options.reason ?? "stopping a child process this app started",
   });
 };
 

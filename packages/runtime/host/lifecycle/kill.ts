@@ -1,6 +1,11 @@
 import { execFile } from "node:child_process";
 import { Effect } from "effect";
 import { pollWithDeadline } from "./poll.js";
+import {
+  readProcessIdentity,
+  type RecordedProcess,
+  signalRecordedProcess,
+} from "../../kernel/shared/process-identity.js";
 
 const ALIVE_POLL_INTERVAL_MS = 50;
 const SIGKILL_CONFIRM_BUDGET_MS = 1_000;
@@ -40,27 +45,29 @@ const waitForPidExit = (
     onDeadline: () => new ExitConfirmDeadlineError(),
   }).pipe(Effect.catch(() => Effect.succeed(false)));
 
+/**
+ * Stop a worker from a stored pid: SIGTERM, then SIGKILL after `graceMs`.
+ * Each signal goes only to the process that was recorded (start time or
+ * the worker's own command line), never to whatever now holds the pid.
+ */
 export const killWorkerProcess = (
-  pid: number,
+  recorded: RecordedProcess,
   graceMs: number,
-  stillOwned: () => boolean = () => true,
+  reason: string,
 ): Effect.Effect<KillResult> =>
   Effect.gen(function* () {
-    if (!stillOwned()) return { stopped: false, escalatedToSigkill: false };
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      return { stopped: false, escalatedToSigkill: false };
-    }
+    const pid = recorded.pid;
+    const first = signalRecordedProcess(recorded, "SIGTERM", { reason });
+    if (first === "gone") return { stopped: true, escalatedToSigkill: false };
+    if (first !== "sent") return { stopped: false, escalatedToSigkill: false };
     if (yield* waitForPidExit(pid, graceMs)) {
       return { stopped: true, escalatedToSigkill: false };
     }
-    if (!stillOwned()) return { stopped: true, escalatedToSigkill: false };
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      return { stopped: true, escalatedToSigkill: true };
-    }
+    const second = signalRecordedProcess(recorded, "SIGKILL", {
+      reason: `${reason}; still running ${graceMs}ms after SIGTERM`,
+    });
+    if (second === "gone") return { stopped: true, escalatedToSigkill: false };
+    if (second !== "sent") return { stopped: true, escalatedToSigkill: false };
     if (yield* waitForPidExit(pid, SIGKILL_CONFIRM_BUDGET_MS)) {
       return { stopped: true, escalatedToSigkill: true };
     }
@@ -68,17 +75,35 @@ export const killWorkerProcess = (
   });
 
 export const stopPids = (
-  pids: number[],
+  processes: readonly RecordedProcess[],
+  reason: string,
   graceMs = 750,
 ): Effect.Effect<void> =>
-  pids.length === 0
+  processes.length === 0
     ? Effect.void
-    : Effect.forEach(pids, (pid) => killWorkerProcess(pid, graceMs), {
+    : Effect.forEach(processes, (recorded) => killWorkerProcess(recorded, graceMs, reason), {
         concurrency: "unbounded",
         discard: true,
       });
 
+/** Command-line parts that name a worker of this Stella root. */
+export const workerCommandTags = (workerEntryPath: string, stellaAppDir: string): string[] => [
+  workerEntryPath,
+  `--stella-root`,
+  stellaAppDir,
+];
+
 export const findSameRootWorkerPids = async (
+  workerEntryPath: string,
+  stellaAppDir: string,
+): Promise<RecordedProcess[]> =>
+  (await listSameRootWorkerPids(workerEntryPath, stellaAppDir)).map((pid) => ({
+    pid,
+    identity: readProcessIdentity(pid),
+    commandIncludes: workerCommandTags(workerEntryPath, stellaAppDir),
+  }));
+
+const listSameRootWorkerPids = async (
   workerEntryPath: string,
   stellaAppDir: string,
 ): Promise<number[]> => {

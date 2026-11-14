@@ -201,6 +201,7 @@ export const reapOrphanedOwnedProcesses = async (
       record.pid,
       () => stillTheRecordedProcess(record),
       graceMs,
+      "reaping an owned process whose owning Stella is gone",
     );
     if (stopped) {
       reaped.push(record.pid);
@@ -284,7 +285,12 @@ export const reapLegacyOrphanedBrowserDaemons = async (
       findLegacyOrphanedBrowserDaemons().some(
         (candidate) => candidate.pid === daemon.pid,
       );
-    if (await terminateOwnedProcess(daemon.pid, stillOrphaned, graceMs)) {
+    if (await terminateOwnedProcess(
+        daemon.pid,
+        stillOrphaned,
+        graceMs,
+        "reaping a legacy orphaned browser daemon",
+      )) {
       reaped.push(daemon.pid);
       console.warn(
         `[owned-processes] Stopped orphaned browser daemon ${daemon.pid} (${daemon.session}, ${daemon.executable}).`,

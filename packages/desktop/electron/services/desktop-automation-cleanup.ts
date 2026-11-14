@@ -144,7 +144,12 @@ export const stopAllDesktopAutomationDaemons = async (): Promise<void> => {
 
   await Promise.all(
     Array.from(targets, ([pid, stillOwned]) =>
-      terminateOwnedProcess(pid, stillOwned, TERM_GRACE_MS),
+      terminateOwnedProcess(
+        pid,
+        stillOwned,
+        TERM_GRACE_MS,
+        "startup cleanup of an orphaned desktop automation helper",
+      ),
     ),
   );
 

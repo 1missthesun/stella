@@ -4,6 +4,11 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { app } from "electron";
 import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree";
+import {
+  readProcessIdentity,
+  recordedProcessIsLive,
+  type RecordedProcess,
+} from "@stella/runtime/kernel/shared/process-identity";
 import { nativeHelperDirectories } from "../native-helper-path.js";
 import { getMainLogger } from "../observability/main-logger.js";
 
@@ -45,9 +50,16 @@ const startsWithDirectory = (command: string, directory: string) =>
 
 const quotePowerShell = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
+/** Taken when found, so a stop later only reaches that same process. */
+const record = (pid: number, tag: string): RecordedProcess => ({
+  pid,
+  identity: readProcessIdentity(pid),
+  commandIncludes: [tag],
+});
+
 export const findOrphanedProcessesIn = async (
   directories: readonly string[],
-): Promise<number[]> => {
+): Promise<RecordedProcess[]> => {
   const roots = [...new Set(directories.map((directory) => path.resolve(directory)))].filter(
     (directory) => existsSync(directory),
   );
@@ -72,7 +84,8 @@ export const findOrphanedProcessesIn = async (
       return stdout
         .split(/\r?\n/)
         .map((value) => Number.parseInt(value.trim(), 10))
-        .filter((pid) => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+        .filter((pid) => Number.isInteger(pid) && pid > 0 && pid !== process.pid)
+        .map((pid) => ({ pid, identity: null }));
     }
     const rows = await listPosixProcesses();
     const byPid = new Map(rows.map((row) => [row.pid, row]));
@@ -83,25 +96,21 @@ export const findOrphanedProcessesIn = async (
           roots.some((root) => startsWithDirectory(row.command, root)) &&
           isOrphanedPosix(row, byPid),
       )
-      .map((row) => row.pid);
+      .map((row) =>
+        record(row.pid, roots.find((root) => startsWithDirectory(row.command, root))!),
+      );
   } catch {
     return [];
   }
 };
 
-const isPidAlive = (pid: number) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException)?.code === "EPERM";
-  }
-};
-
-export const terminateOrphans = async (pids: readonly number[]) => {
+export const terminateOrphans = async (orphans: readonly RecordedProcess[]) => {
   await Promise.all(
-    pids.map((pid) =>
-      terminateProcessTree(pid, { isRootRunning: () => isPidAlive(pid) }),
+    orphans.map((orphan) =>
+      terminateProcessTree(orphan.pid, {
+        isRootRunning: () => recordedProcessIsLive(orphan),
+        reason: "startup sweep: helper left running by an earlier Stella",
+      }),
     ),
   );
 };
@@ -118,7 +127,7 @@ const parseElapsedSeconds = (value: string): number | null => {
   );
 };
 
-const findStaleCrashpadHandlers = async (): Promise<number[]> => {
+const findStaleCrashpadHandlers = async (): Promise<RecordedProcess[]> => {
   if (process.platform === "win32") return [];
   let database: string;
   try {
@@ -136,7 +145,7 @@ const findStaleCrashpadHandlers = async (): Promise<number[]> => {
       timeout: LIST_TIMEOUT_MS,
     });
     const ownAgeSeconds = process.uptime();
-    const stale: number[] = [];
+    const stale: RecordedProcess[] = [];
     for (const line of stdout.split(/\r?\n/)) {
       const match = line.trim().match(/^(\d+)\s+(\S+)\s+(.+)$/);
       if (!match) continue;
@@ -148,7 +157,7 @@ const findStaleCrashpadHandlers = async (): Promise<number[]> => {
       if (next !== "" && next !== " ") continue;
       const age = parseElapsedSeconds(match[2]!);
       if (age === null || age <= ownAgeSeconds + 2) continue;
-      stale.push(Number(match[1]));
+      stale.push(record(Number(match[1]), `--database=${database}`));
     }
     return stale;
   } catch {
@@ -166,9 +175,14 @@ export const sweepOrphanedHelpers = async (options: {
     ]),
     findStaleCrashpadHandlers(),
   ]);
-  const pids = [...new Set([...helpers, ...crashpad])];
-  if (pids.length === 0) return;
-  await terminateOrphans(pids);
+  const seen = new Set<number>();
+  const orphans = [...helpers, ...crashpad].filter((orphan) => {
+    if (seen.has(orphan.pid)) return false;
+    seen.add(orphan.pid);
+    return true;
+  });
+  if (orphans.length === 0) return;
+  await terminateOrphans(orphans);
   getMainLogger()?.process("startup.orphaned-helpers-stopped", {
     helpers: helpers.length,
     crashpadHandlers: crashpad.length,

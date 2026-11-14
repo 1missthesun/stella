@@ -23,7 +23,6 @@ import { acquireHostLock } from "./lock.js";
 import { pollWithDeadline } from "./poll.js";
 import { connectReadySocket } from "./socket.js";
 import { spawnAdoptedWorker } from "./spawn.js";
-import { processIdentityIsLive } from "../../kernel/shared/process-identity.js";
 import { findSameRootWorkerPids, killWorkerProcess, stopPids } from "./kill.js";
 import {
   defaultLifecycleBudgets,
@@ -182,7 +181,9 @@ const discoverExistingWorker = (
       const survivors = yield* Effect.promise(() =>
         findSameRootWorkerPids(options.workerEntryPath, options.stellaAppDir),
       );
-      if (survivors.length > 0) yield* stopPids(survivors);
+      if (survivors.length > 0) {
+        yield* stopPids(survivors, "runtime worker failed the identity handshake");
+      }
       yield* Effect.promise(() =>
         removeStaleRuntimeArtifacts(options.stellaAppDir),
       );
@@ -225,7 +226,7 @@ const discoverExistingWorker = (
     const orphanPids = yield* Effect.promise(() =>
       findSameRootWorkerPids(options.workerEntryPath, options.stellaAppDir),
     );
-    if (!orphanPids.includes(existingPid)) {
+    if (!orphanPids.some((orphan) => orphan.pid === existingPid)) {
       console.warn(
         `[runtime-host] Stale runtime pidfile pointed at pid ${existingPid}, but that pid no longer matches this worker root; leaving the process alone.`,
       );
@@ -234,7 +235,7 @@ const discoverExistingWorker = (
       console.warn(
         `[runtime-host] Reaping ${orphanPids.length} stale runtime worker(s) for ${options.stellaAppDir} before spawning a fresh worker.`,
       );
-      yield* stopPids(orphanPids);
+      yield* stopPids(orphanPids, "stale runtime worker of this Stella root");
     }
     yield* Effect.promise(() =>
       removeStaleRuntimeArtifacts(options.stellaAppDir),
@@ -291,7 +292,7 @@ export const startOrAttachWorkerEffect = (
 
 export const stopRunningWorkerEffect = (
   stellaAppDir: string,
-  options?: { graceMs?: number },
+  options?: { graceMs?: number; workerCommandTags?: readonly string[] },
 ): Effect.Effect<{ stopped: boolean; pid: number | null }> =>
   Effect.gen(function* () {
     const owner = yield* Effect.promise(() =>
@@ -300,8 +301,16 @@ export const stopRunningWorkerEffect = (
     if (owner == null) return { stopped: false, pid: null };
     const pid = owner.pid;
     const startedAt = Date.now();
-    const result = yield* killWorkerProcess(pid, options?.graceMs ?? 1_500, () =>
-      processIdentityIsLive(owner.pid, owner.identity),
+    const result = yield* killWorkerProcess(
+      {
+        pid,
+        identity: owner.identity,
+        ...(owner.identity === null && options?.workerCommandTags
+          ? { commandIncludes: options.workerCommandTags }
+          : {}),
+      },
+      options?.graceMs ?? 1_500,
+      "stopping the runtime worker for a restart",
     );
     getFileLogger()?.process("worker.kill-latency", {
       pid,

@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { signalOwnChild } from "../shared/process-identity.js";
 import {
   claudeUsageLimitOf,
   formatClaudeUsageLimitReset,
@@ -1254,12 +1255,13 @@ const processIsDead = (child: ChildProcess) =>
  */
 const signalProcessGroup = (child: ChildProcess, signal: NodeJS.Signals) => {
   if (process.platform !== "win32" && child.pid) {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-      // Fall back to the CLI alone.
-    }
+    // Only while the CLI is still our unreaped child: its group id is then
+    // certainly its own.
+    const outcome = signalOwnChild(child.pid, signal, {
+      reason: "stopping a Claude Code session",
+      group: true,
+    });
+    if (outcome !== "failed") return;
   }
   child.kill(signal);
 };

@@ -217,6 +217,7 @@ export const stopOrphanedStellaBrowserDaemons = async () => {
           );
         },
         150,
+        "stopping an orphaned bundled browser daemon",
       ),
     ),
   );
@@ -1209,7 +1210,12 @@ export class StellaBrowserBridgeService {
     const stillOwned = () =>
       processIdentityIsLive(daemon) &&
       Boolean(pidCommandLine(daemon.pid)?.includes("service run"));
-    await terminateOwnedProcess(daemon.pid, stillOwned, DAEMON_SHUTDOWN_TIMEOUT_MS);
+    await terminateOwnedProcess(
+      daemon.pid,
+      stillOwned,
+      DAEMON_SHUTDOWN_TIMEOUT_MS,
+      "stopping this instance's recorded browser daemon",
+    );
   }
 
   private sendCommand(
@@ -1467,6 +1473,7 @@ export class StellaBrowserBridgeService {
           pid,
           () => isBridgeDaemon(pid),
           DAEMON_SHUTDOWN_TIMEOUT_MS,
+          `freeing browser bridge port ${port}`,
         );
       }),
     );

@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { readProcessIdentity, signalRecordedProcess } from "./process-safety.mjs";
 
 const isAlive = (pid) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -86,9 +87,11 @@ export const recordProcesses = (recorded = [], rootPid, extra = []) => {
   const found = [...processTree(rootPid, table), ...table.filter((entry) => extraPids.has(entry.pid))];
   for (const entry of found) {
     if (entry.pid === process.pid) continue;
-    byKey.set(`${entry.pid}:${entry.started}`, {
+    const key = `${entry.pid}:${entry.started}`;
+    byKey.set(key, {
       pid: entry.pid,
       started: entry.started,
+      identity: byKey.get(key)?.identity ?? readProcessIdentity(entry.pid),
       command: entry.command.slice(0, 200),
     });
   }
@@ -97,24 +100,23 @@ export const recordProcesses = (recorded = [], rootPid, extra = []) => {
 
 /**
  * Stops recorded processes that are still the very process recorded (same
- * pid and start time): SIGTERM, then SIGKILL after the grace period.
+ * pid, `ps` start time and, when recorded, kernel start time): SIGTERM, then
+ * SIGKILL after the grace period. Every signal re-checks and is logged.
  */
-export const reapRecordedProcesses = async (recorded = [], graceMs = 4_000) => {
+export const reapRecordedProcesses = async (recorded = [], graceMs = 4_000, reason = "verify-stella: stopping a run's recorded processes") => {
   const table = new Map(processTableWithStart().map((entry) => [entry.pid, entry]));
-  const live = recorded.filter((entry) => table.get(entry.pid)?.started === entry.started && entry.pid !== process.pid);
-  for (const { pid } of live) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {}
-  }
+  const live = recorded
+    .filter((entry) => table.get(entry.pid)?.started === entry.started && entry.pid !== process.pid)
+    // Records from before kernel start times were kept fall back to the ps
+    // start time just matched; either way the SIGKILL below re-checks it.
+    .map((entry) => ({ ...entry, identity: entry.identity ?? readProcessIdentity(entry.pid) }));
+  for (const entry of live) signalRecordedProcess(entry, "SIGTERM", { reason });
   const deadline = Date.now() + graceMs;
   while (Date.now() < deadline && live.some(({ pid }) => isAlive(pid))) await delay(150);
   const now = new Map(processTableWithStart().map((entry) => [entry.pid, entry]));
   for (const entry of live) {
     if (now.get(entry.pid)?.started !== entry.started) continue;
-    try {
-      process.kill(entry.pid, "SIGKILL");
-    } catch {}
+    signalRecordedProcess(entry, "SIGKILL", { reason });
   }
   return live.map(({ pid, command }) => ({ pid, command: command.slice(0, 160) }));
 };
@@ -135,6 +137,8 @@ export const registerRun = (run, pointerPath, tempRoot) => {
         runDir: run.runDir,
         tempRoot,
         xvfbPid: run.display?.mode === "xvfb" ? run.display.pid : null,
+        xvfbDisplay: run.display?.mode === "xvfb" ? run.display.display : null,
+        xvfbIdentity: run.display?.mode === "xvfb" ? run.display.identity ?? null : null,
         processes: run.ownedProcesses ?? [],
         updatedAt: new Date().toISOString(),
       }),
@@ -188,8 +192,23 @@ export const sweepOrphanedRuns = async ({ runOwnedProcesses, removeTempRoot }) =
     const marked = runOwnedProcesses(record.runId).map(({ pid }) => pid);
     const table = processTableWithStart();
     const extra = table.filter((row) => marked.includes(row.pid)).map(({ pid, started, command }) => ({ pid, started, command }));
-    const xvfb = record.xvfbPid ? table.filter((row) => row.pid === record.xvfbPid && /Xvfb/.test(row.command)) : [];
-    const stopped = await reapRecordedProcesses([...(record.processes ?? []), ...extra, ...xvfb], 2_000);
+    // Another run's Xvfb could hold a reused pid: match its display and start time too.
+    const xvfb = record.xvfbPid
+      ? table
+          .filter(
+            (row) =>
+              row.pid === record.xvfbPid &&
+              /Xvfb/.test(row.command) &&
+              (!record.xvfbDisplay || row.command.includes(`${record.xvfbDisplay} `)) &&
+              (!record.xvfbIdentity || readProcessIdentity(row.pid) === record.xvfbIdentity),
+          )
+          .map(({ pid, started, command }) => ({ pid, started, identity: record.xvfbIdentity ?? null, command }))
+      : [];
+    const stopped = await reapRecordedProcesses(
+      [...(record.processes ?? []), ...extra, ...xvfb],
+      2_000,
+      `verify-stella: reaping orphaned run ${record.runId} (its pointer is gone)`,
+    );
     if (record.tempRoot && existsSync(record.tempRoot)) removeTempRoot(record.tempRoot);
     rmSync(file, { force: true });
     swept.push({ runId: record.runId, stopped });

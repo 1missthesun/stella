@@ -168,6 +168,342 @@ pub async fn take_ax_snapshot(
     Ok((bounded.tree, format!("{session_id}|{documents}"), refs))
 }
 
+const PAGE_WALKER_SOURCE: &str = include_str!("../../../extension/lib/snapshot.js");
+const PAGE_WALKER_WORLD: &str = "stella-browser-snapshot";
+const PAGE_WALKER_OBJECT_GROUP: &str = "stella-browser-snapshot";
+
+struct PageFrame {
+    id: String,
+    url: String,
+    child_frames: usize,
+}
+
+struct PageFrameCapture {
+    tree: String,
+    truncated: bool,
+    refs: Vec<(String, Value, Option<i64>)>,
+    frame_elements: usize,
+}
+
+fn collect_page_frames(tree: &Value, frames: &mut Vec<PageFrame>) {
+    let Some(frame) = tree.get("frame") else {
+        return;
+    };
+    let Some(id) = frame.get("id").and_then(Value::as_str) else {
+        return;
+    };
+    frames.push(PageFrame {
+        id: id.to_string(),
+        url: frame
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        child_frames: tree
+            .get("childFrames")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len),
+    });
+    for child in tree
+        .get("childFrames")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        collect_page_frames(child, frames);
+    }
+}
+
+fn page_walker_options(options: &SnapshotOptions) -> Value {
+    let mut walker = serde_json::Map::new();
+    walker.insert("interactive".into(), Value::Bool(options.interactive));
+    walker.insert("compact".into(), Value::Bool(options.compact));
+    walker.insert("cursor".into(), Value::Bool(options.cursor));
+    if let Some(depth) = options.depth {
+        walker.insert("maxDepth".into(), Value::from(depth));
+    }
+    if let Some(selector) = &options.selector {
+        walker.insert("selector".into(), Value::String(selector.clone()));
+    }
+    Value::Object(walker)
+}
+
+async fn capture_page_frame(
+    client: &CdpClient,
+    session_id: &str,
+    frame_id: &str,
+    options: &SnapshotOptions,
+) -> Result<PageFrameCapture, String> {
+    let world = client
+        .send_command(
+            "Page.createIsolatedWorld",
+            Some(serde_json::json!({ "frameId": frame_id, "worldName": PAGE_WALKER_WORLD })),
+            Some(session_id),
+        )
+        .await?;
+    let context_id = world
+        .get("executionContextId")
+        .and_then(Value::as_i64)
+        .ok_or("Frame has no snapshot context")?;
+    let walker = PAGE_WALKER_SOURCE.replacen("export function", "function", 1);
+    let expression = format!(
+        "(() => {{ {walker}\nconst elements = []; const order = [];\
+         const capture = executeSnapshot({{ ...{options}, onRef: (ref, el) => {{ order.push(ref); elements.push(el); }} }});\
+         elements.capture = JSON.stringify({{ tree: capture.tree, refs: capture.refs, truncated: capture.truncated, order,\
+           frameElements: document.querySelectorAll('iframe, frame').length }});\
+         return elements; }})()",
+        options = page_walker_options(options),
+    );
+    let capture = async {
+        let evaluated = client
+            .send_command(
+                "Runtime.evaluate",
+                Some(serde_json::json!({
+                    "expression": expression,
+                    "contextId": context_id,
+                    "returnByValue": false,
+                    "objectGroup": PAGE_WALKER_OBJECT_GROUP,
+                })),
+                Some(session_id),
+            )
+            .await?;
+        if let Some(details) = evaluated.get("exceptionDetails") {
+            let message = details
+                .pointer("/exception/description")
+                .or_else(|| details.get("text"))
+                .and_then(Value::as_str)
+                .unwrap_or("Snapshot failed in the page");
+            return Err(message.lines().next().unwrap_or_default().to_string());
+        }
+        let object_id = evaluated
+            .pointer("/result/objectId")
+            .and_then(Value::as_str)
+            .ok_or("Snapshot returned no result")?;
+        let properties = client
+            .send_command(
+                "Runtime.getProperties",
+                Some(serde_json::json!({ "objectId": object_id, "ownProperties": true })),
+                Some(session_id),
+            )
+            .await?;
+        let mut summary = None;
+        let mut element_ids = HashMap::new();
+        for property in properties
+            .get("result")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let name = property.get("name").and_then(Value::as_str).unwrap_or("");
+            if name == "capture" {
+                summary = property
+                    .pointer("/value/value")
+                    .and_then(Value::as_str)
+                    .and_then(|text| serde_json::from_str::<Value>(text).ok());
+            } else if let (Ok(index), Some(id)) = (
+                name.parse::<usize>(),
+                property.pointer("/value/objectId").and_then(Value::as_str),
+            ) {
+                element_ids.insert(index, id.to_string());
+            }
+        }
+        let summary = summary.ok_or("Snapshot returned no tree")?;
+        let order: Vec<String> = summary
+            .get("order")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| id.as_str().map(String::from))
+            .collect();
+        let backend_ids =
+            futures_util::future::join_all(order.iter().enumerate().map(|(index, _)| {
+                let element = element_ids.get(&index).cloned();
+                async move {
+                    let element = element?;
+                    client
+                        .send_command(
+                            "DOM.describeNode",
+                            Some(serde_json::json!({ "objectId": element })),
+                            Some(session_id),
+                        )
+                        .await
+                        .ok()?
+                        .pointer("/node/backendNodeId")
+                        .and_then(Value::as_i64)
+                }
+            }))
+            .await;
+        let backend_by_ref: HashMap<String, i64> = order
+            .into_iter()
+            .zip(backend_ids)
+            .filter_map(|(id, backend)| backend.map(|backend| (id, backend)))
+            .collect();
+        let refs = summary
+            .get("refs")
+            .and_then(Value::as_object)
+            .map(|refs| {
+                let mut entries: Vec<(String, Value, Option<i64>)> = refs
+                    .iter()
+                    .map(|(id, data)| (id.clone(), data.clone(), backend_by_ref.get(id).copied()))
+                    .collect();
+                entries.sort_by_key(|(id, _, _)| id[1..].parse::<usize>().unwrap_or(usize::MAX));
+                entries
+            })
+            .unwrap_or_default();
+        Ok(PageFrameCapture {
+            tree: summary
+                .get("tree")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .lines()
+                .filter(|line| !line.starts_with("[snapshot metadata:"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            truncated: summary
+                .get("truncated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            refs,
+            frame_elements: summary
+                .get("frameElements")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as usize,
+        })
+    }
+    .await;
+    let _ = client
+        .send_command(
+            "Runtime.releaseObjectGroup",
+            Some(serde_json::json!({ "objectGroup": PAGE_WALKER_OBJECT_GROUP })),
+            Some(session_id),
+        )
+        .await;
+    capture
+}
+
+fn rename_walker_refs(tree: &str, renamed: &HashMap<String, String>) -> String {
+    let mut output = String::with_capacity(tree.len());
+    let mut rest = tree;
+    while let Some(start) = rest.find("[ref=") {
+        let Some(len) = rest[start..].find(']') else {
+            break;
+        };
+        output.push_str(&rest[..start]);
+        match renamed.get(&rest[start + 5..start + len]) {
+            Some(id) => {
+                output.push_str("[ref=");
+                output.push_str(id);
+                output.push(']');
+            }
+            None => output.push_str("[unavailable]"),
+        }
+        rest = &rest[start + len + 1..];
+    }
+    output.push_str(rest);
+    output
+}
+
+/// Snapshot from the page-side walker the extension backend also uses, so
+/// both backends return the same tree; `take_ax_snapshot` keeps Chrome's
+/// accessibility tree for callers that need it.
+pub async fn take_dom_snapshot(
+    client: &CdpClient,
+    session_id: &str,
+    options: &SnapshotOptions,
+    ref_map: &mut RefMap,
+) -> Result<String, String> {
+    let root = client
+        .send_command_no_params("Page.getFrameTree", Some(session_id))
+        .await?;
+    let mut frames = Vec::new();
+    collect_page_frames(
+        root.get("frameTree")
+            .ok_or("Browser did not return a frame tree")?,
+        &mut frames,
+    );
+    let mut next_ref = ref_map.next_ref_num();
+    let mut output = String::new();
+    let mut truncated = frames.len() > MAX_SNAPSHOT_FRAMES;
+    let mut skipped_frames = 0usize;
+    for (index, frame) in frames.iter().take(MAX_SNAPSHOT_FRAMES).enumerate() {
+        let main = index == 0;
+        if !main && options.selector.is_some() {
+            continue;
+        }
+        let capture = match capture_page_frame(client, session_id, &frame.id, options).await {
+            Ok(capture) => capture,
+            Err(error) if main => return Err(error),
+            Err(_) => {
+                skipped_frames += 1;
+                continue;
+            }
+        };
+        truncated |= capture.truncated;
+        skipped_frames += capture.frame_elements.saturating_sub(frame.child_frames);
+        if capture.tree.trim().is_empty() || capture.tree == "(empty)" {
+            continue;
+        }
+        let mut renamed = HashMap::new();
+        for (walker_id, data, backend_id) in capture.refs {
+            let Some(backend_id) = backend_id else {
+                continue;
+            };
+            let ref_id = format!("e{next_ref}");
+            next_ref += 1;
+            ref_map.add_with_hints(
+                ref_id.clone(),
+                Some(backend_id),
+                data.get("role").and_then(Value::as_str).unwrap_or_default(),
+                data.get("name").and_then(Value::as_str).unwrap_or_default(),
+                data.get("nth")
+                    .and_then(Value::as_u64)
+                    .map(|nth| nth as usize),
+                RefLocatorHints::default(),
+            );
+            renamed.insert(walker_id, ref_id);
+        }
+        let tree = rename_walker_refs(&capture.tree, &renamed);
+        if main {
+            output.push_str(&tree);
+        } else {
+            output.push_str(&format!(
+                "\n- frame [frame={}] {}",
+                frame.id,
+                serde_json::to_string(&frame.url).unwrap_or_default()
+            ));
+            for line in tree.lines() {
+                output.push_str("\n  ");
+                output.push_str(line);
+            }
+        }
+        if output.encode_utf16().count() >= MAX_SNAPSHOT_CHARS {
+            truncated = true;
+            break;
+        }
+    }
+    ref_map.set_next_ref_num(next_ref);
+
+    let trimmed = output.trim();
+    if trimmed.is_empty() {
+        ref_map.retain_ids(&HashSet::new());
+        return Ok(if options.interactive {
+            "(no interactive elements)".to_string()
+        } else {
+            "(empty page)".to_string()
+        });
+    }
+    let bounded = bound_snapshot(trimmed, skipped_frames);
+    ref_map.retain_ids(&bounded.visible_refs);
+    if !truncated || bounded.truncated {
+        return Ok(bounded.tree);
+    }
+    let body = bound_snapshot(trimmed, 0).tree;
+    Ok(format!(
+        "{body}\n[snapshot metadata: truncated=true; emittedElements={}; emittedChars={}; maxElements={MAX_SNAPSHOT_ELEMENTS}; maxChars={MAX_SNAPSHOT_CHARS}; skippedCrossOriginFrames={skipped_frames}]",
+        bounded.emitted_elements, bounded.emitted_chars
+    ))
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct BoundedSnapshot {
     tree: String,

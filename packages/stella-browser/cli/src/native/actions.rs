@@ -3741,8 +3741,7 @@ async fn handle_snapshot(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
 
     state.ref_map.clear();
     let tree =
-        snapshot::take_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map, None)
-            .await?;
+        snapshot::take_dom_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map).await?;
 
     let url = mgr.get_url().await.unwrap_or_default();
 

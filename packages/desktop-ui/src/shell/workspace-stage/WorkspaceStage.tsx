@@ -30,6 +30,7 @@ import {
   type FileViewerRect,
 } from "@/features/workspace-display/file-viewer-store";
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
+import { useTabStageVisible } from "@/features/workspace-display/tab-stage-visible";
 import {
   addAgentDisplayPayload,
   openDisplayPayloadTab,
@@ -1030,7 +1031,7 @@ export const WorkspaceStage = memo(
       const activeTabId = useSidebarActiveTabId();
       const activeTab =
         sidebarTabs.find((tab) => tab.id === activeTabId) ?? null;
-      const tabStageVisible = panelOpen && activeTab !== null;
+      const tabStageVisible = useTabStageVisible();
       const viewer = useFileViewer();
       const exclusiveTabShown =
         tabStageVisible && isExclusiveStageSection(activeTab?.kind);

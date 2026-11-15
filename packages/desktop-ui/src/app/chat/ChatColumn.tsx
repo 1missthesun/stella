@@ -35,6 +35,7 @@ import {
 } from "@/features/chat/hooks/use-composer-message-state";
 import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
+import { useTabStageVisible } from "@/features/workspace-display/tab-stage-visible";
 import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
 import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
 import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
@@ -91,9 +92,14 @@ export const ChatColumn = memo(function ChatColumn({
   scroll,
   composerEntering,
   conversationId,
-  showHomeContent,
+  showHomeContent: homeSurface,
 }: ChatColumnProps) {
   const t = useT();
+  // A tab on the stage takes the whole body, so Home steps aside for it:
+  // the chat shows its docked composer, which the stage ends above, as it
+  // does over a conversation with messages. Home comes back with Chat.
+  const tabStageVisible = useTabStageVisible();
+  const showHomeContent = Boolean(homeSurface) && !tabStageVisible;
   const focus = useConversationFocus(conversationId);
   const homeObscuresChat = showHomeContent && !focus;
   const isDraggingRef = useRef(false);

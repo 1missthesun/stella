@@ -28,7 +28,7 @@ A non-Chat tab shows on the stage (`.workspace-stage[data-visible="true"]`, `she
 
 ## Gotchas
 
-- On an empty conversation the composer is centred on Home, so the stage stops above it and covers only the top part of the window (the greeting shows under it). After the first message the composer sits at the bottom and the stage fills the window.
+- A tab on the stage fills the body whether or not the conversation is empty: on Home, opening a tab sets Home aside and the composer docks at the bottom (keeping any draft); back on Chat, Home returns with the composer centred.
 - While a dialog is open the bar is inert: `activeTab` reads null.
 - The tab's top edge runs into the stage with concave feet; never cover the stage's edge with a patch (the open-tab notch is `shell/topbar/open-tab-notch.ts`).
 - Older layouts saved section ids that no longer exist (`tasks`, `search`, `settings`, `quickchat`); they restore as the Home launcher (`resolveSidebarSection` in `features/workspace-display/sidebar-sections.ts`).

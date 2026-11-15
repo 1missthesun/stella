@@ -15,9 +15,10 @@ teardown) is faster to drive headless:
   environment or the gitignored `workers/cloud-builder/.dev.vars`; the script
   never prints it.
 - Objective placement evidence is the owner's agent threads (the
-  `agentThreads.recent`, `agentThreads.forConversation`, and
-  `agentThreads.running` backend calls the desktop renders, see
-  `packages/desktop-ui/src/features/cloud/use-cloud-activity.ts`) and the
+  `agentThreads.forConversation`, `agentThreads.running` and
+  `agentThreads.get` live views the desktop renders, see
+  `packages/desktop-ui/src/features/cloud/use-cloud-activity.ts`; each
+  thread says where it ran and `runsOnDeviceId`) and the
   worker tail: `bunx wrangler tail --format json` in
   `workers/cloud-builder` (`sandbox_ready` means a BuildSession container
   attached; an agent on Stella's models runs in its conversation as a pi
@@ -27,6 +28,25 @@ teardown) is faster to drive headless:
   misses Durable Object logs, so scope it to the tested owner, conversation
   and turn, and read stored logs with `node scripts/worker-logs.mjs --search
   <text>` (DEPLOY.md, "Reading Worker logs").
+- Place a task on a desktop test copy from a cloud chat (proven
+  2026-11-14): turn on Settings › Privacy › **Work from your other
+  devices** in the test copy (the real user path; otherwise its screen asks
+  "Allow work from your other devices?" when the task arrives), read its
+  device id with `backend-call.mjs view devices.list` (it acts as the run's
+  account), then send a cloud turn as that same account:
+  `node .agents/skills/verify-stella/cloud-turn.mjs --email <session info
+  account.email> --wait-report --prompt "Start one background task on my
+  computer <label> (destination device <deviceId>) that …"`. The thread
+  in `agentThreads.forConversation '{"conversationId":"<printed id>"}'`
+  shows `executor: "computer"` and the test copy's `runsOnDeviceId`, and
+  the relayed reply carries the task's words. The task runs with the test
+  copy's engine and shows in its Activity list.
+- Agent evidence through `backend-call.mjs`: `call agentLogs.read
+  '{"threadId":"…","afterSeq":-1}'` (an agent's synced history, usage and
+  generation ids), `view agentEvents.forThread '{"threadId":"…"}'` (its
+  ledger), `view userAsks.open` (pending ask cards; answer one with `POST
+  /api/user-asks/<askId>/answer`, there is no answer RPC), `view
+  engines.get` (each place's Claude login and its end time).
 - Reproduce executor bugs before deploying: the built sandbox image can run
   the attached tool host locally (`docker run --rm --entrypoint sh
   stella-v2-cloud-builder-dev-sandboxsmall:<version>`), where stderr is on the
@@ -37,9 +57,10 @@ teardown) is faster to drive headless:
   `workers/cloud-builder`, then `STELLA_BACKEND_URL=<printed url> node
   .agents/skills/verify-stella/cloud-turn.mjs ...`. It has its own Durable
   Objects and D1, so its owners, conversations and history never mix with
-  dev's, and cloud orchestrator turns on Stella models work there. It has no
-  agent containers, so verify sandbox, background-agent, cloud shell and
-  cloud Claude Code behavior on dev (deploy dev from a tree that contains
+  dev's, and cloud orchestrator turns and cloud agents on Stella models work
+  there (they run as pi agents inside the orchestrator object). It has no
+  agent containers and its gateway can't run account-key (BYOK) turns, so
+  verify sandbox, Claude Code agent, cloud shell and BYOK behavior on dev (deploy dev from a tree that contains
   origin/master; `deploy:dev` refuses anything else). `wrangler tail` does
   not attach to Previews; read the Preview's logs in the dashboard
   (Observability, persisted at full sampling).
@@ -71,6 +92,8 @@ teardown) is faster to drive headless:
   It targets `STELLA_BACKEND_URL` and acts as `STELLA_VERIFY_ACCOUNT_EMAIL`,
   else the current desktop run's account, so it can seed or read back what
   the desktop under test shows (schedules, reminders, conversations).
+- A Preview's owner Durable Objects keep running old code for minutes after
+  a redeploy; use a fresh test email to hit new code at once.
 - A worker-only `bun run deploy:dev` takes about two minutes; one that
   rebuilds the image takes six. Never deploy while a cloud thread is
   `running`: the deploy replaces the isolate running it and the turn is

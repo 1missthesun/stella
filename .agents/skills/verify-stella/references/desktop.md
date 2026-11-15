@@ -16,7 +16,7 @@ The `scripts/control-stella.mjs` file is a compatibility wrapper only. New map e
 The CLI uses grouped subcommands with machine-readable JSON. Named product journeys are optional convenience macros:
 
 - `session` launches, checks, and describes the isolated app.
-- `chat`, `nav`, `settings`, and `apps` encode repeatable Stella journeys (`chat ready|send|state`, `nav home|files|browser`, `settings open|tab|search|state|close`, `apps open|state|ask`).
+- `chat`, `nav`, `settings`, and `apps` encode repeatable Stella journeys (`chat ready|send|state`, `nav home|files|browser|open`, `settings open|tab|search|state|close`, `apps open|state|ask`).
 - `inspect` captures semantic state, components, ARIA, screenshots, and an explicit unsafe eval escape hatch.
 - `drive` performs accessible clicks, fills, key chords, scrolling, waits, and settle detection.
 - `performance` captures metrics, traces, and CPU profiles.
@@ -31,7 +31,7 @@ Numeric ranges: `chat send --timeout` 500-120000 ms (default 10000); `drive sett
 
 ## Desktop launch and doctor
 
-From the repository root, with dependencies installed (`bun run deps desktop`, plus `backend` when the claim needs your own Preview; a worktree has none until you run it). `cloud-turn.mjs` needs no install. On Linux, launch starts a private Xvfb for the run on the first free display from `:90` (system `Xvfb`, `STELLA_VERIFY_XVFB`, or one `scripts/fetch-xvfb.sh` unpacks into `~/.cache/stella-verify/xvfb` from the pacman mirror without root) and runs Electron with software GL there, so no window reaches the user's screen and nothing competes with other runs. The run record's `display` says which; `--display host` puts the window on the real `DISPLAY`, and `--display xvfb` fails instead of falling back. Never start an Xvfb by hand with `-displayfd` or on a low display number: on Hyprland it can take over `:0`, the display the user's own X11 apps use. On macOS the window opens on the visible desktop. Read geometry from a fresh observation rather than assuming a size:
+From the repository root, with dependencies installed (`bun run deps desktop`, plus `backend` when the claim needs your own Preview; a worktree has none until you run it) and the gitignored `workers/cloud-builder/.dev.vars` present (copy it from the main checkout into a fresh worktree, mode 600, and delete it with the worktree). `cloud-turn.mjs` needs no install. Launch refuses (`INSTALLED_APP_CHECKOUT`) when this checkout shares git data with an installed Stella (`$STELLA_APP_DIR`, `~/.local/share/stella/app`, `~/Library/Application Support/Stella/app`, `%LOCALAPPDATA%\Stella\app`), since a test copy there rewrites the install's update refs. On Linux, launch starts a private Xvfb for the run on the first free display from `:90` (system `Xvfb`, `STELLA_VERIFY_XVFB`, or one `scripts/fetch-xvfb.sh` unpacks into `~/.cache/stella-verify/xvfb` from the pacman mirror without root) and runs Electron with software GL there, so no window reaches the user's screen and nothing competes with other runs. The run record's `display` says which; `--display host` puts the window on the real `DISPLAY`, and `--display xvfb` fails instead of falling back. Never start an Xvfb by hand with `-displayfd` or on a low display number: on Hyprland it can take over `:0`, the display the user's own X11 apps use. On macOS the window opens on the visible desktop. Read geometry from a fresh observation rather than assuming a size:
 
 ```bash
 node .agents/skills/verify-stella/control-stella.mjs session launch
@@ -49,6 +49,8 @@ Launch signs in a test account by default (`--account signed-in`); pass `--accou
 On macOS, privacy prompts (Speech Recognition, Microphone, Screen Recording) are charged to the app responsible for the process, and a run started from an agent's shell inherits the user's own Stella. Pass `--own-app-identity` for any claim that touches one: the run uses a cached copy of Electron.app named "Stella Verify" (`com.stella.app.verify`, ad-hoc signed, in `~/Library/Caches/stella-verify-identity/`) launched with responsibility disclaimed, so prompts and grants belong to it and never to the user's Stella. A grant survives later runs of the same Electron version; `tccutil reset <Service> com.stella.app.verify` clears it. Answer its prompts through the `UserNotificationCenter` app with computer use.
 
 Pass `--account signed-out` to boot with no account at all: Stella has no guest accounts, so the app shows onboarding (with `--first-run`) or the sign-in screen and nothing that needs an account works until you sign in. Pass `--first-run` to skip seeding onboarding complete, so the window opens on first-run onboarding; combine it with `--account signed-out` to prove a fresh install.
+
+Electron and the test Chromium start with `--mute-audio` so a test copy never plays sound on the user's speakers (message sounds, read-aloud, voice, agent tabs); `--audible` launches with sound for a claim about audio, and relaunch keeps the run's choice.
 
 Launch creates an isolated run under `.agents/skills/verify-stella/.run/<runId>/`, an isolated durable Stella data directory, and a temporary Chromium user-data directory. It seeds onboarding complete (unless `--first-run`), allocates an ephemeral CDP port, and launches Electron from source (`electron <repo> --dev`) with `STELLA_DEV_HARNESS=1` and an allow-listed environment; there is no Vite or other dev server, and main/preload rebuild themselves when stale. Electron output goes to the owned `electron.log`. It preserves protected-storage behavior with a run-scoped key rather than using the developer's keyring; the key is kept in the run directory (`protected-storage.key`, owner-only) so `session relaunch` can still read what the run encrypted, including the device signing key. A launch takes a few seconds; the active conversation id can appear a moment after `session doctor` first passes, so retry `chat ready` once before treating `ready: false` as a failure.
 
@@ -84,6 +86,7 @@ node .agents/skills/verify-stella/control-stella.mjs chat ready
 node .agents/skills/verify-stella/control-stella.mjs chat send --text "list open tasks"
 node .agents/skills/verify-stella/control-stella.mjs nav home
 node .agents/skills/verify-stella/control-stella.mjs nav files
+node .agents/skills/verify-stella/control-stella.mjs nav open --name Schedule
 node .agents/skills/verify-stella/control-stella.mjs settings open
 node .agents/skills/verify-stella/control-stella.mjs settings tab --name "Shortcuts"
 node .agents/skills/verify-stella/control-stella.mjs settings search --query language
@@ -95,15 +98,15 @@ Use lower-level commands when a feature has no named journey:
 
 ```bash
 node .agents/skills/verify-stella/control-stella.mjs inspect components
-node .agents/skills/verify-stella/control-stella.mjs drive click --role button --name "Open panel"
-node .agents/skills/verify-stella/control-stella.mjs drive click --role button --name "New tab"
+node .agents/skills/verify-stella/control-stella.mjs drive click --role button --name "Open" --within .shell-topbar-full
+node .agents/skills/verify-stella/control-stella.mjs drive click --role tab --name "Chat (⌘1)"
 node .agents/skills/verify-stella/control-stella.mjs drive fill --placeholder "Do anything" --value "draft"
 node .agents/skills/verify-stella/control-stella.mjs drive press --key Shift+Enter
 node .agents/skills/verify-stella/control-stella.mjs drive press --key Control+KeyT
 node .agents/skills/verify-stella/control-stella.mjs drive settle
 ```
 
-The desktop is a single-chat product: the full-window top bar carries only the centred Activity mark, the account button (`Account, <plan> plan`; signed out it is a sign-in button plus a `Settings` gear), and `Open panel`. There is no conversation history, conversation tabs, or New chat control; the active conversation comes from the root route (`?c=`). A fresh `session launch` is the way to get an empty conversation. The workspace panel (Open panel, or right-click in chat) has a tab strip (`Sidebar` tablist), `New tab`, `Close panel`, a launcher with Files, Apps, Browser and Updates, and `Run on <target>` / `Models` controls at its foot.
+The desktop is a single-chat product. The full-window top bar (`.shell-topbar-full`) has, left to right: the `Tabs` tablist (the pinned **Chat (⌘1)** tab, then one tab per open place, file or app, each with `Close <title>`), the **Open** (+, ⌘T) button whose menu has `Search anything` and the places Files, Apps, Browser, Schedule, Email, Updates (only in a git-checkout install) and Trash; the centred **Activity** mark (disabled unless a task is running or paused); then **Where Stella works** (computer icon: This computer / Cloud), **Notifications** (bell), **Models**, and the ⚙ **Account** button (its accessible name is the account's nickname or `Account`; signed out it is **Sign in** plus a `Settings` gear). A non-Chat tab shows on the stage, a layer over the chat between the top bar and the composer; the composer stays usable. There is no conversation history or New chat control; the active conversation comes from the root route (`?c=`). A fresh `session launch` is the way to get an empty conversation. See [top bar and tabs](../features/top-bar-and-tabs.md).
 
 Use current observations to choose roles, accessible names, placeholders, or a suitable named journey. Use `drive click-xy` only after a fresh `inspect components` identifies the viewport geometry. Use `inspect eval --js` only when the CLI and feature map lack a safe observable. Never use eval to mutate product state as a substitute for a user path.
 
@@ -135,8 +138,22 @@ node .agents/skills/verify-stella/control-stella.mjs cleanup apply --dry-run
 node .agents/skills/verify-stella/control-stella.mjs cleanup apply
 ```
 
+`cleanup apply` (alias `stop`) is the only way to stop a run; the `session` group has no stop command. It stops the copy's tasks cleanly (they report interrupted).
+
 Cleanup targets only what the run recorded: the Electron PID (its process group), the test Chromium, the run's Xvfb, processes whose command line carries the run's own `stella-verify-<runId>` path (the detached Bun runtime worker, Electron helpers, crashpad), a borrowed Claude login, the verifier pointer, and the temporary Chromium profile. It preserves the isolated durable data and proof artifacts. A stored PID is signalled only while it is still the process the run recorded (same start time, or for older records the run marker or its own arguments), never on the PID alone, and every signal sent or refused is logged with its target's command and reason to `~/.stella/logs/process-kills.log` (`cli/process-safety.mjs`). Do not kill by process name or a broad `pkill -f` pattern; the developer's own Stella shares the `stella-v2` window class, and a pattern that matches your own shell kills it.
 
+
+## Recipes that come up often
+
+- **Renderer edits.** A run serves the renderer from source with no HMR: `session relaunch` loads edits (it re-mints the account, so re-apply a Free plan through `backend-call.mjs` afterwards). `inspect eval --js 'location.reload()'` reloads the full window only; reloading the hidden overlay window leaves voice unmounted until a relaunch.
+- **Window size and theme.** `inspect eval --js 'window.resizeTo(760, 700)'` resizes the test window (check top-bar changes near 760px too: tabs go icon-only and the strip scrolls). Light or dark: set `"stella-color-mode": "light"|"dark"` in the run's `data/ui-state.json`; the app picks it up live.
+- **Real pointer input.** Drags, hovers and native-feeling clicks go through CDP `Input.dispatchMouseEvent` on the run's `cdpPort`. Hover-only controls (Schedule row actions) are invisible to `drive click`; use `drive click-xy` from their rect.
+- **Main process.** Launch or relaunch with `STELLA_VERIFY_INSPECT_MAIN=<port>` for a Node inspector on Electron main; `require` is unavailable in eval there, `process._linkedBinding("electron_browser_app").app` reaches `app`, and evidence of renderer hangs is in the main log (`main.renderer-stall|busy|health|gone`).
+- **After an in-app Update.** The recorded `electronPid` is stale once Update relaunches the app; `session relaunch` then kills the live renderer. Stop the run and launch again (or write the live main PID into the pointer and `run.json` first).
+- **Updates tab in a test copy.** A run from a git checkout lists that checkout's own recent commits under Updates › History, each with **Undo**. Undo there rewrites your working tree; press it only in an `update-bench` sandbox.
+- **Engine edge cases.** `STELLA_CLAUDE_CLI_PATH=/nonexistent/claude` at launch shows "Claude Code not installed"; a Bun other than the bundled one runs when its directory is first on `PATH` at launch (the env allow-list drops `STELLA_BUN_PATH`).
+- **Fixtures for agents.** On Linux the run's `$HOME` is jailed: fixture scripts that a test task runs must use absolute paths outside `~/.stella` (also for `--fake-mic` WAVs). Haiku refuses a bare `sleep 900`; hold a task with a loop that waits for a release file.
+- **Two computers, one account.** Launch two runs with different `STELLA_VERIFY_RUN` names and the same `STELLA_VERIFY_ACCOUNT_EMAIL`. "Allow work from your other devices?" must be allowed on the computer that runs placed work, else sends fall back to the cloud; `backend-call.mjs call devices.setBrainHome '{"deviceId":"…"}'` pins which computer holds the chat. On Linux the second run's recorded `electronPid` is its `bwrap` wrapper; take a computer "off" by stopping that wrapper's own tree.
 
 ## Observation and interaction results
 
@@ -148,10 +165,12 @@ Cleanup targets only what the run recorded: the Electron PID (its process group)
 
 `drive settle` waits for a quiet DOM interval. Mutations inside `svg[aria-hidden="true"]` are ignored because the top-bar Stella mark and working indicator animate continuously; pass `--ignore <CSS>` to exclude another known-decorative region. The result reports how many mutations it ignored.
 
-`apps open`, `nav files`, and `nav browser` open the panel if needed, then use New tab and the launcher, so each call adds a tab. A transient menu or dialog left open (account menu, model picker) hides the launcher and makes these time out; press Escape first.
+`apps open`, `nav files`, `nav browser` and `nav open --name <place>` click the top bar's **Open** (+) button and the place in its menu, then wait until that tab is selected on the stage. Files root, Apps list and Browser allow one empty tab and Schedule, Email and Updates one tab each, so repeating a call reselects the tab. A transient menu or dialog left open (account menu, Models) can cover the + menu; press Escape first.
+
+`inspect state` (and every macro's state) reports `homeOpen` (the empty-conversation Home overlay), `settingsOpen`, `stageOpen` (a non-Chat tab is showing), `activeTab` (the selected top-bar tab's name, null while a dialog makes the bar inert), `selectedTabs` (every visible selected tab, Settings tabs included), the composer, and the active conversation id.
 
 `chat send` uses the Home composer while the chat layer is obscured and observes new messages after the overlay closes. It reports `action: enter-dispatched`, plus `observation: new-user-message`, `new-notice`, or `no-new-evidence`. It compares message IDs and notices in the active conversation against the pre-send state. Timeout returns observations with exit code 2. A new notice is not classified as a provider error; a visible user message does not prove backend acceptance or assistant completion. `responseCompletion` is explicitly `not-assessed`.
 
-`settings open|tab|state|close` return the shell state (`settingsOpen`, `selectedTabs`, composer), not the dialog's contents; `settings search` also returns the result text. Read dialog contents with `inspect observe`, `inspect components`, or a screenshot. Settings has no Stella plan field: the plan is on the top-bar account button (`Account, Pro plan`) and under that menu's **Plan & usage** ("CURRENT PLAN"). Clicking a Settings search result switches to its tab but does not scroll to the section; scroll `.settings-panel`.
+`settings open|tab|state|close` return the shell state (`settingsOpen`, `selectedTabs`, composer), not the dialog's contents; `settings search` also returns the result text. Read dialog contents with `inspect observe`, `inspect components`, or a screenshot. Settings has no Stella plan field and the top-bar Account button shows no plan: read it under the Account menu's **Plan & usage** ("CURRENT PLAN"). Clicking a Settings search result switches to its tab but does not scroll to the section; scroll `.settings-panel`.
 
 `apps open` and `apps state` return bounded surface text with `classification: not-assessed`; the previous inferred `state` field is removed. `chat send` no longer returns the broad page-text `providerErrorVisible` guess. `ok` means the command ran, not that the feature passed. Text redaction is best-effort and screenshots are unredacted; review artifacts before sharing.

@@ -85,15 +85,17 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
         createdAt: arrived.date,
         busy: pending === key,
         busyLabel: arrived.undone ? t("shell.appSource.updating") : t("shell.appSource.updates.undoing"),
-        actions: [
-          {
-            label: arrived.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
-            primary: true,
-            keep: true,
-            disabled: blocked,
-            run: act(key, () => api.undo(arrived.flip)),
-          },
-        ],
+        actions: state.canUndo
+          ? [
+              {
+                label: arrived.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
+                primary: true,
+                keep: true,
+                disabled: blocked,
+                run: act(key, () => api.undo(arrived.flip)),
+              },
+            ]
+          : [],
       });
     }
 

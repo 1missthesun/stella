@@ -104,7 +104,8 @@ const HistoryItem = ({
   now: number;
   pending: boolean;
   blocked: boolean;
-  onUndo: () => void;
+  /** Null where Stella can't undo (a developer's own checkout). */
+  onUndo: (() => void) | null;
 }) => {
   const t = useT();
   const locale = useLocale();
@@ -126,7 +127,7 @@ const HistoryItem = ({
         </div>
         <div className="updates-section__detail">{when}</div>
       </div>
-      {commit.kind === "version" ? null : (
+      {commit.kind === "version" || !onUndo ? null : (
         <div className="updates-section__actions">
           {pending ? (
             <span className="updates-section__status">
@@ -227,7 +228,11 @@ export function UpdatesSection() {
                 now={now}
                 pending={pending === `undo:${commit.sha}`}
                 blocked={blocked}
-                onUndo={() => void run(`undo:${commit.sha}`, () => api.undo(commit.sha))}
+                onUndo={
+                  state.canUndo
+                    ? () => void run(`undo:${commit.sha}`, () => api.undo(commit.sha))
+                    : null
+                }
               />
             ))}
           </ul>

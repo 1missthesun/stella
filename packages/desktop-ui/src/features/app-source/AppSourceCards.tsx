@@ -216,11 +216,15 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
       }
       busy={pending}
       disabled={blocked}
-      action={{
-        label: commit.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
-        primary: commit.undone,
-        onClick: () => void run(agentId, () => api.undo(commit.sha)),
-      }}
+      action={
+        state.canUndo
+          ? {
+              label: commit.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
+              primary: commit.undone,
+              onClick: () => void run(agentId, () => api.undo(commit.sha)),
+            }
+          : null
+      }
     />
   );
 });

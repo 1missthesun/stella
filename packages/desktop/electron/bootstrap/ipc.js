@@ -439,6 +439,10 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         state.processRuntime.registerCleanup("before-quit", "update-hold", () => updateTransition.finishHold());
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
+            // A developer running Stella from their own checkout has no
+            // launcher; undoing there would rewrite their working tree.
+            // STELLA_APP_SOURCE_UNDO=1 lets a test sandbox stand in for an install.
+            undoAllowed: isLauncherPresent() || process.env.STELLA_APP_SOURCE_UNDO === "1",
             broadcast: (next) => {
                 if (next.waiting.some((offer) => offer.kind === "draft" && !offer.stale) ||
                     next.remote.status === "ahead" ||

@@ -93,6 +93,11 @@ import {
 
 type AppSourceServiceOptions = {
   stellaAppDir: string;
+  /**
+   * Undo is allowed: Stella runs as an install (under its launcher), or a
+   * test sandbox stands in for one. A developer's own checkout never undoes.
+   */
+  undoAllowed: boolean;
   broadcast: (state: AppSourceState) => void;
   isAnyWindowVisible: () => boolean;
   requestRuntimeRestart: () => void;
@@ -210,6 +215,7 @@ const EMPTY_STATE: AppSourceState = {
   remote: { status: "none", count: 0 },
   upstream: NO_UPSTREAM,
   recent: [],
+  canUndo: false,
   waiting: [],
   skipped: [],
   busy: false,
@@ -576,6 +582,12 @@ export class AppSourceService {
 
   undo(sha: string) {
     return this.exclusive(async (cwd) => {
+      if (!this.options.undoAllowed) {
+        throw new PlainFailure(
+          "unavailable",
+          "Stella runs from a developer checkout here; undoing would rewrite its working tree.",
+        );
+      }
       if (!/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha)) {
         throw new PlainFailure("gone", "Unknown change.");
       }
@@ -1580,6 +1592,7 @@ export class AppSourceService {
         : { status: "none", count: 0 },
       upstream: upstream ?? NO_UPSTREAM,
       recent,
+      canUndo: this.options.undoAllowed,
       ...(this.notShared ? { notShared: this.notShared } : {}),
       waiting: offered.filter((offer) => offer.adding || !skipped.has(offer.key)),
       skipped: offered.filter((offer) => !offer.adding && skipped.has(offer.key)),

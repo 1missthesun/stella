@@ -3,7 +3,7 @@ export const END_TURN_WAITING_TOOL = "end_turn_waiting";
 export const WAITING_FOR_MAX_CHARS = 200;
 
 export const END_TURN_WAITING_DESCRIPTION =
-  "End this turn waiting instead of reporting: you keep your task, no report goes to whoever started you, and nobody is woken. Use it only when your assignment is not done and can't move until something arrives (a go-ahead, another task's work, an upload, a set time); a message, a helper's report or a scheduled fire resumes you as usual. Call it as your last step, then end the turn with one short line. When the work is done or failed, or you need your starter, end your turn with your report instead.";
+  "End this turn waiting instead of reporting: you keep your task, no report goes to whoever started you, and nobody is woken. Use it whenever your assignment is not done and is waiting on something still going (an agent you started, a background command or monitor that tells you when it ends, another task, a go-ahead, an upload, a set time); a message, a helper's report, a finished command or a scheduled fire resumes you as usual. Call it as your last step, then end the turn with one short line. When the work is done or failed, or you need your starter, end your turn with your report instead.";
 
 export const END_TURN_WAITING_PARAMETERS = {
   type: "object",

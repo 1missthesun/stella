@@ -10,6 +10,8 @@ xcodebuildmcp_version="${STELLA_XCODEBUILDMCP_VERSION:-2.7.0}"
 system_path="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 mac_repo="${STELLA_IOS_MAC_REPO:-$repo_root}"
 mac_path="$HOME/.bun/bin:$system_path"
+sim_profile_source="$skill_dir/scripts/ios-sim-profile.json"
+max_booted="${STELLA_IOS_MAX_BOOTED:-4}"
 
 usage() {
   cat <<'EOF'
@@ -24,7 +26,8 @@ Commands:
   stage
   source
   clean-source
-  boot [udid]
+  boot [udid] [--except <categories>] [--stock]
+                      slims the device with simslim (ios-sim-profile.json) before booting it
   build [--no-bundler] [--metro-only] [--port <port>]
   sign-in [--plan pro|plus|max|free] [--email <name>@test.stella.local]
   info
@@ -173,6 +176,11 @@ else
   printf 'repo_clean=yes\n'
 fi
 printf 'available_iphones=%s\n' "$device_count"
+if command -v simslim >/dev/null; then
+  printf 'simslim=%s\n' "$(simslim --version | awk '{ print $NF }')"
+else
+  printf 'simslim=missing (brew install mobai-app/tap/simslim)\n'
+fi
 if test "$(/usr/bin/osascript -e 'tell application "System Events" to get UI elements enabled' 2>/dev/null || true)" = true \
   && test -x /opt/homebrew/bin/cliclick; then
   printf 'screen_input=yes\n'
@@ -268,44 +276,122 @@ REMOTE
     printf 'Removed staged source %s\n' "$remote_source"
     ;;
   boot)
-    requested_udid="${1:-}"
-    if [[ -n "$requested_udid" ]]; then
-      validate_udid "$requested_udid"
-    fi
+    requested_udid=""
+    sim_stock="${STELLA_IOS_SIM_STOCK:-0}"
+    sim_except="${STELLA_IOS_SIM_EXCEPT:-}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --stock) sim_stock=1 ;;
+        --except)
+          sim_except="${2:-}"
+          [[ "$sim_except" =~ ^[a-z,-]+$ ]] || {
+            printf '--except takes comma-separated simslim category ids (see `simslim profiles`)\n' >&2
+            exit 2
+          }
+          shift
+          ;;
+        -*)
+          printf 'Unknown boot option: %s\n' "$1" >&2
+          exit 2
+          ;;
+        *)
+          validate_udid "$1"
+          requested_udid="$1"
+          ;;
+      esac
+      shift
+    done
     mkdir -p "$run_dir"
-    boot_result="$(run_zsh "$requested_udid" "${STELLA_IOS_ALLOW_SECOND_SIM:-0}" <<'REMOTE'
+    # Every simulator this helper boots is slimmed with simslim first (see
+    # features/ios.md, "Slim simulators"): the repo profile plus any --except
+    # categories, or stock with --stock.
+    slim_profile=""
+    if [[ "$sim_stock" != "1" ]]; then
+      slim_profile="$run_dir/ios-sim-profile.json"
+      node -e '
+        const fs = require("fs");
+        const [src, dest, extra] = process.argv.slice(1);
+        const profile = JSON.parse(fs.readFileSync(src, "utf8"));
+        const more = extra.split(",").filter(Boolean);
+        if (more.length) {
+          profile.name = `${profile.name}+${more.join("+")}`;
+          profile.except = [...new Set([...(profile.except ?? []), ...more])];
+        }
+        fs.writeFileSync(dest, JSON.stringify(profile, null, 2) + "\n");
+      ' "$sim_profile_source" "$slim_profile" "$sim_except"
+    fi
+    boot_result="$(run_zsh "$requested_udid" "$max_booted" "$slim_profile" <<'REMOTE'
 set -eu
 udid="$1"
+max_booted="$2"
+profile="$3"
 if test -z "$udid"; then
   udid="$(/usr/bin/xcrun simctl list devices available | /usr/bin/awk -F '[()]' '/iPhone/ && !/iPhone Air/ { print $2; exit }')"
 fi
 test -n "$udid"
+if test -n "$profile" && ! command -v simslim >/dev/null; then
+  printf 'simslim is not installed, and every simulator this helper boots is slimmed first. Install it with `brew install mobai-app/tap/simslim`, or pass --stock for a check that needs a stock simulator.\n' >&2
+  exit 3
+fi
 if /usr/bin/xcrun simctl list devices booted | /usr/bin/grep -Fq "$udid"; then
   started=0
+  if test -n "$profile"; then
+    # Never reboot a device that is already up: it may be another run.
+    if simslim verify "$udid" --profile "$profile" >/dev/null 2>&1; then
+      slim="$(/usr/bin/sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' "$profile")"
+    else
+      slim=drift
+      printf 'Device %s was already booted and is not in the slim profile; it was left as is. Shut it down and boot it again through this helper to slim it.\n' "$udid" >&2
+    fi
+  else
+    slim=unchanged
+  fi
 else
-  others="$(/usr/bin/xcrun simctl list devices booted | /usr/bin/grep -E '\(Booted\)' | /usr/bin/sed -E 's/^ *//' || true)"
-  if test -n "$others" && test "$2" != "1"; then
-    printf 'Refusing to boot a second simulator; this Mac runs one at a time. Booted now:\n%s\nUse that device if it is yours (boot <udid>), wait for its owner, or ask. STELLA_IOS_ALLOW_SECOND_SIM=1 overrides.\n' "$others" >&2
+  # Agents boot stock-named devices (iPhone …, iPad …); custom-named ones
+  # (for example the Muse devices) belong to the user and do not count.
+  booted="$(/usr/bin/xcrun simctl list devices booted | /usr/bin/grep -E '\(Booted\)' | /usr/bin/sed -E 's/^ *//' || true)"
+  count="$(printf '%s\n' "$booted" | /usr/bin/grep -cE '^(iPhone|iPad)' || true)"
+  if test "$count" -ge "$max_booted"; then
+    printf 'Refusing to boot: %s agent simulators are already booted and this Mac runs at most %s slim ones at once. Booted now:\n%s\nUse one of those if it is yours (boot <udid>), wait for its owner, or ask. STELLA_IOS_MAX_BOOTED overrides the cap.\n' "$count" "$max_booted" "$booted" >&2
     exit 3
+  fi
+  if test -z "$profile" && test "$count" -ge 2; then
+    printf 'Refusing a --stock boot with %s agent simulators already up: a stock simulator costs about three slim ones. Wait for one to shut down, or ask.\n' "$count" >&2
+    exit 3
+  fi
+  if test -n "$profile"; then
+    # Writes the profile launchd disable overrides while the device is off
+    # (no-op when they already match), so its first boot starts none of them.
+    simslim on "$udid" --profile "$profile" --preserve-boot-state >&2
+    slim="$(/usr/bin/sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' "$profile")"
+  else
+    # --stock: clear any slim overrides (no-op on a stock device). The next
+    # ordinary boot through this helper slims it again.
+    if command -v simslim >/dev/null; then
+      simslim off "$udid" --preserve-boot-state >&2
+    fi
+    slim=stock
   fi
   /usr/bin/xcrun simctl boot "$udid"
   started=1
 fi
 /usr/bin/xcrun simctl bootstatus "$udid" -b >&2
 /usr/bin/open -a Simulator --args -CurrentDeviceUDID "$udid"
-printf '%s|%s\n' "$udid" "$started"
+printf '%s|%s|%s\n' "$udid" "$started" "$slim"
 REMOTE
 )"
     boot_udid="${boot_result%%|*}"
-    boot_started="${boot_result##*|}"
+    boot_rest="${boot_result#*|}"
+    boot_started="${boot_rest%%|*}"
+    boot_slim="${boot_rest#*|}"
     validate_udid "$boot_udid"
     if [[ "$boot_started" == "0" && -f "$sim_state" ]] \
       && [[ "$(read_state_value "$sim_state" UDID)" == "$boot_udid" ]] \
       && [[ "$(read_state_value "$sim_state" STARTED)" == "1" ]]; then
       boot_started=1
     fi
-    printf 'UDID=%s\nSTARTED=%s\n' "$boot_udid" "$boot_started" >"$sim_state"
-    printf 'udid=%s\nstarted_by_helper=%s\n' "$boot_udid" "$boot_started"
+    printf 'UDID=%s\nSTARTED=%s\nSLIM=%s\n' "$boot_udid" "$boot_started" "$boot_slim" >"$sim_state"
+    printf 'udid=%s\nstarted_by_helper=%s\nslim=%s\n' "$boot_udid" "$boot_started" "$boot_slim"
     ;;
   build)
     no_bundler=""

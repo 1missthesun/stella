@@ -1,0 +1,6 @@
+{
+  "name": "stella",
+  "description": "Stella iOS verification: every simslim category off except the daemons the app uses in Simulator (photo library, Files recents, Sign in with Apple). See features/ios.md, Slim simulators.",
+  "except": [],
+  "keep": ["com.apple.assetsd", "com.apple.searchd", "com.apple.akd"]
+}

@@ -7,6 +7,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -845,6 +846,9 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
       );
     }
   }
+  // Test copies never play sound on the user's speakers (message sounds,
+  // read-aloud, voice) unless the claim is about audio (`--audible`).
+  if (!run.audible) electronArgs.push("--mute-audio");
   if (fakeMic) {
     electronArgs.push(
       "--use-fake-device-for-media-stream",
@@ -986,7 +990,49 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
   }
 };
 
+// The installed Stella's checkout (and any worktree of it) is never a test
+// copy: worktrees share refs, so a test copy's sync rewrote an install's
+// update refs with dev-backend history and broke its Update (2026-11-13).
+const installedAppDirs = () =>
+  [
+    process.env.STELLA_APP_DIR,
+    path.join(os.homedir(), ".local/share/stella/app"),
+    path.join(os.homedir(), "Library/Application Support/Stella/app"),
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Stella", "app") : null,
+  ].filter((dir) => dir && existsSync(dir));
+
+const gitCommonDir = (dir) => {
+  const result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return null;
+  try {
+    return realpathSync(result.stdout.trim());
+  } catch {
+    return null;
+  }
+};
+
+const refuseInstalledAppCheckout = () => {
+  const ours = gitCommonDir(repoRoot);
+  if (!ours) return;
+  for (const dir of installedAppDirs()) {
+    if (gitCommonDir(dir) !== ours) continue;
+    fail(
+      `This checkout shares its git data with the installed Stella at ${dir} (it is that checkout or a worktree of it). A test copy here would rewrite the installed app's update refs.`,
+      1,
+      {
+        errorCode: "INSTALLED_APP_CHECKOUT",
+        recovery: "Run from the stella-v2 clone (or a worktree of it), or a separate `git clone`.",
+        retryable: false,
+      },
+    );
+  }
+};
+
 const cmdLaunch = async (options) => {
+  refuseInstalledAppCheckout();
   await sweepAbandonedRuns();
   const existing = currentRun();
   if (
@@ -1084,6 +1130,7 @@ const cmdLaunch = async (options) => {
     modelGateway,
     fakeMic,
     ownIdentity: Boolean(options["own-app-identity"]) && process.platform === "darwin",
+    audible: Boolean(options.audible),
     displayMode: displayMode === "host" ? "host" : "xvfb",
     display: null,
     browserExtension: null,
@@ -1149,6 +1196,7 @@ const startRunTestBrowser = async (run) => {
     extension: run.browserExtension,
     display: run.display?.display ?? null,
     softwareGl: run.display?.mode === "xvfb" || linuxSoftwareGl(),
+    muted: !run.audible,
   });
   run.browserExtension = { ...run.browserExtension, chromiumPid: browser.pid, chromiumIdentity: browser.identity, chromium: browser.chromium };
   writeJson(POINTER_PATH, run);
@@ -1199,6 +1247,7 @@ const teardownRun = async (run) => {
 };
 
 const cmdRelaunch = async () => {
+  refuseInstalledAppCheckout();
   const run = currentRun();
   if (!run)
     fail("No verification instance is recorded.", 1, {
@@ -1607,7 +1656,11 @@ const SHELL_STATE_JS = `(() => {
     activeConversationId: chatColumn?.getAttribute("data-conversation-id") || chatSurface?.getAttribute("data-conversation-id") || null,
     homeOpen: Boolean(document.querySelector(".full-body-home-overlay")),
     settingsOpen: Boolean([...document.querySelectorAll('[role="dialog"]')].find((el) => visible(el) && (el.textContent || "").includes("Settings"))),
-    panelOpen: document.querySelector(".display-panel-topbar")?.getAttribute("data-display-open") === "true",
+    stageOpen: document.querySelector(".workspace-stage")?.getAttribute("data-visible") === "true",
+    activeTab: (() => {
+      const tab = [...document.querySelectorAll('[role="tablist"][aria-label="Tabs"] [role="tab"][aria-selected="true"]')].find(visible);
+      return tab ? (tab.getAttribute("aria-label") || tab.textContent || "").trim() || null : null;
+    })(),
     composer: composer ? { visible: true, enabled: !composer.disabled, empty: composer.value.length === 0 } : { visible: false, enabled: false, empty: true },
     selectedTabs,
   };
@@ -1702,18 +1755,16 @@ const cmdChatState = async () => {
   emitSuccess("chat.state", await readShellState(run), run, startedAt);
 };
 
+// Places open from the top bar's + menu ("Open", ⌘T), each as its own tab on
+// the stage over the chat. Picking a place that allows one tab activates it.
 const openLauncherDestination = async (run, name) => {
-  if (!(await readShellState(run)).panelOpen) {
-    await clickQuery(run, { role: "button", name: "Open panel" });
-    await waitForState(run, (state) => state.panelOpen);
+  const placeShowing = await waitQuery(run, { role: "button", name, within: ".new-tab-menu" }, 500).then(() => true, () => false);
+  if (!placeShowing) {
+    await clickQuery(run, { role: "button", name: "Open", within: ".shell-topbar-full" });
+    await waitQuery(run, { role: "button", name, within: ".new-tab-menu" });
   }
-  const launcherShowing = await waitQuery(run, { role: "button", name }, 1_500).then(() => true, () => false);
-  if (!launcherShowing) {
-    await clickQuery(run, { role: "button", name: "New tab" });
-    await waitQuery(run, { role: "button", name });
-  }
-  await clickQuery(run, { role: "button", name });
-  return waitForState(run, (state) => state.selectedTabs.includes(name));
+  await clickQuery(run, { role: "button", name, within: ".new-tab-menu" });
+  return waitForState(run, (state) => state.stageOpen && state.activeTab === name);
 };
 
 const cmdNavHome = async () => {
@@ -1739,7 +1790,8 @@ const cmdNavDestination = async (command, name) => {
 const ensureSettingsOpen = async (run) => {
   let state = await readShellState(run);
   if (!state.settingsOpen) {
-    await clickQuery(run, { selector: 'button[aria-label="Settings"], button[aria-label^="Account,"]' });
+    // Signed in: the ⚙ Account button; signed out: the Settings gear.
+    await clickQuery(run, { selector: 'button.shell-topbar-account-trigger, .shell-topbar-full button[aria-label="Settings"]' });
     await waitQuery(run, { role: "menuitem", name: "Settings" });
     await clickQuery(run, { role: "menuitem", name: "Settings" });
     await waitQuery(run, { role: "tab", name: "General" });
@@ -2436,6 +2488,12 @@ try {
     case "nav-browser":
       await cmdNavDestination("nav.browser", "Browser");
       break;
+    case "nav-open": {
+      const place = options.name ?? positionals.join(" ");
+      if (!place) fail("nav open requires --name <place> (Files, Apps, Browser, Schedule, Email, Updates, Trash).");
+      await cmdNavDestination("nav.open", place);
+      break;
+    }
     case "settings-open":
       await cmdSettingsOpen();
       break;

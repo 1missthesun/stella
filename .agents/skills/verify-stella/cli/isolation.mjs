@@ -237,7 +237,7 @@ export const prepareTestExtension = ({ runDir, socketDir, extPort }) => {
   return { extensionDir, profileDir, extensionId: id, extPort, socketDir };
 };
 
-export const startTestBrowser = async ({ runDir, extension, display, softwareGl }) => {
+export const startTestBrowser = async ({ runDir, extension, display, softwareGl, muted = true }) => {
   const chromium = resolveChromium();
   if (!chromium) {
     throw new Error(
@@ -254,6 +254,7 @@ export const startTestBrowser = async ({ runDir, extension, display, softwareGl 
     "--password-store=basic",
     "--use-mock-keychain",
     "--remote-debugging-port=0",
+    ...(muted ? ["--mute-audio"] : []),
     ...(process.platform === "linux" ? ["--ozone-platform=x11"] : []),
     ...(softwareGl ? ["--disable-gpu"] : []),
     "about:blank",

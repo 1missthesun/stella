@@ -20,6 +20,9 @@ export const runHostEffect = async <A>(
   throw Cause.squash(exit.cause);
 };
 
+export const sleepMs = (ms: number): Promise<void> =>
+  hostRuntime.runPromise(Effect.sleep(ms));
+
 export type HostTimerHandle = {
   readonly cancel: () => void;
 };

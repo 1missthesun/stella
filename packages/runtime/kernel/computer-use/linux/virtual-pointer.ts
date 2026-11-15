@@ -1,5 +1,6 @@
 import net from "node:net";
 import path from "node:path";
+import { forkCancelableTimeout } from "../effect-runtime.js";
 
 /**
  * A minimal Wayland client for zwlr_virtual_pointer_v1: real pointer input
@@ -108,16 +109,16 @@ export class WaylandVirtualPointer {
   roundtrip(): Promise<void> {
     const id = this.allocate();
     return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const cancelTimeout = forkCancelableTimeout(TIMEOUT_MS, () => {
         this.callbacks.delete(id);
         reject(
           new Error(
             "The compositor did not answer the virtual pointer in time.",
           ),
         );
-      }, TIMEOUT_MS);
+      });
       this.callbacks.set(id, () => {
-        clearTimeout(timer);
+        cancelTimeout();
         if (this.error) reject(this.error);
         else resolve();
       });

@@ -11,7 +11,7 @@ import {
   HeadTailOutputBuffer,
   RAW_SHELL_OUTPUT_MAX_BYTES,
 } from "../head-tail-output-buffer.js";
-import { runToolEffect } from "../effect-runtime.js";
+import { forkAbortTimer, runToolEffect } from "../effect-runtime.js";
 import { acquireAbortLatch } from "../../agent-core/abort-bridge.js";
 import { watchChildStdio } from "../../shared/child-stdio.js";
 import { sanitizeToolVisibleText } from "../safety.js";
@@ -648,16 +648,12 @@ export const startShell = (
     onActivity?.(record, delta);
   };
 
-  const lifetime = setTimeout(() => {
-    if (!record.running) return;
-    append(SHELL_LIFETIME_REACHED, true);
-    void record.kill();
-  }, SHELL_MAX_LIFETIME_MS);
-  lifetime.unref?.();
+  // Armed once the shell has started (a launch that fails never runs).
+  let cancelLifetime = () => {};
 
   const finish = (exitCode: number | null) => {
     if (!record.running) return;
-    clearTimeout(lifetime);
+    cancelLifetime();
     record.running = false;
     record.exitCode = exitCode;
     record.completedAt = Date.now();
@@ -810,6 +806,13 @@ export const startShell = (
     child.on("close", (code) => finish(code ?? null));
   }
 
+  if (record.running) {
+    cancelLifetime = forkAbortTimer(SHELL_MAX_LIFETIME_MS, () => {
+      if (!record.running) return;
+      append(SHELL_LIFETIME_REACHED, true);
+      void record.kill();
+    });
+  }
   state.shells.set(id, record);
   return record;
 };

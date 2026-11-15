@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import { promises as fsPromises } from "fs";
 import path from "path";
+import { Effect } from "effect";
 
 const PRIVATE_DIR_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -130,7 +131,7 @@ const renameReplacing = async (from: string, to: string) => {
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | null)?.code ?? "";
       if (attempt >= RENAME_ATTEMPTS || !RENAME_RETRY_CODES.has(code)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_MS * attempt));
+      await Effect.runPromise(Effect.sleep(RENAME_RETRY_MS * attempt));
     }
   }
 };

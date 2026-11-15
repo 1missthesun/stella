@@ -12,6 +12,9 @@ export const runComputerUseEffect = async <A>(
   throw Cause.squash(exit.cause);
 };
 
+export const sleepMs = (ms: number): Promise<void> =>
+  computerUseRuntime.runPromise(Effect.sleep(ms));
+
 export const forkCancelableTimeout = (
   timeoutMs: number,
   onTimeout: () => void,

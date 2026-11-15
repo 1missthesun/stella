@@ -193,9 +193,9 @@
       "ceiling": 52.92
     },
     "turn.tool.sqlStatements.p50": {
-      "value": 318,
+      "value": 336,
       "kind": "count",
-      "ceiling": 335.9
+      "ceiling": 354.8
     },
     "turn.tool.writeStatements.p50": {
       "value": 91,

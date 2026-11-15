@@ -1,5 +1,6 @@
 import net from "node:net";
 import os from "node:os";
+import { forkCancelableTimeout } from "../effect-runtime.js";
 
 /**
  * A small D-Bus client for the session and accessibility buses: EXTERNAL
@@ -415,7 +416,7 @@ export type DBusCall = Readonly<{
 type Pending = {
   resolve: (value: unknown[]) => void;
   reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
+  cancelTimeout: () => void;
   member: string;
 };
 
@@ -551,11 +552,16 @@ export class DBusConnection {
     const message = Buffer.concat([header.bytes(), body.bytes()]);
     const timeoutMs = call.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
     return new Promise<unknown[]>((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const cancelTimeout = forkCancelableTimeout(timeoutMs, () => {
         this.pending.delete(serial);
         reject(new DBusTimeoutError(call.member, timeoutMs));
-      }, timeoutMs);
-      this.pending.set(serial, { resolve, reject, timer, member: call.member });
+      });
+      this.pending.set(serial, {
+        resolve,
+        reject,
+        cancelTimeout,
+        member: call.member,
+      });
       this.socket.write(message);
     });
   }
@@ -563,7 +569,7 @@ export class DBusConnection {
   private failAll(error: Error) {
     if (!this.closedError) this.closedError = error;
     for (const [serial, pending] of this.pending) {
-      clearTimeout(pending.timer);
+      pending.cancelTimeout();
       pending.reject(error);
       this.pending.delete(serial);
     }
@@ -609,7 +615,7 @@ export class DBusConnection {
     const pending = this.pending.get(replySerial);
     if (!pending) return;
     this.pending.delete(replySerial);
-    clearTimeout(pending.timer);
+    pending.cancelTimeout();
     try {
       const bodyReader = new Reader(message, bodyStart);
       const values = signature

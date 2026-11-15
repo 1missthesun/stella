@@ -2795,6 +2795,8 @@ export class NodeReplKernelRegistry {
   ) => BrowserSessionClient;
   private lastOwnerLeaseIssuedAt = Date.now();
   private sweeping = false;
+  private cancelTaskTabSweep?: () => void;
+  private taskTabSweepStopped = false;
 
   constructor(private readonly options: NodeReplKernelManagerOptions = {}) {
     this.evalTimeoutMs = options.evalTimeoutMs ?? DEFAULT_EVAL_TIMEOUT_MS;
@@ -2818,10 +2820,19 @@ export class NodeReplKernelRegistry {
     this.browserSessionFactory =
       options.browserSessionFactory ?? createBrowserSession;
     if (options.taskTabs) {
-      const sweep = () => void this.sweepTaskTabs();
-      setTimeout(sweep, TASK_TABS_FIRST_SWEEP_DELAY_MS).unref?.();
-      setInterval(sweep, TASK_TABS_SWEEP_INTERVAL_MS).unref?.();
+      this.scheduleTaskTabSweep(TASK_TABS_FIRST_SWEEP_DELAY_MS);
     }
+  }
+
+  /** Sweeps once after `delayMs`, then every interval until dispose. */
+  private scheduleTaskTabSweep(delayMs: number): void {
+    if (this.taskTabSweepStopped) return;
+    this.cancelTaskTabSweep = forkCancelableTimeout(delayMs, () => {
+      this.cancelTaskTabSweep = undefined;
+      void this.sweepTaskTabs().finally(() =>
+        this.scheduleTaskTabSweep(TASK_TABS_SWEEP_INTERVAL_MS),
+      );
+    });
   }
 
   browserTaskStarted(agentId: string): void {
@@ -3282,6 +3293,9 @@ export class NodeReplKernelRegistry {
     this.cellCleanupEpoch += 1;
     this.cancelCellCleanup?.();
     this.cancelCellCleanup = undefined;
+    this.taskTabSweepStopped = true;
+    this.cancelTaskTabSweep?.();
+    this.cancelTaskTabSweep = undefined;
     const pending: Promise<void>[] = [];
     for (const [id, kernel] of [...this.kernels]) {
       pending.push(this.disposeKernel(id, kernel));

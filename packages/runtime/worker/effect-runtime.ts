@@ -7,6 +7,9 @@ import {
 
 export const workerRuntime = ManagedRuntime.make(Layer.empty);
 
+export const sleepMs = (ms: number): Promise<void> =>
+  workerRuntime.runPromise(Effect.sleep(ms));
+
 export type WorkerTimerHandle = {
   readonly cancel: () => void;
 };

@@ -59,6 +59,7 @@ import {
   forkDelayed,
   forkInterval,
   type HostTimerHandle,
+  sleepMs,
 } from "./effect-runtime.js";
 
 const CLAIM_RESPONSE_TIMEOUT_MS = DISPATCH_OFFER_WINDOW_MS + 1_000;
@@ -2150,7 +2151,7 @@ export class ExecutionPlacementBridge {
           `Execution placement task ${row.dispatchId} lost its local run (attempt ${attempt}, ${Math.round(elapsed / 1000)}s since the first); resuming it in ${Math.round(wait / 1000)}s.`,
           error,
         );
-        await new Promise((resolve) => setTimeout(resolve, wait));
+        await sleepMs(wait);
         if (!this.isLiveEpoch(epoch)) return null;
       }
     }

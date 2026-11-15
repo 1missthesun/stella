@@ -57,6 +57,45 @@ const walk = async (directory) => {
   return files;
 };
 
+/**
+ * The code on a line outside template literals, which hold source that
+ * runs elsewhere (a script evaluated in a browser page) or plain text, not
+ * code this package runs. Quote strings and trailing `//` comments are
+ * walked so their backticks don't open a template. `${…}` inside a
+ * template counts as part of it.
+ */
+const codeOutsideTemplates = (line, inTemplate) => {
+  let code = "";
+  let quote = null;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (inTemplate) {
+      if (char === "\\") index += 1;
+      else if (char === "`") inTemplate = false;
+      continue;
+    }
+    if (quote) {
+      if (char === "\\") {
+        code += char + (line[index + 1] ?? "");
+        index += 1;
+        continue;
+      }
+      if (char === quote) quote = null;
+      code += char;
+      continue;
+    }
+    if (char === "`") {
+      inTemplate = true;
+      code += " ";
+      continue;
+    }
+    if (char === "/" && line[index + 1] === "/") break;
+    if (char === '"' || char === "'") quote = char;
+    code += char;
+  }
+  return { code, inTemplate };
+};
+
 const effectBearingTargets = [
   { segments: ["packages", "runtime"], keyPrefix: "" },
   {
@@ -79,17 +118,21 @@ export const scanEffectRatchetTargets = async (repoRoot) => {
       const allowlistKey = `${target.keyPrefix}${relativeFile}`;
       const lines = text.split("\n");
       let entry = null;
+      let inTemplate = false;
       for (let index = 0; index < lines.length; index += 1) {
         const trimmed = lines[index].trim();
         if (
-          trimmed.startsWith("//") ||
-          trimmed.startsWith("*") ||
-          trimmed.startsWith("/*")
+          !inTemplate &&
+          (trimmed.startsWith("//") ||
+            trimmed.startsWith("*") ||
+            trimmed.startsWith("/*"))
         ) {
           continue;
         }
+        const scanned = codeOutsideTemplates(lines[index], inTemplate);
+        inTemplate = scanned.inTemplate;
         for (const pattern of bannedPatterns) {
-          const matches = lines[index].match(pattern.regex);
+          const matches = scanned.code.match(pattern.regex);
           if (!matches) continue;
           if (!entry) {
             entry = { total: 0, byPattern: new Map(), lines: [] };

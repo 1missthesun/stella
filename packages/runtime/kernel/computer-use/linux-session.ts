@@ -58,6 +58,7 @@ import {
   type LinuxWindow,
 } from "./linux/desktop.js";
 import { HyprlandDesktop } from "./linux/hyprland.js";
+import { forkCancelableTimeout, sleepMs } from "./effect-runtime.js";
 
 /**
  * Computer use on Linux. Background by default, like macOS and Windows:
@@ -1349,7 +1350,7 @@ export const createLinuxComputerUseSession = (
               (await atspi.extents(anchor.ref).catch(() => null)) ?? before;
             moved = vertical ? before.y - after.y : before.x - after.x;
             if (Math.abs(moved) > 1) break;
-            await new Promise((resolve) => setTimeout(resolve, 30));
+            await sleepMs(30);
           } while (Date.now() < deadline);
           if (Math.abs(moved) > 1) {
             return {
@@ -1508,7 +1509,7 @@ export const createLinuxComputerUseSession = (
       result = await run(desktop);
     } finally {
       // Give the app a moment to take the input before focus moves away.
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      await sleepMs(60);
       await desktop.foreground.restore(before).catch(() => undefined);
     }
     const [windowNow, pointerNow] = await Promise.all([
@@ -1991,7 +1992,7 @@ export const createLinuxComputerUseSession = (
     target: LinuxWindow,
   ): Promise<string | null> => {
     for (const delay of [0, 30]) {
-      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+      if (delay) await sleepMs(delay);
       const now = await desktop.focusedWindowId().catch(() => before.windowId);
       if (now === target.id && before.windowId !== target.id) {
         await desktop.foreground.restore(before).catch(() => undefined);
@@ -2060,14 +2061,14 @@ export const createLinuxComputerUseSession = (
       Date.now() < changeDeadline &&
       stateIdOf(current) === recent.stateId
     ) {
-      await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
+      await sleepMs(SETTLE_POLL_MS);
       current = await readSnapshot(sessionId, target, "never");
       reread = true;
     }
     if (stateIdOf(current) !== recent.stateId) {
       const stableDeadline = Date.now() + SETTLE_STABLE_MAX_MS;
       while (Date.now() < stableDeadline) {
-        await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
+        await sleepMs(SETTLE_POLL_MS);
         const next = await readSnapshot(sessionId, target, "never");
         reread = true;
         const same = stateIdOf(next) === stateIdOf(current);
@@ -2250,9 +2251,7 @@ export const createLinuxComputerUseSession = (
         }
         const remaining = request.timeoutMs - (Date.now() - started);
         if (remaining > 0)
-          await new Promise((resolve) =>
-            setTimeout(resolve, Math.min(150, remaining)),
-          );
+          await sleepMs(Math.min(150, remaining));
       }
       throw new LinuxWaitTimeoutError(
         request.timeoutMs,
@@ -2300,7 +2299,7 @@ export const createLinuxComputerUseSession = (
         if (base) {
           const deadline = Date.now() + SETTLE_CHANGE_MS;
           while (Date.now() < deadline) {
-            await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
+            await sleepMs(SETTLE_POLL_MS);
             if (
               stateIdOf(
                 await readSnapshot(sessionId, command.target, "never"),
@@ -2340,24 +2339,22 @@ export const createLinuxComputerUseSession = (
               typedRequest.type === "wait_for_change"
                 ? typedRequest.timeoutMs + 15_000
                 : 30_000;
-            let timer: ReturnType<typeof setTimeout> | undefined;
+            let cancelTimeout: (() => void) | undefined;
             try {
               return await Promise.race([
                 handle(typedRequest, signal),
                 new Promise<never>((_, reject) => {
-                  timer = setTimeout(
-                    () =>
-                      reject(
-                        new Error(
-                          `The app or the desktop did not answer within ${Math.round(limitMs / 1000)} s; it may be busy or hung. Observe again, or tell the user the app is not responding.`,
-                        ),
+                  cancelTimeout = forkCancelableTimeout(limitMs, () =>
+                    reject(
+                      new Error(
+                        `The app or the desktop did not answer within ${Math.round(limitMs / 1000)} s; it may be busy or hung. Observe again, or tell the user the app is not responding.`,
                       ),
-                    limitMs,
+                    ),
                   );
                 }),
               ]);
             } finally {
-              clearTimeout(timer);
+              cancelTimeout?.();
             }
           } catch (error) {
             const aborted =

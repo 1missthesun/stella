@@ -28,6 +28,7 @@ import {
   type PlacementLocalExecutionKind,
 } from "../../kernel/runner/execution-placement-local-ownership.js";
 import type { PiReportDelivery } from "../../kernel/runner/types.js";
+import { forkDelayed, sleepMs } from "../effect-runtime.js";
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
@@ -662,7 +663,7 @@ const SIGN_IN_WAIT_MS = 10 * 60_000;
 const signedIn = async (session: OpenSession, maxMs: number): Promise<void> => {
   const until = Date.now() + maxMs;
   while (!session.runnerCell.get()?.getStellaSiteAuth() && Date.now() < until) {
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await sleepMs(2_000);
   }
 };
 
@@ -711,9 +712,9 @@ const placementReconciled = (maxMs: number): Promise<void> => {
   const state = reconciled;
   if (state.done) return Promise.resolve();
   return new Promise((resolve) => {
-    const timer = setTimeout(done, maxMs);
+    const timer = forkDelayed(maxMs, done);
     function done() {
-      clearTimeout(timer);
+      timer.cancel();
       state.wake.delete(done);
       resolve();
     }

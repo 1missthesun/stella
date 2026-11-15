@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 
+import { forkCancelableTimeout, sleepMs } from "../effect-runtime.js";
 import { WaylandVirtualPointer } from "./virtual-pointer.js";
 import {
   LinuxDesktopUnavailableError,
@@ -134,7 +135,7 @@ export const findHyprlandInstance = (): HyprlandInstance | null => {
   return { socket: live[0]!.socket, waylandDisplay: live[0]!.wlSocket! };
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = sleepMs;
 
 /** Decodes grim's binary PPM (P6, maxval 255). */
 const decodePpm = (bytes: Buffer) => {
@@ -239,18 +240,18 @@ const runCapture = (args: string[], waylandDisplay: string): Promise<Buffer> =>
     });
     const chunks: Buffer[] = [];
     const errors: Buffer[] = [];
-    const timer = setTimeout(() => {
+    const cancelTimeout = forkCancelableTimeout(CAPTURE_TIMEOUT_MS, () => {
       child.kill("SIGKILL");
       reject(
         new Error(
           `grim did not return a frame within ${CAPTURE_TIMEOUT_MS}ms.`,
         ),
       );
-    }, CAPTURE_TIMEOUT_MS);
+    });
     child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
     child.stderr.on("data", (chunk: Buffer) => errors.push(chunk));
     child.once("error", (error: NodeJS.ErrnoException) => {
-      clearTimeout(timer);
+      cancelTimeout();
       reject(
         error.code === "ENOENT"
           ? new LinuxDesktopUnavailableError(
@@ -260,7 +261,7 @@ const runCapture = (args: string[], waylandDisplay: string): Promise<Buffer> =>
       );
     });
     child.once("close", (code) => {
-      clearTimeout(timer);
+      cancelTimeout();
       if (code === 0) resolve(Buffer.concat(chunks));
       else
         reject(
@@ -334,22 +335,22 @@ export class HyprlandDesktop implements LinuxDesktop {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const connection = net.createConnection(this.socket);
-      const timer = setTimeout(() => {
+      const cancelTimeout = forkCancelableTimeout(REQUEST_TIMEOUT_MS, () => {
         connection.destroy();
         reject(
           new Error(
             `Hyprland did not answer ${command.split(" ")[0]} in time.`,
           ),
         );
-      }, REQUEST_TIMEOUT_MS);
+      });
       connection.on("connect", () => connection.write(command));
       connection.on("data", (chunk: Buffer) => chunks.push(chunk));
       connection.on("error", (error) => {
-        clearTimeout(timer);
+        cancelTimeout();
         reject(error);
       });
       connection.on("close", () => {
-        clearTimeout(timer);
+        cancelTimeout();
         resolve(Buffer.concat(chunks).toString("utf8"));
       });
     });

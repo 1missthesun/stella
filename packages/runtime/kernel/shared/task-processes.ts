@@ -32,6 +32,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { Effect } from "effect";
 import { readProcessIdentity, type RecordedProcess, signalRecordedProcess } from "./process-identity.js";
 
 export const TASK_PROCESS_OWNER_ENV = "STELLA_TASK_PROCESS_OWNER";
@@ -431,7 +432,7 @@ const groupAlive = (pgid: number) => {
   }
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => Effect.runPromise(Effect.sleep(ms));
 
 const waitGone = async (targets: Targets, ms: number) => {
   const deadline = Date.now() + ms;

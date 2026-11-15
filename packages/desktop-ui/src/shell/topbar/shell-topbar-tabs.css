@@ -83,8 +83,7 @@
 }
 
 /* Chat is the pinned tab: sized to its name, never narrowed, and still
-   reachable when many tabs make the strip scroll. Its backing stops clear
-   of the bar's last pixel, where the stage's edge runs. */
+   reachable when many tabs make the strip scroll. */
 .topbar-tabs__tab--chat {
   position: sticky;
   left: 0;
@@ -92,6 +91,13 @@
   flex-shrink: 0;
   /* With the strip's gap, room for the first tab's foot. */
   margin-right: 6px;
+}
+
+/* Tabs scrolled under Chat are hidden by a backing, there only while they
+   are (open-tab-notch.ts): on a theme whose bar isn't the stage's colour it
+   would show as a box. It stops clear of the bar's last pixel, where the
+   stage's edge runs. */
+.topbar-tabs__strip[data-scrolled="true"] .topbar-tabs__tab--chat {
   background: linear-gradient(var(--background), var(--background)) top / 100%
     calc(100% - 2px) no-repeat;
 }
@@ -115,12 +121,10 @@
   background: color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
+/* Chat showing is marked by its strong word alone. A fill there would be the
+   bar's only filled shape, and in this bar a fill means a menu is open. */
 .topbar-tabs__tab[data-active="true"] {
   color: var(--text-strong);
-}
-
-.topbar-tabs__tab--chat[data-active="true"]::before {
-  background: color-mix(in oklch, var(--foreground) 9%, transparent);
 }
 
 /* The tab on the stage: the stage's own fill and edge, open at the base.
@@ -424,14 +428,19 @@
   padding: 0;
   border: 0;
   border-radius: 7px;
-  /* Opaque like the pinned Chat tab, so a strip that scrolls is cut cleanly
-     at the + rather than showing a tab's icon through it. */
-  background: var(--background);
+  background: transparent;
   color: var(--text-muted, var(--text-weak));
   cursor: default;
   position: relative;
   z-index: 1;
   -webkit-app-region: no-drag;
+}
+
+/* Opaque like the pinned Chat tab while the strip runs on under it, so the
+   strip is cut cleanly at the + rather than showing a tab's icon through
+   it. */
+.topbar-tabs__strip[data-overflowing="true"] + .topbar-tabs__new {
+  background: var(--background);
 }
 
 .topbar-tabs__new:hover {

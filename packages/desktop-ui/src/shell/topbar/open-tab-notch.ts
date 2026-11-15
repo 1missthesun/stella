@@ -19,6 +19,7 @@ const REACH_GROW_DELAY_MS = 500;
  * painted over the edge: under the tab there is no edge.
  */
 export function syncOpenTabNotch(strip: HTMLElement | null): void {
+  if (strip) markStripScroll(strip);
   const root = document.documentElement;
   const open = strip?.querySelector<HTMLElement>(OPEN_TAB);
   let left = 0;
@@ -55,6 +56,24 @@ export function syncOpenTabNotch(strip: HTMLElement | null): void {
   } else if (root.style.getPropertyValue(LEFT)) {
     root.style.removeProperty(LEFT);
     root.style.removeProperty(RIGHT);
+  }
+}
+
+/**
+ * Say whether tabs are scrolled under the pinned Chat tab or run on under
+ * the + button: only then do those two need an opaque backing, which would
+ * otherwise show as a box on a theme whose bar is not the stage's colour.
+ */
+function markStripScroll(strip: HTMLElement): void {
+  const scrolled = strip.scrollLeft > 0.5;
+  const overflowing = strip.scrollWidth > strip.clientWidth + 0.5;
+  if ((strip.dataset.scrolled === "true") !== scrolled) {
+    if (scrolled) strip.dataset.scrolled = "true";
+    else delete strip.dataset.scrolled;
+  }
+  if ((strip.dataset.overflowing === "true") !== overflowing) {
+    if (overflowing) strip.dataset.overflowing = "true";
+    else delete strip.dataset.overflowing;
   }
 }
 

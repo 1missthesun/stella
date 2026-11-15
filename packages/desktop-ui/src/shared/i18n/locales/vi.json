@@ -2829,7 +2829,8 @@
         "upToDateTitle": "Bạn đang dùng bản mới nhất",
         "upToDateBody": "Các phiên bản mới của Stella sẽ hiện ở đây.",
         "notSharedConflict": "Các thay đổi thực hiện ở đây không đến được các máy tính khác của bạn: chúng xung đột với một thay đổi từ máy tính khác. Hãy lấy thay đổi đó để chia sẻ chúng.",
-        "notSharedBuild": "Các thay đổi thực hiện ở đây không đến được các máy tính khác của bạn: cùng với một thay đổi từ máy tính khác, Stella sẽ không build được. Hãy lấy thay đổi đó để chia sẻ chúng."
+        "notSharedBuild": "Các thay đổi thực hiện ở đây không đến được các máy tính khác của bạn: cùng với một thay đổi từ máy tính khác, Stella sẽ không build được. Hãy lấy thay đổi đó để chia sẻ chúng.",
+        "developerCheckout": "Stella đang chạy từ bản checkout của nhà phát triển tại đây: các bản cập nhật không thay đổi nó và không có gì được chia sẻ với các máy tính khác của bạn."
       },
       "updating": "Đang cập nhật…",
       "afterRecording": "Sau khi ghi xong",

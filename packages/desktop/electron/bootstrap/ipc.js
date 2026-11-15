@@ -61,6 +61,7 @@ import { assertHeadSigned, signHead } from "../launcher-client.js";
 import { getMainLogger } from "../observability/main-logger.js";
 import { buildBrowserExtensionClientsState, readBrowserExtensionRouting, saveBrowserExtensionRouting, } from "../services/browser-extension-routing-store.js";
 import { openDraftPreview } from "../services/app-source/draft-preview.js";
+import { isInstalledProduct } from "../app-identity.js";
 import { holdForRelaunch, isLauncherPresent, relaunchApp, reportPrepared, } from "../launcher-client.js";
 import {
   handleIpc,
@@ -439,10 +440,11 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         state.processRuntime.registerCleanup("before-quit", "update-hold", () => updateTransition.finishHold());
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
-            // A developer running Stella from their own checkout has no
-            // launcher; undoing there would rewrite their working tree.
-            // STELLA_APP_SOURCE_UNDO=1 lets a test sandbox stand in for an install.
-            undoAllowed: isLauncherPresent() || process.env.STELLA_APP_SOURCE_UNDO === "1",
+            // A developer running Stella from their own checkout (no launcher)
+            // keeps that working tree to themselves: updates neither change it
+            // nor share it. STELLA_APP_SOURCE_INSTALLED=1 lets a test sandbox
+            // stand in for an install.
+            installed: isInstalledProduct() || process.env.STELLA_APP_SOURCE_INSTALLED === "1",
             broadcast: (next) => {
                 if (next.waiting.some((offer) => offer.kind === "draft" && !offer.stale) ||
                     next.remote.status === "ahead" ||

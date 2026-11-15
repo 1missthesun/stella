@@ -2851,7 +2851,8 @@
         "upToDateTitle": "Ești la zi",
         "upToDateBody": "Versiunile noi ale Stella apar aici.",
         "notSharedConflict": "Modificările făcute aici nu ajung pe celelalte computere ale tale: intră în conflict cu o modificare de pe alt computer. Obține acea modificare ca să le partajezi.",
-        "notSharedBuild": "Modificările făcute aici nu ajung pe celelalte computere ale tale: împreună cu o modificare de pe alt computer, Stella nu s-ar compila. Obține acea modificare ca să le partajezi."
+        "notSharedBuild": "Modificările făcute aici nu ajung pe celelalte computere ale tale: împreună cu o modificare de pe alt computer, Stella nu s-ar compila. Obține acea modificare ca să le partajezi.",
+        "developerCheckout": "Stella rulează aici dintr-o copie de dezvoltator: actualizările nu o modifică și nimic nu este partajat cu celelalte computere ale tale."
       },
       "updating": "Se actualizează…",
       "afterRecording": "După înregistrare",

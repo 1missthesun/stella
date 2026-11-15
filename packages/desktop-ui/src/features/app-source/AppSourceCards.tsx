@@ -217,7 +217,7 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
       busy={pending}
       disabled={blocked}
       action={
-        state.canUndo
+        !state.developerCheckout
           ? {
               label: commit.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
               primary: commit.undone,

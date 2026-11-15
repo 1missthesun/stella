@@ -177,9 +177,9 @@ const launch = async () => {
   if (existsSync(pointerFile)) await stop();
   const result = harness(["session", "launch", "--replace", "--account", "signed-in"], {
     STELLA_RENDERER_MODE: mode,
-    // The sandbox stands in for an install, so it may undo (a developer
-    // checkout never does).
-    STELLA_APP_SOURCE_UNDO: "1",
+    // The sandbox stands in for an install, so its updates sync, add and
+    // undo (a developer checkout's never do).
+    STELLA_APP_SOURCE_INSTALLED: "1",
   });
   if (!result.ok) throw new Error(JSON.stringify(result.error));
   const run = readRun();

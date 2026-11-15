@@ -2840,7 +2840,8 @@
         "upToDateTitle": "Je bent helemaal bij",
         "upToDateBody": "Nieuwe versies van Stella verschijnen hier.",
         "notSharedConflict": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: ze botsen met een wijziging van een andere computer. Haal die wijziging op om ze te delen.",
-        "notSharedBuild": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: samen met een wijziging van een andere computer zou Stella niet bouwen. Haal die wijziging op om ze te delen."
+        "notSharedBuild": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: samen met een wijziging van een andere computer zou Stella niet bouwen. Haal die wijziging op om ze te delen.",
+        "developerCheckout": "Stella draait hier vanuit een ontwikkelaarskopie: updates wijzigen die niet en er wordt niets gedeeld met je andere computers."
       },
       "updating": "Bijwerken…",
       "afterRecording": "Na je opname",

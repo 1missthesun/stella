@@ -2862,7 +2862,8 @@
         "upToDateTitle": "Masz najnowszą wersję",
         "upToDateBody": "Nowe wersje Stelli pojawią się tutaj.",
         "notSharedConflict": "Zmiany wprowadzone tutaj nie docierają do Twoich innych komputerów: kolidują ze zmianą z innego komputera. Pobierz tę zmianę, aby je udostępnić.",
-        "notSharedBuild": "Zmiany wprowadzone tutaj nie docierają do Twoich innych komputerów: razem ze zmianą z innego komputera Stella by się nie zbudowała. Pobierz tę zmianę, aby je udostępnić."
+        "notSharedBuild": "Zmiany wprowadzone tutaj nie docierają do Twoich innych komputerów: razem ze zmianą z innego komputera Stella by się nie zbudowała. Pobierz tę zmianę, aby je udostępnić.",
+        "developerCheckout": "Stella działa tu z kopii deweloperskiej: aktualizacje jej nie zmieniają i nic nie jest udostępniane Twoim innym komputerom."
       },
       "updating": "Aktualizowanie…",
       "afterRecording": "Po nagraniu",

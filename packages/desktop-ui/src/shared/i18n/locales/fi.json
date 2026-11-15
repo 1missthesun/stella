@@ -2840,7 +2840,8 @@
         "upToDateTitle": "Kaikki on ajan tasalla",
         "upToDateBody": "Stellan uudet versiot näkyvät tässä.",
         "notSharedConflict": "Täällä tehdyt muutokset eivät päädy muille tietokoneillesi: ne ovat ristiriidassa toisen tietokoneen muutoksen kanssa. Hae se muutos, niin ne jaetaan.",
-        "notSharedBuild": "Täällä tehdyt muutokset eivät päädy muille tietokoneillesi: yhdessä toisen tietokoneen muutoksen kanssa Stella ei kääntyisi. Hae se muutos, niin ne jaetaan."
+        "notSharedBuild": "Täällä tehdyt muutokset eivät päädy muille tietokoneillesi: yhdessä toisen tietokoneen muutoksen kanssa Stella ei kääntyisi. Hae se muutos, niin ne jaetaan.",
+        "developerCheckout": "Stella toimii täällä kehittäjän työkopiosta: päivitykset eivät muuta sitä, eikä mitään jaeta muille tietokoneillesi."
       },
       "updating": "Päivitetään…",
       "afterRecording": "Tallenteesi jälkeen",

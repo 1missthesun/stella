@@ -174,25 +174,33 @@ export function UpdatesSection() {
     state.busy || pending !== null || state.merging !== undefined;
   return (
     <div className="updates-section sidebar-section__scroll" data-testid="updates-section">
-      <h2 className="updates-section__heading">{t("shell.appSource.updates.waiting")}</h2>
-      {state.waiting.length === 0 ? (
-        <div className="updates-section__quiet">
-          <Check size={14} strokeWidth={2} aria-hidden="true" />
-          {t("shell.appSource.updates.upToDate")}
-        </div>
+      {state.developerCheckout ? (
+        <p className="updates-section__note" data-testid="updates-developer-checkout">
+          {t("shell.appSource.updates.developerCheckout")}
+        </p>
       ) : (
-        <ul className="updates-section__list" data-testid="updates-waiting">
-          {state.waiting.map((offer) => (
-            <WaitingItem
-              key={offer.key}
-              offer={offer}
-              pending={pending === offer.key}
-              blocked={blocked}
-              onAdd={() => void run(offer.key, () => addOffer(offer))}
-              onSkip={() => void run(`skip:${offer.key}`, () => api.skip(offer.key))}
-            />
-          ))}
-        </ul>
+        <>
+          <h2 className="updates-section__heading">{t("shell.appSource.updates.waiting")}</h2>
+          {state.waiting.length === 0 ? (
+            <div className="updates-section__quiet">
+              <Check size={14} strokeWidth={2} aria-hidden="true" />
+              {t("shell.appSource.updates.upToDate")}
+            </div>
+          ) : (
+            <ul className="updates-section__list" data-testid="updates-waiting">
+              {state.waiting.map((offer) => (
+                <WaitingItem
+                  key={offer.key}
+                  offer={offer}
+                  pending={pending === offer.key}
+                  blocked={blocked}
+                  onAdd={() => void run(offer.key, () => addOffer(offer))}
+                  onSkip={() => void run(`skip:${offer.key}`, () => api.skip(offer.key))}
+                />
+              ))}
+            </ul>
+          )}
+        </>
       )}
       {state.skipped.length > 0 ? (
         <>
@@ -229,7 +237,7 @@ export function UpdatesSection() {
                 pending={pending === `undo:${commit.sha}`}
                 blocked={blocked}
                 onUndo={
-                  state.canUndo
+                  !state.developerCheckout
                     ? () => void run(`undo:${commit.sha}`, () => api.undo(commit.sha))
                     : null
                 }

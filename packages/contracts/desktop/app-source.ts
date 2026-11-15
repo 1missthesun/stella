@@ -72,11 +72,12 @@ export type AppSourceState = {
   merging?: { from: "upstream" | "remote" | "draft"; draft: string };
   recent: AppSourceCommit[];
   /**
-   * Whether this Stella may undo changes. False when it runs from a
-   * developer's own checkout rather than an install (no launcher): there an
-   * undo would rewrite the developer's working tree, so nothing offers one.
+   * Stella runs from a developer's own checkout rather than an install (no
+   * launcher). Its updates never change that working tree: nothing is waiting,
+   * added, undone, caught up or shared with the account's other computers, and
+   * the Updates tab only lists the checkout's history.
    */
-  canUndo: boolean;
+  developerCheckout: boolean;
   /**
    * Changes made here are not reaching the user's other computers: they clash
    * with a change from another computer this one hasn't taken ("conflict"),

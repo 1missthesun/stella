@@ -94,10 +94,12 @@ import {
 type AppSourceServiceOptions = {
   stellaAppDir: string;
   /**
-   * Undo is allowed: Stella runs as an install (under its launcher), or a
-   * test sandbox stands in for one. A developer's own checkout never undoes.
+   * Stella runs as an install (under its launcher), or a test sandbox stands
+   * in for one. Otherwise it runs from a developer's own checkout, which its
+   * updates leave alone: no syncing, announcing, preparing, catching up,
+   * adding or undoing; only the history is read.
    */
-  undoAllowed: boolean;
+  installed: boolean;
   broadcast: (state: AppSourceState) => void;
   isAnyWindowVisible: () => boolean;
   requestRuntimeRestart: () => void;
@@ -215,7 +217,7 @@ const EMPTY_STATE: AppSourceState = {
   remote: { status: "none", count: 0 },
   upstream: NO_UPSTREAM,
   recent: [],
-  canUndo: false,
+  developerCheckout: false,
   waiting: [],
   skipped: [],
   busy: false,
@@ -232,6 +234,13 @@ class PlainFailure extends Error {
     super(message);
   }
 }
+
+/** A developer's own checkout (no launcher) is left alone by Stella's updates. */
+const checkoutRefusal = () =>
+  new PlainFailure(
+    "unavailable",
+    "Stella runs from a developer checkout here; updates don't change its working tree.",
+  );
 
 /** The windows could not show the change, and the checkout is back where it was. */
 class RendererRejected extends Error {
@@ -435,9 +444,20 @@ export class AppSourceService {
     if (this.linkedCheckout) this.options.log("app-source.linked-worktree", { commonDir });
   }
 
-  /** The backend this checkout syncs its updates with; none for a linked worktree or before that is known. */
+  /**
+   * The backend this checkout syncs its updates with; none for a developer's
+   * checkout, a linked worktree, or before that is known. Without one nothing
+   * is fetched, pushed, shared, announced or merged in the background.
+   */
   private backendUrl(): string | null {
-    return this.linkedCheckout === false ? this.options.getBackendUrl() : null;
+    return this.options.installed && this.linkedCheckout === false
+      ? this.options.getBackendUrl()
+      : null;
+  }
+
+  /** A developer's own checkout is never changed by Stella's updates. */
+  private refuseInCheckout() {
+    if (!this.options.installed) throw checkoutRefusal();
   }
 
   /**
@@ -445,6 +465,7 @@ export class AppSourceService {
    * remembered by git, so the same conflict is never resolved twice.
    */
   private async rememberResolutions() {
+    if (!this.options.installed) return;
     const cwd = this.options.stellaAppDir;
     const current = await gitRaw(cwd, ["config", "--get", "rerere.enabled"]).catch(() => null);
     if (!current || current.stdout.trim() !== "") return;
@@ -582,12 +603,6 @@ export class AppSourceService {
 
   undo(sha: string) {
     return this.exclusive(async (cwd) => {
-      if (!this.options.undoAllowed) {
-        throw new PlainFailure(
-          "unavailable",
-          "Stella runs from a developer checkout here; undoing would rewrite its working tree.",
-        );
-      }
       if (!/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha)) {
         throw new PlainFailure("gone", "Unknown change.");
       }
@@ -935,6 +950,13 @@ export class AppSourceService {
   private exclusive(
     task: (cwd: string) => Promise<void | { background: true }>,
   ): Promise<AppSourceActionResult> {
+    // Every action here changes the checkout (Add, Get, Update, Undo, what
+    // was asked for elsewhere, a catch-up): a developer's own is refused
+    // before anything is announced, wanted or merged.
+    if (!this.options.installed) {
+      const refusal = checkoutRefusal();
+      return Promise.resolve({ ok: false, error: refusal.message, ...failureOf(refusal) });
+    }
     const requestedAt = performance.now();
     const result = this.queue.then(async (): Promise<AppSourceActionResult> => {
       this.timeline = { startedAt: requestedAt, last: requestedAt, steps: [] };
@@ -1218,6 +1240,7 @@ export class AppSourceService {
 
   /** A HEAD the launcher refuses to sign is moved back, so Stella never runs on an unsigned version. */
   private async moveHead(cwd: string, from: string, to: string) {
+    this.refuseInCheckout();
     await git(cwd, ["merge", "--ff-only", to]);
     this.mark("merge");
     try {
@@ -1358,6 +1381,18 @@ export class AppSourceService {
       ]),
       this.recentLog(cwd),
     ]);
+    if (!this.options.installed) {
+      // Drafts, versions and other computers' changes are neither prepared
+      // nor offered here, so nothing can be added without or with a click.
+      return {
+        remote: { status: "none", count: 0 },
+        upstream: NO_UPSTREAM,
+        recent: (await this.readRecent(cwd, log)).map((row) => row.commit),
+        developerCheckout: true,
+        waiting: [],
+        skipped: [],
+      };
+    }
     const inProgress = new Set(worktrees.map((tree) => tree.branch));
     const drafts: FoundDraft[] = [];
     for (const line of refs.split("\n").filter(Boolean)) {
@@ -1592,7 +1627,7 @@ export class AppSourceService {
         : { status: "none", count: 0 },
       upstream: upstream ?? NO_UPSTREAM,
       recent,
-      canUndo: this.options.undoAllowed,
+      developerCheckout: false,
       ...(this.notShared ? { notShared: this.notShared } : {}),
       waiting: offered.filter((offer) => offer.adding || !skipped.has(offer.key)),
       skipped: offered.filter((offer) => !offer.adding && skipped.has(offer.key)),
@@ -2608,7 +2643,7 @@ export class AppSourceService {
   }
 
   async syncFork() {
-    if (this.disposed || this.busy || this.syncing) return;
+    if (this.disposed || this.busy || this.syncing || !this.options.installed) return;
     this.syncing = true;
     const cwd = this.options.stellaAppDir;
     const target = this.published;

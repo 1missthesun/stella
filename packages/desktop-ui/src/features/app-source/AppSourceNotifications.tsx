@@ -85,7 +85,7 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
         createdAt: arrived.date,
         busy: pending === key,
         busyLabel: arrived.undone ? t("shell.appSource.updating") : t("shell.appSource.updates.undoing"),
-        actions: state.canUndo
+        actions: !state.developerCheckout
           ? [
               {
                 label: arrived.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),

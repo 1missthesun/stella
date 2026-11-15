@@ -2851,7 +2851,8 @@
         "upToDateTitle": "Tudo atualizado",
         "upToDateBody": "Novas versões da Stella aparecem aqui.",
         "notSharedConflict": "As alterações feitas aqui não estão chegando aos seus outros computadores: elas entram em conflito com uma alteração de outro computador. Obtenha essa alteração para compartilhá-las.",
-        "notSharedBuild": "As alterações feitas aqui não estão chegando aos seus outros computadores: junto com uma alteração de outro computador, o Stella não seria compilado. Obtenha essa alteração para compartilhá-las."
+        "notSharedBuild": "As alterações feitas aqui não estão chegando aos seus outros computadores: junto com uma alteração de outro computador, o Stella não seria compilado. Obtenha essa alteração para compartilhá-las.",
+        "developerCheckout": "O Stella está sendo executado aqui a partir de uma cópia de desenvolvimento: as atualizações não a alteram e nada é compartilhado com seus outros computadores."
       },
       "updating": "Atualizando…",
       "afterRecording": "Depois da sua gravação",

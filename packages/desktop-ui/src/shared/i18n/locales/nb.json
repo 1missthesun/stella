@@ -2840,7 +2840,8 @@
         "upToDateTitle": "Du er oppdatert",
         "upToDateBody": "Nye versjoner av Stella vises her.",
         "notSharedConflict": "Endringer gjort her når ikke frem til de andre datamaskinene dine: de er i konflikt med en endring fra en annen datamaskin. Hent den endringen for å dele dem.",
-        "notSharedBuild": "Endringer gjort her når ikke frem til de andre datamaskinene dine: sammen med en endring fra en annen datamaskin ville ikke Stella bygges. Hent den endringen for å dele dem."
+        "notSharedBuild": "Endringer gjort her når ikke frem til de andre datamaskinene dine: sammen med en endring fra en annen datamaskin ville ikke Stella bygges. Hent den endringen for å dele dem.",
+        "developerCheckout": "Stella kjører her fra en utviklerkopi: oppdateringer endrer den ikke, og ingenting deles med de andre datamaskinene dine."
       },
       "updating": "Oppdaterer…",
       "afterRecording": "Etter opptaket ditt",

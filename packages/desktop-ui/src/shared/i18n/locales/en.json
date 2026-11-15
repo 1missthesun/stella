@@ -2840,7 +2840,8 @@
         "upToDateTitle": "You're up to date",
         "upToDateBody": "New versions of Stella show up here.",
         "notSharedConflict": "Changes made here aren't reaching your other computers: they clash with a change from another computer. Get that change to share them.",
-        "notSharedBuild": "Changes made here aren't reaching your other computers: together with a change from another computer, Stella wouldn't build. Get that change to share them."
+        "notSharedBuild": "Changes made here aren't reaching your other computers: together with a change from another computer, Stella wouldn't build. Get that change to share them.",
+        "developerCheckout": "Stella runs from a developer checkout here: updates don't change it, and nothing is shared with your other computers."
       },
       "updating": "Updating…",
       "afterRecording": "After your recording",

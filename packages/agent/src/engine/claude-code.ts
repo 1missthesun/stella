@@ -42,6 +42,7 @@ import {
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
+import { claudeCodeToolName, stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
 import { createHash } from "node:crypto";
 import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
@@ -73,7 +74,6 @@ export const CLAUDE_CODE_BUILTIN_TOOLS = [
 const CLI_WEB_TOOLS: readonly string[] = ["WebSearch", "WebFetch"];
 const ENGINE_ONLY_TOOLS = ["TaskStop", "Monitor", "Grep", "Glob", "WebSearch", "WebFetch"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
-const MCP_PREFIX = "mcp__stella__";
 
 export const claudeCodeContextWindow = (model: string): number => (/\[1m\]/i.test(model) ? 1_000_000 : 200_000);
 
@@ -479,7 +479,7 @@ const cliToolName =
   (name: string): string =>
     CLI_WEB_TOOLS.includes(name) || (!binding.builtinsOff && (CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(name))
       ? name
-      : `${MCP_PREFIX}${name}`;
+      : claudeCodeToolName(name);
 
 /**
  * What a tool result says when the call was cut off by Stella stopping (an update, a restart, a crash): pi-durable's
@@ -1308,8 +1308,13 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               blocks.set(cliIndex, { index, kind: "thinking" });
               out.push({ type: "thinking_start", contentIndex: index, partial: output });
             } else if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
-              const native = !block.name.startsWith("mcp__");
-              const name = native ? block.name : block.name.startsWith(MCP_PREFIX) ? block.name.slice(MCP_PREFIX.length) : block.name;
+              // Stella's tools carry their plain names (old sessions: `mcp__stella__<name>`); anything else is Claude Code's own.
+              const stellaName = stellaToolNameOf(block.name, [
+                ...turn.toolSet.tools.map((tool) => tool.name),
+                ...(turn.nextToolSet?.tools.map((tool) => tool.name) ?? []),
+              ]);
+              const native = stellaName === undefined && !block.name.startsWith("mcp__");
+              const name = stellaName ?? block.name;
               const call: ToolCall = { type: "toolCall", id: block.id, name, arguments: {} };
               output.content.push(call);
               const index = output.content.length - 1;

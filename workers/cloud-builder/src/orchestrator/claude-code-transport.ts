@@ -1,3 +1,4 @@
+import { claudeCodeToolName } from "@stella/contracts/claude-code-tool-names";
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
 import {
   CLAUDE_CODE_SESSION_LOST,
@@ -72,7 +73,6 @@ export type FrameAnswer = { status: number; body: unknown };
 
 const BUSY_RETRY_MS = 2_000;
 const BUSY_RETRIES = 10;
-const MCP_PREFIX = "mcp__stella__";
 
 const attemptKey = (identity: CloudCliTurnIdentity): string => `${identity.turnId}#${identity.attemptGeneration}`;
 
@@ -126,7 +126,7 @@ const streamEventsOf = (message: CloudCliAssistantMessage): Record<string, unkno
           content_block: {
             type: "tool_use",
             id: part.id,
-            name: CLOUD_CLI_WEB_TOOLS.includes(part.name) ? part.name : `${MCP_PREFIX}${part.name}`,
+            name: CLOUD_CLI_WEB_TOOLS.includes(part.name) ? part.name : claudeCodeToolName(part.name),
             input: {},
           },
         }),

@@ -1,4 +1,5 @@
 import type { CloudTurnAttemptPaths } from "@stella/contracts/cloud-turn-attempt";
+import { withClaudeCodeToolNames } from "@stella/contracts/claude-code-tool-names";
 import { constants as fsConstants, existsSync } from "node:fs";
 import {
   chown,
@@ -685,9 +686,12 @@ export const runAgentTurn = (
                 nativeTools: CLOUD_CLI_WEB_TOOLS,
               }),
               prompt: input.prompt,
-              systemPrompt: buildClaudeCodeNativeToolRuntimePrompt(
-                cloudSystemPrompt,
-                CLOUD_CLI_WEB_TOOLS,
+              systemPrompt: withClaudeCodeToolNames(
+                buildClaudeCodeNativeToolRuntimePrompt(
+                  cloudSystemPrompt,
+                  CLOUD_CLI_WEB_TOOLS,
+                ),
+                cloudToolMetadata.map((tool) => tool.name),
               ),
               execution: nativeExecution,
               claudeAccount,
@@ -701,7 +705,7 @@ export const runAgentTurn = (
               ...(input.rebuildNativeSession === true
                 ? { recoveryHistory: input.history ?? [] }
                 : {}),
-              claudeMcpServerConfig: claudeToolMcpHost.mcpServerConfig,
+              claudeToolHost: claudeToolMcpHost,
               onStreamEvent: cloudAgentProgressFromStream(emitEvent),
               // A message that reaches the turn after end_turn_waiting
               // resumes it in place: the turn no longer ends waiting.

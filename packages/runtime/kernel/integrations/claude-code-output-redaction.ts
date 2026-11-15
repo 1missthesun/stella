@@ -57,8 +57,14 @@ export const redactClaudeCodeToolOutput = async (
   return { changed: next !== output, output: next };
 };
 
+/**
+ * `isStellaTool` says which tool names are Stella's own (they reach the model
+ * through Stella's host, which redacts their results itself).
+ */
 export const claudeCodePostToolUseHookResponse = async (
   input: unknown,
+  isStellaTool: (toolName: string) => boolean = (toolName) =>
+    toolName.startsWith("mcp__"),
 ): Promise<Record<string, unknown>> => {
   const body = input as {
     hook_event_name?: unknown;
@@ -70,7 +76,7 @@ export const claudeCodePostToolUseHookResponse = async (
     !body ||
     body.hook_event_name !== "PostToolUse" ||
     typeof body.tool_name !== "string" ||
-    body.tool_name.startsWith("mcp__") ||
+    isStellaTool(body.tool_name) ||
     body.tool_response === undefined
   ) {
     return {};

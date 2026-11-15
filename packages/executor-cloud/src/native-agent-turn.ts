@@ -5,7 +5,6 @@ import { markTurnStep } from "./turn-timing.js";
 import * as Effect from "effect/Effect";
 import {
   chmod,
-  mkdtemp,
   mkdir,
   readdir,
   readFile,
@@ -14,13 +13,17 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   AgentModelReasoningEffort,
   CloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+import {
+  CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV,
+  CLAUDE_CODE_STELLA_SERVER_NAME,
+  claudeCodeToolName,
+} from "@stella/contracts/claude-code-tool-names";
 import {
   CLOUD_ADOPTED_SESSION_DIR,
   CLOUD_CLAUDE_ACCOUNTS_ROOT,
@@ -77,10 +80,8 @@ import {
 } from "./native-state-integrity.js";
 import type { AgentInbox } from "./agent-inbox.js";
 import type { ClaudeKeeperClient } from "./claude-keeper-client.js";
-import {
-  CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER,
-  type ClaudeKeeperState,
-} from "./claude-keeper-protocol.js";
+import type { ClaudeKeeperState } from "./claude-keeper-protocol.js";
+import type { ClaudeCodeToolMcpHost } from "@stella/runtime/kernel/integrations/claude-code-tool-mcp-host.js";
 import { NATIVE_STATE_ATTESTATION_FILE } from "./native-state-integrity.js";
 import {
   createNativeTurnCancellation,
@@ -135,41 +136,17 @@ const streamJsonUserMessage = (
 
 type NativeEvent = (kind: string, payload: unknown) => void;
 
-/** The MCP server name; Claude exposes its tools as `mcp__stella__<name>`. */
-export const CLOUD_CLAUDE_MCP_SERVER_NAME = "stella";
+/** The MCP server name Stella's tools come from (listed in the CLI's init event). */
+export const CLOUD_CLAUDE_MCP_SERVER_NAME = CLAUDE_CODE_STELLA_SERVER_NAME;
 
-export type CloudClaudeMcpServerConfig = {
-  type: "http";
-  url: string;
-  headers: { Authorization: string };
-};
-
-export const createCloudClaudeMcpConfig = async (
-  serverConfig: CloudClaudeMcpServerConfig,
-): Promise<{ path: string; cleanup: () => Promise<void> }> => {
-  const directory = await mkdtemp(
-    path.join(tmpdir(), "stella-cloud-claude-mcp-"),
-  );
-  try {
-    await chmod(directory, 0o700);
-    const configPath = path.join(directory, "mcp.json");
-    await writeFile(
-      configPath,
-      JSON.stringify({
-        mcpServers: { [CLOUD_CLAUDE_MCP_SERVER_NAME]: serverConfig },
-      }),
-      { mode: 0o600 },
-    );
-    await chmod(configPath, 0o600);
-    return {
-      path: configPath,
-      cleanup: () => rm(directory, { recursive: true, force: true }),
-    };
-  } catch (error) {
-    await rm(directory, { recursive: true, force: true });
-    throw error;
-  }
-};
+/**
+ * Stella's tools for one turn, served on the CLI's own stdin/stdout (the
+ * runtime's `ClaudeCodeToolMcpHost`): the model sees their plain names.
+ */
+export type CloudClaudeToolHost = Pick<
+  ClaudeCodeToolMcpHost,
+  "openControlChannel" | "claudeToolNames"
+>;
 
 export const cloudNativeStateRootForThread = (threadId: string): string =>
   cloudNativeStateRoot(createHash("sha256").update(threadId).digest("hex"));
@@ -560,6 +537,8 @@ export const buildClaudeChildEnv = (options: {
     MCP_CONNECTION_NONBLOCKING: "0",
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+    // Stella's tools keep their own names (no `mcp__stella__` prefix).
+    [CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV]: "1",
   };
   delete childEnv.ANTHROPIC_BASE_URL;
   delete childEnv.ANTHROPIC_API_KEY;
@@ -595,33 +574,32 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   model: string;
   reasoningEffort: AgentModelReasoningEffort;
   systemPrompt: string;
-  mcpConfigPath: string;
+  /** The names Stella's tools carry (`ClaudeCodeToolMcpHost.claudeToolNames`). */
+  stellaToolNames: readonly string[];
   resume: boolean;
   resumeAt?: string;
   sessionId: string;
   inputPrompt?: string;
   includePartialMessages?: boolean;
-  streamInput?: boolean;
   nativeTools?: readonly string[];
 }): string[] => [
   "-p",
   "--verbose",
   "--output-format",
   "stream-json",
-  ...(options.streamInput
-    ? ["--input-format", "stream-json", "--replay-user-messages"]
-    : []),
+  // Always streamed: Stella's tools answer on this same stdin.
+  "--input-format",
+  "stream-json",
+  "--replay-user-messages",
   ...(options.includePartialMessages ? ["--include-partial-messages"] : []),
   ...resolveClaudeModelArgs(options.model),
   ...resolveClaudeReasoningArgs(options.reasoningEffort),
   "--dangerously-skip-permissions",
   "--strict-mcp-config",
-  "--mcp-config",
-  options.mcpConfigPath,
   "--tools",
   (options.nativeTools ?? []).join(","),
   "--allowedTools",
-  [...(options.nativeTools ?? []), `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}`].join(","),
+  [...(options.nativeTools ?? []), ...options.stellaToolNames].join(","),
   "--setting-sources",
   "",
   "--settings",
@@ -711,7 +689,7 @@ export const runCloudClaude = async (options: {
   execution: Extract<CloudExecutionSelection, { engine: "anthropic" }>;
   claudeAccount: CloudClaudeAccountInput;
   stateRoot: string;
-  mcpServerConfig: CloudClaudeMcpServerConfig;
+  toolHost: CloudClaudeToolHost;
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
@@ -764,17 +742,16 @@ export const runCloudClaude = async (options: {
       : deterministicUuid(profile.sessionKey);
   markTurnStep("claudeStateChecked");
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
-  const argsFor = (mcpConfigPath: string, resumeSession: boolean) =>
+  const argsFor = (resumeSession: boolean) =>
     buildCloudClaudeTakeoverArgs({
       model: options.execution.model,
       reasoningEffort: options.execution.reasoningEffort,
       systemPrompt: options.systemPrompt,
-      mcpConfigPath,
+      stellaToolNames: options.toolHost.claudeToolNames,
       resume: resumeSession,
       ...(resumeSession && resumeAt ? { resumeAt } : {}),
       sessionId,
       includePartialMessages: profile.includePartialMessages,
-      streamInput: Boolean(inbox),
       nativeTools: profile.nativeTools,
     });
   const childEnv = buildClaudeChildEnv({
@@ -791,6 +768,7 @@ export const runCloudClaude = async (options: {
   });
   const claudeCommand = resolveExternalCliPath("claude");
   let keeper: ClaudeKeeperClient | undefined;
+  let keeperReused = false;
   if (options.keeper && inbox) {
     const env = stringEnv(childEnv);
     const key = createHash("sha256")
@@ -800,7 +778,7 @@ export const runCloudClaude = async (options: {
           command: realpathSync(claudeCommand),
           account: options.claudeAccount,
           toolCatalogHash: options.keeper.toolCatalogHash,
-          args: argsFor(CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER, false),
+          args: argsFor(false),
           env,
           cwd: profile.cwd,
         }),
@@ -819,18 +797,15 @@ export const runCloudClaude = async (options: {
         key,
         reusable: options.keeper.reusable,
         state,
-        upstream: {
-          url: options.mcpServerConfig.url,
-          authorization: options.mcpServerConfig.headers.Authorization,
-        },
         spawn: {
           command: claudeCommand,
-          args: argsFor(CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER, resume),
+          args: argsFor(resume),
           env,
           cwd: profile.cwd,
         },
       });
       keeper = options.keeper.client;
+      keeperReused = attached.reused;
       markTurnStep(attached.reused ? "claudeReused" : "claudeSpawned");
       if (attached.fresh !== "none") {
         markTurnStep(
@@ -844,14 +819,17 @@ export const runCloudClaude = async (options: {
       markTurnStep("claudeKeeperFailed");
     }
   }
-  const mcpConfig = keeper
-    ? undefined
-    : await createCloudClaudeMcpConfig(options.mcpServerConfig);
   let kept: KeptClaude | undefined;
   let handedOn = false;
+  let stdin: { write(data: string): void; end(): void } | undefined;
+  // Stella's tools answer on the CLI's stdin. A kept CLI that is picked up
+  // again already registered them (its first turn wrote the initialize
+  // request); this turn's host just answers its calls.
+  const toolChannel = options.toolHost.openControlChannel((line) =>
+    stdin?.write(`${line}\n`),
+  );
   try {
-    const args = argsFor(mcpConfig?.path ?? "", resume);
-    let stdin: { write(data: string): void; end(): void } | undefined;
+    const args = argsFor(resume);
     let inputEnded = false;
     const injected = new Map<string, string>();
     const steered: string[] = [];
@@ -914,6 +892,7 @@ export const runCloudClaude = async (options: {
     let lastEntryUuid: string | undefined;
     let quietResumeAt: string | undefined;
     const onJson = (event: ClaudeStreamJsonEvent): void => {
+        if (toolChannel.handle(event)) return;
         options.onStreamEvent?.(event);
         const type = event.type;
         if ((type === "assistant" || (type === "user" && event.isMeta !== true && event.isSynthetic !== true)) && typeof event.uuid === "string") {
@@ -1020,7 +999,9 @@ export const runCloudClaude = async (options: {
                 ? `Claude Code reported an unsuccessful turn${subtype}: ${reported}`
                 : `Claude Code reported an unsuccessful turn${subtype}.`);
             void serialInput(async () => endInput());
-          } else if (inbox && injected.size === 0) {
+          } else if (!inbox) {
+            void serialInput(async () => endInput());
+          } else if (injected.size === 0) {
             void finishInput();
           }
         }
@@ -1063,22 +1044,20 @@ export const runCloudClaude = async (options: {
             );
           },
         };
+        if (!keeperReused) stdin.write(`${toolChannel.initializeLine}\n`);
         stdin.write(`${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`);
         markTurnStep("claudePromptSent");
       });
     const result = keeper
       ? await runKept(keeper).finally(endInput)
       : await runJsonLines({
-          ...(inbox
-            ? {
-                feedInput: (input: NodeJS.WritableStream) => {
-                  stdin = input;
-                  input.write(
-                    `${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`,
-                  );
-                },
-              }
-            : { input: options.inputPrompt }),
+          feedInput: (input: NodeJS.WritableStream) => {
+            stdin = input;
+            input.write(`${toolChannel.initializeLine}\n`);
+            input.write(
+              `${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`,
+            );
+          },
           command: claudeCommand,
           args,
           cwd: profile.cwd,
@@ -1145,7 +1124,7 @@ export const runCloudClaude = async (options: {
       ...(kept ? { kept } : {}),
     };
   } finally {
-    await mcpConfig?.cleanup();
+    toolChannel.close();
     if (keeper && !handedOn) {
       if (kept) await kept.discard().catch(() => undefined);
       else keeper.close();
@@ -1257,7 +1236,7 @@ const writeHistorySession = async (args: {
   const text = claudeCodeTranscript(
     messages as never,
     { sessionId, cwd: workingFolder, version: await claudeCliVersion() },
-    (name) => `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}__${name}`,
+    claudeCodeToolName,
     (message) => current !== undefined && claudeCodeIdentity(message) === current,
   );
   if (!text) return undefined;
@@ -1285,15 +1264,15 @@ export const runNativeAgentTurn = async (options: {
   fresh?: true;
   history?: AgentHistoryRow[];
   nativeStateRoot?: string;
-  claudeMcpServerConfig?: CloudClaudeMcpServerConfig;
+  claudeToolHost?: CloudClaudeToolHost;
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
   quiet?: boolean;
   keeper?: CloudClaudeKeeperInput;
 }): Promise<NativeAgentTurnResult> => {
-  const mcpServerConfig = options.claudeMcpServerConfig;
-  if (!mcpServerConfig) {
+  const toolHost = options.claudeToolHost;
+  if (!toolHost) {
     throw new Error("Stella's Claude tool bridge is unavailable.");
   }
   const stateRoot =
@@ -1392,7 +1371,7 @@ export const runNativeAgentTurn = async (options: {
       execution: options.execution,
       claudeAccount: options.claudeAccount,
       stateRoot,
-      mcpServerConfig,
+      toolHost,
       onStreamEvent,
       ...(options.cancellation ? { cancellation: options.cancellation } : {}),
       ...(options.inbox ? { inbox: options.inbox } : {}),

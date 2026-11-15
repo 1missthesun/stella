@@ -41,9 +41,16 @@ import {
 } from "./external-cli-resolution.js";
 import {
   createClaudeCodeToolMcpHost,
+  type ClaudeCodeToolControlChannel,
   type ClaudeCodeToolMcpActiveTurn,
   type ClaudeCodeToolMcpHost,
 } from "./claude-code-tool-mcp-host.js";
+import {
+  CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV,
+  claudeCodeToolName,
+  stellaToolNameFromClaudeCode,
+  withClaudeCodeToolNames,
+} from "@stella/contracts/claude-code-tool-names";
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 import {
   claudeCliHasOption,
@@ -253,6 +260,8 @@ type ClaudeCodeProcessState = {
   /** The newest transcript entry (a prompt, tool result or reply) this process streamed. */
   lastEntryUuid?: string;
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
+  /** Stella's tools on this process's stdin/stdout. */
+  toolChannel?: ClaudeCodeToolControlChannel;
   adrift?: {
     lines: ClaudeStreamEvent[];
     woke: boolean;
@@ -299,7 +308,6 @@ type ClaudeCodeSession = {
   process?: ClaudeCodeProcessState;
   mcpHost?: ClaudeCodeToolMcpHost;
   mcpToolCatalogKey?: string;
-  mcpConfigPath?: string;
   settingsPath?: string;
   activeMcpTurn?: ClaudeCodeToolMcpActiveTurn;
   activeNativeToolUseCorrelator?: ClaudeNativeToolUseCorrelator;
@@ -810,13 +818,23 @@ const buildClaudeCodeHookSettingsObject = () => {
 const CLAUDE_CODE_HOOK_SETTINGS = JSON.stringify(
   buildClaudeCodeHookSettingsObject(),
 );
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Claude Code's own tools only: Stella's (plain names, and old prefixed ones)
+ * come back through Stella's host, which redacts their results itself.
+ */
+export const claudeCodeNativeToolMatcher = (stellaToolNames: readonly string[]) =>
+  stellaToolNames.length > 0
+    ? `^(?!mcp__|(?:${stellaToolNames.map(escapeRegExp).join("|")})$).*`
+    : "^(?!mcp__).*";
 const buildClaudeCodeRedactingSettings = (
   hook: ClaudeCodeToolMcpHost["postToolUseHook"],
+  stellaToolNames: readonly string[],
 ) => {
   const settings = buildClaudeCodeHookSettingsObject();
   settings.hooks.PostToolUse = [
     {
-      matcher: "^(?!mcp__).*",
+      matcher: claudeCodeNativeToolMatcher(stellaToolNames),
       hooks: [
         {
           type: "http",
@@ -879,10 +897,9 @@ const stableToolArgs = (value: unknown): string => {
   }
   return JSON.stringify(value) ?? "null";
 };
+/** One key for a tool however Claude Code named it (plain, old prefixed, MCP-side). */
 const normalizeClaudeToolName = (toolName: string) =>
-  toolName.includes("__")
-    ? (toolName.split("__").at(-1) ?? toolName)
-    : toolName;
+  claudeCodeToolName(stellaToolNameFromClaudeCode(toolName));
 const claudeToolKey = (toolName: string, toolArgs: ClaudeToolArgs) => {
   return crypto
     .createHash("sha256")
@@ -949,8 +966,27 @@ type ObservedToolUse = {
   toolName: string;
   toolArgs: ClaudeToolArgs;
 };
-const callsThroughMcp = (toolName: string) => toolName.startsWith("mcp__");
-export const createClaudeNativeToolUseCorrelator = () => {
+/** Which Claude Code tool names are Stella's, for a session's catalog. */
+export const stellaToolPredicate = (
+  tools: readonly { name: string }[],
+): ((toolName: string) => boolean) => {
+  const names = new Set(tools.map((tool) => claudeCodeToolName(tool.name)));
+  return (toolName) => toolName.startsWith("mcp__") || names.has(toolName);
+};
+const isStellaToolCall = (
+  toolName: string,
+  tools: readonly { name: string }[],
+): boolean =>
+  toolName.startsWith("mcp__") ||
+  tools.some((tool) => claudeCodeToolName(tool.name) === toolName);
+/**
+ * `callsThroughMcp` says which tool names are Stella's (their calls reach
+ * Stella's host); the default knows only old prefixed names.
+ */
+export const createClaudeNativeToolUseCorrelator = (
+  callsThroughMcp: (toolName: string) => boolean = (toolName) =>
+    toolName.startsWith("mcp__"),
+) => {
   const queued = new Map<string, string[]>();
   const waiters = new Map<string, ((id: string) => void)[]>();
   const observedIds = new Set<string>();
@@ -1451,7 +1487,7 @@ const observeNativeToolCalls = (
         block?.type !== "tool_use" ||
         typeof block.id !== "string" ||
         typeof block.name !== "string" ||
-        block.name.startsWith("mcp__") ||
+        isStellaToolCall(block.name, pending.request.tools) ||
         pending.nativeToolCalls.has(block.id)
       ) {
         continue;
@@ -1875,7 +1911,6 @@ const cleanupSessionMcpHost = (session: ClaudeCodeSession) => {
   const host = session.mcpHost;
   session.mcpHost = undefined;
   session.mcpToolCatalogKey = undefined;
-  session.mcpConfigPath = undefined;
   session.settingsPath = undefined;
   session.activeMcpTurn = undefined;
   if (host) {
@@ -2088,7 +2123,9 @@ class ClaudeCodeSessionRuntime {
     }
     if (!request.vanilla) {
       session.onBackgroundWake = request.onBackgroundWake;
-      const nativeToolUseCorrelator = createClaudeNativeToolUseCorrelator();
+      const nativeToolUseCorrelator = createClaudeNativeToolUseCorrelator(
+        stellaToolPredicate(request.tools),
+      );
       session.activeNativeToolUseCorrelator = nativeToolUseCorrelator;
       session.activeMcpTurn = {
         identityScope: request.sessionKey,
@@ -2796,29 +2833,33 @@ class ClaudeCodeSessionRuntime {
         : CLAUDE_CODE_HOOK_SETTINGS,
     ];
     if (!request.vanilla) {
-      if (!mcpHost || !session.mcpConfigPath) {
+      if (!mcpHost) {
         throw new Error("Claude Code native tool host is unavailable.");
       }
+      // Stella's tools arrive over stdin/stdout (`openControlChannel`), so
+      // there is no MCP config; `--tools` only narrows Claude Code's own.
       const nativeTools = normalizeNativeTools(request.nativeTools);
-      const allowedTools = [
-        ...nativeTools,
-        ...request.tools.map((tool) => `mcp__stella__${tool.name}`),
-      ].join(",");
       args.push(
         "--strict-mcp-config",
-        "--mcp-config",
-        session.mcpConfigPath,
         "--tools",
-        [...nativeTools, "mcp__stella__*"].join(","),
+        nativeTools.join(","),
         "--allowedTools",
-        allowedTools,
+        [...nativeTools, ...mcpHost.claudeToolNames].join(","),
       );
     }
     if (request.settingSources) {
       args.push("--setting-sources", request.settingSources.join(","));
     }
     if (effectiveSystemPrompt.trim()) {
-      args.push("--system-prompt", effectiveSystemPrompt.trim());
+      args.push(
+        "--system-prompt",
+        request.vanilla
+          ? effectiveSystemPrompt.trim()
+          : withClaudeCodeToolNames(
+              effectiveSystemPrompt.trim(),
+              request.tools.map((tool) => tool.name),
+            ),
+      );
       if (cliHasSystemPromptSnapshot) {
         args.push("--system-prompt-snapshot", "off");
       }
@@ -2858,7 +2899,6 @@ class ClaudeCodeSessionRuntime {
         await session.mcpHost.close().catch(() => undefined);
         session.mcpHost = undefined;
         session.mcpToolCatalogKey = undefined;
-        session.mcpConfigPath = undefined;
         session.settingsPath = undefined;
       }
       return undefined;
@@ -2880,26 +2920,16 @@ class ClaudeCodeSessionRuntime {
       getActiveTurn: () => activeMcpTurnFor(session),
     });
     session.mcpToolCatalogKey = catalogKey;
-    session.mcpConfigPath = path.join(
-      ensureArtifactDir(session),
-      "claude-code-mcp.json",
-    );
-    fs.writeFileSync(
-      session.mcpConfigPath,
-      JSON.stringify({
-        mcpServers: { stella: session.mcpHost.mcpServerConfig },
-      }),
-      { encoding: "utf8", mode: 0o600 },
-    );
-    // writeFile's mode does not tighten an existing path after host rotation.
-    fs.chmodSync(session.mcpConfigPath, 0o600);
     session.settingsPath = path.join(
       ensureArtifactDir(session),
       "claude-code-settings.json",
     );
     fs.writeFileSync(
       session.settingsPath,
-      buildClaudeCodeRedactingSettings(session.mcpHost.postToolUseHook),
+      buildClaudeCodeRedactingSettings(
+        session.mcpHost.postToolUseHook,
+        session.mcpHost.claudeToolNames,
+      ),
       { encoding: "utf8", mode: 0o600 },
     );
     fs.chmodSync(session.settingsPath, 0o600);
@@ -2977,6 +3007,9 @@ class ClaudeCodeSessionRuntime {
     childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT = String(
       CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS,
     );
+    // Stella's tools keep their own names (no `mcp__stella__` prefix).
+    if (mcpHost) childEnv[CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV] = "1";
+    else delete childEnv[CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV];
     session.claudeLoginEmail = claudeConfig.email;
     session.claudeLoginConfigDir = claudeConfigDir;
     delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
@@ -3037,6 +3070,14 @@ class ClaudeCodeSessionRuntime {
       claudeConfigDir,
       cliIdentity,
     };
+    if (mcpHost) {
+      const channel = mcpHost.openControlChannel((line) => {
+        if (!processState.closed) child.stdin.write(`${line}\n`, () => {});
+      });
+      processState.toolChannel = channel;
+      // Before any prompt: registers Stella's tools for this process.
+      child.stdin.write(`${channel.initializeLine}\n`, () => {});
+    }
     session.process = processState;
     this.activeProcesses.set(request.sessionKey, child);
     const refreshPendingIdleTimers = (hasOutput = false) => {
@@ -3313,6 +3354,8 @@ class ClaudeCodeSessionRuntime {
         if (!parsedLine) {
           continue;
         }
+        // Stella's tool traffic is answered at once, whatever else is going on.
+        if (processState.toolChannel?.handle(parsedLine)) continue;
         if (
           this.holdAdrift(request.sessionKey, session, processState, parsedLine)
         ) {
@@ -3342,6 +3385,7 @@ class ClaudeCodeSessionRuntime {
         `Failed to start Claude Code: ${normalizeErrorMessage(error)}`,
       );
       processState.closed = true;
+      processState.toolChannel?.close();
       const ownsSessionProcess = session.process === processState;
       if (ownsSessionProcess) {
         resetSessionMcpClients(session, wrapped);
@@ -3366,6 +3410,7 @@ class ClaudeCodeSessionRuntime {
     child.once("close", (code) => {
       consumeStdout(true);
       processState.closed = true;
+      processState.toolChannel?.close();
       if (session.resumeReady) {
         try {
           request.onSessionCheckpoint?.({

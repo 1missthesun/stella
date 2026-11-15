@@ -17,7 +17,12 @@ import {
   buildClaudeCodeNativeToolRuntimePrompt,
   createClaudeNativeToolUseCorrelator,
   getClaudeCodeStatusChangeFromStreamEvent,
+  stellaToolPredicate,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
+import {
+  stellaToolNameFromClaudeCode,
+  withClaudeCodeToolNames,
+} from "@stella/contracts/claude-code-tool-names";
 import { createClaudeCodeToolMcpHost } from "@stella/runtime/kernel/integrations/claude-code-tool-mcp-host.js";
 import { createClaudeCodeCompactionDetector } from "@stella/runtime/kernel/integrations/claude-code-compaction.js";
 import {
@@ -34,7 +39,6 @@ import {
 } from "./agent-turn.js";
 import { parseAuthoritativeAgentHistory } from "./agent-history.js";
 import {
-  CLOUD_CLAUDE_MCP_SERVER_NAME,
   cloudClaudeRoleProfile,
   nativeHistoryCursorFromMessages,
   nativeHistoryCursorFromRows,
@@ -56,7 +60,6 @@ type Broker = Pick<TurnCredentialBrokerClient, "postJson">;
 const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, llmCalls: 0 };
 export const ORCHESTRATOR_EVENT_BATCH_MS = 500;
 const BROKER_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000];
-const MCP_TOOL_PREFIX = `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}__`;
 
 const asError = (error: unknown): Error =>
   error instanceof Error ? error : new Error(String(error));
@@ -272,9 +275,12 @@ export class CliAssistantAssembler {
   #outputTokens = 0;
   #llmCalls = 0;
 
+  /** `isStellaTool` says which Claude Code tool names are Stella's own. */
   constructor(
     private readonly emit: (event: CloudOrchestratorEvent) => void,
     private readonly fallbackModel: string,
+    private readonly isStellaTool: (toolName: string) => boolean = (toolName) =>
+      toolName.startsWith("mcp__"),
   ) {}
 
   readonly #compaction = createClaudeCodeCompactionDetector();
@@ -371,13 +377,12 @@ export class CliAssistantAssembler {
           typeof block.name === "string"
         ) {
           open.toolUseIds.push(block.id);
-          if (!block.name.startsWith(MCP_TOOL_PREFIX)) this.#nativeCalls.add(block.id);
+          const stella = this.isStellaTool(block.name);
+          if (!stella) this.#nativeCalls.add(block.id);
           open.content.push({
             type: "toolCall",
             id: block.id,
-            name: block.name.startsWith(MCP_TOOL_PREFIX)
-              ? block.name.slice(MCP_TOOL_PREFIX.length)
-              : block.name,
+            name: stella ? stellaToolNameFromClaudeCode(block.name) : block.name,
             arguments: asRecord(block.input) ?? {},
           });
         }
@@ -642,11 +647,13 @@ export const runOrchestratorTurn = async (args: {
     turnCancellation.abort(error);
   };
   const lane = new OrchestratorEventLane(broker, abortTurn);
+  const isStellaTool = stellaToolPredicate(spec.toolCatalog);
   const assembler = new CliAssistantAssembler(
     (event) => lane.emit(event),
     execution.model,
+    isStellaTool,
   );
-  const correlator = createClaudeNativeToolUseCorrelator();
+  const correlator = createClaudeNativeToolUseCorrelator(isStellaTool);
   const nativeTools = spec.webTools && !spec.compact ? CLOUD_CLI_WEB_TOOLS : [];
   const identityScope = `${input.threadId}:${input.turnId}`;
 
@@ -735,7 +742,10 @@ export const runOrchestratorTurn = async (args: {
         prompt: input.prompt,
         systemPrompt: spec.compact
           ? ""
-          : buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt, nativeTools),
+          : withClaudeCodeToolNames(
+              buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt, nativeTools),
+              spec.toolCatalog.map((tool) => tool.name),
+            ),
         execution,
         claudeAccount,
         threadId: input.threadId,
@@ -758,7 +768,7 @@ export const runOrchestratorTurn = async (args: {
               history: input.history ?? [],
             }
           : {}),
-        claudeMcpServerConfig: mcpHost.mcpServerConfig,
+        claudeToolHost: mcpHost,
         cancellation: turnCancellation,
         ...(spec.quiet ? { quiet: true } : {}),
         onStreamEvent: (event) => {

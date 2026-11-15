@@ -4,8 +4,8 @@ import http from "node:http";
 import type { Socket } from "node:net";
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -13,6 +13,7 @@ import {
   McpError,
   type CallToolRequest,
   type CallToolResult,
+  type JSONRPCMessage,
   type ServerNotification,
   type ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -40,6 +41,13 @@ import {
 } from "./effect-runtime.js";
 import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redaction.js";
 import { waitsForUser } from "@stella/contracts/long-tool-call";
+import {
+  CLAUDE_CODE_STELLA_SERVER_NAME,
+  claudeCodeToolName,
+  legacyClaudeCodeToolAliases,
+  LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX,
+  withClaudeCodeToolNames,
+} from "@stella/contracts/claude-code-tool-names";
 import {
   CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS,
   CLAUDE_CODE_STELLA_TOOL_CEILING_MS,
@@ -140,16 +148,31 @@ export type ClaudeCodeToolMcpActiveTurn = {
   }) => void | Promise<void>;
 };
 
+/**
+ * Stella's tools on one Claude Code process's own stdin/stdout. The process
+ * lists them as an in-process ("sdk") MCP server, so with
+ * `CLAUDE_AGENT_SDK_MCP_NO_PREFIX=1` the model sees their plain names.
+ */
+export type ClaudeCodeToolControlChannel = {
+  /**
+   * The control request to write first on the process's stdin: it registers
+   * Stella's server and maps old prefixed tool names onto the plain ones.
+   */
+  initializeLine: string;
+  /** Takes one stdout event; true when it was this channel's (answer written). */
+  handle: (event: Record<string, unknown>) => boolean;
+  close: () => void;
+};
+
 export type ClaudeCodeToolMcpHost = {
-  url: string;
-  authorizationHeader: string;
   toolCatalogHash: string;
+  /** The names Stella's tools carry in Claude Code, in catalog order. */
+  claudeToolNames: readonly string[];
   postToolUseHook: { url: string; headers: { Authorization: string } };
-  mcpServerConfig: {
-    type: "http";
-    url: string;
-    headers: { Authorization: string };
-  };
+  /** Serve this host's tools over a Claude Code process's stdin/stdout. */
+  openControlChannel: (
+    write: (line: string) => void,
+  ) => ClaudeCodeToolControlChannel;
   abortActiveCalls: (reason?: unknown) => void;
   waitForClientReady: (
     signal?: AbortSignal,
@@ -354,36 +377,49 @@ export const createClaudeCodeToolMcpHost = async (
     options.allowLegacyImagePathReopen !== false;
   const progressHeartbeatMs =
     options.progressHeartbeatMs ?? CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS;
+  const stellaNames = options.tools.map((tool) => tool.name);
   const tools = options.tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
+    // The name the model sees: plain, never one of Claude Code's own.
+    name: claudeCodeToolName(tool.name),
+    description: withClaudeCodeToolNames(tool.description, stellaNames),
     // Claude rejects root combinators. The host still dispatches through
     // Stella's original catalog and execution-side validators.
     inputSchema: normalizeProviderToolInputSchema(tool.parameters),
   }));
-  const names = new Set<string>();
-  for (const tool of tools) {
-    if (!tool.name || names.has(tool.name)) {
+  /** Claude Code's name for each tool → Stella's own. */
+  const stellaNameOf = new Map<string, string>();
+  for (const [index, tool] of tools.entries()) {
+    const stellaName = options.tools[index]!.name;
+    if (!tool.name || stellaNameOf.has(tool.name)) {
       throw new Error(
         tool.name
           ? `Duplicate Claude Code MCP tool: ${tool.name}`
           : "Claude Code MCP tools must have names",
       );
     }
-    names.add(tool.name);
+    stellaNameOf.set(tool.name, stellaName);
     if (tool.inputSchema.type !== "object") {
       throw new Error(
         `Claude Code MCP tool ${tool.name} must have an object JSON schema`,
       );
     }
   }
+  /** Stella's name for a call: the plain name, or an old prefixed one. */
+  const resolveStellaName = (claudeName: string): string | undefined =>
+    stellaNameOf.get(claudeName) ??
+    (claudeName.startsWith(LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX)
+      ? stellaNameOf.get(
+          claudeCodeToolName(
+            claudeName.slice(LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX.length),
+          ),
+        )
+      : undefined);
 
   const catalogHash = crypto
     .createHash("sha256")
     .update(stableJson(tools))
     .digest("hex");
   const bearer = `Bearer ${crypto.randomBytes(32).toString("base64url")}`;
-  const endpointPath = `/mcp/${crypto.randomBytes(32).toString("base64url")}`;
   const hookPath = `/hooks/${crypto.randomBytes(32).toString("base64url")}`;
   const nextCallGeneration = () => new AbortController();
   let callGeneration = nextCallGeneration();
@@ -438,10 +474,14 @@ export const createClaudeCodeToolMcpHost = async (
     extra: CallToolExtra,
     reportProgress: (message: string) => void,
   ): Promise<CallToolResult> => {
-    if (!names.has(request.params.name)) {
+    // `claudeName` is what the model called (and what the native tool_use
+    // correlator saw); `toolName` is Stella's own name for the tool.
+    const claudeName = request.params.name;
+    const toolName = resolveStellaName(claudeName);
+    if (!toolName) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        `Tool is not available in this Stella session: ${request.params.name}`,
+        `Tool is not available in this Stella session: ${claudeName}`,
       );
     }
     const turn = await awaitWithAbort(
@@ -449,7 +489,7 @@ export const createClaudeCodeToolMcpHost = async (
       extra.signal,
     );
     const integrityCheck = turn?.checkToolUseIntegrity?.(
-      request.params.name,
+      claudeName,
       request.params.arguments ?? {},
       extra.signal,
     );
@@ -459,7 +499,7 @@ export const createClaudeCodeToolMcpHost = async (
     if (truncation) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        `Refusing ${request.params.name}: your stream ended with ` +
+        `Refusing ${claudeName}: your stream ended with ` +
           `stop_reason "${truncation.stopReason}" while these arguments ` +
           `were still being written, so they are cut off mid-value and ` +
           `were NOT executed. Reissue the call with complete arguments` +
@@ -474,7 +514,7 @@ export const createClaudeCodeToolMcpHost = async (
       .slice(0, 24);
     const canonicalRequestHash = crypto
       .createHash("sha256")
-      .update(request.params.name)
+      .update(toolName)
       .update("\0")
       .update(stableJson(request.params.arguments ?? {}))
       .digest("hex");
@@ -482,13 +522,12 @@ export const createClaudeCodeToolMcpHost = async (
       turn?.nativeToolCallIds === true && turn.claimNativeToolUseId
         ? turn.claimNativeToolUseId
         : undefined;
-    const durableImageGen =
-      request.params.name === "image_gen" && !claimNativeId;
+    const durableImageGen = toolName === "image_gen" && !claimNativeId;
     const nativeToolUseId =
       durableImageGen && turn?.claimNativeToolUseId
         ? await awaitWithAbort(
             turn.claimNativeToolUseId(
-              request.params.name,
+              claudeName,
               request.params.arguments ?? {},
               extra.signal,
             ),
@@ -505,17 +544,17 @@ export const createClaudeCodeToolMcpHost = async (
       ? `claude:${durableScope}:${nativeToolUseId}:${canonicalRequestHash.slice(0, 24)}`
       : `mcp:${clientSessionId}:${String(extra.requestId)}`;
     const ledgerKey = durableImageGen
-      ? `${durableScope}:${nativeToolUseId}:${request.params.name}:${canonicalRequestHash}`
-      : `${clientSessionId}:${String(extra.requestId)}:${request.params.name}`;
+      ? `${durableScope}:${nativeToolUseId}:${toolName}:${canonicalRequestHash}`
+      : `${clientSessionId}:${String(extra.requestId)}:${toolName}`;
     const registerDeliveryAcknowledgement = () => {
-      if (request.params.name !== "image_gen") return;
+      if (toolName !== "image_gen") return;
       const acknowledgement = turn?.onToolResponseWritten;
       const delivery = responseDelivery.getStore();
       if (!acknowledgement || !delivery) return;
       delivery.acknowledgements.add(() =>
         acknowledgement({
           toolCallId,
-          toolName: request.params.name,
+          toolName: toolName,
         }),
       );
     };
@@ -539,7 +578,7 @@ export const createClaudeCodeToolMcpHost = async (
         };
       }
 
-      const ceiling = waitsForUser(request.params.name)
+      const ceiling = waitsForUser(toolName)
         ? undefined
         : AbortSignal.timeout(CLAUDE_CODE_STELLA_TOOL_CEILING_MS);
       const callSignal = AbortSignal.any([
@@ -551,7 +590,7 @@ export const createClaudeCodeToolMcpHost = async (
       const onUpdate: ToolUpdateCallback = (update) => {
         turn.onToolUpdate?.({
           toolCallId,
-          toolName: request.params.name,
+          toolName: toolName,
           update,
         });
         reportProgress(summarizeUpdate(update));
@@ -561,7 +600,7 @@ export const createClaudeCodeToolMcpHost = async (
         if (claimNativeId) {
           toolCallId = await awaitWithAbort(
             claimNativeId(
-              request.params.name,
+              claudeName,
               request.params.arguments ?? {},
               callSignal,
             ),
@@ -571,7 +610,7 @@ export const createClaudeCodeToolMcpHost = async (
         const result = await awaitWithAbort(
           turn.executeTool(
             toolCallId,
-            request.params.name,
+            toolName,
             request.params.arguments ?? {},
             callSignal,
             onUpdate,
@@ -580,7 +619,7 @@ export const createClaudeCodeToolMcpHost = async (
         );
         turn.onToolResult?.({
           toolCallId,
-          toolName: request.params.name,
+          toolName: toolName,
           result,
         });
         return await awaitWithAbort(
@@ -593,10 +632,10 @@ export const createClaudeCodeToolMcpHost = async (
           !extra.signal.aborted &&
           !callGeneration.signal.aborted
         ) {
-          const text = stellaToolCeilingText(request.params.name);
+          const text = stellaToolCeilingText(toolName);
           turn.onToolResult?.({
             toolCallId,
-            toolName: request.params.name,
+            toolName: toolName,
             result: { error: text },
           });
           return { content: [{ type: "text", text }], isError: true };
@@ -629,34 +668,150 @@ export const createClaudeCodeToolMcpHost = async (
     return result;
   };
 
-  type McpClientSession = {
-    server: Server;
-    transport: StreamableHTTPServerTransport;
-  };
-  const clientSessions = new Map<string, McpClientSession>();
-  const pendingSessions = new Set<McpClientSession>();
-  const createClientSession = async (): Promise<McpClientSession> => {
+  /** One stdin/stdout channel per Claude Code process. */
+  type ControlChannelState = { server: Server; close: () => void };
+  const channels = new Set<ControlChannelState>();
+  const aliases = legacyClaudeCodeToolAliases(stellaNames);
+  const openControlChannel = (
+    write: (line: string) => void,
+  ): ClaudeCodeToolControlChannel => {
+    const initializeRequestId = `stella-init-${crypto.randomUUID()}`;
+    const initializeLine = JSON.stringify({
+      type: "control_request",
+      request_id: initializeRequestId,
+      request: {
+        subtype: "initialize",
+        sdkMcpServers: [CLAUDE_CODE_STELLA_SERVER_NAME],
+        toolAliases: aliases,
+      },
+    });
     const server = new Server(
       { name: "stella-claude-code-tools", version: "1.0.0" },
       { capabilities: { tools: {} } },
     );
     configureMcpServer(server);
-    const state = {} as McpClientSession;
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-      onsessioninitialized: (sessionId) => {
-        pendingSessions.delete(state);
-        clientSessions.set(sessionId, state);
+    /** The CLI's control request waiting on each JSON-RPC request id. */
+    const awaiting = new Map<
+      string | number,
+      {
+        requestId: string;
+        delivery: {
+          acknowledgements: Set<() => void | Promise<void>>;
+          catalogListed: boolean;
+        };
+      }
+    >();
+    let closed = false;
+    const answer = (requestId: string, mcpResponse: unknown) =>
+      write(
+        JSON.stringify({
+          type: "control_response",
+          response: {
+            subtype: "success",
+            request_id: requestId,
+            response: { mcp_response: mcpResponse },
+          },
+        }),
+      );
+    const transport: Transport = {
+      // Distinct per process: JSON-RPC ids restart at 0 with every CLI, and
+      // call identities and the call ledger key on (session, id).
+      sessionId: crypto.randomUUID(),
+      start: async () => undefined,
+      send: async (message: JSONRPCMessage) => {
+        if (closed) return;
+        if (
+          "id" in message &&
+          message.id !== undefined &&
+          ("result" in message || "error" in message)
+        ) {
+          const waiting = awaiting.get(message.id);
+          if (waiting) {
+            awaiting.delete(message.id);
+            answer(waiting.requestId, message);
+            if (waiting.delivery.catalogListed) announceClientReady();
+            for (const acknowledge of waiting.delivery.acknowledgements) {
+              void Promise.resolve(acknowledge()).catch(() => undefined);
+            }
+            return;
+          }
+        }
+        // Progress notifications (and anything else the server starts) go
+        // to the CLI as its own control requests.
+        write(
+          JSON.stringify({
+            type: "control_request",
+            request_id: crypto.randomUUID(),
+            request: {
+              subtype: "mcp_message",
+              server_name: CLAUDE_CODE_STELLA_SERVER_NAME,
+              message,
+            },
+          }),
+        );
       },
-      onsessionclosed: (sessionId) => {
-        clientSessions.delete(sessionId);
+      close: async () => {
+        if (closed) return;
+        closed = true;
+        awaiting.clear();
+        transport.onclose?.();
       },
-    });
-    state.server = server;
-    state.transport = transport;
-    pendingSessions.add(state);
-    await server.connect(transport);
-    return state;
+    };
+    void server.connect(transport).catch(() => undefined);
+    const state: ControlChannelState = {
+      server,
+      close: () => {
+        channels.delete(state);
+        void server.close().catch(() => undefined);
+      },
+    };
+    channels.add(state);
+    const handle = (event: Record<string, unknown>): boolean => {
+      if (event.type === "control_response") {
+        const response = event.response as { request_id?: unknown } | undefined;
+        return response?.request_id === initializeRequestId;
+      }
+      if (event.type !== "control_request") return false;
+      const request = event.request as
+        | { subtype?: unknown; server_name?: unknown; message?: unknown }
+        | undefined;
+      if (
+        request?.subtype !== "mcp_message" ||
+        request.server_name !== CLAUDE_CODE_STELLA_SERVER_NAME
+      ) {
+        return false;
+      }
+      const requestId =
+        typeof event.request_id === "string" ? event.request_id : "";
+      const message = request.message as JSONRPCMessage | undefined;
+      if (closed || !message || typeof message !== "object") {
+        answer(requestId, {
+          jsonrpc: "2.0",
+          id: (message as { id?: unknown } | undefined)?.id ?? 0,
+          error: { code: -32001, message: "Stella's tools are not available." },
+        });
+        return true;
+      }
+      if (
+        "method" in message &&
+        "id" in message &&
+        message.id !== null &&
+        message.id !== undefined
+      ) {
+        const delivery = {
+          acknowledgements: new Set<() => void | Promise<void>>(),
+          catalogListed: false,
+        };
+        awaiting.set(message.id, { requestId, delivery });
+        responseDelivery.run(delivery, () => transport.onmessage?.(message));
+        return true;
+      }
+      // A notification (initialized, cancelled) or a reply: nothing to wait for.
+      transport.onmessage?.(message);
+      answer(requestId, { jsonrpc: "2.0", result: {}, id: 0 });
+      return true;
+    };
+    return { initializeLine, handle, close: state.close };
   };
 
   const sockets = new Set<Socket>();
@@ -682,25 +837,15 @@ export const createClaudeCodeToolMcpHost = async (
     } catch {
       body = null;
     }
-    const answer = await claudeCodePostToolUseHookResponse(body);
+    const answer = await claudeCodePostToolUseHookResponse(body, (name) =>
+      resolveStellaName(name) !== undefined || name.startsWith("mcp__"),
+    );
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(answer));
   };
+  // The loopback HTTP server only answers Claude Code's PostToolUse hook.
   const httpServer = http.createServer((request, response) => {
-    if (request.url === hookPath && request.method === "POST") {
-      if (!sameSecret(request.headers.authorization, bearer)) {
-        unauthorized(response);
-        return;
-      }
-      void answerHook(request, response).catch(() => {
-        if (!response.headersSent) {
-          response.writeHead(200, { "content-type": "application/json" });
-        }
-        if (!response.writableEnded) response.end("{}");
-      });
-      return;
-    }
-    if (request.url !== endpointPath) {
+    if (request.url !== hookPath || request.method !== "POST") {
       response.writeHead(404).end();
       return;
     }
@@ -708,65 +853,11 @@ export const createClaudeCodeToolMcpHost = async (
       unauthorized(response);
       return;
     }
-    const sessionHeader = request.headers["mcp-session-id"];
-    const sessionId = Array.isArray(sessionHeader)
-      ? sessionHeader[0]
-      : sessionHeader;
-    const handle = async () => {
-      let state: McpClientSession | undefined;
-      if (sessionId) {
-        state = clientSessions.get(sessionId);
-        if (!state) {
-          response.writeHead(404, { "content-type": "application/json" });
-          response.end(
-            JSON.stringify({
-              jsonrpc: "2.0",
-              error: { code: -32001, message: "MCP session not found" },
-              id: null,
-            }),
-          );
-          return;
-        }
-      } else {
-        state = await createClientSession();
-      }
-      const delivery = {
-        acknowledgements: new Set<() => void | Promise<void>>(),
-        catalogListed: false,
-      };
-      let responseFinished = false;
-      response.once("finish", () => {
-        responseFinished = true;
-        if (delivery.catalogListed) announceClientReady();
-        for (const acknowledge of delivery.acknowledgements) {
-          void Promise.resolve(acknowledge()).catch(() => undefined);
-        }
-        delivery.acknowledgements.clear();
-      });
-      response.once("close", () => {
-        if (!responseFinished) delivery.acknowledgements.clear();
-      });
-      await responseDelivery.run(delivery, () =>
-        state.transport.handleRequest(request, response),
-      );
-      if (!state.transport.sessionId) {
-        pendingSessions.delete(state);
-        await state.server.close().catch(() => undefined);
-      }
-    };
-    void handle().catch(() => {
+    void answerHook(request, response).catch(() => {
       if (!response.headersSent) {
-        response.writeHead(500, { "content-type": "application/json" });
+        response.writeHead(200, { "content-type": "application/json" });
       }
-      if (!response.writableEnded) {
-        response.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: { code: -32603, message: "Internal server error" },
-            id: null,
-          }),
-        );
-      }
+      if (!response.writableEnded) response.end("{}");
     });
   });
   // Claude Code's fetch reuses idle keep-alive sockets and does not retry a
@@ -779,7 +870,6 @@ export const createClaudeCodeToolMcpHost = async (
   });
 
   const port = await listen(httpServer);
-  const url = `http://${HOST}:${port}${endpointPath}`;
   const abortActiveCalls = (reason?: unknown) => {
     const ending = callGeneration;
     callGeneration = nextCallGeneration();
@@ -789,11 +879,9 @@ export const createClaudeCodeToolMcpHost = async (
     abortActiveCalls(
       reason ?? new Error("Claude Code MCP client sessions reset"),
     );
-    const sessions = [...clientSessions.values(), ...pendingSessions.values()];
-    clientSessions.clear();
-    pendingSessions.clear();
+    const ending = [...channels];
     catalogListed = false;
-    await Promise.allSettled(sessions.map((state) => state.server.close()));
+    for (const channel of ending) channel.close();
   };
   const waitForClientReady = async (
     signal?: AbortSignal,
@@ -838,18 +926,13 @@ export const createClaudeCodeToolMcpHost = async (
   };
 
   return {
-    url,
-    authorizationHeader: bearer,
     toolCatalogHash: catalogHash,
+    claudeToolNames: tools.map((tool) => tool.name),
     postToolUseHook: {
       url: `http://${HOST}:${port}${hookPath}`,
       headers: { Authorization: bearer },
     },
-    mcpServerConfig: {
-      type: "http",
-      url,
-      headers: { Authorization: bearer },
-    },
+    openControlChannel,
     abortActiveCalls,
     waitForClientReady,
     resetClientSessions,

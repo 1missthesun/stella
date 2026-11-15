@@ -1,7 +1,5 @@
 export const CLAUDE_KEEPER_DIRECTORY = "/home/stella-host-state/claude-keepers";
 
-export const CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER = "\u0000stella-mcp-config\u0000";
-
 export const CLAUDE_KEEPER_IDLE_MS = 120_000;
 
 export type ClaudeKeeperState = {
@@ -17,15 +15,12 @@ export type ClaudeKeeperSpawn = {
   cwd: string;
 };
 
-export type ClaudeKeeperUpstream = { url: string; authorization: string };
-
 export type ClaudeKeeperRequest =
   | {
       t: "attach";
       key: string;
       reusable: boolean;
       state: ClaudeKeeperState | null;
-      upstream: ClaudeKeeperUpstream;
       spawn: ClaudeKeeperSpawn;
     }
   | { t: "write"; data: string }

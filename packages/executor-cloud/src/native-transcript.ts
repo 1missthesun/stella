@@ -1,3 +1,4 @@
+import { stellaToolNameFromClaudeCode } from "@stella/contracts/claude-code-tool-names";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 
@@ -5,7 +6,6 @@ type Execution = Extract<CloudExecutionSelection, { engine: "anthropic" }>;
 type Block = Record<string, unknown>;
 type Usage = { inputTokens: number; outputTokens: number; llmCalls: number };
 
-const MCP_PREFIX = "mcp__stella__";
 const RESULT_MAX_CHARS = 16_000;
 const ARGUMENTS_MAX_CHARS = 64_000;
 const TURN_MAX_CHARS = 2_000_000;
@@ -116,7 +116,7 @@ export const createNativeTranscript = (args: { prompt: string; inputPrompt: stri
       } else if (block.type === "redacted_thinking" && typeof block.data === "string") {
         open.message.content.push({ type: "thinking", thinking: "", thinkingSignature: block.data, redacted: true });
       } else if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
-        const name = block.name.startsWith(MCP_PREFIX) ? block.name.slice(MCP_PREFIX.length) : block.name;
+        const name = stellaToolNameFromClaudeCode(block.name);
         toolNames.set(block.id, name);
         open.message.content.push({ type: "toolCall", id: block.id, name, arguments: toolArguments(block.input) });
         (open.message as { stopReason: string }).stopReason = "toolUse";

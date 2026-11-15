@@ -42,7 +42,7 @@ import {
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
-import { claudeCodeToolName, stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
+import { stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
 import { createHash } from "node:crypto";
 import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
@@ -72,6 +72,9 @@ export const CLAUDE_CODE_BUILTIN_TOOLS = [
   "WebFetch",
 ] as const;
 const CLI_WEB_TOOLS: readonly string[] = ["WebSearch", "WebFetch"];
+
+/** Stella's tools keep their own names in Claude Code, as do its built-ins. */
+const sameToolName = (name: string): string => name;
 const ENGINE_ONLY_TOOLS = ["TaskStop", "Monitor", "Grep", "Glob", "WebSearch", "WebFetch"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
 
@@ -474,12 +477,6 @@ export const CLAUDE_CODE_SESSION_LOST = "CLAUDE_CODE_SESSION_LOST";
 
 const sessionLost = (error: unknown): boolean => (error as { code?: unknown } | undefined)?.code === CLAUDE_CODE_SESSION_LOST;
 
-const cliToolName =
-  (binding: Binding) =>
-  (name: string): string =>
-    CLI_WEB_TOOLS.includes(name) || (!binding.builtinsOff && (CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(name))
-      ? name
-      : claudeCodeToolName(name);
 
 /**
  * What a tool result says when the call was cut off by Stella stopping (an update, a restart, a crash): pi-durable's
@@ -671,8 +668,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       sessionKey: `${binding.session.sessionKey}:compact:${crypto.randomUUID()}`,
       ephemeral: true,
     };
-    const toolName = cliToolName(binding);
-    const sessionId = await hydrate(ref, (meta) => claudeCodeTranscript(withResidentContext(messages), meta, toolName));
+    const sessionId = await hydrate(ref, (meta) => claudeCodeTranscript(withResidentContext(messages), meta, sameToolName));
     if (!sessionId) return undefined;
     const prompt = `/compact ${instructions ?? ""}`.trim();
     let summary: string | undefined;
@@ -947,7 +943,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           claudeCodeTranscript(
             conversation.slice(0, promptAt),
             meta,
-            cliToolName(binding),
+            sameToolName,
             thinkingOn(conversation, request.model.id, options.resolveModel?.(request.model.id)),
           ),
         )

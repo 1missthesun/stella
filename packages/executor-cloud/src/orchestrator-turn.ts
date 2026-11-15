@@ -19,10 +19,7 @@ import {
   getClaudeCodeStatusChangeFromStreamEvent,
   stellaToolPredicate,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
-import {
-  stellaToolNameFromClaudeCode,
-  withClaudeCodeToolNames,
-} from "@stella/contracts/claude-code-tool-names";
+import { stellaToolNameFromClaudeCode } from "@stella/contracts/claude-code-tool-names";
 import { createClaudeCodeToolMcpHost } from "@stella/runtime/kernel/integrations/claude-code-tool-mcp-host.js";
 import { createClaudeCodeCompactionDetector } from "@stella/runtime/kernel/integrations/claude-code-compaction.js";
 import {
@@ -742,10 +739,7 @@ export const runOrchestratorTurn = async (args: {
         prompt: input.prompt,
         systemPrompt: spec.compact
           ? ""
-          : withClaudeCodeToolNames(
-              buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt, nativeTools),
-              spec.toolCatalog.map((tool) => tool.name),
-            ),
+          : buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt, nativeTools),
         execution,
         claudeAccount,
         threadId: input.threadId,

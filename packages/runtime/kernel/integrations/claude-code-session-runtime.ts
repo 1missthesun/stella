@@ -47,9 +47,7 @@ import {
 } from "./claude-code-tool-mcp-host.js";
 import {
   CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV,
-  claudeCodeToolName,
   stellaToolNameFromClaudeCode,
-  withClaudeCodeToolNames,
 } from "@stella/contracts/claude-code-tool-names";
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 import {
@@ -899,7 +897,7 @@ const stableToolArgs = (value: unknown): string => {
 };
 /** One key for a tool however Claude Code named it (plain, old prefixed, MCP-side). */
 const normalizeClaudeToolName = (toolName: string) =>
-  claudeCodeToolName(stellaToolNameFromClaudeCode(toolName));
+  stellaToolNameFromClaudeCode(toolName);
 const claudeToolKey = (toolName: string, toolArgs: ClaudeToolArgs) => {
   return crypto
     .createHash("sha256")
@@ -970,7 +968,7 @@ type ObservedToolUse = {
 export const stellaToolPredicate = (
   tools: readonly { name: string }[],
 ): ((toolName: string) => boolean) => {
-  const names = new Set(tools.map((tool) => claudeCodeToolName(tool.name)));
+  const names = new Set(tools.map((tool) => tool.name));
   return (toolName) => toolName.startsWith("mcp__") || names.has(toolName);
 };
 const isStellaToolCall = (
@@ -978,7 +976,7 @@ const isStellaToolCall = (
   tools: readonly { name: string }[],
 ): boolean =>
   toolName.startsWith("mcp__") ||
-  tools.some((tool) => claudeCodeToolName(tool.name) === toolName);
+  tools.some((tool) => tool.name === toolName);
 /**
  * `callsThroughMcp` says which tool names are Stella's (their calls reach
  * Stella's host); the default knows only old prefixed names.
@@ -2853,12 +2851,7 @@ class ClaudeCodeSessionRuntime {
     if (effectiveSystemPrompt.trim()) {
       args.push(
         "--system-prompt",
-        request.vanilla
-          ? effectiveSystemPrompt.trim()
-          : withClaudeCodeToolNames(
-              effectiveSystemPrompt.trim(),
-              request.tools.map((tool) => tool.name),
-            ),
+        effectiveSystemPrompt.trim(),
       );
       if (cliHasSystemPromptSnapshot) {
         args.push("--system-prompt-snapshot", "off");

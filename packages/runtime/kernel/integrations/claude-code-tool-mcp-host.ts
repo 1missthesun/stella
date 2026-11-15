@@ -43,10 +43,8 @@ import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redactio
 import { waitsForUser } from "@stella/contracts/long-tool-call";
 import {
   CLAUDE_CODE_STELLA_SERVER_NAME,
-  claudeCodeToolName,
   legacyClaudeCodeToolAliases,
   LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX,
-  withClaudeCodeToolNames,
 } from "@stella/contracts/claude-code-tool-names";
 import {
   CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS,
@@ -379,9 +377,9 @@ export const createClaudeCodeToolMcpHost = async (
     options.progressHeartbeatMs ?? CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS;
   const stellaNames = options.tools.map((tool) => tool.name);
   const tools = options.tools.map((tool) => ({
-    // The name the model sees: plain, never one of Claude Code's own.
-    name: claudeCodeToolName(tool.name),
-    description: withClaudeCodeToolNames(tool.description, stellaNames),
+    // The name the model sees: Stella's own, with no prefix.
+    name: tool.name,
+    description: tool.description,
     // Claude rejects root combinators. The host still dispatches through
     // Stella's original catalog and execution-side validators.
     inputSchema: normalizeProviderToolInputSchema(tool.parameters),
@@ -409,9 +407,7 @@ export const createClaudeCodeToolMcpHost = async (
     stellaNameOf.get(claudeName) ??
     (claudeName.startsWith(LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX)
       ? stellaNameOf.get(
-          claudeCodeToolName(
-            claudeName.slice(LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX.length),
-          ),
+          claudeName.slice(LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX.length),
         )
       : undefined);
 

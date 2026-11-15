@@ -34,6 +34,7 @@ export const STELLA_PROMPT_FENCE_TOOLS = [
   "spawn_agent",
   "switch_destination",
   "use_secure_value",
+  "write_stdin",
 ] as const;
 
 const FENCE_TOOL_SET = new Set<string>(STELLA_PROMPT_FENCE_TOOLS);

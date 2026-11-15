@@ -1,5 +1,5 @@
 import type { CloudTurnAttemptPaths } from "@stella/contracts/cloud-turn-attempt";
-import { withClaudeCodeToolNames } from "@stella/contracts/claude-code-tool-names";
+import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools.js";
 import { constants as fsConstants, existsSync } from "node:fs";
 import {
   chown,
@@ -18,7 +18,6 @@ import {
 } from "@stella/contracts/local-file-links";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
-  CLOUD_CLI_WEB_TOOLS,
   parseCloudAgentSystemPrompt,
   type CloudCliTurnRoleInput,
 } from "@stella/contracts/cloud-orchestrator-cli";
@@ -559,21 +558,29 @@ export const runAgentTurn = (
       );
 
       markTurnStep("toolHostCreated");
+      // The same split as a Claude Code task on a computer: Claude Code's own
+      // Read/Edit/Write/Bash/Grep/Glob (plus TaskStop/Monitor and its web
+      // tools) run inside the CLI, which runs sandboxed as the tool user
+      // (claude-sandbox.ts); Stella serves the rest.
+      const byName = new Map(
+        toolHost
+          .getToolCatalog("general", { agentEngine: "claude_code_local" })
+          .map((tool) => [tool.name, tool]),
+      );
+      const claudeToolSet = resolveClaudeCodeToolSet({
+        role: "worker",
+        catalog: cloudGeneralToolNames()
+          .map((name) => byName.get(name))
+          .filter((tool): tool is ToolMetadata => Boolean(tool)),
+        builtinsOff: false,
+      });
       const context: ToolContext = cloudAgentToolContext({
         threadId: input.threadId,
         workspaceRoot,
         workspaceStateDir,
         toolHome,
-        allowedToolNames: cloudGeneralToolNames().filter((name) => name !== "web"),
+        allowedToolNames: claudeToolSet.tools.map((tool) => tool.name),
       });
-
-      const catalog = [
-        ...toolHost.getToolCatalog("general", {}),
-        ...toolHost.getToolCatalog("general", {
-          agentEngine: "claude_code_local",
-        }),
-      ];
-      const byName = new Map(catalog.map((tool) => [tool.name, tool]));
       let waitingFor: string | undefined;
       const endTurnWaitingTool: ToolMetadata = {
         name: END_TURN_WAITING_TOOL,
@@ -581,15 +588,11 @@ export const runAgentTurn = (
         parameters: END_TURN_WAITING_PARAMETERS as unknown as ToolMetadata["parameters"],
       };
       const cloudToolMetadata = [
-        ...cloudGeneralToolNames()
-          .filter((name) => name !== "web")
-          .map((name) => byName.get(name))
-          .filter((tool): tool is ToolMetadata => Boolean(tool))
-          .map((tool) =>
-            tool.name === "code"
-              ? { ...tool, description: CODE_TOOL_CLOUD_AGENT_DESCRIPTION }
-              : tool,
-          ),
+        ...claudeToolSet.tools.map((tool) =>
+          tool.name === "code"
+            ? { ...tool, description: CODE_TOOL_CLOUD_AGENT_DESCRIPTION }
+            : tool,
+        ),
         cloudAgentMoveTool,
         endTurnWaitingTool,
       ];
@@ -683,15 +686,12 @@ export const runAgentTurn = (
                 role: "agent",
                 threadId: input.threadId,
                 conversationId: input.conversationId,
-                nativeTools: CLOUD_CLI_WEB_TOOLS,
+                nativeTools: claudeToolSet.nativeTools,
               }),
               prompt: input.prompt,
-              systemPrompt: withClaudeCodeToolNames(
-                buildClaudeCodeNativeToolRuntimePrompt(
-                  cloudSystemPrompt,
-                  CLOUD_CLI_WEB_TOOLS,
-                ),
-                cloudToolMetadata.map((tool) => tool.name),
+              systemPrompt: buildClaudeCodeNativeToolRuntimePrompt(
+                cloudSystemPrompt,
+                claudeToolSet.nativeTools,
               ),
               execution: nativeExecution,
               claudeAccount,

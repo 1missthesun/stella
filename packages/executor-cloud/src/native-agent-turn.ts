@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { markTurnStep } from "./turn-timing.js";
 import * as Effect from "effect/Effect";
 import {
@@ -22,7 +23,6 @@ import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effor
 import {
   CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV,
   CLAUDE_CODE_STELLA_SERVER_NAME,
-  claudeCodeToolName,
 } from "@stella/contracts/claude-code-tool-names";
 import {
   CLOUD_ADOPTED_SESSION_DIR,
@@ -53,6 +53,7 @@ import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-i
 import type { ToolProcessIdentity } from "@stella/runtime/kernel/tools/types.js";
 import {
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
+  claudeCodeNativeToolMatcher,
   ClaudeCodeCompactionLoopError,
   claudeCodeSubscriptionLimitOf,
   getClaudeCodeStatusChangeFromStreamEvent,
@@ -62,7 +63,17 @@ import {
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
 import { resolveExternalCliPath } from "@stella/runtime/kernel/integrations/external-cli-resolution.js";
 import { prepareCloudClaudeCli } from "./claude-cli.js";
-import { CLOUD_HOST_STATE } from "./cloud-process-isolation.js";
+import {
+  CLOUD_HOST_STATE,
+  CLOUD_TOOL_PROCESS_IDENTITY,
+} from "./cloud-process-isolation.js";
+import {
+  prepareClaudeSandbox,
+  probeClaudeSandbox,
+  restoreNativeStateOwner,
+  sandboxedClaudeLaunch,
+} from "./claude-sandbox.js";
+import { CLOUD_TOOL_HOME, toolStateEnvironment } from "@stella/contracts/cloud-tool-home";
 import { WORLD_ROOT } from "./workspace-paths.js";
 import {
   parseAuthoritativeAgentHistory,
@@ -582,6 +593,8 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   inputPrompt?: string;
   includePartialMessages?: boolean;
   nativeTools?: readonly string[];
+  /** The command Claude Code runs after each of its own tools to redact the output. */
+  postToolUseHookCommand?: string;
 }): string[] => [
   "-p",
   "--verbose",
@@ -606,6 +619,24 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   JSON.stringify({
     workflowKeywordTriggerEnabled: false,
     disableWorkflows: true,
+    ...(options.postToolUseHookCommand && (options.nativeTools ?? []).length > 0
+      ? {
+          hooks: {
+            PostToolUse: [
+              {
+                matcher: claudeCodeNativeToolMatcher(options.stellaToolNames),
+                hooks: [
+                  {
+                    type: "command",
+                    command: options.postToolUseHookCommand,
+                    timeout: 15,
+                  },
+                ],
+              },
+            ],
+          },
+        }
+      : {}),
   }),
   // Send the prompt as given on every launch. By default the CLI records a
   // conversation's first system prompt and resends that record on every
@@ -742,6 +773,12 @@ export const runCloudClaude = async (options: {
       : deterministicUuid(profile.sessionKey);
   markTurnStep("claudeStateChecked");
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
+  // Claude Code redacts its own tools' output through this command, run
+  // inside its sandbox (Stella's host redacts Stella's tools).
+  const hookScript = fileURLToPath(
+    new URL("./claude-post-tool-use-hook.ts", import.meta.url),
+  );
+  const postToolUseHookCommand = `"${process.execPath}" "${hookScript}"`;
   const argsFor = (resumeSession: boolean) =>
     buildCloudClaudeTakeoverArgs({
       model: options.execution.model,
@@ -753,8 +790,12 @@ export const runCloudClaude = async (options: {
       sessionId,
       includePartialMessages: profile.includePartialMessages,
       nativeTools: profile.nativeTools,
+      postToolUseHookCommand,
     });
-  const childEnv = buildClaudeChildEnv({
+  // Inside the sandbox an agent's home is the owner's world, as for Stella's
+  // own shell; the orchestrator has no files, so its home is its private /tmp.
+  const sandboxHome = profile.role === "orchestrator" ? "/tmp" : WORLD_ROOT;
+  const baseEnv = buildClaudeChildEnv({
     initialEnv: process.env,
     stateRoot,
     accountDirectory,
@@ -766,7 +807,54 @@ export const runCloudClaude = async (options: {
       ? { autoCompactWindowTokens: profile.autoCompactWindowTokens }
       : {}),
   });
+  const childEnv: NodeJS.ProcessEnv = {
+    ...baseEnv,
+    ...toolStateEnvironment(profile.role === "orchestrator" ? "/tmp" : CLOUD_TOOL_HOME),
+    HOME: sandboxHome,
+    USER: CLOUD_TOOL_PROCESS_IDENTITY.user,
+    LOGNAME: CLOUD_TOOL_PROCESS_IDENTITY.user,
+    TMPDIR: "/tmp",
+  };
   const claudeCommand = resolveExternalCliPath("claude");
+  const sandbox = await prepareClaudeSandbox({
+    stateRoot,
+    accountDirectory,
+    cwd: profile.cwd,
+    home: sandboxHome,
+    threadKey: profile.sessionKey,
+    fresh: !(options.keeper && inbox),
+  }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+  // Every turn proves the sandbox for real before Claude Code runs in it.
+  const escaped =
+    typeof sandbox === "string"
+      ? `FAIL prepare: ${sandbox}`
+      : await probeClaudeSandbox(sandbox, {
+          hookScript,
+          runtime: process.execPath,
+        });
+  if (escaped || typeof sandbox === "string") {
+    console.error(`claude sandbox probe failed: ${(escaped ?? "").slice(0, 2_000)}`);
+    // Which checks failed reaches the turn's timing log (paths and check
+    // names only).
+    const failed = (escaped ?? "")
+      .split("\n")
+      .filter((line) => line.startsWith("FAIL "))
+      .map((line) => line.slice(5));
+    for (const check of failed.length > 0 ? failed : [`error ${escaped}`]) {
+      markTurnStep(`claudeSandboxFailed_${check.replace(/[^A-Za-z0-9_]+/gu, "_").slice(0, 80)}`);
+    }
+    return {
+      finalText: "",
+      error:
+        "Stella couldn't start Claude Code in its sandbox, so it stopped before answering. Try again.",
+      usage: { inputTokens: 0, outputTokens: 0, llmCalls: 0 },
+      sessionId: "",
+      steered: [],
+    };
+  }
+  markTurnStep("claudeSandboxProven");
+  const launchOf = (args: string[]) =>
+    sandboxedClaudeLaunch(sandbox, claudeCommand, args);
   let keeper: ClaudeKeeperClient | undefined;
   let keeperReused = false;
   if (options.keeper && inbox) {
@@ -798,8 +886,7 @@ export const runCloudClaude = async (options: {
         reusable: options.keeper.reusable,
         state,
         spawn: {
-          command: claudeCommand,
-          args: argsFor(resume),
+          ...launchOf(argsFor(resume)),
           env,
           cwd: profile.cwd,
         },
@@ -1058,8 +1145,7 @@ export const runCloudClaude = async (options: {
               `${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`,
             );
           },
-          command: claudeCommand,
-          args,
+          ...launchOf(args),
           cwd: profile.cwd,
           env: childEnv,
           cancellation,
@@ -1236,7 +1322,7 @@ const writeHistorySession = async (args: {
   const text = claudeCodeTranscript(
     messages as never,
     { sessionId, cwd: workingFolder, version: await claudeCliVersion() },
-    claudeCodeToolName,
+    (name) => name,
     (message) => current !== undefined && claudeCodeIdentity(message) === current,
   );
   if (!text) return undefined;
@@ -1444,6 +1530,10 @@ export const runNativeAgentTurn = async (options: {
       ...(result.error ? { error: result.error } : {}),
     });
   const kept = result.kept;
+  // The CLI ran as the tool user and left its session folder owned by it.
+  // Give it back to root before the executor seals and archives it, so the
+  // native-state machinery sees the root-owned tree it requires.
+  await restoreNativeStateOwner(stateRoot);
   let checkpoint: Awaited<ReturnType<typeof sealNativeState>>;
   try {
     if (!result.sessionId) {

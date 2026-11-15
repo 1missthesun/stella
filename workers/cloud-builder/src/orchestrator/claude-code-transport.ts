@@ -1,4 +1,3 @@
-import { claudeCodeToolName } from "@stella/contracts/claude-code-tool-names";
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
 import {
   CLAUDE_CODE_SESSION_LOST,
@@ -126,7 +125,7 @@ const streamEventsOf = (message: CloudCliAssistantMessage): Record<string, unkno
           content_block: {
             type: "tool_use",
             id: part.id,
-            name: CLOUD_CLI_WEB_TOOLS.includes(part.name) ? part.name : claudeCodeToolName(part.name),
+            name: part.name,
             input: {},
           },
         }),

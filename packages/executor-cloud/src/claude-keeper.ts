@@ -32,6 +32,24 @@ type Child = {
 };
 
 let child: Child | undefined;
+
+/**
+ * Claude Code runs under its sandbox launcher (claude-sandbox.ts), in a
+ * process group of its own: parking, continuing and killing reach the CLI and
+ * the launcher together.
+ */
+const signal = (current: Child, name: NodeJS.Signals): void => {
+  const pid = current.process.pid;
+  try {
+    if (pid) {
+      process.kill(-pid, name);
+      return;
+    }
+  } catch {
+    // The group is gone; signal the launcher itself.
+  }
+  current.process.kill(name);
+};
 let attached: net.Socket | undefined;
 let cancelIdleTimer: (() => void) | undefined;
 
@@ -41,7 +59,7 @@ const send = (socket: net.Socket | undefined, event: ClaudeKeeperEvent): void =>
 
 const shutdown = (reason: string): never => {
   log("shutdown", { reason });
-  if (child && !child.exited) child.process.kill("SIGKILL");
+  if (child && !child.exited) signal(child, "SIGKILL");
   void rm(socketPath, { force: true }).catch(() => undefined);
   void rm(`${socketPath}.pid`, { force: true }).catch(() => undefined);
   process.exit(0);
@@ -51,7 +69,7 @@ const killChild = async (): Promise<Child | undefined> => {
   const current = child;
   if (!current) return undefined;
   child = undefined;
-  if (!current.exited) current.process.kill("SIGKILL");
+  if (!current.exited) signal(current, "SIGKILL");
   await current.exitedPromise;
   return current;
 };
@@ -65,6 +83,7 @@ const startChild = async (
     cwd: spec.spawn.cwd,
     env: spec.spawn.env,
     stdio: ["pipe", "pipe", "pipe"],
+    detached: true,
   });
   let resolveExit!: () => void;
   const current: Child = {
@@ -80,11 +99,7 @@ const startChild = async (
   };
   child = current;
   let pending = "";
-  let configRemoved = false;
   processHandle.stdout.on("data", (chunk: Buffer) => {
-    if (!configRemoved) {
-      configRemoved = true;
-        }
     pending += chunk.toString();
     const lines = pending.split(/\r?\n/u);
     pending = lines.pop() ?? "";
@@ -154,7 +169,7 @@ const attach = async (
   if (current && !current.exited && fresh === "none") {
     current.parked = false;
     current.released = null;
-    current.process.kill("SIGCONT");
+    signal(current, "SIGCONT");
     log("claude_reused", { pid: current.process.pid });
     send(socket, { t: "attached", reused: true, fresh });
     return;
@@ -207,7 +222,7 @@ const park = async (socket: net.Socket, stateRoot: string): Promise<void> => {
     send(socket, { t: "error", message: "Claude exited before it could wait." });
     return;
   }
-  current.process.kill("SIGSTOP");
+  signal(current, "SIGSTOP");
   current.parked = true;
   send(socket, { t: "parked" });
 };

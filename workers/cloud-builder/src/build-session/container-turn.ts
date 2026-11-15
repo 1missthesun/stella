@@ -1590,7 +1590,13 @@ export const runAgentAttempt = async (
       role: "agent",
       systemPrompt: [
         renderCloudAgentPrompt("agents/general.md", {
-          names: [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL, END_TURN_WAITING_TOOL],
+          // Container agents run on Claude Code: its own Bash (with TaskStop
+          // and Monitor) replaces Stella's shell sessions and write_stdin.
+          names: [
+            ...cloudGeneralToolNames().filter((name) => name !== "write_stdin"),
+            CLOUD_AGENT_MOVE_TOOL,
+            END_TURN_WAITING_TOOL,
+          ],
           history: true,
         }),
         ...(rulesSection ? [rulesSection] : []),

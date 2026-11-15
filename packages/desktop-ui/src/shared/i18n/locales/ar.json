@@ -2105,8 +2105,7 @@
         "deletionScheduled": "تمت جدولة حذف حسابك. سنرسل إليك بريدًا إلكترونيًا عند الانتهاء.",
         "signInBeforeDelete": "سجّل الدخول قبل حذف حسابك."
       },
-      "signedInToStellaAs": "مسجّل الدخول إلى Stella باسم {email}",
-      "deleteLabel": "حذف البيانات أو الحساب"
+      "signedInToStellaAs": "مسجّل الدخول إلى Stella باسم {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "منتقي نموذج المساعد",

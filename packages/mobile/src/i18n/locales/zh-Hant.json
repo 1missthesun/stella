@@ -2055,8 +2055,7 @@
         "deletionScheduled": "你的帳號已排定刪除。完成後我們會寄電子郵件通知你。",
         "signInBeforeDelete": "請先登入，再刪除帳號。"
       },
-      "signedInToStellaAs": "已用 {email} 登入 Stella",
-      "deleteLabel": "刪除資料或帳戶"
+      "signedInToStellaAs": "已用 {email} 登入 Stella"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "助理模型選擇器",
@@ -2829,7 +2828,8 @@
         "upToDateTitle": "已是最新版本",
         "upToDateBody": "Stella 的新版本會顯示在這裡。",
         "notSharedConflict": "此處所做的變更沒有同步到你的其他電腦：它們與另一台電腦上的變更衝突。取得那項變更即可共享。",
-        "notSharedBuild": "此處所做的變更沒有同步到你的其他電腦：與另一台電腦上的變更合在一起時，Stella 無法建置。取得那項變更即可共享。"
+        "notSharedBuild": "此處所做的變更沒有同步到你的其他電腦：與另一台電腦上的變更合在一起時，Stella 無法建置。取得那項變更即可共享。",
+        "developerCheckout": "此處的 Stella 從開發者簽出副本執行：更新不會變更它，也不會與你的其他電腦分享任何內容。"
       },
       "updating": "正在更新…",
       "afterRecording": "錄製結束後",

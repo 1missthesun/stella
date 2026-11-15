@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Ditt konto är schemalagt för radering. Vi mejlar dig när det är klart.",
         "signInBeforeDelete": "Logga in innan du raderar ditt konto."
       },
-      "signedInToStellaAs": "Inloggad i Stella som {email}",
-      "deleteLabel": "Radera data eller konto"
+      "signedInToStellaAs": "Inloggad i Stella som {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Modellväljare för assistent",

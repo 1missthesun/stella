@@ -2085,8 +2085,7 @@
         "deletionScheduled": "Usunięcie Twojego konta zostało zaplanowane. Wyślemy Ci e-mail, gdy się zakończy.",
         "signInBeforeDelete": "Zaloguj się przed usunięciem konta."
       },
-      "signedInToStellaAs": "Zalogowano do Stelli jako {email}",
-      "deleteLabel": "Usuń dane lub konto"
+      "signedInToStellaAs": "Zalogowano do Stelli jako {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Wybór modelu asystenta",

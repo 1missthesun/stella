@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Hesabınız silinmek üzere planlandı. Tamamlandığında size e-posta göndereceğiz.",
         "signInBeforeDelete": "Hesabınızı silmeden önce giriş yapın."
       },
-      "signedInToStellaAs": "Stella'ya {email} olarak giriş yapıldı",
-      "deleteLabel": "Verileri veya hesabı sil"
+      "signedInToStellaAs": "Stella'ya {email} olarak giriş yapıldı"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Asistan modeli seçici",
@@ -2840,7 +2839,8 @@
         "upToDateTitle": "Her şey güncel",
         "upToDateBody": "Stella'nın yeni sürümleri burada görünür.",
         "notSharedConflict": "Burada yapılan değişiklikler diğer bilgisayarlarınıza ulaşmıyor: başka bir bilgisayardaki bir değişiklikle çakışıyorlar. Paylaşmak için o değişikliği alın.",
-        "notSharedBuild": "Burada yapılan değişiklikler diğer bilgisayarlarınıza ulaşmıyor: başka bir bilgisayardaki bir değişiklikle birlikte Stella derlenmiyor. Paylaşmak için o değişikliği alın."
+        "notSharedBuild": "Burada yapılan değişiklikler diğer bilgisayarlarınıza ulaşmıyor: başka bir bilgisayardaki bir değişiklikle birlikte Stella derlenmiyor. Paylaşmak için o değişikliği alın.",
+        "developerCheckout": "Stella burada bir geliştirici kopyasından çalışıyor: güncellemeler onu değiştirmez ve diğer bilgisayarlarınızla hiçbir şey paylaşılmaz."
       },
       "updating": "Güncelleniyor…",
       "afterRecording": "Kaydınızdan sonra",

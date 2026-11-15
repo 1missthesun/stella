@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Your account is scheduled for deletion. We'll email you when it's done.",
         "signInBeforeDelete": "Sign in before deleting your account."
       },
-      "signedInToStellaAs": "Signed in to Stella as {email}",
-      "deleteLabel": "Delete data or account"
+      "signedInToStellaAs": "Signed in to Stella as {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Assistant model picker",
@@ -2840,7 +2839,8 @@
         "upToDateTitle": "You're up to date",
         "upToDateBody": "New versions of Stella show up here.",
         "notSharedConflict": "Changes made here aren't reaching your other computers: they clash with a change from another computer. Get that change to share them.",
-        "notSharedBuild": "Changes made here aren't reaching your other computers: together with a change from another computer, Stella wouldn't build. Get that change to share them."
+        "notSharedBuild": "Changes made here aren't reaching your other computers: together with a change from another computer, Stella wouldn't build. Get that change to share them.",
+        "developerCheckout": "Stella runs from a developer checkout here: updates don't change it, and nothing is shared with your other computers."
       },
       "updating": "Updating…",
       "afterRecording": "After your recording",

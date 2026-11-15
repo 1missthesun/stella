@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Din konto er planlagt til sletning. Vi sender dig en e-mail, når det er gjort.",
         "signInBeforeDelete": "Log ind, før du sletter din konto."
       },
-      "signedInToStellaAs": "Logget ind på Stella som {email}",
-      "deleteLabel": "Slet data eller konto"
+      "signedInToStellaAs": "Logget ind på Stella som {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Modelvælger til assistent",
@@ -2840,7 +2839,8 @@
         "upToDateTitle": "Du er opdateret",
         "upToDateBody": "Nye versioner af Stella vises her.",
         "notSharedConflict": "Ændringer foretaget her når ikke frem til dine andre computere: de er i konflikt med en ændring fra en anden computer. Hent den ændring for at dele dem.",
-        "notSharedBuild": "Ændringer foretaget her når ikke frem til dine andre computere: sammen med en ændring fra en anden computer kan Stella ikke bygges. Hent den ændring for at dele dem."
+        "notSharedBuild": "Ændringer foretaget her når ikke frem til dine andre computere: sammen med en ændring fra en anden computer kan Stella ikke bygges. Hent den ændring for at dele dem.",
+        "developerCheckout": "Stella kører her fra en udviklerkopi: opdateringer ændrer den ikke, og intet deles med dine andre computere."
       },
       "updating": "Opdaterer…",
       "afterRecording": "Efter din optagelse",

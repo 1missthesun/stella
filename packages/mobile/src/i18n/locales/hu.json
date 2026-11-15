@@ -2065,8 +2065,7 @@
         "deletionScheduled": "A fiókod törlése ütemezve van. E-mailt küldünk, ha kész.",
         "signInBeforeDelete": "Jelentkezz be a fiókod törlése előtt."
       },
-      "signedInToStellaAs": "Bejelentkezve a Stellába: {email}",
-      "deleteLabel": "Adatok vagy fiók törlése"
+      "signedInToStellaAs": "Bejelentkezve a Stellába: {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Asszisztensmodell-választó",
@@ -2840,7 +2839,8 @@
         "upToDateTitle": "Minden naprakész",
         "upToDateBody": "A Stella új verziói itt jelennek meg.",
         "notSharedConflict": "Az itt végzett módosítások nem jutnak el a többi számítógépedre: ütköznek egy másik számítógép módosításával. Szerezd be azt a módosítást a megosztásukhoz.",
-        "notSharedBuild": "Az itt végzett módosítások nem jutnak el a többi számítógépedre: egy másik számítógép módosításával együtt a Stella nem fordulna le. Szerezd be azt a módosítást a megosztásukhoz."
+        "notSharedBuild": "Az itt végzett módosítások nem jutnak el a többi számítógépedre: egy másik számítógép módosításával együtt a Stella nem fordulna le. Szerezd be azt a módosítást a megosztásukhoz.",
+        "developerCheckout": "A Stella itt egy fejlesztői példányból fut: a frissítések nem módosítják, és semmi sem kerül megosztásra a többi számítógépeddel."
       },
       "updating": "Frissítés…",
       "afterRecording": "A felvétel után",

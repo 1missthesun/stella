@@ -2055,8 +2055,7 @@
         "deletionScheduled": "Akun Anda dijadwalkan untuk dihapus. Kami akan mengirim email setelah selesai.",
         "signInBeforeDelete": "Masuk sebelum menghapus akun Anda."
       },
-      "signedInToStellaAs": "Masuk ke Stella sebagai {email}",
-      "deleteLabel": "Hapus data atau akun"
+      "signedInToStellaAs": "Masuk ke Stella sebagai {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Pemilih model asisten",

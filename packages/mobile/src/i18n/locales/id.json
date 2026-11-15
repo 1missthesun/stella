@@ -2055,8 +2055,7 @@
         "deletionScheduled": "Akun Anda dijadwalkan untuk dihapus. Kami akan mengirim email setelah selesai.",
         "signInBeforeDelete": "Masuk sebelum menghapus akun Anda."
       },
-      "signedInToStellaAs": "Masuk ke Stella sebagai {email}",
-      "deleteLabel": "Hapus data atau akun"
+      "signedInToStellaAs": "Masuk ke Stella sebagai {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Pemilih model asisten",
@@ -2829,7 +2828,8 @@
         "upToDateTitle": "Semua sudah terbaru",
         "upToDateBody": "Versi baru Stella muncul di sini.",
         "notSharedConflict": "Perubahan yang dibuat di sini tidak sampai ke komputer Anda yang lain: perubahan itu bentrok dengan perubahan dari komputer lain. Ambil perubahan itu untuk membagikannya.",
-        "notSharedBuild": "Perubahan yang dibuat di sini tidak sampai ke komputer Anda yang lain: bersama perubahan dari komputer lain, Stella tidak akan bisa dibangun. Ambil perubahan itu untuk membagikannya."
+        "notSharedBuild": "Perubahan yang dibuat di sini tidak sampai ke komputer Anda yang lain: bersama perubahan dari komputer lain, Stella tidak akan bisa dibangun. Ambil perubahan itu untuk membagikannya.",
+        "developerCheckout": "Stella berjalan dari checkout developer di sini: pembaruan tidak mengubahnya, dan tidak ada yang dibagikan ke komputer Anda yang lain."
       },
       "updating": "Memperbarui…",
       "afterRecording": "Setelah rekaman Anda",

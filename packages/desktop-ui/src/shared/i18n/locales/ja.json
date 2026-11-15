@@ -2055,8 +2055,7 @@
         "deletionScheduled": "アカウントの削除が予約されました。完了したらメールでお知らせします。",
         "signInBeforeDelete": "アカウントを削除する前にサインインしてください。"
       },
-      "signedInToStellaAs": "{email} で Stella にサインイン中",
-      "deleteLabel": "データまたはアカウントを削除"
+      "signedInToStellaAs": "{email} で Stella にサインイン中"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "アシスタントのモデルピッカー",

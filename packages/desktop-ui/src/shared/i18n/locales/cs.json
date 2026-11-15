@@ -2085,8 +2085,7 @@
         "deletionScheduled": "Smazání vašeho účtu je naplánováno. Až bude hotovo, pošleme vám e-mail.",
         "signInBeforeDelete": "Před smazáním účtu se přihlaste."
       },
-      "signedInToStellaAs": "Přihlášeno do Stelly jako {email}",
-      "deleteLabel": "Smazat data nebo účet"
+      "signedInToStellaAs": "Přihlášeno do Stelly jako {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Výběr modelu asistenta",

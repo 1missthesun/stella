@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Din konto er planlagt til sletning. Vi sender dig en e-mail, når det er gjort.",
         "signInBeforeDelete": "Log ind, før du sletter din konto."
       },
-      "signedInToStellaAs": "Logget ind på Stella som {email}",
-      "deleteLabel": "Slet data eller konto"
+      "signedInToStellaAs": "Logget ind på Stella som {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Modelvælger til assistent",

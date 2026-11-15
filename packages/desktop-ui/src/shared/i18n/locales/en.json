@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Your account is scheduled for deletion. We'll email you when it's done.",
         "signInBeforeDelete": "Sign in before deleting your account."
       },
-      "signedInToStellaAs": "Signed in to Stella as {email}",
-      "deleteLabel": "Delete data or account"
+      "signedInToStellaAs": "Signed in to Stella as {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Assistant model picker",

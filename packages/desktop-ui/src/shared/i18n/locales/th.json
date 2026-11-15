@@ -2055,8 +2055,7 @@
         "deletionScheduled": "บัญชีของคุณถูกกำหนดให้ลบแล้ว เราจะส่งอีเมลแจ้งเมื่อเสร็จสิ้น",
         "signInBeforeDelete": "ลงชื่อเข้าใช้ก่อนลบบัญชีของคุณ"
       },
-      "signedInToStellaAs": "ลงชื่อเข้าใช้ Stella ด้วย {email}",
-      "deleteLabel": "ลบข้อมูลหรือบัญชี"
+      "signedInToStellaAs": "ลงชื่อเข้าใช้ Stella ด้วย {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "ตัวเลือกโมเดลผู้ช่วย",

@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Dein Konto ist zur Löschung vorgemerkt. Wir schicken dir eine E-Mail, wenn es erledigt ist.",
         "signInBeforeDelete": "Melde dich an, bevor du dein Konto löschst."
       },
-      "signedInToStellaAs": "Bei Stella angemeldet als {email}",
-      "deleteLabel": "Daten oder Konto löschen"
+      "signedInToStellaAs": "Bei Stella angemeldet als {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Modellauswahl für Assistent",

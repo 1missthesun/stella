@@ -2075,8 +2075,7 @@
         "deletionScheduled": "L'eliminazione del tuo account è programmata. Ti invieremo un'email quando sarà completata.",
         "signInBeforeDelete": "Accedi prima di eliminare il tuo account."
       },
-      "signedInToStellaAs": "Accesso a Stella come {email}",
-      "deleteLabel": "Elimina dati o account"
+      "signedInToStellaAs": "Accesso a Stella come {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Selettore del modello dell'assistente",

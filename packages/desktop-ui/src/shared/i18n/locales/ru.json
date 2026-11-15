@@ -2085,8 +2085,7 @@
         "deletionScheduled": "Удаление вашего аккаунта запланировано. Мы сообщим по электронной почте, когда всё будет готово.",
         "signInBeforeDelete": "Войдите, прежде чем удалять аккаунт."
       },
-      "signedInToStellaAs": "Вход в Stella выполнен как {email}",
-      "deleteLabel": "Удалить данные или аккаунт"
+      "signedInToStellaAs": "Вход в Stella выполнен как {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Выбор модели ассистента",

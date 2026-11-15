@@ -2055,8 +2055,7 @@
         "deletionScheduled": "アカウントの削除が予約されました。完了したらメールでお知らせします。",
         "signInBeforeDelete": "アカウントを削除する前にサインインしてください。"
       },
-      "signedInToStellaAs": "{email} で Stella にサインイン中",
-      "deleteLabel": "データまたはアカウントを削除"
+      "signedInToStellaAs": "{email} で Stella にサインイン中"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "アシスタントのモデルピッカー",
@@ -2829,7 +2828,8 @@
         "upToDateTitle": "最新の状態です",
         "upToDateBody": "Stellaの新しいバージョンがここに表示されます。",
         "notSharedConflict": "ここでの変更が他のコンピュータに届いていません：別のコンピュータの変更と競合しています。その変更を取得すると共有されます。",
-        "notSharedBuild": "ここでの変更が他のコンピュータに届いていません：別のコンピュータの変更と合わせるとStellaがビルドできません。その変更を取得すると共有されます。"
+        "notSharedBuild": "ここでの変更が他のコンピュータに届いていません：別のコンピュータの変更と合わせるとStellaがビルドできません。その変更を取得すると共有されます。",
+        "developerCheckout": "ここでは Stella が開発者のチェックアウトから実行されています。アップデートで変更されることはなく、他のコンピューターとも何も共有されません。"
       },
       "updating": "アップデート中…",
       "afterRecording": "録画の終了後",

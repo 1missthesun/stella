@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Ο λογαριασμός σας έχει προγραμματιστεί για διαγραφή. Θα σας στείλουμε email όταν ολοκληρωθεί.",
         "signInBeforeDelete": "Συνδεθείτε πριν διαγράψετε τον λογαριασμό σας."
       },
-      "signedInToStellaAs": "Συνδεδεμένος στη Stella ως {email}",
-      "deleteLabel": "Διαγραφή δεδομένων ή λογαριασμού"
+      "signedInToStellaAs": "Συνδεδεμένος στη Stella ως {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Επιλογέας μοντέλου βοηθού",

@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Tilisi on ajoitettu poistettavaksi. Lähetämme sähköpostia, kun se on valmis.",
         "signInBeforeDelete": "Kirjaudu sisään ennen tilisi poistamista."
       },
-      "signedInToStellaAs": "Kirjautunut Stellaan tilillä {email}",
-      "deleteLabel": "Poista tiedot tai tili"
+      "signedInToStellaAs": "Kirjautunut Stellaan tilillä {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Avustajan mallivalitsin",

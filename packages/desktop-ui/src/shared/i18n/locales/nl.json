@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Je account staat gepland voor verwijdering. We mailen je zodra het klaar is.",
         "signInBeforeDelete": "Meld je aan voordat je je account verwijdert."
       },
-      "signedInToStellaAs": "Ingelogd bij Stella als {email}",
-      "deleteLabel": "Gegevens of account verwijderen"
+      "signedInToStellaAs": "Ingelogd bij Stella als {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Modelkiezer voor assistent",

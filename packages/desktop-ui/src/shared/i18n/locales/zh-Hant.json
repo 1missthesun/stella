@@ -2055,8 +2055,7 @@
         "deletionScheduled": "你的帳號已排定刪除。完成後我們會寄電子郵件通知你。",
         "signInBeforeDelete": "請先登入，再刪除帳號。"
       },
-      "signedInToStellaAs": "已用 {email} 登入 Stella",
-      "deleteLabel": "刪除資料或帳戶"
+      "signedInToStellaAs": "已用 {email} 登入 Stella"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "助理模型選擇器",

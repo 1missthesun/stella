@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Tilisi on ajoitettu poistettavaksi. Lähetämme sähköpostia, kun se on valmis.",
         "signInBeforeDelete": "Kirjaudu sisään ennen tilisi poistamista."
       },
-      "signedInToStellaAs": "Kirjautunut Stellaan tilillä {email}",
-      "deleteLabel": "Poista tiedot tai tili"
+      "signedInToStellaAs": "Kirjautunut Stellaan tilillä {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Avustajan mallivalitsin",
@@ -2840,7 +2839,8 @@
         "upToDateTitle": "Kaikki on ajan tasalla",
         "upToDateBody": "Stellan uudet versiot näkyvät tässä.",
         "notSharedConflict": "Täällä tehdyt muutokset eivät päädy muille tietokoneillesi: ne ovat ristiriidassa toisen tietokoneen muutoksen kanssa. Hae se muutos, niin ne jaetaan.",
-        "notSharedBuild": "Täällä tehdyt muutokset eivät päädy muille tietokoneillesi: yhdessä toisen tietokoneen muutoksen kanssa Stella ei kääntyisi. Hae se muutos, niin ne jaetaan."
+        "notSharedBuild": "Täällä tehdyt muutokset eivät päädy muille tietokoneillesi: yhdessä toisen tietokoneen muutoksen kanssa Stella ei kääntyisi. Hae se muutos, niin ne jaetaan.",
+        "developerCheckout": "Stella toimii täällä kehittäjän työkopiosta: päivitykset eivät muuta sitä, eikä mitään jaeta muille tietokoneillesi."
       },
       "updating": "Päivitetään…",
       "afterRecording": "Tallenteesi jälkeen",

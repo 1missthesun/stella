@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Je account staat gepland voor verwijdering. We mailen je zodra het klaar is.",
         "signInBeforeDelete": "Meld je aan voordat je je account verwijdert."
       },
-      "signedInToStellaAs": "Ingelogd bij Stella als {email}",
-      "deleteLabel": "Gegevens of account verwijderen"
+      "signedInToStellaAs": "Ingelogd bij Stella als {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Modelkiezer voor assistent",
@@ -2840,7 +2839,8 @@
         "upToDateTitle": "Je bent helemaal bij",
         "upToDateBody": "Nieuwe versies van Stella verschijnen hier.",
         "notSharedConflict": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: ze botsen met een wijziging van een andere computer. Haal die wijziging op om ze te delen.",
-        "notSharedBuild": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: samen met een wijziging van een andere computer zou Stella niet bouwen. Haal die wijziging op om ze te delen."
+        "notSharedBuild": "Wijzigingen die hier zijn gemaakt bereiken je andere computers niet: samen met een wijziging van een andere computer zou Stella niet bouwen. Haal die wijziging op om ze te delen.",
+        "developerCheckout": "Stella draait hier vanuit een ontwikkelaarskopie: updates wijzigen die niet en er wordt niets gedeeld met je andere computers."
       },
       "updating": "Bijwerken…",
       "afterRecording": "Na je opname",

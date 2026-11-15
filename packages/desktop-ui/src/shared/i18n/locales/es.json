@@ -2075,8 +2075,7 @@
         "deletionScheduled": "Tu cuenta está programada para eliminarse. Te enviaremos un correo cuando esté hecho.",
         "signInBeforeDelete": "Inicia sesión antes de eliminar tu cuenta."
       },
-      "signedInToStellaAs": "Sesión iniciada en Stella como {email}",
-      "deleteLabel": "Eliminar datos o cuenta"
+      "signedInToStellaAs": "Sesión iniciada en Stella como {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Selector de modelo del asistente",

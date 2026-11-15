@@ -2055,8 +2055,7 @@
         "deletionScheduled": "Tài khoản của bạn đã được lên lịch xóa. Chúng tôi sẽ gửi email khi hoàn tất.",
         "signInBeforeDelete": "Đăng nhập trước khi xóa tài khoản của bạn."
       },
-      "signedInToStellaAs": "Đã đăng nhập Stella bằng {email}",
-      "deleteLabel": "Xóa dữ liệu hoặc tài khoản"
+      "signedInToStellaAs": "Đã đăng nhập Stella bằng {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Bộ chọn mô hình trợ lý",

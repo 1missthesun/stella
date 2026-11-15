@@ -2065,8 +2065,7 @@
         "deletionScheduled": "Hesabınız silinmek üzere planlandı. Tamamlandığında size e-posta göndereceğiz.",
         "signInBeforeDelete": "Hesabınızı silmeden önce giriş yapın."
       },
-      "signedInToStellaAs": "Stella'ya {email} olarak giriş yapıldı",
-      "deleteLabel": "Verileri veya hesabı sil"
+      "signedInToStellaAs": "Stella'ya {email} olarak giriş yapıldı"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Asistan modeli seçici",

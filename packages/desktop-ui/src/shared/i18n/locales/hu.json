@@ -2065,8 +2065,7 @@
         "deletionScheduled": "A fiókod törlése ütemezve van. E-mailt küldünk, ha kész.",
         "signInBeforeDelete": "Jelentkezz be a fiókod törlése előtt."
       },
-      "signedInToStellaAs": "Bejelentkezve a Stellába: {email}",
-      "deleteLabel": "Adatok vagy fiók törlése"
+      "signedInToStellaAs": "Bejelentkezve a Stellába: {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Asszisztensmodell-választó",

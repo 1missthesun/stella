@@ -2075,8 +2075,7 @@
         "deletionScheduled": "Contul tău este programat pentru ștergere. Îți vom trimite un e-mail când este gata.",
         "signInBeforeDelete": "Conectează-te înainte de a-ți șterge contul."
       },
-      "signedInToStellaAs": "Conectat la Stella ca {email}",
-      "deleteLabel": "Șterge datele sau contul"
+      "signedInToStellaAs": "Conectat la Stella ca {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Selector de model pentru asistent",

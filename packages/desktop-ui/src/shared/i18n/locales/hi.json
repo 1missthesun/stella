@@ -2065,8 +2065,7 @@
         "deletionScheduled": "आपका खाता हटाने के लिए शेड्यूल है। पूरा होने पर हम आपको ईमेल करेंगे।",
         "signInBeforeDelete": "अपना खाता हटाने से पहले साइन इन करें।"
       },
-      "signedInToStellaAs": "Stella में {email} के रूप में साइन इन",
-      "deleteLabel": "डेटा या खाता हटाएँ"
+      "signedInToStellaAs": "Stella में {email} के रूप में साइन इन"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "सहायक मॉडल पिकर",

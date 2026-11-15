@@ -2075,8 +2075,7 @@
         "deletionScheduled": "A exclusão da sua conta está agendada. Enviaremos um e-mail quando terminar.",
         "signInBeforeDelete": "Entre antes de excluir sua conta."
       },
-      "signedInToStellaAs": "Conectado à Stella como {email}",
-      "deleteLabel": "Excluir dados ou conta"
+      "signedInToStellaAs": "Conectado à Stella como {email}"
     },
     "agentModelPicker": {
       "assistantPickerAriaLabel": "Seletor de modelo do assistente",

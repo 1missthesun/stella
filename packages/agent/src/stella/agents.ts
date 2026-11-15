@@ -431,7 +431,8 @@ export type AgentDirectoryHost = {
     args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true },
     context: Context,
   ): Promise<AgentMessageDelivery | undefined>;
-  stop?(args: { key: string; threadId: string; requesterThreadId?: string }, context: Context): Promise<AgentStopResult>;
+  /** `elsewhere`: it runs on another computer or in the cloud, so skip any copy of it here. */
+  stop?(args: { key: string; threadId: string; requesterThreadId?: string; elsewhere?: true }, context: Context): Promise<AgentStopResult>;
   move?(
     args: { key: string; threadId: string; to: string; message: string; requesterThreadId?: string },
     context: Context,
@@ -604,6 +605,8 @@ type ReporterInput = {
   fromUser?: true;
   report?: true;
   note?: true;
+  /** Sent by no one on purpose (a schedule's fire): a stopped agent keeps it for when it is resumed. */
+  wake?: true;
 };
 type ReporterState =
   | {
@@ -790,7 +793,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (carried === undefined) {
           await runtime.commit(async (tx) => {
             const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
-            if (agent && wasStopped(agent) && (reporter.input.report || reporter.input.note)) {
+            if (agent && wasStopped(agent) && (reporter.input.report || reporter.input.note || reporter.input.wake)) {
               agent.held = [...(agent.held ?? []), message];
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }
@@ -2242,14 +2245,27 @@ export function stellaAgents(host: StellaAgentsHost) {
     for (const agent of order) {
       if (!agent.record.remote) await markStopped(store, agent.parentConversationId, agent.threadId, context);
     }
+    const stopThere = async (agent: TreeAgent): Promise<void> => {
+      const stop = remoteHostOf(agent.record)?.stop;
+      const result = stop
+        ? await stop(agent.threadId, context).catch(() => undefined)
+        : await host.directory
+            ?.stop?.({ key: `stop:${agent.threadId}:${Date.now()}`, threadId: agent.threadId, elsewhere: true }, context)
+            .catch(() => undefined);
+      if (result) elsewhere.push(result);
+    };
     for (const agent of order) {
       const { record } = agent;
       if (record.remote) {
-        const stop = remoteHostOf(record)?.stop;
-        const result = stop
-          ? await stop(agent.threadId, context).catch(() => undefined)
-          : await host.directory?.stop?.({ key: `stop:${agent.threadId}:${Date.now()}`, threadId: agent.threadId }, context).catch(() => undefined);
-        if (result) elsewhere.push(result);
+        await stopThere(agent);
+        continue;
+      }
+      // It moved itself to another computer or the cloud and runs there now:
+      // the stop goes where it runs, which stops everything it started there.
+      if (record.away) {
+        await (await store.conversation(record.conversationId as ConversationId, context))?.abort(context);
+        local.push(agent.threadId);
+        await stopThere(agent);
         continue;
       }
       const id = record.conversationId as ConversationId;
@@ -2523,6 +2539,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       fromOrchestrator?: boolean;
       report?: true;
       reportFrom?: string;
+      wake?: true;
     },
     context: Context,
   ): Promise<void> => {
@@ -2569,6 +2586,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           message: args.message,
           ...(args.fromOrchestrator ? {} : { fromUser: true as const }),
           ...(args.report ? { report: true as const } : {}),
+          ...(args.wake ? { wake: true as const } : {}),
         },
         { ownership: { kind: "conversation" }, background: true, conversationId: home },
       );
@@ -2678,7 +2696,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       const stopped = args.signal?.aborted === true || (settled.status === "unanswered" && settled.reason === "aborted");
       const waitedFor = await takeWait(harness, agent.id, !stopped && settled.status === "done" && settled.type === "input", context);
       const rewake =
-        retry === 1 ? await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], stopped, context) : [];
+        retry === 1
+          ? await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], stopped, args.signal?.reason === PLACED_AGENT_STOPPED, context)
+          : [];
       if (stopped) {
         await dropMove(harness, agent.id, context);
         await settle();
@@ -2756,6 +2776,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     settled: { status: string; reason?: string; entry?: EntryId },
     given: string[],
     stopped: boolean,
+    byStop: boolean,
     context: Context,
   ): Promise<Array<{ key: string; message: string }>> => {
     const unread = (record: { status: string; reason?: string; entry?: EntryId } | undefined) =>
@@ -2768,7 +2789,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         steers.map((steer) => tx.submissionByRequest(record.conversationId as ConversationId, `steer:${steer.key}`)),
       );
       const unreadSteers = steers.filter((_, index) => unread(outcomes[index]));
-      const rewake = stopped ? unreadSteers.filter((steer) => parseAgentReportId(steer.key) !== null) : [];
+      // Reports the run had not read go back to the thread so they wake it
+      // wherever it runs next; after a stop they wait with it until it is resumed.
+      const rewake =
+        stopped && !byStop && !wasStopped(record) ? unreadSteers.filter((steer) => parseAgentReportId(steer.key) !== null) : [];
       const withdrawn = unreadSteers.filter((steer) => !rewake.includes(steer)).map((steer) => steer.message);
       const pending = steers.filter((_, index) => outcomes[index] === undefined || outcomes[index]?.status === "queued");
       const first = record.carried?.runKey !== runKey || !record.carried.settled;

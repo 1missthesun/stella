@@ -176,6 +176,8 @@ const MODELS_READY_WAIT_MS = 30_000;
 const PLACED_MODELS_WAIT_MS = 120_000;
 const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
+/** Message ids of wakes no one sent on purpose: a schedule's fire, a background command's exit, a restart's note. */
+const AUTOMATIC_WAKE_ID = /^(?:schedule|background-exit|restart-shells):/u;
 /** A sign-in made right away (the notice in the chat) needs no note to Stella. */
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
 /** A hold that comes back within this long (a refused login tried again) is the same episode. */
@@ -994,7 +996,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         const chat = await ready(session.conversationId);
         const record = await chat.agentStanding(threadId, context);
         if (!record || record.agentStatus === "canceled") return;
-        await chat.messageAgent({ key: `claude-code-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true }, context);
+        await chat.messageAgent({ key: `claude-code-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true, wake: true }, context);
       })().catch((error: unknown) => options.report(error));
     });
   }
@@ -1366,8 +1368,8 @@ export function desktopChats(options: DesktopChatsOptions) {
           "Stella's cloud did not answer, so the message may not have been delivered.",
         );
       },
-      stop: async ({ key, threadId, requesterThreadId }) => {
-        if (!requesterThreadId) {
+      stop: async ({ key, threadId, requesterThreadId, elsewhere }) => {
+        if (!requesterThreadId && !elsewhere) {
           const here = await stopLocalAgent(threadId);
           if (here !== "not_found") {
             return { threadId, outcome: "stopped", where: "on this computer", ...(here.elsewhere.length ? { descendants: here.elsewhere } : {}) };
@@ -1409,13 +1411,26 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
+  /** The chat a task on this computer lives in: one it started, or one placed here from another device. */
+  const chatOfTask = async (threadId: string): Promise<string | undefined> => {
+    const indexed = (await threadIndex())[threadId];
+    if (indexed) return indexed;
+    const candidates = new Set([...placedIn.values(), ...chats.keys(), ...(await activeSet())]);
+    for (const conversationId of candidates) {
+      const chat = await open(conversationId).catch(() => undefined);
+      const agent = chat ? (await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context).catch(() => undefined))?.agents[threadId] : undefined;
+      if (agent && !agent.remote && agent.conversationId >= 0) return conversationId;
+    }
+    return undefined;
+  };
+
   const stopLocalAgent = async (threadId: string): Promise<{ elsewhere: AgentStopResult[] } | "not_found"> => {
-    const conversationId = (await threadIndex())[threadId];
+    const conversationId = await chatOfTask(threadId);
     if (!conversationId) return "not_found";
     const chat = await ready(conversationId);
     const stopped = await chat.stopAgent(threadId, context);
     if (!stopped) return "not_found";
-    for (const local of stopped.local) claudeCodeEngine?.abort(conversationId, { threadId: local });
+    for (const local of stopped.local) claudeCodeEngine?.stop(conversationId, local);
     return { elsewhere: stopped.elsewhere };
   };
 
@@ -2703,7 +2718,9 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (placed) {
       if (placed.runKey !== runKey) return false;
       placed.cancel.abort(stopped ? PLACED_AGENT_STOPPED : undefined);
-      return true;
+      // A stop also ends what the run leaves behind here (its shells, background
+      // commands and wake-ups, the agents it started), as a stop of any task does.
+      if (!stopped) return true;
     }
     // No run of it is live here: a restart paused it, and reopening its chat
     // resumed its work on its own. A canceled dispatch must still end it.
@@ -2725,7 +2742,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       const pending = stopsLanding.get(conversationId) ?? new Set<Promise<unknown>>();
       stopsLanding.set(conversationId, pending.add(stop));
       const ended = await stop.finally(() => pending.delete(stop));
-      for (const local of ended?.local ?? []) claudeCodeEngine?.abort(conversationId, { threadId: local });
+      for (const local of ended?.local ?? []) claudeCodeEngine?.stop(conversationId, local);
       return true;
     }
     return true;
@@ -2764,6 +2781,9 @@ export function desktopChats(options: DesktopChatsOptions) {
       const record = await chat.agentStanding(threadId, context);
       if (!record) return "not_found";
       const report = parseAgentReportId(messageId);
+      // A schedule's fire or a background command's exit wakes a task by itself;
+      // a stopped task keeps it until someone resumes it.
+      const wake = !report && AUTOMATIC_WAKE_ID.test(messageId.trim());
       await chat.messageAgent(
         {
           key: `device:${messageId.trim() || crypto.randomUUID()}`,
@@ -2771,10 +2791,11 @@ export function desktopChats(options: DesktopChatsOptions) {
           message: text,
           fromOrchestrator: true,
           ...(report ? { report: true as const, reportFrom: report.threadId } : {}),
+          ...(wake ? { wake: true as const } : {}),
         },
         context,
       );
-      return record.status === "running" ? "steered" : "resumed";
+      return record.status === "running" ? "steered" : (report || wake) && record.stopped ? "queued" : "resumed";
     },
     stopAgent: stopLocalAgent,
     async deliverReport(conversationId: string, report: DeliveredReport): Promise<void> {

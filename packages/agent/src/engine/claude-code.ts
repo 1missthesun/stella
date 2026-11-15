@@ -1746,6 +1746,20 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         abortTurn(session.turn, "Stopped.");
       }
     },
+    /**
+     * A task was stopped: its turn ends and its Claude Code process closes, so
+     * nothing the process still watches (a background command, a monitor)
+     * starts a turn by itself. Resuming the task starts it again from its session.
+     */
+    stop(conversationId: string, threadId: string) {
+      for (const [id, session] of sessions) {
+        const ref = session.binding.session;
+        if (ref.conversationId !== conversationId || ref.threadId !== threadId) continue;
+        abortTurn(session.turn, "Stopped.");
+        options.transport.close?.(ref);
+        sessions.delete(id);
+      }
+    },
     /** Resume: steps a usage limit holds in this chat (its reply and its agents) continue now. */
     wakeUsageLimitHolds(conversationId: string): number {
       const keys = new Set<string>();

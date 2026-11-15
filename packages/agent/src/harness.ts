@@ -117,7 +117,7 @@ export type OpenStellaHarness = {
   >;
   agentRecords(context: Context): Promise<StellaAgentRecord[]>;
   messageAgent(
-    args: { key: string; threadId: string; message: string; fromOrchestrator?: boolean },
+    args: { key: string; threadId: string; message: string; fromOrchestrator?: boolean; wake?: true },
     context: Context,
   ): Promise<void>;
   runPlacedAgent(args: PlacedAgentRun, context: Context): Promise<PlacedAgentResult>;

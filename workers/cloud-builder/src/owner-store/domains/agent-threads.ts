@@ -64,6 +64,7 @@ import {
   agentReportId,
   agentReportReceipt,
   isPlaceholderAgentResult,
+  parseAgentReportId,
 } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
@@ -1818,6 +1819,7 @@ const cancelMovedTurn = async (ctx: OwnerContext, payload: unknown): Promise<voi
 const DIRECTORY_AGENTS_RECENT = 50;
 const DIRECTORY_SESSIONS_RECENT = 20;
 const LIVE_STATUSES_SQL = agentStatusSqlList(LIVE_STORED_AGENT_STATUSES);
+const LIVE_STATUSES = new Set<string>(LIVE_STORED_AGENT_STATUSES);
 export const DIRECTORY_THREAD_IDS_MAX = 200;
 const DIRECTORY_THREAD_IDS_PER_QUERY = 50;
 const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
@@ -2182,7 +2184,7 @@ type ControlInput = {
  * until it lands, starts the agent's next run, or expires; its computer
  * coming back offers it again at once.
  */
-type CommandHold = "unreachable" | "timeout" | "between_runs";
+type CommandHold = "unreachable" | "timeout" | "between_runs" | "stopped";
 
 type Routed =
   | { outcome: AgentControlOutcome; note?: string; waitingForDevice?: true }
@@ -2234,6 +2236,7 @@ const controlAgent = async (
     });
     throw error;
   }
+  if (input.kind === "stop") holdInputsForStop(ctx, input.thread.thread_id, input.commandId);
   const result = await commandResult(ctx, input, executor, deviceId, routed);
   if ("hold" in routed) {
     holdCommand(ctx, input, deviceId, routed.hold);
@@ -2243,7 +2246,7 @@ const controlAgent = async (
        delivered_at = CASE WHEN ? = 'delivered' THEN ? ELSE delivered_at END
      WHERE command_id = ?`,
     "hold" in routed ? "pending" : "delivered",
-    result.outcome,
+    "hold" in routed && routed.hold === "stopped" ? STOP_HELD : result.outcome,
     JSON.stringify(result),
     ctx.now,
     "hold" in routed ? "pending" : "delivered",
@@ -2370,12 +2373,15 @@ const holdCommand = (
   deviceId: string | null,
   reason: CommandHold,
 ): void => {
-  ctx.jobs.schedule(
-    COMMAND_JOB,
-    ctx.now + COMMAND_RETRY_MS,
-    { messageId: input.commandId },
-    { id: commandJobId(input.commandId) },
-  );
+  // Held for a stopped agent: no retry; resuming the agent sends it on.
+  if (reason !== "stopped") {
+    ctx.jobs.schedule(
+      COMMAND_JOB,
+      ctx.now + COMMAND_RETRY_MS,
+      { messageId: input.commandId },
+      { id: commandJobId(input.commandId) },
+    );
+  }
   if (input.kind === "stop") {
     recordAgentChange(
       ctx.db,
@@ -2411,14 +2417,99 @@ const supersedeHeldStops = (ctx: OwnerContext, threadId: string, commandId: stri
   }
 };
 
+/** Marks a message or resume that was on its way to an agent when it was stopped: it waits until the agent is resumed. */
+const STOP_HELD = "held_while_stopped";
+
+const stoppedByStop = (thread: Pick<ThreadRow, "status" | "error_message">): boolean =>
+  thread.status === "canceled" && isAgentStopReason(thread.error_message);
+
+/** A message no one sent on purpose: a helper's report, a schedule's fire. */
+const automaticWake = (commandId: string): boolean =>
+  parseAgentReportId(commandId) !== null || commandId.startsWith("schedule:");
+
+/**
+ * A stop holds whatever was on its way to the agent (messages queued for its
+ * next step or for its computer), so none of it starts the agent again.
+ */
+const holdInputsForStop = (ctx: OwnerContext, threadId: string, stopCommandId: string): number => {
+  const pending = ctx.db.all<{ command_id: string }>(
+    `SELECT command_id FROM agent_commands
+      WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume') AND command_id <> ?`,
+    threadId,
+    stopCommandId,
+  );
+  for (const row of pending) {
+    ctx.jobs.cancel(commandJobId(row.command_id));
+    ctx.db.run(
+      "UPDATE agent_commands SET outcome = ?, updated_at = ? WHERE command_id = ? AND state = 'pending'",
+      STOP_HELD,
+      ctx.now,
+      row.command_id,
+    );
+  }
+  if (pending.length > 0) {
+    logCommand(ctx, threadId, "command_routed", `stop_held_inputs:${stopCommandId}`, "owner:command-outbox", {
+      commandId: stopCommandId,
+      command: "stop",
+      heldInputs: pending.map((row) => row.command_id),
+    });
+  }
+  return pending.length;
+};
+
+/** The agent was resumed on purpose: what waited for that goes to it now, oldest first. */
+const releaseInputsAfterStop = (ctx: OwnerContext, threadId: string, resumedBy: string): void => {
+  const waiting = ctx.db.all<{ command_id: string }>(
+    `SELECT command_id FROM agent_commands
+      WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume') AND command_id <> ?
+      ORDER BY created_at ASC`,
+    threadId,
+    resumedBy,
+  );
+  ctx.db.run(
+    "UPDATE agent_commands SET outcome = NULL, updated_at = ? WHERE thread_id = ? AND state = 'pending' AND outcome = ?",
+    ctx.now,
+    threadId,
+    STOP_HELD,
+  );
+  waiting.forEach((row, index) => {
+    ctx.jobs.schedule(COMMAND_JOB, ctx.now + index, { messageId: row.command_id }, { id: commandJobId(row.command_id) });
+  });
+};
+
 const routeCommand = async (
   ctx: OwnerContext,
   input: ControlInput,
   executor: ThreadExecutor,
   deviceId: string | null,
 ): Promise<Routed> => {
-  const { thread } = input;
   if (input.kind === "stop") return await routeStop(ctx, input, executor, deviceId);
+  const stopped = stoppedByStop(input.thread);
+  if (
+    (stopped && input.kind === "message" && automaticWake(input.commandId)) ||
+    readCommand(ctx.db, input.commandId)?.outcome === STOP_HELD
+  ) {
+    return { hold: "stopped" };
+  }
+  const heldForStop =
+    stopped ||
+    ctx.db.one<{ found: number }>(
+      "SELECT 1 AS found FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND outcome = ? LIMIT 1",
+      input.thread.thread_id,
+      STOP_HELD,
+    ) !== null;
+  const routed = await routeInput(ctx, input, executor, deviceId);
+  if (heldForStop && !("hold" in routed)) releaseInputsAfterStop(ctx, input.thread.thread_id, input.commandId);
+  return routed;
+};
+
+const routeInput = async (
+  ctx: OwnerContext,
+  input: ControlInput,
+  executor: ThreadExecutor,
+  deviceId: string | null,
+): Promise<Routed> => {
+  const { thread } = input;
   if (input.kind === "resume" && ACTIVE_STATUSES.has(thread.status)) {
     return { outcome: "running", note: "It is already running; nothing to resume." };
   }
@@ -2555,6 +2646,20 @@ const nextAttempt = (ctx: OwnerContext, input: ControlInput): void => {
   });
 };
 
+/** Tells the computer a stopped task lives on (one it started on or was placed on), so it ends there too. */
+const tellComputerOfStop = async (
+  ctx: OwnerContext,
+  input: ControlInput,
+  executor: ThreadExecutor,
+  deviceId: string | null,
+): Promise<"stopped" | "unreachable" | "timeout"> => {
+  if ((executor.kind !== "local" && executor.kind !== "dispatch") || !deviceId) return "stopped";
+  const sent = await ctx.host
+    .stopLocalAgent({ deviceId, threadId: input.thread.thread_id, ownerGeneration: input.ownerGeneration, commandId: input.commandId })
+    .catch(() => undefined);
+  return sent?.outcome === "unreachable" || sent?.outcome === "timeout" ? sent.outcome : "stopped";
+};
+
 const routeStop = async (
   ctx: OwnerContext,
   input: ControlInput,
@@ -2568,15 +2673,20 @@ const routeStop = async (
   }
   if (endedWaiting(thread)) {
     // Its turn ended waiting (end_turn_waiting): nothing runs, but it still
-    // holds its task, so the stop is what ends it. Its computer hears too, so
-    // the task shows as stopped there and its leftover processes end.
-    if (executor.kind === "local" && deviceId) {
-      await ctx.host
-        .stopLocalAgent({ deviceId, threadId: thread.thread_id, ownerGeneration: input.ownerGeneration, commandId: input.commandId })
-        .catch(() => undefined);
-    }
+    // holds its task, so the stop is what ends it. Its computer hears too
+    // (where it was started there or placed there), so the task shows as
+    // stopped there, its leftover processes end, and what it waits on there
+    // (background commands, wake-ups) no longer starts it.
+    // An offline computer hears once it is back: the stop stays held and is
+    // offered again, while the cloud already counts the task as stopped.
+    const told = await tellComputerOfStop(ctx, input, executor, deviceId);
     await markEndedWaitingStopped(ctx, thread, input.source, input.commandId);
-    return { outcome: "stopped" };
+    return told === "stopped" ? { outcome: "stopped" } : { hold: told };
+  }
+  if (stoppedByStop(thread) && (readCommand(ctx.db, input.commandId)?.attempts ?? 0) > 0) {
+    // This stop already ended it here while its computer was away: tell the computer now.
+    const told = await tellComputerOfStop(ctx, input, executor, deviceId);
+    return told === "stopped" ? { outcome: "stopped" } : { hold: told };
   }
   if (!ACTIVE_STATUSES.has(thread.status)) {
     return {
@@ -2656,7 +2766,10 @@ const commandResult = async (
   const offlineName = device
     ? `${device.name}${device.lastSeenAt !== undefined ? ` (last seen ${new Date(device.lastSeenAt).toISOString()})` : ""}`
     : "that computer";
-  if ("hold" in routed && routed.hold === "between_runs") {
+  if ("hold" in routed && routed.hold === "stopped") {
+    outcome = "held";
+    note = `${threadId} is stopped, so this waits and reaches it when someone resumes it with send_message. It does not start it again.`;
+  } else if ("hold" in routed && routed.hold === "between_runs") {
     // Not "held": that reads as offline to the sender. The agent is running and
     // takes the message at its next step, as a steer would.
     outcome = "queued";
@@ -2742,7 +2855,7 @@ const recordMessageLanded = (
  * at once (`flushDeviceCommands`), so a long absence backs off to a slow
  * recheck; one waiting for its attempt to start there rechecks within a minute.
  */
-const commandRetryDelay = (hold: CommandHold, attempts: number): number =>
+const commandRetryDelay = (hold: Exclude<CommandHold, "stopped">, attempts: number): number =>
   hold === "unreachable"
     ? Math.max(COMMAND_RETRY_MS, deviceWaitDelay(attempts))
     : Math.min(60_000, Math.max(COMMAND_RETRY_MS, deviceWaitDelay(attempts)));
@@ -2847,6 +2960,10 @@ const runCommand = async (ctx: OwnerContext, payload: { messageId?: unknown }): 
     return;
   }
   if ("hold" in routed) {
+    if (routed.hold === "stopped") {
+      ctx.db.run("UPDATE agent_commands SET outcome = ?, updated_at = ? WHERE command_id = ?", STOP_HELD, ctx.now, row.command_id);
+      return;
+    }
     ctx.jobs.schedule(
       COMMAND_JOB,
       ctx.now + commandRetryDelay(routed.hold, row.attempts),
@@ -3368,29 +3485,39 @@ const deviceStanding = async (
   }
 };
 
-const runningDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
-  db.all<ThreadRow>(
-    `WITH RECURSIVE tree(thread_id, depth) AS (
-       SELECT thread_id, 1 FROM agent_threads WHERE parent_thread_id = ? AND thread_id <> ?
-       UNION
-       SELECT child.thread_id, tree.depth + 1 FROM agent_threads child
-         JOIN tree ON child.parent_thread_id = tree.thread_id
-        WHERE tree.depth < 16
-     )
-     SELECT t.* FROM agent_threads t
-       JOIN (SELECT thread_id, MAX(depth) AS depth FROM tree GROUP BY thread_id) below ON below.thread_id = t.thread_id
-      WHERE t.status IN ${LIVE_STATUSES_SQL}
-      ORDER BY below.depth DESC`,
-    threadId,
-    threadId,
-  );
+/**
+ * Everything below an agent that a stop must reach, deepest first: the ones
+ * running or waiting for the user, the ones whose turn ended waiting
+ * (end_turn_waiting: a finished command, a schedule's fire or a helper's
+ * report would start them again), and the ones a message is on its way to.
+ */
+const stoppableDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
+  db
+    .all<ThreadRow & { pending_input: number }>(
+      `WITH RECURSIVE tree(thread_id, depth) AS (
+         SELECT thread_id, 1 FROM agent_threads WHERE parent_thread_id = ? AND thread_id <> ?
+         UNION
+         SELECT child.thread_id, tree.depth + 1 FROM agent_threads child
+           JOIN tree ON child.parent_thread_id = tree.thread_id
+          WHERE tree.depth < 16
+       )
+       SELECT t.*, EXISTS (SELECT 1 FROM agent_commands c
+                            WHERE c.thread_id = t.thread_id AND c.state = 'pending' AND c.kind IN ('message', 'resume')) AS pending_input
+         FROM agent_threads t
+         JOIN (SELECT thread_id, MAX(depth) AS depth FROM tree GROUP BY thread_id) below ON below.thread_id = t.thread_id
+        ORDER BY below.depth DESC`,
+      threadId,
+      threadId,
+    )
+    .filter((row) => LIVE_STATUSES.has(row.status) || endedWaiting(row) || row.pending_input > 0)
+    .map(({ pending_input: _pending, ...row }) => row);
 
 const stopTree = async (
   ctx: OwnerContext,
   input: Omit<ControlInput, "kind">,
 ): Promise<{ result: AgentControlResult; descendants: AgentControlResult[] }> => {
   const descendants: AgentControlResult[] = [];
-  for (const child of runningDescendants(ctx.db, input.thread.thread_id)) {
+  for (const child of stoppableDescendants(ctx.db, input.thread.thread_id)) {
     try {
       const { result } = await controlAgent(ctx, {
         ...input,

@@ -22,7 +22,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text as NativeText,
   TextInput,
   type StyleProp,
   type TextInputProps,
@@ -170,15 +169,19 @@ function ComposerTextInput({
       : style;
   return (
     <View style={containerStyle}>
-      <NativeText
+      {/* Scales with the input, which has no Dynamic Type cap of its own
+          (0 = none), so the measured height matches the input's text. */}
+      <Text
         style={mirrorStyle}
+        allowFontScaling={props.allowFontScaling}
+        maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? 0}
         onLayout={handleMirrorLayout}
         accessible={false}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
         {mirrorTextOf(value)}
-      </NativeText>
+      </Text>
       <TextInput
         ref={ref}
         {...props}

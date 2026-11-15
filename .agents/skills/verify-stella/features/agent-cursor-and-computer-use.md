@@ -1,38 +1,30 @@
 # Agent cursor and computer use
 
-The agent cursor makes browser and native computer-use actions visible before Stella changes the target UI. It is passive presentation: the existing browser or OS action remains the input source.
+Tasks control desktop apps through `sky` in the `code` tool (skills `stella-computer-macos`, `stella-computer-windows`, `stella-computer-linux`) and browsers through `browser`. The agent cursor shows where an action will land before it happens; it is passive presentation, the real browser or OS action is the input.
 
-## Sub-features
+## Computer use by platform
 
-- `in-app-agent-cursor` renders inside the in-app browser page.
-- `external-agent-cursor` renders in the top document of an extension-controlled Chromium tab.
-- `native-agent-cursor` renders in a click-through overlay attached to the macOS or Windows target window.
-- `cursor-arrival-gate` delays the real click until the cursor reaches the resolved action point.
-- `cursor-cleanup` hides browser cursors when their owner session ends and native cursors after inactivity.
+- **macOS**: the native helper `desktop_automation` (Accessibility tree, ScreenCaptureKit; `packages/native/src/desktop_automation.swift`), one helper per task session, released at the task's run end and self-exiting after 15 idle minutes. Needs Accessibility (and Screen Recording) for the helper's identity; a call costs about half a second.
+- **Windows**: the native helper `stella_computer_helper` (`packages/native/src/stella_computer_helper.cpp`). Background by default (`delivery: "background"`: UI Automation patterns, PostMessage, PrintWindow; the user's pointer and focus stay put). Chromium/Electron, XAML, GTK and VCL mouse input need `delivery: "foreground"`, which a task uses only when the user asked Stella to take over the screen; otherwise it gets a message saying nothing was sent. Coordinate actions are pixel-checked around their points.
+- **Linux (Hyprland only)**: pure TypeScript, no native helper (`packages/runtime/kernel/computer-use/linux-session.ts` + `linux/`): its own D-Bus client to AT-SPI, Hyprland IPC, `grim` window capture, and a `zwlr_virtual_pointer` client for foreground input. Chromium needs `--force-renderer-accessibility`, Qt `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`. Windows on hidden workspaces stop drawing (their pictures go stale while AT-SPI stays live).
 
-## Expected behavior
+## Agent cursor
 
-- The cursor is Stella's pink-to-cyan gradient pointer (one 46x48 PNG drawn at 23x24 with a blue glow), the same bytes in the browser script, the macOS helper and the Windows helper. A white vector arrow means a stale native helper build.
-- Short moves scoot; longer moves follow a bounded curved path.
-- Arrival produces one brief wobble, not a perpetual loop.
-- Clicking has no synthetic ring, badge, or pulse. The target control's response is the click feedback.
-- The overlay never receives pointer input and must not raise or focus the target window.
+- The cursor is Stella's pink-to-cyan gradient pointer (one 46×48 PNG drawn at 23×24 with a blue glow), the same bytes in the browser script and the macOS and Windows helpers; a white vector arrow means a stale native helper. Short moves scoot, longer ones curve; arrival wobbles once; clicks have no ring or badge.
+- In-app browser: drawn inside the page. Extension tabs: drawn in the top document. macOS/Windows: a click-through overlay attached to the target window that never takes focus. The real click waits for arrival (fails open on protected pages); a hidden page runs no animation frames, so the cursor jumps there.
 
 ## Live verification
 
-- **In-app browser.** Launch the isolated desktop app, open Browser, and navigate to a safe page containing two separated buttons. Record the compositor while a real agent clicks both buttons. Require each visible cursor arrival to precede the corresponding page-state change.
-- **External Chromium.** Package or load the real Stella Browser extension, run the same two-button journey through the external backend, and capture the Chromium tab. Also exercise raw move/down/up and a drag if those actions changed.
-- **macOS computer use.** On a graphical macOS session with Accessibility permission, snapshot a safe app such as Calculator or TextEdit, then execute two real element clicks through `stella-computer`. Require the software cursor to stay over the target app, move between resolved AX points, and arrive before each action.
-- **Windows computer use.** On a Windows host, drive Notepad or Calculator through the real helper in both background and foreground dispatch modes. Require the passive layered window to remain owned by the target app, arrive before click/drag input, and leave the physical pointer and focus semantics unchanged for background dispatch.
-- **Timing evidence.** Preserve a frame sequence containing start, in-flight, arrival, and changed target state. A typecheck, successful command receipt, or mocked controller is not visual proof.
+- **In-app browser.** Open Browser in a test copy, load a safe page with two separated buttons, have a task click both, and record the compositor (the renderer screenshot can't see the native view). Each arrival must precede its page change.
+- **Extension tabs.** `--browser-extension`, the same journey, captured from the test Chromium.
+- **macOS.** On the Mac with `--own-app-identity`, have a task snapshot and click a safe app (Calculator, TextEdit, a throwaway Chrome profile; never the user's Chrome; System Settings is forbidden). Worktrees lack the gitignored `packages/native/out/darwin`; copy it from the main checkout. A quick native A/B: run `desktop_automation snapshot --pid <pid> --state <file> --no-inline-screenshot` directly.
+- **Windows.** On the Windows test machine (anym), Notepad or Calculator in background and foreground delivery; background must leave the physical pointer and focus alone.
+- **Linux.** Never on the user's workspace: run the target app in a nested Hyprland on a special workspace (or a special workspace of the real session with `render_unfocused`), drive it through a test task, and capture with `grim`.
+- Preserve frames for start, in flight, arrival and the changed target; a command receipt is not visual proof.
 
 ## Gotchas
 
-- The in-app browser is a native `WebContentsView`; the React renderer cannot paint above it.
-- Browser cursor failure must fail open so protected pages do not block the real action indefinitely.
-- macOS helpers launched from a new path may lack Accessibility permission even when the developer's installed Stella helper is trusted.
-- Linux has browser control but no native desktop computer-use backend.
-- A hidden page (an external agent tab Chrome keeps in the background, or an in-app tab not on screen) runs no animation frames, so the cursor jumps to its target there instead of animating; waiting for arrival there stalled every click by about 4.5s.
-- External agent tabs open in the background by design, and the in-app panel does not switch to agent tabs on its own, so the cursor is only seen when the user is looking at that tab.
-- Installs fetch native helpers from R2 in the launcher's prepare step whenever HEAD changes; check `packages/native/out/<platform>/.stella-native-helpers.json` for the installed build.
-- The Windows overlay is excluded from OS capture to keep it out of Stella's own screenshots; verify its visible composition with an external camera or a capture path that intentionally disables that exclusion in a disposable build.
+- Installs fetch native helpers from R2 whenever HEAD changes; `packages/native/out/<platform>/.stella-native-helpers.json` names the installed build. A master push of `packages/native` publishes to every install and needs the user's go; never `cp` over a running macOS helper (it gets SIGKILLed), stage and `mv`.
+- macOS helpers launched from a new path may lack Accessibility even when the user's installed helper is trusted.
+- The Windows overlay is excluded from OS capture, so Stella's own screenshots never show it.
+- On Linux, AT-SPI GrabFocus on Chromium makes it activate itself and, with omarchy's `focus_on_activate`, steal focus.

@@ -4,7 +4,7 @@ The companion is the floating Stella mark that sits on top of every window. It i
 
 ## Sub-features
 
-- `companion-toggle` shows or hides it from Settings › General, persisted across launches.
+- `companion-toggle` shows or hides it from Settings › General › **Desktop companion**, persisted across launches.
 - `companion-hover` reveals the arc of buttons (read aloud, dictate, voice) around the mark.
 - `companion-compose` opens the prompt pill on click and sends into the active conversation.
 - `companion-bubbles` mirrors the latest user message and reply as bubbles that fade after a dwell.

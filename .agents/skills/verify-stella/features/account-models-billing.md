@@ -1,37 +1,29 @@
-# Account, models, and billing
+# Account, models and billing
 
-The top-bar account menu and the workspace panel's foot controls expose authentication state, execution target, provider/model choice, usage, subscription, and billing entry points.
+The top bar's right side carries identity, where Stella works, and model choice: **Where Stella works** (computer icon), **Models**, and the ⚙ **Account** menu. Usage and billing open from the Account menu.
 
 ## Sub-features
 
-- `account-menu` changes between signed-out and signed-in identity states.
-- `execution-target` selects the available local or cloud execution environment.
-- `model-picker` selects a provider/model compatible with the target.
-- `usage-billing` opens usage, subscription, upgrade, and checkout surfaces.
-- `connectors-feedback` reaches connected services and feedback destinations.
-
-## How to get to it (user POV)
-
-- Choose the signed-in account control (`Account, <plan> plan`) or the signed-out sign-in button and Settings gear in the top bar. The signed-in menu has Settings, Plan & usage, Theme, Stella on your phone, Connectors, Send feedback, and Sign out.
-- Open the workspace panel. Its foot has the execution target (`Run on This computer`, a dialog offering This computer and Cloud) and **Models** (a dialog with Assistant, Image, and Voice surfaces, a model search, and provider groups such as Stella, Claude Code, and ChatGPT).
-- Open usage, plan, billing, Connectors, or feedback from account/settings destinations.
+- `account-menu`: signed in, the ⚙ **Account** button (`button.shell-topbar-account-trigger`, named by nickname or `Account`; while the account is paused its name adds the reason) with Settings, Plan & usage, Theme, Stella on your phone, Connectors, Send feedback, Sign out. Signed out: **Sign in** plus a **Settings** gear.
+- `execution-target`: **Where Stella works** (`shell/GlobalExecutionTargetControl.tsx`): a dialog with **This computer**, **Cloud** and the account's other computers; the checked row is the current target. Signed out or with cloud sync off it stays on this computer.
+- `model-picker`: **Models** (`shell/GlobalModelsControl.jsx`): a dialog with **Assistant** and **Image** tabs, **Search models**, **Refresh model catalog**, provider groups (Stella with reasoning effort, Claude Code, ChatGPT, xAI, Meta, OpenRouter, Anthropic, OpenAI, GitHub Copilot, Google, Kimi, Z.AI, Cerebras, Local) each with **Sign in** or **Add key**, and **Show in composer** (pins the model chip in the composer). The trigger always says Models.
+- `live-model-lists`: each provider's own model list (OpenRouter, Vercel AI Gateway, OpenCode, Anthropic, OpenAI, Google, xAI, Cerebras) feeds the picker on top of the catalog snapshot, on this computer and for keys saved to the account; every provider section accepts a typed model id, and an uncatalogued model runs shaped like its nearest sibling.
+- `usage-billing`: **Plan & usage** shows the plan, allowance and upgrade; the usage page (`app/usage`) breaks spend down by thread and call. Checkout opens Stripe.
+- `connectors-feedback`: **Connectors** (connected services) and **Send feedback** dialogs.
 
 ## Driving it with control-stella
 
-Preconditions:
+Preconditions: an isolated test account (`--account pro|plus|max`, or `STELLA_VERIFY_METERED=1` / `STELLA_VERIFY_ALLOWANCE=spent` for budgets); never the developer's own credentials.
 
-- The verifier is healthy. Signed-in, paid, and provider states require an isolated test account or explicit existing fixture.
-- Never reuse or expose the developer's production credentials.
-
-- **Discover state.** Run `inspect components` and `inspect state`; record whether account, target, and model controls are present.
-- **Account menu.** Open the visible identity control with `drive click` and assert the menu items appropriate to signed-in or signed-out state.
-- **Target/model.** Select a visible execution target and read its label from the closed control. For a model, reopen Models and inspect the selected option; the trigger always says Models.
-- **Usage/billing.** Open the destination and require its route/dialog heading. Stop before paid checkout unless completing it is explicitly in scope.
-- **Adjacent destinations.** Open Connectors or feedback from the visible menu and capture the resulting route/dialog.
+- **Account menu.** `drive click --selector button.shell-topbar-account-trigger`, then `inspect components` for the menu items.
+- **Target.** `drive click --role button --name "Where Stella works"`, pick a row, reopen and read the checked row; for placement claims read the thread's `executor` and `runsOnDeviceId` (cloud reference).
+- **Model.** `drive click --role button --name Models`, choose an option, reopen and read the selected option. The dialog's tabs are named `Stella's main assistant` and `Image generation provider`. **Show in composer** is an unnamed switch (`drive click --selector '.work-models-pin-switch [role=switch]'`); on, the composer shows a `Model: <name>` chip.
+- **Plan.** Account › **Plan & usage**; with a spent allowance the near-limit and limit states show there and in the bell.
+- **Live lists.** Save a provider key (Add key) and require a model only the provider's list has, then type an uncatalogued id and send a turn with it.
 
 ## Gotchas
 
-- Control visibility changes with right-side surfaces, account state, and platform capability.
-- Model lists are scoped by provider and execution target. An absent model may be correctly filtered.
-- Billing and checkout are external side effects. Do not purchase, subscribe, or submit payment without explicit authorization.
-- A signed-out verifier can prove menus and blocked states but not authenticated account mutations.
+- Model lists are scoped by provider, plan and target; an absent model may be correctly filtered ("not on your plan" goes to the bell).
+- Billing and checkout are external side effects: never purchase, subscribe or submit payment without explicit authorization.
+- BYOK turns need dev; a Preview's gateway can't run them.
+- A signed-out verifier proves menus and blocked states, not account mutations.

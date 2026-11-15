@@ -4,9 +4,9 @@ Rich chat extends the primary composer and timeline with context, attachments, m
 
 ## Sub-features
 
-- `chat-context` adds files, images, browser state, or other captured context.
-- `chat-model` changes the model or execution target shown for the conversation.
-- `chat-voice` covers dictation and voice mode when permissions and audio are available.
+- `chat-context` adds files, images, browser state, or other captured context. The composer's **Add** (+) menu has **Attach files…**, **Screenshot**, and on a Mac with the native helper **Record screen** ([record screen](./record-screen.md)). Files of any size attach by path; unsent attachments survive a relaunch (`composer-attachments.json`).
+- `chat-model` changes the model (top bar **Models**, or the composer's model pin when "Show in composer" is on) or where Stella works (top bar computer icon).
+- `chat-voice` covers dictation (see [chat](./chat.md)) and voice mode when permissions and audio are available.
 - `chat-queue` queues, stops, retries, or resumes work while a turn is active.
 - `chat-actions` copies, retries, or otherwise acts on a rendered message.
 - `chat-artifacts` opens files, previews, citations, and agent completion output.
@@ -15,8 +15,8 @@ Rich chat extends the primary composer and timeline with context, attachments, m
 
 ## How to get to it (user POV)
 
-- Use the composer add control or drag/drop/paste supported content.
-- Choose the visible model or execution-target control.
+- Use the composer **Add** (+) control or drag/drop/paste supported content.
+- Choose **Models** or **Where Stella works** in the top bar.
 - Use microphone/voice controls when present.
 - Open a message action menu or select a rendered artifact in the timeline.
 
@@ -29,12 +29,12 @@ Preconditions:
 
 - **Discover.** Run `node .agents/skills/verify-stella/control-stella.mjs inspect components` before assuming optional controls exist.
 - **Attach/context.** Use `drive click` on the real add/context control, select a visible source, and require a chip or tray item before sending.
-- **Model/runtime.** Open the visible selector, choose an option, then read it back from the closed control and `chat state`.
+- **Model/runtime.** Open **Models**, choose an option, then reopen it and read the checked option (the trigger always says Models); for the target, open **Where Stella works** and read the checked row.
 - **Keyboard.** Use `drive press --key Shift+Enter` for a newline and chord syntax for shortcuts. Assert the composer value before any send.
 - **Messages/artifacts.** After a suitable turn exists, open actions or an artifact with `drive click`; require the copied-state feedback, retry state, or resulting display tab.
 - **Replies/focus.** Verify an adjacent answer has no quote bubble and the ask above it has no badge. Delegate a task, discuss something else, then require one task quote bubble (status glyph, title, More) above the returning result and a "1 reply" badge under the original ask. Click the bubble's title, the badge, and the original lifecycle row separately; each must open the focused chain over the blurred timeline with a visible composer and no dialog frame. Escape, the header's Close, or a click on the backdrop restores the timeline position. The header pill's **More** (and the bubble's) opens the saved result; close it with Escape before closing focus.
 - **Cloud report.** Open a completed cloud task’s focused conversation, then click **More** in its header. Require the saved result even without a local runtime record. Reload and reopen focus and More; the result must remain readable. An open report updates after a follow-up completes.
-- **Cloud lifecycle.** Launch with `session launch --account pro`, open the workspace panel, choose **Run on This computer**, then **Cloud**. `chat send` works from the Home overlay; `drive fill --placeholder "Do anything"` then `drive press --key Enter` is the lower-level equivalent. Send a request to spawn a cloud agent that writes one file with only its Write tool and links it. Require, live and without reload: the spawn row settled under the spawning reply, the relaying reply carrying the task quote bubble above it with one pill inside whose entry has `cloudDriveFile`, nothing rendered under that reply, no full file card, the inline link titled by its drive path, and one sidebar entry. Repeat with **This computer** and a distinct task description (desktop thread ids are description slugs and collide across accounts): the wake prompt must be a hidden journal record with `[Agent completed]` text and take no slot in the timeline, and the relaying reply must carry the task quote bubble with the file pill inside it and nothing below. Capture the row under the spawning reply while it runs and its completed state alongside the sidebar task. Ask Stella to continue that same task with `send_input`; require a distinct follow-up row and a second completion without changing the first. Reload with `drive press --key Control+r` and require both occurrences to remain. Save screenshots and ARIA snapshots under `artifacts/cloud-lifecycle/`.
+- **Cloud lifecycle.** Launch with `session launch --account pro`, choose **Where Stella works** › **Cloud** in the top bar. `chat send` works from the Home overlay; `drive fill --placeholder "Do anything"` then `drive press --key Enter` is the lower-level equivalent. Send a request to spawn a cloud agent that writes one file with only its Write tool and links it. Require, live and without reload: the spawn row settled under the spawning reply, the relaying reply carrying the task quote bubble above it with one pill inside whose entry has `cloudDriveFile`, nothing rendered under that reply, no full file card, the inline link titled by its drive path, and one sidebar entry. Repeat with **This computer** and a distinct task description (desktop thread ids are description slugs and collide across accounts): the wake prompt must be a hidden journal record with `[Agent completed]` text and take no slot in the timeline, and the relaying reply must carry the task quote bubble with the file pill inside it and nothing below. Capture the row under the spawning reply while it runs and its completed state alongside the sidebar task. Ask Stella to continue that same task with `send_input`; require a distinct follow-up row and a second completion without changing the first. Reload with `drive press --key Control+r` and require both occurrences to remain. Save screenshots and ARIA snapshots in the run's `evidenceDir`.
 - **Bubble pop and handoff.** Send a short prompt; capture the sent bubble springing up from its bottom-right corner (~360 ms, opaque within ~120 ms) and a 200 ms quiet entrance before the dots. When the answer arrives, require the dots gone in the same frame and the reply popping in from its bottom-left corner, with no size morph and no duplicate indicator below it. Trace with `performance trace`; inspect renderer layout/paint work during the pop. Repeat with cancel and reduced motion (direct appearance); require no lingering dots or Stop. History and the focused reply view must not replay the pop.
 - **Send reconciliation.** Select Cloud and send one uniquely worded prompt. Require exactly one user bubble after admission, after the journal arrives, and after reload. Send the same text again intentionally and require two user bubbles; matching text alone must never collapse separate sends.
 - **Proof.** Capture snapshots plus screenshots of the working change. A "before" comes only from when you first reproduced the problem; never rebuild old code to get one. Use bounded `diagnostics console` or `diagnostics network-summary` for failures.

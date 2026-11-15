@@ -1,6 +1,6 @@
 # Mobile account and pairing
 
-Mobile account settings expose identity, the account's computers, Cloud Home, cloud-browser reset, appearance, theme, plan, and sign-out behavior.
+The phone's sidebar (`components/sidebar/SidebarNav.tsx`) lists the places **Chat, Schedule, Email, Apps, Files**, with the account entry at its foot opening Settings (`components/SettingsContent.tsx`). Settings sections, in order: Subscription, Server (self-hosted), Cloud Home, Appearance, Notifications (push), ask escalation (how far asks may reach the phone), Voice, About (terms, privacy), Sign out, Delete account. The account's computers are in the chat settings sheet.
 
 ## Sub-features
 
@@ -12,9 +12,9 @@ Mobile account settings expose identity, the account's computers, Cloud Home, cl
 
 ## How to get to it (user POV)
 
-- Open Account from the main mobile navigation.
+- Open the sidebar (swipe or **Open navigation**) and tap the account entry at its foot.
 - Open the chat settings sheet (gear, top right of the chat) to see the account's computers.
-- Open Cloud Home, browser, appearance, plan, or sign-out rows from Account.
+- Open Cloud Home, appearance, notifications, plan, or sign-out rows from Settings.
 
 ## Driving it with control-stella-ios
 
@@ -23,7 +23,7 @@ Preconditions:
 - The app is authenticated on a booted simulator.
 - An online computer needs a separate desktop session signed in to the same test account (for example `control-stella.mjs session launch --account pro`, then `sign-in --email` with that run's account); never reuse a production one.
 
-- **Account.** Capture the Account frame and require identity plus settings sections.
+- **Settings.** Capture the Settings frame and require identity plus the sections above.
 - **Appearance.** Select a mode or theme, navigate away, return, and require the selected value and visual theme to persist.
 - **Cloud Home/browser.** Open the row and require its current enabled, unavailable, or error state. Confirm before any destructive browser-profile reset.
 - **Computers.** Open the chat settings sheet and require the verifier-owned desktop to appear; picking it connects without a code.

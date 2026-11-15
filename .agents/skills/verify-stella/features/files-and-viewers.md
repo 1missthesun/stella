@@ -1,36 +1,35 @@
-# Files and viewers
+# Files, viewers and Drive
 
-Files exposes conversation and workspace artifacts, while payload-backed viewers render supported content in the workspace display.
+**Files** lists what Stella and its tasks produced and what the conversation links; the file viewer shows one file at a time. Drive is the account's cloud storage (`stella://drive/<path>` links), opened by the same viewer on desktop, web and phone.
 
 ## Sub-features
 
-- `files-open` launches the Files sidebar section.
-- `files-list` shows loading, empty, grouped, and error states.
-- `file-open` converts a selected file into a display tab.
-- `viewer-kinds` covers text, code, image, audio, video, PDF, CSV, and unsupported fallbacks.
+- `files-tab`: + menu › **Files** (`shell/sidebar-sections/FilesSection.jsx`); loading, grouped and empty ("No files yet · Files from Stella show up here."). The + menu's **Search anything** searches the same index.
+- `trash-tab`: + menu › **Trash** (`shell/display/TrashTabContent.tsx`), files Stella moved to the Trash with restore.
+- `file-viewer` (`features/workspace-display/file-viewer-store.ts`, `shell/workspace-stage/WorkspaceStage.tsx`): one file at a time, either floating over the chat (movable, resizable, never over the composer) or filling the stage; the choice persists (`stella.fileViewer.mode`). Its header has the title (path in the tooltip), **More** (open, copy link, public link…), and previous/next arrows through the set of files the item came with (a reply's files, a task's files: "viewer sets", `viewer-siblings.ts`).
+- `viewer-kinds`: text, code, Markdown, HTML documents (sandboxed canvas; side panel `clamp(380px, 34vw, 520px)`, expanded `min(960px, 100% - 48px)`), image, audio, video, PDF, CSV (parsed off the UI thread, capped), Office documents, source diffs, and an explicit fallback for anything else.
+- `drive-files`: a `stella://drive/` link (or a cloud-world path `/workspace/world/drive/...`) opens the Drive file in the viewer; Drive HTML is read by main (`display:canvasDriveUrl`, ≤48 MB) and served as `stella-canvas://memory/<id>/<name>` with its assets. A file's content identity is its `version` (every write gets a fresh key): `drive.fileUrl` returns it and the live view `drive.versions {paths}` pushes changes, so an open viewer, tiles and previews update when the file is replaced under the same name (`createDriveFileVersionStore`, `packages/contracts/drive-file-versions.ts`). New Drive caches must key on `version`, never path or size.
+- `right-click`: files, links and images have native context menus drawn by Electron main (`desktop/electron/services/context-menu-service.ts`); renderer screenshots don't show them.
 
 ## How to get to it (user POV)
 
-- Choose **New tab**, then **Files**.
-- Select a file produced by a conversation or task.
-- Select a file artifact directly from chat.
+- + menu › **Files** or **Trash**; or click a file pill, inline link or tile in the chat.
+- Use the viewer's arrows to step through a reply's files; drag the floating viewer, or fill the stage.
 
 ## Driving it with control-stella
 
-Preconditions:
+Preconditions: a safe fixture or an existing artifact; never browse the user's unrelated files for one.
 
-- The verifier is healthy. Opening a concrete viewer requires a safe fixture or an existing artifact.
-- Do not inspect the user's unrelated filesystem to find a fixture.
-
-- **Open.** Run `node .agents/skills/verify-stella/control-stella.mjs nav files` and classify the visible list state with `inspect aria`.
-- **Select.** Use `inspect components` to find a named file row, then `drive click` it.
-- **Viewer.** Require a workspace display tab and viewer appropriate to the file type. Capture the top bar and content.
-- **Large data.** For CSV or long text, run `performance metrics` and bounded `performance trace` around open/scroll behavior.
-- **Close.** Close the viewer tab and require the Files source or prior display tab to remain usable.
+- **Open.** `node .agents/skills/verify-stella/control-stella.mjs nav files`; classify the list with `inspect aria`.
+- **Select.** `inspect components` for a named row, then `drive click` it; require the viewer with the right kind and header.
+- **Drive fixture.** Upload into the run's account with `backend-call.mjs call drive.prepareUpload` → PUT → `drive.finalizeUpload` (or `scripts/upload-drive-fixtures.ts <token> <file> <drivePath>`), then have the chat link `stella://drive/<path>` and open it.
+- **Freshness.** With the viewer open, upload a new version under the same name and require the viewer to change without a reopen.
+- **Large data.** `performance metrics` and a bounded `performance trace` around opening and scrolling a big CSV or long text.
 
 ## Gotchas
 
-- Empty Files ("Nothing here yet") is a valid state when no conversation has produced artifacts, which is the default in a fresh harness run.
-- CSV and long text previews must remain bounded or off the renderer hot path.
-- Unsupported content should show an explicit fallback or external-open action, not a blank panel.
-- File preview proof must exercise the real selection path, not call `display:readFile` directly.
+- Empty Files is the default in a fresh run.
+- File preview proof must go through the real selection path, not `display:readFile` directly.
+- Drive has no delete handler; overwrite a test file with a tombstone instead.
+- Public links: only image, video, audio and PDF render inline at stellashare.app; HTML documents publish through `shares.saveDriveDocument`.
+- The viewer replaced the old right-panel file tabs; there is no "Close panel".

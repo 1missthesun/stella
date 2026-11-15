@@ -8,17 +8,29 @@ The [desktop reference](../references/desktop.md) covers harness setup and diagn
 
 ## Desktop features
 
-- [Chat](./chat.md) covers the single conversation's readiness, drafting, sending, and dictation.
+- [Top bar, tabs and the stage](./top-bar-and-tabs.md) covers the top bar's controls, the + menu and its places, tabs, and the stage they open on.
+- [Chat](./chat.md) covers the single conversation's readiness, sending, silent turns, dictation routes, and chat alerts.
 - [Rich chat](./chat-rich.md) covers attachments, context, model selection, voice, queued sends, message actions, and artifacts.
 - [Home](./home.md) covers the full-body Home overlay, when it shows, and its composer-driven exit.
-- [Workspace display](./workspace-display.md) covers the right-side workspace panel, its tabs and launcher, and open/close behavior.
-- [Files and viewers](./files-and-viewers.md) covers Files navigation and file-preview tabs.
-- [Browser and takeover](./browser-and-takeover.md) covers browser tabs and cloud-browser user intervention.
-- [Agent cursor and computer use](./agent-cursor-and-computer-use.md) covers synchronized pointer presentation in browser and native computer-use actions.
+- [Activity and tasks](./activity-and-tasks.md) covers the Activity mark and list, waiting, long calls, paused groups, stop/resume, and tasks across restarts.
+- [Ask cards and chat cards](./asks-and-chat-cards.md) covers question and secure-input cards, asks through the orchestrator, safety stops, and usage limits.
+- [Notifications](./notifications.md) covers the bell: what lands there, toasts, and actions.
+- [Schedule](./schedule.md) covers the Schedule tab, schedule cards (grouped), fired reminders, and where schedules run.
+- [Email and Today](./email.md) covers the Email tab, Today, sorting, limits, and the dev email account.
+- [Updates, drafts and Undo](./updates.md) covers the Update pill, the Updates tab, updates across computers, drafts, and Undo.
+- [Record screen](./record-screen.md) covers Show Stella recording on macOS.
+- [Files, viewers and Drive](./files-and-viewers.md) covers Files, Trash, the file viewer and its kinds, Drive files and their versions.
+- [Browser and takeover](./browser-and-takeover.md) covers the Browser tab, the Stella Browser extension, task tab cleanup, and cloud-browser takeover.
+- [Agent cursor and computer use](./agent-cursor-and-computer-use.md) covers computer use on macOS, Windows and Linux/Hyprland, and the agent cursor.
 - [Apps](./apps.md) covers empty, loading, populated, and error states of the cloud app library.
 - [Settings](./settings.md) covers entry points, tabs, global search, and dismissal.
 - [Desktop companion](./companion.md) covers the floating mark: toggle, hover arc, mini composer, bubbles, drag, and shortcut dictation.
-- [Account, models, and billing](./account-models-billing.md) covers account menus, execution target, model selection, usage, and billing entry points.
+- [Account, models and billing](./account-models-billing.md) covers the Account menu, where Stella works, the Models dialog and live model lists, usage, and billing.
+- [Claude Code engine](./claude-code.md) covers running on the user's Claude Code: install, plain tool names, auto-update, login ends, and limits.
+- [Memory](./memory.md) covers main, rules and area files, who reads them, and sync limits.
+- [Desktop onboarding](./onboarding.md) covers the first-run walkthrough and signed-out use.
+
+Personal drafts may be present on the developer's own installs; they are not product features and have no notes here.
 
 ## iOS features
 

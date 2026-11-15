@@ -16,7 +16,7 @@ The mobile shell resolves startup and onboarding before exposing the main naviga
 - Launch Stella from the iPhone Simulator home screen.
 - Sign in when no valid session exists.
 - Complete onboarding after the first sign-in.
-- Use the main navigation after the auth gate resolves.
+- Use the sidebar places (Chat, Schedule, Email, Apps, Files) after the auth gate resolves.
 
 ## Driving it with control-stella-ios
 

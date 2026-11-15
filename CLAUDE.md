@@ -132,6 +132,12 @@ without asking.
   you didn't make are theirs, so don't revert, incorporate or clean them up,
   and commit only your own files by explicit path (never `git add -A` or
   `git commit -am`). Prefer non-interactive git commands.
+  Before working in one of the user's own checkouts (the Mac's
+  `~/projects/stella-v2`, omarchy's `~/Projects/stella-v2`), fetch and
+  fast-forward it to the latest master by default: work happens on several
+  computers and one gets ahead of another. Never discard or rewrite the
+  user's local work (no reset, clean, stash, switch or force); if the tree is
+  dirty or has diverged, leave it and say what is in the way.
 
 ## Dev backend
 

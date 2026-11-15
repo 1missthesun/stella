@@ -26,36 +26,39 @@ const toMs = (value: Date | string | number | null | undefined): number => {
   return 0;
 };
 
-const browserSessionTokens = new Map<string, string>();
+type DeviceRow = {
+  id?: unknown;
+  createdAt?: string | number | null;
+  updatedAt?: string | number | null;
+  expiresAt?: string | number | null;
+  ipAddress?: unknown;
+  userAgent?: unknown;
+  current?: unknown;
+};
 
+// `/devices` answers any valid session (Better Auth's `/list-sessions` only
+// one under a day old) and never returns other sessions' tokens.
 export const listAccountSessions =
   async (): Promise<AccountSessionSummary[]> => {
     const list = window.electronAPI?.system?.listAuthSessions;
     if (list) return list();
-    const [result, current] = await Promise.all([
-      authClient.listSessions(),
-      authClient.getSession().catch(() => null),
-    ]);
-    if (result.error || !result.data) {
+    const result = await authClient.$fetch<DeviceRow[]>("/devices", {
+      method: "GET",
+    });
+    if (result.error || !Array.isArray(result.data)) {
       throw new Error(result.error?.message ?? "Session list failed.");
     }
-    const currentId = current?.data?.session?.id ?? null;
-    browserSessionTokens.clear();
     return result.data
-      .map((session) => {
-        if (typeof session.token === "string") {
-          browserSessionTokens.set(session.id, session.token);
-        }
-        return {
-          id: session.id,
-          createdAt: toMs(session.createdAt),
-          updatedAt: toMs(session.updatedAt),
-          expiresAt: toMs(session.expiresAt),
-          ipAddress: session.ipAddress ?? null,
-          userAgent: session.userAgent ?? null,
-          current: session.id === currentId,
-        };
-      })
+      .filter((row): row is DeviceRow & { id: string } => typeof row.id === "string" && row.id.length > 0)
+      .map((row) => ({
+        id: row.id,
+        createdAt: toMs(row.createdAt),
+        updatedAt: toMs(row.updatedAt),
+        expiresAt: toMs(row.expiresAt),
+        ipAddress: typeof row.ipAddress === "string" ? row.ipAddress : null,
+        userAgent: typeof row.userAgent === "string" ? row.userAgent : null,
+        current: row.current === true,
+      }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   };
 
@@ -65,13 +68,13 @@ export const revokeAccountSession = async (sessionId: string) => {
     await revoke(sessionId);
     return;
   }
-  const token = browserSessionTokens.get(sessionId);
-  if (!token) throw new Error("That session is no longer active.");
-  const result = await authClient.revokeSession({ token });
+  const result = await authClient.$fetch("/devices/revoke", {
+    method: "POST",
+    body: { sessionId },
+  });
   if (result.error) {
     throw new Error(result.error.message ?? "Session revocation failed.");
   }
-  browserSessionTokens.delete(sessionId);
 };
 
 export const secureSignOut = async (

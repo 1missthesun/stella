@@ -1,7 +1,14 @@
 // The passkey stack's tsyringe needs this evaluating ahead of it in this chunk.
 import "reflect-metadata";
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
-import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  createAuthMiddleware,
+  getSessionFromCtx,
+  sensitiveSessionMiddleware,
+  sessionMiddleware,
+} from "better-auth/api";
 import { bearer, jwt, magicLink, oneTimeToken } from "better-auth/plugins";
 import { expo } from "@better-auth/expo";
 
@@ -343,6 +350,20 @@ const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
   },
 });
 
+// Ends a signed-in device's Stella access (owner sessions, phone push) once
+// its auth session is revoked, for /revoke-session and /devices/revoke alike.
+const endOwnerSession = async (env: AuthEnv, userId: string, sessionId: string) => {
+  await revokeOwnerSessions(env, userId, { sessionId });
+  await ownerInternalCall(env, userId, "devices.pushSessionEnded", { sessionId }).catch((error: unknown) => {
+    console.error(
+      JSON.stringify({
+        event: "auth_revoke_session_push_teardown_failed",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  });
+};
+
 const revokedSessionTeardown = (env: AuthEnv): BetterAuthPlugin => ({
   id: "stella-revoked-session-teardown",
   hooks: {
@@ -360,20 +381,61 @@ const revokedSessionTeardown = (env: AuthEnv): BetterAuthPlugin => ({
             | null;
           const sessionId = typeof target?.session?.id === "string" ? target.session.id : "";
           if (!sessionId || target?.session?.userId !== caller.userId) return;
-          await revokeOwnerSessions(env, caller.userId, { sessionId });
-          await ownerInternalCall(env, caller.userId, "devices.pushSessionEnded", { sessionId }).catch(
-            (error: unknown) => {
-              console.error(
-                JSON.stringify({
-                  event: "auth_revoke_session_push_teardown_failed",
-                  message: error instanceof Error ? error.message : String(error),
-                }),
-              );
-            },
-          );
+          await endOwnerSession(env, caller.userId, sessionId);
         }),
       },
     ],
+  },
+});
+
+// Settings › Signed-in devices. Better Auth's own /list-sessions only answers
+// a session younger than `freshAge` (a day) and hands out every session's
+// token, so a desktop signed in for longer always got 403. These answer any
+// valid session, never return tokens, and revoke by id on the server.
+const signedInDevices = (env: AuthEnv): BetterAuthPlugin => ({
+  id: "stella-signed-in-devices",
+  endpoints: {
+    listDevices: createAuthEndpoint(
+      "/devices",
+      { method: "GET", use: [sessionMiddleware], requireHeaders: true },
+      async (ctx) => {
+        const { session } = ctx.context.session;
+        const now = Date.now();
+        const sessions = await ctx.context.internalAdapter.listSessions(session.userId, {
+          onlyActiveSessions: true,
+        });
+        return ctx.json(
+          sessions
+            .filter((row) => new Date(row.expiresAt).getTime() > now)
+            .map((row) => ({
+              id: row.id,
+              createdAt: row.createdAt,
+              updatedAt: row.updatedAt,
+              expiresAt: row.expiresAt,
+              ipAddress: row.ipAddress ?? null,
+              userAgent: row.userAgent ?? null,
+              current: row.id === session.id,
+            })),
+        );
+      },
+    ),
+    revokeDevice: createAuthEndpoint(
+      "/devices/revoke",
+      { method: "POST", use: [sensitiveSessionMiddleware], requireHeaders: true },
+      async (ctx) => {
+        const sessionId = (ctx.body as { sessionId?: unknown } | undefined)?.sessionId;
+        if (typeof sessionId !== "string" || !sessionId) {
+          throw new APIError("BAD_REQUEST", { message: "A session id is required." });
+        }
+        const { session } = ctx.context.session;
+        const sessions = await ctx.context.internalAdapter.listSessions(session.userId);
+        const target = sessions.find((row) => row.id === sessionId);
+        if (!target) throw new APIError("NOT_FOUND", { message: "That session is no longer active." });
+        await endOwnerSession(env, session.userId, target.id);
+        await ctx.context.internalAdapter.deleteSession(target.token);
+        return ctx.json({ ok: true });
+      },
+    ),
   },
 });
 
@@ -557,6 +619,7 @@ const buildOptions = (env: AuthEnv) => {
       bearer({ requireSignature: true }),
       revokedTokenFloor(env),
       revokedSessionTeardown(env),
+      signedInDevices(env),
       pushSignOutTeardown(env),
       oneTimeToken({ storeToken: "hashed", expiresIn: 3, disableClientRequest: true, setOttHeaderOnNewSession: true }),
       nativeOttRedirect(),

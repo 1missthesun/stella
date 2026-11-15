@@ -1065,17 +1065,22 @@ export class AuthService {
     return { ok: true };
   }
 
+  // `/devices` answers any valid session; Better Auth's `/list-sessions` only a
+  // session under a day old (403 after that). Servers that predate `/devices`
+  // answer 404 there, so fall back to the old route for them.
   async listSessions() {
-    const [list, current] = await Promise.all([
-      this.authFetch("/list-sessions", {
+    let list = await this.authFetch("/devices", {
+      method: "GET",
+      headers: { accept: "application/json" },
+    });
+    let legacy = false;
+    if (list.status === 404) {
+      legacy = true;
+      list = await this.authFetch("/list-sessions", {
         method: "GET",
         headers: { accept: "application/json" },
-      }),
-      this.authFetch("/get-session", {
-        method: "GET",
-        headers: { accept: "application/json" },
-      }).catch(() => null),
-    ]);
+      });
+    }
     if (!list.ok) {
       throw new Error(`Session list failed with HTTP ${list.status}.`);
     }
@@ -1090,14 +1095,21 @@ export class AuthService {
       expiresAt?: unknown;
       ipAddress?: unknown;
       userAgent?: unknown;
+      current?: unknown;
     }>;
     let currentId: string | null = null;
-    if (current?.ok) {
-      const body = (await current.json().catch(() => null)) as {
-        session?: { id?: unknown };
-      } | null;
-      currentId =
-        typeof body?.session?.id === "string" ? body.session.id : null;
+    if (legacy) {
+      const current = await this.authFetch("/get-session", {
+        method: "GET",
+        headers: { accept: "application/json" },
+      }).catch(() => null);
+      if (current?.ok) {
+        const body = (await current.json().catch(() => null)) as {
+          session?: { id?: unknown };
+        } | null;
+        currentId =
+          typeof body?.session?.id === "string" ? body.session.id : null;
+      }
     }
     const time = (value: unknown): number => {
       const parsed =
@@ -1117,12 +1129,42 @@ export class AuthService {
         expiresAt: time(row.expiresAt),
         ipAddress: typeof row.ipAddress === "string" ? row.ipAddress : null,
         userAgent: typeof row.userAgent === "string" ? row.userAgent : null,
-        current: row.id === currentId,
+        current: legacy ? row.id === currentId : row.current === true,
       }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   async revokeSessionById(sessionId: string) {
+    const response = await this.authFetch("/devices/revoke", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ sessionId }),
+    });
+    if (response.status === 404 && !(await this.isKnownSessionMissing(response))) {
+      return await this.revokeSessionByIdLegacy(sessionId);
+    }
+    if (response.status === 404) {
+      throw new Error("That session is no longer active.");
+    }
+    if (!response.ok) {
+      throw new Error(`Session revocation failed with HTTP ${response.status}.`);
+    }
+    return { ok: true };
+  }
+
+  // A 404 from `/devices/revoke` is either "no such session" (the route
+  // exists) or a server without the route; only the second falls back.
+  private async isKnownSessionMissing(response: Response) {
+    const body = (await response.clone().json().catch(() => null)) as {
+      message?: unknown;
+    } | null;
+    return typeof body?.message === "string" && body.message.length > 0;
+  }
+
+  private async revokeSessionByIdLegacy(sessionId: string) {
     const list = await this.authFetch("/list-sessions", {
       method: "GET",
       headers: { accept: "application/json" },

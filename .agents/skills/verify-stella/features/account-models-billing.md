@@ -17,7 +17,7 @@ Preconditions: an isolated test account (`--account pro|plus|max`, or `STELLA_VE
 
 - **Account menu.** `drive click --selector button.shell-topbar-account-trigger`, then `inspect components` for the menu items.
 - **Target.** `drive click --role button --name "Where Stella works"`, pick a row, reopen and read the checked row; for placement claims read the thread's `executor` and `runsOnDeviceId` (cloud reference).
-- **Model.** `drive click --role button --name Models`, choose an option, reopen and read the selected option. The dialog's tabs are named `Stella's main assistant` and `Image generation provider`. **Show in composer** is an unnamed switch (`drive click --selector '.work-models-pin-switch [role=switch]'`); on, the composer shows a `Model: <name>` chip.
+- **Model.** `drive click --role button --name Models`, choose an option, reopen and read the selected option. The dialog's tabs are named `Stella's main assistant` and `Image generation provider`. **Show in composer** is a switch by that name (`drive click --role switch --name "Show in composer"`); on, the composer shows a `Model: <name>` chip.
 - **Plan.** Account › **Plan & usage**; with a spent allowance the near-limit and limit states show there and in the bell.
 - **Live lists.** Save a provider key (Add key) and require a model only the provider's list has, then type an uncatalogued id and send a turn with it.
 

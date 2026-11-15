@@ -11,23 +11,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { Button } from "@/ui/button";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
 import { cloudEnginesApi } from "@/features/cloud/cloud-engines-api";
 import { EngineConnectPrompt } from "@/features/cloud/EngineConnectPrompt";
 import { useEngineConnect } from "@/features/cloud/use-engine-connect";
+import { formatPlan } from "@/features/cloud/EngineAccountRow";
 import {
-  accountInitials,
-  EngineAccountHeader,
-  EngineAccountRowView,
-  formatPlan,
-  type EngineAccountMenuItem,
-  type EngineAccountPlace,
-} from "@/features/cloud/EngineAccountRow";
+  AiDetailsGroup,
+  AiInUse,
+  AiLink,
+  AiNote,
+  AiPrimaryAccount,
+  AiProviderSection,
+  AiRow,
+  type AiMenuItem,
+} from "@/features/cloud/AiProviderSection";
 import {
   announceChatGptPlanUse,
   ContinueWithChatGptButton,
-  ManageChatGptUsageLink,
+  openChatGptUsage,
 } from "./ChatGptBrand";
 import { useChatGptProfiles } from "./use-chatgpt-profiles";
 
@@ -108,12 +112,29 @@ export function ChatGptAccountsSection({
   settings,
   refreshing,
   cloudAvailable,
+  engineInUse = false,
+  onUseEngine,
+  useEngineDisabled = false,
 }: {
   settings: EngineSettings | undefined;
   refreshing: boolean;
   cloudAvailable: boolean;
+  engineInUse?: boolean;
+  onUseEngine?: () => void;
+  useEngineDisabled?: boolean;
 }) {
   const t = useT();
+  const useEngineButton = onUseEngine ? (
+    <Button
+      type="button"
+      variant="ghost"
+      className="pill-btn"
+      disabled={useEngineDisabled}
+      onClick={onUseEngine}
+    >
+      {t("settings.engineAccounts.use")}
+    </Button>
+  ) : null;
   const chatgpt = useChatGptProfiles();
   const connect = useEngineConnect();
   const [busy, setBusy] = useState(false);
@@ -210,186 +231,209 @@ export function ChatGptAccountsSection({
     return undefined;
   };
 
-  const addChatGpt = chatgpt.available ? (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <ContinueWithChatGptButton
-          label={accounts.length > 0 ? t(`${K}.addChatgpt`) : undefined}
-          disabled={disabled}
-          loading={adding}
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12}>
-        <DropdownMenuItem onSelect={() => void signInHere()}>
-          {t(`${K}.addOnComputer`)}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!cloudAvailable} onSelect={() => void signInCloud()}>
-          {t(`${K}.addInCloud`)}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  ) : (
-    <ContinueWithChatGptButton
-      label={accounts.length > 0 ? t(`${K}.addChatgptCloud`) : undefined}
-      onClick={() => void signInCloud()}
-      disabled={disabled}
-      loading={adding}
-    />
-  );
+  const addChatGpt = (label?: string) =>
+    chatgpt.available ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <ContinueWithChatGptButton label={label} disabled={disabled} loading={adding} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12}>
+          <DropdownMenuItem onSelect={() => void signInHere()}>
+            {t(`${K}.addOnComputer`)}
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={!cloudAvailable} onSelect={() => void signInCloud()}>
+            {t(`${K}.addInCloud`)}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) : (
+      <ContinueWithChatGptButton
+        label={label}
+        onClick={() => void signInCloud()}
+        disabled={disabled}
+        loading={adding}
+      />
+    );
+
+  const views = accounts.map((account) => {
+    const { local, cloud } = account;
+    const signedInHere = local?.status === "signed_in";
+    const signedInCloud = Boolean(cloud && !cloud.status);
+
+    const menu: AiMenuItem[] = [];
+    if (chatgpt.available && !signedInHere) {
+      menu.push({
+        key: "in-here",
+        label: t(`${K}.signInComputer`),
+        onSelect: () =>
+          void signInHere(
+            local
+              ? { profileId: local.id }
+              : account.clientId
+                ? { sharedClientId: account.clientId }
+                : {},
+          ),
+      });
+    }
+    if (cloudAvailable && !signedInCloud) {
+      menu.push({
+        key: "in-cloud",
+        label: t(`${K}.signInCloud`),
+        onSelect: () =>
+          void signInCloud(
+            cloud
+              ? { accountId: cloud.accountId }
+              : account.clientId
+                ? { clientId: account.clientId }
+                : {},
+          ),
+      });
+    }
+    if (signedInHere && local?.planUsage === false) {
+      menu.push({
+        key: "plan-here",
+        label: t(`${K}.enablePlanUsage`),
+        onSelect: () => void signInHere({ profileId: local.id, enablePlanUsage: true }),
+      });
+    }
+    if (signedInCloud && cloud?.planUsage === false) {
+      menu.push({
+        key: "plan-cloud",
+        label: t(`${K}.enablePlanUsageCloud`),
+        onSelect: () => void signInCloud({ accountId: cloud.accountId, enablePlanUsage: true }),
+      });
+    }
+    if (local && local.status !== "signed_out") {
+      menu.push({
+        key: "out-here",
+        label: t(`${K}.signOutComputer`),
+        onSelect: () =>
+          void run(
+            async () => revokeNote("computer", await chatgpt.signOut(local.id)),
+            t(`${K}.signedOut`),
+          ),
+      });
+    }
+    if (cloud && cloud.status !== "signed_out") {
+      menu.push({
+        key: "out-cloud",
+        label: t(`${K}.signOutCloud`),
+        onSelect: () =>
+          void run(
+            async () =>
+              revokeNote("cloud", await cloudEnginesApi.disconnect("chatgpt", cloud.accountId)),
+            t(`${K}.signedOut`),
+          ),
+      });
+    }
+    if (local || cloud) {
+      menu.push({
+        key: "remove",
+        label: t(`${K}.remove`),
+        onSelect: () =>
+          void run(async () => {
+            if (local) await chatgpt.remove(local.id);
+            if (cloud) {
+              await cloudEnginesApi.disconnect("chatgpt", cloud.accountId, { forget: true });
+            }
+          }, t(`${K}.removed`)),
+      });
+    }
+
+    const usableHere = signedInHere && local?.planUsage !== false;
+    const usableInCloud = signedInCloud && cloud?.planUsage !== false;
+    const active =
+      (!local || local.active) && (!cloud || cloud.active) && (usableHere || usableInCloud);
+    const pick =
+      !active && (usableHere || usableInCloud)
+        ? () =>
+            void run(async () => {
+              if (cloud && usableInCloud && !cloud.active) {
+                await cloudEnginesApi.setActiveAccount("chatgpt", cloud.accountId);
+              }
+              if (local && usableHere && !local.active) await chatgpt.setActive(local.id);
+            })
+        : undefined;
+    const where =
+      signedInHere && signedInCloud
+        ? t(`${K}.whereBoth`)
+        : signedInHere
+          ? t(`${K}.whereComputer`)
+          : signedInCloud
+            ? t(`${K}.whereCloud`)
+            : t(`${K}.whereNone`);
+    return { account, menu, active, pick, where, status: statusOf(account) };
+  });
+
+  const primary = views.find((view) => view.active) ?? views.find((view) => view.pick) ?? views[0];
+  const connected = Boolean(primary && (primary.account.local || primary.account.cloud));
+
+  const details =
+    views.length > 0 ? (
+      <AiDetailsGroup label={t(`${K}.accountsLabel`)}>
+        {views.map((view) => (
+          <AiRow
+            key={view.account.key}
+            name={view.account.title}
+            meta={[formatPlan(view.account.plan), view.where, view.status].filter(Boolean).join(" · ")}
+            {...(view.active ? { inUseLabel: t(`${K}.inUse`) } : {})}
+            {...(view.pick ? { onUse: view.pick, useLabel: t(`${K}.use`) } : {})}
+            menuLabel={t(`${K}.moreLabel`, { name: view.account.title })}
+            menu={view.menu}
+            busy={disabled}
+          />
+        ))}
+      </AiDetailsGroup>
+    ) : undefined;
 
   return (
     <>
-      <EngineAccountHeader title={t(`${K}.chatgptTitle`)} control={addChatGpt} />
-      {accounts.map((account) => {
-        const { local, cloud } = account;
-        const signedInHere = local?.status === "signed_in";
-        const signedInCloud = Boolean(cloud && !cloud.status);
-        const places: EngineAccountPlace[] = [
-          ...(chatgpt.available
-            ? [{ key: "computer", label: t(`${K}.placeComputer`), signedIn: signedInHere }]
-            : []),
-          ...(cloudAvailable
-            ? [{ key: "cloud", label: t(`${K}.placeCloud`), signedIn: signedInCloud }]
-            : []),
-        ];
-
-        const items: EngineAccountMenuItem[] = [];
-        if (chatgpt.available && !signedInHere) {
-          items.push({
-            key: "in-here",
-            label: t(`${K}.signInComputer`),
-            onSelect: () =>
-              void signInHere(
-                local
-                  ? { profileId: local.id }
-                  : account.clientId
-                    ? { sharedClientId: account.clientId }
-                    : {},
-              ),
-          });
-        }
-        if (cloudAvailable && !signedInCloud) {
-          items.push({
-            key: "in-cloud",
-            label: t(`${K}.signInCloud`),
-            onSelect: () =>
-              void signInCloud(
-                cloud
-                  ? { accountId: cloud.accountId }
-                  : account.clientId
-                    ? { clientId: account.clientId }
-                    : {},
-              ),
-          });
-        }
-        if (signedInHere && local?.planUsage === false) {
-          items.push({
-            key: "plan-here",
-            label: t(`${K}.enablePlanUsage`),
-            onSelect: () => void signInHere({ profileId: local.id, enablePlanUsage: true }),
-          });
-        }
-        if (signedInCloud && cloud?.planUsage === false) {
-          items.push({
-            key: "plan-cloud",
-            label: t(`${K}.enablePlanUsageCloud`),
-            onSelect: () =>
-              void signInCloud({ accountId: cloud.accountId, enablePlanUsage: true }),
-          });
-        }
-
-        const tail: EngineAccountMenuItem[] = [];
-        if (local && local.status !== "signed_out") {
-          tail.push({
-            key: "out-here",
-            label: t(`${K}.signOutComputer`),
-            onSelect: () =>
-              void run(
-                async () => revokeNote("computer", await chatgpt.signOut(local.id)),
-                t(`${K}.signedOut`),
-              ),
-          });
-        }
-        if (cloud && cloud.status !== "signed_out") {
-          tail.push({
-            key: "out-cloud",
-            label: t(`${K}.signOutCloud`),
-            onSelect: () =>
-              void run(
-                async () =>
-                  revokeNote("cloud", await cloudEnginesApi.disconnect("chatgpt", cloud.accountId)),
-                t(`${K}.signedOut`),
-              ),
-          });
-        }
-        if (local || cloud) {
-          tail.push({
-            key: "remove",
-            label: t(`${K}.remove`),
-            onSelect: () =>
-              void run(async () => {
-                if (local) await chatgpt.remove(local.id);
-                if (cloud) {
-                  await cloudEnginesApi.disconnect("chatgpt", cloud.accountId, { forget: true });
+      <AiProviderSection
+        id="chatgpt"
+        titleKey={`${K}.chatgptTitle`}
+        {...(connected ? { action: addChatGpt(t(`${K}.addAccount`)) } : {})}
+        details={connected ? details : undefined}
+        detailsLabel={t(`${K}.detailsLabelChatgpt`)}
+        notes={
+          <>
+            {primary?.status ? <AiNote>{primary.status}</AiNote> : null}
+            {chatgpt.signingIn ? (
+              <AiNote
+                action={
+                  <button type="button" className="pill-btn" onClick={chatgpt.cancelSignIn}>
+                    {t("common.cancel")}
+                  </button>
                 }
-              }, t(`${K}.removed`)),
-          });
+              >
+                <span aria-live="polite">{t(`${K}.chatgptBrowserWaiting`)}</span>
+              </AiNote>
+            ) : null}
+            {connect.flow ? <EngineConnectPrompt connect={connect} /> : null}
+          </>
         }
-
-        const usableHere = signedInHere && local?.planUsage !== false;
-        const usableInCloud = signedInCloud && cloud?.planUsage !== false;
-        const active =
-          (!local || local.active) && (!cloud || cloud.active) && (usableHere || usableInCloud);
-        const pick =
-          !active && (usableHere || usableInCloud)
-            ? () =>
-                void run(async () => {
-                  if (cloud && usableInCloud && !cloud.active) {
-                    await cloudEnginesApi.setActiveAccount("chatgpt", cloud.accountId);
-                  }
-                  if (local && usableHere && !local.active) await chatgpt.setActive(local.id);
-                })
-            : undefined;
-        const subtitle = [formatPlan(account.plan), statusOf(account)]
-          .filter(Boolean)
-          .join(" · ");
-
-        return (
-          <EngineAccountRowView
-            key={account.key}
-            id={account.key}
-            title={account.title}
-            initials={accountInitials({ label: account.title, ...(account.email ? { email: account.email } : {}) })}
-            {...(subtitle ? { subtitle } : {})}
-            places={places}
-            active={active}
-            busy={disabled}
-            {...(pick ? { onPick: pick } : {})}
-            items={items}
-            tail={tail}
+      >
+        {connected && primary ? (
+          <AiPrimaryAccount
+            name={primary.account.title}
+            meta={
+              <>
+                {[formatPlan(primary.account.plan), primary.where].filter(Boolean).join(" · ")}
+                <AiLink label={t(`${K}.manageUsage`)} onClick={openChatGptUsage} external />
+              </>
+            }
+            {...(engineInUse && primary.active
+              ? { status: <AiInUse label={t(`${K}.inUse`)} /> }
+              : useEngineButton
+                ? { status: useEngineButton }
+                : {})}
           />
-        );
-      })}
-      {connect.flow ? <EngineConnectPrompt connect={connect} /> : null}
-      {chatgpt.signingIn ? (
-        <div className="settings-row">
-          <div className="settings-row-sublabel" aria-live="polite">
-            {t(`${K}.chatgptBrowserWaiting`)}
-          </div>
-          <div className="settings-row-control">
-            <button type="button" className="pill-btn" onClick={chatgpt.cancelSignIn}>
-              {t("common.cancel")}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {accounts.some((account) => Boolean(account.local || account.cloud)) ? (
-        <div className="settings-row">
-          <div className="settings-row-control">
-            <ManageChatGptUsageLink />
-          </div>
-        </div>
-      ) : null}
+        ) : (
+          <AiPrimaryAccount
+            name={<span data-empty>{t(`${K}.notConnected`)}</span>}
+            trailing={addChatGpt()}
+          />
+        )}
+      </AiProviderSection>
     </>
   );
 }

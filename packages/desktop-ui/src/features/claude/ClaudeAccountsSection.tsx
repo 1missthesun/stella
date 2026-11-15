@@ -16,19 +16,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
-import { CloudIcon, Globe, Monitor } from "@/ui/icons";
 import { showToast } from "@/ui/toast";
 import { useLocale, useT } from "@/shared/i18n";
 import { getDeviceIdOrNull } from "@/platform/electron/device-id";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { cloudEnginesApi } from "@/features/cloud/cloud-engines-api";
+import { formatPlan } from "@/features/cloud/EngineAccountRow";
 import {
-  accountInitials,
-  EngineAccountHeader,
-  EngineAccountRowView,
-  formatPlan,
-  type EngineAccountMenuItem,
-} from "@/features/cloud/EngineAccountRow";
+  AiDetailsGroup,
+  AiInUse,
+  AiLink,
+  AiNote,
+  AiPrimaryAccount,
+  AiProviderSection,
+  AiRow,
+  type AiMenuItem,
+} from "@/features/cloud/AiProviderSection";
+import { openExternalUrl } from "@/platform/electron/open-external";
 import { ClaudeLoginPrompt } from "./ClaudeLoginPrompt";
 import {
   ClaudeSyncNoticeDialog,
@@ -42,6 +46,9 @@ import "./claude-accounts.css";
 
 const K = "settings.engineAccounts";
 const C = "settings.engineAccounts.claude";
+
+const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
+const openClaudeUsage = () => openExternalUrl(CLAUDE_USAGE_URL);
 
 const sameEmail = (a: string | undefined, b: string | undefined) =>
   Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
@@ -67,12 +74,29 @@ export function ClaudeAccountsSection({
   settings,
   refreshing,
   cloudAvailable,
+  engineInUse = false,
+  onUseEngine,
+  useEngineDisabled = false,
 }: {
   settings: EngineSettings | undefined;
   refreshing: boolean;
   cloudAvailable: boolean;
+  engineInUse?: boolean;
+  onUseEngine?: () => void;
+  useEngineDisabled?: boolean;
 }) {
   const t = useT();
+  const useEngineButton = onUseEngine ? (
+    <Button
+      type="button"
+      variant="ghost"
+      className="pill-btn"
+      disabled={useEngineDisabled}
+      onClick={onUseEngine}
+    >
+      {t("settings.engineAccounts.use")}
+    </Button>
+  ) : null;
   const local = useClaudeLocalAccounts();
   const locale = useLocale();
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -331,11 +355,18 @@ export function ClaudeAccountsSection({
     };
   };
 
-  const reasonText = (place: PlaceView): string => {
-    if (place.reason === "selected") return t(`${C}.reasonSelected`);
-    if (place.reason === "own_login") return t(`${C}.reasonOwnLogin`);
-    return place.kind === "cloud" ? t(`${C}.reasonCloudLogin`) : t(`${C}.reasonOtherLogin`);
-  };
+  const placeShort = (place: PlaceView) =>
+    place.kind === "this"
+      ? t(`${C}.thisComputerUnnamed`)
+      : place.kind === "cloud"
+        ? t(`${C}.cloudStart`)
+        : place.name;
+  const placeInline = (place: PlaceView) =>
+    place.kind === "this"
+      ? t(`${C}.thisComputerInline`)
+      : place.kind === "cloud"
+        ? t(`${C}.cloudInline`)
+        : place.name;
 
   const otherOnline = places.filter(
     (place) => place.kind === "device" && place.online && place.cliInstalled !== false,
@@ -365,7 +396,7 @@ export function ClaudeAccountsSection({
       target: signInTarget(place, undefined),
     })),
   ];
-  const addControl =
+  const addControl = (label: string) =>
     addTargets.length > 1 ? (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -375,7 +406,7 @@ export function ClaudeAccountsSection({
             className="pill-btn"
             disabled={disabled || login.open || install.installing}
           >
-            {t(`${K}.addClaude`)}
+            {label}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12}>
@@ -407,16 +438,16 @@ export function ClaudeAccountsSection({
           addTargets[0]?.target ? startLogin(addTargets[0].target) : addTargets[0]?.run?.()
         }
       >
-        {t(`${K}.addClaude`)}
+        {label}
       </Button>
     );
 
-  const accountRow = (account: EngineConnection) => {
+  const accountMenu = (account: EngineConnection): AiMenuItem[] => {
     const config = localFor(account.email);
     const inCloud = (account.places ?? []).some((place) => place.kind === "cloud");
-    const tail: EngineAccountMenuItem[] = [];
+    const items: AiMenuItem[] = [];
     if (config && !config.isDefault) {
-      tail.push({
+      items.push({
         key: "out-here",
         label: t(`${K}.signOutComputer`),
         onSelect: () =>
@@ -424,7 +455,7 @@ export function ClaudeAccountsSection({
       });
     }
     if (inCloud) {
-      tail.push({
+      items.push({
         key: "out-cloud",
         label: t(`${K}.signOutCloud`),
         onSelect: () =>
@@ -434,7 +465,7 @@ export function ClaudeAccountsSection({
           ),
       });
     }
-    tail.push({
+    items.push({
       key: "remove",
       label: t(`${K}.remove`),
       onSelect: () =>
@@ -443,103 +474,159 @@ export function ClaudeAccountsSection({
           t(`${K}.removed`),
         ),
     });
-    const plan = formatPlan(account.plan);
-    const active = account.accountId === chosenId;
-    return (
-      <EngineAccountRowView
-        key={account.accountId}
-        id={account.accountId}
-        title={account.email ?? account.label}
-        initials={accountInitials({
-          label: account.label,
-          ...(account.email ? { email: account.email } : {}),
-        })}
-        {...(plan ? { subtitle: plan } : {})}
-        active={active}
-        activeLabel={t(`${C}.chosen`)}
-        busy={disabled}
-        {...(active || !overview ? {} : { onPick: () => choose(account.accountId) })}
-        items={[]}
-        tail={tail}
-      />
-    );
+    return items;
   };
 
-  return (
+  const thisPlace = places.find((place) => place.kind === "this");
+  const activeLocal = local.configs.find((config) => config.configId === local.activeConfigId);
+  const usingOwn = !chosen;
+  const primaryEmail = chosen
+    ? (chosen.email ?? chosen.label)
+    : (thisPlace?.inUseEmail ??
+      places.find((place) => place.signedIn && place.inUseEmail)?.inUseEmail);
+  const primaryPlan = formatPlan(chosen ? chosen.plan : activeLocal?.plan);
+  const reachable = places.filter((place) => place.online && place.reported);
+  const usingIt = reachable.filter((place) =>
+    chosen ? place.signedIn && !place.missingChosen : place.signedIn,
+  );
+  const where = !primaryEmail
+    ? null
+    : usingOwn
+      ? thisPlace?.signedIn
+        ? t(`${C}.ownLoginHere`)
+        : usingIt.length > 0
+          ? t(`${C}.usedOn`, { places: usingIt.map((place) => placeInline(place)).join(", ") })
+          : null
+      : usingIt.length === reachable.length && reachable.length > 1
+        ? t(`${C}.everywhere`)
+        : usingIt.length > 0
+          ? t(`${C}.usedOn`, { places: usingIt.map((place) => placeInline(place)).join(", ") })
+          : null;
+
+  const noteFor = (place: PlaceView): { text: string; target: ClaudeLoginTarget | null } | null => {
+    if (!place.online || place.cliInstalled === false) return null;
+    const target = signInTarget(
+      place,
+      place.missingChosen ? chosen?.email : place.loginEnd?.email,
+    );
+    if (place.loginEnd?.state === "ended") {
+      return { text: t(`${C}.noteEnded`, { place: placeShort(place) }), target };
+    }
+    if (place.loginEnd?.state === "ending") {
+      return {
+        text: t(`${C}.noteEnding`, { place: placeShort(place), date: formatEnd(place.loginEnd.endsAt) }),
+        target,
+      };
+    }
+    if (place.missingChosen && chosen) {
+      return {
+        text: t(`${C}.noteMissingChosen`, { place: placeShort(place), email: chosen.email ?? chosen.label }),
+        target,
+      };
+    }
+    if (!place.signedIn && place.reported) {
+      return { text: t(`${C}.noteSignedOut`, { place: placeShort(place) }), target };
+    }
+    return null;
+  };
+  const notes = places
+    .map((place) => ({ place, note: noteFor(place) }))
+    .filter((entry): entry is { place: PlaceView; note: { text: string; target: ClaudeLoginTarget | null } } =>
+      Boolean(entry.note),
+    );
+  const installNote = thisPlace?.cliInstalled === false && offerInstall;
+  const signInButton = (target: ClaudeLoginTarget | null) =>
+    target ? (
+      <Button
+        type="button"
+        variant="ghost"
+        className="pill-btn"
+        disabled={disabled || login.open}
+        onClick={() => startLogin(target)}
+      >
+        {t(`${K}.signIn`)}
+      </Button>
+    ) : null;
+  const installButton =
+    !install.installing && install.state.status !== "error" ? (
+      <Button
+        type="button"
+        variant="ghost"
+        className="pill-btn"
+        disabled={disabled || login.open}
+        onClick={installHere}
+      >
+        {t("claudeInstall.install")}
+      </Button>
+    ) : null;
+
+  const connected = Boolean(primaryEmail);
+  const accountCount = accounts.length + unlistedLocal.length;
+
+  const inUseRow = (account: (typeof accounts)[number]) => account.accountId === chosenId;
+  const placeMeta = (place: PlaceView, status: string) => {
+    if (place.loginEnd?.state === "ended") return `${status} · ${t(`${C}.rowEnded`)}`;
+    if (place.loginEnd?.state === "ending") {
+      return `${status} · ${t(`${C}.rowEnding`, { date: formatEnd(place.loginEnd.endsAt) })}`;
+    }
+    if (place.missingChosen && chosen && place.signedIn && place.inUseEmail) {
+      return t(`${C}.rowNotChosen`, { email: place.inUseEmail, chosen: chosen.email ?? chosen.label });
+    }
+    return status;
+  };
+
+  const details = (
     <>
-      <EngineAccountHeader
-        title={t(`${K}.claudeTitle`)}
-        description={t(`${C}.chooseNote`)}
-        control={addControl}
-      />
-      <div className="claude-accounts" role="radiogroup" aria-label={t(`${K}.claudeTitle`)}>
-        {overview ? (
-          <EngineAccountRowView
-            id="claude-automatic"
-            title={t(`${C}.automatic`)}
-            initials=""
-            leading={
-              <span className="claude-accounts__auto-icon" aria-hidden>
-                <Globe size={16} />
-              </span>
-            }
-            subtitle={t(`${C}.automaticHint`)}
-            active={chosenId === null}
-            activeLabel={t(`${C}.chosen`)}
+      <AiDetailsGroup label={t(`${K}.accountsLabel`)}>
+        {accounts.map((account) => (
+          <AiRow
+            key={account.accountId}
+            name={account.email ?? account.label}
+            meta={formatPlan(account.plan)}
+            {...(inUseRow(account)
+              ? { inUseLabel: t(`${K}.inUse`) }
+              : account.accountId !== chosenId && overview
+                ? { onUse: () => choose(account.accountId), useLabel: t(`${K}.use`) }
+                : {})}
+            menuLabel={t(`${K}.moreLabel`, { name: account.email ?? account.label })}
+            menu={accountMenu(account)}
             busy={disabled}
-            {...(chosenId === null ? {} : { onPick: () => choose(null) })}
-            items={[]}
           />
-        ) : null}
-        {accounts.map(accountRow)}
-        {unlistedLocal.map((config) => {
-          const plan = formatPlan(config.plan);
-          return (
-            <EngineAccountRowView
-              key={`local:${config.configId}`}
-              id={`local:${config.configId}`}
-              title={config.email!}
-              initials={accountInitials({ label: config.email!, email: config.email! })}
-              {...(plan ? { subtitle: plan } : {})}
-              active={false}
-              busy={disabled}
-              items={[]}
-              tail={
-                config.isDefault
-                  ? []
-                  : [
-                      {
-                        key: "out-here",
-                        label: t(`${K}.signOutComputer`),
-                        onSelect: () =>
-                          void run(
-                            () => local.signOut(config.configId),
-                            t(`${K}.signedOut`),
-                          ),
-                      },
-                    ]
-              }
-            />
-          );
-        })}
-        {signedOutExtras.map((config) => (
-          <EngineAccountRowView
+        ))}
+        {unlistedLocal.map((config) => (
+          <AiRow
             key={`local:${config.configId}`}
-            id={`local:${config.configId}`}
-            title={t(`${K}.signedOutLogin`)}
-            initials="?"
-            subtitle={t(`${K}.placeComputer`)}
-            active={false}
+            name={config.email!}
+            meta={formatPlan(config.plan)}
+            menuLabel={t(`${K}.moreLabel`, { name: config.email! })}
+            menu={
+              config.isDefault
+                ? []
+                : [
+                    {
+                      key: "out-here",
+                      label: t(`${K}.signOutComputer`),
+                      onSelect: () =>
+                        void run(() => local.signOut(config.configId), t(`${K}.signedOut`)),
+                    },
+                  ]
+            }
             busy={disabled}
-            items={[
+          />
+        ))}
+        {signedOutExtras.map((config) => (
+          <AiRow
+            key={`local:${config.configId}`}
+            name={t(`${K}.signedOutLogin`)}
+            meta={t(`${K}.placeComputer`)}
+            busy={disabled}
+            menuLabel={t(`${K}.moreLabel`, { name: t(`${K}.signedOutLogin`) })}
+            menu={[
               {
                 key: "again",
                 label: t(`${K}.signInAgain`),
-                onSelect: () =>
-                  startLogin({ place: "local", configId: config.configId }),
+                onSelect: () => startLogin({ place: "local", configId: config.configId }),
               },
-            ]}
-            tail={[
               {
                 key: "remove",
                 label: t(`${K}.remove`),
@@ -548,122 +635,107 @@ export function ClaudeAccountsSection({
             ]}
           />
         ))}
-      </div>
-
+        {overview ? (
+          <AiRow
+            name={t(`${C}.ownLogin`)}
+            meta={t(`${C}.ownLoginHint`)}
+            {...(chosenId === null ? { inUseLabel: t(`${K}.inUse`) } : {})}
+            {...(chosenId !== null ? { onUse: () => choose(null), useLabel: t(`${K}.use`) } : {})}
+            busy={disabled}
+          />
+        ) : null}
+      </AiDetailsGroup>
       {places.length > 0 ? (
-        <div className="claude-places" data-claude-places>
-          <div className="claude-places__title">{t(`${C}.inUseTitle`)}</div>
+        <AiDetailsGroup label={t(`${K}.computersLabel`)}>
           {places.map((place) => {
-            const target = signInTarget(
-              place,
-              place.missingChosen ? chosen?.email : place.loginEnd?.email,
-            );
-            const notInstalled = place.cliInstalled === false;
-            const signedIn = place.signedIn;
+            const note = noteFor(place);
             const status = !place.online
               ? t(`${C}.offline`)
-              : notInstalled
+              : place.cliInstalled === false
                 ? t(`${C}.cliMissing`)
-                : !place.reported
-                  ? place.kind === "this"
-                    ? null
-                    : t(`${C}.unknown`)
-                  : !signedIn
+                : place.signedIn
+                  ? place.inUseEmail
+                  : place.reported
                     ? t(`${C}.notSignedIn`)
-                    : null;
-            const needsSignIn =
-              place.online &&
-              !notInstalled &&
-              (place.missingChosen || (!signedIn && place.reported) || Boolean(place.loginEnd));
-            const showOwn =
-              place.kind !== "cloud" &&
-              place.ownLoginEmail &&
-              !sameEmail(place.ownLoginEmail, place.inUseEmail);
+                    : t(`${C}.unknown`);
             return (
-              <div
+              <AiRow
                 key={place.key}
-                className="claude-place"
-                data-claude-place={place.key}
-                data-reason={place.reason}
-                data-missing-chosen={place.missingChosen || undefined}
+                name={place.name}
+                meta={placeMeta(place, status ?? "")}
+                busy={disabled}
+                {...(place.kind === "this" && installNote
+                  ? {
+                      extra: (
+                        <div className="ai-row__install">
+                          <ClaudeCliInstallStatus state={install.state} onRetry={installHere} />
+                        </div>
+                      ),
+                    }
+                  : {})}
               >
-                <span className="claude-place__icon" aria-hidden>
-                  {place.kind === "cloud" ? <CloudIcon size={16} /> : <Monitor size={16} />}
-                </span>
-                <div className="claude-place__text">
-                  <div className="claude-place__name">{place.name}</div>
-                  {signedIn ? (
-                    <div className="claude-place__account">
-                      <span className="claude-place__email">{place.inUseEmail}</span>
-                      <span className="claude-place__reason" data-reason={place.reason}>
-                        {reasonText(place)}
-                      </span>
-                    </div>
-                  ) : null}
-                  {status ? <div className="claude-place__status">{status}</div> : null}
-                  {place.loginEnd ? (
-                    <div className="claude-place__warn" data-claude-login-end={place.loginEnd.state}>
-                      {place.loginEnd.state === "ending"
-                        ? t("claudeLogin.endingDescription", { date: formatEnd(place.loginEnd.endsAt) })
-                        : place.loginEnd.email
-                          ? t("claudeLogin.endedDescriptionEmail", { email: place.loginEnd.email })
-                          : t("claudeLogin.endedDescription")}
-                    </div>
-                  ) : null}
-                  {notInstalled && place.kind === "this" && offerInstall ? (
-                    <>
-                      {install.state.status === "idle" ? (
-                        <div className="claude-place__note">{t("claudeInstall.ownPlan")}</div>
-                      ) : null}
-                      <div className="claude-place__install">
-                        <ClaudeCliInstallStatus state={install.state} onRetry={installHere} />
-                      </div>
-                    </>
-                  ) : null}
-                  {showOwn ? (
-                    <div className="claude-place__note">
-                      {t(`${C}.ownLoginNote`, { email: place.ownLoginEmail! })}
-                    </div>
-                  ) : null}
-                  {place.missingChosen && chosen?.email && place.online && !notInstalled ? (
-                    <div className="claude-place__warn">
-                      {t(signedIn ? `${C}.missingChosenFallback` : `${C}.missingChosen`, {
-                        email: chosen.email,
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-                {notInstalled &&
-                place.kind === "this" &&
-                offerInstall &&
-                !install.installing &&
-                install.state.status !== "error" ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="pill-btn"
-                    disabled={disabled || login.open}
-                    onClick={installHere}
-                  >
-                    {t("claudeInstall.install")}
-                  </Button>
-                ) : null}
-                {needsSignIn && target ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="pill-btn"
-                    disabled={disabled || login.open}
-                    onClick={() => startLogin(target)}
-                  >
-                    {t(`${K}.signIn`)}
-                  </Button>
-                ) : null}
-              </div>
+                {place.kind === "this" && installNote ? installButton : note ? signInButton(note.target) : null}
+              </AiRow>
             );
           })}
-        </div>
+        </AiDetailsGroup>
       ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <AiProviderSection
+        id="claude"
+        titleKey={`${K}.claudeTitle`}
+        {...(connected ? { action: addControl(t(`${K}.addAccount`)) } : {})}
+        details={connected || accountCount > 0 ? details : undefined}
+        detailsLabel={t(`${K}.detailsLabel`)}
+        notes={
+          <>
+            {installNote ? (
+              <AiNote action={installButton}>{t(`${K}.cliMissing`)}</AiNote>
+            ) : null}
+            {installNote && install.state.status !== "idle" ? (
+              <div className="ai-row__install">
+                <ClaudeCliInstallStatus state={install.state} onRetry={installHere} />
+              </div>
+            ) : null}
+            {connected
+              ? notes
+                  .filter(({ place }) => !place.signedIn || place.loginEnd)
+                  .slice(0, 2)
+                  .map(({ place, note }) => (
+                  <AiNote key={place.key} action={signInButton(note.target)}>
+                    {note.text}
+                  </AiNote>
+                ))
+              : null}
+          </>
+        }
+      >
+        {connected ? (
+          <AiPrimaryAccount
+            name={primaryEmail}
+            meta={
+              <>
+                {[primaryPlan, where].filter(Boolean).join(" · ") || null}
+                <AiLink label={t(`${K}.manageUsage`)} onClick={openClaudeUsage} external />
+              </>
+            }
+            {...(engineInUse
+              ? { status: <AiInUse label={t(`${K}.inUse`)} /> }
+              : useEngineButton
+                ? { status: useEngineButton }
+                : {})}
+          />
+        ) : (
+          <AiPrimaryAccount
+            name={<span data-empty>{t(`${K}.notConnected`)}</span>}
+            trailing={installNote ? null : addControl(t(`${K}.signIn`))}
+          />
+        )}
+      </AiProviderSection>
 
       <ClaudeLoginPrompt login={login} />
       <ClaudeSyncNoticeDialog

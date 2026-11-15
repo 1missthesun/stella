@@ -47,11 +47,11 @@ export const connectPlanCopy = (
 
 export const openPlans = (): void => planUsageDialog.openPlans();
 
-/** Where connecting lives when the card can't show: the Models picker, or Settings → Account on the web. */
+/** Where connecting lives when the card can't show: the Models picker, or Settings → Claude and ChatGPT on the web. */
 export const openEngineConnectFallback = (): void => {
   if (typeof window === "undefined") return;
   if (connectPlanChatGptOnly()) {
-    writeViewState("settings.tab", "account");
+    writeViewState("settings.tab", "ai");
     void import("@/shell/settings-dialog-store").then(({ settingsDialog }) => settingsDialog.open());
     return;
   }

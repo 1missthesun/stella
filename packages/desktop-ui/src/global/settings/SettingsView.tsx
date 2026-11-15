@@ -21,6 +21,7 @@ import {
 } from "@/global/settings/settings-tabs";
 import { useViewState } from "@/platform/view-state/view-state";
 import { AccountTab } from "./tabs/AccountTab";
+import { AiTab } from "./tabs/AiTab";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { ShortcutsTab } from "./tabs/ShortcutsTab";
 import { PrivacyTab } from "./tabs/PrivacyTab";
@@ -199,6 +200,8 @@ function SettingsTabContent({
         <GeneralTab />
       ) : activeTab === "shortcuts" && platformCapabilities.shortcuts ? (
         <ShortcutsTab />
+      ) : activeTab === "ai" ? (
+        <AiTab />
       ) : activeTab === "account" ? (
         <AccountTab onSignOut={onSignOut} onOpenLegal={onOpenLegal} />
       ) : activeTab === "audio" ? (

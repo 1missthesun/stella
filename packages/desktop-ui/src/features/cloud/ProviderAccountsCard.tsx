@@ -1,4 +1,3 @@
-import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useState } from "react";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import type {
@@ -14,6 +13,8 @@ import { ChatGptAccountsSection } from "@/features/chatgpt/ChatGptAccountsSectio
 import { ClaudeAccountsSection } from "@/features/claude/ClaudeAccountsSection";
 import { cloudEnginesApi, useCloudEngines } from "./cloud-engines-api";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
+import { AiInUse, AiPrimaryAccount } from "./AiProviderSection";
+import "./ai-accounts.css";
 import { useServerFeature } from "@/platform/backend/server-discovery";
 
 const K = "settings.engineAccounts";
@@ -63,62 +64,53 @@ export function ProviderAccountsCard() {
     }
   };
 
+  const engineChoice = (engine: "anthropic" | "chatgpt") =>
+    isAuthenticated && chatEngine !== engine
+      ? {
+          onUseEngine: () => void chooseEngine(engine),
+          useEngineDisabled: switching || !usableProviders.has(engine),
+        }
+      : {};
+
   return (
-    <div className="settings-card">
-      <SettingsCardTitle titleKey={`${K}.cardTitle`} />
-      <ChatGptAccountsSection
-        settings={connections}
-        refreshing={refreshing}
-        cloudAvailable={isAuthenticated}
-      />
+    <>
       <ClaudeAccountsSection
         settings={connections}
         refreshing={refreshing}
         cloudAvailable={isAuthenticated}
+        engineInUse={isAuthenticated && chatEngine === "anthropic"}
+        {...engineChoice("anthropic")}
       />
-      {isAuthenticated ? (
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">{t(`${K}.runsOnLabel`)}</div>
-          </div>
-          <div className="settings-row-control engine-account-controls">
-            {managedModels ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className={`pill-btn${chatEngine === "stella" ? " pill-btn--active" : ""}`}
-                aria-pressed={chatEngine === "stella"}
-                onClick={() => void chooseEngine("stella")}
-                disabled={switching}
-              >
-                Stella
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              className={`pill-btn${chatEngine === "anthropic" ? " pill-btn--active" : ""}`}
-              aria-pressed={chatEngine === "anthropic"}
-              onClick={() => void chooseEngine("anthropic")}
-              disabled={switching || !usableProviders.has("anthropic")}
-              title={usableProviders.has("anthropic") ? undefined : t(`${K}.needsClaudeCloud`)}
-            >
-              Claude
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className={`pill-btn${chatEngine === "chatgpt" ? " pill-btn--active" : ""}`}
-              aria-pressed={chatEngine === "chatgpt"}
-              onClick={() => void chooseEngine("chatgpt")}
-              disabled={switching || !usableProviders.has("chatgpt")}
-              title={usableProviders.has("chatgpt") ? undefined : t(`${K}.needsChatgptCloud`)}
-            >
-              ChatGPT
-            </Button>
-          </div>
-        </div>
+      <ChatGptAccountsSection
+        settings={connections}
+        refreshing={refreshing}
+        cloudAvailable={isAuthenticated}
+        engineInUse={isAuthenticated && chatEngine === "chatgpt"}
+        {...engineChoice("chatgpt")}
+      />
+      {isAuthenticated && managedModels ? (
+        <section className="settings-card ai-provider ai-provider--plain" data-ai-provider="stella">
+          <AiPrimaryAccount
+            name={t(`${K}.stellaModels`)}
+            meta={t(`${K}.stellaModelsHint`)}
+            status={
+              chatEngine === "stella" ? (
+                <AiInUse label={t(`${K}.inUse`)} />
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="pill-btn"
+                  disabled={switching}
+                  onClick={() => void chooseEngine("stella")}
+                >
+                  {t(`${K}.use`)}
+                </Button>
+              )
+            }
+          />
+        </section>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -14,15 +14,18 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 import { deleteAuthUser } from "@/global/auth/services/auth-session";
 import { clearCachedToken } from "@/global/auth/services/auth-token";
 import { uiState } from "@/platform/ui-state";
+import { useViewState } from "@/platform/view-state/view-state";
+import { ChevronRight } from "@/ui/icons";
 import type { LegalDocument } from "@/global/legal/legal-text";
 import { useT } from "@/shared/i18n";
 import { getSettingsErrorMessage } from "./shared";
 import { CloudBoundary } from "@/features/cloud/CloudBoundary";
-import { ProviderAccountsCard } from "@/features/cloud/ProviderAccountsCard";
 import { SessionsCard } from "./SessionsCard";
 import { PasskeysCard } from "./PasskeysCard";
 import { ServerSettingsCard } from "@/global/self-host/ServerSettingsCard";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
+import { useCurrentUser } from "@/global/auth/hooks/use-current-user";
+import "@/features/cloud/ai-accounts.css";
 
 type AccountDeleteAction = "data" | "account";
 
@@ -99,9 +102,16 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
   const t = useT();
   const selfHosted = useSelfHostedServer();
   const { hasConnectedAccount } = useAuthSessionState();
+  const { user } = useCurrentUser();
+  const email = user?.email?.trim();
   const [pendingDeleteAction, setPendingDeleteAction] =
     useState<AccountDeleteAction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useViewState<boolean>(
+    "settings.account.deleteOpen",
+    false,
+    (value) => typeof value === "boolean",
+  );
   const closeDeleteDialog = useCallback(
     (open: boolean) => {
       if (!open && !isDeleting) {
@@ -168,22 +178,14 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
 
   return (
     <div className="settings-tab-content settings-tab-content--account">
-      <ServerSettingsCard />
-      <CloudBoundary>
-        <ProviderAccountsCard />
-      </CloudBoundary>
-      {hasConnectedAccount ? (
-        <CloudBoundary>
-          <SessionsCard />
-        </CloudBoundary>
-      ) : null}
-      {hasConnectedAccount ? <PasskeysCard /> : null}
       <div className="settings-card">
         <SettingsCardTitle titleKey="settings.account.title" />
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">
-              {t("settings.account.signOut.label")}
+              {email
+                ? t("settings.account.signedInToStellaAs", { email })
+                : t("settings.account.signOut.label")}
             </div>
           </div>
           <div className="settings-row-control">
@@ -193,36 +195,25 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
               className="pill-btn"
               onClick={onSignOut}
             >
-              {t("settings.account.signOut.action")}
+              {t("settings.account.signOut.thisComputer")}
             </Button>
           </div>
         </div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">
-              {t("settings.account.deleteData.label")}
-            </div>
-          </div>
-          <div className="settings-row-control">
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn pill-btn--danger"
-              onClick={() => setPendingDeleteAction("data")}
-              disabled={isDeleting}
-            >
-              {isDeleting && pendingDeleteAction === "data"
-                ? t("settings.account.deleteData.working")
-                : t("settings.account.deleteData.action")}
-            </Button>
-          </div>
-        </div>
-        {/* The owner of a self-hosted server can't delete it from here. */}
-        {selfHosted ? null : (
+        <button
+          type="button"
+          className="ai-provider__more"
+          aria-expanded={deleteOpen}
+          onClick={() => setDeleteOpen(!deleteOpen)}
+        >
+          <ChevronRight size={14} aria-hidden className="ai-provider__chevron" />
+          {t("settings.account.deleteLabel")}
+        </button>
+        {deleteOpen ? (
+          <div className="ai-provider__details">
           <div className="settings-row">
             <div className="settings-row-info">
               <div className="settings-row-label">
-                {t("settings.account.deleteAccount.label")}
+                {t("settings.account.deleteData.label")}
               </div>
             </div>
             <div className="settings-row-control">
@@ -230,37 +221,55 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
                 type="button"
                 variant="ghost"
                 className="pill-btn pill-btn--danger"
-                onClick={() => setPendingDeleteAction("account")}
-                disabled={isDeleting || !hasConnectedAccount}
+                onClick={() => setPendingDeleteAction("data")}
+                disabled={isDeleting}
               >
-                {isDeleting && pendingDeleteAction === "account"
-                  ? t("settings.account.deleteAccount.working")
-                  : t("settings.account.deleteAccount.action")}
+                {isDeleting && pendingDeleteAction === "data"
+                  ? t("settings.account.deleteData.working")
+                  : t("settings.account.deleteData.action")}
               </Button>
             </div>
           </div>
-        )}
+          {/* The owner of a self-hosted server can't delete it from here. */}
+          {selfHosted ? null : (
+            <div className="settings-row">
+              <div className="settings-row-info">
+                <div className="settings-row-label">
+                  {t("settings.account.deleteAccount.label")}
+                </div>
+              </div>
+              <div className="settings-row-control">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="pill-btn pill-btn--danger"
+                  onClick={() => setPendingDeleteAction("account")}
+                  disabled={isDeleting || !hasConnectedAccount}
+                >
+                  {isDeleting && pendingDeleteAction === "account"
+                    ? t("settings.account.deleteAccount.working")
+                    : t("settings.account.deleteAccount.action")}
+                </Button>
+              </div>
+            </div>
+          )}
+          </div>
+        ) : null}
       </div>
-      <div className="settings-card">
-        <SettingsCardTitle titleKey="settings.account.legal.title" />
-        <div className="settings-row-control">
-          <Button
-            type="button"
-            variant="ghost"
-            className="pill-btn"
-            onClick={() => onOpenLegal?.("terms")}
-          >
-            {t("settings.account.legal.terms")}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="pill-btn"
-            onClick={() => onOpenLegal?.("privacy")}
-          >
-            {t("settings.account.legal.privacy")}
-          </Button>
-        </div>
+      {hasConnectedAccount ? (
+        <CloudBoundary>
+          <SessionsCard />
+        </CloudBoundary>
+      ) : null}
+      {hasConnectedAccount ? <PasskeysCard /> : null}
+      <ServerSettingsCard />
+      <div className="ai-legal">
+        <button type="button" className="ai-link" onClick={() => onOpenLegal?.("terms")}>
+          {t("settings.account.legal.terms")}
+        </button>
+        <button type="button" className="ai-link" onClick={() => onOpenLegal?.("privacy")}>
+          {t("settings.account.legal.privacy")}
+        </button>
       </div>
       <Dialog
         open={pendingDeleteAction !== null}

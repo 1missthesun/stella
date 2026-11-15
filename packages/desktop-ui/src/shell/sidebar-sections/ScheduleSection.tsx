@@ -452,7 +452,13 @@ function ScheduleItem({
             }}
           >
             <Trash2 size={14} strokeWidth={1.75} />
-            {confirmDelete ? <span>{t("schedule.deleteConfirm")}</span> : null}
+            {/* The words sit to the bin's left, outside its box, so the bin
+                stays where it was and a second click in place confirms. */}
+            {confirmDelete ? (
+              <span className="schedule-section__confirm-label" aria-hidden="true">
+                {t("schedule.deleteConfirm")}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>

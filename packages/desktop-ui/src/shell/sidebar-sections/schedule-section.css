@@ -52,6 +52,13 @@
   opacity: 1;
 }
 
+/* Without a hovering pointer (touch), the actions are always shown. */
+@media (hover: none) {
+  .schedule-section__actions {
+    opacity: 1;
+  }
+}
+
 .schedule-section__icon-button {
   display: inline-flex;
   align-items: center;
@@ -74,8 +81,35 @@
   color: var(--text-strong);
 }
 
-.schedule-section__icon-button[data-confirm] {
+.schedule-section__icon-button {
+  position: relative;
+}
+
+.schedule-section__icon-button[data-confirm],
+.schedule-section__icon-button[data-confirm]:hover:not(:disabled) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  background: color-mix(in oklch, var(--destructive, var(--foreground)) 10%, var(--background));
   color: var(--destructive, var(--text-strong));
+}
+
+/* "Delete?" grows to the left over Pause and Edit, which step aside while
+   the bin waits for its second click; the bin itself never moves. */
+.schedule-section__confirm-label {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px 0 8px;
+  border-radius: 8px 0 0 8px;
+  background: inherit;
+  white-space: nowrap;
+}
+
+.schedule-section__actions:has([data-confirm]) .schedule-section__icon-button:not([data-confirm]) {
+  visibility: hidden;
 }
 
 .schedule-section__icon-button:focus-visible {

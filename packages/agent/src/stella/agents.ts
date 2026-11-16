@@ -873,7 +873,12 @@ export function stellaAgents(host: StellaAgentsHost) {
               {
                 type: "input",
                 content: [...carried, message].join("\n\n"),
-                whenBusy: "steer",
+                // An automatic wake (a finished command or monitor) that lands
+                // while the task's run is still going waits for that run to end
+                // and gets its own turn. Steered in, it could reach the run just
+                // after end_turn_waiting and take the waiting back, so the run
+                // went out as a premature "[Agent completed] Waiting for …".
+                whenBusy: reporter.input.wake ? "followUp" : "steer",
                 requestId: `agent-msg:${reporter.id}`,
               },
               context,
@@ -924,7 +929,12 @@ export function stellaAgents(host: StellaAgentsHost) {
             })().catch(() => false);
           }
           if (settled?.status === "unanswered" && settled.reason === "aborted") await dropMove(runtime, agentConversationId, context);
-          const waitedFor = await takeWait(runtime, agentConversationId, settled?.status === "done" && settled.type === "input", context);
+          const waitedFor = await takeWait(
+            runtime,
+            agentConversationId,
+            settled?.status === "done" && settled.type === "input" ? settled.answer : undefined,
+            context,
+          );
           const move =
             settled?.status === "done" && settled.type === "input" ? await takeMove(runtime, agentConversationId, context) : undefined;
           if (move && settled?.status === "done" && settled.type === "input") {
@@ -2762,7 +2772,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         host.agentLog?.kick(agent.id);
       }
       const stopped = args.signal?.aborted === true || (settled.status === "unanswered" && settled.reason === "aborted");
-      const waitedFor = await takeWait(harness, agent.id, !stopped && settled.status === "done" && settled.type === "input", context);
+      const waitedFor = await takeWait(harness, agent.id, !stopped && settled.status === "done" && settled.type === "input" ? settled.answer : undefined, context);
       const rewake =
         retry === 1
           ? await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], stopped, args.signal?.reason === PLACED_AGENT_STOPPED, context)
@@ -3003,7 +3013,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const takeWait = async (
     store: Pick<ToolExecutionApi, "snapshot"> & { commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown> },
     agentConversationId: ConversationId,
-    answered: boolean,
+    answer: EntryId | undefined,
     context: Context,
   ): Promise<string | undefined> => {
     const waiting = (await store.snapshot(StellaAgentDoc, agentConversationId, context))?.waiting;
@@ -3012,18 +3022,21 @@ export function stellaAgents(host: StellaAgentsHost) {
     await store.commit(async (tx) => {
       delete (await tx.doc(StellaAgentDoc, agentConversationId)).waiting;
       // A message steered into the same run after the wait resumed it there.
+      // Only what came before the run's answer counts: a message queued for
+      // the next turn (a wake that arrived as the run ended) lands after it and
+      // leaves this run waiting.
       const after = waiting.afterEntry;
       let cursor: Parameters<Tx["scanEntries"]>[2];
       for (let pages = 0; after !== undefined && pages < 20 && !steered; pages += 1) {
         const page = await tx.scanEntries({ conversationId: agentConversationId, order: "descending" }, 50, cursor);
         const newer = page.items.filter((entry) => Number(entry.id) > after);
-        steered = newer.some((entry) => entry.kind === "pi.user");
+        steered = newer.some((entry) => entry.kind === "pi.user" && (answer === undefined || Number(entry.id) < Number(answer)));
         cursor = page.next;
         if (cursor === undefined || newer.length < page.items.length) break;
       }
       return undefined;
     }, context);
-    return answered && !steered ? waiting.waitingFor : undefined;
+    return answer !== undefined && !steered ? waiting.waitingFor : undefined;
   };
 
   const heldLead = async (

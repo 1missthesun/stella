@@ -994,8 +994,12 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!threadId) return;
       void (async () => {
         const chat = await ready(session.conversationId);
-        const record = await chat.agentStanding(threadId, context);
-        if (!record || record.agentStatus === "canceled") return;
+        // A task stopped on purpose keeps the wake until it is resumed (the
+        // Reporter holds it). Dropping it here also dropped wakes for tasks that
+        // only read as stopped (a run cut short by a restart, or a stop that a
+        // later resume had not cleared), and their turn then ran with no Stella
+        // turn: every tool call refused and the reply reached no one.
+        if (!(await chat.agentStanding(threadId, context))) return;
         await chat.messageAgent({ key: `claude-code-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true, wake: true }, context);
       })().catch((error: unknown) => options.report(error));
     });

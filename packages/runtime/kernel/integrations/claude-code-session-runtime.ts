@@ -270,6 +270,11 @@ type ClaudeCodeProcessState = {
 type BackgroundTask = ClaudeCodeBackgroundWake["tasks"][number] & {
   id?: string;
 };
+/** What woke a query Claude Code started with no finished command to name (a Monitor's event). */
+const MONITOR_EVENT_TASK: BackgroundTask = {
+  summary: "A monitor you started reported an event.",
+  status: "event",
+};
 const backgroundTaskOf = (
   line: ClaudeStreamEvent,
 ): BackgroundTask | undefined => {
@@ -3659,11 +3664,17 @@ class ClaudeCodeSessionRuntime {
       return false;
     }
     if (!processState.adrift) {
-      if (!finished && !processState.finished) return false;
+      // A query Claude Code starts by itself with no step of ours in flight
+      // begins with `init`. A finished background command announces itself
+      // first (task_notification), but a Monitor's event does not: before, its
+      // query ran unheld, with no Stella turn, so every tool call it made was
+      // refused and what it wrote reached no one.
+      const ownQuery = !finished && !processState.finished && line.type === "system" && line.subtype === "init";
+      if (!finished && !processState.finished && !ownQuery) return false;
       processState.adrift = {
         lines: [],
         woke: false,
-        tasks: processState.finished ?? [],
+        tasks: processState.finished ?? (ownQuery ? [MONITOR_EVENT_TASK] : []),
       };
       processState.finished = undefined;
     }

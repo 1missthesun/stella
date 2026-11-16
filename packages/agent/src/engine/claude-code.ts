@@ -321,9 +321,11 @@ const clip = (text: string, max: number): string => (text.length > max ? `${text
 
 const backgroundWakeText = (wake: ClaudeCodeBackgroundWake): string =>
   [
-    wake.tasks.length === 1
-      ? "[wake: a command you left running in the background has finished.]"
-      : `[wake: ${wake.tasks.length} commands you left running in the background have finished.]`,
+    wake.tasks.every((task) => task.status === "event")
+      ? "[wake: a monitor you left running in the background reported an event.]"
+      : wake.tasks.length === 1
+        ? "[wake: a command you left running in the background has finished.]"
+        : `[wake: ${wake.tasks.length} commands you left running in the background have finished.]`,
     "",
     ...wake.tasks.map((task) => `- ${task.summary}${task.outputFile ? `\n  Output: ${task.outputFile}` : ""}`),
     "",

@@ -1884,7 +1884,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2098,7 +2098,7 @@
         "chatGptMigration": "Migrace směrování ChatGPT se nezdařila.",
         "chatGptNoModels": "Momentálně nejsou dostupné žádné modely ChatGPT.",
         "chatGptNotConnected": "Nejdřív se na tomto počítači přihlaste přes ChatGPT.",
-        "chatGptPlanUsageOff": "Používání tarifu ChatGPT není pro tento účet povolené. Povolte ho v Nastavení › Účet, nebo vyberte jiný model.",
+        "chatGptPlanUsageOff": "Používání tarifu ChatGPT není pro tento účet povolené. Povolte ho v {place}, nebo vyberte jiný model.",
         "chatGptVerify": "Modely ChatGPT nebylo možné ověřit: {error}",
         "chatGptVerifying": "Počkejte, až se ověření modelů ChatGPT dokončí.",
         "connectChatGpt": "Nepodařilo se připojit ChatGPT.",
@@ -3321,7 +3321,7 @@
       "decline": "Decline",
       "remember": "Zapamatovat na tomto počítači",
       "rememberRelayed": "Zapamatovat na počítači, který se ptal",
-      "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala; kdykoli to můžete smazat v Nastavení.",
+      "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala; kdykoli to můžete smazat v {place}.",
       "rememberOff": "Použito jednou, pak smazáno.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
       "note": "Přidat poznámku (nepovinné)",
@@ -3576,7 +3576,7 @@
     "screen": {
       "title": "Připojte tento počítač k {name}",
       "yourServer": "vašemu serveru",
-      "body": "Tento počítač není přihlášen k vašemu serveru. Vytvořte párovací odkaz na již připojeném zařízení (Nastavení → Připojit zařízení) nebo v nastavení serveru a vložte ho sem.",
+      "body": "Tento počítač není přihlášen k vašemu serveru. Vytvořte párovací odkaz na již připojeném zařízení ({place}) nebo v nastavení serveru a vložte ho sem.",
       "paste": "Vložit párovací odkaz"
     },
     "onboarding": {

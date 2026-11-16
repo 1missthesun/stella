@@ -1854,7 +1854,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2068,7 +2068,7 @@
         "chatGptMigration": "ChatGPT 路由迁移失败。",
         "chatGptNoModels": "当前没有可用的 ChatGPT 模型。",
         "chatGptNotConnected": "请先在这台电脑上使用 ChatGPT 登录。",
-        "chatGptPlanUsageOff": "此账号未启用 ChatGPT 套餐使用。请在「设置 › 账户」中启用，或选择其他模型。",
+        "chatGptPlanUsageOff": "此账号未启用 ChatGPT 套餐使用。请在「{place}」中启用，或选择其他模型。",
         "chatGptVerify": "无法验证 ChatGPT 模型：{error}",
         "chatGptVerifying": "请等待 ChatGPT 模型验证完成。",
         "connectChatGpt": "连接 ChatGPT 失败。",
@@ -3265,7 +3265,7 @@
       "decline": "Decline",
       "remember": "在这台电脑上记住",
       "rememberRelayed": "在提问的那台电脑上记住",
-      "rememberOn": "已保存为「{label}」。Stella 之后会直接复用，不再问你；你可以随时在设置中删除。",
+      "rememberOn": "已保存为「{label}」。Stella 之后会直接复用，不再问你；你可以随时在「{place}」中删除。",
       "rememberOff": "仅使用一次，然后删除。",
       "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。",
       "note": "添加备注（可选）",
@@ -3478,7 +3478,7 @@
     "screen": {
       "title": "将这台电脑连接到 {name}",
       "yourServer": "你的服务器",
-      "body": "这台电脑尚未登录你的服务器。请在已连接的设备上（设置 → 连接设备）或通过服务器设置创建配对链接，然后粘贴到这里。",
+      "body": "这台电脑尚未登录你的服务器。请在已连接的设备上（{place}）或通过服务器设置创建配对链接，然后粘贴到这里。",
       "paste": "粘贴配对链接"
     },
     "onboarding": {

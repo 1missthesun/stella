@@ -1874,7 +1874,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2088,7 +2088,7 @@
         "chatGptMigration": "Migrarea rutării ChatGPT a eșuat.",
         "chatGptNoModels": "Momentan nu este disponibil niciun model ChatGPT.",
         "chatGptNotConnected": "Mai întâi conectează-te cu ChatGPT pe acest computer.",
-        "chatGptPlanUsageOff": "Utilizarea abonamentului ChatGPT nu este activată pentru acest cont. Activeaz-o din Setări › Cont sau alege alt model.",
+        "chatGptPlanUsageOff": "Utilizarea abonamentului ChatGPT nu este activată pentru acest cont. Activeaz-o din {place} sau alege alt model.",
         "chatGptVerify": "Modelele ChatGPT nu au putut fi verificate: {error}",
         "chatGptVerifying": "Așteaptă finalizarea verificării modelelor ChatGPT.",
         "connectChatGpt": "Conectarea la ChatGPT a eșuat.",
@@ -3303,7 +3303,7 @@
       "decline": "Decline",
       "remember": "Ține minte pe acest computer",
       "rememberRelayed": "Ține minte pe computerul care a cerut",
-      "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe; îl poți șterge oricând din Setări.",
+      "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe; îl poți șterge oricând din {place}.",
       "rememberOff": "Folosit o dată, apoi șters.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
       "note": "Adaugă o notă (opțional)",
@@ -3544,7 +3544,7 @@
     "screen": {
       "title": "Conectează acest computer la {name}",
       "yourServer": "serverul tău",
-      "body": "Acest computer nu este conectat la serverul tău. Creează un link de asociere pe un dispozitiv deja conectat (Setări → Conectează un dispozitiv) sau din configurarea serverului și lipește-l aici.",
+      "body": "Acest computer nu este conectat la serverul tău. Creează un link de asociere pe un dispozitiv deja conectat ({place}) sau din configurarea serverului și lipește-l aici.",
       "paste": "Lipește un link de asociere"
     },
     "onboarding": {

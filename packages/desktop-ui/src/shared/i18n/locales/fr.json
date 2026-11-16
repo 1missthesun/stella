@@ -1874,7 +1874,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2088,7 +2088,7 @@
         "chatGptMigration": "Échec de la migration du routage ChatGPT.",
         "chatGptNoModels": "Aucun modèle ChatGPT n'est disponible actuellement.",
         "chatGptNotConnected": "Connectez-vous d'abord avec ChatGPT sur cet ordinateur.",
-        "chatGptPlanUsageOff": "L'utilisation du forfait ChatGPT n'est pas activée pour ce compte. Activez-la dans Paramètres › Compte, ou choisissez un autre modèle.",
+        "chatGptPlanUsageOff": "L'utilisation du forfait ChatGPT n'est pas activée pour ce compte. Activez-la dans {place}, ou choisissez un autre modèle.",
         "chatGptVerify": "Impossible de vérifier les modèles ChatGPT : {error}",
         "chatGptVerifying": "Attendez la fin de la vérification des modèles ChatGPT.",
         "connectChatGpt": "Échec de la connexion à ChatGPT.",
@@ -3303,7 +3303,7 @@
       "decline": "Decline",
       "remember": "Mémoriser sur cet ordinateur",
       "rememberRelayed": "Mémoriser sur l’ordinateur qui l’a demandé",
-      "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander ; supprimez-le quand vous voulez dans les Réglages.",
+      "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander ; supprimez-le quand vous voulez dans {place}.",
       "rememberOff": "Utilisé une fois, puis supprimé.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
       "note": "Ajouter une note (facultatif)",
@@ -3544,7 +3544,7 @@
     "screen": {
       "title": "Connecter cet ordinateur à {name}",
       "yourServer": "votre serveur",
-      "body": "Cet ordinateur n'est pas connecté à votre serveur. Créez un lien d'association sur un appareil déjà connecté (Réglages → Connecter un appareil) ou avec la configuration de votre serveur, puis collez-le ici.",
+      "body": "Cet ordinateur n'est pas connecté à votre serveur. Créez un lien d'association sur un appareil déjà connecté ({place}) ou avec la configuration de votre serveur, puis collez-le ici.",
       "paste": "Coller un lien d'association"
     },
     "onboarding": {

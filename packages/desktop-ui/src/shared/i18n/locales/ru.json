@@ -1884,7 +1884,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2098,7 +2098,7 @@
         "chatGptMigration": "Не удалось перенести маршрутизацию ChatGPT.",
         "chatGptNoModels": "Сейчас нет доступных моделей ChatGPT.",
         "chatGptNotConnected": "Сначала войдите через ChatGPT на этом компьютере.",
-        "chatGptPlanUsageOff": "Использование плана ChatGPT не включено для этого аккаунта. Включите его в разделе Настройки › Аккаунт или выберите другую модель.",
+        "chatGptPlanUsageOff": "Использование плана ChatGPT не включено для этого аккаунта. Включите его в разделе {place} или выберите другую модель.",
         "chatGptVerify": "Не удалось проверить модели ChatGPT: {error}",
         "chatGptVerifying": "Дождитесь окончания проверки моделей ChatGPT.",
         "connectChatGpt": "Не удалось подключить ChatGPT.",
@@ -3321,7 +3321,7 @@
       "decline": "Decline",
       "remember": "Запомнить на этом компьютере",
       "rememberRelayed": "Запомнить на компьютере, который спрашивает",
-      "rememberOn": "Сохранено как «{label}». Stella будет использовать это снова, не спрашивая вас; удалить можно в любой момент в настройках.",
+      "rememberOn": "Сохранено как «{label}». Stella будет использовать это снова, не спрашивая вас; удалить можно в любой момент в разделе {place}.",
       "rememberOff": "Используется один раз, затем удаляется.",
       "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое.",
       "note": "Добавить заметку (необязательно)",
@@ -3576,7 +3576,7 @@
     "screen": {
       "title": "Подключите этот компьютер к {name}",
       "yourServer": "вашему серверу",
-      "body": "Этот компьютер не авторизован на вашем сервере. Создайте ссылку для привязки на уже подключённом устройстве (Настройки → Подключить устройство) или в настройке сервера и вставьте её сюда.",
+      "body": "Этот компьютер не авторизован на вашем сервере. Создайте ссылку для привязки на уже подключённом устройстве ({place}) или в настройке сервера и вставьте её сюда.",
       "paste": "Вставить ссылку для привязки"
     },
     "onboarding": {

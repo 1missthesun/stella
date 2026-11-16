@@ -1854,7 +1854,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2068,7 +2068,7 @@
         "chatGptMigration": "ChatGPT 라우팅 마이그레이션에 실패했습니다.",
         "chatGptNoModels": "현재 사용할 수 있는 ChatGPT 모델이 없습니다.",
         "chatGptNotConnected": "먼저 이 컴퓨터에서 ChatGPT로 로그인하세요.",
-        "chatGptPlanUsageOff": "이 계정에서 ChatGPT 요금제 사용이 활성화되어 있지 않습니다. 설정 › 계정에서 활성화하거나 다른 모델을 선택하세요.",
+        "chatGptPlanUsageOff": "이 계정에서 ChatGPT 요금제 사용이 활성화되어 있지 않습니다. {place}에서 활성화하거나 다른 모델을 선택하세요.",
         "chatGptVerify": "ChatGPT 모델을 확인할 수 없습니다: {error}",
         "chatGptVerifying": "ChatGPT 모델 확인이 끝날 때까지 기다리세요.",
         "connectChatGpt": "ChatGPT를 연결하지 못했습니다.",
@@ -3265,7 +3265,7 @@
       "decline": "Decline",
       "remember": "이 컴퓨터에 기억하기",
       "rememberRelayed": "요청한 컴퓨터에 기억하기",
-      "rememberOn": "“{label}”(으)로 저장했어요. Stella가 다시 묻지 않고 재사용해요. 설정에서 언제든지 삭제할 수 있어요.",
+      "rememberOn": "“{label}”(으)로 저장했어요. Stella가 다시 묻지 않고 재사용해요. {place}에서 언제든지 삭제할 수 있어요.",
       "rememberOff": "한 번 사용한 뒤 삭제돼요.",
       "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요.",
       "note": "메모 추가 (선택)",
@@ -3478,7 +3478,7 @@
     "screen": {
       "title": "이 컴퓨터를 {name}에 연결",
       "yourServer": "내 서버",
-      "body": "이 컴퓨터는 서버에 로그인되어 있지 않습니다. 이미 연결된 기기(설정 → 기기 연결)나 서버 설정에서 페어링 링크를 만들어 여기에 붙여 넣으세요.",
+      "body": "이 컴퓨터는 서버에 로그인되어 있지 않습니다. 이미 연결된 기기({place})나 서버 설정에서 페어링 링크를 만들어 여기에 붙여 넣으세요.",
       "paste": "페어링 링크 붙여 넣기"
     },
     "onboarding": {

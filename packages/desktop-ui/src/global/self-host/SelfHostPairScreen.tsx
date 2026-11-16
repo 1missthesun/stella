@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/ui/button";
 import { useT } from "@/shared/i18n";
+import { settingsPlace } from "@/global/settings/settings-place";
 import { selfHostDialogs, useDesktopServerState } from "./self-host-store";
 import "./self-host.css";
 
@@ -14,7 +15,9 @@ export function SelfHostPairScreen() {
         <h1 className="self-host-screen__title">
           {t("selfHost.screen.title", { name: state?.name ?? t("selfHost.screen.yourServer") })}
         </h1>
-        <p className="self-host-dialog__text">{t("selfHost.screen.body")}</p>
+        <p className="self-host-dialog__text">{t("selfHost.screen.body", {
+          place: settingsPlace(t, "settings.tabs.account", "selfHost.settings.title", "selfHost.settings.connectDevice"),
+        })}</p>
         <div className="self-host-dialog__actions">
           {state?.canSwitch ? (
             <Button

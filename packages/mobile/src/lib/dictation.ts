@@ -337,7 +337,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
           "Microphone access needed",
           canAskAgain
             ? "Stella needs access to your microphone to record voice messages. You can allow it the next time iOS asks."
-            : "Stella needs access to your microphone to record voice messages. Turn it on in Settings → Stella → Microphone.",
+            : "Stella needs access to your microphone to record voice messages. Tap Open Settings and turn on Microphone.",
           canAskAgain
             ? [{ text: "OK", style: "default" }]
             : [

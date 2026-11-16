@@ -1167,7 +1167,7 @@ export function ChatPane({
           "Microphone access needed",
           permission.canAskAgain
             ? "Stella needs access to your microphone for realtime voice. You can allow it the next time the system asks."
-            : "Stella needs access to your microphone for realtime voice. Turn it on in Settings → Stella → Microphone.",
+            : "Stella needs access to your microphone for realtime voice. Tap Open Settings and turn on Microphone.",
           permission.canAskAgain
             ? [{ text: "OK", style: "default" }]
             : [

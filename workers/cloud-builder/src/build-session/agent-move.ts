@@ -57,7 +57,7 @@ export const serveAgentMoveRequest = async (
   if (device.availability && !device.availability.capabilities.includes("claude-code")) {
     return reply({
       ok: false,
-      error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Account there) and try again.`,
+      error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Claude and ChatGPT there) and try again.`,
     });
   }
   const request: MoveRequest = {

@@ -260,20 +260,20 @@ export const renderMediaAccess = (snapshot: ExecutionContextSnapshot): string | 
   const keyLine = key?.saved
     ? `Still images use their own ${name} key.`
     : key
-      ? `Still images are set to their own ${name} key, but none is saved: ask them to add it in Settings → Image.`
+      ? `Still images are set to their own ${name} key, but none is saved: ask them to add it in Models → Image (the Models button at the top of Stella's window on a computer).`
       : null;
   if (media.stella === "included") {
     return ["# Media generation", "On: included in the user's plan.", keyLine].filter(Boolean).join("\n");
   }
   const fix =
-    media.stella === "sign_in" ? "sign in and subscribe to Stella Pro" : "subscribe to Stella Pro (Account, top right)";
+    media.stella === "sign_in" ? "sign in and subscribe to Stella Pro" : "subscribe to Stella Pro (Plan & usage in the account menu, top right, on a computer; Settings on the phone)";
   const why = media.stella === "sign_in" ? "no Stella account" : "not in the user's plan";
   if (key?.saved) {
     return `# Media generation\nStill images only, on their own ${name} key; the rest is off (${why}). For other media, don't try; tell them to ${fix}.`;
   }
   return [
     "# Media generation",
-    `Off: ${why}. If they ask for media, don't try; tell them to ${fix}, or for still images, add their own OpenAI, OpenRouter or fal key in Settings → Image.`,
+    `Off: ${why}. If they ask for media, don't try; tell them to ${fix}, or for still images, add their own OpenAI, OpenRouter or fal key in Models → Image (the Models button at the top of Stella's window on a computer).`,
     keyLine,
   ]
     .filter(Boolean)

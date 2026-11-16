@@ -61,5 +61,5 @@ export const isClaudeLoginFailureText = (text: string): boolean =>
 
 export const cloudClaudeLoginEndedText = (email: string | undefined): string =>
   email
-    ? `Your Claude sign-in for ${email} in your cloud has ended. Sign in again in Settings › Account › Claude to continue.`
-    : "Your Claude sign-in in your cloud has ended. Sign in again in Settings › Account › Claude to continue.";
+    ? `Your Claude sign-in for ${email} in your cloud has ended. Sign in again under Settings › Claude and ChatGPT (on the phone: the chat settings) to continue.`
+    : "Your Claude sign-in in your cloud has ended. Sign in again under Settings › Claude and ChatGPT (on the phone: the chat settings) to continue.";

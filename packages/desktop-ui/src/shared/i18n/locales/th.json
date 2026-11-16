@@ -1854,7 +1854,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2068,7 +2068,7 @@
         "chatGptMigration": "การย้ายเส้นทาง ChatGPT ล้มเหลว",
         "chatGptNoModels": "ขณะนี้ไม่มีโมเดล ChatGPT ที่พร้อมใช้งาน",
         "chatGptNotConnected": "ลงชื่อเข้าใช้ด้วย ChatGPT บนคอมพิวเตอร์เครื่องนี้ก่อน",
-        "chatGptPlanUsageOff": "บัญชีนี้ยังไม่ได้เปิดใช้แพ็กเกจ ChatGPT เปิดใช้ได้ที่ การตั้งค่า › บัญชี หรือเลือกโมเดลอื่น",
+        "chatGptPlanUsageOff": "บัญชีนี้ยังไม่ได้เปิดใช้แพ็กเกจ ChatGPT เปิดใช้ได้ที่ {place} หรือเลือกโมเดลอื่น",
         "chatGptVerify": "ไม่สามารถตรวจสอบโมเดล ChatGPT ได้: {error}",
         "chatGptVerifying": "รอให้การตรวจสอบโมเดล ChatGPT เสร็จสิ้น",
         "connectChatGpt": "เชื่อมต่อ ChatGPT ไม่สำเร็จ",
@@ -3265,7 +3265,7 @@
       "decline": "Decline",
       "remember": "จำไว้ในคอมพิวเตอร์เครื่องนี้",
       "rememberRelayed": "จำไว้ในคอมพิวเตอร์ที่ขอข้อมูล",
-      "rememberOn": "บันทึกเป็น “{label}” แล้ว Stella จะใช้ซ้ำโดยไม่ถามคุณอีก และคุณลบได้ทุกเมื่อในการตั้งค่า",
+      "rememberOn": "บันทึกเป็น “{label}” แล้ว Stella จะใช้ซ้ำโดยไม่ถามคุณอีก และคุณลบได้ทุกเมื่อใน {place}",
       "rememberOff": "ใช้ครั้งเดียวแล้วลบทิ้ง",
       "replacing": "ค่าที่บันทึกไว้สำหรับ “{label}” ใช้ไม่ได้ ใส่ค่าที่ถูกต้อง แล้วค่านี้จะแทนที่ค่าที่บันทึกไว้",
       "note": "เพิ่มหมายเหตุ (ไม่บังคับ)",
@@ -3478,7 +3478,7 @@
     "screen": {
       "title": "เชื่อมต่อคอมพิวเตอร์เครื่องนี้กับ {name}",
       "yourServer": "เซิร์ฟเวอร์ของคุณ",
-      "body": "คอมพิวเตอร์เครื่องนี้ยังไม่ได้ลงชื่อเข้าใช้เซิร์ฟเวอร์ของคุณ สร้างลิงก์จับคู่บนอุปกรณ์ที่เชื่อมต่ออยู่แล้ว (การตั้งค่า → เชื่อมต่ออุปกรณ์) หรือจากการตั้งค่าเซิร์ฟเวอร์ แล้ววางที่นี่",
+      "body": "คอมพิวเตอร์เครื่องนี้ยังไม่ได้ลงชื่อเข้าใช้เซิร์ฟเวอร์ของคุณ สร้างลิงก์จับคู่บนอุปกรณ์ที่เชื่อมต่ออยู่แล้ว ({place}) หรือจากการตั้งค่าเซิร์ฟเวอร์ แล้ววางที่นี่",
       "paste": "วางลิงก์จับคู่"
     },
     "onboarding": {

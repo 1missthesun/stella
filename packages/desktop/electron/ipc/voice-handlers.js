@@ -190,7 +190,7 @@ export const registerVoiceHandlers = (options) => {
         const apiKey = getLocalLlmCredential(options.stellaAppDir, "openai")?.trim() ||
             (await getLocalLlmOAuthApiKey(options.stellaAppDir, "openai"))?.trim();
         if (!apiKey) {
-            return voiceSetupRefusal("Connect OpenAI in Settings to use it for voice.");
+            return voiceSetupRefusal("Add an OpenAI key in Models to use it for voice.");
         }
         const model = preferences.model?.startsWith("openai/")
             ? preferences.model.slice("openai/".length)
@@ -253,7 +253,7 @@ export const registerVoiceHandlers = (options) => {
         const apiKey = getLocalLlmCredential(options.stellaAppDir, "xai")?.trim() ||
             (await getLocalLlmOAuthApiKey(options.stellaAppDir, "xai"))?.trim();
         if (!apiKey) {
-            return voiceSetupRefusal("Connect xAI in Settings to use it for voice.");
+            return voiceSetupRefusal("Add an xAI key in Models to use it for voice.");
         }
         const model = preferences.model?.startsWith("xai/")
             ? preferences.model.slice("xai/".length)

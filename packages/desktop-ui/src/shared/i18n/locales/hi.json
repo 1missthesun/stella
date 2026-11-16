@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "ChatGPT रूटिंग माइग्रेशन विफल।",
         "chatGptNoModels": "अभी कोई ChatGPT मॉडल उपलब्ध नहीं है।",
         "chatGptNotConnected": "पहले इस कंप्यूटर पर ChatGPT से साइन इन करें।",
-        "chatGptPlanUsageOff": "इस खाते के लिए ChatGPT प्लान का उपयोग चालू नहीं है। इसे सेटिंग्स › खाता में चालू करें, या कोई दूसरा मॉडल चुनें।",
+        "chatGptPlanUsageOff": "इस खाते के लिए ChatGPT प्लान का उपयोग चालू नहीं है। इसे {place} में चालू करें, या कोई दूसरा मॉडल चुनें।",
         "chatGptVerify": "ChatGPT मॉडल सत्यापित नहीं हो सके: {error}",
         "chatGptVerifying": "ChatGPT मॉडल का सत्यापन पूरा होने तक प्रतीक्षा करें।",
         "connectChatGpt": "ChatGPT कनेक्ट करने में विफल।",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "इस कंप्यूटर पर याद रखें",
       "rememberRelayed": "पूछने वाले कंप्यूटर पर याद रखें",
-      "rememberOn": "“{label}” के नाम से सहेजा गया। Stella आपसे दोबारा पूछे बिना इसे फिर इस्तेमाल करेगी; आप इसे कभी भी सेटिंग्स में हटा सकते हैं।",
+      "rememberOn": "“{label}” के नाम से सहेजा गया। Stella आपसे दोबारा पूछे बिना इसे फिर इस्तेमाल करेगी; आप इसे कभी भी {place} में हटा सकते हैं।",
       "rememberOff": "एक बार इस्तेमाल हुआ, फिर हटा दिया गया।",
       "replacing": "“{label}” के लिए सहेजा गया मान काम नहीं किया। सही मान डालें; यह सहेजे गए मान की जगह ले लेगा।",
       "note": "नोट जोड़ें (वैकल्पिक)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "इस कंप्यूटर को {name} से कनेक्ट करें",
       "yourServer": "आपके सर्वर",
-      "body": "यह कंप्यूटर आपके सर्वर में साइन इन नहीं है। पहले से कनेक्ट किसी डिवाइस (सेटिंग्स → डिवाइस कनेक्ट करें) या सर्वर सेटअप से पेयरिंग लिंक बनाएँ और यहाँ पेस्ट करें।",
+      "body": "यह कंप्यूटर आपके सर्वर में साइन इन नहीं है। पहले से कनेक्ट किसी डिवाइस ({place}) या सर्वर सेटअप से पेयरिंग लिंक बनाएँ और यहाँ पेस्ट करें।",
       "paste": "पेयरिंग लिंक पेस्ट करें"
     },
     "onboarding": {

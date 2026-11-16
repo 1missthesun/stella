@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "Migratie van ChatGPT-routering mislukt.",
         "chatGptNoModels": "Er zijn momenteel geen ChatGPT-modellen beschikbaar.",
         "chatGptNotConnected": "Log eerst op deze computer in met ChatGPT.",
-        "chatGptPlanUsageOff": "Gebruik van het ChatGPT-abonnement is niet ingeschakeld voor dit account. Schakel het in via Instellingen › Account of kies een ander model.",
+        "chatGptPlanUsageOff": "Gebruik van het ChatGPT-abonnement is niet ingeschakeld voor dit account. Schakel het in via {place} of kies een ander model.",
         "chatGptVerify": "ChatGPT-modellen konden niet worden geverifieerd: {error}",
         "chatGptVerifying": "Wacht tot de ChatGPT-modellen geverifieerd zijn.",
         "connectChatGpt": "Verbinden met ChatGPT mislukt.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Onthouden op deze computer",
       "rememberRelayed": "Onthouden op de computer die het vroeg",
-      "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen; je kunt het altijd verwijderen in Instellingen.",
+      "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen; je kunt het altijd verwijderen in {place}.",
       "rememberOff": "Eén keer gebruikt en daarna verwijderd.",
       "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde.",
       "note": "Notitie toevoegen (optioneel)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Verbind deze computer met {name}",
       "yourServer": "je server",
-      "body": "Deze computer is niet aangemeld bij je server. Maak een koppellink op een apparaat dat al verbonden is (Instellingen → Apparaat verbinden) of met de installatie van je server en plak hem hier.",
+      "body": "Deze computer is niet aangemeld bij je server. Maak een koppellink op een apparaat dat al verbonden is ({place}) of met de installatie van je server en plak hem hier.",
       "paste": "Koppellink plakken"
     },
     "onboarding": {

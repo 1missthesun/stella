@@ -16,6 +16,7 @@ import { Button } from "@/ui/button";
 import { Select } from "@/ui/select";
 import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
+import { settingsPlace } from "@/global/settings/settings-place";
 import {
   answerUserAsk,
   declineUserAsk,
@@ -287,6 +288,7 @@ function UserAskSecureInputBody({
               remember
                 ? t("userAsk.secureInput.rememberOn", {
                     label: detail.save?.label ?? "",
+                    place: settingsPlace(t, "settings.secureValues.title"),
                   })
                 : t("userAsk.secureInput.rememberOff")
             }

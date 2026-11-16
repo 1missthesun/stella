@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "Migration der ChatGPT-Weiterleitung fehlgeschlagen.",
         "chatGptNoModels": "Derzeit sind keine ChatGPT-Modelle verfügbar.",
         "chatGptNotConnected": "Melde dich zuerst auf diesem Computer mit ChatGPT an.",
-        "chatGptPlanUsageOff": "Die Nutzung des ChatGPT-Abos ist für dieses Konto nicht aktiviert. Aktiviere sie unter Einstellungen › Konto oder wähle ein anderes Modell.",
+        "chatGptPlanUsageOff": "Die Nutzung des ChatGPT-Abos ist für dieses Konto nicht aktiviert. Aktiviere sie unter {place} oder wähle ein anderes Modell.",
         "chatGptVerify": "ChatGPT-Modelle konnten nicht geprüft werden: {error}",
         "chatGptVerifying": "Warte, bis die Prüfung der ChatGPT-Modelle abgeschlossen ist.",
         "connectChatGpt": "ChatGPT konnte nicht verbunden werden.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Auf diesem Computer merken",
       "rememberRelayed": "Auf dem anfragenden Computer merken",
-      "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit in den Einstellungen löschen.",
+      "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit unter {place} löschen.",
       "rememberOff": "Einmal verwendet, dann gelöscht.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
       "note": "Notiz hinzufügen (optional)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Diesen Computer mit {name} verbinden",
       "yourServer": "deinem Server",
-      "body": "Dieser Computer ist nicht bei deinem Server angemeldet. Erstelle einen Kopplungslink auf einem bereits verbundenen Gerät (Einstellungen → Gerät verbinden) oder mit der Einrichtung deines Servers und füge ihn hier ein.",
+      "body": "Dieser Computer ist nicht bei deinem Server angemeldet. Erstelle einen Kopplungslink auf einem bereits verbundenen Gerät ({place}) oder mit der Einrichtung deines Servers und füge ihn hier ein.",
       "paste": "Kopplungslink einfügen"
     },
     "onboarding": {

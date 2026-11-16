@@ -1874,7 +1874,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2088,7 +2088,7 @@
         "chatGptMigration": "Falha na migração do roteamento do ChatGPT.",
         "chatGptNoModels": "No momento não há modelos do ChatGPT disponíveis.",
         "chatGptNotConnected": "Primeiro, entre com o ChatGPT neste computador.",
-        "chatGptPlanUsageOff": "O uso do plano do ChatGPT não está ativado para esta conta. Ative em Configurações › Conta ou escolha outro modelo.",
+        "chatGptPlanUsageOff": "O uso do plano do ChatGPT não está ativado para esta conta. Ative em {place} ou escolha outro modelo.",
         "chatGptVerify": "Não foi possível verificar os modelos do ChatGPT: {error}",
         "chatGptVerifying": "Aguarde a verificação dos modelos do ChatGPT terminar.",
         "connectChatGpt": "Não foi possível conectar o ChatGPT.",
@@ -3303,7 +3303,7 @@
       "decline": "Decline",
       "remember": "Memorizar neste computador",
       "rememberRelayed": "Memorizar no computador que pediu",
-      "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar; pode apagá-lo a qualquer momento nas Definições.",
+      "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar; pode apagá-lo a qualquer momento em {place}.",
       "rememberOff": "Usado uma vez e depois apagado.",
       "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
       "note": "Adicione uma nota (opcional)",
@@ -3544,7 +3544,7 @@
     "screen": {
       "title": "Conecte este computador a {name}",
       "yourServer": "seu servidor",
-      "body": "Este computador não está conectado ao seu servidor. Crie um link de pareamento em um dispositivo já conectado (Ajustes → Conectar um dispositivo) ou na configuração do servidor e cole aqui.",
+      "body": "Este computador não está conectado ao seu servidor. Crie um link de pareamento em um dispositivo já conectado ({place}) ou na configuração do servidor e cole aqui.",
       "paste": "Colar um link de pareamento"
     },
     "onboarding": {

@@ -1874,7 +1874,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2088,7 +2088,7 @@
         "chatGptMigration": "העברת הניתוב של ChatGPT נכשלה.",
         "chatGptNoModels": "כרגע אין מודלי ChatGPT זמינים.",
         "chatGptNotConnected": "קודם צריך להתחבר עם ChatGPT במחשב הזה.",
-        "chatGptPlanUsageOff": "השימוש במינוי ChatGPT לא מופעל בחשבון הזה. אפשר להפעיל אותו בהגדרות › חשבון, או לבחור מודל אחר.",
+        "chatGptPlanUsageOff": "השימוש במינוי ChatGPT לא מופעל בחשבון הזה. אפשר להפעיל אותו ב{place}, או לבחור מודל אחר.",
         "chatGptVerify": "לא ניתן היה לאמת את מודלי ChatGPT: {error}",
         "chatGptVerifying": "המתן לסיום האימות של מודלי ChatGPT.",
         "connectChatGpt": "חיבור ChatGPT נכשל.",
@@ -3303,7 +3303,7 @@
       "decline": "Decline",
       "remember": "לזכור במחשב הזה",
       "rememberRelayed": "לזכור במחשב ששאל",
-      "rememberOn": "נשמר בשם “{label}”. Stella תשתמש בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת בהגדרות.",
+      "rememberOn": "נשמר בשם “{label}”. Stella תשתמש בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת ב-{place}.",
       "rememberOff": "בשימוש פעם אחת ואז נמחק.",
       "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור.",
       "note": "הוסף הערה (אופציונלי)",
@@ -3544,7 +3544,7 @@
     "screen": {
       "title": "חבר את המחשב הזה ל-{name}",
       "yourServer": "השרת שלך",
-      "body": "המחשב הזה לא מחובר לשרת שלך. צור קישור צימוד במכשיר שכבר מחובר (הגדרות ← חיבור מכשיר) או בהגדרת השרת, והדבק אותו כאן.",
+      "body": "המחשב הזה לא מחובר לשרת שלך. צור קישור צימוד במכשיר שכבר מחובר ({place}) או בהגדרת השרת, והדבק אותו כאן.",
       "paste": "הדבקת קישור צימוד"
     },
     "onboarding": {

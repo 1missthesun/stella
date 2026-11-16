@@ -75,7 +75,7 @@ export const handleDeviceRequestRoute = async (
   if (isDeviceClaudeLoginRequestMethod(method)) {
     return deviceRequestErrorResponse(
       "forbidden",
-      "Claude sign-ins on another computer go through Stella's account settings.",
+      "Claude sign-ins on another computer go through Settings › Claude and ChatGPT.",
     );
   }
   const paramsJson = JSON.stringify(params);
@@ -153,7 +153,7 @@ export const handleDeviceRequestRoute = async (
     if (crossDevice && (!isDeviceFileRequestMethod(method) || !isOwnerComputer(deviceId))) {
       return deviceRequestErrorResponse(
         "forbidden",
-        "This phone isn't connected to that computer. Connect it again in Settings.",
+        "This phone isn't connected to that computer. Choose it again under Where Stella works in the chat settings.",
       );
     }
     const pairing = (snapshot.pairedDevices ?? []).find(
@@ -179,7 +179,7 @@ export const handleDeviceRequestRoute = async (
       });
       return deviceRequestErrorResponse(
         "forbidden",
-        "This phone isn't connected to that computer. Connect it again in Settings.",
+        "This phone isn't connected to that computer. Choose it again under Where Stella works in the chat settings.",
       );
     }
     asker = verified.mobileDeviceId;

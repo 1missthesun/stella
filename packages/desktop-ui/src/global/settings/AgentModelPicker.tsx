@@ -23,6 +23,7 @@ import { buildEngineReasoningPatch, buildEngineRoutingPatch, buildEngineTransiti
 import "./AgentModelPicker.css";
 import { isWebsiteHost } from "@/platform/capabilities";
 import { WebsiteModelPicker } from "./WebsiteModelPicker";
+import { settingsPlace } from "./settings-place";
 
 type ImageGenerationProvider = "stella" | "openai" | "openrouter" | "fal";
 type ImageGenerationPreferences = {
@@ -439,7 +440,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                         throw new Error(t("settings.agentModelPicker.errors.chatGptNotConnected"));
                     }
                     if (!profile.planUsage) {
-                        throw new Error(t("settings.agentModelPicker.errors.chatGptPlanUsageOff"));
+                        throw new Error(t("settings.agentModelPicker.errors.chatGptPlanUsageOff", { place: settingsPlace(t, "settings.tabs.ai") }));
                     }
                     announceChatGptPlanUse();
                 }

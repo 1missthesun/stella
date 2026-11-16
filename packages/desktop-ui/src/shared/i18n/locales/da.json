@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "Migrering af ChatGPT-routing mislykkedes.",
         "chatGptNoModels": "Der er ingen ChatGPT-modeller tilgængelige lige nu.",
         "chatGptNotConnected": "Log først ind med ChatGPT på denne computer.",
-        "chatGptPlanUsageOff": "Brug af ChatGPT-abonnementet er ikke slået til for denne konto. Slå det til under Indstillinger › Konto, eller vælg en anden model.",
+        "chatGptPlanUsageOff": "Brug af ChatGPT-abonnementet er ikke slået til for denne konto. Slå det til under {place}, eller vælg en anden model.",
         "chatGptVerify": "ChatGPT-modeller kunne ikke bekræftes: {error}",
         "chatGptVerifying": "Vent, til ChatGPT-modellerne er bekræftet.",
         "connectChatGpt": "Kunne ikke tilslutte ChatGPT.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Husk på denne computer",
       "rememberRelayed": "Husk på den computer, der spurgte",
-      "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen; du kan slette den når som helst under Indstillinger.",
+      "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen; du kan slette den når som helst under {place}.",
       "rememberOff": "Brugt én gang og derefter slettet.",
       "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
       "note": "Tilføj en note (valgfrit)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Forbind denne computer til {name}",
       "yourServer": "din server",
-      "body": "Denne computer er ikke logget ind på din server. Lav et parringslink på en enhed, der allerede er forbundet (Indstillinger → Forbind en enhed), eller med din servers opsætning, og indsæt det her.",
+      "body": "Denne computer er ikke logget ind på din server. Lav et parringslink på en enhed, der allerede er forbundet ({place}), eller med din servers opsætning, og indsæt det her.",
       "paste": "Indsæt et parringslink"
     },
     "onboarding": {

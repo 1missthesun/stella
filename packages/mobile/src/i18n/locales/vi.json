@@ -1854,7 +1854,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2068,7 +2068,7 @@
         "chatGptMigration": "Chuyển đổi định tuyến ChatGPT thất bại.",
         "chatGptNoModels": "Hiện không có mô hình ChatGPT nào khả dụng.",
         "chatGptNotConnected": "Hãy đăng nhập bằng ChatGPT trên máy tính này trước.",
-        "chatGptPlanUsageOff": "Tài khoản này chưa bật sử dụng gói ChatGPT. Hãy bật trong Cài đặt › Tài khoản hoặc chọn mô hình khác.",
+        "chatGptPlanUsageOff": "Tài khoản này chưa bật sử dụng gói ChatGPT. Hãy bật trong {place} hoặc chọn mô hình khác.",
         "chatGptVerify": "Không thể xác minh các mô hình ChatGPT: {error}",
         "chatGptVerifying": "Hãy đợi quá trình xác minh mô hình ChatGPT hoàn tất.",
         "connectChatGpt": "Không kết nối được ChatGPT.",
@@ -3265,7 +3265,7 @@
       "decline": "Decline",
       "remember": "Ghi nhớ trên máy tính này",
       "rememberRelayed": "Ghi nhớ trên máy tính đã hỏi",
-      "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong Cài đặt.",
+      "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong {place}.",
       "rememberOff": "Dùng một lần rồi xóa.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
       "note": "Thêm ghi chú (không bắt buộc)",
@@ -3478,7 +3478,7 @@
     "screen": {
       "title": "Kết nối máy tính này với {name}",
       "yourServer": "máy chủ của bạn",
-      "body": "Máy tính này chưa đăng nhập vào máy chủ của bạn. Hãy tạo liên kết ghép nối trên một thiết bị đã kết nối (Cài đặt → Kết nối thiết bị) hoặc bằng phần thiết lập máy chủ, rồi dán vào đây.",
+      "body": "Máy tính này chưa đăng nhập vào máy chủ của bạn. Hãy tạo liên kết ghép nối trên một thiết bị đã kết nối ({place}) hoặc bằng phần thiết lập máy chủ, rồi dán vào đây.",
       "paste": "Dán liên kết ghép nối"
     },
     "onboarding": {

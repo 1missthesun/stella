@@ -241,7 +241,7 @@ const createProject = (ctx: OwnerContext, args: CreateArgs): CloudProject => {
       );
       if (!row) {
         throw bad(
-          "That GitHub connection isn't available on this account. Connect GitHub from Settings first.",
+          "That GitHub connection isn't available on this account. Connect GitHub in Settings › Privacy › Cloud projects first.",
         );
       }
       connection = row;
@@ -256,7 +256,7 @@ const createProject = (ctx: OwnerContext, args: CreateArgs): CloudProject => {
       connection = rows[0]!;
     }
     const repos = parseUserRepos(connection.user_repos);
-    if (!repos) throw bad("Reconnect GitHub from Settings so Stella can check which repositories you can reach.");
+    if (!repos) throw bad("Reconnect GitHub in Settings › Privacy › Cloud projects so Stella can check which repositories you can reach.");
     const fullName = remoteUrl.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
     if (!userRepoPermission(repos, fullName)) {
       throw bad(

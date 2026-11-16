@@ -560,7 +560,7 @@ impl ExtensionBridge {
                         c.info.label()
                     )),
                     Some((_, c)) if !guard.routable(c) => Err(format!(
-                        "The browser \"{}\" is turned off in Stella's Settings (Browser extension). Use another browser or ask the user to turn it back on.",
+                        "The browser \"{}\" is turned off in Stella's Settings › General › Stella for Chrome. Use another browser or ask the user to turn it back on.",
                         c.info.label()
                     )),
                     Some((generation, _)) => {
@@ -614,7 +614,7 @@ impl ExtensionBridge {
                     )
                 } else {
                     format!(
-                        "The Stella Browser extension is connected only in browsers turned off in Stella's Settings (Browser extension): {}. Ask the user to turn one on, or use Stella's own browser with browser.use(\"in-app\").",
+                        "The Stella Browser extension is connected only in browsers turned off in Stella's Settings › General › Stella for Chrome: {}. Ask the user to turn one on, or use Stella's own browser with browser.use(\"in-app\").",
                         guard.labels()
                     )
                 });
@@ -674,7 +674,7 @@ impl ExtensionBridge {
                     .unwrap_or_else(|| key.trim_start_matches("browser:").to_string());
                 return Err(if disabled {
                     format!(
-                        "This task's tabs are in {}, which the user turned off in Stella's Settings. Nothing was sent. Open a new tab with browser.tabs.new() to continue in another browser.",
+                        "This task's tabs are in {}, which the user turned off in Stella's Settings › General › Stella for Chrome. Nothing was sent. Open a new tab with browser.tabs.new() to continue in another browser.",
                         name
                     )
                 } else {

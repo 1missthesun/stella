@@ -1904,7 +1904,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2118,7 +2118,7 @@
         "chatGptMigration": "فشل ترحيل توجيه ChatGPT.",
         "chatGptNoModels": "لا تتوفر حاليًا أي نماذج ChatGPT.",
         "chatGptNotConnected": "سجّل الدخول باستخدام ChatGPT على هذا الكمبيوتر أولاً.",
-        "chatGptPlanUsageOff": "استخدام خطة ChatGPT غير مفعّل لهذا الحساب. فعّله من الإعدادات › الحساب، أو اختر نموذجًا آخر.",
+        "chatGptPlanUsageOff": "استخدام خطة ChatGPT غير مفعّل لهذا الحساب. فعّله من {place}، أو اختر نموذجًا آخر.",
         "chatGptVerify": "تعذّر التحقق من نماذج ChatGPT: {error}",
         "chatGptVerifying": "انتظر حتى ينتهي التحقق من نماذج ChatGPT.",
         "connectChatGpt": "تعذّر توصيل ChatGPT.",
@@ -3357,7 +3357,7 @@
       "decline": "Decline",
       "remember": "تذكّر على هذا الكمبيوتر",
       "rememberRelayed": "تذكّر على الكمبيوتر الذي طلبه",
-      "rememberOn": "حُفظ باسم «{label}». ستعيد Stella استخدامه دون أن تسألك مرة أخرى؛ ويمكنك حذفه في أي وقت من الإعدادات.",
+      "rememberOn": "حُفظ باسم «{label}». ستعيد Stella استخدامه دون أن تسألك مرة أخرى؛ ويمكنك حذفه في أي وقت من {place}.",
       "rememberOff": "يُستخدم مرة واحدة ثم يُحذف.",
       "replacing": "لم تنجح القيمة المحفوظة لـ«{label}». أدخل القيمة الصحيحة؛ وستحل محل المحفوظة.",
       "note": "أضف ملاحظة (اختياري)",
@@ -3640,7 +3640,7 @@
     "screen": {
       "title": "وصّل هذا الكمبيوتر بـ {name}",
       "yourServer": "خادمك",
-      "body": "هذا الكمبيوتر غير مسجّل الدخول إلى خادمك. أنشئ رابط إقران على جهاز متصل بالفعل (الإعدادات ← توصيل جهاز) أو من إعداد الخادم، ثم الصقه هنا.",
+      "body": "هذا الكمبيوتر غير مسجّل الدخول إلى خادمك. أنشئ رابط إقران على جهاز متصل بالفعل ({place}) أو من إعداد الخادم، ثم الصقه هنا.",
       "paste": "لصق رابط إقران"
     },
     "onboarding": {

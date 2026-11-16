@@ -1854,7 +1854,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2068,7 +2068,7 @@
         "chatGptMigration": "ChatGPT のルーティング移行に失敗しました。",
         "chatGptNoModels": "現在、利用できる ChatGPT のモデルはありません。",
         "chatGptNotConnected": "まずこのコンピュータで ChatGPT にサインインしてください。",
-        "chatGptPlanUsageOff": "このアカウントでは ChatGPT のプランの使用が有効になっていません。設定 › アカウントで有効にするか、別のモデルを選択してください。",
+        "chatGptPlanUsageOff": "このアカウントでは ChatGPT のプランの使用が有効になっていません。{place}で有効にするか、別のモデルを選択してください。",
         "chatGptVerify": "ChatGPT のモデルを確認できませんでした: {error}",
         "chatGptVerifying": "ChatGPT のモデルの確認が終わるまでお待ちください。",
         "connectChatGpt": "ChatGPT に接続できませんでした。",
@@ -3265,7 +3265,7 @@
       "decline": "Decline",
       "remember": "このコンピュータに記憶する",
       "rememberRelayed": "要求元のコンピュータに記憶する",
-      "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。設定からいつでも削除できます。",
+      "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。{place} からいつでも削除できます。",
       "rememberOff": "一度だけ使用し、その後削除します。",
       "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。",
       "note": "メモを追加（任意）",
@@ -3478,7 +3478,7 @@
     "screen": {
       "title": "このコンピューターを {name} に接続",
       "yourServer": "あなたのサーバー",
-      "body": "このコンピューターはサーバーにサインインしていません。接続済みのデバイス（設定 → デバイスを接続）またはサーバーのセットアップでペアリングリンクを作成し、ここに貼り付けてください。",
+      "body": "このコンピューターはサーバーにサインインしていません。接続済みのデバイス（{place}）またはサーバーのセットアップでペアリングリンクを作成し、ここに貼り付けてください。",
       "paste": "ペアリングリンクを貼り付け"
     },
     "onboarding": {

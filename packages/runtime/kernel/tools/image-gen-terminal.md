@@ -6,7 +6,7 @@ until its selected provider operation is terminal, every image has been copied i
 Failures return the gateway job ID, terminal status, stable error code, and
 reason when available.
 
-`image_gen` honors the image provider saved in Settings. `stella` uses the
+`image_gen` honors the image provider saved in Models → Image. `stella` uses the
 managed gateway. `openai`, `openrouter`, and `fal` use the user's locally saved
 credential directly; reference images go only to that selected provider and
 do not pass through Stella managed storage. Local references are restricted to

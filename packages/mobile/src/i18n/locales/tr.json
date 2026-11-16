@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "ChatGPT yönlendirme geçişi başarısız oldu.",
         "chatGptNoModels": "Şu anda kullanılabilir ChatGPT modeli yok.",
         "chatGptNotConnected": "Önce bu bilgisayarda ChatGPT ile oturum aç.",
-        "chatGptPlanUsageOff": "Bu hesap için ChatGPT planı kullanımı etkin değil. Ayarlar › Hesap bölümünden etkinleştir veya başka bir model seç.",
+        "chatGptPlanUsageOff": "Bu hesap için ChatGPT planı kullanımı etkin değil. {place} bölümünden etkinleştir veya başka bir model seç.",
         "chatGptVerify": "ChatGPT modelleri doğrulanamadı: {error}",
         "chatGptVerifying": "ChatGPT modellerinin doğrulanmasının bitmesini bekleyin.",
         "connectChatGpt": "ChatGPT bağlanamadı.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Bu bilgisayarda hatırla",
       "rememberRelayed": "Soran bilgisayarda hatırla",
-      "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır; istediğiniz zaman Ayarlar’dan silebilirsiniz.",
+      "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır; istediğiniz zaman {place} bölümünden silebilirsiniz.",
       "rememberOff": "Bir kez kullanılır, sonra silinir.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
       "note": "Not ekle (isteğe bağlı)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Bu bilgisayarı {name} sunucusuna bağla",
       "yourServer": "sunucun",
-      "body": "Bu bilgisayar sunucunda oturum açmamış. Zaten bağlı bir cihazda (Ayarlar → Cihaz bağla) veya sunucu kurulumuyla bir eşleştirme bağlantısı oluştur ve buraya yapıştır.",
+      "body": "Bu bilgisayar sunucunda oturum açmamış. Zaten bağlı bir cihazda ({place}) veya sunucu kurulumuyla bir eşleştirme bağlantısı oluştur ve buraya yapıştır.",
       "paste": "Eşleştirme bağlantısı yapıştır"
     },
     "onboarding": {

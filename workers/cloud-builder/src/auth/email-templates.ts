@@ -107,8 +107,8 @@ export const buildNewSignInAlertEmail = (
                 ${deviceLabel}<br>${whenLabel}
               </p>
               <p style="margin:0;font-size:14px;color:rgba(22,22,22,0.52);line-height:1.55;">
-                If this was you, no action is needed. If it wasn't, open Stella,
-                go to Settings, Account, and sign out every session you don't recognize.
+                If this was you, no action is needed. If it wasn't, open Stella on your computer,
+                go to Settings › Account, and sign out every session you don't recognize.
               </p>
             </td>
           </tr>
@@ -167,7 +167,7 @@ export const buildAccountDeletionEmail = (
       html: accountNoticeEmail(logoSrc, "Account deletion scheduled", [
         "We received a request to delete your Stella account. You have been signed out on every device, and the account is disabled.",
         `Your account and its data will be deleted after ${dueLabel}. We'll email you when it's done.`,
-        "Changed your mind? Sign in to Stella before then and the deletion is canceled. If you didn't ask for this, sign in now to keep your account, then review your sessions in Settings, Account.",
+        "Changed your mind? Sign in to Stella before then and the deletion is canceled. If you didn't ask for this, sign in now to keep your account, then review your sessions in Stella on your computer, in Settings › Account.",
       ]),
     };
   }
@@ -176,7 +176,7 @@ export const buildAccountDeletionEmail = (
       subject: "Your Stella account deletion was canceled",
       html: accountNoticeEmail(logoSrc, "Deletion canceled", [
         "You signed in to Stella, so your account will not be deleted and is active again.",
-        "Automatic renewal of any subscription stays off. You can turn it back on in Settings, Account.",
+        "Automatic renewal of any subscription stays off. You can turn it back on in Stella: Plan & usage in the account menu on your computer, or Settings on your phone.",
       ]),
     };
   }

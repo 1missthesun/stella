@@ -1854,7 +1854,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2068,7 +2068,7 @@
         "chatGptMigration": "Migrasi perutean ChatGPT gagal.",
         "chatGptNoModels": "Saat ini tidak ada model ChatGPT yang tersedia.",
         "chatGptNotConnected": "Masuk dengan ChatGPT di komputer ini terlebih dahulu.",
-        "chatGptPlanUsageOff": "Penggunaan paket ChatGPT belum diaktifkan untuk akun ini. Aktifkan di Pengaturan › Akun, atau pilih model lain.",
+        "chatGptPlanUsageOff": "Penggunaan paket ChatGPT belum diaktifkan untuk akun ini. Aktifkan di {place}, atau pilih model lain.",
         "chatGptVerify": "Model ChatGPT tidak dapat diverifikasi: {error}",
         "chatGptVerifying": "Tunggu hingga verifikasi model ChatGPT selesai.",
         "connectChatGpt": "Gagal menghubungkan ChatGPT.",
@@ -3265,7 +3265,7 @@
       "decline": "Decline",
       "remember": "Ingat di komputer ini",
       "rememberRelayed": "Ingat di komputer yang meminta",
-      "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di Pengaturan.",
+      "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di {place}.",
       "rememberOff": "Dipakai sekali, lalu dihapus.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
       "note": "Tambahkan catatan (opsional)",
@@ -3478,7 +3478,7 @@
     "screen": {
       "title": "Hubungkan komputer ini ke {name}",
       "yourServer": "server Anda",
-      "body": "Komputer ini belum masuk ke server Anda. Buat tautan pemasangan di perangkat yang sudah terhubung (Pengaturan → Hubungkan perangkat) atau dengan pengaturan server, lalu tempel di sini.",
+      "body": "Komputer ini belum masuk ke server Anda. Buat tautan pemasangan di perangkat yang sudah terhubung ({place}) atau dengan pengaturan server, lalu tempel di sini.",
       "paste": "Tempel tautan pemasangan"
     },
     "onboarding": {

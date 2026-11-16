@@ -44,7 +44,7 @@ import "./connect-plan.css";
 type OptionId = "chatgpt" | "claude" | "apikey";
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
 
-/** The model a cloud ChatGPT run starts on, as in Settings → Account. */
+/** The model a cloud ChatGPT run starts on, as in Settings › Claude and ChatGPT. */
 const CLOUD_CHATGPT_MODEL = "gpt-6.1-sol";
 
 type KeptMessage =

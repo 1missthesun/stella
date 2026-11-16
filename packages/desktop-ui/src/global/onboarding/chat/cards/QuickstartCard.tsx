@@ -5,6 +5,7 @@ import { ChevronDown, RotateCcw } from "@/ui/icons";
 import { uiState } from "@/platform/ui-state";
 import { getPlatform } from "@/platform/electron/platform";
 import { useT } from "@/shared/i18n";
+import { settingsPlace } from "@/global/settings/settings-place";
 import type { DiscoveryCategory } from "@stella/contracts/discovery";
 import type { OnboardingStarter } from "@stella/contracts/desktop/onboarding";
 import {
@@ -387,7 +388,9 @@ export function QuickstartCard({
             <ChevronDown size={14} className="obc-notes__chevron" />
           </summary>
           <pre className="obc-notes__body">{result.coreMemory}</pre>
-          <div className="obc-notes__foot">{t("onboarding.chat.ready.notesFoot")}</div>
+          <div className="obc-notes__foot">{t("onboarding.chat.ready.notesFoot", {
+            place: settingsPlace(t, "settings.tabs.privacy", "settings.memory.title"),
+          })}</div>
         </details>
       ) : null}
 

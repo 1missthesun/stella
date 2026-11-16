@@ -17,7 +17,7 @@ export const createImageGenTool = (
     replay: "keyed",
     agentTypes: [AGENT_IDS.ORCHESTRATOR],
     description:
-      "Generate a still image with the provider chosen in Settings (Stella managed, or the user's OpenAI, OpenRouter or Fal key). The call waits for the final outcome and the image appears in the chat, so don't describe or link its path unless asked. Never resubmit, poll or open it: a pending call is reattached after interruptions.",
+      "Generate a still image with the provider chosen in Models → Image (Stella managed, or the user's OpenAI, OpenRouter or Fal key). The call waits for the final outcome and the image appears in the chat, so don't describe or link its path unless asked. Never resubmit, poll or open it: a pending call is reattached after interruptions.",
     promptSnippet:
       "Generate a still image and return its terminal artifact result",
     parameters: {

@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "A ChatGPT-átirányítás migrálása sikertelen.",
         "chatGptNoModels": "Jelenleg nem érhető el ChatGPT-modell.",
         "chatGptNotConnected": "Először jelentkezz be a ChatGPT-vel ezen a számítógépen.",
-        "chatGptPlanUsageOff": "A ChatGPT-előfizetés használata nincs engedélyezve ehhez a fiókhoz. Engedélyezd a Beállítások › Fiók menüben, vagy válassz másik modellt.",
+        "chatGptPlanUsageOff": "A ChatGPT-előfizetés használata nincs engedélyezve ehhez a fiókhoz. Engedélyezd a {place} menüben, vagy válassz másik modellt.",
         "chatGptVerify": "A ChatGPT-modelleket nem sikerült ellenőrizni: {error}",
         "chatGptVerifying": "Várd meg, amíg a ChatGPT-modellek ellenőrzése befejeződik.",
         "connectChatGpt": "Nem sikerült csatlakoztatni a ChatGPT-t.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Megjegyzés ezen a számítógépen",
       "rememberRelayed": "Megjegyzés a kérdező számítógépen",
-      "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne; bármikor törölheted a Beállításokban.",
+      "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne; bármikor törölheted itt: {place}.",
       "rememberOff": "Egyszer használva, majd törölve.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
       "note": "Megjegyzés hozzáadása (nem kötelező)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Csatlakoztasd ezt a számítógépet: {name}",
       "yourServer": "saját szerveredhez",
-      "body": "Ez a számítógép nincs bejelentkezve a szerveredre. Hozz létre párosítási linket egy már csatlakoztatott eszközön (Beállítások → Eszköz csatlakoztatása) vagy a szerver beállításával, és illeszd be ide.",
+      "body": "Ez a számítógép nincs bejelentkezve a szerveredre. Hozz létre párosítási linket egy már csatlakoztatott eszközön ({place}) vagy a szerver beállításával, és illeszd be ide.",
       "paste": "Párosítási link beillesztése"
     },
     "onboarding": {

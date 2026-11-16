@@ -1884,7 +1884,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2098,7 +2098,7 @@
         "chatGptMigration": "Migracja przekierowania ChatGPT nie powiodła się.",
         "chatGptNoModels": "Obecnie brak dostępnych modeli ChatGPT.",
         "chatGptNotConnected": "Najpierw zaloguj się przez ChatGPT na tym komputerze.",
-        "chatGptPlanUsageOff": "Korzystanie z planu ChatGPT nie jest włączone dla tego konta. Włącz je w Ustawienia › Konto lub wybierz inny model.",
+        "chatGptPlanUsageOff": "Korzystanie z planu ChatGPT nie jest włączone dla tego konta. Włącz je w {place} lub wybierz inny model.",
         "chatGptVerify": "Nie udało się zweryfikować modeli ChatGPT: {error}",
         "chatGptVerifying": "Poczekaj na zakończenie weryfikacji modeli ChatGPT.",
         "connectChatGpt": "Nie udało się połączyć ChatGPT.",
@@ -3321,7 +3321,7 @@
       "decline": "Decline",
       "remember": "Zapamiętaj na tym komputerze",
       "rememberRelayed": "Zapamiętaj na komputerze, który pytał",
-      "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania; możesz to w każdej chwili usunąć w Ustawieniach.",
+      "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania; możesz to w każdej chwili usunąć w {place}.",
       "rememberOff": "Użyto raz, a potem usunięto.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
       "note": "Dodaj notatkę (opcjonalnie)",
@@ -3576,7 +3576,7 @@
     "screen": {
       "title": "Połącz ten komputer z {name}",
       "yourServer": "Twoim serwerem",
-      "body": "Ten komputer nie jest zalogowany na Twoim serwerze. Utwórz link parowania na już połączonym urządzeniu (Ustawienia → Połącz urządzenie) lub w konfiguracji serwera i wklej go tutaj.",
+      "body": "Ten komputer nie jest zalogowany na Twoim serwerze. Utwórz link parowania na już połączonym urządzeniu ({place}) lub w konfiguracji serwera i wklej go tutaj.",
       "paste": "Wklej link parowania"
     },
     "onboarding": {

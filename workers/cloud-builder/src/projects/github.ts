@@ -205,7 +205,7 @@ export const mintInstallationToken = async (
         await errorText(
           response,
           response.status === 404
-            ? "That GitHub installation is gone. Reconnect GitHub from Settings."
+            ? "That GitHub installation is gone. Reconnect GitHub in Settings › Privacy › Cloud projects."
             : "That GitHub installation is suspended.",
         ),
         response.status,
@@ -215,7 +215,7 @@ export const mintInstallationToken = async (
       await errorText(
         response,
         response.status === 404
-          ? "That GitHub installation is gone. Reconnect GitHub from Settings."
+          ? "That GitHub installation is gone. Reconnect GitHub in Settings › Privacy › Cloud projects."
           : "GitHub wouldn't issue an access token for this project.",
       ),
     );

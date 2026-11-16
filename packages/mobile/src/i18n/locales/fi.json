@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "ChatGPT-ohjauksen siirto epäonnistui.",
         "chatGptNoModels": "Yhtään ChatGPT-mallia ei ole tällä hetkellä käytettävissä.",
         "chatGptNotConnected": "Kirjaudu ensin ChatGPT:llä tällä tietokoneella.",
-        "chatGptPlanUsageOff": "ChatGPT-tilauksen käyttöä ei ole otettu käyttöön tällä tilillä. Ota se käyttöön kohdassa Asetukset › Tili tai valitse toinen malli.",
+        "chatGptPlanUsageOff": "ChatGPT-tilauksen käyttöä ei ole otettu käyttöön tällä tilillä. Ota se käyttöön kohdassa {place} tai valitse toinen malli.",
         "chatGptVerify": "ChatGPT-malleja ei voitu vahvistaa: {error}",
         "chatGptVerifying": "Odota, että ChatGPT-mallien vahvistus valmistuu.",
         "connectChatGpt": "ChatGPT:n yhdistäminen epäonnistui.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Muista tällä tietokoneella",
       "rememberRelayed": "Muista kysyneellä tietokoneella",
-      "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa asetuksista.",
+      "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa kohdasta {place}.",
       "rememberOff": "Käytetään kerran ja poistetaan sitten.",
       "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun.",
       "note": "Lisää huomautus (valinnainen)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Yhdistä tämä tietokone: {name}",
       "yourServer": "palvelimesi",
-      "body": "Tämä tietokone ei ole kirjautunut palvelimellesi. Luo yhdistämislinkki jo yhdistetyllä laitteella (Asetukset → Yhdistä laite) tai palvelimen asennuksella ja liitä se tähän.",
+      "body": "Tämä tietokone ei ole kirjautunut palvelimellesi. Luo yhdistämislinkki jo yhdistetyllä laitteella ({place}) tai palvelimen asennuksella ja liitä se tähän.",
       "paste": "Liitä yhdistämislinkki"
     },
     "onboarding": {

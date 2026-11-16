@@ -265,7 +265,7 @@ export const runLocalImageGeneration = async (
   const model = providerModel(provider, preferences.model);
   const apiKey = await getAccessibleLocalLlmApiKey(dataDir, provider);
   if (!apiKey) {
-    return { error: `Connect ${provider} in Settings to use it for images.` };
+    return { error: `Add a ${provider} key in Models to use it for images.` };
   }
 
   const references = await Promise.all(

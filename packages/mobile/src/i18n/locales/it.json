@@ -1874,7 +1874,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2088,7 +2088,7 @@
         "chatGptMigration": "Migrazione dell'instradamento ChatGPT non riuscita.",
         "chatGptNoModels": "Al momento non è disponibile nessun modello ChatGPT.",
         "chatGptNotConnected": "Accedi prima con ChatGPT su questo computer.",
-        "chatGptPlanUsageOff": "L'uso del piano ChatGPT non è attivo per questo account. Attivalo in Impostazioni › Account o scegli un altro modello.",
+        "chatGptPlanUsageOff": "L'uso del piano ChatGPT non è attivo per questo account. Attivalo in {place} o scegli un altro modello.",
         "chatGptVerify": "Impossibile verificare i modelli ChatGPT: {error}",
         "chatGptVerifying": "Attendi che la verifica dei modelli ChatGPT sia completata.",
         "connectChatGpt": "Connessione a ChatGPT non riuscita.",
@@ -3303,7 +3303,7 @@
       "decline": "Decline",
       "remember": "Ricorda su questo computer",
       "rememberRelayed": "Ricorda sul computer che l’ha chiesto",
-      "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo; puoi eliminarlo quando vuoi nelle Impostazioni.",
+      "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo; puoi eliminarlo quando vuoi in {place}.",
       "rememberOff": "Usato una volta, poi eliminato.",
       "replacing": "Il valore salvato per «{label}» non ha funzionato. Inserisci quello giusto; sostituirà quello salvato.",
       "note": "Aggiungi una nota (facoltativa)",
@@ -3544,7 +3544,7 @@
     "screen": {
       "title": "Connetti questo computer a {name}",
       "yourServer": "il tuo server",
-      "body": "Questo computer non ha effettuato l'accesso al tuo server. Crea un link di abbinamento su un dispositivo già connesso (Impostazioni → Connetti un dispositivo) o con la configurazione del server, poi incollalo qui.",
+      "body": "Questo computer non ha effettuato l'accesso al tuo server. Crea un link di abbinamento su un dispositivo già connesso ({place}) o con la configurazione del server, poi incollalo qui.",
       "paste": "Incolla un link di abbinamento"
     },
     "onboarding": {

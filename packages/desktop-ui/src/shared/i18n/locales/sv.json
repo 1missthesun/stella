@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "Migreringen av ChatGPT-dirigering misslyckades.",
         "chatGptNoModels": "Inga ChatGPT-modeller är tillgängliga just nu.",
         "chatGptNotConnected": "Logga först in med ChatGPT på den här datorn.",
-        "chatGptPlanUsageOff": "Användning av ChatGPT-abonnemanget är inte aktiverad för det här kontot. Aktivera den i Inställningar › Konto eller välj en annan modell.",
+        "chatGptPlanUsageOff": "Användning av ChatGPT-abonnemanget är inte aktiverad för det här kontot. Aktivera den i {place} eller välj en annan modell.",
         "chatGptVerify": "ChatGPT-modellerna kunde inte verifieras: {error}",
         "chatGptVerifying": "Vänta tills ChatGPT-modellerna har verifierats.",
         "connectChatGpt": "Det gick inte att ansluta ChatGPT.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Kom ihåg på den här datorn",
       "rememberRelayed": "Kom ihåg på datorn som frågade",
-      "rememberOn": "Sparat som ”{label}”. Stella återanvänder det utan att fråga dig igen; du kan radera det när som helst i Inställningar.",
+      "rememberOn": "Sparat som ”{label}”. Stella återanvänder det utan att fråga dig igen; du kan radera det när som helst i {place}.",
       "rememberOff": "Används en gång och raderas sedan.",
       "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade.",
       "note": "Lägg till en anteckning (valfritt)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Anslut den här datorn till {name}",
       "yourServer": "din server",
-      "body": "Den här datorn är inte inloggad på din server. Skapa en kopplingslänk på en enhet som redan är ansluten (Inställningar → Anslut en enhet) eller med serverns installation och klistra in den här.",
+      "body": "Den här datorn är inte inloggad på din server. Skapa en kopplingslänk på en enhet som redan är ansluten ({place}) eller med serverns installation och klistra in den här.",
       "paste": "Klistra in en kopplingslänk"
     },
     "onboarding": {

@@ -1874,7 +1874,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2088,7 +2088,7 @@
         "chatGptMigration": "Error en la migración del enrutamiento de ChatGPT.",
         "chatGptNoModels": "Ahora mismo no hay modelos de ChatGPT disponibles.",
         "chatGptNotConnected": "Primero inicia sesión con ChatGPT en esta computadora.",
-        "chatGptPlanUsageOff": "El uso del plan de ChatGPT no está activado para esta cuenta. Actívalo en Ajustes › Cuenta o elige otro modelo.",
+        "chatGptPlanUsageOff": "El uso del plan de ChatGPT no está activado para esta cuenta. Actívalo en {place} o elige otro modelo.",
         "chatGptVerify": "No se pudieron verificar los modelos de ChatGPT: {error}",
         "chatGptVerifying": "Espera a que terminen de verificarse los modelos de ChatGPT.",
         "connectChatGpt": "No se pudo conectar ChatGPT.",
@@ -3303,7 +3303,7 @@
       "decline": "Decline",
       "remember": "Recordar en este ordenador",
       "rememberRelayed": "Recordar en el ordenador que lo pide",
-      "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte; puedes borrarlo cuando quieras en Ajustes.",
+      "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte; puedes borrarlo cuando quieras en {place}.",
       "rememberOff": "Se usa una vez y se borra.",
       "replacing": "El valor guardado para «{label}» no funcionó. Introduce el correcto; sustituirá al guardado.",
       "note": "Añade una nota (opcional)",
@@ -3544,7 +3544,7 @@
     "screen": {
       "title": "Conecta este ordenador a {name}",
       "yourServer": "tu servidor",
-      "body": "Este ordenador no tiene la sesión iniciada en tu servidor. Crea un enlace de vinculación en un dispositivo ya conectado (Ajustes → Conectar un dispositivo) o con la configuración de tu servidor y pégalo aquí.",
+      "body": "Este ordenador no tiene la sesión iniciada en tu servidor. Crea un enlace de vinculación en un dispositivo ya conectado ({place}) o con la configuración de tu servidor y pégalo aquí.",
       "paste": "Pegar un enlace de vinculación"
     },
     "onboarding": {

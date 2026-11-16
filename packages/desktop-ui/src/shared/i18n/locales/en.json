@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "ChatGPT routing migration failed.",
         "chatGptNoModels": "No ChatGPT models are currently available.",
         "chatGptNotConnected": "Sign in with ChatGPT on this computer first.",
-        "chatGptPlanUsageOff": "ChatGPT plan use isn't enabled for this account. Enable it in Settings › Account, or choose another model.",
+        "chatGptPlanUsageOff": "ChatGPT plan use isn't enabled for this account. Enable it in {place}, or choose another model.",
         "chatGptVerify": "ChatGPT models could not be verified: {error}",
         "chatGptVerifying": "Wait for ChatGPT models to finish verifying.",
         "connectChatGpt": "Failed to connect ChatGPT.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Remember on this computer",
       "rememberRelayed": "Remember on the computer that asked",
-      "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again; delete it any time in Settings.",
+      "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again; delete it any time in {place}.",
       "rememberOff": "Used once, then deleted.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
       "note": "Add a note (optional)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Connect this computer to {name}",
       "yourServer": "your server",
-      "body": "This computer isn't signed in to your server. Make a pairing link on a device that's already connected (Settings → Connect a device), or with your server's setup, then paste it here.",
+      "body": "This computer isn't signed in to your server. Make a pairing link on a device that's already connected ({place}), or with your server's setup, then paste it here.",
       "paste": "Paste a pairing link"
     },
     "onboarding": {

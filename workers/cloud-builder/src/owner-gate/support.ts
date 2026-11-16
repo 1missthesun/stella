@@ -93,7 +93,7 @@ export const executionUnavailableMessage = (
     ? "Connect Claude before using that cloud execution route."
     : execution.engine === "chatgpt"
       ? "Connect ChatGPT before using that cloud execution route."
-      : `Add a key for ${execution.provider} in Settings before using that cloud model.`;
+      : `Add a key for ${execution.provider} in the model picker (Models on a computer, the chat settings on the phone) before using that cloud model.`;
 
 export const snapshotAllowsCloudSandbox = (
   snapshot: Pick<OwnerSnapshot, "cloudSandbox">,

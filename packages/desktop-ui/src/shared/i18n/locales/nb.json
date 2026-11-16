@@ -1864,7 +1864,7 @@
         },
         "highlightsLabel": "What I picked up",
         "hint": "Or type anything below.",
-        "notesFoot": "You can read or edit this any time in Settings › Memory.",
+        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
         "notesSummary": "See everything I noted",
         "start": "Start chatting",
         "startersLabel": "Try one of these",
@@ -2078,7 +2078,7 @@
         "chatGptMigration": "Migrering av ChatGPT-ruting mislyktes.",
         "chatGptNoModels": "Ingen ChatGPT-modeller er tilgjengelige for øyeblikket.",
         "chatGptNotConnected": "Logg inn med ChatGPT på denne datamaskinen først.",
-        "chatGptPlanUsageOff": "Bruk av ChatGPT-abonnementet er ikke slått på for denne kontoen. Slå det på under Innstillinger › Konto, eller velg en annen modell.",
+        "chatGptPlanUsageOff": "Bruk av ChatGPT-abonnementet er ikke slått på for denne kontoen. Slå det på under {place}, eller velg en annen modell.",
         "chatGptVerify": "ChatGPT-modellene kunne ikke verifiseres: {error}",
         "chatGptVerifying": "Vent til ChatGPT-modellene er ferdig verifisert.",
         "connectChatGpt": "Kunne ikke koble til ChatGPT.",
@@ -3285,7 +3285,7 @@
       "decline": "Decline",
       "remember": "Husk på denne datamaskinen",
       "rememberRelayed": "Husk på datamaskinen som spurte",
-      "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i Innstillinger.",
+      "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i {place}.",
       "rememberOff": "Brukt én gang og deretter slettet.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
       "note": "Legg til et notat (valgfritt)",
@@ -3512,7 +3512,7 @@
     "screen": {
       "title": "Koble denne datamaskinen til {name}",
       "yourServer": "serveren din",
-      "body": "Denne datamaskinen er ikke logget inn på serveren din. Lag en paringslenke på en enhet som allerede er tilkoblet (Innstillinger → Koble til en enhet) eller med serveroppsettet, og lim den inn her.",
+      "body": "Denne datamaskinen er ikke logget inn på serveren din. Lag en paringslenke på en enhet som allerede er tilkoblet ({place}) eller med serveroppsettet, og lim den inn her.",
       "paste": "Lim inn en paringslenke"
     },
     "onboarding": {

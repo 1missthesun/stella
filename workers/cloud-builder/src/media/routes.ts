@@ -13,7 +13,7 @@ const BASE = "/api/media/v1";
 const MAX_BODY_BYTES = 24 * 1024 * 1024;
 const MAX_WEBHOOK_BYTES = 4 * 1024 * 1024;
 const AUTH_ACTION =
-  "Ask the user to open the Stella desktop app and finish signing in (Settings → Account, or the welcome screen on first launch). Once they're signed in, retry the same request — no payload changes needed.";
+  "Ask the user to open the Stella desktop app and finish signing in (the Sign in button at the top of the window, or the welcome screen on first launch). Once they're signed in, retry the same request — no payload changes needed.";
 
 type RouteEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL">;
 

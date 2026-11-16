@@ -133,7 +133,7 @@ export type OwnerHost = {
     /** The model this turn and the conversation's later backend-started turns run on, when it changes here. */
     execution?: import("@stella/contracts/agent-engine").CloudExecutionSelection;
   }): Promise<void>;
-  startScheduledTurn(input: ScheduledTurnStart): Promise<void>;
+  startScheduledTurn(input: ScheduledTurnStart): Promise<ScheduledTurnStarted>;
   purgeOwner(mode: OwnerPurgeMode, requestId: string): Promise<{ pending: string[] }>;
 };
 
@@ -175,6 +175,16 @@ export type ScheduledTurnStart = {
    */
   computerOnly?: { ownDevice: boolean };
   agent?: { description: string };
+};
+
+/** Where a scheduled run went, so its end can be followed. */
+export type ScheduledTurnStarted = {
+  /** The gate's dispatch, for a run sent to a computer (which may run it in the cloud instead). */
+  dispatchId?: string;
+  /** The cloud turn, for a run started in the cloud. */
+  cloudTurnId?: string;
+  /** The cloud agent a scheduled agent run starts. */
+  agentThreadId?: string;
 };
 
 export type AgentTurnDispatch = {

@@ -4,12 +4,13 @@ import {
   TURN_PLANE_PROTOCOL,
   TURN_TITLE_MAX_CHARS,
   type CloudTurnStartRequest,
+  type CloudTurnStartResponse,
 } from "@stella/contracts/turn-plane/turn-start";
 import { HEADER_CONVERSATION_ID, ORCHESTRATOR_INTERNAL_ORIGIN } from "../build-session/shared/keys.js";
 import { HEADER_OWNER } from "../conversation-types.js";
 import { HEADER_TURN_AUTH_KIND } from "../turn-start-request.js";
 import type { GateHostDependencies } from "./gate-host.js";
-import type { ScheduledTurnStart } from "./registry.js";
+import type { ScheduledTurnStart, ScheduledTurnStarted } from "./registry.js";
 
 export class ScheduledTurnError extends Error {
   readonly retryable: boolean;
@@ -31,7 +32,7 @@ export class ScheduledTurnError extends Error {
 const startOnDesktop = async (
   deps: GateHostDependencies,
   input: ScheduledTurnStart & { targetDeviceId: string },
-): Promise<void> => {
+): Promise<ScheduledTurnStarted> => {
   const result = await deps.submit({
     request: {
       protocol: PLACEMENT_PROTOCOL,
@@ -66,12 +67,13 @@ const startOnDesktop = async (
       computerAway: Boolean(input.computerOnly) && dispatch.state === "blocked",
     });
   }
+  return { dispatchId: dispatch.dispatchId };
 };
 
 const startInCloud = async (
   deps: GateHostDependencies,
   input: ScheduledTurnStart,
-): Promise<void> => {
+): Promise<ScheduledTurnStarted> => {
   const request: CloudTurnStartRequest = {
     protocol: TURN_PLANE_PROTOCOL,
     clientMsgId: input.agent ? `pia:${input.clientMsgId}` : input.clientMsgId,
@@ -105,8 +107,12 @@ const startInCloud = async (
     },
   );
   if (response.ok) {
-    await response.body?.cancel().catch(() => undefined);
-    return;
+    const accepted = (await response.json().catch(() => null)) as Partial<CloudTurnStartResponse> | null;
+    const cloudTurnId = typeof accepted?.turnId === "string" && accepted.turnId ? accepted.turnId : undefined;
+    return {
+      ...(cloudTurnId ? { cloudTurnId } : {}),
+      ...(input.agent ? { agentThreadId: scheduledAgentThreadId(input.clientMsgId) } : {}),
+    };
   }
   const body = (await response.json().catch(() => null)) as {
     error?: { code?: unknown; message?: unknown; retryable?: unknown };
@@ -133,14 +139,11 @@ const scheduledAgentThreadId = (clientMsgId: string): string =>
 export const startScheduledTurn = async (
   deps: GateHostDependencies,
   input: ScheduledTurnStart,
-): Promise<void> => {
+): Promise<ScheduledTurnStarted> => {
   const targetDeviceId = input.targetDeviceId?.trim();
-  if (targetDeviceId) {
-    await startOnDesktop(deps, { ...input, targetDeviceId });
-    return;
-  }
+  if (targetDeviceId) return await startOnDesktop(deps, { ...input, targetDeviceId });
   if (input.computerOnly) {
     throw new ScheduledTurnError("There is no computer to run this on.", { retryable: false, computerAway: true });
   }
-  await startInCloud(deps, input);
+  return await startInCloud(deps, input);
 };

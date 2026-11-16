@@ -34,13 +34,16 @@ import {
 import { boolean, empty, json, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
-import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
+import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain, ScheduledTurnStarted } from "../registry.js";
 import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess, cloudSandboxAccess } from "./billing.js";
 import { livePushTokens, resolveCurrentDeviceId, sendPushMessages } from "./devices.js";
 import { queueAgentNote, queueStellaNote } from "./agent-reports.js";
 import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { deliverScheduledMessage, scheduleTargetThread } from "./agent-threads.js";
+import { agentChangeHooks } from "./agent-events.js";
+import { isAgentStopReason } from "@stella/contracts/agent-status";
+import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
 import {
   scheduledThreadFallbackNote,
   scheduledThreadMessage,
@@ -229,6 +232,26 @@ export const SCHEDULES_RUNS_MIGRATION = {
        settled_at INTEGER
      )`,
     `CREATE INDEX schedule_runs_created ON schedule_runs (created_at)`,
+  ],
+};
+
+/**
+ * A run in the cloud is followed like one on a computer: `dispatch_id` is the
+ * gate's dispatch of a run sent to a computer (which may go to the cloud
+ * instead), `cloud_turn_id` the cloud turn that runs it, `cloud_thread_id`
+ * the cloud agent a scheduled agent run starts. `done_at` marks a run whose
+ * end was acted on, so it is acted on once.
+ */
+export const SCHEDULES_CLOUD_RUNS_MIGRATION = {
+  id: "schedules.12-cloud-runs",
+  statements: [
+    `ALTER TABLE schedule_runs ADD COLUMN dispatch_id TEXT`,
+    `ALTER TABLE schedule_runs ADD COLUMN cloud_turn_id TEXT`,
+    `ALTER TABLE schedule_runs ADD COLUMN cloud_thread_id TEXT`,
+    `ALTER TABLE schedule_runs ADD COLUMN done_at INTEGER`,
+    `CREATE INDEX schedule_runs_dispatch ON schedule_runs (dispatch_id) WHERE dispatch_id IS NOT NULL`,
+    `CREATE INDEX schedule_runs_cloud_turn ON schedule_runs (cloud_turn_id) WHERE cloud_turn_id IS NOT NULL`,
+    `CREATE INDEX schedule_runs_cloud_thread ON schedule_runs (cloud_thread_id) WHERE cloud_thread_id IS NOT NULL`,
   ],
 };
 
@@ -1400,7 +1423,17 @@ const finishFire = (ctx: OwnerContext, scheduleId: string, fireId: string, outco
 /** Waits between tries of a run that never started anywhere (a computer's run that failed before starting). */
 const RUN_RETRY_DELAYS_MS = [60_000, 5 * 60_000, 15 * 60_000] as const;
 const RUN_RECORD_TTL_MS = 7 * DAY_MS;
+/** An unsettled run is kept this long at most (a cloud agent can run for days). */
+const RUN_RECORD_MAX_MS = 30 * DAY_MS;
+/**
+ * How long a cloud run may go without word of how it ended before it is
+ * checked: a cloud turn always reports its end (its watchdog ends one that
+ * stalls), so silence this long means the report was lost.
+ */
+const CLOUD_RUN_CHECK_MS = 12 * 60 * 60_000;
 export const SCHEDULE_FAILED_JOB = "schedules.tellFailed";
+const SCHEDULE_SETTLE_JOB = "schedules.settleRun";
+const SCHEDULE_CHECK_RUN_JOB = "schedules.checkRun";
 
 type RunRecord = {
   fire_id: string;
@@ -1416,14 +1449,22 @@ type RunRecord = {
   error: string | null;
   created_at: number;
   settled_at: number | null;
+  dispatch_id: string | null;
+  cloud_turn_id: string | null;
+  cloud_thread_id: string | null;
+  done_at: number | null;
 };
 
 const readRun = (db: OwnerDbReader, fireId: string): RunRecord | null =>
   db.one<RunRecord>("SELECT * FROM schedule_runs WHERE fire_id = ?", fireId);
 
-/** Notes a run about to be handed to a computer, before it is: its end can arrive at once. */
+/** Notes a run about to be started, before it is: its end can arrive at once. */
 const recordRun = (ctx: OwnerContext, row: Row, fireId: string): void => {
-  ctx.db.run("DELETE FROM schedule_runs WHERE created_at < ?", ctx.now - RUN_RECORD_TTL_MS);
+  ctx.db.run(
+    "DELETE FROM schedule_runs WHERE (done_at IS NOT NULL AND created_at < ?) OR created_at < ?",
+    ctx.now - RUN_RECORD_TTL_MS,
+    ctx.now - RUN_RECORD_MAX_MS,
+  );
   ctx.db.run(
     `INSERT INTO schedule_runs (fire_id, schedule_id, first_fire_id, attempt, due_at, handed, created_at)
      VALUES (?, ?, ?, ?, ?, 0, ?) ON CONFLICT (fire_id) DO NOTHING`,
@@ -1436,12 +1477,31 @@ const recordRun = (ctx: OwnerContext, row: Row, fireId: string): void => {
   );
 };
 
-/** The computer has the run: from here its end decides what happens next. */
-const runHandedOver = (ctx: OwnerContext, fireId: string): void => {
-  ctx.db.run("UPDATE schedule_runs SET handed = 1 WHERE fire_id = ?", fireId);
+/**
+ * The run is started (on a computer or in the cloud): from here its end
+ * decides what happens next. A run started in the cloud is checked on if no
+ * word of its end comes.
+ */
+const runHandedOver = (ctx: OwnerContext, fireId: string, started: ScheduledTurnStarted): void => {
+  ctx.db.run(
+    `UPDATE schedule_runs SET handed = 1,
+       dispatch_id = COALESCE(dispatch_id, ?),
+       cloud_turn_id = COALESCE(cloud_turn_id, ?),
+       cloud_thread_id = COALESCE(cloud_thread_id, ?)
+     WHERE fire_id = ?`,
+    started.dispatchId ?? null,
+    started.cloudTurnId ?? null,
+    started.agentThreadId ?? null,
+    fireId,
+  );
+  if (started.cloudTurnId) {
+    ctx.jobs.schedule(SCHEDULE_CHECK_RUN_JOB, ctx.now + CLOUD_RUN_CHECK_MS, { fireId }, { id: checkRunJobId(fireId) });
+  }
   const run = readRun(ctx.db, fireId);
   if (run?.outcome) settleRun(ctx, run);
 };
+
+const checkRunJobId = (fireId: string): string => `schedule-check:${fireId}`;
 
 const runNotHandedOver = (ctx: OwnerContext, fireId: string): void => {
   ctx.db.run("DELETE FROM schedule_runs WHERE fire_id = ? AND handed = 0", fireId);
@@ -1491,7 +1551,173 @@ const runSettled = (ctx: OwnerContext, raw: unknown): { known: boolean } => {
   return { known: true };
 };
 
+const SCHEDULE_TURN_KEY = /^(?:pia:)?schedule:(.+)$/u;
+
+const queueSettle = (db: OwnerDb, fireId: string, now: number): void => {
+  db.run(
+    `INSERT INTO owner_jobs (id, kind, run_at, payload, attempts) VALUES (?, ?, ?, ?, 0)
+     ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, run_at = excluded.run_at,
+       payload = excluded.payload, attempts = 0`,
+    `schedule-settle:${fireId}`,
+    SCHEDULE_SETTLE_JOB,
+    Math.max(0, Math.floor(now)),
+    JSON.stringify({ fireId }),
+  );
+};
+
+/** Records how a run ended, once; the settle job acts on it. */
+const noteRunOutcome = (
+  db: OwnerDb,
+  fireId: string,
+  end: { outcome: string; started: boolean; onPurpose?: boolean; error?: string | null },
+  now: number,
+): void => {
+  const error =
+    end.outcome === "completed" ? null : (end.error?.trim() || `It ended ${end.outcome}.`).slice(0, 2_000);
+  db.run(
+    `UPDATE schedule_runs SET outcome = ?, started = ?, on_purpose = ?, error = ?, settled_at = ?
+      WHERE fire_id = ? AND outcome IS NULL`,
+    end.outcome,
+    end.started ? 1 : 0,
+    end.onPurpose ? 1 : 0,
+    error,
+    now,
+    fireId,
+  );
+  queueSettle(db, fireId, now);
+};
+
+/**
+ * Follows a run in the cloud through the owner events of its cloud turn: the
+ * turn's start names the run (its client message id is the run's, or the
+ * dispatch's that sent it to the cloud), and the turn's end settles it. A
+ * scheduled agent's turn only starts the agent, so its end waits for the
+ * agent's (`agentChangeHooks` below); a turn that ended before the agent
+ * existed never started it.
+ */
+export const followScheduledRuns = (
+  ctx: Pick<OwnerContext, "db" | "now">,
+  events: readonly OwnerEvent[],
+): void => {
+  for (const event of events) {
+    if (event.kind === "turn.started") {
+      const clientMsgId = event.clientMsgId ?? "";
+      const fireId = SCHEDULE_TURN_KEY.exec(clientMsgId)?.[1] ?? "";
+      ctx.db.run(
+        `UPDATE schedule_runs SET cloud_turn_id = ?
+          WHERE (fire_id = ? OR dispatch_id = ?) AND cloud_turn_id IS NULL AND outcome IS NULL`,
+        event.turnId,
+        fireId,
+        clientMsgId,
+      );
+      continue;
+    }
+    if (event.kind !== "turn.event" || !event.terminal || !event.terminalStatus) continue;
+    const run = ctx.db.one<RunRecord>(
+      "SELECT * FROM schedule_runs WHERE cloud_turn_id = ? AND outcome IS NULL",
+      event.turnId,
+    );
+    if (!run) continue;
+    const status = event.terminalStatus;
+    if (run.cloud_thread_id) {
+      if (status === "completed" || status === "waiting_for_user") continue;
+      const agent = ctx.db.one<{ status: string }>(
+        "SELECT status FROM agent_threads WHERE thread_id = ?",
+        run.cloud_thread_id,
+      );
+      if (agent) continue;
+      noteRunOutcome(
+        ctx.db,
+        run.fire_id,
+        { outcome: status, started: false, error: event.errorMessage ?? null },
+        ctx.now,
+      );
+      continue;
+    }
+    noteRunOutcome(
+      ctx.db,
+      run.fire_id,
+      {
+        outcome: status === "waiting_for_user" ? "completed" : status,
+        // A turn that ended before running did nothing; unknown counts as started.
+        started: event.began !== false,
+        // A cloud turn's cancel can come from the system as well as from
+        // someone's Stop, and the event doesn't say which: it is told.
+        error: event.errorMessage ?? null,
+      },
+      ctx.now,
+    );
+  }
+};
+
+const AGENT_ENDED = new Set(["completed", "failed", "canceled"]);
+
+/** A scheduled cloud agent's run ends with the agent. */
+agentChangeHooks.push((db, threadId, now) => {
+  const run = db.one<{ fire_id: string }>(
+    "SELECT fire_id FROM schedule_runs WHERE cloud_thread_id = ? AND outcome IS NULL",
+    threadId,
+  );
+  if (!run) return;
+  const thread = db.one<{ status: string; error_message: string | null }>(
+    "SELECT status, error_message FROM agent_threads WHERE thread_id = ?",
+    threadId,
+  );
+  if (!thread || !AGENT_ENDED.has(thread.status)) return;
+  noteRunOutcome(
+    db,
+    run.fire_id,
+    {
+      outcome: thread.status,
+      started: true,
+      onPurpose: thread.status === "canceled" && isAgentStopReason(thread.error_message),
+      error: thread.error_message,
+    },
+    now,
+  );
+});
+
+const fireIdPayload = object({ fireId: string({ max: 128 }) });
+
+const settleQueued = (ctx: OwnerContext, payload: unknown): void => {
+  const run = readRun(ctx.db, fireIdPayload(payload).fireId);
+  if (run?.handed) settleRun(ctx, run);
+};
+
+/**
+ * A cloud run with no word of its end after `CLOUD_RUN_CHECK_MS`. A scheduled
+ * agent still at work (or paused, or waiting for the user) is checked again
+ * later; anything else lost its report, and is told as a run whose end is
+ * not known.
+ */
+const checkRun = (ctx: OwnerContext, payload: unknown): void => {
+  const { fireId } = fireIdPayload(payload);
+  const run = readRun(ctx.db, fireId);
+  if (!run || run.outcome !== null) return;
+  if (run.cloud_thread_id) {
+    const agent = ctx.db.one<{ status: string }>(
+      "SELECT status FROM agent_threads WHERE thread_id = ?",
+      run.cloud_thread_id,
+    );
+    if (agent && !AGENT_ENDED.has(agent.status) && ctx.now - run.created_at < RUN_RECORD_MAX_MS) {
+      ctx.jobs.schedule(SCHEDULE_CHECK_RUN_JOB, ctx.now + CLOUD_RUN_CHECK_MS, { fireId }, { id: checkRunJobId(fireId) });
+      return;
+    }
+  }
+  log("error", "schedule_run_unheard", { scheduleId: run.schedule_id, fireId, cloudTurnId: run.cloud_turn_id });
+  noteRunOutcome(
+    ctx.db,
+    fireId,
+    { outcome: "failed", started: true, error: "No word came back on how it ended" },
+    ctx.now,
+  );
+};
+
+/** Acts on a run's end, once: a run's end can be heard twice (the gate and the cloud turn's own report). */
 const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
+  if (run.done_at !== null || run.outcome === null) return;
+  ctx.db.run("UPDATE schedule_runs SET done_at = ? WHERE fire_id = ? AND done_at IS NULL", ctx.now, run.fire_id);
+  ctx.jobs.cancel(checkRunJobId(run.fire_id));
   const row = readRow(ctx.db, run.schedule_id);
   if (run.outcome === "completed") {
     if (row?.failure_told_at !== null && row?.failure_told_at !== undefined) {
@@ -1518,7 +1744,9 @@ const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
     ctx.now,
     row.schedule_id,
   );
-  if (!run.started && retryRun(ctx, row, run)) return;
+  // A cloud turn canceled before it ran may have been someone's Stop: told, not run again.
+  const stoppedInCloud = run.outcome === "canceled" && run.cloud_turn_id !== null;
+  if (!run.started && !stoppedInCloud && retryRun(ctx, row, run)) return;
   let after: "ended" | "continues" | "paused" = "ended";
   try {
     after = row.status === "paused" ? "paused" : parseStored(row.schedule_json).kind === "at" ? "ended" : "continues";
@@ -1532,7 +1760,7 @@ const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
     attempts: run.attempt,
     after,
     dueAt: run.due_at,
-    ...(run.device_id ? { deviceId: run.device_id } : {}),
+    ...(run.device_id ? { deviceId: run.device_id } : run.cloud_turn_id ? { inCloud: true } : {}),
   });
 };
 
@@ -1586,6 +1814,7 @@ type FailedRun = {
   after: "ended" | "continues" | "paused";
   dueAt?: number;
   deviceId?: string;
+  inCloud?: boolean;
 };
 
 /**
@@ -1617,6 +1846,7 @@ const failedPayload = object({
   after: literal("ended", "continues", "paused"),
   dueAt: optional(number({ min: 0 })),
   deviceId: optional(string({ max: 256 })),
+  inCloud: optional(boolean()),
 });
 
 const isoMinute = (ms: number): string => `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
@@ -1632,6 +1862,8 @@ const tellFailed = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
     const devices = await ctx.host.deviceDestinations().catch(() => []);
     const device = devices.find((candidate) => candidate.deviceId === failed.deviceId);
     where = ` on ${device?.label?.trim() || "the computer it was sent to"}`;
+  } else if (failed.inCloud) {
+    where = " in the cloud";
   }
   const error = failed.error.trim().replace(/\.$/u, "");
   const how =
@@ -1997,9 +2229,10 @@ const startRun = async (
   const targetDeviceId = run.agent
     ? ownDeviceId
     : await whereStellaRuns(ctx, { conversationId, ownerGeneration, fallback: ownDeviceId ?? undefined, placement });
-  const tracked = Boolean(targetDeviceId);
-  if (tracked) recordRun(ctx, row, fireId);
-  const start = async (id: string) =>
+  // Every run is followed to its end, wherever it runs.
+  const tracked = true;
+  recordRun(ctx, row, fireId);
+  const start = async (id: string): Promise<ScheduledTurnStarted> =>
     await ctx.host.startScheduledTurn({
       ownerGeneration,
       conversationId: id,
@@ -2012,20 +2245,21 @@ const startRun = async (
         : {}),
       ...(run.agent ? { agent: run.agent } : {}),
     });
+  let started: ScheduledTurnStarted;
   try {
     try {
-      await start(conversationId);
+      started = await start(conversationId);
     } catch (error) {
       if (!(error instanceof ScheduledTurnError) || !error.conversationGone || !row.conversation_id) throw error;
       conversationId = crypto.randomUUID();
-      await start(conversationId);
+      started = await start(conversationId);
       const current = readRow(ctx.db, scheduleId);
       if (current && current.active_fire_id === fireId) {
         ctx.db.run("UPDATE schedules SET conversation_id = ? WHERE schedule_id = ?", conversationId, scheduleId);
       }
     }
   } catch (error) {
-    if (tracked) runNotHandedOver(ctx, fireId);
+    runNotHandedOver(ctx, fireId);
     const message = error instanceof Error ? error.message : String(error);
     const definite = error instanceof ScheduledTurnError;
     return {
@@ -2044,7 +2278,7 @@ const startRun = async (
       row.retry_of,
     );
   }
-  if (tracked) runHandedOver(ctx, fireId);
+  runHandedOver(ctx, fireId, started);
   return { ok: true, tracked };
 };
 
@@ -2363,6 +2597,7 @@ export const schedulesDomain = {
     SCHEDULES_RUN_STATE_MIGRATION,
     SCHEDULES_TARGET_THREAD_MIGRATION,
     SCHEDULES_RUNS_MIGRATION,
+    SCHEDULES_CLOUD_RUNS_MIGRATION,
   ],
   views: {
     "schedules.list": {
@@ -2448,6 +2683,14 @@ export const schedulesDomain = {
     },
     [SCHEDULE_FAILED_JOB]: {
       run: tellFailed,
+      maxAttempts: 8,
+    },
+    [SCHEDULE_SETTLE_JOB]: {
+      run: settleQueued,
+      maxAttempts: 8,
+    },
+    [SCHEDULE_CHECK_RUN_JOB]: {
+      run: checkRun,
       maxAttempts: 8,
     },
   },

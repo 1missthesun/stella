@@ -61,6 +61,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       errorMessage?: string;
       resultJson?: string;
       deferred?: boolean;
+      began?: boolean;
     } = {},
   ): Promise<number> {
     const eventSeq =
@@ -77,7 +78,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     eventKind: string,
     payload: unknown,
     eventSeq: number,
-    options: { terminal?: boolean; errorMessage?: string; resultJson?: string },
+    options: { terminal?: boolean; errorMessage?: string; resultJson?: string; began?: boolean },
   ): TurnEventEvent {
     const terminal = options.terminal === true;
     return {
@@ -92,6 +93,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       ...(terminal
         ? { terminalStatus: TERMINAL_STATUS[eventKind] ?? "failed" }
         : {}),
+      ...(terminal && options.began !== undefined ? { began: options.began } : {}),
       ...(options.errorMessage ? { errorMessage: options.errorMessage } : {}),
       ...(options.resultJson ? { resultJson: options.resultJson } : {}),
       createdAt: Date.now(),
@@ -177,13 +179,19 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     options: { retry?: boolean } = {},
   ): Promise<boolean> {
     try {
+      const eventSeq = await this.terminalEventSeq(turn, owed);
       await this.emitTurnEvent(
         turn,
         owed.kind,
         owed.payload ?? { message: owed.message },
         {
           terminal: true,
-          eventSeq: await this.terminalEventSeq(turn, owed),
+          eventSeq,
+          // A turn's first event is its `started`, emitted as it begins
+          // running (`runTurn`); a terminal that takes the first number
+          // ended a turn that never ran (canceled while queued, refused
+          // before starting).
+          began: eventSeq > 1,
           ...(owed.kind !== "completed" ? { errorMessage: owed.message } : {}),
           ...(owed.resultJson ? { resultJson: owed.resultJson } : {}),
         },

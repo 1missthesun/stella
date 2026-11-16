@@ -4,6 +4,7 @@ import {
   type AgentThreadEffects,
 } from "./domains/agent-threads.js";
 import { applyConversationEvent } from "./domains/conversations.js";
+import { followScheduledRuns } from "./domains/schedules.js";
 import type { OwnerContext } from "./registry.js";
 
 const KIND_ORDER: Record<OwnerEvent["kind"], number> = {
@@ -45,5 +46,6 @@ export const applyOwnerEventsToStore = (
         break;
     }
   }
+  followScheduledRuns(ctx, ordered);
   return effects;
 };

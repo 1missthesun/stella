@@ -346,6 +346,12 @@ export class InAppBrowserCdpAdapter {
       server.once("listening", onListening);
       server.listen(0, "127.0.0.1");
     });
+    // A listening server still reports failed accepts (EMFILE and the like)
+    // as "error"; without a listener that is an uncaught exception in
+    // Electron's main process. The server keeps listening.
+    server.on("error", (error) => {
+      console.warn("[in-app-browser] CDP server error:", error.message);
+    });
 
     const address = server.address() as AddressInfo;
     this.httpServer = server;

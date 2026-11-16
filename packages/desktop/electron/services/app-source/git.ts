@@ -62,7 +62,14 @@ export const run = (
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });
       },
     );
-    if (options.input !== undefined) child.stdin?.end(options.input);
+    if (options.input !== undefined) {
+      // git can exit before it reads all of its input (a failure, the
+      // timeout, the abort signal). Writing to it then fails with EPIPE, and
+      // an "error" with no listener is an uncaught exception in Electron's
+      // main process. git's exit status already reports what went wrong.
+      child.stdin?.on("error", () => undefined);
+      child.stdin?.end(options.input);
+    }
     if (options.background && child.pid) {
       try {
         setPriority(child.pid, constants.priority.PRIORITY_LOW);

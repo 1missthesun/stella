@@ -269,6 +269,9 @@ const storeInMacosKeychain = async ({ service, account, value }) => await new Pr
     });
     child.on("error", (error) => resolve({ ok: false, failure: error.message }));
     child.on("close", (code) => resolve(code === 0 ? { ok: true, failure: "" } : { ok: false, failure }));
+    // Its exit status reports a failure; a write to a helper that already
+    // exited must not become an uncaught exception in the main process.
+    child.stdin?.on("error", () => undefined);
     child.stdin?.end(`${value}\n${value}\n`);
 });
 const CLOUD_OUTBOX_FILE = "user-ask-cloud-outbox.json";

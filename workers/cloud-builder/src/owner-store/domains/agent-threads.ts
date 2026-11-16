@@ -4741,7 +4741,8 @@ export const applyAgentThreadEvent = (
         queueStellaNote(
           { db, now: event.completedAt },
           {
-            noteId: `waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`,
+            // Also the message's clientMsgId, so it must stay within 64 URL-safe characters.
+            noteId: agentReportReceipt(`waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
             conversationId: thread.origin_conversation_id ?? thread.conversation_id,
             ownerGeneration: thread.owner_generation,
             fromThreadId: thread.thread_id,

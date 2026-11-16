@@ -264,6 +264,10 @@ type ClaudeCodeProcessState = {
     lines: ClaudeStreamEvent[];
     woke: boolean;
     tasks: BackgroundTask[];
+    /** One id for this wake, so announcing it again can't start a second turn. */
+    wakeId?: string;
+    /** Announces the wake again until a turn takes the query up. */
+    rewake?: () => void;
   };
   finished?: BackgroundTask[];
 };
@@ -321,7 +325,7 @@ type ClaudeCodeSession = {
   toolSetChanges?: number;
   backgroundTasks?: number;
   onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
-  mcpTurnWaiters?: Set<(turn: ClaudeCodeToolMcpActiveTurn) => void>;
+  mcpTurnWaiters?: Set<(turn: ClaudeCodeToolMcpActiveTurn | undefined) => void>;
   modelFallbackNotified?: boolean;
   /** The current CLI process started a background shell (Bash run_in_background). */
   backgroundShellStarted?: boolean;
@@ -440,7 +444,24 @@ const DEFAULT_STEP_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
 const MAX_ADRIFT_LINES = 50_000;
-const ADRIFT_TOOL_TURN_WAIT_MS = 2 * 60 * 1000;
+// A wake Claude Code started on its own is announced again on this interval
+// until a Stella turn takes its query up. The first announcement can miss
+// (the app is restarting, the chat isn't loaded yet); the wake's id keeps
+// repeats from opening a second turn.
+const ADRIFT_REWAKE_INTERVAL_MS = 30 * 1000;
+const endAdrift = (processState: ClaudeCodeProcessState) => {
+  const held = processState.adrift;
+  held?.rewake?.();
+  processState.adrift = undefined;
+  return held;
+};
+/** Tool calls held for a turn get none once the query they belong to is gone. */
+const releaseMcpTurnWaiters = (session: ClaudeCodeSession) => {
+  if (session.process?.adrift && !session.process.closed) return;
+  for (const waiter of [...(session.mcpTurnWaiters ?? [])]) {
+    waiter(session.activeMcpTurn);
+  }
+};
 const activeMcpTurnFor = (
   session: ClaudeCodeSession,
 ):
@@ -451,15 +472,14 @@ const activeMcpTurnFor = (
     return session.activeMcpTurn;
   }
   return new Promise((resolve) => {
+    // A tool call from a query Claude Code started on its own waits for the
+    // Stella turn its wake opens, however long that takes (the app may be
+    // restarting). It is refused only once the query itself is gone.
     const waiters = (session.mcpTurnWaiters ??= new Set());
     const settle = (turn: ClaudeCodeToolMcpActiveTurn | undefined) => {
-      cancelTimeout();
       waiters.delete(settle);
       resolve(turn);
     };
-    const cancelTimeout = forkCancelableTimeout(ADRIFT_TOOL_TURN_WAIT_MS, () =>
-      settle(undefined),
-    );
     waiters.add(settle);
   });
 };
@@ -1907,8 +1927,10 @@ const cleanupSessionProcess = (session: ClaudeCodeSession) => {
     session,
     new Error("Claude Code session process was closed."),
   );
+  endAdrift(session.process);
   killProcess(session.process.child);
   session.process = undefined;
+  releaseMcpTurnWaiters(session);
 };
 const cleanupSessionMcpHost = (session: ClaudeCodeSession) => {
   const host = session.mcpHost;
@@ -3408,6 +3430,8 @@ class ClaudeCodeSessionRuntime {
     child.once("close", (code) => {
       consumeStdout(true);
       processState.closed = true;
+      endAdrift(processState);
+      if (session.process === processState) releaseMcpTurnWaiters(session);
       processState.toolChannel?.close();
       if (session.resumeReady) {
         try {
@@ -3587,8 +3611,7 @@ class ClaudeCodeSessionRuntime {
         }
       }
       processState.pending.push(pending);
-      const held = processState.adrift;
-      processState.adrift = undefined;
+      const held = endAdrift(processState);
       const adrift = held?.woke ? held : undefined;
       const ownQueryFirst = Boolean(held || processState.finished);
       const sendsPrompt = !adrift || !request.backgroundWake;
@@ -3682,7 +3705,7 @@ class ClaudeCodeSessionRuntime {
     if (finished) adrift.tasks.push(finished);
     adrift.lines.push(line);
     if (adrift.lines.length > MAX_ADRIFT_LINES) {
-      processState.adrift = undefined;
+      endAdrift(processState);
       if (session.process === processState) {
         this.resetStreamingProcess(sessionKey, session);
       } else {
@@ -3697,14 +3720,20 @@ class ClaudeCodeSessionRuntime {
       (line.type === "system" && line.subtype === "init");
     if (startsQuery && !adrift.woke) {
       adrift.woke = true;
-      try {
-        session.onBackgroundWake?.({
-          id: adrift.tasks[0]?.id ?? crypto.randomUUID(),
-          tasks: adrift.tasks.map(({ id: _id, ...task }) => task),
-        });
-      } catch {
-        // A host-side observer must not break the CLI's stream.
-      }
+      adrift.wakeId = adrift.tasks[0]?.id ?? crypto.randomUUID();
+      const announce = () => {
+        if (processState.adrift !== adrift || processState.closed) return;
+        adrift.rewake = forkCancelableTimeout(ADRIFT_REWAKE_INTERVAL_MS, announce);
+        try {
+          session.onBackgroundWake?.({
+            id: adrift.wakeId!,
+            tasks: adrift.tasks.map(({ id: _id, ...task }) => task),
+          });
+        } catch {
+          // A host-side observer must not break the CLI's stream.
+        }
+      };
+      announce();
     }
     return true;
   }

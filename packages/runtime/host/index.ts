@@ -2165,6 +2165,13 @@ export class StellaRuntimeHost {
                 rpc: AGENT_RUN_RPC_OPTIONS,
               },
             ),
+          tellStella: async ({ conversationId, noteId, text }) => {
+            const client = this.getConfiguredHostAuthToken()
+              ? this.ensureHostBackendClient()
+              : null;
+            if (!client) throw new Error("Sign in to Stella to reach it from this computer.");
+            await client.call("schedules.tellStella", { conversationId, noteId, text });
+          },
           startAgent: async ({ conversationId, key, description, prompt }) =>
             await this.createBackgroundAgent({
               conversationId,

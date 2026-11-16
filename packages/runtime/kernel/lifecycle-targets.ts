@@ -33,6 +33,16 @@ export type StellaHostRunnerTarget = {
       messageId: string;
       text: string;
     }) => Promise<"steered" | "resumed" | "queued" | "not_found" | "refused">;
+    /**
+     * A message for Stella in a conversation that reaches her wherever it
+     * runs (through the cloud, like an agent's message): for when she runs
+     * on another computer or in the cloud, or this computer's run failed.
+     */
+    tellStella?: (payload: {
+      conversationId: string;
+      noteId: string;
+      text: string;
+    }) => Promise<void>;
   } | null;
 };
 

@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { Cron } from 'croner'
 import { z } from 'zod'
@@ -22,6 +23,7 @@ import {
   scheduleScriptsDir,
 } from './shared/schedule-scripts.js'
 import type { StellaHostRunnerTarget } from './lifecycle-targets.js'
+import type { RuntimeAutomationTurnResult } from '@stella/contracts/protocol'
 import {
   SCHEDULE_THREAD_ID_MAX_CHARS,
   scheduledThreadFallbackNote,
@@ -164,6 +166,10 @@ const cloneGeneratedEvent = (
   ...event,
   payload: { ...event.payload },
 })
+
+/** A stable id for a message about one run, so a resent one lands once. */
+const scheduleNoteId = (jobId: string, what: 'run' | 'failed', atMs: number): string =>
+  `local-${what}:${crypto.createHash('sha256').update(`${jobId}\0${atMs}`).digest('hex').slice(0, 40)}`
 
 const truncatePreview = (value: string, maxChars = MAX_PREVIEW_CHARS) =>
   value.length > maxChars ? `${value.slice(0, maxChars)}...` : value
@@ -1708,6 +1714,83 @@ export class LocalSchedulerService {
     this.emitChange()
   }
 
+  /**
+   * A turn for Stella from this computer's schedule. When Stella runs on
+   * another computer or in the cloud this computer can't run it (nothing
+   * ran), so the prompt goes to her there through the cloud instead.
+   */
+  private async runForStella(
+    active: LocalCronJobRecord,
+    runner: NonNullable<LocalSchedulerRunner>,
+    userPrompt: string,
+    atMs: number,
+  ): Promise<RuntimeAutomationTurnResult> {
+    const result = await runner.runAutomationTurn({
+      conversationId: active.conversationId,
+      userPrompt,
+      agentType: 'orchestrator',
+    })
+    if (result.status !== 'error' || result.code !== 'brain_elsewhere' || !runner.tellStella) {
+      return result
+    }
+    try {
+      await runner.tellStella({
+        conversationId: active.conversationId,
+        noteId: scheduleNoteId(active.id, 'run', atMs),
+        text: userPrompt,
+      })
+      return { status: 'ok', finalText: '' }
+    } catch (error) {
+      return {
+        status: 'error',
+        finalText: '',
+        error: `${result.error} Sending it there failed too: ${error instanceof Error ? error.message : String(error)}`,
+      }
+    }
+  }
+
+  /**
+   * A run that failed here is told to Stella (wherever she runs), once per
+   * failing streak: the next run that works clears it.
+   */
+  private tellRunFailed(
+    active: LocalCronJobRecord,
+    runner: NonNullable<LocalSchedulerRunner>,
+    error: string,
+    atMs: number,
+    what: string,
+  ): void {
+    if (!runner.tellStella || active.failureToldAtMs !== undefined) return
+    const told = Date.now()
+    active.failureToldAtMs = told
+    const name = active.name?.trim() || active.id
+    const label = active.payload.kind === 'watch' ? 'Watch' : 'Scheduled task'
+    const after = active.enabled
+      ? `It stays on; its next run is at ${new Date(active.nextRunAtMs).toISOString()}.`
+      : "It won't run again by itself."
+    const text = [
+      `[${label} "${name}" on ${os.hostname().trim() || 'a computer'} didn't run] (${active.id})`,
+      `It was due at ${new Date(atMs).toISOString()} and failed on that computer: ${error.trim()}`,
+      after,
+      'Nobody else was told.',
+      '',
+      active.payload.kind === 'task' ? `Its instructions:\n${what}` : what,
+    ].join('\n')
+    void runner
+      .tellStella({
+        conversationId: active.conversationId,
+        noteId: scheduleNoteId(active.id, 'failed', atMs),
+        text,
+      })
+      .catch((sendError: unknown) => {
+        console.warn('[local-scheduler] telling Stella of a failed run failed', active.id, sendError)
+        if (active.failureToldAtMs === told) {
+          active.failureToldAtMs = undefined
+          this.persistState()
+        }
+      })
+  }
+
   private async executeCronTask(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,
@@ -1725,11 +1808,12 @@ export class LocalSchedulerService {
       return 'done'
     }
 
-    const runResult = await runner.runAutomationTurn({
-      conversationId: active.conversationId,
-      userPrompt: `${delivered.status === 'fallback' ? `${delivered.note}\n\n` : ''}${buildTaskFirePrompt(active.name, taskPrompt)}`,
-      agentType: 'orchestrator',
-    })
+    const runResult = await this.runForStella(
+      active,
+      runner,
+      `${delivered.status === 'fallback' ? `${delivered.note}\n\n` : ''}${buildTaskFirePrompt(active.name, taskPrompt)}`,
+      startedAt,
+    )
 
     if (runResult.status === 'busy') {
       active.runningAtMs = undefined
@@ -1750,6 +1834,7 @@ export class LocalSchedulerService {
       active.lastError = runResult.error
       active.lastOutputPreview = undefined
       this.advanceCronAfterRun(active, finishedAt, true)
+      this.tellRunFailed(active, runner, runResult.error, startedAt, taskPrompt)
       this.persistState()
       this.emitChange()
       return 'done'
@@ -1759,6 +1844,7 @@ export class LocalSchedulerService {
     const deliver = active.deliver !== false
     active.lastStatus = finalText ? 'ok' : 'no-response'
     active.lastError = undefined
+    active.failureToldAtMs = undefined
     active.lastOutputPreview = finalText ? truncatePreview(finalText) : undefined
 
     if (deliver && finalText) {
@@ -1926,9 +2012,10 @@ export class LocalSchedulerService {
               error: error instanceof Error ? error.message : String(error),
             }),
           )
-        : await runner.runAutomationTurn({
-            conversationId: active.conversationId,
-            userPrompt: `${fallbackNote}${
+        : await this.runForStella(
+            active,
+            runner,
+            `${fallbackNote}${
               escalation.reason === 'change'
                 ? buildWatchChangePrompt(
                     active.name,
@@ -1938,8 +2025,8 @@ export class LocalSchedulerService {
                   )
                 : buildWatchFailurePrompt(active.name, scriptPath, escalation.summary)
             }`,
-            agentType: 'orchestrator',
-          })
+            escalation.atMs,
+          )
 
     if (turnResult.status === 'busy') {
       active.pendingEscalation = escalation
@@ -1962,6 +2049,15 @@ export class LocalSchedulerService {
       active.lastError = turnResult.error
       active.lastOutputPreview = undefined
       this.advanceCronAfterRun(active, finishedAt, true)
+      this.tellRunFailed(
+        active,
+        runner,
+        turnResult.error,
+        escalation.atMs,
+        escalation.reason === 'change'
+          ? `It found: ${escalation.summary}\n\nWhat to do with a finding: ${watch.instructions ?? 'Tell the user what it found.'}`
+          : `Its check failed: ${escalation.summary}\n\nIts check script: ${scriptPath}`,
+      )
       this.persistState()
       this.emitChange()
       return 'done'
@@ -1977,6 +2073,7 @@ export class LocalSchedulerService {
         : 'sensor-error'
     active.lastError =
       escalation.reason === 'sensor-error' ? escalation.summary : undefined
+    active.failureToldAtMs = undefined
     active.lastOutputPreview = finalText ? truncatePreview(finalText) : undefined
 
     if (deliver && finalText) {

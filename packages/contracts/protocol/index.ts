@@ -369,7 +369,13 @@ export type RuntimeAutomationTurnRequest = {
 export type RuntimeAutomationTurnResult =
   | { status: "ok"; finalText: string }
   | { status: "busy"; finalText: ""; error: string }
-  | { status: "error"; finalText: ""; error: string };
+  | {
+      status: "error";
+      finalText: "";
+      error: string;
+      /** Stella for this conversation runs on another computer or in the cloud, so nothing ran here. */
+      code?: "brain_elsewhere";
+    };
 
 export type RuntimeLocalAgentRequest = {
   conversationId: string;

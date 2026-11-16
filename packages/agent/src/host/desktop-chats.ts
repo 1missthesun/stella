@@ -144,7 +144,7 @@ import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import { desktopExecution, type DesktopBrain, type DesktopDevices, type DesktopExecution } from "./desktop-execution.ts";
-import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import type { LiveProviderModel } from "@stella/contracts/provider-live-models";
 import { journalMirror, journalTurnGate, placedTaskGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
@@ -2445,11 +2445,16 @@ export function desktopChats(options: DesktopChatsOptions) {
       placementRunId?: string;
       observe?: (events: PiChatEvent[]) => void;
     },
-  ): Promise<{ status: "ok"; finalText: string } | { status: "busy" | "error"; finalText: ""; error: string }> => {
+  ): Promise<
+    | { status: "ok"; finalText: string }
+    | { status: "busy" | "error"; finalText: ""; error: string; code?: typeof PI_BRAIN_ELSEWHERE_CODE }
+  > => {
     const { observe, placementRunId } = turn;
     if (!placementRunId) {
       const where = await brainPlacement(conversationId);
-      if (!where.here) return { status: "error", finalText: "", error: elsewhere(where) };
+      if (!where.here) {
+        return { status: "error", finalText: "", error: elsewhere(where), code: PI_BRAIN_ELSEWHERE_CODE };
+      }
     }
     const placement: Placement = {};
     if (placementRunId) placements.set(placementRunId, placement);

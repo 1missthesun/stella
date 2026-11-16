@@ -34,7 +34,7 @@ const wavHeader = (dataBytes: number): Buffer => {
 };
 
 const describeFailure = (status: number, body: string): string => {
-  if (status === 401 || status === 403) return "OpenRouter rejected your API key. Check it in Settings → Models.";
+  if (status === 401 || status === 403) return "OpenRouter rejected your API key. Check it in Models, under OpenRouter.";
   if (status === 402) return "Your OpenRouter account is out of credit.";
   let message = "";
   try {

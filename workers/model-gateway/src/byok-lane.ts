@@ -21,6 +21,7 @@ import {
   ownedResponseBody,
   type GatewayDeps,
 } from "./request-util.js";
+import { llmRouteFailureMarker } from "@stella/contracts/llm-route-failure";
 
 const ACCESS_MAX_CACHE_MS = 60_000;
 const ACCESS_EXPIRY_MARGIN_MS = 60_000;
@@ -73,14 +74,14 @@ export const accessFor = async (
       throw new GatewayError(
         403,
         "engine_sign_in_required",
-        `Your ${provider} sign-in ended. Sign in again in Stella's settings.`,
+        `Your ${provider} sign-in ended. Sign in again in Settings › Claude and ChatGPT (on the phone: the chat settings).`,
       );
     }
     if (result.code === "generation_stale") {
       throw new GatewayError(403, "generation_stale", "This capability belongs to a superseded account generation.");
     }
     if (result.status === 404) {
-      throw new GatewayError(403, "unauthorized", `No ${provider} key is saved to this account.`);
+      throw new GatewayError(403, "unauthorized", `No ${provider} key is saved to this account. Add it in the model picker, or pick another model.${llmRouteFailureMarker("missing-credential", provider)}`);
     }
     throw new GatewayError(503, "internal", "Account provider keys are temporarily unavailable.", {
       retryable: true,

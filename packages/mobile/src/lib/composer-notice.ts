@@ -8,6 +8,11 @@ import {
   CONNECT_PLAN_COPY,
   CONNECT_PLAN_OFFER_MOBILE_ENABLED,
 } from "@stella/contracts/connect-plan-offer";
+import {
+  detectLlmRouteFailure,
+  type LlmRouteFailureKind,
+} from "@stella/contracts/llm-route-failure";
+import { openDrawer } from "./drawer";
 
 export type ComposerNoticeKind =
   | "sign-in"
@@ -155,6 +160,41 @@ const PROVIDER_MATCHERS = [
   "permission denied",
 ] as const;
 
+const CHOOSE_MODEL_ACTION = {
+  label: "Choose model",
+  onPress: () => openDrawer("end"),
+};
+
+const ROUTE_FAILURE_NOTICES: Record<LlmRouteFailureKind, NoticeCopy> = {
+  "missing-credential": {
+    kind: "provider",
+    title: "Provider key needed",
+    description:
+      "Your selected model's API key is missing or unreadable. Add or re-check it in the chat settings, or pick another model.",
+    action: CHOOSE_MODEL_ACTION,
+  },
+  "unknown-model": {
+    kind: "provider",
+    title: "Model unavailable",
+    description:
+      "Stella could not use your selected model. Choose a different model in the chat settings to continue.",
+    action: CHOOSE_MODEL_ACTION,
+  },
+  "unsupported-provider": {
+    kind: "provider",
+    title: "Model unavailable",
+    description:
+      "Stella could not use your selected model. Choose a different model in the chat settings to continue.",
+    action: CHOOSE_MODEL_ACTION,
+  },
+  "no-stella-route": {
+    kind: "sign-in",
+    title: "No model available",
+    description:
+      "Sign in to use Stella, or add your own provider key in the chat settings to keep going.",
+  },
+};
+
 const statusCodeOf = (normalized: string): number | null => {
   const match = normalized.match(
     /\b(?:http(?: status)?|status(?: code)?|error(?: code)?|code)\s*[:=]?\s*([45]\d{2})\b/i,
@@ -169,6 +209,8 @@ export function classifyComposerNotice(
 ): NoticeCopy | null {
   const normalized = (message ?? "").trim().toLowerCase();
   if (!normalized) return null;
+  const routeFailure = detectLlmRouteFailure(message);
+  if (routeFailure) return ROUTE_FAILURE_NOTICES[routeFailure.kind];
   const status = statusCodeOf(normalized);
 
   if (normalized.includes("sign in to stella to use cloud tasks")) {
@@ -234,6 +276,7 @@ export function classifyComposerNotice(
       title: "Model usage limit reached",
       description:
         "This model has reached a temporary usage limit. Choose another model or try again shortly.",
+      action: CHOOSE_MODEL_ACTION,
     };
   }
   if (includesAny(normalized, SIGN_IN_MATCHERS) || status === 401) {
@@ -249,6 +292,7 @@ export function classifyComposerNotice(
       title: "Provider access needed",
       description:
         "Reconnect the selected provider or choose another model to continue.",
+      action: CHOOSE_MODEL_ACTION,
     };
   }
   return null;

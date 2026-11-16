@@ -42,12 +42,20 @@ export const LLM_ROUTE_FAILURE_MARKERS: Record<LlmRouteFailureKind, string> = {
   "no-stella-route": "stella.route_error.no_stella_route",
 };
 
-const markerSuffix = (kind: LlmRouteFailureKind): string =>
-  ` [${LLM_ROUTE_FAILURE_MARKERS[kind]}]`;
+/** The marker a thrown message ends with; `provider` names the provider whose key is missing. */
+export const llmRouteFailureMarker = (
+  kind: LlmRouteFailureKind,
+  provider?: string,
+): string =>
+  provider
+    ? ` [${LLM_ROUTE_FAILURE_MARKERS[kind]} provider=${provider}]`
+    : ` [${LLM_ROUTE_FAILURE_MARKERS[kind]}]`;
+
+const markerSuffix = llmRouteFailureMarker;
 
 const ACCOUNT_CREDENTIAL_REMEDIES: Record<string, string> = {
   chatgpt:
-    "Sign in with ChatGPT in Settings → Account to use it here, or run this task in the cloud, where the ChatGPT account connected to your Stella account already serves it. Sign in with ChatGPT registers each computer as its own host, so a cloud connection does not cover this one.",
+    "Sign in with ChatGPT on this computer (Settings › Claude and ChatGPT) to use it here, or run this task in the cloud, where the ChatGPT account connected to your Stella account already serves it. Sign in with ChatGPT registers each computer as its own host, so a cloud connection does not cover this one.",
 };
 
 const describeSelection = (
@@ -75,13 +83,13 @@ export const formatLlmRouteFailure = (failure: LlmRouteFailure): string => {
       );
       const accountRemedy = ACCOUNT_CREDENTIAL_REMEDIES[failure.provider];
       if (accountRemedy) {
-        return `No ${name} credential on this computer (${selection}). ${accountRemedy}${markerSuffix(failure.kind)}`;
+        return `No ${name} credential on this computer (${selection}). ${accountRemedy}${markerSuffix(failure.kind, failure.provider)}`;
       }
-      return `No usable API key for ${name} (${selection}). Add or re-check your ${name} key in Settings → Model, or pick another model.${markerSuffix(failure.kind)}`;
+      return `No usable API key for ${name} (${selection}). Add or re-check your ${name} key in the model picker, or pick another model.${markerSuffix(failure.kind, failure.provider)}`;
     }
     case "unknown-model": {
       if (!failure.suggestedModel) {
-        return `Selected model "${failure.model}" is not available from ${getProviderDisplayName(failure.provider)}. Pick a different model in Settings → Model.${markerSuffix(failure.kind)}`;
+        return `Selected model "${failure.model}" is not available from ${getProviderDisplayName(failure.provider)}. Pick a different model in the model picker.${markerSuffix(failure.kind)}`;
       }
       const engineName = failure.suggestedModel.startsWith("codex/")
         ? "the Codex engine"
@@ -91,14 +99,32 @@ export const formatLlmRouteFailure = (failure: LlmRouteFailure): string => {
       return `Selected model "${failure.model}" is not available from ${getProviderDisplayName(failure.provider)}. It is served by ${engineName}; use "${failure.suggestedModel}" instead.${markerSuffix(failure.kind)}`;
     }
     case "unsupported-provider":
-      return `Unknown model provider "${failure.provider}" (selected model "${failure.model}"). Pick a different model in Settings → Model.${markerSuffix(failure.kind)}`;
+      return `Unknown model provider "${failure.provider}" (selected model "${failure.model}"). Pick a different model in the model picker.${markerSuffix(failure.kind)}`;
     case "no-stella-route":
-      return `No usable model route is configured. Sign in to use Stella, or add a provider API key in Settings.${markerSuffix(failure.kind)}`;
+      return `No usable model route is configured. Sign in to use Stella, or add a provider API key in the model picker.${markerSuffix(failure.kind)}`;
     default: {
       const _exhaustive: never = failure;
       return _exhaustive;
     }
   }
+};
+
+const MARKER_PATTERN = /\[(stella\.route_error\.[a-z_]+)(?: provider=([A-Za-z0-9._-]+))?\]/;
+
+/**
+ * Recover the failure kind, and for a missing credential the provider whose
+ * key is missing, from a thrown message via its stable marker.
+ */
+export const detectLlmRouteFailure = (
+  message: string | null | undefined,
+): { kind: LlmRouteFailureKind; provider?: string } | null => {
+  const match = message ? MARKER_PATTERN.exec(message) : null;
+  if (!match) return null;
+  const kind = (Object.keys(LLM_ROUTE_FAILURE_MARKERS) as LlmRouteFailureKind[]).find(
+    (candidate) => LLM_ROUTE_FAILURE_MARKERS[candidate] === match[1],
+  );
+  if (!kind) return null;
+  return match[2] ? { kind, provider: match[2] } : { kind };
 };
 
 /**

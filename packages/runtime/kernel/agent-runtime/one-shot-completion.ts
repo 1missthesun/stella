@@ -164,7 +164,7 @@ export const runOneShotCompletion = async (args: {
       throw lastRouteError;
     }
     throw new Error(
-      "No API credential is available for this completion. Add a matching local key in Settings → Models or sign in to use Stella.",
+      "No API credential is available for this completion. Add a matching key in Models (at the top of Stella's window), or sign in to use Stella.",
     );
   }
 

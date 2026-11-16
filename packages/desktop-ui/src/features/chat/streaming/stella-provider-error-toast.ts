@@ -1,6 +1,7 @@
 import {
   BYOK_TOAST_ACTION,
   OPEN_MODEL_PICKER_EVENT,
+  openModelPickerAt,
 } from '@/global/billing/byok-action'
 import type { ManagedModelAudience } from '@/global/billing/audience'
 import {
@@ -13,7 +14,11 @@ import { i18nFallback } from '@/shared/i18n/I18nProvider'
 import { translateNow } from '@/shared/i18n/active-translator'
 import { showToast, type ToastOptions } from '@/ui/toast'
 import { planUsageDialog } from '@/global/billing/plan-usage-dialog-store'
-import { detectLlmRouteFailureKind } from "@stella/contracts/llm-route-failure"
+import {
+  detectLlmRouteFailure,
+  detectLlmRouteFailureKind,
+} from "@stella/contracts/llm-route-failure"
+import { getProviderDisplayName } from "@stella/contracts/provider-display"
 import {
   STELLA_USAGE_LIMIT_DESCRIPTIONS,
   STELLA_USAGE_LIMIT_TITLES,
@@ -71,6 +76,14 @@ const openModelPicker = () => {
   window.dispatchEvent(new Event(OPEN_MODEL_PICKER_EVENT))
 }
 
+const openAiSettings = () => {
+  void import('@/shell/settings-dialog-store').then(({ settingsDialog }) =>
+    settingsDialog.openAt('ai'),
+  )
+}
+
+const CHATGPT_PROVIDER = 'chatgpt'
+
 const chooseModelAction = {
   label: 'Choose model',
   onClick: openModelPicker,
@@ -116,16 +129,33 @@ export const resolveStellaProviderErrorToast = (
   const classification = classifyStellaProviderError(reason)
   const message = classification.message
 
-  const routeFailureKind = detectLlmRouteFailureKind(message)
+  const routeFailure = detectLlmRouteFailure(message)
+  const routeFailureKind = routeFailure?.kind ?? null
   if (routeFailureKind === 'missing-credential') {
+    const provider = routeFailure?.provider
+    if (provider === CHATGPT_PROVIDER) {
+      return {
+        title: 'Sign in to ChatGPT on this computer',
+        description:
+          'Your selected ChatGPT model needs ChatGPT signed in here. Sign in under Settings › Claude and ChatGPT, or pick another model.',
+        variant: 'error',
+        duration: 10000,
+        action: { label: 'Open Claude and ChatGPT', onClick: openAiSettings },
+        secondaryAction: chooseModelAction,
+      }
+    }
+    const name = provider ? getProviderDisplayName(provider) : null
     return {
       title: 'Provider key needed',
-      description:
-        'Stella could not use your selected model because its API key is missing or unreadable. Add or re-check it in Settings → Model, or pick another model.',
+      description: name
+        ? `Stella could not use your selected model because its ${name} API key is missing or unreadable. Add or re-check it in Models, or pick another model.`
+        : 'Stella could not use your selected model because its API key is missing or unreadable. Add or re-check it in Models, or pick another model.',
       variant: 'error',
       duration: 8000,
-      action: chooseModelAction,
-      secondaryAction: BYOK_TOAST_ACTION,
+      action: name
+        ? { label: `Add ${name} key`, onClick: () => openModelPickerAt(provider) }
+        : chooseModelAction,
+      secondaryAction: name ? chooseModelAction : BYOK_TOAST_ACTION,
     }
   }
   if (

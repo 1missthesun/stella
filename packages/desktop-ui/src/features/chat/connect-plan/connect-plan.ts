@@ -5,7 +5,6 @@ import {
 import { OPEN_MODEL_PICKER_EVENT } from "@/global/billing/byok-action";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { isWebsiteHost } from "@/platform/capabilities";
-import { writeViewState } from "@/platform/view-state/view-state";
 import { presentComposerNotice } from "@/features/chat/composer-notice-store";
 import type { ToastOptions } from "@/ui/toast";
 import { classifyStellaProviderError } from "@/features/chat/streaming/stella-provider-error-classifier";
@@ -51,8 +50,7 @@ export const openPlans = (): void => planUsageDialog.openPlans();
 export const openEngineConnectFallback = (): void => {
   if (typeof window === "undefined") return;
   if (connectPlanChatGptOnly()) {
-    writeViewState("settings.tab", "ai");
-    void import("@/shell/settings-dialog-store").then(({ settingsDialog }) => settingsDialog.open());
+    void import("@/shell/settings-dialog-store").then(({ settingsDialog }) => settingsDialog.openAt("ai"));
     return;
   }
   window.dispatchEvent(new Event(OPEN_MODEL_PICKER_EVENT));

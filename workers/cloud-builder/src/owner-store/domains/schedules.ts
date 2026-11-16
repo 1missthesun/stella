@@ -37,7 +37,9 @@ import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess, cloudSandboxAccess } from "./billing.js";
-import { livePushTokens, sendPushMessages } from "./devices.js";
+import { livePushTokens, resolveCurrentDeviceId, sendPushMessages } from "./devices.js";
+import { queueAgentNote, queueStellaNote } from "./agent-reports.js";
+import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { deliverScheduledMessage, scheduleTargetThread } from "./agent-threads.js";
 import {
   scheduledThreadFallbackNote,
@@ -197,6 +199,39 @@ export const SCHEDULES_TARGET_THREAD_MIGRATION = {
   statements: [`ALTER TABLE schedules ADD COLUMN target_thread_id TEXT`],
 };
 
+/**
+ * A schedule's run lives on after the schedule hands it over: each handed-over
+ * run is recorded until it settles, so a run that fails where it runs is
+ * retried or reported instead of being taken for done. `retry_of` carries a
+ * retry's chain to its next run; `failure_told_at` keeps a failing repeating
+ * schedule from telling Stella on every run.
+ */
+export const SCHEDULES_RUNS_MIGRATION = {
+  id: "schedules.11-runs",
+  statements: [
+    `ALTER TABLE schedules ADD COLUMN created_by_thread_id TEXT`,
+    `ALTER TABLE schedules ADD COLUMN retry_of TEXT`,
+    `ALTER TABLE schedules ADD COLUMN retry_attempt INTEGER`,
+    `ALTER TABLE schedules ADD COLUMN failure_told_at INTEGER`,
+    `CREATE TABLE schedule_runs (
+       fire_id TEXT PRIMARY KEY,
+       schedule_id TEXT NOT NULL,
+       first_fire_id TEXT NOT NULL,
+       attempt INTEGER NOT NULL,
+       due_at INTEGER NOT NULL,
+       handed INTEGER NOT NULL DEFAULT 0,
+       outcome TEXT,
+       started INTEGER,
+       on_purpose INTEGER,
+       device_id TEXT,
+       error TEXT,
+       created_at INTEGER NOT NULL,
+       settled_at INTEGER
+     )`,
+    `CREATE INDEX schedule_runs_created ON schedule_runs (created_at)`,
+  ],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
@@ -211,6 +246,10 @@ type Row = {
   failing_since: number | null;
   repair_sent_at: number | null;
   waiting_since: number | null;
+  created_by_thread_id: string | null;
+  retry_of: string | null;
+  retry_attempt: number | null;
+  failure_told_at: number | null;
   conversation_id: string | null;
   target_device_id: string | null;
   prompt: string;
@@ -258,7 +297,17 @@ const transitionRun = (
   from: RunState,
   to: RunState,
   fields: Partial<
-    Pick<Row, "status" | "next_run_at" | "last_run_at" | "last_error" | "last_error_at" | "failure_count" | "waiting_since">
+    Pick<
+      Row,
+      | "status"
+      | "next_run_at"
+      | "last_run_at"
+      | "last_error"
+      | "last_error_at"
+      | "failure_count"
+      | "waiting_since"
+      | "failure_told_at"
+    >
   > = {},
 ): boolean => {
   const current = readRow(ctx.db, scheduleId);
@@ -686,6 +735,8 @@ type CreateInput = {
   targetThreadId?: string;
   script?: string;
   once?: boolean;
+  /** The agent that set it up, told too when a run fails. */
+  createdByThreadId?: string;
 };
 
 /** A schedule may target only an agent the ledger knows; its canonical thread id. */
@@ -715,6 +766,9 @@ const createSchedule = async (
   const once = kind === "watch" && input.once === true;
   const requestId = input.requestId.trim();
   const targetThreadId = targetThreadOf(ctx, kind, input.targetThreadId);
+  const createdBy = input.createdByThreadId?.trim() ?? "";
+  const createdByThreadId =
+    kind === "reminder" || !createdBy ? null : (scheduleTargetThread(ctx.db, createdBy)?.thread_id ?? createdBy);
   const intent = {
     kind,
     prompt,
@@ -774,6 +828,10 @@ const createSchedule = async (
         failing_since: null,
         repair_sent_at: null,
         waiting_since: null,
+        created_by_thread_id: createdByThreadId,
+        retry_of: null,
+        retry_attempt: null,
+        failure_told_at: null,
         conversation_id: conversationId,
         target_device_id: targetDeviceId,
         prompt,
@@ -1002,6 +1060,7 @@ const toolParser = object({
   conversationId: optional(string({ max: 128 })),
   status: optional(literal("active", "paused")),
   schedule: optional(scheduleParser),
+  createdByThreadId: optional(string({ max: 128, pattern: ID_PATTERN })),
 });
 
 const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleToolResult> => {
@@ -1026,6 +1085,7 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
         ...(args.targetThreadId !== undefined ? { targetThreadId: args.targetThreadId } : {}),
         ...(args.script !== undefined ? { script: args.script } : {}),
         ...(args.once !== undefined ? { once: args.once } : {}),
+        ...(args.createdByThreadId ? { createdByThreadId: args.createdByThreadId } : {}),
       },
     );
     const { check, ...schedule } = created.result;
@@ -1276,6 +1336,13 @@ type FireOutcome = {
   pause?: boolean;
   /** The schedule's last run (a watch that stops once it finds something). */
   last?: boolean;
+  /** A failure Stella already heard about another way (a watch's own repair note). */
+  quiet?: boolean;
+  /**
+   * The run went to a computer and is still running there: it is done only
+   * when it settles (`schedules.runSettled`), so a failing streak isn't over.
+   */
+  tracked?: boolean;
 };
 
 /** Settles a run: back to armed for the next occurrence or a retry, or done. */
@@ -1305,6 +1372,7 @@ const finishFire = (ctx: OwnerContext, scheduleId: string, fireId: string, outco
       last_error_at: null,
       failure_count: 0,
       waiting_since: null,
+      ...(outcome.tracked ? {} : { failure_told_at: null }),
     });
     return;
   }
@@ -1312,13 +1380,328 @@ const finishFire = (ctx: OwnerContext, scheduleId: string, fireId: string, outco
   const retryAt = ctx.now + FIRE_RETRY_DELAY_MS;
   const retry =
     !pause && outcome.retry !== undefined && failureCount <= MAX_FIRE_RETRIES && (last || retryAt < upcoming);
-  transitionRun(ctx, scheduleId, run, armed(retry && outcome.retry?.sameFire ? fireId : null), {
+  const moved = transitionRun(ctx, scheduleId, run, armed(retry && outcome.retry?.sameFire ? fireId : null), {
     status: pause ? "paused" : retry || !last ? row.status : "done",
     next_run_at: retry ? retryAt : upcoming,
     last_error: error.slice(0, MAX_ERROR_CHARS),
     last_error_at: ctx.now,
     failure_count: failureCount,
   });
+  if (moved && !retry && !outcome.quiet) {
+    tellRunFailed(ctx, scheduleId, {
+      fireId,
+      error,
+      attempts: failureCount,
+      after: pause ? "paused" : last ? "ended" : "continues",
+    });
+  }
+};
+
+/** Waits between tries of a run that never started anywhere (a computer's run that failed before starting). */
+const RUN_RETRY_DELAYS_MS = [60_000, 5 * 60_000, 15 * 60_000] as const;
+const RUN_RECORD_TTL_MS = 7 * DAY_MS;
+export const SCHEDULE_FAILED_JOB = "schedules.tellFailed";
+
+type RunRecord = {
+  fire_id: string;
+  schedule_id: string;
+  first_fire_id: string;
+  attempt: number;
+  due_at: number;
+  handed: number;
+  outcome: string | null;
+  started: number | null;
+  on_purpose: number | null;
+  device_id: string | null;
+  error: string | null;
+  created_at: number;
+  settled_at: number | null;
+};
+
+const readRun = (db: OwnerDbReader, fireId: string): RunRecord | null =>
+  db.one<RunRecord>("SELECT * FROM schedule_runs WHERE fire_id = ?", fireId);
+
+/** Notes a run about to be handed to a computer, before it is: its end can arrive at once. */
+const recordRun = (ctx: OwnerContext, row: Row, fireId: string): void => {
+  ctx.db.run("DELETE FROM schedule_runs WHERE created_at < ?", ctx.now - RUN_RECORD_TTL_MS);
+  ctx.db.run(
+    `INSERT INTO schedule_runs (fire_id, schedule_id, first_fire_id, attempt, due_at, handed, created_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?) ON CONFLICT (fire_id) DO NOTHING`,
+    fireId,
+    row.schedule_id,
+    row.retry_of ?? fireId,
+    row.retry_attempt ?? 1,
+    row.waiting_since ?? row.next_run_at,
+    ctx.now,
+  );
+};
+
+/** The computer has the run: from here its end decides what happens next. */
+const runHandedOver = (ctx: OwnerContext, fireId: string): void => {
+  ctx.db.run("UPDATE schedule_runs SET handed = 1 WHERE fire_id = ?", fireId);
+  const run = readRun(ctx.db, fireId);
+  if (run?.outcome) settleRun(ctx, run);
+};
+
+const runNotHandedOver = (ctx: OwnerContext, fireId: string): void => {
+  ctx.db.run("DELETE FROM schedule_runs WHERE fire_id = ? AND handed = 0", fireId);
+};
+
+const runSettledArgs = object({
+  clientMsgId: string({ max: 256 }),
+  state: string({ max: 64 }),
+  started: boolean(),
+  onPurpose: optional(boolean()),
+  deviceId: optional(string({ max: 256 })),
+  errorCode: optional(string({ max: 256 })),
+  errorMessage: optional(string({ max: 4_000 })),
+});
+
+/**
+ * How a run handed to a computer ended, from the owner gate. A computer's run
+ * can fail long after the schedule handed it over (aborted where it ran, the
+ * computer gone before it started): that run is not done.
+ */
+const runSettled = (ctx: OwnerContext, raw: unknown): { known: boolean } => {
+  const args = runSettledArgs(raw);
+  const fireId = args.clientMsgId.startsWith("schedule:") ? args.clientMsgId.slice("schedule:".length) : "";
+  const run = fireId ? readRun(ctx.db, fireId) : null;
+  if (!run) {
+    log("info", "schedule_run_settled_unknown", { clientMsgId: args.clientMsgId, state: args.state });
+    return { known: false };
+  }
+  if (run.outcome !== null) return { known: true };
+  const error =
+    args.state === "completed"
+      ? null
+      : (args.errorMessage?.trim() || args.errorCode?.trim() || `It ended ${args.state}.`).slice(0, 2_000);
+  ctx.db.run(
+    `UPDATE schedule_runs SET outcome = ?, started = ?, on_purpose = ?, device_id = ?, error = ?, settled_at = ?
+      WHERE fire_id = ? AND outcome IS NULL`,
+    args.state,
+    args.started ? 1 : 0,
+    args.onPurpose ? 1 : 0,
+    args.deviceId ?? null,
+    error,
+    ctx.now,
+    fireId,
+  );
+  const settled = readRun(ctx.db, fireId);
+  if (settled?.handed) settleRun(ctx, settled);
+  return { known: true };
+};
+
+const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
+  const row = readRow(ctx.db, run.schedule_id);
+  if (run.outcome === "completed") {
+    if (row?.failure_told_at !== null && row?.failure_told_at !== undefined) {
+      ctx.db.run("UPDATE schedules SET failure_told_at = NULL WHERE schedule_id = ?", run.schedule_id);
+    }
+    return;
+  }
+  // Someone stopped it (Stop in the chat, a cancel): they know.
+  if (run.outcome === "canceled" && run.on_purpose) return;
+  const error = run.error ?? `It ended ${run.outcome ?? "without finishing"}.`;
+  log("error", "schedule_run_failed", {
+    scheduleId: run.schedule_id,
+    fireId: run.fire_id,
+    attempt: run.attempt,
+    outcome: run.outcome,
+    started: Boolean(run.started),
+    error: error.slice(0, 300),
+  });
+  if (!row) return;
+  ctx.db.run(
+    "UPDATE schedules SET last_error = ?, last_error_at = ?, updated_at = ? WHERE schedule_id = ?",
+    error.slice(0, MAX_ERROR_CHARS),
+    ctx.now,
+    ctx.now,
+    row.schedule_id,
+  );
+  if (!run.started && retryRun(ctx, row, run)) return;
+  let after: "ended" | "continues" | "paused" = "ended";
+  try {
+    after = row.status === "paused" ? "paused" : parseStored(row.schedule_json).kind === "at" ? "ended" : "continues";
+  } catch {
+    after = "ended";
+  }
+  tellRunFailed(ctx, row.schedule_id, {
+    fireId: run.fire_id,
+    error,
+    started: Boolean(run.started),
+    attempts: run.attempt,
+    after,
+    dueAt: run.due_at,
+    ...(run.device_id ? { deviceId: run.device_id } : {}),
+  });
+};
+
+/**
+ * A run that never started anywhere did nothing, so it runs again shortly, a
+ * few times, while the schedule is still meant to run it then: not paused,
+ * removed or already on to another run. Each try is a new run (its own fire
+ * id) chained to the first by `retry_of`.
+ */
+const retryRun = (ctx: OwnerContext, row: Row, run: RunRecord): boolean => {
+  const delay = RUN_RETRY_DELAYS_MS[run.attempt - 1];
+  if (delay === undefined) return false;
+  const state = runStateOf(row);
+  if (state.kind !== "armed" || state.retryFireId !== null) return false;
+  let oneTime: boolean;
+  try {
+    oneTime = parseStored(row.schedule_json).kind === "at";
+  } catch {
+    return false;
+  }
+  const retryAt = ctx.now + delay;
+  // A one-time schedule ran its only run (done); active again means it was
+  // given a new time meanwhile. A repeating one retries only before its next run.
+  if (oneTime ? row.status !== "done" : row.status !== "active" || retryAt >= row.next_run_at) return false;
+  ctx.db.run(
+    `UPDATE schedules SET status = 'active', next_run_at = ?, retry_of = ?, retry_attempt = ?, updated_at = ?
+      WHERE schedule_id = ? AND run_state = 'armed' AND active_fire_id IS NULL`,
+    retryAt,
+    run.first_fire_id,
+    run.attempt + 1,
+    ctx.now,
+    row.schedule_id,
+  );
+  arm(ctx, row.schedule_id);
+  log("info", "schedule_run_retry", {
+    scheduleId: row.schedule_id,
+    fireId: run.fire_id,
+    attempt: run.attempt + 1,
+    retryAt,
+  });
+  return true;
+};
+
+type FailedRun = {
+  fireId: string;
+  error: string;
+  /** Whether it got as far as running; unknown when the cloud couldn't tell. */
+  started?: boolean;
+  attempts: number;
+  /** What the schedule does now. */
+  after: "ended" | "continues" | "paused";
+  dueAt?: number;
+  deviceId?: string;
+};
+
+/**
+ * A run that won't happen is told, never just recorded: Stella hears it in
+ * the schedule's conversation, and so does the agent that set it up, as a
+ * message (the same outbox as an agent's report: it reaches wherever each
+ * runs, retried until taken). A repeating schedule tells once per failing
+ * streak.
+ */
+const tellRunFailed = (ctx: OwnerContext, scheduleId: string, failed: FailedRun): void => {
+  const row = readRow(ctx.db, scheduleId);
+  if (!row) return;
+  if (failed.after === "continues" && row.failure_told_at !== null) return;
+  ctx.db.run("UPDATE schedules SET failure_told_at = ? WHERE schedule_id = ?", ctx.now, scheduleId);
+  ctx.jobs.schedule(
+    SCHEDULE_FAILED_JOB,
+    ctx.now,
+    { scheduleId, ...failed, error: failed.error.slice(0, 2_000) },
+    { id: `schedule-failed:${failed.fireId}` },
+  );
+};
+
+const failedPayload = object({
+  scheduleId: string({ max: 128 }),
+  fireId: string({ max: 128 }),
+  error: string({ max: 4_000 }),
+  started: optional(boolean()),
+  attempts: number({ min: 1, max: 1_000 }),
+  after: literal("ended", "continues", "paused"),
+  dueAt: optional(number({ min: 0 })),
+  deviceId: optional(string({ max: 256 })),
+});
+
+const isoMinute = (ms: number): string => `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+
+const tellFailed = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const failed = failedPayload(payload);
+  const row = readRow(ctx.db, failed.scheduleId);
+  if (!row) return;
+  const snapshot = await ctx.host.snapshot();
+  const kind = toScheduleKind(row.kind);
+  let where = "";
+  if (failed.deviceId) {
+    const devices = await ctx.host.deviceDestinations().catch(() => []);
+    const device = devices.find((candidate) => candidate.deviceId === failed.deviceId);
+    where = ` on ${device?.label?.trim() || "the computer it was sent to"}`;
+  }
+  const error = failed.error.trim().replace(/\.$/u, "");
+  const how =
+    failed.started === true
+      ? `It started${where} but ended before finishing (${error}); what it did before that is not known.`
+      : failed.started === false
+        ? `It never started${where}: ${error}.`
+        : `Its run failed${where}: ${error}.`;
+  const tries = failed.attempts > 1 ? ` It was tried ${failed.attempts} times.` : "";
+  const after =
+    failed.after === "paused"
+      ? "The schedule is paused now."
+      : failed.after === "continues"
+        ? `The schedule stays on; its next run is at ${isoMinute(row.next_run_at)}.`
+        : "It won't run again by itself.";
+  const due = failed.dueAt ?? row.last_run_at ?? row.next_run_at;
+  const what = kind === "reminder" ? "Its message" : "Its instructions";
+  const creator =
+    row.created_by_thread_id && kind !== "reminder" ? scheduleTargetThread(ctx.db, row.created_by_thread_id) : null;
+  const reachable =
+    creator && (creator.owner_generation === null || creator.owner_generation === snapshot.ownerGeneration)
+      ? creator
+      : null;
+  const name = row.description.trim() || row.schedule_id;
+  const label = kind === "reminder" ? "Reminder" : kind === "watch" ? "Watch" : "Scheduled task";
+  const facts = [`It was due at ${isoMinute(due)}. ${how}${tries}`, after];
+  const instructions = `${what}:\n${row.prompt}`;
+  const from = `schedule:${row.schedule_id}`;
+  const conversationId = row.conversation_id;
+  if (conversationId && !conversationId.startsWith("local_")) {
+    const live = ctx.db.one<{ conversation_id: string }>(
+      "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
+      conversationId,
+    );
+    if (live) {
+      queueStellaNote(ctx, {
+        noteId: agentReportReceipt(`schedule-failed:${failed.fireId}`),
+        conversationId,
+        ownerGeneration: snapshot.ownerGeneration,
+        fromThreadId: from,
+        text: [
+          `[${label} "${name}" didn't run] (${row.schedule_id})`,
+          ...facts,
+          reachable
+            ? `The task that set it up (${reachable.thread_id}) was told too and handles it; it's yours only if that task can't.`
+            : "Nobody else was told.",
+          "",
+          instructions,
+        ].join("\n"),
+      });
+    }
+  }
+  if (reachable) {
+    queueAgentNote(ctx, {
+      // "schedule:" marks it automatic: a task stopped on purpose holds it
+      // until it is resumed instead of being started by it.
+      noteId: agentReportReceipt(`schedule:failed:${failed.fireId}:by`),
+      parentThreadId: reachable.thread_id,
+      conversationId: reachable.conversation_id,
+      ownerGeneration: snapshot.ownerGeneration,
+      fromThreadId: from,
+      text: [
+        `[Your ${label.toLowerCase()} "${name}" didn't run] (${row.schedule_id})`,
+        ...facts,
+        "You set it up, so it's yours to handle; Stella was told too.",
+        "",
+        instructions,
+      ].join("\n"),
+    });
+  }
 };
 
 const INTERRUPTED_RUN = "This run was cut off before it finished starting.";
@@ -1388,6 +1771,7 @@ const runFire = async (
   if (!snapshot.writable) {
     finishFire(ctx, scheduleId, fireId, {
       error: "This run was skipped: your cloud account isn't accepting work right now.",
+      quiet: true,
     });
     return;
   }
@@ -1441,7 +1825,7 @@ const runFire = async (
     fireId,
     snapshot.ownerGeneration,
     {
-      prompt: `${fallback}${row.prompt}${late}`,
+      prompt: `${fallback}${row.prompt}${late}${retryNote(row)}`,
       ...(toRoute(row.route) === "agent" && !row.target_thread_id
         ? { agent: { description: row.description } }
         : {}),
@@ -1452,8 +1836,14 @@ const runFire = async (
     await waitForComputer(ctx, row, fireId, placement.device);
     return;
   }
-  finishFire(ctx, scheduleId, fireId, started.ok ? {} : started.outcome);
+  finishFire(ctx, scheduleId, fireId, started.ok ? { tracked: started.tracked } : started.outcome);
 };
+
+/** A retry's run says so: its first try never started, so nothing of it was done. */
+const retryNote = (row: Row): string =>
+  row.retry_of && row.retry_attempt
+    ? `\n\n(Try ${row.retry_attempt}: the earlier try never started${row.last_error ? ` (${row.last_error})` : ""}, so nothing of it was done.)`
+    : "";
 
 /** Where a scheduled run goes: anywhere (today's routing), or only to a computer. */
 type Placement =
@@ -1576,15 +1966,18 @@ const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string): boolea
     return true;
   } catch (error) {
     if (!(error instanceof RpcError) || error.code !== "RATE_LIMITED") throw error;
+    // Not told: with many schedules it would wake Stella for every skipped
+    // run; the schedule shows it as its last error.
     finishFire(ctx, scheduleId, fireId, {
       error: `This run was skipped: today's ${budget.count} scheduled runs on the ${planLabel(budget.plan)} plan are used up.`,
+      quiet: true,
     });
     return false;
   }
 };
 
 type StartOutcome =
-  | { ok: true }
+  | { ok: true; tracked: boolean }
   | { ok: false; computerAway: boolean; outcome: { error: string; retry?: { sameFire: boolean } } };
 
 const startRun = async (
@@ -1600,7 +1993,12 @@ const startRun = async (
   if (!row.conversation_id) {
     ctx.db.run("UPDATE schedules SET conversation_id = ? WHERE schedule_id = ?", conversationId, scheduleId);
   }
-  const targetDeviceId = placement.computerOnly ? placement.device?.deviceId : row.target_device_id;
+  const ownDeviceId = placement.computerOnly ? placement.device?.deviceId : row.target_device_id;
+  const targetDeviceId = run.agent
+    ? ownDeviceId
+    : await whereStellaRuns(ctx, { conversationId, ownerGeneration, fallback: ownDeviceId ?? undefined, placement });
+  const tracked = Boolean(targetDeviceId);
+  if (tracked) recordRun(ctx, row, fireId);
   const start = async (id: string) =>
     await ctx.host.startScheduledTurn({
       ownerGeneration,
@@ -1609,7 +2007,9 @@ const startRun = async (
       prompt: run.prompt,
       title: row.description,
       ...(targetDeviceId ? { targetDeviceId } : {}),
-      ...(placement.computerOnly ? { computerOnly: { ownDevice: placement.ownDevice } } : {}),
+      ...(placement.computerOnly
+        ? { computerOnly: { ownDevice: placement.ownDevice && targetDeviceId === placement.device?.deviceId } }
+        : {}),
       ...(run.agent ? { agent: run.agent } : {}),
     });
   try {
@@ -1625,6 +2025,7 @@ const startRun = async (
       }
     }
   } catch (error) {
+    if (tracked) runNotHandedOver(ctx, fireId);
     const message = error instanceof Error ? error.message : String(error);
     const definite = error instanceof ScheduledTurnError;
     return {
@@ -1636,7 +2037,41 @@ const startRun = async (
       },
     };
   }
-  return { ok: true };
+  if (row.retry_of !== null) {
+    ctx.db.run(
+      "UPDATE schedules SET retry_of = NULL, retry_attempt = NULL WHERE schedule_id = ? AND retry_of = ?",
+      scheduleId,
+      row.retry_of,
+    );
+  }
+  if (tracked) runHandedOver(ctx, fireId);
+  return { ok: true, tracked };
+};
+
+/**
+ * Where a run for Stella goes: to the computer her conversation runs on, or
+ * the cloud when it runs there. A computer that doesn't hold the
+ * conversation can't run a turn of it (its turn is refused and stopped at
+ * once), so the schedule's own computer is only the fallback for a
+ * conversation that runs nowhere yet. A computer-only plan never starts one
+ * in the cloud.
+ */
+const whereStellaRuns = async (
+  ctx: OwnerContext,
+  args: { conversationId: string; ownerGeneration: string; fallback: string | undefined; placement: Placement },
+): Promise<string | undefined> => {
+  const target = await ctx.host
+    .agentReportTarget({ conversationId: args.conversationId, ownerGeneration: args.ownerGeneration })
+    .catch((error: unknown) => {
+      log("error", "schedule_brain_lookup_failed", {
+        conversationId: args.conversationId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    });
+  if (target?.kind === "device") return resolveCurrentDeviceId(ctx.db, target.deviceId);
+  if (target?.kind === "cloud" && !args.placement.computerOnly) return undefined;
+  return args.fallback;
 };
 
 type ThreadSend =
@@ -1768,7 +2203,7 @@ const fireWatch = async (
         scheduleId,
       );
       if (current.repair_sent_at !== null) {
-        finishFire(ctx, scheduleId, fireId, { error: run.error });
+        finishFire(ctx, scheduleId, fireId, { error: run.error, quiet: true });
         return;
       }
       failure = run.error;
@@ -1799,6 +2234,7 @@ const fireWatch = async (
     }
     if (sent.kind === "fallback") fallback = `${sent.note}\n\n`;
   }
+  let tracked = false;
   if (!row.target_thread_id || fallback) {
     const placement = await placementOf(ctx, row);
     if (placement.away) {
@@ -1828,6 +2264,7 @@ const fireWatch = async (
       finishFire(ctx, scheduleId, fireId, started.outcome);
       return;
     }
+    tracked = started.tracked;
   }
   if (found) {
     ctx.db.run("UPDATE schedules SET pending_finding = NULL WHERE schedule_id = ?", scheduleId);
@@ -1838,7 +2275,45 @@ const fireWatch = async (
       scheduleId,
     );
   }
-  finishFire(ctx, scheduleId, fireId, failure ? { error: failure } : { last: Boolean(found) && row.once === 1 });
+  finishFire(
+    ctx,
+    scheduleId,
+    fireId,
+    failure ? { error: failure, quiet: true } : { last: Boolean(found) && row.once === 1, tracked },
+  );
+};
+
+const tellStellaArgs = object({
+  conversationId: string({ max: 128, pattern: ID_PATTERN }),
+  noteId: string({ max: 64, pattern: /^[A-Za-z0-9._:-]{8,64}$/u }),
+  text: string({ max: 16_000 }),
+});
+
+/**
+ * A computer's own schedule (a watch whose check needs that computer) speaks
+ * to Stella through here when she isn't running on that computer: queued like
+ * an agent's message, it reaches the computer or cloud that runs her.
+ */
+const tellStella = async (
+  ctx: OwnerContext,
+  args: ScheduleCalls["schedules.tellStella"]["args"],
+): Promise<{ queued: boolean }> => {
+  const live = ctx.db.one<{ conversation_id: string }>(
+    "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
+    args.conversationId,
+  );
+  if (!live) throw new RpcError("NOT_FOUND", "That conversation is gone.");
+  const text = args.text.trim();
+  if (!text) bad("A message for Stella needs text.");
+  const snapshot = await ctx.host.snapshot();
+  queueStellaNote(ctx, {
+    noteId: args.noteId,
+    conversationId: args.conversationId,
+    ownerGeneration: snapshot.ownerGeneration,
+    fromThreadId: `schedule:${args.noteId}`.slice(0, 128),
+    text,
+  });
+  return { queued: true };
 };
 
 const createArgs = object({
@@ -1853,6 +2328,7 @@ const createArgs = object({
   targetThreadId: optional(string({ max: 128, pattern: ID_PATTERN })),
   script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
   once: optional(boolean()),
+  createdByThreadId: optional(string({ max: 128, pattern: ID_PATTERN })),
 });
 
 const updateArgs = object({
@@ -1886,6 +2362,7 @@ export const schedulesDomain = {
     SCHEDULES_WAITING_MIGRATION,
     SCHEDULES_RUN_STATE_MIGRATION,
     SCHEDULES_TARGET_THREAD_MIGRATION,
+    SCHEDULES_RUNS_MIGRATION,
   ],
   views: {
     "schedules.list": {
@@ -1944,10 +2421,17 @@ export const schedulesDomain = {
       parse: zoneArgs,
       handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.reportZone"]["args"]) => reportZone(ctx, args),
     },
+    "schedules.tellStella": {
+      scope: "owner",
+      parse: tellStellaArgs,
+      handler: async (ctx: OwnerContext, args: ScheduleCalls["schedules.tellStella"]["args"]) =>
+        await tellStella(ctx, args),
+    },
   },
   internal: {
     "schedules.tool": (ctx: OwnerContext, args: unknown) => scheduleTool(ctx, args),
     "schedules.computerBack": (ctx: OwnerContext, args: unknown) => computerBack(ctx, args),
+    "schedules.runSettled": (ctx: OwnerContext, args: unknown) => runSettled(ctx, args),
   },
   jobs: {
     [SCHEDULE_FIRE_JOB]: {
@@ -1962,6 +2446,10 @@ export const schedulesDomain = {
       run: postNotice,
       maxAttempts: 5,
     },
+    [SCHEDULE_FAILED_JOB]: {
+      run: tellFailed,
+      maxAttempts: 8,
+    },
   },
   purge: (ctx) => {
     for (const { schedule_id } of ctx.db.all<{ schedule_id: string }>("SELECT schedule_id FROM schedules")) {
@@ -1973,6 +2461,7 @@ export const schedulesDomain = {
       ctx.jobs.cancel(reminderReturnJobId(fire_id));
     }
     ctx.db.run("DELETE FROM schedules");
+    ctx.db.run("DELETE FROM schedule_runs");
     ctx.db.run("DELETE FROM schedule_receipts");
     ctx.db.run("DELETE FROM reminder_fires");
     ctx.db.run("DELETE FROM schedule_zone");

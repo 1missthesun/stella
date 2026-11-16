@@ -103,6 +103,8 @@ export type LocalCronJobRecord = {
   runsOn?: 'computer'
   /** A run came due while its computer was away and runs once the computer is back. */
   waitingSinceMs?: number
+  /** Stella was told its runs fail; cleared by the next run that works, so a failing streak tells once. */
+  failureToldAtMs?: number
   createdAt: number
   updatedAt: number
 }
@@ -152,6 +154,8 @@ export type LocalCronJobCreateInput = {
   enabled?: boolean
   deliver?: boolean
   deleteAfterRun?: boolean
+  /** The agent that set it up: it hears too when a run fails. */
+  createdByThreadId?: string
 }
 
 export type LocalCronJobUpdatePatch = {

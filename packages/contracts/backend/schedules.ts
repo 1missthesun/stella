@@ -67,8 +67,19 @@ export type ScheduleCalls = {
       targetThreadId?: string;
       script?: string;
       once?: boolean;
+      /** The agent that set it up: it hears too when a run fails. */
+      createdByThreadId?: string;
     };
     result: ScheduleRow & { check?: WatchCheckResult };
+  };
+  /**
+   * A message for Stella in a conversation, from a schedule that lives on a
+   * computer: it reaches her wherever the conversation runs (another
+   * computer or the cloud), like an agent's message would.
+   */
+  "schedules.tellStella": {
+    args: { conversationId: string; noteId: string; text: string };
+    result: { queued: boolean };
   };
   "schedules.update": {
     args: {

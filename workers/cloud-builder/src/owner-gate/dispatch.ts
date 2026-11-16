@@ -55,6 +55,14 @@ import {
 } from "./support.js";
 import { OwnerGateDeviceSockets } from "./device-sockets.js";
 
+
+/**
+ * States a dispatch ends from without anything having run: still offered, or
+ * claimed but not yet accepted. From any later state the executor may have
+ * begun, even if the gate never heard "running".
+ */
+const NEVER_STARTED_STATES: ReadonlySet<DispatchState> = new Set<DispatchState>(["offering", "computer_claimed"]);
+
 export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
   protected dispatchRow(dispatchId: string): DispatchRow | undefined {
     return this.ctx.storage.sql
@@ -125,6 +133,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     if (options.notifyExecutor !== false) this.notifyExecutor(next);
     if (!isTerminalDispatchState(from) && isTerminalDispatchState(to)) {
       await this.reportDeviceAgentSettled(next);
+      await this.reportScheduledRunSettled(next, from);
     }
     return { applied: true, row: next };
   }
@@ -159,6 +168,33 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     );
     if (!response.ok) {
       log("error", "device_agent_settle_failed", {
+        dispatchId: row.dispatch_id,
+        message: response.error.message,
+      });
+    }
+  }
+
+  /**
+   * A schedule's run ends here, not when the schedule handed it over: the
+   * schedule hears how it ended so a failed run is retried or reported,
+   * never dropped.
+   */
+  protected async reportScheduledRunSettled(row: DispatchRow, from: DispatchState): Promise<void> {
+    if (row.ingress !== "schedule") return;
+    const response = await this.ownerStore().internalCall("schedules.runSettled", {
+      clientMsgId: row.idempotency_key,
+      state: row.state,
+      // Whether it got as far as running anywhere: a run that never started
+      // did nothing, so running it again is safe.
+      started: row.started_at !== null || !NEVER_STARTED_STATES.has(from),
+      ...(row.executor_device_id ? { deviceId: row.executor_device_id } : {}),
+      ...(row.error_code ? { errorCode: row.error_code } : {}),
+      ...(row.error_message ? { errorMessage: row.error_message.slice(0, 2_000) } : {}),
+      // Canceled by request (Stop, a cancel) rather than ended by the executor.
+      ...(row.state === "canceled" && row.cancel_request_id ? { onPurpose: true } : {}),
+    });
+    if (!response.ok) {
+      log("error", "scheduled_run_settle_failed", {
         dispatchId: row.dispatch_id,
         message: response.error.message,
       });

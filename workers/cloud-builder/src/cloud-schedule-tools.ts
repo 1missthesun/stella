@@ -329,6 +329,7 @@ export const createCloudScheduleTools = (
               asTrimmedString(args.conversationId) || context.conversationId,
             schedule,
             ...watch,
+            ...(kind !== "reminder" && context.threadId ? { createdByThreadId: context.threadId } : {}),
           },
           toolCallId,
           signal,

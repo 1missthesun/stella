@@ -304,6 +304,7 @@ export const handleScheduleAdd = async (
     ...(typeof args.deleteAfterRun === "boolean"
       ? { deleteAfterRun: args.deleteAfterRun }
       : {}),
+    ...(callerThreadId(context) ? { createdByThreadId: callerThreadId(context) } : {}),
   });
   return {
     result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${targetNote(record, context)}${watchCheckNote(record)}${whereNote(record)}`,

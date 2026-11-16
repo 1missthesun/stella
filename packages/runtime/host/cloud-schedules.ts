@@ -90,6 +90,7 @@ export const createCloudSchedules = (options: {
       ...(description ? { description } : {}),
       ...(input.conversationId ? { conversationId: input.conversationId } : {}),
       ...(deviceId ? { targetDeviceId: deviceId } : {}),
+      ...(input.createdByThreadId ? { createdByThreadId: input.createdByThreadId } : {}),
     });
     if (input.enabled === false) {
       return (await update(row.scheduleId, { enabled: false })) ?? toCronJob(row);

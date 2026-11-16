@@ -270,6 +270,34 @@ export const verifyMobilePairingProof = async (input: {
   };
 };
 
+/**
+ * Whether each DispatchPayload field crosses the wire. The gate stores and
+ * forwards exactly the canonical bytes below, so a field they leave out is
+ * dropped in transit without a trace (a schedule's `scheduledAgent` was, and
+ * its runs went to the wrong place). Adding a field to DispatchPayload fails
+ * the typecheck here until it is decided; `true` must also be written below.
+ */
+export const DISPATCH_PAYLOAD_WIRE_FIELDS = {
+  schemaVersion: true,
+  prompt: true,
+  conversationId: true,
+  clientMsgId: true,
+  userMessageEventId: true,
+  locale: true,
+  attachments: true,
+  context: true,
+  execution: true,
+  description: true,
+  threadId: true,
+  model: true,
+  handoff: true,
+  scheduledAgent: true,
+  // Not carried yet (nor parsed from a computer's request): a computer runs
+  // a placed agent at depth 1 with no starter. Carrying it changes how placed
+  // helpers run, so it waits for its own change.
+  lineage: false,
+} as const satisfies Record<keyof DispatchPayload, boolean>;
+
 export const canonicalDispatchPayloadJson = (
   payload: DispatchPayload,
 ): string =>
@@ -309,5 +337,8 @@ export const canonicalDispatchPayloadJson = (
     ...(payload.threadId ? { threadId: payload.threadId } : {}),
     ...(payload.model ? { model: payload.model } : {}),
     ...(payload.handoff === true ? { handoff: true } : {}),
+    ...(payload.scheduledAgent?.description
+      ? { scheduledAgent: { description: payload.scheduledAgent.description } }
+      : {}),
   });
 

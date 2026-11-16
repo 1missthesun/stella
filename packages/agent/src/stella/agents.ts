@@ -974,6 +974,8 @@ export function stellaAgents(host: StellaAgentsHost) {
             waitedFor !== undefined
               ? await stellaRoute({ snapshot: runtime.snapshot.bind(runtime), conversationId: agentConversationId }, context).catch(() => undefined)
               : undefined;
+          // How Stella's messages name her here, to tell her from a lead.
+          const stellaThread = waitedFor !== undefined ? await host.directory?.conversationId(context).catch(() => undefined) : undefined;
           await runtime.commit(async (tx) => {
             const finished =
               settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
@@ -1025,21 +1027,37 @@ export function stellaAgents(host: StellaAgentsHost) {
               agent.reported.push(settled.answer);
               agent.waiting = { waitingFor: waitedFor, at: Date.now() };
               const starter = await unansweredStarter(tx, agentConversationId, `agent-msg:${reporter.id}`, settled.answer);
+              // Who asked decides where the reply goes, not this agent's depth
+              // here: an agent started from another host (the cloud, another
+              // computer) is a top-level agent on this one, whoever its lead is.
+              const fromStella =
+                starter !== undefined &&
+                (starter.threadId.toLowerCase() === STELLA_MESSAGE_TARGET || starter.threadId === stellaThread);
               const reply =
-                starter && replyRoute?.root === runtime.conversationId
+                fromStella && replyRoute?.root === runtime.conversationId
                   ? waitingReplyNote(replyRoute, settled.answer, textOf(answer), waitedFor)
                   : undefined;
               if (reply) notes.send.push(reply);
-              // A helper whose lead (this conversation's agent) messaged it gets
-              // the same guarantee: its last words reach the lead as its reply,
-              // the way a helper's message to its lead goes.
-              if (
-                starter &&
+              // A helper whose lead messaged it gets the same guarantee: its last
+              // words reach the lead as its reply, the way a helper's message to
+              // its lead goes. Here when the lead is this conversation's agent,
+              // through the directory when the lead runs on another host.
+              const localLead =
+                starter !== undefined &&
                 self.agentType !== "orchestrator" &&
                 self.parentConversationId !== undefined &&
                 self.threadId !== undefined &&
-                starter.threadId === self.threadId
-              ) {
+                starter.threadId === self.threadId;
+              if (starter && !fromStella && !localLead && host.directory) {
+                notes.send.push({
+                  callId: `waiting-reply:${settled.answer}`,
+                  key: `waiting-reply:${threadId}:${settled.answer}`,
+                  message: boundedReply(textOf(answer), waitedFor),
+                  from: { threadId, label: description },
+                  to: starter.threadId,
+                });
+              }
+              if (localLead && self.threadId !== undefined && self.parentConversationId !== undefined) {
                 await tx.createTask(
                   Reporter,
                   {
@@ -1630,6 +1648,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     context: Context,
     open?: (id: ConversationId) => Promise<Pick<ConversationHandle, "submit"> | undefined>,
   ): Promise<boolean | AgentMessageDelivery> => {
+    if (note.to !== undefined) {
+      if (!host.directory) return false;
+      const delivery = await host.directory.message({ key: note.key, to: note.to, text: note.message, from: note.from }, context);
+      return delivery ?? false;
+    }
     if (note.remote) {
       if (!host.directory) return false;
       const delivery = await host.directory.message(

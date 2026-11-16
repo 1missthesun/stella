@@ -23,6 +23,8 @@ export type StellaPendingNote = {
   message: string;
   from: { threadId: string; label: string };
   remote?: true;
+  /** Goes to this agent (a lead on another host) instead of Stella. */
+  to?: string;
 };
 
 export const StellaAgentDoc = defineDoc<StellaAgentRole>({

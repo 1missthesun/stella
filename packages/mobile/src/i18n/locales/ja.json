@@ -3118,11 +3118,15 @@
         "signOutTitle": "Stella からサインアウトしますか？"
       },
       "feedback": {
-        "description": "メッセージは匿名で送信され、アカウントとは結び付けられません。",
+        "contactLabel": "メールアドレス（任意）",
+        "contactPlaceholder": "you@example.com",
+        "description": "返信できるよう、アカウントのメールアドレスと一緒に Stella チームに届きます。",
+        "descriptionSignedOut": "Stella チームに届きます。返信をご希望の場合はメールアドレスを入力してください。",
         "fieldLabel": "フィードバック",
         "placeholder": "うまくいっていること、いないこと、こうなってほしいことを教えてください…",
         "send": "送信",
         "sending": "送信中…",
+        "sentWith": "一緒に送信される情報: {details}",
         "title": "フィードバックを送る",
         "toasts": {
           "failedTitle": "フィードバックを送信できませんでした",

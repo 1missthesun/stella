@@ -3118,11 +3118,15 @@
         "signOutTitle": "退出 Stella 登录？"
       },
       "feedback": {
-        "description": "你的留言以匿名方式发送 — 不会与你的账户关联。",
+        "contactLabel": "你的邮箱（选填）",
+        "contactPlaceholder": "you@example.com",
+        "description": "会连同你的账户邮箱一起发送给 Stella 团队，方便我们回复你。",
+        "descriptionSignedOut": "会发送给 Stella 团队。如需回复，请留下你的邮箱。",
         "fieldLabel": "反馈",
         "placeholder": "告诉我们哪些好用、哪些不好用，或你希望看到什么…",
         "send": "发送",
         "sending": "正在发送…",
+        "sentWith": "一并发送：{details}",
         "title": "发送反馈",
         "toasts": {
           "failedTitle": "无法发送反馈",

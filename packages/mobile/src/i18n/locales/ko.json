@@ -3118,11 +3118,15 @@
         "signOutTitle": "Stella에서 로그아웃할까요?"
       },
       "feedback": {
-        "description": "메시지는 익명으로 전송되며 계정과 연결되지 않습니다.",
+        "contactLabel": "이메일 (선택 사항)",
+        "contactPlaceholder": "you@example.com",
+        "description": "답장할 수 있도록 계정 이메일과 함께 Stella 팀에 전달됩니다.",
+        "descriptionSignedOut": "Stella 팀에 전달됩니다. 답장을 원하시면 이메일을 입력하세요.",
         "fieldLabel": "피드백",
         "placeholder": "잘 되는 점, 아쉬운 점, 바라는 점을 알려 주세요…",
         "send": "보내기",
         "sending": "보내는 중…",
+        "sentWith": "함께 전송: {details}",
         "title": "피드백 보내기",
         "toasts": {
           "failedTitle": "피드백을 보내지 못했습니다",

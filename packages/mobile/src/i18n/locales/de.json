@@ -3136,11 +3136,15 @@
         "signOutTitle": "Von Stella abmelden?"
       },
       "feedback": {
-        "description": "Deine Nachricht wird anonym gesendet — sie ist nicht mit deinem Konto verknüpft.",
+        "contactLabel": "Deine E-Mail-Adresse (optional)",
+        "contactPlaceholder": "du@example.com",
+        "description": "Geht an das Stella-Team, zusammen mit der E-Mail-Adresse deines Kontos, damit wir antworten können.",
+        "descriptionSignedOut": "Geht an das Stella-Team. Gib deine E-Mail-Adresse an, wenn du eine Antwort möchtest.",
         "fieldLabel": "Feedback",
         "placeholder": "Sag uns, was funktioniert, was nicht, oder was du dir wünschst…",
         "send": "Senden",
         "sending": "Wird gesendet…",
+        "sentWith": "Wird mitgesendet: {details}",
         "title": "Feedback senden",
         "toasts": {
           "failedTitle": "Feedback konnte nicht gesendet werden",

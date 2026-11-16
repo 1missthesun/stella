@@ -3136,11 +3136,15 @@
         "signOutTitle": "Stella oturumu kapatılsın mı?"
       },
       "feedback": {
-        "description": "Mesajınız anonim olarak gönderilir — hesabınızla ilişkilendirilmez.",
+        "contactLabel": "E-posta adresin (isteğe bağlı)",
+        "contactPlaceholder": "sen@example.com",
+        "description": "Yanıt verebilmemiz için hesabının e-posta adresiyle birlikte Stella ekibine iletilir.",
+        "descriptionSignedOut": "Stella ekibine iletilir. Yanıt istersen e-posta adresini ekle.",
         "fieldLabel": "Geri bildirim",
         "placeholder": "Neyin işe yaradığını, neyin yaramadığını veya ne görmek istediğinizi anlatın…",
         "send": "Gönder",
         "sending": "Gönderiliyor…",
+        "sentWith": "Birlikte gönderilenler: {details}",
         "title": "Geri bildirim gönder",
         "toasts": {
           "failedTitle": "Geri bildirim gönderilemedi",

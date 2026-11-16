@@ -3118,11 +3118,15 @@
         "signOutTitle": "Keluar dari Stella?"
       },
       "feedback": {
-        "description": "Pesan Anda dikirim secara anonim — tidak terkait dengan akun Anda.",
+        "contactLabel": "Emailmu (opsional)",
+        "contactPlaceholder": "kamu@example.com",
+        "description": "Dikirim ke tim Stella beserta email akunmu, agar kami bisa membalas.",
+        "descriptionSignedOut": "Dikirim ke tim Stella. Tambahkan emailmu jika ingin dibalas.",
         "fieldLabel": "Masukan",
         "placeholder": "Ceritakan apa yang sudah bagus, apa yang belum, atau apa yang ingin Anda lihat…",
         "send": "Kirim",
         "sending": "Mengirim…",
+        "sentWith": "Dikirim bersama: {details}",
         "title": "Kirim masukan",
         "toasts": {
           "failedTitle": "Tidak dapat mengirim masukan",

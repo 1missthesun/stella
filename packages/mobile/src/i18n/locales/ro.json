@@ -3152,11 +3152,15 @@
         "signOutTitle": "Te deconectezi de la Stella?"
       },
       "feedback": {
-        "description": "Mesajul tău este trimis anonim — nu este legat de contul tău.",
+        "contactLabel": "E-mailul tău (opțional)",
+        "contactPlaceholder": "tu@exemplu.com",
+        "description": "Ajunge la echipa Stella împreună cu adresa de e-mail a contului tău, ca să-ți putem răspunde.",
+        "descriptionSignedOut": "Ajunge la echipa Stella. Adaugă adresa ta de e-mail dacă vrei un răspuns.",
         "fieldLabel": "Feedback",
         "placeholder": "Spune-ne ce funcționează, ce nu sau ce ți-ar plăcea să vezi…",
         "send": "Trimite",
         "sending": "Se trimite…",
+        "sentWith": "Se trimite cu: {details}",
         "title": "Trimite feedback",
         "toasts": {
           "failedTitle": "Feedbackul nu a putut fi trimis",

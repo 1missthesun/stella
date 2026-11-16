@@ -3118,11 +3118,15 @@
         "signOutTitle": "ออกจากระบบ Stella หรือไม่"
       },
       "feedback": {
-        "description": "ข้อความของคุณถูกส่งแบบไม่ระบุตัวตน — ไม่เชื่อมโยงกับบัญชีของคุณ",
+        "contactLabel": "อีเมลของคุณ (ไม่บังคับ)",
+        "contactPlaceholder": "you@example.com",
+        "description": "ส่งถึงทีม Stella พร้อมอีเมลบัญชีของคุณ เพื่อให้เราตอบกลับได้",
+        "descriptionSignedOut": "ส่งถึงทีม Stella ใส่อีเมลของคุณหากต้องการให้เราตอบกลับ",
         "fieldLabel": "ความคิดเห็น",
         "placeholder": "บอกเราว่าอะไรใช้ได้ดี อะไรยังไม่ดี หรืออยากเห็นอะไรเพิ่ม…",
         "send": "ส่ง",
         "sending": "กำลังส่ง…",
+        "sentWith": "ส่งไปพร้อมกับ: {details}",
         "title": "ส่งความคิดเห็น",
         "toasts": {
           "failedTitle": "ส่งความคิดเห็นไม่สำเร็จ",

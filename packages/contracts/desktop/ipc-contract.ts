@@ -392,6 +392,7 @@ import {
   IPC_ANONYMOUS_COUNTS_GET,
   IPC_ANONYMOUS_COUNTS_SET,
   IPC_ANONYMOUS_COUNTS_RECORD,
+  IPC_APP_RELEASE_INFO,
   IPC_PREFERENCES_SET_WAKE_WORD,
   IPC_PREFERENCES_WAKE_WORD_CHANGED,
   IPC_PROMPT_PRESETS_DELETE,
@@ -1166,6 +1167,7 @@ export type IpcInvokeContract = {
     DesktopAnonymousCountsState
   >;
   [IPC_ANONYMOUS_COUNTS_RECORD]: Invoke<[request: AnonymousCountRequest], void>;
+  [IPC_APP_RELEASE_INFO]: Invoke<[], { appVersion: string; platform: string }>;
   [IPC_PREFERENCES_GET_READ_ALOUD]: Invoke<[], boolean>;
   [IPC_PREFERENCES_SET_READ_ALOUD]: Invoke<
     [enabled: boolean],

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,6 +10,20 @@ import type { SourceTools } from "./tools.js";
 
 const toPosix = (value: string) => value.replace(/\\/g, "/");
 const ASSETS = "assets";
+
+const sourceCommit = (cwd: string): string => {
+  try {
+    const commit = execFileSync("git", ["rev-parse", "--short=12", "HEAD"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 10_000,
+    }).trim();
+    return /^[0-9a-f]{7,40}$/.test(commit) ? `web+s${commit}` : "";
+  } catch {
+    return "";
+  }
+};
 
 export const webBuildEnv = (
   uiRoot: string,
@@ -30,9 +45,11 @@ export const webBuildEnv = (
     throw new Error("Configure the Stella backend and Apps host origins.");
   }
   const webUrl = (pick("STELLA_WEB_URL") || processEnv.NEXT_PUBLIC_STELLA_SITE_URL || "").trim();
+  const webVersion = pick("STELLA_WEB_VERSION") || sourceCommit(uiRoot);
   return {
     ...base,
     ...(webUrl ? { VITE_STELLA_WEB_URL: webUrl } : {}),
+    ...(webVersion ? { VITE_STELLA_WEB_VERSION: webVersion } : {}),
     VITE_STELLA_WEB_BUILD: "1",
     VITE_STELLA_BACKEND_URL: backendUrl,
     VITE_TURNSTILE_SITE_KEY: pick("TURNSTILE_SITE_KEY"),

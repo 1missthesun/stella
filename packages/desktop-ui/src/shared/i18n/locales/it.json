@@ -3152,11 +3152,15 @@
         "signOutTitle": "Uscire da Stella?"
       },
       "feedback": {
-        "description": "Il tuo messaggio viene inviato in forma anonima: non è collegato al tuo account.",
+        "contactLabel": "La tua email (facoltativa)",
+        "contactPlaceholder": "tu@esempio.com",
+        "description": "Arriva al team di Stella con l'email del tuo account, così possiamo risponderti.",
+        "descriptionSignedOut": "Arriva al team di Stella. Aggiungi la tua email se vuoi una risposta.",
         "fieldLabel": "Feedback",
         "placeholder": "Raccontaci cosa funziona, cosa no, o cosa ti piacerebbe vedere…",
         "send": "Invia",
         "sending": "Invio…",
+        "sentWith": "Inviato con: {details}",
         "title": "Invia feedback",
         "toasts": {
           "failedTitle": "Impossibile inviare il feedback",

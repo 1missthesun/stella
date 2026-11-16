@@ -3136,11 +3136,15 @@
         "signOutTitle": "Αποσύνδεση από τη Stella;"
       },
       "feedback": {
-        "description": "Το μήνυμά σας αποστέλλεται ανώνυμα — δεν συνδέεται με τον λογαριασμό σας.",
+        "contactLabel": "Το email σου (προαιρετικό)",
+        "contactPlaceholder": "esy@example.com",
+        "description": "Πηγαίνει στην ομάδα του Stella μαζί με το email του λογαριασμού σου, ώστε να μπορούμε να απαντήσουμε.",
+        "descriptionSignedOut": "Πηγαίνει στην ομάδα του Stella. Πρόσθεσε το email σου αν θέλεις απάντηση.",
         "fieldLabel": "Σχόλια",
         "placeholder": "Πείτε μας τι λειτουργεί, τι όχι, ή τι θα θέλατε να δείτε…",
         "send": "Αποστολή",
         "sending": "Αποστολή…",
+        "sentWith": "Αποστέλλεται μαζί με: {details}",
         "title": "Αποστολή σχολίων",
         "toasts": {
           "failedTitle": "Δεν ήταν δυνατή η αποστολή σχολίων",

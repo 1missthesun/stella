@@ -3152,11 +3152,15 @@
         "signOutTitle": "להתנתק מ-Stella?"
       },
       "feedback": {
-        "description": "ההודעה שלך נשלחת באופן אנונימי — היא אינה מקושרת לחשבון שלך.",
+        "contactLabel": "האימייל שלך (רשות)",
+        "contactPlaceholder": "you@example.com",
+        "description": "נשלח לצוות של Stella יחד עם כתובת האימייל של החשבון שלך, כדי שנוכל להשיב.",
+        "descriptionSignedOut": "נשלח לצוות של Stella. הוסיפו את האימייל שלכם אם תרצו תשובה.",
         "fieldLabel": "משוב",
         "placeholder": "ספר לנו מה עובד, מה לא, או מה היית רוצה לראות…",
         "send": "שלח",
         "sending": "שולח…",
+        "sentWith": "נשלח עם: {details}",
         "title": "שלח משוב",
         "toasts": {
           "failedTitle": "לא ניתן היה לשלוח משוב",

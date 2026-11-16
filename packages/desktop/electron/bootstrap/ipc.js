@@ -316,6 +316,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerAnonymousCountsHandlers({
         counts: services.anonymousCounts,
+        getStellaAppDir: lifecycle.getStellaAppDir,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerScheduleHandlers({

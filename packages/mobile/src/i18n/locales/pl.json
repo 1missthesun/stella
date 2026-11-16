@@ -3168,11 +3168,15 @@
         "signOutTitle": "Wylogować się ze Stelli?"
       },
       "feedback": {
-        "description": "Twoja wiadomość jest wysyłana anonimowo — nie jest powiązana z Twoim kontem.",
+        "contactLabel": "Twój e-mail (opcjonalnie)",
+        "contactPlaceholder": "ty@example.com",
+        "description": "Trafia do zespołu Stella razem z adresem e-mail Twojego konta, abyśmy mogli odpowiedzieć.",
+        "descriptionSignedOut": "Trafia do zespołu Stella. Dodaj swój e-mail, jeśli chcesz otrzymać odpowiedź.",
         "fieldLabel": "Opinia",
         "placeholder": "Napisz, co działa, co nie, albo co chciałbyś zobaczyć…",
         "send": "Wyślij",
         "sending": "Wysyłanie…",
+        "sentWith": "Wysyłane razem z: {details}",
         "title": "Wyślij opinię",
         "toasts": {
           "failedTitle": "Nie udało się wysłać opinii",

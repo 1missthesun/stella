@@ -3136,11 +3136,15 @@
         "signOutTitle": "Kijelentkezel a Stellából?"
       },
       "feedback": {
-        "description": "Az üzeneted névtelenül érkezik – nem kapcsolódik a fiókodhoz.",
+        "contactLabel": "E-mail-címed (nem kötelező)",
+        "contactPlaceholder": "te@example.com",
+        "description": "A Stella csapatához kerül a fiókod e-mail-címével együtt, hogy válaszolhassunk.",
+        "descriptionSignedOut": "A Stella csapatához kerül. Add meg az e-mail-címed, ha választ szeretnél.",
         "fieldLabel": "Visszajelzés",
         "placeholder": "Írd meg, mi működik, mi nem, vagy mit szeretnél látni…",
         "send": "Küldés",
         "sending": "Küldés…",
+        "sentWith": "Mellékelve: {details}",
         "title": "Visszajelzés küldése",
         "toasts": {
           "failedTitle": "Nem sikerült elküldeni a visszajelzést",

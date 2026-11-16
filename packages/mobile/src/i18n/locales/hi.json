@@ -3136,11 +3136,15 @@
         "signOutTitle": "Stella से साइन आउट करें?"
       },
       "feedback": {
-        "description": "आपका संदेश गुमनाम रूप से भेजा जाता है — यह आपके खाते से नहीं जुड़ता।",
+        "contactLabel": "आपका ईमेल (वैकल्पिक)",
+        "contactPlaceholder": "aap@example.com",
+        "description": "यह आपके अकाउंट के ईमेल के साथ Stella टीम तक पहुँचता है, ताकि हम जवाब दे सकें।",
+        "descriptionSignedOut": "यह Stella टीम तक पहुँचता है। जवाब चाहिए तो अपना ईमेल जोड़ें।",
         "fieldLabel": "प्रतिक्रिया",
         "placeholder": "बताएँ कि क्या अच्छा चल रहा है, क्या नहीं, या आप क्या देखना चाहेंगे…",
         "send": "भेजें",
         "sending": "भेजा जा रहा है…",
+        "sentWith": "साथ में भेजा जाता है: {details}",
         "title": "प्रतिक्रिया भेजें",
         "toasts": {
           "failedTitle": "प्रतिक्रिया नहीं भेजी जा सकी",

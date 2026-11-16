@@ -3152,11 +3152,15 @@
         "signOutTitle": "Sair da Stella?"
       },
       "feedback": {
-        "description": "Sua mensagem é enviada de forma anônima — não fica ligada à sua conta.",
+        "contactLabel": "Seu e-mail (opcional)",
+        "contactPlaceholder": "voce@exemplo.com",
+        "description": "Vai para a equipe do Stella com o e-mail da sua conta, para podermos responder.",
+        "descriptionSignedOut": "Vai para a equipe do Stella. Adicione seu e-mail se quiser uma resposta.",
         "fieldLabel": "Comentário",
         "placeholder": "Conte o que está funcionando, o que não está, ou o que você adoraria ver…",
         "send": "Enviar",
         "sending": "Enviando…",
+        "sentWith": "Enviado com: {details}",
         "title": "Enviar comentário",
         "toasts": {
           "failedTitle": "Não foi possível enviar o comentário",

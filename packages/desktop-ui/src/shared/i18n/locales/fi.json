@@ -3136,11 +3136,15 @@
         "signOutTitle": "Kirjaudutaanko ulos Stellasta?"
       },
       "feedback": {
-        "description": "Viestisi lähetetään nimettömänä — sitä ei yhdistetä tiliisi.",
+        "contactLabel": "Sähköpostiosoitteesi (valinnainen)",
+        "contactPlaceholder": "sina@example.com",
+        "description": "Menee Stella-tiimille tilisi sähköpostiosoitteen kanssa, jotta voimme vastata.",
+        "descriptionSignedOut": "Menee Stella-tiimille. Lisää sähköpostiosoitteesi, jos haluat vastauksen.",
         "fieldLabel": "Palaute",
         "placeholder": "Kerro, mikä toimii, mikä ei tai mitä haluaisit nähdä…",
         "send": "Lähetä",
         "sending": "Lähetetään…",
+        "sentWith": "Lähetetään mukana: {details}",
         "title": "Lähetä palautetta",
         "toasts": {
           "failedTitle": "Palautetta ei voitu lähettää",

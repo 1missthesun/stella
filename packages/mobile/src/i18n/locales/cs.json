@@ -3168,11 +3168,15 @@
         "signOutTitle": "Odhlásit se ze Stelly?"
       },
       "feedback": {
-        "description": "Vaše zpráva se odesílá anonymně — není spojena s vaším účtem.",
+        "contactLabel": "Váš e‑mail (nepovinné)",
+        "contactPlaceholder": "vy@example.com",
+        "description": "Zpráva dorazí týmu Stella spolu s e‑mailem vašeho účtu, abychom mohli odpovědět.",
+        "descriptionSignedOut": "Zpráva dorazí týmu Stella. Pokud chcete odpověď, přidejte svůj e‑mail.",
         "fieldLabel": "Zpětná vazba",
         "placeholder": "Napište, co funguje, co ne, nebo co byste rádi viděli…",
         "send": "Odeslat",
         "sending": "Odesílání…",
+        "sentWith": "Odesláno s: {details}",
         "title": "Odeslat zpětnou vazbu",
         "toasts": {
           "failedTitle": "Zpětnou vazbu se nepodařilo odeslat",

@@ -3136,11 +3136,15 @@
         "signOutTitle": "Vil du logge ud af Stella?"
       },
       "feedback": {
-        "description": "Din besked sendes anonymt — den kobles ikke til din konto.",
+        "contactLabel": "Din e-mail (valgfrit)",
+        "contactPlaceholder": "dig@example.com",
+        "description": "Sendes til Stella-teamet med din kontos e-mail, så vi kan svare.",
+        "descriptionSignedOut": "Sendes til Stella-teamet. Tilføj din e-mail, hvis du vil have svar.",
         "fieldLabel": "Feedback",
         "placeholder": "Fortæl os, hvad der virker, hvad der ikke gør, eller hvad du gerne vil se…",
         "send": "Send",
         "sending": "Sender…",
+        "sentWith": "Sendes med: {details}",
         "title": "Send feedback",
         "toasts": {
           "failedTitle": "Kunne ikke sende feedback",

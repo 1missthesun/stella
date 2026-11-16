@@ -252,6 +252,7 @@ export const IPC_PREFERENCES_SET_TELEMETRY =
 export const IPC_ANONYMOUS_COUNTS_GET = "anonymousCounts:get" as const;
 export const IPC_ANONYMOUS_COUNTS_SET = "anonymousCounts:set" as const;
 export const IPC_ANONYMOUS_COUNTS_RECORD = "anonymousCounts:record" as const;
+export const IPC_APP_RELEASE_INFO = "app:releaseInfo" as const;
 export const IPC_PREFERENCES_GET_READ_ALOUD =
   "preferences:getReadAloud" as const;
 export const IPC_PREFERENCES_SET_READ_ALOUD =

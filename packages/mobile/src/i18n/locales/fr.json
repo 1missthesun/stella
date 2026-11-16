@@ -3152,11 +3152,15 @@
         "signOutTitle": "Se déconnecter de Stella ?"
       },
       "feedback": {
-        "description": "Votre message est envoyé anonymement — il n’est pas lié à votre compte.",
+        "contactLabel": "Votre e-mail (facultatif)",
+        "contactPlaceholder": "vous@exemple.com",
+        "description": "Envoyé à l'équipe Stella avec l'e-mail de votre compte, pour que nous puissions vous répondre.",
+        "descriptionSignedOut": "Envoyé à l'équipe Stella. Ajoutez votre e-mail si vous souhaitez une réponse.",
         "fieldLabel": "Avis",
         "placeholder": "Dites-nous ce qui marche, ce qui ne marche pas, ou ce que vous aimeriez voir…",
         "send": "Envoyer",
         "sending": "Envoi…",
+        "sentWith": "Envoyé avec : {details}",
         "title": "Envoyer un avis",
         "toasts": {
           "failedTitle": "Impossible d’envoyer l’avis",

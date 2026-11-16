@@ -1,5 +1,9 @@
-import { useCallback, useState } from "react";
-import { FEEDBACK_MAX_CHARS } from "@stella/contracts/backend/preferences";
+import { useCallback, useEffect, useState } from "react";
+import {
+  FEEDBACK_CONTACT_MAX_CHARS,
+  FEEDBACK_MAX_CHARS,
+} from "@stella/contracts/backend/preferences";
+import { useCurrentUser } from "@/global/auth/hooks/use-current-user";
 import { backendClient } from "@/platform/backend/backend-client";
 import { Button } from "@/ui/button";
 import {
@@ -12,6 +16,10 @@ import {
 import { TextField } from "@/ui/text-field";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
+import {
+  readFeedbackClientInfo,
+  type FeedbackClientInfo,
+} from "./feedback-client-info";
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -28,14 +36,36 @@ interface FeedbackFormProps {
 
 const FeedbackForm = ({ onCancel, onSubmitted }: FeedbackFormProps) => {
   const t = useT();
+  const { user, hasConnectedAccount } = useCurrentUser();
+  const accountEmail = hasConnectedAccount ? user?.email : undefined;
   const [text, setText] = useState("");
+  const [contact, setContact] = useState("");
+  const [clientInfo, setClientInfo] = useState<FeedbackClientInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void readFeedbackClientInfo().then((info) => {
+      if (live) setClientInfo(info);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || submitting) return;
     setSubmitting(true);
     try {
-      await backendClient.call("feedback.submit", { message: trimmed });
+      const info = clientInfo ?? (await readFeedbackClientInfo());
+      const trimmedContact = accountEmail ? "" : contact.trim();
+      await backendClient.call("feedback.submit", {
+        message: trimmed,
+        platform: info.platform,
+        ...(info.appVersion ? { appVersion: info.appVersion } : {}),
+        ...(trimmedContact ? { contact: trimmedContact } : {}),
+      });
       onCancel();
       onSubmitted?.();
       showToast({
@@ -53,12 +83,22 @@ const FeedbackForm = ({ onCancel, onSubmitted }: FeedbackFormProps) => {
     } finally {
       setSubmitting(false);
     }
-  }, [text, submitting, onCancel, onSubmitted, t]);
+  }, [text, contact, accountEmail, clientInfo, submitting, onCancel, onSubmitted, t]);
+
+  const sentWith = [
+    accountEmail ?? (contact.trim() || null),
+    clientInfo?.appVersion ? `Stella ${clientInfo.appVersion}` : null,
+    clientInfo?.platform ?? null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <>
       <div className="sidebar-feedback-description">
-        {t("shell.sidebar.feedback.description")}
+        {accountEmail
+          ? t("shell.sidebar.feedback.description")
+          : t("shell.sidebar.feedback.descriptionSignedOut")}
       </div>
       <div className="sidebar-feedback-body">
         <TextField
@@ -77,6 +117,25 @@ const FeedbackForm = ({ onCancel, onSubmitted }: FeedbackFormProps) => {
           {text.length.toLocaleString()} /{" "}
           {FEEDBACK_MAX_LENGTH.toLocaleString()}
         </div>
+        {accountEmail ? null : (
+          <div className="sidebar-feedback-contact">
+            <TextField
+              type="email"
+              autoComplete="email"
+              label={t("shell.sidebar.feedback.contactLabel")}
+              placeholder={t("shell.sidebar.feedback.contactPlaceholder")}
+              maxLength={FEEDBACK_CONTACT_MAX_CHARS}
+              value={contact}
+              onChange={(event) => setContact(event.target.value)}
+              disabled={submitting}
+            />
+          </div>
+        )}
+        {sentWith ? (
+          <div className="sidebar-feedback-sent-with">
+            {t("shell.sidebar.feedback.sentWith", { details: sentWith })}
+          </div>
+        ) : null}
       </div>
       <div className="sidebar-confirm-actions">
         <Button

@@ -3136,11 +3136,15 @@
         "signOutTitle": "Uitloggen bij Stella?"
       },
       "feedback": {
-        "description": "Je bericht wordt anoniem verstuurd — het wordt niet aan je account gekoppeld.",
+        "contactLabel": "Je e-mailadres (optioneel)",
+        "contactPlaceholder": "jij@voorbeeld.nl",
+        "description": "Gaat naar het Stella-team, samen met het e-mailadres van je account, zodat we kunnen antwoorden.",
+        "descriptionSignedOut": "Gaat naar het Stella-team. Voeg je e-mailadres toe als je een antwoord wilt.",
         "fieldLabel": "Feedback",
         "placeholder": "Vertel ons wat werkt, wat niet, of wat je graag zou zien…",
         "send": "Versturen",
         "sending": "Versturen…",
+        "sentWith": "Wordt meegestuurd: {details}",
         "title": "Feedback sturen",
         "toasts": {
           "failedTitle": "Kon feedback niet versturen",

@@ -3118,11 +3118,15 @@
         "signOutTitle": "Đăng xuất khỏi Stella?"
       },
       "feedback": {
-        "description": "Tin nhắn của bạn được gửi ẩn danh — không liên kết với tài khoản của bạn.",
+        "contactLabel": "Email của bạn (không bắt buộc)",
+        "contactPlaceholder": "ban@example.com",
+        "description": "Gửi đến đội ngũ Stella kèm email tài khoản của bạn để chúng tôi có thể trả lời.",
+        "descriptionSignedOut": "Gửi đến đội ngũ Stella. Thêm email nếu bạn muốn được trả lời.",
         "fieldLabel": "Phản hồi",
         "placeholder": "Hãy cho chúng tôi biết điều gì đang ổn, điều gì chưa ổn, hoặc điều bạn muốn thấy…",
         "send": "Gửi",
         "sending": "Đang gửi…",
+        "sentWith": "Gửi kèm: {details}",
         "title": "Gửi phản hồi",
         "toasts": {
           "failedTitle": "Không gửi được phản hồi",

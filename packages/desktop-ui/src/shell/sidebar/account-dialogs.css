@@ -108,6 +108,19 @@
   text-align: end;
 }
 
+.sidebar-feedback-contact {
+  margin-top: 12px;
+}
+
+.sidebar-feedback-sent-with {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-family-sans, "Manrope", sans-serif);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .sidebar-feedback-panel {
   display: flex;
   flex: 1 1 auto;

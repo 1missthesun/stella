@@ -3136,11 +3136,15 @@
         "signOutTitle": "Sign out of Stella?"
       },
       "feedback": {
-        "description": "Your message is sent anonymously — it isn't linked to your account.",
+        "contactLabel": "Your email (optional)",
+        "contactPlaceholder": "you@example.com",
+        "description": "Goes to the Stella team with your account email, so we can reply.",
+        "descriptionSignedOut": "Goes to the Stella team. Add your email if you'd like a reply.",
         "fieldLabel": "Feedback",
         "placeholder": "Tell us what's working, what isn't, or what you'd love to see…",
         "send": "Send",
         "sending": "Sending…",
+        "sentWith": "Sent with: {details}",
         "title": "Send feedback",
         "toasts": {
           "failedTitle": "Couldn't send feedback",

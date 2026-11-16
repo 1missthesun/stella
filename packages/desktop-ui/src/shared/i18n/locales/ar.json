@@ -3200,11 +3200,15 @@
         "signOutTitle": "تسجيل الخروج من Stella؟"
       },
       "feedback": {
-        "description": "تُرسل رسالتك بشكل مجهول — وهي غير مرتبطة بحسابك.",
+        "contactLabel": "بريدك الإلكتروني (اختياري)",
+        "contactPlaceholder": "you@example.com",
+        "description": "تصل إلى فريق Stella مع البريد الإلكتروني لحسابك، لنتمكن من الرد عليك.",
+        "descriptionSignedOut": "تصل إلى فريق Stella. أضف بريدك الإلكتروني إن أردت أن نرد عليك.",
         "fieldLabel": "الملاحظات",
         "placeholder": "أخبرنا بما ينجح وما لا ينجح أو ما تودّ رؤيته…",
         "send": "إرسال",
         "sending": "جارٍ الإرسال…",
+        "sentWith": "تُرسل مع: {details}",
         "title": "أرسل ملاحظات",
         "toasts": {
           "failedTitle": "تعذّر إرسال الملاحظات",

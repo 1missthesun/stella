@@ -3118,11 +3118,15 @@
         "signOutTitle": "要登出 Stella 嗎？"
       },
       "feedback": {
-        "description": "你的訊息會以匿名方式傳送 — 不會連結到你的帳號。",
+        "contactLabel": "你的電子郵件（選填）",
+        "contactPlaceholder": "you@example.com",
+        "description": "會連同你的帳戶電子郵件一起傳送給 Stella 團隊，方便我們回覆你。",
+        "descriptionSignedOut": "會傳送給 Stella 團隊。如需回覆，請留下你的電子郵件。",
         "fieldLabel": "回饋",
         "placeholder": "告訴我們哪裡好用、哪裡不好用，或你希望看到什麼…",
         "send": "傳送",
         "sending": "正在傳送…",
+        "sentWith": "一併傳送：{details}",
         "title": "傳送回饋",
         "toasts": {
           "failedTitle": "無法傳送回饋",

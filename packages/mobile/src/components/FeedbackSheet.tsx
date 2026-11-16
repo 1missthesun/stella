@@ -12,7 +12,12 @@ import {
 import { Text } from "./Text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { FEEDBACK_MAX_CHARS } from "@stella/contracts/backend/preferences";
+import * as Updates from "expo-updates";
+import {
+  FEEDBACK_CONTACT_MAX_CHARS,
+  FEEDBACK_MAX_CHARS,
+} from "@stella/contracts/backend/preferences";
+import { authClient } from "../lib/auth-client";
 import { getBackendClient } from "../lib/backend";
 import { userFacingError } from "../lib/user-facing-error";
 import { PrimaryButton } from "./PrimaryButton";
@@ -20,6 +25,17 @@ import { type Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { useColors } from "../theme/theme-context";
 import { useT } from "../i18n";
+
+const appPlatform = (): string =>
+  `${Platform.OS === "ios" ? "iOS" : Platform.OS === "android" ? "Android" : Platform.OS} ${String(Platform.Version)}`;
+
+/** Store version, plus the over-the-air update it runs when it isn't the built-in one. */
+const appVersion = (): string | null => {
+  const version = Constants.expoConfig?.version;
+  if (!version) return null;
+  const update = Updates.isEmbeddedLaunch ? null : Updates.updateId?.slice(0, 8);
+  return update ? `${version}+ota.${update}` : version;
+};
 
 type Status =
   | { kind: "editing" }
@@ -37,14 +53,33 @@ export function FeedbackSheet({
   const colors = useColors();
   const t = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const session = authClient.useSession();
+  const sessionUser = session.data?.user as
+    | { email?: string | null; isAnonymous?: boolean | null }
+    | undefined;
+  const accountEmail =
+    sessionUser && sessionUser.isAnonymous !== true
+      ? sessionUser.email || null
+      : null;
   const [text, setText] = useState("");
+  const [contact, setContact] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "editing" });
 
   useEffect(() => {
     if (!visible) return;
     setText("");
+    setContact("");
     setStatus({ kind: "editing" });
   }, [visible]);
+
+  const version = appVersion();
+  const sentWith = [
+    accountEmail ?? (contact.trim() || null),
+    version ? `Stella ${version}` : null,
+    appPlatform(),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const sending = status.kind === "sending";
   const trimmed = text.trim();
@@ -53,12 +88,12 @@ export function FeedbackSheet({
     if (!trimmed || sending) return;
     setStatus({ kind: "sending" });
     try {
+      const trimmedContact = accountEmail ? "" : contact.trim();
       await getBackendClient().call("feedback.submit", {
         message: trimmed,
-        platform: `${Platform.OS} ${String(Platform.Version)}`,
-        ...(Constants.expoConfig?.version
-          ? { appVersion: Constants.expoConfig.version }
-          : {}),
+        platform: appPlatform(),
+        ...(version ? { appVersion: version } : {}),
+        ...(trimmedContact ? { contact: trimmedContact } : {}),
       });
       setStatus({ kind: "sent" });
     } catch (error) {
@@ -106,7 +141,9 @@ export function FeedbackSheet({
               keyboardShouldPersistTaps="handled"
             >
               <Text style={styles.description}>
-                {t("shell.sidebar.feedback.description")}
+                {accountEmail
+                  ? t("shell.sidebar.feedback.description")
+                  : t("shell.sidebar.feedback.descriptionSignedOut")}
               </Text>
               <TextInput
                 testID="feedback-input"
@@ -124,6 +161,25 @@ export function FeedbackSheet({
               />
               <Text style={styles.count}>
                 {text.length.toLocaleString()} / {FEEDBACK_MAX_CHARS.toLocaleString()}
+              </Text>
+              {accountEmail ? null : (
+                <TextInput
+                  testID="feedback-contact"
+                  accessibilityLabel={t("shell.sidebar.feedback.contactLabel")}
+                  placeholder={t("shell.sidebar.feedback.contactLabel")}
+                  placeholderTextColor={colors.textMuted}
+                  value={contact}
+                  onChangeText={setContact}
+                  maxLength={FEEDBACK_CONTACT_MAX_CHARS}
+                  editable={!sending}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  style={styles.contact}
+                />
+              )}
+              <Text style={styles.sentWith} testID="feedback-sent-with">
+                {t("shell.sidebar.feedback.sentWith", { details: sentWith })}
               </Text>
               {status.kind === "failed" ? (
                 <Text style={styles.error} accessibilityLiveRegion="polite">
@@ -197,6 +253,23 @@ const makeStyles = (colors: Colors) =>
       minHeight: 160,
       paddingHorizontal: 14,
       paddingVertical: 12,
+    },
+    contact: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      color: colors.text,
+      fontFamily: fonts.sans.regular,
+      fontSize: 15,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    sentWith: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 12,
+      lineHeight: 17,
     },
     count: {
       alignSelf: "flex-end",

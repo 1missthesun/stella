@@ -1,10 +1,10 @@
-import { app } from "electron";
+import { app, dialog } from "electron";
 import { getCompileCacheDir } from "node:module";
 import { resolveAppInstall } from "../app-identity.js";
 import {
   getFileLogger,
   initFileLogger,
-  installGlobalErrorLogging,
+  installMainCrashHandling,
   type FileLogger,
 } from "@stella/runtime/observability/file-logger";
 import {
@@ -28,7 +28,16 @@ export const initMainProcessLogging = (stellaAppDir: string): FileLogger => {
   if (registered) return logger;
   registered = true;
 
-  installGlobalErrorLogging(logger);
+  installMainCrashHandling(logger, {
+    showUncaught: (error) => {
+      // What Electron's own handler shows (lib/browser/init.ts).
+      const stack = error.stack ? error.stack : `${error.name}: ${error.message}`;
+      dialog.showErrorBox(
+        "A JavaScript error occurred in the main process",
+        `Uncaught Exception:\n${stack}`,
+      );
+    },
+  });
   logger.process("main.starting", {
     pid: process.pid,
     version: safe(() => app.getVersion()),

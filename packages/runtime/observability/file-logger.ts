@@ -116,29 +116,42 @@ export const initFileLogger = (
 export const getFileLogger = (): FileLogger | null => sharedLogger;
 
 /**
- * Install global crash handlers that route uncaught exceptions and
- * unhandled rejections to the error channel before the runtime acts on them.
+ * Electron main's crash policy. Electron shows "A JavaScript error occurred
+ * in the main process" for an uncaught exception and keeps running; its own
+ * handler stands aside once any other `uncaughtException` listener exists,
+ * so `showUncaught` shows that same dialog for everything this does not
+ * survive.
  *
- * For uncaught exceptions we use `uncaughtExceptionMonitor`, which observes
- * the error and writes a durable on-disk record WITHOUT suppressing the
- * runtime's default fatal behavior (the process still crashes/exits as
- * Node/Bun/Electron would without this listener). A plain `uncaughtException`
- * listener would silently swallow the crash and leave the process running in
- * an undefined state.
+ * An error that only says a peer hung up (EPIPE, ECONNRESET: a caller,
+ * child or client that closed its end) is logged with its full context and
+ * survived without a dialog, as the runtime worker does: the stream it came
+ * from is already destroyed, and the user can do nothing about it. Every
+ * other uncaught exception is recorded and shown as before.
  *
- * For unhandled rejections we register an `unhandledRejection` listener, which
- * DOES swallow the rejection (the process keeps running with only a log line)
- * rather than triggering the default surfacing. This is deliberate: the
- * detached worker relies on it to stay alive across benign unhandled
- * rejections. Callers that want strict fatal semantics here should revisit
- * this decision.
+ * Unhandled rejections are logged and swallowed (the process keeps running
+ * with only a log line), as before.
  */
-export const installGlobalErrorLogging = (logger: FileLogger): void => {
-  process.on("uncaughtExceptionMonitor", (error) => {
-    logger.crash("process.uncaughtException", error);
-  });
+export const installMainCrashHandling = (
+  logger: FileLogger,
+  options: { showUncaught: (error: Error) => void },
+): void => {
   process.on("unhandledRejection", (reason) => {
     logger.crash("process.unhandledRejection", reason);
+  });
+  process.on("uncaughtException", (error) => {
+    if (isPeerDisconnectError(error)) {
+      logger.warn(
+        "process.peer-disconnect-survived",
+        errorDiagnosticFields(error),
+      );
+      console.warn(
+        "[main] A peer closed its end of a pipe or socket; Stella keeps running:",
+        error,
+      );
+      return;
+    }
+    logger.crash("process.uncaughtException", error);
+    options.showUncaught(error);
   });
 };
 

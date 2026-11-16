@@ -1,14 +1,15 @@
 /**
  * Mobile read-aloud over HLS. Native players (AVPlayer, ExoPlayer) cannot
  * play a length-less `audio/mpeg` stream, so one synthesis streams the TTS
- * provider's PCM (`tts.ts`), re-encodes it to MP3, cuts it into ~2 s packed-audio segments and
+ * provider's MP3 frames (`tts.ts`), cuts them into ~2 s packed-audio segments and
  * writes each to `MEDIA` at `tts/<ticket>/seg-<n>.mp3`, updating
  * `tts/<ticket>/index.json` after every segment. The playlist route reads
  * that manifest, so the first segment plays while synthesis continues.
  * A bucket lifecycle rule deletes `tts/` after a day.
  */
 
-import { createPcmMp3Encoder, estimateTtsUsage, openTtsPcm, type TtsProvider, type TtsUsage } from "./tts.js";
+import { concat, readFrame } from "./mp3.js";
+import { estimateTtsUsage, openTtsAudio, type TtsProvider, type TtsUsage } from "./tts.js";
 import { ttsObjectKey } from "./ticket.js";
 
 const TARGET_SEGMENT_SEC = 2.0;
@@ -43,53 +44,6 @@ export const buildHlsPlaylist = (manifest: HlsManifest): string => {
   return `${lines.join("\n")}\n`;
 };
 
-const MPEG1_L3_BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
-const MPEG2_L3_BITRATES = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
-const SAMPLE_RATES: Record<"1" | "2" | "2.5", number[]> = {
-  "1": [44100, 48000, 32000, 0],
-  "2": [22050, 24000, 16000, 0],
-  "2.5": [11025, 12000, 8000, 0],
-};
-
-const readFrame = (buf: Uint8Array, i: number): { frameLen: number; durationSec: number } | null => {
-  if (i + 4 > buf.length) return null;
-  if (buf[i] !== 0xff || (buf[i + 1]! & 0xe0) !== 0xe0) return null;
-  const versionBits = (buf[i + 1]! >> 3) & 0x03;
-  const layerBits = (buf[i + 1]! >> 1) & 0x03;
-  if (versionBits === 1 || layerBits !== 1) return null;
-  const version = versionBits === 3 ? "1" : versionBits === 2 ? "2" : "2.5";
-  const bitrateIndex = (buf[i + 2]! >> 4) & 0x0f;
-  const srIndex = (buf[i + 2]! >> 2) & 0x03;
-  const padding = (buf[i + 2]! >> 1) & 0x01;
-  if (bitrateIndex === 0 || bitrateIndex === 15 || srIndex === 3) return null;
-  const bitrateKbps = (version === "1" ? MPEG1_L3_BITRATES : MPEG2_L3_BITRATES)[bitrateIndex]!;
-  const sampleRate = SAMPLE_RATES[version][srIndex]!;
-  if (!bitrateKbps || !sampleRate) return null;
-  const samplesPerFrame = version === "1" ? 1152 : 576;
-  const frameLen = Math.floor(((samplesPerFrame / 8) * bitrateKbps * 1000) / sampleRate) + padding;
-  if (frameLen < 4) return null;
-  return { frameLen, durationSec: samplesPerFrame / sampleRate };
-};
-
-const id3v2Length = (buf: Uint8Array): number => {
-  if (buf.length < 10 || buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) return 0;
-  const size = ((buf[6]! & 0x7f) << 21) | ((buf[7]! & 0x7f) << 14) | ((buf[8]! & 0x7f) << 7) | (buf[9]! & 0x7f);
-  const total = 10 + size;
-  return total <= buf.length ? total : 0;
-};
-
-const concat = (parts: Uint8Array[]): Uint8Array => {
-  let total = 0;
-  for (const part of parts) total += part.length;
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-};
-
 const syncsafe4 = (n: number) => [(n >>> 21) & 0x7f, (n >>> 14) & 0x7f, (n >>> 7) & 0x7f, n & 0x7f];
 
 /**
@@ -119,7 +73,7 @@ export type HlsSynthesisResult = {
   segments: number;
   usage: TtsUsage | null;
   sentChars: number;
-  pcmBytes: number;
+  audioSeconds: number;
 };
 
 export const synthesizeHls = async (input: {
@@ -135,23 +89,33 @@ export const synthesizeHls = async (input: {
     input.bucket.put(ttsObjectKey(input.ticket, HLS_MANIFEST_FILE), JSON.stringify(manifest), {
       httpMetadata: { contentType: "application/json" },
     });
-  const encoder = createPcmMp3Encoder();
   let provider: TtsProvider | null = null;
   let sentChars = () => 0;
-  const usage = () => (provider ? estimateTtsUsage(sentChars(), encoder.pcmBytes) : null);
+  let frames: Uint8Array[] = [];
+  let duration = 0;
+  let startSec = 0;
+  let audioBytes = 0;
+  let capped = false;
   const finish = async (status: HlsSynthesisResult["status"]): Promise<HlsSynthesisResult> => {
     manifest.done = true;
     manifest.error = status === "error" && manifest.segments.length === 0;
     await writeManifest().catch(() => undefined);
-    return { status, segments: manifest.segments.length, usage: usage(), sentChars: sentChars(), pcmBytes: encoder.pcmBytes };
+    const audioSeconds = startSec + duration;
+    return {
+      status,
+      segments: manifest.segments.length,
+      usage: provider ? estimateTtsUsage(sentChars(), audioSeconds) : null,
+      sentChars: sentChars(),
+      audioSeconds,
+    };
   };
 
   const signal = AbortSignal.timeout(SYNTHESIS_TIMEOUT_MS);
   let source: ReadableStream<Uint8Array>;
   try {
-    const opened = await openTtsPcm(input.env, { text: input.text, voice: input.voice, signal });
+    const opened = await openTtsAudio(input.env, { text: input.text, voice: input.voice, signal });
     provider = opened.provider;
-    source = opened.pcm;
+    source = opened.mp3;
     sentChars = opened.sentChars;
   } catch (error) {
     console.error(JSON.stringify({
@@ -160,14 +124,6 @@ export const synthesizeHls = async (input: {
     }));
     return await finish("error");
   }
-
-  let mp3: Uint8Array = new Uint8Array(0);
-  let aligned = false;
-  let frames: Uint8Array[] = [];
-  let duration = 0;
-  let startSec = 0;
-  let audioBytes = 0;
-  let capped = false;
 
   const flush = async () => {
     if (frames.length === 0) return;
@@ -182,31 +138,23 @@ export const synthesizeHls = async (input: {
     duration = 0;
   };
 
-  const ingest = async (bytes: Uint8Array) => {
-    if (bytes.length === 0) return;
-    audioBytes += bytes.length;
-    mp3 = mp3.length === 0 ? bytes : concat([mp3, bytes]);
-    let cursor = aligned ? 0 : id3v2Length(mp3);
-    for (;;) {
+  // `openTtsAudio` yields whole frames only.
+  const ingest = async (mp3: Uint8Array) => {
+    let cursor = 0;
+    while (cursor < mp3.length) {
       if (manifest.segments.length >= MAX_SEGMENTS || audioBytes >= MAX_AUDIO_BYTES) {
         capped = true;
-        break;
+        return;
       }
       const frame = readFrame(mp3, cursor);
-      if (!frame) {
-        if (cursor + 4 > mp3.length || aligned) break;
-        cursor += 1;
-        continue;
-      }
-      if (cursor + frame.frameLen > mp3.length) break;
-      aligned = true;
+      if (!frame) return;
       frames.push(mp3.slice(cursor, cursor + frame.frameLen));
+      audioBytes += frame.frameLen;
       duration += frame.durationSec;
       cursor += frame.frameLen;
       const target = manifest.segments.length === 0 ? FIRST_SEGMENT_SEC : TARGET_SEGMENT_SEC;
       if (duration >= target) await flush();
     }
-    mp3 = cursor > 0 ? mp3.slice(cursor) : mp3;
   };
 
   const reader = source.getReader();
@@ -214,13 +162,12 @@ export const synthesizeHls = async (input: {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (value) await ingest(encoder.push(value));
+      if (value) await ingest(value);
       if (input.canceled() || capped) {
         await reader.cancel().catch(() => undefined);
         return await finish(capped ? "done" : "canceled");
       }
     }
-    await ingest(encoder.finish());
     if (!capped) await flush();
     return await finish(manifest.segments.length > 0 ? "done" : "error");
   } catch (error) {

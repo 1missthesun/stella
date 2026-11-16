@@ -1,19 +1,15 @@
-import { Mp3Encoder } from "@breezystack/lamejs";
 import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 import { TTS_TARIFF } from "@stella/contracts/billing-tariffs";
 import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
 import { DEFAULT_STELLA_TTS_VOICE, isStellaTtsVoice } from "@stella/contracts/realtime-voice-catalog";
 import { Effect, Fiber } from "effect";
+import { concat, createMp3Framer } from "./mp3.js";
 
 export const TTS_MODEL = STELLA_MEDIA_MODELS.speech;
-export const PCM_SAMPLE_RATE = 24_000;
-const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * 2;
-const MP3_KBPS = 48;
 const OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech";
 // Simba streams each request's audio as it is made (first bytes in ~0.5 s
 // whatever the length), so text is split only for the per-request limit
-// (about two minutes of PCM, ~2,000 characters) and to start the next part
-// while the current one plays.
+// (about six minutes of MP3) and to start the next part while one plays.
 const CHUNK_CHARS = 1_000;
 const CHUNKS_IN_FLIGHT = 2;
 
@@ -104,10 +100,10 @@ export type TtsUsage = {
 };
 
 /** Simba bills per input character sent, so this is exact for what was sent. */
-export const estimateTtsUsage = (chars: number, pcmBytes: number): TtsUsage => ({
+export const estimateTtsUsage = (chars: number, audioSeconds: number): TtsUsage => ({
   provider: "openrouter",
   chars,
-  audioSeconds: Number((pcmBytes / PCM_BYTES_PER_SECOND).toFixed(2)),
+  audioSeconds: Number(audioSeconds.toFixed(2)),
   estimatedUsd: Number(((chars / 1_000) * TTS_TARIFF.speechifySimbaUsdPerThousandChars).toFixed(6)),
 });
 
@@ -128,7 +124,7 @@ const openRouterSpeech = async (
       model: TTS_MODEL,
       input: input.text,
       voice: input.voice,
-      response_format: "pcm",
+      response_format: "mp3",
       // OpenRouter forwards per-provider options; a top-level `language` is ignored.
       ...(input.language ? { provider: { options: { speechify: { language: input.language } } } } : {}),
     }),
@@ -137,11 +133,6 @@ const openRouterSpeech = async (
   if (!response.ok || !response.body) {
     const detail = await response.text().catch(() => "");
     throw new Error(`OpenRouter TTS returned ${response.status}: ${detail.slice(0, 300)}`);
-  }
-  const rate = /rate=(\d+)/u.exec(response.headers.get("content-type") ?? "")?.[1];
-  if (rate && Number(rate) !== PCM_SAMPLE_RATE) {
-    await response.body.cancel().catch(() => undefined);
-    throw new Error(`OpenRouter TTS returned ${rate} Hz PCM; read-aloud expects ${PCM_SAMPLE_RATE} Hz.`);
   }
   return response.body;
 };
@@ -176,7 +167,7 @@ type ChunkAudio = {
   wake: (() => void) | null;
 };
 
-const chunkedPcm = (
+const chunkedAudio = (
   chunks: string[],
   synthesize: (text: string, audio: ChunkAudio) => Effect.Effect<void, unknown>,
   onSend: (chars: number) => void,
@@ -251,14 +242,20 @@ const chunkedPcm = (
 };
 
 /**
- * 24 kHz mono 16-bit PCM for `text`, streamed as Simba makes it, a chunk
- * of text per request with the next one read ahead. Throws when read-aloud
- * is not set up or the provider refuses the first chunk.
+ * MP3 for `text` as whole frames, streamed as Simba makes it, a chunk of
+ * text per request with the next one read ahead; each request's file is
+ * passed on without its ID3 tag so they play as one stream. Throws when
+ * read-aloud is not set up or the provider refuses the first chunk.
  */
-export const openTtsPcm = async (
+export const openTtsAudio = async (
   env: object,
   args: { text: string; voice: string; signal: AbortSignal },
-): Promise<{ provider: TtsProvider; pcm: ReadableStream<Uint8Array>; sentChars: () => number }> => {
+): Promise<{
+  provider: TtsProvider;
+  mp3: ReadableStream<Uint8Array>;
+  sentChars: () => number;
+  audioSeconds: () => number;
+}> => {
   const picked = ttsProvider(env);
   if (!picked) throw new Error("Read-aloud is not configured.");
   args.signal.throwIfAborted();
@@ -270,14 +267,19 @@ export const openTtsPcm = async (
       try: async (interrupted) => {
         const signal = AbortSignal.any([args.signal, interrupted]);
         const input = { text, voice: args.voice, language: ttsLanguage(text, args.text) };
+        let counted = 0;
         for (let attempt = 0; ; attempt += 1) {
           try {
             const reader = (await openRouterSpeech(picked.apiKey, input, signal, attribution)).getReader();
+            const framer = createMp3Framer();
             for (;;) {
               const { done, value } = await reader.read();
               if (done) return;
-              if (value.length === 0) continue;
-              audio.parts.push(value);
+              const frames = framer.push(value);
+              if (frames.length === 0) continue;
+              seconds += framer.seconds - counted;
+              counted = framer.seconds;
+              audio.parts.push(frames);
               const resume = audio.wake;
               audio.wake = null;
               resume?.();
@@ -290,7 +292,8 @@ export const openTtsPcm = async (
       catch: (error) => error,
     });
   let sent = 0;
-  const reader = chunkedPcm(splitTtsText(args.text), synthesize, (chars) => {
+  let seconds = 0;
+  const reader = chunkedAudio(splitTtsText(args.text), synthesize, (chars) => {
     sent += chars;
   }).getReader();
   const first = await reader.read().catch(async (error: unknown) => {
@@ -300,7 +303,8 @@ export const openTtsPcm = async (
   return {
     provider: picked.provider,
     sentChars: () => sent,
-    pcm: new ReadableStream<Uint8Array>({
+    audioSeconds: () => seconds,
+    mp3: new ReadableStream<Uint8Array>({
       start(controller) {
         if (first.done) controller.close();
         else controller.enqueue(first.value);
@@ -315,71 +319,4 @@ export const openTtsPcm = async (
       },
     }),
   };
-};
-
-const concat = (parts: Uint8Array[]): Uint8Array => {
-  if (parts.length === 1) return parts[0]!;
-  let total = 0;
-  for (const part of parts) total += part.length;
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-};
-
-const EMPTY = new Uint8Array(0);
-
-export const createPcmMp3Encoder = () => {
-  const encoder = new Mp3Encoder(1, PCM_SAMPLE_RATE, MP3_KBPS);
-  let oddByte: number | null = null;
-  let pcmBytes = 0;
-  return {
-    push(bytes: Uint8Array): Uint8Array {
-      pcmBytes += bytes.length;
-      let input = bytes;
-      if (oddByte !== null) {
-        input = concat([Uint8Array.of(oddByte), bytes]);
-        oddByte = null;
-      }
-      const sampleCount = input.length >> 1;
-      if (input.length % 2 === 1) oddByte = input[input.length - 1]!;
-      if (sampleCount === 0) return EMPTY;
-      const samples = new Int16Array(sampleCount);
-      const view = new DataView(input.buffer, input.byteOffset, sampleCount * 2);
-      for (let i = 0; i < sampleCount; i += 1) samples[i] = view.getInt16(i * 2, true);
-      return new Uint8Array(encoder.encodeBuffer(samples));
-    },
-    finish(): Uint8Array {
-      return new Uint8Array(encoder.flush());
-    },
-    get pcmBytes() {
-      return pcmBytes;
-    },
-  };
-};
-
-export const pcmToWav = (pcm: Uint8Array): Uint8Array => {
-  const out = new Uint8Array(44 + pcm.byteLength);
-  const view = new DataView(out.buffer);
-  const ascii = (offset: number, value: string) => {
-    for (let index = 0; index < value.length; index += 1) out[offset + index] = value.charCodeAt(index);
-  };
-  ascii(0, "RIFF");
-  view.setUint32(4, 36 + pcm.byteLength, true);
-  ascii(8, "WAVE");
-  ascii(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, PCM_SAMPLE_RATE, true);
-  view.setUint32(28, PCM_BYTES_PER_SECOND, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  ascii(36, "data");
-  view.setUint32(40, pcm.byteLength, true);
-  out.set(pcm, 44);
-  return out;
 };

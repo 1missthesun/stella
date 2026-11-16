@@ -525,7 +525,7 @@ const ttsSku = (vendor: TtsVendor): string => (vendor === "openai" ? "gpt-4o-min
 
 const settleTts = (
   ctx: OwnerContext,
-  input: { id: string; vendor: TtsVendor; chars: number; pcmBytes: number; outcome: CostOutcome },
+  input: { id: string; vendor: TtsVendor; chars: number; audioSeconds: number; outcome: CostOutcome },
 ): number => {
   const charge = input.chars > 0 ? ttsCostMicroCents(input.vendor, input.chars) : 0;
   settleSpend(
@@ -542,7 +542,7 @@ const settleTts = (
               category: "tts",
               provider: input.vendor,
               sku: ttsSku(input.vendor),
-              quantity: { chars: input.chars, audioSeconds: Math.round(input.pcmBytes / 48_000) },
+              quantity: { chars: input.chars, audioSeconds: Math.round(input.audioSeconds) },
               providerCostMicroCents: charge,
               basis: "estimated",
               outcome: input.outcome,
@@ -594,11 +594,11 @@ const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
   const vendor = ttsVendor(job.vendor);
   if (streamStatus(ctx, job.id) !== "synthesizing" || !ttsProvider(ctx.env) || !ctx.env.MEDIA) {
     ctx.db.run("UPDATE tts_streams SET status = 'error' WHERE id = ? AND status = 'synthesizing'", job.id);
-    settleTts(ctx, { id: job.id, vendor, chars: 0, pcmBytes: 0, outcome: "cancelled" });
+    settleTts(ctx, { id: job.id, vendor, chars: 0, audioSeconds: 0, outcome: "cancelled" });
     return;
   }
   const startedAt = Date.now();
-  let usage: { sentChars: number; pcmBytes: number } = { sentChars: 0, pcmBytes: 0 };
+  let usage: { sentChars: number; audioSeconds: number } = { sentChars: 0, audioSeconds: 0 };
   let status = "error";
   try {
     const result = await synthesizeHls({
@@ -610,7 +610,7 @@ const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
       canceled: () => streamStatus(ctx, job.id) !== "synthesizing",
     });
     status = result.status;
-    usage = { sentChars: result.sentChars, pcmBytes: result.pcmBytes };
+    usage = { sentChars: result.sentChars, audioSeconds: result.audioSeconds };
     log("info", "tts_usage", {
       transport: "hls",
       status: result.status,
@@ -625,7 +625,7 @@ const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
       id: job.id,
       vendor,
       chars: usage.sentChars,
-      pcmBytes: usage.pcmBytes,
+      audioSeconds: usage.audioSeconds,
       outcome: status === "done" ? "succeeded" : status === "canceled" ? "cancelled" : "failed",
     });
   }
@@ -982,14 +982,17 @@ export const voiceDomain = {
       return { ok: true, id };
     },
     "tts.settle": (ctx, raw) => {
-      const { vendor, ...input } = object({
+      const { vendor, pcmBytes, ...input } = object({
         id: string({ min: 1, max: 64 }),
         vendor: literal("fal", "openrouter", "openai"),
         chars: number({ int: true, min: 0, max: TTS_MAX_INPUT_CHARS }),
         pcmBytes: number({ int: true, min: 0, max: 1_000_000_000 }),
         outcome: literal("succeeded", "failed", "aborted"),
       })(raw);
-      return { chargedMicroCents: settleTts(ctx, { ...input, vendor: ttsVendor(vendor) }) };
+      // Callers send the audio's length as 24 kHz 16-bit PCM bytes.
+      return {
+        chargedMicroCents: settleTts(ctx, { ...input, vendor: ttsVendor(vendor), audioSeconds: pcmBytes / 48_000 }),
+      };
     },
     "tts.cancel": (ctx, raw) => {
       const { id } = object({ id: string({ min: 1, max: 64 }) })(raw);

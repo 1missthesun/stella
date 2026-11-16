@@ -19,7 +19,7 @@ import { readBodyText, readJsonObject } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import type { OwnerCaller } from "../owner-store/registry.js";
 import { ttsText } from "../owner-store/domains/voice.js";
-import { createPcmMp3Encoder, estimateTtsUsage, openTtsPcm, pcmToWav, resolveTtsVoice, ttsProvider } from "./tts.js";
+import { estimateTtsUsage, openTtsAudio, resolveTtsVoice, ttsProvider } from "./tts.js";
 import { buildHlsPlaylist, HLS_MANIFEST_FILE, type HlsManifest } from "./hls.js";
 import { readTtsTicket, ttsObjectKey } from "./ticket.js";
 import { ownerGateStub } from "../rpc-release.js";
@@ -177,14 +177,17 @@ const notConfigured = () => new RpcError("UNAVAILABLE", "Stella read-aloud is no
 const providerSignal = (request: Request): AbortSignal =>
   AbortSignal.any([request.signal, AbortSignal.timeout(PROVIDER_TIMEOUT_MS)]);
 
-const openPcm = async (env: VoiceEnv, text: string, voice: string, transport: string, signal: AbortSignal) => {
+const openAudio = async (env: VoiceEnv, text: string, voice: string, transport: string, signal: AbortSignal) => {
   try {
-    return await openTtsPcm(env, { text, voice, signal });
+    return await openTtsAudio(env, { text, voice, signal });
   } catch (error) {
     log("error", "tts_provider_failed", { transport, message: error instanceof Error ? error.message : String(error) });
     throw new RpcError("UNAVAILABLE", "Speech generation failed.");
   }
 };
+
+// `tts.settle` takes the audio's length as 24 kHz 16-bit PCM bytes.
+const pcmBytesOf = (audioSeconds: number): number => Math.round(audioSeconds * 48_000);
 
 const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
@@ -194,13 +197,11 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
   const { text, settle } = await admitText(env, caller, body.text, configured.provider);
   const voice = resolveTtsVoice(body.voice);
   const startedAt = Date.now();
-  const opened = await openPcm(env, text, voice, "stream", providerSignal(request)).catch(async (error: unknown) => {
+  const opened = await openAudio(env, text, voice, "stream", providerSignal(request)).catch(async (error: unknown) => {
     await settle({ chars: 0, pcmBytes: 0, outcome: "failed" });
     throw error;
   });
-  const { provider, pcm } = opened;
-  const reader = pcm.getReader();
-  const encoder = createPcmMp3Encoder();
+  const reader = opened.mp3.getReader();
   let audioBytes = 0;
   let firstAudioMs: number | null = null;
   const report = async (status: string) => {
@@ -210,36 +211,27 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
       requestChars: text.length,
       audioBytes,
       firstAudioMs,
-      ...estimateTtsUsage(opened.sentChars(), encoder.pcmBytes),
+      ...estimateTtsUsage(opened.sentChars(), opened.audioSeconds()),
       durationMs: Date.now() - startedAt,
     });
     await settle({
       chars: opened.sentChars(),
-      pcmBytes: encoder.pcmBytes,
+      pcmBytes: pcmBytesOf(opened.audioSeconds()),
       outcome: status === "completed" ? "succeeded" : status === "failed" ? "failed" : "aborted",
     });
   };
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) {
-            const tail = encoder.finish();
-            if (tail.length > 0) controller.enqueue(tail);
-            audioBytes += tail.length;
-            await report(audioBytes > 0 ? "completed" : "failed");
-            controller.close();
-            return;
-          }
-          const chunk = value ? encoder.push(value) : new Uint8Array(0);
-          if (chunk.length > 0) {
-            firstAudioMs ??= Date.now() - startedAt;
-            audioBytes += chunk.length;
-            controller.enqueue(chunk);
-            return;
-          }
+        const { done, value } = await reader.read();
+        if (done) {
+          await report(audioBytes > 0 ? "completed" : "failed");
+          controller.close();
+          return;
         }
+        firstAudioMs ??= Date.now() - startedAt;
+        audioBytes += value.length;
+        controller.enqueue(value);
       } catch (error) {
         await reader.cancel(error).catch(() => undefined);
         await report("interrupted");
@@ -268,29 +260,28 @@ const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> =>
 
   if (provider === "stella") {
     const voice = resolveTtsVoice(body.voice);
-    const opened = await openPcm(env, text, voice, "oneshot_stella", signal).catch(async (error: unknown) => {
+    const opened = await openAudio(env, text, voice, "oneshot_stella", signal).catch(async (error: unknown) => {
       await settle({ chars: 0, pcmBytes: 0, outcome: "failed" });
       throw error;
     });
-    const pcm = new Uint8Array(await new Response(opened.pcm).arrayBuffer().catch(() => new ArrayBuffer(0)));
+    const audio = new Uint8Array(await new Response(opened.mp3).arrayBuffer().catch(() => new ArrayBuffer(0)));
     await settle({
       chars: opened.sentChars(),
-      pcmBytes: pcm.byteLength,
-      outcome: pcm.byteLength > 0 ? "succeeded" : "failed",
+      pcmBytes: pcmBytesOf(opened.audioSeconds()),
+      outcome: audio.byteLength > 0 ? "succeeded" : "failed",
     });
-    if (pcm.byteLength === 0) {
+    if (audio.byteLength === 0) {
       log("error", "tts_provider_failed", { transport: "oneshot_stella", provider: opened.provider });
       throw new RpcError("UNAVAILABLE", "Speech generation failed.");
     }
-    const audio = pcmToWav(pcm);
     logTtsUsage({
       transport: "oneshot_stella",
       requestChars: text.length,
       audioBytes: audio.byteLength,
-      ...estimateTtsUsage(opened.sentChars(), pcm.byteLength),
+      ...estimateTtsUsage(opened.sentChars(), opened.audioSeconds()),
       durationMs: Date.now() - startedAt,
     });
-    return new Response(audio, { headers: { "content-type": "audio/wav", "cache-control": "no-store" } });
+    return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
   }
 
   const voice = typeof body.voice === "string" && body.voice.trim() ? body.voice.trim().slice(0, 100) : "marin";

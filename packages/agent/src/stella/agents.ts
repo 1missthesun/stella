@@ -59,6 +59,8 @@ import {
   endTurnWaitingResult,
   helperStoppedText,
   parseWaitingFor,
+  starterMessageSender,
+  unansweredWaitingReply,
 } from "@stella/contracts/agent-waiting";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
@@ -958,6 +960,10 @@ export function stellaAgents(host: StellaAgentsHost) {
             await runtime.snapshot(LiveDoc, agentConversationId, context).catch(() => undefined),
             ownSubmission,
           );
+          const replyRoute =
+            waitedFor !== undefined
+              ? await stellaRoute({ snapshot: runtime.snapshot.bind(runtime), conversationId: agentConversationId }, context).catch(() => undefined)
+              : undefined;
           await runtime.commit(async (tx) => {
             const finished =
               settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
@@ -1008,6 +1014,11 @@ export function stellaAgents(host: StellaAgentsHost) {
               if (agent.reported.includes(settled.answer)) return next();
               agent.reported.push(settled.answer);
               agent.waiting = { waitingFor: waitedFor, at: Date.now() };
+              const reply =
+                replyRoute?.root === runtime.conversationId && (await unansweredStella(tx, agentConversationId, `agent-msg:${reporter.id}`, settled.answer))
+                  ? waitingReplyNote(replyRoute, settled.answer, textOf(answer), waitedFor)
+                  : undefined;
+              if (reply) notes.send.push(reply);
               return {
                 status: "running",
                 checkpoint: {
@@ -1511,7 +1522,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  const stellaRoute = async (api: ToolExecutionApi, context: Context) => {
+  const stellaRoute = async (api: Pick<ToolExecutionApi, "snapshot" | "conversationId">, context: Context) => {
     const { self, root, top } = await chainOf(api, context);
     if (self.agentType === "orchestrator" || !self.threadId) return undefined;
     const state = root === undefined ? undefined : await api.snapshot(StellaAgentsDoc, root, context);
@@ -1645,6 +1656,55 @@ export function stellaAgents(host: StellaAgentsHost) {
     return {
       closing: notes.filter((note) => last.has(note.callId)),
       send: notes.filter((note) => !last.has(note.callId)),
+    };
+  };
+
+  // Did the run (from its input through its answer) take in a message from the
+  // Stella that started it and never answer her with send_message?
+  const unansweredStella = async (tx: Tx, conversationId: ConversationId, requestId: string, answer: EntryId): Promise<boolean> => {
+    const from = (await tx.submissionByRequest(conversationId, requestId))?.entry;
+    if (from === undefined) return false;
+    const inputs: string[] = [];
+    const targets: string[] = [];
+    let cursor: Parameters<Tx["scanEntries"]>[2];
+    scan: for (let pages = 0; pages < 40; pages += 1) {
+      const page = await tx.scanEntries({ conversationId, maxEntryId: answer, order: "descending" }, 50, cursor);
+      for (const entry of page.items) {
+        if (entry.id < from) break scan;
+        const message = entry.model?.[0] as { role?: string; content?: unknown } | undefined;
+        if (entry.kind === "pi.user") inputs.push(messageText(message));
+        if (entry.kind !== "pi.assistant") continue;
+        for (const part of (message as AssistantMessage | undefined)?.content ?? []) {
+          if (part.type !== "toolCall" || part.name !== "send_message") continue;
+          const to = (part.arguments as { thread_id?: unknown } | undefined)?.thread_id;
+          if (typeof to === "string") targets.push(to.trim());
+        }
+      }
+      cursor = page.next;
+      if (cursor === undefined) break;
+    }
+    const starter = starterMessageSender(inputs.reverse());
+    if (!starter) return false;
+    return !targets.some((to) => to.toLowerCase() === STELLA_MESSAGE_TARGET || to === starter.threadId);
+  };
+
+  // Its reply to Stella, as if it had sent it with send_message: only for a
+  // task Stella started, whose route to her is `route` (see stellaRoute).
+  const waitingReplyNote = (
+    route: Awaited<ReturnType<typeof stellaRoute>>,
+    answer: EntryId,
+    text: string,
+    waitingFor: string,
+  ): StellaPendingNote | undefined => {
+    if (!route?.root || !route.from || route.self.depth !== 1) return undefined;
+    const full = unansweredWaitingReply(text, waitingFor);
+    const message = full.length > AGENT_MESSAGE_MAX_CHARS ? `${full.slice(0, AGENT_MESSAGE_MAX_CHARS - 20).trimEnd()}\n[...truncated]` : full;
+    return {
+      callId: `waiting-reply:${answer}`,
+      key: `waiting-reply:${route.from.threadId}:${answer}`,
+      message,
+      from: route.from,
+      ...(route.remote ? { remote: true as const } : {}),
     };
   };
 
@@ -2765,6 +2825,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         // A run that ends waiting sends no report: its text is only the waiting
         // note, so a message from its last step must still go out as a message.
         await settle(settled.answer, true);
+        const route = await stellaRoute({ snapshot: harness.snapshot.bind(harness), conversationId: agent.id }, context);
+        const owed = await harness.commit((tx) => unansweredStella(tx, agent.id, requestId, settled.answer), context);
+        const reply = owed ? waitingReplyNote(route, settled.answer, textOf(message), waitedFor) : undefined;
+        if (reply && route?.root !== undefined) {
+          await deliverNote(route.root, reply, context, (id) => harness.conversation(id, context)).catch(() => false);
+        }
         return { threadId, status: "ok", finalText: textOf(message), waitingFor: waitedFor };
       }
       const finalText = withClosingNotes(await settle(settled.answer), textOf(message));

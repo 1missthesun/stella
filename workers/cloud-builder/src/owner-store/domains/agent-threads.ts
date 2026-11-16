@@ -83,7 +83,7 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
-import { WAITING_FOR_MAX_CHARS, helperStoppedText, resultWaitingFor, waitingResultJson } from "@stella/contracts/agent-waiting";
+import { WAITING_FOR_MAX_CHARS, helperStoppedText, resultWaitingFor, resultWaitingReply, waitingResultJson } from "@stella/contracts/agent-waiting";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
@@ -4733,6 +4733,21 @@ export const applyAgentThreadEvent = (
               : { kind: status, text: status === "completed" ? null : errorMessage },
           ),
         });
+      }
+      // It ended waiting after a message from Stella, which started it: a waiting
+      // turn sends no report, so its last words reach her as its reply.
+      const reply = status === "completed" ? resultWaitingReply(event.resultJson) : undefined;
+      if (reply && !thread.parent_thread_id && thread.owner_generation) {
+        queueStellaNote(
+          { db, now: event.completedAt },
+          {
+            noteId: `waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`,
+            conversationId: thread.origin_conversation_id ?? thread.conversation_id,
+            ownerGeneration: thread.owner_generation,
+            fromThreadId: thread.thread_id,
+            text: formatAgentMessage({ threadId: thread.thread_id, label: thread.description || "An agent" }, reply),
+          },
+        );
       }
       if (event.status === "completed" && thread.origin_device_id === null) {
         const files = threadOutputFiles(db, thread.thread_id);

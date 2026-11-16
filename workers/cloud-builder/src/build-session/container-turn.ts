@@ -998,6 +998,7 @@ export const runContainerAgentTurn = async (
         payload: {
           finalText: result.finalText ?? "",
           ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
+          ...(result.waitingFor && result.waitingReply ? { waitingReply: result.waitingReply } : {}),
           usage: result.usage,
           coldContainerStartMs,
           restoreMs,

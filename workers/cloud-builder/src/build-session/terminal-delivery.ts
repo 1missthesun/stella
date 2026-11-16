@@ -170,10 +170,14 @@ export const deliverTerminal = async (
         typeof pending.payload.waitingFor === "string" && pending.payload.waitingFor.trim()
           ? pending.payload.waitingFor.trim()
           : undefined;
+      const waitingReply =
+        typeof pending.payload.waitingReply === "string" && pending.payload.waitingReply.trim()
+          ? pending.payload.waitingReply.trim()
+          : undefined;
       const resultJson =
         pending.kind === "completed"
           ? waitingFor
-            ? waitingResultJson(finalText, waitingFor)
+            ? waitingResultJson(finalText, waitingFor, waitingReply)
             : JSON.stringify({ finalText })
           : undefined;
       const errorMessage =

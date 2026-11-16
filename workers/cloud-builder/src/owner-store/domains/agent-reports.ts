@@ -744,7 +744,7 @@ const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> =
 };
 
 export const queueStellaNote = (
-  ctx: OwnerContext,
+  ctx: Pick<OwnerContext, "db" | "now">,
   args: {
     noteId: string;
     conversationId: string;

@@ -57,6 +57,8 @@ import {
   END_TURN_WAITING_TOOL,
   endTurnWaitingResult,
   parseWaitingFor,
+  starterMessageSender,
+  unansweredWaitingReply,
 } from "@stella/contracts/agent-waiting";
 import {
   toolStateDir,
@@ -131,6 +133,8 @@ export type AgentTurnTerminalResult = {
   finalText: string;
   error?: string;
   waitingFor?: string;
+  /** The turn ended waiting after a message from its starter: this goes to the starter as its reply. */
+  waitingReply?: string;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   usage: { inputTokens: number; outputTokens: number; llmCalls: number };
   checkpointMs?: number;
@@ -582,6 +586,8 @@ export const runAgentTurn = (
         allowedToolNames: claudeToolSet.tools.map((tool) => tool.name),
       });
       let waitingFor: string | undefined;
+      // What the turn took in: its prompt and the messages that reached it mid-turn.
+      const turnInputs: string[] = [input.prompt];
       const endTurnWaitingTool: ToolMetadata = {
         name: END_TURN_WAITING_TOOL,
         description: END_TURN_WAITING_DESCRIPTION,
@@ -712,6 +718,7 @@ export const runAgentTurn = (
               inbox: {
                 take: async () => {
                   const taken = await inbox.take();
+                  turnInputs.push(...taken);
                   if (taken.length > 0) waitingFor = undefined;
                   return taken;
                 },
@@ -1000,12 +1007,18 @@ export const runAgentTurn = (
       const finalText = execution.finalText;
       const error = execution.errorMessage;
       const waiting = error ? undefined : waitingFor;
+      // A cloud agent has no send_message: when its starter messaged it this
+      // turn and it ends waiting, its last words are the reply, and the waiting
+      // note alone would lose them.
+      const waitingReply =
+        waiting && starterMessageSender(turnInputs) ? unansweredWaitingReply(finalText ?? "", waiting) : undefined;
       return {
         ok: !error,
         finalText:
           `${finalText || (error || waiting ? "" : "The agent finished without a report.")}${outputs.notice}`.trim(),
         ...(error ? { error } : {}),
         ...(waiting ? { waitingFor: waiting } : {}),
+        ...(waitingReply ? { waitingReply } : {}),
         usage: { inputTokens, outputTokens, llmCalls },
         checkpointMs,
         ...(turnStateCheckpoint ? { turnStateCheckpoint } : {}),

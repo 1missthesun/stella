@@ -95,6 +95,7 @@ export type InAppBrowserBootstrapServerOptions = {
   getExtensionStatus?: () => Promise<boolean | null>;
   endpoint?: StellaInAppBrowserInitEndpoint;
   tokenPath?: string;
+  log?: (event: string, fields: Record<string, string | number>) => void;
 };
 
 export type InAppBrowserBootstrapCapability = Readonly<{
@@ -229,6 +230,15 @@ export class InAppBrowserBootstrapServer {
         server.once("listening", onListening);
         server.listen(this.endpoint);
       });
+      // A listening server still reports failed accepts (EMFILE and the
+      // like) as "error"; without a listener that is an uncaught exception
+      // in Electron's main process. The server keeps listening.
+      server.on("error", (error: NodeJS.ErrnoException) => {
+        this.options.log?.("browser-bootstrap.server-error", {
+          errorMessage: error.message,
+          ...(error.code ? { errorCode: error.code } : {}),
+        });
+      });
       this.endpointIdentity = filesystemEndpointPath
         ? readFileIdentity(filesystemEndpointPath)
         : null;
@@ -277,6 +287,13 @@ export class InAppBrowserBootstrapServer {
 
   private handleSocket(socket: Socket) {
     this.sockets.add(socket);
+    // Callers give up on their own deadline or when their call is cancelled
+    // and close the connection, sometimes while this side is still working on
+    // the answer. Writing that answer then fails (EPIPE, ECONNRESET), and an
+    // "error" with no listener is an uncaught exception in Electron's main
+    // process, which shows the user an error dialog. A caller that left is
+    // normal: drop the connection.
+    socket.on("error", () => socket.destroy());
     socket.setEncoding("utf8");
     socket.setTimeout(5 * 60_000, () => socket.destroy());
     socket.once("close", () => this.sockets.delete(socket));
@@ -284,6 +301,7 @@ export class InAppBrowserBootstrapServer {
     socket.on("data", (chunk: string) => {
       buffer += chunk;
       if (Buffer.byteLength(buffer) > MAX_REQUEST_BYTES) {
+        socket.removeAllListeners("data");
         this.reply(
           socket,
           false,
@@ -300,8 +318,16 @@ export class InAppBrowserBootstrapServer {
   }
 
   private async handleRequest(socket: Socket, line: string) {
+    const request = { action: "unknown", receivedAt: Date.now() };
     try {
       const parsed: unknown = JSON.parse(line);
+      const action =
+        typeof parsed === "object" && parsed !== null
+          ? (parsed as { action?: unknown }).action
+          : undefined;
+      if (action === "ensure" || action === "extension_status") {
+        request.action = action;
+      }
       const statusRequest = extensionStatusRequestSchema.safeParse(parsed);
       if (
         statusRequest.success &&
@@ -309,7 +335,7 @@ export class InAppBrowserBootstrapServer {
         sameToken(statusRequest.data.token, this.options.token)
       ) {
         const connected = await this.options.getExtensionStatus();
-        this.reply(socket, true, undefined, { connected });
+        this.reply(socket, true, undefined, { connected }, request);
         return;
       }
       const payload = ensureRequestSchema.safeParse(parsed);
@@ -331,9 +357,9 @@ export class InAppBrowserBootstrapServer {
         ownerLeaseIssuedAt: payload.data.ownerLeaseIssuedAt,
         ...(payload.data.recover ? { recover: true } : {}),
       });
-      this.reply(socket, true, undefined, result);
+      this.reply(socket, true, undefined, result, request);
     } catch (error) {
-      this.reply(socket, false, errorMessage(error));
+      this.reply(socket, false, errorMessage(error), undefined, request);
     }
   }
 
@@ -342,8 +368,24 @@ export class InAppBrowserBootstrapServer {
     success: boolean,
     error?: string,
     data?: InAppBrowserBootstrapResult | { connected: boolean | null },
+    request?: Readonly<{ action: string; receivedAt: number }>,
   ) {
-    if (socket.destroyed) return;
+    // Record callers that left before their answer, and how long the answer
+    // took: callers with short deadlines (the 2 s extension check) give up
+    // when this side is slow.
+    const answerMs = request ? Date.now() - request.receivedAt : 0;
+    const callerLeft = () => {
+      if (!request) return;
+      this.options.log?.("browser-bootstrap.caller-left", {
+        action: request.action,
+        answerMs,
+      });
+    };
+    if (socket.destroyed || !socket.writable) {
+      callerLeft();
+      return;
+    }
+    socket.once("error", callerLeft);
     socket.end(
       `${JSON.stringify({
         success,

@@ -167,6 +167,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         state.inAppBrowserBootstrapServer = new InAppBrowserBootstrapServer({
             token: randomUUID(),
             ensureReady: ensureInAppBrowserReady,
+            log: (event, fields) => getMainLogger()?.warn(event, fields),
             getExtensionStatus: async () => {
                 if (!isStellaBrowserBridgeBinaryInstalled())
                     return false;

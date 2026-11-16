@@ -74,6 +74,7 @@ export type HlsSynthesisResult = {
   usage: TtsUsage | null;
   sentChars: number;
   audioSeconds: number;
+  firstSegmentMs: number | null;
 };
 
 export const synthesizeHls = async (input: {
@@ -96,6 +97,8 @@ export const synthesizeHls = async (input: {
   let startSec = 0;
   let audioBytes = 0;
   let capped = false;
+  const startedAt = Date.now();
+  let firstSegmentMs: number | null = null;
   const finish = async (status: HlsSynthesisResult["status"]): Promise<HlsSynthesisResult> => {
     manifest.done = true;
     manifest.error = status === "error" && manifest.segments.length === 0;
@@ -107,6 +110,7 @@ export const synthesizeHls = async (input: {
       usage: provider ? estimateTtsUsage(sentChars(), audioSeconds) : null,
       sentChars: sentChars(),
       audioSeconds,
+      firstSegmentMs,
     };
   };
 
@@ -125,36 +129,50 @@ export const synthesizeHls = async (input: {
     return await finish("error");
   }
 
-  const flush = async () => {
+  // Audio arrives much faster than it plays, so segments come in bursts: a
+  // burst's segments are stored together, then the manifest lists them once.
+  const cut: { bytes: Uint8Array; duration: number }[] = [];
+  const cutSegment = () => {
     if (frames.length === 0) return;
-    const bytes = concat([id3Timestamp(startSec), ...frames]);
-    await input.bucket.put(ttsObjectKey(input.ticket, hlsSegmentFile(manifest.segments.length)), bytes, {
-      httpMetadata: { contentType: "audio/mpeg" },
-    });
-    manifest.segments.push(duration);
-    await writeManifest();
+    cut.push({ bytes: concat([id3Timestamp(startSec), ...frames]), duration });
     startSec += duration;
     frames = [];
     duration = 0;
+  };
+  const publish = async () => {
+    if (cut.length === 0) return;
+    const batch = cut.splice(0);
+    const first = manifest.segments.length;
+    await Promise.all(
+      batch.map((segment, index) =>
+        input.bucket.put(ttsObjectKey(input.ticket, hlsSegmentFile(first + index)), segment.bytes, {
+          httpMetadata: { contentType: "audio/mpeg" },
+        }),
+      ),
+    );
+    manifest.segments.push(...batch.map((segment) => segment.duration));
+    await writeManifest();
+    firstSegmentMs ??= Date.now() - startedAt;
   };
 
   // `openTtsAudio` yields whole frames only.
   const ingest = async (mp3: Uint8Array) => {
     let cursor = 0;
     while (cursor < mp3.length) {
-      if (manifest.segments.length >= MAX_SEGMENTS || audioBytes >= MAX_AUDIO_BYTES) {
+      if (manifest.segments.length + cut.length >= MAX_SEGMENTS || audioBytes >= MAX_AUDIO_BYTES) {
         capped = true;
-        return;
+        break;
       }
       const frame = readFrame(mp3, cursor);
-      if (!frame) return;
+      if (!frame) break;
       frames.push(mp3.slice(cursor, cursor + frame.frameLen));
       audioBytes += frame.frameLen;
       duration += frame.durationSec;
       cursor += frame.frameLen;
-      const target = manifest.segments.length === 0 ? FIRST_SEGMENT_SEC : TARGET_SEGMENT_SEC;
-      if (duration >= target) await flush();
+      const target = manifest.segments.length + cut.length === 0 ? FIRST_SEGMENT_SEC : TARGET_SEGMENT_SEC;
+      if (duration >= target) cutSegment();
     }
+    await publish();
   };
 
   const reader = source.getReader();
@@ -168,7 +186,10 @@ export const synthesizeHls = async (input: {
         return await finish(capped ? "done" : "canceled");
       }
     }
-    if (!capped) await flush();
+    if (!capped) {
+      cutSegment();
+      await publish();
+    }
     return await finish(manifest.segments.length > 0 ? "done" : "error");
   } catch (error) {
     await reader.cancel().catch(() => undefined);

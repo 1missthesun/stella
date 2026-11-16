@@ -615,6 +615,8 @@ const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
       transport: "hls",
       status: result.status,
       segments: result.segments,
+      queuedMs: startedAt - (ctx.db.one<{ at: number }>("SELECT created_at AS at FROM tts_streams WHERE id = ?", job.id)?.at ?? startedAt),
+      firstSegmentMs: result.firstSegmentMs,
       requestChars: job.text.length,
       ...result.usage,
       durationMs: Date.now() - startedAt,

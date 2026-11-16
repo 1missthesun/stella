@@ -2869,10 +2869,16 @@ export function stellaAgents(host: StellaAgentsHost) {
         await settle(settled.answer, true);
         const route = await stellaRoute({ snapshot: harness.snapshot.bind(harness), conversationId: agent.id }, context);
         const starter = await harness.commit((tx) => unansweredStarter(tx, agent.id, requestId, settled.answer), context);
-        const reply = starter ? waitingReplyNote(route, settled.answer, textOf(message), waitedFor) : undefined;
+        // Who asked decides where the reply goes. A run placed here from
+        // elsewhere is a top-level agent on this host whoever started it, so
+        // its depth here can't tell Stella's task from a lead's helper.
+        const stella = await host.directory?.conversationId(context).catch(() => undefined);
+        const fromStella =
+          starter !== undefined && (starter.threadId.toLowerCase() === STELLA_MESSAGE_TARGET || starter.threadId === stella);
+        const reply = fromStella ? waitingReplyNote(route, settled.answer, textOf(message), waitedFor) : undefined;
         if (reply && route?.root !== undefined) {
           await deliverNote(route.root, reply, context, (id) => harness.conversation(id, context)).catch(() => false);
-        } else if (starter && route && route.self.depth > 1 && host.directory) {
+        } else if (starter && !fromStella && host.directory) {
           // A helper placed here by a lead elsewhere: its reply goes to that lead.
           await host.directory
             .message(

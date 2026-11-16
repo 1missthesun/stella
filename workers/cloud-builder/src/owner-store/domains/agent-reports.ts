@@ -588,7 +588,11 @@ const route = async (ctx: OwnerContext, row: OutboxRow): Promise<void> => {
       reportId: row.report_id,
       parentThreadId: parent.thread_id,
       ownerGeneration: row.owner_generation ?? parent.owner_generation ?? "",
-      text: `${reportHeading(row.outcome)} ${row.description.trim() || row.thread_id} (thread ${row.thread_id})\n\n${row.text}`,
+      // A note (a helper's reply) is already framed as a message from it.
+      text:
+        row.kind === "note"
+          ? row.text
+          : `${reportHeading(row.outcome)} ${row.description.trim() || row.thread_id} (thread ${row.thread_id})\n\n${row.text}`,
       fromThreadId: row.thread_id,
     });
     settle(ctx, row, "delivered", `agent:${parent.thread_id}`);
@@ -764,6 +768,40 @@ export const queueStellaNote = (
     args.conversationId,
     args.ownerGeneration,
     args.conversationId,
+    args.text,
+    ctx.now,
+    ctx.now,
+  );
+  scheduleDelivery(ctx.db, args.noteId, ctx.now);
+};
+
+/**
+ * A message from a helper to the agent that started it (its lead), delivered
+ * like the helper's report would be: a note in the same outbox with the lead
+ * as requester.
+ */
+export const queueAgentNote = (
+  ctx: Pick<OwnerContext, "db" | "now">,
+  args: {
+    noteId: string;
+    parentThreadId: string;
+    conversationId: string;
+    ownerGeneration: string;
+    fromThreadId: string;
+    text: string;
+  },
+): void => {
+  ctx.db.run(
+    `INSERT INTO agent_report_outbox
+       (report_id, kind, thread_id, attempt_generation, conversation_id, owner_generation, requester_kind,
+        requester_id, outcome, description, agent_type, text, state, attempts, created_at, updated_at)
+     VALUES (?, 'note', ?, 0, ?, ?, 'agent', ?, 'completed', '', '', ?, 'pending', 0, ?, ?)
+     ON CONFLICT (report_id) DO NOTHING`,
+    args.noteId,
+    args.fromThreadId,
+    args.conversationId,
+    args.ownerGeneration,
+    args.parentThreadId,
     args.text,
     ctx.now,
     ctx.now,

@@ -1024,11 +1024,33 @@ export function stellaAgents(host: StellaAgentsHost) {
               if (agent.reported.includes(settled.answer)) return next();
               agent.reported.push(settled.answer);
               agent.waiting = { waitingFor: waitedFor, at: Date.now() };
+              const starter = await unansweredStarter(tx, agentConversationId, `agent-msg:${reporter.id}`, settled.answer);
               const reply =
-                replyRoute?.root === runtime.conversationId && (await unansweredStella(tx, agentConversationId, `agent-msg:${reporter.id}`, settled.answer))
+                starter && replyRoute?.root === runtime.conversationId
                   ? waitingReplyNote(replyRoute, settled.answer, textOf(answer), waitedFor)
                   : undefined;
               if (reply) notes.send.push(reply);
+              // A helper whose lead (this conversation's agent) messaged it gets
+              // the same guarantee: its last words reach the lead as its reply,
+              // the way a helper's message to its lead goes.
+              if (
+                starter &&
+                self.agentType !== "orchestrator" &&
+                self.parentConversationId !== undefined &&
+                self.threadId !== undefined &&
+                starter.threadId === self.threadId
+              ) {
+                await tx.createTask(
+                  Reporter,
+                  {
+                    threadId: self.threadId,
+                    conversationId: runtime.conversationId,
+                    message: formatAgentMessage({ threadId, label: description }, boundedReply(textOf(answer), waitedFor)),
+                    note: true,
+                  },
+                  { ownership: { kind: "conversation" }, background: true, conversationId: self.parentConversationId as ConversationId },
+                );
+              }
               return {
                 status: "running",
                 checkpoint: {
@@ -1669,11 +1691,17 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  // Did the run (from its input through its answer) take in a message from the
-  // Stella that started it and never answer her with send_message?
-  const unansweredStella = async (tx: Tx, conversationId: ConversationId, requestId: string, answer: EntryId): Promise<boolean> => {
+  // Did the run (from its input through its answer) take in a message from
+  // whoever started the agent (Stella, or its lead) and never answer it with
+  // send_message? Returns that starter.
+  const unansweredStarter = async (
+    tx: Tx,
+    conversationId: ConversationId,
+    requestId: string,
+    answer: EntryId,
+  ): Promise<{ label: string; threadId: string } | undefined> => {
     const from = (await tx.submissionByRequest(conversationId, requestId))?.entry;
-    if (from === undefined) return false;
+    if (from === undefined) return undefined;
     const inputs: string[] = [];
     const targets: string[] = [];
     let cursor: Parameters<Tx["scanEntries"]>[2];
@@ -1694,8 +1722,13 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (cursor === undefined) break;
     }
     const starter = starterMessageSender(inputs.reverse());
-    if (!starter) return false;
-    return !targets.some((to) => to.toLowerCase() === STELLA_MESSAGE_TARGET || to === starter.threadId);
+    if (!starter) return undefined;
+    return targets.some((to) => to.toLowerCase() === STELLA_MESSAGE_TARGET || to === starter.threadId) ? undefined : starter;
+  };
+
+  const boundedReply = (text: string, waitingFor: string): string => {
+    const full = unansweredWaitingReply(text, waitingFor);
+    return full.length > AGENT_MESSAGE_MAX_CHARS ? `${full.slice(0, AGENT_MESSAGE_MAX_CHARS - 20).trimEnd()}\n[...truncated]` : full;
   };
 
   // Its reply to Stella, as if it had sent it with send_message: only for a
@@ -1707,8 +1740,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     waitingFor: string,
   ): StellaPendingNote | undefined => {
     if (!route?.root || !route.from || route.self.depth !== 1) return undefined;
-    const full = unansweredWaitingReply(text, waitingFor);
-    const message = full.length > AGENT_MESSAGE_MAX_CHARS ? `${full.slice(0, AGENT_MESSAGE_MAX_CHARS - 20).trimEnd()}\n[...truncated]` : full;
+    const message = boundedReply(text, waitingFor);
     return {
       callId: `waiting-reply:${answer}`,
       key: `waiting-reply:${route.from.threadId}:${answer}`,
@@ -2836,10 +2868,23 @@ export function stellaAgents(host: StellaAgentsHost) {
         // note, so a message from its last step must still go out as a message.
         await settle(settled.answer, true);
         const route = await stellaRoute({ snapshot: harness.snapshot.bind(harness), conversationId: agent.id }, context);
-        const owed = await harness.commit((tx) => unansweredStella(tx, agent.id, requestId, settled.answer), context);
-        const reply = owed ? waitingReplyNote(route, settled.answer, textOf(message), waitedFor) : undefined;
+        const starter = await harness.commit((tx) => unansweredStarter(tx, agent.id, requestId, settled.answer), context);
+        const reply = starter ? waitingReplyNote(route, settled.answer, textOf(message), waitedFor) : undefined;
         if (reply && route?.root !== undefined) {
           await deliverNote(route.root, reply, context, (id) => harness.conversation(id, context)).catch(() => false);
+        } else if (starter && route && route.self.depth > 1 && host.directory) {
+          // A helper placed here by a lead elsewhere: its reply goes to that lead.
+          await host.directory
+            .message(
+              {
+                key: `waiting-reply:${threadId}:${settled.answer}`,
+                to: starter.threadId,
+                text: boundedReply(textOf(message), waitedFor),
+                from: { threadId, label: args.description.trim() || "An agent" },
+              },
+              context,
+            )
+            .catch(() => undefined);
         }
         return { threadId, status: "ok", finalText: textOf(message), waitingFor: waitedFor };
       }

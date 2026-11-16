@@ -82,7 +82,7 @@ import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
-import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
+import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
 import { WAITING_FOR_MAX_CHARS, helperStoppedText, resultWaitingFor, resultWaitingReply, waitingResultJson } from "@stella/contracts/agent-waiting";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
@@ -4737,6 +4737,20 @@ export const applyAgentThreadEvent = (
       // It ended waiting after a message from Stella, which started it: a waiting
       // turn sends no report, so its last words reach her as its reply.
       const reply = status === "completed" ? resultWaitingReply(event.resultJson) : undefined;
+      // A helper's reply to its lead's message goes to that lead the same way.
+      if (reply && thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id && thread.owner_generation) {
+        queueAgentNote(
+          { db, now: event.completedAt },
+          {
+            noteId: agentReportReceipt(`waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
+            parentThreadId: thread.parent_thread_id,
+            conversationId: thread.conversation_id,
+            ownerGeneration: thread.owner_generation,
+            fromThreadId: thread.thread_id,
+            text: formatAgentMessage({ threadId: thread.thread_id, label: thread.description || "An agent" }, reply),
+          },
+        );
+      }
       if (reply && !thread.parent_thread_id && thread.owner_generation) {
         queueStellaNote(
           { db, now: event.completedAt },

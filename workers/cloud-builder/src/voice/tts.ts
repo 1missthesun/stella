@@ -33,7 +33,9 @@ export const resolveTtsVoice = (voice: unknown): string =>
 // Simba reads text in the voice's own language unless told otherwise, so an
 // English voice turns Japanese, Russian or Arabic into gibberish. Languages
 // written in their own script are recognised here, and Vietnamese by its
-// letters; Simba tells the other Latin-script languages apart itself.
+// letters; Simba tells the other Latin-script languages apart itself. Codes
+// outside Simba's list (Bulgarian, Macedonian, Mongolian) are taken too and
+// read far better than a neighbouring language's.
 const SCRIPTS: readonly { language: string; pattern: RegExp; refine?: (text: string) => string }[] = [
   { language: "ja", pattern: /[\u3040-\u30ff\u31f0-\u31ff]/gu },
   { language: "ko", pattern: /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/gu },
@@ -50,15 +52,21 @@ const SCRIPTS: readonly { language: string; pattern: RegExp; refine?: (text: str
     language: "ru",
     pattern: /[\u0400-\u04ff]/gu,
     refine: (text) =>
-      /[әғқңөұүһӘҒҚҢӨҰҮҺ]/u.test(text)
+      /[әғқңұһӘҒҚҢҰҺ]/u.test(text)
         ? "kk"
-        : /[ўЎ]/u.test(text)
-          ? "be"
-          : /[ђјљњћџЂЈЉЊЋЏ]/u.test(text)
-            ? "sr"
-            : /[іїєґІЇЄҐ]/u.test(text)
-              ? "uk"
-              : "ru",
+        : /[өүӨҮ]/u.test(text)
+          ? "mn"
+          : /[ўЎ]/u.test(text)
+            ? "be"
+            : /[ѓќѕЃЌЅ]/u.test(text)
+              ? "mk"
+              : /[ђјљњћџЂЈЉЊЋЏ]/u.test(text)
+                ? "sr"
+                : /[іїєґІЇЄҐ]/u.test(text)
+                  ? "uk"
+                  : /[ъЪ]/u.test(text) && !/[ыэёЫЭЁ]/u.test(text)
+                    ? "bg"
+                    : "ru",
   },
   { language: "hi", pattern: /[\u0900-\u097f]/gu },
   { language: "bn", pattern: /[\u0980-\u09ff]/gu },

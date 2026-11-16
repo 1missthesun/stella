@@ -361,7 +361,7 @@ money is reachable without a session.
    link, or Stella → **Connect to your own server** and paste it.
 
 Models: without an OpenRouter key the owner connects their Claude or ChatGPT
-account in the app (Settings → Engines); cloud turns use it by default
+account in the app (Settings → Claude and ChatGPT); cloud turns use it by default
 (Claude first, then ChatGPT, then Stella's models if a key is set). The owner
 account can't be deleted from a device; `bun scripts/selfhost.mjs destroy`
 removes the whole server.

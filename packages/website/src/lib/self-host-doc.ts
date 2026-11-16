@@ -91,15 +91,15 @@ The last line is \`"status":"ready"\`. The server is running and the line carrie
 - \`link\`: \`stella://pair?server=…&code=…\`
 - \`qrFile\`: the same link as a QR code (SVG). Every code gets its own file, so making a second code doesn't overwrite the first.
 
-Each code works **once** and expires after **10 minutes**. Make a new one for every device with \`bun scripts/selfhost.mjs pair --json\` (its last line has the same fields). Once one computer is connected, the user can also make codes there: Stella → Settings → **Connect a device**.
+Each code works **once** and expires after **10 minutes**. Make a new one for every device with \`bun scripts/selfhost.mjs pair --json\` (its last line has the same fields). Once one computer is connected, the user can also make codes there: Stella → Settings → Account → Server → **Connect a device**.
 
 **Phone:** show the user the QR code on their screen (open \`qrFile\`). In the Stella app (App Store or Google Play), they choose **Connect your own server** and scan it.
 
-**Desktop:** on the computer where Stella is installed, open the link (\`open "<link>"\` on macOS, \`xdg-open "<link>"\` on Linux), or in Stella open Settings → Server → **Connect…** (on the sign-in screen: **Have your own Stella server? Connect it**) and paste it into **Connect to your own server**. Stella then restarts on the server; the first start downloads Stella from it, which can take a few minutes. No Stella yet? Download it from https://stella.sh first.
+**Desktop:** on the computer where Stella is installed, open the link (\`open "<link>"\` on macOS, \`xdg-open "<link>"\` on Linux), or in Stella open Settings → Account → Server → **Connect a server** (on the sign-in screen: **Have your own Stella server? Connect it**) and paste it into **Connect to your own server**. Stella then restarts on the server; the first start downloads Stella from it, which can take a few minutes. No Stella yet? Download it from https://stella.sh first.
 
 Treat the link like a password until it's used or expired. Don't post it anywhere.
 
-Then the user connects their Claude or ChatGPT account in the app (Settings → **Engines**): that's where the models come from, and cloud turns use it by default. Without it, and without an OpenRouter key, chats on the server have no model to answer with.
+Then the user connects their Claude or ChatGPT account in the app (Settings → **Claude and ChatGPT**): that's where the models come from, and cloud turns use it by default. Without it, and without an OpenRouter key, chats on the server have no model to answer with.
 
 **Done means:** the last line said \`ready\`, and the user's phone or computer shows their server's name after scanning.
 

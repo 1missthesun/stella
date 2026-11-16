@@ -15,6 +15,7 @@ import { adminAccessDenied } from "../admin/access.js";
 import { createAuth, backendUrl, ownerInternalCall } from "../auth/auth.js";
 import { revokeOwnerSessions } from "../session-revocation.js";
 import { verifyUserToken } from "../auth-jwt.js";
+import { clientIp, rateKeyForIp } from "../http/client-ip.js";
 import { fail, json } from "../http/response.js";
 import { fixedWorkSha256SecretEqual } from "../service-bearer.js";
 import { serverDiscovery } from "./discovery.js";
@@ -90,18 +91,6 @@ const constantTimeEqual = (left: string, right: string): boolean => {
 };
 
 const refuse = (status: number, code: string, error: string): Response => fail(status, error, { code });
-
-const clientIp = (request: Request): string =>
-  request.headers.get("cf-connecting-ip")?.trim() || request.headers.get("x-real-ip")?.trim() || "unknown";
-
-const rateKeyForIp = (ip: string): string => {
-  if (!ip.includes(":")) return ip;
-  const [head = "", tail = ""] = ip.toLowerCase().split("::");
-  const left = head ? head.split(":") : [];
-  const right = tail ? tail.split(":") : [];
-  const groups = ip.includes("::") ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right] : left;
-  return `${groups.slice(0, 4).join(":")}::/64`;
-};
 
 const withinRate = async (env: Cloudflare.Env, key: string, limit: number, now: number): Promise<boolean> => {
   const windowStart = now - (now % CLAIM_WINDOW_MS);

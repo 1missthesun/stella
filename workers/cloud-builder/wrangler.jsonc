@@ -90,6 +90,8 @@
     "SITES_HOST": "*-dev.stellasites.app",
     "SITES_SHARED_ORIGIN": "",
     "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
+    // Where in-app feedback is emailed (src/feedback). Unset: feedback is only stored.
+    "STELLA_FEEDBACK_TO": "contact@fromyou.ai",
   },
   "secrets": {
     "required": [
@@ -318,6 +320,7 @@
       "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
       "CANVAS_OWNER_SITE_URL": "https://stella-website-dev.fromyou.workers.dev",
       "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
+      "STELLA_FEEDBACK_TO": "contact@fromyou.ai",
     },
     "observability": {
       "enabled": true,
@@ -700,6 +703,7 @@
         "SITES_SHARED_ORIGIN": "",
         "SLACK_ENVIRONMENTS": "1",
         "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
+        "STELLA_FEEDBACK_TO": "contact@fromyou.ai",
         "ADMIN_ACCESS_TEAM_DOMAIN": "fromyou.cloudflareaccess.com",
         "ADMIN_ACCESS_AUD": "fc47bb85d7a88032bd25e910c3212ca1f7049d0c2f7c4dad4b2e367b65e16614",
       },

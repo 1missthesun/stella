@@ -44,6 +44,7 @@ export const PREFERRED_BROWSERS = [
 export type PreferredBrowser = (typeof PREFERRED_BROWSERS)[number];
 
 export const FEEDBACK_MAX_CHARS = 32_000;
+export const FEEDBACK_CONTACT_MAX_CHARS = 200;
 
 export type Preferences = {
   locale: PreferenceLocale | null;
@@ -70,8 +71,17 @@ export type PreferenceCalls = {
   };
   "support.grant": { args: Record<string, never>; result: Preferences };
   "support.revoke": { args: Record<string, never>; result: Preferences };
+  /**
+   * Works signed in or out. Signed in, the account is recorded and answered;
+   * signed out, `contact` (optional) is how to reply.
+   */
   "feedback.submit": {
-    args: { message: string; appVersion?: string; platform?: string };
+    args: {
+      message: string;
+      contact?: string;
+      appVersion?: string;
+      platform?: string;
+    };
     result: null;
   };
 };

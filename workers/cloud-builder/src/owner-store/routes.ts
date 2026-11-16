@@ -20,11 +20,13 @@ import {
   HEADER_TOKEN_IAT,
 } from "../conversation-types.js";
 import { readJsonObject } from "../http/body.js";
+import { clientIp } from "../http/client-ip.js";
 import { requireCaller, verifyCaller } from "../http/caller.js";
 import { admitSession, ownerGateRevocations } from "../session-revocation.js";
 import { ownerRegistry } from "./domains.js";
 import { RpcError, toBackendError } from "./errors.js";
-import type { OwnerCaller, OwnerRegistry } from "./registry.js";
+import type { CallName } from "@stella/contracts/backend/api";
+import type { OwnerCaller, OwnerRegistry, PublicCallDef } from "./registry.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { stageClaudeSessionChunk } from "./domains/claude-sessions.js";
 
@@ -68,6 +70,42 @@ const readArgs = async (request: Request, maxBytes = MAX_RPC_BODY_BYTES): Promis
   return body.value.args ?? {};
 };
 
+const runPublicCall = async (
+  request: Request,
+  env: RouteEnv,
+  name: string,
+  def: PublicCallDef<CallName>,
+): Promise<RpcResponse> => {
+  try {
+    let caller: OwnerCaller | null = null;
+    if (request.headers.get("authorization")) {
+      const verified = await requireCaller(request, env);
+      if (!verified.ok) throw verified.error;
+      caller = verified.caller;
+    }
+    const args = def.parse(await readArgs(request));
+    const value = await def.handler(
+      {
+        caller,
+        env: env as unknown as Cloudflare.Env,
+        now: Date.now(),
+        clientIp: clientIp(request),
+      },
+      args as never,
+    );
+    return { ok: true, value: value ?? null };
+  } catch (error) {
+    if (!(error instanceof RpcError)) {
+      console.error(JSON.stringify({
+        event: "public_call_failed",
+        name,
+        message: error instanceof Error ? error.message : String(error),
+      }));
+    }
+    return { ok: false, error: toBackendError(error) };
+  }
+};
+
 export const handleRpc = async (
   request: Request,
   env: RouteEnv,
@@ -87,6 +125,7 @@ export const handleRpc = async (
   if (!def) {
     return rpcJson({ ok: false, error: toBackendError(new RpcError("NOT_FOUND", `Unknown function ${name}.`)) });
   }
+  if (def.scope === "public") return rpcJson(await runPublicCall(request, env, name, def));
   const verified = await requireCaller(request, env);
   if (!verified.ok) return rpcJson({ ok: false, error: toBackendError(verified.error) });
   const { caller } = verified;

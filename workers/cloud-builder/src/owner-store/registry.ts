@@ -290,7 +290,21 @@ export type GlobalCallDef<K extends CallName> = {
   handler: (ctx: GlobalContext, args: CallArgs<K>) => CallResult<K> | Promise<CallResult<K>>;
 };
 
-export type CallDef<K extends CallName> = OwnerCallDef<K> | GlobalCallDef<K>;
+/** Runs in the Worker for signed-in and signed-out callers alike; `caller` is null without a sign-in. */
+export type PublicContext = {
+  caller: OwnerCaller | null;
+  env: Cloudflare.Env;
+  now: number;
+  clientIp: string;
+};
+
+export type PublicCallDef<K extends CallName> = {
+  scope: "public";
+  parse: Parser<CallArgs<K>>;
+  handler: (ctx: PublicContext, args: CallArgs<K>) => CallResult<K> | Promise<CallResult<K>>;
+};
+
+export type CallDef<K extends CallName> = OwnerCallDef<K> | GlobalCallDef<K> | PublicCallDef<K>;
 
 export type ViewDef<K extends ViewName> = {
   parse: Parser<ViewArgs<K>>;

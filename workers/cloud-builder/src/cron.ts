@@ -16,8 +16,14 @@ export async function runScheduled(
     async () =>
       (await import("./auth/account-deletion.js")).runAccountDeletions(env as unknown as Cloudflare.Env),
   ];
-  const sweeps: Array<[string, () => Promise<unknown>]> = controller.cron === HOURLY_CRON ? [deletions] : [
+  const feedback: [string, () => Promise<unknown>] = [
+    "feedback emails",
+    async () =>
+      (await import("./owner-store/domains/feedback.js")).retryFeedbackEmails(env as unknown as Cloudflare.Env),
+  ];
+  const sweeps: Array<[string, () => Promise<unknown>]> = controller.cron === HOURLY_CRON ? [deletions, feedback] : [
     deletions,
+    feedback,
     ["model prices", () => syncModelPrices(env)],
     ["abuse tables", () => sweepAbuseTables(env)],
     ["auth tables", () => sweepAuthTables(env)],

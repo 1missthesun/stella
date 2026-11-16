@@ -204,6 +204,40 @@ const sendNewSignInAlertEmail = async (
   }
 };
 
+export type OutgoingEmail = {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  replyTo?: string;
+};
+
+/** Sends through the Cloudflare Email Service binding, falling back to Resend. */
+export const sendEmail = async (env: AuthEnv, message: OutgoingEmail): Promise<"cloudflare" | "resend"> => {
+  const binding = (env as { EMAIL?: SendEmail }).EMAIL;
+  const cloudflareFrom = binding ? configured(env, "STELLA_EMAIL_FROM") : undefined;
+  const resendKey = configured(env, "RESEND_API_KEY");
+  const resendFrom = resendKey ? configured(env, "RESEND_FROM") ?? configured(env, "STELLA_EMAIL_FROM") : undefined;
+  if (!cloudflareFrom && !resendFrom) throw new Error("Email is not set up on this Stella.");
+  const { replyTo, ...content } = message;
+  if (binding && cloudflareFrom) {
+    try {
+      await binding.send({ from: parseMailbox(cloudflareFrom), ...content, ...(replyTo ? { replyTo } : {}) });
+      return "cloudflare";
+    } catch (error) {
+      if (!resendFrom) throw error;
+    }
+  }
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
+    body: JSON.stringify({ from: resendFrom, ...content, ...(replyTo ? { reply_to: replyTo } : {}) }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`Resend refused the email (${response.status}).`);
+  return "resend";
+};
+
 export const sendAccountEmail = async (
   env: AuthEnv,
   email: string,
@@ -214,30 +248,9 @@ export const sendAccountEmail = async (
     console.log(JSON.stringify({ event, provider: "test_account_log", subject: build("").subject }));
     return;
   }
-  const binding = (env as { EMAIL?: SendEmail }).EMAIL;
-  const cloudflareFrom = binding ? configured(env, "STELLA_EMAIL_FROM") : undefined;
-  const resendKey = configured(env, "RESEND_API_KEY");
-  const resendFrom = resendKey ? configured(env, "RESEND_FROM") ?? configured(env, "STELLA_EMAIL_FROM") : undefined;
-  if (!cloudflareFrom && !resendFrom) throw new Error("Email is not set up on this Stella.");
   const logo = configured(env, "STELLA_EMAIL_LOGO_URL") ?? `${websiteUrl(env)}/stella-logo.png`;
-  const message = build(escapeHtmlAttribute(logo));
-  if (binding && cloudflareFrom) {
-    try {
-      await binding.send({ from: parseMailbox(cloudflareFrom), to: email, ...message });
-      console.log(JSON.stringify({ event, provider: "cloudflare" }));
-      return;
-    } catch (error) {
-      if (!resendFrom) throw error;
-    }
-  }
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: resendFrom, to: email, ...message }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`Resend refused the email (${response.status}).`);
-  console.log(JSON.stringify({ event, provider: "resend" }));
+  const provider = await sendEmail(env, { to: email, ...build(escapeHtmlAttribute(logo)) });
+  console.log(JSON.stringify({ event, provider }));
 };
 
 const parseMailbox = (value: string): string | { email: string; name: string } => {

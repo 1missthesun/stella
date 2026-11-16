@@ -15,6 +15,7 @@ import { homeDomain } from "./domains/home.js";
 import { driveDomain } from "./domains/drive.js";
 import { schedulesDomain } from "./domains/schedules.js";
 import { preferencesDomain } from "./domains/preferences.js";
+import { feedbackDomain } from "./domains/feedback.js";
 import { accountDomain } from "./domains/account.js";
 import { sharesDomain } from "./domains/shares.js";
 import { searchDomain } from "./domains/search.js";
@@ -60,6 +61,7 @@ export const ownerDomains: OwnerDomain[] = [
   driveDomain,
   schedulesDomain,
   preferencesDomain,
+  feedbackDomain,
   accountDomain,
   sharesDomain,
   searchDomain,

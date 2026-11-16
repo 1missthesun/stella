@@ -1,4 +1,5 @@
 import { createAuth, sendAccountEmail, testAccountsEnabled } from "./auth.js";
+import { forgetFeedbackSender } from "../owner-store/domains/feedback.js";
 import { buildAccountDeletionEmail, type AccountDeletionEmailKind } from "./email-templates.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { revokeOwnerSessions } from "../session-revocation.js";
@@ -246,6 +247,7 @@ const advanceDeleting = async (env: Cloudflare.Env, row: DeletionRow, now: numbe
       d1(env).prepare("DELETE FROM github_installations WHERE owner_id = ?").bind(row.user_id),
       d1(env).prepare("DELETE FROM slack_github_connects WHERE owner_id = ?").bind(row.user_id),
       d1(env).prepare("DELETE FROM device_pairings WHERE owner_user_id = ?").bind(row.user_id),
+      forgetFeedbackSender(d1(env), row.user_id),
       d1(env)
         .prepare("UPDATE account_deletions SET owner_closed_at = ? WHERE user_id = ?")
         .bind(now, row.user_id),

@@ -1,5 +1,4 @@
 import {
-  FEEDBACK_MAX_CHARS,
   PREFERENCE_LOCALES,
   PREFERRED_BROWSERS,
   type PreferenceCalls,
@@ -8,7 +7,7 @@ import {
   type PreferredBrowser,
   type SupportAccessEntry,
 } from "@stella/contracts/backend/preferences";
-import { boolean, empty, literal, object, optional, string } from "../args.js";
+import { boolean, empty, literal, object, optional } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -20,7 +19,6 @@ const SUPPORT_UNTIL_KEY = "support_access_until";
 const SUPPORT_LOG_KEY = "support_access_log";
 const SUPPORT_GRANT_MS = 24 * 60 * 60 * 1000;
 const SUPPORT_LOG_MAX = 50;
-const FEEDBACK_META_MAX_CHARS = 64;
 
 export const PREFERENCES_MIGRATION = {
   id: "preferences.1-init",
@@ -142,35 +140,6 @@ const setPreferences = (
   return readPreferences(ctx.db);
 };
 
-const submitFeedback = async (
-  ctx: OwnerContext,
-  args: PreferenceCalls["feedback.submit"]["args"],
-): Promise<null> => {
-  const message = args.message.trim();
-  if (!message) throw new RpcError("BAD_REQUEST", "Feedback can't be empty.");
-  if (message.length > FEEDBACK_MAX_CHARS) {
-    throw new RpcError("BAD_REQUEST", `Feedback is limited to ${FEEDBACK_MAX_CHARS} characters.`);
-  }
-  enforceOwnerRateLimit(
-    ctx.db,
-    ctx.now,
-    "feedback.submit",
-    { count: 10, windowMs: 60_000 },
-    "Too many feedback submissions. Please try again in a minute.",
-  );
-  const database = ctx.env.DB;
-  if (!database) throw new RpcError("UNAVAILABLE", "Feedback isn't available right now.");
-  const appVersion = args.appVersion?.trim().slice(0, FEEDBACK_META_MAX_CHARS) || null;
-  const platform = args.platform?.trim().slice(0, FEEDBACK_META_MAX_CHARS) || null;
-  await database
-    .prepare(
-      "INSERT INTO feedback (id, message, app_version, platform, created_at) VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind(crypto.randomUUID(), message, appVersion, platform, ctx.now)
-    .run();
-  return null;
-};
-
 export const preferencesDomain = {
   name: "preferences",
   migrations: [PREFERENCES_MIGRATION],
@@ -200,16 +169,6 @@ export const preferencesDomain = {
       scope: "owner",
       parse: empty(),
       handler: (ctx: OwnerContext) => setSupportAccess(ctx, false),
-    },
-    "feedback.submit": {
-      scope: "owner",
-      parse: object({
-        message: string({ max: FEEDBACK_MAX_CHARS * 2 }),
-        appVersion: optional(string({ max: 1_000 })),
-        platform: optional(string({ max: 1_000 })),
-      }),
-      handler: (ctx: OwnerContext, args: PreferenceCalls["feedback.submit"]["args"]) =>
-        submitFeedback(ctx, args),
     },
   },
   internal: {

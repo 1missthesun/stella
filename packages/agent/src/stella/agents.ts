@@ -2657,18 +2657,26 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!current) return [];
       delete current.away;
       if (current.carried?.runKey === args.runKey) return [...current.carried.messages];
+      // A new run placed here is its starter resuming it (the cloud holds automatic
+      // wakes for a stopped task), so a stop marked here earlier no longer holds.
+      // Left in place, it kept every later wake here (a background command's exit,
+      // a helper's message) held as if the task were still stopped.
+      delete current.stopped;
+      delete current.paused;
       const messages = [...(current.held ?? [])];
       delete current.held;
       current.carried = { runKey: args.runKey, messages };
       return messages;
     }, context);
-    const settle = async (answer?: EntryId): Promise<string[]> => {
+    // `closingToo`: the run sends no report (it ended waiting), so messages from
+    // its last step go out as messages instead of joining the report.
+    const settle = async (answer?: EntryId, closingToo = false): Promise<string[]> => {
       const waiting = answer !== undefined && (await agentsBusy(busyReader(harness, context), agent.id).catch(() => false));
       const notes = await harness.commit((tx) => settleNotes(tx, agent.id, waiting ? undefined : answer), context);
-      for (const note of notes.send) {
+      for (const note of closingToo ? [...notes.send, ...notes.closing] : notes.send) {
         await deliverNote(root.id, note, context, (id) => harness.conversation(id, context)).catch(() => false);
       }
-      return notes.closing.map((note) => note.message);
+      return closingToo ? [] : notes.closing.map((note) => note.message);
     };
     let content = [...carried, args.prompt].join("\n\n");
     let requestId = `placed:${args.runKey}`;
@@ -2754,8 +2762,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         return { threadId, status: "error", error: agentFailureText(message) };
       }
       if (waitedFor !== undefined) {
-        const said = withClosingNotes(await settle(settled.answer), textOf(message));
-        return { threadId, status: "ok", finalText: said, waitingFor: waitedFor };
+        // A run that ends waiting sends no report: its text is only the waiting
+        // note, so a message from its last step must still go out as a message.
+        await settle(settled.answer, true);
+        return { threadId, status: "ok", finalText: textOf(message), waitingFor: waitedFor };
       }
       const finalText = withClosingNotes(await settle(settled.answer), textOf(message));
       if (finalText.trim()) return { threadId, status: "ok", finalText };

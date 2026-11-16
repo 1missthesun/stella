@@ -23,11 +23,6 @@
   justify-content: flex-end;
 }
 
-.connect-plan__head .composer-notice__secondary.pill-btn {
-  height: 28px;
-  padding-block: 0;
-}
-
 .connect-plan__options {
   display: flex;
   flex-direction: column;

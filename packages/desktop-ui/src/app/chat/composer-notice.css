@@ -192,8 +192,10 @@
   }
 }
 
-/* Same height as the other chat-card actions (28px). */
-.composer-notice__primary.pill-btn {
+/* Both actions share one size, the other chat-card actions' 28px; the
+   primary differs only in its fill. */
+.composer-notice__primary.pill-btn,
+.composer-notice__secondary.pill-btn {
   height: 28px;
   padding-block: 0;
 }

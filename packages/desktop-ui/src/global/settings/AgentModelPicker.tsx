@@ -6,7 +6,7 @@ import { EngineScopedModelList } from "@/global/settings/EngineScopedModelList";
 import { ProviderOnlyPicker, type ProviderOption, } from "@/global/settings/ProviderOnlyPicker";
 import { VoiceCatalogPicker } from "@/global/settings/VoiceCatalogPicker";
 import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
-import { coerceRealtimeVoiceProvider, type ReadAloudVoiceProvider, type RealtimeVoicePreferences, type RealtimeVoiceUnderlyingProvider, } from "@stella/contracts/local-preferences";
+import { coerceRealtimeVoiceProvider, resolveReadAloudProvider, type ReadAloudVoiceProvider, type RealtimeVoicePreferences, type RealtimeVoiceUnderlyingProvider, } from "@stella/contracts/local-preferences";
 import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
 import { useClaudeCodeModelCatalog } from "@/global/settings/hooks/use-claude-code-model-catalog";
 import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
@@ -574,17 +574,17 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     }, [patchRealtimeVoice, preferences, t]);
     const handleReadAloudProviderSelect = useCallback((provider: ReadAloudVoiceProvider) => {
         const previous = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
-        if ((previous.readAloudProvider ?? "gemini") === provider)
+        if (resolveReadAloudProvider(previous) === provider)
             return;
         void patchRealtimeVoice({ ...previous, readAloudProvider: provider }, t("settings.agentModelPicker.errors.updateReadAloud"));
     }, [patchRealtimeVoice, preferences, t]);
     const handleReadAloudVoiceSelect = useCallback((voiceId: string) => {
         const previous = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
-        if (previous.voices?.gemini === voiceId)
+        if (previous.voices?.stella === voiceId)
             return;
         void patchRealtimeVoice({
             ...previous,
-            voices: { ...(previous.voices ?? {}), gemini: voiceId },
+            voices: { ...(previous.voices ?? {}), stella: voiceId },
         }, t("settings.agentModelPicker.errors.updateVoice"));
     }, [patchRealtimeVoice, preferences, t]);
     const handleVoiceProviderSelect = useCallback(async (providerKey: string) => {

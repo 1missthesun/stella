@@ -1035,7 +1035,7 @@ const normalizeRealtimeVoiceSelections = (
     gptlive?: unknown;
     openai?: unknown;
     xai?: unknown;
-    gemini?: unknown;
+    stella?: unknown;
   };
   const out: RealtimeVoiceSelections = {};
   if (typeof record.gptlive === "string" && record.gptlive.trim().length > 0) {
@@ -1047,8 +1047,10 @@ const normalizeRealtimeVoiceSelections = (
   if (typeof record.xai === "string" && record.xai.trim().length > 0) {
     out.xai = record.xai.trim();
   }
-  if (typeof record.gemini === "string" && record.gemini.trim().length > 0) {
-    out.gemini = record.gemini.trim();
+  // A voice saved under the old "gemini" key belongs to the previous
+  // read-aloud model, so it is dropped rather than carried over.
+  if (typeof record.stella === "string" && record.stella.trim().length > 0) {
+    out.stella = record.stella.trim();
   }
   return Object.keys(out).length > 0 ? out : undefined;
 };
@@ -1078,10 +1080,12 @@ export const normalizeRealtimeVoicePreferences = (
   const enabled =
     typeof record.enabled === "boolean" ? record.enabled : undefined;
   const readAloudProvider =
-    record.readAloudProvider === "openai" ||
-    record.readAloudProvider === "gemini"
-      ? record.readAloudProvider
-      : undefined;
+    record.readAloudProvider === "openai"
+      ? "openai"
+      : record.readAloudProvider === "stella" ||
+          record.readAloudProvider === "gemini"
+        ? "stella"
+        : undefined;
 
   const result: RealtimeVoicePreferences = { provider };
   if (provider !== "stella" && model) result.model = model;

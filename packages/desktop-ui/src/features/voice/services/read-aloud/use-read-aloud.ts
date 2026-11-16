@@ -85,7 +85,7 @@ export function useReadAloud(messages: readonly MessageRecord[]): void {
           const prefs = await resolveReadAloudVoicePrefs();
           if (!enabledRef.current) return;
 
-          if (prefs.family === "gemini" && canStreamReadAloud()) {
+          if (prefs.family === "stella" && canStreamReadAloud()) {
             try {
               const response = await openReadAloudStream({
                 text: clean,

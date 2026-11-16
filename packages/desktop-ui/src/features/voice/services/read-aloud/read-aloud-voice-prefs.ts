@@ -22,6 +22,6 @@ export const resolveReadAloudVoicePrefs =
           : undefined;
       return { family, voice };
     } catch {
-      return { family: "gemini" };
+      return { family: "stella" };
     }
   };

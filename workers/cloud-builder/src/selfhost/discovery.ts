@@ -85,7 +85,7 @@ export const serverFeatures = async (env: Cloudflare.Env): Promise<ServerFeature
     cloudAgents: Boolean((env as { Sandbox?: unknown }).Sandbox),
     managedModels,
     media: has(env, "FAL_KEY"),
-    readAloud: has(env, "OPENROUTER_API_KEY", "FAL_KEY", "OPENAI_API_KEY"),
+    readAloud: has(env, "OPENROUTER_API_KEY", "OPENAI_API_KEY"),
     dictation: has(env, "META_MODEL_API_KEY", "OPENROUTER_API_KEY"),
     realtimeVoice: has(env, "OPENAI_API_KEY"),
     webSearch: webSearchBackend(env) !== "off",

@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Sesli okuma ses sağlayıcısı",
         "description": "Yanıtları bu sağlayıcının sesiyle sesli okur.",
-        "geminiTitle": "Yanıtları Gemini TTS ile sesli oku",
         "label": "Sesli oku",
-        "openaiTitle": "Yanıtları OpenAI TTS ile sesli oku"
+        "openaiTitle": "Yanıtları OpenAI TTS ile sesli oku",
+        "stellaTitle": "Yanıtları Speechify ile sesli oku"
       },
       "source": {
-        "gemini": "Gemini sesleri",
         "gptlive": "Stella sesleri",
         "openai": "OpenAI sesleri",
+        "stella": "Speechify sesleri",
         "xai": "Grok sesleri"
       }
     },

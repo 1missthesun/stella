@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Check, ChevronLeft, ChevronRight, ChevronDown } from "@/ui/icons";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/ui/dropdown-menu";
-import { DEFAULT_GEMINI_TTS_VOICE, GEMINI_TTS_VOICES, getDefaultRealtimeVoice, getRealtimeVoiceCatalog, } from "@stella/contracts/realtime-voice-catalog";
+import { DEFAULT_STELLA_TTS_VOICE, STELLA_TTS_VOICES, getDefaultRealtimeVoice, getRealtimeVoiceCatalog, } from "@stella/contracts/realtime-voice-catalog";
 import { resolveReadAloudProvider, resolveRealtimeUnderlyingProvider, } from "@stella/contracts/local-preferences";
 import { useT } from "@/shared/i18n";
 import "./VoiceCatalogPicker.css";
@@ -86,7 +86,7 @@ export function VoiceCatalogPicker({ voiceProvider, selectedVoices, onSelectVoic
     const handleReadAloudVoicePick = useCallback((voiceId) => {
         onSelectReadAloudVoice?.(voiceId);
     }, [onSelectReadAloudVoice]);
-    const activeReadAloudVoiceId = selectedVoices?.gemini?.trim() || DEFAULT_GEMINI_TTS_VOICE;
+    const activeReadAloudVoiceId = selectedVoices?.stella?.trim() || DEFAULT_STELLA_TTS_VOICE;
     const handleReadAloudPick = useCallback((provider) => {
         if (disabled || !onSelectReadAloudProvider)
             return;
@@ -112,15 +112,15 @@ export function VoiceCatalogPicker({ voiceProvider, selectedVoices, onSelectVoic
           <div className="voice-catalog-picker-label">
             <span>{t("settings.voiceCatalog.readAloud.label")}</span>
             <div className="voice-catalog-subtoggle" role="tablist" aria-label={t("settings.voiceCatalog.readAloud.ariaLabel")}>
-              <button type="button" role="tab" aria-selected={activeReadAloud === "gemini"} className="voice-catalog-subtoggle-btn" data-active={activeReadAloud === "gemini" || undefined} onClick={() => handleReadAloudPick("gemini")} disabled={disabled} title={t("settings.voiceCatalog.readAloud.geminiTitle")}>
-                Gemini
+              <button type="button" role="tab" aria-selected={activeReadAloud === "stella"} className="voice-catalog-subtoggle-btn" data-active={activeReadAloud === "stella" || undefined} onClick={() => handleReadAloudPick("stella")} disabled={disabled} title={t("settings.voiceCatalog.readAloud.stellaTitle")}>
+                Speechify
               </button>
               <button type="button" role="tab" aria-selected={activeReadAloud === "openai"} className="voice-catalog-subtoggle-btn" data-active={activeReadAloud === "openai" || undefined} onClick={() => handleReadAloudPick("openai")} disabled={disabled} title={t("settings.voiceCatalog.readAloud.openaiTitle")}>
                 OpenAI
               </button>
             </div>
           </div>
-          {activeReadAloud === "gemini" ? (<VoiceStepper catalog={GEMINI_TTS_VOICES} activeVoiceId={activeReadAloudVoiceId} sourceLabel={t("settings.voiceCatalog.source.gemini")} onPick={handleReadAloudVoicePick} disabled={disabled || !onSelectReadAloudVoice}/>) : null}
+          {activeReadAloud === "stella" ? (<VoiceStepper catalog={STELLA_TTS_VOICES} activeVoiceId={activeReadAloudVoiceId} sourceLabel={t("settings.voiceCatalog.source.stella")} onPick={handleReadAloudVoicePick} disabled={disabled || !onSelectReadAloudVoice}/>) : null}
           <p className="voice-catalog-readaloud-desc">
             {t("settings.voiceCatalog.readAloud.description")}
           </p>

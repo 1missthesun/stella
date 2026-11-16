@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "ज़ोर से पढ़ने का प्रदाता",
         "description": "इस प्रदाता की आवाज़ से उत्तर ज़ोर से बोलता है।",
-        "geminiTitle": "Gemini TTS से उत्तर ज़ोर से पढ़ें",
         "label": "ज़ोर से पढ़ें",
-        "openaiTitle": "OpenAI TTS से उत्तर ज़ोर से पढ़ें"
+        "openaiTitle": "OpenAI TTS से उत्तर ज़ोर से पढ़ें",
+        "stellaTitle": "Speechify से उत्तर ज़ोर से पढ़ें"
       },
       "source": {
-        "gemini": "Gemini आवाज़ें",
         "gptlive": "स्टेला की आवाज़ें",
         "openai": "OpenAI आवाज़ें",
+        "stella": "Speechify आवाज़ें",
         "xai": "Grok आवाज़ें"
       }
     },

@@ -2722,14 +2722,14 @@
       "readAloud": {
         "ariaLabel": "Nhà cung cấp giọng đọc to",
         "description": "Đọc to câu trả lời bằng giọng của nhà cung cấp này.",
-        "geminiTitle": "Đọc to câu trả lời bằng Gemini TTS",
         "label": "Đọc to",
-        "openaiTitle": "Đọc to câu trả lời bằng OpenAI TTS"
+        "openaiTitle": "Đọc to câu trả lời bằng OpenAI TTS",
+        "stellaTitle": "Đọc to câu trả lời bằng Speechify"
       },
       "source": {
-        "gemini": "Giọng nói Gemini",
         "gptlive": "Giọng Stella",
         "openai": "Giọng nói OpenAI",
+        "stella": "Giọng nói Speechify",
         "xai": "Giọng nói Grok"
       }
     },

@@ -2722,14 +2722,14 @@
       "readAloud": {
         "ariaLabel": "Penyedia suara untuk bacakan",
         "description": "Membacakan balasan dengan suara dari penyedia ini.",
-        "geminiTitle": "Bacakan balasan dengan Gemini TTS",
         "label": "Bacakan",
-        "openaiTitle": "Bacakan balasan dengan OpenAI TTS"
+        "openaiTitle": "Bacakan balasan dengan OpenAI TTS",
+        "stellaTitle": "Bacakan balasan dengan Speechify"
       },
       "source": {
-        "gemini": "Suara Gemini",
         "gptlive": "Suara Stella",
         "openai": "Suara OpenAI",
+        "stella": "Suara Speechify",
         "xai": "Suara Grok"
       }
     },

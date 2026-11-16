@@ -2722,14 +2722,14 @@
       "readAloud": {
         "ariaLabel": "朗读语音提供商",
         "description": "使用此提供商的语音朗读回复。",
-        "geminiTitle": "使用 Gemini TTS 朗读回复",
         "label": "朗读",
-        "openaiTitle": "使用 OpenAI TTS 朗读回复"
+        "openaiTitle": "使用 OpenAI TTS 朗读回复",
+        "stellaTitle": "使用 Speechify 朗读回复"
       },
       "source": {
-        "gemini": "Gemini 语音",
         "gptlive": "Stella 语音",
         "openai": "OpenAI 语音",
+        "stella": "Speechify 语音",
         "xai": "Grok 语音"
       }
     },

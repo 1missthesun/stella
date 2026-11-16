@@ -2,7 +2,7 @@ import { Mp3Encoder } from "@breezystack/lamejs";
 import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 import { TTS_TARIFF } from "@stella/contracts/billing-tariffs";
 import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
-import { DEFAULT_GEMINI_TTS_VOICE, isGeminiTtsVoice } from "@stella/contracts/realtime-voice-catalog";
+import { DEFAULT_STELLA_TTS_VOICE, isStellaTtsVoice } from "@stella/contracts/realtime-voice-catalog";
 import { Effect, Fiber } from "effect";
 
 export const TTS_MODEL = STELLA_MEDIA_MODELS.speech;
@@ -10,64 +10,113 @@ export const PCM_SAMPLE_RATE = 24_000;
 const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * 2;
 const MP3_KBPS = 48;
 const OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech";
-const FAL_RUN_URL = `https://fal.run/${TTS_MODEL}`;
-const FIRST_CHUNK_MIN_CHARS = 40;
-const FIRST_CHUNK_CHARS = 240;
-const CHUNK_CHARS = 400;
-const CHUNKS_IN_FLIGHT = 4;
+// Simba streams each request's audio as it is made (first bytes in ~0.5 s
+// whatever the length), so text is split only for the per-request limit
+// (about two minutes of PCM, ~2,000 characters) and to start the next part
+// while the current one plays.
+const CHUNK_CHARS = 1_000;
+const CHUNKS_IN_FLIGHT = 2;
 
-// Billed audio tokens per second of speech. Google documents 25/s, but the
-// API has been observed to report ~39/s; the estimate stays on the high side
-// so internal spend is never underestimated.
-const AUDIO_TOKENS_PER_SECOND_ESTIMATE = 40;
-
-export type TtsProvider = "openrouter" | "fal";
-
-const KEY_NAMES: Record<TtsProvider, string> = { openrouter: "OPENROUTER_API_KEY", fal: "FAL_KEY" };
+export type TtsProvider = "openrouter";
 
 const read = (env: object, name: string): string | null => {
   const value = (env as Record<string, unknown>)[name];
   return typeof value === "string" && value.trim() ? value.trim() : null;
 };
 
+/** Stella's read-aloud voice runs on OpenRouter only; fal does not carry Simba. */
 export const ttsProvider = (env: object): { provider: TtsProvider; apiKey: string } | null => {
-  const configured = (["openrouter", "fal"] as const).flatMap((provider) => {
-    const apiKey = read(env, KEY_NAMES[provider]);
-    return apiKey ? [{ provider, apiKey }] : [];
-  });
-  const forced = read(env, "STELLA_MEDIA_PROVIDER")?.toLowerCase();
-  return configured.find((entry) => entry.provider === forced) ?? configured[0] ?? null;
+  const apiKey = read(env, "OPENROUTER_API_KEY");
+  return apiKey ? { provider: "openrouter", apiKey } : null;
 };
 
-export const resolveGeminiTtsVoice = (voice: unknown): string =>
-  typeof voice === "string" && isGeminiTtsVoice(voice.trim()) ? voice.trim() : DEFAULT_GEMINI_TTS_VOICE;
+/** A voice from Stella's read-aloud catalog, else the default (Beth). */
+export const resolveTtsVoice = (voice: unknown): string =>
+  typeof voice === "string" && isStellaTtsVoice(voice.trim()) ? voice.trim() : DEFAULT_STELLA_TTS_VOICE;
+
+// Simba reads text in the voice's own language unless told otherwise, so an
+// English voice turns Japanese, Russian or Arabic into gibberish. Languages
+// written in their own script are recognised here, and Vietnamese by its
+// letters; Simba tells the other Latin-script languages apart itself.
+const SCRIPTS: readonly { language: string; pattern: RegExp; refine?: (text: string) => string }[] = [
+  { language: "ja", pattern: /[\u3040-\u30ff\u31f0-\u31ff]/gu },
+  { language: "ko", pattern: /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/gu },
+  { language: "zh", pattern: /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/gu },
+  {
+    language: "ar",
+    pattern: /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]/gu,
+    refine: (text) => (/[ٹڈڑںھے]/u.test(text) ? "ur" : /[پچژکگی]/u.test(text) ? "fa" : "ar"),
+  },
+  { language: "he", pattern: /[\u0590-\u05ff]/gu },
+  { language: "th", pattern: /[\u0e00-\u0e7f]/gu },
+  { language: "el", pattern: /[\u0370-\u03ff\u1f00-\u1fff]/gu },
+  {
+    language: "ru",
+    pattern: /[\u0400-\u04ff]/gu,
+    refine: (text) =>
+      /[әғқңөұүһӘҒҚҢӨҰҮҺ]/u.test(text)
+        ? "kk"
+        : /[ўЎ]/u.test(text)
+          ? "be"
+          : /[ђјљњћџЂЈЉЊЋЏ]/u.test(text)
+            ? "sr"
+            : /[іїєґІЇЄҐ]/u.test(text)
+              ? "uk"
+              : "ru",
+  },
+  { language: "hi", pattern: /[\u0900-\u097f]/gu },
+  { language: "bn", pattern: /[\u0980-\u09ff]/gu },
+  { language: "gu", pattern: /[\u0a80-\u0aff]/gu },
+  { language: "ta", pattern: /[\u0b80-\u0bff]/gu },
+  { language: "te", pattern: /[\u0c00-\u0c7f]/gu },
+  { language: "ka", pattern: /[\u10a0-\u10ff]/gu },
+  { language: "my", pattern: /[\u1000-\u109f]/gu },
+];
+const LATIN = /[A-Za-z\u00c0-\u024f\u1e00-\u1eff]/gu;
+const KANA = /[\u3040-\u30ff\u31f0-\u31ff]/u;
+const VIETNAMESE = /[\u01a0\u01a1\u01af\u01b0\u1ea0-\u1ef9]/gu;
+
+/**
+ * The Simba language code for `chunk` when it is mostly in a non-Latin
+ * script or is Vietnamese, else null. `whole` is the full text: Chinese characters in a
+ * text that also has kana are Japanese.
+ */
+export const ttsLanguage = (chunk: string, whole = chunk): string | null => {
+  let best: { language: string; count: number; refine?: (text: string) => string } | null = null;
+  for (const script of SCRIPTS) {
+    const count = chunk.match(script.pattern)?.length ?? 0;
+    if (count > (best?.count ?? 0)) best = { language: script.language, count, refine: script.refine };
+  }
+  const latin = chunk.match(LATIN)?.length ?? 0;
+  if (!best || best.count < latin) {
+    const vietnamese = chunk.match(VIETNAMESE)?.length ?? 0;
+    return vietnamese >= 3 && vietnamese >= latin * 0.05 ? "vi" : null;
+  }
+  if (best.language === "zh" && KANA.test(whole)) return "ja";
+  return best.refine ? best.refine(chunk) : best.language;
+};
 
 export type TtsUsage = {
   provider: TtsProvider;
-  textInputTokens: number;
-  audioOutputTokens: number;
+  chars: number;
+  audioSeconds: number;
   estimatedUsd: number;
 };
 
-export const estimateTtsUsage = (provider: TtsProvider, requestChars: number, pcmBytes: number): TtsUsage => {
-  const textInputTokens = Math.ceil(requestChars / 4);
-  const audioOutputTokens = Math.ceil((pcmBytes / PCM_BYTES_PER_SECOND) * AUDIO_TOKENS_PER_SECOND_ESTIMATE);
-  const estimatedUsd =
-    provider === "fal"
-      ? (requestChars / 1_000) * TTS_TARIFF.falGeminiUsdPerThousandChars
-      : (textInputTokens * TTS_TARIFF.openRouterGeminiInputUsdPerMillionTokens +
-          audioOutputTokens * TTS_TARIFF.openRouterGeminiAudioUsdPerMillionTokens) /
-        1_000_000;
-  return { provider, textInputTokens, audioOutputTokens, estimatedUsd: Number(estimatedUsd.toFixed(6)) };
-};
+/** Simba bills per input character sent, so this is exact for what was sent. */
+export const estimateTtsUsage = (chars: number, pcmBytes: number): TtsUsage => ({
+  provider: "openrouter",
+  chars,
+  audioSeconds: Number((pcmBytes / PCM_BYTES_PER_SECOND).toFixed(2)),
+  estimatedUsd: Number(((chars / 1_000) * TTS_TARIFF.speechifySimbaUsdPerThousandChars).toFixed(6)),
+});
 
-const openRouterSpeechChunk = async (
+const openRouterSpeech = async (
   apiKey: string,
-  text: string,
-  voice: string,
+  input: { text: string; voice: string; language: string | null },
   signal: AbortSignal,
-  attribution = true,
-): Promise<Uint8Array> => {
+  attribution: boolean,
+): Promise<ReadableStream<Uint8Array>> => {
   const response = await fetch(OPENROUTER_SPEECH_URL, {
     method: "POST",
     headers: {
@@ -75,14 +124,26 @@ const openRouterSpeechChunk = async (
       "content-type": "application/json",
       ...(attribution ? { "HTTP-Referer": "https://stella.sh", "X-OpenRouter-Title": "Stella" } : {}),
     },
-    body: JSON.stringify({ model: TTS_MODEL, input: text, voice, response_format: "pcm" }),
+    body: JSON.stringify({
+      model: TTS_MODEL,
+      input: input.text,
+      voice: input.voice,
+      response_format: "pcm",
+      // OpenRouter forwards per-provider options; a top-level `language` is ignored.
+      ...(input.language ? { provider: { options: { speechify: { language: input.language } } } } : {}),
+    }),
     signal,
   });
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
     const detail = await response.text().catch(() => "");
     throw new Error(`OpenRouter TTS returned ${response.status}: ${detail.slice(0, 300)}`);
   }
-  return new Uint8Array(await response.arrayBuffer());
+  const rate = /rate=(\d+)/u.exec(response.headers.get("content-type") ?? "")?.[1];
+  if (rate && Number(rate) !== PCM_SAMPLE_RATE) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error(`OpenRouter TTS returned ${rate} Hz PCM; read-aloud expects ${PCM_SAMPLE_RATE} Hz.`);
+  }
+  return response.body;
 };
 
 export const splitTtsText = (text: string): string[] => {
@@ -94,8 +155,7 @@ export const splitTtsText = (text: string): string[] => {
     current = "";
   };
   for (const sentence of sentences) {
-    const limit = chunks.length === 0 ? FIRST_CHUNK_CHARS : CHUNK_CHARS;
-    if (current && current.length + sentence.length > limit) flush();
+    if (current && current.length + sentence.length > CHUNK_CHARS) flush();
     current += sentence;
     while (current.length > CHUNK_CHARS) {
       const cut = current.lastIndexOf(" ", CHUNK_CHARS);
@@ -103,89 +163,56 @@ export const splitTtsText = (text: string): string[] => {
       chunks.push(current.slice(0, at).trim());
       current = current.slice(at);
     }
-    if (chunks.length === 0 && current.trim().length >= FIRST_CHUNK_MIN_CHARS) flush();
   }
   flush();
   return chunks.filter((chunk) => chunk.length > 0);
 };
 
-export const wavToPcm24k = (wav: Uint8Array): Uint8Array => {
-  const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
-  if (wav.byteLength < 12 || String.fromCharCode(...wav.slice(0, 4)) !== "RIFF") return wav;
-  let offset = 12;
-  let channels = 1;
-  let sampleRate = PCM_SAMPLE_RATE;
-  let bits = 16;
-  while (offset + 8 <= wav.byteLength) {
-    const id = String.fromCharCode(...wav.slice(offset, offset + 4));
-    const size = view.getUint32(offset + 4, true);
-    const body = offset + 8;
-    if (id === "fmt ") {
-      channels = view.getUint16(body + 2, true);
-      sampleRate = view.getUint32(body + 4, true);
-      bits = view.getUint16(body + 14, true);
-    } else if (id === "data") {
-      const end = Math.min(wav.byteLength, body + (size === 0xffffffff || size === 0 ? wav.byteLength : size));
-      const data = wav.subarray(body, end);
-      if (channels === 1 && sampleRate === PCM_SAMPLE_RATE && bits === 16) return data;
-      if (bits !== 16) throw new Error(`Unsupported TTS WAV sample size ${bits}.`);
-      const frames = Math.floor(data.byteLength / (2 * channels));
-      const source = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const outFrames = Math.floor((frames * PCM_SAMPLE_RATE) / sampleRate);
-      const out = new Uint8Array(outFrames * 2);
-      const outView = new DataView(out.buffer);
-      for (let index = 0; index < outFrames; index += 1) {
-        const frame = Math.min(frames - 1, Math.floor((index * sampleRate) / PCM_SAMPLE_RATE));
-        let sum = 0;
-        for (let channel = 0; channel < channels; channel += 1) sum += source.getInt16((frame * channels + channel) * 2, true);
-        outView.setInt16(index * 2, Math.round(sum / channels), true);
-      }
-      return out;
-    }
-    offset = body + size + (size % 2);
-  }
-  throw new Error("TTS WAV had no data chunk.");
-};
-
-const falSpeechChunk = async (apiKey: string, text: string, voice: string, signal: AbortSignal): Promise<Uint8Array> => {
-  const response = await fetch(FAL_RUN_URL, {
-    method: "POST",
-    headers: { authorization: `Key ${apiKey}`, "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ prompt: text, voice }),
-    signal,
-  });
-  const raw = await response.text();
-  if (!response.ok) throw new Error(`fal TTS returned ${response.status}: ${raw.slice(0, 300)}`);
-  const url = (JSON.parse(raw) as { audio?: { url?: unknown } }).audio?.url;
-  if (typeof url !== "string" || !url) throw new Error("fal TTS returned no audio.");
-  const audio = await fetch(url, { signal });
-  if (!audio.ok) throw new Error(`fal TTS audio download returned ${audio.status}.`);
-  return wavToPcm24k(new Uint8Array(await audio.arrayBuffer()));
+/** One chunk's audio as it arrives, read ahead of the listener. */
+type ChunkAudio = {
+  parts: Uint8Array[];
+  done: boolean;
+  error: { cause: unknown } | null;
+  wake: (() => void) | null;
 };
 
 const chunkedPcm = (
   chunks: string[],
-  synthesize: (text: string) => Effect.Effect<Uint8Array, unknown>,
+  synthesize: (text: string, audio: ChunkAudio) => Effect.Effect<void, unknown>,
   onSend: (chars: number) => void,
 ): ReadableStream<Uint8Array> => {
   let next = 0;
-  const pending: Promise<Uint8Array>[] = [];
-  const running: Fiber.Fiber<Uint8Array, unknown>[] = [];
+  const queue: ChunkAudio[] = [];
+  const running: Fiber.Fiber<void, unknown>[] = [];
+  const wake = (audio: ChunkAudio) => {
+    const resume = audio.wake;
+    audio.wake = null;
+    resume?.();
+  };
   const stop = () => {
     next = chunks.length;
-    pending.length = 0;
+    queue.length = 0;
     const live = running.splice(0);
     if (live.length > 0) Effect.runFork(Fiber.interruptAll(live));
   };
   const fill = () => {
-    while (pending.length < CHUNKS_IN_FLIGHT && next < chunks.length) {
+    while (queue.length < CHUNKS_IN_FLIGHT && next < chunks.length) {
       const chunk = chunks[next++]!;
+      const audio: ChunkAudio = { parts: [], done: false, error: null, wake: null };
+      queue.push(audio);
       onSend(chunk.length);
-      const fiber = Effect.runFork(synthesize(chunk));
+      const fiber = Effect.runFork(synthesize(chunk, audio));
       running.push(fiber);
-      const promise = Effect.runPromise(Fiber.join(fiber));
-      promise.catch(() => stop());
-      pending.push(promise);
+      Effect.runPromise(Fiber.join(fiber)).then(
+        () => {
+          audio.done = true;
+          wake(audio);
+        },
+        (cause: unknown) => {
+          audio.error = { cause };
+          wake(audio);
+        },
+      );
     }
   };
   return new ReadableStream<Uint8Array>({
@@ -193,14 +220,29 @@ const chunkedPcm = (
       fill();
     },
     async pull(controller) {
-      const current = pending.shift();
-      if (!current) {
-        controller.close();
-        return;
+      for (;;) {
+        const current = queue[0];
+        if (!current) {
+          controller.close();
+          return;
+        }
+        if (current.parts.length > 0) {
+          controller.enqueue(concat(current.parts.splice(0)));
+          return;
+        }
+        if (current.error) {
+          stop();
+          throw current.error.cause;
+        }
+        if (current.done) {
+          queue.shift();
+          fill();
+          continue;
+        }
+        await new Promise<void>((resolve) => {
+          current.wake = resolve;
+        });
       }
-      const pcm = await current;
-      fill();
-      controller.enqueue(pcm);
     },
     cancel() {
       stop();
@@ -209,11 +251,9 @@ const chunkedPcm = (
 };
 
 /**
- * 24 kHz mono 16-bit PCM for `text`, a sentence-sized chunk at a time.
- * Neither provider streams one request's audio progressively (OpenRouter
- * answers Gemini TTS whole), so a short first chunk is what gets audio
- * playing quickly. Throws when read-aloud is not set up or the provider
- * refuses the first chunk.
+ * 24 kHz mono 16-bit PCM for `text`, streamed as Simba makes it, a chunk
+ * of text per request with the next one read ahead. Throws when read-aloud
+ * is not set up or the provider refuses the first chunk.
  */
 export const openTtsPcm = async (
   env: object,
@@ -223,14 +263,30 @@ export const openTtsPcm = async (
   if (!picked) throw new Error("Read-aloud is not configured.");
   args.signal.throwIfAborted();
   const attribution = !ownerModeEnabled(env);
-  const request =
-    picked.provider === "openrouter"
-      ? (key: string, text: string, voice: string, signal: AbortSignal) =>
-          openRouterSpeechChunk(key, text, voice, signal, attribution)
-      : falSpeechChunk;
-  const synthesize = (text: string) =>
+  // A chunk that fails before any audio arrives is tried once more: OpenRouter
+  // does not bill failed generations, and a dropped part would cut the reply.
+  const synthesize = (text: string, audio: ChunkAudio) =>
     Effect.tryPromise({
-      try: (interrupted) => request(picked.apiKey, text, args.voice, AbortSignal.any([args.signal, interrupted])),
+      try: async (interrupted) => {
+        const signal = AbortSignal.any([args.signal, interrupted]);
+        const input = { text, voice: args.voice, language: ttsLanguage(text, args.text) };
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            const reader = (await openRouterSpeech(picked.apiKey, input, signal, attribution)).getReader();
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) return;
+              if (value.length === 0) continue;
+              audio.parts.push(value);
+              const resume = audio.wake;
+              audio.wake = null;
+              resume?.();
+            }
+          } catch (error) {
+            if (attempt > 0 || audio.parts.length > 0 || signal.aborted) throw error;
+          }
+        }
+      },
       catch: (error) => error,
     });
   let sent = 0;

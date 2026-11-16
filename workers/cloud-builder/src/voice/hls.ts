@@ -138,7 +138,7 @@ export const synthesizeHls = async (input: {
   const encoder = createPcmMp3Encoder();
   let provider: TtsProvider | null = null;
   let sentChars = () => 0;
-  const usage = () => (provider ? estimateTtsUsage(provider, sentChars(), encoder.pcmBytes) : null);
+  const usage = () => (provider ? estimateTtsUsage(sentChars(), encoder.pcmBytes) : null);
   const finish = async (status: HlsSynthesisResult["status"]): Promise<HlsSynthesisResult> => {
     manifest.done = true;
     manifest.error = status === "error" && manifest.segments.length === 0;

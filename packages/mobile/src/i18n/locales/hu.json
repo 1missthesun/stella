@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Felolvasás szolgáltatója",
         "description": "Felolvassa a válaszokat ennek a szolgáltatónak a hangján.",
-        "geminiTitle": "Válaszok felolvasása Gemini TTS-sel",
         "label": "Felolvasás",
-        "openaiTitle": "Válaszok felolvasása OpenAI TTS-sel"
+        "openaiTitle": "Válaszok felolvasása OpenAI TTS-sel",
+        "stellaTitle": "Válaszok felolvasása a Speechify segítségével"
       },
       "source": {
-        "gemini": "Gemini hangok",
         "gptlive": "Stella hangjai",
         "openai": "OpenAI hangok",
+        "stella": "Speechify hangok",
         "xai": "Grok hangok"
       }
     },

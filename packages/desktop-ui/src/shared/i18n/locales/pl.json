@@ -2752,14 +2752,14 @@
       "readAloud": {
         "ariaLabel": "Dostawca głosu do czytania na głos",
         "description": "Wypowiada odpowiedzi na głos głosem tego dostawcy.",
-        "geminiTitle": "Czytaj odpowiedzi na głos przez Gemini TTS",
         "label": "Czytaj na głos",
-        "openaiTitle": "Czytaj odpowiedzi na głos przez OpenAI TTS"
+        "openaiTitle": "Czytaj odpowiedzi na głos przez OpenAI TTS",
+        "stellaTitle": "Czytaj odpowiedzi na głos przez Speechify"
       },
       "source": {
-        "gemini": "Głosy Gemini",
         "gptlive": "Głosy Stelli",
         "openai": "Głosy OpenAI",
+        "stella": "Głosy Speechify",
         "xai": "Głosy Grok"
       }
     },

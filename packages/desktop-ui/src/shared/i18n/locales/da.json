@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Stemmeudbyder til oplæsning",
         "description": "Læser svar højt med denne udbyders stemme.",
-        "geminiTitle": "Læs svar op med Gemini TTS",
         "label": "Læs op",
-        "openaiTitle": "Læs svar op med OpenAI TTS"
+        "openaiTitle": "Læs svar op med OpenAI TTS",
+        "stellaTitle": "Læs svar op med Speechify"
       },
       "source": {
-        "gemini": "Gemini-stemmer",
         "gptlive": "Stella-stemmer",
         "openai": "OpenAI-stemmer",
+        "stella": "Speechify-stemmer",
         "xai": "Grok-stemmer"
       }
     },

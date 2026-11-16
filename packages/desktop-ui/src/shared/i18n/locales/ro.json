@@ -2742,14 +2742,14 @@
       "readAloud": {
         "ariaLabel": "Furnizor pentru citirea cu voce tare",
         "description": "Rostește răspunsurile cu voce tare folosind vocea acestui furnizor.",
-        "geminiTitle": "Citește răspunsurile cu voce tare folosind Gemini TTS",
         "label": "Citește cu voce tare",
-        "openaiTitle": "Citește răspunsurile cu voce tare folosind OpenAI TTS"
+        "openaiTitle": "Citește răspunsurile cu voce tare folosind OpenAI TTS",
+        "stellaTitle": "Citește răspunsurile cu voce tare folosind Speechify"
       },
       "source": {
-        "gemini": "Voci Gemini",
         "gptlive": "Voci Stella",
         "openai": "Voci OpenAI",
+        "stella": "Voci Speechify",
         "xai": "Voci Grok"
       }
     },

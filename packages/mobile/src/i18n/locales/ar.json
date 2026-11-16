@@ -2772,14 +2772,14 @@
       "readAloud": {
         "ariaLabel": "مزوّد صوت القراءة بصوت عالٍ",
         "description": "ينطق الردود بصوت عالٍ باستخدام صوت هذا المزوّد.",
-        "geminiTitle": "اقرأ الردود بصوت عالٍ باستخدام Gemini TTS",
         "label": "القراءة بصوت عالٍ",
-        "openaiTitle": "اقرأ الردود بصوت عالٍ باستخدام OpenAI TTS"
+        "openaiTitle": "اقرأ الردود بصوت عالٍ باستخدام OpenAI TTS",
+        "stellaTitle": "اقرأ الردود بصوت عالٍ باستخدام Speechify"
       },
       "source": {
-        "gemini": "أصوات Gemini",
         "gptlive": "أصوات ستيلا",
         "openai": "أصوات OpenAI",
+        "stella": "أصوات Speechify",
         "xai": "أصوات Grok"
       }
     },

@@ -2,7 +2,7 @@
 // best estimate. Bump TARIFF_VERSION whenever a rate changes; every cost
 // ledger row records the version it was priced with.
 
-export const TARIFF_VERSION = "2026-10-14.1";
+export const TARIFF_VERSION = "2026-11-16.1";
 
 export const MICRO_CENTS_PER_USD = 100_000_000;
 
@@ -61,13 +61,13 @@ export const hostingCostMicroCents = (input: { requests: number; cpuMs: number }
       (Math.max(0, input.cpuMs) / 1_000_000) * HOSTING_TARIFF.usdPerMillionCpuMs,
   );
 
-// Read-aloud. fal Gemini TTS is priced per input character; OpenAI mini TTS
-// by its token tariff, approximated per character.
+// Read-aloud, priced per input character. Speechify Simba 3.5 on OpenRouter
+// bills exactly $15 per million characters sent (checked 2026-11-16 against
+// OpenRouter's generation records); OpenAI mini TTS by its token tariff,
+// approximated per character.
 export const TTS_TARIFF = {
-  falGeminiUsdPerThousandChars: 0.045,
+  speechifySimbaUsdPerThousandChars: 0.015,
   openAiMiniUsdPerThousandChars: 0.015,
-  openRouterGeminiInputUsdPerMillionTokens: 0.5,
-  openRouterGeminiAudioUsdPerMillionTokens: 9,
 } as const;
 
 // Google Maps Platform list prices for the SKUs the resolver calls.

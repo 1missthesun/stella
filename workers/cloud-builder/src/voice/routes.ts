@@ -19,7 +19,7 @@ import { readBodyText, readJsonObject } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import type { OwnerCaller } from "../owner-store/registry.js";
 import { ttsText } from "../owner-store/domains/voice.js";
-import { createPcmMp3Encoder, estimateTtsUsage, openTtsPcm, pcmToWav, resolveGeminiTtsVoice, ttsProvider } from "./tts.js";
+import { createPcmMp3Encoder, estimateTtsUsage, openTtsPcm, pcmToWav, resolveTtsVoice, ttsProvider } from "./tts.js";
 import { buildHlsPlaylist, HLS_MANIFEST_FILE, type HlsManifest } from "./hls.js";
 import { readTtsTicket, ttsObjectKey } from "./ticket.js";
 import { ownerGateStub } from "../rpc-release.js";
@@ -124,7 +124,7 @@ const readJson = async (request: Request): Promise<Record<string, unknown>> => {
   );
 };
 
-type TtsVendor = "fal" | "openrouter" | "openai";
+type TtsVendor = "openrouter" | "openai";
 
 type AdmittedText = {
   text: string;
@@ -192,7 +192,7 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
   const configured = ttsProvider(env);
   if (!configured) throw notConfigured();
   const { text, settle } = await admitText(env, caller, body.text, configured.provider);
-  const voice = resolveGeminiTtsVoice(body.voice);
+  const voice = resolveTtsVoice(body.voice);
   const startedAt = Date.now();
   const opened = await openPcm(env, text, voice, "stream", providerSignal(request)).catch(async (error: unknown) => {
     await settle({ chars: 0, pcmBytes: 0, outcome: "failed" });
@@ -210,7 +210,7 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
       requestChars: text.length,
       audioBytes,
       firstAudioMs,
-      ...estimateTtsUsage(provider, opened.sentChars(), encoder.pcmBytes),
+      ...estimateTtsUsage(opened.sentChars(), encoder.pcmBytes),
       durationMs: Date.now() - startedAt,
     });
     await settle({
@@ -257,22 +257,18 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
 const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
   const body = await readJson(request);
-  const provider = body.voiceProvider === "gemini" ? "gemini" : "openai";
-  const gemini = ttsProvider(env);
-  const apiKey = provider === "gemini" ? (gemini?.apiKey ?? null) : secret(env, "OPENAI_API_KEY");
+  // Desktops before 2026-11-16 call Stella's own read-aloud voice "gemini".
+  const provider = body.voiceProvider === "openai" ? "openai" : "stella";
+  const stella = ttsProvider(env);
+  const apiKey = provider === "stella" ? (stella?.apiKey ?? null) : secret(env, "OPENAI_API_KEY");
   if (!apiKey) throw notConfigured();
-  const { text, settle } = await admitText(
-    env,
-    caller,
-    body.text,
-    provider === "gemini" ? (gemini?.provider ?? "fal") : "openai",
-  );
+  const { text, settle } = await admitText(env, caller, body.text, provider === "stella" ? "openrouter" : "openai");
   const startedAt = Date.now();
   const signal = providerSignal(request);
 
-  if (provider === "gemini") {
-    const voice = resolveGeminiTtsVoice(body.voice);
-    const opened = await openPcm(env, text, voice, "oneshot_gemini", signal).catch(async (error: unknown) => {
+  if (provider === "stella") {
+    const voice = resolveTtsVoice(body.voice);
+    const opened = await openPcm(env, text, voice, "oneshot_stella", signal).catch(async (error: unknown) => {
       await settle({ chars: 0, pcmBytes: 0, outcome: "failed" });
       throw error;
     });
@@ -283,15 +279,15 @@ const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> =>
       outcome: pcm.byteLength > 0 ? "succeeded" : "failed",
     });
     if (pcm.byteLength === 0) {
-      log("error", "tts_provider_failed", { transport: "oneshot_gemini", provider: opened.provider });
+      log("error", "tts_provider_failed", { transport: "oneshot_stella", provider: opened.provider });
       throw new RpcError("UNAVAILABLE", "Speech generation failed.");
     }
     const audio = pcmToWav(pcm);
     logTtsUsage({
-      transport: "oneshot_gemini",
+      transport: "oneshot_stella",
       requestChars: text.length,
       audioBytes: audio.byteLength,
-      ...estimateTtsUsage(opened.provider, text.length, pcm.byteLength),
+      ...estimateTtsUsage(opened.sentChars(), pcm.byteLength),
       durationMs: Date.now() - startedAt,
     });
     return new Response(audio, { headers: { "content-type": "audio/wav", "cache-control": "no-store" } });

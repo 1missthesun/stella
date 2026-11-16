@@ -2752,14 +2752,14 @@
       "readAloud": {
         "ariaLabel": "Poskytovatel hlasu pro čtení nahlas",
         "description": "Předčítá odpovědi nahlas hlasem tohoto poskytovatele.",
-        "geminiTitle": "Číst odpovědi nahlas pomocí Gemini TTS",
         "label": "Číst nahlas",
-        "openaiTitle": "Číst odpovědi nahlas pomocí OpenAI TTS"
+        "openaiTitle": "Číst odpovědi nahlas pomocí OpenAI TTS",
+        "stellaTitle": "Číst odpovědi nahlas pomocí Speechify"
       },
       "source": {
-        "gemini": "Hlasy Gemini",
         "gptlive": "Hlasy Stelly",
         "openai": "Hlasy OpenAI",
+        "stella": "Hlasy Speechify",
         "xai": "Hlasy Grok"
       }
     },

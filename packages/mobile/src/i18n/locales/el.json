@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Πάροχος ανάγνωσης φωναχτά",
         "description": "Εκφωνεί τις απαντήσεις με τη φωνή αυτού του παρόχου.",
-        "geminiTitle": "Ανάγνωση απαντήσεων φωναχτά με Gemini TTS",
         "label": "Ανάγνωση φωναχτά",
-        "openaiTitle": "Ανάγνωση απαντήσεων φωναχτά με OpenAI TTS"
+        "openaiTitle": "Ανάγνωση απαντήσεων φωναχτά με OpenAI TTS",
+        "stellaTitle": "Ανάγνωση απαντήσεων φωναχτά με Speechify"
       },
       "source": {
-        "gemini": "Φωνές Gemini",
         "gptlive": "Φωνές Stella",
         "openai": "Φωνές OpenAI",
+        "stella": "Φωνές Speechify",
         "xai": "Φωνές Grok"
       }
     },

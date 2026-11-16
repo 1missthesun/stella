@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Ääneen lukemisen palveluntarjoaja",
         "description": "Puhuu vastaukset ääneen tämän palveluntarjoajan äänellä.",
-        "geminiTitle": "Lue vastaukset ääneen Gemini TTS:llä",
         "label": "Lue ääneen",
-        "openaiTitle": "Lue vastaukset ääneen OpenAI TTS:llä"
+        "openaiTitle": "Lue vastaukset ääneen OpenAI TTS:llä",
+        "stellaTitle": "Lue vastaukset ääneen Speechifyn avulla"
       },
       "source": {
-        "gemini": "Gemini-äänet",
         "gptlive": "Stellan äänet",
         "openai": "OpenAI-äänet",
+        "stella": "Speechify-äänet",
         "xai": "Grok-äänet"
       }
     },

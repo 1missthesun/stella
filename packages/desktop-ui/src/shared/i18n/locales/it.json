@@ -2742,14 +2742,14 @@
       "readAloud": {
         "ariaLabel": "Provider vocale per la lettura ad alta voce",
         "description": "Legge le risposte ad alta voce con la voce di questo provider.",
-        "geminiTitle": "Leggi le risposte ad alta voce con il TTS di Gemini",
         "label": "Leggi ad alta voce",
-        "openaiTitle": "Leggi le risposte ad alta voce con il TTS di OpenAI"
+        "openaiTitle": "Leggi le risposte ad alta voce con il TTS di OpenAI",
+        "stellaTitle": "Leggi le risposte ad alta voce con Speechify"
       },
       "source": {
-        "gemini": "Voci Gemini",
         "gptlive": "Voci Stella",
         "openai": "Voci OpenAI",
+        "stella": "Voci Speechify",
         "xai": "Voci Grok"
       }
     },

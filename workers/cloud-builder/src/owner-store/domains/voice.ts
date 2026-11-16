@@ -22,7 +22,7 @@ import {
 } from "@stella/contracts/backend/voice";
 import { DEFAULT_GPT_LIVE_VOICE } from "@stella/contracts/realtime-voice-catalog";
 import { log } from "../../build-session/shared/keys.js";
-import { estimateTtsUsage, resolveGeminiTtsVoice, TTS_MODEL, ttsProvider } from "../../voice/tts.js";
+import { estimateTtsUsage, resolveTtsVoice, TTS_MODEL, ttsProvider } from "../../voice/tts.js";
 import { HLS_MANIFEST_FILE, synthesizeHls, type HlsManifest } from "../../voice/hls.js";
 import { mintTtsTicket, ttsObjectKey, ttsOwnerPrefix } from "../../voice/ticket.js";
 import { array, empty, literal, number, object, optional, string, type Parser } from "../args.js";
@@ -469,23 +469,21 @@ const reap = async (ctx: OwnerContext): Promise<void> => {
 
 const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
 
-type TtsVendor = "fal" | "openrouter" | "openai";
+type TtsVendor = "openrouter" | "openai";
+
+// Rows and calls from before 2026-11-16 can still say "fal"; that route is gone
+// and Stella's read-aloud voice is billed at the OpenRouter rate.
+const ttsVendor = (vendor: string | undefined): TtsVendor => (vendor === "openai" ? "openai" : "openrouter");
 
 const TTS_RESERVATION_MS = 15 * 60_000;
 const ttsSpendId = (id: string) => `tts:${id}`;
 
-const ttsHoldMicroCents = (vendor: TtsVendor, chars: number): number =>
-  usdToMicroCents(
-    (chars / 1_000) *
-      (vendor === "openai" ? TTS_TARIFF.openAiMiniUsdPerThousandChars : TTS_TARIFF.falGeminiUsdPerThousandChars),
-  );
-
-// What one synthesis cost us: fal and OpenAI mini by input characters sent,
-// OpenRouter Gemini by text and audio tokens.
-const ttsCostMicroCents = (vendor: TtsVendor, chars: number, pcmBytes: number): number =>
+// Both read-aloud voices are priced per input character sent, so the hold
+// for the whole text is also the most a synthesis can cost.
+const ttsCostMicroCents = (vendor: TtsVendor, chars: number): number =>
   vendor === "openai"
     ? usdToMicroCents((chars / 1_000) * TTS_TARIFF.openAiMiniUsdPerThousandChars)
-    : usdToMicroCents(estimateTtsUsage(vendor, chars, pcmBytes).estimatedUsd);
+    : usdToMicroCents(estimateTtsUsage(chars, 0).estimatedUsd);
 
 // Read-aloud spends the pooled budget. The per-plan daily character cap stays
 // as a safety limit on top.
@@ -503,7 +501,7 @@ const admitTts = (ctx: OwnerContext, input: { id: string; chars: number; vendor:
   }
   const hold = reserveSpend(ctx, {
     id: ttsSpendId(input.id),
-    microCents: ttsHoldMicroCents(input.vendor, input.chars),
+    microCents: ttsCostMicroCents(input.vendor, input.chars),
     expiresAt: ctx.now + TTS_RESERVATION_MS,
     category: "tts",
   });
@@ -529,7 +527,7 @@ const settleTts = (
   ctx: OwnerContext,
   input: { id: string; vendor: TtsVendor; chars: number; pcmBytes: number; outcome: CostOutcome },
 ): number => {
-  const charge = input.chars > 0 ? ttsCostMicroCents(input.vendor, input.chars, input.pcmBytes) : 0;
+  const charge = input.chars > 0 ? ttsCostMicroCents(input.vendor, input.chars) : 0;
   settleSpend(
     { ...ctx, now: Date.now() },
     {
@@ -582,7 +580,7 @@ const prepareTts = async (
   ctx.jobs.schedule(
     TTS_SYNTHESIZE_JOB,
     ctx.now,
-    { id: ticket.id, ticket: ticket.ticket, text, voice: resolveGeminiTtsVoice(args.voice), vendor },
+    { id: ticket.id, ticket: ticket.ticket, text, voice: resolveTtsVoice(args.voice), vendor },
     { id: ttsJobId(ticket.id) },
   );
   return { ticket: ticket.ticket, playlistPath: voiceTtsPlaylistPath(ticket.ticket), expiresAt: ticket.expiresAt };
@@ -592,8 +590,8 @@ const streamStatus = (ctx: OwnerContext, id: string): string | null =>
   ctx.db.one<{ status: string }>("SELECT status FROM tts_streams WHERE id = ?", id)?.status ?? null;
 
 const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
-  const job = payload as { id: string; ticket: string; text: string; voice: string; vendor?: TtsVendor };
-  const vendor = job.vendor ?? ttsProvider(ctx.env)?.provider ?? "fal";
+  const job = payload as { id: string; ticket: string; text: string; voice: string; vendor?: string };
+  const vendor = ttsVendor(job.vendor);
   if (streamStatus(ctx, job.id) !== "synthesizing" || !ttsProvider(ctx.env) || !ctx.env.MEDIA) {
     ctx.db.run("UPDATE tts_streams SET status = 'error' WHERE id = ? AND status = 'synthesizing'", job.id);
     settleTts(ctx, { id: job.id, vendor, chars: 0, pcmBytes: 0, outcome: "cancelled" });
@@ -980,18 +978,18 @@ export const voiceDomain = {
         vendor: optional(literal("fal", "openrouter", "openai")),
       })(raw);
       const id = crypto.randomUUID();
-      admitTts(ctx, { id, chars, vendor: vendor ?? ttsProvider(ctx.env)?.provider ?? "fal" });
+      admitTts(ctx, { id, chars, vendor: ttsVendor(vendor) });
       return { ok: true, id };
     },
     "tts.settle": (ctx, raw) => {
-      const input = object({
+      const { vendor, ...input } = object({
         id: string({ min: 1, max: 64 }),
         vendor: literal("fal", "openrouter", "openai"),
         chars: number({ int: true, min: 0, max: TTS_MAX_INPUT_CHARS }),
         pcmBytes: number({ int: true, min: 0, max: 1_000_000_000 }),
         outcome: literal("succeeded", "failed", "aborted"),
       })(raw);
-      return { chargedMicroCents: settleTts(ctx, input) };
+      return { chargedMicroCents: settleTts(ctx, { ...input, vendor: ttsVendor(vendor) }) };
     },
     "tts.cancel": (ctx, raw) => {
       const { id } = object({ id: string({ min: 1, max: 64 }) })(raw);

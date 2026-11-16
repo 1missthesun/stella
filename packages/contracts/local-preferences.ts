@@ -2,13 +2,15 @@ export type RealtimeVoiceProvider = "stella" | "openai" | "xai";
 
 export type RealtimeVoiceUnderlyingProvider = "gptlive" | "openai" | "xai";
 
-export type ReadAloudVoiceProvider = "gemini" | "openai";
+// "stella" is Stella's own read-aloud voice (Speechify Simba 3.5 today);
+// preferences saved before 2026-11-16 call it "gemini".
+export type ReadAloudVoiceProvider = "stella" | "openai";
 
 export type RealtimeVoiceSelections = {
   gptlive?: string;
   openai?: string;
   xai?: string;
-  gemini?: string;
+  stella?: string;
 };
 
 export type RealtimeVoicePreferences = {
@@ -45,7 +47,7 @@ export const hasRealtimeVoiceSessionRouteChanged = (
 export const resolveReadAloudProvider = (
   prefs: Pick<RealtimeVoicePreferences, "readAloudProvider">,
 ): ReadAloudVoiceProvider =>
-  prefs.readAloudProvider === "openai" ? "openai" : "gemini";
+  prefs.readAloudProvider === "openai" ? "openai" : "stella";
 
 const REALTIME_VOICE_PROVIDERS: readonly RealtimeVoiceProvider[] = [
   "stella",

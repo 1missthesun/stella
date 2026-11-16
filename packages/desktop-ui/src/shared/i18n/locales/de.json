@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Anbieter für Vorlesen",
         "description": "Liest Antworten mit der Stimme dieses Anbieters vor.",
-        "geminiTitle": "Antworten mit Gemini TTS vorlesen",
         "label": "Vorlesen",
-        "openaiTitle": "Antworten mit OpenAI TTS vorlesen"
+        "openaiTitle": "Antworten mit OpenAI TTS vorlesen",
+        "stellaTitle": "Antworten mit Speechify vorlesen"
       },
       "source": {
-        "gemini": "Gemini-Stimmen",
         "gptlive": "Stella-Stimmen",
         "openai": "OpenAI-Stimmen",
+        "stella": "Speechify-Stimmen",
         "xai": "Grok-Stimmen"
       }
     },

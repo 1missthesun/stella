@@ -2752,14 +2752,14 @@
       "readAloud": {
         "ariaLabel": "Провайдер голоса для чтения вслух",
         "description": "Произносит ответы вслух голосом этого провайдера.",
-        "geminiTitle": "Читать ответы вслух с помощью Gemini TTS",
         "label": "Читать вслух",
-        "openaiTitle": "Читать ответы вслух с помощью OpenAI TTS"
+        "openaiTitle": "Читать ответы вслух с помощью OpenAI TTS",
+        "stellaTitle": "Читать ответы вслух с помощью Speechify"
       },
       "source": {
-        "gemini": "Голоса Gemini",
         "gptlive": "Голоса Stella",
         "openai": "Голоса OpenAI",
+        "stella": "Голоса Speechify",
         "xai": "Голоса Grok"
       }
     },

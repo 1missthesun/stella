@@ -2722,14 +2722,14 @@
       "readAloud": {
         "ariaLabel": "読み上げの音声プロバイダ",
         "description": "このプロバイダの音声で返信を読み上げます。",
-        "geminiTitle": "Gemini TTS で返信を読み上げます",
         "label": "読み上げ",
-        "openaiTitle": "OpenAI TTS で返信を読み上げます"
+        "openaiTitle": "OpenAI TTS で返信を読み上げます",
+        "stellaTitle": "Speechify で返信を読み上げます"
       },
       "source": {
-        "gemini": "Gemini の音声",
         "gptlive": "Stella の音声",
         "openai": "OpenAI の音声",
+        "stella": "Speechify の音声",
         "xai": "Grok の音声"
       }
     },

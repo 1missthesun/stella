@@ -2732,14 +2732,14 @@
       "readAloud": {
         "ariaLabel": "Read aloud voice provider",
         "description": "Speaks replies out loud using this provider's voice.",
-        "geminiTitle": "Read replies aloud with Gemini TTS",
         "label": "Read aloud",
-        "openaiTitle": "Read replies aloud with OpenAI TTS"
+        "openaiTitle": "Read replies aloud with OpenAI TTS",
+        "stellaTitle": "Read replies aloud with Speechify"
       },
       "source": {
-        "gemini": "Gemini voices",
         "gptlive": "Stella voices",
         "openai": "OpenAI voices",
+        "stella": "Speechify voices",
         "xai": "Grok voices"
       }
     },

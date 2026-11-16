@@ -2742,14 +2742,14 @@
       "readAloud": {
         "ariaLabel": "ספק הקול להקראה",
         "description": "מקריא תשובות בקול באמצעות הקול של ספק זה.",
-        "geminiTitle": "הקרא תשובות באמצעות Gemini TTS",
         "label": "הקראה",
-        "openaiTitle": "הקרא תשובות באמצעות OpenAI TTS"
+        "openaiTitle": "הקרא תשובות באמצעות OpenAI TTS",
+        "stellaTitle": "הקרא תשובות באמצעות Speechify"
       },
       "source": {
-        "gemini": "קולות Gemini",
         "gptlive": "קולות של סטלה",
         "openai": "קולות OpenAI",
+        "stella": "קולות Speechify",
         "xai": "קולות Grok"
       }
     },

@@ -211,6 +211,7 @@ import {
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
   IPC_LOCAL_CHAT_UPDATED,
   IPC_MEDIA_COPY_ATTACHMENT,
+  IPC_CLIPBOARD_WRITE_TEXT,
   IPC_MEDIA_COPY_IMAGE,
   IPC_MEDIA_SAVE_OUTPUT,
   IPC_MEETINGS_OPEN_FOLDER,
@@ -911,6 +912,11 @@ export const createElectronApi = (
       copyImage: (pngBase64: string) =>
         ipc.invoke(IPC_MEDIA_COPY_IMAGE, { pngBase64 }),
       copyAttachment: invoker(IPC_MEDIA_COPY_ATTACHMENT),
+    },
+
+    clipboard: {
+      writeText: (text: string) =>
+        ipc.invoke(IPC_CLIPBOARD_WRITE_TEXT, { text }),
     },
 
     meetings: {

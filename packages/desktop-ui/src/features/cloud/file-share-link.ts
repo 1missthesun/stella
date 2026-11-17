@@ -48,11 +48,13 @@ const drivePathFor = async (filePath: string, blob: Blob | null): Promise<string
   return finalized.path;
 };
 
+/** A public link to a file already in the Drive, by its Drive path. */
+export const publicDriveLink = async (drivePath: string): Promise<string> => {
+  const link = await backendClient.call("shares.shareFile", { path: drivePath });
+  return link.url;
+};
+
 export const publicFileLink = async (
   filePath: string,
   blob: Blob | null,
-): Promise<string> => {
-  const path = await drivePathFor(filePath, blob);
-  const link = await backendClient.call("shares.shareFile", { path });
-  return link.url;
-};
+): Promise<string> => publicDriveLink(await drivePathFor(filePath, blob));

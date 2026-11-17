@@ -3012,6 +3012,7 @@
         "copied": "已複製",
         "copy": "複製",
         "copyFailed": "無法複製",
+        "copyManually": "無法複製。請選取後自行複製。",
         "delete": "刪除",
         "deleteConfirm": "再次點擊以刪除",
         "expand": "展開",

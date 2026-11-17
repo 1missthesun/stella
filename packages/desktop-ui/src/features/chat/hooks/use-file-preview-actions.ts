@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
 
 type UseFilePreviewActionsOptions = {
   sourcePath: string;
@@ -23,8 +24,11 @@ export const useFilePreviewActions = ({
   }, [sourcePath, suggestedName]);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(copyText ?? sourcePath);
-    setActionStatus("Copied");
+    setActionStatus(
+      (await copyTextToClipboard(copyText ?? sourcePath))
+        ? "Copied"
+        : "Could not copy",
+    );
   }, [copyText, sourcePath]);
 
   return {

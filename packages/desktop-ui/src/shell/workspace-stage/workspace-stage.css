@@ -709,6 +709,11 @@
   animation: file-viewer-status-in 140ms ease;
 }
 
+.file-viewer__manual-copy {
+  flex: 1 1 10rem;
+  animation: file-viewer-status-in 140ms ease;
+}
+
 @keyframes file-viewer-status-in {
   from {
     opacity: 0;

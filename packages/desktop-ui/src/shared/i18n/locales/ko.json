@@ -3012,6 +3012,7 @@
         "copied": "복사됨",
         "copy": "복사",
         "copyFailed": "복사할 수 없습니다",
+        "copyManually": "복사하지 못했습니다. 선택해서 복사하세요.",
         "delete": "삭제",
         "deleteConfirm": "삭제하려면 다시 클릭",
         "expand": "확대",

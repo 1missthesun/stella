@@ -396,6 +396,7 @@ export const IPC_BROWSER_EXTENSION_CLIENTS_CHANGED =
 export const IPC_MEDIA_SAVE_OUTPUT = "media:saveOutput" as const;
 export const IPC_MEDIA_COPY_IMAGE = "media:copyImage" as const;
 export const IPC_MEDIA_COPY_ATTACHMENT = "media:copyAttachment" as const;
+export const IPC_CLIPBOARD_WRITE_TEXT = "clipboard:writeText" as const;
 
 export const IPC_MEETINGS_STATUS = "meetings:status" as const;
 export const IPC_MEETINGS_START = "meetings:start" as const;

@@ -9,6 +9,7 @@ import {
   Lock,
   Trash2,
 } from "@/ui/icons";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { showToast } from "@/ui/toast";
 import {
@@ -89,7 +90,7 @@ const drivePathOf = (
 };
 
 const copyToClipboard = async (value: string): Promise<void> => {
-  await navigator.clipboard.writeText(value);
+  if (!(await copyTextToClipboard(value))) throw new Error("Couldn't copy");
 };
 
 const openInSystemBrowser = (url: string): void => {

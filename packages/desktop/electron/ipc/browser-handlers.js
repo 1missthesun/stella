@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { clipboard, ClipboardItem, nativeImage } from "electron";
 import { fetchPublicUrl, normalizeSafeExternalUrl } from "@stella/runtime/kernel/tools/network-guards";
-import { IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMAGE, IPC_MEDIA_SAVE_OUTPUT, } from "@stella/contracts/desktop/ipc-channels";
+import { IPC_CLIPBOARD_WRITE_TEXT, IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMAGE, IPC_MEDIA_SAVE_OUTPUT, } from "@stella/contracts/desktop/ipc-channels";
 import { decodeAndValidateImage, decodeBase64ImageBounded, readResponseBodyBounded, validateDecodedImageFile, } from "@stella/runtime/kernel/tools/image-decode-validation";
 import { materializeMediaArtifact } from "@stella/runtime/kernel/tools/media-artifact-store";
 import {
@@ -156,6 +156,25 @@ export const registerBrowserHandlers = (options) => {
                 },
             });
             return { ok: true, path: saved.path };
+        }
+        catch (error) {
+            return { ok: false, error: error.message };
+        }
+    });
+    // The page's own clipboard API refuses a write that doesn't follow a click
+    // within a few seconds (a link fetched first, a native menu item), so the
+    // app's text copies go through here.
+    handleIpc(IPC_CLIPBOARD_WRITE_TEXT, (event, payload) => {
+        if (!options.assertPrivilegedSender(event, IPC_CLIPBOARD_WRITE_TEXT)) {
+            return { ok: false, error: "Blocked untrusted request." };
+        }
+        const text = typeof payload?.text === "string" ? payload.text : "";
+        if (!text) {
+            return { ok: false, error: "Nothing to copy." };
+        }
+        try {
+            clipboard.writeText(text);
+            return { ok: true };
         }
         catch (error) {
             return { ok: false, error: error.message };

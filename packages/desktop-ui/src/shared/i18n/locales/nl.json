@@ -3027,6 +3027,7 @@
         "copied": "Gekopieerd",
         "copy": "Kopiëren",
         "copyFailed": "Kon niet kopiëren",
+        "copyManually": "Kopiëren lukte niet. Selecteer dit en kopieer het.",
         "delete": "Verwijderen",
         "deleteConfirm": "Klik nogmaals om te verwijderen",
         "expand": "Uitvouwen",

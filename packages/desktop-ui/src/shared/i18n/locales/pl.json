@@ -3053,6 +3053,7 @@
         "copied": "Skopiowano",
         "copy": "Kopiuj",
         "copyFailed": "Nie udało się skopiować",
+        "copyManually": "Nie udało się skopiować. Zaznacz to i skopiuj.",
         "delete": "Usuń",
         "deleteConfirm": "Kliknij ponownie, aby usunąć",
         "expand": "Rozwiń",

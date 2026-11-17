@@ -3027,6 +3027,7 @@
         "copied": "Kopiert",
         "copy": "Kopieren",
         "copyFailed": "Kopieren nicht möglich",
+        "copyManually": "Kopieren nicht möglich. Markiere den Text und kopiere ihn.",
         "delete": "Löschen",
         "deleteConfirm": "Zum Löschen erneut klicken",
         "expand": "Erweitern",

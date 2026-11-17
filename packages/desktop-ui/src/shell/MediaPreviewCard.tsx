@@ -5,6 +5,7 @@ import {
   type DisplayFileBlob,
 } from "@/shared/hooks/use-display-file-data";
 import { copyImageBlob } from "@/shell/media-clipboard";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { fileViewer } from "@/features/workspace-display/file-viewer-store";
 import { AudioPlayer } from "@/shell/AudioPlayer";
 import { useMediaStream } from "@/shared/hooks/use-media-stream-url";
@@ -79,8 +80,9 @@ const MediaActions = ({
         return;
       }
       if (copyText != null) {
-        await navigator.clipboard.writeText(copyText);
-        setMessage("Copied");
+        setMessage(
+          (await copyTextToClipboard(copyText)) ? "Copied" : "Could not copy",
+        );
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not copy");

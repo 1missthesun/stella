@@ -1,0 +1,25 @@
+.manual-copy-field {
+  min-width: 0;
+  width: 100%;
+  max-width: 22rem;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-app-region: no-drag;
+}
+
+.manual-copy-field:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.manual-copy-field::selection {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+}

@@ -3079,6 +3079,7 @@
         "copied": "تم النسخ",
         "copy": "نسخ",
         "copyFailed": "تعذّر النسخ",
+        "copyManually": "تعذّر النسخ. حدّد هذا وانسخه.",
         "delete": "حذف",
         "deleteConfirm": "انقر مرة أخرى للحذف",
         "expand": "توسيع",

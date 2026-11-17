@@ -164,6 +164,10 @@
   color: var(--text-weak);
 }
 
+.media-tab__manual-copy {
+  flex: 1 1 10rem;
+}
+
 .media-tab__hero-preview {
   flex: 1;
   min-height: 0;

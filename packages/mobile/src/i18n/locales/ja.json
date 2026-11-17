@@ -3012,6 +3012,7 @@
         "copied": "コピーしました",
         "copy": "コピー",
         "copyFailed": "コピーできませんでした",
+        "copyManually": "コピーできませんでした。選択してコピーしてください。",
         "delete": "削除",
         "deleteConfirm": "もう一度クリックして削除",
         "expand": "拡大",

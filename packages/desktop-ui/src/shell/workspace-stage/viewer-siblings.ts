@@ -88,17 +88,24 @@ const useConversationStripEntries = (): StripEntry[] => {
   return useMemo(() => {
     const entries: StripEntry[] = [];
     for (const file of deriveConversationFiles(events)) {
-      if (file.payload.cloudDrivePath || file.cloudDriveFile) continue;
-      const id = stripIdFor(file.payload);
-      if (!id) continue;
+      // A Drive file opens under its Drive path (as a chat link opens it),
+      // so its strip item is the same item the viewer shows once opened.
+      const drive = file.cloudDriveFile;
+      if (drive?.stored === false) continue;
+      const payload: DisplayTabPayload = drive
+        ? { ...file.payload, cloudDrivePath: drive.path }
+        : file.payload;
+      const localId = stripIdFor(payload);
+      if (!localId) continue;
+      const id = drive ? `drive:${localId}` : localId;
       entries.push({
         source: "artifact",
         id,
-        kind: displayTabKindForPayload(file.payload),
+        kind: displayTabKindForPayload(payload),
         title: file.path.split(/[\\/]/).pop() || file.path,
         filePath: file.path,
         createdAt: file.timestamp,
-        payload: file.payload,
+        payload,
         setKey: file.set?.key ?? id,
         setOrder: file.set?.order ?? 0,
         ...(file.set ? { from: file.set.from } : {}),

@@ -39,7 +39,7 @@ const reads = new Map<string, { value: Promise<DriveRead>; bytes: number }>();
  * round trip. A path nobody watches gets a fresh link each time (its bytes
  * are still kept per version).
  */
-const linkFor = async (path: string): Promise<DriveFileUrl> => {
+export const driveFileLink = async (path: string): Promise<DriveFileUrl> => {
   const pending = links.get(path);
   if (pending) {
     const link = await pending.value.catch(() => null);
@@ -113,8 +113,8 @@ const keepRead = (key: string, value: Promise<DriveRead>) => {
 };
 
 /** A Drive file's bytes, downloaded once per version. */
-const readDriveFile = async (path: string, maxBytes: number): Promise<DriveRead> => {
-  const link = await linkFor(path);
+export const readDriveFile = async (path: string, maxBytes: number): Promise<DriveRead> => {
+  const link = await driveFileLink(path);
   const key = `${path}\0${link.version}\0${maxBytes}`;
   const kept = reads.get(key);
   if (kept) {
@@ -142,7 +142,7 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
   useEffect(() => {
     if (current.tag !== null) return;
     let live = true;
-    void linkFor(path).then(
+    void driveFileLink(path).then(
       (link) => {
         if (live) setBase({ path, tag: link.version });
       },
@@ -163,7 +163,7 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
     key: `drive:${path}:${tag}`,
     drivePath: path,
     async mediaUrl() {
-      return (await linkFor(path)).url;
+      return (await driveFileLink(path)).url;
     },
     async read(filePath: string, maxBytes = 32 * 1024 * 1024) {
       return await readDriveFile(drivePathFor(path, filePath), maxBytes);

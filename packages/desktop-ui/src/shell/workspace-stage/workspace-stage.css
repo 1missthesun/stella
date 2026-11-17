@@ -532,6 +532,13 @@
   pointer-events: none;
 }
 
+/* A document's first page covers its icon once it's made. */
+.viewer-strip__img--page {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+}
+
 .viewer-strip__img--empty {
   background: color-mix(in oklch, var(--foreground) 8%, transparent);
 }

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { CANVAS_BRIDGE_SCRIPT } from "@stella/contracts/canvas-bridge";
 import { createTailwindBuild, cssModule, isTailwindStylesheet } from "./css.js";
 import { envDefines, loadRendererEnv, pairedAppsHosts, type RendererEnv } from "./env.js";
 import { createModuleGraph, isInNodeModules, SOURCE_EXTENSIONS } from "./modules.js";
@@ -382,6 +383,9 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
           (match) => `'sha256-${createHash("sha256").update(match[1]!).digest("base64")}'`,
         )
       : []),
+    // A canvas renders as a srcdoc frame on the web and inherits this policy;
+    // its link and Ask Stella bridge is the one inline script it may run.
+    `'sha256-${createHash("sha256").update(CANVAS_BRIDGE_SCRIPT).digest("base64")}'`,
     ...(options.scriptSources ?? []),
   ];
   if (scriptSources.length > 0) {

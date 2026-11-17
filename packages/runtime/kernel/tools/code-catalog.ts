@@ -1,3 +1,5 @@
+import { rankTools } from "./tool-search-rank.js";
+
 export type DemotedToolCatalogEntry = {
   name: string;
   description?: string;
@@ -288,84 +290,6 @@ export const buildCatalogSection = (
   }
 };
 
-const singularize = (token: string): string =>
-  token.length > 3 && token.endsWith("s") && !token.endsWith("ss")
-    ? token.slice(0, -1)
-    : token;
-
-export const tokenizeToolQuery = (value: string): string[] => {
-  if (typeof value !== "string") return [];
-  const spaced = value.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
-  const tokens = spaced
-    .split(/[^a-z0-9]+/g)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2);
-  return [...new Set(tokens.map(singularize))];
-};
-
-const collectPropertyText = (
-  schema: unknown,
-  depth: number,
-  sink: string[],
-): void => {
-  if (depth > MAX_SCHEMA_RENDER_DEPTH) return;
-  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return;
-  const record = schema as Record<string, unknown>;
-  const properties =
-    record.properties &&
-    typeof record.properties === "object" &&
-    !Array.isArray(record.properties)
-      ? (record.properties as Record<string, unknown>)
-      : null;
-  if (properties) {
-    for (const [key, value] of Object.entries(properties)) {
-      sink.push(key);
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        const description = (value as Record<string, unknown>).description;
-        if (typeof description === "string") sink.push(description);
-        collectPropertyText(value, depth + 1, sink);
-      }
-    }
-  }
-  if (record.items) collectPropertyText(record.items, depth + 1, sink);
-};
-
-export const scoreToolSearch = (
-  tool: DemotedToolCatalogEntry,
-  queryTokens: readonly string[],
-): number => {
-  try {
-    if (!tool || typeof tool.name !== "string" || queryTokens.length === 0) {
-      return 0;
-    }
-    const nameLower = tool.name.toLowerCase();
-    const nameTokens = new Set(tokenizeToolQuery(tool.name));
-    const descriptionText = [
-      typeof tool.description === "string" ? tool.description : "",
-      ...(tool.demoted?.searchTerms ?? []),
-    ]
-      .join(" ")
-      .toLowerCase();
-    const propertySink: string[] = [];
-    collectPropertyText(tool.parameters, 0, propertySink);
-    const propertyText = propertySink.join(" ").toLowerCase();
-
-    let score = 0;
-    for (const token of queryTokens) {
-      if (token === singularize(nameLower) || token === nameLower) {
-        score += 20;
-      } else if (nameLower.includes(token) || nameTokens.has(token)) {
-        score += 8;
-      }
-      if (descriptionText.includes(token)) score += 4;
-      if (propertyText.includes(token)) score += 2;
-    }
-    return score;
-  } catch {
-    return 0;
-  }
-};
-
 const clampSearchLimit = (value: unknown): number => {
   if (typeof value !== "number" || !Number.isFinite(value)) return 6;
   return Math.max(1, Math.min(12, Math.floor(value)));
@@ -402,17 +326,9 @@ export const searchToolCatalog = (
       (tool) => tool.name.toLowerCase() === normalized,
     );
     if (exact.length > 0) return exact.map(toSearchResult);
-    const queryTokens = tokenizeToolQuery(normalized);
-    return valid
-      .map((tool) => ({ tool, score: scoreToolSearch(tool, queryTokens) }))
-      .filter((entry) => entry.score > 0)
-      .sort(
-        (left, right) =>
-          right.score - left.score ||
-          left.tool.name.localeCompare(right.tool.name),
-      )
-      .slice(0, clampSearchLimit(limit))
-      .map((entry) => toSearchResult(entry.tool));
+    return rankTools(valid, query, clampSearchLimit(limit)).map(
+      toSearchResult,
+    );
   } catch {
     return [];
   }

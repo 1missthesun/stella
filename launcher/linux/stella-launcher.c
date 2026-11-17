@@ -3707,8 +3707,10 @@ int main(int argc, char **argv) {
         ask_running_launcher_to_show();
         return 0;
     }
-    if (rttime_prepare(argc, argv, &lock_fd)) return 0;
+    /* First: after an in-place update the previous image's helpers are ours,
+     * and a relaunch below would leave them behind. */
     stop_inherited_children();
+    if (rttime_prepare(argc, argv, &lock_fd)) return 0;
     state_load();
     follow_server_file();
     updater_start();

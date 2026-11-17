@@ -33,6 +33,8 @@ type RealtimeLimitCheck = {
   limit: RealtimeCpuLimit | null;
   rtkit: RtkitState;
   zero: boolean;
+  /** The next start of Stella lifts the limit by itself (see launcherCuresOnNextStart). */
+  curedOnNextStart: boolean;
 };
 
 const RTKIT_BUS_NAME = "org.freedesktop.RealtimeKit1";
@@ -102,6 +104,17 @@ const probeRtkit = async (): Promise<RtkitState> => {
 const isZero = (limit: RealtimeCpuLimit | null) =>
   limit !== null && (limit.soft === 0 || limit.hard === 0);
 
+/**
+ * Started by a launcher from before the fix: every launcher since passes
+ * STELLA_LAUNCHER_RTKIT. That happens right after an app update, which restarts
+ * Electron under the launcher already running; the launcher updates itself on
+ * the next start, and the new one restarts under the user's systemd with fresh
+ * limits. Nothing for the user to fix, so this is logged, not shown.
+ */
+const launcherCuresOnNextStart = () =>
+  process.env.STELLA_LAUNCHER?.trim() === "1" &&
+  !process.env.STELLA_LAUNCHER_RTKIT?.trim();
+
 const runCheck = async (): Promise<RealtimeLimitCheck> => {
   const fromLauncher = process.env.STELLA_LAUNCHER_RTKIT?.trim();
   const rtkit: RtkitState =
@@ -115,12 +128,15 @@ const runCheck = async (): Promise<RealtimeLimitCheck> => {
   }
   const limit = readRealtimeCpuLimit();
   const zero = isZero(limit);
+  const curedOnNextStart = zero && launcherCuresOnNextStart();
   const fields = {
     soft: limit?.soft ?? "unknown",
     hard: limit?.hard ?? "unknown",
     rtkit,
     disableRtkit: process.env.DISABLE_RTKIT ?? "",
-    launcher: process.env.STELLA_LAUNCHER_RTTIME ?? "",
+    launcher: curedOnNextStart
+      ? "predates-fix: cured on the next start"
+      : (process.env.STELLA_LAUNCHER_RTTIME ?? ""),
   };
   const logger = getMainLogger();
   if (zero) {
@@ -132,7 +148,7 @@ const runCheck = async (): Promise<RealtimeLimitCheck> => {
   } else {
     logger?.process("linux.realtime-limit", fields);
   }
-  return { limit, rtkit, zero };
+  return { limit, rtkit, zero, curedOnNextStart };
 };
 
 /** Starts the check once (Linux only). Call early in main. */
@@ -143,7 +159,12 @@ export const startLinuxRealtimeLimitCheck = (): void => {
       "[linux] Real-time limit check failed:",
       error instanceof Error ? error.message : String(error),
     );
-    return { limit: null, rtkit: "unknown" as const, zero: false };
+    return {
+      limit: null,
+      rtkit: "unknown" as const,
+      zero: false,
+      curedOnNextStart: false,
+    };
   });
 };
 
@@ -177,21 +198,22 @@ const noticeText = (rtkit: RtkitState) => {
 };
 
 /**
- * Tells the user once when the limit is 0. Remembered in userData until a start
- * with a healthy limit, so the problem coming back is told again.
+ * Tells the user once when the limit is 0 and Stella cannot lift it by itself.
+ * Remembered in userData until a start with a healthy limit, so the problem
+ * coming back is told again.
  */
 export const noticeLinuxRealtimeLimitOnce = async (options: {
   showDialog: boolean;
   window?: BrowserWindow | null;
 }): Promise<void> => {
   if (!check) return;
-  const { zero, rtkit } = await check;
+  const { zero, rtkit, curedOnNextStart } = await check;
   const marker = path.join(app.getPath("userData"), NOTICE_FILE);
   if (!zero) {
     await rm(marker, { force: true }).catch(() => {});
     return;
   }
-  if (!options.showDialog) return;
+  if (!options.showDialog || curedOnNextStart) return;
   const told = await readFile(marker, "utf8").then(
     () => true,
     () => false,

@@ -1,0 +1,174 @@
+.map {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(28px, 4vw, 64px);
+  width: min(1040px, 100%);
+  margin: clamp(40px, 7svh, 80px) auto 0;
+  text-align: left;
+}
+
+/* A plain laptop: the screen holds what's checked there. */
+.computer {
+  margin: 0;
+}
+
+.screen {
+  position: relative;
+  aspect-ratio: 16 / 10.4;
+  padding: clamp(22px, 3.4vw, 40px);
+  border: clamp(8px, 1vw, 12px) solid #e4e4e8;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  border-radius: clamp(14px, 1.6vw, 20px) clamp(14px, 1.6vw, 20px) 6px 6px;
+  background: #fff;
+}
+
+.base {
+  height: clamp(10px, 1.2vw, 14px);
+  margin: 0 -6%;
+  border-radius: 0 0 14px 14px / 0 0 100% 100%;
+  background: #d6d6db;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.map .screenTitle {
+  margin: 0;
+  font-size: clamp(20px, 2.2vw, 30px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.stays {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 clamp(16px, 2.4vw, 32px);
+  margin: clamp(16px, 2.6vw, 30px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stays li {
+  padding: clamp(9px, 1.1vw, 13px) 0;
+  border-top: 1px solid #ececee;
+  font-size: clamp(14px, 1.25vw, 17px);
+  font-weight: 540;
+  letter-spacing: -0.012em;
+  color: #3a3a3f;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 420ms ease,
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.map[data-in="1"] .stays li {
+  opacity: 1;
+  transform: none;
+}
+
+/* What leaves: two items, out along one hairline. */
+.out {
+  position: relative;
+}
+
+.wire {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: clamp(28px, 4vw, 64px);
+  height: 1px;
+  background: rgba(10, 10, 13, 0.25);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1) 600ms;
+}
+
+.map[data-in="1"] .wire {
+  transform: scaleX(1);
+}
+
+.map .outTitle {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(10, 10, 13, 0.5);
+}
+
+.leaves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaves li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(10, 10, 13, 0.1);
+  opacity: 0;
+  transform: translateX(-24px);
+  transition:
+    opacity 480ms ease,
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.map[data-in="1"] .leaves li {
+  opacity: 1;
+  transform: none;
+}
+
+.leaves strong {
+  font-size: clamp(17px, 1.5vw, 21px);
+  font-weight: 640;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.leaves span {
+  font-size: 15px;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+@media (max-width: 760px) {
+  .map {
+    grid-template-columns: 1fr;
+    gap: 44px;
+  }
+
+  .stays {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .wire {
+    top: auto;
+    right: auto;
+    bottom: 100%;
+    left: 24px;
+    width: 1px;
+    height: 44px;
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+
+  .map[data-in="1"] .wire {
+    transform: scaleY(1);
+  }
+
+  .leaves li {
+    transform: translateY(-16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stays li,
+  .leaves li,
+  .wire {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

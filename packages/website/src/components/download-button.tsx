@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { reportGoogleAdsDownload } from "@/components/google-ads-tag";
 import { INSTALL_COMMAND } from "@/lib/downloads";
 
-function AppleIcon({ size = 18 }: { size?: number }) {
+export function AppleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -18,7 +18,7 @@ function AppleIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-function WindowsIcon({ size = 18 }: { size?: number }) {
+export function WindowsIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -32,7 +32,7 @@ function WindowsIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-function LinuxIcon({ size = 18 }: { size?: number }) {
+export function LinuxIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"

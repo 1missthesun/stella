@@ -1,0 +1,262 @@
+/* The Stella Security window at its real 400x600, scaled down on narrow
+   screens: every size is written in --u, one pixel of the real window. */
+
+.window {
+  --ink: #0a0a0b;
+  --grey: #6e6e73;
+  --line: #ececee;
+  --blue: #2871c9;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  width: min(400px, 100%);
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  container-type: inline-size;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--l-sans), system-ui, sans-serif;
+  text-align: left;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.09),
+    0 50px 120px -30px rgba(10, 20, 60, 0.55);
+}
+
+.bar,
+.body {
+  --u: min(1px, 0.25cqw);
+}
+
+.bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 8);
+  height: calc(var(--u) * 40);
+  padding: 0 calc(var(--u) * 14);
+}
+
+.bar i {
+  width: calc(var(--u) * 12);
+  height: calc(var(--u) * 12);
+  border-radius: 50%;
+  background: #e4e4e7;
+}
+
+.bar span {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: calc(var(--u) * 13);
+  font-weight: 560;
+  letter-spacing: -0.005em;
+  color: var(--grey);
+}
+
+.body {
+  padding: calc(var(--u) * 30) calc(var(--u) * 32) 0;
+  animation: bodyIn 520ms ease both;
+}
+
+@keyframes bodyIn {
+  from {
+    opacity: 0;
+  }
+}
+
+.head {
+  min-height: calc(var(--u) * 78);
+}
+
+.window .heading {
+  margin: 0;
+  font-size: calc(var(--u) * 40);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  animation: swap 380ms var(--ease) both;
+}
+
+.window .checked {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 8);
+  margin: calc(var(--u) * 8) 0 0;
+  font-size: calc(var(--u) * 15);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--grey);
+  animation: swap 320ms var(--ease) both;
+}
+
+.dot {
+  width: calc(var(--u) * 7);
+  height: calc(var(--u) * 7);
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+@keyframes swap {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--u) * 8));
+  }
+}
+
+/* The one thing: opens under the heading, closes once it's fixed. */
+.item {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 520ms var(--ease),
+    opacity 300ms ease;
+}
+
+.item[data-open="1"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 520ms var(--ease),
+    opacity 420ms ease 140ms;
+}
+
+.itemIn {
+  min-height: 0;
+  overflow: hidden;
+  padding-top: calc(var(--u) * 14);
+}
+
+.window .itemTitle {
+  margin: 0;
+  font-size: calc(var(--u) * 18);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.window .itemWhy {
+  margin: calc(var(--u) * 6) 0 0;
+  font-size: calc(var(--u) * 15);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--grey);
+}
+
+.primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--u) * 46);
+  margin-top: calc(var(--u) * 18);
+  border-radius: calc(var(--u) * 10);
+  background: var(--blue);
+  color: #fff;
+  font-size: calc(var(--u) * 16);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+
+.primary[data-pressed="1"] {
+  transform: scale(0.97);
+  background: #1f5fae;
+}
+
+.quiet {
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--u) * 12) 0 calc(var(--u) * 4);
+  font-size: calc(var(--u) * 15);
+  font-weight: 500;
+  color: var(--grey);
+}
+
+.window .label {
+  margin: calc(var(--u) * 28) 0 calc(var(--u) * 4);
+  font-size: calc(var(--u) * 13);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--grey);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.list li > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 12);
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  padding: calc(var(--u) * 12) 0;
+  font-size: calc(var(--u) * 15);
+  line-height: 1.35;
+  letter-spacing: -0.008em;
+}
+
+.list li:first-child > div {
+  border-top: 0;
+}
+
+.list li + li > div {
+  border-top: 1px solid var(--line);
+}
+
+.list time {
+  flex: none;
+  font-size: calc(var(--u) * 13);
+  color: var(--grey);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The fix lands at the top of the list. */
+.list .new {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 520ms var(--ease) 260ms,
+    opacity 420ms ease 420ms;
+}
+
+.list .new > div {
+  padding: 0;
+  transition: padding 520ms var(--ease) 260ms;
+}
+
+.list .new[data-open="1"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.list .new[data-open="1"] > div {
+  padding: calc(var(--u) * 12) 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .body,
+  .window .heading,
+  .window .checked {
+    animation: none;
+  }
+
+  .item,
+  .item[data-open="1"],
+  .list .new,
+  .list .new > div,
+  .primary {
+    transition: none;
+  }
+}

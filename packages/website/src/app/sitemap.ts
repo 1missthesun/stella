@@ -19,6 +19,7 @@ const ROUTES: Route[] = [
   { path: "/ai", priority: 0.7, changeFrequency: "weekly" },
   { path: "/one-chat", priority: 0.7, changeFrequency: "monthly" },
   { path: "/voice", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/security", priority: 0.7, changeFrequency: "monthly" },
   { path: "/learn-more/whats-new", priority: 0.6, changeFrequency: "weekly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },

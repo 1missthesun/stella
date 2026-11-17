@@ -7,6 +7,7 @@ import {
 } from "@/lib/legal-text";
 import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PLAN_CATALOG, PLAN_ORDER, planPriceLabel } from "@/lib/plans";
 import { howLlmsFull, howLlmsSections } from "@/lib/problems/markdown";
+import { SECURITY_MARKDOWN_BODY, SECURITY_PATH } from "@/lib/security";
 import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
@@ -110,6 +111,13 @@ comes with every paid plan.
 One ongoing chat, with the work happening behind it — on your ChatGPT or
 Claude plan, or Stella's models. See ${abs("/pricing.md")} for plans.
 `;
+
+const SECURITY_MD = `${header(
+  "Stella Security — safe online, without the worry",
+  SECURITY_PATH,
+  "A small app that checks your computer, your accounts and today's security news, and fixes what's wrong with one tap.",
+)}
+${SECURITY_MARKDOWN_BODY}`;
 
 const VOICE_MD = `${header(
   "Voice — talk to Stella out loud",
@@ -386,6 +394,13 @@ export const AGENT_PAGES: AgentPage[] = [
     label: "One chat",
     description: "One ongoing conversation: everything you ask, in one place.",
     markdown: ONE_CHAT_MD,
+  },
+  {
+    route: SECURITY_PATH,
+    mdPath: `${SECURITY_PATH}.md`,
+    label: "Stella Security",
+    description: "A small desktop app that keeps ordinary people safe online: your computer, your accounts, today's news, fixed with one tap.",
+    markdown: SECURITY_MD,
   },
   {
     route: "/voice",

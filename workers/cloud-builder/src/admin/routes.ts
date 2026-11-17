@@ -355,14 +355,21 @@ const conversationRestart = async (request: Request, env: AdminEnv): Promise<Res
   return json(await env.ORCHESTRATOR_SESSIONS.getByName(conversationId).restartForVerification());
 };
 
-/** Test accounts only: runs an email-domain internal call (`sortProbe` sorts given emails; `summaryNow` posts a summary). */
+/** Test accounts only: runs an email-domain internal call (`readNow` starts Stella's read; `tool` runs the email tool with `args`; `import` puts `args.raw`, an RFC 822 email, in the inbox). */
 const emailProbeRoute = async (request: Request, env: AdminEnv): Promise<Response> => {
   const { testAccountsEnabled } = await import("../auth/auth.js");
   if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
   const body = await readBody(request);
   const ownerId = ownerIdOf(body?.ownerId);
-  const action = body?.action === "summaryNow" ? "email.summaryNow" : body?.action === "sortProbe" ? "email.sortProbe" : "";
-  if (!ownerId || !action) return fail(400, "Need ownerId and action sortProbe|summaryNow.");
+  const action =
+    body?.action === "readNow"
+      ? "email.readNow"
+      : body?.action === "tool"
+        ? "email.tool"
+        : body?.action === "import"
+          ? "email.testImport"
+          : "";
+  if (!ownerId || !action) return fail(400, "Need ownerId and action readNow|tool|import.");
   const row = await (env as unknown as Cloudflare.Env).DB?.prepare('SELECT "email" FROM "user" WHERE "id" = ?')
     .bind(ownerId)
     .first<{ email: string | null }>();
@@ -371,7 +378,7 @@ const emailProbeRoute = async (request: Request, env: AdminEnv): Promise<Respons
   const snapshot = await stub.snapshot();
   const response = (await stub.ownerInternal({
     name: action,
-    args: action === "email.sortProbe" ? { mails: body?.mails } : {},
+    args: action === "email.readNow" ? {} : (body?.args ?? {}),
     ownerGeneration: snapshot.ownerGeneration,
   })) as unknown as RpcResponse;
   return response.ok ? json(response.value) : fail(rpcErrorStatus(response.error.code), response.error.message);

@@ -94,11 +94,13 @@ export class SafeguardBlockedError extends Error {
 export const cloudExecutionContext = (
   turn: Pick<ChatTurnRequest, "audience">,
   destinations: DevicesResponse | null,
+  emailAccounts?: string[] | null,
 ): ExecutionContextSnapshot =>
   createExecutionContextSnapshot({
     devices: destinations?.devices ?? null,
     destination: { kind: "cloud" },
     media: { stella: mediaAccessForAudience(turn.audience) },
+    ...(emailAccounts?.length ? { email: { accounts: emailAccounts } } : {}),
   });
 
 export const piModelSpec = (

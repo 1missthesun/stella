@@ -42,6 +42,7 @@ export const RESIDENT_SECTION_KEYS: ReadonlySet<string> = new Set([
   "engine-model",
   "working-directory",
   "media-access",
+  "email",
   "response-language",
 ]);
 

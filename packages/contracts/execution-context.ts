@@ -44,11 +44,15 @@ export const mediaAccessForAudience = (
   return CAPABILITIES.every((capability) => hasCapability(plan, capability)) ? "included" : "upgrade";
 };
 
+/** Email is on: Stella reads these inboxes herself and keeps the Email page. */
+export type EmailAccess = { accounts: string[] };
+
 export type ExecutionContextSnapshot = {
   devices: ExecutionContextDevice[];
   destination: ExecutionDestination;
   devicesKnown: boolean;
   media?: MediaAccess;
+  email?: EmailAccess;
 };
 
 const MAX_DEVICES = 100;
@@ -62,6 +66,7 @@ export const createExecutionContextSnapshot = (args: {
   devices: readonly (DeviceDestination & { signedIn?: DeviceEngine[] })[] | null;
   destination: ExecutionDestination;
   media?: MediaAccess | undefined;
+  email?: EmailAccess | undefined;
 }): ExecutionContextSnapshot => ({
   destination:
     args.destination.kind === "cloud"
@@ -103,7 +108,16 @@ export const createExecutionContextSnapshot = (args: {
         },
       }
     : {}),
+  ...(args.email && args.email.accounts.length > 0
+    ? { email: { accounts: args.email.accounts.slice(0, 20).map(labelText) } }
+    : {}),
 });
+
+const readEmailAccess = (value: unknown): EmailAccess | undefined => {
+  if (!isRecord(value) || !Array.isArray(value.accounts)) return undefined;
+  const accounts = value.accounts.filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+  return accounts.length > 0 ? { accounts } : undefined;
+};
 
 const readMediaAccess = (value: unknown): MediaAccess | undefined => {
   if (!isRecord(value)) return undefined;
@@ -193,6 +207,7 @@ export const readExecutionContextSnapshot = (
     devices: snapshot.devicesKnown ? devices : null,
     destination,
     media: readMediaAccess(snapshot.media),
+    email: readEmailAccess(snapshot.email),
   });
 };
 
@@ -278,4 +293,23 @@ export const renderMediaAccess = (snapshot: ExecutionContextSnapshot): string | 
   ]
     .filter(Boolean)
     .join("\n");
+};
+
+/**
+ * Stella's email instructions, for the orchestrator, only while Email is on
+ * (Gmail connected through Stella and Email turned on).
+ */
+export const renderEmailAccess = (snapshot: ExecutionContextSnapshot): string | undefined => {
+  const accounts = snapshot.email?.accounts;
+  if (!accounts?.length) return undefined;
+  return [
+    "# Email",
+    `Email is on: you read the user's Gmail yourself (${accounts.join(", ")}) and keep their Email page, the page they open from the Email tab on a computer and on their phone. It is built around decisions, not emails.`,
+    "- When to read: a message from the system says there is new mail (a scheduled read, a few times a day), or an email that may not wait just arrived; or the user asks about their email. Then call email `inbox`, `read` the threads you need, and update the page with email `page`.",
+    "- The page: needs_you is what only the user can decide, few items, each a gist with your recommendation and one proposed step as `action` (\"Send reply\", \"Pay it\", \"Confirm 7:30\"). When the step is a reply, draft the reply you recommend (pick the option you'd choose and say why in the gist; never a holding reply) with email `draft`, and put its text in `draft` and its id in `draftId`; they change it with Tell Stella. handled is what you did without them (archived, filed, a routine confirmation), with `action` (\"Undo\", \"Unarchive\") only when it can be undone. waiting is threads where someone owes the user a reply. Everything else only counts toward `ignored`. Related mail is one item (`count`, `threads`). Remove items once they are done or no longer matter. Mark `urgent` only for what can't wait hours or what a wake rule asked to hear about at once; it reaches their phone.",
+    "- In the chat: say nothing for a read that only updated the page: answer exactly <no-reply/>. When something needs them, one short line pointing to the page (\"Two emails need you, on the Email page: the lease renewal and Dana's question.\"), never a rundown.",
+    "- Their taps on the page arrive as a <canvas-action canvas=\"email\"> message. `do:<id>` is their yes to exactly that item's `action`: do it (send the drafted reply with email `send`, passing its draft id), then move the item to handled or remove it. `undo:<id>` reverses what you did. `tell:<id>` carries their words about the item in `text`. `check` asks you to read now.",
+    "- Sending as the user: only after their yes for that exact email (a tap on its action, or their words). Until then it stays a Gmail draft. Payments and anything else with consequences likewise wait for their yes.",
+    "- When they say a kind of email doesn't matter, or ask to hear about something at once, or to always handle something a certain way, save it with email `rules` (ignore, wake or act) and follow it.",
+  ].join("\n");
 };

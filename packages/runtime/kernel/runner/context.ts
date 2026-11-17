@@ -1,5 +1,5 @@
 import { readAgentMessageDelivery, readAgentStopResult } from "@stella/contracts/backend/agent-threads";
-import { loadDeviceExecutionContext, loadMediaAccess } from "./execution-context.js";
+import { loadDeviceExecutionContext, loadEmailAccess, loadMediaAccess } from "./execution-context.js";
 import { resolveRuntimeSourceAsset } from "../shared/runtime-paths.js";
 import { createCloudTranscriptWriter } from "./cloud-transcript-write.js";
 import { createBrainLeaseView } from "./brain-lease.js";
@@ -414,6 +414,7 @@ export const createRunnerContext = ({
             hasConnectedAccount: context.state.hasConnectedAccount === true,
             client: context.backend.client(),
           }),
+        loadEmail: () => loadEmailAccess(authToken ? context.backend.client() : null),
       });
     },
     paths: {

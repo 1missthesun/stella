@@ -16,6 +16,7 @@ import { attachedFilesText } from "../prompt-context.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
 import { buildCloudSkillsBlock } from "../cloud-skills.js";
 import { unwrapRpc } from "../owner-store/errors.js";
+import { emailFeatureOnFor } from "@stella/contracts/email-feature";
 import {
   isSlackConversationId,
   renderSlackSystemPrompt,
@@ -939,11 +940,18 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
   }): Promise<Response> {
     const { turn, turnCancellation, executionSignal, assertExactTurnActive } =
       args;
-    const [home, canonicalPrompts, destinations, pi] = await Promise.all([
+    const slackTurn = isSlackConversationId(turn.conversationId);
+    const [home, canonicalPrompts, destinations, pi, emailAccounts] = await Promise.all([
       args.homeWork,
       args.canonicalPromptsWork,
       args.destinationsWork,
       import("../pi-runtime.js"),
+      slackTurn || !emailFeatureOnFor(this.env)
+        ? null
+        : this.ownerGate(turn.ownerId)
+            .ownerInternal({ name: "email.connected", args: {}, ownerGeneration: turn.ownerGeneration })
+            .then((response) => (unwrapRpc(response) as { accounts?: string[] }).accounts ?? null)
+            .catch(() => null),
     ]);
     await assertExactTurnActive();
     const slack = isSlackConversationId(turn.conversationId);
@@ -964,6 +972,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     const executionContext = cloudExecutionContext(
       turn,
       slack ? null : destinations,
+      emailAccounts,
     );
     const locale = await this.resolveTurnLocale(turn);
     const sources: import("../pi-runtime.js").PiTurnSources =

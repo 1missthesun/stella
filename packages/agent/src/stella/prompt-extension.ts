@@ -3,6 +3,7 @@ import { defineExtension, section, type HookRegistration, type PromptInput, type
 import {
   renderExecutionDestination,
   renderExecutionDevices,
+  renderEmailAccess,
   renderMediaAccess,
 } from "@stella/contracts/execution-context";
 import { STELLA_MESSAGE_TARGET } from "@stella/contracts/agent-directory";
@@ -158,6 +159,13 @@ export function stellaPromptExtension(sources: StellaContextSources, imageBudget
         const snapshot = await sources.executionContext(input.conversationId, context);
         return snapshot && renderMediaAccess(snapshot);
       }),
+      section(
+        "email",
+        orchestratorOnly(async (input, context) => {
+          const snapshot = await sources.executionContext(input.conversationId, context);
+          return snapshot && renderEmailAccess(snapshot);
+        }),
+      ),
       section(
         "response-language",
         orchestratorOnly(async (_input, context) => responseLanguageSection(await sources.locale?.(context))?.text),

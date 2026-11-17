@@ -374,3 +374,16 @@ export const gmailReadThread = async (get: Fetcher, threadId: string): Promise<G
     };
   });
 };
+
+/** Takes a whole thread out of the inbox (archive) or puts it back. */
+export const gmailSetThreadInbox = async (get: Fetcher, threadId: string, inInbox: boolean): Promise<void> => {
+  await get(`${GMAIL_API}/threads/${encodeURIComponent(threadId)}/modify`, {
+    method: "POST",
+    body: inInbox ? { addLabelIds: ["INBOX"] } : { removeLabelIds: ["INBOX"] },
+  });
+};
+
+/** Deletes a saved draft (after its reply was sent as written). */
+export const gmailDeleteDraft = async (get: Fetcher, draftId: string): Promise<void> => {
+  await get(`${GMAIL_API}/drafts/${encodeURIComponent(draftId)}`, { method: "DELETE", text: true });
+};

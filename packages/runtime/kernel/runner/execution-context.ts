@@ -6,6 +6,7 @@ import {
   createExecutionContextSnapshot,
   mediaAccessForAudience,
   readExecutionContextSnapshot,
+  type EmailAccess,
   type ExecutionContextSnapshot,
   type MediaAccess,
 } from "@stella/contracts/execution-context";
@@ -134,6 +135,32 @@ export const loadMediaAccess = async (args: {
   };
 };
 
+/** The inboxes Stella reads while Email is on, from the backend's pushed view. */
+export const loadEmailAccess = async (client: BackendClient | null): Promise<EmailAccess | undefined> => {
+  if (!client) return undefined;
+  const held = holdView(client, "email.accounts", {});
+  const accounts = held.value
+    ? held.value.accounts
+    : await Effect.runPromise(
+        Effect.callback<string[]>((resume) => {
+          let stop: (() => void) | null = null;
+          let settled = false;
+          const settle = (value: string[]) => {
+            if (settled) return;
+            settled = true;
+            resume(Effect.succeed(value));
+            queueMicrotask(() => stop?.());
+          };
+          stop = client.watch("email.accounts", {}, (value) => settle(value.accounts), () => settle([]));
+          return Effect.sync(() => {
+            settled = true;
+            stop?.();
+          });
+        }).pipe(Effect.timeoutOrElse({ duration: FALLBACK_READ_TIMEOUT_MS, orElse: () => Effect.succeed([] as string[]) })),
+      );
+  return accounts.length > 0 ? { accounts } : undefined;
+};
+
 export const loadDeviceExecutionContext = async (args: {
   deviceId: string;
   baseUrl: string | null;
@@ -141,12 +168,14 @@ export const loadDeviceExecutionContext = async (args: {
   client?: BackendClient | null;
   fetchImpl?: typeof fetch;
   loadMedia?: () => Promise<MediaAccess | undefined>;
+  loadEmail?: () => Promise<EmailAccess | undefined>;
 }): Promise<ExecutionContextSnapshot> => {
-  const [snapshot, media] = await Promise.all([
+  const [snapshot, media, email] = await Promise.all([
     loadDevices(args),
     args.loadMedia?.().catch(() => undefined),
+    args.loadEmail?.().catch(() => undefined),
   ]);
-  return media ? { ...snapshot, media } : snapshot;
+  return { ...snapshot, ...(media ? { media } : {}), ...(email ? { email } : {}) };
 };
 
 const fetchDevices = async (args: {

@@ -175,12 +175,6 @@ export const CANVAS_BRIDGE_SCRIPT = String.raw`
 })();
 `;
 
-/**
- * On the web a canvas is a `srcdoc` frame, which inherits the chat page's CSP:
- * no inline script runs in it unless that policy names it. The web build pins
- * this one script by hash (build-web.ts), so the bridge runs and nothing else
- * a canvas carries inline does.
- */
 const BRIDGE_TAG = `<script>${CANVAS_BRIDGE_SCRIPT}</script>`;
 
 export const injectCanvasBridge = (html: string): string => {

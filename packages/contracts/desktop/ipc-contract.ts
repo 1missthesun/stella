@@ -910,7 +910,8 @@ export type IpcInvokeContract = {
   >;
   [IPC_DISPLAY_CANVAS_FILE_URL]: Invoke<
     [payload: { filePath: string }],
-    { url: string } | { missing: true; message?: string }
+    | { url: string; actions?: import("../canvas-actions.js").CanvasAction[] }
+    | { missing: true; message?: string }
   >;
   [IPC_DISPLAY_CANVAS_HTML_URL]: Invoke<
     [payload: { html: string; drivePath?: string }],
@@ -918,7 +919,7 @@ export type IpcInvokeContract = {
   >;
   [IPC_DISPLAY_CANVAS_DRIVE_URL]: Invoke<
     [payload: { drivePath: string }],
-    { url: string }
+    { url: string; actions?: import("../canvas-actions.js").CanvasAction[] }
   >;
   [IPC_DISPLAY_TRASH_LIST]: Invoke<
     [],

@@ -13,7 +13,10 @@ type UseAgentInputRoutingOptions = {
 }
 
 type UseAgentInputRoutingResult = {
-  sendContextlessMessage: (text: string, metadata?: MessageMetadata) => void
+  sendContextlessMessage: (
+    text: string,
+    metadata?: MessageMetadata,
+  ) => Promise<boolean>
   sendAgentInputMessage: (
     detail: StellaSendMessageDetail,
     metadata?: MessageMetadata,
@@ -38,18 +41,16 @@ export function useAgentInputRouting({
   }, [sendMessage])
 
   const sendContextlessMessage = useCallback(
-    (text: string, metadata?: MessageMetadata) => {
-      void sendMessageRef
-        .current({
-          text,
-          selectedText: null,
-          chatContext: null,
-          onClear: NO_OP,
-          metadata,
-        })
-        .then((accepted) => {
-          if (accepted) enterChatSurfaceForInteraction()
-        })
+    async (text: string, metadata?: MessageMetadata) => {
+      const accepted = await sendMessageRef.current({
+        text,
+        selectedText: null,
+        chatContext: null,
+        onClear: NO_OP,
+        metadata,
+      })
+      if (accepted) enterChatSurfaceForInteraction()
+      return accepted
     },
     [enterChatSurfaceForInteraction],
   )
@@ -62,7 +63,7 @@ export function useAgentInputRouting({
         !activeConversationId ||
         !window.electronAPI?.agent?.sendInput
       ) {
-        sendContextlessMessage(detail.text, metadata)
+        void sendContextlessMessage(detail.text, metadata)
         return
       }
       enterChatSurfaceForInteraction()
@@ -78,7 +79,7 @@ export function useAgentInputRouting({
             'Failed to send routed agent input:',
             (error as Error).message,
           )
-          sendContextlessMessage(detail.text, metadata)
+          void sendContextlessMessage(detail.text, metadata)
         })
     },
     [activeConversationId, enterChatSurfaceForInteraction, sendContextlessMessage],

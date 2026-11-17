@@ -1,3 +1,4 @@
+import { canvasActionDisplay } from "@stella/contracts/canvas-actions";
 import { assistantRowHasOwnContent, eventRowRendersContent } from "../lib/assistant-row-content";
 import { withReplyContext } from "../lib/reply-context";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
@@ -720,10 +721,15 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const messageReaction = readMessageReaction(message.payload);
         const userSpawnedThreadIds = getSpawnedThreadIds(message.toolEvents);
         const userSpawnedDescriptions = getSpawnedDescriptions(message.toolEvents);
+        const userText = getDisplayUserText(message);
+        const canvasAction = canvasActionDisplay(userText);
         const row: UserRowViewModel = {
           kind: "user",
           id: message._id,
-          text: getDisplayUserText(message),
+          text: canvasAction ? canvasAction.text : userText,
+          ...(canvasAction
+            ? { canvasAction: { canvas: canvasAction.canvas, chip: canvasAction.chip } }
+            : {}),
           timestampMs: message.timestamp,
           ...(isUiHiddenChatMessagePayload(message.payload ?? null)
             ? { hidden: true }

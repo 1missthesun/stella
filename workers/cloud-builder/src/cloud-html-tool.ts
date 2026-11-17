@@ -6,6 +6,11 @@ import {
   HTML_TOOL_PARAMETERS,
   htmlCanvasSlug,
 } from "@stella/runtime/kernel/tools/defs/html-def.js";
+import {
+  canvasActionsProblem,
+  parseCanvasActions,
+  withCanvasActionManifest,
+} from "@stella/contracts/canvas-actions";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import type { DriveTurnFilesResult } from "./owner-store/domains/drive.js";
 import type { OwnerInternalCall } from "./owner-store/registry.js";
@@ -61,9 +66,13 @@ export const createCloudHtmlTool = (
     const args = (params ?? {}) as Record<string, unknown>;
     const rawSlug = typeof args.slug === "string" ? args.slug.trim() : "";
     const title = typeof args.title === "string" ? args.title.trim() : "";
-    const html = typeof args.html === "string" ? args.html : "";
+    const authored = typeof args.html === "string" ? args.html : "";
     if (!title) return failure("title is required.");
-    if (html.length === 0) return failure("html is required.");
+    if (authored.length === 0) return failure("html is required.");
+    const actionsProblem = canvasActionsProblem(args.actions);
+    if (actionsProblem) return failure(actionsProblem);
+    const actions = parseCanvasActions(args.actions);
+    const html = withCanvasActionManifest(authored, actions);
 
     const slug = htmlCanvasSlug(rawSlug, title);
     const bytes = new TextEncoder().encode(html);
@@ -113,7 +122,7 @@ export const createCloudHtmlTool = (
     try {
       link = (await context.ownerInternal("shares.saveCanvas", {
         canvas: slug,
-        html,
+        html: withCanvasActionManifest(authored, []),
         title,
       })) as SavedCanvasShare;
     } catch {
@@ -135,6 +144,7 @@ export const createCloudHtmlTool = (
         createdAt,
         bytes: bytes.byteLength,
         driveBacked: true,
+        ...(actions.length > 0 ? { actions: actions.map((action) => action.id) } : {}),
         ...(link ? { shareUrl: link.url, shareVisibility: link.visibility } : {}),
       },
     };

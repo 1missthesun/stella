@@ -1,3 +1,5 @@
+import { canvasActionDisplay } from "@stella/contracts/canvas-actions";
+import { EMAIL_PAGE_CANVAS } from "@stella/contracts/email-page";
 import {
   type ReactNode,
   memo,
@@ -832,7 +834,11 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     const attachmentPreviews = item.attachmentPreviews ?? [];
     const showThumbs = thumbs.length > 0;
     const documentNames = item.documentNames ?? [];
-    const showText = item.text.trim().length > 0;
+    // A tap on a canvas button arrives as a <canvas-action> block: a chip
+    // naming the canvas, and only what the user chose or typed in the bubble.
+    const canvasAction = canvasActionDisplay(item.text);
+    const userText = canvasAction ? canvasAction.text : item.text;
+    const showText = userText.trim().length > 0;
     const quotedText = item.quotedText?.trim();
     const pastedTexts = item.pastedTexts ?? [];
     const imageUris: {
@@ -956,7 +962,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       />
     ) : null;
     const userBubbleBody = showText ? (
-      <UserMessageText text={item.text} styles={styles} />
+      <UserMessageText text={userText} styles={styles} />
     ) : null;
     if (menuClone) {
       return <View style={styles.userBubble}>{userBubbleBody}</View>;
@@ -966,6 +972,23 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         {attachmentRow}
         <View style={styles.userRow}>
           <View style={styles.userColumn}>
+            {canvasAction ? (
+              <View style={[styles.quoteChip, styles.userQuoteChip]} testID="canvas-action-chip">
+                <Icon
+                  name={canvasAction.canvas === EMAIL_PAGE_CANVAS ? "mail" : "panel-top"}
+                  size={13}
+                  color={colors.textMuted}
+                  style={styles.quoteChipIcon}
+                />
+                <Text
+                  style={styles.quoteChipText}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                >
+                  {canvasAction.chip}
+                </Text>
+              </View>
+            ) : null}
             {quotedText ? (
               <View style={[styles.quoteChip, styles.userQuoteChip]}>
                 <Icon

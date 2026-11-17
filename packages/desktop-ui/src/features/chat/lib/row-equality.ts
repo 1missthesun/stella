@@ -336,6 +336,8 @@ const userRowEqual = (a: UserRowViewModel, b: UserRowViewModel): boolean =>
   (a.windowLabel ?? null) === (b.windowLabel ?? null) &&
   (a.windowPreviewImageUrl ?? null) === (b.windowPreviewImageUrl ?? null) &&
   appSelectionLabelsEqual(a.appSelectionLabels, b.appSelectionLabels) &&
+  a.canvasAction?.chip === b.canvasAction?.chip &&
+  a.canvasAction?.canvas === b.canvasAction?.canvas &&
   (a.activityLabel ?? null) === (b.activityLabel ?? null) &&
   (a.pastedTexts?.length ?? 0) === (b.pastedTexts?.length ?? 0) &&
   (a.quotedText ?? null) === (b.quotedText ?? null) &&

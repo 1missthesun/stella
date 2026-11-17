@@ -6,6 +6,13 @@ import { Readable } from "node:stream";
 import { app, session } from "electron";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
+import { canvasPolicyDirectives } from "@stella/contracts/canvas-host";
+import {
+  CANVAS_ACTION_MANIFEST_MAX_BYTES,
+  injectCanvasActionBridge,
+  readCanvasActionManifest,
+  type CanvasAction,
+} from "@stella/contracts/canvas-actions";
 
 /**
  * `stella-canvas://` is where canvases render: model-authored HTML from the
@@ -74,36 +81,7 @@ const ASSET_TYPES: Record<string, string> = {
   ".m4a": "audio/mp4",
 };
 
-/**
- * Where a canvas may load scripts, styles and fonts from, and fetch. Never
- * `stella-media:` (local files, for the app renderer only), `stella-app:`,
- * or a wildcard.
- */
-const CANVAS_CDN_SOURCES = [
-  "https://cdn.jsdelivr.net",
-  "https://unpkg.com",
-  "https://cdnjs.cloudflare.com",
-  "https://cdn.tailwindcss.com",
-  "https://fonts.googleapis.com",
-  "https://fonts.gstatic.com",
-  "https://esm.sh",
-].join(" ");
-
-// `unsafe-eval` adds nothing to what inline scripts can already do here, and
-// in-browser compilers (Babel standalone, Alpine, Vue's template build) need it.
-const CANVAS_CSP = [
-  "sandbox allow-scripts",
-  "default-src 'none'",
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${CANVAS_CDN_SOURCES}`,
-  `style-src 'self' 'unsafe-inline' ${CANVAS_CDN_SOURCES}`,
-  `font-src 'self' data: ${CANVAS_CDN_SOURCES}`,
-  "img-src 'self' https: data: blob:",
-  "media-src 'self' https: data: blob:",
-  `connect-src ${CANVAS_CDN_SOURCES}`,
-  "frame-src 'none'",
-  "form-action 'none'",
-  "base-uri 'none'",
-].join("; ");
+const CANVAS_CSP = ["sandbox allow-scripts allow-forms", ...canvasPolicyDirectives({ self: true })].join("; ");
 
 const canvasResponse = (
   status: number,
@@ -267,6 +245,23 @@ export const canvasUrlForLocalFile = async (
   if (!stats?.isFile()) return null;
   const token = tokenForDirectory(path.dirname(file));
   return `${CANVAS_SCHEME}://${DIRECTORY_HOST}/${token}/${encodeURIComponent(path.basename(file))}`;
+};
+
+/** The actions a local canvas file declares (its first bytes; see canvas-actions.ts). */
+export const canvasActionsOfLocalFile = async (
+  filePath: string,
+): Promise<CanvasAction[]> => {
+  let handle: fs.FileHandle | null = null;
+  try {
+    handle = await fs.open(path.resolve(filePath), "r");
+    const buffer = Buffer.alloc(CANVAS_ACTION_MANIFEST_MAX_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    return readCanvasActionManifest(buffer.subarray(0, bytesRead).toString("utf8"));
+  } catch {
+    return [];
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
 };
 
 type CanvasDocument =
@@ -452,7 +447,7 @@ export const serveCanvasProtocol = (partition: string) => {
     }
     return canvasResponse(
       200,
-      injectCanvasBridge(document.html),
+      injectCanvasBridge(injectCanvasActionBridge(document.html)),
       "text/html; charset=utf-8",
     );
   });

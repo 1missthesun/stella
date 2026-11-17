@@ -1,3 +1,5 @@
+import { canvasActionBridgeSource } from "@stella/contracts/canvas-actions";
+
 export const CANVAS_CDN_HOSTS = [
   "cdn.jsdelivr.net",
   "unpkg.com",
@@ -100,7 +102,35 @@ true;
 `;
 }
 
-export function canvasBridgeScript(token: string): string {
+/**
+ * The canvas-action bridge's transport in the WebView: taps go out on the
+ * same private channel as links, with the token; what the app sends back
+ * (action states, a built-in page's data) arrives through a receiver under
+ * `receiverKey`, a different random name, so knowing it reveals nothing.
+ */
+const actionTransport = (receiverKey: string) => String.raw`(() => {
+    let receive = null;
+    try {
+      Object.defineProperty(window, ${JSON.stringify(receiverKey)}, {
+        value: (message) => {
+          if (receive) receive(message);
+        },
+        configurable: false,
+        writable: false,
+        enumerable: false,
+      });
+    } catch {
+      return null;
+    }
+    return {
+      send: (message) => post(stringify({ type: "stella:canvas-action", token, id: message.id, fields: message.fields })),
+      listen: (handler) => {
+        receive = handler;
+      },
+    };
+  })()`;
+
+export function canvasBridgeScript(token: string, receiverKey: string): string {
   const key = JSON.stringify(`__stellaCanvas_${token}`);
   const tokenLiteral = JSON.stringify(token);
   return String.raw`
@@ -151,6 +181,8 @@ export function canvasBridgeScript(token: string): string {
   window.addEventListener("submit", (event) => {
     event.preventDefault();
   }, true);
+
+  ${canvasActionBridgeSource(actionTransport(receiverKey))}
 
   const postSize = (height, width) => post(stringify({ type: "${"stella:document-size"}", token, height, width }));
   ${measureSource("postSize")}

@@ -14,6 +14,11 @@ import {
   HTML_TOOL_PROMPT_SNIPPET,
   htmlCanvasSlug,
 } from "./html-def.js";
+import {
+  canvasActionsProblem,
+  parseCanvasActions,
+  withCanvasActionManifest,
+} from "@stella/contracts/canvas-actions";
 
 export type HtmlToolOptions = {
   stellaDataDir: string;
@@ -61,16 +66,21 @@ export const createHtmlTool = (options: HtmlToolOptions): ToolDefinition => {
 
       if (!title) return { error: "title is required." };
       if (html.length === 0) return { error: "html is required." };
+      const actionsProblem = canvasActionsProblem(args.actions);
+      if (actionsProblem) return { error: actionsProblem };
+      const actions = parseCanvasActions(args.actions);
+      const shared = withCanvasActionManifest(html, []);
+      const saved = withCanvasActionManifest(html, actions);
 
       const slug = htmlCanvasSlug(rawSlug, title);
       const dir = path.join(stellaDataDir, "outputs", "html");
       const filePath = path.join(dir, `${slug}.html`);
 
       await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(filePath, html, "utf8");
+      await fs.writeFile(filePath, saved, "utf8");
 
       const createdAt = Date.now();
-      const link = await saveCanvasLink(options, { canvas: slug, html, title });
+      const link = await saveCanvasLink(options, { canvas: slug, html: shared, title });
 
       return {
         result: link
@@ -81,7 +91,8 @@ export const createHtmlTool = (options: HtmlToolOptions): ToolDefinition => {
           slug,
           title,
           createdAt,
-          bytes: Buffer.byteLength(html, "utf8"),
+          bytes: Buffer.byteLength(saved, "utf8"),
+          ...(actions.length > 0 ? { actions: actions.map((action) => action.id) } : {}),
           ...(link
             ? { shareUrl: link.url, shareVisibility: link.visibility }
             : {}),

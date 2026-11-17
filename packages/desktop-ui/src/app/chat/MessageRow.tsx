@@ -1,3 +1,4 @@
+import { EMAIL_PAGE_CANVAS } from "@stella/contracts/email-page";
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
 import {
   Fragment,
@@ -485,6 +486,17 @@ export const UserMessageRow = memo(
         node: <ContextPill kind={label.startsWith(emailPrefix) ? "email" : "app-selection"} label={label} />,
       });
     });
+    if (row.canvasAction) {
+      chips.push({
+        key: "canvas-action",
+        node: (
+          <ContextPill
+            kind={row.canvasAction.canvas === EMAIL_PAGE_CANVAS ? "email" : "canvas"}
+            label={row.canvasAction.chip}
+          />
+        ),
+      });
+    }
     if (activityLabel) {
       chips.push({
         key: "activity",

@@ -25,6 +25,8 @@ import {
   withCanvasPolicy,
 } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
+import { readCanvasActionManifest } from "@stella/contracts/canvas-actions";
+import { useCanvasActionChannel, type CanvasIdentity } from "../lib/canvas-actions";
 import { TopSheet } from "./TopSheet";
 import { FileViewerFooter } from "./FileViewerPanel";
 import { TopSheetDragHandle } from "./TopSheet";
@@ -294,11 +296,14 @@ function CanvasDocumentWebView({
   html,
   style,
   location,
+  identity,
   onOpenLink,
   onContentHeight,
 }: {
   html: string;
   style: object;
+  /** Names the canvas in the messages its action buttons send. */
+  identity: CanvasIdentity;
   /** Where the canvas file lives; its relative links resolve against it. */
   location: CanvasDocumentLocation | null;
   /** Opens a link the canvas can't follow itself (anything but a fragment). */
@@ -313,7 +318,12 @@ function CanvasDocumentWebView({
     }),
     [html],
   );
-  const bridgeScript = useMemo(() => canvasBridgeScript(token), [token]);
+  const actions = useMemo(() => readCanvasActionManifest(html), [html]);
+  const { receiverKey, handleMessage: handleActionMessage, onLoaded } = useCanvasActionChannel({ webViewRef, token, actions, identity });
+  const bridgeScript = useMemo(
+    () => canvasBridgeScript(token, receiverKey),
+    [token, receiverKey],
+  );
   const loadedTokenRef = useRef<string | null>(null);
   const viewWidthRef = useRef(0);
 
@@ -321,6 +331,7 @@ function CanvasDocumentWebView({
     (event: WebViewMessageEvent) => {
       const message = parseDocumentMessage(event.nativeEvent.data);
       if (!message) return;
+      if (handleActionMessage(message as Record<string, unknown>)) return;
       const height = documentHeightInPoints(message, token, viewWidthRef.current);
       if (height !== null) {
         onContentHeight?.(height);
@@ -340,7 +351,7 @@ function CanvasDocumentWebView({
       }
       if (link.kind !== "blocked") onOpenLink(link);
     },
-    [location, onContentHeight, onOpenLink, token],
+    [handleActionMessage, location, onContentHeight, onOpenLink, token],
   );
 
   return (
@@ -370,6 +381,7 @@ function CanvasDocumentWebView({
       injectedJavaScriptBeforeContentLoaded={bridgeScript}
       injectedJavaScript={bridgeScript}
       onMessage={handleMessage}
+      onLoadEnd={onLoaded}
       onShouldStartLoadWithRequest={(request) => {
         const isCanvasDocument =
           request.url === "about:blank" ||
@@ -738,6 +750,15 @@ export function ArtifactViewerContent({
   );
   const canvas =
     artifact.payload.kind === "canvas-html" ? artifact.payload : null;
+  const canvasIdentity = useMemo(
+    () => ({
+      canvas: canvas
+        ? (canvas.slug ?? canvas.filePath.split(/[\\/]/).pop()?.replace(/\.html?$/i, "") ?? "canvas")
+        : "canvas",
+      title: canvas ? artifactTitle(canvas) : "Canvas",
+    }),
+    [canvas],
+  );
   const canvasShare = useCanvasShareToggle(
     canvas ? canvasSlugFor(canvas.slug, canvas.filePath) : null,
     loaded?.kind === "canvas-html" ? loaded.html : null,
@@ -1387,6 +1408,7 @@ export function ArtifactViewerContent({
               html={loaded.html}
               style={styles.documentWebview}
               location={canvasLocation}
+              identity={canvasIdentity}
               onOpenLink={openCanvasLink}
             />
           ) : loaded?.kind === "html-document" ? (

@@ -67,7 +67,7 @@ import {
   useShellTopInset,
 } from "../../src/components/MainScreenSurface";
 import { ArtifactViewer } from "../../src/components/ArtifactViewer";
-import { useEmailAsks } from "../../src/lib/email";
+import { useChatSendQueue } from "../../src/lib/chat-send-queue";
 import { CloudBrowserInterventionCard } from "../../src/components/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "../../src/components/CloudConnectorConnectCard";
 import { UserAskCard } from "../../src/components/UserAskCard";
@@ -489,8 +489,8 @@ function ChatSurface(props: {
   ]);
 
   const sendReady = thread.composerGate.kind === "ready";
-  // What an email digest action asked goes out as an ordinary message here.
-  useEmailAsks(thread.sendPrompt, sendReady);
+  // What a canvas button or the Email page asked goes out as an ordinary message here.
+  useChatSendQueue(thread.sendPrompt, sendReady);
   const handoffSentRef = useRef(false);
   useEffect(() => {
     if (!handoffDraft?.send || handoffSentRef.current || !sendReady) return;

@@ -7,7 +7,10 @@ import {
 import type { MessageMetadata } from '@/features/chat/lib/event-transforms'
 
 type UseStellaSendMessageBridgeOptions = {
-  sendContextlessMessage: (text: string, metadata?: MessageMetadata) => void
+  sendContextlessMessage: (
+    text: string,
+    metadata?: MessageMetadata,
+  ) => Promise<boolean>
   sendAgentInputMessage: (
     detail: StellaSendMessageDetail,
     metadata?: MessageMetadata,
@@ -27,7 +30,10 @@ export function useStellaSendMessageBridge({
         sendAgentInputMessage(detail, metadata)
         return
       }
-      sendContextlessMessage(detail.text, metadata)
+      void sendContextlessMessage(detail.text, metadata).then(
+        (accepted) => detail.onResult?.(accepted),
+        () => detail.onResult?.(false),
+      )
     }
 
     window.addEventListener(STELLA_SEND_MESSAGE_EVENT, handleSuggestionMessage)

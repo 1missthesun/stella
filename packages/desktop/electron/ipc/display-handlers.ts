@@ -45,7 +45,9 @@ import {
   isEvidenceThumbnailSource,
 } from "@stella/contracts/chat-evidence-thumbnails";
 import { renderDesktopEvidenceThumbnail } from "../services/evidence-thumbnail.js";
+import { readCanvasActionManifest } from "@stella/contracts/canvas-actions";
 import {
+  canvasActionsOfLocalFile,
   canvasUrlForLocalFile,
   MAX_CANVAS_HTML_BYTES,
   registerCanvasHtml,
@@ -1001,7 +1003,10 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       }
       assertNotCloudWorkspacePath(filePath);
       const url = await canvasUrlForLocalFile(filePath);
-      if (url) return { url };
+      if (url) {
+        const actions = await canvasActionsOfLocalFile(filePath);
+        return actions.length > 0 ? { url, actions } : { url };
+      }
       const read = await readDisplayFile(
         { filePath, maxBytes: MAX_CANVAS_HTML_BYTES },
         { remote: false },
@@ -1022,7 +1027,12 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         read.bytes.byteOffset,
         read.bytes.byteLength,
       );
-      return { url: registerCanvasHtml(bytes.toString("utf8"), filePath) };
+      const html = bytes.toString("utf8");
+      const actions = readCanvasActionManifest(html);
+      return {
+        url: registerCanvasHtml(html, filePath),
+        ...(actions.length > 0 ? { actions } : {}),
+      };
     },
   );
 
@@ -1114,7 +1124,11 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         copy.bytes.byteOffset,
         copy.bytes.byteLength,
       ).toString("utf8");
-      return { url: registerCanvasHtml(html, `/${drivePath}`, "drive") };
+      const actions = readCanvasActionManifest(html);
+      return {
+        url: registerCanvasHtml(html, `/${drivePath}`, "drive"),
+        ...(actions.length > 0 ? { actions } : {}),
+      };
     },
   );
 

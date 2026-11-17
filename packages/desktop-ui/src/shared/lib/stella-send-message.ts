@@ -6,6 +6,8 @@ export type StellaSendMessageDetail = {
   triggerKind?: string;
   triggerSource?: string;
   targetAgentId?: string;
+  /** Told whether the chat took the message (false when another send was still going out). */
+  onResult?: (accepted: boolean) => void;
 };
 
 export function toStellaMessageMetadata(

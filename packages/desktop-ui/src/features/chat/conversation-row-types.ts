@@ -28,6 +28,8 @@ export type UserRowViewModel = {
   activityLabel?: string;
   pastedTexts?: PastedTextDescriptor[];
   quotedText?: string;
+  /** A tap on a canvas control: the canvas it came from and its chip. */
+  canvasAction?: { canvas: string; chip: string };
   reaction?: string;
   reactionAt?: number;
   attachments: Attachment[];

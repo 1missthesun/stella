@@ -93,7 +93,8 @@ export type ContextPillKind =
   | "pasted-text"
   | "selected-text"
   | "viewing"
-  | "email";
+  | "email"
+  | "canvas";
 
 const CONTEXT_PILL_ICONS = {
   window: AppWindowMac,
@@ -103,6 +104,7 @@ const CONTEXT_PILL_ICONS = {
   "selected-text": TextQuote,
   viewing: Eye,
   email: Mail,
+  canvas: AppWindowMac,
 } as const;
 
 type ContextPillProps = HTMLAttributes<HTMLElement> & {

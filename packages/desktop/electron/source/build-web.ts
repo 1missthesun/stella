@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { CANVAS_BRIDGE_SCRIPT } from "@stella/contracts/canvas-bridge";
+import { CANVAS_HOST_FILE, CANVAS_HOST_HTML } from "@stella/contracts/canvas-host";
 import { createTailwindBuild, cssModule, isTailwindStylesheet } from "./css.js";
 import { envDefines, loadRendererEnv, pairedAppsHosts, type RendererEnv } from "./env.js";
 import { createModuleGraph, isInNodeModules, SOURCE_EXTENSIONS } from "./modules.js";
@@ -383,15 +383,14 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
           (match) => `'sha256-${createHash("sha256").update(match[1]!).digest("base64")}'`,
         )
       : []),
-    // A canvas renders as a srcdoc frame on the web and inherits this policy;
-    // its link and Ask Stella bridge is the one inline script it may run.
-    `'sha256-${createHash("sha256").update(CANVAS_BRIDGE_SCRIPT).digest("base64")}'`,
     ...(options.scriptSources ?? []),
   ];
   if (scriptSources.length > 0) {
     html = html.replace(/(<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*?script-src )/, (match) => `${match}${scriptSources.join(" ")} `);
   }
   fs.writeFileSync(path.join(outDir, "index.html"), html);
+  // Canvases render in this page, under their own policy rather than the chat's (canvas-host.ts).
+  fs.writeFileSync(path.join(outDir, CANVAS_HOST_FILE), CANVAS_HOST_HTML);
 
   fs.cpSync(publicDir, outDir, { recursive: true });
   try {

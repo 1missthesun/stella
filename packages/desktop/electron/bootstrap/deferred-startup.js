@@ -5,6 +5,7 @@ import { sweepOrphanedHelpers } from "../services/orphaned-helpers.js";
 import { resolveStellaBrowserBinaryPath } from "../utils/stella-browser-paths.js";
 import { getTotalSystemMemoryMb, isLowMemoryWindowsDevice, } from "../resource-profile.js";
 import { getCompanionEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
+import { noticeLinuxRealtimeLimitOnce } from "../linux-realtime-limit.js";
 const OVERLAY_STARTUP_WARM_DELAY_MS = 5_000;
 const runDeferredStartupTask = async (context, task) => {
     if (task.delayMs) {
@@ -79,6 +80,18 @@ const createDeferredStartupTasks = (context) => {
             afterAppPaint: true,
             run: () => {
                 scheduleOverlayWarmup(context);
+            },
+        },
+        {
+            label: "linux-realtime-limit-notice",
+            afterAppPaint: true,
+            run: () => {
+                void noticeLinuxRealtimeLimitOnce({
+                    showDialog: config.install !== "harness",
+                    window: state.windowManager?.getFullWindow() ?? null,
+                }).catch((error) => {
+                    console.debug("[startup] Real-time limit notice failed:", error instanceof Error ? error.message : String(error));
+                });
             },
         },
         {

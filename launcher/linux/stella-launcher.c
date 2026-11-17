@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -1865,6 +1866,9 @@ static void ui_capture(const char *name, guint delay_ms) {
 
 static char *g_bun_bin;
 static char *g_bun_version;
+/* What rttime_prepare() found, passed to Electron (see there). */
+static const char *g_rtkit_state;
+static char *g_rttime_note;
 
 static StrList base_environment(void) {
     StrList env = {0};
@@ -1872,7 +1876,7 @@ static StrList base_environment(void) {
                               "STELLA_V2_DEV_DATA_DIR", "STELLA_APP_DIR", "STELLA_RUNTIME_STATE_DIR",
                               "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
                               "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
-                              "WEBKIT_DISABLE_DMABUF_RENDERER", NULL};
+                              "WEBKIT_DISABLE_DMABUF_RENDERER", "STELLA_LAUNCHER_RTTIME_RELAUNCHED", NULL};
     const char *harness[] = {"STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                              "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN", NULL};
     const char *key_file = getenv("STELLA_LAUNCHER_KEY_FILE");
@@ -1922,6 +1926,10 @@ static StrList electron_environment(void) {
     if (g_git) env_set(&env, "STELLA_GIT_BIN", g_git->bin);
     if (g_signer) env_set(&env, "STELLA_LAUNCHER_PUBKEY", g_signer->spki_base64);
     env_set(&env, "CHROME_DESKTOP", "stella.desktop");
+    env_unset(&env, "STELLA_LAUNCHER_RTKIT");
+    env_unset(&env, "STELLA_LAUNCHER_RTTIME");
+    if (g_rtkit_state) env_set(&env, "STELLA_LAUNCHER_RTKIT", g_rtkit_state);
+    if (g_rttime_note) env_set(&env, "STELLA_LAUNCHER_RTTIME", g_rttime_note);
     if (P.isolated) {
         env_set(&env, "STELLA_LAUNCHER_USER_DATA_DIR", P.isolated_user_data);
         env_set(&env, "STELLA_DATA_DIR", P.isolated_home);
@@ -3467,6 +3475,208 @@ static void reap_inherited_children(int with_main_loop) {
     free(inherited);
 }
 
+/* ---- Real-time CPU limit (RLIMIT_RTTIME) ----
+ * On a Linux desktop without RealtimeKit, xdg-desktop-portal reports a
+ * real-time budget of 0, and PipeWire's client library (module-rt) then sets
+ * RLIMIT_RTTIME to 0 in every process that loads it: the desktop shell, a bar,
+ * an app menu. Everything they start inherits that, and the kernel SIGKILLs a
+ * process whose hard limit is 0 as soon as one of its threads arms a CPU-time
+ * timer (a soft limit of 0 sends SIGXCPU, which also kills). No log line, no
+ * OOM: Stella's GPU process, renderers, services and task shells just died
+ * ("Electron exited (signal 9)").
+ *
+ * So, before this launcher starts anything:
+ *  - a soft limit below the hard one is raised to it;
+ *  - a hard limit of 0 only root can raise, but the user's systemd manager
+ *    starts units with its own limits, so the launcher starts itself once more
+ *    there and this copy leaves;
+ *  - without RealtimeKit, DISABLE_RTKIT=1 stops PipeWire inside Stella (screen
+ *    capture) and in what it starts from asking the portal and setting the
+ *    limit to 0 again. Nothing can get real-time scheduling on such a system
+ *    anyway, so nothing is lost.
+ * Electron gets what was found (STELLA_LAUNCHER_RTKIT, STELLA_LAUNCHER_RTTIME),
+ * logs it, and tells the user when the limit is still 0. */
+#define RTKIT_BUS_NAME "org.freedesktop.RealtimeKit1"
+#define RTTIME_RELAUNCHED_ENV "STELLA_LAUNCHER_RTTIME_RELAUNCHED"
+
+static char *rlim_text(rlim_t value) {
+    return value == RLIM_INFINITY ? xstrdup("unlimited") : xasprintf("%llu", (unsigned long long)value);
+}
+
+static int rttime_get(struct rlimit *rl) { return getrlimit(RLIMIT_RTTIME, rl); }
+
+static void rttime_raise_soft(void) {
+    struct rlimit rl;
+    char *was, *to;
+    if (rttime_get(&rl) != 0 || rl.rlim_cur >= rl.rlim_max) return;
+    was = rlim_text(rl.rlim_cur);
+    to = rlim_text(rl.rlim_max);
+    rl.rlim_cur = rl.rlim_max;
+    if (setrlimit(RLIMIT_RTTIME, &rl) == 0) LOG("launcher: raised the real-time CPU limit (RLIMIT_RTTIME) from %s to %s", was, to);
+    else LOG("launcher: could not raise the real-time CPU limit (RLIMIT_RTTIME) from %s: %s", was, strerror(errno));
+    free(was);
+    free(to);
+}
+
+static int rttime_hard_zero(void) {
+    struct rlimit rl;
+    return rttime_get(&rl) == 0 && rl.rlim_max == 0;
+}
+
+/* Whether RealtimeKit runs or can be started on the system bus. A private
+ * connection: the shared one exits the process when the bus goes away. */
+static int rtkit_available(void) {
+    GError *error = NULL;
+    char *address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+    GDBusConnection *bus = NULL;
+    GVariant *reply;
+    int found = 0;
+    if (address)
+        bus = g_dbus_connection_new_for_address_sync(
+            address, G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+            NULL, NULL, &error);
+    g_free(address);
+    if (!bus) {
+        LOG("launcher: no system bus to look for RealtimeKit: %s", error ? error->message : "unknown error");
+        g_clear_error(&error);
+        return 0;
+    }
+    reply = g_dbus_connection_call_sync(bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                                        "NameHasOwner", g_variant_new("(s)", RTKIT_BUS_NAME), G_VARIANT_TYPE("(b)"),
+                                        G_DBUS_CALL_FLAGS_NONE, 2000, NULL, NULL);
+    if (reply) {
+        gboolean owned = FALSE;
+        g_variant_get(reply, "(b)", &owned);
+        found = owned ? 1 : 0;
+        g_variant_unref(reply);
+    }
+    if (!found) {
+        reply = g_dbus_connection_call_sync(bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                                            "ListActivatableNames", NULL, G_VARIANT_TYPE("(as)"),
+                                            G_DBUS_CALL_FLAGS_NONE, 2000, NULL, NULL);
+        if (reply) {
+            GVariantIter *names;
+            const char *name;
+            g_variant_get(reply, "(as)", &names);
+            while (g_variant_iter_next(names, "&s", &name))
+                if (!strcmp(name, RTKIT_BUS_NAME)) found = 1;
+            g_variant_iter_free(names);
+            g_variant_unref(reply);
+        }
+    }
+    g_dbus_connection_close_sync(bus, NULL, NULL);
+    g_object_unref(bus);
+    return found;
+}
+
+/* Starts this launcher again as a transient unit of the user's systemd
+ * manager, which gives it the manager's limits instead of the 0 this process
+ * inherited. The unit carries this environment and directory; KillMode=process
+ * leaves what Stella started running after the launcher exits, as the app
+ * scope it came from did. Returns 0 once the unit has started. */
+static int rttime_relaunch(int argc, char **argv) {
+    static const char *skipped[] = {"INVOCATION_ID", "JOURNAL_STREAM", "SYSTEMD_EXEC_PID", "MANAGERPID",
+                                    "NOTIFY_SOCKET", "LISTEN_PID", "LISTEN_FDS", "LISTEN_FDNAMES",
+                                    "WATCHDOG_PID", "WATCHDOG_USEC", NULL};
+    char exe[PATH_MAX];
+    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    char *systemd_run = which("systemd-run"), *arg;
+    StrList args = {0};
+    CmdResult r;
+    char **e;
+    int i, ok;
+    if (n <= 0 || !systemd_run) {
+        g_rttime_note = xstrdup(systemd_run ? "relaunch-failed: no executable path" : "relaunch-unavailable: no systemd-run");
+        free(systemd_run);
+        return -1;
+    }
+    exe[n] = 0;
+    sl_push(&args, systemd_run);
+    sl_push(&args, "--user");
+    sl_push(&args, "--quiet");
+    sl_push(&args, "--collect");
+    sl_push(&args, "--same-dir");
+    sl_push(&args, "--slice=app.slice");
+    arg = xasprintf("--unit=app-stella-launcher-%d.service", (int)getpid());
+    sl_push(&args, arg);
+    free(arg);
+    sl_push(&args, "--description=Stella");
+    sl_push(&args, "--property=KillMode=process");
+    for (e = environ; *e; e++) {
+        size_t k;
+        int skip = 0;
+        for (k = 0; skipped[k]; k++) {
+            size_t len = strlen(skipped[k]);
+            if (!strncmp(*e, skipped[k], len) && (*e)[len] == '=') skip = 1;
+        }
+        if (skip || !strchr(*e, '=')) continue;
+        arg = xasprintf("--setenv=%s", *e);
+        sl_push(&args, arg);
+        free(arg);
+    }
+    sl_push(&args, "--setenv=" RTTIME_RELAUNCHED_ENV "=1");
+    sl_push(&args, "--");
+    sl_push(&args, exe);
+    for (i = 1; i < argc; i++) sl_push(&args, argv[i]);
+    ok = run_cmd(args.items, NULL, environ, NULL, 30, &r) == 0 && !r.timed_out && r.code == 0;
+    if (ok) {
+        LOG("launcher: started again as app-stella-launcher-%d.service with the user's systemd limits", (int)getpid());
+    } else {
+        char *why = trimmed(r.err && *r.err ? r.err : last_error());
+        LOG("launcher: could not start again under the user's systemd (exit %d): %s", r.code, why);
+        g_rttime_note = xasprintf("relaunch-failed: %s", why);
+        free(why);
+    }
+    cmd_free(&r);
+    sl_free(&args);
+    free(systemd_run);
+    return ok ? 0 : -1;
+}
+
+/* Returns 1 when this process should leave because a fresh copy has started. */
+static int rttime_prepare(int argc, char **argv, int *lock_fd) {
+    struct rlimit rl;
+    rttime_raise_soft();
+    if (rttime_hard_zero()) {
+        if (getenv(RTTIME_RELAUNCHED_ENV)) {
+            LOG("launcher: the user's systemd also starts Stella with a real-time CPU limit of 0 (RLIMIT_RTTIME)");
+            g_rttime_note = xstrdup("relaunch-failed: the user's systemd manager has a limit of 0 too");
+        } else if (O.self_test) {
+            LOG("launcher: real-time CPU limit (RLIMIT_RTTIME) is 0; self-test keeps it");
+        } else {
+            LOG("launcher: started with a real-time CPU limit (RLIMIT_RTTIME) of 0, which gets Stella's processes "
+                "killed; starting again under the user's systemd");
+            /* The fresh copy takes the lock; take it back if it never starts. */
+            flock(*lock_fd, LOCK_UN);
+            if (rttime_relaunch(argc, argv) == 0) return 1;
+            if (flock(*lock_fd, LOCK_EX | LOCK_NB) != 0) {
+                LOG("launcher: another launcher took %s meanwhile; exiting", P.root);
+                return 1;
+            }
+        }
+    } else if (getenv(RTTIME_RELAUNCHED_ENV)) {
+        g_rttime_note = xstrdup("relaunched");
+    }
+    unsetenv(RTTIME_RELAUNCHED_ENV);
+    if (rttime_get(&rl) == 0) {
+        char *soft = rlim_text(rl.rlim_cur), *hard = rlim_text(rl.rlim_max);
+        LOG("launcher: real-time CPU limit (RLIMIT_RTTIME) soft %s hard %s", soft, hard);
+        free(soft);
+        free(hard);
+    }
+    if (rtkit_available()) {
+        g_rtkit_state = "present";
+    } else {
+        g_rtkit_state = "absent";
+        if (!getenv("DISABLE_RTKIT")) {
+            setenv("DISABLE_RTKIT", "1", 1);
+            LOG("launcher: no RealtimeKit on this system; DISABLE_RTKIT=1 keeps PipeWire in Stella from setting a "
+                "real-time CPU limit of 0");
+        }
+    }
+    return 0;
+}
+
 static gpointer worker(gpointer data) {
     int code;
     (void)data;
@@ -3497,6 +3707,7 @@ int main(int argc, char **argv) {
         ask_running_launcher_to_show();
         return 0;
     }
+    if (rttime_prepare(argc, argv, &lock_fd)) return 0;
     stop_inherited_children();
     state_load();
     follow_server_file();

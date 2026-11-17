@@ -360,7 +360,7 @@ button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .more{border:0;background:none;color:var(--muted);font-size:13px;padding:6px 0 0}
 .status{color:var(--muted);font-size:13px;margin:10px 0 0}
 form.tell{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-textarea{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:76px;resize:vertical;outline:none}
+textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:76px;resize:vertical;outline:none}
 textarea:focus{border-color:var(--accent)}
 form.tell .row{margin-top:0}
 .empty{color:var(--muted);margin:10px 0 0}

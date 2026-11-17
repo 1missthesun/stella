@@ -1,6 +1,7 @@
-import type { Context, JsonValue } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
+import type { JsonValue } from "@earendil-works/chord/json";
 import { withAbortSignal, withoutAbortSignal } from "@earendil-works/chord/context";
-import type { ImageContent, TextContent, TSchema } from "@earendil-works/pi-ai";
+import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
 import path from "node:path";
 import { AgentDoc, defineExtension, type Extension, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
@@ -99,15 +100,17 @@ const jsonDetails = (details: unknown): JsonValue | undefined => {
  * request. A schema with any of them goes out loosened to one plain object,
  * and the call is checked against the original before it runs.
  */
+type ToolSchema = ToolRegistration["parameters"];
+
 const providerSchema = (
   spec: StellaToolSpec,
 ): Pick<ToolRegistration, "parameters" | "prepareArguments"> => {
   if (!needsProviderToolSchemaNormalization(spec.parameters)) {
-    return { parameters: spec.parameters as unknown as TSchema };
+    return { parameters: spec.parameters as unknown as ToolSchema };
   }
-  const original = { name: spec.name, description: spec.description, parameters: spec.parameters as unknown as TSchema };
+  const original = { name: spec.name, description: spec.description, parameters: spec.parameters as unknown as ToolSchema };
   return {
-    parameters: normalizeProviderToolInputSchema(spec.parameters) as unknown as TSchema,
+    parameters: normalizeProviderToolInputSchema(spec.parameters) as unknown as ToolSchema,
     prepareArguments: (args) =>
       validateToolArguments(original, { type: "toolCall", id: "", name: spec.name, arguments: (args ?? {}) as Parameters<typeof validateToolArguments>[1]["arguments"] }),
   };
@@ -169,7 +172,7 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
     }
     const details = jsonDetails(outcome.details);
     return {
-      content: outcome.content.length > 0 ? outcome.content : [{ type: "text", text: "(no output)" }],
+      output: outcome.content.length > 0 ? outcome.content : [{ type: "text", text: "(no output)" }],
       ...(outcome.isError ? { isError: true } : {}),
       ...(details === undefined ? {} : { details }),
     };
@@ -179,9 +182,10 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
 export const STELLA_CODE_TOOL_NAME = "code";
 
 const READ_TOOL = "Read";
+const IMAGE_READ_CODES: ReadonlySet<string> = new Set(["image", "unsupported_image"]);
 
 /**
- * The coding `Read` (pi's, text only) with images handed to the host's
+ * The coding `Read` (pi's) with images handed to the host's
  * `Read`, which fits them to the model and returns them as images. Text keeps
  * pi's reading: relative paths, line ranges and truncation as before.
  */
@@ -195,7 +199,9 @@ const imageRead = (host: StellaToolHost): Wrap => ({
       async execute(args, api, context) {
         const result = await tool.execute(args, api, context);
         const raw = (args as { path?: unknown } | undefined)?.path;
-        if (typeof raw !== "string" || !result?.diagnostics?.some((note) => note.code === "unsupported_image")) {
+        // pi reads an image itself (diagnostic `image`) or says it can't (`unsupported_image`); either way the
+        // host's Read shows it, fitted to the model.
+        if (typeof raw !== "string" || !result?.diagnostics?.some((note) => note.code !== undefined && IMAGE_READ_CODES.has(note.code))) {
           return result;
         }
         const cwd = api.env?.cwd;

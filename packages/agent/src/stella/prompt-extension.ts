@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import { defineExtension, section, type HookRegistration, type PromptInput, type PromptSection } from "@earendil-works/pi-durable";
 import {
   renderExecutionDestination,

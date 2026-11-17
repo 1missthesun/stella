@@ -4,7 +4,8 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { AssistantEntry, watchEvents, type Conversation, type Harness, type SubmissionRecord } from "@earendil-works/pi-durable";
+import { AssistantEntry, type Conversation, type Harness, type SubmissionRecord } from "@earendil-works/pi-durable";
+import { watchConversationEvents } from "./stella/conversation-events.ts";
 import { openStellaHarness, orchestratorAgent, stellaModelRef } from "./harness.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./host/desktop-agents.ts";
 import { desktopContextSources } from "./host/desktop-sources.ts";
@@ -126,13 +127,13 @@ async function main() {
   const root = await harness.root(context, { agent: orchestratorAgent(stellaModelRef("orchestrator")) });
   out({ kind: "start", pid: process.pid, database, conversationId: root.id });
 
-  const events = await watchEvents(harness, root.id, context);
+  const events = await watchConversationEvents(harness, root, context);
   events.start(async (batch) => {
     for (const event of batch) {
       if (event.type === "message_end") {
         const message = event.entry.model?.[0];
         out({ kind: "entry", entryId: event.entry.id, entryKind: event.entry.kind, role: message?.role });
-      } else if (event.type === "run_start" || event.type === "run_end" || event.type === "turn_start" || event.type === "turn_end") {
+      } else if (event.type === "run_start" || event.type === "run_end") {
         out({ kind: event.type });
       } else if (event.type === "auto_retry_start") {
         out({ kind: event.type, attempt: event.attempt, error: event.errorMessage });

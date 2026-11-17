@@ -1,13 +1,11 @@
 import { safeguardCardLabel } from "@stella/contracts/safeguard-block";
 import { SAFEGUARD_ENTRY_KIND, type SafeguardEntryData } from "../stella/safeguard.ts";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { AssistantMessage, Message, TextContent } from "@earendil-works/pi-ai";
 import {
   defineDoc,
   InboxDoc,
   LiveDoc,
-  watchEvents,
-  type AgentEventStream,
   type Conversation,
   type Cursor,
   type EntryDraft,
@@ -27,6 +25,8 @@ import {
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import { wakePromptOf } from "@stella/contracts/agent-wake-prompt";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
+import { appendedEntries, onConversationChange, runEnded } from "../stella/conversation-events.ts";
+import { boundedReplay } from "../stella/doc-checkpoint.ts";
 
 const spawnedThreadId = (details: unknown, text: string): string | undefined => {
   const fromDetails = (details as { thread_id?: unknown } | undefined)?.thread_id;
@@ -112,14 +112,13 @@ const LocalLogSyncDoc = defineDoc<{ importedSeq?: number; mirrored?: number; rep
   history: "latest",
   fork: "current",
   initial: () => ({}),
+  checkpointWhen: boundedReplay,
 });
 
 const PAGE = 200;
 const RELAY_SCAN_PAGE = 4;
 const IMPORT_PAGE = 1000;
 type Imported = { message: LocalLogMessage; text: string };
-const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "run_end"]);
-
 const fromLog = (entry: { data?: unknown }): boolean =>
   typeof (entry.data as { localLog?: unknown } | undefined)?.localLog === "string";
 
@@ -496,9 +495,9 @@ export async function localLogMirror(args: {
 
   await importNow().catch(report);
 
-  const stream: AgentEventStream = await watchEvents(harness, root.id, context);
-  stream.start(async (events) => {
-    if ((events as Array<{ type: string }>).some((event) => MIRRORED_EVENTS.has(event.type))) sync();
+  // Mirror when the conversation gains entries or a run ends.
+  const stream = await onConversationChange(root, context, (before, after) => {
+    if (appendedEntries(before, after).length > 0 || runEnded(before, after)) sync();
   });
   sync();
 

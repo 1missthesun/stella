@@ -1,4 +1,5 @@
 import { defineDoc } from "@earendil-works/pi-durable";
+import { boundedReplay } from "./doc-checkpoint.ts";
 
 export type StellaAgentRole = {
   agentType: "orchestrator" | "general";
@@ -34,6 +35,7 @@ export const StellaAgentDoc = defineDoc<StellaAgentRole>({
   history: "latest",
   fork: "current",
   initial: () => ({ agentType: "orchestrator", depth: 0 }),
+  checkpointWhen: boundedReplay,
 });
 
 export { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";

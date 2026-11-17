@@ -9,7 +9,7 @@
  * write one. Assistants that stopped are never model context, so it changes
  * nothing the model reads.
  */
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { AssistantEntry, LiveDoc, type Conversation, type Harness } from "@earendil-works/pi-durable";
 

@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import {
   createAssistantMessageEventStream,
   type AssistantMessage,
@@ -20,6 +20,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { DURABLE_OBJECT_READ_IMAGE_CAPS } from "@stella/runtime/kernel/shared/image-caps";
 import { isImageRef } from "@stella/runtime/kernel/shared/image-ref";
+import { boundedReplay } from "./doc-checkpoint.ts";
 
 /**
  * How many images one model request carries. Every image a conversation has
@@ -59,6 +60,7 @@ export const StellaImageBudgetDoc = defineDoc<{ floorAt: number }>({
   history: "latest",
   fork: "current",
   initial: () => ({ floorAt: 0 }),
+  checkpointWhen: boundedReplay,
 });
 
 type Block = TextContent | ImageContent;

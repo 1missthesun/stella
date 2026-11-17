@@ -1,10 +1,9 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import {
   createAssistantMessageEventStream,
   getCurrentSystemPrompt,
   getCurrentTools,
   parseStreamingJson,
-  Type,
   type Api,
   type AssistantMessage,
   type AssistantMessageEventStream,
@@ -20,6 +19,7 @@ import {
   type TranscriptContext,
   type Usage,
 } from "@earendil-works/pi-ai";
+import { obj } from "@earendil-works/pi-schema";
 import { createProvider, type Provider } from "@earendil-works/pi-ai/models";
 import {
   AgentDoc,
@@ -1585,7 +1585,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   };
 
   const INTERRUPTED: ToolExecutionResult = {
-    content: [{ type: "text", text: "This call was interrupted: Stella restarted before Claude Code finished it." }],
+    output: [{ type: "text", text: "This call was interrupted: Stella restarted before Claude Code finished it." }],
     isError: true,
   };
 
@@ -1594,7 +1594,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const nativeOutcome = async (api: ToolExecutionApi, context: Context): Promise<ToolExecutionResult> => {
     const result = await nativeResult(api.callId, context);
     calls.delete(api.callId);
-    return { content: [{ type: "text", text: result.text || "(no output)" }], ...(result.isError ? { isError: true } : {}) };
+    return { output: [{ type: "text", text: result.text || "(no output)" }], ...(result.isError ? { isError: true } : {}) };
   };
 
   const asInnerArguments = (inner: ToolRegistration, args: unknown): unknown => {
@@ -1636,7 +1636,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     defineTool({
       name,
       description: `Claude Code's ${name}.`,
-      parameters: Type.Object({}, { additionalProperties: true }),
+      parameters: obj({}, { open: true }),
       async execute(_args, api, context) {
         if (isNativeCall(api.callId)) return await nativeOutcome(api, context);
         return INTERRUPTED;
@@ -1711,9 +1711,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             afterTool: (call, result) => {
               const record = calls.get(call.id);
               if (!record || record.native || record.truncated || record.turn.done) return undefined;
-              if (result.control || result.content === undefined || !builtinWaits(record.turn, call.id)) return undefined;
+              if (result.control || !builtinWaits(record.turn, call.id)) return undefined;
               calls.delete(call.id);
-              const content = result.content.filter((part): part is TextContent | ImageContent => part.type === "text" || part.type === "image");
+              const content = (result.output ?? []).filter((part): part is TextContent | ImageContent => part.type === "text" || part.type === "image");
               const diagnostics = result.diagnostics ?? [];
               if (diagnostics.length > 0) {
                 content.push({
@@ -1721,6 +1721,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
                   text: `<harness>\n${diagnostics.map((diagnostic) => `[${diagnostic.severity}] ${diagnostic.message}`).join("\n")}\n</harness>`,
                 });
               }
+              if (content.length === 0) content.push({ type: "text", text: "(no output)" });
               deliver(record.turn, call.id, { content, ...(result.isError ? { isError: true } : {}) });
               return undefined;
             },

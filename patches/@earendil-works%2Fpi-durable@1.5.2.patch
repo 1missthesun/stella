@@ -1,5 +1,5 @@
 diff --git a/dist/env/node.d.ts b/dist/env/node.d.ts
-index 8c34542861db2f1944ead19a828a940881cec679..157c555100d62ab167cf76a987bcc6ac38edb1ff 100644
+index 7dc4337e83009a92045cb0b1ae4fd6a71aa86abe..b0a5e5955cdd66ec364b383fe109e7f349266603 100644
 --- a/dist/env/node.d.ts
 +++ b/dist/env/node.d.ts
 @@ -9,12 +9,20 @@ export declare class NodeExecutionEnv implements ExecutionEnv {
@@ -20,14 +20,14 @@ index 8c34542861db2f1944ead19a828a940881cec679..157c555100d62ab167cf76a987bcc6ac
 +        killProcessTree?: (pid: number) => void | Promise<void>;
      });
 +    private killCommandTree;
-     watch(targets: readonly WatchTarget[], onChange: (change: WatchChange) => void, context: Context): Promise<Result<FileWatcher, FileError>>;
+     watch(targets: readonly WatchTarget[], onChange: (change: FileChange) => void, context: Context): Promise<Result<FileWatcher, FileError>>;
      absolutePath(path: string, _context: Context): Promise<Result<string, FileError>>;
      joinPath(parts: string[], _context: Context): Promise<Result<string, FileError>>;
 diff --git a/dist/env/node.js b/dist/env/node.js
-index 7aca239b4cadcf41aa0495af436378c3e521193f..43dd864fcac0adf595a2e05e7a9a8ad36017f881 100644
+index 120ff2015d81eb795a090eae897910a58768373f..576105102027f366e33216d9702fd89a4de78696 100644
 --- a/dist/env/node.js
 +++ b/dist/env/node.js
-@@ -548,11 +548,27 @@ export class NodeExecutionEnv {
+@@ -556,11 +556,27 @@ export class NodeExecutionEnv {
      shellEnv;
      watchOptions;
      activeChildPids = new Set();
@@ -55,7 +55,7 @@ index 7aca239b4cadcf41aa0495af436378c3e521193f..43dd864fcac0adf595a2e05e7a9a8ad3
      }
      async watch(targets, onChange, context) {
          const aborted = abortResult(context.abortSignal);
-@@ -628,7 +644,7 @@ export class NodeExecutionEnv {
+@@ -636,7 +652,7 @@ export class NodeExecutionEnv {
              let spillBackpressured = false;
              const onAbort = () => {
                  if (child?.pid)
@@ -64,7 +64,7 @@ index 7aca239b4cadcf41aa0495af436378c3e521193f..43dd864fcac0adf595a2e05e7a9a8ad3
              };
              const failCallback = (error) => {
                  if (callbackError !== undefined)
-@@ -1158,9 +1174,9 @@ export class NodeExecutionEnv {
+@@ -1166,9 +1182,9 @@ export class NodeExecutionEnv {
          }
      }
      async cleanup(_context) {

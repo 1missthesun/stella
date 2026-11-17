@@ -12,7 +12,7 @@
  * incoming model that older context is gone unsummarized. Either way the
  * journal only grows.
  */
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import { estimateMessageTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { CompactionEntry, type ContextView, type Conversation, type Harness } from "@earendil-works/pi-durable";

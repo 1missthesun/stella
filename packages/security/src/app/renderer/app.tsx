@@ -87,7 +87,7 @@ const Steps = ({ progress, email }: { progress?: string; email: boolean }) => {
 const Privacy = () => (
   <div className="privacy fade">
     <p>Checks run on this computer. Your files, browsing history and saved passwords never leave it; passwords aren't even read.</p>
-    <p>What does leave: your email address, to look it up in known leaks; short facts about a new download, extension or suspicious email (its name, where it came from) when Stella Security asks a model about it, through your Stella account; and, if you connect email, nothing is stored anywhere but here.</p>
+    <p>What does leave: your email addresses, to XposedOrNot's public leak database, to see if they were in a leak. The names and details of apps, extensions, downloads and programs that start with your computer, the first time each one is seen, so a model can judge them. If you connect email: the sender, subject, a short snippet and link addresses of messages that look suspicious, for the same model. The model runs through your Stella account on US servers. Your email login stays on this computer.</p>
     <p>Stella Security isn't an antivirus. Your computer's built-in protection already does that job.</p>
   </div>
 );

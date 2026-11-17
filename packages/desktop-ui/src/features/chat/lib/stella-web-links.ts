@@ -1,4 +1,5 @@
 import type { ElectronBrowserViewApi } from "@/shared/types/electron";
+import { maybeHandleCanvasShareUrl } from "@/features/canvas-share/open-shared-canvas";
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 
@@ -69,4 +70,22 @@ export const openUrlInStellaBrowser = async (
     });
   }
   return true;
+};
+
+/**
+ * Opens a web page the way a link in a chat message does: a shared canvas in
+ * Stella's viewer, any other page in Stella's browser on the desktop (the
+ * system browser when that fails), a new tab on the web.
+ */
+export const openWebLink = (value: string): void => {
+  const url = normalizedHttpUrl(value);
+  if (!url || maybeHandleCanvasShareUrl(url)) return;
+  const api = window.electronAPI?.browserView;
+  if (!api) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  void openUrlInStellaBrowser(url, api).catch(() => {
+    window.electronAPI?.system?.openExternal(url);
+  });
 };

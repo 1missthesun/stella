@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   ScrollView,
   Share,
   StyleSheet,
@@ -100,7 +99,15 @@ import {
 import type { Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
-import { classifyCanvasNavigation } from "../lib/canvas-navigation";
+import {
+  canvasDocumentLocation,
+  resolveCanvasLink,
+  type CanvasDocumentLocation,
+  type CanvasLink,
+} from "@stella/contracts/canvas-links";
+import { driveLinkTarget } from "@stella/contracts/cloud-world-paths";
+import { openWebLink } from "../lib/open-web-link";
+import { requestOpenApp } from "../lib/workspace-app-links";
 import {
   cloudDriveUrlExpiry,
   resolveCloudDriveFileUri,
@@ -274,15 +281,31 @@ function DocumentWebView({
   );
 }
 
+const scrollToFragmentScript = (fragment: string) => `(() => {
+  const fragment = ${JSON.stringify(fragment)};
+  if (!fragment) { window.scrollTo({ top: 0, behavior: "auto" }); return; }
+  const target = document.getElementById(fragment) ||
+    document.querySelector('[name="' + CSS.escape(fragment) + '"]');
+  if (target) target.scrollIntoView();
+})();
+true;`;
+
 function CanvasDocumentWebView({
   html,
   style,
+  location,
+  onOpenLink,
   onContentHeight,
 }: {
   html: string;
   style: object;
+  /** Where the canvas file lives; its relative links resolve against it. */
+  location: CanvasDocumentLocation | null;
+  /** Opens a link the canvas can't follow itself (anything but a fragment). */
+  onOpenLink: (link: CanvasLink) => void;
   onContentHeight?: (height: number) => void;
 }) {
+  const webViewRef = useRef<WebView>(null);
   const { token, source } = useMemo(
     () => ({
       token: newDocumentToken(),
@@ -310,16 +333,19 @@ function CanvasDocumentWebView({
       ) {
         return;
       }
-      const navigation = classifyCanvasNavigation(message.href);
-      if (navigation.kind === "external") {
-        void Linking.openURL(navigation.url).catch(() => undefined);
+      const link = resolveCanvasLink(message.href, location);
+      if (link.kind === "fragment") {
+        webViewRef.current?.injectJavaScript(scrollToFragmentScript(link.fragment));
+        return;
       }
+      if (link.kind !== "blocked") onOpenLink(link);
     },
-    [onContentHeight, token],
+    [location, onContentHeight, onOpenLink, token],
   );
 
   return (
     <WebView
+      ref={webViewRef}
       key={token}
       originWhitelist={["*"]}
       source={source}
@@ -570,6 +596,52 @@ export function ArtifactViewerContent({
       }));
     },
     [artifact, loaded, openedArtifact],
+  );
+
+  const canvasLocation = useMemo(
+    () =>
+      artifact.payload.kind === "canvas-html"
+        ? canvasDocumentLocation(
+            artifact.payload.filePath,
+            artifact.payload.driveBacked === true,
+          )
+        : null,
+    [artifact.payload],
+  );
+  // A canvas link opens the way the same link opens from chat: pages in the
+  // in-app browser, Drive files, canvases and a computer's files right here
+  // (Back returns to the canvas), apps in Apps.
+  const openCanvasLink = useCallback(
+    (link: CanvasLink) => {
+      if (link.kind === "web" || link.kind === "external") {
+        void openWebLink(link.url).then((opened) => {
+          if (!opened) Alert.alert("Couldn't open this link", link.url);
+        });
+        return;
+      }
+      if (link.kind === "app") {
+        onClose();
+        requestOpenApp(link.slug);
+        return;
+      }
+      if (link.kind !== "drive" && link.kind !== "device") return;
+      tapLight();
+      const child = stellaFileChatArtifact(
+        link.kind === "drive" ? driveLinkTarget(link.path) : link.path,
+        artifact.conversationId,
+      );
+      setTrailState((current) => ({
+        root: openedArtifact,
+        entries: [
+          ...(current.root === openedArtifact ? current.entries : []),
+          {
+            artifact: child,
+            preferDeviceId: link.kind === "device" ? preferDeviceId : null,
+          },
+        ],
+      }));
+    },
+    [artifact.conversationId, onClose, openedArtifact, preferDeviceId],
   );
 
   const shownFolder = loaded?.kind === "folder" ? loaded : null;
@@ -1314,6 +1386,8 @@ export function ArtifactViewerContent({
             <CanvasDocumentWebView
               html={loaded.html}
               style={styles.documentWebview}
+              location={canvasLocation}
+              onOpenLink={openCanvasLink}
             />
           ) : loaded?.kind === "html-document" ? (
             <DocumentWebView

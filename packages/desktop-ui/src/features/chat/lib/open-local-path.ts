@@ -12,7 +12,20 @@ const ipcErrorMessage = (caught: unknown): string =>
     "",
   );
 
-export const openLocalPath = async (filePath: string): Promise<string | null> => {
+export type OpenLocalPathOptions = {
+  /**
+   * The link came from a document rather than from Stella (a link inside a
+   * canvas). A file Stella can't show is then revealed in its folder instead
+   * of being opened with its default app, so a document can never launch a
+   * program or script with one click.
+   */
+  fromDocument?: boolean;
+};
+
+export const openLocalPath = async (
+  filePath: string,
+  options: OpenLocalPathOptions = {},
+): Promise<string | null> => {
   const payload = displayPayloadForStellaFile(filePath, Date.now());
   if (payload) {
     openDisplayPayloadTab(payload);
@@ -34,6 +47,17 @@ export const openLocalPath = async (filePath: string): Promise<string | null> =>
   }
   if (stat && !stat.ok && stat.message) return stat.message;
   const api = window.electronAPI?.system;
+  if (options.fromDocument) {
+    if (stat?.ok && stat.value.kind === "directory") {
+      openDisplayPayloadTab({ kind: "folder", filePath, createdAt: Date.now() });
+      return null;
+    }
+    if (!stat?.ok || !api?.showItemInFolder) {
+      return deviceFileUnavailableMessage(null, filePath);
+    }
+    api.showItemInFolder(filePath);
+    return null;
+  }
   if (!api?.openPath) return deviceFileUnavailableMessage(null, filePath);
   const result = await api.openPath(filePath).catch(() => null);
   if (result?.ok) return null;
@@ -44,8 +68,11 @@ export const showOpenPathError = (error: string) => {
   showToast({ description: error, variant: "error" });
 };
 
-export const openLocalPathOrExplain = (filePath: string) => {
-  void openLocalPath(filePath).then((error) => {
+export const openLocalPathOrExplain = (
+  filePath: string,
+  options: OpenLocalPathOptions = {},
+) => {
+  void openLocalPath(filePath, options).then((error) => {
     if (error) showOpenPathError(error);
   });
 };

@@ -5,7 +5,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { app, session } from "electron";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
-import { injectCanvasBridge } from "./canvas-bridge.js";
+import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
 
 /**
  * `stella-canvas://` is where canvases render: model-authored HTML from the

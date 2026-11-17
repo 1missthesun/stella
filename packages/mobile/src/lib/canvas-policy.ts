@@ -141,7 +141,7 @@ export function canvasBridgeScript(token: string): string {
 
   window.addEventListener("click", (event) => {
     const target = event.target;
-    const anchor = target instanceof Element ? closest.call(target, "a[href]") : null;
+    const anchor = target instanceof Element ? closest.call(target, "a[href], area[href]") : null;
     if (!anchor) return;
     event.preventDefault();
     if (!event.isTrusted) return;

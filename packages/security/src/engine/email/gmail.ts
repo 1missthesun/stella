@@ -72,7 +72,7 @@ export const connectGmail = async (deps: GmailDeps, loginHint?: string): Promise
         code_challenge: challenge,
         code_challenge_method: "S256",
         access_type: "offline",
-        prompt: "consent",
+        prompt: "select_account consent",
         state,
         ...(loginHint ? { login_hint: loginHint } : {}),
       }).toString();

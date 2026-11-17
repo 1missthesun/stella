@@ -276,7 +276,7 @@ ipcMain.handle("sign-in", async (_e, how: { kind: "google" } | { kind: "email"; 
 ipcMain.handle("connect-email", async () => {
   try {
     setView({ error: undefined });
-    const t = await connectGmail(gmailDeps, view.account?.email);
+    const t = await connectGmail(gmailDeps);
     setView({ email: { connected: true, address: t.email } });
     void check("email connected");
   } catch (e) {

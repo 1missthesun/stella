@@ -2,7 +2,7 @@ import os from "node:os";
 import { emailExposure, emailExposureFindings, siteBreachFindings } from "./accounts/breaches.ts";
 import { browserDownloads, listExtensions, listProfiles, savedLogins, siteUse, type Extension } from "./browsers.ts";
 import { checkBrowserUpdates } from "./checks/browser-updates.ts";
-import { installedApps, recentDownloads, startupItems, type InventoryItem } from "./checks/inventory.ts";
+import { enrichForJudging, installedApps, recentDownloads, startupItems, type InventoryItem } from "./checks/inventory.ts";
 import { checkEncryption, checkFirewall, checkScreenLock, checkSystemUpdates } from "./checks/system.ts";
 import { judgeChanges, type ChangeVerdict } from "./judge.ts";
 import type { ModelClient, ModelUsage } from "./model.ts";
@@ -135,6 +135,7 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
   const sameAs = (i: InventoryItem) => (i.kind === "extension" ? `ext:${i.facts.browser}:${i.facts.id}:${i.facts.version}` : i.key);
   const toJudge = [...new Map(fresh.map((i) => [sameAs(i), i])).values()];
   if (toJudge.length && opts.model) {
+    await enrichForJudging(toJudge);
     progress(`Checking ${toJudge.length} new thing${toJudge.length === 1 ? "" : "s"}`);
     const batches: InventoryItem[][] = [];
     for (let i = 0; i < toJudge.length; i += 40) batches.push(toJudge.slice(i, i + 40));

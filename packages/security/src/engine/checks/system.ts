@@ -107,8 +107,9 @@ export const checkSystemUpdates = async (mac?: MacBar): Promise<Out> => {
     const supported = mac?.majors.slice(0, 3).some((m) => m.major === major);
     const graceCutoff = Date.now() - UPDATE_GRACE_DAYS * DAY;
     const missed = line?.releases.filter((r) => newerThan(r.version) && r.released <= graceCutoff) ?? [];
-    const fixes = missed.reduce((n, r) => n + r.cves, 0);
-    const exploited = missed.reduce((n, r) => n + r.exploited, 0);
+    // The same hole can be fixed in more than one release; count each once.
+    const fixes = new Set(missed.flatMap((r) => r.cves)).size;
+    const exploited = new Set(missed.flatMap((r) => r.exploited)).size;
     const action = { kind: "open" as const, label: "Open Software Update", url: settingsUrl.updates.darwin };
     if (mac && line && !supported) {
       out.findings.push({

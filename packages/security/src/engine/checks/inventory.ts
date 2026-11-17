@@ -235,3 +235,27 @@ export const recentDownloads = async (sinceMs: number): Promise<InventoryItem[]>
   return out;
 };
 
+
+/**
+ * Facts that cost a moment per item (code signatures), gathered only for items about to be
+ * judged rather than on every check.
+ */
+export const enrichForJudging = async (items: InventoryItem[]): Promise<void> => {
+  if (OS !== "darwin") return;
+  await Promise.all(
+    items
+      .filter((i) => i.kind === "app" && typeof i.facts.path === "string" && i.facts.signedBy === undefined)
+      .map(async (i) => {
+        const file = String(i.facts.path);
+        const sig = await run("codesign", ["-dv", "--verbose=2", file], 8000);
+        const authority = sig.stderr.match(/Authority=(.+)/)?.[1]?.trim();
+        i.facts.signedBy = authority ?? (/not signed/i.test(sig.stderr) ? "not signed" : "unknown");
+        const team = sig.stderr.match(/TeamIdentifier=(.+)/)?.[1]?.trim();
+        if (team && team !== "not set") i.facts.teamId = team;
+        // Gatekeeper's own verdict: "Notarized Developer ID", "Mac App Store", "Apple System", or rejected.
+        const gk = await run("spctl", ["--assess", "--type", "execute", "-vv", file], 10_000);
+        const source = (gk.stderr + gk.stdout).match(/source=(.+)/)?.[1]?.trim();
+        i.facts.checkedByMacOS = source ?? (/rejected/.test(gk.stderr + gk.stdout) ? "rejected" : "unknown");
+      }),
+  );
+};

@@ -62,13 +62,13 @@ export type PublicBreach = {
 export const breachCatalog = async (): Promise<PublicBreach[]> => fetchJson<PublicBreach[]>("https://haveibeenpwned.com/api/v3/breaches");
 
 /** Latest macOS per major line plus how many security fixes each release carried (SOFA, maintained by the Mac admins community from Apple's own data). */
-export type MacRelease = { version: string; released: number; cves: number; exploited: number };
+export type MacRelease = { version: string; released: number; cves: string[]; exploited: string[] };
 export type MacBar = { majors: { major: string; name: string; latest: MacRelease; releases: MacRelease[] }[] };
 
 export const macosBar = async (): Promise<MacBar | undefined> => {
-  type Rel = { ProductVersion: string; ReleaseDate: string; UniqueCVEsCount?: number; ActivelyExploitedCVEs?: string[] };
+  type Rel = { ProductVersion: string; ReleaseDate: string; CVEs?: Record<string, unknown>; ActivelyExploitedCVEs?: string[] };
   const data = await fetchJson<{ OSVersions: { OSVersion: string; Latest: Rel; SecurityReleases: Rel[] }[] }>("https://sofafeed.macadmins.io/v1/macos_data_feed.json");
-  const rel = (r: Rel): MacRelease => ({ version: r.ProductVersion, released: Date.parse(r.ReleaseDate), cves: r.UniqueCVEsCount ?? 0, exploited: r.ActivelyExploitedCVEs?.length ?? 0 });
+  const rel = (r: Rel): MacRelease => ({ version: r.ProductVersion, released: Date.parse(r.ReleaseDate), cves: Object.keys(r.CVEs ?? {}), exploited: r.ActivelyExploitedCVEs ?? [] });
   const majors = data.OSVersions.map((o) => ({ major: o.Latest.ProductVersion.split(".")[0]!, name: o.OSVersion.replace(/\s+\d+$/, ""), latest: rel(o.Latest), releases: o.SecurityReleases.map(rel) }));
   return majors.length ? { majors } : undefined;
 };

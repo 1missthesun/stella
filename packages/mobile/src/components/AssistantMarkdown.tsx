@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, type ReactNode } from "react";
-import { Alert, Linking, Platform, StyleSheet, View } from "react-native";
+import { Alert, Platform, StyleSheet, View } from "react-native";
 import {
   Markdown,
   List,
@@ -12,9 +12,8 @@ import {
   type NodeStyleOverrides,
   type PartialMarkdownTheme,
 } from "react-native-nitro-markdown";
-import * as WebBrowser from "expo-web-browser";
 import { parseStellaFileUrl } from "../lib/stella-file-links";
-import { canvasShareOpenUrl } from "../lib/canvas-share-links";
+import { openWebLink } from "../lib/open-web-link";
 import { parseStellaAppUrl } from "@stella/contracts/workspace-apps";
 import { requestOpenApp } from "../lib/workspace-app-links";
 import { fadeHex } from "../theme/oklch";
@@ -27,21 +26,6 @@ import { Text } from "./Text";
 import { useT } from "../i18n";
 
 const BASE_FONT_SIZE = 17;
-
-async function openLink(url: string): Promise<boolean> {
-  if (!/^[a-z][a-z\d+.-]*:/i.test(url)) return false;
-  try {
-    if (/^https?:\/\//i.test(url)) {
-      await WebBrowser.openBrowserAsync(await canvasShareOpenUrl(url));
-    } else {
-      await Linking.openURL(url);
-    }
-    return true;
-  } catch (error) {
-    console.warn("[markdown] link open failed", url, error);
-    return false;
-  }
-}
 
 function buildTheme(colors: Colors): PartialMarkdownTheme {
   return {
@@ -215,7 +199,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         }
         return false;
       }
-      void openLink(url).then((opened) => {
+      void openWebLink(url).then((opened) => {
         if (!opened) Alert.alert(t("shell.display.canvasShare.toasts.openFailed"), url);
       });
       return false;

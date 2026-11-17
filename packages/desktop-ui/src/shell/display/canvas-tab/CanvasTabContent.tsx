@@ -3,13 +3,18 @@ import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { useDriveFileRevision } from "@/features/cloud/drive-file-versions";
 import { useCloudDriveHtml } from "@/features/cloud/use-cloud-drive-html";
-import { openExternalUrl } from "@/platform/electron/open-external";
 import { deviceFileMissingMessage } from "@stella/contracts/device-files";
 import { CanvasIllustration } from "../illustrations/CanvasIllustration";
 import { CanvasShareBar } from "./CanvasShareBar";
 import { PreviewProblem } from "../preview-states";
 import type { CanvasHtmlItem } from "./canvas-items";
-import { classifyCanvasNavigation } from "./canvas-navigation";
+import { openCanvasLink } from "./open-canvas-link";
+import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
+import {
+  canvasDocumentLocation,
+  resolveCanvasLink,
+  type CanvasDocumentLocation,
+} from "@stella/contracts/canvas-links";
 import { useEmbeddedCanvasAssets } from "./use-embedded-canvas-assets";
 import { useT } from "@/shared/i18n";
 import "./canvas-tab.css";
@@ -74,7 +79,7 @@ const LocalFileCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => 
         };
     }, [item.filePath, key]);
     const settled = resolved?.key === key ? resolved : null;
-    return <CanvasHeroFrameDocument item={item} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
+    return <CanvasHeroFrameDocument item={item} location={canvasDocumentLocation(item.filePath, false)} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
 };
 const DriveCanvasHeroFrameContent = ({ item, drivePath }: { item: CanvasHtmlItem; drivePath: string }) => {
     const revision = useDriveFileRevision(drivePath);
@@ -101,7 +106,7 @@ const DriveCanvasHeroFrameContent = ({ item, drivePath }: { item: CanvasHtmlItem
         };
     }, [drivePath, key]);
     const settled = resolved?.key === key ? resolved : null;
-    return <CanvasHeroFrameDocument item={item} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
+    return <CanvasHeroFrameDocument item={item} location={canvasDocumentLocation(drivePath, true)} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
 };
 const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = false, drivePath, }: {
   item: CanvasHtmlItem;
@@ -112,6 +117,12 @@ const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = fals
   drivePath?: string;
 }) => {
     const hasCanvasOrigin = canvasUrlApi() !== null;
+    const location = drivePath
+        ? canvasDocumentLocation(drivePath, true)
+        : canvasDocumentLocation(item.filePath, Boolean(item.driveBacked));
+    // On the web a canvas renders from `srcdoc`, so it carries the same
+    // bridge Electron main serves every canvas with.
+    const bridged = useMemo(() => (html && !hasCanvasOrigin ? injectCanvasBridge(html) : html), [html, hasCanvasOrigin]);
     const [registered, setRegistered] = useState<{
         html: string;
         src: string | null;
@@ -134,10 +145,10 @@ const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = fals
         };
     }, [html, drivePath]);
     if (!hasCanvasOrigin) {
-        return <CanvasHeroFrameDocument item={item} frame={html ? { srcDoc: html } : null} error={error} loading={loading} limited={limited}/>;
+        return <CanvasHeroFrameDocument item={item} location={location} frame={bridged ? { srcDoc: bridged } : null} error={error} loading={loading} limited={limited}/>;
     }
     const settled = html && registered?.html === html ? registered : null;
-    return <CanvasHeroFrameDocument item={item} frame={settled?.src ? { src: settled.src } : null} error={error ?? settled?.error ?? null} loading={loading || (Boolean(html) && !settled)} limited={limited}/>;
+    return <CanvasHeroFrameDocument item={item} location={location} frame={settled?.src ? { src: settled.src } : null} error={error ?? settled?.error ?? null} loading={loading || (Boolean(html) && !settled)} limited={limited}/>;
 };
 const BytesCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const fileSource = useContext(DisplayFileSourceContext);
@@ -165,8 +176,10 @@ const CanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
         return <BytesCanvasHeroFrameContent item={item}/>;
     return <LocalFileCanvasHeroFrameContent item={item}/>;
 };
-const CanvasHeroFrameDocument = ({ item, frame, error, loading, limited = false, }: {
+const CanvasHeroFrameDocument = ({ item, location, frame, error, loading, limited = false, }: {
   item: CanvasHtmlItem;
+  /** Where the canvas file lives; its relative links resolve against it. */
+  location: CanvasDocumentLocation | null;
   frame: CanvasFrame | null;
   error: string | null;
   loading: boolean;
@@ -176,20 +189,35 @@ const CanvasHeroFrameDocument = ({ item, frame, error, loading, limited = false,
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const loadCountRef = useRef(0);
     const [navigationReset, setNavigationReset] = useState(0);
+    const locationRef = useRef(location);
+    locationRef.current = location;
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             // The canvas origin is opaque ("null"), so the sender is
             // identified by its window, never by origin.
-            if (event.source !== iframeRef.current?.contentWindow)
+            const frameWindow = iframeRef.current?.contentWindow;
+            if (!frameWindow || event.source !== frameWindow)
                 return;
             const data = event.data;
-            if (data?.type === "stella:canvas-open-external" &&
-                typeof data.url === "string") {
-                const navigation = classifyCanvasNavigation(data.url);
-                if (navigation.kind === "external") {
-                    openExternalUrl(navigation.url);
-                }
+            // `stella:canvas-open-external` is what canvases served by an
+            // older main send for web links.
+            const href = data?.type === "stella:canvas-link" && typeof data.href === "string"
+                ? data.href
+                : data?.type === "stella:canvas-open-external" && typeof data.url === "string"
+                    ? data.url
+                    : null;
+            if (href === null)
+                return;
+            // A click in the canvas activates this window too; a canvas
+            // script posting on its own does not, so it can't open anything.
+            if (navigator.userActivation && !navigator.userActivation.isActive)
+                return;
+            const link = resolveCanvasLink(href, locationRef.current);
+            if (link.kind === "fragment") {
+                frameWindow.postMessage({ type: "stella:canvas-scroll", fragment: link.fragment }, "*");
+                return;
             }
+            openCanvasLink(link);
         };
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);

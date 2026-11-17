@@ -1,16 +1,22 @@
 /**
- * The script every canvas document is served with (see canvas-protocol.ts).
+ * The script every canvas document is served with: by Electron main on the
+ * `stella-canvas:` scheme (see canvas-protocol.ts), and inlined into the
+ * `srcdoc` the web chat renders a canvas from.
  *
  * A canvas runs on an opaque origin, so this is its only line to the app, and
- * it is postMessage: link and form destinations go to the parent to open
- * externally, text selections and `[data-stella-compose]` targets feed the
- * Ask Stella chip. The parent checks that each message comes from the canvas
- * iframe's window before acting on it.
+ * it is postMessage: every link and form destination goes to the parent
+ * exactly as written (`stella:canvas-link`), and the parent, which knows where
+ * the canvas file lives, resolves and opens it (see `resolveCanvasLink` in
+ * canvas-links.ts). Text selections and `[data-stella-compose]` targets feed
+ * the Ask Stella chip. The parent checks that each message comes from the
+ * canvas iframe's window, and that the user just interacted, before acting.
  */
 const CANVAS_BRIDGE_SCRIPT = String.raw`
 (() => {
   const scrollToFragment = (hash) => {
-    const fragment = decodeURIComponent(hash.replace(/^#/, ""));
+    const raw = String(hash).replace(/^#/, "");
+    let fragment = raw;
+    try { fragment = decodeURIComponent(raw); } catch {}
     if (!fragment) {
       window.scrollTo({ top: 0, behavior: "auto" });
       return;
@@ -20,31 +26,23 @@ const CANVAS_BRIDGE_SCRIPT = String.raw`
     target?.scrollIntoView();
   };
 
-  // Links resolve against the document (or its <base>): web destinations open
-  // externally, links into this same document scroll, and every other
-  // destination, including sibling documents in the canvas folder, is refused.
+  // A link into this same document scrolls here; every other destination
+  // goes to the app as written, which opens it the way the same link opens
+  // from a chat message (or scrolls back here when it names this document).
   const navigate = (rawHref) => {
-    let url;
-    try {
-      url = new URL(rawHref.trim(), document.baseURI);
-    } catch {
+    const href = String(rawHref || "").trim();
+    if (!href) return;
+    if (href.startsWith("#")) {
+      scrollToFragment(href);
       return;
     }
-    if (url.protocol === "http:" || url.protocol === "https:") {
-      parent.postMessage({ type: "stella:canvas-open-external", url: url.href }, "*");
-      return;
-    }
-    if (url.href.split("#")[0] === location.href.split("#")[0]) {
-      scrollToFragment(url.hash);
-      return;
-    }
-    console.warn("Stella canvas: only web links and links within this document open:", url.href);
+    parent.postMessage({ type: "stella:canvas-link", href }, "*");
   };
 
   document.addEventListener("click", (event) => {
     const target = event.target;
     const anchor = target && typeof target.closest === "function"
-      ? target.closest("a[href]")
+      ? target.closest("a[href], area[href]")
       : null;
     if (!anchor) return;
     event.preventDefault();
@@ -168,6 +166,10 @@ const CANVAS_BRIDGE_SCRIPT = String.raw`
     if (event.data && event.data.type === "stella:canvas-selection-clear") {
       window.getSelection()?.removeAllRanges();
       post();
+    }
+    if (event.data && event.data.type === "stella:canvas-scroll" &&
+        typeof event.data.fragment === "string") {
+      scrollToFragment(event.data.fragment);
     }
   });
 })();

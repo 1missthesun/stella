@@ -2,7 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FileEntry } from "@/features/workspace-display/files-index";
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
 import type { DisplayTab } from "@/features/workspace-display/types";
-import { deferStripThumbnails, useStripThumbnail } from "./strip-thumbnails";
+import {
+  deferStripThumbnails,
+  useDriveStripThumbnail,
+  useStripThumbnail,
+  type StripThumbKind,
+} from "./strip-thumbnails";
 import { Play } from "@/ui/icons";
 import { formatTimestampHeader } from "@/features/chat/lib/message-time-labels";
 import { translateNow, useLocale, useT } from "@/shared/i18n";
@@ -42,8 +47,36 @@ const imagePathOf = (entry: FileEntry): string | null => {
   return payload.asset.filePaths[0] ?? null;
 };
 
-function ImageThumb({ filePath }: { filePath: string }) {
-  const url = useStripThumbnail("image", filePath, true);
+const videoPathOf = (entry: FileEntry): string | null => {
+  const payload = entry.payload;
+  if (payload.kind !== "media" || payload.asset.kind !== "video") return null;
+  return payload.asset.filePath;
+};
+
+const pdfPathOf = (entry: FileEntry): string | null =>
+  entry.payload.kind === "pdf" ? entry.payload.filePath : null;
+
+/** What the item's thumbnail is made from, if it has one. */
+type ThumbSource = {
+  kind: StripThumbKind;
+  /** A file here, or (for a Drive file) its stand-in path. */
+  filePath: string;
+  /** Set for a Drive file: what the thumbnail is read from. */
+  drivePath: string | null;
+};
+
+const thumbSourceOf = (entry: FileEntry): ThumbSource | null => {
+  const drivePath = entry.payload.cloudDrivePath ?? null;
+  const image = imagePathOf(entry);
+  if (image) return { kind: "image", filePath: image, drivePath };
+  const video = videoPathOf(entry);
+  if (video) return { kind: "video", filePath: video, drivePath };
+  const pdf = pdfPathOf(entry);
+  if (pdf) return { kind: "pdf", filePath: pdf, drivePath };
+  return null;
+};
+
+function ThumbImage({ url }: { url: string | null }) {
   return url ? (
     <img className="viewer-strip__img" src={url} alt="" draggable={false} />
   ) : (
@@ -51,19 +84,35 @@ function ImageThumb({ filePath }: { filePath: string }) {
   );
 }
 
-const videoPathOf = (entry: FileEntry): string | null => {
-  const payload = entry.payload;
-  if (payload.kind !== "media" || payload.asset.kind !== "video") return null;
-  return payload.asset.filePath;
-};
+function LocalThumb({ source }: { source: ThumbSource }) {
+  return <ThumbImage url={useStripThumbnail(source.kind, source.filePath, true)} />;
+}
 
-/** A still from half a second in, made once. */
-function VideoThumb({ filePath }: { filePath: string }) {
-  const url = useStripThumbnail("video", filePath, true);
+function DriveThumb({ source, drivePath }: { source: ThumbSource; drivePath: string }) {
+  return <ThumbImage url={useDriveStripThumbnail(source.kind, drivePath, true)} />;
+}
+
+/** A document's first page, over its icon once it's made. */
+function PageThumb({ source }: { source: ThumbSource }) {
+  const local = useStripThumbnail(source.kind, source.filePath, !source.drivePath);
+  const drive = useDriveStripThumbnail(source.kind, source.drivePath ?? "", Boolean(source.drivePath));
+  const url = source.drivePath ? drive : local;
   return url ? (
-    <img className="viewer-strip__img" src={url} alt="" draggable={false} />
+    <img
+      className="viewer-strip__img viewer-strip__img--page"
+      src={url}
+      alt=""
+      draggable={false}
+    />
+  ) : null;
+}
+
+/** A small still: a picture, a clip's frame half a second in, a PDF's first page. */
+function Thumb({ source }: { source: ThumbSource }) {
+  return source.drivePath ? (
+    <DriveThumb source={source} drivePath={source.drivePath} />
   ) : (
-    <span className="viewer-strip__img viewer-strip__img--empty" />
+    <LocalThumb source={source} />
   );
 }
 
@@ -88,17 +137,18 @@ function StripItem({
   tooltip: string;
   onPointerPick: (id: string) => void;
 }) {
-  const imagePath = imagePathOf(entry);
-  const videoPath = imagePath ? null : videoPathOf(entry);
+  const source = thumbSourceOf(entry);
+  const drivePath = entry.payload.cloudDrivePath ?? null;
   const ref = useRef<HTMLButtonElement | null>(null);
   const near = useNearView(ref);
-  const ext = imagePath || videoPath ? null : extensionOf(entry);
+  const media = source && source.kind !== "pdf" ? source.kind : null;
+  const ext = media ? null : extensionOf(entry);
   return (
     <button
       ref={ref}
       type="button"
       className="viewer-strip__item"
-      data-kind={imagePath ? "image" : videoPath ? "video" : "file"}
+      data-kind={media ?? "file"}
       data-current={current ? "true" : undefined}
       aria-current={current ? "true" : undefined}
       aria-label={entry.title}
@@ -113,35 +163,35 @@ function StripItem({
       onContextMenu={contextMenu(
         async () => {
           const open = () => showSibling(fromId, entry);
-          const path = imagePath ?? videoPath ?? entry.filePath;
+          // A Drive file's payload path is a stand-in, not a file here.
+          const path = drivePath ? null : (source?.filePath ?? entry.filePath);
           if (!path) return [[{ label: translateNow("contextMenu.open"), run: open }]];
-          return await fileMenu(path, { open, image: Boolean(imagePath) })();
+          return await fileMenu(path, { open, image: source?.kind === "image" })();
         },
         { claims: ["image"] },
       )}
     >
-      {imagePath ? (
-        near ? (
-          <ImageThumb filePath={imagePath} />
-        ) : (
-          <span className="viewer-strip__img viewer-strip__img--empty" />
-        )
-      ) : videoPath ? (
+      {source && media ? (
         <>
           {near ? (
-            <VideoThumb filePath={videoPath} />
+            <Thumb source={source} />
           ) : (
             <span className="viewer-strip__img viewer-strip__img--empty" />
           )}
-          <span className="viewer-strip__badge" aria-hidden="true">
-            <Play size={9} />
-          </span>
+          {media === "video" ? (
+            <span className="viewer-strip__badge" aria-hidden="true">
+              <Play size={9} />
+            </span>
+          ) : null}
         </>
       ) : (
-        <span className="viewer-strip__file" aria-hidden="true">
-          <DisplayTabIcon kind={entry.kind} size={16} />
-          {ext ? <span className="viewer-strip__ext">{ext}</span> : null}
-        </span>
+        <>
+          <span className="viewer-strip__file" aria-hidden="true">
+            <DisplayTabIcon kind={entry.kind} size={16} />
+            {ext ? <span className="viewer-strip__ext">{ext}</span> : null}
+          </span>
+          {source && near ? <PageThumb source={source} /> : null}
+        </>
       )}
     </button>
   );

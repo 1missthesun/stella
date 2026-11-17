@@ -8,7 +8,7 @@ import { judgeChanges, type ChangeVerdict } from "./judge.ts";
 import type { ModelClient, ModelUsage } from "./model.ts";
 import { buildFeed, type Feed } from "./news/feed.ts";
 import { matchThreats } from "./news/match.ts";
-import { breachCatalog } from "./reference.ts";
+import { breachCatalog, macosBar } from "./reference.ts";
 import { loadState, saveState, type State } from "./state.ts";
 import type { Finding, FixAction, HandledLine, RunSummary } from "./types.ts";
 import { DAY, OS } from "./util.ts";
@@ -107,7 +107,7 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
   const [enc, fw, sys, lock, browsers, sites, logins, startup, apps, downloads, dlHistory] = await Promise.all([
     guard("encryption", checkEncryption),
     guard("firewall", checkFirewall),
-    guard("system updates", () => checkSystemUpdates()),
+    guard("system updates", async () => checkSystemUpdates(OS === "darwin" ? await macosBar().catch(() => undefined) : undefined)),
     guard("screen lock", checkScreenLock),
     guard("browser updates", () => checkBrowserUpdates(profiles)),
     guard("browsing", () => siteUse(profiles)),
@@ -131,25 +131,32 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
   // ---- what's new since the last check -> the model judges it
   const inventory: InventoryItem[] = [...(startup ?? []), ...extensions.map(extensionItem), ...(downloads ?? []), ...(apps ?? [])];
   const fresh = inventory.filter((i) => !state.seen[i.key]);
-  const toJudge = fresh.filter((i) => !(firstRun && i.kind === "app"));
-  for (const i of fresh) if (i.kind === "app" && firstRun) state.seen[i.key] = { firstSeen: startedAt, name: i.name, kind: i.kind };
+  // The same extension in several browser profiles is one judgment.
+  const sameAs = (i: InventoryItem) => (i.kind === "extension" ? `ext:${i.facts.browser}:${i.facts.id}:${i.facts.version}` : i.key);
+  const toJudge = [...new Map(fresh.map((i) => [sameAs(i), i])).values()];
   if (toJudge.length && opts.model) {
     progress(`Checking ${toJudge.length} new thing${toJudge.length === 1 ? "" : "s"}`);
-    for (let i = 0; i < toJudge.length; i += 40) {
-      const batch = toJudge.slice(i, i + 40);
-      const res = await guard("judge", () => judgeChanges(opts.model!, batch, osLabel()));
-      if (!res) continue;
-      addUsage(res.usage);
-      for (const v of res.verdicts) {
-        const item = batch.find((b) => b.key === v.key);
-        if (item) state.seen[item.key] = { firstSeen: startedAt, name: item.name, kind: item.kind, verdict: v };
-      }
-    }
+    const batches: InventoryItem[][] = [];
+    for (let i = 0; i < toJudge.length; i += 40) batches.push(toJudge.slice(i, i + 40));
+    // A first check can be a few hundred apps: three batches at a time.
+    for (let i = 0; i < batches.length; i += 3)
+      await Promise.all(
+        batches.slice(i, i + 3).map(async (batch) => {
+          const res = await guard("judge", () => judgeChanges(opts.model!, batch, osLabel()));
+          if (!res) return;
+          addUsage(res.usage);
+          for (const v of res.verdicts) {
+            const item = batch.find((b) => b.key === v.key);
+            if (!item) continue;
+            for (const twin of fresh.filter((f) => sameAs(f) === sameAs(item))) state.seen[twin.key] = { firstSeen: startedAt, name: twin.name, kind: twin.kind, verdict: v };
+          }
+        }),
+      );
   }
   // Every judged item that isn't fine stays a finding until it's gone from the computer.
   const present = new Set(inventory.map((i) => i.key));
   const counts: Record<string, number> = {};
-  for (const i of fresh) counts[i.kind] = (counts[i.kind] ?? 0) + 1;
+  for (const i of toJudge) counts[i.kind] = (counts[i.kind] ?? 0) + 1;
   for (const [key, seen] of Object.entries(state.seen)) {
     if (!present.has(key)) continue;
     const v = seen.verdict;
@@ -168,8 +175,9 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
     });
   }
   const label: Record<string, string> = { download: "new download", extension: "browser extension", startup: "thing that starts with your computer", app: "new app" };
-  for (const [k, n] of Object.entries(counts)) if (!(firstRun && k === "app")) handled.push({ id: `checked:${k}`, text: `Checked ${n} ${label[k]}${n === 1 ? "" : k === "startup" ? "s" : "s"}`.replace("things that starts", "things that start").replace(/thing that starts with your computers$/, "things that start with your computer"), at: Date.now() });
-  if (firstRun && extensions.length && !counts.extension) handled.push({ id: "checked:extension", text: `Checked ${extensions.length} browser extensions`, at: Date.now() });
+  for (const [k, n] of Object.entries(counts)) handled.push({ id: `checked:${k}`, text: `Checked ${n} ${firstRun ? label[k]!.replace("new ", "") : label[k]}${n === 1 ? "" : k === "startup" ? "s" : "s"}`.replace("things that starts", "things that start").replace(/thing that starts with your computers$/, "things that start with your computer"), at: Date.now() });
+  const uniqueExtensions = new Set(extensions.map((e) => `${e.browser}:${e.id}`)).size;
+  if (firstRun && uniqueExtensions && !counts.extension) handled.push({ id: "checked:extension", text: `Checked ${uniqueExtensions} browser extensions`, at: Date.now() });
 
   // ---- accounts: public breach list vs saved passwords; your email vs known leaks
   progress("Checking your accounts against known leaks");

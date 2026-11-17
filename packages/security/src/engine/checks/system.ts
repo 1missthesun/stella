@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Finding, HandledLine } from "../types.ts";
-import { OS, exists, powershell, run } from "../util.ts";
+import { type MacBar, UPDATE_GRACE_DAYS } from "../reference.ts";
+import { DAY, OS, exists, powershell, run } from "../util.ts";
 
 type Out = { findings: Finding[]; handled: HandledLine[] };
 const now = () => Date.now();
@@ -92,28 +93,60 @@ export const checkFirewall = async (): Promise<Out> => {
 };
 
 /** How long the system has gone without security updates. */
-export const checkSystemUpdates = async (latest?: { macos?: string[]; windowsBuild?: Record<string, number> }): Promise<Out> => {
+export const checkSystemUpdates = async (mac?: MacBar): Promise<Out> => {
   const out: Out = { findings: [], handled: [] };
   if (OS === "darwin") {
     const v = (await run("sw_vers", ["-productVersion"])).stdout.trim();
-    // Pending updates the system already knows about (no network call; reads its own cache).
+    // Pending updates the system already knows about (no network call; reads its own cache, which can be stale).
     const plist = await run("defaults", ["read", "/Library/Preferences/com.apple.SoftwareUpdate", "RecommendedUpdates"]);
-    const pending = plist.ok ? (plist.stdout.match(/"Display Name" = "?([^";]+)/g) ?? []).map((s) => s.replace(/.*= "?/, "")) : [];
+    const pending = [...new Set(plist.ok ? (plist.stdout.match(/"Display Name" = "?([^";]+)/g) ?? []).map((s) => s.replace(/.*= "?/, "").trim()) : [])];
     const major = v.split(".")[0];
-    const newest = latest?.macos?.find((x) => x.split(".")[0] === major);
-    const behind = newest && v && newest.localeCompare(v, undefined, { numeric: true }) > 0;
-    if (pending.length || behind) {
+    const newerThan = (x: string) => x.localeCompare(v, undefined, { numeric: true }) > 0;
+    const line = mac?.majors.find((m) => m.major === major);
+    // Apple fixes the newest three macOS lines; older ones stop getting security fixes.
+    const supported = mac?.majors.slice(0, 3).some((m) => m.major === major);
+    const graceCutoff = Date.now() - UPDATE_GRACE_DAYS * DAY;
+    const missed = line?.releases.filter((r) => newerThan(r.version) && r.released <= graceCutoff) ?? [];
+    const fixes = missed.reduce((n, r) => n + r.cves, 0);
+    const exploited = missed.reduce((n, r) => n + r.exploited, 0);
+    const action = { kind: "open" as const, label: "Open Software Update", url: settingsUrl.updates.darwin };
+    if (mac && line && !supported) {
       out.findings.push({
-        id: `macos-update-${newest ?? pending.join(",")}`,
+        id: `macos-unsupported-${major}`,
+        kind: "update",
+        title: "Your Mac no longer gets security fixes",
+        detail: `Apple stopped fixing macOS ${line.name} (you have ${v}). Upgrade macOS in Software Update; if your Mac can't, it's no longer safe for banking or email.`,
+        needsYou: true,
+        urgency: 50,
+        action,
+        evidence: { version: v, newestLines: mac.majors.slice(0, 3).map((m) => m.latest.version) },
+      });
+    } else if (missed.length && line) {
+      out.findings.push({
+        id: `macos-update-${line.latest.version}`,
         kind: "update",
         title: "Update your Mac",
-        detail: `macOS ${newest ?? "has an update"}${behind ? ` is out (you have ${v})` : ""}. Updates close holes attackers are using.`,
+        detail: `macOS ${line.latest.version} is out (you have ${v}).${fixes ? ` You're missing ${fixes} security fixes${exploited ? `, ${exploited} for holes already being used in attacks` : ""}.` : " It fixes security holes."}`,
         needsYou: true,
-        urgency: 45,
-        action: { kind: "open", label: "Open Software Update", url: settingsUrl.updates.darwin },
-        evidence: { version: v, newest, pending },
+        urgency: exploited ? 60 : 45,
+        action,
+        evidence: { version: v, latest: line.latest.version, missedReleases: missed.map((r) => r.version), fixes, exploited, pending },
       });
-    } else if (v) out.handled.push({ id: "os-updates", text: `macOS ${v} is up to date`, at: now() });
+    } else if (pending.length) {
+      // Up to date on macOS itself, but Software Update has something waiting (often Safari).
+      const names = pending.map((p) => p.replace(/\s+[\d.]+$/, ""));
+      const label = [...new Set(names)].join(" and ");
+      out.findings.push({
+        id: `mac-pending-${[...new Set(names)].join(",")}`,
+        kind: "update",
+        title: `Install the ${label} update`,
+        detail: `Software Update has a ${label} update waiting. Updates close holes attackers are using.`,
+        needsYou: true,
+        urgency: 35,
+        action,
+        evidence: { version: v, pending },
+      });
+    } else if (v && mac) out.handled.push({ id: "os-updates", text: `macOS ${v} is up to date`, at: now() });
   } else if (OS === "win32") {
     const r = await powershell("$s=New-Object -ComObject Microsoft.Update.Session; $q=$s.CreateUpdateSearcher(); $c=$q.GetTotalHistoryCount(); if($c -gt 0){ ($q.QueryHistory(0,1) | Select-Object -First 1).Date.ToString('o') }", 40_000);
     const last = Date.parse(r.stdout.trim());

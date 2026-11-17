@@ -87,7 +87,34 @@ export const startupItems = async (): Promise<InventoryItem[]> => {
             /* none */
           }
         }
-        out.push({ key: `startup:systemd-user:${unit}`, kind: "startup", name: unit, facts: { where: "systemd user service", command: text.match(/^ExecStart=(.*)$/m)?.[1] ?? "" } });
+        const field = (t: string, k: string) => t.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1]?.trim() ?? "";
+        // A timer only says when; what it runs is in its service unit.
+        let svc = text;
+        if (/\.(timer|socket|path)$/.test(unit)) {
+          const target = field(text, "Unit") || unit.replace(/\.(timer|socket|path)$/, ".service");
+          try {
+            svc = readFileSync(path.join(userUnits, target), "utf8");
+          } catch {
+            // System-provided units (PipeWire, etc.) live under /usr/lib/systemd/user.
+            try {
+              svc = readFileSync(path.join("/usr/lib/systemd/user", target), "utf8");
+            } catch {
+              svc = "";
+            }
+          }
+        }
+        out.push({
+          key: `startup:systemd-user:${unit}`,
+          kind: "startup",
+          name: unit,
+          facts: {
+            where: unit.endsWith(".timer") ? "systemd user timer (runs on a schedule)" : "systemd user service",
+            description: field(svc, "Description") || field(text, "Description"),
+            command: field(svc, "ExecStart"),
+            workingDirectory: field(svc, "WorkingDirectory"),
+            ...(unit.endsWith(".timer") ? { schedule: field(text, "OnCalendar") || field(text, "OnUnitActiveSec") } : {}),
+          },
+        });
       }
     }
     const cron = await run("crontab", ["-l"]);

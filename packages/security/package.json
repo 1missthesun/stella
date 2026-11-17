@@ -1,0 +1,22 @@
+{
+  "name": "@stella/security",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Stella Security: a small desktop app that keeps ordinary people safe online.",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "start": "bun scripts/build.ts && electron dist/main.cjs",
+    "scan": "bun src/cli.ts scan",
+    "typecheck": "tsc -p tsconfig.json --pretty false --noEmit"
+  },
+  "dependencies": {
+    "@stella/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "bun-types": "1.4.4",
+    "typescript": "npm:typescript@^7.0.2"
+  }
+}

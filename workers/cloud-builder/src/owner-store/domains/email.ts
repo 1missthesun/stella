@@ -1410,6 +1410,18 @@ const updatePage = async (ctx: OwnerContext, args: ToolArgs): Promise<string> =>
   };
   const before = readPage(ctx.db, ctx.now);
   const { page, problems, newlyUrgent } = applyEmailPageUpdate(before, update, ctx.now);
+  for (const item of page.items) {
+    const times = (item.threads ?? []).map(
+      (thread) =>
+        ctx.db.one<{ at: number | null }>(
+          "SELECT MAX(received_at) AS at FROM email_mail WHERE account = ? AND thread_id = ? AND direction = 'in'",
+          thread.account,
+          thread.thread,
+        )?.at ?? 0,
+    );
+    const newest = Math.max(0, ...times);
+    if (newest > 0) item.mailAt = newest;
+  }
   writePage(ctx, page);
   for (const item of newlyUrgent) {
     await pushUrgent(ctx, item).catch((error: unknown) => log("push_failed", { message: errorText(error) }));

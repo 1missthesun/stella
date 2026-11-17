@@ -45,6 +45,8 @@ export type EmailPageItem = {
   urgent?: boolean;
   /** When it last changed. */
   at: number;
+  /** When its newest email arrived (set from its threads by the backend). */
+  mailAt?: number;
 };
 
 export type EmailPageIgnored = {
@@ -96,7 +98,7 @@ const block = (value: unknown, max: number): string =>
   typeof value === "string" ? value.replace(/\r\n?/gu, "\n").replace(/[\u0000-\u0008\u000b-\u001f\u007f]+/gu, "").trim().slice(0, max) : "";
 
 /** One item of a `page` update: an id and the fields to set; null or "" clears an optional field. */
-export type EmailPageItemUpdate = { id: string } & Partial<Record<keyof Omit<EmailPageItem, "id" | "at">, unknown>>;
+export type EmailPageItemUpdate = { id: string } & Partial<Record<keyof Omit<EmailPageItem, "id" | "at" | "mailAt">, unknown>>;
 
 export type EmailPageUpdate = {
   items?: EmailPageItemUpdate[];
@@ -188,6 +190,7 @@ export const applyEmailPageUpdate = (
       ...(count ? { count } : {}),
       ...(threads ? { threads } : {}),
       ...(urgent ? { urgent: true } : {}),
+      ...(before?.mailAt ? { mailAt: before.mailAt } : {}),
       at: now,
     };
     if (urgent && !before?.urgent) newlyUrgent.push(item);
@@ -476,7 +479,7 @@ footer details[open] summary::after{content:" ⌄"}
     if (item.from) meta.push(item.from);
     if (item.count > 1) meta.push(item.count + " emails");
     if (view && view.accounts.length > 1 && item.threads && item.threads[0]) meta.push(item.threads[0].account);
-    if (item.at) meta.push(when(item.at));
+    if (item.mailAt) meta.push(when(item.mailAt));
     if (meta.length) box.appendChild(el("p", "meta", meta.join(" · ")));
     box.appendChild(el("p", "gist", item.gist));
 

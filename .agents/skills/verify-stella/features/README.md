@@ -16,7 +16,7 @@ The [desktop reference](../references/desktop.md) covers harness setup and diagn
 - [Ask cards and chat cards](./asks-and-chat-cards.md) covers question and secure-input cards, asks through the orchestrator, safety stops, and usage limits.
 - [Notifications](./notifications.md) covers the bell: what lands there, toasts, and actions.
 - [Schedule](./schedule.md) covers the Schedule tab, schedule cards (grouped), fired reminders, and where schedules run.
-- [Email and Today](./email.md) covers the Email tab, Today, sorting, limits, and the dev email account.
+- [Email](./email.md) covers the Email page Stella keeps, her reads and wakes, taps and rules, and the dev email account.
 - [Updates, drafts and Undo](./updates.md) covers the Update pill, the Updates tab, updates across computers, drafts, and Undo.
 - [Record screen](./record-screen.md) covers Show Stella recording on macOS.
 - [Files, viewers and Drive](./files-and-viewers.md) covers Files, Trash, the file viewer and its kinds, Drive files and their versions.

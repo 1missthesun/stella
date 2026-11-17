@@ -263,7 +263,7 @@ const Main = ({ view }: { view: View }) => {
     return (
       <div className="hero fade">
         <h1 className="headline">Checking your computer</h1>
-        <div className="sub">The first check takes a minute or two.</div>
+        <div className="sub">The first check takes a few minutes. After that, checks are quick.</div>
         <div style={{ height: 22 }} />
         <Steps progress={view.progress} email={Boolean(view.email?.connected)} />
         {view.error && <div className="error">{view.error}</div>}

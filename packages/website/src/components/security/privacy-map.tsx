@@ -4,14 +4,15 @@ import { useRef } from "react";
 import { useInViewOnce } from "@/components/landing/motion";
 import p from "./privacy-map.module.css";
 
-const STAYS = ["Browsing history", "Files", "Downloads", "Apps", "Extensions", "Settings"];
+const STAYS = ["Browsing history", "Files", "Saved passwords", "Sites you log in to", "Settings", "Everyday email"];
 
 const LEAVES = [
   { what: "Your email address", why: "to check it against known leaks" },
-  { what: "A short description of one suspicious item", why: "to ask about it" },
+  { what: "Names of new apps, extensions and downloads", why: "for a model to judge, once each" },
+  { what: "Suspicious-looking emails: sender, subject, a snippet", why: "only if you connect email" },
 ];
 
-/** What's checked on the computer and stays there, and the two things that leave. */
+/** What's checked on the computer and stays there, and the few things that leave. */
 export function PrivacyMap() {
   const ref = useRef<HTMLDivElement>(null);
   useInViewOnce(ref, 0.35);

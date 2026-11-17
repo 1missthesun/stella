@@ -34,7 +34,7 @@ export const SECURITY_FAQ: Answer[] = [
   },
   {
     q: "What leaves my computer?",
-    a: "Very little, and we say exactly what. The checks run on your own computer, and your browsing history and files never leave it. To look you up in known data leaks it sends your email address. When something looks suspicious, it sends a short description of that one item to ask about it. That's all.",
+    a: "Very little, and we say exactly what. The checks run on your own computer, and your browsing history and files never leave it. To look you up in known data leaks it sends your email address. When a new app, extension or download appears, it sends its name and where it came from so a model can judge it. If you connect email, it sends the sender, subject and a short snippet of messages that look suspicious. That's all, and it's listed in the app.",
   },
   {
     q: "Do I need to connect anything?",
@@ -78,8 +78,9 @@ fake email to spam, open the right page to change a leaked password.
 
 ## Privacy
 The scanning runs on your own computer. Your browsing history and files never
-leave it. What does leave: your email address, for the leak check, and the
-short description of a suspicious item it asks about.
+leave it. What does leave: your email address, for the leak check; the names
+of new apps, extensions and downloads, for a model to judge; and, if you
+connect email, the sender, subject and a snippet of suspicious messages.
 
 ## Price
 ${SECURITY_PRICE_LINE}. Sign in with your Stella account.

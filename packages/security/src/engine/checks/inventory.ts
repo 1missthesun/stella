@@ -47,9 +47,8 @@ export const startupItems = async (): Promise<InventoryItem[]> => {
         out.push({ key: `startup:${file}`, kind: "startup", name: plistField(text, "Label") ?? f, facts: { where: dir, file, program, args, runAtLoad: plistField(text, "RunAtLoad") === "true" } });
       }
     }
-    // Login Items (the visible list in System Settings)
-    const li = await run("osascript", ["-e", 'tell application "System Events" to get the name of every login item'], 8000);
-    for (const name of li.stdout.split(",").map((s) => s.trim()).filter(Boolean)) out.push({ key: `startup:loginitem:${name}`, kind: "startup", name, facts: { where: "Login Items" } });
+    // The visible Login Items list needs an Automation permission prompt (System Events), so it's
+    // left out; LaunchAgents/Daemons above are where unwanted things actually hide.
   } else if (OS === "win32") {
     const r = await powershell(
       `$o=@(); foreach($k in 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run','HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run','HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'){ $p=Get-ItemProperty $k -ErrorAction SilentlyContinue; if($p){ $p.PSObject.Properties | ?{ $_.Name -notlike 'PS*' } | %{ $o+=[pscustomobject]@{where=$k;name=$_.Name;command=[string]$_.Value} } } };

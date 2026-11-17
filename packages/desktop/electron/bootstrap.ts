@@ -32,6 +32,7 @@ import {
   resolveDevHarnessOptions,
 } from "./bootstrap/dev-harness-options.js";
 import { connectLauncher } from "./launcher-client.js";
+import { startLinuxRealtimeLimitCheck } from "./linux-realtime-limit.js";
 import { applyDesktopIdentityEnv } from "./source/env.js";
 import { applySelfHostedServerEnv } from "./services/self-host-service.js";
 import { resolveRendererBuildMode } from "./source/renderer-protocol.js";
@@ -109,6 +110,9 @@ export const bootstrapMainProcess = () => {
   connectLauncher();
   initMainProcessLogging(stellaAppDir);
   installBrokenPipeGuards();
+  // Linux: log the real-time CPU limit Stella runs under and keep PipeWire in
+  // this process from setting it to 0 (see linux-realtime-limit.ts).
+  startLinuxRealtimeLimitCheck();
   // Windows-only: keep DWM from putting Stella on MPO hardware overlay
   // planes (whole-monitor flicker on NVIDIA + high-refresh setups). Must run
   // before `ready` so the switch reaches the GPU process. No-op on macOS.

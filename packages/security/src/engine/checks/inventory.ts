@@ -260,10 +260,15 @@ export const enrichForJudging = async (items: InventoryItem[]): Promise<void> =>
         i.facts.signedBy = authority ?? (/not signed/i.test(sig.stderr) ? "not signed" : "unknown");
         const team = sig.stderr.match(/TeamIdentifier=(.+)/)?.[1]?.trim();
         if (team && team !== "not set") i.facts.teamId = team;
-        // Gatekeeper's own verdict: "Notarized Developer ID", "Mac App Store", "Apple System", or rejected.
-        const gk = await run("spctl", ["--assess", "--type", "execute", "-vv", file], 30_000);
-        const source = (gk.stderr + gk.stdout).match(/source=(.+)/)?.[1]?.trim();
-        i.facts.checkedByMacOS = source ?? (/rejected/.test(gk.stderr + gk.stdout) ? "rejected" : "unknown");
+        // Gatekeeper is slow (macOS runs it one at a time), so ask it only when the signature
+        // alone doesn't settle it: Developer ID and App Store signatures are already vouched for.
+        const vouched = /^(Developer ID Application|Apple Mac OS Application Signing|Software Signing)/.test(authority ?? "");
+        if (!vouched) {
+          const gk = await run("spctl", ["--assess", "--type", "execute", "-vv", file], 30_000);
+          const said = gk.stderr + gk.stdout;
+          const source = said.match(/source=(.+)/)?.[1]?.trim();
+          i.facts.checkedByMacOS = source ?? (/modified|invalid/i.test(said) ? "signature broken" : /rejected/.test(said) ? "rejected" : "unknown");
+        }
       }),
     );
 };

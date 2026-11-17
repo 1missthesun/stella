@@ -3040,6 +3040,7 @@
         "copied": "Copiado",
         "copy": "Copiar",
         "copyFailed": "Não foi possível copiar",
+        "copyManually": "Não foi possível copiar. Selecione e copie.",
         "delete": "Excluir",
         "deleteConfirm": "Clique de novo para excluir",
         "expand": "Expandir",

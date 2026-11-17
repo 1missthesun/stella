@@ -3027,6 +3027,7 @@
         "copied": "Kopierat",
         "copy": "Kopiera",
         "copyFailed": "Det gick inte att kopiera",
+        "copyManually": "Det gick inte att kopiera. Markera detta och kopiera det.",
         "delete": "Radera",
         "deleteConfirm": "Klicka igen för att radera",
         "expand": "Förstora",

@@ -334,6 +334,7 @@ import {
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
   IPC_LOCAL_CHAT_UPDATED,
   IPC_MEDIA_COPY_ATTACHMENT,
+  IPC_CLIPBOARD_WRITE_TEXT,
   IPC_MEDIA_COPY_IMAGE,
   IPC_MEDIA_SAVE_OUTPUT,
   IPC_MEETINGS_OPEN_FOLDER,
@@ -1469,6 +1470,7 @@ export type IpcInvokeContract = {
     [payload: { pngBase64: string }],
     OkErrorResult
   >;
+  [IPC_CLIPBOARD_WRITE_TEXT]: Invoke<[payload: { text: string }], OkErrorResult>;
   [IPC_MEDIA_COPY_ATTACHMENT]: Invoke<
     [
       payload: {

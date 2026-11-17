@@ -19,6 +19,7 @@ import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { useOptionalUiState } from "@/context/ui-state";
 import type { FileEntry } from "@/features/workspace-display/files-index";
 import { copyImageBlob } from "@/shell/media-clipboard";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import {
   ViewerItemContext,
   useRegisterViewerActions,
@@ -61,7 +62,11 @@ const useViewerMediaActions = (item: MediaTabItem, onDelete: () => void) => {
       : text !== null
         ? {
             copyLabel: "Copy text",
-            copy: () => navigator.clipboard.writeText(text),
+            copy: async () => {
+              if (!(await copyTextToClipboard(text))) {
+                throw new Error("Couldn't copy");
+              }
+            },
           }
         : {}),
     remove: onDelete,

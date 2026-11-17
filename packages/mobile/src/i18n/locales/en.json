@@ -3027,6 +3027,7 @@
         "copied": "Copied",
         "copy": "Copy",
         "copyFailed": "Could not copy",
+        "copyManually": "Couldn't copy. Select this and copy it.",
         "delete": "Delete",
         "deleteConfirm": "Click again to delete",
         "expand": "Expand",

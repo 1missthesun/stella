@@ -4,6 +4,7 @@ import "./dialog.css";
 import "./dropdown-menu.css";
 import "./image-lightbox.css";
 import "./keybind.css";
+import "./manual-copy-field.css";
 import "./pill.css";
 import "./select.css";
 import "./popover.css";

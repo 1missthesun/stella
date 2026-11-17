@@ -3027,6 +3027,7 @@
         "copied": "Kopyalandı",
         "copy": "Kopyala",
         "copyFailed": "Kopyalanamadı",
+        "copyManually": "Kopyalanamadı. Bunu seçip kopyalayın.",
         "delete": "Sil",
         "deleteConfirm": "Silmek için tekrar tıklayın",
         "expand": "Genişlet",

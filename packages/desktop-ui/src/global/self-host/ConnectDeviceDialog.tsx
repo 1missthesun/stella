@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { Button } from "@/ui/button";
 import { Copy } from "@/ui/icons";
 import {
@@ -94,13 +95,9 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
   }, [expiresAt, pairingId]);
 
   const copyLink = useCallback(async (link: string) => {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1_500);
-    } catch {
-      setCopied(false);
-    }
+    const ok = await copyTextToClipboard(link);
+    setCopied(ok);
+    if (ok) window.setTimeout(() => setCopied(false), 1_500);
   }, []);
 
   return (

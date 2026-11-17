@@ -3053,6 +3053,7 @@
         "copied": "Zkopírováno",
         "copy": "Kopírovat",
         "copyFailed": "Nepodařilo se zkopírovat",
+        "copyManually": "Kopírování se nezdařilo. Označte toto a zkopírujte.",
         "delete": "Smazat",
         "deleteConfirm": "Klikněte znovu pro smazání",
         "expand": "Rozbalit",

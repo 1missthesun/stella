@@ -3027,6 +3027,7 @@
         "copied": "Kopieret",
         "copy": "Kopiér",
         "copyFailed": "Kunne ikke kopiere",
+        "copyManually": "Kunne ikke kopiere. Markér dette, og kopiér det.",
         "delete": "Slet",
         "deleteConfirm": "Klik igen for at slette",
         "expand": "Udvid",

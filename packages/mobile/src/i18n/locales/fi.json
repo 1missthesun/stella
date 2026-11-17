@@ -3027,6 +3027,7 @@
         "copied": "Kopioitu",
         "copy": "Kopioi",
         "copyFailed": "Ei voitu kopioida",
+        "copyManually": "Kopiointi ei onnistunut. Valitse tämä ja kopioi se.",
         "delete": "Poista",
         "deleteConfirm": "Napsauta uudelleen poistaaksesi",
         "expand": "Laajenna",

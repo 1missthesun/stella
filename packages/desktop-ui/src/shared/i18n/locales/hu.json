@@ -3027,6 +3027,7 @@
         "copied": "Másolva",
         "copy": "Másolás",
         "copyFailed": "Nem sikerült másolni",
+        "copyManually": "Nem sikerült másolni. Jelöld ki, és másold ki.",
         "delete": "Törlés",
         "deleteConfirm": "Kattints újra a törléshez",
         "expand": "Kibontás",

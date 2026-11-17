@@ -48,7 +48,13 @@ import {
 import type { DisplayTab } from "@/features/workspace-display/types";
 import { DeferredDisplayContent } from "@/shell/sidebar-sections/DeferredDisplayContent";
 import { SidebarSectionBody } from "@/shell/sidebar-sections/SidebarSectionBody";
-import { publicFileLink } from "@/features/cloud/file-share-link";
+import {
+  publicDriveLink,
+  publicFileLink,
+} from "@/features/cloud/file-share-link";
+import { driveLinkTarget } from "@stella/contracts/cloud-world-paths";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
+import { ManualCopyField } from "@/ui/manual-copy-field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -389,15 +395,20 @@ function ViewerHeader({
   /** Set to the right-click menu for what's open. */
   menuRef: { current: MenuBuilder | null };
 }) {
-  const path = payloadPath(item.payload);
-  const filePath = localFilePath(item.payload);
+  // A Drive file's payload carries a stand-in path ("/folder/name"); what
+  // names it is its Drive path.
+  const drivePath = item.payload?.cloudDrivePath ?? null;
+  const path = drivePath ?? payloadPath(item.payload);
+  const filePath = drivePath ? null : localFilePath(item.payload);
   const attachment = useViewerChatAttachment(item);
   const [status, setStatus] = useState<string | null>(null);
+  const [manualLink, setManualLink] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
     setStatus(null);
+    setManualLink(null);
     setArmed(false);
   }, [item.id]);
 
@@ -419,24 +430,33 @@ function ViewerHeader({
     setStatus(result.ok ? "Saved" : (result.error ?? "Couldn't save"));
   }, [filePath]);
 
-  const share = useCallback(async () => {
-    if (!filePath || sharing) return;
+  const canShare = Boolean(drivePath || filePath);
+  // Not async: the copy has to start inside the click (see clipboard.ts).
+  const share = useCallback(() => {
+    if (sharing) return;
+    const link = drivePath
+      ? publicDriveLink(drivePath)
+      : filePath
+        ? publicFileLink(filePath, null).catch(async () =>
+            publicFileLink(filePath, await readFileBlob(filePath)),
+          )
+        : null;
+    if (!link) return;
     setSharing(true);
-    try {
-      let url: string;
+    setManualLink(null);
+    const copied = copyTextToClipboard(link);
+    void (async () => {
       try {
-        url = await publicFileLink(filePath, null);
-      } catch {
-        url = await publicFileLink(filePath, await readFileBlob(filePath));
+        const url = await link;
+        if (await copied) setStatus("Public link copied");
+        else setManualLink(url);
+      } catch (err) {
+        setStatus(errorText(err, "Couldn't share"));
+      } finally {
+        setSharing(false);
       }
-      await navigator.clipboard.writeText(url);
-      setStatus("Public link copied");
-    } catch (err) {
-      setStatus(errorText(err, "Couldn't share"));
-    } finally {
-      setSharing(false);
-    }
-  }, [filePath, sharing]);
+    })();
+  }, [drivePath, filePath, sharing]);
 
   const copyBody = useCallback(async () => {
     if (!actions?.copy) return;
@@ -450,13 +470,13 @@ function ViewerHeader({
 
   const copyPath = useCallback(async () => {
     if (!path) return;
-    try {
-      await navigator.clipboard.writeText(path);
-      setStatus("Path copied");
-    } catch (err) {
-      setStatus(errorText(err, "Couldn't copy"));
+    setManualLink(null);
+    if (await copyTextToClipboard(path)) {
+      setStatus(item.payload?.kind === "url" ? "Link copied" : "Path copied");
+    } else {
+      setManualLink(path);
     }
-  }, [path]);
+  }, [item.payload?.kind, path]);
 
   const remove = actions?.remove;
   const hasMenu = Boolean(actions?.copy || path || remove);
@@ -475,9 +495,9 @@ function ViewerHeader({
     }
     if (item.payload?.kind === "url" && path) {
       sections.push(linkMenu(path).slice(1));
-    } else if (filePath) {
+    } else if (filePath || drivePath) {
       sections.push(
-        ...(await fileMenu(filePath, {
+        ...(await fileMenu(drivePath ? driveLinkTarget(drivePath) : filePath!, {
           addToChat: attachment
             ? {
                 label: attachment.added
@@ -525,7 +545,13 @@ function ViewerHeader({
       >
         {item.title}
       </span>
-      {status ? (
+      {manualLink ? (
+        <ManualCopyField
+          className="file-viewer__manual-copy"
+          value={manualLink}
+          label="Couldn't copy. Select this and copy it."
+        />
+      ) : status ? (
         <span className="file-viewer__status" role="status">
           {status}
         </span>
@@ -556,10 +582,10 @@ function ViewerHeader({
             <Download size={15} strokeWidth={1.75} />
           </HeaderButton>
         ) : null}
-        {filePath ? (
+        {canShare ? (
           <HeaderButton
             label="Share · copy a public link anyone can open"
-            onClick={() => void share()}
+            onClick={share}
             disabled={sharing}
           >
             {sharing ? (

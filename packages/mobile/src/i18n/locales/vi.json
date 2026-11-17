@@ -3012,6 +3012,7 @@
         "copied": "Đã sao chép",
         "copy": "Sao chép",
         "copyFailed": "Không thể sao chép",
+        "copyManually": "Không sao chép được. Hãy chọn và sao chép.",
         "delete": "Xóa",
         "deleteConfirm": "Nhấp lần nữa để xóa",
         "expand": "Mở rộng",

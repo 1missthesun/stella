@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { execFile } from "node:child_process";
-import { promises as fs, realpathSync, statSync } from "node:fs";
+import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -8,7 +8,7 @@ import {
   claudeProjectSlot,
   isClaudeSessionFilePath,
 } from "@stella/contracts/backend/claude-sessions";
-import { findExternalCliPath } from "./external-cli-resolution.js";
+import { selectClaudeCli, type ClaudeCliLaunch } from "./claude-cli-launch.js";
 
 const MAX_SIDECAR_DEPTH = 4;
 const REPLY_HASH_LIMIT = 400;
@@ -84,49 +84,30 @@ export const listClaudeSessionFiles = async (
   ];
 };
 
-/**
- * Which `claude` binary a new process would run right now. An update replaces
- * the launcher's target (native installs) or the file itself (npm, package
- * managers), so anything learned from the binary is keyed by this.
- */
-const identityOf = (executable: string): string | null => {
-  try {
-    const realPath = realpathSync(executable);
-    const stat = statSync(realPath);
-    return `${realPath}:${stat.mtimeMs}:${stat.size}`;
-  } catch {
-    return null;
-  }
-};
+type SelectedCli = Pick<ClaudeCliLaunch, "executable" | "identity" | "version">;
 
-export const claudeCliIdentity = (): string | null => {
-  const executable = findExternalCliPath("claude");
-  return executable ? identityOf(executable) : null;
-};
+/**
+ * The Claude Code a new process would run right now (checked to start; see
+ * claude-cli-launch.ts), without repairing anything. An update changes its
+ * identity, so anything learned from the binary is keyed by it.
+ */
+const selectedCli = async (): Promise<SelectedCli | null> =>
+  await selectClaudeCli({ repair: "none" }).catch(() => null);
 
 const perCliBinary = <T>(read: (executable: string) => Promise<T>, missing: T) => {
   let cached: { identity: string; value: Promise<T> } | null = null;
-  return (): Promise<T> => {
-    const executable = findExternalCliPath("claude");
-    const identity = executable ? identityOf(executable) : null;
-    if (!executable || !identity) return Promise.resolve(missing);
-    if (cached?.identity !== identity) {
-      cached = { identity, value: read(executable) };
+  return async (given?: SelectedCli | null): Promise<T> => {
+    const selected = given ?? (await selectedCli());
+    if (!selected) return missing;
+    if (cached?.identity !== selected.identity) {
+      cached = { identity: selected.identity, value: read(selected.executable) };
     }
-    return cached.value;
+    return await cached.value;
   };
 };
 
-export const claudeCliVersion = perCliBinary<string>(
-  (executable) =>
-    new Promise((resolve) => {
-      execFile(executable, ["--version"], { timeout: 15_000 }, (error, stdout) => {
-        const match = /\d+\.\d+\.\d+/.exec(String(stdout ?? ""));
-        resolve(!error && match ? match[0] : "unknown");
-      });
-    }),
-  "unknown",
-);
+export const claudeCliVersion = async (given?: SelectedCli | null): Promise<string> =>
+  (given ?? (await selectedCli()))?.version ?? "unknown";
 
 const claudeCliHelp = perCliBinary<string>(
   (executable) =>
@@ -141,8 +122,10 @@ const claudeCliHelp = perCliBinary<string>(
   "",
 );
 
-export const claudeCliHasOption = async (option: string): Promise<boolean> =>
-  (await claudeCliHelp()).split(/[\s,]+/).includes(option);
+export const claudeCliHasOption = async (
+  option: string,
+  given?: SelectedCli | null,
+): Promise<boolean> => (await claudeCliHelp(given)).split(/[\s,]+/).includes(option);
 
 export const compareClaudeCliVersions = (left: string, right: string): number => {
   const parse = (value: string) =>
@@ -157,8 +140,10 @@ export const compareClaudeCliVersions = (left: string, right: string): number =>
 };
 
 /** `--resume-session-at` is a print-mode option Claude Code leaves out of `--help`; 2.1.296 is the oldest seen with it. */
-export const claudeCliResumesAtMessage = async (): Promise<boolean> => {
-  const version = await claudeCliVersion();
+export const claudeCliResumesAtMessage = async (
+  given?: SelectedCli | null,
+): Promise<boolean> => {
+  const version = await claudeCliVersion(given);
   return version !== "unknown" && compareClaudeCliVersions(version, "2.1.296") >= 0;
 };
 

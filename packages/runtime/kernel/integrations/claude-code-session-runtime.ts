@@ -35,10 +35,13 @@ import {
   recordClaudeCodeContextWindows,
   recordClaudeCodeResolvedModel,
 } from "./claude-code-resolved-models.js";
+import { buildExternalCliChildEnv } from "./external-cli-resolution.js";
 import {
-  buildExternalCliChildEnv,
-  resolveExternalCliPath,
-} from "./external-cli-resolution.js";
+  CLAUDE_CLI_UNUSABLE_CODE,
+  noteClaudeCliLaunchFailed,
+  selectClaudeCli,
+  type ClaudeCliLaunch,
+} from "./claude-cli-launch.js";
 import {
   createClaudeCodeToolMcpHost,
   type ClaudeCodeToolControlChannel,
@@ -52,7 +55,6 @@ import {
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 import {
   claudeCliHasOption,
-  claudeCliIdentity,
   claudeCliResumesAtMessage,
   claudeSessionProjectDir,
   resolveClaudeWorkingFolder,
@@ -255,6 +257,10 @@ type ClaudeCodeProcessState = {
   launchConfig: string;
   cliIdentity: string | null;
   claudeConfigDir: string | null;
+  /** The program this process runs. */
+  executable?: string;
+  /** Whether it has printed anything on stdout: one that exits without printing never started. */
+  printed?: boolean;
   /** The newest transcript entry (a prompt, tool result or reply) this process streamed. */
   lastEntryUuid?: string;
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
@@ -485,6 +491,7 @@ const activeMcpTurnFor = (
 };
 const CLAUDE_CODE_COMPACTING_TEXT = "Compacting context";
 const CLAUDE_CODE_RUNNING_TEXT = "Working";
+const CLAUDE_CLI_REPAIRING_TEXT = "Repairing Claude Code on this computer";
 /**
  * Loop breaker for Claude Code's own auto-compaction. A healthy turn compacts
  * at most once; repeated compactions within one Stella turn mean the session
@@ -545,17 +552,29 @@ export class ClaudeCodeProcessEndedError extends Error {
   exitCode: number | null;
 
   mcpCalls: McpCallRecord[];
+  /** The program it ran, when it ended before printing anything (it never started). */
+  beforeStart?: string;
   constructor(
     message: string,
     exitCode: number | null = null,
     mcpCalls: McpCallRecord[] = [],
+    beforeStart?: string,
   ) {
     super(message);
     this.name = "ClaudeCodeProcessEndedError";
     this.exitCode = exitCode;
     this.mcpCalls = mcpCalls;
+    if (beforeStart) this.beforeStart = beforeStart;
   }
 }
+/** What a Claude Code process that never started says: the program and what it printed. */
+const launchFailureText = (
+  executable: string,
+  code: number | null | string,
+  stderr: string,
+): string =>
+  `Claude Code (${executable}) exited with code ${code ?? "unknown"} before it started` +
+  (stderr.trim() ? `: ${stderr.trim()}` : ", without printing anything.");
 /**
  * The step completed but its `result` payload contained no final text.
  */
@@ -760,10 +779,18 @@ const withClaudeLoginRejected = (error: unknown, email: string | undefined) => {
   failure.status = 401;
   return failure;
 };
-const withStepRecoveryExhausted = (error: unknown) =>
-  new Error(
-    `${normalizeErrorMessage(error)} Stella retried ${MAX_STEP_RECOVERIES_PER_TURN} time(s) but Claude Code kept ending the step without a usable result. Try the request again; if it keeps failing, check that \`claude --version\` runs on this computer.`,
+const withStepRecoveryExhausted = (error: unknown) => {
+  const program =
+    error instanceof ClaudeCodeProcessEndedError ? error.beforeStart : undefined;
+  const failure: ClaudeCodeError = new Error(
+    program
+      ? `${normalizeErrorMessage(error)} Stella started it ${MAX_STEP_RECOVERIES_PER_TURN + 1} times and it ended before starting each time. Check that \`${program} --version\` runs in a terminal on this computer, or reinstall Claude Code.`
+      : `${normalizeErrorMessage(error)} Stella retried ${MAX_STEP_RECOVERIES_PER_TURN} time(s) but Claude Code kept ending the step without a usable result. Try the request again; if it keeps failing, check that \`claude --version\` runs on this computer.`,
   );
+  // It never started: the engine says so as Claude Code that can't start.
+  if (program) failure.code = CLAUDE_CLI_UNUSABLE_CODE;
+  return failure;
+};
 const describeClaudeUsageLimit = (limit: ClaudeUsageLimit) =>
   limit.monthly
     ? "Claude's monthly spend limit is reached for this account."
@@ -2326,6 +2353,8 @@ class ClaudeCodeSessionRuntime {
     // Holds in this step so far: each one waits longer before trying a
     // refused login again.
     let loginHolds = 0;
+    // A Claude Code that can't start says so before any sign-in wait.
+    if (!session.process || session.process.closed) await this.selectCli(request);
     await this.awaitClaudeLogin(request);
 
     for (;;) {
@@ -2482,6 +2511,23 @@ class ClaudeCodeSessionRuntime {
         currentPromptImages = [];
       }
     }
+  }
+  /**
+   * The Claude Code this turn runs: checked to start, else the last one that
+   * did while the install is repaired, else (with nothing to run) after the
+   * repair, else a `ClaudeCliUnusableError` saying what is wrong.
+   */
+  async selectCli(request: ClaudeCodeTurnRequest): Promise<ClaudeCliLaunch> {
+    let announced = false;
+    return await selectClaudeCli({
+      repair: "wait",
+      ...(request.abortSignal ? { signal: request.abortSignal } : {}),
+      onRepairing: () => {
+        if (announced) return;
+        announced = true;
+        request.onStatusChange?.({ state: "running", text: CLAUDE_CLI_REPAIRING_TEXT });
+      },
+    });
   }
   /**
    * Returns once a Claude login here can answer. When none can, a turn that
@@ -2970,7 +3016,21 @@ class ClaudeCodeSessionRuntime {
     );
     const claudeConfig = await getClaudeCodeConfig();
     const claudeConfigDir = claudeConfig.configDir ?? null;
-    const cliIdentity = claudeCliIdentity();
+    // Only a Claude Code that has shown it starts (or the last one that did).
+    // A live process can carry on while a broken install is repaired; only a
+    // new start waits for the repair.
+    const live =
+      session.process !== undefined &&
+      !session.process.closed &&
+      !session.process.child.killed &&
+      !processIsDead(session.process.child);
+    const asError = (error: unknown) =>
+      error instanceof Error ? error : new Error(String(error));
+    let selected: ClaudeCliLaunch | Error = await (live
+      ? selectClaudeCli({ repair: "background" })
+      : this.selectCli(request)
+    ).catch(asError);
+    const cliIdentity = selected instanceof Error ? null : selected.identity;
     if (
       session.process &&
       !session.process.closed &&
@@ -2988,6 +3048,8 @@ class ClaudeCodeSessionRuntime {
         session.process.claudeConfigDir === claudeConfigDir &&
         (cliIdentity === null ||
           session.process.cliIdentity === cliIdentity ||
+          // Running on a stand-in: the live process works, keep it.
+          (!(selected instanceof Error) && selected.fallback !== undefined) ||
           (session.backgroundTasks ?? 0) > 0 ||
           session.process.adrift !== undefined)
       ) {
@@ -3001,7 +3063,11 @@ class ClaudeCodeSessionRuntime {
       }
       this.resetStreamingProcess(request.sessionKey, session);
     }
-    const executablePath = resolveExternalCliPath("claude");
+    if (selected instanceof Error && live) {
+      selected = await this.selectCli(request).catch(asError);
+    }
+    if (selected instanceof Error) throw selected;
+    const executablePath = selected.executable;
     const effortLevel = request.effortLevel?.trim();
     const childEnv = buildExternalCliChildEnv(
       executablePath,
@@ -3044,9 +3110,10 @@ class ClaudeCodeSessionRuntime {
     }
     const cliHasSystemPromptSnapshot = await claudeCliHasOption(
       "--system-prompt-snapshot",
+      selected,
     );
     const resumeAt =
-      useResume && session.resumeAtNextSpawn && (await claudeCliResumesAtMessage())
+      useResume && session.resumeAtNextSpawn && (await claudeCliResumesAtMessage(selected))
         ? session.resumeAtNextSpawn
         : undefined;
     session.resumeAtNextSpawn = undefined;
@@ -3089,6 +3156,8 @@ class ClaudeCodeSessionRuntime {
       launchConfig,
       claudeConfigDir,
       cliIdentity,
+      executable: executablePath,
+      printed: false,
     };
     if (mcpHost) {
       const channel = mcpHost.openControlChannel((line) => {
@@ -3385,6 +3454,7 @@ class ClaudeCodeSessionRuntime {
       }
     };
     child.stdout.on("data", (chunk) => {
+      processState.printed = true;
       processState.stdoutBuffer += processState.stdoutDecoder.write(chunk);
       refreshPendingIdleTimers(true);
       consumeStdout(false);
@@ -3402,8 +3472,10 @@ class ClaudeCodeSessionRuntime {
     });
     child.once("error", (error) => {
       const wrapped = new Error(
-        `Failed to start Claude Code: ${normalizeErrorMessage(error)}`,
+        `Failed to start Claude Code (${executablePath}): ${normalizeErrorMessage(error)}`,
       );
+      // Look at the binary again before the next start.
+      if (!processState.printed) noteClaudeCliLaunchFailed(executablePath);
       processState.closed = true;
       processState.toolChannel?.close();
       const ownsSessionProcess = session.process === processState;
@@ -3423,6 +3495,7 @@ class ClaudeCodeSessionRuntime {
             wrapped.message,
             null,
             pending.mcpCalls,
+            processState.printed ? undefined : executablePath,
           ),
         );
       }
@@ -3457,15 +3530,26 @@ class ClaudeCodeSessionRuntime {
       if (this.activeProcesses.get(request.sessionKey) === child) {
         this.activeProcesses.delete(request.sessionKey);
       }
-      const message =
-        processState.stderrText.trim() ||
-        `Claude Code exited with code ${code ?? "unknown"} before returning a result.`;
+      // Ended before printing anything: it never started. Say which program
+      // and look at it again before the next start (the retry then runs the
+      // last working one if this one no longer answers).
+      const neverStarted = !processState.printed && !processState.pending.some((pending) => pending.request.abortSignal?.aborted);
+      if (neverStarted) noteClaudeCliLaunchFailed(executablePath);
+      const message = neverStarted
+        ? launchFailureText(executablePath, code, processState.stderrText)
+        : processState.stderrText.trim() ||
+          `Claude Code exited with code ${code ?? "unknown"} before returning a result.`;
       for (const pending of processState.pending.splice(0)) {
         this.detachAbortListener(pending);
         pending.reject(
           pending.request.abortSignal?.aborted
             ? new Error("Claude Code run aborted.")
-            : new ClaudeCodeProcessEndedError(message, code, pending.mcpCalls),
+            : new ClaudeCodeProcessEndedError(
+                message,
+                code,
+                pending.mcpCalls,
+                neverStarted ? executablePath : undefined,
+              ),
         );
       }
     });
@@ -3485,10 +3569,15 @@ class ClaudeCodeSessionRuntime {
     const exited = Deferred.makeUnsafe<void>();
     const onExit = () => {
       if (exitError) return;
+      const program = processState.printed ? undefined : processState.executable;
       exitError = new ClaudeCodeProcessEndedError(
-        processState.stderrText.trim() ||
-          `Claude Code exited with code ${child.exitCode ?? "unknown"} before it loaded Stella's tools.`,
+        program
+          ? launchFailureText(program, child.exitCode, processState.stderrText)
+          : processState.stderrText.trim() ||
+              `Claude Code exited with code ${child.exitCode ?? "unknown"} before it loaded Stella's tools.`,
         child.exitCode,
+        [],
+        program,
       );
       Deferred.doneUnsafe(exited, Effect.void);
     };

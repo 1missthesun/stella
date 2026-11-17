@@ -1585,8 +1585,10 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         phase: terminalPhase,
         lane: "chat",
         source: "desktop",
+        // The one line that says why a turn failed: room for an engine's own
+        // error and what to do about it (a Claude Code that can't start).
         ...(body.notice?.trim()
-          ? { notice: body.notice.trim().slice(0, 500) }
+          ? { notice: body.notice.trim().slice(0, 2_000) }
           : {}),
         ...(safeguard ? { safeguard } : {}),
         createdAt: terminalAt,

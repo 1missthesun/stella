@@ -392,6 +392,53 @@ export const findExternalCliPath = (
   }
 };
 
+const entryExists = (candidate: string): boolean => {
+  try {
+    fs.lstatSync(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * When no runnable CLI is found: the first place one is installed but can't
+ * be run (a file without its execute bit, a link to a file that's gone), in
+ * the order `resolveExternalCliPath` looks. An install cut off midway leaves
+ * that; an uninstall leaves nothing.
+ */
+export const findUnrunnableExternalCliPath = (
+  cli: ExternalCli,
+  options: ResolveExternalCliOptions = {},
+): string | null => {
+  const env = options.env ?? process.env;
+  const cwd = path.resolve(options.cwd ?? process.cwd());
+  const homeDir = resolveHomeDir(env, options.homeDir);
+  const config = CLI_CONFIG[cli];
+  for (const envName of config.overrideEnvNames) {
+    const configuredPath = env[envName]?.trim();
+    if (!configuredPath) continue;
+    const expanded = expandConfiguredPath(configuredPath, homeDir, cwd);
+    return executableCandidates(expanded, env, { exactName: true }).find(entryExists) ?? null;
+  }
+  const directories = [
+    ...pathValue(env)
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((entry) => (path.isAbsolute(entry) ? entry : path.resolve(cwd, entry))),
+    ...(options.wellKnownDirectories
+      ? options.wellKnownDirectories.map((directory) => path.resolve(directory))
+      : defaultWellKnownDirectories(cli, env, homeDir)),
+  ];
+  for (const directory of directories) {
+    const found = executableCandidates(path.join(directory, cli), env, {
+      exactName: false,
+    }).find((candidate) => entryExists(candidate) && !isExecutableFile(candidate));
+    if (found) return path.resolve(found);
+  }
+  return null;
+};
+
 export const buildExternalCliChildEnv = (
   executablePath: string,
   env: NodeJS.ProcessEnv = process.env,

@@ -12,6 +12,8 @@ const STATE_FILE = "claude-cli-updates.json";
 const CHECK_INTERVAL_MS = 12 * 60 * 60_000;
 const RETRY_INTERVAL_MS = 60 * 60_000;
 const NOT_INSTALLED_INTERVAL_MS = 15 * 60_000;
+/** An install that can't start is looked at (and its repair tried) again soon. */
+const UNUSABLE_INTERVAL_MS = 30 * 60_000;
 const AFTER_START_MS = 90_000;
 const RESTART_QUIET_MS = 10 * 60_000;
 const DUE_POLL_MS = 15 * 60_000;
@@ -27,16 +29,20 @@ type UpdaterState = {
 const intervalAfter = (status: UpdaterState["status"]): number =>
   status === "failed"
     ? RETRY_INTERVAL_MS
-    : status === "not_installed"
-      ? NOT_INSTALLED_INTERVAL_MS
-      : CHECK_INTERVAL_MS;
+    : status === "unusable"
+      ? UNUSABLE_INTERVAL_MS
+      : status === "not_installed"
+        ? NOT_INSTALLED_INTERVAL_MS
+        : CHECK_INTERVAL_MS;
 
 /**
- * Keeps the Claude Code CLI current for someone who never opens it in a
- * terminal, where it would update itself: Stella only ever runs it
+ * Keeps the Claude Code CLI current and working for someone who never opens
+ * it in a terminal, where it would update itself: Stella only ever runs it
  * non-interactively. Checks shortly after Stella starts and then twice a day,
- * silently. A session moves to an installed update at the start of its next
- * turn (`ensureStreamingProcess` in the runtime).
+ * silently. An install that can't start is repaired rather than updated, and
+ * a new version is checked to start before any turn runs it; until it does,
+ * turns run the last one that did (`claude-cli-launch.ts`). A session moves
+ * to a new version at the start of its next turn (`ensureStreamingProcess`).
  */
 export class ClaudeCliUpdater {
   private readonly statePath: string;
@@ -103,7 +109,7 @@ export class ClaudeCliUpdater {
     this.running = true;
     let outcome: ClaudeCliUpdateOutcome;
     try {
-      outcome = await updateClaudeCli({ signal: this.abort.signal });
+      outcome = await updateClaudeCli();
     } catch (error) {
       outcome = {
         status: "failed",
@@ -127,6 +133,17 @@ export class ClaudeCliUpdater {
     const logger = getFileLogger();
     if (outcome.status === "failed") {
       logger?.warn("claude-cli.update-failed", { ...outcome });
+    } else if (outcome.status === "unusable") {
+      logger?.warn("claude-cli.unusable", {
+        problem: outcome.problem,
+        method: outcome.method,
+        repair: outcome.repair.status,
+        ...(outcome.repair.status === "failed" ? { repairOutput: outcome.repair.output } : {}),
+        ...(outcome.repair.status === "manual" ? { how: outcome.repair.how } : {}),
+        fallback: outcome.fallback,
+      });
+    } else if (outcome.status === "repaired") {
+      logger?.warn("claude-cli.repaired", { ...outcome });
     } else if (outcome.status !== previous.status || outcome.status === "updated") {
       logger?.process(`claude-cli.update-${outcome.status}`, { ...outcome });
     }

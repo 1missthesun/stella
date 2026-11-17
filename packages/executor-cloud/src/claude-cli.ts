@@ -42,6 +42,11 @@ const isExecutable = (file: string): boolean => {
   }
 };
 
+/** It is there and answers `--version`: a cut-off install is neither run nor updated with. */
+const nativeStarts = async (): Promise<boolean> =>
+  isExecutable(NATIVE_CLI) &&
+  (await readClaudeCliVersion(NATIVE_CLI, installerEnv()).catch(() => null)) !== null;
+
 const PASSED_ENV = /^(PATH|LANG|TZ|SSL_CERT_FILE|SSL_CERT_DIR|NODE_EXTRA_CA_CERTS|(https?|all|no)_proxy)$/i;
 
 const installerEnv = (): NodeJS.ProcessEnv => ({
@@ -88,7 +93,8 @@ const takeRefreshLock = async (): Promise<boolean> => {
 };
 
 const runRefresh = async (): Promise<void> => {
-  const installed = isExecutable(NATIVE_CLI);
+  // One that can't start can't update itself: the image's copy installs it again.
+  const installed = await nativeStarts();
   const last = await readStatus();
   const env = installerEnv();
   const result = installed
@@ -96,7 +102,7 @@ const runRefresh = async (): Promise<void> => {
         env,
         timeoutMs: REFRESH_TIMEOUT_MS,
       })
-    : await runClaudeCliCommand(IMAGE_CLI, ["install", "latest"], {
+    : await runClaudeCliCommand(IMAGE_CLI, ["install", "latest", ...(isExecutable(NATIVE_CLI) ? ["--force"] : [])], {
         env,
         timeoutMs: REFRESH_TIMEOUT_MS,
       });
@@ -136,7 +142,7 @@ export const refreshCloudClaudeCli = async (
     return;
   }
   await mkdir(CLI_HOME, { recursive: true, mode: 0o755 });
-  const installed = isExecutable(NATIVE_CLI);
+  const installed = await nativeStarts();
   const last = await readStatus();
   if (
     installed &&
@@ -164,8 +170,13 @@ const startRefreshHoldingLock = (): void => {
   child.unref();
 };
 
-const pointAtNativeCli = (): boolean => {
-  if (!isExecutable(NATIVE_CLI)) return false;
+const pointAtNativeCli = async (): Promise<boolean> => {
+  if (!(await nativeStarts())) {
+    if (process.env.STELLA_CLAUDE_CLI_PATH === NATIVE_CLI) {
+      delete process.env.STELLA_CLAUDE_CLI_PATH;
+    }
+    return false;
+  }
   process.env.STELLA_CLAUDE_CLI_PATH = NATIVE_CLI;
   return true;
 };
@@ -177,7 +188,14 @@ const pointAtNativeCli = (): boolean => {
  * asked for; past that the turn runs on the image's copy. Nothing else waits.
  */
 export const prepareCloudClaudeCli = async (): Promise<void> => {
-  if (!existsSync(EXECUTOR) || pointAtNativeCli()) return;
+  if (!existsSync(EXECUTOR) || (await pointAtNativeCli())) return;
+  if (isExecutable(NATIVE_CLI)) {
+    // Installed but it doesn't start (an install cut off): this turn runs the
+    // image's copy while the install is redone in the background.
+    console.error(JSON.stringify({ event: "claude_cli_native_unusable", last: await readStatus() }));
+    if (await takeRefreshLock()) startRefreshHoldingLock();
+    return;
+  }
   const startedAt = Date.now();
   if (await takeRefreshLock()) startRefreshHoldingLock();
   while (
@@ -186,7 +204,7 @@ export const prepareCloudClaudeCli = async (): Promise<void> => {
   ) {
     await Effect.runPromise(Effect.sleep(500));
   }
-  if (!pointAtNativeCli()) {
+  if (!(await pointAtNativeCli())) {
     console.error(
       JSON.stringify({
         event: "claude_cli_image_fallback",
@@ -203,10 +221,10 @@ export const prepareCloudClaudeCli = async (): Promise<void> => {
  */
 export const warmCloudClaudeCli = async (): Promise<void> => {
   if (!existsSync(EXECUTOR)) return;
-  if (!isExecutable(NATIVE_CLI)) {
+  if (!(await nativeStarts())) {
     await refreshCloudClaudeCli().catch(() => undefined);
   }
-  const cli = isExecutable(NATIVE_CLI) ? NATIVE_CLI : IMAGE_CLI;
+  const cli = (await nativeStarts()) ? NATIVE_CLI : IMAGE_CLI;
   await new Promise<void>((resolve) => {
     const reader = spawn("sh", ["-c", 'cat -- "$(readlink -f -- "$0")" >/dev/null', cli], {
       stdio: "ignore",

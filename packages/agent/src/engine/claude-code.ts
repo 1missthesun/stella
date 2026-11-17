@@ -274,6 +274,8 @@ const markedError = (error: unknown): string => {
   if (code === "CLAUDE_CODE_USAGE_LIMIT") return `[claude-code/usage-limit] ${message}`;
   // The runtime couldn't find the claude executable on this computer.
   if (/Claude Code CLI executable was not found/i.test(message)) return `[claude-code/not-installed] ${message}`;
+  // It is installed but can't start (and nothing could stand in for it).
+  if (code === "CLAUDE_CODE_CLI_UNUSABLE") return `[claude-code/cli-unusable] ${message}`;
   if (code === "CLAUDE_CODE_SAFEGUARD_BLOCK" || isSafeguardBlockText(message)) return markSafeguardBlock("claude-code", message);
   return message;
 };

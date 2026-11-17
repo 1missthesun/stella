@@ -12,10 +12,11 @@ import {
 } from "@stella/contracts/claude-local-accounts";
 import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backend/engines";
 import { readStoredClaudeLogin, type StoredClaudeLogin } from "@stella/contracts/claude-login";
+import { buildExternalCliChildEnv } from "@stella/runtime/kernel/integrations/external-cli-resolution";
 import {
-  buildExternalCliChildEnv,
-  findExternalCliPath,
-} from "@stella/runtime/kernel/integrations/external-cli-resolution";
+  ClaudeCliUnusableError,
+  selectClaudeCli,
+} from "@stella/runtime/kernel/integrations/claude-cli-launch";
 import {
   installClaudeCli,
   type ClaudeCliInstallProgress,
@@ -158,6 +159,8 @@ const text = (value: unknown): string | undefined =>
 export class ClaudeLocalAccounts {
   private configs: ConfigStatus[] | null = null;
   private cliInstalled = false;
+  /** Why the installed Claude Code can't start, when it can't. */
+  private cliProblem: string | null = null;
   private refreshing: Promise<void> | null = null;
   private lastRefreshAt = 0;
   private readonly logins = new Map<string, PendingLogin>();
@@ -341,8 +344,8 @@ export class ClaudeLocalAccounts {
   async startLogin(
     options: { configId?: string; email?: string; remote?: boolean } = {},
   ): Promise<ClaudeLocalLoginStart> {
-    const executable = this.resolveCli();
-    if (!executable) throw new Error("Claude Code isn't installed on this computer.");
+    const executable = await this.resolveCli();
+    if (!executable) throw new Error(this.cliProblem ?? "Claude Code isn't installed on this computer.");
     if (!this.configs) await this.refresh();
     let configId: string;
     let dir: string | null;
@@ -517,7 +520,7 @@ export class ClaudeLocalAccounts {
   async installCli(
     onProgress: (progress: ClaudeCliInstallProgress) => void,
   ): Promise<ClaudeCliInstallResult> {
-    const existing = this.resolveCli();
+    const existing = await this.resolveCli();
     if (existing) {
       this.broadcastIfChanged();
       return { status: "installed", version: null, executable: existing };
@@ -536,7 +539,7 @@ export class ClaudeLocalAccounts {
       }
       const result = await this.installing;
       if (result.status === "installed") {
-        this.resolveCli();
+        await this.resolveCli();
         await this.refresh().catch(() => undefined);
         this.broadcastIfChanged();
       }
@@ -553,11 +556,27 @@ export class ClaudeLocalAccounts {
     for (const pending of [...this.logins.values()]) this.endLogin(pending, { kill: true });
   }
 
-  private resolveCli(): string | null {
-    const executable = findExternalCliPath("claude");
+  /**
+   * The Claude Code a turn would run (checked to start, or the last one that
+   * did), or null. Never the wrapper of a version manager that updates in
+   * the foreground: a status check that times out must not cut off an
+   * install. An install that can't start counts as installed, so its logins
+   * aren't taken for signed out and a turn says what is wrong with it.
+   */
+  private async resolveCli(): Promise<string | null> {
+    let executable: string | null = null;
+    let installed = false;
+    try {
+      executable = (await selectClaudeCli({ repair: "background" })).executable;
+      installed = true;
+      this.cliProblem = null;
+    } catch (error) {
+      installed = error instanceof ClaudeCliUnusableError;
+      this.cliProblem = installed ? (error as Error).message : null;
+    }
     const wasInstalled = this.cliInstalled;
-    this.cliInstalled = executable !== null;
-    if (executable && !wasInstalled) this.options.onCliFound?.();
+    this.cliInstalled = installed;
+    if (installed && !wasInstalled) this.options.onCliFound?.();
     return executable;
   }
 
@@ -689,9 +708,11 @@ export class ClaudeLocalAccounts {
     if (this.refreshing) return this.refreshing;
     const run = (async () => {
       if (!this.deviceId) await this.loadDeviceId();
-      const executable = this.resolveCli();
+      const executable = await this.resolveCli();
       if (!executable) {
-        this.configs = [];
+        // Installed but unable to start: its logins are as they were (a
+        // turn then fails with what is wrong with Claude Code, not a sign-in).
+        this.configs = this.cliInstalled ? (this.configs ?? []) : [];
       } else {
         const entries = [
           { configId: DEFAULT_CONFIG_ID, dir: null as string | null, createdAt: 0 },
@@ -793,7 +814,7 @@ export class ClaudeLocalAccounts {
 
   private async removeConfigDir(dir: string): Promise<void> {
     if (path.dirname(dir) !== this.accountsDir) return;
-    const executable = this.resolveCli();
+    const executable = await this.resolveCli();
     if (executable) {
       await this.runCli(executable, dir, ["auth", "logout"], LOGOUT_TIMEOUT_MS);
     }

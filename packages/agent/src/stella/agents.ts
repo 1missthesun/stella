@@ -565,9 +565,17 @@ const agentFailureText = (message: AssistantMessage | undefined): string =>
     ? safeguardTaskFailure(safeguardModelLabel(message.responseModel, message.model))
     : (message?.errorMessage ?? "The agent failed.");
 
-/** Why a task's turn got no answer: a block in plain words, else the harness's reason. */
-const unansweredText = (settled: { reason: string; detail?: unknown }): string =>
-  typeof settled.detail === "string" && isSafeguardBlockText(settled.detail) ? safeguardTaskFailure(undefined) : settled.reason;
+/**
+ * Why a task's turn got no answer: a block in plain words, else what failed
+ * in its own words (a failed model request settles with reason `model_error`
+ * and the error itself as its detail), else the harness's reason.
+ */
+export const unansweredText = (settled: { reason: string; detail?: unknown }): string => {
+  const detail = typeof settled.detail === "string" ? settled.detail.trim() : "";
+  if (detail && isSafeguardBlockText(detail)) return safeguardTaskFailure(undefined);
+  return detail ? detail.replace(ENGINE_ERROR_MARK, "") : settled.reason;
+};
+const ENGINE_ERROR_MARK = /^\s*\[[a-z-]+\/[a-z-]+\]\s*/;
 
 /** A helper ended its turn waiting while its lead's report was held for it, so the lead hears it once. */
 const waitingHelperNotice = (args: { threadId: string; description: string; waitingFor: string; said?: string }): string =>

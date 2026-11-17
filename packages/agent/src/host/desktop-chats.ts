@@ -113,6 +113,7 @@ import {
   type AgentModelChoice,
   type RemoteAgentHost,
   type RunsOn,
+  unansweredText,
 } from "../stella/agents.ts";
 import type { StellaToolHost } from "../stella/host-tools.ts";
 import {
@@ -2515,7 +2516,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     const settled = await submission.wait(context);
     if (settled.status === "unanswered") {
-      return { status: "error", finalText: "", error: settled.reason ?? "The turn did not finish." };
+      return { status: "error", finalText: "", error: unansweredText(settled) || "The turn did not finish." };
     }
     const answer = settled.type === "input" ? settled.answer : undefined;
     if (answer === undefined) return { status: "ok", finalText: "" };

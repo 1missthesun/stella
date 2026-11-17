@@ -202,6 +202,13 @@ export const resolveStellaProviderErrorToast = (
         variant: 'error',
         duration: 10000,
       }
+    case 'claude-code-unusable':
+      return {
+        title: "Claude Code can't start",
+        description: stripClaudeCodeMark(message),
+        variant: 'error',
+        duration: 15000,
+      }
     case 'claude-code-usage-limit':
       return {
         title: 'Claude usage limit reached',

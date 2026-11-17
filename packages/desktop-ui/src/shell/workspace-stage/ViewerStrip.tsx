@@ -2,8 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FileEntry } from "@/features/workspace-display/files-index";
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
 import type { DisplayTab } from "@/features/workspace-display/types";
-import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
-import { useMediaStream } from "@/shared/hooks/use-media-stream-url";
+import { deferStripThumbnails, useStripThumbnail } from "./strip-thumbnails";
 import { Play } from "@/ui/icons";
 import { formatTimestampHeader } from "@/features/chat/lib/message-time-labels";
 import { translateNow, useLocale, useT } from "@/shared/i18n";
@@ -44,8 +43,7 @@ const imagePathOf = (entry: FileEntry): string | null => {
 };
 
 function ImageThumb({ filePath }: { filePath: string }) {
-  const { files } = useDisplayFileBlobs([filePath]);
-  const url = files[0]?.url;
+  const url = useStripThumbnail("image", filePath, true);
   return url ? (
     <img className="viewer-strip__img" src={url} alt="" draggable={false} />
   ) : (
@@ -59,19 +57,11 @@ const videoPathOf = (entry: FileEntry): string | null => {
   return payload.asset.filePath;
 };
 
-/** A poster frame: the browser paints the frame at the fragment's time. */
+/** A still from half a second in, made once. */
 function VideoThumb({ filePath }: { filePath: string }) {
-  const { url } = useMediaStream(filePath, "video");
+  const url = useStripThumbnail("video", filePath, true);
   return url ? (
-    <video
-      className="viewer-strip__img"
-      src={`${url}#t=0.5`}
-      muted
-      playsInline
-      preload="metadata"
-      tabIndex={-1}
-      aria-hidden="true"
-    />
+    <img className="viewer-strip__img" src={url} alt="" draggable={false} />
   ) : (
     <span className="viewer-strip__img viewer-strip__img--empty" />
   );
@@ -90,11 +80,13 @@ function StripItem({
   current,
   fromId,
   tooltip,
+  onPointerPick,
 }: {
   entry: FileEntry;
   current: boolean;
   fromId: string;
   tooltip: string;
+  onPointerPick: (id: string) => void;
 }) {
   const imagePath = imagePathOf(entry);
   const videoPath = imagePath ? null : videoPathOf(entry);
@@ -111,8 +103,12 @@ function StripItem({
       aria-current={current ? "true" : undefined}
       aria-label={entry.title}
       title={tooltip}
-      onClick={() => {
-        if (!current) showSibling(fromId, entry);
+      onClick={(event) => {
+        if (current) return;
+        // A click (not Enter or ⇧←/→, which arrive with no detail) picks
+        // something already on screen, so the strip stays where it is.
+        if (event.detail > 0) onPointerPick(entry.id);
+        showSibling(fromId, entry);
       }}
       onContextMenu={contextMenu(
         async () => {
@@ -164,43 +160,56 @@ const offsetIn = (list: HTMLElement, el: HTMLElement, vertical: boolean) => {
   return offset;
 };
 
-/**
- * Scroll `list` just enough to keep `el` (and a neighbour) in view. On a
- * jump (`center`) the whole set `el` belongs to comes into view when it fits.
- */
-const keepInView = (list: HTMLElement, el: HTMLElement, center: boolean) => {
+/** The strip's direction, scroll and visible length, and where a node sits in it. */
+const placeOf = (list: HTMLElement) => {
   const vertical = getComputedStyle(list).flexDirection === "column";
   // Offsets, not client rects: the viewer's open animation scales it.
   const scroll = vertical ? list.scrollTop : list.scrollLeft;
   const view = vertical ? list.clientHeight : list.clientWidth;
-  const group = el.closest<HTMLElement>(".viewer-strip__set");
   const fit = (node: HTMLElement) => ({
     start: offsetIn(list, node, vertical) - scroll,
     size: vertical ? node.offsetHeight : node.offsetWidth,
   });
+  return { vertical, scroll, view, fit };
+};
+
+/**
+ * Centre `el` (with the whole set it belongs to, when that fits): only when
+ * the viewer opens or the strip turns between rail and row.
+ */
+const centerOn = (list: HTMLElement, el: HTMLElement) => {
+  const { vertical, scroll, view, fit } = placeOf(list);
+  const group = el.closest<HTMLElement>(".viewer-strip__set");
   const item = fit(el);
   const whole = group ? fit(group) : item;
-  const span = center && whole.size <= view - 24 ? whole : item;
-  const pad = Math.min(item.size * 1.3, view / 3);
-  let target = scroll;
-  if (center) target = scroll + span.start - (view - span.size) / 2;
-  else if (item.start < pad) target = scroll + item.start - pad;
-  else if (item.start + item.size > view - pad)
-    target = scroll + item.start + item.size - view + pad;
+  const span = whole.size <= view - 24 ? whole : item;
+  const target = scroll + span.start - (view - span.size) / 2;
   if (Math.abs(target - scroll) < 1) return;
-  list.scrollTo({
-    [vertical ? "top" : "left"]: target,
-    behavior: center ? "auto" : "smooth",
-  });
+  list.scrollTo({ [vertical ? "top" : "left"]: target, behavior: "auto" });
 };
 
 /** Whether all of `el` is inside the strip's visible part. */
-const isInView = (list: HTMLElement, el: HTMLElement, vertical: boolean) => {
-  const start =
-    offsetIn(list, el, vertical) - (vertical ? list.scrollTop : list.scrollLeft);
-  const size = vertical ? el.offsetHeight : el.offsetWidth;
-  const view = vertical ? list.clientHeight : list.clientWidth;
-  return start >= 0 && start + size <= view;
+const isInView = (list: HTMLElement, el: HTMLElement) => {
+  const { view, fit } = placeOf(list);
+  const item = fit(el);
+  return item.start >= 0 && item.start + item.size <= view;
+};
+
+/**
+ * Bring `el` into view when part of it is off the strip (stepping with the
+ * arrow keys past an edge), with a little of the next item showing. An
+ * item already in view never moves the strip.
+ */
+const reveal = (list: HTMLElement, el: HTMLElement) => {
+  const { vertical, scroll, view, fit } = placeOf(list);
+  const item = fit(el);
+  const margin = Math.min(item.size * 0.6, view / 4);
+  let target = scroll;
+  if (item.start < 0) target = scroll + item.start - margin;
+  else if (item.start + item.size > view)
+    target = scroll + item.start + item.size - view + margin;
+  if (Math.abs(target - scroll) < 1) return;
+  list.scrollTo({ [vertical ? "top" : "left"]: target, behavior: "smooth" });
 };
 
 /** "2:14 PM" today, "Yesterday", "Mon" this week, "Nov 7" before. */
@@ -234,7 +243,7 @@ const shortWhen = (ms: number, locale: string): string => {
  * audio, documents), oldest first. A rail on the left when the viewer is
  * wide, a row along the bottom when it's narrow. Like the filmstrips in
  * Photos and Lightroom it holds still while you step, and only scrolls when
- * the current item nears an edge.
+ * the current item would otherwise be out of sight.
  *
  * What came with one message sits together as a set, in its own soft tray;
  * the tray you're in is a touch stronger, with when it arrived written
@@ -246,31 +255,39 @@ export function ViewerStrip({ item }: { item: DisplayTab }) {
   const locale = useLocale();
   const { items, index, sets, set } = useViewerSiblings(item.id, item.kind);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const firstScroll = useRef(true);
-  const lastLength = useRef(0);
-  const lastSet = useRef<string | null>(null);
+  const centered = useRef(false);
+  const picked = useRef<string | null>(null);
   const show = index !== -1 && items.length > 1;
   const grouped = sets.length > 1;
 
+  // The file just shown loads before any thumbnail does.
+  useLayoutEffect(() => {
+    deferStripThumbnails();
+  }, [item.id]);
+
+  // Centred once when the strip appears. After that it holds still: a
+  // clicked item is already on screen, and anything else (arrow keys, the
+  // edge arrows, a set jump) only scrolls when the item would be hidden.
   useLayoutEffect(() => {
     const list = listRef.current;
     const current = list?.querySelector<HTMLElement>("[data-current='true']");
-    if (!list || !current) return;
-    // Centre on open, whenever the list itself changes, and on entering
-    // another set; glide only when stepping inside a set.
-    const settled =
-      !firstScroll.current &&
-      lastLength.current === items.length &&
-      lastSet.current === (set?.key ?? null);
-    keepInView(list, current, !settled);
-    firstScroll.current = false;
-    lastLength.current = items.length;
-    lastSet.current = set?.key ?? null;
-  }, [index, items.length, set?.key, show]);
+    if (!list || !current) {
+      centered.current = false;
+      return;
+    }
+    const clicked = picked.current === item.id;
+    picked.current = null;
+    if (!centered.current) {
+      centered.current = true;
+      centerOn(list, current);
+      return;
+    }
+    if (!clicked) reveal(list, current);
+  }, [item.id, index, show]);
 
-  // Switching between rail and row re-centres the current item, and so does
-  // any resize that hides it (the viewer's first open settles its height
-  // after the strip has already scrolled).
+  // Switching between rail and row re-centres the current item; a resize
+  // that hides it (the viewer's first open settles its height after the
+  // strip has already scrolled) brings it back.
   useEffect(() => {
     const list = listRef.current;
     if (!list || typeof ResizeObserver === "undefined") return;
@@ -279,9 +296,7 @@ export function ViewerStrip({ item }: { item: DisplayTab }) {
       const current = list.querySelector<HTMLElement>("[data-current='true']");
       if (!current) return;
       const next = getComputedStyle(list).flexDirection === "column";
-      if (next !== vertical || !isInView(list, current, next)) {
-        keepInView(list, current, true);
-      }
+      if (next !== vertical || !isInView(list, current)) centerOn(list, current);
       vertical = next;
     });
     observer.observe(list);
@@ -335,6 +350,9 @@ export function ViewerStrip({ item }: { item: DisplayTab }) {
                   current={entry.id === item.id}
                   fromId={item.id}
                   tooltip={tooltipFor(entry, run, run.start + offset)}
+                  onPointerPick={(id) => {
+                    picked.current = id;
+                  }}
                 />
               ))}
               {current && grouped ? (

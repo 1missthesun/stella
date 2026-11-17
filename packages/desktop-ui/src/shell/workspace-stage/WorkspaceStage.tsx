@@ -716,6 +716,13 @@ const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
   }, [grouped, index, item, items]);
 };
 
+/** Viewers light enough to mount in the frame that opens them. */
+const IMMEDIATE_KINDS: ReadonlySet<DisplayTab["kind"]> = new Set([
+  "image",
+  "video",
+  "audio",
+]);
+
 function FileViewerFrame({
   hiddenForExclusiveTab,
 }: {
@@ -867,7 +874,11 @@ function FileViewerFrame({
         <ViewerItemContext value={item.id}>
           <ViewerNavContext value={setBodyNav}>
             <ViewerActionsContext value={setBodyActions}>
-              <DeferredDisplayContent key={item.id} render={item.render} />
+              <DeferredDisplayContent
+                key={item.id}
+                render={item.render}
+                immediate={IMMEDIATE_KINDS.has(item.kind)}
+              />
             </ViewerActionsContext>
           </ViewerNavContext>
         </ViewerItemContext>

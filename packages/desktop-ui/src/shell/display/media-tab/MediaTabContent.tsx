@@ -11,7 +11,13 @@ import type { MediaTabItem } from "./media-item";
 import { MediaActionBar } from "./MediaActionBar";
 import { HeroPrompt } from "./HeroPrompt";
 import { useT } from "@/shared/i18n";
-import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
+import {
+  prefetchDisplayFile,
+  useDisplayFileBlobs,
+} from "@/shared/hooks/use-display-file-data";
+import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
+import { useOptionalUiState } from "@/context/ui-state";
+import type { FileEntry } from "@/features/workspace-display/files-index";
 import { copyImageBlob } from "@/shell/media-clipboard";
 import {
   ViewerItemContext,
@@ -71,6 +77,50 @@ const useMediaNeighbours = (itemId: string, kind: DisplayTabKind) => {
       next: items[index + 1] ?? null,
     };
   }, [index, items]);
+};
+
+const NEIGHBOUR_DELAY_MS = 350;
+
+const localImageOf = (entry: FileEntry | null): string | null => {
+  const payload = entry?.payload;
+  if (!payload || payload.kind !== "media" || payload.cloudDrivePath) return null;
+  return payload.asset.kind === "image" ? (payload.asset.filePaths[0] ?? null) : null;
+};
+
+/**
+ * Once the picture on screen has had its moment, read the pictures either
+ * side of it and decode them, so stepping to them is immediate.
+ */
+const usePrefetchNeighbours = (
+  previous: FileEntry | null,
+  next: FileEntry | null,
+  enabled: boolean,
+) => {
+  const source = useContext(DisplayFileSourceContext);
+  const conversationId = useOptionalUiState()?.state.conversationId ?? null;
+  const before = localImageOf(previous);
+  const after = localImageOf(next);
+  useEffect(() => {
+    if (!enabled || source) return;
+    const paths = [after, before].filter((path): path is string => Boolean(path));
+    if (paths.length === 0) return;
+    const releases: Array<() => void> = [];
+    const timer = setTimeout(() => {
+      for (const path of paths) {
+        releases.push(
+          prefetchDisplayFile(path, conversationId, (url) => {
+            const image = new Image();
+            image.src = url;
+            void image.decode().catch(() => undefined);
+          }),
+        );
+      }
+    }, NEIGHBOUR_DELAY_MS);
+    return () => {
+      clearTimeout(timer);
+      for (const release of releases) release();
+    };
+  }, [after, before, conversationId, enabled, source]);
 };
 
 export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
@@ -136,6 +186,7 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
 
   const inViewer = useContext(ViewerItemContext) === item.id;
   useViewerMediaActions(item, handleDelete);
+  usePrefetchNeighbours(neighbours.previous, neighbours.next, inViewer);
 
   if (inViewer) {
     // The viewer's header holds the actions, so the media gets the space.

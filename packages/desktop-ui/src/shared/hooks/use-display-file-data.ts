@@ -2,7 +2,7 @@ import {
   DisplayFileSourceContext,
   type DisplayFileSource,
 } from "./display-file-source";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useOptionalUiState } from "@/context/ui-state";
 import { readDeviceFileCopy } from "@/features/cloud/device-file-copy";
 import {
@@ -30,13 +30,21 @@ type DisplayFileRead =
       reason?: DeviceFileMissingReason;
     };
 
+type FileStamp = { sizeBytes: number; modifiedAt: number | null };
+
 type CacheEntry = {
   promise: Promise<DisplayFileRead>;
   resolved: DisplayFileRead | null;
   blob: Blob | null;
   url: string | null;
   refCount: number;
-  evictionTimer: ReturnType<typeof setTimeout> | null;
+  /** When the entry was last let go; idle entries are evicted oldest first. */
+  idleSince: number;
+  /** Size and time of the file as read, for local files (no `source`). */
+  stamp: Promise<FileStamp | null> | null;
+  checkedAt: number;
+  /** Hooks showing this entry, told when the file changed under it. */
+  stale: Set<() => void>;
 };
 const isDisplayFileApiAvailable = () =>
   typeof window !== "undefined" &&
@@ -69,8 +77,24 @@ const readDisplayFileRaw = async (
     );
   }
 };
+// @reloadable a cache of file reads; a newer copy starts empty
 const cache = new Map<string, CacheEntry>();
-const CACHE_GRACE_MS = 750;
+
+/** One read outside the cache (a thumbnail that only needs the bytes once). */
+export const readDisplayFileOnce = (
+  filePath: string,
+  conversationId: string | null,
+): Promise<DisplayFileRead> =>
+  readDisplayFileRaw(filePath, undefined, conversationId, undefined);
+/**
+ * What closed viewers keep, so reopening a file shows the same blob URL
+ * (Chromium then reuses its decoded image too) instead of reading and
+ * decoding it again. Oldest idle entries go first past either limit.
+ */
+const IDLE_CACHE_MAX_BYTES = 192 * 1024 * 1024;
+const IDLE_CACHE_MAX_ENTRIES = 96;
+/** A file shown again is checked against its size and time at most this often. */
+const RECHECK_MS = 1500;
 const displayFileCacheKey = (
   filePath: string,
   conversationId: string | null,
@@ -111,6 +135,69 @@ const finalizeEvict = (cacheKey: string, entry: CacheEntry) => {
   entry.blob = null;
   if (cache.get(cacheKey) === entry) cache.delete(cacheKey);
 };
+
+const entryBytes = (entry: CacheEntry): number =>
+  entry.resolved && !entry.resolved.missing ? entry.resolved.bytes.byteLength : 0;
+
+const trimIdle = () => {
+  const idle = [...cache.entries()]
+    .filter(([, entry]) => entry.refCount === 0 && entry.resolved)
+    .sort((a, b) => a[1].idleSince - b[1].idleSince);
+  let bytes = idle.reduce((sum, [, entry]) => sum + entryBytes(entry), 0);
+  let count = idle.length;
+  for (const [key, entry] of idle) {
+    if (bytes <= IDLE_CACHE_MAX_BYTES && count <= IDLE_CACHE_MAX_ENTRIES) break;
+    bytes -= entryBytes(entry);
+    count -= 1;
+    finalizeEvict(key, entry);
+  }
+};
+
+const statFile = (
+  filePath: string,
+  conversationId: string | null,
+): Promise<FileStamp | null> => {
+  const stat = window.electronAPI?.display?.statPath;
+  if (!stat) return Promise.resolve(null);
+  return stat(filePath, { conversationId }).then(
+    (result) =>
+      result && result.kind === "file"
+        ? {
+            sizeBytes: result.sizeBytes,
+            modifiedAt:
+              typeof result.modifiedAt === "number" ? result.modifiedAt : null,
+          }
+        : null,
+    () => null,
+  );
+};
+
+const sameStamp = (a: FileStamp | null, b: FileStamp | null): boolean =>
+  !a || !b || (a.sizeBytes === b.sizeBytes && a.modifiedAt === b.modifiedAt);
+
+/**
+ * A cached local file shown again is drawn at once, then checked: if it was
+ * replaced on disk since it was read, the entry is dropped and whoever shows
+ * it reads it afresh.
+ */
+const recheck = (
+  cacheKey: string,
+  entry: CacheEntry,
+  filePath: string,
+  conversationId: string | null,
+) => {
+  const read = entry.stamp;
+  if (!read || Date.now() - entry.checkedAt < RECHECK_MS) return;
+  entry.checkedAt = Date.now();
+  void Promise.all([read, statFile(filePath, conversationId)]).then(
+    ([before, now]) => {
+      if (cache.get(cacheKey) !== entry || sameStamp(before, now)) return;
+      cache.delete(cacheKey);
+      for (const notify of [...entry.stale]) notify();
+      if (entry.refCount === 0) finalizeEvict(cacheKey, entry);
+    },
+  );
+};
 const acquire = (
   filePath: string,
   unavailableMessage: string | undefined,
@@ -141,7 +228,10 @@ const acquire = (
       blob: null,
       url: null,
       refCount: 0,
-      evictionTimer: null,
+      idleSince: 0,
+      stamp: source ? null : statFile(filePath, conversationId),
+      checkedAt: Date.now(),
+      stale: new Set(),
     };
     entry = created;
     cache.set(cacheKey, created);
@@ -153,14 +243,16 @@ const acquire = (
           return;
         }
         created.resolved = result;
+        if (created.refCount === 0) {
+          created.idleSince = performance.now();
+          trimIdle();
+        }
       })
       .catch(() => {
         if (cache.get(cacheKey) === created) cache.delete(cacheKey);
       });
-  }
-  if (entry.evictionTimer) {
-    clearTimeout(entry.evictionTimer);
-    entry.evictionTimer = null;
+  } else if (entry.resolved) {
+    recheck(cacheKey, entry, filePath, conversationId);
   }
   entry.refCount += 1;
   return entry;
@@ -168,10 +260,35 @@ const acquire = (
 const release = (cacheKey: string, entry: CacheEntry) => {
   entry.refCount = Math.max(0, entry.refCount - 1);
   if (entry.refCount > 0) return;
-  if (entry.evictionTimer) clearTimeout(entry.evictionTimer);
-  entry.evictionTimer = setTimeout(() => {
-    if (entry.refCount === 0) finalizeEvict(cacheKey, entry);
-  }, CACHE_GRACE_MS);
+  entry.idleSince = performance.now();
+  if (cache.get(cacheKey) !== entry) {
+    finalizeEvict(cacheKey, entry);
+    return;
+  }
+  trimIdle();
+};
+
+/** Read a file into the cache ahead of time (the viewer's neighbours). */
+export const prefetchDisplayFile = (
+  filePath: string,
+  conversationId: string | null,
+  onReady?: (url: string) => void,
+): (() => void) => {
+  const cacheKey = displayFileCacheKey(filePath, conversationId);
+  const entry = acquire(filePath, undefined, conversationId, undefined, undefined, null);
+  let released = false;
+  void entry.promise.then(
+    () => {
+      const url = released ? null : objectUrlFor(entry);
+      if (url) onReady?.(url);
+    },
+    () => undefined,
+  );
+  return () => {
+    if (released) return;
+    released = true;
+    release(cacheKey, entry);
+  };
 };
 export function useDisplayFileBytes(
   filePath: string,
@@ -198,6 +315,7 @@ export function useDisplayFileBytes(
   const [missing, setMissing] = useState(false);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [reread, setReread] = useState(0);
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -219,6 +337,10 @@ export function useDisplayFileBytes(
       maxBytes,
       source,
     );
+    const onStale = () => {
+      if (!cancelled) setReread((count) => count + 1);
+    };
+    entry.stale.add(onStale);
     void entry.promise
       .then((result) => {
         if (cancelled) return;
@@ -239,9 +361,10 @@ export function useDisplayFileBytes(
       });
     return () => {
       cancelled = true;
+      entry.stale.delete(onStale);
       release(cacheKey, entry);
     };
-  }, [conversationId, filePath, maxBytes, unavailableMessage, version, source]);
+  }, [conversationId, filePath, maxBytes, unavailableMessage, version, source, reread]);
   return { bytes, error, loading, missing, truncated };
 }
 
@@ -249,6 +372,64 @@ type BlobResult = {
   blob: DisplayFileBlob | null;
   missing: boolean;
   message?: string;
+};
+
+type BlobState = {
+  key: string;
+  files: Array<DisplayFileBlob | null>;
+  error: string | null;
+  loading: boolean;
+  missing: boolean[];
+  missingMessages: Array<string | null>;
+};
+
+const blobOf = (entry: CacheEntry): DisplayFileBlob | null => {
+  const url = objectUrlFor(entry);
+  const blob = entry.blob;
+  if (!url || !blob || !entry.resolved || entry.resolved.missing) return null;
+  return {
+    url,
+    mimeType: entry.resolved.mimeType || "application/octet-stream",
+    blob,
+  };
+};
+
+/**
+ * What the cache already holds for `filePaths`, so a file seen before is in
+ * the first frame rather than one render later.
+ */
+const cachedState = (
+  key: string,
+  filePaths: string[],
+  conversationId: string | null,
+): BlobState => {
+  const empty = filePaths.map(() => null);
+  const files: Array<DisplayFileBlob | null> = [];
+  for (const filePath of filePaths) {
+    const entry = cache.get(displayFileCacheKey(filePath, conversationId));
+    const blob = entry?.resolved ? blobOf(entry) : null;
+    if (!entry || !blob) {
+      return {
+        key,
+        files: empty,
+        error: null,
+        loading: true,
+        missing: filePaths.map(() => false),
+        missingMessages: empty,
+      };
+    }
+    // Newest idle entry, so nothing evicts it before the effect takes it.
+    if (entry.refCount === 0) entry.idleSince = performance.now();
+    files.push(blob);
+  }
+  return {
+    key,
+    files,
+    error: null,
+    loading: false,
+    missing: filePaths.map(() => false),
+    missingMessages: empty,
+  };
 };
 
 export function useDisplayFileBlobs(
@@ -269,24 +450,21 @@ export function useDisplayFileBlobs(
     : conversationIdOverride !== undefined
       ? conversationIdOverride
       : (uiState?.state.conversationId ?? null);
-  const [files, setFiles] = useState<Array<DisplayFileBlob | null>>(() =>
-    filePaths.map(() => null),
+  const pathsKey = filePaths.join("|");
+  const key = `${conversationId ?? ""}\0${pathsKey}`;
+  const [reread, setReread] = useState(0);
+  const [stored, setStored] = useState<BlobState>(() =>
+    cachedState(key, filePaths, conversationId),
   );
-  const [missing, setMissing] = useState<boolean[]>(() =>
-    filePaths.map(() => false),
-  );
-  const [missingMessages, setMissingMessages] = useState<Array<string | null>>(
-    () => filePaths.map(() => null),
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const key = useMemo(
-    () => `${conversationId ?? ""}\0${filePaths.join("|")}`,
-    [conversationId, filePaths],
-  );
+  let state = stored;
+  if (state.key !== key) {
+    state = cachedState(key, filePaths, conversationId);
+    setStored(state);
+  }
   useEffect(() => {
     let cancelled = false;
-    const acquired = filePaths.map((filePath) => ({
+    const paths = pathsKey ? pathsKey.split("|") : [];
+    const acquired = paths.map((filePath) => ({
       cacheKey: displayFileCacheKey(filePath, conversationId),
       entry: acquire(
         filePath,
@@ -297,42 +475,42 @@ export function useDisplayFileBlobs(
         source,
       ),
     }));
-    const seeded = acquired.map(({ entry }): BlobResult | undefined => {
-      const resolved = entry.resolved;
-      if (!resolved) return undefined;
-      if (resolved.missing) return { blob: null, missing: true };
-      const url = objectUrlFor(entry);
-      const blob = entry.blob;
-      if (!url || !blob) return { blob: null, missing: true };
-      return {
-        blob: {
-          url,
-          mimeType: resolved.mimeType || "application/octet-stream",
-          blob,
-        },
-        missing: false,
-      };
-    });
-    if (seeded.every((result) => result !== undefined)) {
-      setFiles(seeded.map((result) => result.blob));
-      setMissing(seeded.map((result) => result.missing));
-      setError(null);
-      setLoading(false);
-    } else {
-      setLoading(true);
-      setError(null);
-      setMissing(filePaths.map(() => false));
-      setFiles(filePaths.map(() => null));
+    const onStale = () => {
+      if (!cancelled) setReread((count) => count + 1);
+    };
+    for (const { entry } of acquired) entry.stale.add(onStale);
+    const update = (next: Omit<BlobState, "key">) => {
+      if (cancelled) return;
+      setStored((previous) =>
+        previous.key === key &&
+        previous.loading === next.loading &&
+        previous.error === next.error &&
+        previous.files.every((file, index) => file?.url === next.files[index]?.url) &&
+        previous.missing.every((value, index) => value === next.missing[index])
+          ? previous
+          : { key, ...next },
+      );
+    };
+    const seeded = acquired.map(({ entry }) =>
+      entry.resolved ? blobOf(entry) : undefined,
+    );
+    if (!seeded.every((blob) => blob)) {
+      update({
+        files: paths.map(() => null),
+        error: null,
+        loading: true,
+        missing: paths.map(() => false),
+        missingMessages: paths.map(() => null),
+      });
     }
+    let failure: string | null = null;
     void Promise.all(
       acquired.map(async ({ entry }, index): Promise<BlobResult> => {
         let result: DisplayFileRead | undefined;
         try {
           result = await entry.promise;
         } catch (caught) {
-          if (!cancelled) {
-            setError(caught instanceof Error ? caught.message : String(caught));
-          }
+          failure = caught instanceof Error ? caught.message : String(caught);
           return { blob: null, missing: false };
         }
         if (result?.missing || entry.resolved?.missing) {
@@ -341,33 +519,35 @@ export function useDisplayFileBlobs(
             missing: true,
             message: deviceFileMissingMessage(
               result?.missing ? result.reason : undefined,
-              filePaths[index],
+              paths[index],
             ),
           };
         }
-        const url = objectUrlFor(entry);
-        const blob = entry.blob;
-        if (!url || !blob) return { blob: null, missing: true };
-        return {
-          blob: {
-            url,
-            mimeType: entry.resolved?.mimeType ?? "application/octet-stream",
-            blob,
-          },
-          missing: false,
-        };
+        const blob = blobOf(entry);
+        return blob ? { blob, missing: false } : { blob: null, missing: true };
       }),
     ).then((results) => {
-      if (cancelled) return;
-      setFiles(results.map((r) => r.blob));
-      setMissing(results.map((r) => r.missing));
-      setMissingMessages(results.map((r) => r.message ?? null));
-      setLoading(false);
+      update({
+        files: results.map((r) => r.blob),
+        error: failure,
+        loading: false,
+        missing: results.map((r) => r.missing),
+        missingMessages: results.map((r) => r.message ?? null),
+      });
     });
     return () => {
       cancelled = true;
-      for (const { cacheKey, entry } of acquired) release(cacheKey, entry);
+      for (const { cacheKey, entry } of acquired) {
+        entry.stale.delete(onStale);
+        release(cacheKey, entry);
+      }
     };
-  }, [key, unavailableMessage, source]);
-  return { files, error, loading, missing, missingMessages };
+  }, [key, pathsKey, conversationId, unavailableMessage, source, reread]);
+  return {
+    files: state.files,
+    error: state.error,
+    loading: state.loading,
+    missing: state.missing,
+    missingMessages: state.missingMessages,
+  };
 }

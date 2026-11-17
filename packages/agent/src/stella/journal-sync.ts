@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import {
   CompactionEntry,
@@ -11,6 +11,7 @@ import {
   type Harness,
 } from "@earendil-works/pi-durable";
 import type { JournalCheckpoint, JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
+import { boundedReplay } from "./doc-checkpoint.ts";
 
 export type JournalMessage = {
   seq: number;
@@ -141,6 +142,7 @@ export const JournalSyncDoc = defineDoc<JournalSyncState>({
   history: "latest",
   fork: "current",
   initial: () => ({}),
+  checkpointWhen: boundedReplay,
 });
 
 const ENTRY_KIND = { user: "pi.user", assistant: "pi.assistant", toolResult: "pi.tool-result" } as const;

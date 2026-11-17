@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { ExecutionContextSnapshot } from "@stella/contracts/execution-context";
 import type { StellaPromptEnvironment } from "@stella/contracts/stella-prompts";
 import type { ConversationId } from "@earendil-works/pi-durable";

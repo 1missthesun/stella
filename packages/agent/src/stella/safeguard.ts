@@ -6,7 +6,7 @@
  * over. Entries are immutable, so compaction, resume and another engine's
  * session all read the edited context; nothing is deleted from the history.
  */
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import {
   CompactionEntry,
@@ -30,6 +30,7 @@ import {
   type SafeguardFold,
 } from "@stella/contracts/safeguard-block";
 import { journalSeqOf } from "./journal-sync.ts";
+import { boundedReplay } from "./doc-checkpoint.ts";
 
 export const SAFEGUARD_ENTRY_KIND = "stella.safeguard";
 
@@ -48,6 +49,7 @@ export const SafeguardDoc = defineDoc<{ fold: SafeguardFold }>({
   history: "latest",
   fork: "initial",
   initial: () => ({ fold: emptySafeguardFold() }),
+  checkpointWhen: boundedReplay,
 });
 
 const MESSAGE_KINDS: ReadonlySet<string> = new Set(["pi.user", "pi.assistant", "pi.tool-result"]);

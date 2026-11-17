@@ -1,6 +1,6 @@
 import { mkdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { EnvTarget } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { defaultAgentDirectory } from "@stella/runtime/kernel/agents/agent-directory";

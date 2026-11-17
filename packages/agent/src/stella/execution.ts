@@ -1,5 +1,5 @@
-import type { Context } from "@earendil-works/chord";
-import { Type } from "@earendil-works/pi-ai";
+import type { Context } from "@earendil-works/chord/context";
+import { bool, obj, opt, str } from "@earendil-works/pi-schema";
 import { defineTool, type ConversationId, type ToolExecutionApi } from "@earendil-works/pi-durable";
 import {
   DEVICE_OFFLINE_POLL_MS,
@@ -148,7 +148,7 @@ export type AgentSwitch = (
   args: { destination: string; prompt?: string; leave_files?: boolean },
   api: ToolExecutionApi,
   context: Context,
-) => Promise<{ content: Array<{ type: "text"; text: string }>; details?: Record<string, string> }>;
+) => Promise<{ output: Array<{ type: "text"; text: string }>; details?: Record<string, string> }>;
 
 export const switchDestinationTool = (
   host: StellaExecutionHost,
@@ -159,15 +159,15 @@ export const switchDestinationTool = (
     name: SWITCH_DESTINATION_TOOL_NAME,
     description:
       'Move yourself, with this whole conversation, to "cloud" or one of the user\'s computers; you continue there from your brief once this turn ends, so end the turn with at most one short line. As Stella, the conversation\'s turns run there from then on and the app\'s destination picker follows. As an agent, that place\'s Stella runs you with its files, apps, browser and sign-ins; your thread id, reports and messages follow you, but your working folder\'s files stay behind: commit and push first (a WIP branch is fine).',
-    parameters: Type.Object({
-      destination: Type.String({
+    parameters: obj({
+      destination: str({
         description: '"cloud" or a device_id.',
       }),
-      prompt: Type.String({
+      prompt: str({
         description: "Your self-contained brief to read there: what you were asked and what to do next.",
       }),
-      leave_files: Type.Optional(
-        Type.Boolean({
+      leave_files: opt(
+        bool({
           description:
             "Agents: move even with uncommitted or unpushed changes, which stay behind.",
         }),
@@ -191,7 +191,7 @@ export const switchDestinationTool = (
           ? { kind: "cloud" }
           : { kind: "device", deviceId: destination.deviceId };
       if (samePlacement(target, rootPlacement)) {
-        return { content: [{ type: "text", text: `You already run on ${describePlacement(rootPlacement)}. Carry on here.` }] };
+        return { output: [{ type: "text", text: `You already run on ${describePlacement(rootPlacement)}. Carry on here.` }] };
       }
       const brief = args.prompt?.trim();
       if (!brief) throw new Error("Pass your brief as prompt: what you will do there, as you will read it there.");
@@ -199,7 +199,7 @@ export const switchDestinationTool = (
       const moved = await moveBrain(target, brief, context);
       if ("error" in moved) throw new Error(moved.error);
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: `You are moving to ${describePlacement(moved.moved)}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,

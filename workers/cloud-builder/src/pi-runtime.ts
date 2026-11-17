@@ -1,5 +1,5 @@
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { Api, Message, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
@@ -22,8 +22,6 @@ import {
   type EntryId,
   LiveDoc,
   ProviderDoc,
-  watchEvents,
-  type AgentEventStream,
   type Conversation,
   type ConversationId,
   type EntryRecord,
@@ -31,6 +29,15 @@ import {
   type SettledSubmissionRecord,
 } from "@earendil-works/pi-durable";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
+import { snapshotPiTablesBeforeUpgrade } from "./pi-table-snapshot.js";
+import {
+  appendedEntries,
+  onConversationChange,
+  resultEntryFor,
+  toolCallArguments,
+  watchConversationEvents,
+  type ConversationEvents,
+} from "@stella/agent/stella/conversation-events";
 import {
   offersAgentTools,
   openStellaHarness,
@@ -561,7 +568,7 @@ export class PiConversationRuntime {
   readonly #live = new Map<string, AgentLease>();
   #brokerClaims: Promise<unknown> = Promise.resolve();
   readonly #waiting = new Map<string, Set<() => void>>();
-  #clientStream: AgentEventStream | undefined;
+  #clientStream: ConversationEvents | undefined;
   #harnessRef: Harness | undefined;
   readonly #agentLog = agentLogSync({
     harness: () => this.#harnessRef,
@@ -1742,6 +1749,8 @@ export class PiConversationRuntime {
       }
       if (kept) this.#state = kept;
       await this.#setModels(kept);
+      // Keep pi's tables as pi-durable 1.1.0 left them before this version migrates them: the way back (pi-table-snapshot.ts).
+      snapshotPiTablesBeforeUpgrade(this.#options.storage);
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
       const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp } = await openStellaHarness(
         {
@@ -1762,6 +1771,15 @@ export class PiConversationRuntime {
         BACKGROUND_CONTEXT,
       );
       this.#harnessRef = harness;
+      // A storage error fails the pi session for good (pi-durable 1.2): the next use opens it again from storage,
+      // and clients attach to the new one.
+      const opening = this.#opening;
+      void harness.closed.then((end) => {
+        if (end.kind !== "failed" || this.#opening !== opening) return;
+        this.#opening = undefined;
+        this.#clientStream = undefined;
+        this.#options.report(new Error("The conversation's pi session failed; it opens again.", { cause: end.error }));
+      });
       const root = await harness.root(BACKGROUND_CONTEXT);
       const { contextStartSeq } = await this.#options.journalStart();
       if (await alignJournalContext(harness, root, contextStartSeq, BACKGROUND_CONTEXT)) {
@@ -2268,33 +2286,61 @@ export class PiConversationRuntime {
     onEntry: (entry: EntryRecord) => void,
     context: Context,
     onTool?: (tool: PiToolActivity) => void,
-  ): Promise<AgentEventStream> {
-    const { harness, root } = await this.open();
-    const stream = await watchEvents(harness, root.id, context);
+  ): Promise<{ stop(): Promise<unknown> }> {
+    const { root } = await this.open();
     let last = afterEntryId;
     const take = (entry: EntryRecord) => {
       if (entry.id <= last) return;
       last = entry.id;
       onEntry(entry);
     };
-    for (const entry of stream.snapshot.entries) take(entry);
-    stream.start(async (events) => {
-      for (const event of events) {
-        if (event.type === "message_end" || event.type === "entry_appended") take(event.entry);
-        else if (event.type === "snapshot") for (const entry of event.entries) take(entry);
-        else if (event.type === "tool_execution_start") {
-          onTool?.({ toolCallId: event.toolCallId, name: event.toolName, phase: "start", args: event.args });
-        } else if (event.type === "tool_execution_end") {
-          const result = event.entry?.model?.[0] as { role?: string; isError?: boolean } | undefined;
-          onTool?.({
-            toolCallId: event.toolCallId,
-            name: event.toolName,
-            phase: "end",
-            isError: result?.role === "toolResult" && result.isError === true,
-          });
+    const toolSlots = (view: { docs: Readonly<Record<string, unknown>> }) =>
+      ((view.docs["pi.live"] as { tools?: Array<{ callId: string; name: string; status: string; entry?: number }> } | undefined)
+        ?.tools ?? []);
+    // The window starts right after the last entry mirrored; when more came since than it holds, the gap is paged first.
+    const stream = await onConversationChange(
+      root,
+      context,
+      (before, after) => {
+        const slotsBefore = new Map(toolSlots(before).map((slot) => [slot.callId, slot]));
+        const slots = toolSlots(after);
+        for (const slot of slots) {
+          if (slot.status === "running" && slotsBefore.get(slot.callId)?.status !== "running") {
+            onTool?.({ toolCallId: slot.callId, name: slot.name, phase: "start", args: toolCallArguments(after.entries, slot.callId) });
+          }
         }
-      }
-    });
+        const added = appendedEntries(before, after);
+        const ended = (callId: string, name: string, entryId: number | undefined) => {
+          const result = after.entries.find((entry) => entry.id === entryId)?.model?.[0] as
+            | { role?: string; isError?: boolean }
+            | undefined;
+          onTool?.({ toolCallId: callId, name, phase: "end", isError: result?.role === "toolResult" && result.isError === true });
+        };
+        for (const previous of slotsBefore.values()) {
+          if (previous.status === "done") continue;
+          const slot = slots.find((candidate) => candidate.callId === previous.callId);
+          if (slot?.status === "done") ended(previous.callId, previous.name, slot.entry);
+          else if (slot === undefined) ended(previous.callId, previous.name, resultEntryFor(added, previous.callId)?.id);
+        }
+        for (const entry of added) take(entry);
+      },
+      { from: (afterEntryId + 1) as EntryId },
+    );
+    const first = stream.view;
+    if (first.before !== undefined && first.before > afterEntryId) {
+      let cursor: Parameters<typeof root.entries>[2];
+      do {
+        const page = await root.entries(
+          { minEntryId: (afterEntryId + 1) as EntryId, maxEntryId: first.before, order: "ascending" },
+          CLIENT_HISTORY_PAGE,
+          cursor,
+          context,
+        );
+        for (const entry of page.items) take(entry);
+        cursor = page.next;
+      } while (cursor !== undefined);
+    }
+    for (const entry of first.entries) take(entry);
     return stream;
   }
 
@@ -2310,14 +2356,12 @@ export class PiConversationRuntime {
   ): Promise<{ snapshot: unknown; hasOlder: boolean }> {
     const { harness, root } = await this.open();
     const previous = this.#clientStream;
-    const stream = await watchEvents(harness, root.id, context);
+    const stream = await watchConversationEvents(harness, root, context);
     this.#clientStream = stream;
-    const [snapshot] = piEventsForClients([stream.snapshot as unknown as PiChatEvent]) as [
-      Extract<PiChatEvent, { type: "snapshot" }>,
-    ];
+    const [snapshot] = piEventsForClients([stream.snapshot]) as [Extract<PiChatEvent, { type: "snapshot" }>];
     if (previous) onEvents([snapshot]);
     stream.start(async (events) => {
-      if (this.#clientStream === stream) onEvents(piEventsForClients(events as unknown as PiChatEvent[]));
+      if (this.#clientStream === stream) onEvents(piEventsForClients(events));
     });
     await previous?.stop().catch(() => undefined);
     const page = await root.entries({}, CLIENT_HISTORY_PAGE, undefined, context);
@@ -2408,9 +2452,9 @@ const conversationImagesExtension = (images: ConversationImages) =>
     hooks: [
       hook(ToolTask, {
         afterTool: async (_call, result) => {
-          if (!result.content) return undefined;
-          const content = await images.storeContent(result.content);
-          return content === result.content ? undefined : { ...result, content: [...content] };
+          if (!result.output) return undefined;
+          const output = await images.storeContent(result.output);
+          return output === result.output ? undefined : { ...result, output: [...output] };
         },
       }),
     ],

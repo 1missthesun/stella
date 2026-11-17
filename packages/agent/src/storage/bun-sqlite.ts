@@ -11,6 +11,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { SqliteDatabase, SqliteExecutor, SqliteValue } from "@earendil-works/pi-durable/storage/sqlite";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
+import { snapshotBeforePiUpgrade } from "./pi-snapshot.ts";
 
 const WAL_AUTO_CHECKPOINT_PAGES = 1_000;
 const BUSY_TIMEOUT_MS = 5_000;
@@ -56,6 +57,8 @@ class SerialQueue {
   }
 }
 
+const STATEMENT_CACHE_SIZE = 256;
+
 /** bun:sqlite returns BLOBs as Uint8Array and integers as numbers (or bigint with safeIntegers). */
 const bindings = (params: readonly SqliteValue[]): SQLQueryBindings[] => params as SQLQueryBindings[];
 
@@ -79,6 +82,10 @@ abstract class BunSqliteExecutor implements SqliteExecutor {
     });
   }
 
+  runCounted(sql: string, ...params: SqliteValue[]): Promise<number> {
+    return this.runOperation(() => Number(this.statement(sql).run(...bindings(params)).changes));
+  }
+
   get<T extends object>(sql: string, ...params: SqliteValue[]): Promise<T | undefined> {
     return this.runOperation(() => (this.statement(sql).get(...bindings(params)) ?? undefined) as T | undefined);
   }
@@ -87,11 +94,24 @@ abstract class BunSqliteExecutor implements SqliteExecutor {
     return this.runOperation(() => this.statement(sql).all(...bindings(params)) as T[]);
   }
 
+  /**
+   * Prepared statements, most recently used last. Bounded like Chord's own
+   * SQLite drivers: SQL whose shape varies (a query builder's) would otherwise
+   * keep every statement it ever prepared.
+   */
   private statement(sql: string): Statement {
     let statement = this.statements.get(sql);
     if (statement === undefined) {
       statement = this.database.prepare(sql);
-      this.statements.set(sql, statement);
+    } else {
+      this.statements.delete(sql);
+    }
+    this.statements.set(sql, statement);
+    while (this.statements.size > STATEMENT_CACHE_SIZE) {
+      const oldest = this.statements.keys().next().value;
+      if (oldest === undefined) break;
+      this.statements.get(oldest)?.finalize();
+      this.statements.delete(oldest);
     }
     return statement;
   }
@@ -176,6 +196,8 @@ export async function openBunSqliteDatabase(path: string): Promise<BunSqliteData
   }
 }
 
+/** Opens pi's storage in one SQLite file, keeping a copy of a pi-durable 1.1.0 file before it is migrated. */
 export async function openBunSqliteStorage(path: string): Promise<SqliteStorage> {
+  await snapshotBeforePiUpgrade(path);
   return SqliteStorage.open(await openBunSqliteDatabase(path));
 }

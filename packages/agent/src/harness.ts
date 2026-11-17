@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { ModelThinkingLevel, Models } from "@earendil-works/pi-ai";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
 import type { AgentStopResult } from "@stella/contracts/backend/agent-threads";

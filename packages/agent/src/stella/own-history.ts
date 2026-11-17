@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { ConversationId, EntryId, EntryRecord, Harness } from "@earendil-works/pi-durable";
 import { answerOwnHistory, withoutThinking, type OwnHistoryRow, type OwnHistorySql } from "@stella/contracts/history-search";
 import { MAX_AGENT_DEPTH } from "./agent-doc.ts";

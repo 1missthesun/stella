@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { ConversationId, ToolExecutionApi, ToolRegistration, Tx, Wrap } from "@earendil-works/pi-durable";
 import { PI_ASK_FIRST_PREFIX } from "@stella/contracts/pi-chat";
 import { StellaAgentDoc } from "./agent-doc.ts";
@@ -179,7 +179,7 @@ export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
         const reply = await askStella(host, name, input, api, context);
         if (reply === undefined) return await tool.execute(args, api, context);
         await markPass(api, name, context);
-        return { content: [{ type: "text", text: repliedText(name, reply) }] };
+        return { output: [{ type: "text", text: repliedText(name, reply) }] };
       },
     }),
   }));

@@ -20,8 +20,6 @@ import {
   type ContextEdit,
   defineDoc,
   LiveDoc,
-  watchEvents,
-  type AgentEventStream,
   type Conversation,
   type ConversationId,
   type Cursor,
@@ -153,6 +151,12 @@ import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
 import { afterStop, stopStella } from "../stella/stop.ts";
+import {
+  appendedEntries,
+  onConversationChange,
+  watchConversationEvents,
+  type ConversationEvents,
+} from "../stella/conversation-events.ts";
 import { ownHistoryQuery } from "../stella/own-history.ts";
 import { ownHistorySql } from "@stella/runtime/kernel/storage/own-history-sql";
 import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
@@ -163,6 +167,7 @@ import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/
 import { agentMoveModel } from "../stella/agent-move-model.ts";
 import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
 import { fetchWithDeadline, REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
+import { boundedReplay } from "../stella/doc-checkpoint.ts";
 
 const HISTORY_PAGE = 200;
 const CLIENT_PAGE_BYTES = 2 * 1024 * 1024;
@@ -432,8 +437,8 @@ type Chat = {
   journalAdvanced?(): void;
   localLog?: LocalLogMirror;
   execution: DesktopExecution;
-  stream?: AgentEventStream;
-  safeguardStream: AgentEventStream;
+  stream?: ConversationEvents;
+  safeguardStream: { stop(): Promise<unknown> };
   watchers: number;
   idleCheck: ReturnType<typeof setInterval>;
   followCheck: ReturnType<typeof setInterval>;
@@ -457,6 +462,7 @@ const LocaleDoc = defineDoc<{ locale?: string }>({
   history: "latest",
   fork: "current",
   initial: () => ({}),
+  checkpointWhen: boundedReplay,
 });
 
 const fileName = (conversationId: string): string => {
@@ -1916,21 +1922,38 @@ export function desktopChats(options: DesktopChatsOptions) {
             });
         }, FOLLOW_MS);
         followCheck.unref?.();
-        const safeguardStream = await watchEvents(harness, root.id, context);
-        safeguardStream.start(async (events) => {
+        // Every answer the conversation gains either raises a safety block or clears one.
+        const safeguardStream = await onConversationChange(root, context, async (before, after) => {
           const noted: SafeguardEvent[] = [];
-          for (const event of events as unknown as PiChatEvent[]) {
-            if (event.type !== "message_end" || event.entry.kind !== "pi.assistant") continue;
-            const message = event.entry.model?.[0] as AssistantMessage | undefined;
+          for (const entry of appendedEntries(before, after)) {
+            if (entry.kind !== "pi.assistant") continue;
+            const message = entry.model?.[0] as AssistantMessage | undefined;
             if (!message) continue;
             if (isSafeguardBlock(message)) {
-              noted.push({ e: "blocked", turnId: `entry:${event.entry.id}`, info: safeguardInfoOf(message) });
+              noted.push({ e: "blocked", turnId: `entry:${entry.id}`, info: safeguardInfoOf(message) });
             } else if (message.stopReason === "stop") {
               noted.push({ e: "replied" });
             }
           }
           if (noted.length > 0) await noteSafeguard(conversationId, { harness, root }, noted).catch(options.report);
         });
+        // A storage error fails the pi session for good (pi-durable 1.2): drop this chat so the next use opens it
+        // again from storage, and put a watching window back on the reopened one.
+        const self = chats.get(conversationId);
+        void harness.closed.then(async (end) => {
+          if (end.kind !== "failed" || chats.get(conversationId) !== self) return;
+          chats.delete(conversationId);
+          options.report(new Error(`The pi session of ${conversationId} failed; it opens again.`, { cause: end.error }));
+          clearInterval(idleCheck);
+          clearInterval(followCheck);
+          const watchers = opened?.watchers ?? 0;
+          await Promise.allSettled([mirror?.stop(), safeguardStream.stop(), localLog?.stop(), opened?.stream?.stop()]);
+          if (watchers === 0) return;
+          const reopened = await open(conversationId);
+          reopened.watchers += watchers;
+          const stream = await attach(conversationId, reopened);
+          options.emit({ conversationId, events: eventsForClients([stream.snapshot]) });
+        }).catch((error: unknown) => options.report(error));
         opened = {
           harness,
           root,
@@ -1980,17 +2003,16 @@ export function desktopChats(options: DesktopChatsOptions) {
       ),
     );
 
-  const attach = async (conversationId: string, chat: Chat): Promise<AgentEventStream> => {
+  const attach = async (conversationId: string, chat: Chat): Promise<ConversationEvents> => {
     const previous = chat.stream;
-    const stream = await watchEvents(chat.harness, chat.root.id, context);
+    const stream = await watchConversationEvents(chat.harness, chat.root, context);
     chat.stream = stream;
-    if (options.userReminders) chat.reminderContext = reminderContextFrom(stream.snapshot.entries);
     stream.start(async (events) => {
       if (chat.stream !== stream) return;
-      options.emit({ conversationId, events: eventsForClients(events as unknown as PiChatEvent[]) });
+      options.emit({ conversationId, events: eventsForClients(events) });
     });
     if (previous) {
-      options.emit({ conversationId, events: eventsForClients([stream.snapshot as unknown as PiChatEvent]) });
+      options.emit({ conversationId, events: eventsForClients([stream.snapshot]) });
       await previous.stop().catch(() => undefined);
     }
     return stream;
@@ -2002,7 +2024,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     chat.watchers += 1;
     const stream = await attach(conversationId, chat);
     const { entries, hasOlder } = await history(chat);
-    const [snapshot] = eventsForClients([stream.snapshot as unknown as PiChatEvent]) as [PiChatWatchResult["snapshot"]];
+    const [snapshot] = eventsForClients([stream.snapshot]) as [PiChatWatchResult["snapshot"]];
     const held = usageLimitEvent(conversationId);
     if (held) options.emit({ conversationId, events: [held] });
     const waiting = loginHoldEvent(conversationId);
@@ -2195,20 +2217,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       }
       if (piUserView(user).text.trim() && !isPiAgentInput(user)) into.previousUserAt = user.timestamp;
     }
-  };
-
-  const reminderContextFrom = (entries: readonly EntryRecord[]): ReminderContext | undefined => {
-    const first = entries[0];
-    if (!first) return undefined;
-    const edits = new Map<EntryId, ContextEdit>();
-    for (const entry of entries) for (const edit of entry.edits ?? []) edits.set(edit.target, edit);
-    const into: ReminderContext = { tail: first.id, shown: new Set() };
-    for (const entry of entries) {
-      const edit = edits.get(entry.id);
-      noteUserMessages(edit?.action === "omit" ? [] : edit?.action === "replace" ? edit.messages : (entry.model ?? []), into);
-      if (entry.id > into.tail) into.tail = entry.id;
-    }
-    return into;
   };
 
   const reminderContextOf = async (chat: Chat): Promise<Pick<ReminderContext, "previousUserAt" | "shown">> => {
@@ -2462,8 +2470,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     try {
       const chat = await ready(conversationId);
       placement.chat = chat;
-      const observer = observe ? await watchEvents(chat.harness, chat.root.id, context) : undefined;
-      observer?.start(async (events) => observe?.(events as unknown as PiChatEvent[]));
+      const observer = observe ? await watchConversationEvents(chat.harness, chat.root, context) : undefined;
+      observer?.start(async (events) => observe?.(events));
       try {
         return await automationTurn(conversationId, chat, turn);
       } finally {

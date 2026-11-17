@@ -1,5 +1,6 @@
-import type { Context } from "@earendil-works/chord";
-import { Type, type AssistantMessage, type ModelThinkingLevel, type TextContent } from "@earendil-works/pi-ai";
+import type { Context } from "@earendil-works/chord/context";
+import type { AssistantMessage, ModelThinkingLevel, TextContent } from "@earendil-works/pi-ai";
+import { lit, obj, opt, str } from "@earendil-works/pi-schema";
 import {
   AgentDoc,
   AssistantEntry,
@@ -21,6 +22,8 @@ import {
   type ModelRef,
   type TaskRuntime,
   type ToolExecutionApi,
+  type RunFailureReason,
+  type SettledSubmissionRecord,
 } from "@earendil-works/pi-durable";
 import {
   AGENT_MESSAGE_MAX_CHARS,
@@ -94,6 +97,8 @@ import {
   type SpawnDestination,
   type StellaPlacement,
 } from "./placement.ts";
+import { boundedReplay } from "./doc-checkpoint.ts";
+import { runFailureText } from "./conversation-events.ts";
 
 export const STELLA_AGENTS_EXTENSION = "stella-agents";
 /** Tasks only: the orchestrator's agent removes it. */
@@ -222,6 +227,7 @@ export const StellaAgentsDoc = defineDoc<StellaAgents>({
   history: "latest",
   fork: "initial",
   initial: () => ({ agents: {}, calls: {} }),
+  checkpointWhen: boundedReplay,
 });
 
 const PLACED_CALL_PREFIX = "placed:";
@@ -573,6 +579,10 @@ const agentFailureText = (message: AssistantMessage | undefined): string =>
 export const unansweredText = (settled: { reason: string; detail?: unknown }): string => {
   const detail = typeof settled.detail === "string" ? settled.detail.trim() : "";
   if (detail && isSafeguardBlockText(detail)) return safeguardTaskFailure(undefined);
+  if (settled.reason !== "model_error") {
+    const said = runFailureText({ reason: settled.reason as RunFailureReason, ...(detail ? { detail } : {}) });
+    if (said) return said;
+  }
   return detail ? detail.replace(ENGINE_ERROR_MARK, "") : settled.reason;
 };
 const ENGINE_ERROR_MARK = /^\s*\[[a-z-]+\/[a-z-]+\]\s*/;
@@ -635,7 +645,7 @@ type ReporterState =
     };
 
 const REPORTER_TASK = "stella.agent-reporter";
-const LIVE_TASK_STATUSES = ["pending", "running", "waiting", "completing"] as const;
+const LIVE_TASK_STATUSES = ["pending", "running", "waiting", "sleeping", "completing"] as const;
 
 type BusyReader = {
   agents(conversationId: ConversationId): Promise<Readonly<{ agents: Readonly<Record<string, AgentRecord>> }> | undefined>;
@@ -746,7 +756,7 @@ const CLAUDE_SIGN_IN_HELD_NOTE =
   "But its run is waiting for a Claude sign-in on this computer (the Claude login here ended), so it reads your message only once someone signs in to Claude here.";
 
 const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDelivery["outcome"] | "answered"; note?: string }) => ({
-  content: [
+  output: [
     {
       type: "text" as const,
       text: `Delivered to ${delivery.threadId}. ${
@@ -767,7 +777,7 @@ const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDel
 });
 
 const statusResult = (view: Record<string, unknown>) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(view) }],
+  output: [{ type: "text" as const, text: JSON.stringify(view) }],
 });
 
 type DirectoryLedger = {
@@ -857,7 +867,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           attempt: attemptOf(siblings, threadId, Number(reporter.id)),
           description: siblings?.agents[threadId]?.description ?? threadId,
         };
-        let settled: Awaited<ReturnType<Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof runtime.conversation>>>["submit"]>>["wait"]>> | undefined;
+        let settled: SettledSubmissionRecord | undefined;
         let refused: string | undefined;
         let end: AgentRunEnd = {};
         let submitted = false;
@@ -1408,34 +1418,34 @@ export function stellaAgents(host: StellaAgentsHost) {
     name: "spawn_agent",
     description:
       "Start a background agent. It sees your brief and the user's standing rules, never this conversation. Returns its thread_id at once; its final report arrives later as [Agent completed].",
-    parameters: Type.Object({
-      description: Type.String({
+    parameters: obj({
+      description: str({
         description: "The agent's name: its area (\"Finance\") or, for a one-off, the work. Distinguishing words first.",
       }),
-      prompt: Type.String({
+      prompt: str({
         description:
           "The brief: the request and what the agent can't know. The user's standing rules are already in its context, so a brief that repeats one adds nothing.",
       }),
-      model: Type.Optional(
-        Type.String({
+      model: opt(
+        str({
           description:
             "Omit to use the configured model. Otherwise `stella/default`, `<provider>/<model>` on the user's own key or plan (e.g. `codex/gpt-6.1-sol`), or `claude-code` / `claude-code/<model>`; append `:low`, `:medium`, `:high`, `:xhigh` or `:max` for reasoning.",
         }),
       ),
-      destination: Type.Optional(
-        Type.String({
+      destination: opt(
+        str({
           description:
             'Omit to run it where you run. Otherwise "cloud" or a device_id: the agent runs entirely there, with that machine\'s files, apps, browser, sign-ins and Claude Code. Its reports still come to you. An offline computer is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on.',
         }),
       ),
-      directory: Type.Optional(
-        Type.String({
+      directory: opt(
+        str({
           description:
             "Omit to start in a fresh folder. Otherwise an absolute path on this computer to start in (not with destination); its AGENTS.md joins the agent's context.",
         }),
       ),
-      workspace: Type.Optional(
-        Type.Literal("large", {
+      workspace: opt(
+        lit("large", {
           description:
             'Cloud agents only. A cloud agent\'s container has 4 GiB of memory and a 12 GB disk; "large" gives it a 20 GB disk, for installing or building a big repository (several GB of dependencies, like a monorepo). An agent whose container runs out of memory or disk gets a larger one for its next run.',
         }),
@@ -1531,7 +1541,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             ? `${describePlacement(where)} is asking the user on its screen to allow work from other devices, so it starts once they allow it there (it waits for that, up to a week). Tell the user to answer that prompt on ${describePlacement(where)}.`
             : `${describePlacement(where)} can't take it yet (not ready, or waiting for the user to allow work from other devices there), so it starts once it can (it waits for that, up to a week). Tell the user.`;
         return {
-          content: [
+          output: [
             {
               type: "text",
               text: [
@@ -1569,7 +1579,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       );
       await api.details({ thread_id: threadId }, context);
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}).\n${STARTED_NOTE}`,
@@ -1621,7 +1631,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         return undefined;
       }, context);
       return {
-        content: [
+        output: [
           {
             type: "text" as const,
             text: "Queued for Stella: it goes out once you take your next step, or as part of your final report if you finish now, so don't repeat it there.",
@@ -1641,7 +1651,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     }
     if (typeof sent === "object") return deliveredResult(sent);
     return {
-      content: [
+      output: [
         {
           type: "text" as const,
           text: "Delivered to Stella, which reads it as its next turn. Your final report still goes back on its own.",
@@ -1829,11 +1839,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     name: "send_message",
     description:
       'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on. With destination, an agent you started whose computer is offline or unavailable continues there instead, with its history.',
-    parameters: Type.Object({
-      thread_id: Type.String({ description: 'A thread_id from agent_status, or "stella".' }),
-      message: Type.String({ description: "The message. To your own agent, only what is new." }),
-      destination: Type.Optional(
-        Type.String({ description: 'Optional: "cloud" or a device_id. The agent continues there, with this message as its instruction.' }),
+    parameters: obj({
+      thread_id: str({ description: 'A thread_id from agent_status, or "stella".' }),
+      message: str({ description: "The message. To your own agent, only what is new." }),
+      destination: opt(
+        str({ description: 'Optional: "cloud" or a device_id. The agent continues there, with this message as its instruction.' }),
       ),
     }),
     replay: "safe",
@@ -1934,7 +1944,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       state.calls[callKey] = { threadId, reporter: -1 };
       noteRemote(state, threadId, { kind: "messaged" });
     }, context);
-    return { content: [{ type: "text" as const, text: agentMoveText(moved) }] };
+    return { output: [{ type: "text" as const, text: agentMoveText(moved) }] };
   };
 
   const expectRemoteReport = (
@@ -2159,7 +2169,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       sessions: elsewhere?.sessions ?? [],
       ...(elsewhere?.unavailable ? { unavailable: elsewhere.unavailable } : {}),
     });
-    return { content: [{ type: "text" as const, text: listing }] };
+    return { output: [{ type: "text" as const, text: listing }] };
   };
 
   const messageOther = async (
@@ -2293,8 +2303,8 @@ export function stellaAgents(host: StellaAgentsHost) {
     name: "agent_status",
     description:
       "Read-only; for when the user asks how work is going or you need a failure's detail. Without thread_id: everyone you can reach, one line each (thread_id · status · where, when not this computer · last active — name): your agents, teammates, other Stella sessions and cloud sessions; the newest are listed, and older ones stay resumable by a thread_id from history. With thread_id: its status, where it runs, who started it, a short preview of its latest message (not its result) and its latest tool call. A running agent on one call past every time limit says so (status and `long_call`, with that call's latest output): it may be stuck, and stop_agent ends it. An agent's full report arrives on its own as [Agent completed]. reachable: false means neither send_message nor stop_agent can reach it from here.",
-    parameters: Type.Object({
-      thread_id: Type.Optional(Type.String({ description: "Optional: the agent to inspect." })),
+    parameters: obj({
+      thread_id: opt(str({ description: "Optional: the agent to inspect." })),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
@@ -2419,8 +2429,8 @@ export function stellaAgents(host: StellaAgentsHost) {
     name: "stop_agent",
     description:
       "Pause or stop an agent at once, with every agent it started, wherever they run. Nothing is lost and it sends no report; a later send_message resumes it where it was.",
-    parameters: Type.Object({
-      thread_id: Type.String({ description: "The agent's thread_id." }),
+    parameters: obj({
+      thread_id: str({ description: "The agent's thread_id." }),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
@@ -2433,10 +2443,10 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (target) {
         const { elsewhere, endedProcesses } = await stopSubtree(api, target, root ?? (api.conversationId as ConversationId), context);
         const there = elsewhere.find((result) => result.threadId === threadId);
-        if (there) return { content: [{ type: "text", text: agentStopText(there) }] };
+        if (there) return { output: [{ type: "text", text: agentStopText(there) }] };
         const others = elsewhere.flatMap((result) => [result, ...(result.descendants ?? [])]).filter((result) => result.outcome !== "not_running");
         return {
-          content: [
+          output: [
             {
               type: "text",
               text: `Stopped ${threadId}${others.length ? ` and, elsewhere, ${others.map((result) => `${result.threadId} (${result.where})`).join(", ")}` : ""}. Each keeps its history; send_message resumes it.${endedProcesses > 0 ? ` Their running processes (${endedProcesses}: shells, servers, builds and the like) ended too; when you resume one, tell it to start again what it still needs.` : ""}`,
@@ -2448,7 +2458,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         { key: String(api.taskId), threadId, ...(stella || !self.threadId ? {} : { requesterThreadId: self.threadId }) },
         context,
       );
-      if (stopped) return { content: [{ type: "text", text: agentStopText(stopped) }] };
+      if (stopped) return { output: [{ type: "text", text: agentStopText(stopped) }] };
       throw new Error(
         stella
           ? `No agent ${threadId} here. agent_status without a thread_id lists who you can reach.`
@@ -3016,7 +3026,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (where !== AGENT_MOVE_CLOUD) await untilOnline(execution?.standing, where, context);
     const target = await agentTarget(where, { claudeCode: onClaudeCode(agent?.model) }, context);
     if ("error" in target) throw new Error(target.error);
-    if (target.here) return { content: [{ type: "text", text: `You already run on ${target.name}. Carry on here.` }] };
+    if (target.here) return { output: [{ type: "text", text: `You already run on ${target.name}. Carry on here.` }] };
     if (await agentsBusy(busyReader(api, context), api.conversationId).catch(() => false)) {
       throw new Error(
         "Agents you started are still at work here, and they stay here. Wait for their reports (or stop them), then move.",
@@ -3033,7 +3043,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       role.moving = { deviceId: target.deviceId, name: target.name, brief, key: String(api.taskId) };
     }, context);
     return {
-      content: [
+      output: [
         {
           type: "text",
           text: `You move to ${target.name} as soon as this turn ends: its own Stella continues you there with this whole conversation and your brief, under the same thread id, and your reports, messages and stops follow you.${
@@ -3150,8 +3160,8 @@ export function stellaAgents(host: StellaAgentsHost) {
   const endTurnWaiting = defineTool({
     name: END_TURN_WAITING_TOOL,
     description: END_TURN_WAITING_DESCRIPTION,
-    parameters: Type.Object({
-      waiting_for: Type.String({ description: END_TURN_WAITING_PARAMETERS.properties.waiting_for.description }),
+    parameters: obj({
+      waiting_for: str({ description: END_TURN_WAITING_PARAMETERS.properties.waiting_for.description }),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
@@ -3166,7 +3176,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           ...(latest ? { afterEntry: Number(latest.id) } : {}),
         };
       }, context);
-      return { content: [{ type: "text", text: endTurnWaitingResult(waitingFor) }], details: { waitingFor } };
+      return { output: [{ type: "text", text: endTurnWaitingResult(waitingFor) }], details: { waitingFor } };
     },
   });
 

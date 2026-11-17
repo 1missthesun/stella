@@ -1,8 +1,9 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { Message, UserMessage } from "@earendil-works/pi-ai";
 import { defineDoc, GenerationTask, hook, type ConversationId, type Harness } from "@earendil-works/pi-durable";
 import { piUserHidden, type PiPartMarks, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { appendMessageRefTag, formatMessageRefTag } from "@stella/contracts/reply-refs";
+import { boundedReplay } from "./doc-checkpoint.ts";
 
 const MAX_IDS = 2_000;
 const RECORD_WAIT_MS = 5_000;
@@ -18,6 +19,7 @@ export const StellaMessageIdsDoc = defineDoc<{ ids: Record<string, number> }>({
   history: "latest",
   fork: "current",
   initial: () => ({ ids: {} }),
+  checkpointWhen: boundedReplay,
 });
 
 export async function recordMessageId(

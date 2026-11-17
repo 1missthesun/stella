@@ -9,7 +9,7 @@ import {
   type SafeguardEvent,
 } from "@stella/contracts/safeguard-block";
 import { randomUUID } from "node:crypto";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import {
   AssistantEntry,
@@ -19,8 +19,6 @@ import {
   LiveDoc,
   ROOT_CONVERSATION_ID,
   ToolTask,
-  watchEvents,
-  type AgentEventStream,
   type Conversation,
   type EntryId,
   type EntryRecord,
@@ -56,6 +54,7 @@ import {
 } from "../stella/journal-sync.ts";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
 import { stopStella } from "../stella/stop.ts";
+import { appendedEntries, onConversationChange, runEnded, toolFinished } from "../stella/conversation-events.ts";
 
 export type JournalReadRecord = {
   seq: number;
@@ -203,7 +202,6 @@ export type JournalMirror = {
 
 const PAGE = 100;
 const REMOTE_TURN_STALE_MS = 30 * 60_000;
-const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "tool_execution_end", "run_end"]);
 const LEASE_SILENCE = "lease_renewal_silence";
 const FINISH_FAILED = "finish:";
 const CONFIRM_RETRY_MS = 10_000;
@@ -913,9 +911,9 @@ export async function journalMirror(args: {
       })
     : Promise.resolve(true);
 
-  const stream: AgentEventStream = await watchEvents(harness, root.id, context);
-  stream.start(async (events) => {
-    if ((events as Array<{ type: string }>).some((event) => MIRRORED_EVENTS.has(event.type))) sync();
+  // Mirror when the conversation gains entries, a tool call finishes or a run ends.
+  const stream = await onConversationChange(root, context, (before, after) => {
+    if (appendedEntries(before, after).length > 0 || toolFinished(before, after) || runEnded(before, after)) sync();
   });
   sync();
 

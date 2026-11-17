@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import {
   CompactionEntry,
@@ -22,6 +22,7 @@ import {
 } from "@stella/contracts/backend/agent-logs";
 import { StellaAgentDoc } from "./agent-doc.ts";
 import { importJournal, journalSeqOf, JournalSyncDoc, type JournalMessage, type JournalSeed } from "./journal-sync.ts";
+import { boundedReplay } from "./doc-checkpoint.ts";
 
 export type AgentLogState = {
   syncId?: string;
@@ -37,6 +38,7 @@ export const AgentLogDoc = defineDoc<AgentLogState>({
   history: "latest",
   fork: "initial",
   initial: () => ({}),
+  checkpointWhen: boundedReplay,
 });
 
 export type AgentLogTransport = {

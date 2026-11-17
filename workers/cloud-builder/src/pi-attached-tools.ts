@@ -1,4 +1,5 @@
-import type { Context, JsonValue } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
+import type { JsonValue } from "@earendil-works/chord/json";
 import type { TSchema } from "@sinclair/typebox";
 import { defineExtension, type Extension } from "@earendil-works/pi-durable";
 import { STELLA_CODING_EXTENSION } from "@stella/agent/stella/coding";
@@ -79,7 +80,7 @@ const asResult = (result: SerializedAgentToolResult) => {
     details = undefined;
   }
   return {
-    content: [{ type: "text" as const, text: text || "(no output)" }, ...images],
+    output: [{ type: "text" as const, text: text || "(no output)" }, ...images],
     ...(result.outcome.kind === "error" ? { isError: true } : {}),
     ...(details === undefined ? {} : { details }),
   };

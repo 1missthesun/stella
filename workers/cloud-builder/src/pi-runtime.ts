@@ -1750,7 +1750,7 @@ export class PiConversationRuntime {
       if (kept) this.#state = kept;
       await this.#setModels(kept);
       // Keep pi's tables as pi-durable 1.1.0 left them before this version migrates them: the way back (pi-table-snapshot.ts).
-      snapshotPiTablesBeforeUpgrade(this.#options.storage);
+      if (snapshotPiTablesBeforeUpgrade(this.#options.storage) === "taken") this.#options.log("pi_tables_kept_before_upgrade", {});
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
       const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp } = await openStellaHarness(
         {

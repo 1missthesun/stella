@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream, readFileSync, statSync } from "node:fs";
+import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { listDirSafe } from "../browsers.ts";
 import { OS, exists, home, powershell, run } from "../util.ts";
@@ -131,7 +131,14 @@ export const installedApps = async (): Promise<InventoryItem[]> => {
     for (const dir of ["/Applications", home("Applications")]) {
       for (const f of listDirSafe(dir)) {
         if (!f.endsWith(".app")) continue;
-        const plist = path.join(dir, f, "Contents/Info.plist");
+        // Shortcuts to an app that was moved or deleted aren't an installed app.
+        let real: string;
+        try {
+          real = realpathSync(path.join(dir, f));
+        } catch {
+          continue;
+        }
+        const plist = path.join(real, "Contents/Info.plist");
         let version = "";
         let bundleId = "";
         try {
@@ -142,7 +149,7 @@ export const installedApps = async (): Promise<InventoryItem[]> => {
           const r = await run("defaults", ["read", plist.replace(/\.plist$/, ""), "CFBundleShortVersionString"]);
           version = r.stdout.trim();
         }
-        out.push({ key: `app:${dir}/${f}`, kind: "app", name: f.replace(/\.app$/, ""), facts: { version, bundleId, path: path.join(dir, f) } });
+        out.push({ key: `app:${dir}/${f}`, kind: "app", name: f.replace(/\.app$/, ""), facts: { version, bundleId, path: real } });
       }
     }
   } else if (OS === "win32") {
@@ -242,10 +249,11 @@ export const recentDownloads = async (sinceMs: number): Promise<InventoryItem[]>
  */
 export const enrichForJudging = async (items: InventoryItem[]): Promise<void> => {
   if (OS !== "darwin") return;
-  await Promise.all(
-    items
-      .filter((i) => i.kind === "app" && typeof i.facts.path === "string" && i.facts.signedBy === undefined)
-      .map(async (i) => {
+  const todo = items.filter((i) => i.kind === "app" && typeof i.facts.path === "string" && i.facts.signedBy === undefined);
+  // macOS runs Gatekeeper assessments one after another, so a few at a time with a generous limit.
+  for (let n = 0; n < todo.length; n += 3)
+    await Promise.all(
+      todo.slice(n, n + 3).map(async (i) => {
         const file = String(i.facts.path);
         const sig = await run("codesign", ["-dv", "--verbose=2", file], 8000);
         const authority = sig.stderr.match(/Authority=(.+)/)?.[1]?.trim();
@@ -253,9 +261,9 @@ export const enrichForJudging = async (items: InventoryItem[]): Promise<void> =>
         const team = sig.stderr.match(/TeamIdentifier=(.+)/)?.[1]?.trim();
         if (team && team !== "not set") i.facts.teamId = team;
         // Gatekeeper's own verdict: "Notarized Developer ID", "Mac App Store", "Apple System", or rejected.
-        const gk = await run("spctl", ["--assess", "--type", "execute", "-vv", file], 10_000);
+        const gk = await run("spctl", ["--assess", "--type", "execute", "-vv", file], 30_000);
         const source = (gk.stderr + gk.stdout).match(/source=(.+)/)?.[1]?.trim();
         i.facts.checkedByMacOS = source ?? (/rejected/.test(gk.stderr + gk.stdout) ? "rejected" : "unknown");
       }),
-  );
+    );
 };

@@ -18,7 +18,7 @@ import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { listIntegrationActions, listIntegrationCatalog, publishIntegration } from "./catalog.js";
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
 import { X_STATE_KIND, xConnectCodePage, xResultPage } from "./x.js";
-import { GOOGLE_STATE_KIND, googleConnectCodePage, googleResultPage } from "./google.js";
+import { GOOGLE_STATE_KIND, googleConnectCodePage, googleResultPage, isStellaGoogleIntegration, withStellaGoogle } from "./google.js";
 import { formatConnectCode } from "../owner-store/oauth-claims.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { adminAccessDenied } from "../admin/access.js";
@@ -119,8 +119,23 @@ const actions = async (request: Request, env: RouteEnv): Promise<Response> => {
   if (limit !== null && !/^\d{1,3}$/u.test(limit)) return fail(400, "Action page limit must be an integer from 1 to 100.");
   const query = params.get("query")?.trim();
   if (query && query.length > 200) return fail(400, "Action query is too long.");
+  // The caller's own actions: a Google service that runs on Stella's own
+  // Google connection lists Stella's actions, the ones /run executes for it,
+  // not the published Composio catalog's (whose inputs differ).
+  const published = {
+    catalog: async () => [],
+    actions: (args: Parameters<typeof listIntegrationActions>[1]) => listIntegrationActions(env, args),
+  };
+  const source = !isStellaGoogleIntegration(id) ? published : withStellaGoogle(
+    published,
+    async () => {
+      const routes = await internal(env, auth.caller.ownerId, "integrations.googleRoutes", {});
+      if (!routes.ok) throw new Error(routes.error.message);
+      return routes.value as Record<string, "stella" | "composio">;
+    },
+  );
   try {
-    const page = await listIntegrationActions(env, {
+    const page = await source.actions({
       id,
       ...(params.get("action") ? { action: params.get("action")!.trim() } : {}),
       ...(query ? { query } : {}),

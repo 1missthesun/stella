@@ -64,6 +64,9 @@ import {
   NOTHING_CAN_WAKE_MARK,
   nothingCanWakeRefusal,
   nothingCanWakeText,
+  nothingCanWakeNowText,
+  isUnlistedWaker,
+  UNLISTED_WORK_WAKER,
   helperStoppedText,
   parseWaitingFor,
   starterMessageSender,
@@ -3231,8 +3234,39 @@ export function stellaAgents(host: StellaAgentsHost) {
     else if (await askedStarter(store, agentConversationId, role, context).catch(() => false)) {
       found.push("an answer to the question you put to whoever started you");
     }
-    found.push(...(await host.wakeSources(role.threadId).catch(() => ["work of yours on this computer that could not be listed just now"])));
+    found.push(...(await host.wakeSources(role.threadId).catch(() => [UNLISTED_WORK_WAKER])));
     return found;
+  };
+
+  /**
+   * A waiting task whose wakers could not all be listed when it waited is
+   * checked again once they can: with nothing live by then, it hears so.
+   */
+  const recheckWaiting = async (
+    harness: Harness,
+    threadId: string,
+    context: Context,
+  ): Promise<"told" | "live" | "unknown" | "not_waiting"> => {
+    const standing = await agentStanding(harness, threadId, context);
+    if (standing?.status !== "waiting" || !standing.waitingFor) return "not_waiting";
+    const found = await treeAgent(harness, threadId, context);
+    if (!found || found.record.remote || found.record.conversationId < 0) return "not_waiting";
+    const wakers = await wakersOf(harness, found.record.conversationId as ConversationId, context);
+    if (wakers === undefined) return "not_waiting";
+    if (wakers.some((waker) => !isUnlistedWaker(waker))) return "live";
+    if (wakers.length > 0) return "unknown";
+    await messageAgent(
+      harness,
+      {
+        key: `wake-check:${threadId}:${Date.now()}`,
+        threadId,
+        message: nothingCanWakeNowText(standing.waitingFor),
+        fromOrchestrator: true,
+        wake: true,
+      },
+      context,
+    );
+    return "told";
   };
 
   const takeWait = async (
@@ -3340,6 +3374,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     messageAgent,
     stopAgentByThread,
     agentStanding,
+    recheckWaiting,
     runPlacedAgent,
     steerPlacedAgent,
     markCatchUp,

@@ -1,7 +1,7 @@
 import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PiChatRequest, PiChatUsageRequest } from "@stella/contracts/pi-chat";
@@ -27,9 +27,10 @@ import {
   persistPlacementCancellation,
   type PlacementLocalExecutionKind,
 } from "../../kernel/runner/execution-placement-local-ownership.js";
-import type { PiReportDelivery } from "../../kernel/runner/types.js";
+import type { PiReportDelivery, RunnerPublicApi } from "../../kernel/runner/types.js";
 import type { LocalCronJobRecord } from "@stella/contracts/scheduling";
 import { forkDelayed, sleepMs } from "../effect-runtime.js";
+import { UNLISTED_SCHEDULES_WAKER } from "@stella/contracts/agent-waiting";
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
@@ -278,8 +279,65 @@ export const closePiChats = async (session: OpenSession): Promise<void> => {
 const pausedShellsFile = (session: OpenSession) =>
   path.join(session.config.get().stellaDataDirPath, "agent", "stopped-shells.json");
 
+const taskShellsFile = (session: OpenSession) =>
+  path.join(session.config.get().stellaDataDirPath, "agent", "task-shells.json");
+const SHELLS_WORKER = `${process.pid}:${Date.now()}`;
+const quittingSessions = new WeakSet<OpenSession>();
+
+/**
+ * The commands tasks run in the background, kept on disk as they start and
+ * end: a crash leaves no time to save them, so what this file holds at the
+ * next start is what the crash stopped, and each task hears so like after a
+ * quit. A quit saves them to the stopped-shells file and clears this one.
+ */
+export const trackTaskShells = (
+  session: OpenSession,
+  runner: Pick<RunnerPublicApi, "runningTaskShells" | "onTaskShellsChanged">,
+): void => {
+  const file = taskShellsFile(session);
+  try {
+    const left = existsSync(file)
+      ? (JSON.parse(readFileSync(file, "utf8")) as { worker?: string; at?: number; shells?: unknown[] })
+      : undefined;
+    if (left && left.worker !== SHELLS_WORKER && Array.isArray(left.shells) && left.shells.length > 0) {
+      const paused = pausedShellsFile(session);
+      const earlier = existsSync(paused)
+        ? (JSON.parse(readFileSync(paused, "utf8")) as { stoppedAt?: number; shells?: unknown[] })
+        : undefined;
+      mkdirSync(path.dirname(paused), { recursive: true });
+      writeFileSync(
+        paused,
+        JSON.stringify({
+          stoppedAt: earlier?.stoppedAt ?? left.at ?? Date.now(),
+          shells: [...(earlier?.shells ?? []), ...left.shells],
+        }),
+      );
+    }
+    if (left && left.worker !== SHELLS_WORKER) rmSync(file, { force: true });
+  } catch (error) {
+    console.warn("[pi-chat] reading the commands a crash stopped failed", error);
+  }
+  runner.onTaskShellsChanged(() => {
+    if (quittingSessions.has(session)) return;
+    try {
+      const shells = runner.runningTaskShells();
+      if (shells.length === 0) {
+        rmSync(file, { force: true });
+        return;
+      }
+      mkdirSync(path.dirname(file), { recursive: true });
+      const tmp = `${file}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify({ worker: SHELLS_WORKER, at: Date.now(), shells }));
+      renameSync(tmp, file);
+    } catch (error) {
+      console.warn("[pi-chat] recording task commands failed", error);
+    }
+  });
+};
+
 export const quitPiChats = async (session: OpenSession, stop: () => Promise<unknown> | undefined): Promise<void> => {
   markClaudeCodeQuitting();
+  quittingSessions.add(session);
   // Tasks resume after the restart, but the background commands they started
   // die with the app; remember them so each task is told when it resumes.
   try {
@@ -288,6 +346,7 @@ export const quitPiChats = async (session: OpenSession, stop: () => Promise<unkn
       mkdirSync(path.dirname(pausedShellsFile(session)), { recursive: true });
       writeFileSync(pausedShellsFile(session), JSON.stringify({ stoppedAt: Date.now(), shells }));
     }
+    rmSync(taskShellsFile(session), { force: true });
   } catch (error) {
     console.warn("[pi-chat] remembering stopped background commands failed", error);
   }
@@ -706,10 +765,11 @@ const tellTasksOfStoppedShells = async (
   for (const shell of saved.shells ?? []) byAgent.set(shell.agentId, [...(byAgent.get(shell.agentId) ?? []), shell]);
   for (const [agentId, shells] of byAgent) {
     const text = [
-      "Stella restarted on this computer (an update, restart or quit) while you were working; you have picked up where you were.",
-      "These background commands you had started were stopped by the restart and are not running now:",
+      "[wake: Stella restarted on this computer (an update, restart, quit or crash), and that stopped background commands you had started, or cut them off from you, before they finished, so they will not report.]",
+      "",
       ...shells.map((shell) => `- \`${shell.command}\` (cwd: ${shell.cwd}, session ${shell.sessionId})`),
-      "Start again any you still need; their earlier sessions and output are gone.",
+      "",
+      "If you were working, you have picked up where you were. If you were waiting on one of them, check directly whether what it was for has happened. Start again any you still need; their earlier sessions and output are gone.",
     ].join("\n");
     await chats
       .deliverAgentMessage(agentId, text, `restart-shells:${saved.stoppedAt ?? 0}:${agentId}`)
@@ -735,16 +795,66 @@ const taskWakeSources = async (session: OpenSession, hostBus: HostBus.Interface,
   for (const task of claudeCodeBackgroundOf(threadId)) {
     found.push(`your ${/monitor/i.test(task.kind ?? "") ? "monitor" : "background command"} "${clip(task.description)}"`);
   }
-  const jobs = (await hostBus
-    .request(METHOD_NAMES.INTERNAL_SCHEDULE_LIST_CRON_JOBS, undefined, { timeoutMs: WAKE_SOURCE_LIST_MS })
-    .catch(() => undefined)) as LocalCronJobRecord[] | undefined;
-  if (!jobs) return [...found, "schedules aimed at you (they could not be listed just now)"];
-  for (const job of jobs) {
+  const listed = await listWakeJobs(hostBus);
+  let aimed = false;
+  for (const job of listed?.jobs ?? []) {
     const payload = job.payload;
     if (!job.enabled || (payload.kind !== "task" && payload.kind !== "watch") || payload.threadId !== threadId) continue;
+    aimed = true;
     found.push(`the schedule "${clip(job.name)}" (next ${new Date(job.nextRunAtMs).toISOString()})`);
   }
+  // A list that failed or has not loaded is not "no schedules": the task may
+  // wait on one. It is checked again once the list loads.
+  if (!aimed && !listed?.complete) {
+    found.push(UNLISTED_SCHEDULES_WAKER);
+    recheckOnceListed(session, hostBus, threadId);
+  }
   return found;
+};
+
+const listWakeJobs = async (hostBus: HostBus.Interface): Promise<{ jobs: LocalCronJobRecord[]; complete: boolean } | undefined> =>
+  (await hostBus
+    .request(METHOD_NAMES.INTERNAL_SCHEDULE_LIST_WAKE_JOBS, undefined, { timeoutMs: WAKE_SOURCE_LIST_MS })
+    .catch(() => undefined)) as { jobs: LocalCronJobRecord[]; complete: boolean } | undefined;
+
+const RECHECK_EVERY_MS = 60_000;
+const RECHECK_FOR_MS = 24 * 60 * 60_000;
+const unlistedWaits = new WeakMap<OpenSession, { threads: Map<string, number>; running: boolean }>();
+
+/**
+ * A task that waited while its schedules could not be listed is checked
+ * again once they can be: with nothing live then, it hears so.
+ */
+const recheckOnceListed = (session: OpenSession, hostBus: HostBus.Interface, threadId: string): void => {
+  let state = unlistedWaits.get(session);
+  if (!state) {
+    state = { threads: new Map(), running: false };
+    unlistedWaits.set(session, state);
+  }
+  if (!state.threads.has(threadId)) state.threads.set(threadId, Date.now());
+  if (state.running) return;
+  state.running = true;
+  const pending = state;
+  void (async () => {
+    try {
+      while (pending.threads.size > 0) {
+        await sleepMs(RECHECK_EVERY_MS);
+        for (const [id, since] of pending.threads) if (Date.now() - since > RECHECK_FOR_MS) pending.threads.delete(id);
+        if (!(await listWakeJobs(hostBus))?.complete) continue;
+        const chats = await piChatsFor(session, hostBus);
+        for (const id of [...pending.threads.keys()]) {
+          const outcome = await chats.recheckWaiting(id).catch((error: unknown) => {
+            console.warn("[pi-chat] checking a waiting task again failed", { threadId: id, error });
+            return "unknown" as const;
+          });
+          if (outcome !== "unknown") pending.threads.delete(id);
+          console.info("[pi-chat] checked a waiting task again once its schedules could be listed", { threadId: id, outcome });
+        }
+      }
+    } finally {
+      pending.running = false;
+    }
+  })();
 };
 
 /**

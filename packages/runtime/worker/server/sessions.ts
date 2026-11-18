@@ -26,6 +26,7 @@ import * as RunnerModule from "./runner-module.js";
 import {
   closePiChats,
   quitPiChats,
+  trackTaskShells,
   piChatsBusy,
   piBackgroundExitTarget,
   piDeliverReport,
@@ -496,6 +497,7 @@ export const layer = Layer.effect(
                     builtRunner?.setBackgroundExitTarget(
                       piBackgroundExitTarget(session, hostBus),
                     );
+                    if (builtRunner) trackTaskShells(session, builtRunner);
                     if (builtRunner && currentSession === session) {
                       catalog.scheduleWarm(() => session.runnerCell.get());
                     }

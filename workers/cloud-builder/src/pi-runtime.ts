@@ -287,6 +287,8 @@ export type PiThreadReport = {
   settled?: true;
   attemptGeneration?: number;
   files?: PiDeliveredFile[];
+  /** The attempt ended its turn waiting: it keeps its task, and nothing is reported. */
+  waitingFor?: string;
 };
 
 export type PiTurnSources = {
@@ -1162,6 +1164,23 @@ export class PiConversationRuntime {
           const info = await this.#agentInfo(run.threadId, context);
           const cardTurnId = this.#cardTurnId(run.threadId, info);
           if (cardTurnId) this.#options.agentWaiting?.({ threadId: run.threadId, turnId: cardTurnId, ...info, waitingFor: end.waitingFor });
+          // A task placed here from elsewhere settles its attempt as waiting:
+          // left running, a later message would steer into a turn that has
+          // ended, and what can wake it (a schedule removed) would not count it
+          // as waiting.
+          if (info.origin) {
+            const reporter = /^agent-run:(\d+)$/u.exec(run.runId)?.[1];
+            const attemptGeneration = reporter ? await this.#threadAttemptOf(`agent-report:${reporter}`, context) : undefined;
+            await this.#options
+              .deliverThreadReport?.({
+                threadId: run.threadId,
+                requestId: `waiting:${run.runId}`,
+                text: end.answer ?? "",
+                waitingFor: end.waitingFor,
+                ...(attemptGeneration !== undefined ? { attemptGeneration } : {}),
+              })
+              .catch((error: unknown) => this.#options.report(error));
+          }
         }
         await this.#gate(authority)
           .release({ turnId: ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}` })

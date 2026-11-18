@@ -56,6 +56,8 @@ export type ShellState = {
   cliBridgeSocketPath?: string;
   shellsEndWithTurn: boolean;
   lastDeferredDeleteSweepAt: number;
+  /** A task's command started or ended (what `listRunningTaskShells` returns changed). */
+  onTaskShellsChanged?: () => void;
 };
 
 export type ShellSessionOwner = {
@@ -378,6 +380,14 @@ export const listRunningTaskShells = (state: ShellState): RunningTaskShell[] => 
   return running;
 };
 
+export const noteTaskShellsChanged = (state: ShellState): void => {
+  try {
+    state.onTaskShellsChanged?.();
+  } catch (error) {
+    console.warn("[shell] recording task commands failed", error);
+  }
+};
+
 export const setShellOwner = (
   record: Pick<ShellRecord, "id">,
   context?: ToolContext,
@@ -665,6 +675,7 @@ export const startShell = (
     record.pty?.close();
     onClose?.();
     pruneCompletedShellSessions(state);
+    if (record.owner?.agentId) noteTaskShellsChanged(state);
   };
 
   const shellEnv = buildShellEnv(

@@ -115,6 +115,8 @@ export type OpenStellaHarness = {
       }
     | undefined
   >;
+  /** Checks again a waiting task whose wakers could not all be listed; tells it when nothing is live. */
+  recheckWaiting(threadId: string, context: Context): Promise<"told" | "live" | "unknown" | "not_waiting">;
   agentRecords(context: Context): Promise<StellaAgentRecord[]>;
   messageAgent(
     args: { key: string; threadId: string; message: string; fromOrchestrator?: boolean; wake?: true },
@@ -169,6 +171,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     messageAgent: (args, messageContext) => agents.messageAgent(harness, args, messageContext),
     stopAgent: (threadId, stopContext) => agents.stopAgentByThread(harness, threadId, stopContext),
     agentStanding: (threadId, standingContext) => agents.agentStanding(harness, threadId, standingContext),
+    recheckWaiting: (threadId, recheckContext) => agents.recheckWaiting(harness, threadId, recheckContext),
     runPlacedAgent: (args, runContext) => agents.runPlacedAgent(harness, args, runContext),
     steerPlacedAgent: (args, steerContext) => agents.steerPlacedAgent(harness, args, steerContext),
     markCatchUp: (threadId, markContext) => agents.markCatchUp(harness, threadId, markContext),

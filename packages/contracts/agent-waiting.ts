@@ -61,6 +61,23 @@ export const nothingCanWakeText = (waitingFor: string): string =>
   `${NOTHING_CAN_WAKE_MARK} You ended your turn waiting for ${waitingFor}, but by the time it ended nothing that could wake you was live (${NOTHING_LIVE}). You were resumed for this. ${NOTHING_CAN_WAKE_STEPS}`;
 
 /**
+ * The wake a waiting task gets when what it may have been waiting on could not
+ * be listed as it waited (its cloud schedules, while offline), and once listed,
+ * nothing that could wake it is live.
+ */
+export const nothingCanWakeNowText = (waitingFor: string): string =>
+  `${NOTHING_CAN_WAKE_MARK} You are waiting for ${waitingFor}, but nothing that could wake you is live (${NOTHING_LIVE}). You were resumed for this. ${NOTHING_CAN_WAKE_STEPS}`;
+
+/**
+ * What can wake a waiting task but could not be listed just now (a schedule
+ * list that failed or had not loaded): it counts as live, since it may well
+ * be, and the task is checked again once it can be listed.
+ */
+export const UNLISTED_SCHEDULES_WAKER = "schedules aimed at you (they could not be listed just now)";
+export const UNLISTED_WORK_WAKER = "work of yours on this computer that could not be listed just now";
+export const isUnlistedWaker = (waker: string): boolean => waker === UNLISTED_SCHEDULES_WAKER || waker === UNLISTED_WORK_WAKER;
+
+/**
  * An attempt that ended waiting: stored as its result, it is not reported.
  * `reply` is what goes to its starter as a message instead (see
  * `unansweredWaitingReply`), when the turn took in the starter's message.

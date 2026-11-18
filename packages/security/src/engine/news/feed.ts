@@ -24,14 +24,27 @@ const addUsage = (a: ModelUsage, b: ModelUsage): ModelUsage => ({
 });
 /** The same incident found in two batches (or two builds) becomes one threat. */
 export const mergeThreats = <T extends Threat>(threats: T[]): T[] => {
-  const merged = new Map<string, T>();
+  const out: T[] = [];
+  const sites = (t: Threat) => new Set(t.domains.map(baseDomain));
+  // Same incident: same kind and the same site, or (for incidents hitting many sites) two sites in common.
+  const same = (a: Threat, b: Threat) => {
+    if (a.kind !== b.kind) return false;
+    const x = sites(a);
+    const y = sites(b);
+    if (!x.size || !y.size) return a.id === b.id;
+    const shared = [...x].filter((d) => y.has(d)).length;
+    return shared >= Math.min(2, x.size, y.size);
+  };
   for (const t of threats) {
-    const key = t.domains[0] ? `${t.kind}:${baseDomain(t.domains[0])}` : t.id;
-    const prev = merged.get(key);
-    if (prev) merged.set(key, { ...prev, domains: [...new Set([...prev.domains, ...t.domains])], sources: [...new Set([...prev.sources, ...t.sources])], severity: Math.max(prev.severity, t.severity) as Threat["severity"] });
-    else merged.set(key, t);
+    const i = out.findIndex((o) => same(o, t));
+    if (i < 0) {
+      out.push(t);
+      continue;
+    }
+    const prev = out[i]!;
+    out[i] = { ...prev, domains: [...new Set([...prev.domains, ...t.domains])], sources: [...new Set([...prev.sources, ...t.sources])], severity: Math.max(prev.severity, t.severity) as Threat["severity"] };
   }
-  return [...merged.values()];
+  return out;
 };
 
 export const ZERO_USAGE: ModelUsage = { inputTokens: 0, cachedTokens: 0, outputTokens: 0, reasoningTokens: 0, costUsd: 0, ms: 0 };

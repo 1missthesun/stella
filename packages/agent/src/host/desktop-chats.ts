@@ -439,6 +439,7 @@ type Chat = {
   messageAgent: OpenStellaHarness["messageAgent"];
   stopAgent: OpenStellaHarness["stopAgent"];
   agentStanding: OpenStellaHarness["agentStanding"];
+  recheckWaiting: OpenStellaHarness["recheckWaiting"];
   runPlacedAgent: OpenStellaHarness["runPlacedAgent"];
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
   mirror?: JournalMirror;
@@ -1619,6 +1620,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           messageAgent,
           stopAgent,
           agentStanding,
+          recheckWaiting,
           runPlacedAgent,
           steerPlacedAgent,
         } =
@@ -1983,6 +1985,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           messageAgent,
           stopAgent,
           agentStanding,
+          recheckWaiting,
           runPlacedAgent,
           steerPlacedAgent,
           ...(mirror ? { mirror } : {}),
@@ -2847,6 +2850,13 @@ export function desktopChats(options: DesktopChatsOptions) {
         context,
       );
       return record.status === "running" ? "steered" : (report || wake) && record.stopped ? "queued" : "resumed";
+    },
+    /** Checks again a waiting task whose wakers could not all be listed when it waited. */
+    async recheckWaiting(threadId: string): Promise<"told" | "live" | "unknown" | "not_waiting"> {
+      const conversationId = (await threadIndex())[threadId];
+      if (!conversationId) return "not_waiting";
+      const chat = await ready(conversationId);
+      return await chat.recheckWaiting(threadId, context);
     },
     stopAgent: stopLocalAgent,
     async deliverReport(conversationId: string, report: DeliveredReport): Promise<void> {

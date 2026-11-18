@@ -88,6 +88,7 @@ import type { JsonRpcPeer } from "@stella/contracts/protocol/rpc-peer";
 import type { RuntimeClientAttachParams } from "@stella/contracts/protocol/runtime-client";
 import type {
   LocalCronJobCreateInput,
+  LocalCronJobRecord,
   LocalCronJobUpdatePatch,
   LocalHeartbeatUpsertInput,
 } from "@stella/contracts/scheduling";
@@ -2023,6 +2024,22 @@ export class StellaRuntimeHost {
       .catch(() => []);
     return [...cloud, ...local];
   }
+  /**
+   * Every schedule, saying whether the list is whole: signed in, the cloud's
+   * may fail to load or not be reachable yet, and a missing one must not read
+   * as none (a task waiting on it would be told nothing can wake it).
+   */
+  async listCronJobsForWake(): Promise<{ jobs: LocalCronJobRecord[]; complete: boolean }> {
+    const local = this.schedulerService?.listCronJobs() ?? [];
+    const signedIn = Boolean(this.configCache.hasConnectedAccount);
+    if (signedIn && !this.getConfiguredHostAuthToken()) return { jobs: local, complete: false };
+    try {
+      return { jobs: [...(await this.getCloudSchedules().list()), ...local], complete: true };
+    } catch (error) {
+      console.warn("[schedules] the cloud's schedules could not be listed", error);
+      return { jobs: local, complete: !signedIn };
+    }
+  }
   async addCronJob(input: LocalCronJobCreateInput) {
     if (isCloudSchedulePayload(input.payload)) {
       const signedIn = this.configCache.hasConnectedAccount;
@@ -2604,6 +2621,10 @@ export class StellaRuntimeHost {
     peer.registerRequestHandler(
       METHOD_NAMES.INTERNAL_SCHEDULE_LIST_CRON_JOBS,
       async () => await this.listCronJobs(),
+    );
+    peer.registerRequestHandler(
+      METHOD_NAMES.INTERNAL_SCHEDULE_LIST_WAKE_JOBS,
+      async () => await this.listCronJobsForWake(),
     );
     peer.registerRequestHandler(
       METHOD_NAMES.INTERNAL_SCHEDULE_LIST_HEARTBEATS,

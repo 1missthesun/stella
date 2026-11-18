@@ -196,6 +196,7 @@ export type RunnerContext = {
       access: import("../tools/shell.js").ShellSessionAccess,
     ) => string[];
     listRunningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
+    onTaskShellsChanged: (listener: (() => void) | undefined) => void;
     killAllShells: () => Promise<void>;
     killShell: (sessionId: string) => Promise<void> | void;
     shutdown: () => Promise<void>;
@@ -296,6 +297,8 @@ export type RunnerPublicApi = {
   killAllShells: () => Promise<void>;
   /** Background commands tasks started that are still running. */
   runningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
+  /** Called whenever a task's background command starts or ends. */
+  onTaskShellsChanged: (listener: (() => void) | undefined) => void;
   piTools: import("./pi-tools.js").RunnerPiTools;
   agentHealthCheck: () => AgentHealth;
   warmModelCatalog: () => Promise<void>;

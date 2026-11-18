@@ -971,7 +971,12 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       return;
     }
     let outcome: PiThreadOutcome;
-    if (report.settled) {
+    if (report.waitingFor !== undefined) {
+      outcome = {
+        status: "completed",
+        resultJson: waitingResultJson(report.text.slice(0, 30_000), report.waitingFor),
+      };
+    } else if (report.settled) {
       if (!attempt.pausing && report.status !== "canceled") return;
       outcome = { status: "canceled", errorMessage: AGENT_STOPPED_REASON };
     } else {

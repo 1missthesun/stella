@@ -703,6 +703,9 @@ export const createToolHost = ({
     listRunningShellSessionsOwnedBy: (access: ShellSessionAccess) =>
       listRunningShellSessionsOwnedBy(shellState, access),
     listRunningTaskShells: () => listRunningTaskShells(shellState),
+    onTaskShellsChanged: (listener: (() => void) | undefined) => {
+      shellState.onTaskShellsChanged = listener;
+    },
     watchShellExit: (sessionId: string, listener: () => void) =>
       watchShellExit(shellState, sessionId, listener),
     readShellExitSnapshot: (sessionId: string) =>

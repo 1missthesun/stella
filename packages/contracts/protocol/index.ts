@@ -132,6 +132,8 @@ export const METHOD_NAMES = {
     "internal.worker.discovery.collectAllSignals",
   INTERNAL_WORKER_ONE_SHOT_COMPLETION: "internal.worker.oneShotCompletion",
   INTERNAL_SCHEDULE_LIST_CRON_JOBS: "internal.schedule.listCronJobs",
+  /** Schedules with whether every one could be listed (the cloud's may fail or not be loaded yet). */
+  INTERNAL_SCHEDULE_LIST_WAKE_JOBS: "internal.schedule.listWakeJobs",
   INTERNAL_SCHEDULE_LIST_HEARTBEATS: "internal.schedule.listHeartbeats",
   INTERNAL_SCHEDULE_ADD_CRON_JOB: "internal.schedule.addCronJob",
   INTERNAL_SCHEDULE_UPDATE_CRON_JOB: "internal.schedule.updateCronJob",

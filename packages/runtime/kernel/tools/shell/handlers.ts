@@ -20,6 +20,7 @@ import {
   recordAcceptedWriteId,
   resizeShellPty,
   setShellOwner,
+  noteTaskShellsChanged,
   settleCompletedShellEffect,
   shellOwnerMatchesContext,
   startShell,
@@ -319,6 +320,7 @@ export const handleExecCommand = async (
     prepared.processIdentity,
   );
   setShellOwner(record, context);
+  if (record.running && context?.agentId) noteTaskShellsChanged(state);
   let interaction: ShellInteractionLease;
   try {
     interaction = await acquireShellInteraction(state, record, signal);

@@ -354,6 +354,7 @@ export type RunnerPublicApi = {
       conversationId: string;
       fromThreadId: string;
       text: string;
+      toThreadId?: string;
     }) => Promise<void>;
     handoff: (
       args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,

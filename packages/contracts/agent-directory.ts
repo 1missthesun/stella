@@ -92,12 +92,21 @@ export const selectAgentRoster = (rows: readonly AgentDirectoryAgentRow[]) => {
 const lastSeen = (lastSeenAt: number | undefined, now: number) =>
   lastSeenAt !== undefined ? ` (last seen ${formatAge(lastSeenAt, now)})` : "";
 
+/**
+ * What holds for an agent whose computer is offline: messages to it are
+ * refused, while a stop works now (it is recorded at once and held for that
+ * computer, which applies it the moment it reconnects, up to a week later).
+ */
 const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefined =>
   row.offline
     ? isLive(row.status)
-      ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects. Messages to it are refused until then`
+      ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it carries on by itself when ${row.where} reconnects. Messages to it are refused until then. A stop works now: stop_agent records it at once and it is held for ${row.where}, which applies it the moment it reconnects, so the agent doesn't carry on there. To redo its work elsewhere, stop it first (or carry it on elsewhere with send_message's destination), so two copies don't run`
       : `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}; messages to it are refused until ${row.where} reconnects`
     : undefined;
+
+/** The note for a running agent of yours whose computer is offline: no report comes before it is back. */
+export const OFFLINE_RUNNING_STATUS_NOTE =
+  "Its computer is offline, so its report comes only once that computer is back. Decide now whether to wait for it (end your turn waiting), carry it on elsewhere (send_message with destination), or stop it and redo the work: stop it first, then start the new one.";
 
 const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
   row.awaitingConsent && !row.offline && row.pausedBy === undefined

@@ -39,7 +39,7 @@ import {
 } from "@stella/contracts/agent-directory";
 import type { LocalAgentPause } from "@stella/contracts/agent-pause";
 import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
-import { PLACED_AGENT_STOPPED } from "../stella/agents.ts";
+import { PLACED_AGENT_STOPPED, PLACED_CALL_PREFIX } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import { deviceEngineSignIns, type ExecutionContextSnapshot, type ExecutionDestination } from "@stella/contracts/execution-context";
@@ -213,14 +213,20 @@ const IMPORT_BATCH_ROWS = 200;
 const IMPORT_BATCH_BYTES = 3 * 1024 * 1024;
 const IMPORT_RECORD_MAX_BYTES = 1024 * 1024;
 
-export type ResumedTask = { threadId: string; description: string };
+/** `startedBy`: the lead that placed it here from elsewhere; a task of Stella's has none. */
+export type ResumedTask = { threadId: string; description: string; startedBy?: AgentMessageSender };
 export type ResumedChat = { conversationId: string; agents: ResumedTask[] };
 
-/** The hidden note a restart leaves for Stella: what was running on that computer and how it stands now. */
+/**
+ * The hidden note a restart leaves for Stella: what was running on that
+ * computer and how it stands now. With `helpers`, the same note for a lead
+ * elsewhere about the helpers it placed there.
+ */
 export const restartNoteText = (
   computer: { name: string; deviceId?: string },
   at: number,
   agents: ReadonlyArray<ResumedTask & { now?: { status: string; stopped?: true; error?: string } }>,
+  options?: { helpers?: true },
 ): string => {
   const where = computer.deviceId ? `${computer.name} (device_id: ${computer.deviceId})` : computer.name;
   const line = (agent: ResumedTask) => `- ${agent.description} (thread_id: ${agent.threadId})`;
@@ -230,14 +236,16 @@ export const restartNoteText = (
   const failed = agents.filter((agent) => agent.now?.status === "error" && !agent.now.stopped);
   return [
     "[Computer restarted]",
-    `Stella restarted on ${where} at ${new Date(at).toISOString()} (an update, restart, quit or crash). The tasks below were running there and picked up where they were by themselves, with their context; a step that was mid-way when it stopped was either redone (when safe) or reported to the task as interrupted.`,
+    `Stella restarted on ${where} at ${new Date(at).toISOString()} (an update, restart, quit or crash). The ${options?.helpers ? "helpers you started there" : "tasks"} below were running there and picked up where they were by themselves, with their context; a step that was mid-way when it stopped was either redone (when safe) or reported to the task as interrupted.`,
     ...(continuing.length ? ["Continuing:", ...continuing.map(line)] : []),
     ...(finished.length ? ["Resumed and since finished (their reports come as usual):", ...finished.map(line)] : []),
     ...(stopped.length ? ["Stayed stopped (stopped while that computer was off):", ...stopped.map(line)] : []),
     ...(failed.length
       ? ["Could not continue:", ...failed.map((agent) => `${line(agent)}: ${agent.now?.error?.trim() || "it failed after the restart"}`)]
       : []),
-    "This is for your awareness only: nothing needs doing and no reply is expected. Mention it to the user only if it matters to what they ask.",
+    options?.helpers
+      ? "Nothing needs doing: their reports come to you as usual, so end your turn waiting again unless one could not continue and you need to act on it."
+      : "This is for your awareness only: nothing needs doing and no reply is expected. Mention it to the user only if it matters to what they ask.",
   ].join("\n");
 };
 
@@ -313,7 +321,7 @@ export type DesktopChatsOptions = {
     ): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
     message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
     stop(args: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string }): Promise<AgentStopResult>;
-    note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string }): Promise<void>;
+    note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string; toThreadId?: string }): Promise<void>;
     move?(
       args: Omit<AgentThreadCalls["agentThreads.move"]["args"], "ownerGeneration" | "execution">,
     ): Promise<AgentThreadCalls["agentThreads.move"]["result"]>;
@@ -1790,7 +1798,14 @@ export function desktopChats(options: DesktopChatsOptions) {
                       const role = await api.snapshot(StellaAgentDoc, api.conversationId, gateContext);
                       if (!role?.threadId || role.parentConversationId === undefined) return false;
                       const parent = await api.snapshot(StellaAgentsDoc, role.parentConversationId as ConversationId, gateContext);
-                      return parent?.agents[role.threadId]?.placedAs !== undefined;
+                      // Placed here by the server's dispatch, or moved here: either way
+                      // the server may have stopped or moved it while this computer was off.
+                      return (
+                        parent?.agents[role.threadId]?.placedAs !== undefined ||
+                        Object.entries(parent?.calls ?? {}).some(
+                          ([key, call]) => call.threadId === role.threadId && key.startsWith(PLACED_CALL_PREFIX),
+                        )
+                      );
                     }),
                   ]
                 : []),
@@ -2721,11 +2736,24 @@ export function desktopChats(options: DesktopChatsOptions) {
   /** Tasks this computer runs for the chat (its own and those placed here) that are working now. */
   const tasksRunningHere = async (chat: Chat): Promise<ResumedTask[]> => {
     const state = await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context);
-    const here = new Set(Object.entries(state?.agents ?? {}).filter(([, agent]) => !agent.remote).map(([threadId]) => threadId));
+    const here = new Map(Object.entries(state?.agents ?? {}).filter(([, agent]) => !agent.remote));
     if (here.size === 0) return [];
-    return (await chat.agentRecords(context))
-      .filter((record) => here.has(record.threadId) && record.status === "running")
-      .map((record) => ({ threadId: record.threadId, description: record.description }));
+    const running = (await chat.agentRecords(context)).filter((record) => here.has(record.threadId) && record.status === "running");
+    return await Promise.all(
+      running.map(async (record) => {
+        const conversationId = here.get(record.threadId)?.conversationId;
+        // A helper a lead elsewhere placed here carries that lead as its starter.
+        const role =
+          conversationId !== undefined && conversationId >= 0
+            ? await chat.harness.snapshot(StellaAgentDoc, conversationId as ConversationId, context).catch(() => undefined)
+            : undefined;
+        return {
+          threadId: record.threadId,
+          description: record.description,
+          ...(role?.startedBy && role.depth > 1 ? { startedBy: role.startedBy } : {}),
+        };
+      }),
+    );
   };
 
   /** Stops of tasks canceled while this computer was off, per chat, still waiting for its models. */
@@ -2929,7 +2957,34 @@ export function desktopChats(options: DesktopChatsOptions) {
             if (record.status === "completed" && !record.stopped) return record;
             return { status: "error", error: record.error ?? "It ended without finishing after the restart." };
           };
-          const text = restartNoteText(computer, at, agents.map((agent) => ({ ...agent, now: now(agent.threadId) })));
+          // A lead elsewhere hears of the helpers it placed here; Stella of the
+          // rest, and of any helper whose lead could not be told.
+          const forStella = agents.filter((agent) => !agent.startedBy);
+          const byLead = new Map<string, ResumedTask[]>();
+          for (const agent of agents) {
+            if (agent.startedBy) byLead.set(agent.startedBy.threadId, [...(byLead.get(agent.startedBy.threadId) ?? []), agent]);
+          }
+          for (const [lead, helpers] of byLead) {
+            const told =
+              options.agentThreads && !conversationId.startsWith("local_")
+                ? await options.agentThreads
+                    .note({
+                      noteId: `restart-${at}-${createHash("sha256").update(`${conversationId}\0${computer.deviceId ?? computer.name}\0${lead}`).digest("hex").slice(0, 16)}`,
+                      conversationId,
+                      fromThreadId: helpers[0]!.threadId,
+                      toThreadId: lead,
+                      text: restartNoteText(computer, at, helpers.map((agent) => ({ ...agent, now: now(agent.threadId) })), { helpers: true }),
+                    })
+                    .then(() => true)
+                    .catch((error: unknown) => {
+                      options.report(error);
+                      return false;
+                    })
+                : false;
+            if (!told) forStella.push(...helpers);
+          }
+          if (forStella.length === 0) continue;
+          const text = restartNoteText(computer, at, forStella.map((agent) => ({ ...agent, now: now(agent.threadId) })));
           const appendId = `restart-${at}-${createHash("sha256").update(`${conversationId}\0${computer.deviceId ?? computer.name}`).digest("hex").slice(0, 12)}`;
           await appendHiddenNote(chat, conversationId, appendId, text, at);
         } catch (error) {

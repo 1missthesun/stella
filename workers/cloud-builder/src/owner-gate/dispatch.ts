@@ -36,6 +36,7 @@ import type {
 } from "./types.js";
 import {
   DISPATCH_RECONCILE_MAX_MS,
+  DISPATCH_STOP_HOLD_MS,
   DISPATCH_RENEW_WRITE_BELOW_MS,
   ALARM_BACKOFF_KEY,
   ALARM_HOT_STREAK_KEY,
@@ -1257,6 +1258,28 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           },
           now,
           { notifyExecutor: false },
+        );
+        continue;
+      }
+      if (
+        leaseLapsed &&
+        row.state === "reconciliation_required" &&
+        row.kind === "agent" &&
+        row.executor_device_id &&
+        row.cancel_request_id &&
+        now < row.updated_at + DISPATCH_STOP_HOLD_MS &&
+        !this.liveSocket(row.executor_device_id)
+      ) {
+        // A task stopped (or moved elsewhere) while its computer is away: the
+        // stop is held until that computer is back, as a message to it is,
+        // so it hears it as a stop there instead of finding its run ended
+        // without one and carrying on. The hold re-arms without counting as
+        // an update, so it ends a week after the stop at the latest.
+        this.ctx.storage.sql.exec(
+          `UPDATE dispatches SET lease_expires_at = ?
+            WHERE dispatch_id = ? AND state = 'reconciliation_required'`,
+          Math.min(now + DISPATCH_RECONCILE_MAX_MS, row.updated_at + DISPATCH_STOP_HOLD_MS),
+          row.dispatch_id,
         );
         continue;
       }

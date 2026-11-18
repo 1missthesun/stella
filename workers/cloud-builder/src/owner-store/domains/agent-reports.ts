@@ -17,7 +17,7 @@ import {
 import { agentChangeHooks, appendAgentEvent } from "./agent-events.js";
 import { deliverReportToAgent } from "./agent-threads.js";
 import { resolveCurrentDeviceId } from "./devices.js";
-import { object, string } from "../args.js";
+import { object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import type {
   OwnerContext,
@@ -878,7 +878,30 @@ const noteParser = object({
   conversationId: id(),
   fromThreadId: id(),
   text: string({ min: 1, max: 40_000 }),
+  /** A lead of this conversation to give the note to instead of Stella (a computer's note about the helpers it runs). */
+  toThreadId: optional(id()),
 });
+
+const queueNote = (ctx: OwnerContext, args: ReturnType<typeof noteParser>): { queued: true } => {
+  const { toThreadId, ...note } = args;
+  if (!toThreadId) {
+    queueStellaNote(ctx, note);
+    return { queued: true };
+  }
+  const lead = readThread(ctx.db, toThreadId);
+  if (!lead || (lead.conversation_id !== note.conversationId && lead.origin_conversation_id !== note.conversationId)) {
+    throw new RpcError("NOT_FOUND", `No agent ${toThreadId} in this conversation.`);
+  }
+  queueAgentNote(ctx, {
+    noteId: note.noteId,
+    parentThreadId: lead.thread_id,
+    conversationId: lead.conversation_id,
+    ownerGeneration: note.ownerGeneration,
+    fromThreadId: note.fromThreadId,
+    text: note.text,
+  });
+  return { queued: true };
+};
 
 export const AGENT_REPORTS_STOP_MIGRATION = {
   id: "agent-reports.2-stop-replaces-pause",
@@ -901,10 +924,7 @@ export const agentReportsDomain = {
     "agentReports.note": {
       scope: "owner",
       parse: noteParser,
-      handler: (ctx, args) => {
-        queueStellaNote(ctx, args);
-        return { queued: true };
-      },
+      handler: queueNote,
     },
     "agentReports.acknowledge": {
       scope: "owner",
@@ -923,10 +943,7 @@ export const agentReportsDomain = {
     },
   },
   internal: {
-    "agentReports.note": (ctx, raw) => {
-      queueStellaNote(ctx, noteParser(raw));
-      return { queued: true };
-    },
+    "agentReports.note": (ctx, raw) => queueNote(ctx, noteParser(raw)),
   },
   jobs: {
     [AGENT_REPORT_JOB]: {

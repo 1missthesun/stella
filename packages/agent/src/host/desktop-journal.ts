@@ -247,25 +247,26 @@ export const journalTurnGate = (standing: Promise<boolean>, resumedRun: () => Ta
 /**
  * A task placed on this computer by another one resumes as soon as its chat
  * reopens after a restart, before the desktop has asked the server whether it
- * was stopped or moved meanwhile. Its tools wait for that answer (once per
- * start), so a stopped task never takes another step here.
+ * was stopped or moved meanwhile. Its model calls and tools wait for that
+ * answer (once per start), so a stopped task never takes another step here:
+ * not a tool call, and not a last reply that would go out as its report.
  */
 export const placedTaskGate = (
   settled: () => Promise<void>,
   placed: (api: HookApi, context: Context) => Promise<boolean>,
 ): Extension => {
   let done = false;
+  const wait = async (api: HookApi, context: Context): Promise<undefined> => {
+    if (done || api.conversationId === ROOT_CONVERSATION_ID) return undefined;
+    if (!(await placed(api, context))) return undefined;
+    await Promise.race([settled().then(() => (done = true)), abortOf(context.abortSignal)]);
+    return undefined;
+  };
   return defineExtension({
     name: "stella-placed-task-gate",
     hooks: [
-      hook(ToolTask, {
-        beforeTool: async (_call, api, context) => {
-          if (done || api.conversationId === ROOT_CONVERSATION_ID) return undefined;
-          if (!(await placed(api, context))) return undefined;
-          await Promise.race([settled().then(() => (done = true)), abortOf(context.abortSignal)]);
-          return undefined;
-        },
-      }),
+      hook(GenerationTask, { beforeRequest: (_request, api, context) => wait(api, context) }),
+      hook(ToolTask, { beforeTool: (_call, api, context) => wait(api, context) }),
     ],
   });
 };

@@ -143,6 +143,7 @@ import {
 } from "@stella/contracts/turn-plane/placement";
 import {
   canonicalDispatchPayloadJson,
+  legacyDispatchPayloadJson,
   sha256Hex,
 } from "@stella/contracts/turn-plane/pairing-proof";
 import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
@@ -1730,20 +1731,22 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const requestingDeviceId = request.requestingDeviceId?.trim() || undefined;
     const pairGrantDeviceId = input.pairGrantDeviceId?.trim() || undefined;
     const requiredCapabilities = [...request.requiredCapabilities];
-    const fingerprint = JSON.stringify([
-      request.kind,
-      request.ingress,
-      request.subject,
-      targetMode,
-      request.targetDeviceId ?? "",
-      request.conversationId,
-      request.parentTurnId ?? "",
-      request.threadId ?? "",
-      requestingDeviceId ?? "",
-      pairGrantDeviceId ?? "",
-      requiredCapabilities,
-      payloadHash,
-    ]);
+    const fingerprintOf = (hash: string) =>
+      JSON.stringify([
+        request.kind,
+        request.ingress,
+        request.subject,
+        targetMode,
+        request.targetDeviceId ?? "",
+        request.conversationId,
+        request.parentTurnId ?? "",
+        request.threadId ?? "",
+        requestingDeviceId ?? "",
+        pairGrantDeviceId ?? "",
+        requiredCapabilities,
+        hash,
+      ]);
+    const fingerprint = fingerprintOf(payloadHash);
     const existing = this.ctx.storage.sql
       .exec<DispatchRow>(
         `SELECT * FROM dispatches WHERE idempotency_key = ?`,
@@ -1751,7 +1754,11 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       )
       .toArray()[0];
     if (existing) {
-      if (existing.routing_fingerprint !== fingerprint) {
+      // A helper's dispatch submitted before its lineage crossed the wire
+      // was stored without it; the same request replayed now is that one.
+      const legacyJson = legacyDispatchPayloadJson(request.payload);
+      const legacy = legacyJson ? fingerprintOf(await sha256Hex(legacyJson)) : undefined;
+      if (existing.routing_fingerprint !== fingerprint && existing.routing_fingerprint !== legacy) {
         return fail(
           "conflict",
           "This idempotency key was already used for different execution bytes or routing metadata.",

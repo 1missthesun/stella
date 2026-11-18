@@ -45,7 +45,22 @@ import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { InternalDef, JobDef, OwnerContext, OwnerDbReader, OwnerDomain, OwnerViewContext } from "../registry.js";
 import { readMainConversationId } from "./conversations.js";
 import { livePushTokens, resolveCurrentDeviceId, sendPushMessages } from "./devices.js";
-import { stellaGmailTokens, stellaGoogleAccounts, stellaGoogleAvailable } from "./google-accounts.js";
+import {
+  FAKE_GMAIL_DOMAIN,
+  FAKE_GMAIL_MIGRATION,
+  addFakeGmailInbox,
+  fakeGmailEnabled,
+  fakeGmailFetcher,
+  fakeGmailInboxes,
+  fakeGmailList,
+  removeFakeGmailInbox,
+} from "./fake-gmail.js";
+import {
+  forgetStellaGoogleAccountsForTest,
+  stellaGmailTokens,
+  stellaGoogleAccounts,
+  stellaGoogleAvailable,
+} from "./google-accounts.js";
 import { ownerZone } from "./schedules.js";
 import { ownerModeEnabled } from "../../selfhost/owner-mode.js";
 
@@ -530,6 +545,9 @@ const log = (event: string, fields: Record<string, unknown> = {}): void => {
 };
 
 const liveAccounts = async (ctx: OwnerContext): Promise<LiveAccount[]> => {
+  // A test account with a fake inbox reads only fake inboxes, whatever else is connected.
+  const fake = fakeGmailInboxes(ctx);
+  if (fake.length > 0) return fake.map((email) => ({ email, get: async () => fakeGmailFetcher(ctx.db, email, () => ctx.now) }));
   if (!stellaGoogleAvailable(ctx.env)) return [];
   const tokens = await stellaGmailTokens(ctx);
   return tokens.map((account) => ({
@@ -1052,7 +1070,7 @@ const reconcileAccounts = async (ctx: OwnerContext, options: { backfill: boolean
       }
     }
     const current = ctx.db.one<AccountRow>("SELECT * FROM email_accounts WHERE email = ?", account.email);
-    if (pushTopic(ctx) && (!current?.watch_expires_at || current.watch_expires_at - ctx.now < 7 * DAY - WATCH_RENEW_MS)) {
+    if (pushTopic(ctx) && !account.email.endsWith(`@${FAKE_GMAIL_DOMAIN}`) && (!current?.watch_expires_at || current.watch_expires_at - ctx.now < 7 * DAY - WATCH_RENEW_MS)) {
       await watchAccount(ctx, account).catch((error: unknown) => {
         log("watch_failed", { owner: ctx.ownerId.slice(0, 12), message: errorText(error) });
         markSynced(ctx, account.email, { error: `Live updates are off: ${errorText(error)}` });
@@ -1137,8 +1155,10 @@ const pageState = (ctx: Reader): EmailPageState => {
   const state = stateOf(ctx.db);
   const on = state?.enabled === 1;
   const accounts = ctx.db.all<{ email: string }>("SELECT email FROM email_accounts ORDER BY created_at").map((row) => row.email);
-  const google = stellaGoogleAccounts(ctx.db, "gmail");
-  const gmailConnected = google.filter((account) => account.connected).map((account) => account.email ?? account.label);
+  const fake = fakeGmailInboxes(ctx);
+  const google = fake.length > 0 ? [] : stellaGoogleAccounts(ctx.db, "gmail");
+  const gmailConnected =
+    fake.length > 0 ? fake : google.filter((account) => account.connected).map((account) => account.email ?? account.label);
   return {
     enabled: on,
     accounts,
@@ -1551,6 +1571,7 @@ const runningEmailDomain = {
     EMAIL_TODAY_MIGRATION,
     EMAIL_OWN_KEY_MIGRATION,
     EMAIL_STELLA_MIGRATION,
+    FAKE_GMAIL_MIGRATION,
   ],
   calls: {
     "email.setEnabled": {
@@ -1584,22 +1605,57 @@ const runningEmailDomain = {
     "email.tool": emailTool,
     /** Whether Stella's email instructions apply to this owner: Email on, with the inboxes she reads. */
     "email.connected": (ctx: OwnerContext) => ({ accounts: connectedAccounts(ctx.db) }),
-    /** Test accounts only (admin email probe): puts a raw RFC 822 email into the inbox, as if it had arrived. */
+    /**
+     * Test accounts only (admin email probe): puts a raw RFC 822 email into a
+     * fake inbox, as if it had just arrived (Gmail's push included). Never a
+     * real inbox: a test must not reach a real person's mail.
+     */
     "email.testImport": async (ctx: OwnerContext, raw: unknown) => {
       const args = (raw && typeof raw === "object" ? raw : {}) as ToolArgs;
       const message = typeof args.raw === "string" ? args.raw : "";
       if (!message) throw new RpcError("BAD_REQUEST", "testImport needs raw.");
-      const account = await accountFor(ctx, text(args, "account", 320));
+      const fake = fakeGmailInboxes(ctx);
+      const wanted = text(args, "account", 320).toLowerCase() || (fake.length === 1 ? fake[0]! : "");
+      if (!fake.includes(wanted)) {
+        throw new RpcError("CONFLICT", `Test mail goes only into a fake inbox (fakeInbox first); fake inboxes: ${fake.join(", ") || "none"}.`);
+      }
       const bytes = new TextEncoder().encode(message.replace(/\r?\n/gu, "\r\n"));
       let binary = "";
       for (const byte of bytes) binary += String.fromCharCode(byte);
       const encoded = btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/u, "");
-      const get = await account.get();
-      const result = (await get(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages/import?internalDateSource=dateHeader&neverMarkSpam=true",
+      const result = (await fakeGmailFetcher(ctx.db, wanted, () => ctx.now)(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/import",
         { method: "POST", body: { raw: encoded, labelIds: ["INBOX", "UNREAD"] } },
       )) as { id?: string; threadId?: string };
-      return { id: result.id ?? null, threadId: result.threadId ?? null, account: account.email };
+      if (enabled(ctx.db)) ctx.jobs.schedule(SYNC_JOB, ctx.now, { account: wanted }, { id: `${SYNC_JOB}:${wanted}` });
+      return { id: result.id ?? null, threadId: result.threadId ?? null, account: wanted };
+    },
+    /**
+     * Test accounts only (admin email probe): adds (or with `remove`, deletes)
+     * a fake inbox `<name>@fake-gmail.test`. `forgetGoogle` drops this test
+     * account's real Google connections without revoking them at Google: dev
+     * and production can share one Google app, and revoking ends that
+     * person's grant everywhere, production included.
+     */
+    "email.testFakeInbox": (ctx: OwnerContext, raw: unknown) => {
+      if (!fakeGmailEnabled(ctx.env)) throw new RpcError("FORBIDDEN", "Fake inboxes exist only where test accounts are on.");
+      const args = (raw && typeof raw === "object" ? raw : {}) as ToolArgs;
+      const email = text(args, "email", 120).toLowerCase();
+      if (!new RegExp(`^[a-z0-9._-]+@${FAKE_GMAIL_DOMAIN.replace(/\./gu, "\\.")}$`, "u").test(email)) {
+        throw new RpcError("BAD_REQUEST", `A fake inbox is <name>@${FAKE_GMAIL_DOMAIN}.`);
+      }
+      if (args.forgetGoogle === true) forgetStellaGoogleAccountsForTest(ctx.db);
+      if (args.remove === true) removeFakeGmailInbox(ctx.db, email);
+      else addFakeGmailInbox(ctx.db, email, ctx.now);
+      if (enabled(ctx.db)) scheduleTick(ctx, 0);
+      return { inboxes: fakeGmailInboxes(ctx), googleAccounts: stellaGoogleAccounts(ctx.db, "gmail").length };
+    },
+    /** Test accounts only: what a fake inbox holds (to check what Stella sent, drafted or archived). */
+    "email.testFakeList": (ctx: OwnerContext, raw: unknown) => {
+      const args = (raw && typeof raw === "object" ? raw : {}) as ToolArgs;
+      const email = text(args, "email", 120).toLowerCase();
+      if (!fakeGmailInboxes(ctx).includes(email)) throw new RpcError("NOT_FOUND", `${email} isn't a fake inbox here.`);
+      return { messages: fakeGmailList(ctx.db, email) };
     },
     "email.readNow": async (ctx: OwnerContext) => {
       if (!enabled(ctx.db)) return { started: false };
@@ -1630,6 +1686,8 @@ const runningEmailDomain = {
       "email_senders",
       "email_corrections",
       "email_state",
+      "email_fake_messages",
+      "email_fake_inboxes",
     ]) {
       ctx.db.run(`DELETE FROM ${table}`);
     }

@@ -368,8 +368,12 @@ const emailProbeRoute = async (request: Request, env: AdminEnv): Promise<Respons
         ? "email.tool"
         : body?.action === "import"
           ? "email.testImport"
-          : "";
-  if (!ownerId || !action) return fail(400, "Need ownerId and action readNow|tool|import.");
+          : body?.action === "fakeInbox"
+            ? "email.testFakeInbox"
+            : body?.action === "fakeList"
+              ? "email.testFakeList"
+              : "";
+  if (!ownerId || !action) return fail(400, "Need ownerId and action readNow|tool|import|fakeInbox|fakeList.");
   const row = await (env as unknown as Cloudflare.Env).DB?.prepare('SELECT "email" FROM "user" WHERE "id" = ?')
     .bind(ownerId)
     .first<{ email: string | null }>();

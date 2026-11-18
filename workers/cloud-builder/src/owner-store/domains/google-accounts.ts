@@ -24,7 +24,7 @@ import { object, optional, string } from "../args.js";
 import { issueOAuthClaim, redeemOAuthClaim } from "../oauth-claims.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import { RpcError } from "../errors.js";
-import type { OwnerContext, OwnerDbReader } from "../registry.js";
+import type { OwnerContext, OwnerDb, OwnerDbReader } from "../registry.js";
 
 export const GOOGLE_ACCOUNTS_MIGRATION = {
   id: "integrations.4-google-accounts",
@@ -386,6 +386,15 @@ export const removeStellaGoogleAccount = async (
   }
   await revokeGoogleToken(row.refresh_token ?? row.access_token);
   return stellaGoogleAccounts(ctx.db, integrationId);
+};
+
+/**
+ * Forgets every Google account here without revoking it at Google. Test
+ * accounts only: dev and production can share one Google app, so revoking a
+ * test account's grant can end the same person's production grant.
+ */
+export const forgetStellaGoogleAccountsForTest = (db: OwnerDb): void => {
+  db.run("DELETE FROM google_accounts");
 };
 
 /** Revokes and forgets every Google account (account deletion). */

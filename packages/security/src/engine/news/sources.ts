@@ -11,7 +11,28 @@ export const FEEDS: { source: string; url: string }[] = [
   { source: "DataBreaches.net", url: "https://databreaches.net/feed/" },
   { source: "Malwarebytes Labs", url: "https://www.malwarebytes.com/blog/feed/index.xml" },
   { source: "Google News", url: "https://news.google.com/rss/search?q=%22data%20breach%22%20OR%20hacked%20OR%20skimmer%20when:1d&hl=en-US&gl=US&ceid=US:en" },
+  { source: "Help Net Security", url: "https://www.helpnetsecurity.com/feed/" },
+  { source: "Dark Reading", url: "https://www.darkreading.com/rss.xml" },
+  { source: "CyberScoop", url: "https://cyberscoop.com/feed/" },
+  { source: "TechCrunch", url: "https://techcrunch.com/category/security/feed/" },
+  { source: "Graham Cluley", url: "https://grahamcluley.com/feed/" },
+  // Bing News, newest first: the consumer stories (shops, apps, scams) security sites skip.
+  // Google News and BleepingComputer refuse requests from Stella's server, Bing doesn't.
+  ...["%22data+breach%22", "hackers+customers+data", "card+skimmer+OR+%22payment+data%22", "scam+warning+OR+phishing+campaign", "malicious+extension+OR+malicious+app"].map((q) => ({
+    source: "Bing News",
+    url: `https://www.bing.com/news/search?q=${q}&qft=sortbydate%3d%221%22&format=rss`,
+  })),
 ];
+
+/** Bing wraps each article link in a click-tracking redirect; keep the article's own address. */
+const unwrap = (link: string) => {
+  if (!/bing\.com\/news\/apiclick/i.test(link)) return link;
+  try {
+    return new URL(link).searchParams.get("url") ?? link;
+  } catch {
+    return link;
+  }
+};
 
 const decode = (s: string) =>
   s
@@ -38,8 +59,8 @@ export const parseFeed = (xml: string, source: string): Story[] => {
     const published = tag(b, "pubDate") ?? tag(b, "published") ?? tag(b, "updated") ?? tag(b, "dc:date");
     return {
       title: decode(tag(b, "title") ?? ""),
-      url: decode(link),
-      source: source === "Google News" ? decode(tag(b, "source") ?? source) : source,
+      url: unwrap(decode(link)),
+      source: source === "Google News" ? decode(tag(b, "source") ?? source) : source === "Bing News" ? decode(tag(b, "News:Source") ?? source) : source,
       ...(published ? { published: new Date(decode(published)).toISOString() } : {}),
       summary: decode(body).slice(0, 900),
     };

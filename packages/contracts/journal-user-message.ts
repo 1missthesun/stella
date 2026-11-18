@@ -1,5 +1,6 @@
 import { splitAttachmentPreamble } from "./chat-attachments.js";
 import { messageText } from "./conversation-protocol.js";
+import { PASTED_TEXT_ONLY_PROMPT } from "./pasted-text.js";
 
 export type JournalPastedText = { lines: number; chars: number; text?: string };
 
@@ -124,7 +125,12 @@ export const journalUserMessage = (
   const prompt = splitAttachmentPreamble(messageText(payload));
   const storedDisplayText = asRecord(payload.metadata)?.displayText;
   const displayText = typeof storedDisplayText === "string" ? storedDisplayText : undefined;
-  const text = displayText ?? prompt.text;
+  const displayContext = displayContextOf(payload);
+  const text =
+    displayText ??
+    (prompt.text === PASTED_TEXT_ONLY_PROMPT && displayContext?.pastedTexts?.length
+      ? ""
+      : prompt.text);
   const drivePaths = [...new Set([...turnAttachmentPaths(payload), ...prompt.paths])];
   const blocks = blocksOf(payload);
   const inlineImages = blocks.flatMap((block) =>
@@ -136,7 +142,6 @@ export const journalUserMessage = (
       : [],
   );
   const declaredFiles = declaredFilesOf(payload);
-  const displayContext = displayContextOf(payload);
   return {
     text,
     ...(displayText !== undefined ? { displayText } : {}),

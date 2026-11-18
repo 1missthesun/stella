@@ -54,10 +54,11 @@ import {
   DISPATCH_CLOUD_MAX_ATTEMPTS,
 } from "./constants.js";
 import { log } from "./support.js";
+import { PASTED_TEXT_ONLY_PROMPT } from "@stella/contracts/pasted-text";
 import { OwnerGateDispatch } from "./dispatch.js";
 
 const contextOnlyPrompt = (payload: DispatchPayload): string =>
-  payload.context?.text ? "(Pasted text)" : "(Attached files)";
+  payload.context?.text ? PASTED_TEXT_ONLY_PROMPT : "(Attached files)";
 
 export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
   protected cloudPayload(row: DispatchRow): DispatchPayload | null {

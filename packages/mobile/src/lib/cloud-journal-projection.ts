@@ -69,9 +69,7 @@ const userPresentation = (message: JournalUserMessage) => {
         const name = file.name?.trim() || file.path?.split(/[\\/]/).at(-1) || "";
         return name ? [name] : [];
       });
-  const pastedTexts = (message.displayContext?.pastedTexts ?? []).map(
-    ({ lines, chars }) => ({ lines, chars }),
-  );
+  const pastedTexts = message.displayContext?.pastedTexts ?? [];
   const quotedText = message.displayContext?.quotedText;
   return {
     text: message.text,

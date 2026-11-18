@@ -4,6 +4,12 @@ import type { ChatMessage } from "../types";
 import type { AutomaticExecutionTarget } from "./execution-placement";
 import type { NotSentReason } from "./chat-send-state";
 import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
+import {
+  chatSendParts,
+  toPastedTextDescriptor,
+  type ChatSendParts,
+} from "@stella/contracts/pasted-text";
+import { TURN_CONTEXT_TEXT_MAX_CHARS } from "@stella/contracts/turn-plane/turn-start";
 
 export type DesktopChatOutboxAttachment = {
   path: string;
@@ -50,6 +56,8 @@ export type DesktopChatOutboxRecord = {
   structuredAttachments?: true;
   text: string;
   displayText: string;
+  /** Long text sent beside the prompt, shown as "Pasted text" attachments. */
+  pastedTexts?: string[];
   createdAt: number;
   sequence: number;
   attachments: DesktopChatOutboxAttachment[];
@@ -108,6 +116,26 @@ export const desktopChatOutboxPrompt = (
 ): string => record.structuredAttachments === true
   ? record.text
   : withAttachmentPreamble(record.text, record.attachments.map((entry) => entry.path));
+
+export const desktopChatOutboxSendParts = (
+  record: Pick<
+    DesktopChatOutboxRecord,
+    "text" | "attachments" | "structuredAttachments" | "pastedTexts"
+  >,
+): ChatSendParts =>
+  chatSendParts({
+    typed: desktopChatOutboxPrompt(record),
+    pastedTexts: record.pastedTexts ?? [],
+  });
+
+const parsePastedTexts = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const texts = value.filter(
+    (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+  );
+  const total = texts.reduce((sum, entry) => sum + entry.length, 0);
+  return total <= TURN_CONTEXT_TEXT_MAX_CHARS ? texts : [];
+};
 
 const finiteNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -255,6 +283,7 @@ export const parseDesktopChatOutbox = (
             Boolean(entry),
           )
       : [];
+    const pastedTexts = parsePastedTexts(record.pastedTexts);
     const authority = parseAuthority(record.authority);
     const executionTarget = parseExecutionTarget(record.executionTarget);
     const execution = executionTarget?.mode !== "device"
@@ -267,6 +296,7 @@ export const parseDesktopChatOutbox = (
       ...(record.structuredAttachments === true ? { structuredAttachments: true as const } : {}),
       text,
       displayText,
+      ...(pastedTexts.length ? { pastedTexts } : {}),
       createdAt,
       sequence,
       attachments,
@@ -378,6 +408,9 @@ export const restoreOutboxMessages = (
       role: "user",
       text: record.displayText,
       createdAt: record.createdAt,
+      ...(record.pastedTexts?.length
+        ? { pastedTexts: record.pastedTexts.map(toPastedTextDescriptor) }
+        : {}),
       ...(record.attachments.length ? {
         attachmentPaths: record.attachments.map(entry => entry.path),
         attachmentPreviews: record.attachments.map(entry => ({

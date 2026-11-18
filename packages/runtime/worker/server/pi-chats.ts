@@ -31,6 +31,8 @@ import type { PiReportDelivery, RunnerPublicApi } from "../../kernel/runner/type
 import type { LocalCronJobRecord } from "@stella/contracts/scheduling";
 import { forkDelayed, sleepMs } from "../effect-runtime.js";
 import { UNLISTED_SCHEDULES_WAKER } from "@stella/contracts/agent-waiting";
+import { pidIsAlive, readProcessIdentity } from "../../kernel/shared/process-identity.js";
+import { terminateProcessTree } from "../../kernel/shared/process-tree.js";
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
@@ -284,6 +286,49 @@ const taskShellsFile = (session: OpenSession) =>
 const SHELLS_WORKER = `${process.pid}:${Date.now()}`;
 const quittingSessions = new WeakSet<OpenSession>();
 
+type CrashedShell = { sessionId?: string; pid?: number; identity?: string; command?: string };
+const crashEndings = new WeakMap<OpenSession, Promise<Set<string>>>();
+
+/**
+ * A crash leaves a task's background commands running with no one reading
+ * them: their output pipes belonged to the worker that died, so what they
+ * write is lost and their exit goes to no one. They cannot be reattached, so
+ * they are ended like a quit ends them: each one's process group, while its
+ * leader is provably the process recorded (same start time), or, the leader
+ * gone, while its group still exists (a group id is not reused while any
+ * member lives). Returns the sessions that could not be ended.
+ */
+const endCrashedShells = async (shells: readonly CrashedShell[]): Promise<Set<string>> => {
+  const left = new Set<string>();
+  await Promise.all(
+    shells.map(async (shell) => {
+      const { pid, identity, sessionId } = shell;
+      if (!sessionId || pid === undefined) return;
+      if (process.platform === "win32" || !identity) {
+        // No start time to prove it is still the same process: never signal on a bare pid.
+        if (pidIsAlive(pid)) left.add(sessionId);
+        return;
+      }
+      const isRoot = () => readProcessIdentity(pid) === identity;
+      await terminateProcessTree(pid, {
+        isRootRunning: isRoot,
+        reason: "Stella restarted after a crash: this task's background command can no longer report to it",
+        forceAfterMs: 1_000,
+      });
+      const groupLives = (() => {
+        try {
+          process.kill(-pid, 0);
+          return true;
+        } catch (error) {
+          return (error as NodeJS.ErrnoException)?.code === "EPERM";
+        }
+      })();
+      if (isRoot() || groupLives) left.add(sessionId);
+    }),
+  );
+  return left;
+};
+
 /**
  * The commands tasks run in the background, kept on disk as they start and
  * end: a crash leaves no time to save them, so what this file holds at the
@@ -300,6 +345,7 @@ export const trackTaskShells = (
       ? (JSON.parse(readFileSync(file, "utf8")) as { worker?: string; at?: number; shells?: unknown[] })
       : undefined;
     if (left && left.worker !== SHELLS_WORKER && Array.isArray(left.shells) && left.shells.length > 0) {
+      crashEndings.set(session, endCrashedShells(left.shells as CrashedShell[]));
       const paused = pausedShellsFile(session);
       const earlier = existsSync(paused)
         ? (JSON.parse(readFileSync(paused, "utf8")) as { stoppedAt?: number; shells?: unknown[] })
@@ -317,10 +363,21 @@ export const trackTaskShells = (
   } catch (error) {
     console.warn("[pi-chat] reading the commands a crash stopped failed", error);
   }
+  const identities = new Map<string, string | null>();
   runner.onTaskShellsChanged(() => {
     if (quittingSessions.has(session)) return;
     try {
-      const shells = runner.runningTaskShells();
+      // Each command's start time, read once while it surely runs: after a
+      // crash its group is ended only while it is provably the same one.
+      const shells = runner.runningTaskShells().map((shell) => {
+        if (shell.pid !== undefined && !identities.has(shell.sessionId)) {
+          identities.set(shell.sessionId, readProcessIdentity(shell.pid));
+        }
+        const identity = identities.get(shell.sessionId);
+        return identity ? { ...shell, identity } : shell;
+      });
+      const live = new Set(shells.map((shell) => shell.sessionId));
+      for (const id of identities.keys()) if (!live.has(id)) identities.delete(id);
       if (shells.length === 0) {
         rmSync(file, { force: true });
         return;
@@ -761,13 +818,23 @@ const tellTasksOfStoppedShells = async (
     shells?: Array<{ sessionId: string; command: string; cwd: string; startedAt: number; agentId: string }>;
   };
   rmSync(file, { force: true });
+  const ending = crashEndings.get(session);
+  crashEndings.delete(session);
+  const stillRunning = (await ending?.catch(() => new Set<string>())) ?? new Set<string>();
   const byAgent = new Map<string, NonNullable<typeof saved.shells>>();
   for (const shell of saved.shells ?? []) byAgent.set(shell.agentId, [...(byAgent.get(shell.agentId) ?? []), shell]);
   for (const [agentId, shells] of byAgent) {
     const text = [
-      "[wake: Stella restarted on this computer (an update, restart, quit or crash), and that stopped background commands you had started, or cut them off from you, before they finished, so they will not report.]",
+      "[wake: Stella restarted on this computer (an update, restart, quit or crash), and that stopped background commands you had started before they finished, so they will not report.]",
       "",
-      ...shells.map((shell) => `- \`${shell.command}\` (cwd: ${shell.cwd}, session ${shell.sessionId})`),
+      ...shells.map(
+        (shell) =>
+          `- \`${shell.command}\` (cwd: ${shell.cwd}, session ${shell.sessionId})${
+            stillRunning.has(shell.sessionId)
+              ? ": Stella could not end it, so it may still be running, but its output and exit can no longer reach you"
+              : ""
+          }`,
+      ),
       "",
       "If you were working, you have picked up where you were. If you were waiting on one of them, check directly whether what it was for has happened. Start again any you still need; their earlier sessions and output are gone.",
     ].join("\n");

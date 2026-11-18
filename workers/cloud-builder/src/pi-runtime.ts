@@ -29,7 +29,7 @@ import {
   type SettledSubmissionRecord,
 } from "@earendil-works/pi-durable";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
-import { snapshotPiTablesBeforeUpgrade } from "./pi-table-snapshot.js";
+import { dropPiTableSnapshot, keepPiTableSnapshots, snapshotPiTablesBeforeUpgrade } from "./pi-table-snapshot.js";
 import {
   appendedEntries,
   onConversationChange,
@@ -326,7 +326,10 @@ export type PiRuntimeEnv = Pick<
       | "CLOUD_BUILDER_PUBLIC_URL"
       | "BROWSER_GATEWAY"
     >
-  >;
+  > & {
+    /** `drop` ends the way back from pi-durable 1.5's storage upgrade (pi-table-snapshot.ts). */
+    PI_UPGRADE_COPIES?: string;
+  };
 
 export type PiBrowserHandoff = {
   authority: PiAuthority;
@@ -1749,8 +1752,13 @@ export class PiConversationRuntime {
       }
       if (kept) this.#state = kept;
       await this.#setModels(kept);
-      // Keep pi's tables as pi-durable 1.1.0 left them before this version migrates them: the way back (pi-table-snapshot.ts).
-      if (snapshotPiTablesBeforeUpgrade(this.#options.storage) === "taken") this.#options.log("pi_tables_kept_before_upgrade", {});
+      // Keep pi's tables as pi-durable 1.1.0 left them before this version migrates them: the way back
+      // (pi-table-snapshot.ts), until PI_UPGRADE_COPIES=drop ends it.
+      if (!keepPiTableSnapshots(this.#options.env)) {
+        if (dropPiTableSnapshot(this.#options.storage) === "dropped") this.#options.log("pi_tables_copy_dropped", {});
+      } else if (snapshotPiTablesBeforeUpgrade(this.#options.storage) === "taken") {
+        this.#options.log("pi_tables_kept_before_upgrade", {});
+      }
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
       const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp } = await openStellaHarness(
         {

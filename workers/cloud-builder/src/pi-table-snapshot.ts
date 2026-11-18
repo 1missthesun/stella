@@ -100,11 +100,64 @@ export function restorePiTables(storage: PiTableSnapshotStorage): "restored" | "
   return "restored";
 }
 
+/** The copy's measured size, kept beside it: it never changes, and measuring reads every row once. */
+const SIZE = `${PI_SNAPSHOT_PREFIX}bytes`;
+
+/** Bytes the copy takes in the database, from SQLite's page stats where it has them, else from its rows' lengths. */
+const measureCopy = (storage: PiTableSnapshotStorage): number => {
+  const copies = PI_TABLES.map((table) => `${PI_SNAPSHOT_PREFIX}${table}`).filter((table) => tableExists(storage, table));
+  try {
+    let bytes = 0;
+    for (const table of copies) {
+      bytes += Number(storage.sql.exec("SELECT COALESCE(SUM(pgsize), 0) AS bytes FROM dbstat WHERE name = ?", table).toArray()[0]?.bytes ?? 0);
+    }
+    if (bytes > 0) return bytes;
+  } catch {
+    // No dbstat in this SQLite build: count the rows' bytes instead.
+  }
+  let bytes = 0;
+  for (const table of copies) {
+    const columns = storage.sql.exec("SELECT name FROM pragma_table_info(?)", table).toArray().map((row) => String(row.name));
+    if (columns.length === 0) continue;
+    const length = columns.map((column) => `COALESCE(LENGTH(CAST("${column.replaceAll('"', '""')}" AS BLOB)), 0)`).join(" + ");
+    bytes += Number(storage.sql.exec(`SELECT COALESCE(SUM(${length}), 0) AS bytes FROM ${table}`).toArray()[0]?.bytes ?? 0);
+  }
+  return bytes;
+};
+
+/**
+ * How much of the database the pre-upgrade copy takes, 0 without one. Size limits that guard the conversation leave it
+ * out: it is a fixed safety copy, and trimming the journal cannot shrink it.
+ */
+export function piTableSnapshotBytes(storage: PiTableSnapshotStorage): number {
+  if (!tableExists(storage, DEFINITIONS)) return 0;
+  if (tableExists(storage, SIZE)) {
+    const row = storage.sql.exec(`SELECT bytes FROM ${SIZE} WHERE singleton = 1`).toArray()[0];
+    if (row !== undefined) return Number(row.bytes);
+  }
+  const bytes = measureCopy(storage);
+  storage.transactionSync(() => {
+    storage.sql.exec(`CREATE TABLE IF NOT EXISTS ${SIZE} (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), bytes INTEGER NOT NULL)`);
+    storage.sql.exec(`INSERT OR REPLACE INTO ${SIZE} (singleton, bytes) VALUES (1, ?)`, bytes);
+  });
+  return bytes;
+}
+
+/**
+ * Whether to keep the pre-upgrade copies. Kept unless the Worker's `PI_UPGRADE_COPIES` is `drop`, which ends the way
+ * back for every conversation: each drops its copy the next time it opens, and none takes a new one. Set it once 1.5
+ * has run clean (DEPLOY.md, "Pi's pre-upgrade copies").
+ */
+export const keepPiTableSnapshots = (env: { PI_UPGRADE_COPIES?: string }): boolean =>
+  env.PI_UPGRADE_COPIES?.trim().toLowerCase() !== "drop";
+
 /** Drop the copy once the upgrade is settled and there is no going back to 1.1.0. */
-export function dropPiTableSnapshot(storage: PiTableSnapshotStorage): void {
-  if (!tableExists(storage, DEFINITIONS)) return;
+export function dropPiTableSnapshot(storage: PiTableSnapshotStorage): "dropped" | "none" {
+  if (!tableExists(storage, DEFINITIONS)) return "none";
   storage.transactionSync(() => {
     for (const table of PI_TABLES) storage.sql.exec(`DROP TABLE IF EXISTS ${PI_SNAPSHOT_PREFIX}${table}`);
+    storage.sql.exec(`DROP TABLE IF EXISTS ${SIZE}`);
     storage.sql.exec(`DROP TABLE ${DEFINITIONS}`);
   });
+  return "dropped";
 }

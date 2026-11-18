@@ -245,6 +245,27 @@ retry. Self-hosters run `bun scripts/selfhost.mjs update`, which deploys
 as above; a release that raises the minimum server API (`MIN_SUPPORTED_SERVER_API`
 in `packages/contracts/self-host.ts`) says so in its notes.
 
+### Pi's pre-upgrade copies (cloud-builder)
+
+pi-durable 1.5 migrates pi's tables in each conversation's Durable Object
+the first time it opens them, and 1.1.0 can't read the result. The way back is a
+copy of those tables as 1.1.0 left them (`pi110_*`, taken on the first open,
+logged `pi_tables_kept_before_upgrade`); a rollback build calls
+`restorePiTables` (`workers/cloud-builder/src/pi-table-snapshot.ts`) only
+when `durable_schema.version` is 2, once. The copy doesn't count toward a
+conversation's storage-pressure size.
+
+To end the way back for good, once 1.5 has run clean:
+
+```bash
+cd workers/cloud-builder
+echo drop | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put PI_UPGRADE_COPIES --env production
+```
+
+Each conversation then drops its copy the next time it opens
+(`pi_tables_copy_dropped`) and none takes a new one. After that a 1.1.0 build
+can't open an upgraded conversation, so never deploy one again.
+
 ### Sandbox image and code bundle (cloud-builder)
 
 The sandbox image (`workers/cloud-builder/Dockerfile`) holds the OS, tools,

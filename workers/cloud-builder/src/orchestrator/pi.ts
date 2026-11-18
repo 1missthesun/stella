@@ -324,6 +324,17 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 },
               },
             }),
+          wakeSources: async (threadId, authority) => {
+            const listed = (await this.piOwnerCaller(authority).ownerInternal("schedules.tool", { action: "list" })) as {
+              schedules?: Array<{ targetThreadId?: string; status?: string; description?: string; prompt?: string; nextRunAt?: number }>;
+            } | null;
+            return (listed?.schedules ?? [])
+              .filter((row) => row.targetThreadId === threadId && row.status === "active")
+              .map((row) => {
+                const name = (row.description || row.prompt || "a check").replace(/\s+/g, " ").trim().slice(0, 80);
+                return `the schedule "${name}"${row.nextRunAt ? ` (next ${new Date(row.nextRunAt).toISOString()})` : ""}`;
+              });
+          },
           agentWaiting: (event) =>
             this.publishAgentLifecycleCard(event.turnId, Date.now(), {
               type: "agent-lifecycle",

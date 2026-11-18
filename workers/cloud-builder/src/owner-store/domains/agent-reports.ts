@@ -7,7 +7,7 @@ import {
   AGENT_REPORT_MAX_CHARS,
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
-import { resultWaitingFor } from "@stella/contracts/agent-waiting";
+import { resultWaitingFor, scheduleGoneText } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -253,6 +253,27 @@ const scheduleAudit = (
       checks,
     }),
   );
+};
+
+/**
+ * A schedule aimed at a task was removed or paused: a task whose turn ended
+ * waiting hears it at once, since that schedule's fire may have been what it
+ * waited for. A task at work hears nothing (it removed it itself, or will see).
+ */
+export const tellWaitingScheduleGone = (
+  ctx: Pick<OwnerContext, "db" | "now">,
+  args: { threadId: string; name: string; change: "removed" | "paused"; key: string },
+): void => {
+  const thread = readThread(ctx.db, args.threadId);
+  if (!thread || !endedWaiting(thread) || !thread.owner_generation) return;
+  queueAgentNote(ctx, {
+    noteId: agentReportReceipt(`schedule-gone:${args.key}`),
+    parentThreadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    ownerGeneration: thread.owner_generation,
+    fromThreadId: thread.thread_id,
+    text: scheduleGoneText(args.name, args.change),
+  });
 };
 
 /** An attempt that ended its turn waiting (end_turn_waiting): it keeps its task and is never reported. */

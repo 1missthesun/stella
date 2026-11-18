@@ -183,7 +183,7 @@ const PLACED_MODELS_WAIT_MS = 120_000;
 const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
 /** Message ids of wakes no one sent on purpose: a schedule's fire, a background command's exit, a restart's note. */
-const AUTOMATIC_WAKE_ID = /^(?:schedule|background-exit|restart-shells):/u;
+const AUTOMATIC_WAKE_ID = /^(?:schedule|schedule-gone|background-exit|restart-shells):/u;
 /** A sign-in made right away (the notice in the chat) needs no note to Stella. */
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
 /** A hold that comes back within this long (a refused login tried again) is the same episode. */
@@ -371,6 +371,8 @@ export type DesktopChatsOptions = {
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
   /** Ends the shell sessions a stopped task left running here; resolves with how many. */
   endAgentShells?(threadId: string): Promise<number>;
+  /** What here could wake a task by itself: its background commands and monitors, schedules aimed at it. */
+  wakeSources?(threadId: string): Promise<string[]>;
   localLog?(conversationId: string): DesktopLocalLog | undefined;
   /** Records this computer's usage-limit pauses in the cloud and resumes a chat's paused work. */
   usageLimits?: {
@@ -1654,6 +1656,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
                 ...(options.endAgentShells ? { endAgentShells: options.endAgentShells } : {}),
+                ...(options.wakeSources ? { wakeSources: options.wakeSources } : {}),
                 execution: execution.host,
                 ...(agentLog && agentLogTransport
                   ? {
@@ -2826,6 +2829,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       const chat = await ready(conversationId);
       const record = await chat.agentStanding(threadId, context);
       if (!record) return "not_found";
+      // A schedule that is gone matters only to a task still waiting (it may have waited for it).
+      if (messageId.startsWith("schedule-gone:") && record.status !== "waiting") return "not_found";
       const report = parseAgentReportId(messageId);
       // A schedule's fire or a background command's exit wakes a task by itself;
       // a stopped task keeps it until someone resumes it.

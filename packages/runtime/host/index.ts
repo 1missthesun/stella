@@ -91,6 +91,7 @@ import type {
   LocalCronJobUpdatePatch,
   LocalHeartbeatUpsertInput,
 } from "@stella/contracts/scheduling";
+import { scheduleGoneText } from "@stella/contracts/agent-waiting";
 import type {
   AgentMessageDeviceOutcome,
   AgentStopDeviceOutcome,
@@ -2053,13 +2054,37 @@ export class StellaRuntimeHost {
     if (isCloudScheduleId(jobId)) {
       return await this.getCloudSchedules().remove(jobId);
     }
-    return this.ensureScheduler().removeCronJob(jobId);
+    const aimed = this.localScheduleAimedAtTask(jobId);
+    const removed = this.ensureScheduler().removeCronJob(jobId);
+    if (aimed && (await removed)) this.tellWaitingScheduleGone(aimed, "removed");
+    return removed;
   }
   async updateCronJob(jobId: string, patch: LocalCronJobUpdatePatch) {
     if (isCloudScheduleId(jobId)) {
       return await this.getCloudSchedules().update(jobId, patch);
     }
-    return this.ensureScheduler().updateCronJob(jobId, patch);
+    const aimed = this.localScheduleAimedAtTask(jobId);
+    const updated = await this.ensureScheduler().updateCronJob(jobId, patch);
+    const still = updated?.payload.kind === "task" || updated?.payload.kind === "watch" ? updated.payload.threadId : undefined;
+    if (aimed && updated && (!updated.enabled || still !== aimed.threadId)) {
+      this.tellWaitingScheduleGone(aimed, updated.enabled ? "removed" : "paused");
+    }
+    return updated;
+  }
+  /** An enabled schedule on this computer that wakes a task's thread. */
+  private localScheduleAimedAtTask(jobId: string): { jobId: string; name: string; threadId: string } | undefined {
+    const job = this.schedulerService?.listCronJobs().find((entry) => entry.id === jobId);
+    const payload = job?.payload;
+    if (!job?.enabled || !payload || (payload.kind !== "task" && payload.kind !== "watch") || !payload.threadId) return undefined;
+    return { jobId, name: job.name, threadId: payload.threadId };
+  }
+  /** A task waiting with that schedule aimed at it hears it is gone; a task at work hears nothing. */
+  private tellWaitingScheduleGone(aimed: { jobId: string; name: string; threadId: string }, change: "removed" | "paused") {
+    void this.messageAgent({
+      threadId: aimed.threadId,
+      messageId: `schedule-gone:${aimed.jobId}:${Date.now()}`,
+      text: scheduleGoneText(aimed.name, change),
+    }).catch(() => undefined);
   }
   async upsertHeartbeat(input: LocalHeartbeatUpsertInput) {
     return this.ensureScheduler().upsertHeartbeat(input);

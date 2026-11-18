@@ -38,7 +38,7 @@ import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain, ScheduledTurnSt
 import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess, cloudSandboxAccess } from "./billing.js";
 import { livePushTokens, resolveCurrentDeviceId, sendPushMessages } from "./devices.js";
-import { queueAgentNote, queueStellaNote } from "./agent-reports.js";
+import { queueAgentNote, queueStellaNote, tellWaitingScheduleGone } from "./agent-reports.js";
 import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { deliverScheduledMessage, scheduleTargetThread } from "./agent-threads.js";
 import { agentChangeHooks } from "./agent-events.js";
@@ -1028,6 +1028,14 @@ const updateSchedule = async (
         next.script !== row.script;
       if (edited) queueNotice(ctx, next, "updated");
       else if (next.status !== row.status) queueNotice(ctx, next, next.status === "active" ? "resumed" : "paused");
+      if (row.status === "active" && row.target_thread_id && (next.status !== "active" || next.target_thread_id !== row.target_thread_id)) {
+        tellWaitingScheduleGone(ctx, {
+          threadId: row.target_thread_id,
+          name: row.description || row.prompt,
+          change: next.status !== "active" ? "paused" : "removed",
+          key: `${row.schedule_id}:${ctx.now}`,
+        });
+      }
       return {
         ...toScheduleRow(next, ownerZone(ctx.db), computerOnly(ctx)),
         ...(first ? { check: first.check } : {}),
@@ -1049,6 +1057,14 @@ const removeSchedule = (ctx: OwnerContext, input: { requestId: string; scheduleI
       if (!row) return { removed: false };
       ctx.db.run("DELETE FROM schedules WHERE schedule_id = ?", input.scheduleId);
       queueNotice(ctx, row, "removed");
+      if (row.status === "active" && row.target_thread_id) {
+        tellWaitingScheduleGone(ctx, {
+          threadId: row.target_thread_id,
+          name: row.description || row.prompt,
+          change: "removed",
+          key: `${row.schedule_id}:${ctx.now}`,
+        });
+      }
       return { removed: true };
     },
   );

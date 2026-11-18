@@ -3,7 +3,7 @@ export const END_TURN_WAITING_TOOL = "end_turn_waiting";
 export const WAITING_FOR_MAX_CHARS = 200;
 
 export const END_TURN_WAITING_DESCRIPTION =
-  "End this turn waiting instead of reporting: you keep your task, no report goes to whoever started you, and nobody is woken. Use it whenever your assignment is not done and is waiting on something still going (an agent you started, a background command or monitor that tells you when it ends, another task, a go-ahead, an upload, a set time); a message, a helper's report, a finished command or a scheduled fire resumes you as usual. Call it as your last step, then end the turn with one short line. When the work is done or failed, or you need your starter, end your turn with your report instead.";
+  "End this turn waiting instead of reporting: you keep your task, no report goes to whoever started you, and nobody is woken. Use it whenever your assignment is not done and is waiting on something still going (an agent you started, a background command or monitor that tells you when it ends, another task, a go-ahead, an upload, a set time); a message, a helper's report, a finished command or a scheduled fire resumes you as usual. Something live must be able to wake you: with nothing (no background command or monitor of yours running, no helper at work, no schedule aimed at you, no open question to whoever started you) the wait is refused, so set one up first (a scheduled check aimed at you survives restarts). If what you wait on is stopped or removed while you wait, you are woken and told. Call it as your last step, then end the turn with one short line. When the work is done or failed, or you need your starter, end your turn with your report instead.";
 
 export const END_TURN_WAITING_PARAMETERS = {
   type: "object",
@@ -24,8 +24,41 @@ export const parseWaitingFor = (args: Record<string, unknown>): string | undefin
 
 export const END_TURN_WAITING_MISSING = "Say what you are waiting for in waiting_for.";
 
-export const endTurnWaitingResult = (waitingFor: string): string =>
-  `You end this turn waiting for ${waitingFor}. No report goes out and nobody is woken; a message, a helper's report or a scheduled fire resumes you. End your turn now with one short line.`;
+export const endTurnWaitingResult = (waitingFor: string, wakers?: readonly string[]): string =>
+  [
+    `You end this turn waiting for ${waitingFor}. No report goes out and nobody is woken; a message, a helper's report or a scheduled fire resumes you.`,
+    ...(wakers && wakers.length > 0 ? [`What can wake you now: ${wakers.join("; ")}.`] : []),
+    "End your turn now with one short line.",
+  ].join(" ");
+
+/** What a task waiting with a schedule aimed at it hears when that schedule is removed or paused. */
+export const scheduleGoneText = (name: string, change: "removed" | "paused"): string =>
+  [
+    `[wake: the schedule "${name.replace(/\s+/g, " ").trim().slice(0, 120)}" aimed at you was ${change}, so it will not wake you.]`,
+    "",
+    "You were resumed for this. If you were waiting on it, check directly whether what it was for has happened; if you still need to wait, set up another way to be woken (a background command or monitor that ends when it happens, or a scheduled check aimed at you), or report.",
+  ].join("\n");
+
+/** Starts the message a task gets when it ended its turn waiting with nothing left that could wake it. */
+export const NOTHING_CAN_WAKE_MARK = "[Nothing can wake you]";
+
+const NOTHING_LIVE =
+  "no background command or monitor of yours is running, no helper of yours is at work, no schedule is aimed at you, no message is on its way to you, and you have no question open with whoever started you";
+
+const NOTHING_CAN_WAKE_STEPS =
+  "Check directly now whether it has already happened. If it has not and you still need to wait, first set up what will wake you: a background command or monitor that ends when it happens, or a scheduled check aimed at you (schedule_add in code, a task with your thread). Then end your turn waiting again. If only a person can move it on, ask them (ask_user), or end your turn with your report.";
+
+/** end_turn_waiting refused: nothing live could ever resume the task. */
+export const nothingCanWakeRefusal = (waitingFor: string): string =>
+  `You can't end this turn waiting for ${waitingFor}: nothing that could wake you is live (${NOTHING_LIVE}), so you would wait until someone noticed. ${NOTHING_CAN_WAKE_STEPS}`;
+
+/**
+ * The wake a task gets when its turn ended waiting but what could have woken it
+ * was gone by then (it stopped its last helper or its watch after calling
+ * end_turn_waiting, say).
+ */
+export const nothingCanWakeText = (waitingFor: string): string =>
+  `${NOTHING_CAN_WAKE_MARK} You ended your turn waiting for ${waitingFor}, but by the time it ended nothing that could wake you was live (${NOTHING_LIVE}). You were resumed for this. ${NOTHING_CAN_WAKE_STEPS}`;
 
 /**
  * An attempt that ended waiting: stored as its result, it is not reported.

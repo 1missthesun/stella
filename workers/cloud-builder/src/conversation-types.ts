@@ -33,8 +33,14 @@ export const RESIDENT_ROLLOVER_TOKENS = 1_500_000;
 export const HOT_MAX_BYTES = 48 * 1024 * 1024;
 export const CUT_SCAN_PAGE_ROWS = 1_000;
 export const CUT_SCAN_MAX_ROWS = 100_000;
-export const DB_PRESSURE_AGGRESSIVE_BYTES = 64 * 1024 * 1024;
-export const DB_PRESSURE_EMERGENCY_BYTES = 512 * 1024 * 1024;
+/**
+ * Storage pressure on a conversation's whole SQLite database (journal, pi's tables, spill, search index), not counting
+ * pi's pre-upgrade copy. A Durable Object holds up to 10 GB and refuses writes past it; storage costs $0.20 per GB-month
+ * and neither wake time nor sync size grows with it, so these only guard that limit. Above them the journal keeps fewer
+ * live rows (the rest move to R2 segments), which also shortens the history a desktop brain loads.
+ */
+export const DB_PRESSURE_AGGRESSIVE_BYTES = 1024 * 1024 * 1024;
+export const DB_PRESSURE_EMERGENCY_BYTES = 4 * 1024 * 1024 * 1024;
 export const DB_PRESSURE_AGGRESSIVE_ROWS = 500;
 export const DB_PRESSURE_EMERGENCY_ROWS = 200;
 /** Spill to R2 above this. The platform row cap is 2 MB; this leaves margin. */

@@ -4,6 +4,7 @@ import type { ChatTurnRequest } from "./types.js";
 import { json } from "./support.js";
 import { OrchestratorTurnQueue } from "./turn-queue.js";
 import { JOURNAL_CHECKPOINT_KEY } from "./constants.js";
+import { piTableSnapshotBytes } from "../pi-table-snapshot.js";
 
 export abstract class OrchestratorJournalProbe extends OrchestratorTurnQueue {
   protected async loadCanonicalPromptsForTurn(
@@ -54,6 +55,7 @@ export abstract class OrchestratorJournalProbe extends OrchestratorTurnQueue {
         ),
       inbox: this.journal.inboxSize(),
       databaseBytes: this.journal.databaseSize(),
+      piCopyBytes: piTableSnapshotBytes(this.ctx.storage),
       storedBytes: this.journal.storedBytes(),
       spillObjects: this.journal.allSpillKeys().length,
       purgePending: this.journal.purgePending(),

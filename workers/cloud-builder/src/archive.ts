@@ -17,6 +17,7 @@ import {
 } from "./conversation-types.js";
 import { sha256Hex } from "./hash.js";
 import { PiEntryArchive, type ArchivedPiEntry } from "./pi-entry-archive.js";
+import { piTableSnapshotBytes } from "./pi-table-snapshot.js";
 import type {
   Journal,
   JournalRow,
@@ -88,7 +89,7 @@ export class ConversationArchive {
     private readonly journal: Journal,
     private readonly log: ConversationLogger,
     private readonly checkpointSeq: () => Promise<number | undefined>,
-    storage?: DurableObjectStorage,
+    private readonly storage?: DurableObjectStorage,
   ) {
     this.piEntries =
       bucket && storage
@@ -267,13 +268,17 @@ export class ConversationArchive {
     hot: { rows: number; bytes: number; tokens: number };
   } | null {
     const hot = this.journal.hotStats();
-    const dbBytes = this.journal.databaseSize();
+    const databaseBytes = this.journal.databaseSize();
+    // pi's pre-upgrade copy is a fixed safety copy that trimming the journal cannot shrink.
+    const copyBytes = databaseBytes > DB_PRESSURE_AGGRESSIVE_BYTES && this.storage ? piTableSnapshotBytes(this.storage) : 0;
+    const dbBytes = databaseBytes - copyBytes;
     if (dbBytes > DB_PRESSURE_AGGRESSIVE_BYTES) {
       const tier =
         dbBytes > DB_PRESSURE_EMERGENCY_BYTES ? "emergency" : "aggressive";
       this.log("error", "conversation_storage_pressure", {
         tier,
-        databaseBytes: dbBytes,
+        databaseBytes,
+        piCopyBytes: copyBytes,
         hotRows: hot.rows,
         checkpoint: checkpoint ?? null,
       });
@@ -283,7 +288,14 @@ export class ConversationArchive {
           : DB_PRESSURE_AGGRESSIVE_ROWS,
         0,
       );
-      return desired === null ? null : { ceiling: desired, reason: tier, hot };
+      if (desired === null) return null;
+      // Rows past the context summary are what a desktop brain rebuilds its context from, and cutting any of them
+      // retires the summary. Only the emergency tier, near the object's storage limit, cuts there.
+      const ceiling =
+        tier === "aggressive" && checkpoint !== undefined
+          ? Math.min(desired, checkpoint)
+          : desired;
+      return { ceiling, reason: tier, hot };
     }
     const floor = this.journal.meta().hot_min_seq;
     const overBytes = hot.bytes > HOT_MAX_BYTES;

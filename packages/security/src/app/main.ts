@@ -387,6 +387,11 @@ function startTestControl(portFile: string) {
       else if (req.url === "/gmail-insert") out = await gmailTestApi(gmailDeps).insert(q.raw!);
       else if (req.url === "/gmail-labels") out = await gmailTestApi(gmailDeps).labels(q.id!);
       else if (req.url === "/gmail-trash") out = await gmailTestApi(gmailDeps).trash(q.id!);
+      else if (req.url === "/gmail-audit") {
+        const g = gmailTestApi(gmailDeps);
+        const hits = await g.search(q.raw!);
+        out = { hits: await Promise.all(hits.map(async (m) => ({ id: m.id, labels: await g.labels(m.id) }))), userLabels: await g.userLabels(), drafts: await g.draftCount() };
+      } else if (req.url === "/gmail-delete") out = await gmailTestApi(gmailDeps).remove(q.id!);
       else if (req.url === "/quit") {
         res.end("{}");
         quitting = true;

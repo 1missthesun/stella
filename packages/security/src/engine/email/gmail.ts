@@ -225,5 +225,12 @@ export const gmailTestApi = (deps: GmailDeps) => ({
   insert: async (raw: string) =>
     (await gmail<{ id: string }>(deps, "messages?internalDateSource=receivedTime", { method: "POST", body: JSON.stringify({ raw: Buffer.from(raw).toString("base64url"), labelIds: ["INBOX", "UNREAD"] }) })).id,
   labels: async (id: string) => (await gmail<{ labelIds?: string[] }>(deps, `messages/${id}?format=minimal`)).labelIds ?? [],
+  search: async (q: string) => (await gmail<{ messages?: { id: string }[] }>(deps, `messages?includeSpamTrash=true&maxResults=50&q=${encodeURIComponent(q)}`)).messages ?? [],
+  userLabels: async () => ((await gmail<{ labels?: { name: string; type: string }[] }>(deps, "labels")).labels ?? []).filter((l) => l.type === "user").map((l) => l.name),
+  draftCount: async () => (await gmail<{ resultSizeEstimate?: number }>(deps, "drafts?maxResults=1")).resultSizeEstimate ?? 0,
+  remove: async (id: string) => {
+    const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}`, { method: "DELETE", headers: { authorization: `Bearer ${(await accessToken(deps)).access}` } });
+    return r.status;
+  },
   trash: async (id: string) => (await gmail<{ labelIds?: string[] }>(deps, `messages/${id}/trash`, { method: "POST" })).labelIds ?? [],
 });

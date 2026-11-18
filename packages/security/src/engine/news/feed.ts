@@ -1,7 +1,7 @@
 import { digestNews, type Story, type Threat } from "../judge.ts";
 import { parseJson, type ModelClient, type ModelUsage } from "../model.ts";
-import { breachCatalog } from "../reference.ts";
-import { baseDomain, fetchText } from "../util.ts";
+import { breachCatalog } from "../breach-catalog.ts";
+import { baseDomain, fetchText } from "../pure.ts";
 import { breachStories, fetchStories, kevStories } from "./sources.ts";
 
 export type Feed = {

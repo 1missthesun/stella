@@ -43,23 +43,7 @@ export const edgeBar = async (): Promise<BrowserBar | undefined> => {
   return { browser: "edge", latest: rel[0].ProductVersion, mustHave: bar.ProductVersion, mustHaveSince: Date.parse(bar.PublishedTime) };
 };
 
-export type PublicBreach = {
-  Name: string;
-  Title: string;
-  Domain: string;
-  BreachDate: string;
-  AddedDate: string;
-  PwnCount: number;
-  DataClasses: string[];
-  IsVerified: boolean;
-  IsSensitive: boolean;
-  IsSpamList: boolean;
-  IsFabricated: boolean;
-  IsMalware?: boolean;
-};
-
-/** The public list of known breaches (Have I Been Pwned, free, no key, no personal data sent). */
-export const breachCatalog = async (): Promise<PublicBreach[]> => fetchJson<PublicBreach[]>("https://haveibeenpwned.com/api/v3/breaches");
+export { breachCatalog, type PublicBreach } from "./breach-catalog.ts";
 
 /** Latest macOS per major line plus how many security fixes each release carried (SOFA, maintained by the Mac admins community from Apple's own data). */
 export type MacRelease = { version: string; released: number; cves: string[]; exploited: string[] };

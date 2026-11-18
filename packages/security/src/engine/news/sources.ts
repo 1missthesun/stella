@@ -1,6 +1,6 @@
 import type { Story } from "../judge.ts";
-import type { PublicBreach } from "../reference.ts";
-import { DAY, fetchJson, fetchText } from "../util.ts";
+import type { PublicBreach } from "../breach-catalog.ts";
+import { DAY, fetchJson, fetchText } from "../pure.ts";
 
 export const FEEDS: { source: string; url: string }[] = [
   { source: "BleepingComputer", url: "https://www.bleepingcomputer.com/feed/" },

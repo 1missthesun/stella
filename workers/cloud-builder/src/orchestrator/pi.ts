@@ -1,4 +1,5 @@
 import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
+import { Effect } from "effect";
 import { AGENT_STOP_WIRE_REASON, AGENT_STOPPED_REASON } from "@stella/contracts/agent-status";
 import { UNLISTED_SCHEDULES_WAKER, waitingResultJson } from "@stella/contracts/agent-waiting";
 import {
@@ -331,21 +332,23 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               },
             }),
           wakeSources: async (threadId, authority) => {
-            let slow: ReturnType<typeof setTimeout> | undefined;
-            const listed = (await Promise.race([
-              this.piOwnerCaller(authority).ownerInternal("schedules.tool", { action: "list" }),
-              new Promise<never>((_, reject) => {
-                slow = setTimeout(() => reject(new Error("Schedules took too long to list.")), WAKE_SCHEDULE_LIST_MS);
-              }),
-            ])
-              .finally(() => clearTimeout(slow))
-              .catch(async (error: unknown) => {
-                // Not listed is not "none": the wait stands, and the task is
-                // checked again once its schedules can be listed.
-                log("info", "pi_wake_schedules_unlisted", { threadId, message: errorMessage(error) });
-                await this.noteWakeRecheck(threadId).catch(() => undefined);
-                return undefined;
-              })) as {
+            const listed = (await Effect.runPromise(
+              Effect.tryPromise({
+                try: () => this.piOwnerCaller(authority).ownerInternal("schedules.tool", { action: "list" }),
+                catch: (error) => error,
+              }).pipe(
+                Effect.timeoutOrElse({
+                  duration: WAKE_SCHEDULE_LIST_MS,
+                  orElse: () => Effect.fail(new Error("Schedules took too long to list.")),
+                }),
+              ),
+            ).catch(async (error: unknown) => {
+              // Not listed is not "none": the wait stands, and the task is
+              // checked again once its schedules can be listed.
+              log("info", "pi_wake_schedules_unlisted", { threadId, message: errorMessage(error) });
+              await this.noteWakeRecheck(threadId).catch(() => undefined);
+              return undefined;
+            })) as {
               schedules?: Array<{ targetThreadId?: string; status?: string; description?: string; prompt?: string; nextRunAt?: number }>;
             } | null | undefined;
             if (listed === undefined) return [UNLISTED_SCHEDULES_WAKER];

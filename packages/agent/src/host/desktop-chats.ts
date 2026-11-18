@@ -332,6 +332,12 @@ export type DesktopChatsOptions = {
     description: string;
     attempt: number;
     parentThreadId?: string;
+    /**
+     * A task placed here from elsewhere, running a turn this computer started
+     * by itself (its own background work, a schedule here). The cloud records it
+     * on the task's own thread, whose parent gets the report.
+     */
+    placed?: true;
   }): void;
   agentRunEnded?(agent: {
     conversationId: string;
@@ -1691,13 +1697,19 @@ export function desktopChats(options: DesktopChatsOptions) {
                   }
                   await noteAgentThread(run.threadId, conversationId);
                   const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
-                  if (isAnotherHostsAgent(state, run.threadId)) return;
                   const agent = state?.agents[run.threadId];
+                  // A task placed here keeps the thread the cloud gave it: a turn
+                  // this computer starts of it is recorded there, so its report
+                  // goes to whoever the cloud says started it (a lead elsewhere),
+                  // not to Stella's chat here, where it sits as a top-level task.
+                  // Only one that came back after moving away is someone else's.
+                  if (agent?.origin !== undefined) return;
                   agentStarted?.({
                     conversationId,
                     threadId: run.threadId,
                     description: agent?.description ?? run.threadId,
                     attempt: await attempts(run.threadId),
+                    ...(isAnotherHostsAgent(state, run.threadId) ? { placed: true as const } : {}),
                   });
                 },
                 ...(subagentEnded || agentRunEnded || agentWaiting
@@ -1716,7 +1728,8 @@ export function desktopChats(options: DesktopChatsOptions) {
                             run.parentConversationId === opened.root.id
                               ? await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context)
                               : undefined;
-                          if (!isAnotherHostsAgent(state, run.threadId)) {
+                          // A placed task's own turn ends waiting on its own thread too.
+                          if (state?.agents[run.threadId]?.origin === undefined) {
                             agentWaiting({
                               conversationId,
                               threadId: run.threadId,
@@ -1785,7 +1798,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 ...(agentStopped
                   ? {
                       agentStopped: async (agent) => {
-                        if (opened && isAnotherHostsAgent(await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context), agent.threadId)) {
+                        if (opened && (await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context))?.agents[agent.threadId]?.origin !== undefined) {
                           return;
                         }
                         agentStopped({ conversationId, ...agent, attempt: await attempts(agent.threadId) });
@@ -2721,7 +2734,25 @@ export function desktopChats(options: DesktopChatsOptions) {
           };
         }
       }
-      return await chat.runPlacedAgent({ ...placedRun, ...(runsOn ? { runsOn } : {}), signal: placed.cancel.signal }, context);
+      const result = await chat.runPlacedAgent({ ...placedRun, ...(runsOn ? { runsOn } : {}), signal: placed.cancel.signal }, context);
+      // Wakes from its own background work, monitors and schedules here find it
+      // (after a restart too); the turns they start are recorded on its thread.
+      if (result.status !== "moved") await noteAgentThread(result.threadId, conversationId).catch((error: unknown) => options.report(error));
+      // A turn the placement ran ends like one this computer started: commands it
+      // left running in the background wake it when they exit (that turn runs
+      // here and reports to its lead), and its browser and computer-use end.
+      // Without this only turns started here armed those wakes, so a placed
+      // task waiting on its own background command was never woken.
+      if (result.status !== "moved") {
+        options.agentRunEnded?.({
+          conversationId,
+          threadId: result.threadId,
+          interrupted: result.status === "canceled",
+          waiting: result.status === "ok" && result.waitingFor !== undefined,
+          ...(result.status === "ok" && result.finalText ? { report: result.finalText } : {}),
+        });
+      }
+      return result;
     } finally {
       signal?.removeEventListener("abort", stop);
       if (placedRuns.get(run.agentKey) === placed) placedRuns.delete(run.agentKey);
@@ -2827,7 +2858,9 @@ export function desktopChats(options: DesktopChatsOptions) {
       text: string,
       messageId: string,
     ): Promise<"steered" | "resumed" | "queued" | "not_found"> {
-      const conversationId = (await threadIndex())[threadId];
+      // Placed tasks too: a turn this computer starts of one is recorded on its
+      // own thread in the cloud (hosted turns), so it reports to its real lead.
+      const conversationId = await chatOfTask(threadId);
       if (!conversationId || !text.trim()) return "not_found";
       const chat = await ready(conversationId);
       const record = await chat.agentStanding(threadId, context);

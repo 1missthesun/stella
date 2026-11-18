@@ -177,6 +177,21 @@ export type AgentMoveResult = AgentThreadControl & {
   cwd?: string;
 };
 
+/** One task rule the event log checks (see the owner store's agent-invariants). */
+export type AgentInvariantKind =
+  | "report_to_stella_not_lead"
+  | "report_lost"
+  | "stopped_task_took_input"
+  | "waiting_on_nothing_seen"
+  | "two_hosts_one_attempt";
+
+export type AgentInvariantReport = {
+  since: number;
+  checks: Array<{ kind: AgentInvariantKind; count: number; examples: string[] }>;
+  /** Turns a placed task's computer ran by itself, recorded on its own thread; `withoutStart` came from older apps. */
+  hostedTurns: { recorded: number; withoutStart: number };
+};
+
 export type AgentThreadCalls = {
   "agentThreads.spawnFromDesktop": {
     args: Origin & {
@@ -332,6 +347,11 @@ export type AgentThreadCalls = {
   "computerThreads.running": {
     args: { originDeviceId: string; ownerGeneration: string };
     result: Array<{ threadId: string; conversationId: string; attemptGeneration: number }>;
+  };
+  /** How often each task rule was broken in the last `days` (default 7), from the agent event log. */
+  "agentThreads.invariants": {
+    args: { days?: number };
+    result: AgentInvariantReport;
   };
   /**
    * A computer records that a usage limit paused (`held`) or released

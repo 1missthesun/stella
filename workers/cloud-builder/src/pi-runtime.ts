@@ -1,3 +1,4 @@
+import { isScheduleGoneText, UNLISTED_SCHEDULES_WAKER } from "@stella/contracts/agent-waiting";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord/context";
 import type { Api, Message, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
@@ -287,8 +288,6 @@ export type PiThreadReport = {
   settled?: true;
   attemptGeneration?: number;
   files?: PiDeliveredFile[];
-  /** The attempt ended its turn waiting: it keeps its task, and nothing is reported. */
-  waitingFor?: string;
 };
 
 export type PiTurnSources = {
@@ -534,7 +533,7 @@ type Opened = {
   root: Conversation;
   rootSession: string;
   refreshTools(): void;
-  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "stopAgent" | "agentStanding" | "markCatchUp">;
+  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "stopAgent" | "agentStanding" | "markCatchUp" | "recheckWaiting">;
 };
 
 const toolSpec = (tool: CloudCodeSourceAgentTool): StellaToolSpec => ({
@@ -1164,23 +1163,6 @@ export class PiConversationRuntime {
           const info = await this.#agentInfo(run.threadId, context);
           const cardTurnId = this.#cardTurnId(run.threadId, info);
           if (cardTurnId) this.#options.agentWaiting?.({ threadId: run.threadId, turnId: cardTurnId, ...info, waitingFor: end.waitingFor });
-          // A task placed here from elsewhere settles its attempt as waiting:
-          // left running, a later message would steer into a turn that has
-          // ended, and what can wake it (a schedule removed) would not count it
-          // as waiting.
-          if (info.origin) {
-            const reporter = /^agent-run:(\d+)$/u.exec(run.runId)?.[1];
-            const attemptGeneration = reporter ? await this.#threadAttemptOf(`agent-report:${reporter}`, context) : undefined;
-            await this.#options
-              .deliverThreadReport?.({
-                threadId: run.threadId,
-                requestId: `waiting:${run.runId}`,
-                text: end.answer ?? "",
-                waitingFor: end.waitingFor,
-                ...(attemptGeneration !== undefined ? { attemptGeneration } : {}),
-              })
-              .catch((error: unknown) => this.#options.report(error));
-          }
         }
         await this.#gate(authority)
           .release({ turnId: ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}` })
@@ -1787,7 +1769,7 @@ export class PiConversationRuntime {
         this.#options.log("pi_tables_kept_before_upgrade", {});
       }
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
-      const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp } = await openStellaHarness(
+      const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting } = await openStellaHarness(
         {
           storage,
           models: this.#models,
@@ -1828,7 +1810,7 @@ export class PiConversationRuntime {
         root,
         rootSession,
         refreshTools,
-        agents: { startAgent, messageAgent, stopAgent, agentStanding, markCatchUp },
+        agents: { startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting },
       };
     })().catch((error: unknown) => {
       this.#opening = undefined;
@@ -2024,6 +2006,8 @@ export class PiConversationRuntime {
     context: Context,
   ): Promise<void> {
     const { agents } = await this.open();
+    // A schedule-gone notice matters only to a task still waiting on it.
+    if (isScheduleGoneText(args.text) && (await agents.agentStanding(args.threadId, context))?.status !== "waiting") return;
     await agents.messageAgent(
       {
         key: `${threadCallKey(args.threadId, args.attemptGeneration)}:steer:${args.messageId}`,
@@ -2123,11 +2107,19 @@ export class PiConversationRuntime {
       await Promise.race([stopped, waitFor(ORIGIN_STOP_HOLD_MS)]);
       return "stopped";
     }
+    // A schedule-gone notice matters only to a task still waiting on it.
+    if (isScheduleGoneText(input.text ?? "") && standing.status !== "waiting") return running ? "steered" : "resumed";
     await agents.messageAgent(
       { key: `control:${input.commandId}`, threadId: input.threadId, message: input.text ?? "", fromOrchestrator: true },
       context,
     );
     return running ? "steered" : "resumed";
+  }
+
+  /** Checks again a waiting task whose schedules could not be listed when it waited. */
+  async recheckWaiting(threadId: string, context: Context): Promise<"told" | "live" | "unknown" | "not_waiting"> {
+    const { agents } = await this.open();
+    return await agents.recheckWaiting(threadId, context);
   }
 
   async threadAgentRunning(threadId: string, context: Context): Promise<boolean> {

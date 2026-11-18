@@ -31,10 +31,15 @@ export const endTurnWaitingResult = (waitingFor: string, wakers?: readonly strin
     "End your turn now with one short line.",
   ].join(" ");
 
+const SCHEDULE_GONE_MARK = "[wake: the schedule \"";
+
+/** A schedule-gone notice: it matters only to a task still waiting, and is dropped for one at work. */
+export const isScheduleGoneText = (text: string): boolean => text.trimStart().startsWith(SCHEDULE_GONE_MARK);
+
 /** What a task waiting with a schedule aimed at it hears when that schedule is removed or paused. */
 export const scheduleGoneText = (name: string, change: "removed" | "paused"): string =>
   [
-    `[wake: the schedule "${name.replace(/\s+/g, " ").trim().slice(0, 120)}" aimed at you was ${change}, so it will not wake you.]`,
+    `${SCHEDULE_GONE_MARK}${name.replace(/\s+/g, " ").trim().slice(0, 120)}" aimed at you was ${change}, so it will not wake you.]`,
     "",
     "You were resumed for this. If you were waiting on it, check directly whether what it was for has happened; if you still need to wait, set up another way to be woken (a background command or monitor that ends when it happens, or a scheduled check aimed at you), or report.",
   ].join("\n");

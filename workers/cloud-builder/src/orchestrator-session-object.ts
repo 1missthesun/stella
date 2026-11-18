@@ -75,6 +75,9 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       await this.checkPlacedChats().catch((error: unknown) => {
         log("error", "pi_placed_check_failed", { message: errorMessage(error) });
       });
+      await this.recheckUnlistedWaits().catch((error: unknown) => {
+        log("error", "pi_wake_recheck_failed", { message: errorMessage(error) });
+      });
     }
   }
 

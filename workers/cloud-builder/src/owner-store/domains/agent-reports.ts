@@ -14,6 +14,8 @@ import {
   agentStatusSqlList,
   isAgentStopReason,
 } from "@stella/contracts/agent-status";
+import { runsAsPiAgent } from "../../cloud-agent-dispatch.js";
+import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { agentChangeHooks, appendAgentEvent } from "./agent-events.js";
 import { deliverReportToAgent } from "./agent-threads.js";
 import { resolveCurrentDeviceId } from "./devices.js";
@@ -59,6 +61,10 @@ type ThreadRow = {
   error_message: string | null;
   origin_delivery_ack_at: number | null;
   updated_at: number;
+  harness: string | null;
+  executor_device_id: string | null;
+  placement: string;
+  execution_json: string | null;
 };
 
 type OutboxState = "pending" | "offered" | "delivered" | "dropped";
@@ -265,7 +271,16 @@ export const tellWaitingScheduleGone = (
   args: { threadId: string; name: string; change: "removed" | "paused"; key: string },
 ): void => {
   const thread = readThread(ctx.db, args.threadId);
-  if (!thread || !endedWaiting(thread) || !thread.owner_generation) return;
+  if (!thread || !thread.owner_generation) return;
+  // A task on the cloud's Stella engine keeps its attempt open while it
+  // waits (its own helpers and checks wake it there), so it still reads as
+  // running here: the engine drops the notice unless the task is waiting.
+  const onCloudEngine =
+    thread.status === "running" &&
+    !thread.executor_device_id &&
+    thread.placement !== "computer" &&
+    (thread.harness !== null || runsOnCloudEngine(thread.execution_json));
+  if (!endedWaiting(thread) && !onCloudEngine) return;
   queueAgentNote(ctx, {
     noteId: agentReportReceipt(`schedule-gone:${args.key}`),
     parentThreadId: thread.thread_id,
@@ -274,6 +289,17 @@ export const tellWaitingScheduleGone = (
     fromThreadId: thread.thread_id,
     text: scheduleGoneText(args.name, args.change),
   });
+};
+
+/** Whether a task's execution runs on the conversation's cloud engine (not in a container of its own). */
+const runsOnCloudEngine = (executionJson: string | null): boolean => {
+  if (!executionJson) return false;
+  try {
+    const parsed = parseCloudExecutionSelection(JSON.parse(executionJson));
+    return parsed !== null && runsAsPiAgent(parsed);
+  } catch {
+    return false;
+  }
 };
 
 /** An attempt that ended its turn waiting (end_turn_waiting): it keeps its task and is never reported. */

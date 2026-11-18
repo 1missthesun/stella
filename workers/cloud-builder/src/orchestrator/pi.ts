@@ -1,6 +1,6 @@
 import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { AGENT_STOP_WIRE_REASON, AGENT_STOPPED_REASON } from "@stella/contracts/agent-status";
-import { waitingResultJson } from "@stella/contracts/agent-waiting";
+import { UNLISTED_SCHEDULES_WAKER, waitingResultJson } from "@stella/contracts/agent-waiting";
 import {
   agentAttemptOutcomeOf,
   type AgentAttemptOutcome,
@@ -114,6 +114,9 @@ import {
   PI_DEVICE_AGENT_PREFIX,
   piThreadKey,
   PI_LIVE_KEY,
+  PI_WAKE_RECHECK_EVERY_MS,
+  PI_WAKE_RECHECK_FOR_MS,
+  PI_WAKE_RECHECK_KEY,
   PI_BRAIN_KEY,
   LOCAL_TURN_LEASE_KEY,
   JOURNAL_CHECKPOINT_KEY,
@@ -139,6 +142,9 @@ import {
 import { crewScopeForConversation } from "../slack/scope.js";
 import { OrchestratorCloudAgents } from "./cloud-agents.js";
 import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
+
+/** A schedule list slower than this counts as not listed. */
+const WAKE_SCHEDULE_LIST_MS = 15_000;
 
 export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   protected abstract claudeCodeTransport(): import("./claude-code-transport.js").CloudClaudeCodeTransport;
@@ -325,9 +331,24 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               },
             }),
           wakeSources: async (threadId, authority) => {
-            const listed = (await this.piOwnerCaller(authority).ownerInternal("schedules.tool", { action: "list" })) as {
+            let slow: ReturnType<typeof setTimeout> | undefined;
+            const listed = (await Promise.race([
+              this.piOwnerCaller(authority).ownerInternal("schedules.tool", { action: "list" }),
+              new Promise<never>((_, reject) => {
+                slow = setTimeout(() => reject(new Error("Schedules took too long to list.")), WAKE_SCHEDULE_LIST_MS);
+              }),
+            ])
+              .finally(() => clearTimeout(slow))
+              .catch(async (error: unknown) => {
+                // Not listed is not "none": the wait stands, and the task is
+                // checked again once its schedules can be listed.
+                log("info", "pi_wake_schedules_unlisted", { threadId, message: errorMessage(error) });
+                await this.noteWakeRecheck(threadId).catch(() => undefined);
+                return undefined;
+              })) as {
               schedules?: Array<{ targetThreadId?: string; status?: string; description?: string; prompt?: string; nextRunAt?: number }>;
-            } | null;
+            } | null | undefined;
+            if (listed === undefined) return [UNLISTED_SCHEDULES_WAKER];
             return (listed?.schedules ?? [])
               .filter((row) => row.targetThreadId === threadId && row.status === "active")
               .map((row) => {
@@ -971,12 +992,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       return;
     }
     let outcome: PiThreadOutcome;
-    if (report.waitingFor !== undefined) {
-      outcome = {
-        status: "completed",
-        resultJson: waitingResultJson(report.text.slice(0, 30_000), report.waitingFor),
-      };
-    } else if (report.settled) {
+    if (report.settled) {
       if (!attempt.pausing && report.status !== "canceled") return;
       outcome = { status: "canceled", errorMessage: AGENT_STOPPED_REASON };
     } else {
@@ -1251,6 +1267,47 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const runtime = await this.openPiRuntime(this.piGatewayOrigin());
     const { contextFor } = await import("../pi-runtime.js");
     return await runtime.controlHarnessAgent(input, contextFor());
+  }
+
+  protected async noteWakeRecheck(threadId: string): Promise<void> {
+    await this.ctx.blockConcurrencyWhile(async () => {
+      const pending = (await this.ctx.storage.get<Record<string, number>>(PI_WAKE_RECHECK_KEY)) ?? {};
+      if (pending[threadId] === undefined) pending[threadId] = Date.now();
+      await this.ctx.storage.put(PI_WAKE_RECHECK_KEY, pending);
+      await this.armAlarmNoLaterThan(Date.now() + PI_WAKE_RECHECK_EVERY_MS);
+    });
+  }
+
+  /**
+   * Tasks that waited while their schedules could not be listed are checked
+   * again: with nothing live once everything can be listed, each is told so.
+   */
+  protected async recheckUnlistedWaits(): Promise<void> {
+    const pending = await this.ctx.storage.get<Record<string, number>>(PI_WAKE_RECHECK_KEY);
+    if (!pending || Object.keys(pending).length === 0) return;
+    const runtime = await this.openPiRuntime(this.piGatewayOrigin());
+    const { contextFor } = await import("../pi-runtime.js");
+    const settled: string[] = [];
+    for (const [threadId, since] of Object.entries(pending)) {
+      if (Date.now() - since > PI_WAKE_RECHECK_FOR_MS) {
+        settled.push(threadId);
+        continue;
+      }
+      const outcome = await runtime.recheckWaiting(threadId, contextFor()).catch((error: unknown) => {
+        log("error", "pi_wake_recheck_failed", { threadId, message: errorMessage(error) });
+        return "unknown" as const;
+      });
+      log("info", "pi_wake_rechecked", { threadId, outcome });
+      if (outcome !== "unknown") settled.push(threadId);
+    }
+    const left = await this.ctx.blockConcurrencyWhile(async () => {
+      const current = (await this.ctx.storage.get<Record<string, number>>(PI_WAKE_RECHECK_KEY)) ?? {};
+      for (const threadId of settled) delete current[threadId];
+      if (Object.keys(current).length === 0) await this.ctx.storage.delete(PI_WAKE_RECHECK_KEY);
+      else await this.ctx.storage.put(PI_WAKE_RECHECK_KEY, current);
+      return Object.keys(current).length;
+    });
+    if (left > 0) await this.armAlarmNoLaterThan(Date.now() + PI_WAKE_RECHECK_EVERY_MS);
   }
 
   protected async piHeartbeat(): Promise<void> {

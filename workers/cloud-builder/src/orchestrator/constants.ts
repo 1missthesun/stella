@@ -18,6 +18,10 @@ export const piThreadKey = (threadId: string): string =>
 export const PI_JOURNAL_IMPORT_BATCH = 200;
 export const PI_MIRRORED_KEY = "piMirroredEntry";
 export const PI_LIVE_KEY = "piLive";
+/** Tasks that waited while their schedules could not be listed: threadId -> since (ms). */
+export const PI_WAKE_RECHECK_KEY = "piWakeRecheck";
+export const PI_WAKE_RECHECK_EVERY_MS = 60_000;
+export const PI_WAKE_RECHECK_FOR_MS = 24 * 60 * 60_000;
 export const PI_BRAIN_KEY = "piBrain";
 export const JOURNAL_CHECKPOINT_KEY = "journalCheckpoint";
 export const CHECKPOINT_TURN_SCAN = 64;

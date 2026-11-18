@@ -362,6 +362,8 @@ export type RunningTaskShell = {
   startedAt: number;
   conversationId: string;
   agentId: string;
+  /** The shell's process, leading its own process group (POSIX). */
+  pid?: number;
 };
 
 export const listRunningTaskShells = (state: ShellState): RunningTaskShell[] => {
@@ -375,6 +377,7 @@ export const listRunningTaskShells = (state: ShellState): RunningTaskShell[] => 
       startedAt: shell.startedAt,
       conversationId: shell.owner.conversationId,
       agentId: shell.owner.agentId,
+      ...((shell.child?.pid ?? shell.pty?.process.pid) ? { pid: shell.child?.pid ?? shell.pty?.process.pid } : {}),
     });
   }
   return running;

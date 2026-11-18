@@ -68,6 +68,8 @@ export type AgentReportCalls = {
       conversationId: string;
       fromThreadId: string;
       text: string;
+      /** A lead to give the note to, like a helper's report, instead of Stella. */
+      toThreadId?: string;
     };
     result: { queued: boolean };
   };

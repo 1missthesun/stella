@@ -28,6 +28,7 @@ import {
 import {
   AGENT_MESSAGE_MAX_CHARS,
   agentDirectoryEntry,
+  OFFLINE_RUNNING_STATUS_NOTE,
   buildAgentDirectoryResult,
   formatAgentMessage,
   isFramedAgentMessage,
@@ -230,7 +231,7 @@ export const StellaAgentsDoc = defineDoc<StellaAgents>({
   checkpointWhen: boundedReplay,
 });
 
-const PLACED_CALL_PREFIX = "placed:";
+export const PLACED_CALL_PREFIX = "placed:";
 
 export const isAnotherHostsAgent = (
   state: { agents: Record<string, AgentRecord>; calls: Record<string, { threadId: string }> } | undefined,
@@ -2350,7 +2351,9 @@ export function stellaAgents(host: StellaAgentsHost) {
         return statusResult({
           ...entry,
           relation: mine ? "you started it" : relationOf(row, self, parentThreadId),
-          ...(mine && entry.status === "running" ? { note: RUNNING_STATUS_NOTE } : {}),
+          ...(mine && entry.status === "running"
+            ? { note: row.offline ? OFFLINE_RUNNING_STATUS_NOTE : RUNNING_STATUS_NOTE }
+            : {}),
           ...(reachable ? {} : { reachable: false }),
           ...(await agentDetails(api, threadId, found.record, context)),
         });

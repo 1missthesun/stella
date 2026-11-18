@@ -1,3 +1,4 @@
+import { readAgentLineage } from "../agent-depth.js";
 import type { DispatchPayload } from "./placement.js";
 
 export const MOBILE_PAIRING_PROOF_VERSION =
@@ -292,16 +293,27 @@ export const DISPATCH_PAYLOAD_WIRE_FIELDS = {
   model: true,
   handoff: true,
   scheduledAgent: true,
-  // Not carried yet (nor parsed from a computer's request): a computer runs
-  // a placed agent at depth 1 with no starter. Carrying it changes how placed
-  // helpers run, so it waits for its own change.
-  lineage: false,
+  // A helper's depth and starter, so it stays a helper on the computer it is
+  // placed on. Only the owner store sets it (a client's request never carries
+  // it), and only for a helper: a top-level task's bytes are unchanged.
+  lineage: true,
 } as const satisfies Record<keyof DispatchPayload, boolean>;
+
+/**
+ * The lineage a dispatch carries: a helper's (depth past 1, or a starter).
+ * A top-level task carries none, which is what every computer assumes
+ * without one, so its payload bytes are what they always were.
+ */
+const wireLineage = (payload: DispatchPayload) => {
+  const lineage = readAgentLineage(payload.lineage);
+  return lineage && (lineage.depth > 1 || lineage.startedBy) ? lineage : undefined;
+};
 
 export const canonicalDispatchPayloadJson = (
   payload: DispatchPayload,
-): string =>
-  JSON.stringify({
+): string => {
+  const lineage = wireLineage(payload);
+  return JSON.stringify({
     schemaVersion: 1,
     prompt: payload.prompt,
     conversationId: payload.conversationId,
@@ -340,5 +352,17 @@ export const canonicalDispatchPayloadJson = (
     ...(payload.scheduledAgent?.description
       ? { scheduledAgent: { description: payload.scheduledAgent.description } }
       : {}),
+    ...(lineage ? { lineage } : {}),
   });
+};
+
+/**
+ * The bytes builds before lineage crossed the wire stored for the same
+ * payload: a dispatch submitted then and replayed now still matches.
+ */
+export const legacyDispatchPayloadJson = (payload: DispatchPayload): string | undefined => {
+  if (!wireLineage(payload)) return undefined;
+  const { lineage: _lineage, ...rest } = payload;
+  return canonicalDispatchPayloadJson(rest);
+};
 

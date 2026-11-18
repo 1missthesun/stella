@@ -2780,7 +2780,7 @@ const commandResult = async (
     note =
       input.kind === "stop"
         ? routed.hold === "unreachable"
-          ? `${name} is offline right now, so it could not stop yet. The stop is held and applied the moment ${name} reconnects, unless you message the agent first.`
+          ? `${name} is offline right now, so it could not stop yet. The stop is held and applied the moment ${name} reconnects (it waits up to a week), unless you message the agent first. If you redo its work elsewhere meanwhile, this stop keeps the old one from carrying on there.`
           : `${name} did not answer in time. The stop is offered again until ${name} answers.`
         : routed.hold === "unreachable"
             ? `${offlineName} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, however long that takes.`
@@ -2792,7 +2792,7 @@ const commandResult = async (
     outcome = routed.outcome;
     note = routed.note;
     if (executor.kind === "dispatch" && input.kind === "stop" && outcome === "stopped" && device && !device.online) {
-      note = `${device.name} is offline right now. The agent is recorded as stopped, and it stops there the moment ${device.name} reconnects.`;
+      note = `${device.name} is offline right now. The agent is recorded as stopped, and the stop is held for ${device.name}: it stops there the moment ${device.name} reconnects (the stop waits up to a week), so it won't carry on there if you redo its work elsewhere.`;
     }
   }
   return {

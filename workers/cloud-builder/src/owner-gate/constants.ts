@@ -19,6 +19,8 @@ export const HOSTING_BUDGET_MESSAGE =
 export const HOSTING_CAP_MESSAGE =
   "It served more requests today than Stella allows for one account. It will be back tomorrow.";
 export const DISPATCH_RECONCILE_MAX_MS = 3_600_000;
+/** How long a stop waits for the computer it was sent to, like any work held for a computer (`DEVICE_AVAILABILITY_WAIT_MS`). */
+export const DISPATCH_STOP_HOLD_MS = 7 * 24 * 60 * 60_000;
 export const DISPATCH_CLOUD_RETRY_DELAY_MS = 1_000;
 export const DISPATCH_CLOUD_MAX_ATTEMPTS = 2;
 export const DEFAULT_TURN_TIMEOUT_MS = 900_000;

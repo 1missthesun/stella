@@ -108,6 +108,19 @@ const remoteCancellation = (
     ? { errorCode: AGENT_STOPPED_ERROR_CODE, errorMessage: AGENT_STOPPED_REASON }
     : { errorMessage: "Canceled by the user." };
 
+/**
+ * A run the server already ended while this computer was away. One ended by
+ * a stop ends here as a stop (the task is marked stopped and what it left
+ * running ends), not as a run that merely lost its place and may start again.
+ */
+const remoteEnded = (
+  remote: Pick<DispatchSummary, "state" | "cancelReason">,
+  fallback: { errorCode: string; errorMessage: string },
+): { errorCode?: string; errorMessage: string } =>
+  remote.state === "canceled" && isAgentStopReason(remote.cancelReason)
+    ? remoteCancellation(remote)
+    : fallback;
+
 export type ExecutionPlacementRunResult = {
   status: "ok" | "error" | "canceled";
   stopped?: boolean;
@@ -1122,6 +1135,16 @@ export class ExecutionPlacementBridge {
       if (local.state === "terminal_pending" && !local.cancelRpcPending) {
         this.inbox.markTerminal(dispatch.dispatchId, dispatch, this.now());
         void this.heartbeat();
+      } else if (
+        local.kind === "agent" &&
+        local.state === "running" &&
+        !local.cancelRpcPending &&
+        dispatch.state === "canceled" &&
+        isAgentStopReason(dispatch.cancelReason)
+      ) {
+        // Stopped while this computer was away, and the server gave up
+        // waiting for it: the task still stops here, as a stop.
+        await this.cancelAccepted(local, dispatch);
       }
       return;
     }
@@ -1537,12 +1560,15 @@ export class ExecutionPlacementBridge {
       return;
     }
     if (!remote || remote.placement === "cloud" || isTerminalState(remote.state)) {
-      this.inbox.stageCancellation(row.dispatchId, {
-        outcome: "canceled",
+      const notOwned = {
         errorCode: !remote || remote.placement === "cloud"
           ? "LOCAL_EXECUTION_NO_LONGER_OWNED"
           : "LOCAL_EXECUTION_REMOTE_TERMINAL",
         errorMessage: "The server no longer assigned this task to the desktop.",
+      };
+      this.inbox.stageCancellation(row.dispatchId, {
+        outcome: "canceled",
+        ...(remote ? remoteEnded(remote, notOwned) : notOwned),
         orphanOnAck: true,
         now: this.now(),
       });
@@ -1878,9 +1904,11 @@ export class ExecutionPlacementBridge {
         if (["claimed", "accepted", "running"].includes(row.state)) {
           this.inbox.stageCancellation(row.dispatchId, {
             outcome: "canceled",
-            errorCode: "LOCAL_EXECUTION_REMOTE_TERMINAL",
-            errorMessage:
-              "The server reached a terminal state before local reconciliation.",
+            ...remoteEnded(remote, {
+              errorCode: "LOCAL_EXECUTION_REMOTE_TERMINAL",
+              errorMessage:
+                "The server reached a terminal state before local reconciliation.",
+            }),
             orphanOnAck: true,
             now: this.now(),
           });

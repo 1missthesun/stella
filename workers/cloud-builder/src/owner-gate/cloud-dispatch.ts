@@ -1,4 +1,5 @@
 import { releasingStub } from "../rpc-release.js";
+import { readAgentLineage, type AgentLineage } from "@stella/contracts/agent-depth";
 import {
   type AdmittedCloudChat,
   chatTurnFingerprintSource,
@@ -511,6 +512,8 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     if (!sessions) throw new Error("Build session namespace is not bound.");
     const snapshot = await this.snapshot({ now });
     const threadId = newAgentThreadId();
+    // A helper placed here stays a helper: its depth and starter come along.
+    const lineage = readAgentLineage(payload.lineage) ?? { depth: 1 };
     const request: CloudAgentTurnStartRequest = {
       protocol: TURN_PLANE_PROTOCOL,
       kind: "agent",
@@ -518,7 +521,8 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       ownerGeneration: row.owner_generation,
       conversationId: row.conversation_id,
       threadId,
-      agentDepth: 1,
+      ...(lineage.startedBy ? { parentThreadId: lineage.startedBy.threadId } : {}),
+      agentDepth: lineage.depth,
       attemptGeneration: 1,
       turnId: row.dispatch_id,
       prompt: payload.prompt,
@@ -537,6 +541,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
           ...request,
           execution: request.execution,
         },
+        lineage,
         now,
       );
       if (started.state === "cloud_running") {
@@ -583,6 +588,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
   protected async startPiPlacedAgent(
     row: DispatchRow,
     request: CloudAgentTurnStartRequest & { execution: PiAgentExecution },
+    lineage: AgentLineage,
     now: number,
   ): Promise<DispatchRow> {
     const sessions = this.env.ORCHESTRATOR_SESSIONS;
@@ -600,7 +606,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         description: request.description,
         turnId: row.dispatch_id,
         attemptGeneration: 1,
-        lineage: { depth: 1 },
+        lineage,
       },
     });
     const running = await this.markCloudRunning(

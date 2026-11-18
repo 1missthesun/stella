@@ -423,6 +423,7 @@
         "@stella/executor-cloud": "workspace:*",
         "@stella/model-catalog": "workspace:*",
         "@stella/runtime": "workspace:*",
+        "@stella/security": "workspace:*",
         "better-auth": "1.7.7",
         "croner": "^10.0.1",
         "effect": "4.0.0",

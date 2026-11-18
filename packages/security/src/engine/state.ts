@@ -19,6 +19,8 @@ export type State = {
   handledLog: HandledLine[];
   lastRun?: RunSummary;
   feed?: Feed;
+  /** When this computer last downloaded the shared feed. */
+  feedFetchedAt?: number;
   breachCatalog?: { at: number; list: PublicBreach[] };
   emailLeaks?: Record<string, { at: number; leaks: unknown[] }>;
   mail?: { checkedThrough?: number; connectedAt?: number; verdicts: Record<string, EmailVerdict & { at: number; from: string; subject: string }> };

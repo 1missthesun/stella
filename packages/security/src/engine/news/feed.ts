@@ -22,6 +22,18 @@ const addUsage = (a: ModelUsage, b: ModelUsage): ModelUsage => ({
   costUsd: a.costUsd + b.costUsd,
   ms: a.ms + b.ms,
 });
+/** The same incident found in two batches (or two builds) becomes one threat. */
+export const mergeThreats = <T extends Threat>(threats: T[]): T[] => {
+  const merged = new Map<string, T>();
+  for (const t of threats) {
+    const key = t.domains[0] ? `${t.kind}:${baseDomain(t.domains[0])}` : t.id;
+    const prev = merged.get(key);
+    if (prev) merged.set(key, { ...prev, domains: [...new Set([...prev.domains, ...t.domains])], sources: [...new Set([...prev.sources, ...t.sources])], severity: Math.max(prev.severity, t.severity) as Threat["severity"] });
+    else merged.set(key, t);
+  }
+  return [...merged.values()];
+};
+
 export const ZERO_USAGE: ModelUsage = { inputTokens: 0, cachedTokens: 0, outputTokens: 0, reasoningTokens: 0, costUsd: 0, ms: 0 };
 
 const articleText = async (url: string): Promise<string> => {
@@ -63,17 +75,25 @@ const enrich = async (model: ModelClient, t: Threat): Promise<{ threat: Threat; 
 
 const BATCH = 60;
 
+/** Today's stories from every source (news sites, the public breach list, CISA's exploited-holes list). */
+export const gatherStories = async (hours = 30): Promise<{ stories: Story[]; errors: string[] }> => {
+  const errors: string[] = [];
+  const [news, catalog, kev] = await Promise.all([
+    fetchStories(hours),
+    breachCatalog().catch((e) => (errors.push(`breaches: ${e.message}`), [])),
+    kevStories().catch((e) => (errors.push(`kev: ${e.message}`), [])),
+  ]);
+  errors.push(...news.errors);
+  return { stories: [...breachStories(catalog), ...kev, ...news.stories], errors };
+};
+
 export const buildFeed = async (model: ModelClient, opts: { hours?: number; stories?: Story[] } = {}): Promise<Feed> => {
   const errors: string[] = [];
   let stories = opts.stories;
   if (!stories) {
-    const [news, catalog, kev] = await Promise.all([
-      fetchStories(opts.hours ?? 30),
-      breachCatalog().catch((e) => (errors.push(`breaches: ${e.message}`), [])),
-      kevStories().catch((e) => (errors.push(`kev: ${e.message}`), [])),
-    ]);
-    errors.push(...news.errors);
-    stories = [...breachStories(catalog), ...kev, ...news.stories];
+    const got = await gatherStories(opts.hours ?? 30);
+    errors.push(...got.errors);
+    stories = got.stories;
   }
   let usage = ZERO_USAGE;
   const threats: Threat[] = [];
@@ -82,16 +102,9 @@ export const buildFeed = async (model: ModelClient, opts: { hours?: number; stor
     usage = addUsage(usage, res.usage);
     threats.push(...res.threats);
   }
-  // Merge the same incident found in two batches.
-  const merged = new Map<string, Threat>();
-  for (const t of threats) {
-    const key = t.domains[0] ? `${t.kind}:${baseDomain(t.domains[0])}` : t.id;
-    const prev = merged.get(key);
-    if (prev) merged.set(key, { ...prev, domains: [...new Set([...prev.domains, ...t.domains])], sources: [...new Set([...prev.sources, ...t.sources])], severity: Math.max(prev.severity, t.severity) as Threat["severity"] });
-    else merged.set(key, t);
-  }
+  const merged = mergeThreats(threats);
   const out: Threat[] = [];
-  for (const t of merged.values()) {
+  for (const t of merged) {
     const many = /\b(\d{2,})\s+(web)?sites|supply.chain|skimm/i.test(`${t.headline} ${t.detail}`);
     if ((t.kind === "skimming" || many) && t.sources.length) {
       const r = await enrich(model, t);

@@ -21,6 +21,8 @@ const { values, positionals } = parseArgs({
     email: { type: "string", multiple: true },
     /** Development: sign in as a Stella dev test account (needs STELLA_ADMIN_API_SECRET) and use Stella's gateway. */
     "stella-test-account": { type: "string" },
+    /** Download the shared news feed from a Stella backend instead of reading the news here. */
+    "feed-url": { type: "string" },
   },
 });
 
@@ -49,6 +51,7 @@ const summary = await runScan({
   dataDir: values["data-dir"] ?? defaultDataDir(),
   ...(model ? { model } : {}),
   ...(values.email ? { emails: values.email } : {}),
+  ...(values["feed-url"] ? { feedUrl: values["feed-url"] } : {}),
   onProgress: (l) => !values.json && console.error(`… ${l}`),
 });
 if (values.json) console.log(JSON.stringify(summary, null, 1));

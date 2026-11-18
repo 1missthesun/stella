@@ -1,4 +1,4 @@
-import type { InventoryItem } from "./checks/inventory.ts";
+import type { InventoryItem } from "./types.ts";
 import { parseJson, type ModelClient, type ModelUsage } from "./model.ts";
 
 const VOICE = `Write for someone who isn't technical: short, calm, plain words, no jargon (no "malware", "payload", "C2", "IOC", "phishing kit"; say "a fake", "a program that steals passwords", "a scam"). Never alarm without a reason. Titles are at most 6 words and say what to do or what it is. Details are one sentence, at most 25 words.`;

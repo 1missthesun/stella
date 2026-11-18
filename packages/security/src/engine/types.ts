@@ -58,3 +58,11 @@ export type RunSummary = {
   errors: { check: string; message: string }[];
   model: { calls: number; inputTokens: number; outputTokens: number; costUsd: number };
 };
+
+/** Something on the computer the model may be asked about (an app, extension, download or startup item). */
+export type InventoryItem = {
+  key: string;
+  kind: "startup" | "app" | "download" | "extension";
+  name: string;
+  facts: Record<string, unknown>;
+};

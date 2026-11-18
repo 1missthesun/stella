@@ -151,7 +151,8 @@ const check = async (reason: string) => {
       const summary = await runScan({
         dataDir: dataDir(),
         ...(model ? { model } : {}),
-        ...(process.env.STELLA_SECURITY_FEED_URL ? { feedUrl: process.env.STELLA_SECURITY_FEED_URL } : {}),
+        // The day's news is read once on Stella's server for everyone; this computer only downloads it.
+        feedUrl: process.env.STELLA_SECURITY_FEED_URL ?? `${backendUrl}/api/security/feed`,
         emails: [account?.email, gmailDeps.load()?.email].filter(Boolean) as string[],
         ...(mailOn ? { mail: gmailCheck(gmailDeps) } : {}),
         onProgress: (p) => setView({ progress: p }),

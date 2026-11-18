@@ -5,12 +5,8 @@ import { listDirSafe } from "../browsers.ts";
 import { OS, exists, home, powershell, run } from "../util.ts";
 
 /** Something on the computer that can run code or came from outside, tracked so changes can be judged. */
-export type InventoryItem = {
-  key: string;
-  kind: "startup" | "app" | "download" | "extension";
-  name: string;
-  facts: Record<string, unknown>;
-};
+export type { InventoryItem } from "../types.ts";
+import type { InventoryItem } from "../types.ts";
 
 const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";
 

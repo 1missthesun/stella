@@ -214,13 +214,24 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
   // ---- today's news vs this person
   progress("Reading today's security news");
   let feed: Feed | undefined = state.feed;
-  if (!feed || Date.now() - Date.parse(feed.builtAt) > 12 * 3_600_000) {
-    feed = await guard("news", async () => {
-      if (opts.feedUrl) {
-        const r = await fetch(opts.feedUrl, { signal: AbortSignal.timeout(20_000) });
+  if (opts.feedUrl) {
+    // Shared feed from Stella's server: a small download, refreshed hourly at most. If the server
+    // can't be reached, yesterday's copy still works for up to three days.
+    if (!state.feedFetchedAt || Date.now() - state.feedFetchedAt > 3_600_000) {
+      const got = await guard("news", async () => {
+        const r = await fetch(opts.feedUrl!, { signal: AbortSignal.timeout(20_000) });
         if (!r.ok) throw new Error(`feed HTTP ${r.status}`);
         return (await r.json()) as Feed;
+      });
+      if (got?.threats) {
+        feed = state.feed = got;
+        state.feedFetchedAt = Date.now();
       }
+    }
+    if (feed && Date.now() - Date.parse(feed.builtAt) > 3 * DAY) feed = undefined;
+  } else if (!feed || Date.now() - Date.parse(feed.builtAt) > 12 * 3_600_000) {
+    // No server (command line, development): read the news on this computer.
+    feed = await guard("news", async () => {
       if (!opts.newsModel && !opts.model) throw new Error("no model for the news digest");
       const f = await buildFeed(opts.newsModel ?? opts.model!);
       addUsage(f.usage);

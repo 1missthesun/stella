@@ -89,6 +89,7 @@ import { verifyServiceBearerRequestWithAny } from "../service-bearer.js";
 import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
 import { handleBillingRoute } from "../billing/routes.js";
 import { handleAdminRoute } from "../admin/routes.js";
+import { handleSecurityFeedRoute } from "../security-feed.js";
 import { handleStellaModelsRoute } from "../catalog/models.js";
 import { handlePreviewSessionCapabilityRoute } from "../billing/preview-session-capability.js";
 import { handleDevicesRoute } from "../devices/routes.js";
@@ -993,6 +994,7 @@ app.use(
   ),
 );
 app.use(mount(handleBillingRoute));
+app.use(mount(handleSecurityFeedRoute));
 app.use(mount(handleAdminRoute));
 app.use(mount(handleDevicesRoute));
 app.use(mount(handleUserAsksRoute));

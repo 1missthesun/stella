@@ -18,5 +18,8 @@
     "@types/node": "^26.6.4",
     "bun-types": "1.4.4",
     "typescript": "npm:typescript@^7.0.2"
+  },
+  "exports": {
+    "./feed": "./src/feed-server.ts"
   }
 }

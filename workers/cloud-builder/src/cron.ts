@@ -21,9 +21,14 @@ export async function runScheduled(
     async () =>
       (await import("./owner-store/domains/feedback.js")).retryFeedbackEmails(env as unknown as Cloudflare.Env),
   ];
-  const sweeps: Array<[string, () => Promise<unknown>]> = controller.cron === HOURLY_CRON ? [deletions, feedback] : [
+  const securityFeed: [string, () => Promise<unknown>] = [
+    "security feed",
+    async () => (await import("./security-feed.js")).refreshSecurityFeed(env as never),
+  ];
+  const sweeps: Array<[string, () => Promise<unknown>]> = controller.cron === HOURLY_CRON ? [deletions, feedback, securityFeed] : [
     deletions,
     feedback,
+    securityFeed,
     ["model prices", () => syncModelPrices(env)],
     ["abuse tables", () => sweepAbuseTables(env)],
     ["auth tables", () => sweepAuthTables(env)],

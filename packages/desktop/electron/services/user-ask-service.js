@@ -18,6 +18,7 @@ import {
   redactSecretFingerprints,
 } from "@stella/contracts/secret-redaction";
 import { PI_LATE_ANSWER_PREFIX } from "@stella/contracts/pi-chat";
+import { secureFieldScript, secureFillHash, secureFillReceipt } from "@stella/contracts/secure-fill";
 import {
   DEFAULT_USER_ASK_ESCALATION_POLICY,
   USER_ASK_EXPIRED_NOTE,
@@ -94,9 +95,10 @@ const normalizeSaveRequest = (input) => {
     if (!input || typeof input !== "object") {
         return null;
     }
+    const service = normalizeSavedValuePart(input.service);
     return {
-        service: normalizeSavedValuePart(input.service),
-        account: normalizeSavedValuePart(input.account),
+        service,
+        account: usableAccount(service, input.account),
         replace: input.replace === true,
     };
 };
@@ -116,6 +118,27 @@ const accountFromAnswer = (fields, values) => {
     return "";
 };
 const sameAccount = (left, right) => left.trim().toLowerCase() === right.trim().toLowerCase();
+/**
+ * An account that names nothing (redacted text the task copied back, the
+ * service's own name) is treated as no account, so it can't split one login
+ * into several saved records.
+ */
+const usableAccount = (service, account) => {
+    const value = normalizeSavedValuePart(account);
+    if (!value ||
+        value.includes(SECRET_REDACTION_MARK) ||
+        /\[redacted[^\]]*\]/i.test(value) ||
+        (service && sameAccount(value, service))) {
+        return "";
+    }
+    return value;
+};
+const ownerOfRequest = (request) => ({
+    ...(typeof request?.agentId === "string" && request.agentId ? { threadId: request.agentId } : {}),
+    ...(typeof request?.conversationId === "string" && request.conversationId
+        ? { conversationId: request.conversationId }
+        : {}),
+});
 const mirroredAskOf = (row) => {
     if (!row || typeof row !== "object") {
         return null;
@@ -588,7 +611,7 @@ export class UserAskService {
                 replaceId = matches[0]?.id ?? "";
             }
             else {
-                const reused = await this.reuseSavedValue(save, fields, matches);
+                const reused = await this.reuseSavedValue(save, fields, matches, request);
                 if (reused) {
                     return reused;
                 }
@@ -622,15 +645,8 @@ export class UserAskService {
             saveContext: save ? { ...save, replaceId } : null,
         });
     }
-    async reuseSavedValue(save, fields, matches) {
-        if (matches.length === 0) {
-            return null;
-        }
-        if (matches.length > 1 && !save.account) {
-            const accounts = matches.map((entry) => entry.account || entry.label);
-            throw new Error(`Several saved values for ${save.service} are on this computer (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
-        }
-        const entry = matches[0];
+    /** The saved values of one record for these fields, or null when it lacks one. */
+    async savedAnswer(entry, fields) {
         const stored = await this.saved.readValues(entry);
         if (!stored) {
             return null;
@@ -657,24 +673,76 @@ export class UserAskService {
                 values[field.id] = value;
             }
         }
-        if (!handlesAreDistinct(handles)) {
+        return handlesAreDistinct(handles) ? { values, handles } : null;
+    }
+    async reuseSavedValue(save, fields, matches, request) {
+        if (matches.length === 0) {
             return null;
         }
+        // Several records for one service: use the one that has every field
+        // asked for; only when more than one does is the account needed.
+        const fitting = [];
+        for (const entry of matches) {
+            const answer = await this.savedAnswer(entry, fields);
+            if (answer) {
+                fitting.push({ entry, answer });
+            }
+        }
+        if (fitting.length === 0) {
+            return null;
+        }
+        if (fitting.length > 1 && !save.account) {
+            const accounts = fitting.map(({ entry }) => usableAccount(entry.service, entry.account) || entry.label);
+            throw new Error(`Several saved values for ${save.service} are on this computer (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
+        }
+        const { entry, answer } = fitting[0];
+        const readable = await this.readableOrHandles(answer.values, fields, ownerOfRequest(request));
+        const handles = { ...answer.handles, ...readable.handles };
         await this.saved.markUsed(entry.id);
         return {
             outcome: "answered",
             askId: `saved:${entry.id}`,
-            ...(Object.keys(values).length > 0 ? { values } : {}),
+            ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
             ...(Object.keys(handles).length > 0 ? { handles } : {}),
+            ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
+            ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
             saved: {
                 label: entry.label,
-                ...(entry.account ? { account: entry.account } : {}),
+                ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
                 reused: true,
                 remembered: true,
                 savedAt: entry.updatedAt,
             },
             answeredAt: Date.now(),
         };
+    }
+    /**
+     * Readable values go back as text, except one that Stella would redact
+     * from the task's view anyway (the same text is saved as a secret, or it
+     * looks like a key): that one comes back as a handle, so the task can
+     * still fill it instead of seeing [REDACTED] and asking again.
+     */
+    async readableOrHandles(values, fields, owner) {
+        const fingerprints = await this.getSecureValueFingerprints();
+        const kept = {};
+        const handles = {};
+        const asHandles = [];
+        let freshUntil = 0;
+        for (const [fieldId, value] of Object.entries(values)) {
+            const hidden = value &&
+                (redactSensitiveText(value) !== value ||
+                    redactSecretFingerprints(value, fingerprints) !== value);
+            if (!hidden) {
+                kept[fieldId] = value;
+                continue;
+            }
+            const field = fields.find((candidate) => candidate.id === fieldId);
+            const handle = this.saved.rememberFresh(value, field?.label || fieldId, owner);
+            handles[fieldId] = handle;
+            asHandles.push(fieldId);
+            freshUntil = this.saved.freshExpiresAt(handle) ?? freshUntil;
+        }
+        return { values: kept, handles, asHandles, ...(freshUntil ? { freshUntil } : {}) };
     }
     async open({ request, blocking, timeoutMs, kind, detail, saveContext = null }) {
         const askId = randomUUID();
@@ -907,11 +975,11 @@ export class UserAskService {
             : [];
         let savedNote = null;
         if (keep.some(({ field }) => field.sensitive)) {
-            const account = save.account || accountFromAnswer(detail.fields, values);
+            const account = save.account || usableAccount(save.service, accountFromAnswer(detail.fields, values));
             const existing = save.replaceId
                 ? save.replaceId
                 : save.service
-                    ? ((await this.saved.findMatches(save.service, "")).find((entry) => sameAccount(entry.account, account))?.id ?? "")
+                    ? this.existingRecordFor(await this.saved.findMatches(save.service, ""), account)
                     : "";
             const stored = await this.saved.save({
                 ...(existing ? { existingId: existing } : {}),
@@ -932,13 +1000,29 @@ export class UserAskService {
             await this.saved.remove({ id: save.replaceId });
         }
         const shared = sharedHandles(handles);
+        const owner = {
+            ...(record.ask.threadId ? { threadId: record.ask.threadId } : {}),
+            ...(record.ask.conversationId ? { conversationId: record.ask.conversationId } : {}),
+        };
+        let freshUntil = 0;
         for (const { field, value } of collected) {
             if (!field.sensitive || (handles[field.id] && !shared.has(handles[field.id]))) {
                 continue;
             }
-            // Every sensitive field gets a handle of its own; a saved handle that
-            // more than one field would share is replaced with a single-use one.
-            handles[field.id] = this.saved.rememberSingleUse(value, field.label);
+            // Every sensitive field gets a handle of its own; one not saved (or
+            // that more than one field would share) is kept for this task only,
+            // usable again and again until it expires.
+            handles[field.id] = this.saved.rememberFresh(value, field.label, owner);
+            freshUntil = this.saved.freshExpiresAt(handles[field.id]) ?? freshUntil;
+            // Its fingerprint outlives it, so the value stays redacted from
+            // whatever output it later turns up in.
+            this.retainedFingerprints = mergeFingerprints(this.retainedFingerprints, fingerprintSecrets([value], fingerprintParams));
+        }
+        this.fingerprintCache = null;
+        const readable = await this.readableOrHandles(values, detail.fields, owner);
+        Object.assign(handles, readable.handles);
+        if (readable.freshUntil) {
+            freshUntil = Math.max(freshUntil, readable.freshUntil);
         }
         if (!savedNote &&
             save &&
@@ -954,8 +1038,10 @@ export class UserAskService {
         return {
             outcome: "answered",
             askId,
-            ...(Object.keys(values).length > 0 ? { values } : {}),
+            ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
             ...(Object.keys(handles).length > 0 ? { handles } : {}),
+            ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
+            ...(freshUntil ? { freshUntil } : {}),
             ...(savedNote ? { saved: savedNote } : {}),
             ...(userNote ? { userNote } : {}),
             answeredAt,
@@ -1015,33 +1101,49 @@ export class UserAskService {
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
     }
-    async missingHandleMessage(handle) {
-        if (await this.saved.issued(handle)) {
-            return "That secure value is no longer on this computer: a value the user chose not to remember works once and for an hour. Ask for it again with request_secure_input.";
+    /**
+     * The record a new answer for this service updates: the one for the same
+     * account, else the only record the service has when it names no account
+     * (or this answer names none), so one login stays one record.
+     */
+    existingRecordFor(matches, account) {
+        const same = matches.find((entry) => sameAccount(usableAccount(entry.service, entry.account), account));
+        if (same) {
+            return same.id;
+        }
+        if (matches.length === 1 && (!account || !usableAccount(matches[0].service, matches[0].account))) {
+            return matches[0].id;
+        }
+        return "";
+    }
+    async missingHandleMessage(handle, reason) {
+        if (reason === "other_task") {
+            return "That handle belongs to another task: a value the user gave without saving it is usable only by the task that asked for it. Call request_secure_input yourself (with the same service and account, saved values come back without asking the user).";
+        }
+        if (reason === "expired" || (await this.saved.issued(handle))) {
+            return "That handle has expired: a value the user gave without saving it stays usable for 30 minutes after they gave it. Ask for it again with request_secure_input (a one-time code may need a fresh one sent first).";
         }
         return "Stella never issued that handle, so it was probably copied wrong. Pass the exact handle for this field from the `handles` of your request_secure_input result (handles.<field id>); calling request_secure_input again with the same service returns remembered values without asking the user.";
     }
-    async resolveHandle(handle) {
-        const resolved = await this.saved.resolve(handle);
-        if (!resolved) {
-            return null;
-        }
-        if (resolved.singleUse) {
-            this.retainedFingerprints = mergeFingerprints(this.retainedFingerprints, fingerprintSecrets([resolved.value], fingerprintParams));
-            this.fingerprintCache = null;
-        }
-        return resolved.value;
+    /** The value behind a handle for the task asking, or the reason it isn't usable. */
+    async resolveHandle(handle, request) {
+        return await this.saved.resolve(handle, ownerOfRequest(request));
     }
     async revealSecureValueForFill(request) {
         const handle = typeof request?.handle === "string" ? request.handle : "";
         if (!isUserAskSecretHandle(handle)) {
             return { ok: false, error: "That is not a secure value handle." };
         }
-        const value = await this.resolveHandle(handle);
-        if (value === null) {
-            return { ok: false, error: await this.missingHandleMessage(handle) };
+        const resolved = await this.resolveHandle(handle, request);
+        if (!resolved.ok) {
+            return { ok: false, error: await this.missingHandleMessage(handle, resolved.reason) };
         }
-        return { ok: true, value };
+        return {
+            ok: true,
+            value: resolved.value,
+            label: resolved.label,
+            ...(resolved.expiresAt ? { expiresAt: resolved.expiresAt } : {}),
+        };
     }
     async listStoredSecureValues() {
         return await this.saved.list();
@@ -1059,7 +1161,7 @@ export class UserAskService {
         if (!isUserAskSecretHandle(handle)) {
             return null;
         }
-        return await this.resolveHandle(handle);
+        return await this.saved.take(handle);
     }
     async useSecureValue(request) {
         const handle = typeof request?.handle === "string" ? request.handle : "";
@@ -1074,18 +1176,19 @@ export class UserAskService {
                 ok: false,
             };
         }
-        const value = await this.resolveHandle(handle);
-        if (value === null) {
+        const resolved = await this.resolveHandle(handle, request);
+        if (!resolved.ok) {
             return {
                 handle,
                 target: target?.kind ?? "command",
                 usedAt,
-                detail: await this.missingHandleMessage(handle),
+                detail: await this.missingHandleMessage(handle, resolved.reason),
                 ok: false,
             };
         }
+        const value = resolved.value;
         if (target?.kind === "browser_field") {
-            const result = await this.typeIntoBrowserField(target, value);
+            const result = await this.typeIntoBrowserField(target, value, resolved);
             return { handle, target: "browser_field", usedAt, ...result };
         }
         if (target?.kind === "command") {
@@ -1130,7 +1233,7 @@ export class UserAskService {
             ok: false,
         };
     }
-    async typeIntoBrowserField(target, value) {
+    async typeIntoBrowserField(target, value, resolved) {
         const browser = this.options.getInAppBrowserService();
         if (!browser) {
             return { detail: "Stella's browser is not open on this computer.", ok: false };
@@ -1140,6 +1243,44 @@ export class UserAskService {
             : browser.listDebuggerTargets()[0]?.id;
         if (!tabId) {
             return { detail: "No browser tab is open to type into.", ok: false };
+        }
+        const mode = target.mode === "move" || target.mode === "clear" ? target.mode : "fill";
+        const seed = randomInt(0, 2 ** 31);
+        const hash = secureFillHash(value, seed);
+        const inspect = async (clear) => {
+            try {
+                const evaluated = await browser.sendDebuggerCommand(tabId, "Runtime.evaluate", {
+                    expression: secureFieldScript({
+                        hash,
+                        seed,
+                        length: value.length,
+                        ...(mode === "clear" ? {} : { selector: target.selector }),
+                        ...(clear ? { clear } : {}),
+                    }),
+                    returnByValue: true,
+                });
+                const report = evaluated?.result?.value;
+                return report && Array.isArray(report.landed) ? report : null;
+            }
+            catch {
+                return null;
+            }
+        };
+        const finish = (outcome) => {
+            const written = secureFillReceipt({
+                label: resolved?.label ?? "",
+                selector: target.selector,
+                mode,
+                outcome,
+            });
+            return {
+                detail: scrubSecret(written.detail, value).slice(0, RECEIPT_DETAIL_LIMIT),
+                ok: written.ok,
+            };
+        };
+        const cleared = mode === "fill" ? 0 : ((await inspect("all"))?.cleared ?? 0);
+        if (mode === "clear") {
+            return finish({ tabId, cleared });
         }
         try {
             await browser.sendDebuggerCommand(tabId, "DOM.enable", {});
@@ -1154,14 +1295,21 @@ export class UserAskService {
             }
             await browser.sendDebuggerCommand(tabId, "DOM.focus", { nodeId: found.nodeId });
             await browser.sendDebuggerCommand(tabId, "Input.insertText", { text: value });
-            return { detail: `Typed the stored value into ${target.selector}.`, ok: true };
         }
         catch (error) {
+            await inspect("all");
             return {
                 detail: scrubSecret(error?.message || "The browser field could not be filled.", value).slice(0, RECEIPT_DETAIL_LIMIT),
                 ok: false,
             };
         }
+        const report = await inspect("visible-not-target");
+        return finish({
+            tabId,
+            cleared,
+            ...(report && report.cleared > 0 ? { clearedWrong: report.cleared } : {}),
+            report,
+        });
     }
     async storeInKeychain(target, value) {
         if (process.platform === "darwin") {

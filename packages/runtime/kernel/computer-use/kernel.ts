@@ -13,6 +13,13 @@ import {
 
 import type { BrowserUseResponseMeta } from "@stella/contracts/local-chat";
 import {
+  secureFieldScript,
+  secureFillHash,
+  type SecureFillMode,
+  type SecureFillOutcome,
+  type SecureFillPageReport,
+} from "@stella/contracts/secure-fill";
+import {
   IN_APP_BROWSER_DOWNLOADS_INDEX,
   inAppBrowserDownloadsSegments,
   parseInAppBrowserDownloadRecord,
@@ -901,8 +908,9 @@ class NodeReplKernel {
       selector: string;
       value: string;
       backend?: BrowserBackend;
+      mode?: SecureFillMode;
     }>,
-  ): Promise<number> {
+  ): Promise<SecureFillOutcome> {
     const turnId = context.runId ?? context.rootRunId ?? context.requestId;
     if (turnId) {
       try {
@@ -943,13 +951,65 @@ class NodeReplKernel {
       }
       tabId = chosen.tabId as number;
     }
-    await this.browser.command("fill", {
-      ...bound,
+    const mode = target.mode ?? "fill";
+    const seed = Math.floor(Math.random() * 2 ** 31);
+    const hash = secureFillHash(target.value, seed);
+    const inspect = async (
+      clear?: "all" | "visible-not-target",
+    ): Promise<SecureFillPageReport | null> => {
+      try {
+        const receipt = await this.browser.command<Record<string, unknown>>(
+          "evaluate",
+          {
+            ...bound,
+            tabId,
+            script: secureFieldScript({
+              hash,
+              seed,
+              length: target.value.length,
+              ...(mode === "clear" ? {} : { selector: target.selector }),
+              ...(clear ? { clear } : {}),
+            }),
+          },
+        );
+        const data = receipt.result.data ?? {};
+        const report = this.recordValue(
+          "result" in data ? data.result : data,
+        );
+        return report && Array.isArray(report.landed)
+          ? (report as unknown as SecureFillPageReport)
+          : null;
+      } catch {
+        return null;
+      }
+    };
+    let cleared = 0;
+    if (mode === "move" || mode === "clear") {
+      cleared = (await inspect("all"))?.cleared ?? 0;
+    }
+    if (mode === "clear") return { tabId, cleared };
+    try {
+      await this.browser.command("fill", {
+        ...bound,
+        tabId,
+        selector: target.selector,
+        value: target.value,
+      });
+    } catch (error) {
+      // A fill that failed part-way may have left the value somewhere
+      // visible; take it back out before reporting the failure.
+      await inspect("all");
+      throw error;
+    }
+    // A value that landed in a visible field other than the one the selector
+    // names is cleared from there straight away and reported.
+    const report = await inspect("visible-not-target");
+    return {
       tabId,
-      selector: target.selector,
-      value: target.value,
-    });
-    return tabId;
+      cleared,
+      ...(report && report.cleared > 0 ? { clearedWrong: report.cleared } : {}),
+      report,
+    };
   }
 
   enqueue(
@@ -3312,8 +3372,9 @@ export class NodeReplKernelRegistry {
       selector: string;
       value: string;
       backend?: BrowserBackend;
+      mode?: SecureFillMode;
     }>,
-  ): Promise<number> {
+  ): Promise<SecureFillOutcome> {
     const id = getStellaComputerSessionId(context);
     const kernel = id ? this.kernels.get(id) : undefined;
     if (!kernel) {

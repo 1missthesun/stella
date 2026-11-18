@@ -27,7 +27,13 @@ const KEYCHAIN_SERVICE = "Stella saved value";
 const SECRET_SERVICE_ATTRIBUTE = "stella-saved-value";
 const KEYCHAIN_CHUNK_BYTES = 1800;
 const COMMAND_TIMEOUT_MS = 15_000;
-const SINGLE_USE_TTL_MS = 60 * 60_000;
+/**
+ * How long a value the user gave without remembering it stays usable by the
+ * task that asked for it. It can be used any number of times in that window
+ * (a fill that landed in the wrong field is simply filled again), then it is
+ * forgotten.
+ */
+export const FRESH_VALUE_TTL_MS = 30 * 60_000;
 
 export type SavedField = {
   id: string;
@@ -53,7 +59,26 @@ export type SavedEntry = {
 
 type IndexFile = { version: 1; entries: Record<string, SavedEntry> };
 
-type SingleUse = { value: string; label: string; createdAt: number };
+/** The task a fresh value belongs to: only it can use the value. */
+export type SecureValueOwner = { threadId?: string; conversationId?: string };
+
+type FreshValue = {
+  value: string;
+  label: string;
+  createdAt: number;
+  expiresAt: number;
+  owner: SecureValueOwner;
+};
+
+export type SecureValueResolution =
+  | { ok: true; value: string; label: string; fresh: boolean; expiresAt?: number }
+  | { ok: false; reason: "expired" | "other_task" | "missing" };
+
+const ownedBy = (owner: SecureValueOwner, requester: SecureValueOwner): boolean => {
+  if (owner.threadId) return owner.threadId === requester.threadId;
+  if (owner.conversationId) return owner.conversationId === requester.conversationId;
+  return true;
+};
 
 type CommandResult = { code: number | null; stdout: string };
 
@@ -274,8 +299,8 @@ export const matchSavedFields = (
 
 export class SavedSecureValues {
   private readonly getDir: () => string | null;
-  private readonly singleUse = new Map<string, SingleUse>();
-  private readonly spent = new Set<string>();
+  private readonly fresh = new Map<string, FreshValue>();
+  private readonly expired = new Set<string>();
   private ready: Promise<void> | null = null;
   private readyDir: string | null = null;
 
@@ -547,14 +572,40 @@ export class SavedSecureValues {
     return { entry, handles };
   }
 
-  rememberSingleUse(value: string, label: string): string {
+  /**
+   * Keeps a value the user just gave (and chose not to remember, or that can't
+   * be remembered, like a one-time code) in memory for the task that asked,
+   * and returns its handle. It works any number of times until it expires.
+   */
+  rememberFresh(value: string, label: string, owner: SecureValueOwner): string {
+    this.sweepFresh();
     const now = Date.now();
-    for (const [handle, entry] of this.singleUse) {
-      if (now - entry.createdAt > SINGLE_USE_TTL_MS) this.singleUse.delete(handle);
-    }
     const handle = newHandle();
-    this.singleUse.set(handle, { value, label, createdAt: now });
+    this.fresh.set(handle, {
+      value,
+      label,
+      createdAt: now,
+      expiresAt: now + FRESH_VALUE_TTL_MS,
+      owner: {
+        ...(owner.threadId ? { threadId: owner.threadId } : {}),
+        ...(owner.conversationId ? { conversationId: owner.conversationId } : {}),
+      },
+    });
     return handle;
+  }
+
+  /** When a fresh handle stops working, or undefined for saved ones. */
+  freshExpiresAt(handle: string): number | undefined {
+    return this.fresh.get(handle)?.expiresAt;
+  }
+
+  private sweepFresh(now = Date.now()) {
+    for (const [handle, entry] of this.fresh) {
+      if (now >= entry.expiresAt) {
+        this.fresh.delete(handle);
+        this.expired.add(handle);
+      }
+    }
   }
 
   private async locate(handle: string): Promise<{ dir: string; entry: SavedEntry; field: SavedField } | null> {
@@ -567,29 +618,55 @@ export class SavedSecureValues {
     return null;
   }
 
+  /**
+   * The value behind a handle, for the task asking. A fresh value only
+   * resolves for the task it was given to, and stays until it expires; a
+   * saved one resolves for anyone on this computer.
+   */
   async resolve(
     handle: string,
-  ): Promise<{ value: string; singleUse: boolean } | null> {
-    const single = this.singleUse.get(handle);
-    if (single) {
-      this.singleUse.delete(handle);
-      this.spent.add(handle);
-      return Date.now() - single.createdAt > SINGLE_USE_TTL_MS
-        ? null
-        : { value: single.value, singleUse: true };
+    requester: SecureValueOwner,
+  ): Promise<SecureValueResolution> {
+    this.sweepFresh();
+    const fresh = this.fresh.get(handle);
+    if (fresh) {
+      if (!ownedBy(fresh.owner, requester)) return { ok: false, reason: "other_task" };
+      return {
+        ok: true,
+        value: fresh.value,
+        label: fresh.label,
+        fresh: true,
+        expiresAt: fresh.expiresAt,
+      };
     }
+    if (this.expired.has(handle)) return { ok: false, reason: "expired" };
     const found = await this.locate(handle);
-    if (!found) return null;
+    if (!found) return { ok: false, reason: "missing" };
     const values = await this.readValues(found.entry);
     const value = values?.[found.field.id];
-    if (typeof value !== "string") return null;
+    if (typeof value !== "string") return { ok: false, reason: "missing" };
     this.touch(found.dir, found.entry.id);
-    return { value, singleUse: false };
+    return { ok: true, value, label: found.field.label, fresh: false };
   }
 
-  /** Whether Stella ever issued this handle (so a miss means used up or removed, not mistyped). */
+  /**
+   * Hands a fresh value to Stella itself (a connector key typed into a card)
+   * and forgets it at once. Saved values are read, not removed.
+   */
+  async take(handle: string): Promise<string | null> {
+    const fresh = this.fresh.get(handle);
+    if (fresh) {
+      this.fresh.delete(handle);
+      this.expired.add(handle);
+      return Date.now() < fresh.expiresAt ? fresh.value : null;
+    }
+    const resolved = await this.resolve(handle, {});
+    return resolved.ok ? resolved.value : null;
+  }
+
+  /** Whether Stella ever issued this handle (so a miss means expired or removed, not mistyped). */
   async issued(handle: string): Promise<boolean> {
-    if (this.singleUse.has(handle) || this.spent.has(handle)) return true;
+    if (this.fresh.has(handle) || this.expired.has(handle)) return true;
     return (await this.locate(handle)) !== null;
   }
 
@@ -620,7 +697,8 @@ export class SavedSecureValues {
       delete index.entries[entry.id];
     }
     if (payload.all === true) {
-      this.singleUse.clear();
+      for (const handle of this.fresh.keys()) this.expired.add(handle);
+      this.fresh.clear();
     }
     if (targets.length > 0) this.writeIndex(dir, index);
     return targets.length;
@@ -643,7 +721,7 @@ export class SavedSecureValues {
     const entries = dir ? Object.values(this.readIndex(dir).entries) : [];
     return [
       ...entries.map((entry) => `${entry.id}:${entry.updatedAt}`),
-      ...this.singleUse.keys(),
+      ...this.fresh.keys(),
     ]
       .sort()
       .join("\n");
@@ -661,7 +739,8 @@ export class SavedSecureValues {
         if (field.sensitive && value) values.push(value);
       }
     }
-    for (const entry of this.singleUse.values()) values.push(entry.value);
+    this.sweepFresh();
+    for (const entry of this.fresh.values()) values.push(entry.value);
     return values;
   }
 }

@@ -21,6 +21,12 @@ import {
   fingerprintSecrets,
   redactSecretFingerprints,
 } from "@stella/contracts/secret-redaction";
+import {
+  SECURE_FILL_MODES,
+  secureFillReceipt,
+  type SecureFillMode,
+  type SecureFillOutcome,
+} from "@stella/contracts/secure-fill";
 import { prepareAskUser, userAskResolutionResult } from "./defs/ask-user-def.js";
 import type { ToolContext, ToolResult } from "./types.js";
 
@@ -76,7 +82,10 @@ export type UserToolsConfig = {
     handle: string;
     conversationId?: string;
     agentId?: string;
-  }) => Promise<{ ok: true; value: string } | { ok: false; error: string }>;
+  }) => Promise<
+    | { ok: true; value: string; label?: string; expiresAt?: number }
+    | { ok: false; error: string }
+  >;
   fillSecureBrowserField?: (
     context: ToolContext,
     target: {
@@ -84,8 +93,9 @@ export type UserToolsConfig = {
       selector: string;
       value: string;
       backend?: "in-app" | "external";
+      mode?: SecureFillMode;
     },
-  ) => Promise<number>;
+  ) => Promise<SecureFillOutcome>;
 };
 
 const fillFingerprintParams = createSecretFingerprintParams(Math.random);
@@ -126,16 +136,27 @@ const fillBrowserField = async (
     ...(context.agentId ? { agentId: context.agentId } : {}),
   });
   if (!revealed.ok) return receipt(false, revealed.error);
+  const mode = target.mode ?? "fill";
   try {
-    const filled = await config.fillSecureBrowserField!(context, {
+    const outcome = await config.fillSecureBrowserField!(context, {
       ...(tabId === undefined ? {} : { tabId }),
       selector: target.selector,
       value: revealed.value,
       ...(target.backend ? { backend: target.backend } : {}),
+      mode,
     });
+    const written = secureFillReceipt({
+      label: revealed.label ?? "",
+      selector: target.selector,
+      mode,
+      outcome,
+      ...(revealed.expiresAt ? { usableUntil: clockTime(revealed.expiresAt) } : {}),
+    });
+    // Page labels and ids are the page's own text, but never let the value
+    // itself through if a page echoes it into one.
     return receipt(
-      true,
-      `Filled the stored value into ${target.selector} in tab ${filled}.`,
+      written.ok,
+      scrubFilledSecret(written.detail, revealed.value).slice(0, 2000),
     );
   } catch (error) {
     return receipt(
@@ -146,6 +167,11 @@ const fillBrowserField = async (
       ).slice(0, 2000),
     );
   }
+};
+
+const clockTime = (at: number): string => {
+  const date = new Date(at);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 };
 
 const text = (value: unknown, max = 2000): string =>
@@ -326,17 +352,21 @@ const normalizeTarget = (input: unknown): SecureValueTarget | null => {
   const kind = text(source.kind, 32);
   if (kind === "browser_field") {
     const selector = text(source.selector, 500);
-    if (!selector) return null;
+    if (!selector && text(source.mode, 16).toLowerCase() !== "clear") return null;
     const tabId =
       typeof source.tabId === "number"
         ? String(source.tabId)
         : text(source.tabId, 128);
     const backend = text(source.backend, 16);
+    const mode = text(source.mode, 16).toLowerCase();
     return {
       kind,
       selector,
       ...(tabId ? { tabId } : {}),
       ...(backend === "in-app" || backend === "external" ? { backend } : {}),
+      ...((SECURE_FILL_MODES as readonly string[]).includes(mode) && mode !== "fill"
+        ? { mode: mode as SecureFillMode }
+        : {}),
     };
   }
   if (kind === "command") {

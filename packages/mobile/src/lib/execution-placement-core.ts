@@ -2,7 +2,9 @@ import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
+  DISPATCH_PAYLOAD_MAX_BYTES,
   PLACEMENT_PROTOCOL,
   type DispatchPayload,
   type DispatchSubmitRequest,
@@ -380,6 +382,7 @@ export type AutomaticExecutionAdmissionInput = {
   execution?: CloudExecutionSelection;
   requiredCapabilities?: AutomaticExecutionCapability[];
   attachments?: readonly string[];
+  context?: CloudTurnContext;
 };
 
 const AUTOMATIC_EXECUTION_MAX_ATTACHMENTS = 4;
@@ -426,7 +429,14 @@ export const buildAutomaticExecutionAdmission = (
   if (!attachments.every(validAttachmentPath)) {
     throw new AutomaticExecutionRequestError("An attachment does not name a drive file.");
   }
-  if (!prompt && !(input.kind === "chat" && attachments.length > 0)) {
+  const context =
+    input.kind === "chat" && (input.context?.text?.trim() || input.context?.display)
+      ? input.context
+      : undefined;
+  if (
+    !prompt &&
+    !(input.kind === "chat" && (attachments.length > 0 || context?.text?.trim()))
+  ) {
     throw new AutomaticExecutionRequestError("A prompt is required.");
   }
   const payload: DispatchPayload = {
@@ -437,11 +447,18 @@ export const buildAutomaticExecutionAdmission = (
     ...(input.userMessageEventId ? { userMessageEventId: input.userMessageEventId } : {}),
     ...(input.execution && input.target?.mode !== "device" ? { execution: input.execution } : {}),
     ...(attachments.length ? { attachments } : {}),
+    ...(context ? { context } : {}),
     ...(input.kind === "agent"
       ? { description: input.description?.trim() || prompt.slice(0, 160) }
       : {}),
   };
   const payloadJson = canonicalDispatchPayloadJson(payload);
+  const payloadBytes = utf8ToBytes(payloadJson).byteLength;
+  if (payloadBytes > DISPATCH_PAYLOAD_MAX_BYTES) {
+    throw new AutomaticExecutionRequestError(
+      `This message is too large to send (${Math.ceil(payloadBytes / 1024)} KB; the limit is ${DISPATCH_PAYLOAD_MAX_BYTES / 1024} KB). Send the long text as a file instead.`,
+    );
+  }
   // The contract's `dispatchPayloadHash` is WebCrypto; React Native has no
   // `crypto.subtle`, so the same digest is taken with @noble over the same
   // canonical bytes.

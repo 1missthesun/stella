@@ -627,6 +627,11 @@ function ChatSurface(props: {
           onAdd: thread.addQuote,
           onRemove: thread.removeQuote,
         }}
+        pastedTexts={{
+          items: thread.pastedTexts,
+          onAdd: thread.addPastedText,
+          onRemove: thread.removePastedText,
+        }}
         onOpenArtifact={openArtifact}
         conversationId={thread.conversationId}
         activityTasks={thread.conversationTasks}

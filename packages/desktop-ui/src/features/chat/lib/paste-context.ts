@@ -1,25 +1,20 @@
 import type { ClipboardEvent, Dispatch, SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
+import {
+  normalizePastedText,
+  shouldAttachPastedText,
+  type PastedTextDescriptor,
+} from "@stella/contracts/pasted-text";
 import { attachFilesToContext } from "./file-attach";
 
 type SetChatContext = Dispatch<SetStateAction<ChatContext | null>>;
 
-export const PASTE_AS_CHIP_MIN_CHARS = 1200;
-export const PASTE_AS_CHIP_MIN_LINES = 18;
-
-export const PASTED_TEXT_PREVIEW_MAX_CHARS = 4000;
-
-export type PastedTextDescriptor = {
-  text?: string;
-  lines: number;
-  chars: number;
-};
-
-export const toPastedTextDescriptor = (text: string): PastedTextDescriptor => ({
-  text: text.slice(0, PASTED_TEXT_PREVIEW_MAX_CHARS),
-  lines: text.split(/\r\n|\r|\n/).length,
-  chars: text.length,
-});
+export {
+  PASTED_TEXT_PREVIEW_MAX_CHARS,
+  shouldAttachPastedText,
+  toPastedTextDescriptor,
+  type PastedTextDescriptor,
+} from "@stella/contracts/pasted-text";
 
 export const describePastedText = (descriptor: PastedTextDescriptor): string =>
   descriptor.lines > 1
@@ -32,17 +27,11 @@ export const pastedTextPreview = (descriptor: PastedTextDescriptor): string => {
   return descriptor.chars > text.length ? `${text}…` : text;
 };
 
-export const shouldAttachPastedText = (text: string): boolean => {
-  if (!text) return false;
-  if (text.length >= PASTE_AS_CHIP_MIN_CHARS) return true;
-  return text.split(/\r\n|\r|\n/).length >= PASTE_AS_CHIP_MIN_LINES;
-};
-
 export const attachPastedText = (
   text: string,
   setChatContext: SetChatContext,
 ): void => {
-  const trimmed = text.replace(/\s+$/, "");
+  const trimmed = normalizePastedText(text);
   if (!trimmed) return;
   setChatContext((prev) => {
     const base: ChatContext = prev ?? { window: null };

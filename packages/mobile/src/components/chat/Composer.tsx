@@ -43,7 +43,8 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
-import type { ComposerQuote } from "../../types";
+import type { ComposerPastedText, ComposerQuote } from "../../types";
+import { shouldAttachPastedText } from "@stella/contracts/pasted-text";
 import { DictationRecordingBar } from "../DictationRecordingBar";
 import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
@@ -54,6 +55,7 @@ import {
   AttachmentFailedMark,
   AttachmentTileRow,
   FileTile,
+  PastedTextTile,
   ImageTile,
   VideoPlayBadge,
 } from "./AttachmentTiles";
@@ -110,6 +112,28 @@ export type ComposerModelPickerConfig = {
 
 type InputHeightBounds = { min: number; max: number };
 
+/** The text one edit inserted, and the result without it. */
+const insertedText = (
+  previous: string,
+  next: string,
+): { text: string; without: string } | null => {
+  if (next.length <= previous.length) return null;
+  const shorter = previous.length;
+  let start = 0;
+  while (start < shorter && previous[start] === next[start]) start += 1;
+  let end = 0;
+  while (
+    end < shorter - start &&
+    previous[previous.length - 1 - end] === next[next.length - 1 - end]
+  ) {
+    end += 1;
+  }
+  return {
+    text: next.slice(start, next.length - end),
+    without: next.slice(0, start) + next.slice(next.length - end),
+  };
+};
+
 const mirrorTextOf = (draft: string) =>
   draft.length === 0 || draft.endsWith("\n") ? `${draft} ` : draft;
 
@@ -127,6 +151,7 @@ function ComposerTextInput({
   containerStyle,
   heightBounds,
   onContentHeight,
+  onLongPaste,
   ...props
 }: Omit<TextInputProps, "value" | "onChangeText" | "style"> & {
   draftStore: ChatDraftStore;
@@ -135,8 +160,22 @@ function ComposerTextInput({
   containerStyle?: StyleProp<ViewStyle>;
   heightBounds: InputHeightBounds;
   onContentHeight?: (height: number) => void;
+  /** A paste long enough to send as "Pasted text" instead of composer text. */
+  onLongPaste?: (text: string) => void;
 }) {
   const value = useChatDraft(draftStore);
+  const handleChangeText = useCallback(
+    (next: string) => {
+      const inserted = onLongPaste ? insertedText(draftStore.get(), next) : null;
+      if (inserted && onLongPaste && shouldAttachPastedText(inserted.text)) {
+        draftStore.set(inserted.without);
+        onLongPaste(inserted.text);
+        return;
+      }
+      draftStore.set(next);
+    },
+    [draftStore, onLongPaste],
+  );
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const onContentHeightRef = useRef(onContentHeight);
   onContentHeightRef.current = onContentHeight;
@@ -187,7 +226,7 @@ function ComposerTextInput({
         {...props}
         style={sizedStyle}
         value={value}
-        onChangeText={draftStore.set}
+        onChangeText={handleChangeText}
       />
     </View>
   );
@@ -364,6 +403,9 @@ export const Composer = memo(function Composer({
   attachments,
   onRemoveAttachment,
   onRetryAttachment,
+  pastedTexts,
+  onAddPastedText,
+  onRemovePastedText,
 }: {
   colors: Colors;
   inputRef: RefObject<TextInput | null>;
@@ -399,6 +441,9 @@ export const Composer = memo(function Composer({
   attachments?: ComposerAttachment[];
   onRemoveAttachment?: (id: string) => void;
   onRetryAttachment?: (id: string) => void;
+  pastedTexts?: ComposerPastedText[];
+  onAddPastedText?: (text: string) => void;
+  onRemovePastedText?: (id: string) => void;
 }) {
   const serverFeatures = useServerFeatures();
   const styles = useMemo(() => makeComposerStyles(colors), [colors]);
@@ -438,7 +483,8 @@ export const Composer = memo(function Composer({
       expanded,
       dictationBelow,
       modelPickerPinned: Boolean(modelPicker?.pinned),
-      hasAttachments: (attachments?.length ?? 0) > 0,
+      hasAttachments:
+        (attachments?.length ?? 0) > 0 || (pastedTexts?.length ?? 0) > 0,
       hasQuotes: (quotes?.length ?? 0) > 0,
     });
 
@@ -573,7 +619,9 @@ export const Composer = memo(function Composer({
     [askCollapsed, askMaxHeight, askNaturalHeight, askRoom, onExpandAsk],
   );
 
-  const showAttachmentStrip = !compact && (attachments?.length ?? 0) > 0;
+  const showAttachmentStrip =
+    !compact &&
+    ((attachments?.length ?? 0) > 0 || (pastedTexts?.length ?? 0) > 0);
   const quoteChips = quotes ?? [];
   const showQuoteStrip = !compact && quoteChips.length > 0;
 
@@ -680,7 +728,27 @@ export const Composer = memo(function Composer({
                   </Pressable>
                 </View>
                 ),
-              }))}
+              })).concat((pastedTexts ?? []).map((pasted) => ({
+                key: pasted.id,
+                node: (
+                <View key={pasted.id} style={styles.attachmentThumb}>
+                  <PastedTextTile text={pasted.text} colors={colors} />
+                  <Pressable
+                    style={styles.attachmentRemove}
+                    accessibilityLabel={t("app.chat.contextChips.removePastedText")}
+                    onPress={() => onRemovePastedText?.(pasted.id)}
+                    hitSlop={4}
+                  >
+                    <Icon
+                      name="x"
+                      size={12}
+                      color="#ffffff"
+                      weight="bold"
+                    />
+                  </Pressable>
+                </View>
+                ),
+              })))}
             />
           ) : null}
           {dictationCompact ? (
@@ -720,6 +788,7 @@ export const Composer = memo(function Composer({
                     isExpandedComposed ? undefined : growForPillHeight
                   }
                   onFocus={onInputFocus}
+                  onLongPaste={onAddPastedText}
                   blurOnSubmit={false}
                   placeholder={
                     isExpandedComposed

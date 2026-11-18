@@ -179,6 +179,7 @@ import { fonts } from "../theme/fonts";
 import type {
   ChatArtifact,
   ChatMessage,
+  ComposerPastedText,
   ComposerQuote,
   MobileTask,
 } from "../types";
@@ -319,6 +320,12 @@ export type ChatPaneQuotes = {
   onRemove?: (id: string) => void;
 };
 
+export type ChatPanePastedTexts = {
+  items?: ComposerPastedText[];
+  onAdd?: (text: string) => void;
+  onRemove?: (id: string) => void;
+};
+
 export type ChatPaneRealtimeVoice = {
   conversationId?: string | null;
   execution?: "phone" | "computer";
@@ -337,6 +344,7 @@ export type ChatPaneProps = {
   composer: ChatPaneComposer;
   attachments?: ChatPaneAttachments;
   quotes?: ChatPaneQuotes;
+  pastedTexts?: ChatPanePastedTexts;
   realtimeVoice?: ChatPaneRealtimeVoice;
   desktopAccess?: StoredPhoneAccess | null;
 
@@ -360,6 +368,7 @@ export type ChatPaneProps = {
 const NO_HISTORY: ChatPaneHistory = {};
 const NO_ATTACHMENTS: ChatPaneAttachments = {};
 const NO_QUOTES: ChatPaneQuotes = {};
+const NO_PASTED_TEXTS: ChatPanePastedTexts = {};
 const NO_REALTIME_VOICE: ChatPaneRealtimeVoice = {};
 
 
@@ -565,6 +574,7 @@ export function ChatPane({
   composer,
   attachments: attachmentsGroup,
   quotes: quotesGroup = NO_QUOTES,
+  pastedTexts: pastedTextsGroup = NO_PASTED_TEXTS,
   realtimeVoice = NO_REALTIME_VOICE,
   desktopAccess: desktopAccessProp = null,
   onOpenArtifact,
@@ -606,6 +616,11 @@ export function ChatPane({
     onAdd: onAddQuote,
     onRemove: onRemoveQuote,
   } = quotesGroup;
+  const {
+    items: pastedTexts,
+    onAdd: onAddPastedText,
+    onRemove: onRemovePastedText,
+  } = pastedTextsGroup;
   const {
     conversationId: realtimeVoiceConversationId = null,
     execution: realtimeVoiceExecution = "phone",
@@ -1822,10 +1837,16 @@ export function ChatPane({
 
   const empty = listMessages.length === 0;
   const composerHasContent =
-    !draftEmpty || (attachments?.length ?? 0) > 0 || (quotes?.length ?? 0) > 0;
+    !draftEmpty ||
+    (attachments?.length ?? 0) > 0 ||
+    (quotes?.length ?? 0) > 0 ||
+    (pastedTexts?.length ?? 0) > 0;
   const canSubmit =
     sendReady &&
-    (hasText || (attachments?.length ?? 0) > 0 || (quotes?.length ?? 0) > 0);
+    (hasText ||
+      (attachments?.length ?? 0) > 0 ||
+      (quotes?.length ?? 0) > 0 ||
+      (pastedTexts?.length ?? 0) > 0);
   const dictationInline = isListening && !hasText;
 
   useEffect(() => {
@@ -2117,6 +2138,9 @@ export function ChatPane({
             onRemoveQuote={onRemoveQuote}
             attachments={attachments}
             onRemoveAttachment={onRemoveAttachment}
+            pastedTexts={pastedTexts}
+            onAddPastedText={onAddPastedText}
+            onRemovePastedText={onRemovePastedText}
             onRetryAttachment={onRetryAttachment}
           />
         </Reanimated.View>

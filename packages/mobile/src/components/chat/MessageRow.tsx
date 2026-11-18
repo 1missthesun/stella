@@ -121,17 +121,18 @@ function SendFailedMark({
   styles: MessageRowStyles;
 }) {
   const open = () =>
-    Alert.alert("Not sent", undefined, [
-      { text: "Retry", onPress: actions.retry },
-      { text: "Remove", style: "destructive", onPress: actions.remove },
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Not sent", actions.message, [
+      ...(actions.retry ? [{ text: "Retry", onPress: actions.retry }] : []),
+      ...(actions.edit ? [{ text: "Edit", onPress: actions.edit }] : []),
+      { text: "Remove", style: "destructive" as const, onPress: actions.remove },
+      { text: "Cancel", style: "cancel" as const },
     ]);
   return (
     <Pressable
       onPress={open}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel="Not sent. Retry or remove"
+      accessibilityLabel={`Not sent. ${actions.message}`}
       style={styles.sendFailedRow}
     >
       <View style={[styles.sendFailedDot, { backgroundColor: colors.danger }]}>

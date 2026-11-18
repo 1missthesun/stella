@@ -164,6 +164,12 @@ export type ComposerQuote = {
   text: string;
 };
 
+/** Long text pasted into the composer, sent beside the prompt as "Pasted text". */
+export type ComposerPastedText = {
+  id: string;
+  text: string;
+};
+
 export type ChatMessage = {
   askRecords?: readonly UserAskRecord[];
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };

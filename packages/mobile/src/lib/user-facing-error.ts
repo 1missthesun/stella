@@ -45,6 +45,12 @@ function mapMessage(raw: string): string {
   ) {
     return "Check your connection and try again.";
   }
+  if (
+    /must be (?:at most|1-)\s*[\d,]+ characters/.test(lower)
+    || lower.includes("exceeds the durable payload limit")
+  ) {
+    return "This message is too long to send. Send the long text as a file instead.";
+  }
   if (t.length > 160) {
     return "Something went wrong. Please try again.";
   }

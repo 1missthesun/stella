@@ -1,4 +1,5 @@
 import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
+import { PASTED_TEXT_ONLY_PROMPT } from "@stella/contracts/pasted-text";
 import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -278,7 +279,7 @@ export const cloudJournalFor = (
       const body: CloudTurnStartRequest = {
         protocol: TURN_PLANE_PROTOCOL,
         clientMsgId,
-        prompt: prompt || (context?.text ? "(Pasted text)" : "(Attached files)"),
+        prompt: prompt || (context?.text ? PASTED_TEXT_ONLY_PROMPT : "(Attached files)"),
         ...(attachments.length ? { attachments } : {}),
         ...(context ? { context } : {}),
         lane: "chat",

@@ -1,4 +1,9 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import {
+  chatSendParts,
+  normalizePastedText,
+  toPastedTextDescriptor,
+} from "@stella/contracts/pasted-text";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, LayoutAnimation } from "react-native";
 import type { TurnStatusWake } from "./turn-status-wake";
@@ -16,7 +21,7 @@ import {
 } from "./desktop-chat-outbox";
 import {
   restoreOutboxMessages,
-  desktopChatOutboxPrompt,
+  desktopChatOutboxSendParts,
   type DesktopChatOutboxAttachment,
   type DesktopChatOutboxPhase,
   type DesktopChatOutboxRecord,
@@ -87,11 +92,13 @@ import { createChatDraftStore, type ChatDraftStore } from "./chat-draft-store";
 import {
   classifyComposerNotice,
   clearComposerNotices,
+  showComposerNotice,
   showComposerNoticeForError,
 } from "./composer-notice";
 import type {
   ChatArtifact,
   ChatMessage,
+  ComposerPastedText,
   ComposerQuote,
   MobileTask,
 } from "../types";
@@ -134,6 +141,21 @@ const resolveAttachmentUploads = async (
     path: (result as PromiseFulfilledResult<string>).value,
     kind: attachments[index]!.kind,
   }));
+};
+
+const notSentMessage = (reason: NotSentReason, error?: unknown): string => {
+  switch (reason) {
+    case "network":
+      return "Stella couldn't reach the server. Check your connection and try again.";
+    case "attachment":
+      return "An attachment didn't upload. Try again.";
+    case "storage":
+      return "Stella couldn't save this message on your phone. Try again.";
+    case "rejected":
+      return error === undefined
+        ? "Stella couldn't accept this message."
+        : userFacingError(error);
+  }
 };
 
 const composerNoticeHandlesError = (error: unknown) =>
@@ -198,6 +220,7 @@ type QueuedSend = {
   userMessageId: string;
   text: string;
   displayText?: string;
+  pastedTexts?: string[];
   createdAt?: number;
   promptText?: string;
   selectedText?: string;
@@ -237,6 +260,7 @@ const queuedSendFromRecord = (
     : {}),
   text: record.text,
   displayText: record.displayText,
+  ...(record.pastedTexts?.length ? { pastedTexts: record.pastedTexts } : {}),
   createdAt: record.createdAt,
   attachments: record.attachments,
   executionTarget: record.executionTarget ?? AUTOMATIC_EXECUTION_TARGET,
@@ -287,6 +311,9 @@ export type ChatComposerThread = {
   quotes: ComposerQuote[];
   addQuote: (text: string) => void;
   removeQuote: (id: string) => void;
+  pastedTexts: ComposerPastedText[];
+  addPastedText: (text: string) => void;
+  removePastedText: (id: string) => void;
   sending: boolean;
   activeSendMessageId?: string | null;
   hasQueuedSend?: boolean;
@@ -439,6 +466,19 @@ export function useChatThread(opts: {
   const removeQuote = useCallback((id: string) => {
     setQuotes((prev) => prev.filter((q) => q.id !== id));
   }, []);
+  const quotesRef = useRef(quotes);
+  quotesRef.current = quotes;
+  const [pastedTexts, setPastedTexts] = useState<ComposerPastedText[]>([]);
+  const pastedTextsRef = useRef(pastedTexts);
+  pastedTextsRef.current = pastedTexts;
+  const addPastedText = useCallback((text: string) => {
+    const normalized = normalizePastedText(text);
+    if (!normalized.trim()) return;
+    setPastedTexts((prev) => [...prev, { id: createId(), text: normalized }]);
+  }, []);
+  const removePastedText = useCallback((id: string) => {
+    setPastedTexts((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
   const [appActive, setAppActive] = useState(
     () =>
       AppState.currentState !== "background" &&
@@ -524,6 +564,7 @@ export function useChatThread(opts: {
       draftStore.set("");
       setAttachments([]);
       setQuotes([]);
+      setPastedTexts([]);
       setWorkingActivity(IDLE_WORKING_ACTIVITY);
       updateMessages([]);
     }
@@ -546,7 +587,9 @@ export function useChatThread(opts: {
         if (!active || generation !== historyPageGenerationRef.current) return;
         const unsendable = storedOutbox.filter(
           (record) =>
-            !record.text.trim() && record.attachments.length === 0,
+            !record.text.trim() &&
+            record.attachments.length === 0 &&
+            !record.pastedTexts?.length,
         );
         if (unsendable.length > 0) {
           void acknowledgeDesktopChatOutbox(
@@ -611,6 +654,7 @@ export function useChatThread(opts: {
         draftStore.set("");
         setAttachments([]);
         setQuotes([]);
+        setPastedTexts([]);
         setWorkingActivity(IDLE_WORKING_ACTIVITY);
       }),
     [abandonSends, draftStore, updateMessages],
@@ -638,6 +682,82 @@ export function useChatThread(opts: {
     [canonicalOutboxAuthority, threadId],
   );
 
+  const notSentMessagesRef = useRef<Map<string, string>>(new Map());
+
+  const dropNotSent = useCallback(
+    (entry: SendEntry) => {
+      const id = entry.item.userMessageId;
+      acknowledgeSend(entry.item);
+      sendsRef.current.delete(id);
+      notSentMessagesRef.current.delete(id);
+      publishSends();
+      updateMessages((current) =>
+        current.filter(
+          (message) => message.id !== id && message.requestId !== id,
+        ),
+      );
+    },
+    [acknowledgeSend, publishSends, updateMessages],
+  );
+
+  /**
+   * Puts a message that was not sent back in the composer, ahead of anything
+   * typed since, and removes its bubble. Messages with files stay as bubbles,
+   * since their files cannot be put back in the composer.
+   */
+  const returnNotSentToComposer = useCallback(
+    (userMessageId: string, onlyIntoEmptyComposer: boolean): boolean => {
+      const entry = sendsRef.current.get(userMessageId);
+      if (!entry || entry.state.kind !== "not_sent") return false;
+      if (entry.item.attachments.length > 0) return false;
+      if (!canonicalAuthorityLeaseCurrent(entry.item.canonicalAuthorityLease)) {
+        return false;
+      }
+      if (
+        onlyIntoEmptyComposer &&
+        (draftStore.get().trim() ||
+          attachmentsRef.current.length > 0 ||
+          quotesRef.current.length > 0 ||
+          pastedTextsRef.current.length > 0)
+      ) {
+        return false;
+      }
+      const text = entry.item.text.trim();
+      if (text) {
+        draftStore.set((current) =>
+          current.trim() ? `${text}\n\n${current}` : text,
+        );
+      }
+      const restored = (entry.item.pastedTexts ?? []).map((value) => ({
+        id: createId(),
+        text: value,
+      }));
+      if (restored.length > 0) {
+        setPastedTexts((current) => [...restored, ...current]);
+      }
+      dropNotSent(entry);
+      return true;
+    },
+    [canonicalAuthorityLeaseCurrent, draftStore, dropNotSent],
+  );
+
+  const reportNotSent = useCallback(
+    (entry: SendEntry, reason: NotSentReason, error?: unknown) => {
+      const message = notSentMessage(reason, error);
+      notSentMessagesRef.current.set(entry.item.userMessageId, message);
+      const returned = returnNotSentToComposer(entry.item.userMessageId, true);
+      showComposerNotice({
+        conversationId: canonicalConversationId,
+        kind: "send-failed",
+        title: returned
+          ? "Not sent. Your message is back in the box below."
+          : "Not sent",
+        description: message,
+      });
+    },
+    [canonicalConversationId, returnNotSentToComposer],
+  );
+
   const outboxRecord = useCallback(
     (item: QueuedSend): Omit<DesktopChatOutboxRecord, "sequence"> => {
       const row = messagesRef.current.find(
@@ -652,6 +772,7 @@ export function useChatThread(opts: {
           : {}),
         text: item.text,
         displayText: item.displayText ?? row?.text ?? item.text,
+        ...(item.pastedTexts?.length ? { pastedTexts: item.pastedTexts } : {}),
         createdAt: item.createdAt ?? row?.createdAt ?? Date.now(),
         attachments: item.attachments,
         ...(item.executionTarget
@@ -704,14 +825,15 @@ export function useChatThread(opts: {
           if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
             return;
           }
-          transition(item.userMessageId, {
+          const entry = transition(item.userMessageId, {
             type: "failed",
             reason: "storage",
           });
+          if (entry) reportNotSent(entry, "storage");
         },
       );
     },
-    [acknowledgeSend, canonicalAuthorityLeaseCurrent, drainQueue, outboxRecord, threadId, transition],
+    [acknowledgeSend, canonicalAuthorityLeaseCurrent, drainQueue, outboxRecord, reportNotSent, threadId, transition],
   );
 
   const releaseSlot = useCallback(() => {
@@ -768,6 +890,7 @@ export function useChatThread(opts: {
           transport.access ?? (await getPreferredPhoneAccess()) ?? undefined;
       }
       if (signal.aborted) throw new AutomaticExecutionWaitAbortedError();
+      const parts = desktopChatOutboxSendParts(item);
       try {
         return await submitAutomaticExecution({
           ...unifiedChatPlacementAdmission({
@@ -776,7 +899,8 @@ export function useChatThread(opts: {
               ? { userMessageEventId: item.userMessageEventId }
               : {}),
             conversationId: route.conversationId,
-            prompt: desktopChatOutboxPrompt(item),
+            prompt: parts.prompt,
+            ...(parts.context ? { context: parts.context } : {}),
             attachments,
           }),
           ...(access ? { access } : {}),
@@ -842,7 +966,7 @@ export function useChatThread(opts: {
   );
 
   const markNotSent = useCallback(
-    (entry: SendEntry, reason: NotSentReason) => {
+    (entry: SendEntry, reason: NotSentReason, error?: unknown) => {
       if (!transition(entry.item.userMessageId, { type: "failed", reason })) {
         return;
       }
@@ -851,8 +975,9 @@ export function useChatThread(opts: {
       void persistPhase(entry.item, { kind: "not_sent", reason }).catch(
         () => undefined,
       );
+      reportNotSent(entry, reason, error);
     },
-    [persistPhase, removeReply, transition],
+    [persistPhase, removeReply, reportNotSent, transition],
   );
 
   const dispatchAutomatic = useCallback(
@@ -948,7 +1073,7 @@ export function useChatThread(opts: {
             return;
           }
           if (isPermanentSendError(error) && !composerNoticeHandlesError(error)) {
-            markNotSent(entry, "rejected");
+            markNotSent(entry, "rejected", error);
             releaseSlot();
             return;
           }
@@ -1097,6 +1222,7 @@ export function useChatThread(opts: {
         }
       }
       if (!transition(userMessageId, { type: "retry" })) return;
+      notSentMessagesRef.current.delete(userMessageId);
       entry.waited = true;
       persist(entry.item);
     },
@@ -1110,17 +1236,9 @@ export function useChatThread(opts: {
       for (const attachment of entry.item.attachments) {
         if (attachment.upload) discardAttachmentUpload(attachment.upload.id);
       }
-      acknowledgeSend(entry.item);
-      sendsRef.current.delete(userMessageId);
-      publishSends();
-      updateMessages((current) =>
-        current.filter(
-          (message) =>
-            message.id !== userMessageId && message.requestId !== userMessageId,
-        ),
-      );
+      dropNotSent(entry);
     },
-    [acknowledgeSend, publishSends, updateMessages],
+    [dropNotSent],
   );
 
   const registeredFailedSendsRef = useRef<Set<string>>(new Set());
@@ -1135,13 +1253,21 @@ export function useChatThread(opts: {
     }
     for (const id of notSent) {
       if (registeredFailedSendsRef.current.has(id)) continue;
+      const entry = sendsRef.current.get(id);
+      const reason =
+        entry?.state.kind === "not_sent" ? entry.state.reason : "network";
       registerFailedSend(id, {
-        retry: () => retrySend(id),
+        message:
+          notSentMessagesRef.current.get(id) ?? notSentMessage(reason),
+        ...(reason === "rejected" ? {} : { retry: () => retrySend(id) }),
+        ...(entry && entry.item.attachments.length === 0
+          ? { edit: () => void returnNotSentToComposer(id, false) }
+          : {}),
         remove: () => removeSend(id),
       });
     }
     registeredFailedSendsRef.current = notSent;
-  }, [removeSend, retrySend, sendStates]);
+  }, [removeSend, retrySend, returnNotSentToComposer, sendStates]);
   useEffect(
     () => () => {
       for (const id of registeredFailedSendsRef.current) clearFailedSend(id);
@@ -1159,9 +1285,29 @@ export function useChatThread(opts: {
       const text = composeQuotedText(pendingQuotes, typed);
       const decoupleQuotes = typed.length > 0 && pendingQuotes.length > 0;
       const rawQuotes = decoupleQuotes ? composeRawQuotes(pendingQuotes) : "";
-      const promptText = decoupleQuotes ? typed : text;
       const composerAttachments = supplied ? [] : attachments;
-      if (!text && composerAttachments.length === 0) return null;
+      const composerPasted = supplied ? [] : pastedTexts;
+      if (!text && composerAttachments.length === 0 && composerPasted.length === 0) {
+        return null;
+      }
+      let parts: ReturnType<typeof chatSendParts>;
+      try {
+        parts = chatSendParts({
+          typed: text,
+          pastedTexts: composerPasted.map((entry) => entry.text),
+        });
+      } catch (error) {
+        showComposerNotice({
+          conversationId: canonicalConversationId,
+          kind: "send-failed",
+          title: "Not sent",
+          description: userFacingError(error),
+        });
+        return null;
+      }
+      const typedMovedToPaste = Boolean(text) && !parts.prompt;
+      const promptText = typedMovedToPaste ? "" : decoupleQuotes ? typed : text;
+      const sentPastedTexts = parts.pastedTexts;
       const picked = composerAttachments;
       const sendAttachments: DesktopChatOutboxAttachment[] = picked.map(
         (entry) => {
@@ -1198,6 +1344,7 @@ export function useChatThread(opts: {
         draftStore.set("");
         setAttachments([]);
         setQuotes([]);
+        setPastedTexts([]);
       }
 
       const behind = [...sendsRef.current.values()].some(
@@ -1210,7 +1357,7 @@ export function useChatThread(opts: {
       const images = picked.filter((entry) => entry.kind === "image");
       const documents = picked.filter((entry) => entry.kind === "file");
       const displayText = promptText;
-      const quotedPreview = rawQuotes
+      const quotedPreview = rawQuotes && !typedMovedToPaste
         ? rawQuotes.slice(0, QUOTED_TEXT_PREVIEW_MAX_CHARS)
         : undefined;
       const thumbs = images.slice(0, 3).map((entry) => entry.uri);
@@ -1221,6 +1368,9 @@ export function useChatThread(opts: {
         text: displayText,
         createdAt,
         hasImage: images.length > 0,
+        ...(sentPastedTexts.length
+          ? { pastedTexts: sentPastedTexts.map(toPastedTextDescriptor) }
+          : {}),
         ...(sendAttachments.length ? {
           attachmentPaths: sendAttachments.map(entry => entry.path),
           attachmentPreviews: sendAttachments.map(entry => ({
@@ -1256,10 +1406,13 @@ export function useChatThread(opts: {
         dispatchId: userMessageId,
         userMessageId,
         userMessageEventId: userMessageId,
-        text,
+        text: parts.prompt,
         displayText,
+        ...(sentPastedTexts.length ? { pastedTexts: sentPastedTexts } : {}),
         createdAt,
-        ...(decoupleQuotes ? { promptText, selectedText: rawQuotes } : {}),
+        ...(decoupleQuotes && !typedMovedToPaste
+          ? { promptText, selectedText: rawQuotes }
+          : {}),
         attachments: sendAttachments,
         executionTarget:
           transport.executionTarget ?? AUTOMATIC_EXECUTION_TARGET,
@@ -1277,7 +1430,9 @@ export function useChatThread(opts: {
     },
     [
       attachments,
+      canonicalConversationId,
       draftStore,
+      pastedTexts,
       persist,
       publishSends,
       quotes,
@@ -1448,6 +1603,9 @@ export function useChatThread(opts: {
     quotes,
     addQuote,
     removeQuote,
+    pastedTexts,
+    addPastedText,
+    removePastedText,
     sending,
     activeSendMessageId: sendingEntry.active,
     hasQueuedSend: sendingEntry.hasQueuedSend,

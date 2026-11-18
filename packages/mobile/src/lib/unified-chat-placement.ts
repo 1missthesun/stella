@@ -1,3 +1,4 @@
+import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import type {
   AutomaticExecutionAdmissionInput,
   AutomaticExecutionStatusSnapshot,
@@ -10,6 +11,7 @@ export const unifiedChatPlacementAdmission = (args: {
   userMessageEventId?: string;
   conversationId: string;
   prompt: string;
+  context?: CloudTurnContext;
   attachments?: readonly PlacementAttachment[];
 }): AutomaticExecutionAdmissionInput => {
   const attachments = args.attachments ?? [];
@@ -19,6 +21,7 @@ export const unifiedChatPlacementAdmission = (args: {
     conversationId: args.conversationId,
     kind: "chat",
     prompt: args.prompt,
+    ...(args.context ? { context: args.context } : {}),
     subject: "computer",
     requiredCapabilities: attachments.length ? ["chat", "attachments"] : ["chat"],
     ...(attachments.length

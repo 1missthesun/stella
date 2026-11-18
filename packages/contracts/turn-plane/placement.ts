@@ -116,6 +116,8 @@ export const EXECUTION_CAPABILITIES = [
   "claude-code",
   "chatgpt",
   "engine-sign-ins",
+  // Has the email tool that keeps the Email page; a device without it gets no email turns.
+  "email-page",
 ] as const;
 export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
 

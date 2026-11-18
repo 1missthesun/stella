@@ -821,6 +821,7 @@ export class StellaRuntimeHost {
             "attachments",
             ...platformCapabilities,
             "engine-sign-ins",
+            "email-page",
             ...(claudeCode ? (["claude-code"] as const) : []),
             ...(chatGpt ? (["chatgpt"] as const) : []),
           ],

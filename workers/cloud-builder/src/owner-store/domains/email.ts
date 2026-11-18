@@ -726,7 +726,11 @@ const startStellaTurn = async (
   const target = await ctx.host
     .agentReportTarget({ conversationId, ownerGeneration: snapshot.ownerGeneration })
     .catch(() => null);
-  const targetDeviceId = target?.kind === "device" ? resolveCurrentDeviceId(ctx.db, target.deviceId) : undefined;
+  const deviceId = target?.kind === "device" ? resolveCurrentDeviceId(ctx.db, target.deviceId) : undefined;
+  // A computer on an app from before the Email page has the old email tool: the cloud reads instead.
+  const targetDeviceId = snapshot.devices?.find((device) => device.deviceId === deviceId)?.capabilities?.includes("email-page")
+    ? deviceId
+    : undefined;
   try {
     await ctx.host.startScheduledTurn({
       ownerGeneration: snapshot.ownerGeneration,

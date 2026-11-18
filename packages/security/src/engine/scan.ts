@@ -157,7 +157,8 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
   // Every judged item that isn't fine stays a finding until it's gone from the computer.
   const present = new Set(inventory.map((i) => i.key));
   const counts: Record<string, number> = {};
-  for (const i of toJudge) counts[i.kind] = (counts[i.kind] ?? 0) + 1;
+  // Only claim "Checked" for what a model actually judged.
+  for (const i of toJudge) if (state.seen[i.key]?.verdict) counts[i.kind] = (counts[i.kind] ?? 0) + 1;
   for (const [key, seen] of Object.entries(state.seen)) {
     if (!present.has(key)) continue;
     const v = seen.verdict;
@@ -178,7 +179,7 @@ export const runScan = async (opts: ScanOptions): Promise<RunSummary> => {
   const label: Record<string, string> = { download: "new download", extension: "browser extension", startup: "thing that starts with your computer", app: "new app" };
   for (const [k, n] of Object.entries(counts)) handled.push({ id: `checked:${k}`, text: `Checked ${n} ${firstRun ? label[k]!.replace("new ", "") : label[k]}${n === 1 ? "" : k === "startup" ? "s" : "s"}`.replace("things that starts", "things that start").replace(/thing that starts with your computers$/, "things that start with your computer"), at: Date.now() });
   const uniqueExtensions = new Set(extensions.map((e) => `${e.browser}:${e.id}`)).size;
-  if (firstRun && uniqueExtensions && !counts.extension) handled.push({ id: "checked:extension", text: `Checked ${uniqueExtensions} browser extensions`, at: Date.now() });
+  if (firstRun && opts.model && uniqueExtensions && !counts.extension) handled.push({ id: "checked:extension", text: `Checked ${uniqueExtensions} browser extensions`, at: Date.now() });
 
   // ---- accounts: public breach list vs saved passwords; your email vs known leaks
   progress("Checking your accounts against known leaks");

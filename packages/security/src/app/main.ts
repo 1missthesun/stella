@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, ipcMain, nativeImage, powerMonitor, safeStorage, shell } from "electron";
 import { connectGmail, gmailCheck, gmailTestApi, moveToSpam, type GmailDeps, type GmailTokens } from "../engine/email/gmail.ts";
@@ -20,14 +20,47 @@ const MODEL = process.env.STELLA_SECURITY_MODEL ?? "deepseek/deepseek-v4.1-flash
 const CHECK_EVERY_MS = 4 * 3_600_000;
 const dataDir = () => app.getPath("userData");
 
+// ---------- a small log on this computer (for "it got stuck" reports; never sent anywhere) ----------
+const logFile = () => path.join(dataDir(), "stella-security.log");
+const text = (x: unknown) => (x instanceof Error ? (x.stack ?? x.message) : typeof x === "string" ? x : JSON.stringify(x));
+for (const level of ["log", "warn", "error"] as const) {
+  const original = console[level].bind(console);
+  console[level] = (...args: unknown[]) => {
+    original(...args);
+    try {
+      const file = logFile();
+      if (existsSync(file) && statSync(file).size > 1_000_000) renameSync(file, `${file}.old`);
+      appendFileSync(file, `${new Date().toISOString()} ${level} ${args.map(text).join(" ")}\n`);
+    } catch {
+      /* logging must never break the app */
+    }
+  };
+}
+process.on("unhandledRejection", (e) => console.error("[unhandled]", e));
+
 // ---------- secrets on disk, encrypted by the OS keychain ----------
 const vaultFile = () => path.join(dataDir(), "vault.bin");
+// The OS key store (DPAPI, Keychain, libsecret) is only usable once the app is ready; nothing may
+// read or write the vault before then, or it reads as empty and the person looks signed out.
 const readVault = (): Record<string, string> => {
+  if (!app.isReady()) throw new Error("vault read before the app was ready");
+  let raw: Buffer;
   try {
-    const raw = readFileSync(vaultFile());
-    const text = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString("utf8");
-    return JSON.parse(text) as Record<string, string>;
+    raw = readFileSync(vaultFile());
   } catch {
+    return {};
+  }
+  if (safeStorage.isEncryptionAvailable()) {
+    try {
+      return JSON.parse(safeStorage.decryptString(raw)) as Record<string, string>;
+    } catch {
+      /* written where no key store was available: plain JSON, re-encrypted on the next write */
+    }
+  }
+  try {
+    return JSON.parse(raw.toString("utf8")) as Record<string, string>;
+  } catch (e) {
+    console.error("[vault] unreadable; treating as signed out", e);
     return {};
   }
 };
@@ -45,7 +78,6 @@ const vault: Vault = {
 
 const backendUrl = process.env.STELLA_SECURITY_BACKEND ?? (process.env.STELLA_SECURITY_DEV ? DEV_BACKEND : PROD_BACKEND);
 const stella = createStellaAccount(backendUrl, vault);
-if (process.env.STELLA_SECURITY_TEST_SESSION_FILE && !stella.signedIn()) stella.useSession(readFileSync(process.env.STELLA_SECURITY_TEST_SESSION_FILE, "utf8").trim());
 
 const gmailDeps: GmailDeps = {
   backendUrl,
@@ -104,7 +136,7 @@ const openUrl = (url: string, browser?: string) => {
 const runKnownFix = async (fix: string): Promise<boolean> => {
   if (fix === "firewall-on") {
     if (OS === "darwin") return (await run("osascript", ["-e", 'do shell script "/usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on" with administrator privileges'], 120_000)).ok;
-    if (OS === "win32") return (await powershell("Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-Command','Set-NetFirewallProfile -All -Enabled True'", 120_000)).ok;
+    if (OS === "win32") return (await powershell("Start-Process powershell -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList '-NoProfile','-WindowStyle','Hidden','-Command','Set-NetFirewallProfile -All -Enabled True'", 120_000)).ok;
   }
   return false;
 };
@@ -118,7 +150,8 @@ type View = {
   email?: { connected: boolean; address?: string };
   error?: string;
 };
-let view: View = { phase: stella.signedIn() ? "ready" : "signed-out" };
+// Set for real once the app is ready (signing in reads the OS key store).
+let view: View = { phase: "signed-out" };
 let win: BrowserWindow | undefined;
 let tray: Tray | undefined;
 const push = () => win?.webContents.send("view", view);
@@ -142,6 +175,7 @@ const check = async (reason: string) => {
   if (checking) return checking;
   if (!stella.signedIn() && !process.env.STELLA_SECURITY_OPENROUTER_KEY_FILE) return;
   checking = (async () => {
+    console.log(`[check] start (${reason})`);
     const before = loadState(dataDir()).lastRun?.needsYou;
     setView({ phase: view.summary ? "checking" : "first-check", progress: "Starting", error: undefined });
     try {
@@ -155,12 +189,13 @@ const check = async (reason: string) => {
         feedUrl: process.env.STELLA_SECURITY_FEED_URL ?? `${backendUrl}/api/security/feed`,
         emails: [account?.email, gmailDeps.load()?.email].filter(Boolean) as string[],
         ...(mailOn ? { mail: gmailCheck(gmailDeps) } : {}),
-        onProgress: (p) => setView({ progress: p }),
+        onProgress: (p) => (console.log(`[check] ${p}`), setView({ progress: p })),
       });
       console.log(`[check] ${reason}: ${summary.needsYou.length} need you, ${summary.handled.length} handled, ${summary.errors.length} errors, $${summary.model.costUsd.toFixed(4)}`);
       notifyNew(before, summary.needsYou);
       setView({ phase: "ready", summary, progress: undefined, ...(account ? { account } : {}) });
     } catch (e) {
+      console.error(`[check] ${reason} failed`, e);
       setView({ phase: "ready", error: (e as Error).message, progress: undefined });
     } finally {
       checking = undefined;
@@ -225,6 +260,9 @@ const updateTray = () => {
 };
 
 app.whenReady().then(async () => {
+  if (process.env.STELLA_SECURITY_TEST_SESSION_FILE && !stella.signedIn()) stella.useSession(readFileSync(process.env.STELLA_SECURITY_TEST_SESSION_FILE, "utf8").trim());
+  view.phase = stella.signedIn() ? "ready" : "signed-out";
+  console.log(`[start] ${app.getVersion()} ${process.platform} signed ${stella.signedIn() ? "in" : "out"}`);
   const state = loadState(dataDir());
   if (state.lastRun) view.summary = state.lastRun;
   view.email = { connected: Boolean(gmailDeps.load()), ...(gmailDeps.load()?.email ? { address: gmailDeps.load()!.email } : {}) };

@@ -219,3 +219,11 @@ export const gmailCheck = (deps: GmailDeps): MailCheck => async (model, state) =
 export const moveToSpam = async (deps: GmailDeps, messageId: string) => {
   await gmail(deps, `messages/${messageId}/modify`, { method: "POST", body: JSON.stringify({ addLabelIds: ["SPAM"], removeLabelIds: ["INBOX"] }) });
 };
+
+/** Test harness only: plant a message in the connected inbox, read its labels, and remove it afterwards. */
+export const gmailTestApi = (deps: GmailDeps) => ({
+  insert: async (raw: string) =>
+    (await gmail<{ id: string }>(deps, "messages?internalDateSource=receivedTime", { method: "POST", body: JSON.stringify({ raw: Buffer.from(raw).toString("base64url"), labelIds: ["INBOX", "UNREAD"] }) })).id,
+  labels: async (id: string) => (await gmail<{ labelIds?: string[] }>(deps, `messages/${id}?format=minimal`)).labelIds ?? [],
+  trash: async (id: string) => (await gmail<{ labelIds?: string[] }>(deps, `messages/${id}/trash`, { method: "POST" })).labelIds ?? [],
+});

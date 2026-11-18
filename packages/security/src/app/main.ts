@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, ipcMain, nativeImage, powerMonitor, safeStorage, shell } from "electron";
-import { connectGmail, gmailCheck, moveToSpam, type GmailDeps, type GmailTokens } from "../engine/email/gmail.ts";
+import { connectGmail, gmailCheck, gmailTestApi, moveToSpam, type GmailDeps, type GmailTokens } from "../engine/email/gmail.ts";
 import { openRouterClient, type ModelClient } from "../engine/model.ts";
 import { markFixed, runScan, snooze } from "../engine/scan.ts";
 import { loadState, saveState } from "../engine/state.ts";
@@ -336,7 +336,7 @@ function startTestControl(portFile: string) {
     let body = "";
     for await (const c of req) body += c;
     try {
-      const q = body ? (JSON.parse(body) as { js?: string; path?: string; width?: number; height?: number; channel?: string; args?: unknown[] }) : {};
+      const q = body ? (JSON.parse(body) as { raw?: string; id?: string; js?: string; path?: string; width?: number; height?: number; channel?: string; args?: unknown[] }) : {};
       let out: unknown = null;
       if (req.url === "/eval") out = await win!.webContents.executeJavaScript(q.js!, true);
       else if (req.url === "/size") win!.setContentSize((q.width ?? 420) * 2, (q.height ?? 680) * 2);
@@ -345,6 +345,9 @@ function startTestControl(portFile: string) {
         writeFileSync(q.path!, img.toPNG());
         out = img.getSize();
       } else if (req.url === "/view") out = view;
+      else if (req.url === "/gmail-insert") out = await gmailTestApi(gmailDeps).insert(q.raw!);
+      else if (req.url === "/gmail-labels") out = await gmailTestApi(gmailDeps).labels(q.id!);
+      else if (req.url === "/gmail-trash") out = await gmailTestApi(gmailDeps).trash(q.id!);
       else if (req.url === "/quit") {
         res.end("{}");
         quitting = true;

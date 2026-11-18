@@ -60,6 +60,11 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
       WHERE thread_id IN (SELECT thread_id FROM agent_threads WHERE conversation_id = ?)`,
     conversationId,
   );
+  db.run(
+    `DELETE FROM agent_hosted_turns
+      WHERE thread_id IN (SELECT thread_id FROM agent_threads WHERE conversation_id = ?)`,
+    conversationId,
+  );
   for (const { message_id } of db.all<{ message_id: string }>(
     `SELECT message_id FROM agent_device_messages
       WHERE thread_id IN (SELECT thread_id FROM agent_threads WHERE conversation_id = ?)`,

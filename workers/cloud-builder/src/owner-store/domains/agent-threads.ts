@@ -82,7 +82,8 @@ import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
-import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
+import { agentInvariants } from "./agent-invariants.js";
+import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
 import {
   NOTHING_CAN_WAKE_MARK,
   WAITING_FOR_MAX_CHARS,
@@ -2511,6 +2512,44 @@ const routeCommand = async (
   return routed;
 };
 
+/** Hands a message to the computer that runs the task (one started there, or a turn it runs there by itself). */
+const messageOnComputer = async (ctx: OwnerContext, input: ControlInput, deviceId: string): Promise<Routed> => {
+  const { thread } = input;
+  const sent = await ctx.host.messageLocalAgent({
+    deviceId,
+    threadId: thread.thread_id,
+    ownerGeneration: input.ownerGeneration,
+    messageId: input.commandId,
+    text: input.text,
+  });
+  switch (sent.outcome) {
+    case "steered":
+    case "resumed":
+      recordMessageLanded(ctx, thread.thread_id, input.commandId, sent.outcome, input.source, deviceId);
+      return { outcome: sent.outcome };
+    case "queued":
+      recordMessageLanded(ctx, thread.thread_id, input.commandId, "queued", input.source, deviceId);
+      return {
+        outcome: "queued",
+        note: `The computer running ${thread.thread_id} holds it for the agent's next step.`,
+      };
+    case "not_found":
+      throw new RpcError(
+        "NOT_FOUND",
+        `${thread.thread_id} is no longer on ${await deviceName(ctx, deviceId)}. agent_status without a thread_id lists who you can reach.`,
+        { reason: "message_target_not_found" },
+      );
+    case "refused":
+      throw new RpcError(
+        "CONFLICT",
+        `${await deviceName(ctx, deviceId)} did not accept the message for ${thread.thread_id}.`,
+        { reason: "message_refused" },
+      );
+    default:
+      return { hold: sent.outcome };
+  }
+};
+
 const routeInput = async (
   ctx: OwnerContext,
   input: ControlInput,
@@ -2540,41 +2579,14 @@ const routeInput = async (
     }
     case "local": {
       if (!deviceId) throw noComputer(thread.thread_id);
-      const sent = await ctx.host.messageLocalAgent({
-        deviceId,
-        threadId: thread.thread_id,
-        ownerGeneration: input.ownerGeneration,
-        messageId: input.commandId,
-        text: input.text,
-      });
-      switch (sent.outcome) {
-        case "steered":
-        case "resumed":
-          recordMessageLanded(ctx, thread.thread_id, input.commandId, sent.outcome, input.source, deviceId);
-          return { outcome: sent.outcome };
-        case "queued":
-          recordMessageLanded(ctx, thread.thread_id, input.commandId, "queued", input.source, deviceId);
-          return {
-            outcome: "queued",
-            note: `The computer running ${thread.thread_id} holds it for the agent's next step.`,
-          };
-        case "not_found":
-          throw new RpcError(
-            "NOT_FOUND",
-            `${thread.thread_id} is no longer on ${await deviceName(ctx, deviceId)}. agent_status without a thread_id lists who you can reach.`,
-            { reason: "message_target_not_found" },
-          );
-        case "refused":
-          throw new RpcError(
-            "CONFLICT",
-            `${await deviceName(ctx, deviceId)} did not accept the message for ${thread.thread_id}.`,
-            { reason: "message_refused" },
-          );
-        default:
-          return { hold: sent.outcome };
-      }
+      return await messageOnComputer(ctx, input, deviceId);
     }
     case "dispatch": {
+      if (deviceId && hostedAttemptRunning(ctx.db, thread)) {
+        // Its computer runs a turn of it by itself: the message goes to that
+        // computer, which steers it in as for a task started there.
+        return await messageOnComputer(ctx, input, deviceId);
+      }
       if (ACTIVE_STATUSES.has(thread.status)) {
         const turn = runningTurn(ctx.db, thread);
         if (turn && attemptWaitingToStart(ctx.db, turn.turn_id)) {
@@ -2723,9 +2735,15 @@ const routeStop = async (
       });
       return { outcome: "not_running", note: "Its conversation's Stella reports it is not running now, so it is recorded as stopped." };
     }
-    case "dispatch":
+    case "dispatch": {
+      // A turn its computer started by itself has no run of the cloud's to
+      // cancel: the computer is told, as for a task started there.
+      const hosted = hostedAttemptRunning(ctx.db, thread);
       await stopDeviceAttempt(ctx, thread, input.commandId, input.source);
-      return { outcome: "stopped" };
+      if (!hosted) return { outcome: "stopped" };
+      const told = await tellComputerOfStop(ctx, input, executor, deviceId);
+      return told === "stopped" ? { outcome: "stopped" } : { hold: told };
+    }
     case "local": {
       if (!deviceId) throw noComputer(thread.thread_id);
       const sent = await ctx.host.stopLocalAgent({
@@ -3760,6 +3778,318 @@ const acknowledgeDelivery = (
   return { acknowledged: true, superseded: false };
 };
 
+/**
+ * A task placed on a computer runs there under the thread the cloud keeps,
+ * whose parent (the lead, or Stella) the cloud records. Besides the runs the
+ * cloud sends it, that computer runs turns of it by itself: its own background
+ * work finishing, a monitor's event, a schedule there firing. Those "hosted"
+ * turns are recorded on the same thread as attempts of their own, so their
+ * report is routed by the thread's record (to the lead that started it), never
+ * by where the task sits in that computer's copy of Stella's chat.
+ *
+ * The computer numbers its turns its own way, so each one is mapped here to the
+ * attempt that records it: `attempt_generation` NULL while the turn joined a
+ * run that was already under way (its terminal settles it later).
+ */
+export const AGENT_HOSTED_TURNS_MIGRATION = {
+  id: "agent-threads.17-hosted-turns",
+  statements: [
+    `CREATE TABLE agent_hosted_turns (
+       thread_id TEXT NOT NULL,
+       device_id TEXT NOT NULL,
+       device_attempt INTEGER NOT NULL,
+       attempt_generation INTEGER,
+       created_at INTEGER NOT NULL,
+       PRIMARY KEY (thread_id, device_id, device_attempt)
+     )`,
+    "CREATE INDEX agent_hosted_turns_attempt ON agent_hosted_turns (thread_id, attempt_generation)",
+  ],
+};
+
+type HostedTurnRow = {
+  thread_id: string;
+  device_id: string;
+  device_attempt: number;
+  attempt_generation: number | null;
+  created_at: number;
+};
+
+/** The placed thread this computer runs, when it is the one the thread is placed on. */
+const hostedThread = (
+  db: OwnerDbReader,
+  args: { threadId: string; originDeviceId: string; ownerGeneration: string },
+): ThreadRow | null => {
+  const row = readThread(db, args.threadId);
+  return row?.executor_device_id &&
+    row.owner_generation === args.ownerGeneration &&
+    resolveCurrentDeviceId(db, row.executor_device_id) === resolveCurrentDeviceId(db, args.originDeviceId)
+    ? row
+    : null;
+};
+
+const readHostedTurn = (db: OwnerDbReader, threadId: string, deviceId: string, deviceAttempt: number): HostedTurnRow | null =>
+  db.one<HostedTurnRow>(
+    "SELECT * FROM agent_hosted_turns WHERE thread_id = ? AND device_id = ? AND device_attempt = ?",
+    threadId,
+    deviceId,
+    deviceAttempt,
+  );
+
+const bindHostedTurn = (
+  db: OwnerDb,
+  args: { threadId: string; deviceId: string; deviceAttempt: number; attemptGeneration: number | null; now: number },
+): void => {
+  db.run(
+    `INSERT INTO agent_hosted_turns (thread_id, device_id, device_attempt, attempt_generation, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (thread_id, device_id, device_attempt) DO UPDATE SET attempt_generation = excluded.attempt_generation`,
+    args.threadId,
+    args.deviceId,
+    args.deviceAttempt,
+    args.attemptGeneration,
+    args.now,
+  );
+};
+
+/** The thread's current attempt is a turn its computer started by itself (no run the cloud sent). */
+export const hostedAttemptRunning = (db: OwnerDbReader, thread: ThreadRow): boolean =>
+  ACTIVE_STATUSES.has(thread.status) &&
+  db.one<{ found: number }>(
+    "SELECT 1 AS found FROM agent_hosted_turns WHERE thread_id = ? AND attempt_generation = ? LIMIT 1",
+    thread.thread_id,
+    thread.attempt_generation,
+  ) !== null;
+
+/** Opens the next attempt of a placed thread for a turn its computer runs by itself. */
+const beginHostedAttempt = (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  deviceId: string,
+  deviceAttempt: number,
+  detail: Record<string, unknown> = {},
+): ThreadRow => {
+  const turnId = crypto.randomUUID();
+  return recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      turnId,
+      kind: startedKind,
+      source: `device:${deviceId}`,
+      detail: { executor: "hosted", deviceAttempt, ...detail },
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        `UPDATE agent_threads SET status = 'running', attempt_generation = ?, origin_delivery_ack_at = NULL,
+           result_json = NULL, error_message = NULL, updated_at = ?
+         WHERE thread_id = ?`,
+        thread.attempt_generation + 1,
+        ctx.now,
+        thread.thread_id,
+      );
+      ctx.db.run(
+        `INSERT INTO agent_turns
+           (turn_id, thread_id, conversation_id, owner_generation, attempt_generation, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'running', ?, ?)`,
+        turnId,
+        thread.thread_id,
+        thread.conversation_id,
+        thread.owner_generation,
+        thread.attempt_generation + 1,
+        ctx.now,
+        ctx.now,
+      );
+      bindHostedTurn(ctx.db, {
+        threadId: thread.thread_id,
+        deviceId,
+        deviceAttempt,
+        attemptGeneration: thread.attempt_generation + 1,
+        now: ctx.now,
+      });
+      return readThread(ctx.db, thread.thread_id)!;
+    },
+  );
+};
+
+/** Ends the running attempt with what the computer's own turn left. */
+const endHostedAttempt = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  deviceId: string,
+  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string },
+): Promise<{ updated: boolean; status: string }> => {
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      kind: endedKind,
+      outcome: ended.status,
+      source: `device:${deviceId}`,
+      detail: { executor: "hosted", ...(ended.waitingFor ? { waitingFor: ended.waitingFor } : {}) },
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, origin_delivery_ack_at = NULL, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ?`,
+        ended.status,
+        ended.waitingFor
+          ? waitingResultJson(ended.result ?? "", ended.waitingFor)
+          : ended.result !== undefined
+            ? JSON.stringify({ finalText: ended.result })
+            : null,
+        ended.error,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+      ctx.db.run(
+        "UPDATE agent_turns SET status = ?, updated_at = ? WHERE thread_id = ? AND attempt_generation = ? AND status = 'running'",
+        ended.status,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+    },
+  );
+  const row = readThread(ctx.db, thread.thread_id)!;
+  await postAgentLifecycleCard(
+    ctx,
+    row,
+    ended.waitingFor
+      ? { kind: "waiting", waitingFor: ended.waitingFor }
+      : { kind: ended.status, text: ended.status === "completed" ? ended.result : ended.error },
+  );
+  return { updated: true, status: ended.status };
+};
+
+const recordHostedTurnIgnored = (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  deviceId: string,
+  deviceAttempt: number,
+  reason: "stopped" | "duplicate",
+): void => {
+  appendAgentEvent(ctx.db, {
+    key: `hosted_turn_ignored:${thread.thread_id}:${deviceId}:${deviceAttempt}`,
+    kind: "terminal_ignored",
+    source: `device:${deviceId}`,
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    attemptGeneration: thread.attempt_generation,
+    status: thread.status,
+    detail: { executor: "hosted", deviceAttempt, reason },
+    createdAt: ctx.now,
+  });
+};
+
+const startHostedTurn = (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  args: AgentThreadCalls["computerThreads.start"]["args"],
+): { threadId: string } => {
+  const deviceId = resolveCurrentDeviceId(ctx.db, args.originDeviceId);
+  if (readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration)) return { threadId: thread.thread_id };
+  if (stoppedByStop(thread)) {
+    recordHostedTurnIgnored(ctx, thread, deviceId, args.attemptGeneration, "stopped");
+    // `attempt_stale`: every app build drops a start refused for this reason instead of retrying it.
+    throw rejectStart("attempt_stale", "That agent was stopped; its computer runs nothing more of it until it is resumed.");
+  }
+  if (ACTIVE_STATUSES.has(thread.status) || thread.status === "waiting_for_user") {
+    // A run is already under way (one the cloud sent, its terminal possibly
+    // still on its way): this turn joins it, and settles once that run has ended.
+    bindHostedTurn(ctx.db, {
+      threadId: thread.thread_id,
+      deviceId,
+      deviceAttempt: args.attemptGeneration,
+      attemptGeneration: null,
+      now: ctx.now,
+    });
+    return { threadId: thread.thread_id };
+  }
+  beginHostedAttempt(ctx, thread, deviceId, args.attemptGeneration);
+  return { threadId: thread.thread_id };
+};
+
+const completeHostedTurn = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  args: AgentThreadCalls["computerThreads.complete"]["args"],
+): Promise<AgentThreadCalls["computerThreads.complete"]["result"]> => {
+  const deviceId = resolveCurrentDeviceId(ctx.db, args.originDeviceId);
+  const result = args.result?.trim() ? args.result : undefined;
+  const status = agentThreadTerminalStatus(args.status);
+  const error = status === "completed" ? null : endedError({ status: args.status, errorMessage: args.error ?? null });
+  const waitingFor = status === "completed" ? args.waitingFor?.trim().slice(0, WAITING_FOR_MAX_CHARS) || undefined : undefined;
+  const ended = { status, ...(result !== undefined ? { result } : {}), error, ...(waitingFor ? { waitingFor } : {}) };
+  const mapped = readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration);
+  if (mapped?.attempt_generation === thread.attempt_generation && ACTIVE_STATUSES.has(thread.status)) {
+    return await endHostedAttempt(ctx, thread, deviceId, ended);
+  }
+  if (ACTIVE_STATUSES.has(thread.status) || thread.status === "waiting_for_user") {
+    // An earlier turn of its own that never reported its end: this later one supersedes it.
+    if (hostedAttemptRunning(ctx.db, thread)) {
+      bindHostedTurn(ctx.db, {
+        threadId: thread.thread_id,
+        deviceId,
+        deviceAttempt: args.attemptGeneration,
+        attemptGeneration: thread.attempt_generation,
+        now: ctx.now,
+      });
+      return await endHostedAttempt(ctx, thread, deviceId, ended);
+    }
+    // The run the cloud sent has not settled yet (its terminal is on its way):
+    // this turn's end waits for it, so neither replaces the other's report.
+    throw new RpcError("CONFLICT", `${thread.thread_id} has a run whose end has not arrived yet; try again.`, {
+      retryable: true,
+      reason: "thread_busy",
+    });
+  }
+  // A stop's own echo (the computer ending the turn the stop cut short) changes nothing.
+  if (status === "canceled") return { updated: false, status: thread.status };
+  if (stoppedByStop(thread)) {
+    // A stopped task's computer finished a turn of it anyway: the stop stands,
+    // nothing it says starts a report, and the audit counts it.
+    recordHostedTurnIgnored(ctx, thread, deviceId, args.attemptGeneration, "stopped");
+    return { updated: false, status: thread.status };
+  }
+  // A turn that joined the run the cloud sent and ended with the same words is
+  // that run's own end, already recorded.
+  if (
+    thread.status === status &&
+    resultTextOf(thread.result_json) === (result?.trim() ?? "") &&
+    (mapped !== null || resultTextOf(thread.result_json) !== "")
+  ) {
+    bindHostedTurn(ctx.db, {
+      threadId: thread.thread_id,
+      deviceId,
+      deviceAttempt: args.attemptGeneration,
+      attemptGeneration: thread.attempt_generation,
+      now: ctx.now,
+    });
+    recordHostedTurnIgnored(ctx, thread, deviceId, args.attemptGeneration, "duplicate");
+    return { updated: false, status: thread.status };
+  }
+  const opened = beginHostedAttempt(ctx, thread, deviceId, args.attemptGeneration, mapped ? {} : { startMissing: true });
+  return await endHostedAttempt(ctx, opened, deviceId, ended);
+};
+
+const cancelHostedTurn = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  args: AgentThreadCalls["computerThreads.cancel"]["args"],
+): Promise<AgentThreadCalls["computerThreads.cancel"]["result"]> => {
+  const deviceId = resolveCurrentDeviceId(ctx.db, args.originDeviceId);
+  const mapped = readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration);
+  if (mapped?.attempt_generation !== thread.attempt_generation || !ACTIVE_STATUSES.has(thread.status)) {
+    return { canceled: false, status: thread.status };
+  }
+  const reason = args.reason?.trim() || "Canceled on this computer.";
+  await endHostedAttempt(ctx, thread, deviceId, { status: "canceled", error: endedError({ status: "canceled", errorMessage: reason }) });
+  return { canceled: true, status: "canceled" };
+};
+
 const rejectStart = (reason: string, message: string): RpcError =>
   new RpcError("CONFLICT", message, { reason });
 
@@ -3773,6 +4103,8 @@ const startComputerThread = async (
     args.conversationId,
   );
   if (!conversation) throw rejectStart("conversation_not_found", "That conversation no longer exists.");
+  const hosted = hostedThread(ctx.db, args);
+  if (hosted) return startHostedTurn(ctx, hosted, args);
   const existing = readThread(ctx.db, args.threadId);
   if (existing) {
     if (
@@ -3872,7 +4204,11 @@ const completeComputerThread = async (
 ): Promise<AgentThreadCalls["computerThreads.complete"]["result"]> => {
   await assertGeneration(ctx, args.ownerGeneration);
   const known = readComputerThread(ctx.db, args);
-  if (!known) throw new RpcError("NOT_FOUND", "That agent no longer exists.");
+  if (!known) {
+    const hosted = hostedThread(ctx.db, args);
+    if (hosted) return await completeHostedTurn(ctx, hosted, args);
+    throw new RpcError("NOT_FOUND", "That agent no longer exists.");
+  }
   const result = args.result?.trim() ? args.result : undefined;
   // A newer attempt whose start never arrived (the computer restarted, or its
   // start was refused before sign-in) still ends here; dropping its terminal
@@ -3989,7 +4325,11 @@ const cancelComputerThread = async (
 ): Promise<AgentThreadCalls["computerThreads.cancel"]["result"]> => {
   await assertGeneration(ctx, args.ownerGeneration);
   const row = readComputerThread(ctx.db, args);
-  if (!row) throw new RpcError("NOT_FOUND", "That agent no longer exists.");
+  if (!row) {
+    const hosted = hostedThread(ctx.db, args);
+    if (hosted) return await cancelHostedTurn(ctx, hosted, args);
+    throw new RpcError("NOT_FOUND", "That agent no longer exists.");
+  }
   if (row.attempt_generation !== args.attemptGeneration) return { canceled: false, status: row.status };
   if (row.status !== "running") return { canceled: true, status: row.status };
   const reason = args.reason?.trim() || "Canceled on this computer.";
@@ -5143,6 +5483,7 @@ export const agentThreadsDomain = {
          END`,
       ],
     },
+    AGENT_HOSTED_TURNS_MIGRATION,
   ],
   calls: {
     "agentThreads.directory": {
@@ -5310,6 +5651,11 @@ export const agentThreadsDomain = {
       }),
       handler: resolveSafeguard,
     },
+    "agentThreads.invariants": {
+      scope: "owner",
+      parse: object({ days: optional(number({ int: true, min: 1, max: 90 })) }),
+      handler: (ctx, args) => agentInvariants(ctx.db, ctx.now, args.days ?? 7),
+    },
     "computerThreads.running": {
       scope: "owner",
       parse: object({ originDeviceId: id(256), ownerGeneration: generation }),
@@ -5379,6 +5725,8 @@ export const agentThreadsDomain = {
     "agentThreads.continueOnDevice": continueDeviceForCloud,
     "agentThreads.cancelOnDevice": cancelDeviceForCloud,
     "agentThreads.deviceSettled": deviceSettled,
+    "agentThreads.invariants": (ctx, raw) =>
+      agentInvariants(ctx.db, ctx.now, object({ days: optional(number({ int: true, min: 1, max: 90 })) })(raw ?? {}).days ?? 7),
     "agentThreads.cloudHandoff": async (ctx, raw) =>
       await moveThread(ctx, { ...cloudHandoffParser(raw), from: { kind: "cloud" } }),
     "agentThreads.directory": async (ctx, raw) =>

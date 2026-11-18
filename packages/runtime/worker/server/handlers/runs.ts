@@ -16,6 +16,7 @@ import {
   WorkerNotInitializedError,
 } from "../errors.js";
 import * as HostBus from "../host-bus.js";
+import { isFramedAgentMessage } from "@stella/contracts/agent-directory";
 import {
   cancelPiPlacedAgent,
   markPlacementReconciled,
@@ -191,13 +192,20 @@ export const runsHandlers: WorkerRpcHandlers = {
       );
       const payload = params as RuntimeLocalAgentMessageRequest;
       const hostBus = yield* HostBus.Service;
-      const outcome = yield* fromPromise(() =>
-        piDeliverAgentMessage(session, hostBus, {
-          threadId: String(payload.threadId ?? ""),
-          text: String(payload.text ?? ""),
-          messageId: String(payload.messageId ?? ""),
-        }),
-      );
+      const message = {
+        threadId: String(payload.threadId ?? ""),
+        text: String(payload.text ?? ""),
+        messageId: String(payload.messageId ?? ""),
+      };
+      const outcome = yield* fromPromise(() => piDeliverAgentMessage(session, hostBus, message));
+      // A schedule on this computer fired for a task that runs elsewhere (a
+      // helper on another computer or in the cloud): the cloud, which keeps the
+      // task's thread, takes it there. Only for this computer's own schedules
+      // (no owner generation): a message the cloud sent here never goes back.
+      if (outcome === "not_found" && !payload.ownerGeneration && message.messageId.startsWith("schedule:")) {
+        const routed = yield* fromPromise(() => scheduleFireThroughCloud(session, message));
+        if (routed) return { outcome: routed };
+      }
       return { outcome };
     }),
 
@@ -290,4 +298,27 @@ export const runsHandlers: WorkerRpcHandlers = {
         ),
       );
     }),
+};
+
+/** The cloud's delivery of a local schedule's fire, as a device outcome; undefined when it couldn't take it. */
+const scheduleFireThroughCloud = async (
+  session: WorkerSessions.OpenSession,
+  message: { threadId: string; text: string; messageId: string },
+): Promise<"steered" | "resumed" | "queued" | undefined> => {
+  const runner = session.runnerCell.get();
+  if (!runner?.getStellaSiteAuth()) return undefined;
+  const scheduleId = /^schedule:(.+):\d+$/u.exec(message.messageId)?.[1];
+  try {
+    const delivery = await runner.agentThreads.message({
+      messageId: message.messageId,
+      to: message.threadId,
+      text: message.text,
+      from: { threadId: scheduleId && scheduleId !== message.threadId ? scheduleId : "schedule", label: "a schedule on another computer" },
+      ...(isFramedAgentMessage(message.text) ? { framed: true } : {}),
+    });
+    return delivery.outcome === "steered" || delivery.outcome === "resumed" ? delivery.outcome : "queued";
+  } catch (error) {
+    console.warn("[schedules] a schedule's fire for a task elsewhere did not reach it", message.threadId, error);
+    return undefined;
+  }
 };

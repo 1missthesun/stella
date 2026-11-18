@@ -103,6 +103,67 @@ const storage = async (url: URL, env: AdminEnv): Promise<Response> => {
   return json({ ownerId, drive: drive.value, world, ownerDb });
 };
 
+const INVARIANT_OWNERS_MAX = 200;
+
+/**
+ * The task-rule checks (owner store `agentThreads.invariants`) for one owner
+ * (`ownerId`), a list (`ownerIds`, comma-separated), or the owners with any
+ * cost recorded in the window (`recent=N`), summed, with the owners that broke
+ * a rule and examples.
+ */
+const agentInvariantsReport = async (url: URL, env: AdminEnv): Promise<Response> => {
+  const days = Number(url.searchParams.get("days") ?? "7");
+  if (!Number.isInteger(days) || days < 1 || days > 90) return fail(400, "days must be 1 to 90.");
+  const single = ownerIdOf(url.searchParams.get("ownerId"));
+  const listed = (url.searchParams.get("ownerIds") ?? "")
+    .split(",")
+    .map((value) => ownerIdOf(value))
+    .filter((value): value is string => value !== null);
+  const recentRaw = url.searchParams.get("recent");
+  let owners: string[] = single ? [single] : listed;
+  if (owners.length === 0 && recentRaw !== null) {
+    const recent = Number(recentRaw);
+    if (!Number.isInteger(recent) || recent < 1 || recent > INVARIANT_OWNERS_MAX) {
+      return fail(400, `recent must be 1 to ${INVARIANT_OWNERS_MAX}.`);
+    }
+    const since = new Date(Date.now() - days * 24 * 60 * 60_000).toISOString().slice(0, 10);
+    const { results } = await db(env)
+      .prepare(
+        `SELECT owner_id AS ownerId, MAX(day) AS last FROM owner_cost_daily WHERE day >= ?
+          GROUP BY owner_id ORDER BY last DESC LIMIT ?`,
+      )
+      .bind(since, recent)
+      .all<{ ownerId: string }>();
+    owners = results.map((row) => row.ownerId);
+  }
+  if (owners.length === 0) return fail(400, "Pass ownerId, ownerIds or recent.");
+  if (owners.length > INVARIANT_OWNERS_MAX) return fail(400, `At most ${INVARIANT_OWNERS_MAX} owners.`);
+  const totals: Record<string, number> = {};
+  const hosted = { recorded: 0, withoutStart: 0 };
+  const byOwner: Array<{ ownerId: string; checks?: unknown; error?: string }> = [];
+  for (const ownerId of owners) {
+    const response = await ownerInternal(env, ownerId, "agentThreads.invariants", { days }).catch((error: unknown) => fail(500, message(error)));
+    if (response instanceof Response) {
+      byOwner.push({ ownerId, error: `unavailable (${response.status})` });
+      continue;
+    }
+    if (!response.ok) {
+      byOwner.push({ ownerId, error: response.error.message });
+      continue;
+    }
+    const report = response.value as {
+      checks: Array<{ kind: string; count: number; examples: string[] }>;
+      hostedTurns: { recorded: number; withoutStart: number };
+    };
+    for (const check of report.checks) totals[check.kind] = (totals[check.kind] ?? 0) + check.count;
+    hosted.recorded += report.hostedTurns.recorded;
+    hosted.withoutStart += report.hostedTurns.withoutStart;
+    const broken = report.checks.filter((check) => check.count > 0);
+    if (broken.length > 0) byOwner.push({ ownerId, checks: broken });
+  }
+  return json({ days, owners: owners.length, totals, hostedTurns: hosted, byOwner });
+};
+
 const top = async (url: URL, env: AdminEnv): Promise<Response> => {
   const rawLimit = url.searchParams.get("limit");
   const limit = rawLimit === null ? TOP_DEFAULT_LIMIT : Number(rawLimit);
@@ -439,6 +500,7 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/owners/lookup": { method: "GET", run: (_request, url, env) => lookup(url, env) },
   "/api/admin/owners/top": { method: "GET", run: (_request, url, env) => top(url, env) },
   "/api/admin/owners/storage": { method: "GET", run: (_request, url, env) => storage(url, env) },
+  "/api/admin/owners/agent-invariants": { method: "GET", run: (_request, url, env) => agentInvariantsReport(url, env) },
   "/api/admin/owners/costs": { method: "GET", run: (_request, url, env) => ownerCosts(url, env) },
   "/api/admin/owners/costs/export": { method: "POST", run: (request, _url, env) => ownerCostsExport(request, env) },
   "/api/admin/costs": {

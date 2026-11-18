@@ -778,6 +778,7 @@ const runRead = async (ctx: OwnerContext): Promise<void> => {
   const zone = zoneOf(ctx, snapshot);
   const plan = planOf(ctx, snapshot);
   try {
+    await runSync(ctx, {}).catch((error: unknown) => log("sync_failed", { owner: ctx.ownerId.slice(0, 12), message: errorText(error) }));
     const count = unreadIncoming(ctx.db);
     if (count > 0) {
       await startStellaTurn(ctx, {
@@ -1486,7 +1487,11 @@ const emailTool = async (ctx: OwnerContext, raw: unknown): Promise<{ text: strin
       "Email isn't on. The user turns it on from the Email tab (it needs Gmail connected through Stella); search, read, draft and send work without it.",
     );
   }
-  if (action === "inbox") return { text: inbox(ctx, zone) };
+  if (action === "inbox") {
+    // Mail Gmail hasn't pushed yet would otherwise wait for the next read.
+    await runSync(ctx, {}).catch((error: unknown) => log("sync_failed", { owner: ctx.ownerId.slice(0, 12), message: errorText(error) }));
+    return { text: inbox(ctx, zone) };
+  }
   if (action === "page") return { text: await updatePage(ctx, args) };
   if (action === "off") {
     await setEnabled(ctx, { enabled: false });

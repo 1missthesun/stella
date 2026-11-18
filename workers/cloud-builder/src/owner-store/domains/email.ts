@@ -1448,6 +1448,20 @@ const updatePage = async (ctx: OwnerContext, args: ToolArgs): Promise<string> =>
     if (newest > 0) item.mailAt = newest;
   }
   writePage(ctx, page);
+  // A draft of Stella's that the page no longer points at (rewritten, sent, or its item gone) leaves the user's Drafts.
+  const stale = before.items.flatMap((old) =>
+    old.draftId && page.items.find((item) => item.id === old.id)?.draftId !== old.draftId
+      ? [{ draftId: old.draftId, accounts: (old.threads ?? []).map((thread) => thread.account) }]
+      : [],
+  );
+  if (stale.length > 0) {
+    const live = await liveAccounts(ctx).catch(() => [] as LiveAccount[]);
+    for (const entry of stale) {
+      for (const account of live.filter((candidate) => entry.accounts.length === 0 || entry.accounts.includes(candidate.email))) {
+        await gmailDeleteDraft(await account.get(), entry.draftId).catch(() => undefined);
+      }
+    }
+  }
   for (const item of newlyUrgent) {
     await pushUrgent(ctx, item).catch((error: unknown) => log("push_failed", { message: errorText(error) }));
   }

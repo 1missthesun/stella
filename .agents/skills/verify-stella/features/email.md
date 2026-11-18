@@ -14,9 +14,15 @@ With Email on, Stella reads the user's Gmail herself, in batches, and keeps one 
 
 ## Driving it
 
-- Use the dev Email QA account `email-e2e2@test.stella.local` (its Gmail is named in the stella-verify area memory, never in this public repo): `STELLA_VERIFY_ACCOUNT_EMAIL=email-e2e2@test.stella.local`, then `nav open --name Email`.
-- Put test mail in with the admin email probe (`POST /api/admin/test-accounts/email-probe`, action `import`, `{raw, account}`; Gmail `messages.import` with INBOX and UNREAD). Use senders at `*.example` so a real send bounces harmlessly. Actions `readNow` and `tool` (`args` = `email` tool args) run a read or a tool call as the owner.
-- Read the page with `backend-call.mjs view email.page '{}'`.
+- Test Email only against the fake Gmail (`workers/cloud-builder/src/owner-store/domains/fake-gmail.ts`). Never put test mail into, or send it from, a real person's inbox: a real inbox is also read by its owner's production Stella, so fake mail there reaches their phone as real.
+- A fake inbox is `<name>@fake-gmail.test`, kept with a dev test account (`@test.stella.local`; test accounts must be on). It answers the Gmail calls Email makes (history, messages, threads, search, labels, drafts, send) from stored messages and never reaches the network: sent replies stay in its Sent folder. An account with a fake inbox reads only fake inboxes.
+- The admin email probe (`POST /api/admin/test-accounts/email-probe`, `{ownerId, action, args}`):
+  - `fakeInbox` `{email, remove?, forgetGoogle?}` adds or removes a fake inbox. `forgetGoogle` drops the test account's real Google connection without revoking it at Google (dev and production can share one Google app, so a revoke can end the person's production grant).
+  - `import` `{raw, account}` puts a raw RFC 822 email into a fake inbox as if it had just arrived (Gmail push included); it refuses any other inbox. Use senders at `*.example`.
+  - `fakeList` `{email}` lists the inbox (labels, from, to, subject) to check what Stella sent, drafted or archived.
+  - `readNow` runs a read; `tool` runs an `email` tool call (`args` = tool args) as the owner.
+- The dev account `email-e2e2@test.stella.local` has `qa-inbox@fake-gmail.test`: `STELLA_VERIFY_ACCOUNT_EMAIL=email-e2e2@test.stella.local`, then `nav open --name Email`. Read the page with `backend-call.mjs view email.page '{}'`.
+- Keep the account on Pro (`STELLA_VERIFY_PLAN=pro`): a session relaunch re-mints the launch plan, and Free's gate budget ($0.01 a month) runs out fast, after which nothing wakes Stella early.
 - The page lives in an iframe: click its buttons with `drive click-xy`; type into it via CDP `Input.insertText`.
 - To see a wake, add a wake rule (`email.tool` `{"action":"rules","op":"add","kind":"wake",...}`) and import matching mail; outside quiet hours an urgent-sounding email wakes her too.
 

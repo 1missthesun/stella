@@ -43,7 +43,7 @@ import {
   takeStoppedClaudeCodeBackground,
   type StoppedClaudeCodeBackground,
 } from "./claude-code-background.js";
-import { markClaudeCodeQuitting } from "../../kernel/integrations/claude-code-session-runtime.js";
+import { markClaudeCodeQuitting } from "../../kernel/integrations/claude-code-quitting.js";
 import { piUserReminders } from "./pi-reminders.js";
 import { piModelUsage } from "./pi-usage.js";
 import {

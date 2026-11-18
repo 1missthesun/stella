@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { claudeCodeQuitting, markClaudeCodeQuitting } from "./claude-code-quitting.js";
 import { signalOwnChild } from "../shared/process-identity.js";
 import {
   claudeUsageLimitOf,
@@ -2168,7 +2169,7 @@ class ClaudeCodeSessionRuntime {
   backgroundEnded(session: ClaudeCodeSession, processState: ClaudeCodeProcessState, code: number | null) {
     const lost = processState.background ?? [];
     processState.background = undefined;
-    if (lost.length === 0 || this.quitting) return;
+    if (lost.length === 0 || claudeCodeQuitting()) return;
     try {
       session.onBackgroundTasks?.(session.process?.background ?? []);
     } catch {
@@ -2186,10 +2187,8 @@ class ClaudeCodeSessionRuntime {
       // A host-side observer must not break the process teardown.
     }
   }
-  /** Stella is quitting: background work its processes lose is told after the next start instead. */
-  quitting = false;
   dispose() {
-    this.quitting = true;
+    markClaudeCodeQuitting();
     for (const child of this.activeProcesses.values()) {
       killProcess(child);
     }
@@ -3859,7 +3858,7 @@ class ClaudeCodeSessionRuntime {
       processState.background = backgroundList;
       // Quitting, the CLI empties its list as it stops its work: what it held
       // stays on record for the next start to tell.
-      if (!this.quitting) try {
+      if (!claudeCodeQuitting()) try {
         session.onBackgroundTasks?.(backgroundList);
       } catch {
         // A host-side observer must not break the CLI's stream.
@@ -3944,7 +3943,7 @@ class ClaudeCodeSessionRuntime {
       adrift.wakeId = adrift.tasks[0]?.id ?? crypto.randomUUID();
       const announce = () => {
         // Quitting: the restart tells the task what stopped, once.
-        if (processState.adrift !== adrift || processState.closed || this.quitting) return;
+        if (processState.adrift !== adrift || processState.closed || claudeCodeQuitting()) return;
         adrift.rewake = forkCancelableTimeout(ADRIFT_REWAKE_INTERVAL_MS, announce);
         try {
           session.onBackgroundWake?.({
@@ -4255,10 +4254,6 @@ export const claudeCodeResumableSessionId = (
 /** Resume: continue every step a usage limit holds (optionally only some sessions). */
 export const wakeClaudeCodeUsageLimitHolds = (select?: (sessionKey: string) => boolean): number =>
   runtime.wakeUsageLimitHolds(select);
-/** Stella is quitting: the background work of the processes it ends is told after the next start, not now. */
-export const markClaudeCodeQuitting = () => {
-  runtime.quitting = true;
-};
 export const closeClaudeCodeSessionWhenIdle = (sessionKey: string) => {
   runtime.closeSessionWhenIdle(sessionKey);
 };

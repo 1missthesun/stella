@@ -172,7 +172,28 @@ const savedValueNote = (saved: UserAskSavedValueNote): string => {
       ? `The user gave a replacement; it overwrote the saved value for "${saved.label}".`
       : `The user chose to remember this on this computer as "${saved.label}"; later requests with the same service and account reuse it without asking.`;
   }
-  return "The user chose not to remember this: each private handle works once and is deleted after you use it.";
+  return "The user chose not to remember this on this computer.";
+};
+
+const clockTime = (at: number): string => {
+  const date = new Date(at);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+};
+
+/** How the task may use the handles it got, so it never asks the user twice for a value it still holds. */
+const handlesNote = (resolution: Extract<UserAskResolution, { outcome: "answered" }>): string => {
+  const parts: string[] = [];
+  if (resolution.freshUntil) {
+    parts.push(
+      `Handles not saved on this computer stay usable by you until ${clockTime(resolution.freshUntil)} (30 minutes): use one as many times as you need, and if a fill lands in the wrong field, fill it again into the right one (into.mode "move" clears it from the wrong one). Never ask the user again for a value you still hold a handle for.`,
+    );
+  }
+  if (resolution.asHandles?.length) {
+    parts.push(
+      `${resolution.asHandles.join(", ")} came back as a handle rather than text because Stella hides that text from you (it matches a saved secret); fill it with use_secure_value like the others.`,
+    );
+  }
+  return parts.join(" ");
 };
 
 /**
@@ -192,6 +213,7 @@ export const userAskResolutionResult = (
       ...(resolution.saved
         ? { saved: resolution.saved, note: savedValueNote(resolution.saved) }
         : {}),
+      ...(handlesNote(resolution) ? { handlesNote: handlesNote(resolution) } : {}),
       ...(resolution.userNote ? { userNote: resolution.userNote } : {}),
       ...(resolution.late ? { late: true } : {}),
     };

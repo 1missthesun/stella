@@ -379,6 +379,10 @@ export type UserAskResolution =
       responses?: readonly UserAskQuestionResponse[];
       values?: Readonly<Record<string, string>>;
       handles?: Readonly<Record<string, string>>;
+      /** Readable fields that came back as handles because Stella would redact their text. */
+      asHandles?: readonly string[];
+      /** When the handles not saved on this computer stop working. */
+      freshUntil?: number;
       saved?: UserAskSavedValueNote;
       userNote?: string;
       answeredAt: number;
@@ -565,6 +569,8 @@ export type SecureValueTarget =
       selector: string;
       tabId?: string;
       backend?: "in-app" | "external";
+      /** "move": clear the value from wherever it is on the page, then fill. "clear": only clear it. */
+      mode?: "fill" | "move" | "clear";
     }>
   | Readonly<{
       kind: "command";

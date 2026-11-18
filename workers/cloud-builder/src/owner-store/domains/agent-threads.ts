@@ -83,7 +83,15 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
-import { WAITING_FOR_MAX_CHARS, helperStoppedText, resultWaitingFor, resultWaitingReply, waitingResultJson } from "@stella/contracts/agent-waiting";
+import {
+  NOTHING_CAN_WAKE_MARK,
+  WAITING_FOR_MAX_CHARS,
+  helperStoppedText,
+  nothingCanWakeText,
+  resultWaitingFor,
+  resultWaitingReply,
+  waitingResultJson,
+} from "@stella/contracts/agent-waiting";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
@@ -4678,6 +4686,8 @@ export const applyAgentThreadEvent = (
         event.status === "waiting_for_user"
           ? event.status
           : agentThreadTerminalStatus(event.status);
+      const wake = event.wakeCheck && ended === "completed" ? waitingWake(db, thread, event.resultJson) : "live";
+      const resultJson = wake === "report" ? JSON.stringify({ finalText: waitingFinalText(event.resultJson) }) : event.resultJson;
       const limit =
         ended === "failed" && jobs && threadExecutor(thread).kind === "cloud"
           ? claudeUsageLimitOf(event.errorMessage ?? "")
@@ -4710,7 +4720,7 @@ export const applyAgentThreadEvent = (
              WHERE thread_id = ?`,
             status,
             event.attemptGeneration,
-            event.resultJson ?? null,
+            resultJson ?? null,
             status === "completed" ? null : (errorMessage ?? null),
             hold?.reason ?? null,
             hold?.until ?? null,
@@ -4728,15 +4738,29 @@ export const applyAgentThreadEvent = (
           ownerGeneration: thread.owner_generation,
           ...agentLifecycleCard(
             { ...thread, attempt_generation: event.attemptGeneration },
-            status === "completed" && resultWaitingFor(event.resultJson)
-              ? { kind: "waiting", waitingFor: resultWaitingFor(event.resultJson)! }
+            status === "completed" && resultWaitingFor(resultJson)
+              ? { kind: "waiting", waitingFor: resultWaitingFor(resultJson)! }
               : { kind: status, text: status === "completed" ? null : errorMessage },
           ),
         });
       }
+      if (wake === "tell" && thread.owner_generation) {
+        const waitingFor = resultWaitingFor(resultJson) ?? "something";
+        queueAgentNote(
+          { db, now: event.completedAt },
+          {
+            noteId: agentReportReceipt(`nothing-can-wake:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
+            parentThreadId: thread.thread_id,
+            conversationId: thread.conversation_id,
+            ownerGeneration: thread.owner_generation,
+            fromThreadId: thread.thread_id,
+            text: nothingCanWakeText(waitingFor),
+          },
+        );
+      }
       // It ended waiting after a message from Stella, which started it: a waiting
       // turn sends no report, so its last words reach her as its reply.
-      const reply = status === "completed" ? resultWaitingReply(event.resultJson) : undefined;
+      const reply = status === "completed" ? resultWaitingReply(resultJson) : undefined;
       // A helper's reply to its lead's message goes to that lead the same way.
       if (reply && thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id && thread.owner_generation) {
         queueAgentNote(
@@ -4778,6 +4802,49 @@ export const applyAgentThreadEvent = (
       return;
     }
   }
+};
+
+const waitingFinalText = (resultJson: string | undefined): string => {
+  try {
+    const parsed = JSON.parse(resultJson ?? "") as { finalText?: unknown };
+    return typeof parsed.finalText === "string" ? parsed.finalText : "";
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * A cloud task whose turn ended waiting: whether anything could start its
+ * next turn by itself (a helper at work or waiting, a message or report on its
+ * way, a schedule aimed at it, its starter holding its reply). Its background
+ * commands end with the turn, so they never count. With nothing, it is told at
+ * once ("tell"); a turn that was already that news and waits on nothing again
+ * ends as its report ("report") rather than wait unseen.
+ */
+const waitingWake = (db: OwnerDbReader, thread: ThreadRow, resultJson: string | undefined): "live" | "tell" | "report" => {
+  if (resultWaitingFor(resultJson) === undefined || resultWaitingReply(resultJson) !== undefined) return "live";
+  const id = thread.thread_id;
+  if (liveDescendants(db, id).length > 0) return "live";
+  const helpers = db.all<Pick<ThreadRow, "status" | "result_json">>(
+    "SELECT status, result_json FROM agent_threads WHERE parent_thread_id = ? AND thread_id <> ?",
+    id,
+    id,
+  );
+  if (helpers.some((helper) => endedWaiting(helper))) return "live";
+  const queued = db.one<{ found: number }>(
+    `SELECT 1 AS found WHERE EXISTS (SELECT 1 FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume'))
+        OR EXISTS (SELECT 1 FROM agent_report_outbox WHERE requester_kind = 'agent' AND requester_id = ? AND state IN ('pending', 'offered'))
+        OR EXISTS (SELECT 1 FROM schedules WHERE target_thread_id = ? AND status = 'active')`,
+    id,
+    id,
+    id,
+  );
+  if (queued) return "live";
+  const last = db.one<{ text: string | null }>(
+    "SELECT text FROM agent_commands WHERE thread_id = ? AND kind = 'message' ORDER BY created_at DESC LIMIT 1",
+    id,
+  );
+  return last?.text?.includes(NOTHING_CAN_WAKE_MARK) ? "report" : "tell";
 };
 
 const conversationThreadRows = (

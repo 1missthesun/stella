@@ -198,6 +198,7 @@ export const deliverTerminal = async (
           ...(resultJson ? { resultJson } : {}),
           ...(errorMessage ? { errorMessage } : {}),
           completedAt,
+          ...(waitingFor && pending.kind === "completed" ? { wakeCheck: true as const } : {}),
         } satisfies ThreadCompletedEvent,
       ]);
     }

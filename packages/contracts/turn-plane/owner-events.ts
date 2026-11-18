@@ -111,6 +111,8 @@ export type ThreadCompletedEvent = OwnerEventBase & {
   resultJson?: string;
   errorMessage?: string;
   completedAt: number;
+  /** A cloud turn that ended waiting: the owner checks that something can still wake the task. */
+  wakeCheck?: true;
 };
 
 export type OwnerEvent =

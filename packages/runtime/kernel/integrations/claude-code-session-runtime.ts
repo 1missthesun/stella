@@ -177,6 +177,8 @@ export type ClaudeCodeTurnRequest = {
   onIntermediateResult?: (result: ClaudeCodeStepResult) => void;
   toolSetAfterStep?: () => ClaudeCodeToolSetChange | undefined;
   onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
+  /** The background commands and monitors the CLI has running for this session, on every change. */
+  onBackgroundTasks?: (tasks: ClaudeCodeBackgroundTaskInfo[]) => void;
   backgroundWake?: boolean;
   onSessionId?: (sessionId: string) => void;
   onSessionCheckpoint?: (checkpoint: {
@@ -198,6 +200,8 @@ export type ClaudeCodeBackgroundWake = {
   id: string;
   tasks: { summary: string; status?: string; outputFile?: string }[];
 };
+/** A background command or monitor a Claude Code process runs (`background_tasks_changed`, verified against CLI 2.1.327). */
+export type ClaudeCodeBackgroundTaskInfo = { id: string; description: string; kind?: string };
 export type ClaudeCodeToolSetChange = {
   tools: readonly ToolMetadata[];
   nativeTools: readonly string[];
@@ -274,16 +278,67 @@ type ClaudeCodeProcessState = {
     wakeId?: string;
     /** Announces the wake again until a turn takes the query up. */
     rewake?: () => void;
+    /** Claude Code answering its own repeat of news the task already has: no wake. */
+    echo?: true;
   };
   finished?: BackgroundTask[];
+  /** When Claude Code last repeated, mid-turn, news the task already has. */
+  echoAt?: number;
+  /** The background commands and monitors this process runs now: they end with it. */
+  background?: ClaudeCodeBackgroundTaskInfo[];
+  /** Why Stella ended this process, when it did. */
+  endReason?: string;
+  /** The task already hears in its running turn that this process's background work stopped. */
+  backgroundTold?: true;
 };
 type BackgroundTask = ClaudeCodeBackgroundWake["tasks"][number] & {
   id?: string;
 };
+const backgroundTaskListOf = (line: ClaudeStreamEvent): ClaudeCodeBackgroundTaskInfo[] | undefined => {
+  if (line.type !== "system" || line.subtype !== "background_tasks_changed") return undefined;
+  if (!Array.isArray(line.tasks)) return [];
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : undefined);
+  return (line.tasks as unknown[]).flatMap((raw, index) => {
+    const task = asObject(raw);
+    if (!task) return [];
+    const kind = text(task.task_type);
+    return [
+      {
+        id: text(task.task_id) ?? `task-${index}`,
+        description: (text(task.description) ?? "a background command").slice(0, 300),
+        ...(kind ? { kind } : {}),
+      },
+    ];
+  });
+};
+/** What the task that started a background command or monitor hears when it stops unfinished. */
+const stoppedBackgroundTask = (task: ClaudeCodeBackgroundTaskInfo, reason: string): BackgroundTask => ({
+  summary: `${/monitor/i.test(task.kind ?? "") ? "Monitor" : "Background command"} "${task.description}" was stopped before it finished (${reason}), so it will not report.`,
+  status: "stopped",
+});
 /** What woke a query Claude Code started with no finished command to name (a Monitor's event). */
 const MONITOR_EVENT_TASK: BackgroundTask = {
   summary: "A monitor you started reported an event.",
   status: "event",
+};
+/**
+ * Resumed, Claude Code repeats that background work of the process before it
+ * stopped unfinished. Stella told the task when that process ended (or after
+ * the restart that ended it), so the repeat wakes no one.
+ */
+const echoesEndedSession = (task: BackgroundTask) =>
+  task.status === "stopped" && /didn.t finish before the previous session ended/iu.test(task.summary);
+const ECHO_QUERY_WINDOW_MS = 30 * 1000;
+const callsStellaTool = (line: ClaudeStreamEvent) => {
+  if (line.type !== "assistant") return false;
+  const content = asObject(line.message)?.content;
+  return (
+    Array.isArray(content) &&
+    content.some((block) => {
+      const entry = asObject(block);
+      return entry?.type === "tool_use" && typeof entry.name === "string" && entry.name.startsWith("mcp__");
+    })
+  );
 };
 const backgroundTaskOf = (
   line: ClaudeStreamEvent,
@@ -331,6 +386,7 @@ type ClaudeCodeSession = {
   toolSetChanges?: number;
   backgroundTasks?: number;
   onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
+  onBackgroundTasks?: (tasks: ClaudeCodeBackgroundTaskInfo[]) => void;
   mcpTurnWaiters?: Set<(turn: ClaudeCodeToolMcpActiveTurn | undefined) => void>;
   modelFallbackNotified?: boolean;
   /** The current CLI process started a background shell (Bash run_in_background). */
@@ -1955,6 +2011,7 @@ const cleanupSessionProcess = (session: ClaudeCodeSession) => {
     new Error("Claude Code session process was closed."),
   );
   endAdrift(session.process);
+  session.process.endReason ??= "Stella closed Claude Code's session for this task";
   killProcess(session.process.child);
   session.process = undefined;
   releaseMcpTurnWaiters(session);
@@ -2102,7 +2159,37 @@ class ClaudeCodeSessionRuntime {
     this.sessions.delete(sessionKey);
     this.closeWhenIdle.delete(sessionKey);
   }
+  /**
+   * A process that ends takes its background commands and monitors with it.
+   * The task that started them hears so at once, so it never waits on one that
+   * can no longer report. Stella quitting leaves that to the next start (the
+   * host keeps the list), where the task resumes and hears it then.
+   */
+  backgroundEnded(session: ClaudeCodeSession, processState: ClaudeCodeProcessState, code: number | null) {
+    const lost = processState.background ?? [];
+    processState.background = undefined;
+    if (lost.length === 0 || this.quitting) return;
+    try {
+      session.onBackgroundTasks?.(session.process?.background ?? []);
+    } catch {
+      // A host-side observer must not break the process teardown.
+    }
+    if (processState.backgroundTold) return;
+    const reason =
+      processState.endReason ?? `Claude Code's process for this task ended by itself${code === null ? "" : ` with code ${code}`}`;
+    try {
+      session.onBackgroundWake?.({
+        id: `stopped:${processState.finalSessionId || session.sessionId}:${lost.map((task) => task.id).join(",")}`,
+        tasks: lost.map((task) => stoppedBackgroundTask(task, reason)),
+      });
+    } catch {
+      // A host-side observer must not break the process teardown.
+    }
+  }
+  /** Stella is quitting: background work its processes lose is told after the next start instead. */
+  quitting = false;
   dispose() {
+    this.quitting = true;
     for (const child of this.activeProcesses.values()) {
       killProcess(child);
     }
@@ -2175,6 +2262,7 @@ class ClaudeCodeSessionRuntime {
     }
     if (!request.vanilla) {
       session.onBackgroundWake = request.onBackgroundWake;
+      session.onBackgroundTasks = request.onBackgroundTasks;
       const nativeToolUseCorrelator = createClaudeNativeToolUseCorrelator(
         stellaToolPredicate(request.tools),
       );
@@ -2386,7 +2474,7 @@ class ClaudeCodeSessionRuntime {
             throw withClaudeSubscriptionLimitReported(limit);
           }
           const backgroundStopped = session.backgroundShellStarted === true;
-          this.resetStreamingProcess(request.sessionKey, session);
+          this.resetStreamingProcess(request.sessionKey, session, backgroundStopped ? { told: true } : {});
           usageLimitHolds += 1;
           await this.holdForUsageLimit(request, limit, usageLimitHolds);
           if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
@@ -2408,7 +2496,7 @@ class ClaudeCodeSessionRuntime {
             detail: normalizeErrorMessage(error).slice(0, 400),
           });
           const backgroundStopped = session.backgroundShellStarted === true;
-          this.resetStreamingProcess(request.sessionKey, session);
+          this.resetStreamingProcess(request.sessionKey, session, backgroundStopped ? { told: true } : {});
           await waitUntil(Date.now() + delay, request.abortSignal, new Promise<void>(() => {}));
           if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
           if (failedAttemptMcpCalls.length > 0) {
@@ -2433,7 +2521,7 @@ class ClaudeCodeSessionRuntime {
             throw withClaudeLoginRejected(error, session.claudeLoginEmail);
           }
           const backgroundStopped = session.backgroundShellStarted === true;
-          this.resetStreamingProcess(request.sessionKey, session);
+          this.resetStreamingProcess(request.sessionKey, session, backgroundStopped ? { told: true } : {});
           const next = await getClaudeCodeConfig({
             recheck: true,
             ...(ended ? { rejectedConfigDir: usedDir } : {}),
@@ -3525,6 +3613,7 @@ class ClaudeCodeSessionRuntime {
         session.process = undefined;
         session.backgroundTasks = 0;
       }
+      this.backgroundEnded(session, processState, code);
       // A restart may already have registered a replacement child under this
       // session key; only remove OUR child from tracking.
       if (this.activeProcesses.get(request.sessionKey) === child) {
@@ -3764,16 +3853,59 @@ class ClaudeCodeSessionRuntime {
     processState: ClaudeCodeProcessState,
     line: ClaudeStreamEvent,
   ) {
-    if (line.type === "system" && line.subtype === "background_tasks_changed") {
-      session.backgroundTasks = Array.isArray(line.tasks)
-        ? line.tasks.length
-        : 0;
+    const backgroundList = backgroundTaskListOf(line);
+    if (backgroundList) {
+      session.backgroundTasks = backgroundList.length;
+      processState.background = backgroundList;
+      // Quitting, the CLI empties its list as it stops its work: what it held
+      // stays on record for the next start to tell.
+      if (!this.quitting) try {
+        session.onBackgroundTasks?.(backgroundList);
+      } catch {
+        // A host-side observer must not break the CLI's stream.
+      }
     }
     const finished = backgroundTaskOf(line);
+    const echo = finished !== undefined && echoesEndedSession(finished);
     if (processState.closed) return false;
     if (processState.pending.length > 0) {
-      if (finished) (processState.finished ??= []).push(finished);
+      if (echo) processState.echoAt = Date.now();
+      else if (finished) (processState.finished ??= []).push(finished);
       return false;
+    }
+    if (!processState.adrift) {
+      const echoQuery =
+        echo ||
+        (!finished &&
+          !processState.finished &&
+          line.type === "system" &&
+          line.subtype === "init" &&
+          processState.echoAt !== undefined &&
+          Date.now() - processState.echoAt < ECHO_QUERY_WINDOW_MS);
+      if (echoQuery || (line.type === "system" && line.subtype === "init")) processState.echoAt = undefined;
+      if (echoQuery) processState.adrift = { lines: [], woke: false, tasks: [], echo: true };
+    }
+    if (processState.adrift?.echo && echo) {
+      processState.adrift.lines.push(line);
+      processState.adrift.tasks.push(finished);
+      return true;
+    }
+    if (processState.adrift?.echo) {
+      const held = processState.adrift;
+      if (finished && !echo) {
+        // Real news arrived meanwhile: the held query wakes the task after all.
+        held.echo = undefined;
+      } else if (callsStellaTool(line)) {
+        // Its tool call needs a Stella turn: wake the task with the repeat.
+        held.echo = undefined;
+        if (held.tasks.length === 0) {
+          held.tasks.push({ summary: "Background work of yours stopped before it finished, as you were told.", status: "stopped" });
+        }
+      } else {
+        held.lines.push(line);
+        if (line.type === "result" || held.lines.length > MAX_ADRIFT_LINES) endAdrift(processState);
+        return true;
+      }
     }
     if (!processState.adrift) {
       // A query Claude Code starts by itself with no step of ours in flight
@@ -3811,7 +3943,8 @@ class ClaudeCodeSessionRuntime {
       adrift.woke = true;
       adrift.wakeId = adrift.tasks[0]?.id ?? crypto.randomUUID();
       const announce = () => {
-        if (processState.adrift !== adrift || processState.closed) return;
+        // Quitting: the restart tells the task what stopped, once.
+        if (processState.adrift !== adrift || processState.closed || this.quitting) return;
         adrift.rewake = forkCancelableTimeout(ADRIFT_REWAKE_INTERVAL_MS, announce);
         try {
           session.onBackgroundWake?.({
@@ -4087,10 +4220,16 @@ class ClaudeCodeSessionRuntime {
       pending.reject(new ClaudeCodeCompactionLoopError(pending.mcpCalls));
     }
   }
-  resetStreamingProcess(sessionKey: string, session: ClaudeCodeSession) {
+  resetStreamingProcess(
+    sessionKey: string,
+    session: ClaudeCodeSession,
+    end: { reason?: string; told?: true } = {},
+  ) {
     if (!session.process) {
       return;
     }
+    session.process.endReason ??= end.reason ?? "Stella restarted Claude Code for this task";
+    if (end.told) session.process.backgroundTold = true;
     const child = session.process.child;
     resetSessionMcpClients(
       session,
@@ -4116,6 +4255,10 @@ export const claudeCodeResumableSessionId = (
 /** Resume: continue every step a usage limit holds (optionally only some sessions). */
 export const wakeClaudeCodeUsageLimitHolds = (select?: (sessionKey: string) => boolean): number =>
   runtime.wakeUsageLimitHolds(select);
+/** Stella is quitting: the background work of the processes it ends is told after the next start, not now. */
+export const markClaudeCodeQuitting = () => {
+  runtime.quitting = true;
+};
 export const closeClaudeCodeSessionWhenIdle = (sessionKey: string) => {
   runtime.closeSessionWhenIdle(sessionKey);
 };

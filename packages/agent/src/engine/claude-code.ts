@@ -322,17 +322,25 @@ const messageKey = (message: Message): string | undefined => {
 const clip = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max)}\n[...truncated]` : text);
 
 const backgroundWakeText = (wake: ClaudeCodeBackgroundWake): string =>
-  [
-    wake.tasks.every((task) => task.status === "event")
-      ? "[wake: a monitor you left running in the background reported an event.]"
-      : wake.tasks.length === 1
-        ? "[wake: a command you left running in the background has finished.]"
-        : `[wake: ${wake.tasks.length} commands you left running in the background have finished.]`,
-    "",
-    ...wake.tasks.map((task) => `- ${task.summary}${task.outputFile ? `\n  Output: ${task.outputFile}` : ""}`),
-    "",
-    "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
-  ].join("\n");
+  wake.tasks.every((task) => task.status === "stopped")
+    ? [
+        "[wake: background work you left running was stopped before it finished, so it will not report.]",
+        "",
+        ...wake.tasks.map((task) => `- ${task.summary}`),
+        "",
+        "You were resumed for this. If you were waiting on it, check directly whether what it was for has happened; if you still need to wait, start it again or schedule a check aimed at you.",
+      ].join("\n")
+    : [
+        wake.tasks.every((task) => task.status === "event")
+          ? "[wake: a monitor you left running in the background reported an event.]"
+          : wake.tasks.length === 1
+            ? "[wake: a command you left running in the background has finished.]"
+            : `[wake: ${wake.tasks.length} commands you left running in the background have finished.]`,
+        "",
+        ...wake.tasks.map((task) => `- ${task.summary}${task.outputFile ? `\n  Output: ${task.outputFile}` : ""}`),
+        "",
+        "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
+      ].join("\n");
 
 const dropsBuiltins = (from: { nativeTools: readonly string[] }, to: { nativeTools: readonly string[] }): boolean =>
   from.nativeTools.some((name) => !to.nativeTools.includes(name));

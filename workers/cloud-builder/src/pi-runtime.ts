@@ -363,6 +363,8 @@ export type PiRuntimeOptions = {
   agentStarted?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   agentStopped?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   agentWaiting?(event: PiAgentInfo & { threadId: string; turnId: string; waitingFor: string }): void;
+  /** Schedules aimed at a task, in words: what could wake it here besides its helpers and messages. */
+  wakeSources?(threadId: string, authority: PiAuthority): Promise<string[]>;
   agentsChanged?(): void;
   agentLedger?(event: PiAgentLedgerEvent): void;
   deviceAgents?: PiDeviceAgents;
@@ -1026,6 +1028,12 @@ export class PiConversationRuntime {
   #agents(): StellaAgentsHost {
     return {
       rootPlacement: { kind: "cloud" },
+      ...(this.#options.wakeSources
+        ? {
+            wakeSources: async (threadId: string) =>
+              (await this.#options.wakeSources?.(threadId, (await this.#agentState()).authority)) ?? [],
+          }
+        : {}),
       place: (destination) => {
         if (destination.kind !== "device") return { kind: "cloud" };
         if (this.#options.deviceAgents) return { kind: "device", deviceId: destination.deviceId };

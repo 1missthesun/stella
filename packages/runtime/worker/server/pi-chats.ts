@@ -28,12 +28,19 @@ import {
   type PlacementLocalExecutionKind,
 } from "../../kernel/runner/execution-placement-local-ownership.js";
 import type { PiReportDelivery } from "../../kernel/runner/types.js";
+import type { LocalCronJobRecord } from "@stella/contracts/scheduling";
 import { forkDelayed, sleepMs } from "../effect-runtime.js";
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
 import { brainFor } from "./pi-brain.js";
 import { cloudJournalFor } from "./pi-journal.js";
+import {
+  claudeCodeBackgroundOf,
+  takeStoppedClaudeCodeBackground,
+  type StoppedClaudeCodeBackground,
+} from "./claude-code-background.js";
+import { markClaudeCodeQuitting } from "../../kernel/integrations/claude-code-session-runtime.js";
 import { piUserReminders } from "./pi-reminders.js";
 import { piModelUsage } from "./pi-usage.js";
 import {
@@ -272,6 +279,7 @@ const pausedShellsFile = (session: OpenSession) =>
   path.join(session.config.get().stellaDataDirPath, "agent", "stopped-shells.json");
 
 export const quitPiChats = async (session: OpenSession, stop: () => Promise<unknown> | undefined): Promise<void> => {
+  markClaudeCodeQuitting();
   // Tasks resume after the restart, but the background commands they started
   // die with the app; remember them so each task is told when it resumes.
   try {
@@ -504,6 +512,7 @@ export const piChatsFor = (
       },
       endAgentShells: async (threadId) =>
         (await session.runnerCell.get()?.backgroundExits.endAgentSessions(threadId)) ?? 0,
+      wakeSources: (threadId) => taskWakeSources(session, hostBus, threadId),
       agentStarted: (agent) => {
         session.runnerCell.get()?.backgroundExits.disarm({ conversationId: agent.conversationId, agentId: agent.threadId });
         session.runnerCell.get()?.piTools.agentBrowserStarted(agent.threadId);
@@ -622,22 +631,32 @@ export const resumePiChats = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
 ): Promise<void> => {
+  const stoppedClaudeCode = takeStoppedClaudeCodeBackground(session.config.get().stellaDataDirPath);
+  const stoppedShells = existsSync(pausedShellsFile(session));
   const file = path.join(session.config.get().stellaDataDirPath, "agent", "active.json");
-  if (!existsSync(file)) return;
+  let active = false;
   try {
-    const ids = JSON.parse(readFileSync(file, "utf8")) as unknown;
-    if (!Array.isArray(ids) || ids.length === 0) return;
+    const ids = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as unknown) : [];
+    active = Array.isArray(ids) && ids.length > 0;
   } catch {
-    return;
+    active = false;
   }
+  // A task waiting on background work the restart stopped runs nothing, so its
+  // chat is not among the active ones: it still hears, or it would wait for good.
+  if (!active && !stoppedShells && stoppedClaudeCode.length === 0) return;
   const chats = await piChatsFor(session, hostBus);
   const at = Date.now();
-  const resumed = await chats.resumeActive();
+  const resumed = active ? await chats.resumeActive() : [];
   // After the desktop has reconciled its placed tasks with the server (one
   // stopped meanwhile stays stopped) and its sign-in has reached the models:
   // tasks hear which of their background commands stopped, and the note says
   // how each task stands.
-  void placementReconciled(RESTART_NOTE_WAIT_MS)
+  const reconciledHere = placementReconciled(RESTART_NOTE_WAIT_MS);
+  // Claude Code tasks need no Stella sign-in to take the news.
+  void reconciledHere
+    .then(() => tellTasksOfStoppedClaudeCodeBackground(stoppedClaudeCode, chats))
+    .catch((error: unknown) => console.warn("[pi-chat] telling tasks of stopped Claude Code background work failed", error));
+  void reconciledHere
     .then(() => signedIn(session, SIGN_IN_WAIT_MS))
     .then(() =>
       tellTasksOfStoppedShells(session, chats).catch((error: unknown) =>
@@ -697,6 +716,69 @@ const tellTasksOfStoppedShells = async (
       .catch((error: unknown) => console.warn("[pi-chat] telling a task of its stopped commands failed", error));
   }
 };
+const WAKE_SOURCE_LIST_MS = 15_000;
+
+/**
+ * What on this computer could start a task's next turn by itself: background
+ * commands it started (Stella's own shells and Claude Code's), Claude Code
+ * monitors, and schedules aimed at its thread.
+ */
+const taskWakeSources = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string): Promise<string[]> => {
+  const clip = (text: string) => {
+    const line = text.replace(/\s+/g, " ").trim();
+    return line.length > 100 ? `${line.slice(0, 100)}…` : line;
+  };
+  const found: string[] = [];
+  for (const shell of session.runnerCell.get()?.runningTaskShells() ?? []) {
+    if (shell.agentId === threadId) found.push(`your background command \`${clip(shell.command)}\``);
+  }
+  for (const task of claudeCodeBackgroundOf(threadId)) {
+    found.push(`your ${/monitor/i.test(task.kind ?? "") ? "monitor" : "background command"} "${clip(task.description)}"`);
+  }
+  const jobs = (await hostBus
+    .request(METHOD_NAMES.INTERNAL_SCHEDULE_LIST_CRON_JOBS, undefined, { timeoutMs: WAKE_SOURCE_LIST_MS })
+    .catch(() => undefined)) as LocalCronJobRecord[] | undefined;
+  if (!jobs) return [...found, "schedules aimed at you (they could not be listed just now)"];
+  for (const job of jobs) {
+    const payload = job.payload;
+    if (!job.enabled || (payload.kind !== "task" && payload.kind !== "watch") || payload.threadId !== threadId) continue;
+    found.push(`the schedule "${clip(job.name)}" (next ${new Date(job.nextRunAtMs).toISOString()})`);
+  }
+  return found;
+};
+
+/**
+ * Claude Code's background commands and monitors end with its process, which
+ * Stella's quit or crash ended. The task that started them hears which, and
+ * that it wakes for it, since a task waiting on one would otherwise wait for
+ * good.
+ */
+const tellTasksOfStoppedClaudeCodeBackground = async (
+  stopped: readonly StoppedClaudeCodeBackground[],
+  chats: Awaited<ReturnType<typeof piChatsFor>>,
+): Promise<void> => {
+  const byThread = new Map<string, StoppedClaudeCodeBackground[]>();
+  for (const entry of stopped) byThread.set(entry.threadId, [...(byThread.get(entry.threadId) ?? []), entry]);
+  for (const [threadId, entries] of byThread) {
+    const tasks = entries.flatMap((entry) => entry.tasks);
+    const text = [
+      "[wake: Stella restarted on this computer (an update, restart, quit or crash), and that stopped background work you had left running before it finished, so it will not report.]",
+      "",
+      ...tasks.map((task) => `- ${/monitor/i.test(task.kind ?? "") ? "Monitor" : "Background command"} "${task.description}"`),
+      "",
+      "You were resumed for this. If you were waiting on it, check directly whether what it was for has happened; if you still need to wait, start it again or schedule a check aimed at you.",
+    ].join("\n");
+    const at = Math.max(...entries.map((entry) => entry.at));
+    const outcome = await chats
+      .deliverAgentMessage(threadId, text, `restart-shells:claude-code:${at}:${threadId}`)
+      .catch((error: unknown) => {
+        console.warn("[pi-chat] telling a task of its stopped Claude Code background work failed", error);
+        return undefined;
+      });
+    console.info("[pi-chat] told a task the restart stopped its Claude Code background work", { threadId, tasks: tasks.length, outcome });
+  }
+};
+
 // One per worker process: the desktop's placement bridge reconciled the
 // tasks placed here since this worker started.
 const reconciled = { done: false, wake: new Set<() => void>() };

@@ -38,6 +38,7 @@ import {
   type AuthorizedToolImage,
   type ToolResult,
 } from "../../kernel/tools/types.js";
+import { noteClaudeCodeBackground } from "./claude-code-background.js";
 import { latestPromptSeq } from "./pi-journal.js";
 import type { OpenSession } from "./sessions.js";
 
@@ -287,6 +288,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         },
         toolSetAfterStep: () => spec.toolSetAfterStep(),
         onBackgroundWake: (wake) => spec.onBackgroundWake(wake),
+        onBackgroundTasks: (tasks) => noteClaudeCodeBackground(session.config.get().stellaDataDirPath, ref, tasks),
         ...(spec.backgroundWake ? { backgroundWake: true } : {}),
         ...(syncs(ref)
           ? {

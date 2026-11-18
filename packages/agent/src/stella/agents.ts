@@ -61,6 +61,9 @@ import {
   END_TURN_WAITING_PARAMETERS,
   END_TURN_WAITING_TOOL,
   endTurnWaitingResult,
+  NOTHING_CAN_WAKE_MARK,
+  nothingCanWakeRefusal,
+  nothingCanWakeText,
   helperStoppedText,
   parseWaitingFor,
   starterMessageSender,
@@ -412,6 +415,12 @@ export type StellaAgentsHost = {
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
   /** A stopped agent's own processes (its shells, tools and what they started) end; resolves with how many. */
   endAgentProcesses?(threadId: string): Promise<number>;
+  /**
+   * What on this host could start a task's next turn by itself, in words: its
+   * background commands and monitors still running, schedules aimed at it.
+   * Without it nothing is refused for want of a wake.
+   */
+  wakeSources?(threadId: string): Promise<string[]>;
   directory?: AgentDirectoryHost;
   agentDirectory?(threadId: string): string;
   directoryProblem?(directory: string): Promise<string | undefined>;
@@ -723,6 +732,21 @@ const wakeWaitingStarter = async (
   );
 };
 
+/** A task's runtime as a plain store: its commits change no task state. */
+const taskStore = (
+  runtime: Pick<TaskRuntime<unknown, { phase: string }, unknown, object>, "snapshot" | "commit">,
+): Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> } => ({
+  snapshot: runtime.snapshot.bind(runtime),
+  commit: async <T,>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> => {
+    let out: T | undefined;
+    await runtime.commit(async (tx) => {
+      out = await change(tx);
+      return undefined;
+    }, context);
+    return out as T;
+  },
+});
+
 const busyReader = (
   store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
   context: Context,
@@ -995,6 +1019,17 @@ export function stellaAgents(host: StellaAgentsHost) {
               : undefined;
           // How Stella's messages name her here, to tell her from a lead.
           const stellaThread = waitedFor !== undefined ? await host.directory?.conversationId(context).catch(() => undefined) : undefined;
+          // What could wake it may be gone by the time the turn ends (it stopped
+          // its last helper or its watch after end_turn_waiting): it hears so at
+          // once, unless this turn was already that news.
+          const wakersAtEnd =
+            waitedFor !== undefined && ![...carried, message].some((text) => text.includes(NOTHING_CAN_WAKE_MARK))
+              ? await wakersOf(taskStore(runtime), agentConversationId, context).catch((error: unknown) => {
+                  console.warn("[stella-agents] checking what can wake a waiting task failed", { threadId, error });
+                  return undefined;
+                })
+              : undefined;
+          if (wakersAtEnd) console.info("[stella-agents] task ended its turn waiting", { threadId, wakers: wakersAtEnd });
           await runtime.commit(async (tx) => {
             const finished =
               settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
@@ -1086,6 +1121,14 @@ export function stellaAgents(host: StellaAgentsHost) {
                     note: true,
                   },
                   { ownership: { kind: "conversation" }, background: true, conversationId: self.parentConversationId as ConversationId },
+                );
+              }
+              // Nothing live can wake it: it hears so at once (after the reads above: a write ends them).
+              if (wakersAtEnd?.length === 0) {
+                await tx.createTask(
+                  Reporter,
+                  { threadId, conversationId: reporter.input.conversationId, message: nothingCanWakeText(waitedFor), wake: true },
+                  { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
                 );
               }
               return {
@@ -3105,6 +3148,93 @@ export function stellaAgents(host: StellaAgentsHost) {
       return undefined;
     }, context);
 
+  /**
+   * Whether the task asked whoever started it something (send_message to them
+   * or Stella, ask_user, request_secure_input) after the last message they sent it.
+   */
+  const askedStarter = async (
+    store: { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+    agentConversationId: ConversationId,
+    role: StellaAgentRole,
+    context: Context,
+  ): Promise<boolean> =>
+    store.commit(async (tx) => {
+      let cursor: Parameters<Tx["scanEntries"]>[2];
+      for (let pages = 0; pages < 8; pages += 1) {
+        const page = await tx.scanEntries({ conversationId: agentConversationId, order: "descending" }, 50, cursor);
+        for (const entry of page.items) {
+          const message = entry.model?.[0] as { role?: string; content?: unknown } | undefined;
+          if (entry.kind === "pi.user") {
+            if (starterMessageSender([messageText(message)])) return false;
+            continue;
+          }
+          if (entry.kind !== "pi.assistant") continue;
+          for (const part of (message as AssistantMessage | undefined)?.content ?? []) {
+            if (part.type !== "toolCall") continue;
+            if (part.name === "ask_user" || part.name === "request_secure_input") return true;
+            if (part.name !== "send_message") continue;
+            const to = (part.arguments as { thread_id?: unknown } | undefined)?.thread_id;
+            if (typeof to !== "string") continue;
+            if (to.trim().toLowerCase() === STELLA_MESSAGE_TARGET || to.trim() === role.startedBy?.threadId) return true;
+          }
+        }
+        cursor = page.next;
+        if (cursor === undefined) break;
+      }
+      return false;
+    }, context);
+
+  /**
+   * What could start a task's next turn by itself, in words: helpers at work,
+   * a message on its way, an open question to its starter, and what its host
+   * knows (background commands and monitors, schedules aimed at it). Undefined
+   * when this host can't tell.
+   */
+  const wakersOf = async (
+    store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+    agentConversationId: ConversationId,
+    context: Context,
+  ): Promise<string[] | undefined> => {
+    if (!host.wakeSources) return undefined;
+    const role = await roleOf(store, agentConversationId, context);
+    if (role.agentType === "orchestrator" || !role.threadId) return undefined;
+    const found: string[] = [];
+    const read = busyReader(store, context);
+    const helpers = await read.agents(agentConversationId);
+    const carrying = new Set((await read.reporters(agentConversationId)).map((reporter) => reporter.input.threadId));
+    for (const [threadId, agent] of Object.entries(helpers?.agents ?? {})) {
+      if (wasStopped(agent)) continue;
+      const name = `your helper "${agent.description.replace(/\s+/g, " ").trim().slice(0, 80)}"`;
+      if (agent.remote) {
+        if (helpers && remoteRunOf(agent, callsFor(helpers as StellaAgents, threadId)).phase === "running") found.push(`${name} at work elsewhere`);
+        continue;
+      }
+      if (agent.conversationId < 0) continue;
+      const id = agent.conversationId as ConversationId;
+      if (carrying.has(threadId) || (await read.running(id)) || (await agentsBusy(read, id, 1))) found.push(`${name} at work`);
+      else if (agent.waiting) found.push(`${name}, itself waiting for ${agent.waiting.waitingFor}`);
+    }
+    const starter = role.parentConversationId as ConversationId | undefined;
+    if (starter !== undefined) {
+      const queued = await store.commit(async (tx) => {
+        for (const reporter of await liveReporters(tx, starter)) {
+          if (reporter.input.threadId !== role.threadId) continue;
+          // A placed one is already in the run that is ending.
+          const submission = await tx.submissionByRequest(agentConversationId, `agent-msg:${reporter.id}`);
+          if (submission === undefined || submission.status === "queued") return true;
+        }
+        return false;
+      }, context);
+      if (queued) found.push("a message on its way to you");
+    }
+    if (role.askingStella) found.push("Stella's answer to your question");
+    else if (await askedStarter(store, agentConversationId, role, context).catch(() => false)) {
+      found.push("an answer to the question you put to whoever started you");
+    }
+    found.push(...(await host.wakeSources(role.threadId).catch(() => ["work of yours on this computer that could not be listed just now"])));
+    return found;
+  };
+
   const takeWait = async (
     store: Pick<ToolExecutionApi, "snapshot"> & { commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown> },
     agentConversationId: ConversationId,
@@ -3172,6 +3302,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!self.threadId || self.agentType === "orchestrator") throw new Error("Only a task ends its turn waiting.");
       const waitingFor = parseWaitingFor(args);
       if (!waitingFor) throw new Error(END_TURN_WAITING_MISSING);
+      const wakers = await wakersOf(api, api.conversationId, context);
+      if (wakers?.length === 0) throw new Error(nothingCanWakeRefusal(waitingFor));
       await api.commit(async (tx) => {
         const latest = (await tx.scanEntries({ conversationId: api.conversationId, order: "descending" }, 1)).items[0];
         (await tx.doc(StellaAgentDoc, api.conversationId)).waiting = {
@@ -3179,7 +3311,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           ...(latest ? { afterEntry: Number(latest.id) } : {}),
         };
       }, context);
-      return { output: [{ type: "text", text: endTurnWaitingResult(waitingFor) }], details: { waitingFor } };
+      return { output: [{ type: "text", text: endTurnWaitingResult(waitingFor, wakers) }], details: { waitingFor } };
     },
   });
 

@@ -36,6 +36,7 @@ export function desktopAgentsHost(
     directory?: StellaAgentsHost["directory"];
     dataDir?: string;
     endAgentShells?: (threadId: string) => Promise<number>;
+    wakeSources?: StellaAgentsHost["wakeSources"];
     execution?: StellaAgentsHost["execution"];
     agentLog?: StellaAgentsHost["agentLog"];
   } = {},
@@ -63,6 +64,7 @@ export function desktopAgentsHost(
         }
       : {}),
     ...(options.execution ? { execution: options.execution } : {}),
+    ...(options.wakeSources ? { wakeSources: options.wakeSources } : {}),
     ...(options.agentLog ? { agentLog: options.agentLog } : {}),
     directoryProblem: async (directory) => {
       const found = await stat(directory).catch(() => undefined);

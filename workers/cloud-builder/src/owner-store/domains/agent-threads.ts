@@ -90,7 +90,7 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { agentInvariants } from "./agent-invariants.js";
-import { boundReportText, endedWaiting, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
+import { boundReportText, endedWaiting, fileLateTurn, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
 import {
   NOTHING_CAN_WAKE_MARK,
   WAITING_FOR_MAX_CHARS,
@@ -4283,6 +4283,16 @@ const completeComputerThread = async (
     return { updated: now?.status === "canceled", status: now?.status ?? row.status };
   }
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
+    // An earlier turn's end, after a later one began: what it said is kept.
+    if (
+      args.attemptGeneration < row.attempt_generation &&
+      args.status === "completed" &&
+      result !== undefined &&
+      !isPlaceholderAgentResult(JSON.stringify({ finalText: result }))
+    ) {
+      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, result, ctx.now);
+      return { updated: false, status: row.status };
+    }
     if (
       row.attempt_generation === args.attemptGeneration &&
       row.status === "completed" &&

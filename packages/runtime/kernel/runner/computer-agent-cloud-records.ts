@@ -52,6 +52,7 @@ type ComputerAgentCloudOutboxStore = Pick<
   | "bindComputerAgentCloudThreadAuthority"
   | "retireComputerAgentCloudGeneration"
   | "deleteComputerAgentCloudOutbox"
+  | "deleteSentComputerAgentCloudOutbox"
 >;
 
 export type ComputerAgentAttempt = {
@@ -551,7 +552,7 @@ export const createComputerAgentCloudRecords = (
           scheduleDrain(0);
           return;
         }
-        options.store.deleteComputerAgentCloudOutbox(entry.id);
+        options.store.deleteSentComputerAgentCloudOutbox(entry.id, entry.payloadJson);
         if (entry.kind === "start") {
           settleStartAdmission(entry.id, "acknowledged");
         }
@@ -596,7 +597,7 @@ export const createComputerAgentCloudRecords = (
         // A backend from before end_turn_waiting refuses the field: the
         // cloud keeps the attempt running, which also sends no report.
         if (entry.kind === "terminal" && asRecord(error)?.code === "BAD_REQUEST" && waitingTerminal(entry.payloadJson)) {
-          options.store.deleteComputerAgentCloudOutbox(entry.id);
+          options.store.deleteSentComputerAgentCloudOutbox(entry.id, entry.payloadJson);
           continue;
         }
         if (entry.kind !== "start" && asRecord(error)?.code === "NOT_FOUND") {

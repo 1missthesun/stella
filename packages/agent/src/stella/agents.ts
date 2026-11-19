@@ -1232,10 +1232,30 @@ export function stellaAgents(host: StellaAgentsHost) {
         }
       },
       report: async (reporter, runtime, context) => {
-        const { report, waiting, notes } = reporter.state.checkpoint;
-        const stopped = reporter.state.checkpoint.stopped === true || reporter.state.checkpoint.paused === true;
+        const { waiting, notes } = reporter.state.checkpoint;
+        let { report } = reporter.state.checkpoint;
+        let stopped = reporter.state.checkpoint.stopped === true || reporter.state.checkpoint.paused === true;
+        // Stopped after its turn settled and before its end went out (stop_agent
+        // found it idle and said it stopped): Stella's own task holds that stop.
+        // What it said stays in its history, as for any stopped task; its end
+        // reaches the cloud as the stop, not as a report.
+        const topLevel = await roleOf(runtime, runtime.conversationId, context).then(
+          (role) => role.agentType === "orchestrator" || role.parentConversationId === undefined,
+        );
+        const record = (await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[reporter.input.threadId];
+        const stoppedLate = !stopped && topLevel && record !== undefined && wasStopped(record);
+        if (stoppedLate && !waiting) {
+          stopped = true;
+          report = undefined;
+        }
         for (const note of notes ?? []) {
           await deliverNote(runtime.conversationId, note, context, (id) => runtime.conversation(id, context));
+        }
+        if (waiting && stoppedLate && host.agentStopped) {
+          const live = await runtime.snapshot(LiveDoc, reporter.input.conversationId as ConversationId, context);
+          if (live?.run === undefined) {
+            await host.agentStopped({ threadId: reporter.input.threadId, description: record?.description ?? reporter.input.threadId }, context);
+          }
         }
         if (waiting) {
           const waitingFor = reporter.state.checkpoint.waitingFor;
@@ -2563,6 +2583,29 @@ export function stellaAgents(host: StellaAgentsHost) {
       const scope = stella ? root : (api.conversationId as ConversationId);
       const target = scope === undefined ? undefined : (await agentTree(api, scope, context)).find((agent) => agent.threadId === threadId);
       if (target) {
+        // Already done here: its turn ended and its report went, with nothing
+        // waiting, nothing on its way to it and nothing it started still going.
+        // There is no run to stop; saying it stopped would be untrue. Only what
+        // it left running ends. (While its report is still on its way, it is
+        // stopped as usual and that report is not sent.)
+        const { record } = target;
+        if (!record.remote && !record.away && record.waiting === undefined && !wasStopped(record)) {
+          const id = record.conversationId as ConversationId;
+          const reader = busyReader(api, context);
+          const idle = !(await reader.running(id));
+          const carried = idle && (await reader.reporters(target.parentConversationId)).some((reporter) => reporter.input.threadId === threadId);
+          if (idle && !carried && !(await agentsBusy(reader, id).catch(() => true))) {
+            const ended = (await host.endAgentProcesses?.(threadId).catch(() => 0)) ?? 0;
+            return {
+              output: [
+                {
+                  type: "text",
+                  text: `${threadId} had already finished: nothing of it was running, so nothing was stopped. Its report reaches you on its own if it has not already.${ended > 0 ? ` The processes it left running (${ended}: shells, servers, builds and the like) ended.` : ""}`,
+                },
+              ],
+            };
+          }
+        }
         const { elsewhere, endedProcesses } = await stopSubtree(api, target, root ?? (api.conversationId as ConversationId), context);
         const there = elsewhere.find((result) => result.threadId === threadId);
         if (there) return { output: [{ type: "text", text: agentStopText(there) }] };

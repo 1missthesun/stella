@@ -1,5 +1,5 @@
 import { isAgentStopReason } from "@stella/contracts/agent-status";
-import { parseAgentReportId } from "@stella/contracts/backend/agent-reports";
+import { agentInputSender } from "@stella/contracts/agent-rules";
 import type { AgentInvariantKind, AgentInvariantReport } from "@stella/contracts/backend/agent-threads";
 import type { OwnerDbReader } from "../registry.js";
 
@@ -8,8 +8,9 @@ import type { OwnerDbReader } from "../registry.js";
  * broken in a window, so what is left of these bugs is a number rather than
  * an anecdote. Each check names one rule:
  *
- * - `report_to_stella_not_lead`: a helper's report or reply went to Stella's
- *   chat although the cloud records the lead that started it.
+ * - `report_to_stella_not_lead`: a helper's report went to Stella's chat
+ *   although the cloud records the lead that started it (a note a task sends
+ *   Stella on purpose is not one).
  * - `report_lost`: a report the cloud gave up delivering, or one the audit
  *   found never sent.
  * - `stopped_task_took_input`: a stopped task started again from something
@@ -30,7 +31,6 @@ const WAITING_TOO_LONG_MS = 6 * 60 * 60_000;
 const EXAMPLES_MAX = 5;
 const SCAN_MAX = 5_000;
 
-const AUTOMATIC_ID = /^(?:report:|schedule:|note:|schedule-gone:|background-exit:|restart-shells:|claude-code-wake:|waiting-reply:|device-offline)/u;
 
 const parse = (json: string | null): Record<string, unknown> => {
   if (!json) return {};
@@ -53,7 +53,7 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
   for (const row of db.all<{ report_id: string; thread_id: string; kind: string; parent: string }>(
     `SELECT o.report_id, o.thread_id, o.kind, t.parent_thread_id AS parent
        FROM agent_report_outbox o JOIN agent_threads t ON t.thread_id = o.thread_id
-      WHERE o.created_at >= ? AND o.requester_kind = 'conversation'
+      WHERE o.created_at >= ? AND o.kind = 'report' AND o.requester_kind = 'conversation'
         AND t.parent_thread_id IS NOT NULL AND t.parent_thread_id <> t.thread_id
       LIMIT ${SCAN_MAX}`,
     since,
@@ -84,18 +84,31 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     const detail = parse(row.detail);
     const trigger = String(detail.messageId ?? detail.reportId ?? "");
     const from = typeof detail.from === "string" ? detail.from : undefined;
-    const fromHelper =
-      from !== undefined &&
-      db.one<{ found: number }>("SELECT 1 AS found FROM agent_threads WHERE thread_id = ? AND parent_thread_id = ?", from, row.thread_id) !== null;
-    if (!AUTOMATIC_ID.test(trigger) && parseAgentReportId(trigger) === null && !fromHelper) continue;
-    const before = db.one<{ thread_patch: string | null; detail: string | null }>(
-      `SELECT thread_patch, detail FROM agent_events
-        WHERE thread_id = ? AND seq < ? AND kind = 'canceled' ORDER BY seq DESC LIMIT 1`,
+    // The same rule the cloud and the desktop apply: only the user or the
+    // task's starter resumes a stopped task.
+    const task = db.one<{ parent_thread_id: string | null; conversation_id: string; origin_conversation_id: string | null }>(
+      "SELECT parent_thread_id, conversation_id, origin_conversation_id FROM agent_threads WHERE thread_id = ?",
+      row.thread_id,
+    );
+    const byStarter =
+      from === undefined ||
+      (task?.parent_thread_id
+        ? from === task.parent_thread_id
+        : from === task?.conversation_id || from === task?.origin_conversation_id);
+    if (agentInputSender({ id: trigger, byStarter }) !== "other") continue;
+    // The task's state just before: its last start or end. A stop followed by a
+    // deliberate restart and a later wait is no longer stopped.
+    const before = db.one<{ kind: string; thread_patch: string | null; detail: string | null }>(
+      `SELECT kind, thread_patch, detail FROM agent_events
+        WHERE thread_id = ? AND seq < ?
+          AND kind IN ('canceled', 'paused', 'completed', 'failed', 'attempt_ended', 'waiting_for_user', 'attempt_started', 'resumed', 'spawned')
+        ORDER BY seq DESC LIMIT 1`,
       row.thread_id,
       row.seq,
     );
-    const error = parse(before?.thread_patch ?? null).error_message;
-    if (!before || (!isAgentStopReason(typeof error === "string" ? error : null) && parse(before.detail).stopped !== true)) continue;
+    if (!before || before.kind !== "canceled") continue;
+    const error = parse(before.thread_patch).error_message;
+    if (!isAgentStopReason(typeof error === "string" ? error : null) && parse(before.detail).stopped !== true) continue;
     add("stopped_task_took_input", `${row.thread_id} resumed by ${trigger || from || "?"}`);
   }
   for (const row of db.all<{ thread_id: string; detail: string | null }>(
@@ -122,10 +135,16 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     add("waiting_on_nothing_seen", `${row.thread_id} since ${new Date(row.updated_at).toISOString()}: ${waitingFor}`);
   }
 
+  // Only what a computer writes while running the attempt: its start and its
+  // end. A computer also writes events for work it doesn't run (spawning a
+  // helper elsewhere, stopping a task, taking delivery of a report into the
+  // chat it holds), which named two computers on one attempt with no double run.
   for (const row of db.all<{ thread_id: string; attempt_generation: number; sources: string }>(
     `SELECT thread_id, attempt_generation, group_concat(DISTINCT source) AS sources FROM agent_events
       WHERE created_at >= ? AND thread_id IS NOT NULL AND attempt_generation IS NOT NULL
         AND source LIKE 'device:%'
+        AND kind IN ('spawned', 'attempt_started', 'resumed', 'completed', 'failed', 'attempt_ended', 'waiting_for_user')
+        AND NOT (kind = 'spawned' AND COALESCE(json_extract(detail, '$.executor'), '') <> 'local')
       GROUP BY thread_id, attempt_generation
      HAVING COUNT(DISTINCT source) > 1
       LIMIT ${SCAN_MAX}`,

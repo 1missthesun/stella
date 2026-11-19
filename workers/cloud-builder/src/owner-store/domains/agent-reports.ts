@@ -7,7 +7,8 @@ import {
   AGENT_REPORT_MAX_CHARS,
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
-import { resultWaitingFor, scheduleGoneText } from "@stella/contracts/agent-waiting";
+import { agentReportRecipient, agentStanding, recordedAgentFacts } from "@stella/contracts/agent-rules";
+import { scheduleGoneText } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -186,14 +187,16 @@ type Requester =
 const conversationOf = (thread: ThreadRow): string =>
   thread.origin_conversation_id ?? thread.conversation_id;
 
-const requesterOf = (db: OwnerDbReader, thread: ThreadRow): Requester =>
-  thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id
-    ? {
-        kind: "agent",
-        threadId: thread.parent_thread_id,
-        thread: readThread(db, thread.parent_thread_id),
-      }
-    : { kind: "conversation", conversationId: conversationOf(thread) };
+const requesterOf = (db: OwnerDbReader, thread: ThreadRow): Requester => {
+  const recipient = agentReportRecipient({
+    threadId: thread.thread_id,
+    parentThreadId: thread.parent_thread_id,
+    conversationId: conversationOf(thread),
+  });
+  return recipient.kind === "agent"
+    ? { kind: "agent", threadId: recipient.threadId, thread: readThread(db, recipient.threadId) }
+    : recipient;
+};
 
 export const resultTextOf = (resultJson: string | null): string => {
   if (!resultJson) return "";
@@ -304,7 +307,7 @@ const runsOnCloudEngine = (executionJson: string | null): boolean => {
 
 /** An attempt that ended its turn waiting (end_turn_waiting): it keeps its task and is never reported. */
 export const endedWaiting = (thread: Pick<ThreadRow, "status" | "result_json">): boolean =>
-  thread.status === "completed" && resultWaitingFor(thread.result_json) !== undefined;
+  agentStanding(recordedAgentFacts({ status: thread.status, resultJson: thread.result_json })).state === "waiting";
 
 /** A finished agent whose report waits for its own agents still at work. */
 export const reportHeldForHelpers = (

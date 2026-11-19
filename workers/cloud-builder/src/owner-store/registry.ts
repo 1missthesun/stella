@@ -7,6 +7,7 @@ import type {
   ViewResult,
 } from "@stella/contracts/backend/api";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
+import type { AgentInputSender } from "@stella/contracts/agent-rules";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type { MemoryPolicyChange } from "@stella/contracts/turn-plane/memory-policy";
 import type { Parser } from "./args.js";
@@ -143,6 +144,7 @@ export type LocalAgentMessage = {
   ownerGeneration: string;
   messageId: string;
   text: string;
+  sender?: AgentInputSender;
 };
 
 export type HarnessAgentControl = {

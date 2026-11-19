@@ -1010,12 +1010,13 @@ export class StellaRuntimeHost {
         messageId,
         text,
         ownerGeneration,
+        sender,
       }) => {
         const result = await this.requestWorker<{
           outcome?: AgentMessageDeviceOutcome;
         } | null>(
           METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE,
-          { threadId, text, messageId, ownerGeneration },
+          { threadId, text, messageId, ownerGeneration, ...(sender ? { sender } : {}) },
           {
             ensureWorker: true,
             recordActivity: true,

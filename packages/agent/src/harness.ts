@@ -119,7 +119,16 @@ export type OpenStellaHarness = {
   recheckWaiting(threadId: string, context: Context): Promise<"told" | "live" | "unknown" | "not_waiting">;
   agentRecords(context: Context): Promise<StellaAgentRecord[]>;
   messageAgent(
-    args: { key: string; threadId: string; message: string; fromOrchestrator?: boolean; wake?: true },
+    args: {
+      key: string;
+      threadId: string;
+      message: string;
+      fromOrchestrator?: boolean;
+      report?: true;
+      reportFrom?: string;
+      note?: true;
+      wake?: true;
+    },
     context: Context,
   ): Promise<void>;
   runPlacedAgent(args: PlacedAgentRun, context: Context): Promise<PlacedAgentResult>;

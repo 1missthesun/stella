@@ -355,6 +355,12 @@ export type DevicePresenceServerFrame =
       threadId: string;
       ownerGeneration: string;
       text: string;
+      /**
+       * Who sent it, as the cloud judged by the shared rules (`agent-rules`):
+       * the computer holds an "other" one while the task is stopped. Older
+       * backends leave it out; older apps ignore it.
+       */
+      sender?: "user" | "starter" | "other";
     }
   | {
       type: "agent-pause";

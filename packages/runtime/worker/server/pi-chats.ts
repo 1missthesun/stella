@@ -1098,8 +1098,9 @@ export const piPlacedChat = async (
 export const piDeliverAgentMessage = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
-  message: { threadId: string; text: string; messageId: string },
-) => (await piChatsFor(session, hostBus)).deliverAgentMessage(message.threadId, message.text, message.messageId);
+  message: { threadId: string; text: string; messageId: string; sender?: "user" | "starter" | "other" },
+) =>
+  (await piChatsFor(session, hostBus)).deliverAgentMessage(message.threadId, message.text, message.messageId, message.sender);
 
 export const piStopAgent = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string) =>
   await (await piChatsFor(session, hostBus)).stopAgent(threadId);

@@ -1,3 +1,4 @@
+import type { AgentInputSender } from "@stella/contracts/agent-rules";
 import {
   AGENT_STOPPED_ERROR_CODE,
   AGENT_STOPPED_REASON,
@@ -187,6 +188,7 @@ type PlacementBridgeOptions = {
     messageId: string;
     text: string;
     ownerGeneration: string;
+    sender?: AgentInputSender;
   }) => Promise<AgentMessageDeviceOutcome>;
   stopLocalAgent?: (args: {
     threadId: string;
@@ -1033,6 +1035,7 @@ export class ExecutionPlacementBridge {
           messageId,
           text: frame.text,
           ownerGeneration: frame.ownerGeneration,
+          ...(frame.sender === "user" || frame.sender === "starter" || frame.sender === "other" ? { sender: frame.sender } : {}),
         });
       } catch (error) {
         this.log("warn", "An agent message was not delivered.", error);

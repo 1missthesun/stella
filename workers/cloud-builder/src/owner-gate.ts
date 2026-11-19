@@ -2205,6 +2205,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     ownerGeneration: string;
     messageId: string;
     text: string;
+    sender?: "user" | "starter" | "other";
   }): Promise<{
     outcome: AgentMessageDeviceOutcome | "unreachable" | "timeout";
   }> {
@@ -2230,6 +2231,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       threadId: input.threadId,
       ownerGeneration: input.ownerGeneration,
       text: input.text,
+      ...(input.sender ? { sender: input.sender } : {}),
     });
     return { outcome: await acknowledged };
   }

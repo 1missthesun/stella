@@ -35,6 +35,8 @@ export type AgentDirectoryAgentRow = {
   pausedBy?: "usage-limit" | "claude-sign-in";
   /** It ended its turn waiting for this, with no report; a message resumes it. */
   waitingFor?: string;
+  /** What its computer saw could wake it as it waited; empty when nothing could. */
+  wakers?: string[];
   /** Running, and on one tool call past every time limit (`LONG_TOOL_CALL_MS`). */
   longCall?: CurrentToolCall;
 };
@@ -115,6 +117,13 @@ const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
 
+const wakersText = (wakers: readonly string[] | undefined): string =>
+  wakers === undefined
+    ? ""
+    : wakers.length === 0
+      ? " (nothing could wake it when it began waiting)"
+      : ` (it wakes on ${wakers.slice(0, 3).map((waker) => oneLine(waker).slice(0, 100)).join("; ")}${wakers.length > 3 ? `; and ${wakers.length - 3} more` : ""})`;
+
 const claudeSignInStatus = (row: AgentDirectoryAgentRow): string =>
   `waiting for a Claude sign-in on ${row.where} (Anthropic refused the Claude login there; it continues by itself once someone signs in there or the login answers again)`;
 
@@ -124,7 +133,7 @@ const statusText = (row: AgentDirectoryAgentRow, now: number): string =>
     : row.pausedBy === "claude-sign-in" && isLiveAgentStatus(row.status)
       ? claudeSignInStatus(row)
       : row.status === "waiting" && row.waitingFor
-        ? `waiting for ${oneLine(row.waitingFor)}`
+        ? `waiting for ${oneLine(row.waitingFor)}${wakersText(row.wakers)}`
         : row.status === "running" && row.longCall
           ? `running, ${longToolCallText(row.longCall, now)}`
           : row.status;

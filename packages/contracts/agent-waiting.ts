@@ -93,6 +93,19 @@ export const waitingResultJson = (finalText: string, waitingFor: string, reply?:
 /** How many of a waiting task's wakers its record keeps. */
 export const WAKERS_MAX = 20;
 
+/** What its computer saw could wake a waiting task, when it recorded that. */
+export const resultWakers = (resultJson: string | null | undefined): string[] | undefined => {
+  if (!resultJson?.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(resultJson) as { wakers?: unknown } | null;
+    return parsed && typeof parsed === "object" && Array.isArray(parsed.wakers)
+      ? parsed.wakers.filter((waker): waker is string => typeof waker === "string" && waker.trim() !== "").slice(0, WAKERS_MAX)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const resultWaitingReply = (resultJson: string | null | undefined): string | undefined => {
   if (!resultJson?.trim()) return undefined;
   try {

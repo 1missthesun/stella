@@ -98,6 +98,7 @@ import {
   nothingCanWakeText,
   resultWaitingFor,
   resultWaitingReply,
+  resultWakers,
   WAKERS_MAX,
   waitingResultJson,
 } from "@stella/contracts/agent-waiting";
@@ -1901,6 +1902,7 @@ const agentDirectory = async (
     const deviceId = threadDeviceId(row);
     const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
     const waitingFor = endedWaiting(row) ? resultWaitingFor(row.result_json) : undefined;
+    const wakers = waitingFor !== undefined ? resultWakers(row.result_json) : undefined;
     const status = reportHeldForHelpers(ctx.db, row)
       ? "waiting_for_helpers"
       : waitingFor !== undefined
@@ -1926,7 +1928,7 @@ const agentDirectory = async (
         : live && claudeSignInGone(device, row)
           ? { pausedBy: "claude-sign-in" as const }
           : {}),
-      ...(waitingFor !== undefined ? { waitingFor } : {}),
+      ...(waitingFor !== undefined ? { waitingFor, ...(wakers ? { wakers } : {}) } : {}),
     };
   });
   const sessions = (isSlackConversationId(args.conversationId)

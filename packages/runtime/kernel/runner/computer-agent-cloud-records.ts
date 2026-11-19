@@ -24,6 +24,7 @@ type ComputerAgentTerminalPayload = {
   result?: string;
   error?: string;
   waitingFor?: string;
+  wakers?: string[];
   fallback?: UnrecordedReport;
 };
 
@@ -76,6 +77,7 @@ export type ComputerAgentCloudRecords = {
     result?: string;
     error?: string;
     waitingFor?: string;
+    wakers?: string[];
     ownerGeneration: string;
     fallback?: UnrecordedReport;
   }) => Promise<void>;
@@ -86,6 +88,8 @@ export type ComputerAgentCloudRecords = {
   ) => Promise<{ canceled: boolean }>;
   pending: () => number;
   hasPending: (threadId: string) => boolean;
+  /** A stop heard here: starts of the task queued before it began without knowing, and the stop ended them. */
+  dropQueuedStarts: (threadId: string) => number;
   resume: () => void;
   stop: () => void;
 };
@@ -419,6 +423,7 @@ export const createComputerAgentCloudRecords = (
           ...(payload.result ? { result: payload.result } : {}),
           ...(payload.error ? { error: payload.error } : {}),
           ...(payload.waitingFor ? { waitingFor: payload.waitingFor } : {}),
+          ...(payload.waitingFor && payload.wakers ? { wakers: payload.wakers.slice(0, 20) } : {}),
         }),
       );
       return;
@@ -766,6 +771,7 @@ export const createComputerAgentCloudRecords = (
           ...(args.result ? { result: args.result } : {}),
           ...(args.error ? { error: args.error } : {}),
           ...(args.waitingFor ? { waitingFor: args.waitingFor } : {}),
+          ...(args.waitingFor && args.wakers ? { wakers: args.wakers } : {}),
           ...(args.fallback ? { fallback: args.fallback } : {}),
         } satisfies ComputerAgentTerminalPayload,
       });
@@ -814,6 +820,26 @@ export const createComputerAgentCloudRecords = (
 
     pending: () => options.store.countComputerAgentCloudOutbox(),
     hasPending: (threadId) => options.store.hasComputerAgentCloudOutbox(threadId),
+    dropQueuedStarts: (threadId) => {
+      const ownerScope = currentOwnerScope() ?? lastKnownOwnerScope;
+      if (!ownerScope) return 0;
+      let dropped = 0;
+      for (const entry of options.store.listComputerAgentCloudOutbox(ownerScope)) {
+        if (entry.threadId !== threadId || entry.kind !== "start") continue;
+        options.store.deleteComputerAgentCloudOutbox(entry.id);
+        settleStartAdmission(
+          entry.id,
+          "rejected",
+          admissionError({
+            code: "COMPUTER_AGENT_START_REJECTED",
+            retryable: false,
+            message: "This agent was stopped before its cloud heard that it started again.",
+          }),
+        );
+        dropped += 1;
+      }
+      return dropped;
+    },
     resume: () => {
       stopped = false;
       const ownerScope = currentOwnerScope();

@@ -98,6 +98,7 @@ import {
   nothingCanWakeText,
   resultWaitingFor,
   resultWaitingReply,
+  WAKERS_MAX,
   waitingResultJson,
 } from "@stella/contracts/agent-waiting";
 import { resolveCurrentDeviceId } from "./devices.js";
@@ -3944,7 +3945,7 @@ const endHostedAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   deviceId: string,
-  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string },
+  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string; wakers?: string[] },
 ): Promise<{ updated: boolean; status: string }> => {
   recordAgentChange(
     ctx.db,
@@ -3962,7 +3963,7 @@ const endHostedAttempt = async (
           WHERE thread_id = ? AND attempt_generation = ?`,
         ended.status,
         ended.waitingFor
-          ? waitingResultJson(ended.result ?? "", ended.waitingFor)
+          ? waitingResultJson(ended.result ?? "", ended.waitingFor, undefined, ended.wakers)
           : ended.result !== undefined
             ? JSON.stringify({ finalText: ended.result })
             : null,
@@ -4049,7 +4050,12 @@ const completeHostedTurn = async (
   const status = agentThreadTerminalStatus(args.status);
   const error = status === "completed" ? null : endedError({ status: args.status, errorMessage: args.error ?? null });
   const waitingFor = status === "completed" ? args.waitingFor?.trim().slice(0, WAITING_FOR_MAX_CHARS) || undefined : undefined;
-  const ended = { status, ...(result !== undefined ? { result } : {}), error, ...(waitingFor ? { waitingFor } : {}) };
+  const ended = {
+    status,
+    ...(result !== undefined ? { result } : {}),
+    error,
+    ...(waitingFor ? { waitingFor, ...(args.wakers ? { wakers: args.wakers } : {}) } : {}),
+  };
   const mapped = readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration);
   if (mapped?.attempt_generation === thread.attempt_generation && ACTIVE_STATUSES.has(thread.status)) {
     return await endHostedAttempt(ctx, thread, deviceId, ended);
@@ -4120,6 +4126,61 @@ const cancelHostedTurn = async (
 const rejectStart = (reason: string, message: string): RpcError =>
   new RpcError("CONFLICT", message, { reason });
 
+/**
+ * The latest stop of a task still on its way to its computer (the computer
+ * was away when it was stopped). Until the computer hears it, what it runs of
+ * the task began without knowing, so none of it counts: the stop is the fence.
+ */
+const unheardStop = (db: OwnerDbReader, threadId: string, deviceId: string): CommandRow | null =>
+  db.one<CommandRow>(
+    `SELECT * FROM agent_commands
+      WHERE thread_id = ? AND kind = 'stop' AND state = 'pending' AND device_id = ?
+      ORDER BY created_at DESC LIMIT 1`,
+    threadId,
+    resolveCurrentDeviceId(db, deviceId),
+  );
+
+const fencedAttempt = (db: OwnerDbReader, threadId: string, attemptGeneration: number): boolean =>
+  db.one<{ found: number }>(
+    "SELECT 1 AS found FROM agent_events WHERE event_key = ?",
+    `turn_fenced:${threadId}:${attemptGeneration}:start`,
+  ) !== null;
+
+/**
+ * A computer's start or turn end for a task it ran without hearing of its
+ * stop: kept as history (with what it said), never delivered, and it does not
+ * start the task again. A task still counted as running is stopped now: its
+ * computer has finished with that turn, and the stop reaches it all the same.
+ */
+const fenceTurn = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  at: "start" | "end",
+  args: { originDeviceId: string; attemptGeneration: number; status?: string; text?: string },
+  stop: CommandRow | null,
+): Promise<void> => {
+  appendAgentEvent(ctx.db, {
+    key: `turn_fenced:${thread.thread_id}:${args.attemptGeneration}:${at}`,
+    kind: "terminal_ignored",
+    source: `device:${args.originDeviceId}`,
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    attemptGeneration: args.attemptGeneration,
+    status: thread.status,
+    detail: {
+      reason: "stop_unheard",
+      at,
+      ...(stop ? { commandId: stop.command_id } : {}),
+      ...(args.status ? { outcome: args.status } : {}),
+      ...(args.text?.trim() ? { text: args.text.slice(0, 2_000) } : {}),
+    },
+    createdAt: ctx.now,
+  });
+  if (stop && thread.status === "running") {
+    await markLocalThreadStopped(ctx, thread, `device:${args.originDeviceId}`, stop.command_id);
+  }
+};
+
 const startComputerThread = async (
   ctx: OwnerContext,
   args: AgentThreadCalls["computerThreads.start"]["args"],
@@ -4151,6 +4212,11 @@ const startComputerThread = async (
     }
     if (args.attemptGeneration < existing.attempt_generation) {
       throw rejectStart("attempt_stale", "A newer attempt of this agent already started.");
+    }
+    const stop = unheardStop(ctx.db, existing.thread_id, args.originDeviceId);
+    if (stop) {
+      await fenceTurn(ctx, existing, "start", args, stop);
+      throw rejectStart("attempt_stale", "This agent was stopped while this computer was away; its stop is on its way here.");
     }
     const resumedFromStop = stoppedByStop(existing);
     recordAgentChange(
@@ -4242,6 +4308,19 @@ const completeComputerThread = async (
     throw new RpcError("NOT_FOUND", "That agent no longer exists.");
   }
   const result = args.result?.trim() ? args.result : undefined;
+  // Run without hearing of its stop: the stop is still on its way to this
+  // computer, or this turn's start was fenced by it, or it ends a turn the
+  // cloud never saw start of a task it counts as stopped (a computer drops
+  // the starts it queued before hearing a stop). Kept as history only.
+  const stop = unheardStop(ctx.db, known.thread_id, args.originDeviceId);
+  if (
+    (stop && args.attemptGeneration >= known.attempt_generation) ||
+    fencedAttempt(ctx.db, known.thread_id, args.attemptGeneration) ||
+    (args.attemptGeneration > known.attempt_generation && stoppedByStop(known))
+  ) {
+    await fenceTurn(ctx, known, "end", { ...args, text: result ?? args.error }, stop);
+    return { updated: false, status: readThread(ctx.db, known.thread_id)?.status ?? known.status };
+  }
   // A newer attempt whose start never arrived (the computer restarted, or its
   // start was refused before sign-in) still ends here; dropping its terminal
   // would lose its report.
@@ -4323,7 +4402,11 @@ const completeComputerThread = async (
         `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, updated_at = ?
           WHERE thread_id = ?`,
         status,
-        waitingFor ? waitingResultJson(result ?? "", waitingFor) : result !== undefined ? JSON.stringify({ finalText: result }) : null,
+        waitingFor
+          ? waitingResultJson(result ?? "", waitingFor, undefined, args.wakers)
+          : result !== undefined
+            ? JSON.stringify({ finalText: result })
+            : null,
         error,
         ctx.now,
         row.thread_id,
@@ -5656,6 +5739,7 @@ export const agentThreadsDomain = {
         result: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
         error: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
         waitingFor: optional(string({ max: 1_000 })),
+        wakers: optional(array(string({ max: 300 }), { max: WAKERS_MAX })),
       }),
       handler: completeComputerThread,
     },

@@ -353,6 +353,8 @@ export type DesktopChatsOptions = {
     attempt: number;
     text: string;
     waitingFor: string;
+    /** What could wake it as it waited, in words (empty: nothing could); absent when unknown. */
+    wakers?: string[];
   }): void;
   subagentEnded?(agent: {
     conversationId: string;
@@ -1740,6 +1742,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                               attempt: run.attempt,
                               text: end.answer ?? "",
                               waitingFor: end.waitingFor,
+                              ...(end.wakers ? { wakers: end.wakers } : {}),
                             });
                           }
                         }

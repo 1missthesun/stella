@@ -87,8 +87,11 @@ export const isUnlistedWaker = (waker: string): boolean => waker === UNLISTED_SC
  * `reply` is what goes to its starter as a message instead (see
  * `unansweredWaitingReply`), when the turn took in the starter's message.
  */
-export const waitingResultJson = (finalText: string, waitingFor: string, reply?: string): string =>
-  JSON.stringify({ finalText, waitingFor, ...(reply ? { reply } : {}) });
+export const waitingResultJson = (finalText: string, waitingFor: string, reply?: string, wakers?: readonly string[]): string =>
+  JSON.stringify({ finalText, waitingFor, ...(reply ? { reply } : {}), ...(wakers ? { wakers: wakers.slice(0, WAKERS_MAX) } : {}) });
+
+/** How many of a waiting task's wakers its record keeps. */
+export const WAKERS_MAX = 20;
 
 export const resultWaitingReply = (resultJson: string | null | undefined): string | undefined => {
   if (!resultJson?.trim()) return undefined;

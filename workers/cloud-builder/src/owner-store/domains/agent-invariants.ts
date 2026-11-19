@@ -16,12 +16,17 @@ import type { OwnerDbReader } from "../registry.js";
  * - `stopped_task_took_input`: a stopped task started again from something
  *   no one sent on purpose (a report, a schedule's fire, a note), or its
  *   computer finished a turn of it after the stop.
- * - `waiting_on_nothing_seen`: a task has waited for hours with nothing the
- *   cloud can see that would wake it (no helper at work, no schedule aimed at
- *   it, no message on its way). Its computer may still hold a background
- *   command for it, so this is an upper bound.
+ * - `waiting_on_nothing_seen`: a task has waited for hours with nothing that
+ *   would wake it: none its computer saw as it waited (its wakers, recorded
+ *   with the wait) and none the cloud can see (a helper at work, a schedule
+ *   aimed at it, a message on its way). A wait from a computer too old to
+ *   record its wakers may still have a background command, so for those this
+ *   is an upper bound.
  * - `two_hosts_one_attempt`: two computers recorded work on the same attempt
  *   of one task.
+ * - `report_carried_not_sent`: what a superseded or late turn said is still
+ *   held for a task that settled an hour ago (it goes with the next report, or
+ *   alone when the task settles without one).
  *
  * `hostedTurns` (not a violation) counts turns a placed task's computer ran by
  * itself that were recorded on its own thread, so routed to its lead.
@@ -125,6 +130,7 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     `SELECT thread_id, updated_at, result_json FROM agent_threads t
       WHERE status = 'completed' AND updated_at >= ? AND updated_at < ?
         AND json_extract(result_json, '$.waitingFor') IS NOT NULL
+        AND COALESCE(json_array_length(result_json, '$.wakers'), 0) = 0
         AND NOT EXISTS (SELECT 1 FROM agent_threads c WHERE c.parent_thread_id = t.thread_id AND c.status IN ('running', 'waiting_for_user'))
         AND NOT EXISTS (SELECT 1 FROM agent_commands m WHERE m.thread_id = t.thread_id AND m.state = 'pending')
         ${schedules ? "AND NOT EXISTS (SELECT 1 FROM schedules s WHERE s.target_thread_id = t.thread_id AND s.status = 'active')" : ""}
@@ -154,6 +160,16 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     add("two_hosts_one_attempt", `${row.thread_id}:${row.attempt_generation} (${row.sources})`);
   }
 
+  for (const row of db.all<{ thread_id: string; status: string }>(
+    `SELECT thread_id, status FROM agent_threads
+      WHERE carried_report IS NOT NULL AND status NOT IN ('running', 'queued') AND updated_at >= ? AND updated_at < ?
+      LIMIT ${SCAN_MAX}`,
+    since,
+    now - 60 * 60_000,
+  )) {
+    add("report_carried_not_sent", `${row.thread_id} (${row.status})`);
+  }
+
   const hosted = db.one<{ turns: number; unannounced: number }>(
     `SELECT COUNT(*) AS turns,
             COALESCE(SUM(CASE WHEN json_extract(detail, '$.startMissing') = 1 THEN 1 ELSE 0 END), 0) AS unannounced
@@ -168,6 +184,7 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     "stopped_task_took_input",
     "waiting_on_nothing_seen",
     "two_hosts_one_attempt",
+    "report_carried_not_sent",
   ];
   return {
     since,

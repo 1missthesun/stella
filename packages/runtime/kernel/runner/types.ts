@@ -335,6 +335,7 @@ export type RunnerPublicApi = {
   computerAgents: {
     start: import("./computer-agent-cloud-records.js").ComputerAgentCloudRecords["create"];
     complete: import("./computer-agent-cloud-records.js").ComputerAgentCloudRecords["complete"];
+    dropQueuedStarts: import("./computer-agent-cloud-records.js").ComputerAgentCloudRecords["dropQueuedStarts"];
     reconcile: (
       elsewhere: (
         threadId: string,

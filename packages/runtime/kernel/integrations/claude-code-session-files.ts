@@ -115,7 +115,7 @@ const claudeCliHelp = perCliBinary<string>(
       execFile(
         executable,
         ["--help"],
-        { timeout: 15_000, maxBuffer: 4 * 1024 * 1024 },
+        { timeout: 15_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
         (error, stdout) => resolve(error ? "" : String(stdout ?? "")),
       );
     }),

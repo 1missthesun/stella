@@ -1865,8 +1865,11 @@ pub fn kill_stale_stella_browser_on_port(port: u16) {
             .flat_map(|c| c.to_le_bytes())
             .collect();
         let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &utf16);
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         let _ = Command::new("powershell")
             .args(["-NoProfile", "-EncodedCommand", &encoded])
+            .creation_flags(CREATE_NO_WINDOW)
             .output();
     }
 

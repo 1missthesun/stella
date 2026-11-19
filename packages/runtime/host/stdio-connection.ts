@@ -16,6 +16,7 @@ export const buildStdioConnectionFactory = (
     const bunBinaryPath = options.bunBinaryPath ?? resolveBunBinaryPath();
     const child = spawn(bunBinaryPath, ["run", workerEntryPath], {
       stdio: ["pipe", "pipe", "inherit"],
+      windowsHide: true,
       env: {
         ...process.env,
         STELLA_BUN_PATH: bunBinaryPath,

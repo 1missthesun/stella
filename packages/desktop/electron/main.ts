@@ -1,3 +1,4 @@
+import "./bootstrap/windows-hidden-spawns.js";
 import { app } from "electron";
 import "@stella/runtime/kernel/shared/http-proxy.js";
 import { configureLinuxGraphics } from "./linux-graphics.js";

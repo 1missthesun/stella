@@ -117,6 +117,12 @@ fn build_ffmpeg_command(output_path: &str) -> tokio::process::Command {
         .stderr(Stdio::piped())
         .kill_on_drop(true);
 
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
     cmd
 }
 

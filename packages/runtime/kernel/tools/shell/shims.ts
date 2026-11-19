@@ -1,5 +1,6 @@
 import path from "path";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readSync, writeFileSync } from "fs";
+import { windowsHiddenSpawnPreloadSource } from "../../shared/windows-hidden-spawns.js";
 
 export type ShellStateOptions = {
   enableShellShims?: boolean;
@@ -38,6 +39,14 @@ const WINDOWS_CLI_SHIMS = [
   },
 ] as const;
 
+const ELECTRON_NODE_ARGV_FIX = "electron-node-argv.cjs";
+
+// Electron-as-Node loads the preload beside the shim (`%~dp0`). It is an
+// argument rather than NODE_OPTIONS because a quoted NODE_OPTIONS value
+// treats backslashes as escapes; the preload then puts itself into
+// NODE_OPTIONS for the processes it starts.
+const WINDOWS_ELECTRON_NODE = `"%STELLA_NODE_BIN%" --require "%~dp0${ELECTRON_NODE_ARGV_FIX}"`;
+
 const buildWindowsCliShimScript = (envVar: string): string =>
   [
     "@echo off",
@@ -46,7 +55,7 @@ const buildWindowsCliShimScript = (envVar: string): string =>
     "  exit /b %ERRORLEVEL%",
     ")",
     'set "ELECTRON_RUN_AS_NODE=1"',
-    `"%STELLA_NODE_BIN%" "%${envVar}%" %*`,
+    `${WINDOWS_ELECTRON_NODE} "%${envVar}%" %*`,
     "",
   ].join("\r\n");
 
@@ -54,7 +63,7 @@ const buildWindowsNodeShimScript = (): string =>
   [
     "@echo off",
     'set "ELECTRON_RUN_AS_NODE=1"',
-    '"%STELLA_NODE_BIN%" %*',
+    `${WINDOWS_ELECTRON_NODE} %*`,
     "",
   ].join("\r\n");
 
@@ -64,10 +73,27 @@ const buildWindowsPythonShimScript = (): string =>
 const buildWindowsPipShimScript = (): string =>
   ["@echo off", '"%STELLA_PYTHON_BIN%" -m pip %*', ""].join("\r\n");
 
-const ELECTRON_NODE_ARGV_FIX = "electron-node-argv.cjs";
+/**
+ * Preload for every Electron-as-Node process the shims start. `defaultApp`
+ * makes argv parsers treat Electron-as-Node like Node. On Windows it also
+ * starts every child without a console window: Electron has no console, so
+ * a console program a script runs (git, npm, cmd) would otherwise open a
+ * blank Terminal window for as long as it runs.
+ */
+const electronNodePreloadSource = (): string =>
+  [
+    'Object.defineProperty(process, "defaultApp", { value: true, configurable: true });',
+    windowsHiddenSpawnPreloadSource(),
+    "",
+  ].join("\n");
 
-const ELECTRON_NODE_ARGV_FIX_SOURCE =
-  'Object.defineProperty(process, "defaultApp", { value: true, configurable: true });\n';
+const writeElectronNodePreload = (shimDir: string): void => {
+  writeFileSync(
+    path.join(shimDir, ELECTRON_NODE_ARGV_FIX),
+    electronNodePreloadSource(),
+    "utf-8",
+  );
+};
 
 const quoteForShDoubleQuotes = (value: string): string =>
   value.replace(/[\\"$`]/g, (char) => `\\${char}`);
@@ -213,13 +239,7 @@ export const ensureNodeShim = (
         : buildUnixNodeShimScript(path.join(shimDir, ELECTRON_NODE_ARGV_FIX)),
       "utf-8",
     );
-    if (process.platform !== "win32") {
-      writeFileSync(
-        path.join(shimDir, ELECTRON_NODE_ARGV_FIX),
-        ELECTRON_NODE_ARGV_FIX_SOURCE,
-        "utf-8",
-      );
-    }
+    writeElectronNodePreload(shimDir);
     if (process.platform === "win32" && process.env.STELLA_PYTHON_BIN?.trim()) {
       for (const command of ["python", "python3", "py"]) {
         writeFileSync(
@@ -279,6 +299,7 @@ export const ensureWindowsCliShims = (
   const shimDir = path.join(secretStateRoot, "shell-shims");
   try {
     mkdirSync(shimDir, { recursive: true });
+    writeElectronNodePreload(shimDir);
     for (const shim of requested) {
       writeFileSync(
         path.join(shimDir, `${shim.command}.cmd`),

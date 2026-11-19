@@ -3547,9 +3547,14 @@ fn open_url_in_browser(url: &str) {
     #[cfg(target_os = "linux")]
     let result = std::process::Command::new("xdg-open").arg(url).spawn();
     #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("cmd")
-        .args(["/c", "start", "", url])
-        .spawn();
+    let result = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", url])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+    };
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     let result: Result<std::process::Child, std::io::Error> = Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,

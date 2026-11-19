@@ -491,7 +491,7 @@ const fileName = (conversationId: string): string => {
 
 const git = (cwd: string, args: string[]): Promise<string> =>
   new Promise((resolve, reject) => {
-    execFile("git", ["-C", cwd, ...args], { timeout: 10_000, maxBuffer: 1024 * 1024 }, (error, stdout) =>
+    execFile("git", ["-C", cwd, ...args], { timeout: 10_000, maxBuffer: 1024 * 1024, windowsHide: true }, (error, stdout) =>
       error ? reject(error) : resolve(stdout),
     );
   });

@@ -19,6 +19,7 @@ const sourceCommit = (cwd: string): string => {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 10_000,
+      windowsHide: true,
     }).trim();
     return /^[0-9a-f]{7,40}$/.test(commit) ? `web+s${commit}` : "";
   } catch {

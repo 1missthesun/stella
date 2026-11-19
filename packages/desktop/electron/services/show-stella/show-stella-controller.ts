@@ -155,7 +155,7 @@ const runBuilder = (helper: string, dir: string): Promise<string> =>
     execFile(
       helper,
       ["build", dir],
-      { timeout: BUILD_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 },
+      { timeout: BUILD_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
       (error, stdout, stderr) => {
         if (error) {
           reject(new Error(String(stderr || error.message).trim()));

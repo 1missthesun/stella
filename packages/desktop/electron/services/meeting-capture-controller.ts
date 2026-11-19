@@ -65,7 +65,7 @@ export class MeetingCaptureController {
       execFile(
         bin,
         [...args, "--root", this.stellaDataDir],
-        { timeout: 10_000 },
+        { timeout: 10_000, windowsHide: true },
         (error, stdout) => {
           if (error) {
             resolve(null);
@@ -120,6 +120,7 @@ export class MeetingCaptureController {
     const child = spawn(bin, ["daemon", "--root", this.stellaDataDir], {
       detached: true,
       stdio: "ignore",
+      windowsHide: true,
       env: { ...process.env, STELLA_PARENT_PID: String(process.pid) },
     });
     this.child = child;

@@ -284,10 +284,14 @@ pub fn ensure_daemon(session: &str) -> Result<DaemonResult, String> {
         configure_daemon_command(&mut cmd, session);
 
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        const DETACHED_PROCESS: u32 = 0x00000008;
+        // A console of its own that has no window, rather than
+        // DETACHED_PROCESS (no console at all): a process without a console
+        // gives every console program it starts (powershell, cmd, ffmpeg) a
+        // new, visible console window. The daemon still outlives this CLI.
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
 
         daemon_child = Some(
-            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)
+            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW)
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::piped())

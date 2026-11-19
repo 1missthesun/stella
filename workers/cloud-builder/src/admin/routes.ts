@@ -164,6 +164,19 @@ const agentInvariantsReport = async (url: URL, env: AdminEnv): Promise<Response>
   return json({ days, owners: owners.length, totals, hostedTurns: hosted, byOwner });
 };
 
+/** One task's recorded history (`agentEvents.forThread`), to explain a check's example. */
+const agentThreadEvents = async (url: URL, env: AdminEnv): Promise<Response> => {
+  const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
+  const threadId = url.searchParams.get("threadId")?.trim();
+  if (!ownerId || !threadId || threadId.length > 256) return fail(400, "Pass ownerId and threadId.");
+  const response = await ownerInternal(env, ownerId, "agentEvents.forThread", { threadId }).catch((error: unknown) =>
+    fail(500, message(error)),
+  );
+  if (response instanceof Response) return response;
+  if (!response.ok) return fail(404, response.error.message);
+  return json({ ownerId, threadId, history: response.value });
+};
+
 const top = async (url: URL, env: AdminEnv): Promise<Response> => {
   const rawLimit = url.searchParams.get("limit");
   const limit = rawLimit === null ? TOP_DEFAULT_LIMIT : Number(rawLimit);
@@ -501,6 +514,7 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/owners/top": { method: "GET", run: (_request, url, env) => top(url, env) },
   "/api/admin/owners/storage": { method: "GET", run: (_request, url, env) => storage(url, env) },
   "/api/admin/owners/agent-invariants": { method: "GET", run: (_request, url, env) => agentInvariantsReport(url, env) },
+  "/api/admin/owners/agent-thread": { method: "GET", run: (_request, url, env) => agentThreadEvents(url, env) },
   "/api/admin/owners/costs": { method: "GET", run: (_request, url, env) => ownerCosts(url, env) },
   "/api/admin/owners/costs/export": { method: "POST", run: (request, _url, env) => ownerCostsExport(request, env) },
   "/api/admin/costs": {

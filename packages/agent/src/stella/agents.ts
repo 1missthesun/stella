@@ -134,7 +134,7 @@ type AgentRecord = {
   away?: true;
   placedAs?: string;
   catchUp?: true;
-  waiting?: { waitingFor: string; at: number };
+  waiting?: { waitingFor: string; at: number; wakers?: string[] };
   heldForHelpers?: true;
 };
 
@@ -1130,7 +1130,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               end = { answer: said, waiting: true, waitingFor: waitedFor, ...(wakersAtEnd ? { wakers: wakersAtEnd } : {}) };
               if (agent.reported.includes(settled.answer)) return next();
               agent.reported.push(settled.answer);
-              agent.waiting = { waitingFor: waitedFor, at: Date.now() };
+              agent.waiting = { waitingFor: waitedFor, at: Date.now(), ...(wakersAtEnd ? { wakers: wakersAtEnd } : {}) };
               const starter = await unansweredStarter(tx, agentConversationId, `agent-msg:${reporter.id}`, settled.answer);
               // Who asked decides where the reply goes, not this agent's depth
               // here: an agent started from another host (the cloud, another
@@ -2194,7 +2194,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         return {
           ...row,
           status: there.status,
-          ...(there.waitingFor ? { waitingFor: there.waitingFor } : {}),
+          ...(there.waitingFor ? { waitingFor: there.waitingFor, ...(there.wakers ? { wakers: there.wakers } : {}) } : {}),
           where: there.where,
           updatedAt: there.updatedAt,
           ...(there.offline ? { offline: there.offline } : {}),
@@ -2239,7 +2239,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               : latest?.stopReason === "error"
                 ? "failed"
                 : "completed",
-      ...(waitingFor !== undefined ? { waitingFor } : {}),
+      ...(waitingFor !== undefined ? { waitingFor, ...(record.waiting?.wakers ? { wakers: record.waiting.wakers } : {}) } : {}),
       ...(live?.run !== undefined ? await longCallOf(api, live, context).then((longCall) => (longCall ? { longCall } : {})) : {}),
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
       ...(live?.run !== undefined && host.directory?.usageLimitPaused?.(agent.threadId)

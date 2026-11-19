@@ -109,13 +109,33 @@ const AUTOMATIC_INPUT_ID =
 /** Ids of the automatic inputs that come from the task's own work or schedules, not from another task. */
 const OWN_WAKE_ID = /^(?:schedule|schedule-gone|background-exit|restart-shells|claude-code-wake|wake-check):/u;
 
+/**
+ * A note: what a task sends a task it didn't start. A computer passes it on to
+ * a task placed elsewhere as `pi:<chat>:message:note:<n>` (under the chat's
+ * id, as it does its tasks' messages to their own helpers, which are
+ * `pi:<chat>:message:message:<n>`), so the id is what tells the two apart.
+ */
+const NOTE_ID = /^pi:[^:]+:message:note:/u;
+
 export const isAutomaticInputId = (id: string): boolean => {
   const trimmed = id.trim();
-  return AUTOMATIC_INPUT_ID.test(trimmed) || parseAgentReportId(trimmed) !== null;
+  return AUTOMATIC_INPUT_ID.test(trimmed) || NOTE_ID.test(trimmed) || parseAgentReportId(trimmed) !== null;
 };
 
 /** A wake from the task's own background work or schedules (it waits for the turn to end rather than steering it). */
 export const isOwnWakeId = (id: string): boolean => OWN_WAKE_ID.test(id.trim());
+
+/**
+ * Whether an input came from the one that started the task, or from the chat
+ * the task belongs to, which stands above every task in it (Stella herself,
+ * and computers send their tasks' messages to helpers placed elsewhere under
+ * the chat's id).
+ */
+export const sentByStarter = (
+  task: { parentThreadId?: string | null; conversationIds: readonly (string | null | undefined)[] },
+  from: string,
+): boolean =>
+  (task.parentThreadId ? from === task.parentThreadId : false) || task.conversationIds.some((id) => id && id === from);
 
 export const agentInputSender = (input: {
   /** The input's id: a message id, a report id, a schedule fire's id. */

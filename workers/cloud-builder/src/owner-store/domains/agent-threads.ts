@@ -17,6 +17,7 @@ import {
 } from "@stella/contracts/agent-status";
 import {
   agentInputAction,
+  sentByStarter as isStarterInput,
   agentInputSender,
   agentStanding,
   recordedAgentFacts,
@@ -2043,9 +2044,10 @@ const crossesSlackBoundary = (ctx: OwnerContext, from: string, to: string): bool
 };
 
 const sentByStarter = (thread: ThreadRow, from: Pick<AgentMessageSender, "threadId">): boolean =>
-  thread.parent_thread_id !== null
-    ? from.threadId === thread.parent_thread_id
-    : from.threadId === thread.conversation_id || from.threadId === thread.origin_conversation_id;
+  isStarterInput(
+    { parentThreadId: thread.parent_thread_id, conversationIds: [thread.conversation_id, thread.origin_conversation_id] },
+    from.threadId,
+  );
 
 const senderStella = (
   ctx: OwnerContext,

@@ -1,5 +1,5 @@
 import { isAgentStopReason } from "@stella/contracts/agent-status";
-import { agentInputSender } from "@stella/contracts/agent-rules";
+import { agentInputSender, sentByStarter } from "@stella/contracts/agent-rules";
 import type { AgentInvariantKind, AgentInvariantReport } from "@stella/contracts/backend/agent-threads";
 import type { OwnerDbReader } from "../registry.js";
 
@@ -92,9 +92,10 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     );
     const byStarter =
       from === undefined ||
-      (task?.parent_thread_id
-        ? from === task.parent_thread_id
-        : from === task?.conversation_id || from === task?.origin_conversation_id);
+      sentByStarter(
+        { parentThreadId: task?.parent_thread_id, conversationIds: [task?.conversation_id, task?.origin_conversation_id] },
+        from,
+      );
     if (agentInputSender({ id: trigger, byStarter }) !== "other") continue;
     // The task's state just before: its last start or end. A stop followed by a
     // deliberate restart and a later wait is no longer stopped.

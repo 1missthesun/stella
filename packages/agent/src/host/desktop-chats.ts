@@ -42,6 +42,7 @@ import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { PLACED_AGENT_STOPPED, PLACED_CALL_PREFIX } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
+import { agentInputAction, agentInputSender, isAutomaticInputId, isOwnWakeId, type AgentInputSender } from "@stella/contracts/agent-rules";
 import { deviceEngineSignIns, type ExecutionContextSnapshot, type ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
@@ -182,8 +183,6 @@ const MODELS_READY_WAIT_MS = 30_000;
 const PLACED_MODELS_WAIT_MS = 120_000;
 const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
-/** Message ids of wakes no one sent on purpose: a schedule's fire, a background command's exit, a restart's note. */
-const AUTOMATIC_WAKE_ID = /^(?:schedule|schedule-gone|background-exit|restart-shells):/u;
 /** A sign-in made right away (the notice in the chat) needs no note to Stella. */
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
 /** A hold that comes back within this long (a refused login tried again) is the same episode. */
@@ -2857,6 +2856,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       threadId: string,
       text: string,
       messageId: string,
+      /** Who sent it, as the cloud judged; absent from older backends and this computer's own wakes. */
+      sender?: AgentInputSender,
     ): Promise<"steered" | "resumed" | "queued" | "not_found"> {
       // Placed tasks too: a turn this computer starts of one is recorded on its
       // own thread in the cloud (hosted turns), so it reports to its real lead.
@@ -2868,9 +2869,12 @@ export function desktopChats(options: DesktopChatsOptions) {
       // A schedule that is gone matters only to a task still waiting (it may have waited for it).
       if (messageId.startsWith("schedule-gone:") && record.status !== "waiting") return "not_found";
       const report = parseAgentReportId(messageId);
-      // A schedule's fire or a background command's exit wakes a task by itself;
-      // a stopped task keeps it until someone resumes it.
-      const wake = !report && AUTOMATIC_WAKE_ID.test(messageId.trim());
+      // The shared rules decide: a schedule's fire or a background command's
+      // exit wakes a task by itself, and a note no one sent it on purpose comes
+      // in like any message; a stopped task keeps all of them until its starter
+      // or the user resumes it. (The cloud already held what another task sent.)
+      const automatic = !report && (isAutomaticInputId(messageId) || sender === "other");
+      const wake = automatic && isOwnWakeId(messageId);
       await chat.messageAgent(
         {
           key: `device:${messageId.trim() || crypto.randomUUID()}`,
@@ -2878,11 +2882,15 @@ export function desktopChats(options: DesktopChatsOptions) {
           message: text,
           fromOrchestrator: true,
           ...(report ? { report: true as const, reportFrom: report.threadId } : {}),
-          ...(wake ? { wake: true as const } : {}),
+          ...(wake ? { wake: true as const } : automatic ? { note: true as const } : {}),
         },
         context,
       );
-      return record.status === "running" ? "steered" : (report || wake) && record.stopped ? "queued" : "resumed";
+      const action = agentInputAction(
+        record.status === "running" ? "running" : record.stopped ? "stopped" : "ended",
+        sender === "other" ? "other" : agentInputSender({ id: messageId, byStarter: true }),
+      );
+      return action === "steer" ? "steered" : action === "hold" ? "queued" : "resumed";
     },
     /** Checks again a waiting task whose wakers could not all be listed when it waited. */
     async recheckWaiting(threadId: string): Promise<"told" | "live" | "unknown" | "not_waiting"> {

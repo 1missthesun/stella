@@ -55,6 +55,7 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
+import { agentInputAction, agentStanding as standingOf, deviceAgentStatus, type AgentInputSender } from "@stella/contracts/agent-rules";
 import {
   END_TURN_WAITING_DESCRIPTION,
   END_TURN_WAITING_MISSING,
@@ -637,10 +638,15 @@ type ReporterInput = {
   message: string;
   fromUser?: true;
   report?: true;
+  /** A message from someone other than the agent's starter or the user: a stopped agent keeps it for when it is resumed. */
   note?: true;
   /** Sent by no one on purpose (a schedule's fire): a stopped agent keeps it for when it is resumed. */
   wake?: true;
 };
+
+/** Who sent what a Reporter delivers, for the shared rules (`agentInputAction`). */
+const reporterSender = (input: Pick<ReporterInput, "fromUser" | "report" | "note" | "wake">): AgentInputSender =>
+  input.report || input.note || input.wake ? "other" : input.fromUser ? "user" : "starter";
 type ReporterState =
   | {
       phase: "deliver";
@@ -841,7 +847,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (carried === undefined) {
           await runtime.commit(async (tx) => {
             const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
-            if (agent && wasStopped(agent) && (reporter.input.report || reporter.input.note || reporter.input.wake)) {
+            if (agent && wasStopped(agent) && agentInputAction("stopped", reporterSender(reporter.input)) === "hold") {
               agent.held = [...(agent.held ?? []), message];
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }
@@ -2461,9 +2467,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         continue;
       }
       const id = record.conversationId as ConversationId;
+      const idle = (await store.snapshot(LiveDoc, id, context))?.run === undefined;
+      // Between turns, no run ends to tell the cloud: one held for its helpers,
+      // or one that ended its turn waiting (the cloud lists it as waiting, and
+      // would otherwise let what no one sent it on purpose start it again).
       const waiting =
-        (await store.snapshot(LiveDoc, id, context))?.run === undefined &&
-        (await agentsBusy(busyReader(store, context), id).catch(() => false));
+        idle && (record.waiting !== undefined || (await agentsBusy(busyReader(store, context), id).catch(() => false)));
       await (await store.conversation(id, context))?.abort(context);
       endedProcesses += (await host.endAgentProcesses?.(agent.threadId).catch(() => 0)) ?? 0;
       local.push(agent.threadId);
@@ -2619,16 +2628,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     const running =
       live?.run !== undefined ||
       (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
-    const stopped = !running && idleStopped;
-    const waiting = !running && !stopped && found.record.waiting !== undefined;
-    return {
-      status: running ? "running" : waiting ? "waiting" : latest?.stopReason === "error" ? "error" : "completed",
-      ...(stopped ? { stopped: true as const } : {}),
-      agentStatus: running ? "running" : stopped ? "canceled" : waiting ? "waiting" : latest?.stopReason === "error" ? "failed" : "completed",
-      ...(waiting && found.record.waiting ? { waitingFor: found.record.waiting.waitingFor } : {}),
-      attempt,
-      ...(lastText ? { lastText } : {}),
-    };
+    const shown = deviceAgentStatus(
+      standingOf({
+        running,
+        stopped: idleStopped,
+        waitingFor: found.record.waiting?.waitingFor,
+        outcome: latest?.stopReason === "error" ? "failed" : "completed",
+      }),
+    );
+    return { ...shown, attempt, ...(lastText ? { lastText } : {}) };
   };
 
   const agentRecords = async (harness: Harness, context: Context): Promise<StellaAgentRecord[]> => {
@@ -2693,30 +2701,28 @@ export function stellaAgents(host: StellaAgentsHost) {
       const running =
         live?.run !== undefined ||
         (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
-      const stopped = !running && idleStopped;
-      const waitingFor = !running && !stopped ? agent.waiting?.waitingFor : undefined;
+      const shown = deviceAgentStatus(
+        standingOf({
+          running,
+          stopped: idleStopped,
+          waitingFor: agent.waiting?.waitingFor,
+          outcome: latest?.stopReason === "error" ? "failed" : "completed",
+        }),
+      );
       const longCall = running ? await longCallOf(harness, live, context) : undefined;
       records.push({
         threadId,
         ...(longCall ? { longCall } : {}),
         description: agent.description,
         placement: agent.placement,
-        status: running ? "running" : waitingFor !== undefined ? "waiting" : latest?.stopReason === "error" ? "error" : "completed",
-        ...(waitingFor !== undefined ? { waitingFor } : {}),
+        status: shown.status,
+        ...(shown.waitingFor !== undefined ? { waitingFor: shown.waitingFor } : {}),
         startedAt: oldest?.timestamp ?? latest?.timestamp ?? Date.now(),
         updatedAt: latest?.timestamp ?? oldest?.timestamp ?? Date.now(),
         assistantMessages: prose,
         ...(latest?.stopReason === "error" && latest.errorMessage ? { error: agentFailureText(latest) } : {}),
-        ...(stopped ? { stopped: true as const } : {}),
-        agentStatus: running
-          ? "running"
-          : stopped
-            ? "canceled"
-            : waitingFor !== undefined
-              ? "waiting"
-              : latest?.stopReason === "error"
-                ? "failed"
-                : "completed",
+        ...(shown.stopped ? { stopped: true as const } : {}),
+        agentStatus: shown.agentStatus,
       });
     }
     return records;
@@ -2731,6 +2737,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       fromOrchestrator?: boolean;
       report?: true;
       reportFrom?: string;
+      /** Not from its starter or the user (a note, another task's message): held while it is stopped. */
+      note?: true;
       wake?: true;
     },
     context: Context,
@@ -2778,6 +2786,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           message: args.message,
           ...(args.fromOrchestrator ? {} : { fromUser: true as const }),
           ...(args.report ? { report: true as const } : {}),
+          ...(args.note ? { note: true as const } : {}),
           ...(args.wake ? { wake: true as const } : {}),
         },
         { ownership: { kind: "conversation" }, background: true, conversationId: home },

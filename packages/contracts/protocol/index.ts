@@ -403,6 +403,8 @@ export type RuntimeLocalAgentMessageRequest = {
   text: string;
   messageId: string;
   ownerGeneration: string;
+  /** Who sent it, as the cloud judged by the shared rules (`agent-rules`); absent from older backends. */
+  sender?: "user" | "starter" | "other";
 };
 
 export type RuntimeLocalAgentStopRequest = {

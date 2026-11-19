@@ -197,7 +197,8 @@ export const runsHandlers: WorkerRpcHandlers = {
         text: String(payload.text ?? ""),
         messageId: String(payload.messageId ?? ""),
       };
-      const outcome = yield* fromPromise(() => piDeliverAgentMessage(session, hostBus, message));
+      const sender = payload.sender === "user" || payload.sender === "starter" || payload.sender === "other" ? payload.sender : undefined;
+      const outcome = yield* fromPromise(() => piDeliverAgentMessage(session, hostBus, { ...message, ...(sender ? { sender } : {}) }));
       // A schedule on this computer fired for a task that runs elsewhere (a
       // helper on another computer or in the cloud): the cloud, which keeps the
       // task's thread, takes it there. Only for this computer's own schedules

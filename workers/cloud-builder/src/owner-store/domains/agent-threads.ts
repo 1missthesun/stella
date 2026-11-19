@@ -16,6 +16,13 @@ import {
   isLiveAgentStatus,
 } from "@stella/contracts/agent-status";
 import {
+  agentInputAction,
+  agentInputSender,
+  agentStanding,
+  recordedAgentFacts,
+  type AgentInputSender,
+} from "@stella/contracts/agent-rules";
+import {
   agentThreadTerminalStatus,
   readAgentStopResult,
   newAgentThreadId,
@@ -64,7 +71,6 @@ import {
   agentReportId,
   agentReportReceipt,
   isPlaceholderAgentResult,
-  parseAgentReportId,
 } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
@@ -2036,7 +2042,7 @@ const crossesSlackBoundary = (ctx: OwnerContext, from: string, to: string): bool
   return false;
 };
 
-const sentByStarter = (thread: ThreadRow, from: AgentMessageSender): boolean =>
+const sentByStarter = (thread: ThreadRow, from: Pick<AgentMessageSender, "threadId">): boolean =>
   thread.parent_thread_id !== null
     ? from.threadId === thread.parent_thread_id
     : from.threadId === thread.conversation_id || from.threadId === thread.origin_conversation_id;
@@ -2430,11 +2436,27 @@ const supersedeHeldStops = (ctx: OwnerContext, threadId: string, commandId: stri
 const STOP_HELD = "held_while_stopped";
 
 const stoppedByStop = (thread: Pick<ThreadRow, "status" | "error_message">): boolean =>
-  thread.status === "canceled" && isAgentStopReason(thread.error_message);
+  agentStanding(recordedAgentFacts({ status: thread.status, errorMessage: thread.error_message })).state === "stopped";
 
-/** A message no one sent on purpose: a helper's report, a schedule's fire. */
-const automaticWake = (commandId: string): boolean =>
-  parseAgentReportId(commandId) !== null || commandId.startsWith("schedule:");
+/**
+ * Who sent an input, for the shared rules: a report, a note or a schedule's
+ * fire is no one's on purpose; a message is its sender's, and counts as the
+ * starter's when it comes from the task's lead (or Stella's chat, for a task
+ * she started). One with no sender on record (an older path) keeps going
+ * through as before.
+ */
+const inputSender = (input: ControlInput): AgentInputSender => {
+  if (input.source === "owner:report-outbox" || input.source.startsWith("schedule:")) return "other";
+  const from = typeof input.detail?.from === "string" ? input.detail.from : undefined;
+  const requester = typeof input.detail?.requester === "string" ? input.detail.requester : undefined;
+  const byStarter =
+    from !== undefined
+      ? sentByStarter(input.thread, { threadId: from })
+      : requester !== undefined
+        ? sentByStarter(input.thread, { threadId: requester })
+        : true;
+  return agentInputSender({ id: input.commandId, byStarter });
+};
 
 /**
  * A stop holds whatever was on its way to the agent (messages queued for its
@@ -2495,7 +2517,7 @@ const routeCommand = async (
   if (input.kind === "stop") return await routeStop(ctx, input, executor, deviceId);
   const stopped = stoppedByStop(input.thread);
   if (
-    (stopped && input.kind === "message" && automaticWake(input.commandId)) ||
+    (stopped && input.kind === "message" && agentInputAction("stopped", inputSender(input)) === "hold") ||
     readCommand(ctx.db, input.commandId)?.outcome === STOP_HELD
   ) {
     return { hold: "stopped" };
@@ -2521,6 +2543,9 @@ const messageOnComputer = async (ctx: OwnerContext, input: ControlInput, deviceI
     ownerGeneration: input.ownerGeneration,
     messageId: input.commandId,
     text: input.text,
+    // The computer applies the same rule to its own copy of the task, which
+    // may know of a stop the cloud hasn't heard of yet.
+    ...(input.kind === "message" ? { sender: inputSender(input) } : {}),
   });
   switch (sent.outcome) {
     case "steered":
@@ -4125,6 +4150,7 @@ const startComputerThread = async (
     if (args.attemptGeneration < existing.attempt_generation) {
       throw rejectStart("attempt_stale", "A newer attempt of this agent already started.");
     }
+    const resumedFromStop = stoppedByStop(existing);
     recordAgentChange(
       ctx.db,
       {
@@ -4147,6 +4173,10 @@ const startComputerThread = async (
         ),
     );
     await postAgentLifecycleCard(ctx, readThread(ctx.db, existing.thread_id)!, { kind: "started" });
+    // Resumed on its computer (by its starter or the user there): what the
+    // cloud held while it was stopped goes to it now, as when the cloud
+    // resumes it. Left held, it would also keep this attempt's report waiting.
+    if (resumedFromStop) releaseInputsAfterStop(ctx, existing.thread_id, `device-resume:${existing.thread_id}:${args.attemptGeneration}`);
     return { threadId: existing.thread_id };
   }
   if (args.attemptGeneration !== 1) {
@@ -4214,6 +4244,7 @@ const completeComputerThread = async (
   // start was refused before sign-in) still ends here; dropping its terminal
   // would lose its report.
   if (args.attemptGeneration > known.attempt_generation) {
+    const resumedFromStop = stoppedByStop(known);
     recordAgentChange(
       ctx.db,
       {
@@ -4234,8 +4265,21 @@ const completeComputerThread = async (
           args.attemptGeneration,
         ),
     );
+    if (resumedFromStop) releaseInputsAfterStop(ctx, known.thread_id, `device-resume:${known.thread_id}:${args.attemptGeneration}`);
   }
   const row = readComputerThread(ctx.db, args) ?? known;
+  // Stopped on its computer after its turn ended waiting: it is stopped now,
+  // as when the cloud stops it, so what no one sent it on purpose is held.
+  if (
+    row.attempt_generation === args.attemptGeneration &&
+    endedWaiting(row) &&
+    args.status === "canceled" &&
+    isAgentStopReason(args.error ?? null)
+  ) {
+    await markEndedWaitingStopped(ctx, row, `device:${args.originDeviceId}`, `device-stop:${row.thread_id}:${row.attempt_generation}`);
+    const now = readThread(ctx.db, row.thread_id);
+    return { updated: now?.status === "canceled", status: now?.status ?? row.status };
+  }
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
     if (
       row.attempt_generation === args.attemptGeneration &&

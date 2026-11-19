@@ -452,7 +452,12 @@ export class SessionStore {
              excluded.next_attempt_at
            ),
            last_error = NULL,
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at
+         -- A run's stop, once queued, is what the cloud hears of that run:
+         -- an end written after it (a turn that settled as it was stopped)
+         -- never replaces it.
+         WHERE json_extract(computer_agent_cloud_outbox.payload_json, '$.status') IS NOT 'canceled'
+            OR json_extract(excluded.payload_json, '$.status') = 'canceled'`,
       )
       .run(
         record.id,
@@ -702,5 +707,15 @@ export class SessionStore {
 
   deleteComputerAgentCloudOutbox(id: string): void {
     this.computerAgentOutbox.delete(id);
+  }
+
+  /**
+   * Removes an entry once what was sent is what it still holds: one rewritten
+   * while it was on its way (a stop queued over a run's end) stays to be sent.
+   */
+  deleteSentComputerAgentCloudOutbox(id: string, payloadJson: string): void {
+    this.cached
+      .prepare("DELETE FROM computer_agent_cloud_outbox WHERE id = ? AND payload_json = ?")
+      .run(id, payloadJson);
   }
 }

@@ -8,7 +8,7 @@ import {
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
 import { agentReportRecipient, agentStanding, recordedAgentFacts } from "@stella/contracts/agent-rules";
-import { scheduleGoneText } from "@stella/contracts/agent-waiting";
+import { resultWaitingFor, scheduleGoneText } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -66,6 +66,8 @@ type ThreadRow = {
   executor_device_id: string | null;
   placement: string;
   execution_json: string | null;
+  /** What earlier turns said that a later turn superseded before it reached anyone (see `carryReport`). */
+  carried_report: string | null;
 };
 
 type OutboxState = "pending" | "offered" | "delivered" | "dropped";
@@ -222,6 +224,8 @@ const reportText = (thread: ThreadRow, outcome: AgentReportOutcome): string => {
   );
 };
 
+const resultWaitingForText = (resultJson: string | null): string => resultWaitingFor(resultJson)?.trim() || "something it named";
+
 const deliveryJobId = (reportId: string): string => `agent-report:${reportId}`;
 
 const scheduleDelivery = (
@@ -340,19 +344,52 @@ export const heldAncestorIds = (
   return held;
 };
 
+/**
+ * A turn's report that a later turn superseded (input was already queued for
+ * the task) is kept on the task, never dropped: it goes out with the task's
+ * next report, or on its own once the task settles without one.
+ */
+export const carryReport = (db: OwnerDb, threadId: string, text: string): void => {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  db.run(
+    `UPDATE agent_threads SET carried_report = CASE
+        WHEN carried_report IS NULL OR carried_report = '' THEN ?
+        ELSE carried_report || char(10) || char(10) || ? END
+      WHERE thread_id = ?`,
+    trimmed,
+    trimmed,
+    threadId,
+  );
+};
+
+const withCarried = (thread: ThreadRow, text: string): string =>
+  thread.carried_report?.trim() ? `${thread.carried_report.trim()}\n\n${text}` : text;
+
 export const deriveAgentReport = (
   db: OwnerDb,
   threadId: string,
   now: number,
 ): void => {
   const thread = readThread(db, threadId);
-  if (!thread || !REPORTABLE.has(thread.status) || endedWaiting(thread)) return;
-  if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
+  if (!thread || !REPORTABLE.has(thread.status)) return;
   if (thread.origin_delivery_ack_at !== null) return;
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
   if (
     db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", reportId)
   ) {
+    return;
+  }
+  const waiting = endedWaiting(thread);
+  const stopped = thread.status === "canceled" && isAgentStopReason(thread.error_message);
+  if (waiting || stopped) {
+    // It settles without a report of its own; what it said in turns a later
+    // one superseded still reaches whoever started it.
+    if (!thread.carried_report?.trim()) return;
+    const tail = waiting
+      ? `(It is waiting now: ${resultWaitingForText(thread.result_json)}.)`
+      : "(It was stopped after this.)";
+    fileReport(db, thread, reportId, "completed", boundReportText(`${thread.carried_report.trim()}\n\n${tail}`, thread.thread_id), now);
     return;
   }
   scheduleAudit(db, thread, now + REPORT_AUDIT_FIRST_MS, 0, false);
@@ -363,7 +400,7 @@ export const deriveAgentReport = (
       ? liveDescendants(db, thread.thread_id)
       : [];
   if (queued || helpers.length > 0) {
-    appendAgentEvent(db, {
+    const deferred = appendAgentEvent(db, {
       key: `report_deferred:${thread.thread_id}:${thread.attempt_generation}`,
       kind: "report_deferred",
       source: "ledger",
@@ -371,11 +408,67 @@ export const deriveAgentReport = (
       conversationId: thread.conversation_id,
       attemptGeneration: thread.attempt_generation,
       status: thread.status,
-      detail: queued ? { queuedInput: true } : { helpers },
+      detail: queued ? { queuedInput: true, carried: true } : { helpers },
       createdAt: now,
     });
+    // Queued input starts another turn, which supersedes this one: keep what
+    // this one said. (Held for helpers, the same turn reports later itself.)
+    if (deferred && queued) carryReport(db, thread.thread_id, reportText(thread, outcome));
     return;
   }
+  fileReport(db, thread, reportId, outcome, boundReportText(withCarried(thread, reportText(thread, outcome)), thread.thread_id), now);
+};
+
+/**
+ * A turn's end that arrives after a later turn of the task began (its
+ * computer reported it late, or the next input started a turn first): what it
+ * said is kept with the task's next report, or, when the task has already
+ * settled and reported, delivered by itself now.
+ */
+export const fileLateTurn = (
+  db: OwnerDb,
+  threadId: string,
+  attemptGeneration: number,
+  text: string,
+  now: number,
+): boolean => {
+  const thread = readThread(db, threadId);
+  if (!thread || attemptGeneration >= thread.attempt_generation || !text.trim()) return false;
+  const lateId = agentReportId(thread.thread_id, attemptGeneration);
+  const known = (key: string) => db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", key) !== null;
+  if (known(lateId) || known(`report_deferred:${thread.thread_id}:${attemptGeneration}`)) return false;
+  const kept = appendAgentEvent(db, {
+    key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
+    kind: "report_deferred",
+    source: "ledger",
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    attemptGeneration,
+    status: "completed",
+    detail: { late: true, carried: true },
+    createdAt: now,
+  });
+  if (!kept) return false;
+  carryReport(db, thread.thread_id, text);
+  const settledAndReported =
+    !LIVE_STATUSES.has(thread.status) && known(agentReportId(thread.thread_id, thread.attempt_generation));
+  if (settledAndReported) {
+    const now_ = readThread(db, threadId)!;
+    fileReport(db, now_, lateId, "completed", boundReportText(now_.carried_report ?? text, thread.thread_id), now);
+  } else {
+    deriveAgentReport(db, thread.thread_id, now);
+  }
+  return true;
+};
+
+const fileReport = (
+  db: OwnerDb,
+  thread: ThreadRow,
+  reportId: string,
+  outcome: AgentReportOutcome,
+  text: string,
+  now: number,
+): void => {
   const requester = requesterOf(db, thread);
   appendAgentEvent(db, {
     key: reportId,
@@ -420,10 +513,11 @@ export const deriveAgentReport = (
     outcome,
     thread.description,
     thread.agent_type,
-    reportText(thread, outcome),
+    text,
     now,
     now,
   );
+  db.run("UPDATE agent_threads SET carried_report = NULL WHERE thread_id = ?", thread.thread_id);
   scheduleDelivery(db, reportId, now);
 };
 
@@ -967,9 +1061,14 @@ export const AGENT_REPORTS_STOP_MIGRATION = {
   ],
 };
 
+export const AGENT_REPORTS_CARRY_MIGRATION = {
+  id: "agent-reports.3-carried-report",
+  statements: ["ALTER TABLE agent_threads ADD COLUMN carried_report TEXT"],
+};
+
 export const agentReportsDomain = {
   name: "agent-reports",
-  migrations: [AGENT_REPORTS_MIGRATION, AGENT_REPORTS_STOP_MIGRATION],
+  migrations: [AGENT_REPORTS_MIGRATION, AGENT_REPORTS_STOP_MIGRATION, AGENT_REPORTS_CARRY_MIGRATION],
   calls: {
     "agentReports.note": {
       scope: "owner",

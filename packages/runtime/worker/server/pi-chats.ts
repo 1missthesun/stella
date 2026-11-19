@@ -688,7 +688,7 @@ export const piChatsFor = (
           .catch((error) => console.debug("[pi-chat] agent notification failed", error));
       },
       agentReported: (agent) => {
-        if (agent.conversationId.startsWith("local_") || agent.running) return;
+        if (agent.conversationId.startsWith("local_")) return;
         const body = /\n(?:result|error): ([\s\S]*?)(?=\n(?:agent_state|routing|presentation): |$)/.exec(agent.report)?.[1]?.trim();
         void (async () => {
           const runner = session.runnerCell.get();

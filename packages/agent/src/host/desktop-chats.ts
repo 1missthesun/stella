@@ -369,8 +369,8 @@ export type DesktopChatsOptions = {
     status: AgentAttemptOutcome;
     failed: boolean;
     report: string;
+    /** The turn this report ends (a later one may already be running). */
     attempt: number;
-    running: boolean;
   }): void;
   agentReportRelayed?(agent: { conversationId: string; description: string }): void;
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
@@ -1649,7 +1649,11 @@ export function desktopChats(options: DesktopChatsOptions) {
               const attempts = async (threadId: string) => {
                 if (!opened) return 1;
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
-                return Math.max(1, Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length);
+                // Numbered as the runs are (`attemptOf`): only calls that ran here count.
+                return Math.max(
+                  1,
+                  Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId && call.reporter >= 0).length,
+                );
               };
               const cloud = engineHost(options.cloudThreads?.(conversationId), "default", () => opened);
               return desktopAgentsHost({
@@ -1707,7 +1711,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                     conversationId,
                     threadId: run.threadId,
                     description: agent?.description ?? run.threadId,
-                    attempt: await attempts(run.threadId),
+                    attempt: run.attempt,
                     ...(isAnotherHostsAgent(state, run.threadId) ? { placed: true as const } : {}),
                   });
                 },
@@ -1779,18 +1783,11 @@ export function desktopChats(options: DesktopChatsOptions) {
                 },
                 ...(agentReported
                   ? {
+                      // Every turn's end is recorded with the turn it ends, even when
+                      // the next one has already started: the cloud keeps a report a
+                      // later turn superseded instead of losing it.
                       agentReported: (agent) => {
-                        void (async () => {
-                          const attempt = await attempts(agent.threadId);
-                          const record = opened
-                            ? (await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context))?.agents[agent.threadId]
-                            : undefined;
-                          const live =
-                            opened && record && !record.remote
-                              ? await opened.harness.snapshot(LiveDoc, record.conversationId as ConversationId, context)
-                              : undefined;
-                          agentReported({ conversationId, ...agent, attempt, running: live?.run !== undefined });
-                        })().catch((error: unknown) => options.report(error));
+                        agentReported({ conversationId, ...agent });
                       },
                     }
                   : {}),

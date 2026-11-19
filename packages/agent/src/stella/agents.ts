@@ -415,6 +415,8 @@ export type StellaAgentsHost = {
     status: AgentAttemptOutcome;
     failed: boolean;
     report: string;
+    /** The turn this report ends (a later one may already be running). */
+    attempt: number;
   }): void;
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
   /** A stopped agent's own processes (its shells, tools and what they started) end; resolves with how many. */
@@ -1305,13 +1307,15 @@ export function stellaAgents(host: StellaAgentsHost) {
             await root?.submit({ type: "input", content: report, whenBusy: "followUp", requestId: delivery.requestId }, context);
           }
           if (host.agentReported && !origin) {
-            const agent = (await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[reporter.input.threadId];
+            const state = await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context);
+            const agent = state?.agents[reporter.input.threadId];
             host.agentReported({
               threadId: reporter.input.threadId,
               description: agent?.description ?? reporter.input.threadId,
               status: delivery.status ?? "completed",
               failed: delivery.status === "failed",
               report,
+              attempt: attemptOf(state, reporter.input.threadId, Number(reporter.id)),
             });
           }
         }

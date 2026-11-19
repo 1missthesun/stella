@@ -112,6 +112,28 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   "STELLA_RENDERER_MODE",
   "STELLA_CLAUDE_CLI_PATH",
   "STELLA_APP_SOURCE_INSTALLED",
+  // Windows: without these a shell cannot resolve `git` to git.exe (PATHEXT)
+  // or start cmd and PowerShell (SystemRoot, ComSpec).
+  ...(process.platform === "win32"
+    ? [
+        "PATHEXT",
+        "SystemRoot",
+        "SystemDrive",
+        "windir",
+        "ComSpec",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "ProgramW6432",
+        "ProgramData",
+        "CommonProgramFiles",
+        "CommonProgramFiles(x86)",
+        "CommonProgramW6432",
+        "PSModulePath",
+        "OS",
+        "PROCESSOR_ARCHITECTURE",
+        "NUMBER_OF_PROCESSORS",
+      ]
+    : []),
 ];
 
 const usage = helpText();
@@ -263,7 +285,15 @@ const currentRun = () => {
 
 const SHORT_DARWIN_TMPDIR = "/tmp/sv";
 
+// Electron refuses a harness profile inside the home folder or the temp
+// folder, and on Windows the temp folder is inside the home folder.
+const WINDOWS_HARNESS_TMPDIR = path.join(path.parse(os.homedir()).root, "stella-verify");
+
 const harnessTempRoot = () => {
+  if (process.platform === "win32") {
+    mkdirSync(WINDOWS_HARNESS_TMPDIR, { recursive: true });
+    return WINDOWS_HARNESS_TMPDIR;
+  }
   if (process.platform !== "darwin") return os.tmpdir();
   mkdirSync(SHORT_DARWIN_TMPDIR, { recursive: true, mode: 0o700 });
   return SHORT_DARWIN_TMPDIR;

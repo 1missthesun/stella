@@ -265,6 +265,8 @@ export type AgentRunEnd = {
   waiting?: true;
   /** It ended its turn with end_turn_waiting: recorded as waiting, never reported. */
   waitingFor?: string;
+  /** What could wake it as its turn ended waiting, in words; empty when nothing could. */
+  wakers?: string[];
 };
 
 export const agentRunOutcome = (
@@ -1125,7 +1127,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               ? textOf(answer)
               : withClosingNotes(notes.closing.map((note) => note.message), [...earlier, textOf(answer)].filter((text) => text.trim()).join("\n\n"));
             if (waitedFor !== undefined && !failed) {
-              end = { answer: said, waiting: true, waitingFor: waitedFor };
+              end = { answer: said, waiting: true, waitingFor: waitedFor, ...(wakersAtEnd ? { wakers: wakersAtEnd } : {}) };
               if (agent.reported.includes(settled.answer)) return next();
               agent.reported.push(settled.answer);
               agent.waiting = { waitingFor: waitedFor, at: Date.now() };

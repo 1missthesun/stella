@@ -658,6 +658,7 @@ export const piChatsFor = (
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
             status: "completed",
             waitingFor: agent.waitingFor,
+            ...(agent.wakers ? { wakers: agent.wakers.map((waker) => waker.slice(0, 300)) } : {}),
             ...(agent.text.trim() ? { result: agent.text.slice(0, AGENT_REPORT_MAX_CHARS) } : {}),
           });
         })().catch((error) => console.warn("[pi-chat] computer thread waiting record failed", error));

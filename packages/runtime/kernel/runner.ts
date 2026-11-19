@@ -452,6 +452,7 @@ export const createStellaHostRunner = (
     computerAgents: {
       start: (args) => computerAgentCloudRecords.create(args),
       complete: (args) => computerAgentCloudRecords.complete(args),
+      dropQueuedStarts: (threadId) => computerAgentCloudRecords.dropQueuedStarts(threadId),
       reconcile: async (elsewhere) => {
         const backend = context.backend.client();
         if (!backend || !context.state.authToken?.trim()) return { settled: [] };

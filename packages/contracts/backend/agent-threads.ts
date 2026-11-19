@@ -183,7 +183,8 @@ export type AgentInvariantKind =
   | "report_lost"
   | "stopped_task_took_input"
   | "waiting_on_nothing_seen"
-  | "two_hosts_one_attempt";
+  | "two_hosts_one_attempt"
+  | "report_carried_not_sent";
 
 export type AgentInvariantReport = {
   since: number;
@@ -327,6 +328,12 @@ export type AgentThreadCalls = {
       error?: string;
       /** It ended its turn waiting (end_turn_waiting): recorded with its result, never reported. */
       waitingFor?: string;
+      /**
+       * What its computer saw could wake it as it waited (helpers at work, its
+       * background commands, schedules aimed at it, a question to its starter),
+       * in words. Empty: nothing could. Absent: the computer could not tell.
+       */
+      wakers?: string[];
     };
     result: { updated: boolean; status: string };
   };

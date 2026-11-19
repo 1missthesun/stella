@@ -218,6 +218,9 @@ export const runsHandlers: WorkerRpcHandlers = {
       const payload = params as RuntimeLocalAgentStopRequest;
       const threadId = String(payload.threadId ?? "");
       const hostBus = yield* HostBus.Service;
+      // Runs of it queued to start before this stop arrived began without
+      // knowing of it: they are not announced (the stop ends them here).
+      session.runnerCell.get()?.computerAgents.dropQueuedStarts(threadId);
       const stopped = yield* fromPromise(() =>
         piStopAgent(session, hostBus, threadId),
       );

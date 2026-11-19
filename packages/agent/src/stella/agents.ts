@@ -278,6 +278,9 @@ export const agentRunOutcome = (
         ? { outcome: "completed", text: end.answer }
         : undefined;
 
+/** How many earlier answers of one run a report carries (the newest ones). */
+const ANSWERS_IN_REPORT_MAX = 8;
+
 const attemptOf = (
   state: { calls: Record<string, { threadId: string; reporter: number }> } | undefined,
   threadId: string,
@@ -982,6 +985,32 @@ export function stellaAgents(host: StellaAgentsHost) {
               return false;
             })().catch(() => false);
           }
+          // Another input to this task is still on its way through it (steered
+          // into this run, or queued for the next): this answer is not the
+          // task's last word. The input answered last reports, with every
+          // answer since the last report (`answersBetween`), and ends the turn.
+          let superseded = false;
+          if (!busy && settled?.status === "done" && settled.type === "input") {
+            superseded = await (async () => {
+              let others: Array<{ id: number; input: ReporterInput }> = [];
+              await runtime.commit(async (tx) => {
+                others = (await liveReporters(tx, runtime.conversationId)).filter(
+                  (other) => other.id !== Number(reporter.id) && other.input.threadId === threadId && !other.input.wake,
+                );
+                return undefined;
+              }, context);
+              for (const other of others) {
+                let pending = false;
+                await runtime.commit(async (tx) => {
+                  const submission = await tx.submissionByRequest(agentConversationId, `agent-msg:${other.id}`);
+                  pending = submission?.status === "queued" || submission?.status === "placed";
+                  return undefined;
+                }, context);
+                if (pending) return true;
+              }
+              return false;
+            })().catch(() => false);
+          }
           if (settled?.status === "unanswered" && settled.reason === "aborted") await dropMove(runtime, agentConversationId, context);
           const waitedFor = await takeWait(
             runtime,
@@ -1076,6 +1105,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               return next(failedReport({ threadId, description, error: unansweredText(settled) }), "failed");
             }
             if (settled.type !== "input" || !agent) return next();
+            if (superseded) return next();
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
             const failed = answer?.stopReason === "error";
             if (answer && isSafeguardBlock(answer)) {
@@ -1085,7 +1115,15 @@ export function stellaAgents(host: StellaAgentsHost) {
               agent.reported.push(settled.answer);
               return next(failedReport({ threadId, description, error }), "failed");
             }
-            const said = failed ? textOf(answer) : withClosingNotes(notes.closing.map((note) => note.message), textOf(answer));
+            // A run that took more inputs as it went (messages steered in, held
+            // ones released on resume) answered each; its report carries every
+            // answer since the last one reported, not only the last.
+            const earlier = failed
+              ? []
+              : await answersBetween(tx, agentConversationId, Math.max(0, ...agent.reported.map(Number)), settled.answer);
+            const said = failed
+              ? textOf(answer)
+              : withClosingNotes(notes.closing.map((note) => note.message), [...earlier, textOf(answer)].filter((text) => text.trim()).join("\n\n"));
             if (waitedFor !== undefined && !failed) {
               end = { answer: said, waiting: true, waitingFor: waitedFor };
               if (agent.reported.includes(settled.answer)) return next();
@@ -1869,6 +1907,26 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   // A run can end on a tool call, an empty message or a split turn. Its report
   // then carries the agent's newest words instead of arriving empty.
+  /** What a task answered (turns it ended with words) after `after` and before `answer`, oldest first. */
+  const answersBetween = async (tx: Tx, conversationId: ConversationId, after: number, answer: EntryId): Promise<string[]> => {
+    const found: string[] = [];
+    let cursor: Parameters<Tx["scanEntries"]>[2];
+    for (let pages = 0; pages < 10 && found.length < ANSWERS_IN_REPORT_MAX; pages += 1) {
+      const page = await tx.scanEntries({ conversationId, maxEntryId: answer, order: "descending" }, 50, cursor);
+      for (const entry of page.items) {
+        if (Number(entry.id) <= after) return found.reverse();
+        if (entry.kind !== "pi.assistant" || Number(entry.id) === Number(answer)) continue;
+        const message = entry.model?.[0] as AssistantMessage | undefined;
+        const text = message?.stopReason === "stop" ? textOf(message) : "";
+        if (text.trim()) found.push(text);
+        if (found.length >= ANSWERS_IN_REPORT_MAX) break;
+      }
+      cursor = page.next;
+      if (cursor === undefined) break;
+    }
+    return found.reverse();
+  };
+
   const silentRunText = async (tx: Tx, conversationId: ConversationId, answer: EntryId | undefined, stillWorking: boolean): Promise<string> => {
     let lastTools: string[] | undefined;
     let cursor: Parameters<Tx["scanEntries"]>[2];

@@ -15,14 +15,28 @@ export const MIN_COMPOSER_SHELL_HEIGHT_PX = 46;
 const getContentHeight = (content: HTMLElement) =>
   content.getBoundingClientRect().height;
 
+// The shell is border-box, so its height has to hold its own border as well as
+// the content; sized to the content alone it clips the content's bottom edge.
+const getShellBorderHeight = (shell: HTMLElement) => {
+  const style = getComputedStyle(shell);
+  return (
+    (Number.parseFloat(style.borderTopWidth) || 0) +
+    (Number.parseFloat(style.borderBottomWidth) || 0)
+  );
+};
+
 export const resolveComposerShellHeight = (
-  measuredHeight: number,
+  measuredContentHeight: number,
   previousHeight: number,
+  borderHeight = 0,
 ): number => {
-  if (!Number.isFinite(measuredHeight) || measuredHeight <= 0) {
+  if (!Number.isFinite(measuredContentHeight) || measuredContentHeight <= 0) {
     return Math.max(previousHeight, MIN_COMPOSER_SHELL_HEIGHT_PX);
   }
-  return Math.max(measuredHeight, MIN_COMPOSER_SHELL_HEIGHT_PX);
+  return Math.max(
+    measuredContentHeight + borderHeight,
+    MIN_COMPOSER_SHELL_HEIGHT_PX,
+  );
 };
 
 const getTargetRadius = (
@@ -84,6 +98,7 @@ export function useAnimatedComposerShell({
       lastHeightRef.current = resolveComposerShellHeight(
         getContentHeight(content),
         lastHeightRef.current,
+        getShellBorderHeight(shell),
       );
       shell.style.height = `${lastHeightRef.current}px`;
       shell.style.borderRadius = `${getTargetRadius(
@@ -127,6 +142,7 @@ export function useAnimatedComposerShell({
       const safeHeight = resolveComposerShellHeight(
         nextHeight,
         lastHeightRef.current,
+        getShellBorderHeight(shell),
       );
       if (Math.abs(safeHeight - lastHeightRef.current) < 1) return;
 

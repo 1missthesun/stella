@@ -110,7 +110,7 @@
   background: var(--panel-surface-bg-gradient);
   border: 1px solid var(--panel-surface-border);
   border-radius: 999px;
-  box-shadow: var(--shadow-sm), var(--panel-surface-highlight);
+  box-shadow: var(--panel-surface-highlight);
   overflow: clip;
   transition: box-shadow 200ms ease, border-color 200ms ease;
 }
@@ -132,7 +132,7 @@
 .chat-sidebar-shell--drag-over {
   border-color: color-mix(in oklch, var(--primary) 42%, var(--panel-surface-border));
   box-shadow:
-    var(--shadow-sm),
+    var(--panel-surface-highlight),
     0 0 0 2px color-mix(in oklch, var(--primary) 38%, transparent),
     0 0 0 6px color-mix(in oklch, var(--primary) 10%, transparent);
 }
@@ -142,7 +142,7 @@
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
+  min-height: 44px;
   padding: 6px;
 }
 

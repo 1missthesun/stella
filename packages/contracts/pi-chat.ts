@@ -81,7 +81,8 @@ export type PiEntry = {
 export type PiToolSlot = {
   callId: string;
   name: string;
-  status: "pending" | "running" | "done";
+  /** `sleeping` and `waiting`: a call that parked (pi-durable 1.6) until it is woken; it has no output meanwhile. */
+  status: "pending" | "running" | "sleeping" | "waiting" | "done";
   output?: string;
   entry?: number;
 };

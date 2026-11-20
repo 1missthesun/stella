@@ -58,6 +58,10 @@ const parts = (view: ConversationView): Parts => ({
 
 const asEntry = (entry: EntryRecord): PiEntry => entry as unknown as PiEntry;
 
+/** Started and not ended: running, or parked (sleeping or waiting) until it is woken to run again. */
+const inProgress = (status: ToolSlot["status"] | undefined): boolean =>
+  status === "running" || status === "sleeping" || status === "waiting";
+
 const toolSlots = (live: LiveState): PiToolSlot[] =>
   (live.tools ?? []).map((slot) => ({
     callId: slot.callId,
@@ -218,7 +222,7 @@ export const eventsBetween = (before: ConversationView, after: ConversationView,
   const slotsBefore = new Map<string, ToolSlot>((was.live.tools ?? []).map((slot) => [slot.callId, slot]));
   const slots = now.live.tools ?? [];
   for (const slot of slots) {
-    if (slot.status !== "running" || slotsBefore.get(slot.callId)?.status === "running") continue;
+    if (!inProgress(slot.status) || inProgress(slotsBefore.get(slot.callId)?.status)) continue;
     events.push({
       type: "tool_execution_start",
       toolCallId: slot.callId,
@@ -235,7 +239,7 @@ export const eventsBetween = (before: ConversationView, after: ConversationView,
   }
   for (const slot of slots) {
     const previous = slotsBefore.get(slot.callId);
-    if (slot.status !== "running" || previous?.status !== "running") continue;
+    if (slot.status !== "running" || !previous || !inProgress(previous.status)) continue;
     const output = outputChange(previous.output, slot.output);
     if (output !== undefined) {
       events.push({ type: "tool_execution_update", toolCallId: slot.callId, toolName: slot.name, output });

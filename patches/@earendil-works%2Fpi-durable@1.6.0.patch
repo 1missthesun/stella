@@ -24,7 +24,7 @@ index 7dc4337e83009a92045cb0b1ae4fd6a71aa86abe..b0a5e5955cdd66ec364b383fe109e7f3
      absolutePath(path: string, _context: Context): Promise<Result<string, FileError>>;
      joinPath(parts: string[], _context: Context): Promise<Result<string, FileError>>;
 diff --git a/dist/env/node.js b/dist/env/node.js
-index 120ff2015d81eb795a090eae897910a58768373f..576105102027f366e33216d9702fd89a4de78696 100644
+index d1530da2acd24090992c767fd20a91b78e91de9e..a992025f6a881c093146672510fba2d6f621a5b7 100644
 --- a/dist/env/node.js
 +++ b/dist/env/node.js
 @@ -556,11 +556,27 @@ export class NodeExecutionEnv {
@@ -64,7 +64,7 @@ index 120ff2015d81eb795a090eae897910a58768373f..576105102027f366e33216d9702fd89a
              };
              const failCallback = (error) => {
                  if (callbackError !== undefined)
-@@ -1166,9 +1182,9 @@ export class NodeExecutionEnv {
+@@ -1169,9 +1185,9 @@ export class NodeExecutionEnv {
          }
      }
      async cleanup(_context) {

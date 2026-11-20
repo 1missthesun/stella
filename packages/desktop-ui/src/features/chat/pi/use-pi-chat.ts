@@ -29,7 +29,9 @@ export const usePiChat = (conversationId: string | null) => {
     [state.entries, state.requestIds],
   );
   const runningTool = useMemo(() => {
-    const running = Object.entries(state.tools).filter(([, tool]) => tool.status === "running");
+    const running = Object.entries(state.tools).filter(
+      ([, tool]) => tool.status === "running" || tool.status === "sleeping" || tool.status === "waiting",
+    );
     const last = running[running.length - 1];
     return last ? { callId: last[0], name: last[1].activity ?? last[1].name } : null;
   }, [state.tools]);

@@ -358,9 +358,9 @@
       "ceiling": 51.73
     },
     "bundle.outputJsBytes": {
-      "value": 12401501,
+      "value": 13371865,
       "kind": "bytes",
-      "ceiling": 13022600.05
+      "ceiling": 14041482.25
     },
     "bundle.bootReachableBytes": {
       "value": 1664903,

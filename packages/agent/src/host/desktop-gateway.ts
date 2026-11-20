@@ -5,9 +5,11 @@ import {
   type GatewayModelResolution,
 } from "@stella/contracts/gateway/api";
 import {
-  STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE,
   createGatewaySessionClient,
   dpopHeadersForSessionCapability,
+  gatewayDeviceVerificationError,
+  gatewayNow,
+  noteGatewayClock,
 } from "@stella/runtime/kernel/gateway-session";
 import {
   GATEWAY_RELAY_KEEPALIVE_HEADER,
@@ -64,7 +66,12 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
     getDeviceSigner: options.getDeviceSigner,
   });
 
-  const send = async (request: Request, body: ArrayBuffer | undefined, capability: string): Promise<Response> => {
+  const send = async (
+    request: Request,
+    body: ArrayBuffer | undefined,
+    capability: string,
+    clockRetried = false,
+  ): Promise<Response> => {
     const headers = new Headers(request.headers);
     const requestId = headers.get(GATEWAY_REQUEST_ID_HEADER)?.trim() || crypto.randomUUID();
     headers.set("authorization", `Bearer ${capability}`);
@@ -75,18 +82,24 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
       method: request.method,
       pathname: new URL(request.url).pathname,
       requestId,
-      now: Date.now(),
+      now: gatewayNow(request.url),
     });
     for (const [name, value] of Object.entries(proof)) headers.set(name, value);
     if (wantsKeepalive(request, body)) headers.set(GATEWAY_RELAY_KEEPALIVE_HEADER, "1");
+    const sentAt = Date.now();
     const response = await fetchWithInactivity(
       fetch,
       request.url,
       { method: request.method, headers, body },
       { label: "Stella model gateway", idleMs: REQUEST_BUDGET_MS.streamIdle, signal: request.signal },
     );
+    const clockMoved = noteGatewayClock(request.url, response, sentAt, Date.now());
     const unwrapped = await unwrapRelayKeepalive(response);
-    if (await dpopInvalid(unwrapped)) throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+    if (await dpopInvalid(unwrapped)) {
+      // Signed by a clock just corrected from this response: sign it again once.
+      if (clockMoved && !clockRetried) return send(request, body, capability, true);
+      throw gatewayDeviceVerificationError(request.url);
+    }
     return unwrapped;
   };
 

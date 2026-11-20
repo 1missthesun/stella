@@ -26,9 +26,11 @@ import {
 } from "@stella/contracts/gateway/api";
 import { readConfiguredBackendUrl } from "@stella/contracts/stella-api";
 import {
-  STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE,
   createGatewaySessionClient,
   dpopHeadersForSessionCapability,
+  gatewayDeviceVerificationError,
+  gatewayNow,
+  noteGatewayClock,
   getRememberedStellaGatewayOrigin,
 } from "./gateway-session.js";
 import type { DeviceSigner } from "./home/device.js";
@@ -197,11 +199,11 @@ const readJwtExpiryMs = (token: string): number | null => {
   }
 };
 
-const shouldRefreshToken = (token: string): boolean => {
+const shouldRefreshToken = (token: string, now: number): boolean => {
   const expiresAtMs = readJwtExpiryMs(token);
   return (
     expiresAtMs !== null &&
-    expiresAtMs <= Date.now() + STELLA_AUTH_REFRESH_SKEW_MS
+    expiresAtMs <= now + STELLA_AUTH_REFRESH_SKEW_MS
   );
 };
 
@@ -421,7 +423,7 @@ const sessionCapabilityFetch = (
         method,
         pathname: new URL(requestUrl).pathname,
         requestId,
-        now: Date.now(),
+        now: gatewayNow(requestUrl),
       });
       for (const [name, value] of Object.entries(proof)) {
         headers.set(name, value);
@@ -440,18 +442,24 @@ const sessionCapabilityFetch = (
         idleMs: REQUEST_BUDGET_MS.streamIdle,
         signal: callerSignal,
       });
+    const sentAt = Date.now();
     const response = await send(input, {
       ...init,
       headers: await proofHeaders(firstCapability),
     });
+    const clockMoved = noteGatewayClock(requestUrl, response, sentAt, Date.now());
+    let capability: string | undefined;
     if (await isDpopInvalid(response)) {
-      throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+      // Signed by a clock just corrected from this response: once more, same capability.
+      if (!clockMoved) throw gatewayDeviceVerificationError(requestUrl);
+      capability = firstCapability;
+    } else {
+      if (response.status !== 401 && !(await capabilityExhausted(response))) {
+        return response;
+      }
+      capability = (await session.refreshCapability(firstCapability))?.trim();
+      if (!capability) return response;
     }
-    if (response.status !== 401 && !(await capabilityExhausted(response))) {
-      return response;
-    }
-    const capability = (await session.refreshCapability(firstCapability))?.trim();
-    if (!capability) return response;
     const retryBody =
       retryRequest && method !== "GET" && method !== "HEAD"
         ? await retryRequest.arrayBuffer()
@@ -465,7 +473,7 @@ const sessionCapabilityFetch = (
       headers: await proofHeaders(capability),
     });
     if (await isDpopInvalid(retried)) {
-      throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+      throw gatewayDeviceVerificationError(requestUrl);
     }
     return retried;
   };
@@ -520,7 +528,11 @@ export const createStellaRoute = (args: {
   // so the exchange itself never fails on a stale token.
   const currentAuthToken = async (): Promise<string | undefined> => {
     const currentToken = args.site.getAuthToken()?.trim() || authToken;
-    if (currentToken && shouldRefreshToken(currentToken)) {
+    // Stella's servers stamp the token: judge its expiry by their clock.
+    const serverNow = gatewayNow(
+      gatewayOrigin ?? getRememberedStellaGatewayOrigin(siteBaseUrl),
+    );
+    if (currentToken && shouldRefreshToken(currentToken, serverNow)) {
       return (await refreshAuthToken()) || currentToken;
     }
     return currentToken || (await refreshAuthToken()) || undefined;

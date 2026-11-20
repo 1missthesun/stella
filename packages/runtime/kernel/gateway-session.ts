@@ -6,6 +6,7 @@ import {
   type GatewaySessionCapabilityResponse,
 } from "@stella/contracts/gateway/api";
 import {
+  GATEWAY_DPOP_MAX_SKEW_MS,
   GATEWAY_DPOP_ALG_HEADER,
   GATEWAY_DPOP_HEADER,
   GATEWAY_DPOP_KEY_HEADER,
@@ -29,6 +30,86 @@ export const STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE =
   "This device could not be verified. Restart Stella and try again.";
 
 const knownGatewayOrigins = new Map<string, string>();
+
+/**
+ * The gateway refuses a device proof whose time is more than
+ * GATEWAY_DPOP_MAX_SKEW_MS from its own clock, so a computer whose clock is
+ * wrong (a dual-boot PC whose Windows reads the hardware clock Linux set to
+ * UTC, time sync turned off) was refused on every request. Proofs and
+ * capability expiry are timed by the gateway's clock as last seen in the Date
+ * header of its responses: this computer's clock plus the offset learned here.
+ */
+const gatewayClockOffsets = new Map<string, number>();
+/** Differences this small are the Date header's whole seconds and latency, not a wrong clock. */
+const GATEWAY_CLOCK_TOLERANCE_MS = 30_000;
+
+const clockKey = (url: string): string => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+};
+
+export const gatewayNow = (gatewayUrl: string | null | undefined): number =>
+  Date.now() + (gatewayUrl ? (gatewayClockOffsets.get(clockKey(gatewayUrl)) ?? 0) : 0);
+
+export const gatewayClockOffsetMs = (gatewayUrl: string): number =>
+  gatewayClockOffsets.get(clockKey(gatewayUrl)) ?? 0;
+
+/**
+ * Learns the gateway's clock from a response sent between `sentAt` and
+ * `receivedAt` (this computer's clock). True when that changed the time
+ * proofs are signed with, so a proof refused for its time is worth one retry.
+ */
+export const noteGatewayClock = (
+  gatewayUrl: string,
+  response: Response,
+  sentAt: number,
+  receivedAt: number,
+): boolean => {
+  const serverMs = Date.parse(response.headers.get("date") ?? "");
+  if (!Number.isFinite(serverMs)) return false;
+  const key = clockKey(gatewayUrl);
+  const measured = serverMs + 500 - (sentAt + receivedAt) / 2;
+  const slack = GATEWAY_CLOCK_TOLERANCE_MS + Math.max(0, receivedAt - sentAt) / 2;
+  const next = Math.abs(measured) <= slack ? 0 : Math.round(measured);
+  const previous = gatewayClockOffsets.get(key) ?? 0;
+  if (Math.abs(next - previous) <= slack) return false;
+  if (next === 0) gatewayClockOffsets.delete(key);
+  else gatewayClockOffsets.set(key, next);
+  console.warn(
+    next === 0
+      ? `[gateway-session] This computer's clock agrees with ${key} again.`
+      : `[gateway-session] This computer's clock is ${describeClockOffset(next)} ${key}; device proofs use the gateway's time.`,
+  );
+  return true;
+};
+
+const describeClockOffset = (offsetMs: number): string => {
+  const minutes = Math.round(Math.abs(offsetMs) / 60_000);
+  const amount =
+    minutes >= 120
+      ? `${Math.round(minutes / 60)} hours`
+      : minutes >= 2
+        ? `${minutes} minutes`
+        : `${Math.round(Math.abs(offsetMs) / 1000)} seconds`;
+  return `${amount} ${offsetMs > 0 ? "behind" : "ahead of"}`;
+};
+
+/**
+ * A refused device proof: says when this computer's clock is too far off to
+ * correct for, since restarting Stella would not help with that.
+ */
+export const gatewayDeviceVerificationError = (gatewayUrl: string): Error => {
+  const offset = gatewayClockOffsetMs(gatewayUrl);
+  if (Math.abs(offset) <= GATEWAY_DPOP_MAX_SKEW_MS / 2) {
+    return new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+  }
+  return new Error(
+    `This device could not be verified: its clock is ${describeClockOffset(offset)} the real time. Turn on setting the time automatically in this computer's date and time settings, then try again.`,
+  );
+};
 
 const siteKey = (siteBaseUrl: string): string =>
   normalizeStellaSiteUrl(siteBaseUrl);
@@ -199,6 +280,14 @@ const readGatewayError = async (
   }
 };
 
+/** The gateway refused the device proof; `clockMoved` when it was timed by a clock now corrected. */
+class GatewayDeviceProofRefused extends Error {
+  constructor(readonly clockMoved: boolean) {
+    super(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+    this.name = "GatewayDeviceProofRefused";
+  }
+}
+
 export class GatewaySessionExchangeError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -250,6 +339,7 @@ const exchangeOnce = async (args: {
       ? { turnstileToken: args.turnstileToken }
       : {}),
   };
+  const sentAt = Date.now();
   const response = await args.fetchImpl(
     `${args.gatewayOrigin}${GATEWAY_SESSION_CAPABILITY_PATH}`,
     {
@@ -262,13 +352,19 @@ const exchangeOnce = async (args: {
       signal: AbortSignal.timeout(GATEWAY_SESSION_EXCHANGE_TIMEOUT_MS),
     },
   );
+  const clockMoved = noteGatewayClock(
+    args.gatewayOrigin,
+    response,
+    sentAt,
+    Date.now(),
+  );
   if (!response.ok) {
     const { code, message } = await readGatewayError(response);
     if (
       (response.status === 400 || response.status === 401) &&
       code === "dpop_invalid"
     ) {
-      throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+      throw new GatewayDeviceProofRefused(clockMoved);
     }
     throw new GatewaySessionExchangeError(response.status, code, message);
   }
@@ -301,7 +397,8 @@ export type GatewaySessionClient = {
 export const createGatewaySessionClient = (
   args: GatewaySessionClientArgs,
 ): GatewaySessionClient => {
-  const now = args.now ?? (() => Date.now());
+  const clock = (gatewayOrigin: string): number =>
+    args.now ? args.now() : gatewayNow(gatewayOrigin);
   const fetchImpl = args.fetch ?? globalThis.fetch;
   let signerPromise: Promise<DeviceSigner> | null = null;
 
@@ -337,6 +434,7 @@ export const createGatewaySessionClient = (
       let currentAuthToken = authToken;
       let refreshedAuth = false;
       let challenged = false;
+      let clockRetried = false;
       let turnstileToken: string | undefined;
       while (true) {
         try {
@@ -345,10 +443,17 @@ export const createGatewaySessionClient = (
             authToken: currentAuthToken,
             signer,
             fetchImpl,
-            now,
+            now: () => clock(gatewayOrigin),
             turnstileToken,
           });
         } catch (error) {
+          if (error instanceof GatewayDeviceProofRefused) {
+            if (error.clockMoved && !clockRetried) {
+              clockRetried = true;
+              continue;
+            }
+            throw gatewayDeviceVerificationError(gatewayOrigin);
+          }
           if (
             error instanceof GatewaySessionExchangeError &&
             error.status === 401 &&
@@ -417,7 +522,7 @@ export const createGatewaySessionClient = (
     if (
       replaced &&
       replaced.capability !== rejected &&
-      replaced.expiresAt - GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS > now()
+      replaced.expiresAt - GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS > clock(gatewayOrigin)
     ) {
       return replaced.capability;
     }
@@ -431,7 +536,7 @@ export const createGatewaySessionClient = (
       const cached = capabilityCache.get(key);
       if (
         cached &&
-        cached.expiresAt - GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS > now()
+        cached.expiresAt - GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS > clock(gatewayOrigin)
       ) {
         return cached.capability;
       }

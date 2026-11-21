@@ -2357,7 +2357,16 @@
       "whereCloud": "Yalnızca bulutta",
       "whereNone": "Oturum açılmadı",
       "stellaModels": "Stella'nın modelleri",
-      "stellaModelsHint": "Stella planınıza dahil"
+      "stellaModelsHint": "Stella planınıza dahil",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Google ile oturum aç",
+      "antigravitySwitch": "Başka bir Google hesabıyla oturum aç",
+      "antigravityBrowserWaiting": "Google oturum açma işlemini tarayıcında tamamla.",
+      "antigravitySignedIn": "Bu bilgisayar Google Antigravity'de oturum açtı.",
+      "antigravityHint": "Google planındaki Gemini, bu bilgisayardaki görevler için",
+      "antigravityFreeNote": "Gemini 4 Neon ve diğer Gemini 4 modelleri bu hesapta Google AI Pro veya Ultra gerektirir. Gemini 3.8 Flash ücretsiz planda çalışır.",
+      "antigravityRisk": "Google, kendi uygulamaları dışında kullanıldığını gördüğü bir hesapta Antigravity'yi askıya alabilir.",
+      "antigravityPlanFree": "Ücretsiz plan"
     },
     "engineModels": {
       "ariaLabel": "{engine} modelleri",

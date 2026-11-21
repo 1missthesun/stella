@@ -11,6 +11,7 @@ import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
 import { ChatGptAccountsSection } from "@/features/chatgpt/ChatGptAccountsSection";
 import { ClaudeAccountsSection } from "@/features/claude/ClaudeAccountsSection";
+import { AntigravityAccountSection } from "@/features/antigravity/AntigravityAccountSection";
 import { cloudEnginesApi, useCloudEngines } from "./cloud-engines-api";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
 import { AiInUse, AiPrimaryAccount } from "./AiProviderSection";
@@ -88,6 +89,7 @@ export function ProviderAccountsCard() {
         engineInUse={isAuthenticated && chatEngine === "chatgpt"}
         {...engineChoice("chatgpt")}
       />
+      <AntigravityAccountSection />
       {isAuthenticated && managedModels ? (
         <section className="settings-card ai-provider ai-provider--plain" data-ai-provider="stella">
           <AiPrimaryAccount

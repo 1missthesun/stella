@@ -2357,7 +2357,16 @@
       "whereCloud": "Μόνο στο cloud",
       "whereNone": "Δεν έχει γίνει σύνδεση",
       "stellaModels": "Μοντέλα της Stella",
-      "stellaModelsHint": "Μέρος του πλάνου σας στη Stella"
+      "stellaModelsHint": "Μέρος του πλάνου σας στη Stella",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Σύνδεση με Google",
+      "antigravitySwitch": "Σύνδεση με άλλον λογαριασμό Google",
+      "antigravityBrowserWaiting": "Ολοκληρώστε τη σύνδεση στη Google στο πρόγραμμα περιήγησης.",
+      "antigravitySignedIn": "Αυτός ο υπολογιστής έχει συνδεθεί στο Google Antigravity.",
+      "antigravityHint": "Gemini με το πρόγραμμα Google σας, για εργασίες σε αυτόν τον υπολογιστή",
+      "antigravityFreeNote": "Το Gemini 4 Neon και τα άλλα μοντέλα Gemini 4 χρειάζονται Google AI Pro ή Ultra σε αυτόν τον λογαριασμό. Το Gemini 3.8 Flash λειτουργεί στο δωρεάν πρόγραμμα.",
+      "antigravityRisk": "Η Google μπορεί να αναστείλει το Antigravity σε λογαριασμό που βλέπει να χρησιμοποιείται εκτός των δικών της εφαρμογών.",
+      "antigravityPlanFree": "Δωρεάν πρόγραμμα"
     },
     "engineModels": {
       "ariaLabel": "Μοντέλα {engine}",

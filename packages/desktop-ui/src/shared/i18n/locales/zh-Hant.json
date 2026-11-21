@@ -2347,7 +2347,16 @@
       "whereCloud": "僅在雲端",
       "whereNone": "未登入",
       "stellaModels": "Stella 的模型",
-      "stellaModelsHint": "包含在你的 Stella 方案中"
+      "stellaModelsHint": "包含在你的 Stella 方案中",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "使用 Google 登入",
+      "antigravitySwitch": "使用其他 Google 帳戶登入",
+      "antigravityBrowserWaiting": "請在瀏覽器中完成 Google 登入。",
+      "antigravitySignedIn": "這台電腦已登入 Google Antigravity。",
+      "antigravityHint": "使用你的 Google 方案執行 Gemini，用於這台電腦上的任務",
+      "antigravityFreeNote": "此帳戶需要 Google AI Pro 或 Ultra 才能使用 Gemini 4 Neon 及其他 Gemini 4 模型。免費方案可使用 Gemini 3.8 Flash。",
+      "antigravityRisk": "如果 Google 發現帳戶在其自家應用程式以外使用，可能會暫停該帳戶的 Antigravity。",
+      "antigravityPlanFree": "免費方案"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

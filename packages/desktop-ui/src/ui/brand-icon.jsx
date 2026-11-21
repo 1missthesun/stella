@@ -7,6 +7,7 @@ const BRAND_KEY_ALIASES = {
     "kimi-coding": "kimi",
     "vercel-ai-gateway": "vercel",
     "github-copilot": "githubcopilot",
+    antigravity: "gemini",
 };
 const BRAND_TINTS = {
     openai: "#10a37f",

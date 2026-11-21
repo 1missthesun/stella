@@ -2347,7 +2347,16 @@
       "whereCloud": "クラウドのみ",
       "whereNone": "サインインしていません",
       "stellaModels": "Stella のモデル",
-      "stellaModelsHint": "Stella プランに含まれます"
+      "stellaModelsHint": "Stella プランに含まれます",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Google でログイン",
+      "antigravitySwitch": "別の Google アカウントでログイン",
+      "antigravityBrowserWaiting": "ブラウザで Google へのログインを完了してください。",
+      "antigravitySignedIn": "このコンピュータは Google Antigravity にログインしています。",
+      "antigravityHint": "Google のプランで使う Gemini（このコンピュータのタスク用）",
+      "antigravityFreeNote": "Gemini 4 Neon などの Gemini 4 モデルには、このアカウントで Google AI Pro または Ultra が必要です。Gemini 3.8 Flash は無料プランでも使えます。",
+      "antigravityRisk": "Google 自身のアプリ以外での利用が見つかると、Google がそのアカウントの Antigravity を停止することがあります。",
+      "antigravityPlanFree": "無料プラン"
     },
     "engineModels": {
       "ariaLabel": "{engine} のモデル",

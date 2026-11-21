@@ -2347,7 +2347,16 @@
       "whereCloud": "ในคลาวด์เท่านั้น",
       "whereNone": "ยังไม่ได้ลงชื่อเข้าใช้",
       "stellaModels": "โมเดลของ Stella",
-      "stellaModelsHint": "เป็นส่วนหนึ่งของแพ็กเกจ Stella ของคุณ"
+      "stellaModelsHint": "เป็นส่วนหนึ่งของแพ็กเกจ Stella ของคุณ",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "ลงชื่อเข้าใช้ด้วย Google",
+      "antigravitySwitch": "ลงชื่อเข้าใช้ด้วยบัญชี Google อื่น",
+      "antigravityBrowserWaiting": "ลงชื่อเข้าใช้ Google ให้เสร็จในเบราว์เซอร์",
+      "antigravitySignedIn": "คอมพิวเตอร์เครื่องนี้ลงชื่อเข้าใช้ Google Antigravity แล้ว",
+      "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ สำหรับงานบนคอมพิวเตอร์เครื่องนี้",
+      "antigravityFreeNote": "Gemini 4 Neon และโมเดล Gemini 4 อื่นๆ ต้องใช้ Google AI Pro หรือ Ultra ในบัญชีนี้ ส่วน Gemini 3.8 Flash ใช้ได้กับแพ็กเกจฟรี",
+      "antigravityRisk": "Google อาจระงับ Antigravity ในบัญชีที่ Google เห็นว่าถูกใช้นอกแอปของตัวเอง",
+      "antigravityPlanFree": "แพ็กเกจฟรี"
     },
     "engineModels": {
       "ariaLabel": "โมเดล {engine}",

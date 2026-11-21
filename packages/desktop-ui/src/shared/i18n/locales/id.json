@@ -2347,7 +2347,16 @@
       "whereCloud": "Hanya di cloud",
       "whereNone": "Belum masuk",
       "stellaModels": "Model Stella",
-      "stellaModelsHint": "Bagian dari paket Stella Anda"
+      "stellaModelsHint": "Bagian dari paket Stella Anda",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Masuk dengan Google",
+      "antigravitySwitch": "Masuk dengan akun Google lain",
+      "antigravityBrowserWaiting": "Selesaikan masuk ke Google di browser Anda.",
+      "antigravitySignedIn": "Komputer ini sudah masuk ke Google Antigravity.",
+      "antigravityHint": "Gemini dengan paket Google Anda, untuk tugas di komputer ini",
+      "antigravityFreeNote": "Gemini 4 Neon dan model Gemini 4 lainnya memerlukan Google AI Pro atau Ultra di akun ini. Gemini 3.8 Flash berfungsi di paket gratis.",
+      "antigravityRisk": "Google dapat menangguhkan Antigravity di akun yang terlihat dipakai di luar aplikasinya sendiri.",
+      "antigravityPlanFree": "Paket gratis"
     },
     "engineModels": {
       "ariaLabel": "Model {engine}",

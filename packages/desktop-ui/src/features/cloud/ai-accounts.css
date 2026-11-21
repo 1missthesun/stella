@@ -210,3 +210,9 @@
 .ai-provider--plain .ai-primary__name {
   font-size: var(--font-size-base);
 }
+
+.ai-provider__hint {
+  margin: 8px 0 0;
+  font-size: var(--font-size-xs);
+  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+}

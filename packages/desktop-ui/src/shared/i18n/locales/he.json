@@ -2367,7 +2367,16 @@
       "whereCloud": "רק בענן",
       "whereNone": "לא מחובר",
       "stellaModels": "המודלים של Stella",
-      "stellaModelsHint": "חלק מהתוכנית שלך ב-Stella"
+      "stellaModelsHint": "חלק מהתוכנית שלך ב-Stella",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "כניסה עם Google",
+      "antigravitySwitch": "כניסה עם חשבון Google אחר",
+      "antigravityBrowserWaiting": "יש לסיים את הכניסה ל-Google בדפדפן.",
+      "antigravitySignedIn": "המחשב הזה מחובר ל-Google Antigravity.",
+      "antigravityHint": "Gemini בתוכנית Google שלך, למשימות במחשב הזה",
+      "antigravityFreeNote": "Gemini 4 Neon ושאר מודלי Gemini 4 דורשים Google AI Pro או Ultra בחשבון הזה. Gemini 3.8 Flash עובד בתוכנית החינמית.",
+      "antigravityRisk": "Google עשויה להשעות את Antigravity בחשבון שהיא רואה שמשמש מחוץ לאפליקציות שלה.",
+      "antigravityPlanFree": "תוכנית חינמית"
     },
     "engineModels": {
       "ariaLabel": "מודלים של {engine}",

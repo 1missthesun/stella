@@ -2347,7 +2347,16 @@
       "whereCloud": "Chỉ trên đám mây",
       "whereNone": "Chưa đăng nhập",
       "stellaModels": "Mô hình của Stella",
-      "stellaModelsHint": "Thuộc gói Stella của bạn"
+      "stellaModelsHint": "Thuộc gói Stella của bạn",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Đăng nhập bằng Google",
+      "antigravitySwitch": "Đăng nhập bằng tài khoản Google khác",
+      "antigravityBrowserWaiting": "Hoàn tất đăng nhập Google trong trình duyệt.",
+      "antigravitySignedIn": "Máy tính này đã đăng nhập Google Antigravity.",
+      "antigravityHint": "Gemini theo gói Google của bạn, cho các tác vụ trên máy tính này",
+      "antigravityFreeNote": "Gemini 4 Neon và các mô hình Gemini 4 khác cần Google AI Pro hoặc Ultra trên tài khoản này. Gemini 3.8 Flash dùng được với gói miễn phí.",
+      "antigravityRisk": "Google có thể tạm ngưng Antigravity trên tài khoản mà Google thấy được dùng bên ngoài ứng dụng của mình.",
+      "antigravityPlanFree": "Gói miễn phí"
     },
     "engineModels": {
       "ariaLabel": "Mô hình {engine}",

@@ -2367,7 +2367,16 @@
       "whereCloud": "Doar în cloud",
       "whereNone": "Neconectat",
       "stellaModels": "Modelele Stella",
-      "stellaModelsHint": "Parte din planul tău Stella"
+      "stellaModelsHint": "Parte din planul tău Stella",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Conectează-te cu Google",
+      "antigravitySwitch": "Conectează-te cu alt cont Google",
+      "antigravityBrowserWaiting": "Finalizează conectarea la Google în browser.",
+      "antigravitySignedIn": "Acest computer este conectat la Google Antigravity.",
+      "antigravityHint": "Gemini din abonamentul tău Google, pentru sarcinile de pe acest computer",
+      "antigravityFreeNote": "Gemini 4 Neon și celelalte modele Gemini 4 necesită Google AI Pro sau Ultra pe acest cont. Gemini 3.8 Flash funcționează cu abonamentul gratuit.",
+      "antigravityRisk": "Google poate suspenda Antigravity pe un cont pe care îl vede folosit în afara aplicațiilor proprii.",
+      "antigravityPlanFree": "Abonament gratuit"
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

@@ -2357,7 +2357,16 @@
       "whereCloud": "Csak a felhőben",
       "whereNone": "Nincs bejelentkezve",
       "stellaModels": "Stella modelljei",
-      "stellaModelsHint": "A Stella-csomagod része"
+      "stellaModelsHint": "A Stella-csomagod része",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Bejelentkezés Google-fiókkal",
+      "antigravitySwitch": "Bejelentkezés másik Google-fiókkal",
+      "antigravityBrowserWaiting": "Fejezd be a Google-bejelentkezést a böngészőben.",
+      "antigravitySignedIn": "Ez a számítógép be van jelentkezve a Google Antigravitybe.",
+      "antigravityHint": "Gemini a Google-előfizetéseddel, a gépen futó feladatokhoz",
+      "antigravityFreeNote": "A Gemini 4 Neonhoz és a többi Gemini 4 modellhez Google AI Pro vagy Ultra kell ezen a fiókon. A Gemini 3.8 Flash az ingyenes csomaggal is működik.",
+      "antigravityRisk": "A Google felfüggesztheti az Antigravityt egy fiókon, ha azt a saját alkalmazásain kívül használják.",
+      "antigravityPlanFree": "Ingyenes csomag"
     },
     "engineModels": {
       "ariaLabel": "{engine} modellek",

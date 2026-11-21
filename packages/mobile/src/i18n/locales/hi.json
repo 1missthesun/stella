@@ -2357,7 +2357,16 @@
       "whereCloud": "केवल क्लाउड में",
       "whereNone": "साइन इन नहीं है",
       "stellaModels": "Stella के मॉडल",
-      "stellaModelsHint": "आपके Stella प्लान का हिस्सा"
+      "stellaModelsHint": "आपके Stella प्लान का हिस्सा",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Google से साइन इन करें",
+      "antigravitySwitch": "किसी दूसरे Google खाते से साइन इन करें",
+      "antigravityBrowserWaiting": "अपने ब्राउज़र में Google साइन-इन पूरा करें।",
+      "antigravitySignedIn": "यह कंप्यूटर Google Antigravity में साइन इन है।",
+      "antigravityHint": "आपके Google प्लान पर Gemini, इस कंप्यूटर के कामों के लिए",
+      "antigravityFreeNote": "Gemini 4 Neon और बाकी Gemini 4 मॉडल के लिए इस खाते पर Google AI Pro या Ultra चाहिए। Gemini 3.8 Flash मुफ़्त प्लान पर चलता है।",
+      "antigravityRisk": "Google उस खाते पर Antigravity निलंबित कर सकता है जिसे वह अपने ऐप्स के बाहर इस्तेमाल होते देखता है।",
+      "antigravityPlanFree": "मुफ़्त प्लान"
     },
     "engineModels": {
       "ariaLabel": "{engine} मॉडल",

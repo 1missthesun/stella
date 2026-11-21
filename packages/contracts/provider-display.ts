@@ -1,5 +1,6 @@
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   anthropic: "Anthropic",
+  antigravity: "Google Antigravity",
   cerebras: "Cerebras",
   "github-copilot": "GitHub Copilot",
   google: "Google",

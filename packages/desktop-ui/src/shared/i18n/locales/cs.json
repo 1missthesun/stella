@@ -2377,7 +2377,16 @@
       "whereCloud": "Jen v cloudu",
       "whereNone": "Nepřihlášeno",
       "stellaModels": "Modely Stelly",
-      "stellaModelsHint": "Součást vašeho plánu Stelly"
+      "stellaModelsHint": "Součást vašeho plánu Stelly",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Přihlásit se přes Google",
+      "antigravitySwitch": "Přihlásit se jiným účtem Google",
+      "antigravityBrowserWaiting": "Dokončete přihlášení ke Googlu v prohlížeči.",
+      "antigravitySignedIn": "Tento počítač je přihlášen do Google Antigravity.",
+      "antigravityHint": "Gemini z vašeho tarifu Google pro úkoly na tomto počítači",
+      "antigravityFreeNote": "Gemini 4 Neon a další modely Gemini 4 vyžadují na tomto účtu Google AI Pro nebo Ultra. Gemini 3.8 Flash funguje i v bezplatném tarifu.",
+      "antigravityRisk": "Google může Antigravity pozastavit na účtu, který podle něj používáte mimo jeho vlastní aplikace.",
+      "antigravityPlanFree": "Bezplatný tarif"
     },
     "engineModels": {
       "ariaLabel": "Modely {engine}",

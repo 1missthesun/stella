@@ -2397,7 +2397,16 @@
       "whereCloud": "في السحابة فقط",
       "whereNone": "لم يتم تسجيل الدخول",
       "stellaModels": "نماذج Stella",
-      "stellaModelsHint": "جزء من خطة Stella الخاصة بك"
+      "stellaModelsHint": "جزء من خطة Stella الخاصة بك",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "تسجيل الدخول باستخدام Google",
+      "antigravitySwitch": "تسجيل الدخول بحساب Google آخر",
+      "antigravityBrowserWaiting": "أكمل تسجيل الدخول إلى Google في متصفحك.",
+      "antigravitySignedIn": "سجّل هذا الكمبيوتر الدخول إلى Google Antigravity.",
+      "antigravityHint": "Gemini ضمن خطة Google الخاصة بك، للمهام على هذا الكمبيوتر",
+      "antigravityFreeNote": "يحتاج Gemini 4 Neon ونماذج Gemini 4 الأخرى إلى Google AI Pro أو Ultra على هذا الحساب. يعمل Gemini 3.8 Flash على الخطة المجانية.",
+      "antigravityRisk": "قد تعلّق Google خدمة Antigravity على حساب تلاحظ استخدامه خارج تطبيقاتها.",
+      "antigravityPlanFree": "الخطة المجانية"
     },
     "engineModels": {
       "ariaLabel": "نماذج {engine}",

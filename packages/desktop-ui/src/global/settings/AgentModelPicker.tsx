@@ -74,6 +74,7 @@ const SECTION_ORDER = [
     "stella",
     CLAUDE_CODE_SECTION_KEY,
     CHATGPT_SECTION_KEY,
+    "antigravity",
     "xai",
     "meta",
     "openrouter",

@@ -2377,7 +2377,16 @@
       "whereCloud": "Только в облаке",
       "whereNone": "Вход не выполнен",
       "stellaModels": "Модели Stella",
-      "stellaModelsHint": "Входит в ваш тариф Stella"
+      "stellaModelsHint": "Входит в ваш тариф Stella",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Войти через Google",
+      "antigravitySwitch": "Войти с другим аккаунтом Google",
+      "antigravityBrowserWaiting": "Завершите вход в Google в браузере.",
+      "antigravitySignedIn": "Этот компьютер вошёл в Google Antigravity.",
+      "antigravityHint": "Gemini по вашему тарифу Google — для задач на этом компьютере",
+      "antigravityFreeNote": "Для Gemini 4 Neon и других моделей Gemini 4 на этом аккаунте нужен Google AI Pro или Ultra. Gemini 3.8 Flash работает на бесплатном тарифе.",
+      "antigravityRisk": "Google может заблокировать Antigravity на аккаунте, если увидит, что его используют вне приложений Google.",
+      "antigravityPlanFree": "Бесплатный тариф"
     },
     "engineModels": {
       "ariaLabel": "Модели {engine}",

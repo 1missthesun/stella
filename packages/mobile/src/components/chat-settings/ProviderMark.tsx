@@ -19,6 +19,7 @@ const BRAND_KEYS: Record<string, string> = {
   "kimi-coding": "kimi",
   "vercel-ai-gateway": "vercel",
   "github-copilot": "githubcopilot",
+  antigravity: "gemini",
 };
 
 const BRAND_TINTS: Record<string, string> = {

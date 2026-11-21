@@ -2357,7 +2357,16 @@
       "whereCloud": "Alleen in de cloud",
       "whereNone": "Niet ingelogd",
       "stellaModels": "Modellen van Stella",
-      "stellaModelsHint": "Onderdeel van je Stella-abonnement"
+      "stellaModelsHint": "Onderdeel van je Stella-abonnement",
+      "antigravityTitle": "Google Antigravity",
+      "antigravitySignIn": "Inloggen met Google",
+      "antigravitySwitch": "Inloggen met een ander Google-account",
+      "antigravityBrowserWaiting": "Rond het inloggen bij Google af in je browser.",
+      "antigravitySignedIn": "Deze computer is ingelogd bij Google Antigravity.",
+      "antigravityHint": "Gemini via je Google-abonnement, voor taken op deze computer",
+      "antigravityFreeNote": "Gemini 4 Neon en de andere Gemini 4-modellen hebben Google AI Pro of Ultra nodig op dit account. Gemini 3.8 Flash werkt met het gratis abonnement.",
+      "antigravityRisk": "Google kan Antigravity blokkeren voor een account dat buiten de eigen apps wordt gebruikt.",
+      "antigravityPlanFree": "Gratis abonnement"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modellen",

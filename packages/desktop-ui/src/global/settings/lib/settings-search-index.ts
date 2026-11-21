@@ -385,6 +385,23 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
   },
   {
     tab: "ai",
+    titleKey: "settings.engineAccounts.antigravityTitle",
+    descriptionKey: "settings.engineAccounts.antigravityHint",
+    keywords: [
+      "antigravity",
+      "google",
+      "gemini",
+      "neon",
+      "subscription",
+      "google ai pro",
+      "ultra",
+      "sign in",
+      "model",
+      "ai",
+    ],
+  },
+  {
+    tab: "ai",
     titleKey: "settings.engineAccounts.chatgptTitle",
     descriptionKey: "settings.engineAccounts.cardIntro",
     keywords: [

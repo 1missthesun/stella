@@ -38,6 +38,7 @@ export const RUNTIME_APP_SERVICE_CALLS = [
   "installClaudeCli",
   "cancelClaudeCliInstall",
   "checkClaudeCliUpdate",
+  "saveMediaOutput",
 ] as const;
 
 export type RuntimeAppServiceCall = (typeof RUNTIME_APP_SERVICE_CALLS)[number];

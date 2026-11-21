@@ -14,6 +14,7 @@ import {
   type LlmSignInNotice,
 } from "./llm-sign-in.js";
 import { integrationCalls } from "./integration-calls.js";
+import { saveMediaOutput } from "./media-output.js";
 import {
   cancelClaudeCliInstall,
   checkClaudeCliUpdate,
@@ -115,4 +116,5 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
     }),
   cancelClaudeCliInstall: (_context, request) => cancelClaudeCliInstall(request),
   checkClaudeCliUpdate: (context, request) => checkClaudeCliUpdate(dataDir(context), request),
+  saveMediaOutput: (context, request) => saveMediaOutput(dataDir(context), request ?? {}),
 };

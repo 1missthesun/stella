@@ -1,52 +1,15 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { clipboard, ClipboardItem, nativeImage } from "electron";
-import { fetchPublicUrl, normalizeSafeExternalUrl } from "@stella/runtime/kernel/tools/network-guards";
+import { callRuntimeAppService } from "../services/runtime-app-services.js";
 import { IPC_CLIPBOARD_WRITE_TEXT, IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMAGE, IPC_MEDIA_SAVE_OUTPUT, } from "@stella/contracts/desktop/ipc-channels";
-import { decodeAndValidateImage, decodeBase64ImageBounded, readResponseBodyBounded, validateDecodedImageFile, } from "@stella/runtime/kernel/tools/image-decode-validation";
-import { materializeMediaArtifact } from "@stella/runtime/kernel/tools/media-artifact-store";
 import {
   handleIpc,
 } from "./typed-ipc.js";
 // Electron 44's clipboard takes W3C-style ClipboardItems; images go on as PNG.
-const MEDIA_FETCH_TIMEOUT_MS = 30_000;
 const writeImageToClipboard = (image) => clipboard.write([
     new ClipboardItem({
         "image/png": new Blob([image.toPNG()], { type: "image/png" }),
     }),
 ]);
-const resolveMediaOutputPath = (dir, fileName) => {
-    if (!fileName ||
-        fileName === "." ||
-        fileName === ".." ||
-        fileName.includes("\0") ||
-        fileName.includes("/") ||
-        fileName.includes("\\") ||
-        path.isAbsolute(fileName)) {
-        throw new Error("Invalid media output filename.");
-    }
-    const resolvedDir = path.resolve(dir);
-    const destPath = path.resolve(resolvedDir, fileName);
-    if (!destPath.startsWith(`${resolvedDir}${path.sep}`)) {
-        throw new Error("Invalid media output filename.");
-    }
-    return destPath;
-};
-const normalizedImageOutputPath = (requestedPath, mimeType) => {
-    const extension = mimeType === "image/jpeg"
-        ? ".jpg"
-        : mimeType === "image/png"
-            ? ".png"
-            : mimeType === "image/gif"
-                ? ".gif"
-                : mimeType === "image/webp"
-                    ? ".webp"
-                    : null;
-    if (!extension)
-        throw new Error("Downloaded image format is unsupported.");
-    const parsed = path.parse(requestedPath);
-    return path.join(parsed.dir, `${parsed.name}${extension}`);
-};
 export const registerBrowserHandlers = (options) => {
     handleIpc(IPC_MEDIA_SAVE_OUTPUT, async (event, payload) => {
         if (!options.assertPrivilegedSender(event, IPC_MEDIA_SAVE_OUTPUT)) {
@@ -57,105 +20,12 @@ export const registerBrowserHandlers = (options) => {
             return { ok: false, error: "Stella root not initialized" };
         }
         try {
-            const dir = path.join(stellaDataDir, "media", "outputs");
-            await fs.mkdir(dir, { recursive: true });
-            let destPath = resolveMediaOutputPath(dir, payload.fileName);
-            const declaredImage = /\.(?:png|jpe?g|gif|webp)$/i.test(destPath);
-            const expectedImageMime = /\.png$/i.test(destPath)
-                ? "image/png"
-                : /\.jpe?g$/i.test(destPath)
-                    ? "image/jpeg"
-                    : /\.gif$/i.test(destPath)
-                        ? "image/gif"
-                        : /\.webp$/i.test(destPath)
-                            ? "image/webp"
-                            : undefined;
-            const validateExisting = expectedImageMime
-                ? async (candidate) => await validateDecodedImageFile(candidate, expectedImageMime)
-                : undefined;
-            const dataUriMatch = payload.url.match(/^data:([^;,]+);base64,(.+)$/is);
-            if (dataUriMatch) {
-                const bytes = decodeBase64ImageBounded(dataUriMatch[2]);
-                const decoded = await decodeAndValidateImage(bytes);
-                if (!decoded || decoded.mimeType !== dataUriMatch[1]?.toLowerCase()) {
-                    throw new Error("Image payload MIME type does not match its decoded bytes.");
-                }
-                if (payload.kind === "image") {
-                    destPath = normalizedImageOutputPath(destPath, decoded.mimeType);
-                }
-                const normalizedExpectedMime = payload.kind === "image" ? decoded.mimeType : expectedImageMime;
-                const saved = await materializeMediaArtifact({
-                    filePath: destPath,
-                    validateExisting: async (candidate) => await validateDecodedImageFile(candidate, normalizedExpectedMime ?? dataUriMatch[1]?.toLowerCase()),
-                    producer: async () => {
-                        if (payload.kind !== "image" &&
-                            expectedImageMime &&
-                            decoded.mimeType !== expectedImageMime) {
-                            throw new Error("Image payload MIME type does not match its decoded bytes.");
-                        }
-                        if (payload.kind !== "image" && !expectedImageMime) {
-                            throw new Error("Image output requires an extension matching its decoded bytes.");
-                        }
-                        return bytes;
-                    },
-                });
-                return { ok: true, path: saved.path };
-            }
-            const safeUrl = normalizeSafeExternalUrl(payload.url);
-            if (payload.kind === "image") {
-                const signal = AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS);
-                const response = await fetchPublicUrl(safeUrl, {
-                    headers: { "User-Agent": "StellaDesktop/1.0" },
-                    signal,
-                });
-                if (!response.ok) {
-                    throw new Error(`Download failed (${response.status})`);
-                }
-                const bytes = await readResponseBodyBounded(response, { signal });
-                const decoded = await decodeAndValidateImage(bytes);
-                if (!decoded) {
-                    throw new Error("Downloaded image is invalid or exceeds safe resource limits.");
-                }
-                destPath = normalizedImageOutputPath(destPath, decoded.mimeType);
-                const saved = await materializeMediaArtifact({
-                    filePath: destPath,
-                    validateExisting: async (candidate) => await validateDecodedImageFile(candidate, decoded.mimeType),
-                    producer: async () => bytes,
-                });
-                return { ok: true, path: saved.path };
-            }
-            const saved = await materializeMediaArtifact({
-                filePath: destPath,
-                ...(validateExisting ? { validateExisting } : {}),
-                producerTimeoutMs: MEDIA_FETCH_TIMEOUT_MS,
-                producer: async (signal) => {
-                    const res = await fetchPublicUrl(safeUrl, {
-                        headers: { "User-Agent": "StellaDesktop/1.0" },
-                            signal,
-                    });
-                    if (!res.ok) {
-                        throw new Error(`Download failed (${res.status})`);
-                    }
-                    const bytes = await readResponseBodyBounded(res, { signal });
-                    const responseIsImage = res.headers
-                        .get("content-type")
-                        ?.toLowerCase()
-                        .startsWith("image/") ?? false;
-                    if (declaredImage || responseIsImage) {
-                        const decoded = await decodeAndValidateImage(bytes);
-                        if (!decoded)
-                            throw new Error("Downloaded image is invalid or exceeds safe resource limits.");
-                        if (expectedImageMime && decoded.mimeType !== expectedImageMime) {
-                            throw new Error(`Downloaded image bytes are ${decoded.mimeType}, not ${expectedImageMime}.`);
-                        }
-                        if (!expectedImageMime) {
-                            throw new Error("Image output requires an extension matching its decoded bytes.");
-                        }
-                    }
-                    return bytes;
-                },
+            // The runtime downloads or decodes it, checks it and writes it.
+            return await callRuntimeAppService("saveMediaOutput", {
+                url: payload?.url,
+                fileName: payload?.fileName,
+                kind: payload?.kind,
             });
-            return { ok: true, path: saved.path };
         }
         catch (error) {
             return { ok: false, error: error.message };

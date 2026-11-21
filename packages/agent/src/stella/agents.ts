@@ -881,6 +881,18 @@ export function stellaAgents(host: StellaAgentsHost) {
     execution && (execution.moveBrain || agentsMove)
       ? switchDestinationTool(execution, host.rootPlacement, agentsMove ? (args, api, context) => agentSwitch(args, api, context) : undefined)
       : undefined;
+  /**
+   * Starts a task's next turn with this input, in the conversation it was
+   * started from. Every turn gets an entry in `calls`, which is what numbers
+   * its attempt (`attemptOf`) here and in the cloud: a turn started without
+   * one (a "[Helper stopped]" wake, an "[Agent waiting]" notice, a "nothing
+   * can wake you" wake) took the number of the turn before it, and the cloud
+   * dropped its end as a repeat of that turn's, report and all.
+   */
+  const nextTurn = async (tx: Tx, home: ConversationId, input: ReporterInput): Promise<void> => {
+    const reporter = await tx.createTask(Reporter, input, { ownership: { kind: "conversation" }, background: true, conversationId: home });
+    (await tx.doc(StellaAgentsDoc, home)).calls[`turn:${reporter}`] = { threadId: input.threadId, reporter };
+  };
   const Reporter = defineTask<ReporterInput, ReporterState, null>({
     name: "stella.agent-reporter",
     version: 1,
@@ -1080,11 +1092,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 agent.startedAt ??= Date.now();
               }
               if ("failed" in move) {
-                await tx.createTask(
-                  Reporter,
-                  { threadId, conversationId: reporter.input.conversationId, message: moveFailedText(move.failed) },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
-                );
+                await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: moveFailedText(move.failed) });
               }
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }, context);
@@ -1128,11 +1136,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             const agent = state.agents[threadId];
             const description = agent?.description ?? threadId;
             if (agent && withdrawn && (reporter.input.report || reporter.input.note)) {
-              await tx.createTask(
-                Reporter,
-                { ...reporter.input, message: [...carried, message].join("\n\n") },
-                { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
-              );
+              await nextTurn(tx, runtime.conversationId, { ...reporter.input, message: [...carried, message].join("\n\n") });
             } else if (agent && (withdrawn || (!submitted && carried.length > 0))) {
               agent.held = [...carried, ...(withdrawn ? [message] : []), ...(agent.held ?? [])];
             }
@@ -1202,24 +1206,16 @@ export function stellaAgents(host: StellaAgentsHost) {
                 });
               }
               if (localLead && self.threadId !== undefined && self.parentConversationId !== undefined) {
-                await tx.createTask(
-                  Reporter,
-                  {
+                await nextTurn(tx, self.parentConversationId as ConversationId, {
                     threadId: self.threadId,
                     conversationId: runtime.conversationId,
                     message: formatAgentMessage({ threadId, label: description }, boundedReply(textOf(answer), waitedFor)),
                     note: true,
-                  },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: self.parentConversationId as ConversationId },
-                );
+                  });
               }
               // Nothing live can wake it: it hears so at once (after the reads above: a write ends them).
               if (wakersAtEnd?.length === 0) {
-                await tx.createTask(
-                  Reporter,
-                  { threadId, conversationId: reporter.input.conversationId, message: nothingCanWakeText(waitedFor), wake: true },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
-                );
+                await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: nothingCanWakeText(waitedFor), wake: true });
               }
               return {
                 status: "running",
@@ -1306,16 +1302,12 @@ export function stellaAgents(host: StellaAgentsHost) {
                 delete record.heldForHelpers;
                 const description =
                   (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[reporter.input.threadId]?.description ?? reporter.input.threadId;
-                await tx.createTask(
-                  Reporter,
-                  {
+                await nextTurn(tx, lead.parentConversationId, {
                     threadId: lead.threadId,
                     conversationId: runtime.conversationId,
                     message: waitingHelperNotice({ threadId: reporter.input.threadId, description, waitingFor, said: report }),
                     report: true,
-                  },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: lead.parentConversationId },
-                );
+                  });
               }
             }
             return { status: "terminal", outcome: { status: "completed", result: null } };
@@ -1352,11 +1344,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               ),
             async (to, message) => {
               await runtime.commit(async (tx) => {
-                await tx.createTask(
-                  Reporter,
-                  { threadId: to.threadId, conversationId: to.conversationId, message, report: true },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: to.home },
-                );
+                await nextTurn(tx, to.home, { threadId: to.threadId, conversationId: to.conversationId, message, report: true });
                 return undefined;
               }, context);
             },
@@ -1424,15 +1412,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         }
         await runtime.commit(async (tx) => {
           if (!fromLedger && report !== undefined && self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId) {
-            await tx.createTask(
-              Reporter,
-              { threadId: self.threadId, conversationId: runtime.conversationId, message: report, report: true },
-              {
-                ownership: { kind: "conversation" },
-                background: true,
-                conversationId: self.parentConversationId as ConversationId,
-              },
-            );
+            await nextTurn(tx, self.parentConversationId as ConversationId, { threadId: self.threadId, conversationId: runtime.conversationId, message: report, report: true });
           }
           return { status: "terminal", outcome: { status: "completed", result: null } };
         }, context);

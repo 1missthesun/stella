@@ -282,18 +282,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     snapshot: OwnerSnapshot,
   ): string[] {
     if (row.ingress === "mobile" && row.requesting_device_id) {
-      return [
-        ...new Set(
-          (snapshot.pairedDevices ?? [])
-            .filter(
-              (pairing) =>
-                pairing.mobileDeviceId === row.requesting_device_id &&
-                (!row.pair_grant_device_id ||
-                  pairing.desktopDeviceId === row.pair_grant_device_id),
-            )
-            .map((pairing) => pairing.desktopDeviceId),
-        ),
-      ];
+      // The phone's chosen computer, checked at the door (a signed pairing on
+      // older apps, the account session otherwise); offers still need it to
+      // be one of the account's computers, present and willing.
+      return row.pair_grant_device_id ? [row.pair_grant_device_id] : [];
     }
     if (
       (row.ingress === "desktop" ||

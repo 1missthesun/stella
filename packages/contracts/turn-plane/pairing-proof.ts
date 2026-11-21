@@ -134,11 +134,39 @@ const bounded = (value: string | null, max: number): string => {
   return trimmed.length > 0 && trimmed.length <= max ? trimmed : "";
 };
 
+/** Phones on app versions from before session-authorised phones sign each request. */
 export const hasMobilePairingProofHeaders = (headers: Headers): boolean =>
-  Boolean(
-    headers.get(MOBILE_PAIRING_HEADERS.proof)?.trim() ||
-      headers.get(MOBILE_PAIRING_HEADERS.mobileDeviceId)?.trim(),
+  Boolean(headers.get(MOBILE_PAIRING_HEADERS.proof)?.trim());
+
+/**
+ * A phone authorised by its account session names itself and, for sends that
+ * let Stella choose, the computer it prefers. Neither is a credential: the
+ * session already lets its holder reach every computer on the account.
+ */
+export const readMobileSessionPhone = (
+  headers: Headers,
+): { mobileDeviceId: string; desktopDeviceId?: string } | null => {
+  const mobileDeviceId = bounded(
+    headers.get(MOBILE_PAIRING_HEADERS.mobileDeviceId),
+    MOBILE_PAIRING_LIMITS.deviceId,
   );
+  if (!mobileDeviceId) return null;
+  const desktopDeviceId = bounded(
+    headers.get(MOBILE_PAIRING_HEADERS.desktopDeviceId),
+    MOBILE_PAIRING_LIMITS.deviceId,
+  );
+  return { mobileDeviceId, ...(desktopDeviceId ? { desktopDeviceId } : {}) };
+};
+
+export const mobileSessionPhoneHeaders = (phone: {
+  mobileDeviceId: string;
+  desktopDeviceId?: string;
+}): Record<string, string> => ({
+  [MOBILE_PAIRING_HEADERS.mobileDeviceId]: phone.mobileDeviceId,
+  ...(phone.desktopDeviceId
+    ? { [MOBILE_PAIRING_HEADERS.desktopDeviceId]: phone.desktopDeviceId }
+    : {}),
+});
 
 export const readMobilePairingProofHeaders = (
   headers: Headers,

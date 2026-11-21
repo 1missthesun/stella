@@ -3,4 +3,4 @@
 export {
   ensurePrivateDir,
   writePrivateFile,
-} from "../shared/private-fs.js";
+} from "@stella/node-shared/shared/private-fs.js";

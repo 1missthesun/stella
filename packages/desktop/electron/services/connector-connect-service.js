@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { BrowserWindow, shell } from "electron";
-import { STELLA_BROWSER_EXTENSION_ID } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
+import { STELLA_BROWSER_EXTENSION_ID } from "@stella/node-shared/tools/stella-browser-bridge-config";
 import { runIntegrationFlow } from "./integration-flows.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 import {

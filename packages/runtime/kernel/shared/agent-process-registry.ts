@@ -7,12 +7,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { terminateProcessTree } from "./process-tree.js";
+import { terminateProcessTree } from "@stella/node-shared/shared/process-tree.js";
 import {
   pidIsAlive as isAlive,
   readProcessIdentity,
   signalRecordedProcess,
-} from "./process-identity.js";
+} from "@stella/node-shared/shared/process-identity.js";
 
 export type AgentProcessRecord = {
   pid: number;

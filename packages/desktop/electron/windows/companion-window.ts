@@ -43,7 +43,7 @@ import {
   getCompanionAnchor,
   setCompanionAnchor,
   setCompanionEnabled,
-} from "@stella/runtime/kernel/preferences/local-preferences";
+} from "@stella/node-shared/preferences/local-preferences";
 import { t } from "../services/i18n-service.js";
 import { STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES } from "../window-capture.js";
 import { createSharedWebPreferences } from "./shared-window-preferences.js";

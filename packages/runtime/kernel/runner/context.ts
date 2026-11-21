@@ -10,7 +10,7 @@ import {
   getModelOverride,
   getReasoningEffort,
   getSubscriptionHarnessEnabled,
-} from "../preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 import type {
   RunnerContext,
   ParsedAgentLike,
@@ -49,7 +49,7 @@ import {
 import type { ResolvedLlmRoute } from "../model-routing.js";
 import { createBackendSession, initialBackendUrl } from "./backend-session.js";
 import { hostname } from "node:os";
-import { resolveJwtOwnerScope } from "./computer-agent-cloud-records.js";
+import { resolveJwtOwnerScope } from "@stella/node-shared/shared/jwt-owner-scope.js";
 import {
   assistantPayloadText,
   createLinkedFilePublisher,

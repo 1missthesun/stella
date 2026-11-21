@@ -1,5 +1,5 @@
 import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
-import { getLocalLlmCredential } from "@stella/runtime/kernel/storage/llm-credentials";
+import { getLocalLlmCredential } from "@stella/node-shared/storage/llm-credentials";
 
 const TRANSCRIPTIONS_URL = "https://openrouter.ai/api/v1/audio/transcriptions";
 const MODEL = STELLA_MEDIA_MODELS.dictation;

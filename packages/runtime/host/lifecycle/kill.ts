@@ -5,7 +5,7 @@ import {
   readProcessIdentity,
   type RecordedProcess,
   signalRecordedProcess,
-} from "../../kernel/shared/process-identity.js";
+} from "@stella/node-shared/shared/process-identity.js";
 
 const ALIVE_POLL_INTERVAL_MS = 50;
 const SIGKILL_CONFIRM_BUDGET_MS = 1_000;

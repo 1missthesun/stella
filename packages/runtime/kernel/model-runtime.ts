@@ -28,7 +28,7 @@ import {
 import {
   ensurePrivateDirSync,
   writePrivateFileSync,
-} from "./shared/private-fs.js";
+} from "@stella/node-shared/shared/private-fs.js";
 
 const DEFAULT_CATALOG_BASE_URL = "https://pi.dev";
 const REMOTE_CATALOG_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1_000;

@@ -17,12 +17,12 @@ import {
   ensurePrivateDirSync,
   readPrivateJsonFileSync,
   writePrivateFileSync,
-} from './shared/private-fs.js'
+} from '@stella/node-shared/shared/private-fs.js'
 import {
   runScheduleScript,
   scheduleScriptsDir,
 } from './shared/schedule-scripts.js'
-import type { StellaHostRunnerTarget } from './lifecycle-targets.js'
+import type { StellaHostRunnerTarget } from '@stella/node-shared/lifecycle-targets.js'
 import type { RuntimeAutomationTurnResult } from '@stella/contracts/protocol'
 import {
   SCHEDULE_THREAD_ID_MAX_CHARS,

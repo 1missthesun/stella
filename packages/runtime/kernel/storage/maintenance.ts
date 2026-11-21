@@ -116,7 +116,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { openSqliteConnection } from "./database.js";
 import { forkFixedRateFiber } from "./effect-runtime.js";
 import { deleteLegacyRunEventBatch } from "./entry-retention.js";
@@ -124,8 +124,8 @@ import {
   SCHEMA_VERSION,
   SEARCH_TEXT_INDEX_NAME,
   SEARCH_TEXT_INDEX_SQL,
-} from "./schema.js";
-import type { SqliteDatabase } from "./shared.js";
+} from "@stella/node-shared/storage/schema.js";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;

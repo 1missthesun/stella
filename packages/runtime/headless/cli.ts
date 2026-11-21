@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import "../kernel/shared/http-proxy.js";
+import "@stella/node-shared/shared/http-proxy.js";
 
 type CliMode = "chat" | "completion" | "list-models";
 

@@ -1,10 +1,10 @@
 import path from "node:path";
 
-import { memoryFileMaxChars } from "@stella/runtime/kernel/memory/memory-client.js";
+import { memoryFileMaxChars } from "@stella/node-shared/memory/memory-client.js";
 import {
   MAIN_MEMORY_RELATIVE_PATH,
   RULES_MEMORY_RELATIVE_PATH,
-} from "@stella/runtime/kernel/memory/memory-layout.js";
+} from "@stella/node-shared/memory/memory-layout.js";
 
 export type MemoryMerge = { path: string; copy: string };
 

@@ -32,7 +32,7 @@ import type {
   BrowserViewUnavailableReason,
 } from "@stella/contracts/desktop/browser-view";
 import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-messaging-host.js";
-import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
+import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/node-shared/tools/stella-browser-bridge-config";
 import { trimInAppBrowserStorage } from "./in-app-browser/storage-hygiene.js";
 import { keepSessionCookies } from "./in-app-browser/session-cookie-keeper.js";
 import {

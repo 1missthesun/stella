@@ -3,7 +3,7 @@ import type { Readable } from "node:stream";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
-import { getFileLogger } from "@stella/runtime/observability/file-logger";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger";
 
 type WakewordEvent =
   | {

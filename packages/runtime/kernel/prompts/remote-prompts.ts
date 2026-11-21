@@ -12,7 +12,7 @@ import {
   STELLA_PROMPT_SCHEMA_VERSION,
 } from "@stella/contracts/stella-prompts";
 import { STELLA_PROMPTS_PATH } from "@stella/contracts/stella-api";
-import { ensurePrivateDir } from "../shared/private-fs.js";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 import { createRuntimeLogger } from "../debug.js";
 
 const logger = createRuntimeLogger("prompts.remote");

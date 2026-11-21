@@ -15,7 +15,7 @@ import {
   getComputerExecutionSignal,
 } from "../computer-use/execution-context.js";
 import { forkTimeoutFiber } from "./effect-runtime.js";
-import { signalOwnChild } from "../shared/process-identity.js";
+import { signalOwnChild } from "@stella/node-shared/shared/process-identity.js";
 
 // NOT named `__dirname`: the CLI/electron esbuild bundles prepend a banner
 // that already declares a top-level `const __dirname`, and esbuild cannot
@@ -40,9 +40,11 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
   const fileName = `${baseName}${ext}`;
   const cliPath = getComputerExecutionCliPath();
   const cliDir = cliPath ? path.dirname(path.resolve(cliPath)) : null;
+  // Set only inside a packaged Electron app.
+  const resourcesPath = (process as { resourcesPath?: unknown }).resourcesPath;
   const candidates = [
-    typeof process.resourcesPath === "string"
-      ? path.join(process.resourcesPath, "native", "out", platformDir, fileName)
+    typeof resourcesPath === "string"
+      ? path.join(resourcesPath, "native", "out", platformDir, fileName)
       : null,
     cliDir
       ? path.resolve(cliDir, "../../../native/out", platformDir, fileName)

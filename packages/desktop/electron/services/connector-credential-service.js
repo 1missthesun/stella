@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { shell } from "electron";
-import { saveConnectorAccessToken, } from "@stella/runtime/kernel/connectors/oauth";
+import { saveConnectorAccessToken, } from "@stella/node-shared/connectors/token-store";
 import { callRuntimeAppService, watchAppServiceProgress, } from "./runtime-app-services.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;

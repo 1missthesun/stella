@@ -61,7 +61,7 @@ import {
   isRejectedThinkingSignatureError,
   MAX_COMPACTIONS_PER_TURN,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
-import { resolveExternalCliPath } from "@stella/runtime/kernel/integrations/external-cli-resolution.js";
+import { resolveExternalCliPath } from "@stella/node-shared/integrations/external-cli-resolution.js";
 import { prepareCloudClaudeCli } from "./claude-cli.js";
 import {
   CLOUD_HOST_STATE,

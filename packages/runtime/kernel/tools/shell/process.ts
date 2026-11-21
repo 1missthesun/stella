@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import type { ToolProcessIdentity } from "../types.js";
-import { terminateProcessTree } from "../../shared/process-tree.js";
+import { terminateProcessTree } from "@stella/node-shared/shared/process-tree.js";
 import { isolateToolProcessLaunch } from "../process-isolation.js";
 
 export type SpawnedShell = ReturnType<typeof spawn>;

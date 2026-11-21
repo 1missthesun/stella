@@ -2,7 +2,7 @@ import crypto from "crypto";
 import fs from "fs";
 import { promises as fsPromises } from "fs";
 import path from "path";
-import { writePrivateFile } from "../shared/private-fs.js";
+import { writePrivateFile } from "@stella/node-shared/shared/private-fs.js";
 
 const RESOLVED_MODELS_FILE = "claude-code-resolved-models.json";
 

@@ -1,6 +1,6 @@
 import path from "path";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readSync, writeFileSync } from "fs";
-import { windowsHiddenSpawnPreloadSource } from "../../shared/windows-hidden-spawns.js";
+import { windowsHiddenSpawnPreloadSource } from "@stella/node-shared/shared/windows-hidden-spawns.js";
 
 export type ShellStateOptions = {
   enableShellShims?: boolean;

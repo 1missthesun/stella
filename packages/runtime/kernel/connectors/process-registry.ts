@@ -11,7 +11,7 @@ import {
   type RecordedProcess,
   signalOwnChild,
   signalRecordedProcess,
-} from "../shared/process-identity.js";
+} from "@stella/node-shared/shared/process-identity.js";
 import { getConnectorStateRoot } from "./state.js";
 
 const execFileAsync = promisify(execFile);

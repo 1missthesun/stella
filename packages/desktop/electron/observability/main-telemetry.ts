@@ -1,9 +1,9 @@
 import path from "node:path";
 import { app } from "electron";
 import type { TelemetryEnvironment } from "@stella/contracts/telemetry";
-import { RemoteTelemetryClient } from "@stella/runtime/observability/remote-telemetry";
-import { telemetryHttpEndpoint } from "@stella/runtime/observability/telemetry-endpoints";
-import { getTelemetryEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
+import { RemoteTelemetryClient } from "@stella/node-shared/observability/remote-telemetry";
+import { telemetryHttpEndpoint } from "@stella/node-shared/observability/telemetry-endpoints";
+import { getTelemetryEnabled } from "@stella/node-shared/preferences/local-preferences";
 
 type MainTelemetryOptions = {
   stellaDataDirPath: string;

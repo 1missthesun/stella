@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { powerMonitor } from "electron";
 import { callRuntimeAppService } from "./runtime-app-services.js";
-import { getFileLogger } from "@stella/runtime/observability/file-logger";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger";
 
 const STATE_FILE = "claude-cli-updates.json";
 const CHECK_INTERVAL_MS = 12 * 60 * 60_000;

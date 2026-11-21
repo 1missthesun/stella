@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { formatCliBridgeEndpoint } from "../kernel/connectors/cli-bridge-endpoint.js";
+import { formatCliBridgeEndpoint } from "../connectors/cli-bridge-endpoint.js";
 
 const RUNTIME_SUBDIR = "runtime";
 const LOGS_SUBDIR = "logs";

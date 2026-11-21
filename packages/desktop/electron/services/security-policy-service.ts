@@ -10,8 +10,8 @@ import path from "path";
 import {
   ensurePrivateDir,
   writePrivateFile,
-} from "@stella/runtime/kernel/home/private-fs";
-import type { WindowManagerTarget } from "@stella/runtime/kernel/lifecycle-targets";
+} from "@stella/node-shared/shared/private-fs";
+import type { WindowManagerTarget } from "@stella/node-shared/lifecycle-targets";
 import { t } from "./i18n-service.js";
 import { visibleDialogParent } from "../windows/dialog-parent.js";
 

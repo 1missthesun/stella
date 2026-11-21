@@ -71,7 +71,7 @@ import {
   type TaskTabs,
 } from "../browser-use/task-tabs.js";
 import { saveBrowserScreenshot } from "./browser-screenshot-store.js";
-import { resolveStatePath } from "../cli/shared.js";
+import { resolveStatePath } from "@stella/node-shared/cli/shared.js";
 import { expandHomePath, toolContextHome } from "../tools/utils.js";
 import type { ComputerUseSession } from "./session.js";
 import {

@@ -5,7 +5,7 @@ import {
   getOrCreateDeviceIdentityEffect,
   resetDeviceIdentityEffect,
   type DeviceIdentity,
-} from "./device.js";
+} from "@stella/node-shared/home/device.js";
 import {
   reconcileBundledExtensionsEffect,
   type ExtensionsSyncReport,

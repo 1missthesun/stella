@@ -5,14 +5,14 @@ import {
   ensureRuntimeIpcDir,
   resolveRuntimePaths,
   type RuntimePaths,
-} from "../../worker/runtime-paths.js";
+} from "@stella/node-shared/worker/runtime-paths.js";
 import {
   probeRunningWorker,
   probeRunningWorkerOwner,
   removeStaleRuntimeArtifacts,
 } from "../../worker/lifecycle-server.js";
 import { ensureRuntimeAuthKey } from "../../worker/runtime-auth.js";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import type { ExpectedRuntimeServerIdentity } from "../../worker/server-identity.js";
 import {
   WorkerNotReadyError,

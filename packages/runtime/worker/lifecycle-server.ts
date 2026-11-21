@@ -4,15 +4,15 @@ import {
   readLiveLockOwner,
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "../kernel/shared/owner-lock.js";
-import { getFileLogger } from "../observability/file-logger.js";
+} from "@stella/node-shared/shared/owner-lock.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { forkDelayed, type WorkerTimerHandle } from "./effect-runtime.js";
 import {
   ensureRuntimeIpcDir,
   resolveRuntimePaths,
   runtimeIpcPathUsesFilesystem,
   type RuntimePaths,
-} from "./runtime-paths.js";
+} from "@stella/node-shared/worker/runtime-paths.js";
 
 export type LifecycleServerOptions = {
   stellaAppDir: string;

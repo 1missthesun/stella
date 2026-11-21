@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
-import { errorDiagnosticFields } from "../../observability/error-fields.js";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { errorDiagnosticFields } from "@stella/node-shared/observability/error-fields.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 
 export type ChildStdioStream = "stdin" | "stdout" | "stderr";
 

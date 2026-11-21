@@ -69,8 +69,8 @@ import { createComputerUseSession } from "../computer-use/session.js";
 import { cleanupWindowsStellaComputerSessionDaemon } from "../cli/stella-computer-windows.js";
 import { createReplConnectClient } from "../connectors/connect-service.js";
 import { createDiskMemory } from "../memory/disk-memory.js";
-import { runMemoryRequest } from "../memory/memory-client.js";
-import { loadLocalPreferences } from "../preferences/local-preferences.js";
+import { runMemoryRequest } from "@stella/node-shared/memory/memory-client.js";
+import { loadLocalPreferences } from "@stella/node-shared/preferences/local-preferences.js";
 
 import type { ToolDefinition } from "../extensions/types.js";
 import type { HookEmitter } from "../extensions/hook-emitter.js";

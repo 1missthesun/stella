@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { extractFrontmatter } from "../frontmatter.js";
-import { ensurePrivateDir } from "../shared/private-fs.js";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 
 export const CUSTOMIZABLE_PROMPT_AGENT_IDS = [
   "orchestrator",

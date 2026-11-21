@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
-import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared";
+import type { LocalChatEventRecord } from "@stella/node-shared/storage/shared";
 
 /**
  * Whether a phone or another of the owner's computers may read a path on

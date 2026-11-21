@@ -19,8 +19,8 @@ import {
   type MemoryClient,
   type MemoryFileInfo,
   type MemoryFileStore,
-} from "./memory-client.js";
-import { MEMORIES_DIR } from "./memory-layout.js";
+} from "@stella/node-shared/memory/memory-client.js";
+import { MEMORIES_DIR } from "@stella/node-shared/memory/memory-layout.js";
 
 const MAX_WALK_ENTRIES = 5_000;
 

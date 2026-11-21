@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { claudeCodeQuitting, markClaudeCodeQuitting } from "./claude-code-quitting.js";
-import { signalOwnChild } from "../shared/process-identity.js";
+import { signalOwnChild } from "@stella/node-shared/shared/process-identity.js";
 import {
   claudeUsageLimitOf,
   formatClaudeUsageLimitReset,
@@ -36,7 +36,7 @@ import {
   recordClaudeCodeContextWindows,
   recordClaudeCodeResolvedModel,
 } from "./claude-code-resolved-models.js";
-import { buildExternalCliChildEnv } from "./external-cli-resolution.js";
+import { buildExternalCliChildEnv } from "@stella/node-shared/integrations/external-cli-resolution.js";
 import {
   CLAUDE_CLI_UNUSABLE_CODE,
   noteClaudeCliLaunchFailed,

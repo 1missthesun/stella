@@ -17,7 +17,7 @@ import {
   type GatewayDeviceKeyProof,
 } from "@stella/contracts/gateway/dpop";
 import { normalizeStellaSiteUrl } from "@stella/contracts/stella-api";
-import type { DeviceSigner } from "./home/device.js";
+import type { DeviceSigner } from "@stella/node-shared/home/device.js";
 
 export const GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS = 60_000;
 const GATEWAY_SESSION_EXCHANGE_TIMEOUT_MS = 15_000;

@@ -13,7 +13,7 @@ import {
   getAgentRuntimeEngine,
   getModelOverride,
   loadLocalPreferences,
-} from "../preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 import type {
   AgentModelReasoningEffort,
   AgentRuntimeEngine,

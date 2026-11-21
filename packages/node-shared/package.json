@@ -1,0 +1,23 @@
+{
+  "name": "@stella/node-shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node code both Electron main and the runtime run: Stella's home paths, preferences, credential stores, chat storage, logging and process helpers. It never imports @stella/runtime or @stella/agent.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --pretty false --noEmit"
+  },
+  "exports": {
+    "./*.js": "./*.ts",
+    "./*": "./*.ts"
+  },
+  "dependencies": {
+    "@stella/contracts": "workspace:*",
+    "effect": "4.0.0",
+    "undici": "^8.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "bun-types": "1.4.4"
+  }
+}

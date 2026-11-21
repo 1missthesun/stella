@@ -4,7 +4,7 @@ import { startupAppPainted } from "../observability/app-paint.js";
 import { sweepOrphanedHelpers } from "../services/orphaned-helpers.js";
 import { resolveStellaBrowserBinaryPath } from "../utils/stella-browser-paths.js";
 import { getTotalSystemMemoryMb, isLowMemoryWindowsDevice, } from "../resource-profile.js";
-import { getCompanionEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getCompanionEnabled } from "@stella/node-shared/preferences/local-preferences";
 import { noticeLinuxRealtimeLimitOnce } from "../linux-realtime-limit.js";
 const OVERLAY_STARTUP_WARM_DELAY_MS = 5_000;
 const runDeferredStartupTask = async (context, task) => {

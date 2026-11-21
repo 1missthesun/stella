@@ -8,8 +8,8 @@ import {
 } from "node:fs";
 import path from "node:path";
 
-import { resolveStatePath } from "@stella/runtime/kernel/cli/shared";
-import { resolveAutomationSocketPath } from "@stella/runtime/kernel/computer-use/automation-socket-paths";
+import { resolveStatePath } from "@stella/node-shared/cli/shared";
+import { resolveAutomationSocketPath } from "@stella/node-shared/computer-use/automation-socket-paths";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
 import { pidRunsExecutable, terminateOwnedProcess } from "./process-identity.js";
 

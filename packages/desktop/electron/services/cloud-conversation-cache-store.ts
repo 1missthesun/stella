@@ -12,7 +12,7 @@ import {
   type CloudConversationCacheSnapshot,
   type CloudConversationCacheVersion,
 } from "@stella/contracts/cloud-conversation-cache";
-import type { SqliteDatabase } from "@stella/runtime/kernel/storage/shared";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared";
 
 const AUTHORITY_FIELD_BYTES = 512;
 const TITLE_BYTES = 4 * 1024;

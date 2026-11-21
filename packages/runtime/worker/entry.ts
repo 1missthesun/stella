@@ -1,11 +1,11 @@
 import { Cause, Effect, Exit, Scope } from "effect";
-import "../kernel/shared/http-proxy.js";
+import "@stella/node-shared/shared/http-proxy.js";
 import path from "node:path";
 import {
   getFileLogger,
   initFileLogger,
   installWorkerCrashHandling,
-} from "../observability/file-logger.js";
+} from "@stella/node-shared/observability/file-logger.js";
 import {
   configureAgentProcessRegistry,
   describeAgentProcesses,

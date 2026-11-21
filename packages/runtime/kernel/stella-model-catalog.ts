@@ -11,7 +11,7 @@ import {
   STELLA_MODELS_PATH,
   normalizeStellaSiteUrl,
 } from "@stella/contracts/stella-api";
-import { writePrivateFile } from "./shared/private-fs.js";
+import { writePrivateFile } from "@stella/node-shared/shared/private-fs.js";
 import type { ResolvedLlmRoute } from "./model-routing.js";
 import {
   findRegistryModel,

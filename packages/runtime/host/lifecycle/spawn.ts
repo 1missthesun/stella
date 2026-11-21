@@ -2,11 +2,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { Cause, Effect, Exit, type Scope } from "effect";
-import { runtimeIpcListenUrl, type RuntimePaths } from "../../worker/runtime-paths.js";
+import { runtimeIpcListenUrl, type RuntimePaths } from "@stella/node-shared/worker/runtime-paths.js";
 import { rotateLogIfOversized } from "../../observability/rotate-file.js";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { killWorkerProcess } from "./kill.js";
-import { readProcessIdentity } from "../../kernel/shared/process-identity.js";
+import { readProcessIdentity } from "@stella/node-shared/shared/process-identity.js";
 
 /** Start time of each worker this host spawned, read as soon as it started. */
 const spawnedIdentity = new WeakMap<ChildProcess, string | null>();

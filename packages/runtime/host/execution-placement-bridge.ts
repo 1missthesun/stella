@@ -40,12 +40,12 @@ import {
   type ExecutionTargetMode,
 } from "@stella/contracts/turn-plane/placement";
 import { canonicalDispatchPayloadJson } from "@stella/contracts/turn-plane/pairing-proof";
-import { getFileLogger } from "../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import {
   DeviceRequestServer,
   type ServeDeviceRequest,
 } from "./device-request-server.js";
-import type { SqliteDatabase } from "../kernel/storage/shared.js";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 import {
   ExecutionPlacementInbox,
   type ExecutionPlacementInboxRow,

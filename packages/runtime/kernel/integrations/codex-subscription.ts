@@ -7,7 +7,7 @@ import {
   parseReasoningEffortLevel,
   type ReasoningEffortLevel,
 } from "@stella/contracts/reasoning-effort";
-import { loadLocalPreferences } from "../preferences/local-preferences.js";
+import { loadLocalPreferences } from "@stella/node-shared/preferences/local-preferences.js";
 
 type CodexReasoningEffort = "none" | ReasoningEffortLevel;
 

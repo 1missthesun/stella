@@ -1,5 +1,5 @@
 import type { Socket } from "node:net";
-import type { RuntimePaths } from "../../worker/runtime-paths.js";
+import type { RuntimePaths } from "@stella/node-shared/worker/runtime-paths.js";
 import type { RuntimeServerIdentity } from "../../worker/server-identity.js";
 
 export type LifecycleConnection = {

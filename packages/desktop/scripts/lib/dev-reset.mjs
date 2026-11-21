@@ -7,7 +7,7 @@ import {
   readProcessGroup,
   recordProcess,
   signalRecordedProcess,
-} from '../../../runtime/kernel/shared/process-identity.ts';
+} from '@stella/node-shared/shared/process-identity';
 
 const scriptDir = import.meta.dirname;
 const desktopDir = resolve(scriptDir, '..', '..');

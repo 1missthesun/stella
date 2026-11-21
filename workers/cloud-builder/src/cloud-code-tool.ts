@@ -21,7 +21,7 @@ import type { ConnectorToolEntry } from "@stella/runtime/kernel/connectors/conne
 import {
   runMemoryRequest,
   type MemoryClient,
-} from "@stella/runtime/kernel/memory/memory-client.js";
+} from "@stella/node-shared/memory/memory-client.js";
 import { AgentToolSuspendedError } from "@stella/runtime/kernel/agent-core/suspension.js";
 import {
   isMapRouteArtifact,

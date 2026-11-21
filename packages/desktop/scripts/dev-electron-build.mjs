@@ -75,15 +75,59 @@ const rendererSourceExternals = [
   "cjs-module-lexer",
 ];
 
+/**
+ * Electron main is the OS and window shell. The runtime (agents, sign-in
+ * flows, model catalogs, connectors) runs in its own process and main reaches
+ * it over the bridge, so the only runtime code main bundles is the bridge
+ * client below, and none of @stella/agent. Code both processes run lives in
+ * @stella/node-shared. assertMainBundleRuntimeBoundary holds the bundle to
+ * this; check-boundary holds the sources to it.
+ */
+export const mainRuntimeBridgeFiles = [
+  "packages/runtime/host/client-protocol.ts",
+  "packages/runtime/host/effect-runtime.ts",
+  "packages/runtime/host/lifecycle.ts",
+  "packages/runtime/host/lifecycle/",
+  "packages/runtime/host/remote.ts",
+  "packages/runtime/kernel/shared/runtime-paths.ts",
+  "packages/runtime/observability/rotate-file.ts",
+  "packages/runtime/worker/effect-runtime.ts",
+  "packages/runtime/worker/lifecycle-server.ts",
+  "packages/runtime/worker/runtime-auth.ts",
+  "packages/runtime/worker/server-identity.ts",
+];
+
+const isMainRuntimeBridgeInput = (input) =>
+  mainRuntimeBridgeFiles.some((file) =>
+    file.endsWith("/") ? input.startsWith(file) : input === file,
+  );
+
+export const assertMainBundleRuntimeBoundary = (metafile) => {
+  const outside = Object.keys(metafile?.inputs ?? {})
+    .map((input) => toPosix(input))
+    .filter(
+      (input) =>
+        input.startsWith("packages/agent/") ||
+        (input.startsWith("packages/runtime/") && !isMainRuntimeBridgeInput(input)),
+    );
+  if (outside.length > 0) {
+    throw new Error(
+      `Electron main bundles runtime or agent code beyond the bridge client: ${outside.join(", ")}. ` +
+        "Run it in the runtime and reach it with a host call (RUNTIME_APP_SERVICE_CALLS), " +
+        "or move code both processes need to @stella/node-shared.",
+    );
+  }
+};
+
 // Every workspace package main can reach resolves to this tree's own source.
 // Without an alias, `@stella/x` resolves through node_modules, and an update's
 // check builds on a scratch copy whose node_modules are the installed
 // version's: it would bundle the old package (or fail on a file only the new
 // one has, as @stella/agent/provider/antigravity did on 2026-11-21).
 const workspaceAliases = {
-  "@stella/agent": path.join(repoRootDir, "packages", "agent", "src"),
   "@stella/contracts": path.join(repoRootDir, "packages", "contracts"),
   "@stella/model-catalog": path.join(repoRootDir, "packages", "model-catalog"),
+  "@stella/node-shared": path.join(repoRootDir, "packages", "node-shared"),
   "@stella/runtime": path.join(repoRootDir, "packages", "runtime"),
   "@stella/theme": path.join(repoRootDir, "packages", "theme"),
 };
@@ -94,24 +138,24 @@ const fingerprintFilePath = path.join(
 );
 
 const bundleSourceRoots = [
-  "packages/agent/src",
   "packages/contracts",
   "packages/desktop/electron",
   "packages/desktop-ui/src/shared/i18n",
-  "packages/runtime",
+  "packages/node-shared",
+  "packages/runtime/host/lifecycle",
 ];
 const bundleSourceExcludedPrefixes = ["packages/home-seed/"];
 const bundleConfigFiles = [
   "package.json",
   "bun.lock",
   "tsconfig.json",
-  "packages/agent/package.json",
   "packages/contracts/package.json",
   "packages/desktop/package.json",
   "packages/desktop/scripts/dev-electron-build.mjs",
   "packages/desktop/tsconfig.electron.json",
   "packages/desktop/tsconfig.preload.json",
   "packages/desktop/tsconfig.browser-pages.json",
+  "packages/node-shared/package.json",
   "packages/runtime/package.json",
   ...desktopEnvFiles("development").map((name) => `packages/desktop-ui/${name}`),
 ];
@@ -265,7 +309,6 @@ export const mainStartupDeferredExternals = [
   ...rendererSourceExternals,
 ];
 export const mainStartupDeferredInputs = [
-  "packages/runtime/kernel/integrations/claude-code-session-runtime.ts",
   "packages/desktop/electron/source/renderer-source.ts",
   "packages/desktop/electron/source/tools.ts",
 ];
@@ -394,7 +437,9 @@ export const buildElectronBundles = async () => {
         runEsbuildBuild({ ...options, write: false, metafile: true }),
       ),
     );
-    assertMainBundleStartupBoundary(mergeMetafiles(results.map((result) => result.metafile)));
+    const metafile = mergeMetafiles(results.map((result) => result.metafile));
+    assertMainBundleRuntimeBoundary(metafile);
+    assertMainBundleStartupBoundary(metafile);
     await assertOutputsParse(results);
     const changedOutputs = [];
     const outputs = [];

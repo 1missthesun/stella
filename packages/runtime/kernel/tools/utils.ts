@@ -3,7 +3,7 @@ import type { Dirent } from "fs";
 import path from "path";
 import os from "os";
 import { createHash } from "crypto";
-import { resolveRuntimeStatePath } from "../home/stella-paths.js";
+import { resolveRuntimeStatePath } from "@stella/node-shared/home/stella-paths.js";
 import { createRuntimeLogger } from "../debug.js";
 import picomatch from "picomatch";
 import { z } from "zod";

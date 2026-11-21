@@ -17,7 +17,7 @@ import type {
 import { listOfficePreviewSnapshots } from "../bootstrap/office-preview-bridge.js";
 import type { LocalChatHistoryService } from "../services/local-chat-history-service.js";
 import { isDisplayReadPathInLocalChatFiles } from "./display-handlers.js";
-import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared";
+import type { LocalChatEventRecord } from "@stella/node-shared/storage/shared";
 import { resolveCanonicalConversationFilePaths } from "../services/canonical-conversation-file-paths.js";
 import type { CloudConversationFileGrants } from "../services/cloud-conversation-file-grants.js";
 import { handleIpc } from "./typed-ipc.js";

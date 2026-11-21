@@ -410,3 +410,11 @@ export const chatGptRequestViolation = (body: Record<string, unknown>): string |
 };
 
 export type { ChatGptProfileSummary, ChatGptProfilesState } from "./chatgpt-siwc-types.js";
+
+/** What Stella keeps from a ChatGPT sign-in to sign in again without re-consent. */
+export type ChatGptSavedRegistration = {
+  clientId: string;
+  subject?: string;
+  idTokenHint?: string;
+  email?: string;
+};

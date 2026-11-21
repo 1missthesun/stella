@@ -20,13 +20,13 @@ import { z } from "zod";
 import {
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "@stella/runtime/kernel/shared/owner-lock";
+} from "@stella/node-shared/shared/owner-lock";
 
 import {
   getStellaInAppBrowserInitEndpoint,
   getStellaInAppBrowserInitTokenPath,
   type StellaInAppBrowserInitEndpoint,
-} from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
+} from "@stella/node-shared/tools/stella-browser-bridge-config";
 
 const MAX_REQUEST_BYTES = 16 * 1024;
 const DISCOVERY_LOCK_TIMEOUT_MS = 5_000;

@@ -2,7 +2,7 @@ import {
   CLOUD_TURN_ATTEMPT_DIRECTORY_FLAG,
   parseCloudTurnAttemptDirectory,
 } from "@stella/contracts/cloud-turn-attempt";
-import "@stella/runtime/kernel/shared/http-proxy.js";
+import "@stella/node-shared/shared/http-proxy.js";
 import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { Effect } from "effect";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";

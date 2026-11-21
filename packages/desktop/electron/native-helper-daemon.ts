@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import { resolveNativeHelperPath } from './native-helper-path.js'
-import { getFileLogger } from '@stella/runtime/observability/file-logger'
+import { getFileLogger } from '@stella/node-shared/observability/file-logger'
 
 type DaemonChild = ChildProcessByStdio<Writable, Readable, null>
 

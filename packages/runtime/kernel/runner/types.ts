@@ -18,8 +18,8 @@ import type {
   HostRuntimeAuthRefreshResult,
   RuntimeAuthRefreshSource,
 } from "@stella/contracts/protocol";
-import type { LocalChatAppendEventArgs } from "../storage/shared.js";
-import type { DeviceSigner } from "../home/device.js";
+import type { LocalChatAppendEventArgs } from "@stella/node-shared/storage/shared.js";
+import type { DeviceSigner } from "@stella/node-shared/home/device.js";
 
 export type StellaHostRunnerOptions = {
   deviceId: string;

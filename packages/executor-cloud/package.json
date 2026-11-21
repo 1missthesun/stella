@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@stella/contracts": "workspace:*",
+    "@stella/node-shared": "workspace:*",
     "@stella/runtime": "workspace:*",
     "effect": "4.0.0"
   },

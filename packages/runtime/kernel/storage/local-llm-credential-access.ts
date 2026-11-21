@@ -1,8 +1,8 @@
-import { getLocalLlmCredential } from "./llm-credentials.js";
+import { getLocalLlmCredential } from "@stella/node-shared/storage/llm-credentials.js";
 import {
   getLocalLlmOAuthApiKey,
   hasLocalLlmOAuthCredential,
-} from "./llm-oauth-credentials.js";
+} from "@stella/node-shared/storage/llm-oauth-credentials.js";
 
 export type LocalLlmOAuthApiKeyAccessOptions = {
   forceRefresh?: boolean;

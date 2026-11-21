@@ -4,7 +4,7 @@ import path from "node:path";
 import { renderStellaPrompt } from "@stella/contracts/stella-prompts";
 
 import { extractFrontmatter } from "../frontmatter.js";
-import { getPromptPresetSelection } from "../preferences/local-preferences.js";
+import { getPromptPresetSelection } from "@stella/node-shared/preferences/local-preferences.js";
 import {
   DEFAULT_PROMPT_PRESET_ID,
   promptSelectionAgentId,

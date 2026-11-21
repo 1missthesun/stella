@@ -12,7 +12,7 @@ import {
 } from "node:fs/promises";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
+import { resolveLogPaths } from "@stella/node-shared/observability/log-paths";
 import { resolveAppInstall } from "../app-identity.js";
 
 const MAX_LOG_AGE_DAYS = 7;

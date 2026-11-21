@@ -3,12 +3,12 @@ import { z } from "zod";
 import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { forkDelayed } from "./effect-runtime.js";
-import { runtimeIpcPathUsesFilesystem } from "./runtime-paths.js";
+import { runtimeIpcPathUsesFilesystem } from "@stella/node-shared/worker/runtime-paths.js";
 import {
   cliBridgeTokenMatches,
   isUsableCliBridgeToken,
   parseCliBridgeEndpoint,
-} from "../kernel/connectors/cli-bridge-endpoint.js";
+} from "@stella/node-shared/connectors/cli-bridge-endpoint.js";
 import type {
   AutomationDaemonSpawnParams,
   AutomationDaemonSpawnResult,
@@ -33,7 +33,7 @@ import type {
  * Defensive ceiling kept below the 104-byte BSD `sun_path` limit (UTF-8
  * bytes + NUL, so 103 usable; Linux allows 108). Mirrors
  * `maxAutomationSocketPathBytes` in
- * `runtime/kernel/computer-use/automation-socket-paths.ts`. The endpoint from
+ * `node-shared/computer-use/automation-socket-paths.ts`. The endpoint from
  * `createSecureCliBridgeEndpoint` lives under the short runtime IPC root;
  * fail with an error naming the path instead of an opaque bind failure if a
  * custom root still exceeds the limit.

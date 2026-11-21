@@ -6,7 +6,7 @@ import {
   nextEscalationLevel,
   USER_ASK_ESCALATION_STEP_MS,
 } from "@stella/contracts/user-ask";
-import { writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+import { writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 const ESCALATION_BUDGET_FILE = "user-ask-escalations.json";
 const BUDGET_WINDOW_MS = 60 * 60_000;
 const MAX_BUDGET_EVENTS = 200;

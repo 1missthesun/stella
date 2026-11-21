@@ -32,6 +32,7 @@
     "@stella/contracts": "workspace:*",
     "@stella/executor-cloud": "workspace:*",
     "@stella/model-catalog": "workspace:*",
+    "@stella/node-shared": "workspace:*",
     "@stella/runtime": "workspace:*",
     "better-auth": "1.7.7",
     "croner": "^10.0.1",

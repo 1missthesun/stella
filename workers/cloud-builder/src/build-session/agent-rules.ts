@@ -1,5 +1,5 @@
 import { standingRulesSection } from "@stella/agent/stella/standing-rules";
-import { RULES_MEMORY_RELATIVE_PATH } from "@stella/runtime/kernel/memory/memory-layout.js";
+import { RULES_MEMORY_RELATIVE_PATH } from "@stella/node-shared/memory/memory-layout.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { ownerMemoryWorld, readWorldStellaText } from "../world-memory.js";
 import type { TurnRequest } from "./shared/types.js";

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { buildExternalCliChildEnv } from "./external-cli-resolution.js";
+import { buildExternalCliChildEnv } from "@stella/node-shared/integrations/external-cli-resolution.js";
 
 const OUTPUT_TAIL_CHARS = 2_000;
 

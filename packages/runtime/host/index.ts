@@ -17,7 +17,7 @@ import {
   backendTokenExpiryMs,
 } from "@stella/contracts/backend/client";
 import { resolveBundledRuntimeFile } from "../kernel/shared/runtime-paths.js";
-import { getFileLogger } from "../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { LocalSchedulerService } from "../kernel/local-scheduler-service.js";
 import {
   createCloudSchedules,
@@ -46,7 +46,7 @@ import {
 import {
   getDesktopDatabasePath,
   initializeDesktopDatabase,
-} from "../kernel/storage/database-init.js";
+} from "@stella/node-shared/storage/database-init.js";
 import {
   METHOD_NAMES,
   NOTIFICATION_NAMES,
@@ -60,7 +60,7 @@ import { createRuntimeUnavailableError } from "@stella/contracts/protocol/rpc-pe
 import { RuntimeWorkerLifecycleController } from "./worker-lifecycle.js";
 import { buildStdioConnectionFactory } from "./stdio-connection.js";
 import { buildInprocConnectionFactory } from "./inproc-connection.js";
-import { resolveRuntimePaths } from "../worker/runtime-paths.js";
+import { resolveRuntimePaths } from "@stella/node-shared/worker/runtime-paths.js";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { forkDelayed, hostRuntime, type HostTimerHandle } from "./effect-runtime.js";
 import {
@@ -99,7 +99,7 @@ import type {
   DispatchPayload,
   DispatchSummary,
 } from "@stella/contracts/turn-plane/placement";
-import type { SqliteDatabase } from "../kernel/storage/shared.js";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 import type { CloudSchedules } from "./cloud-schedules.js";
 import type { RuntimeHostHandler } from "./client-protocol.js";
 import type {

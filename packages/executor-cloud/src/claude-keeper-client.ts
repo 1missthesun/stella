@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readProcessGroup, signalRecordedProcess } from "@stella/runtime/kernel/shared/process-identity.js";
+import { readProcessGroup, signalRecordedProcess } from "@stella/node-shared/shared/process-identity.js";
 import { createHash } from "node:crypto";
 import { closeSync, openSync, statSync, truncateSync } from "node:fs";
 import { chmod, mkdir, readFile } from "node:fs/promises";

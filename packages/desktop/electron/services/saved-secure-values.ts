@@ -16,8 +16,8 @@ import {
 import {
   protectValue,
   unprotectValue,
-} from "@stella/runtime/kernel/shared/protected-storage";
-import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+} from "@stella/node-shared/shared/protected-storage";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 
 const INDEX_FILE = "user-ask-saved-values.json";
 const LEGACY_FILE = "user-ask-secrets.json";

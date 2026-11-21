@@ -17,7 +17,7 @@ import {
   getReasoningEffort,
   loadLocalPreferences,
   updateLocalModelPreferences,
-} from "../../kernel/preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 import {
   getAccessibleLocalLlmApiKey,
   getAccessibleLocalLlmOAuthApiKey,
@@ -31,8 +31,8 @@ import type { PiReportDelivery, RunnerPublicApi } from "../../kernel/runner/type
 import type { LocalCronJobRecord } from "@stella/contracts/scheduling";
 import { forkDelayed, sleepMs } from "../effect-runtime.js";
 import { UNLISTED_SCHEDULES_WAKER } from "@stella/contracts/agent-waiting";
-import { pidIsAlive, readProcessIdentity } from "../../kernel/shared/process-identity.js";
-import { terminateProcessTree } from "../../kernel/shared/process-tree.js";
+import { pidIsAlive, readProcessIdentity } from "@stella/node-shared/shared/process-identity.js";
+import { terminateProcessTree } from "@stella/node-shared/shared/process-tree.js";
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";

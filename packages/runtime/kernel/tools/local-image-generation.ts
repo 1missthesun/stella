@@ -3,7 +3,7 @@ import path from "node:path";
 import {
   getImageGenerationPreferences,
   type ImageGenerationProvider,
-} from "../preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 import { getAccessibleLocalLlmApiKey } from "../storage/local-llm-credential-access.js";
 import {
   claimImageOperationSubmission,

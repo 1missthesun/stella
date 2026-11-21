@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import type { ChannelEnvelope } from "@stella/contracts/local-chat";
-import type {
-  ImageContent,
-} from "@earendil-works/pi-ai";
+
+/** An image in a stored message (pi-ai's ImageContent). */
+type ImageContent = { type: "image"; data: string; mimeType: string };
 
 export type StoredImageContent = ImageContent & { sourcePath?: string };
 

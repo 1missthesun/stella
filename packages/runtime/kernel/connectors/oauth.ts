@@ -1,7 +1,5 @@
-import { promises as fs } from "node:fs";
 import http from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import path from "node:path";
 import { URL } from "node:url";
 
 import { Deferred, Effect } from "effect";
@@ -12,47 +10,19 @@ import {
   runConnectorEffect,
   tryConnectorOp,
 } from "./effect-runtime.js";
-import { getConnectorStateRoot } from "./state.js";
 import {
-  deleteProtectedValue,
-  protectValue,
-  unprotectValue,
-} from "../shared/protected-storage.js";
-import { writePrivateFile } from "../shared/private-fs.js";
+  deleteStoredConnectorTokens,
+  readStoredConnectorToken,
+  writeStoredConnectorToken,
+  type ConnectorTokenPayload,
+} from "@stella/node-shared/connectors/token-store.js";
 import {
   SIGN_IN_PAGE_HEADERS,
   signInErrorHtml,
   signInSuccessHtml,
 } from "@stella/contracts/sign-in-page";
 
-type TokenStore = {
-  version: 2;
-  tokens: Record<string, StoredConnectorTokenRecord>;
-};
-
-type StoredConnectorTokenRecord = {
-  valueProtected: string;
-  expiresAt?: number;
-  clientId?: string;
-  tokenEndpoint?: string;
-  resourceUrl?: string;
-  scopes?: string[];
-};
-
-export type ConnectorTokenPayload = {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
-  clientId?: string;
-  tokenEndpoint?: string;
-  tokenExchange?: {
-    type: "backend";
-    endpoint: string;
-    provider: string;
-  };
-  resourceUrl?: string;
-  scopes?: string[];
-};
+export type { ConnectorTokenPayload } from "@stella/node-shared/connectors/token-store.js";
 
 export type ConnectorTokenStoreBroker = {
   load: (tokenKey: string) => Promise<ConnectorTokenPayload | null>;
@@ -123,127 +93,17 @@ export type PreregisteredConnectorOAuthResponseType = "code" | "token";
 const DISCOVERY_TIMEOUT_MS = 5_000;
 const OAUTH_DISCOVERY_HEADER = "MCP-Protocol-Version";
 const OAUTH_DISCOVERY_VERSION = "2024-11-05";
-const CONNECTOR_TOKEN_SCOPE_PREFIX = "connector-token";
-
-const tokenFile = (stellaAppDir: string) =>
-  path.join(getConnectorStateRoot(stellaAppDir), ".credentials.json");
-
-const credentialScope = (tokenKey: string) =>
-  `${CONNECTOR_TOKEN_SCOPE_PREFIX}:${tokenKey.trim().toLowerCase()}`;
-
-const emptyStore = (): TokenStore => ({ version: 2, tokens: {} });
-
-const isTokenStore = (value: unknown): value is TokenStore =>
-  Boolean(
-    value &&
-      typeof value === "object" &&
-      (value as TokenStore).version === 2 &&
-      (value as TokenStore).tokens &&
-      typeof (value as TokenStore).tokens === "object",
-  );
-
-const readTokenStore = (
-  stellaAppDir: string,
-): Effect.Effect<TokenStore, unknown> =>
-  tryConnectorOp(async () => {
-    const file = tokenFile(stellaAppDir);
-    let raw: string;
-    try {
-      raw = await fs.readFile(file, "utf-8");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyStore();
-      throw error;
-    }
-    let parsed: unknown = null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parsed = null;
-    }
-    if (isTokenStore(parsed)) return parsed;
-    const quarantined = `${file}.corrupt-${Date.now()}`;
-    await fs.rename(file, quarantined);
-    console.warn("[connectors] Moved an unreadable credential store aside.", {
-      quarantined: path.basename(quarantined),
-      bytes: raw.length,
-    });
-    return emptyStore();
-  });
-
-const writeTokenStore = (
-  stellaAppDir: string,
-  store: TokenStore,
-): Effect.Effect<void, unknown> =>
-  tryConnectorOp(() =>
-    writePrivateFile(
-      tokenFile(stellaAppDir),
-      `${JSON.stringify(store, null, 2)}\n`,
-    ),
-  );
-
-const decodeTokenPayload = (
-  tokenKey: string,
-  record?: StoredConnectorTokenRecord,
-): ConnectorTokenPayload | null => {
-  if (!record?.valueProtected) return null;
-  try {
-    const raw = unprotectValue(
-      credentialScope(tokenKey),
-      record.valueProtected,
-    );
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ConnectorTokenPayload;
-    if (parsed?.accessToken) return parsed;
-  } catch {
-    // Treat corrupt protected entries as missing.
-  }
-  return null;
-};
-
-const saveConnectorTokenPayloadEffect = (
-  stellaAppDir: string,
-  tokenKey: string,
-  payload: ConnectorTokenPayload,
-): Effect.Effect<void, unknown> =>
-  Effect.gen(function* () {
-    const broker = tokenStoreBroker;
-    if (broker) {
-      return yield* tryConnectorOp(() => broker.save(tokenKey, payload));
-    }
-    const store = yield* readTokenStore(stellaAppDir);
-    const existing = store.tokens[tokenKey];
-    const valueProtected = yield* Effect.try({
-      try: () =>
-        protectValue(credentialScope(tokenKey), JSON.stringify(payload)),
-      catch: (error) => error,
-    });
-    store.tokens[tokenKey] = {
-      valueProtected,
-      ...(payload.expiresAt ? { expiresAt: payload.expiresAt } : {}),
-      ...(payload.clientId ? { clientId: payload.clientId } : {}),
-      ...(payload.tokenEndpoint ? { tokenEndpoint: payload.tokenEndpoint } : {}),
-      ...(payload.resourceUrl ? { resourceUrl: payload.resourceUrl } : {}),
-      ...(payload.scopes?.length ? { scopes: payload.scopes } : {}),
-    };
-    yield* writeTokenStore(stellaAppDir, store);
-    if (
-      existing?.valueProtected &&
-      existing.valueProtected !== valueProtected
-    ) {
-      yield* Effect.sync(() =>
-        deleteProtectedValue(credentialScope(tokenKey), existing.valueProtected),
-      );
-    }
-  });
-
 export const saveConnectorTokenPayload = async (
   stellaAppDir: string,
   tokenKey: string,
   payload: ConnectorTokenPayload,
 ) => {
-  await runConnectorEffect(
-    saveConnectorTokenPayloadEffect(stellaAppDir, tokenKey, payload),
-  );
+  const broker = tokenStoreBroker;
+  if (broker) {
+    await broker.save(tokenKey, payload);
+    return;
+  }
+  await writeStoredConnectorToken(stellaAppDir, tokenKey, payload);
 };
 
 const connectorRefreshLatches = new Map<
@@ -283,12 +143,12 @@ export const loadConnectorTokenPayload = async (
   const key = tokenKey;
   return await runConnectorEffect(
     Effect.gen(function* () {
+      // On the desktop the broker reads the store in Electron main, which
+      // owns protected storage; refreshing an expired token happens here.
       const broker = tokenStoreBroker;
-      if (broker) {
-        return yield* tryConnectorOp(() => broker.load(key));
-      }
-      const store = yield* readTokenStore(stellaAppDir);
-      const payload = decodeTokenPayload(key, store.tokens[key]);
+      const payload = yield* tryConnectorOp(() =>
+        broker ? broker.load(key) : readStoredConnectorToken(stellaAppDir, key),
+      );
       if (!payload?.accessToken) return null;
       if (!payload.expiresAt || payload.expiresAt > Date.now() + 30_000) {
         return payload;
@@ -626,18 +486,6 @@ export const loadConnectorAccessToken = async (
   );
 };
 
-export const saveConnectorAccessToken = async (
-  stellaAppDir: string,
-  tokenKey: string,
-  accessToken: string,
-  expiresAt?: number,
-) => {
-  await saveConnectorTokenPayload(stellaAppDir, tokenKey, {
-    accessToken,
-    expiresAt,
-  });
-};
-
 export const beginConnectorDeviceOAuth = async (args: {
   clientId: string;
   deviceAuthorizationEndpoint: string;
@@ -768,26 +616,12 @@ export const deleteConnectorAccessTokens = async (
     ...new Set([...tokenKeys].filter((key): key is string => Boolean(key))),
   ];
   if (keys.length === 0) return;
-  await runConnectorEffect(
-    Effect.gen(function* () {
-      const broker = tokenStoreBroker;
-      if (broker) {
-        return yield* tryConnectorOp(() => broker.delete(keys));
-      }
-      const store = yield* readTokenStore(stellaAppDir);
-      let changed = false;
-      for (const key of keys) {
-        const existing = store.tokens[key];
-        if (!existing) continue;
-        yield* Effect.sync(() =>
-          deleteProtectedValue(credentialScope(key), existing.valueProtected),
-        );
-        delete store.tokens[key];
-        changed = true;
-      }
-      if (changed) yield* writeTokenStore(stellaAppDir, store);
-    }),
-  );
+  const broker = tokenStoreBroker;
+  if (broker) {
+    await broker.delete(keys);
+    return;
+  }
+  await deleteStoredConnectorTokens(stellaAppDir, keys);
 };
 
 const callbackIdFromResourceUrl = (resourceUrl: string) =>

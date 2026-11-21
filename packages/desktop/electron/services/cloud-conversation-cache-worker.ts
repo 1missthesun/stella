@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { parentPort, workerData } from "node:worker_threads";
-import type { SqliteDatabase } from "@stella/runtime/kernel/storage/shared";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared";
 import { CloudConversationCacheStore } from "./cloud-conversation-cache-store.js";
 
 const port = parentPort;

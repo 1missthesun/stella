@@ -1041,6 +1041,7 @@ export class AppSourceService {
       paths.some(
         (file) =>
           !file.startsWith("packages/runtime/") &&
+          !file.startsWith("packages/node-shared/") &&
           !file.startsWith("packages/desktop/"),
       );
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;

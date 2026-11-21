@@ -1,3 +1,5 @@
+import { sleepUnlessAborted } from "./cancelable.js";
+
 export type BackendIntegrationProbeResult =
   | "connected"
   | "not_connected"
@@ -85,16 +87,7 @@ export const probeBackendIntegrationConnection = async (options: {
     : "not_connected";
 };
 
-const sleep = (ms: number, signal?: AbortSignal) =>
-  new Promise<void>((resolve) => {
-    const timer = setTimeout(finish, ms);
-    function finish() {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", finish);
-      resolve();
-    }
-    signal?.addEventListener("abort", finish, { once: true });
-  });
+const sleep = sleepUnlessAborted;
 
 export const waitForBackendIntegrationConnection = async (options: {
   backendUrl: string;

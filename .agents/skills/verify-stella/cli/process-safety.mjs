@@ -12,7 +12,7 @@ import {
   readProcessIdentity,
   recordProcess,
   signalRecordedProcess,
-} from "../../../../packages/runtime/kernel/shared/process-identity.ts";
+} from "@stella/node-shared/shared/process-identity";
 
 export { logProcessSignal, pidIsAlive, readProcessCommand, readProcessIdentity, recordProcess, signalRecordedProcess };
 

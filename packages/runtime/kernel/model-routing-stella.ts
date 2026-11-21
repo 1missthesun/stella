@@ -33,7 +33,7 @@ import {
   noteGatewayClock,
   getRememberedStellaGatewayOrigin,
 } from "./gateway-session.js";
-import type { DeviceSigner } from "./home/device.js";
+import type { DeviceSigner } from "@stella/node-shared/home/device.js";
 import type { ResolvedLlmRoute } from "./model-routing.js";
 
 /**

@@ -33,7 +33,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { ensurePrivateDir } from "../shared/private-fs.js";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 
 const BUNDLED_MANIFEST_FILENAME = ".bundled-manifest.json";
 const PERSONALITY_MANIFEST_FILENAME = ".personality-manifest.json";

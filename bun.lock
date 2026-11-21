@@ -89,6 +89,7 @@
         "@earendil-works/pi-durable": "1.6.0",
         "@earendil-works/pi-schema": "1.6.0",
         "@stella/contracts": "workspace:*",
+        "@stella/node-shared": "workspace:*",
         "@stella/runtime": "workspace:*",
       },
       "devDependencies": {
@@ -116,6 +117,7 @@
       },
       "devDependencies": {
         "@stella/contracts": "workspace:*",
+        "@stella/node-shared": "workspace:*",
         "@stella/runtime": "workspace:*",
       },
     },
@@ -125,6 +127,7 @@
       "dependencies": {
         "@better-auth/passkey": "1.7.7",
         "@stella/contracts": "workspace:*",
+        "@stella/node-shared": "workspace:*",
         "@stella/theme": "workspace:*",
       },
       "devDependencies": {
@@ -137,6 +140,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@stella/contracts": "workspace:*",
+        "@stella/node-shared": "workspace:*",
         "@stella/runtime": "workspace:*",
         "effect": "4.0.0",
       },
@@ -272,6 +276,19 @@
       "name": "stella-native-helpers",
       "version": "1.0.0",
     },
+    "packages/node-shared": {
+      "name": "@stella/node-shared",
+      "version": "0.0.0",
+      "dependencies": {
+        "@stella/contracts": "workspace:*",
+        "effect": "4.0.0",
+        "undici": "^8.11.2",
+      },
+      "devDependencies": {
+        "@types/node": "^26.6.4",
+        "bun-types": "1.4.4",
+      },
+    },
     "packages/runtime": {
       "name": "@stella/runtime",
       "version": "0.0.0",
@@ -287,6 +304,7 @@
         "@sinclair/typebox": "0.34.52",
         "@stella/agent": "workspace:*",
         "@stella/contracts": "workspace:*",
+        "@stella/node-shared": "workspace:*",
         "ajv": "^8.20.0",
         "croner": "^10.0.1",
         "effect": "4.0.0",
@@ -403,6 +421,7 @@
         "@stella/contracts": "workspace:*",
         "@stella/executor-cloud": "workspace:*",
         "@stella/model-catalog": "workspace:*",
+        "@stella/node-shared": "workspace:*",
         "@stella/runtime": "workspace:*",
         "better-auth": "1.7.7",
         "croner": "^10.0.1",
@@ -1513,6 +1532,8 @@
     "@stella/model-catalog": ["@stella/model-catalog@workspace:packages/model-catalog"],
 
     "@stella/model-gateway-worker": ["@stella/model-gateway-worker@workspace:workers/model-gateway"],
+
+    "@stella/node-shared": ["@stella/node-shared@workspace:packages/node-shared"],
 
     "@stella/runtime": ["@stella/runtime@workspace:packages/runtime"],
 

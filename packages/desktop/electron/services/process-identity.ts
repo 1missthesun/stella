@@ -6,7 +6,7 @@ import {
   readProcessCommand,
   readProcessIdentity,
   type SignalOutcome,
-} from "@stella/runtime/kernel/shared/process-identity";
+} from "@stella/node-shared/shared/process-identity";
 
 export type ProcessIdentity = Readonly<{
   pid: number;

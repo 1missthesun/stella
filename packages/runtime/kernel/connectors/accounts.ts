@@ -8,7 +8,7 @@ import {
   type ConnectorTokenPayload,
 } from "./oauth.js";
 import { getConnectorStateRoot } from "./state.js";
-import { writePrivateFile } from "../shared/private-fs.js";
+import { writePrivateFile } from "@stella/node-shared/shared/private-fs.js";
 
 export type ConnectorAccount = {
   id: string;

@@ -3,8 +3,8 @@ import type { App } from "electron";
 import {
   resolveRuntimeStatePath,
   resolveStellaAppDir,
-} from "@stella/runtime/kernel/home/stella-paths";
-import { ensurePrivateDir } from "@stella/runtime/kernel/shared/private-fs";
+} from "@stella/node-shared/home/stella-paths";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs";
 
 export type StellaDataDir = {
   stellaAppDir: string;

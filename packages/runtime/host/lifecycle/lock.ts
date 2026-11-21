@@ -4,7 +4,7 @@ import {
   type LockOwner,
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "../../kernel/shared/owner-lock.js";
+} from "@stella/node-shared/shared/owner-lock.js";
 import { pollWithDeadline } from "./poll.js";
 
 const ACQUIRE_POLL_INTERVAL_MS = 50;

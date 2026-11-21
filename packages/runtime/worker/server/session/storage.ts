@@ -2,15 +2,15 @@ import { Context, Effect, Layer } from "effect";
 import { NOTIFICATION_NAMES } from "@stella/contracts/protocol";
 import { performance } from "node:perf_hooks";
 import { createDesktopDatabase } from "../../../kernel/storage/database.js";
-import { getDesktopDatabasePath } from "../../../kernel/storage/database-init.js";
+import { getDesktopDatabasePath } from "@stella/node-shared/storage/database-init.js";
 import { DatabaseMaintenance } from "../../../kernel/storage/maintenance.js";
 import { ChatStore } from "../../../kernel/storage/chat-store.js";
 import { RuntimeStore } from "../../../kernel/storage/runtime-store.js";
-import { projectLocalChatUpdateEvent } from "../../../kernel/storage/session-store.js";
+import { projectLocalChatUpdateEvent } from "@stella/node-shared/storage/session-store.js";
 import type {
   LocalChatEventRecord,
   SqliteDatabase,
-} from "../../../kernel/storage/shared.js";
+} from "@stella/node-shared/storage/shared.js";
 import {
   recordBootField,
   recordBootStep,

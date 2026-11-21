@@ -11,8 +11,8 @@ import { renderStellaPrompt, stellaPromptTools } from "@stella/contracts/stella-
 import {
   MAIN_MEMORY_DISPLAY_PATH,
   MAIN_MEMORY_INJECTED_MAX_CHARS,
-} from "@stella/runtime/kernel/memory/memory-layout";
-import { shapeResidentMemoryDoc } from "@stella/runtime/kernel/memory/resident-doc-shape";
+} from "@stella/node-shared/memory/memory-layout";
+import { shapeResidentMemoryDoc } from "@stella/node-shared/memory/resident-doc-shape";
 import { responseLanguageSection } from "@stella/runtime/kernel/runner/locale-prompt";
 import { StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
 import { messageIdsHook } from "./message-ids.ts";

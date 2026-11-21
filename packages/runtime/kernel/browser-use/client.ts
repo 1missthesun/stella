@@ -12,7 +12,7 @@ import {
   getStellaBrowserBridgeEnv,
   getStellaInAppBrowserInitEndpoint,
   getStellaInAppBrowserInitTokenPath,
-} from "../tools/stella-browser-bridge-config.js";
+} from "@stella/node-shared/tools/stella-browser-bridge-config.js";
 import {
   forkCancelableTimeout,
   runBrowserUseEffect,

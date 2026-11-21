@@ -6,7 +6,7 @@ import {
 } from "../model-routing.js";
 import {
   getModelOverride,
-} from "../preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 import { resolveAgentWorkingDirectory } from "./shared.js";
 import {
   runClaudeCodeAgentTextCompletion,
@@ -21,7 +21,7 @@ import type {
   RuntimeOneShotCompletionRequest,
   RuntimeOneShotCompletionResult,
 } from "@stella/contracts/protocol";
-import type { DeviceSigner } from "../home/device.js";
+import type { DeviceSigner } from "@stella/node-shared/home/device.js";
 
 const logger = createRuntimeLogger("agent-runtime.one-shot-completion");
 

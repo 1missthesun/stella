@@ -1,8 +1,8 @@
 import { applyShortcutRegistration } from "./shortcut-registration.js";
-import { getRealtimeVoicePreferences, loadLocalPreferences, resolveRealtimeVoiceId, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getRealtimeVoicePreferences, loadLocalPreferences, resolveRealtimeVoiceId, updateLocalPreferences, } from "@stella/node-shared/preferences/local-preferences";
 import { DEFAULT_OPENAI_REALTIME_VOICE, DEFAULT_XAI_REALTIME_VOICE, buildXaiRealtimeClientSecretRequest, } from "@stella/contracts/realtime-voice-catalog";
-import { getLocalLlmCredential } from "@stella/runtime/kernel/storage/llm-credentials";
-import { getLocalLlmOAuthApiKey } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
+import { getLocalLlmCredential } from "@stella/node-shared/storage/llm-credentials";
+import { getLocalLlmOAuthApiKey } from "@stella/node-shared/storage/llm-oauth-credentials";
 import { resolveLlmOAuthApiKeyInRuntime } from "../services/runtime-app-services.js";
 import {
   IPC_VOICE_CREATE_OPENAI_SESSION,

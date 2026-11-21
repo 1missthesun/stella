@@ -30,12 +30,12 @@ import {
   listDeferredDeletes,
   purgeAllDeferredDeletes,
   purgeDeferredDelete,
-} from "@stella/runtime/kernel/tools/deferred-delete";
+} from "@stella/node-shared/tools/deferred-delete";
 import type { LocalChatHistoryService } from "../services/local-chat-history-service.js";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
 import { isAssetDocumentPath } from "@stella/contracts/html-relative-assets";
-import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared";
+import type { LocalChatEventRecord } from "@stella/node-shared/storage/shared";
 import {
   MAX_DISPLAY_FILE_BYTES,
   planDisplayFileRead,

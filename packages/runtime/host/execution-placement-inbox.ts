@@ -3,7 +3,7 @@ import type {
   DispatchSummary,
   ExecutionKind,
 } from "@stella/contracts/turn-plane/placement";
-import type { SqliteDatabase } from "../kernel/storage/shared.js";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 
 type PlacementOutcome = "completed" | "failed" | "canceled";
 

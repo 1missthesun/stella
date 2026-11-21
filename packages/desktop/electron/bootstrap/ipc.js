@@ -16,7 +16,7 @@ import { registerOnboardingHandlers } from "../ipc/onboarding-handlers.js";
 import { app, BrowserWindow, powerMonitor, shell } from "electron";
 import { toggleRealtimeVoice, } from "../services/realtime-voice-control.js";
 import { WakewordService } from "../services/wakeword-service.js";
-import { loadLocalPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { loadLocalPreferences, updateLocalPreferences, } from "@stella/node-shared/preferences/local-preferences";
 import { IPC_APP_SOURCE_STATE, IPC_BROWSER_VIEW_STATE, IPC_PREFERENCES_GET_WAKE_WORD, IPC_PREFERENCES_SET_WAKE_WORD, IPC_PREFERENCES_WAKE_WORD_CHANGED, } from "@stella/contracts/desktop/ipc-channels";
 import { registerOfficePreviewHandlers } from "../ipc/office-preview-handlers.js";
 import { registerChatEvidenceHandlers } from "../ipc/chat-evidence-handlers.js";

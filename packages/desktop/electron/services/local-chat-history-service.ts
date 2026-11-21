@@ -2,11 +2,11 @@ import { DatabaseSync } from "node:sqlite";
 import {
   getDesktopDatabasePath,
   initializeDesktopDatabase,
-} from "@stella/runtime/kernel/storage/database-init";
+} from "@stella/node-shared/storage/database-init";
 import {
   SessionStore,
   projectLocalChatUpdateEvent,
-} from "@stella/runtime/kernel/storage/session-store";
+} from "@stella/node-shared/storage/session-store";
 import type {
   LocalChatActivityWindow,
   LocalChatAppendEventArgs,
@@ -14,8 +14,8 @@ import type {
   LocalChatFilesWindow,
   LocalChatMessageRecord,
   LocalChatMessageWindow,
-} from "@stella/runtime/kernel/storage/shared";
-import { SqliteConnection } from "@stella/runtime/kernel/storage/shared";
+} from "@stella/node-shared/storage/shared";
+import { SqliteConnection } from "@stella/node-shared/storage/shared";
 import type {
   CloudConversationCacheLifecycleAuthority,
   CloudConversationCachePurgeResult,

@@ -5,11 +5,11 @@ import path from "node:path";
 import {
   MEMORY_LIST_MAX_FILES,
   isSyncedMemoryPath,
-} from "@stella/runtime/kernel/memory/memory-client.js";
+} from "@stella/node-shared/memory/memory-client.js";
 import {
   MEMORIES_DIR,
   PERSONALITY_FILE,
-} from "@stella/runtime/kernel/memory/memory-layout.js";
+} from "@stella/node-shared/memory/memory-layout.js";
 
 const MAX_WALK_ENTRIES = 5_000;
 

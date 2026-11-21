@@ -18,7 +18,7 @@ import {
   STELLA_BROWSER_BRIDGE_TOKEN,
   STELLA_BROWSER_EXTENSION_ID,
   STELLA_NATIVE_MESSAGING_HOST_NAME,
-} from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
+} from "@stella/node-shared/tools/stella-browser-bridge-config";
 import { registerStellaNativeMessagingHost } from "../utils/register-stella-native-messaging-host.js";
 import {
   BROWSER_BRIDGE_INSTANCE_ID,

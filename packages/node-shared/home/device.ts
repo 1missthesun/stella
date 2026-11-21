@@ -7,7 +7,7 @@ import {
   sign as signBytes,
 } from "crypto";
 
-import { Effect } from "effect";
+import { Cause, Effect, Exit } from "effect";
 
 import {
   deleteProtectedValue,
@@ -15,8 +15,7 @@ import {
   readProtectedValue,
 } from "../shared/protected-storage.js";
 import { ensurePrivateDir, writePrivateFile } from "../shared/private-fs.js";
-import { getFileLogger } from "../../observability/file-logger.js";
-import { withHome } from "./home-runtime.js";
+import { getFileLogger } from "../observability/file-logger.js";
 
 type DeviceRecord = {
   deviceId: string;
@@ -247,10 +246,13 @@ export const getOrCreateDeviceIdentityEffect = (
     );
   });
 
-export const getOrCreateDeviceIdentity = (
+export const getOrCreateDeviceIdentity = async (
   statePath: string,
-): Promise<DeviceIdentity> =>
-  withHome((home) => home.getOrCreateDeviceIdentity(statePath));
+): Promise<DeviceIdentity> => {
+  const exit = await Effect.runPromiseExit(getOrCreateDeviceIdentityEffect(statePath));
+  if (Exit.isSuccess(exit)) return exit.value;
+  throw Cause.squash(exit.cause);
+};
 
 export const resetDeviceIdentityEffect = (
   statePath: string,

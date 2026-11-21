@@ -32,11 +32,11 @@ import {
   type MemoryClient,
   type MemoryFileInfo,
   type MemoryFileStore,
-} from "@stella/runtime/kernel/memory/memory-client.js";
+} from "@stella/node-shared/memory/memory-client.js";
 import {
   MEMORIES_DIR,
   PERSONALITY_FILE,
-} from "@stella/runtime/kernel/memory/memory-layout.js";
+} from "@stella/node-shared/memory/memory-layout.js";
 import { releasingStub } from "./rpc-release.js";
 import { worldName } from "./workspace.js";
 import type { WorldEntry, WorldListingEntry } from "./world/types.js";

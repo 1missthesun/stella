@@ -5,12 +5,13 @@
  * Main keeps only what needs the OS keychain: it stores the credentials a
  * sign-in returns, and asks resolveLlmOAuthApiKey to refresh them.
  */
-import type { OAuthCredentials } from "../../kernel/storage/llm-oauth-credentials.js";
+import type { OAuthCredentials } from "@stella/node-shared/storage/llm-oauth-credentials.js";
 import type { ChatGptRegistration } from "@stella/contracts/chatgpt-siwc";
 import type {
   ChatGptLoopback,
   ChatGptSavedRegistration,
 } from "../../kernel/integrations/chatgpt-sign-in.js";
+import { createCancelableRegistry } from "./cancelable.js";
 
 const loadProviders = () => import("../../kernel/storage/llm-oauth-providers.js");
 
@@ -27,7 +28,7 @@ export type LlmSignInResult = {
   plan?: string;
 };
 
-const activeSignIns = new Map<string, AbortController>();
+const activeSignIns = createCancelableRegistry();
 
 export const listLlmOAuthProviders = async (): Promise<
   Array<{ provider: string; label: string }>
@@ -51,10 +52,7 @@ export const signInLlmOAuth = async (
     await loadProviders();
   const provider = getLlmOAuthProvider(providerId);
   if (!provider) throw new Error("Unsupported OAuth provider.");
-  activeSignIns.get(loginId)?.abort();
-  const controller = new AbortController();
-  activeSignIns.set(loginId, controller);
-  try {
+  return await activeSignIns.run(loginId, async (signal) => {
     const credentials = await loginLlmOAuth(provider, {
       notify: (event) => {
         if (event.type === "auth_url") {
@@ -68,22 +66,16 @@ export const signInLlmOAuth = async (
         }
       },
       prompt: async () => "",
-      signal: controller.signal,
+      signal,
     });
-    if (controller.signal.aborted) {
-      throw controller.signal.reason instanceof Error
-        ? controller.signal.reason
-        : new Error("OAuth login was canceled.");
-    }
+    if (signal.aborted) throw new Error("OAuth login was canceled.");
     return {
       provider: provider.id,
       label: provider.name,
       credentials: credentials as OAuthCredentials,
       ...describeLlmOAuthCredential(provider.id, credentials),
     };
-  } finally {
-    if (activeSignIns.get(loginId) === controller) activeSignIns.delete(loginId);
-  }
+  });
 };
 
 const loadChatGptSignIn = () => import("../../kernel/integrations/chatgpt-sign-in.js");
@@ -109,21 +101,16 @@ export const signInChatGpt = async (
       ? (request.saved as ChatGptSavedRegistration)
       : undefined;
   const { loginChatGpt } = await loadChatGptSignIn();
-  activeSignIns.get(loginId)?.abort();
-  const controller = new AbortController();
-  activeSignIns.set(loginId, controller);
-  try {
-    return await loginChatGpt({
+  return await activeSignIns.run(loginId, (signal) =>
+    loginChatGpt({
       hostId,
       ...(saved ? { saved } : {}),
       reconsent: request?.reconsent === true,
       openUrl: (url) => void notify({ type: "auth_url", url }),
       onRegistration: (clientId) => notify({ type: "registration", clientId }),
-      signal: controller.signal,
-    });
-  } finally {
-    if (activeSignIns.get(loginId) === controller) activeSignIns.delete(loginId);
-  }
+      signal,
+    }),
+  );
 };
 
 const chatGptListeners = new Map<string, ChatGptLoopback>();
@@ -169,11 +156,7 @@ export const cancelLlmOAuthSignIn = (
   request: { loginId?: unknown } | null | undefined,
 ): { canceled: boolean } => {
   const loginId = typeof request?.loginId === "string" ? request.loginId : "";
-  const controller = activeSignIns.get(loginId);
-  if (!controller) return { canceled: false };
-  controller.abort(new Error("OAuth login was canceled."));
-  activeSignIns.delete(loginId);
-  return { canceled: true };
+  return { canceled: activeSignIns.cancel(loginId, new Error("OAuth login was canceled.")) };
 };
 
 export const resolveLlmOAuthApiKeyForApp = async (

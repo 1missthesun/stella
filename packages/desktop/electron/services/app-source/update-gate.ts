@@ -10,7 +10,7 @@ import { git, gitRaw, run } from "./git.js";
  *
  * Both are the build the launcher already runs on every start: Electron main
  * and the sandboxed preload, esbuild bundles over `packages/desktop/electron`,
- * `packages/contracts` and `packages/runtime`. That is deliberately the one
+ * `packages/contracts`, `packages/node-shared` and the runtime's bridge client. That is deliberately the one
  * check worth gating on here — a main or preload that does not build is a
  * Stella that does not start, which is the only outcome a user cannot ask
  * Stella to fix. It costs about a second and needs no install.
@@ -25,7 +25,7 @@ import { git, gitRaw, run } from "./git.js";
  * see `dir-links.ts`; removed link-first, never followed). The root directory
  * holds no workspace packages (bun puts `@stella/*` in each package's own
  * `node_modules`), and the bundle resolves every workspace package main can
- * reach (`@stella/agent`, `@stella/contracts`, `@stella/runtime`, …) through
+ * reach (`@stella/contracts`, `@stella/node-shared`, `@stella/runtime`, …) through
  * esbuild aliases computed from the tree it is building — so the sources
  * under test are the merged ones, while third-party packages come from the
  * checkout. A merge that needs dependencies the checkout does not have yet
@@ -69,9 +69,9 @@ try {
 
 const BUILD_ROOTS = [
   "scripts/lib/",
-  "packages/agent/",
   "packages/contracts/",
   "packages/desktop/",
+  "packages/node-shared/",
   "packages/runtime/",
   "packages/desktop-ui/src/shared/i18n/",
 ];
@@ -177,9 +177,11 @@ const recordedBundleInputs = async (cwd: string) => {
 
 /**
  * Whether the update changes a file the running main process was built from
- * (the inputs recorded with its bundle). The main bundle carries runtime, agent
- * and contracts code too, so such a change needs a relaunch onto a rebuilt
- * main, not only a runtime restart or a renderer swap.
+ * (the inputs recorded with its bundle). The main bundle carries contracts,
+ * node-shared and the runtime's bridge client too, so such a change needs a
+ * relaunch onto a rebuilt main, not only a runtime restart or a renderer
+ * swap. Other runtime and agent code is not in it, so it only restarts the
+ * runtime.
  */
 export const changesMainBundle = async (cwd: string, files: string[]) => {
   const recorded = await recordedBundleInputs(cwd);
@@ -192,9 +194,9 @@ export const touchesBundleInputs = async (cwd: string, files: string[]) => {
     (file) =>
       recorded.has(file) ||
       !file.includes("/") ||
-      file.startsWith("packages/agent/") ||
       file.startsWith("packages/contracts/") ||
       file.startsWith("packages/desktop/") ||
+      file.startsWith("packages/node-shared/") ||
       file.startsWith("packages/runtime/") ||
       file.startsWith("packages/desktop-ui/src/shared/i18n/") ||
       file.startsWith("packages/desktop-ui/.env") ||

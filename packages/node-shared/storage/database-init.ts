@@ -3,7 +3,7 @@ import { performance } from "node:perf_hooks";
 import type { SqliteDatabase } from "./shared.js";
 import { ensurePrivateDirSync } from "../shared/private-fs.js";
 import { SCHEMA_VERSION, migrateDesktopDatabase } from "./schema.js";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { getFileLogger } from "../observability/file-logger.js";
 
 const DB_FILE = "stella.sqlite";
 

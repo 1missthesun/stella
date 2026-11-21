@@ -16,7 +16,7 @@ import {
   ManagedRuntime,
   Scope,
 } from "effect";
-import { ensurePrivateDirSync } from "@stella/runtime/kernel/shared/private-fs";
+import { ensurePrivateDirSync } from "../shared/private-fs";
 import {
   UI_STATE_FILE_NAME,
   type UiStateChanges,

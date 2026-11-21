@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { resolveAppIconPath } from "../app-icon.js";
 import { isDevHarness } from "../app-identity.js";
-import type { PiRunnerTarget } from "@stella/runtime/kernel/lifecycle-targets";
+import type { PiRunnerTarget } from "@stella/node-shared/lifecycle-targets";
 import { readConfiguredBackendUrl } from "@stella/contracts/stella-api";
 import { parsePairingLink } from "@stella/contracts/self-host";
 import { parseConnectClaimLink } from "@stella/contracts/backend/integrations";
@@ -26,7 +26,7 @@ import {
   protectValue,
   readProtectedValue,
   unprotectValue,
-} from "@stella/runtime/kernel/shared/protected-storage";
+} from "@stella/node-shared/shared/protected-storage";
 import type { HostRuntimeAuthRefreshResult } from "@stella/contracts/protocol";
 import {
   AUTH_CAPTCHA_HEADER,

@@ -3,7 +3,12 @@ import { git, gitRaw } from "./git.js";
 const RESTART_PREFIX = "packages/desktop/electron/";
 export const installs = (paths: string[]) =>
   paths.some((file) => file === "bun.lock" || file.endsWith("package.json"));
-const RUNTIME_PREFIXES = ["packages/runtime/", "packages/contracts/", "packages/agent/"];
+const RUNTIME_PREFIXES = [
+  "packages/runtime/",
+  "packages/contracts/",
+  "packages/agent/",
+  "packages/node-shared/",
+];
 /** Names the Bun the launcher starts the runtime with; only a relaunch through the launcher picks it up. */
 const LAUNCHER_MANIFEST = "packages/desktop/launcher.json";
 export const restartsRuntime = (paths: string[]) =>

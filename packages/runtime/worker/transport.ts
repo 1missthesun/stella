@@ -20,7 +20,7 @@ import {
   ensurePrivateSocketDir,
   isWindowsNamedPipePath,
   runtimeIpcPathUsesFilesystem,
-} from "./runtime-paths.js";
+} from "@stella/node-shared/worker/runtime-paths.js";
 import {
   createRuntimeAuthNonce,
   isRuntimeAuthNonce,

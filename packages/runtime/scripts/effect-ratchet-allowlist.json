@@ -11,7 +11,6 @@
   "kernel/integrations/tool-inactivity.ts": 1,
   "kernel/local-scheduler-service.ts": 1,
   "kernel/runner/background-exit-wake.ts": 1,
-  "kernel/shared/join-timeout.ts": 1,
   "kernel/shared/read-image-file.ts": 1,
   "kernel/shared/readiness-latch.ts": 1,
   "kernel/shared/schedule-scripts.ts": 1,
@@ -20,6 +19,7 @@
   "kernel/tools/media-artifact-store.ts": 1,
   "kernel/tools/search.ts": 1,
   "kernel/tools/shell/sessions.ts": 1,
+  "packages/node-shared/shared/join-timeout.ts": 1,
   "worker/cli-bridge-server.ts": 1,
   "workers/cloud-builder/src/archive.ts": {
     "setTimeout(": 1

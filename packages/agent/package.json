@@ -16,6 +16,7 @@
     "@earendil-works/pi-durable": "1.6.0",
     "@earendil-works/pi-schema": "1.6.0",
     "@stella/contracts": "workspace:*",
+    "@stella/node-shared": "workspace:*",
     "@stella/runtime": "workspace:*"
   },
   "devDependencies": {

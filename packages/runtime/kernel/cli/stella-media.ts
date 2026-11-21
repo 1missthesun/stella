@@ -7,7 +7,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
-import { resolveStatePath } from "./shared.js";
+import { resolveStatePath } from "@stella/node-shared/cli/shared.js";
 import { sleepMs } from "./effect-runtime.js";
 import {
   sendMediaRequest,

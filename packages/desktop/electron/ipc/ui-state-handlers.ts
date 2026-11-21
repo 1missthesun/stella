@@ -4,7 +4,7 @@ import {
   type IpcMainEvent,
   type IpcMainInvokeEvent,
 } from "electron";
-import { UiStateStore } from "@stella/runtime/kernel/ui-state/store";
+import { UiStateStore } from "@stella/node-shared/ui-state/store";
 import {
   sanitizeUiStateChanges,
   VIEW_STATE_KEY_PREFIX,

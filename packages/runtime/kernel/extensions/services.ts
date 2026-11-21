@@ -3,7 +3,7 @@ import type { RuntimeStore } from "../storage/runtime-store.js";
 import type {
   LocalChatAppendEventArgs,
   LocalContextEvent,
-} from "../storage/shared.js";
+} from "@stella/node-shared/storage/shared.js";
 import type { ExtensionRuntimeApi } from "./runtime-api.js";
 
 export type ExtensionServices = {

@@ -22,11 +22,11 @@ import type {
 import {
   MEMORY_SYNC_MAX_BYTES,
   memorySyncTooLargeMessage,
-} from "@stella/runtime/kernel/memory/memory-client.js";
+} from "@stella/node-shared/memory/memory-client.js";
 import {
   MEMORIES_DIR,
   PERSONALITY_FILE,
-} from "@stella/runtime/kernel/memory/memory-layout.js";
+} from "@stella/node-shared/memory/memory-layout.js";
 import { tokenSubject } from "../engine-account-access.js";
 import { LocalMemoryFiles, sha256Hex } from "./local-memory-files.js";
 import { memoryMergeBrief, type MemoryMerge } from "./memory-merge-brief.js";

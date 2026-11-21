@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { ensurePrivateDir } from "../shared/private-fs.js";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 
 const MANIFEST_VERSION = 2 as const;
 

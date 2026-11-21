@@ -2,7 +2,7 @@ import { Context, Effect, Layer } from "effect";
 import type { RuntimeModelCatalogSnapshot } from "@stella/contracts/model-catalog";
 import { NOTIFICATION_NAMES } from "@stella/contracts/protocol";
 import type { ModelRuntimeSnapshot } from "../../kernel/model-runtime.js";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { forkDelayed, type WorkerTimerHandle } from "../effect-runtime.js";
 import * as HostBus from "./host-bus.js";
 import type { RuntimeRunner } from "./types.js";

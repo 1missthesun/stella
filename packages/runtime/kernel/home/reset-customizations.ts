@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { ensurePrivateDir } from "../shared/private-fs.js";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 import { listTrackedBundledSkillIds } from "./skills-sync.js";
 
 export type ResetCustomizationsResult = {

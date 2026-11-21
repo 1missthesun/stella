@@ -3,8 +3,8 @@ import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
-import { clearSupersededDeviceId as clearStoredSupersededDeviceId, getOrCreateDeviceIdentity, getOrCreateDeviceSigner, } from "@stella/runtime/kernel/home/device";
-import { deleteConnectorAccessTokens, loadConnectorTokenPayload, saveConnectorTokenPayload, } from "@stella/runtime/kernel/connectors/oauth";
+import { clearSupersededDeviceId as clearStoredSupersededDeviceId, getOrCreateDeviceIdentity, getOrCreateDeviceSigner, } from "@stella/node-shared/home/device";
+import { deleteStoredConnectorTokens, readStoredConnectorToken, writeStoredConnectorToken, } from "@stella/node-shared/connectors/token-store";
 import { createStellaHostRunner, } from "../stella-host-runner.js";
 import { broadcastLocalChatUpdated, broadcastScheduleUpdated, broadcastToWindows, pendingRemoteExecutionRequest, } from "./context.js";
 import { startOfficePreviewBridge } from "./office-preview-bridge.js";
@@ -14,9 +14,9 @@ import { requestMacPermission } from "../utils/macos-permissions.js";
 import { getMainLogger } from "../observability/main-logger.js";
 import { deliverConnectorSignIn } from "../services/integration-flows.js";
 import { deliverAppServiceProgress, resolveLlmOAuthApiKeyInRuntime, } from "../services/runtime-app-services.js";
-import { getLocalLlmCredential, listLocalLlmCredentials, } from "@stella/runtime/kernel/storage/llm-credentials";
-import { getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
-import { getChatGptAccessToken, hasUsableChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
+import { getLocalLlmCredential, listLocalLlmCredentials, } from "@stella/node-shared/storage/llm-credentials";
+import { getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, } from "@stella/node-shared/storage/llm-oauth-credentials";
+import { getChatGptAccessToken, hasUsableChatGptProfile, } from "@stella/node-shared/storage/chatgpt-profiles";
 import {
   IPC_DISPLAY_UPDATE,
   IPC_EXECUTION_REMOTE_REQUEST,
@@ -230,14 +230,14 @@ export const createHostRunnerHandlers = (context, options) => ({
         if (request.operation === "load") {
             return {
                 ok: true,
-                payload: await loadConnectorTokenPayload(stellaDataDir, request.tokenKey),
+                payload: await readStoredConnectorToken(stellaDataDir, request.tokenKey),
             };
         }
         if (request.operation === "save") {
-            await saveConnectorTokenPayload(stellaDataDir, request.tokenKey, request.payload);
+            await writeStoredConnectorToken(stellaDataDir, request.tokenKey, request.payload);
             return { ok: true };
         }
-        await deleteConnectorAccessTokens(stellaDataDir, request.tokenKeys);
+        await deleteStoredConnectorTokens(stellaDataDir, request.tokenKeys);
         return { ok: true };
     },
     requestConnectorCredential: (payload) => payload.preregisteredOAuth

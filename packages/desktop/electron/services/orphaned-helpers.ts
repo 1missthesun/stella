@@ -3,12 +3,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { app } from "electron";
-import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree";
+import { terminateProcessTree } from "@stella/node-shared/shared/process-tree";
 import {
   readProcessIdentity,
   recordedProcessIsLive,
   type RecordedProcess,
-} from "@stella/runtime/kernel/shared/process-identity";
+} from "@stella/node-shared/shared/process-identity";
 import { nativeHelperDirectories } from "../native-helper-path.js";
 import { getMainLogger } from "../observability/main-logger.js";
 

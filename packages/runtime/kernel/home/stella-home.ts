@@ -4,7 +4,7 @@ import type { App } from "electron";
 
 import { Effect } from "effect";
 
-import { ensurePrivateDir } from "../shared/private-fs.js";
+import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 import {
   migrateLegacyHomeLayout,
   migrateLegacySystemSkillRoot,
@@ -20,7 +20,7 @@ import {
   resolveRuntimeStatePath,
   resolveStellaAppDir,
   resolveStellaDataSeedDir,
-} from "./stella-paths.js";
+} from "@stella/node-shared/home/stella-paths.js";
 
 // Path helpers are re-exported so existing Electron-side importers keep
 // working; runtime-worker code must import `stella-paths.js` directly so this

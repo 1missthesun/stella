@@ -10,7 +10,7 @@ import {
   type ExecutionContextSnapshot,
   type MediaAccess,
 } from "@stella/contracts/execution-context";
-import { getImageGenerationPreferences } from "../preferences/local-preferences.js";
+import { getImageGenerationPreferences } from "@stella/node-shared/preferences/local-preferences.js";
 import { hasAccessibleLocalLlmApiKey } from "../storage/local-llm-credential-access.js";
 import { DEVICES_PATH, type DeviceDestination } from "@stella/contracts/turn-plane/placement";
 

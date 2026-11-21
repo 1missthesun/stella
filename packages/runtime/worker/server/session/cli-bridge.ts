@@ -18,8 +18,8 @@ import {
   createSecureCliBridgeEndpoint,
   isWindowsNamedPipePath,
   resolveRuntimePaths,
-} from "../../runtime-paths.js";
-import { parseCliBridgeEndpoint } from "../../../kernel/connectors/cli-bridge-endpoint.js";
+} from "@stella/node-shared/worker/runtime-paths.js";
+import { parseCliBridgeEndpoint } from "@stella/node-shared/connectors/cli-bridge-endpoint.js";
 import {
   createBackendAccountMcpBroker,
   createBackendMediaBroker,

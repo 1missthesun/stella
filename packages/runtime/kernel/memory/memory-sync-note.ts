@@ -1,12 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { resolveRuntimeStatePath } from "../home/stella-paths.js";
+import { resolveRuntimeStatePath } from "@stella/node-shared/home/stella-paths.js";
 import {
   MEMORY_SYNC_MAX_BYTES,
   isSyncedMemoryPath,
   memorySyncTooLargeMessage,
-} from "./memory-client.js";
+} from "@stella/node-shared/memory/memory-client.js";
 
 /**
  * What a task that just wrote a file should know when that file is a memory

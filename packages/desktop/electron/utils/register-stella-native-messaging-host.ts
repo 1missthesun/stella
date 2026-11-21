@@ -8,7 +8,7 @@ import {
   STELLA_BROWSER_EXTENSION_ID,
   STELLA_NATIVE_MESSAGING_HOST_NAME,
   getStellaBrowserSocketDir,
-} from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
+} from "@stella/node-shared/tools/stella-browser-bridge-config";
 import {
   activateStagedStellaBrowserBinary,
   resolveStellaBrowserBinaryPath,

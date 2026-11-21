@@ -36,6 +36,20 @@ const isPiSignInPageImport = (specifier) =>
   /^@earendil-works\/pi-ai\/(?:dist\/)?(?:utils\/oauth-page|auth\/oauth\/callback-server)(?:\.js)?$/.test(
     specifier,
   );
+// Electron main is the OS and window shell: agents, sign-in flows, model
+// catalogs and connectors run in the runtime process, which main reaches over
+// the bridge. The bridge client is the only runtime module main imports; code
+// both processes run lives in @stella/node-shared.
+const MAIN_RUNTIME_IMPORTS = new Set([
+  "@stella/runtime/host/remote",
+  "@stella/runtime/host/remote.js",
+]);
+const isAgentImport = (specifier) =>
+  specifier === "@stella/agent" || specifier.startsWith("@stella/agent/");
+const isRuntimeImport = (specifier) =>
+  specifier === "@stella/runtime" || specifier.startsWith("@stella/runtime/");
+const BUN_SQLITE_REASON =
+  "static node:sqlite breaks the Bun worker; resolve the driver at runtime (see image-operation-store.ts loadSqliteDatabaseCtorSync)";
 const runtimeEffectFencedPrefixes = [
   "packages/runtime/kernel/tools/defs/",
   "packages/runtime/kernel/prompts/",
@@ -143,8 +157,25 @@ export const checkBoundaries = async (repoRoot) => {
         // The detached worker runs under Bun, which has no node:sqlite; a
         // static import crashes the runner chunk at load (desktop-v0.0.409,
         // regressed again via kernel/tools/image-operation-store.ts).
-        return "static node:sqlite breaks the Bun worker; resolve the driver at runtime (see image-operation-store.ts loadSqliteDatabaseCtorSync)";
+        return BUN_SQLITE_REASON;
       }
+      return null;
+    },
+  );
+
+  await inspect(
+    path.join(repoRoot, "packages", "node-shared"),
+    (specifier) => {
+      if (isRuntimeImport(specifier) || isAgentImport(specifier)) {
+        return "node-shared is what main and the runtime both run; it must not depend on the runtime or agent";
+      }
+      if (isDesktopPackageImport(specifier)) {
+        return "node-shared must not depend on desktop packages";
+      }
+      if (/\.\.\/.*(?:runtime|agent|desktop|desktop-ui)\//.test(specifier)) {
+        return "node-shared must not reach into other packages by relative path";
+      }
+      if (specifier === "node:sqlite") return BUN_SQLITE_REASON;
       return null;
     },
   );
@@ -221,9 +252,19 @@ export const checkBoundaries = async (repoRoot) => {
       }
       if (
         file.startsWith("packages/desktop/electron/") &&
-        /\.\.\/.*runtime\//.test(specifier)
+        /\.\.\/.*(?:runtime|agent|node-shared)\//.test(specifier)
       ) {
-        return "Electron must use @stella/runtime workspace exports";
+        return "Electron must use workspace exports, not relative paths into other packages";
+      }
+      if (file.startsWith("packages/desktop/electron/") && isAgentImport(specifier)) {
+        return "Electron main must not load the agent; it runs in the runtime process";
+      }
+      if (
+        file.startsWith("packages/desktop/electron/") &&
+        isRuntimeImport(specifier) &&
+        !MAIN_RUNTIME_IMPORTS.has(specifier)
+      ) {
+        return "Electron main reaches the runtime only through its bridge client (@stella/runtime/host/remote): run the work in the runtime behind a host call (RUNTIME_APP_SERVICE_CALLS), or move code both processes need to @stella/node-shared";
       }
       return null;
     },
@@ -265,6 +306,7 @@ export const checkBoundaries = async (repoRoot) => {
 
   for (const pkg of [
     "agent",
+    "node-shared",
     "runtime",
     "desktop",
     "desktop-ui",

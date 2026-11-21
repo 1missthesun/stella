@@ -16,7 +16,7 @@ import {
   isKeepaliveRelayPath,
   unwrapRelayKeepalive,
 } from "@stella/contracts/gateway/relay-keepalive";
-import type { DeviceSigner } from "@stella/runtime/kernel/home/device";
+import type { DeviceSigner } from "@stella/node-shared/home/device";
 import { fetchWithDeadline, fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import type { StellaAgentType, StellaGatewayAccess, StellaModelSpec } from "../provider/stella.ts";
 

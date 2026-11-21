@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
-import { ensurePrivateDir, writePrivateFile } from "../../shared/private-fs.js";
+import { ensurePrivateDir, writePrivateFile } from "@stella/node-shared/shared/private-fs.js";
 import {
   createScheduleScriptAuthEnv,
   runScheduleScript,

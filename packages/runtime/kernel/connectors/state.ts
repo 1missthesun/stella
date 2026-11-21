@@ -1,5 +1,5 @@
 import path from "node:path";
-import { readPrivateJsonValueSync, writePrivateFile } from "../shared/private-fs.js";
+import { readPrivateJsonValueSync, writePrivateFile } from "@stella/node-shared/shared/private-fs.js";
 
 import type { ApiConnectorConfig, ConnectorCommandConfig } from "./types.js";
 

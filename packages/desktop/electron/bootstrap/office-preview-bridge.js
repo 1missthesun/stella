@@ -5,7 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { IPC_OFFICE_PREVIEW_UPDATE } from "@stella/contracts/desktop/ipc-channels";
 import { broadcastToWindows } from "./context.js";
-import { readProcessGroup, readProcessIdentity, signalRecordedProcess, } from "@stella/runtime/kernel/shared/process-identity";
+import { readProcessGroup, readProcessIdentity, signalRecordedProcess, } from "@stella/node-shared/shared/process-identity";
 const PREVIEW_ROOT_DIRNAME = "office-previews";
 const SESSION_MANIFEST_NAME = "session.json";
 const SESSION_HTML_NAME = "preview.html";

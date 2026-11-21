@@ -5,7 +5,7 @@ import {
   STELLA_RUNTIME_READY_METHOD,
   type RuntimeInitializeResult,
 } from "@stella/contracts/protocol";
-import { runtimeIpcPathUsesFilesystem } from "../../worker/runtime-paths.js";
+import { runtimeIpcPathUsesFilesystem } from "@stella/node-shared/worker/runtime-paths.js";
 import {
   describeRuntimeServerIdentityMismatch,
   parseRuntimeServerIdentity,

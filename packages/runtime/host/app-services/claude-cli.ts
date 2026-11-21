@@ -3,7 +3,11 @@
  * keeps its Claude account logins and the update schedule; how to find,
  * install, update or repair the CLI is the runtime's, which runs it for turns.
  */
-const installs = new Map<string, AbortController>();
+import { randomUUID } from "node:crypto";
+
+import { createCancelableRegistry } from "./cancelable.js";
+
+const installs = createCancelableRegistry();
 
 export const selectClaudeCliForApp = async (
   request: { repair?: unknown } | null | undefined,
@@ -30,23 +34,17 @@ export const installClaudeCliForApp = async (
   request: { installId?: unknown } | null | undefined,
   onProgress: (progress: unknown) => void,
 ) => {
-  const installId = typeof request?.installId === "string" ? request.installId : "";
+  const installId =
+    typeof request?.installId === "string" && request.installId
+      ? request.installId
+      : `install-${randomUUID()}`;
   const { installClaudeCli } = await import("../../kernel/integrations/claude-cli-install.js");
-  const controller = new AbortController();
-  if (installId) installs.set(installId, controller);
-  try {
-    return await installClaudeCli({ signal: controller.signal, onProgress });
-  } finally {
-    if (installs.get(installId) === controller) installs.delete(installId);
-  }
+  return await installs.run(installId, (signal) => installClaudeCli({ signal, onProgress }));
 };
 
 export const cancelClaudeCliInstall = (request: { installId?: unknown } | null | undefined) => {
   const installId = typeof request?.installId === "string" ? request.installId : "";
-  const controller = installs.get(installId);
-  installs.delete(installId);
-  controller?.abort(new Error("Claude Code install cancelled."));
-  return { canceled: Boolean(controller) };
+  return { canceled: installs.cancel(installId, new Error("Claude Code install cancelled.")) };
 };
 
 /** One scheduled check: update or repair the CLI, and forget aliases a new version resolves differently. */

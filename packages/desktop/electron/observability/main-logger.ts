@@ -6,7 +6,7 @@ import {
   initFileLogger,
   installMainCrashHandling,
   type FileLogger,
-} from "@stella/runtime/observability/file-logger";
+} from "@stella/node-shared/observability/file-logger";
 import {
   initDesktopDebugLogging,
   startDesktopNetworkLogging,

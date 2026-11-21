@@ -6,7 +6,7 @@ import {
   automationSocketsRootDir,
   maxAutomationSocketPathBytes,
   resolveAutomationSocketPath,
-} from "../automation-socket-paths.js";
+} from "@stella/node-shared/computer-use/automation-socket-paths.js";
 import {
   resolveNativeHelperPath,
   runNativeHelper,
@@ -35,7 +35,7 @@ import {
 import type { Rect } from "./ax-format.js";
 import type { SessionPaths } from "./session-paths.js";
 import { withoutTaskProcessOwnership } from "../../shared/task-processes.js";
-import { signalRecordedProcess } from "../../shared/process-identity.js";
+import { signalRecordedProcess } from "@stella/node-shared/shared/process-identity.js";
 
 type AutomationDaemonRequestPayload = {
   seq: number;

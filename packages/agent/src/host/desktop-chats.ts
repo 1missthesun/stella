@@ -69,7 +69,7 @@ import {
   type PiUserMessage,
 } from "@stella/contracts/pi-chat";
 import type { AgentReportEnvelope } from "@stella/contracts/agent-wake-prompt";
-import type { DeviceSigner } from "@stella/runtime/kernel/home/device";
+import type { DeviceSigner } from "@stella/node-shared/home/device";
 import {
   offersAgentTools,
   openStellaHarness,

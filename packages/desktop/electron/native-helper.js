@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { resolveNativeHelperPath } from './native-helper-path.js';
-import { getFileLogger } from '@stella/runtime/observability/file-logger';
+import { getFileLogger } from '@stella/node-shared/observability/file-logger';
 const FAILURE_LOG_THROTTLE_MS = 30_000;
 const SLOW_HELPER_LOG_THRESHOLD_MS = 500;
 const lastFailureLogAt = new Map();

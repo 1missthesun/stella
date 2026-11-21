@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { setProtectedStorageProviderOverride } from "@stella/runtime/kernel/shared/protected-storage";
+import { setProtectedStorageProviderOverride } from "@stella/node-shared/shared/protected-storage";
 import { isDevHarness } from "../app-identity.js";
 
 const HARNESS_STORAGE_KEY_ENV = "STELLA_DEV_HARNESS_STORAGE_KEY";

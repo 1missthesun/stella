@@ -15,7 +15,7 @@ import { promisify } from "node:util";
 import {
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "@stella/runtime/kernel/shared/owner-lock";
+} from "@stella/node-shared/shared/owner-lock";
 import { isInstalledProduct } from "../app-identity.js";
 import { resolveDesktopStellaDataDirForInstall } from "../data-paths.js";
 import { processIdentityIsLive } from "./process-identity.js";

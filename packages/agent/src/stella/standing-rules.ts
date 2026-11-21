@@ -2,8 +2,8 @@ import {
   RULES_MEMORY_DISPLAY_PATH,
   RULES_MEMORY_MAX_CHARS,
   rulesMemoryCapNote,
-} from "@stella/runtime/kernel/memory/memory-layout";
-import { shapeResidentMemoryDoc } from "@stella/runtime/kernel/memory/resident-doc-shape";
+} from "@stella/node-shared/memory/memory-layout";
+import { shapeResidentMemoryDoc } from "@stella/node-shared/memory/resident-doc-shape";
 
 export const startupDoc = (path: string, content: string | undefined): string | undefined =>
   content === undefined || content.trim() === ""

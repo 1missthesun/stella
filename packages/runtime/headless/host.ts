@@ -3,19 +3,19 @@ import path from "node:path";
 import {
   deviceSignerForIdentity,
   type DeviceIdentity,
-} from "../kernel/home/device.js";
+} from "@stella/node-shared/home/device.js";
 import {
   getLocalLlmCredential,
   listLocalLlmCredentials,
-} from "../kernel/storage/llm-credentials.js";
+} from "@stella/node-shared/storage/llm-credentials.js";
 import {
   getLocalLlmOAuthApiKey,
   listLocalLlmOAuthCredentials,
-} from "../kernel/storage/llm-oauth-credentials.js";
+} from "@stella/node-shared/storage/llm-oauth-credentials.js";
 import {
   resolveRuntimeStatePath,
   resolveStellaAppDir,
-} from "../kernel/home/stella-paths.js";
+} from "@stella/node-shared/home/stella-paths.js";
 
 export type HeadlessAuthInput = {
   authToken?: string | null;

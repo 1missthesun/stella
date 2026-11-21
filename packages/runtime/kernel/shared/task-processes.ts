@@ -33,7 +33,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { Effect } from "effect";
-import { readProcessIdentity, type RecordedProcess, signalRecordedProcess } from "./process-identity.js";
+import { readProcessIdentity, type RecordedProcess, signalRecordedProcess } from "@stella/node-shared/shared/process-identity.js";
 
 export const TASK_PROCESS_OWNER_ENV = "STELLA_TASK_PROCESS_OWNER";
 export const TASK_PROCESS_LEDGER_ENV = "STELLA_TASK_PROCESS_LEDGER";

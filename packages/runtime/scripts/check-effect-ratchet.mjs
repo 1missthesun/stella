@@ -98,6 +98,7 @@ const codeOutsideTemplates = (line, inTemplate) => {
 
 const effectBearingTargets = [
   { segments: ["packages", "runtime"], keyPrefix: "" },
+  { segments: ["packages", "node-shared"], keyPrefix: "packages/node-shared/" },
   {
     segments: ["packages", "executor-cloud"],
     keyPrefix: "packages/executor-cloud/",

@@ -12,7 +12,7 @@ import {
   workerReadyTelemetry,
   type BootOutcome,
 } from "../../observability/boot-timing.js";
-import { getFileLogger } from "../../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import {
   configureRuntimeTelemetry,
   recordRuntimeTelemetry,

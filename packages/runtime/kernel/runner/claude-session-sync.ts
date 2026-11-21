@@ -34,9 +34,9 @@ import type {
   ClaudeSessionSyncSink,
   RestoredClaudeSession,
 } from "../integrations/claude-code-session-sync-sink.js";
-import type { SqliteDatabase } from "../storage/shared.js";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 import { forkDelayedCall, raceWithTimeoutError } from "./cloud-effect-runtime.js";
-import { resolveJwtOwnerScope } from "./computer-agent-cloud-records.js";
+import { resolveJwtOwnerScope } from "@stella/node-shared/shared/jwt-owner-scope.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
 const STEP_DEBOUNCE_MS = 400;

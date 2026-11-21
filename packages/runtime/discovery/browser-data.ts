@@ -4,7 +4,7 @@ import os from "os";
 import { exec } from "child_process";
 import { z } from "zod";
 import { Effect } from "effect";
-import { mainMemoryPath } from "../kernel/memory/memory-layout.js";
+import { mainMemoryPath } from "@stella/node-shared/memory/memory-layout.js";
 import {
   acquireCloseable,
   runDiscovery,

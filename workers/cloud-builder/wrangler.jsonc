@@ -23,6 +23,7 @@
       "../../packages/executor-cloud/src",
       "../../packages/executor-cloud/package.json",
       "../../packages/model-catalog",
+      "../../packages/node-shared",
       "../../packages/runtime/package.json",
       "../../packages/runtime/kernel",
       "../../packages/runtime/extensions",

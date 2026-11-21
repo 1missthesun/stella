@@ -17,7 +17,7 @@ import type {
 import {
   MEMORY_SYNC_MAX_BYTES,
   isSyncedMemoryPath,
-} from "@stella/runtime/kernel/memory/memory-client.js";
+} from "@stella/node-shared/memory/memory-client.js";
 import { sha256BytesHex, sha256Hex } from "../../hash.js";
 import {
   MemorySyncFileError,

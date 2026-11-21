@@ -21,7 +21,7 @@ import {
 import {
   getMessageSoundPreferences,
   updateLocalPreferences,
-} from "@stella/runtime/kernel/preferences/local-preferences";
+} from "@stella/node-shared/preferences/local-preferences";
 import {
   isWithinQuietHours,
   type UserAskEscalationPolicy,

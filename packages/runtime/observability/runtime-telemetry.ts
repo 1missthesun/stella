@@ -5,12 +5,12 @@ import type { TelemetryEventBody } from "@stella/contracts/telemetry";
 import {
   RemoteTelemetryClient,
   type RemoteTelemetryTransportConfig,
-} from "./remote-telemetry.js";
+} from "@stella/node-shared/observability/remote-telemetry.js";
 import {
   telemetryHttpEndpoint,
   telemetryHttpEnvironment,
-} from "./telemetry-endpoints.js";
-import { getTelemetryEnabled } from "../kernel/preferences/local-preferences.js";
+} from "@stella/node-shared/observability/telemetry-endpoints.js";
+import { getTelemetryEnabled } from "@stella/node-shared/preferences/local-preferences.js";
 
 export type RuntimeTelemetryConfig = {
   stellaDataDirPath: string;

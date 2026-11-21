@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from "./shared.js";
+import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 
 export const LEGACY_RUN_EVENT_ENTRY_TYPE = "run_event";
 export const LEGACY_RUN_EVENT_SWEEP_BATCH = 5_000;

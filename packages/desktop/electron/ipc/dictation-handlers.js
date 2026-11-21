@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { getDictationSoundEffectsEnabled, loadLocalPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getDictationSoundEffectsEnabled, loadLocalPreferences, updateLocalPreferences, } from "@stella/node-shared/preferences/local-preferences";
 import { runNativeHelper } from "../native-helper.js";
 import { hasOpenRouterDictationKey, transcribeWithOpenRouter, } from "../services/dictation-openrouter.js";
 import { applyShortcutRegistration, } from "./shortcut-registration.js";

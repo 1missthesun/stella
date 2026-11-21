@@ -37,7 +37,7 @@
 // userData (`~/Library/Application Support/Stella Development`), which
 // overflows for long usernames. The socket is anchored at a short
 // home-relative path instead, namespaced per install by a hash of the root
-// (same pattern as runtime/kernel/computer-use/automation-socket-paths.ts):
+// (same pattern as node-shared/computer-use/automation-socket-paths.ts):
 //   ~/.stella/meeting-capture/<sha1(resolvedRoot + "\n" + "meeting_capture")[0..<16]>.sock
 // Everything else (pid, state, recordings) stays under <stellaDataDir>/meetings/.
 //

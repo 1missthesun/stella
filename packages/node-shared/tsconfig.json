@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "strict": true,
+    "noEmit": true,
+    // @stella/contracts still carries a few transpiled-JS modules; resolve
+    // them (inferred types) without checking their bodies.
+    "allowJs": true,
+    "checkJs": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node", "bun-types"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

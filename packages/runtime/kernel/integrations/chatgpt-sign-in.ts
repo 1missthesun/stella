@@ -6,6 +6,7 @@ import {
   chatGptLoopbackRedirectUri,
   parseChatGptCallback,
   type ChatGptRegistration,
+  type ChatGptSavedRegistration,
 } from "@stella/contracts/chatgpt-siwc";
 import {
   chatGptDiscovery,
@@ -122,12 +123,7 @@ export async function listenForChatGptCallback(options: { signal?: AbortSignal }
   };
 }
 
-export type ChatGptSavedRegistration = {
-  clientId: string;
-  subject?: string;
-  idTokenHint?: string;
-  email?: string;
-};
+export type { ChatGptSavedRegistration };
 
 export async function loginChatGpt(options: {
   hostId: string;

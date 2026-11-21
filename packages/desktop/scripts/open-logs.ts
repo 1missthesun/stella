@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { resolveLogDir } from "@stella/runtime/worker/runtime-paths";
+import { resolveLogDir } from "@stella/node-shared/worker/runtime-paths";
 
 const logDir = resolveLogDir(process.cwd());
 

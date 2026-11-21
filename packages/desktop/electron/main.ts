@@ -5,6 +5,6 @@
 // until this module, top-level await included, has finished evaluating, so
 // main-process still runs entirely before `ready`.
 import "./bootstrap/windows-hidden-spawns.js";
-import "@stella/runtime/kernel/shared/http-proxy.js";
+import "@stella/node-shared/shared/http-proxy.js";
 
 await import("./main-process.js");

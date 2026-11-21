@@ -5,7 +5,7 @@ import { claudeCliCommandEnv, runCliCommand } from "./claude-cli-command.js";
 import {
   findUnrunnableExternalCliPath,
   resolveExternalCliPath,
-} from "./external-cli-resolution.js";
+} from "@stella/node-shared/integrations/external-cli-resolution.js";
 
 /**
  * Which Claude Code Stella runs, and only one that has shown it runs.

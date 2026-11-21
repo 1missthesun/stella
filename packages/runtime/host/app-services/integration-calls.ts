@@ -9,6 +9,8 @@ import {
   listNativeIntegrationsWithAccounts,
   type NativeCredentialFlowOptions,
 } from "./native-integrations.js";
+import { createCancelableRegistry } from "./cancelable.js";
+import { randomUUID } from "node:crypto";
 
 type IntegrationRequest = {
   flowId?: unknown;
@@ -16,7 +18,7 @@ type IntegrationRequest = {
   [key: string]: unknown;
 } | null | undefined;
 
-const flows = new Map<string, AbortController>();
+const flows = createCancelableRegistry();
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
@@ -55,20 +57,10 @@ const runFlow = async <T>(
   request: IntegrationRequest,
   run: (options: NativeCredentialFlowOptions, stellaDataDir: string) => Promise<T>,
 ): Promise<T> => {
-  const flowId = text(request?.flowId);
-  const controller = new AbortController();
-  if (flowId) {
-    flows.get(flowId)?.abort(new Error("Connection replaced."));
-    flows.set(flowId, controller);
-  }
-  try {
-    return await run(
-      flowOptions(context, request, controller.signal),
-      context.initializeParams.stellaDataDirPath,
-    );
-  } finally {
-    if (flowId && flows.get(flowId) === controller) flows.delete(flowId);
-  }
+  const flowId = text(request?.flowId) || `flow-${randomUUID()}`;
+  return await flows.run(flowId, (signal) =>
+    run(flowOptions(context, request, signal), context.initializeParams.stellaDataDirPath),
+  );
 };
 
 export const integrationCalls = {
@@ -116,9 +108,6 @@ export const integrationCalls = {
     ),
   cancelIntegrationFlow: (_context: AppServiceContext, request: IntegrationRequest) => {
     const flowId = text(request?.flowId);
-    const controller = flows.get(flowId);
-    flows.delete(flowId);
-    controller?.abort(new Error("Connection cancelled."));
-    return { canceled: Boolean(controller) };
+    return { canceled: flows.cancel(flowId, new Error("Connection cancelled.")) };
   },
 };

@@ -1,4 +1,4 @@
-import type { DeviceSigner } from "../kernel/home/device.js";
+import type { DeviceSigner } from "@stella/node-shared/home/device.js";
 
 export const HOST_DEVICE_SIGNING_METHOD = "host.auth.signDevice" as const;
 

@@ -6,7 +6,7 @@
 import {
   getPromptPresetSelection,
   setPromptPresetSelection,
-} from "../../kernel/preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 
 const loadPresets = () => import("../../kernel/prompts/prompt-presets.js");
 

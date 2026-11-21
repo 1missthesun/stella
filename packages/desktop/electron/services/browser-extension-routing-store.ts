@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 import type {
   BrowserExtensionClient,
   BrowserExtensionClientsState,

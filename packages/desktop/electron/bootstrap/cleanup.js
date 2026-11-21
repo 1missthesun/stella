@@ -2,7 +2,7 @@ import { stopAllDesktopAutomationDaemons } from "../services/desktop-automation-
 import { stopOrphanedStellaBrowserDaemons } from "../services/stella-browser-bridge-service.js";
 import { stopNativeHelperDaemons } from "../native-helper-daemon.js";
 import { stopOfficePreviewSessions } from "./office-preview-bridge.js";
-import { joinWithTimeout } from "@stella/runtime/kernel/shared/join-timeout";
+import { joinWithTimeout } from "@stella/node-shared/shared/join-timeout";
 import { isRelaunching } from "../launcher-client.js";
 const RUNTIME_SHELLS_SHUTDOWN_TIMEOUT_MS = 4_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 2_500;

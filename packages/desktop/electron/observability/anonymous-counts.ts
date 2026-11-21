@@ -21,7 +21,7 @@ import {
   getOnboardingCompleted,
   loadLocalPreferences,
   setAnonymousCountsEnabled,
-} from "@stella/runtime/kernel/preferences/local-preferences";
+} from "@stella/node-shared/preferences/local-preferences";
 import { releaseLabel } from "./release-info.js";
 
 type OnceEvent = "first_run" | "engine_chosen" | "first_reply" | "found_via";

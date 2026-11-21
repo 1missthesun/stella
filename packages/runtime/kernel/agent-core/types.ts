@@ -4,7 +4,7 @@ import type {
   TextContent,
 } from "@earendil-works/pi-ai";
 import type { Static, TSchema } from "@sinclair/typebox";
-import type { StoredImageContent } from "../storage/shared.js";
+import type { StoredImageContent } from "@stella/node-shared/storage/shared.js";
 
 export interface CustomAgentMessages {
   runtimeInternal?: {

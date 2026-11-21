@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, promises as fs } from "node:fs";
 import { Effect, Schedule } from "effect";
-import type { RuntimePaths } from "../worker/runtime-paths.js";
+import type { RuntimePaths } from "@stella/node-shared/worker/runtime-paths.js";
 import {
   computeRuntimeBuildStamp,
   RUNTIME_BUILD_STAMP_UNAVAILABLE,

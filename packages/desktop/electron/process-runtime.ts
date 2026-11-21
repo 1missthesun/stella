@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process";
-import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree";
+import { terminateProcessTree } from "@stella/node-shared/shared/process-tree";
 
 export type ProcessRuntimePhase = "before-quit" | "will-quit";
 

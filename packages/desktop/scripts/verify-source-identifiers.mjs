@@ -92,6 +92,7 @@ export const verifyConvertedSourceIdentifiers = ({
 } = {}) => {
   const files = [
     ...walkFiles(path.join(rootDir, "packages", "runtime")),
+    ...walkFiles(path.join(rootDir, "packages", "node-shared")),
     ...walkFiles(path.join(rootDir, "packages", "desktop", "electron")),
   ].filter((file) => file.endsWith(".js"));
   const failures = files.flatMap((filePath) =>

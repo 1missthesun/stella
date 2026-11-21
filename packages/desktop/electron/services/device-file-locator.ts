@@ -4,7 +4,7 @@ import {
   DEVICE_FILE_COPY_LIMITS,
   pickDeviceFileLocation,
 } from "@stella/contracts/device-files";
-import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-agent-cloud-records";
+import { resolveJwtOwnerScope } from "@stella/node-shared/shared/jwt-owner-scope";
 import {
   fetchWithInactivity,
   REQUEST_BUDGET_MS,

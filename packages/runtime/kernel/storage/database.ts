@@ -4,8 +4,8 @@ import {
   getDesktopDatabasePath,
   initializeDesktopDatabase,
   type DesktopDatabaseInitTiming,
-} from "./database-init.js";
-import { SqliteConnection, type SqliteDriverDatabase } from "./shared.js";
+} from "@stella/node-shared/storage/database-init.js";
+import { SqliteConnection, type SqliteDriverDatabase } from "@stella/node-shared/storage/shared.js";
 
 type SqliteDatabaseCtor = new (filePath: string) => SqliteDriverDatabase;
 

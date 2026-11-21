@@ -9,7 +9,7 @@ import {
   RUNTIME_CLIENT_METHODS,
   type RuntimeClientAttachParams,
 } from "@stella/contracts/protocol/runtime-client";
-import { getFileLogger } from "../observability/file-logger.js";
+import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import type { RuntimeServerIdentity } from "../worker/server-identity.js";
 import {
   isRuntimeHostCall,

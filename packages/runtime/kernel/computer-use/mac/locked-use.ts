@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { resolveStatePath } from "../../cli/shared.js";
+import { resolveStatePath } from "@stella/node-shared/cli/shared.js";
 import {
   resolveNativeHelperPath,
   runNativeHelper,
@@ -9,7 +9,7 @@ import {
 import {
   loadLocalPreferences,
   updateLocalPreferences,
-} from "../../preferences/local-preferences.js";
+} from "@stella/node-shared/preferences/local-preferences.js";
 import { forkCancelableTimeout } from "../effect-runtime.js";
 import {
   abortableComputerDelay,

@@ -190,6 +190,7 @@ export const collectLocalNamedImportErrors = ({ sourceFiles }) => {
 export const verifyLocalNamedImports = ({ rootDir = repoRootDir } = {}) => {
   const sourceFiles = [
     ...walkFiles(path.join(rootDir, "packages", "runtime")),
+    ...walkFiles(path.join(rootDir, "packages", "node-shared")),
     ...walkFiles(path.join(rootDir, "packages", "desktop", "electron")),
   ];
   const errors = collectLocalNamedImportErrors({ sourceFiles });

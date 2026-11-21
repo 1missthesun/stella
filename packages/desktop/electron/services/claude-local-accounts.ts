@@ -12,7 +12,7 @@ import {
 } from "@stella/contracts/claude-local-accounts";
 import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backend/engines";
 import { readStoredClaudeLogin, type StoredClaudeLogin } from "@stella/contracts/claude-login";
-import { buildExternalCliChildEnv } from "@stella/runtime/kernel/integrations/external-cli-resolution";
+import { buildExternalCliChildEnv } from "@stella/node-shared/integrations/external-cli-resolution";
 import type {
   ClaudeCliInstallProgress,
   ClaudeCliInstallResult,

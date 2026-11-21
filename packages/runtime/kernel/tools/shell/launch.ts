@@ -3,7 +3,7 @@ import os from "os";
 import { existsSync, realpathSync } from "fs";
 import { toolStateEnvironment } from "@stella/contracts/cloud-tool-home";
 import type { ToolContext, ToolProcessIdentity } from "../types.js";
-import { purgeExpiredDeferredDeletes } from "../deferred-delete.js";
+import { purgeExpiredDeferredDeletes } from "@stella/node-shared/tools/deferred-delete.js";
 import { resolveToolFallbackCwd } from "../cwd.js";
 import { getStellaComputerSessionId } from "../stella-computer-session.js";
 import { stellaAgentShellEnvironment } from "../stella-agent-env.js";

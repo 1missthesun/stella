@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { resolveStatePath } from "../cli/shared.js";
+import { resolveStatePath } from "@stella/node-shared/cli/shared.js";
 import { sanitizeStellaComputerSessionId } from "../tools/stella-computer-session.js";
 import { getComputerExecutionEnv } from "./execution-context.js";
 import {
   readProcessGroup,
   signalOwnChild,
   signalRecordedProcess,
-} from "../shared/process-identity.js";
+} from "@stella/node-shared/shared/process-identity.js";
 
 export const DEFAULT_COMPUTER_SESSION_ID = "manual";
 

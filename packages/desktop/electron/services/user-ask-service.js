@@ -48,12 +48,12 @@ import {
   userAskTtlMs,
   validateUserAskResponses,
 } from "@stella/contracts/user-ask";
-import { protectValue } from "@stella/runtime/kernel/shared/protected-storage";
-import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
+import { protectValue } from "@stella/node-shared/shared/protected-storage";
+import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 import {
   getUserAskEscalationPolicy,
   setUserAskEscalationPolicy,
-} from "@stella/runtime/kernel/preferences/local-preferences";
+} from "@stella/node-shared/preferences/local-preferences";
 import { showStellaNotification } from "./notification-service.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 import { SavedSecureValues, matchSavedFields } from "./saved-secure-values.js";

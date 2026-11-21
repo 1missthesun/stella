@@ -649,6 +649,39 @@ applies until the user clicks Update.
    launcher's prepare step (`packages/desktop/scripts/prepare-install.mjs`),
    which runs on install, relaunch and rollback.
 
+**Before a prod desktop publish, apply it from the previous prod release
+through the real Update.** The version a user is on runs the update, not the
+one being published: its gate builds the new main bundle on a scratch copy
+linked to the installed `node_modules`, so a release can build and run
+perfectly from a fresh checkout and still be refused on every install ("This
+version of Stella would not start", `app-source.apply-build-failed`). That is
+what 629c44402 did on 2026-11-21. Recipe (about 15 minutes, Mac or omarchy):
+
+1. In a scratch worktree, point the `previews` block's `ARTIFACTS` namespace in
+   `workers/cloud-builder/wrangler.jsonc` at a throwaway namespace (never
+   commit it) and `bun run preview -- up --name <name>`.
+2. Publish the previous prod release's source commit (the `Stella-Source`
+   trailer on the prod `upstream` head) to that namespace:
+   `bun run app-source:publish -- --namespace <ns> --backend <preview> --ref <sha>`.
+3. Clone the namespace's `upstream` (read token from
+   `wrangler artifacts repos issue-token upstream --namespace <ns> --scope read`,
+   passed as `http.extraHeader`, never printed) into a sandbox, `bun install
+   --frozen-lockfile`, copy `.agents/skills/verify-stella` and
+   `workers/cloud-builder/.dev.vars` in and list both in `.git/info/exclude`.
+4. Launch it as an install: `STELLA_BACKEND_URL=<preview>
+   STELLA_APP_SOURCE_INSTALLED=1 STELLA_RENDERER_MODE=production
+   control-stella.mjs session launch --account pro` (PATH with `/usr/bin`
+   first, without Stella's `shell-shims` and `runtimes/git-*`).
+5. Publish the release to the namespace, press **Update**, and read the run's
+   `process-*.txt` for `app-source.applied` / `app-source.prebuild` (not
+   `apply-build-failed`). After the relaunch the harness still holds the old
+   pid: write the new main's pid, start time and CDP port into
+   `.run/current-<name>.json` and `run.json`, then check a turn, the new
+   feature and `session relaunch`.
+
+Then `preview -- down`, stop the sandbox with `cleanup apply`, and delete it
+(it holds `.dev.vars`).
+
 What users are actually on: each publish is one commit on that namespace's
 `upstream` repo carrying a `Stella-Source: <monorepo sha>` trailer, so reading
 that repo's head says which commit the channel serves — and therefore what a

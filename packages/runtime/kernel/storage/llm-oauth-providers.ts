@@ -18,6 +18,13 @@ export type LlmOAuthProvider = {
   readonly oauth: OAuthAuth;
 };
 
+/**
+ * GitHub Copilot and xAI sign in with a device code on the provider's own
+ * site. pi-ai's browser-redirect sign-ins (Anthropic, Codex, ChatGPT,
+ * OpenRouter) answer the redirect with Pi's own page, so a redirect sign-in
+ * belongs in Stella's code with @stella/contracts/sign-in-page, the way
+ * Google Antigravity's does.
+ */
 let providers: Map<string, LlmOAuthProvider> | undefined;
 const registry = (): Map<string, LlmOAuthProvider> =>
   (providers ??= new Map(

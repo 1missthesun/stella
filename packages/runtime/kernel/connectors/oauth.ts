@@ -19,6 +19,11 @@ import {
   unprotectValue,
 } from "../shared/protected-storage.js";
 import { writePrivateFile } from "../shared/private-fs.js";
+import {
+  SIGN_IN_PAGE_HEADERS,
+  signInErrorHtml,
+  signInSuccessHtml,
+} from "@stella/contracts/sign-in-page";
 
 type TokenStore = {
   version: 2;
@@ -819,6 +824,11 @@ const callbackPortFromUrl = (callbackUrl?: string) => {
   }
 };
 
+const notWaitingPage = signInErrorHtml(
+  "Nothing is waiting for this connection. Start it again from Stella.",
+  { heading: "Couldn't connect" },
+);
+
 const createOAuthCallbackListener = async (
   state: string,
   options: {
@@ -843,12 +853,13 @@ const createOAuthCallbackListener = async (
     let callbackRejecter: ((error: Error) => void) | null = null;
     const server = http.createServer((req, res) => {
       const host = req.headers.host;
-      if (!host || !req.url || !redirectUri) return;
+      if (!host || !req.url || !redirectUri) {
+        res.writeHead(404, SIGN_IN_PAGE_HEADERS).end(notWaitingPage);
+        return;
+      }
       const url = new URL(req.url, `http://${host}`);
       if (url.pathname !== new URL(redirectUri).pathname) {
-        res
-          .writeHead(400)
-          .end("Invalid Stella connector authorization callback.");
+        res.writeHead(404, SIGN_IN_PAGE_HEADERS).end(notWaitingPage);
         return;
       }
       const code = url.searchParams.get("code");
@@ -859,21 +870,30 @@ const createOAuthCallbackListener = async (
       if (error) {
         settled = true;
         cancelHardTimeout?.();
-        res.writeHead(400).end("Stella connector authorization failed.");
+        res.writeHead(400, SIGN_IN_PAGE_HEADERS).end(
+          signInErrorHtml(
+            "The app didn't give Stella access. You can close this tab and try again in Stella.",
+            {
+              heading: "Couldn't connect",
+              details: errorDescription ? `${error}: ${errorDescription}` : error,
+            },
+          ),
+        );
         server.close();
         callbackRejecter?.(providerError(error, errorDescription));
         return;
       }
       if ((!code && !accessToken) || returnedState !== state) {
-        res
-          .writeHead(400)
-          .end("Invalid Stella connector authorization callback.");
+        res.writeHead(400, SIGN_IN_PAGE_HEADERS).end(notWaitingPage);
         return;
       }
       res
-        .writeHead(200, { "content-type": "text/html" })
+        .writeHead(200, SIGN_IN_PAGE_HEADERS)
         .end(
-          "<html><body><h3>Stella connector authorized.</h3><p>You can close this window.</p></body></html>",
+          signInSuccessHtml(
+            "Stella can use this app now. Return to Stella; you can close this tab.",
+            "Connected",
+          ),
         );
       settled = true;
       cancelHardTimeout?.();

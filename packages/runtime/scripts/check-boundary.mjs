@@ -30,6 +30,12 @@ const isDesktopPackageImport = (specifier) =>
   specifier.startsWith("@stella/desktop/") ||
   specifier === "@stella/desktop-ui" ||
   specifier.startsWith("@stella/desktop-ui/");
+// pi-ai's browser sign-in helpers answer the OAuth redirect with Pi's own
+// branded page; Stella's sign-ins use @stella/contracts/sign-in-page.
+const isPiSignInPageImport = (specifier) =>
+  /^@earendil-works\/pi-ai\/(?:dist\/)?(?:utils\/oauth-page|auth\/oauth\/callback-server)(?:\.js)?$/.test(
+    specifier,
+  );
 const runtimeEffectFencedPrefixes = [
   "packages/runtime/kernel/tools/defs/",
   "packages/runtime/kernel/prompts/",
@@ -256,6 +262,20 @@ export const checkBoundaries = async (repoRoot) => {
     }
     return null;
   });
+
+  for (const pkg of [
+    "agent",
+    "runtime",
+    "desktop",
+    "desktop-ui",
+    "executor-cloud",
+  ]) {
+    await inspect(path.join(repoRoot, "packages", pkg), (specifier) =>
+      isPiSignInPageImport(specifier)
+        ? "sign-in callbacks must show Stella's page (@stella/contracts/sign-in-page), not pi-ai's"
+        : null,
+    );
+  }
 
   return offenders;
 };

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { OAuthAuth, OAuthCredential, ProviderAuthInteraction } from "@earendil-works/pi-ai";
-import { oauthErrorHtml, oauthSuccessHtml } from "@earendil-works/pi-ai/utils/oauth-page";
+import { SIGN_IN_PAGE_HEADERS, signInErrorHtml, signInSuccessHtml } from "@stella/contracts/sign-in-page";
 import { ANTIGRAVITY_ENDPOINTS, antigravityUserAgent } from "./models.ts";
 import { encodeAntigravityKey } from "./stream.ts";
 import { agyFetch } from "./transport.ts";
@@ -46,21 +46,28 @@ const startCallback = (state: string, signal: AbortSignal): Promise<Callback> =>
     const server = createServer((request, response) => {
       const url = new URL(request.url ?? "/", `http://localhost:${CALLBACK_PORT}`);
       if (url.pathname !== CALLBACK_PATH) {
-        response.writeHead(404, { "Content-Type": "text/html; charset=utf-8" }).end(oauthErrorHtml("Not found."));
+        response
+          .writeHead(404, SIGN_IN_PAGE_HEADERS)
+          .end(signInErrorHtml("Nothing is waiting for this sign-in. Start it again from Stella."));
         return;
       }
       const error = url.searchParams.get("error");
       const received = url.searchParams.get("code");
       if (error || !received || url.searchParams.get("state") !== state) {
         response
-          .writeHead(400, { "Content-Type": "text/html; charset=utf-8" })
-          .end(oauthErrorHtml("Google sign-in didn't finish.", error ? `Error: ${error}` : undefined));
+          .writeHead(400, SIGN_IN_PAGE_HEADERS)
+          .end(
+            signInErrorHtml(
+              "Google sign-in didn't finish. You can close this tab and try again in Stella.",
+              error ? { details: `Error: ${error}` } : {},
+            ),
+          );
         settle?.fail(new Error(error ? `Google sign-in failed: ${error}` : "Google sign-in didn't finish."));
         return;
       }
       response
-        .writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
-        .end(oauthSuccessHtml("Signed in to Google Antigravity. You can close this tab and go back to Stella."));
+        .writeHead(200, SIGN_IN_PAGE_HEADERS)
+        .end(signInSuccessHtml("You're signed in to Google Antigravity. Return to Stella; you can close this tab."));
       settle?.ok(received);
     });
     const timer = setTimeout(() => settle?.fail(new Error("Google sign-in timed out.")), LOGIN_TIMEOUT_MS);

@@ -1,3 +1,9 @@
+/**
+ * The page a browser lands on when a sign-in hands back to Stella on this
+ * computer (Google Antigravity, ChatGPT, connector sign-ins). Every local
+ * sign-in callback uses this one page, never a library's own (pi-ai ships a
+ * Pi-branded one).
+ */
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -117,19 +123,33 @@ function renderPage(options: {
 </html>`;
 }
 
-export function oauthSuccessHtml(message: string): string {
+export function signInSuccessHtml(
+  message: string,
+  heading = "Signed in",
+): string {
   return renderPage({
-    title: "Stella — connected",
-    heading: "Connected",
+    title: `Stella — ${heading.toLowerCase()}`,
+    heading,
     message,
   });
 }
 
-export function oauthErrorHtml(message: string, details?: string): string {
+export function signInErrorHtml(
+  message: string,
+  options: { details?: string; heading?: string } = {},
+): string {
+  const heading = options.heading ?? "Couldn't sign in";
   return renderPage({
-    title: "Stella — couldn't connect",
-    heading: "Couldn't connect",
+    title: `Stella — ${heading.toLowerCase()}`,
+    heading,
     message,
-    details,
+    ...(options.details ? { details: options.details } : {}),
   });
 }
+
+/** Headers every sign-in page is sent with: never cached, never leaks the callback address. */
+export const SIGN_IN_PAGE_HEADERS = {
+  "Content-Type": "text/html; charset=utf-8",
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
+} as const;

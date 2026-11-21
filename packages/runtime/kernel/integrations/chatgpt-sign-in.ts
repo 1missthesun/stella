@@ -12,7 +12,7 @@ import {
   completeChatGptSignIn,
   createChatGptPendingSignIn,
 } from "@stella/contracts/chatgpt-siwc-flows";
-import { oauthErrorHtml, oauthSuccessHtml } from "./oauth-page.js";
+import { SIGN_IN_PAGE_HEADERS, signInErrorHtml, signInSuccessHtml } from "@stella/contracts/sign-in-page";
 
 const SIGN_IN_TIMEOUT_MS = 15 * 60_000;
 
@@ -47,32 +47,30 @@ export async function listenForChatGptCallback(options: { signal?: AbortSignal }
   let port = 0;
 
   const server: Server = createServer((req, res) => {
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Referrer-Policy", "no-referrer");
     const html = (status: number, body: string) => {
-      res.writeHead(status, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(status, SIGN_IN_PAGE_HEADERS);
       res.end(body);
     };
     let url: URL;
     try {
       url = new URL(req.url ?? "/", `http://${CHATGPT_SIWC.loopbackHost}:${port}`);
     } catch {
-      html(400, oauthErrorHtml("This sign-in link isn't valid."));
+      html(400, signInErrorHtml("This sign-in link isn't valid."));
       return;
     }
     if (req.method !== "GET" || url.pathname !== CHATGPT_SIWC.loopbackPath || !attempt.settle) {
-      html(404, oauthErrorHtml("Nothing is waiting for this sign-in."));
+      html(404, signInErrorHtml("Nothing is waiting for this sign-in. Start it again from Stella."));
       return;
     }
     const states = url.searchParams.getAll("state");
     if (!attempt.state || states.length !== 1 || states[0] !== attempt.state) {
-      html(400, oauthErrorHtml("This sign-in belongs to a different attempt. Return to the tab that started it."));
+      html(400, signInErrorHtml("This sign-in belongs to a different attempt. Return to the tab that started it."));
       return;
     }
     if (url.searchParams.has("error")) {
-      html(400, oauthErrorHtml("ChatGPT sign-in didn't complete. You can close this tab and try again in Stella."));
+      html(400, signInErrorHtml("ChatGPT sign-in didn't complete. You can close this tab and try again in Stella."));
     } else {
-      html(200, oauthSuccessHtml("You're signed in to ChatGPT. Return to Stella; you can close this tab."));
+      html(200, signInSuccessHtml("You're signed in to ChatGPT. Return to Stella; you can close this tab."));
     }
     settle(url.toString());
   });

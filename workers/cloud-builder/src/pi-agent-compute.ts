@@ -6,9 +6,21 @@ import {
   attachedToolPathsForDirectory,
   isAttachedToolName,
 } from "@stella/executor-cloud/attached-tool-protocol";
+import {
+  acquireAgentContainerSlot,
+  agentContainerHandle,
+  agentContainerSize,
+  materializeAgentWorld,
+  openAgentSession,
+  piAgentContainerSizeKeys,
+  probeAgentContainerPressure,
+  releaseAgentContainer,
+  releaseAgentContainerSlot,
+  type AgentContainerPressure,
+} from "./agent-container.js";
 import { executorSessionEnvironment } from "./executor-session-env.js";
 import { normalizeToolWorkspaceRoot, turnBrokerCredentialsPath } from "./build-session/shared/keys.js";
-import { sandboxClient, type ExecutionSession, type SandboxHandle } from "./sandbox-client.js";
+import type { ExecutionSession, SandboxHandle } from "./sandbox-client.js";
 import {
   issueTurnBrokerCredential,
   revokeTurnBrokerCredential,
@@ -24,7 +36,6 @@ import { conversationWorldName } from "./slack/scope.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import type { InstanceSize } from "./instance-size.js";
 import { issueWorldCapability } from "./world-capability.js";
-import { worldMaterializationCommand, worldMaterializationFailure } from "./world-materialization.js";
 import { agentSandboxId, WORLD_ROOT, worldName } from "./workspace.js";
 
 export type PiComputeEnv = Pick<
@@ -38,8 +49,6 @@ export type PiComputeOwner = { ownerId: string; ownerGeneration: string; convers
 export type PiComputeHost = {
   env: PiComputeEnv;
   storage: DurableObjectStorage;
-  takeSlot(owner: PiComputeOwner, sandboxId: string, signal: AbortSignal): Promise<void>;
-  releaseSlot(owner: PiComputeOwner, sandboxId: string): Promise<void>;
   log(event: string, fields: Record<string, unknown>): void;
 };
 
@@ -51,6 +60,9 @@ export type PiComputeRecord = {
   sandboxId: string;
   sessionId: string;
   daemonDirectory: string;
+  /** Absent on records from before pi agents were sized: those ran small. */
+  size?: InstanceSize;
+  threadId?: string;
 };
 
 export type PiWorkspaceCall = { toolCallId: string; toolName: string; params: Record<string, unknown> };
@@ -60,6 +72,8 @@ export type PiComputeLease = {
   readonly ready: Promise<void>;
   call(call: PiWorkspaceCall): Promise<SerializedAgentToolResult>;
   quiesce(linkedPaths: readonly string[]): Promise<{ deliveredFiles: readonly string[] }>;
+  /** After a run that used the container: a memory or disk shortage there raises this agent's size. */
+  probePressure(): Promise<AgentContainerPressure | undefined>;
   release(options?: { warm?: boolean }): Promise<void>;
   readonly expiresAt: number;
   abort(reason?: unknown): void;
@@ -70,7 +84,6 @@ export const piBrokerSessionId = (conversationId: string): string => `pi:${conve
 const generationKey = (agentConversationId: number) => `piComputeGen:${agentConversationId}`;
 
 export const piComputeKey = (agentConversationId: number) => `piCompute:${agentConversationId}`;
-const INSTANCE_SIZE = "small";
 
 const CREDENTIAL_TTL_MS = Math.min(TURN_BROKER_MAX_TTL_MS, 30 * 60_000);
 const COMMAND_TIMEOUT_MS = 15 * 60_000;
@@ -82,22 +95,19 @@ const hex = async (value: string): Promise<string> =>
 
 const sandboxFor = (
   host: PiComputeHost,
-  sandboxId: string,
-  size: InstanceSize,
-  world: string,
-  owner: string,
+  target: { sandboxId: string; size: InstanceSize; world: string; owner: string },
 ): SandboxHandle => {
-  const namespace = host.env.Sandbox;
-  if (!namespace) throw new Error("Cloud containers are not configured.");
   const idle = Number(host.env.SANDBOX_IDLE_TIMEOUT_MS);
-  return sandboxClient(namespace, sandboxId, {
-    size,
-    workload: "world",
+  return agentContainerHandle(host.env.Sandbox, {
+    ...target,
     ...(Number.isSafeInteger(idle) && idle > 0 ? { idleTimeoutMs: idle } : {}),
-    world,
-    owner,
   });
 };
+
+const piLog =
+  (host: PiComputeHost) =>
+  (_level: "info" | "error", event: string, fields: Record<string, unknown>) =>
+    host.log(event, fields);
 
 const publicOrigin = (host: PiComputeHost): string => {
   const origin = host.env.CLOUD_BUILDER_PUBLIC_URL?.replace(/\/+$/u, "");
@@ -105,53 +115,36 @@ const publicOrigin = (host: PiComputeHost): string => {
   return origin;
 };
 
-const quoted = (value: string) => `'${value.replace(/'/gu, `'"'"'`)}'`;
-
-/**
- * Release one lease's resources by its record: the daemon's process group
- * and directory, its session, its slot, then the container (which snapshots,
- * the warmest start for the owner's next agent, and stops: after the warm
- * window when `warm`, so the agent's next run soon after reuses it, else
- * right after the snapshot). Each step is best-effort; a container that is
- * not running holds none of them.
- */
 /** The owner's world, or the Slack workspace's own world for a Stella Crew agent. */
 const piWorldName = async (host: PiComputeHost, owner: PiComputeOwner): Promise<string> =>
   await conversationWorldName(host.env, owner.ownerId, owner.conversationId, worldName);
 
+/**
+ * Release one lease's resources by its record: its slot, the daemon, its
+ * session, then the container, which snapshots (the warmest start for the
+ * owner's next agent) and stops, after the warm window when `warm` so the
+ * agent's next run soon after reuses it.
+ */
 export const releasePiCompute = async (
   host: PiComputeHost,
   record: PiComputeRecord,
   options: { warm?: boolean } = {},
 ) => {
-  await host.releaseSlot(record.owner, record.sandboxId).catch(() => undefined);
-  const sandbox = sandboxFor(host, record.sandboxId, INSTANCE_SIZE, await piWorldName(host, record.owner), record.owner.ownerId);
-  const running = await sandbox
-    .getState()
-    .then((state) => state.status === "running")
-    .catch(() => false);
-  if (running) {
-    const paths = attachedToolPathsForDirectory(record.daemonDirectory);
-    const pid = await sandbox
-      .exec(`cat -- ${quoted(paths.daemonPid)}`)
-      .then((result) => {
-        if (!result.success) return undefined;
-        const value = JSON.parse(result.stdout) as { pid?: unknown; pgid?: unknown };
-        return Number.isSafeInteger(value.pid) && value.pid === value.pgid && Number(value.pid) > 1
-          ? Number(value.pgid)
-          : undefined;
-      })
-      .catch(() => undefined);
-    if (pid !== undefined) {
-      await sandbox.exec(`kill -TERM -- -${pid}`).catch(() => undefined);
-      await scheduler.wait(500);
-      await sandbox.exec(`kill -KILL -- -${pid}`).catch(() => undefined);
-    }
-    await sandbox.killProcess(`attached-daemon-${record.sessionId}`.slice(0, 64), "SIGKILL").catch(() => undefined);
-    await sandbox.exec(`rm -rf -- ${quoted(record.daemonDirectory)}`).catch(() => undefined);
-    await sandbox.deleteSession(record.sessionId).catch(() => undefined);
-    await sandbox.release({ warm: options.warm === true }).catch(() => undefined);
-  }
+  await releaseAgentContainer({
+    env: host.env,
+    ownerId: record.owner.ownerId,
+    sandbox: sandboxFor(host, {
+      sandboxId: record.sandboxId,
+      size: record.size ?? "small",
+      world: await piWorldName(host, record.owner),
+      owner: record.owner.ownerId,
+    }),
+    sandboxId: record.sandboxId,
+    sessionId: record.sessionId,
+    daemonDirectory: record.daemonDirectory,
+    release: { warm: options.warm === true },
+    log: piLog(host),
+  });
   const brokerKey = turnBrokerStorageKey(record);
   const broker = await host.storage.get<TurnBrokerRecord>(brokerKey);
   if (broker) await host.storage.put(brokerKey, revokeTurnBrokerCredential(broker, Date.now())).catch(() => undefined);
@@ -166,11 +159,15 @@ export const openPiComputeLease = async (
   await host.storage.put(generationKey(agentConversationId), attemptGeneration);
   const identity = { turnId, attemptGeneration };
   const hash = (await hex(`${turnId}:${attemptGeneration}`)).slice(0, 32);
+  const sizeKeys = piAgentContainerSizeKeys(threadId);
+  const size = await agentContainerSize(host.storage, sizeKeys, "small");
   const record: PiComputeRecord = {
     version: 1,
     owner,
     turnId,
     attemptGeneration,
+    size,
+    threadId,
     // Crew agents moved off the owner's world: a fresh container, never one
     // that already holds the owner's files on disk.
     sandboxId: await agentSandboxId(
@@ -203,8 +200,8 @@ export const openPiComputeLease = async (
 
   const attachWorld = async (target: { sandboxId: string; sessionId: string }) => {
     const started = Date.now();
-    await host.takeSlot(owner, target.sandboxId, execution.signal);
-    sandbox = sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world, owner.ownerId);
+    await acquireAgentContainerSlot(host.env, owner.ownerId, target.sandboxId);
+    sandbox = sandboxFor(host, { sandboxId: target.sandboxId, size, world, owner: owner.ownerId });
     if (isSlackConversationId(owner.conversationId) && slackEnvironmentsEnabled(host.env)) {
       const egress = await egressForConversation(host.env as Cloudflare.Env, owner.conversationId);
       const { restarted } = await sandbox.setEgress(egress);
@@ -216,40 +213,31 @@ export const openPiComputeLease = async (
       commandTimeoutMs: COMMAND_TIMEOUT_MS,
       env: executorSessionEnvironment(),
     };
-    // A failed attach leaves its session behind; the retry owns the same id.
-    const session: ExecutionSession = await sandbox.createSession(options).catch(async (error: unknown) => {
-      if (!/already exists/iu.test(error instanceof Error ? error.message : String(error))) throw error;
-      await sandbox!.deleteSession(target.sessionId).catch(() => undefined);
-      return await sandbox!.createSession(options);
-    });
+    const session: ExecutionSession = await openAgentSession(sandbox, options);
     context.assertActive();
     const coldContainerStartMs = Date.now() - started;
     const restoring = Date.now();
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
-    const capability = await issueWorldCapability({
+    const materialized = await materializeAgentWorld(session, {
       secret: builderServiceSecret(host.env),
+      origin: publicOrigin(host),
+      worldRoot: WORLD_ROOT,
       worldName: world,
       turnId,
       attemptGeneration,
-      now: Date.now(),
       ttlMs: CREDENTIAL_TTL_MS,
+      timeoutMs: COMMAND_TIMEOUT_MS,
     });
-    const exportUrl = new URL(`${publicOrigin(host)}/internal/worlds/${world}/export`);
-    const materialized = await session.exec(
-      worldMaterializationCommand({ worldRoot: WORLD_ROOT, exportUrl: exportUrl.toString(), capability }),
-      { timeout: COMMAND_TIMEOUT_MS },
-    );
-    if (!materialized.success) {
+    if (!materialized.ok) {
       host.log("pi_agent_world_materialize_failed", {
         threadId,
         turnId,
-        exitCode: materialized.exitCode,
-        stderr: materialized.stderr.trim().slice(-1500),
-        stdout: materialized.stdout.trim().slice(-500),
+        exitCode: materialized.result.exitCode,
+        stderr: materialized.result.stderr.trim().slice(-1500),
+        stdout: materialized.result.stdout.trim().slice(-500),
       });
-      throw new Error(worldMaterializationFailure(materialized));
+      throw new Error(materialized.message);
     }
-    await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
     const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log, expiresAt);
     await prepareSlackPreviews(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     if (isSlackConversationId(owner.conversationId) && slackEnvironmentsEnabled(host.env)) {
@@ -268,6 +256,7 @@ export const openPiComputeLease = async (
       threadId,
       turnId,
       attemptGeneration,
+      instanceSize: size,
       ms: Date.now() - started,
     });
     return { session, coldContainerStartMs, restoreMs: Date.now() - restoring };
@@ -330,8 +319,8 @@ export const openPiComputeLease = async (
     },
     release: async () => await releasePiCompute(host, record, { warm: releaseWarm }),
     destroy: async (target) => {
-      await host.releaseSlot(owner, target.sandboxId).catch(() => undefined);
-      await sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world, owner.ownerId)
+      await releaseAgentContainerSlot(host.env, owner.ownerId, target.sandboxId);
+      await sandboxFor(host, { sandboxId: target.sandboxId, size, world, owner: owner.ownerId })
         .destroy()
         .catch(() => undefined);
     },
@@ -339,7 +328,7 @@ export const openPiComputeLease = async (
   });
   const target = {
     sandboxId: record.sandboxId,
-    instanceSize: INSTANCE_SIZE,
+    instanceSize: size,
     sessionId: record.sessionId,
     daemonDirectory: record.daemonDirectory,
   } as const;
@@ -403,6 +392,17 @@ export const openPiComputeLease = async (
         });
         return { deliveredFiles: response.status === "quiesced" ? response.deliveredFiles : [] };
       })()),
+    probePressure: async () => {
+      if (!sandbox) return undefined;
+      return await probeAgentContainerPressure({
+        sandbox,
+        size,
+        storage: host.storage,
+        keys: sizeKeys,
+        log: piLog(host),
+        fields: { threadId, turnId, attemptGeneration },
+      }).catch(() => undefined);
+    },
     release: (options) => {
       if (releasing === undefined) releaseWarm = options?.warm === true;
       return (releasing ??= attachment.release(target));

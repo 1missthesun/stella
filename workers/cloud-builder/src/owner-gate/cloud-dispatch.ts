@@ -607,6 +607,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         turnId: row.dispatch_id,
         attemptGeneration: 1,
         lineage,
+        ...(request.workspace ? { workspace: request.workspace } : {}),
       },
     });
     const running = await this.markCloudRunning(

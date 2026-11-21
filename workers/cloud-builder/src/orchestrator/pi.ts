@@ -894,6 +894,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         description: attempt.description,
         attemptGeneration: attempt.attemptGeneration,
         lineage: attempt.lineage,
+        ...(attempt.workspace ? { workspace: attempt.workspace } : {}),
         authority: {
           ownerId: input.ownerId,
           ownerGeneration: input.ownerGeneration,

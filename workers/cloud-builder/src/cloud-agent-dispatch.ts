@@ -401,6 +401,7 @@ export const dispatchCloudAgentTurn = async (args: {
         ...(attempt.originDeviceId
           ? { originDeviceId: attempt.originDeviceId }
           : {}),
+        ...(attempt.workspace ? { workspace: attempt.workspace } : {}),
         lineage: {
           depth: agentDepth,
           ...(caller.parentThreadId
@@ -580,6 +581,8 @@ export type PiThreadAttempt = Readonly<{
   attemptGeneration: number;
   originDeviceId?: string;
   lineage: AgentLineage;
+  /** A spawn's `workspace: "large"`: the agent's container starts heavy. */
+  workspace?: AgentWorkspaceSize;
 }>;
 
 export type PiThreadStart = Readonly<{

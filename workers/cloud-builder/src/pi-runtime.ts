@@ -4,7 +4,6 @@ import type { Context } from "@earendil-works/chord/context";
 import type { Api, Message, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
-import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import {
   isOpusModel,
@@ -187,6 +186,8 @@ import {
 import { ownerGateStub } from "./rpc-release.js";
 import { BROWSER_BUDGET_MESSAGE } from "./browser-billing.js";
 import { containerBudgetMessage } from "./container-meter.js";
+import { piAgentContainerSizeKeys, raiseAgentContainerSize } from "./agent-container.js";
+import { initialInstanceSize } from "./instance-size.js";
 
 /** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
@@ -570,6 +571,8 @@ export class PiConversationRuntime {
   #modelKey: string | undefined;
   readonly #runs = new Map<string, ActiveRun[]>();
   readonly #leases = new Map<number, Promise<AgentLease>>();
+  /** A run's container ran out of memory or disk: the note its report carries, by thread. */
+  readonly #pressureNotes = new Map<string, string>();
   readonly #ending = new Map<string, { runs: number; ended: Promise<void>; resolve: () => void }>();
   readonly #live = new Map<string, AgentLease>();
   #brokerClaims: Promise<unknown> = Promise.resolve();
@@ -1170,8 +1173,11 @@ export class PiConversationRuntime {
         this.#options.log("pi_agent_run_ended", { threadId: run.threadId, turnId: ended?.turnId });
       },
       reportsFromLedger: () => true,
-      deliverReport: async (report, context) => {
-        await this.#agentRunsEnded(report.threadId);
+      deliverReport: async (reported, context) => {
+        await this.#agentRunsEnded(reported.threadId);
+        const pressureNote = this.#pressureNotes.get(reported.threadId);
+        this.#pressureNotes.delete(reported.threadId);
+        const report = pressureNote ? { ...reported, text: `${reported.text}\n\n${pressureNote}`.trim() } : reported;
         const { authority } = await this.#agentState();
         if (report.origin) {
           const filesKey = deliveredFilesKey(report.threadId);
@@ -1363,17 +1369,8 @@ export class PiConversationRuntime {
     return {
       env: this.#options.env,
       storage: this.#options.storage,
-      takeSlot: (owner, sandboxId, signal) => this.#takeSlot(owner, sandboxId, signal),
-      releaseSlot: async (owner, sandboxId) => {
-        await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).releaseAgentContainer({ sandboxId });
-      },
       log: this.#options.log,
     };
-  }
-
-  async #takeSlot(owner: PiComputeOwner, sandboxId: string, _signal: AbortSignal): Promise<void> {
-    const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
-    if (!slot.ok) throw new Error(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
   }
 
   async #attachedTool(call: PiAttachedToolCall, context: Context): Promise<SerializedAgentToolResult> {
@@ -1603,6 +1600,7 @@ export class PiConversationRuntime {
     const { record } = lease;
     if (end.aborted) lease.abort();
     const up = !end.aborted && held.used && (await lease.ready.then(() => true, () => false));
+    let resized = false;
     if (up) {
       try {
         const linked = [...new Set([...held.linked, ...answerLinkedPaths(end.answer ?? "")])];
@@ -1611,10 +1609,17 @@ export class PiConversationRuntime {
       } catch (error) {
         this.#options.report(error);
       }
+      const pressure = await lease.probePressure();
+      if (pressure) {
+        this.#pressureNotes.set(held.threadId, pressure.note);
+        resized = pressure.resizedTo !== undefined;
+      }
     }
     lease.abort();
     await Promise.race([lease.ready.catch(() => undefined), scheduler.wait(LEASE_STOP_WAIT_MS)]);
-    await lease.release({ warm: !end.aborted }).catch((error: unknown) => this.#options.report(error));
+    // A resized agent's container must stop now, or its next run soon after
+    // would find it warm at the old size.
+    await lease.release({ warm: !end.aborted && !resized }).catch((error: unknown) => this.#options.report(error));
     this.#live.delete(`${record.turnId}:${record.attemptGeneration}`);
     await forgetPiCompute(this.#computeHost(), piComputeKey(agentConversationId), record).catch((error: unknown) =>
       this.#options.report(error),
@@ -1918,6 +1923,7 @@ export class PiConversationRuntime {
       description: string;
       attemptGeneration: number;
       lineage: AgentLineage;
+      workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
       authority: PiAuthority;
       model?: StellaModelSpec;
       executionContext: ExecutionContextSnapshot;
@@ -1926,6 +1932,13 @@ export class PiConversationRuntime {
     context: Context,
   ): Promise<void> {
     const { harness, root, agents, refreshTools } = await this.open();
+    if (attempt.workspace) {
+      await raiseAgentContainerSize(
+        this.#options.storage,
+        piAgentContainerSizeKeys(attempt.threadId),
+        initialInstanceSize({ workspace: attempt.workspace }),
+      );
+    }
     if (!this.#threadAgents.has(attempt.threadId)) {
       const agent: ThreadAgent = {
         authority: attempt.authority,

@@ -15,6 +15,8 @@ export function normalizeDelegatedModelMention(mention) {
         return "codex";
     if (lower === "claude" || lower === "claude-code")
         return "claude-code";
+    if (lower === "antigravity" || lower === "gemini")
+        return "antigravity/gemini-4-neon";
     return null;
 }
 export function findDelegatedModelMention(text) {

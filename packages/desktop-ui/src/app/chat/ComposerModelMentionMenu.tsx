@@ -25,7 +25,7 @@ export type ComposerModelMentionTrigger = {
 };
 
 export type ComposerModelMentionOption = {
-  value: "stella" | "chatgpt" | "claude-code" | "xai";
+  value: "stella" | "chatgpt" | "claude-code" | "antigravity" | "xai";
   label: string;
   brand: string;
   searchTerms: readonly string[];
@@ -72,6 +72,12 @@ export const COMPOSER_ENGINE_MENTION_OPTIONS: readonly ComposerModelMentionOptio
       searchTerms: ["claude", "anthropic"],
     },
     {
+      value: "antigravity",
+      label: "Google Antigravity",
+      brand: "antigravity",
+      searchTerms: ["gemini", "neon", "google", "antigravity"],
+    },
+    {
       value: "xai",
       label: "xAI",
       brand: "xai",
@@ -90,6 +96,7 @@ export function resolveCurrentModelMentionValue(
       preferences.modelOverrides.orchestrator ??
       preferences.modelOverrides.general ??
       "";
+    if (selectedModel.startsWith("antigravity/")) return "antigravity";
     return selectedModel === "xai/grok-4.5" ? "xai" : "stella";
   }
   if (preferences?.agentRuntimeEngine === "codex_cli") return "chatgpt";
@@ -103,6 +110,7 @@ function normalizeRecentMentionValue(value: string): string {
   if (value === "default") return "stella";
   if (value === "codex" || value === "codex-cli") return "chatgpt";
   if (value === "claude") return "claude-code";
+  if (value === "gemini") return "antigravity";
   return value;
 }
 

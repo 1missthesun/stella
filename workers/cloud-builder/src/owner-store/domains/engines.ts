@@ -8,7 +8,7 @@ import {
   type CloudExecutionSelection,
   type LegacyCloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
-import { isAccountProviderId } from "@stella/contracts/backend/providers";
+import { isAccountProviderId, isComputerOnlyProviderId } from "@stella/contracts/backend/providers";
 import {
   DEFAULT_REASONING_EFFORT,
   REASONING_EFFORT_LEVELS,
@@ -403,7 +403,7 @@ const parseExecution = (value: unknown, path?: string): CloudExecutionSelection 
     (value as { engine?: unknown }).engine === "provider"
   ) {
     const input = parseProviderExecutionShape(value, path);
-    if (!isAccountProviderId(input.provider)) {
+    if (!isAccountProviderId(input.provider) && !isComputerOnlyProviderId(input.provider)) {
       throw new RpcError("BAD_REQUEST", "Stella doesn't know that model provider.");
     }
     const model = input.model.trim();

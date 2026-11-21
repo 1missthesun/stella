@@ -41,6 +41,13 @@ function brainDetail(brain: Brain, settings: ModelSettings): string {
       ? "In use · Sign in for Cloud"
       : "Sign in";
   }
+  if (brain.kind === "computer") {
+    const computers = settings.computerSignIns[brain.provider] ?? [];
+    if (computers.length > 0) return `On ${computers.join(", ")}`;
+    return brain.id === settings.brainId
+      ? "In use · Sign in on a computer"
+      : "Sign in on a computer";
+  }
   const connection = brain.provider.connection;
   if (!connection) return authHint(brain.provider);
   if (connection.status === "invalid") return "Key not accepted";
@@ -73,7 +80,12 @@ export function ProvidersPage({
     matches(
       query,
       brain.label,
-      brain.kind === "provider" ? brain.provider.id : brain.engine,
+      brain.kind === "engine"
+        ? brain.engine
+        : brain.kind === "computer"
+          ? brain.provider
+          : brain.provider.id,
+      ...(brain.kind === "computer" ? ["gemini", "google"] : []),
     ),
   );
   const ready = brains.filter((brain) => brainReady(brain, settings));
@@ -167,6 +179,26 @@ export function BrainPage({
         <ModelList
           options={settings.modelsFor(brain.id)}
           onPick={(model) => settings.selectEngineModel(brain.engine, model)}
+        />
+      </View>
+    );
+  }
+  if (brain.kind === "computer") {
+    const computers = settings.computerSignIns[brain.provider] ?? [];
+    return (
+      <View>
+        <Note>
+          {computers.length > 0
+            ? `Runs on ${computers.join(", ")}, on the Google plan signed in there. Your phone's chats use it when they run on that computer.`
+            : "Runs only on a computer signed in to Google Antigravity. Sign in on your computer in Settings › Claude and ChatGPT, then chats that run there use it."}
+        </Note>
+        <Hairline />
+        <ModelList
+          options={settings.modelsFor(brain.id)}
+          details={Object.fromEntries(
+            settings.modelsFor(brain.id).map((model) => [model.id, model.description ?? ""]),
+          )}
+          onPick={(model) => settings.selectProviderModel(brain.provider, model)}
         />
       </View>
     );

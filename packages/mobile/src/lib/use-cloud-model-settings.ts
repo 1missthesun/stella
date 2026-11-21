@@ -2,15 +2,18 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Alert } from "react-native";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
+  ANTIGRAVITY_ENGINE_MODELS,
   ENGINE_MODEL_CATALOG,
   type EngineModelCatalog,
   type EngineModelOption,
 } from "@stella/contracts/engine-model-catalog";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
-import type {
-  AccountProvider,
-  ProviderModel,
+import {
+  isComputerOnlyProviderId,
+  type AccountProvider,
+  type ComputerOnlyProviderId,
+  type ProviderModel,
 } from "@stella/contracts/backend/providers";
 import { useT } from "../i18n";
 import { getBackendClient, readBackendView, useBackendView } from "./backend";
@@ -62,6 +65,14 @@ export type Brain =
       provider: AccountProvider;
       label: string;
       mark: string;
+    }
+  | {
+      /** A plan that runs only on a computer signed in to it (Google Antigravity). */
+      id: string;
+      kind: "computer";
+      provider: ComputerOnlyProviderId;
+      label: string;
+      mark: string;
     };
 
 export const providerBrainId = (provider: string) => `provider:${provider}`;
@@ -78,6 +89,19 @@ const ENGINE_MARKS: Record<ModelEngine, string> = {
 };
 
 const ENGINE_OWNED_PROVIDERS = new Set(["stella", "chatgpt"]);
+
+const COMPUTER_BRAINS: ReadonlyArray<{
+  provider: ComputerOnlyProviderId;
+  label: string;
+  models: readonly EngineModelOption[];
+}> = [{ provider: "antigravity", label: "Google Antigravity", models: ANTIGRAVITY_ENGINE_MODELS }];
+
+const computerModels = (provider: string): readonly EngineModelOption[] =>
+  COMPUTER_BRAINS.find((brain) => brain.provider === provider)?.models ?? [];
+
+/** The model a computer-only plan starts on when it is picked. */
+export const computerDefaultModel = (provider: string): string | undefined =>
+  computerModels(provider)[0]?.id;
 
 type ProviderModelsState =
   | { status: "loading" }
@@ -193,6 +217,22 @@ export function useCloudModelSettings(active: boolean) {
     "engines.get",
     active && scope ? {} : "skip",
   );
+  const { value: devices } = useBackendView(
+    "devices.list",
+    active && scope ? {} : "skip",
+  );
+  // Which computers can run each computer-only plan: the sign-ins they report while online.
+  const computerSignIns = useMemo(() => {
+    const signedIn: Record<string, string[]> = {};
+    for (const device of devices?.devices ?? []) {
+      if (!device.online) continue;
+      for (const { provider } of COMPUTER_BRAINS) {
+        if (!device.availability?.capabilities.includes(provider)) continue;
+        (signedIn[provider] ??= []).push(device.label?.trim() || "your computer");
+      }
+    }
+    return signedIn;
+  }, [devices]);
   useEffect(() => {
     if (!liveEngines || writePending.current) return;
     const liveExecution = liveEngines.selection ?? liveEngines.execution;
@@ -274,7 +314,9 @@ export function useCloudModelSettings(active: boolean) {
   );
 
   useEffect(() => {
-    if (execution?.engine === "provider") void loadProviderModels(execution.provider);
+    if (execution?.engine === "provider" && !isComputerOnlyProviderId(execution.provider)) {
+      void loadProviderModels(execution.provider);
+    }
   }, [execution, loadProviderModels]);
 
   const selectProviderModel = useCallback(
@@ -350,6 +392,13 @@ export function useCloudModelSettings(active: boolean) {
       label: option.label,
       mark: ENGINE_MARKS[option.id],
     }));
+    const computer: Brain[] = COMPUTER_BRAINS.map((brain) => ({
+      id: providerBrainId(brain.provider),
+      kind: "computer",
+      provider: brain.provider,
+      label: brain.label,
+      mark: brain.provider,
+    }));
     const accounts: Brain[] = (providers ?? []).map((provider) => ({
       id: providerBrainId(provider.id),
       kind: "provider",
@@ -357,7 +406,7 @@ export function useCloudModelSettings(active: boolean) {
       label: provider.label,
       mark: provider.id,
     }));
-    return [...builtIn, ...accounts];
+    return [...builtIn, ...computer, ...accounts];
   }, [providers]);
 
   const providerModelState = useCallback(
@@ -367,6 +416,18 @@ export function useCloudModelSettings(active: boolean) {
 
   const modelsFor = useCallback(
     (target: string): ModelOption[] => {
+      if (target.startsWith("provider:") && isComputerOnlyProviderId(target.slice("provider:".length))) {
+        const provider = target.slice("provider:".length);
+        const selectedId =
+          execution?.engine === "provider" && execution.provider === provider ? execution.model : null;
+        return computerModels(provider).map((model) => ({
+          id: model.id,
+          label: model.name,
+          description: model.description,
+          selected: model.id === selectedId,
+          available: true,
+        }));
+      }
       if (target.startsWith("provider:")) {
         const provider = target.slice("provider:".length);
         const state = providerModels[provider];
@@ -415,6 +476,9 @@ export function useCloudModelSettings(active: boolean) {
 
   const label = useMemo(() => {
     if (!execution) return "Stella";
+    if (execution.engine === "provider" && isComputerOnlyProviderId(execution.provider)) {
+      return computerModels(execution.provider).find((model) => model.id === execution.model)?.name ?? execution.model;
+    }
     if (execution.engine === "provider") {
       const state = providerModels[execution.provider];
       const name =
@@ -465,6 +529,7 @@ export function useCloudModelSettings(active: boolean) {
       effort,
       supportsEffortSelection,
       connectedProviders,
+      computerSignIns,
       models,
       modelsFor,
       selectModel: (model: string) =>
@@ -484,6 +549,7 @@ export function useCloudModelSettings(active: boolean) {
       selectProviderModel,
       supportsEffortSelection,
       connectedProviders,
+      computerSignIns,
       effort,
       engine,
       execution,

@@ -16,7 +16,11 @@ import { tapLight } from "../../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { useT } from "../../i18n";
 import { REASONING_OPTIONS } from "../../lib/stella-model-catalog";
-import type { Brain, ModelSettings } from "../../lib/use-cloud-model-settings";
+import {
+  computerDefaultModel,
+  type Brain,
+  type ModelSettings,
+} from "../../lib/use-cloud-model-settings";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
@@ -41,6 +45,8 @@ export const brainReady = (brain: Brain, settings: ModelSettings) => {
   if (brain.id === settings.brainId) return true;
   if (brain.kind === "provider")
     return brain.provider.connection?.status === "ok";
+  if (brain.kind === "computer")
+    return (settings.computerSignIns[brain.provider]?.length ?? 0) > 0;
   if (brain.engine === "stella") return true;
   return settings.connectedProviders?.includes(brain.engine) ?? false;
 };
@@ -90,6 +96,11 @@ export function BrainSection({
       settings.selectEngine(brain.engine);
       return;
     }
+    if (brain.kind === "computer") {
+      const model = computerDefaultModel(brain.provider);
+      if (model) settings.selectProviderModel(brain.provider, model);
+      return;
+    }
     void settings.loadProviderModels(brain.provider.id).then((list) => {
       const first = list?.[0];
       if (first) settings.selectProviderModel(brain.provider.id, first.id);
@@ -99,7 +110,7 @@ export function BrainSection({
 
   const items: NativeMenuItem[] = [
     ...settings.brains
-      .filter((brain) => brain.kind === "engine")
+      .filter((brain) => brain.kind === "engine" || brain.kind === "computer")
       .map((brain): NativeMenuItem => ({
         id: brain.id,
         title: brain.label,

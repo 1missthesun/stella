@@ -18,6 +18,18 @@ export type AccountProviderId = (typeof ACCOUNT_PROVIDER_IDS)[number];
 export const isAccountProviderId = (value: unknown): value is AccountProviderId =>
   typeof value === "string" && (ACCOUNT_PROVIDER_IDS as readonly string[]).includes(value);
 
+/**
+ * Plan sign-ins that live only on a computer (never in the account or the
+ * cloud). The account's model choice can name one so every device shows the
+ * same pick; the computers signed in run it, and the cloud runs its default.
+ */
+export const COMPUTER_ONLY_PROVIDER_IDS = ["antigravity"] as const;
+
+export type ComputerOnlyProviderId = (typeof COMPUTER_ONLY_PROVIDER_IDS)[number];
+
+export const isComputerOnlyProviderId = (value: unknown): value is ComputerOnlyProviderId =>
+  typeof value === "string" && (COMPUTER_ONLY_PROVIDER_IDS as readonly string[]).includes(value);
+
 export type ProviderAuthMethod =
   | {
       kind: "api_key";

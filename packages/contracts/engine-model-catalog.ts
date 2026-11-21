@@ -55,6 +55,38 @@ export const CHATGPT_ENGINE_MODELS: readonly EngineModelOption[] = [
   },
 ];
 
+/**
+ * Gemini on the user's Google Antigravity plan, which runs only on a computer
+ * signed in to it. Keep in step with `agent/src/provider/antigravity/models.ts`.
+ */
+export const ANTIGRAVITY_ENGINE_MODELS: readonly EngineModelOption[] = [
+  {
+    id: "gemini-4-neon",
+    name: "Gemini 4 Neon",
+    description: "Most capable · Google AI Pro or Ultra",
+  },
+  {
+    id: "gemini-4-hydrogen",
+    name: "Gemini 4 Hydrogen",
+    description: "Google AI Pro or Ultra",
+  },
+  {
+    id: "gemini-4-carbon",
+    name: "Gemini 4 Carbon",
+    description: "Google AI Ultra",
+  },
+  {
+    id: "gemini-4-argon",
+    name: "Gemini 4 Argon",
+    description: "Google AI Pro or Ultra",
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    description: "Fast · every plan",
+  },
+];
+
 export type EngineModelCatalog = {
   claude: EngineModelOption[];
   chatgpt: EngineModelOption[];

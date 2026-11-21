@@ -7,6 +7,7 @@ import {
   useCloudEngines,
 } from "./cloud-engines-api";
 import { uiState } from "@/platform/ui-state";
+import { BackendRequestError } from "@stella/contracts/backend/client";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
 import {
   cloudExecutionFromLocal,
@@ -97,6 +98,13 @@ const createSelectionController = (accountId: string) => {
     try {
       await cloudEnginesApi.setExecution(derived);
     } catch (error) {
+      // A server from before computer-only plans refuses the pick for good:
+      // keep it on this computer instead of retrying.
+      if (error instanceof BackendRequestError && error.code === "BAD_REQUEST") {
+        uiState.removeItem(pendingKey);
+        uiState.setItem(localOnlyKey, String(Date.now()));
+        return;
+      }
       scheduleRetry();
       throw error;
     }
@@ -111,11 +119,9 @@ const createSelectionController = (accountId: string) => {
     const local = await readLocal();
     if (!local || disposed) return;
     const localOnlyAt = Number(uiState.getItem(localOnlyKey));
-    if (
-      localOnlyAt > 0 &&
-      !derive(local) &&
-      (typeof selectedAt !== "number" || selectedAt <= localOnlyAt)
-    ) {
+    // The marker lives only while the newest local pick is one the account
+    // can't hold: any pick the account takes clears it (pushLocal).
+    if (localOnlyAt > 0 && (typeof selectedAt !== "number" || selectedAt <= localOnlyAt)) {
       return;
     }
     const pending = readPending();

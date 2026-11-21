@@ -157,7 +157,6 @@ export default defineConfig({
       "react-pdf",
       "motion",
       "@tanstack/react-router",
-      "@tanstack/react-table",
       "@legendapp/list/react",
       "zod",
       "@radix-ui/react-dialog",

@@ -14,7 +14,6 @@ import {
   type ToolCall,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { convertMessages, convertTools } from "@earendil-works/pi-ai/api/google-shared";
 import { sanitizeSurrogates } from "@earendil-works/pi-ai/utils/sanitize-unicode";
 import {
   collapseSystemMessages,
@@ -23,6 +22,7 @@ import {
 } from "@earendil-works/pi-ai/utils/transcript";
 import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { antigravityEndpoint, antigravityModelEnum, antigravityRoute, antigravityUserAgent } from "./models.ts";
+import { toGeminiContents, type Content } from "./convert.ts";
 import { toGeminiSchema } from "./schema.ts";
 import { agyFetch } from "./transport.ts";
 
@@ -77,8 +77,6 @@ const sessionFor = (key: string): Session => {
   return session;
 };
 
-type Content = { role: string; parts: Array<Record<string, unknown>> };
-
 const isPrompt = (content: Content) =>
   content.role === "user" &&
   content.parts.some((part) => !("functionResponse" in part) && part.text !== "[Continue]");
@@ -95,15 +93,16 @@ const hasSecondUserTurn = (contents: Content[]) => {
   return false;
 };
 
-const upperTypes = (tools: unknown) =>
-  Array.isArray(tools)
-    ? tools.map((tool: { functionDeclarations?: Array<Record<string, unknown>> }) => ({
-        functionDeclarations: (tool.functionDeclarations ?? []).map(({ parameters, ...declaration }) => ({
-          ...declaration,
-          ...(parameters !== undefined ? { parameters: toGeminiSchema(parameters) } : {}),
-        })),
-      }))
-    : undefined;
+// Tool parameters go in the Gemini Schema shape the CLI sends as `parameters`.
+const toolDeclarations = (tools: ReturnType<typeof getCurrentTools>) => [
+  {
+    functionDeclarations: tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: toGeminiSchema(tool.parameters),
+    })),
+  },
+];
 
 export type AntigravityRequest = { wireModel: string; requestId: string; body: Record<string, unknown> };
 
@@ -117,7 +116,7 @@ export function buildAntigravityRequest(
   if (!route) throw new Error(`antigravity/${model.id} isn't an Antigravity model Stella knows.`);
 
   const normalized = collapseSystemMessages(context);
-  const contents = convertMessages(model as Model<"google-generative-ai">, normalized) as Content[];
+  const contents = toGeminiContents(model, normalized);
   const last = contents.at(-1);
   if (
     last?.role === "model" &&
@@ -153,7 +152,7 @@ export function buildAntigravityRequest(
     ...(systemText.trim()
       ? { systemInstruction: { role: "system", parts: [{ text: sanitizeSurrogates(systemText) }] } }
       : {}),
-    ...(tools.length > 0 ? { tools: upperTypes(convertTools(tools, true, false)) } : {}),
+    ...(tools.length > 0 ? { tools: toolDeclarations(tools) } : {}),
     labels: {
       cascade_id: session.conversationId,
       ...(session.lastExecutionId ? { last_execution_id: session.lastExecutionId } : {}),

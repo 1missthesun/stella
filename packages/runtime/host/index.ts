@@ -12,10 +12,13 @@ import { PlacedChatTooLargeError, placedChatContext } from "./placed-chat-contex
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  BackendClient,
   BackendRequestError,
   backendTokenExpiryMs,
 } from "@stella/contracts/backend/client";
+import {
+  leaseBackendClient,
+  type BackendClientLease,
+} from "@stella/contracts/backend/shared-client";
 import { resolveBundledRuntimeFile } from "../kernel/shared/runtime-paths.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { LocalSchedulerService } from "../kernel/local-scheduler-service.js";
@@ -251,7 +254,7 @@ export class StellaRuntimeHost {
   staleWorkerFrameDrops = 0;
   started = false;
   hostReady = false;
-  hostBackendClient: BackendClient | null = null;
+  hostBackendClient: BackendClientLease | null = null;
   hostBackendClientUrl: string | null = null;
   hostAuthTokenForcePromise: Promise<string> | null = null;
   deviceSuccessionClaimPromise: Promise<void> | null = null;
@@ -541,7 +544,7 @@ export class StellaRuntimeHost {
     return /^https?:\/\//.test(value) ? value : null;
   }
   disposeHostBackendClient() {
-    this.hostBackendClient?.dispose();
+    this.hostBackendClient?.release();
     this.hostBackendClient = null;
     this.hostBackendClientUrl = null;
   }
@@ -588,10 +591,10 @@ export class StellaRuntimeHost {
       return null;
     }
     if (this.hostBackendClient && this.hostBackendClientUrl === baseUrl) {
-      return this.hostBackendClient;
+      return this.hostBackendClient.client;
     }
     this.disposeHostBackendClient();
-    this.hostBackendClient = new BackendClient({
+    this.hostBackendClient = leaseBackendClient({
       baseUrl,
       getToken: async (options) =>
         options?.force
@@ -599,7 +602,7 @@ export class StellaRuntimeHost {
           : this.getConfiguredHostAuthToken() || null,
     });
     this.hostBackendClientUrl = baseUrl;
-    return this.hostBackendClient;
+    return this.hostBackendClient.client;
   }
   resubscribeCloudSchedules() {
     this.cloudScheduleUnsubscribe?.();

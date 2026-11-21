@@ -8,6 +8,10 @@ import {
   BackendRequestError,
 } from "@stella/contracts/backend/client";
 import {
+  leaseBackendClient,
+  type BackendClientLease,
+} from "@stella/contracts/backend/shared-client";
+import {
   UPDATE_PREPARER_STALE_MS,
   updateResultTag,
   type AppSourceRemote,
@@ -334,7 +338,7 @@ export class AppSourceService {
   private forkPushHeld: number | null = null;
   private syncReason = "launch";
   private timers: NodeJS.Timeout[] = [];
-  private backend: { baseUrl: string; client: BackendClient } | null = null;
+  private backend: { baseUrl: string; lease: BackendClientLease } | null = null;
   private access: SourceAccess | null = null;
   private forkBranch: string | null = null;
   private forkUnrelated = false;
@@ -492,7 +496,8 @@ export class AppSourceService {
     this.releases.dispose();
     this.forkWatch?.stop();
     this.forkWatch = null;
-    this.backend?.client.dispose();
+    this.backend?.lease.release();
+    this.backend = null;
   }
 
   getState(): AppSourceState {
@@ -3023,18 +3028,20 @@ export class AppSourceService {
 
   private backendClient(baseUrl: string): BackendClient {
     if (this.backend?.baseUrl !== baseUrl) {
-      this.backend?.client.dispose();
+      this.forkWatch?.stop();
       this.forkWatch = null;
+      this.updateWatch?.stop();
       this.updateWatch = null;
+      this.backend?.lease.release();
       this.backend = {
         baseUrl,
-        client: new BackendClient({
+        lease: leaseBackendClient({
           baseUrl,
           getToken: () => this.options.getAuthToken(),
         }),
       };
     }
-    return this.backend.client;
+    return this.backend.lease.client;
   }
 
   private async accountAccess(

@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
+import type { BackendClient } from "@stella/contracts/backend/client";
 import {
-  BackendClient,
-  type TokenProvider,
-} from "@stella/contracts/backend/client";
+  leaseBackendClient,
+  type BackendClientLease,
+} from "@stella/contracts/backend/shared-client";
 import type {
   ClaudeLocalLogin,
   EngineSettings,
@@ -28,7 +29,7 @@ export const tokenSubject = (token: string | null): string | null => {
 };
 
 export class EngineAccountAccess {
-  private client: { baseUrl: string; value: BackendClient } | null = null;
+  private client: { baseUrl: string; lease: BackendClientLease } | null = null;
   private unwatch: (() => void) | null = null;
   private current: EngineSettings | null = null;
   private subject: string | null = null;
@@ -43,7 +44,7 @@ export class EngineAccountAccess {
     this.subject = next;
     this.chatGptConnect?.abort();
     this.applySettings(null);
-    this.client?.value.reconnect();
+    this.client?.lease.noteAuthToken(token);
     if (next) this.ensureWatch();
   }
 
@@ -171,7 +172,7 @@ export class EngineAccountAccess {
     this.chatGptConnect?.abort();
     this.unwatch?.();
     this.unwatch = null;
-    this.client?.value.dispose();
+    this.client?.lease.release();
     this.client = null;
     this.listeners.clear();
   }
@@ -179,13 +180,18 @@ export class EngineAccountAccess {
   private ensureClient(): BackendClient | null {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl) return null;
-    if (this.client?.baseUrl === baseUrl) return this.client.value;
+    if (this.client?.baseUrl === baseUrl) return this.client.lease.client;
     this.unwatch?.();
     this.unwatch = null;
-    this.client?.value.dispose();
-    const getToken: TokenProvider = async () => await this.options.getAuthToken();
-    this.client = { baseUrl, value: new BackendClient({ baseUrl, getToken }) };
-    return this.client.value;
+    this.client?.lease.release();
+    this.client = {
+      baseUrl,
+      lease: leaseBackendClient({
+        baseUrl,
+        getToken: async () => await this.options.getAuthToken(),
+      }),
+    };
+    return this.client.lease.client;
   }
 
   private ensureWatch(): void {

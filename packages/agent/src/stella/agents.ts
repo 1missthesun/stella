@@ -55,7 +55,13 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
-import { agentInputAction, agentStanding as standingOf, deviceAgentStatus, type AgentInputSender } from "@stella/contracts/agent-rules";
+import {
+  agentInputAction,
+  agentStanding as standingOf,
+  deviceAgentStatus,
+  type AgentInputSender,
+  type AgentStanding,
+} from "@stella/contracts/agent-rules";
 import {
   END_TURN_WAITING_DESCRIPTION,
   END_TURN_WAITING_MISSING,
@@ -239,13 +245,6 @@ export const StellaAgentsDoc = defineDoc<StellaAgents>({
 });
 
 export const PLACED_CALL_PREFIX = "placed:";
-
-export const isAnotherHostsAgent = (
-  state: { agents: Record<string, AgentRecord>; calls: Record<string, { threadId: string }> } | undefined,
-  threadId: string,
-): boolean =>
-  state?.agents[threadId]?.origin !== undefined ||
-  Object.entries(state?.calls ?? {}).some(([key, call]) => call.threadId === threadId && key.startsWith(PLACED_CALL_PREFIX));
 
 export type AgentRun = {
   threadId: string;
@@ -523,6 +522,9 @@ const markStopped = async (
 
 const wasStopped = (agent: AgentRecord): boolean => agent.stopped === true || agent.paused === true;
 
+/** It runs on another host now: started there, or moved itself there. Its record there says how it stands. */
+const runsElsewhere = (agent: AgentRecord): boolean => agent.remote === true || agent.away === true;
+
 const messageText = (message: { content?: unknown } | undefined): string =>
   typeof message?.content === "string"
     ? message.content
@@ -728,6 +730,7 @@ const wakeWaitingStarter = async (
   read: BusyReader,
   starter: StellaAgentRole,
   helperThreadId: string,
+  elsewhereAtWork: (helpers: ReadonlyArray<[string, AgentRecord]>) => Promise<boolean>,
   wake: (to: { threadId: string; conversationId: ConversationId; home: ConversationId }, message: string) => Promise<void>,
   context: Context,
 ): Promise<void> => {
@@ -739,9 +742,8 @@ const wakeWaitingStarter = async (
   const record = (await runtime.snapshot(StellaAgentsDoc, home, context))?.agents[starter.threadId];
   if (!record?.waiting || wasStopped(record)) return;
   const others = Object.entries((await read.agents(own))?.agents ?? {}).filter(([threadId]) => threadId !== helperThreadId);
-  // A helper elsewhere may still be at work; only a stopped one is known not to be.
-  if (others.some(([, agent]) => agent.remote && !wasStopped(agent))) return;
-  const helpers = others.filter(([, agent]) => !agent.remote && agent.conversationId >= 0);
+  if (await elsewhereAtWork(others.filter(([, agent]) => runsElsewhere(agent) && !wasStopped(agent)))) return;
+  const helpers = others.filter(([, agent]) => !runsElsewhere(agent) && agent.conversationId >= 0);
   const carrying = new Set((await read.reporters(own)).map((reporter) => reporter.input.threadId));
   for (const [threadId, agent] of helpers) {
     const id = agent.conversationId as ConversationId;
@@ -777,6 +779,43 @@ const busyReader = (
   running: async (id) => (await store.snapshot(LiveDoc, id, context))?.run !== undefined,
   reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
 });
+
+/**
+ * How a task this host runs stands now, by the shared rules, with what was
+ * read to tell: one place for agent_status, the activity list and the
+ * directory, so they can't show it differently.
+ */
+const localView = async (
+  store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+  record: AgentRecord,
+  context: Context,
+): Promise<{
+  live: LiveState | undefined;
+  recent: Awaited<ReturnType<Tx["scanEntries"]>>["items"];
+  latest: AssistantMessage | undefined;
+  standing: AgentStanding;
+}> => {
+  const conversationId = record.conversationId as ConversationId;
+  const [live, recent] = await Promise.all([
+    store.snapshot(LiveDoc, conversationId, context),
+    store.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items, context),
+  ]);
+  const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+  const idle = live?.run === undefined;
+  const stopped = idle && (wasStopped(record) || stoppedShort(recent));
+  const running = !idle || (!stopped && (await agentsBusy(busyReader(store, context), conversationId).catch(() => false)));
+  return {
+    live,
+    recent,
+    latest,
+    standing: standingOf({
+      running,
+      stopped,
+      waitingFor: record.waiting?.waitingFor,
+      outcome: latest?.stopReason === "error" ? "failed" : "completed",
+    }),
+  };
+};
 
 type TreeAgent = {
   threadId: string;
@@ -848,6 +887,18 @@ export function stellaAgents(host: StellaAgentsHost) {
     execution && (execution.moveBrain || agentsMove)
       ? switchDestinationTool(execution, host.rootPlacement, agentsMove ? (args, api, context) => agentSwitch(args, api, context) : undefined)
       : undefined;
+  /**
+   * Starts a task's next turn with this input, in the conversation it was
+   * started from. Every turn gets an entry in `calls`, which is what numbers
+   * its attempt (`attemptOf`) here and in the cloud: a turn started without
+   * one (a "[Helper stopped]" wake, an "[Agent waiting]" notice, a "nothing
+   * can wake you" wake) took the number of the turn before it, and the cloud
+   * dropped its end as a repeat of that turn's, report and all.
+   */
+  const nextTurn = async (tx: Tx, home: ConversationId, input: ReporterInput): Promise<void> => {
+    const reporter = await tx.createTask(Reporter, input, { ownership: { kind: "conversation" }, background: true, conversationId: home });
+    (await tx.doc(StellaAgentsDoc, home)).calls[`turn:${reporter}`] = { threadId: input.threadId, reporter };
+  };
   const Reporter = defineTask<ReporterInput, ReporterState, null>({
     name: "stella.agent-reporter",
     version: 1,
@@ -1047,11 +1098,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 agent.startedAt ??= Date.now();
               }
               if ("failed" in move) {
-                await tx.createTask(
-                  Reporter,
-                  { threadId, conversationId: reporter.input.conversationId, message: moveFailedText(move.failed) },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
-                );
+                await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: moveFailedText(move.failed) });
               }
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }, context);
@@ -1099,11 +1146,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             const agent = state.agents[threadId];
             const description = agent?.description ?? threadId;
             if (agent && withdrawn && (reporter.input.report || reporter.input.note)) {
-              await tx.createTask(
-                Reporter,
-                { ...reporter.input, message: [...carried, message].join("\n\n") },
-                { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
-              );
+              await nextTurn(tx, runtime.conversationId, { ...reporter.input, message: [...carried, message].join("\n\n") });
             } else if (agent && (withdrawn || (!submitted && carried.length > 0))) {
               agent.held = [...carried, ...(withdrawn ? [message] : []), ...(agent.held ?? [])];
             }
@@ -1178,24 +1221,16 @@ export function stellaAgents(host: StellaAgentsHost) {
                 });
               }
               if (localLead && self.threadId !== undefined && self.parentConversationId !== undefined) {
-                await tx.createTask(
-                  Reporter,
-                  {
+                await nextTurn(tx, self.parentConversationId as ConversationId, {
                     threadId: self.threadId,
                     conversationId: runtime.conversationId,
                     message: formatAgentMessage({ threadId, label: description }, boundedReply(textOf(answer), waitedFor)),
                     note: true,
-                  },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: self.parentConversationId as ConversationId },
-                );
+                  });
               }
               // Nothing live can wake it: it hears so at once (after the reads above: a write ends them).
               if (wakersAtEnd?.length === 0) {
-                await tx.createTask(
-                  Reporter,
-                  { threadId, conversationId: reporter.input.conversationId, message: nothingCanWakeText(waitedFor), wake: true },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
-                );
+                await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: nothingCanWakeText(waitedFor), wake: true });
               }
               return {
                 status: "running",
@@ -1282,16 +1317,12 @@ export function stellaAgents(host: StellaAgentsHost) {
                 delete record.heldForHelpers;
                 const description =
                   (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[reporter.input.threadId]?.description ?? reporter.input.threadId;
-                await tx.createTask(
-                  Reporter,
-                  {
+                await nextTurn(tx, lead.parentConversationId, {
                     threadId: lead.threadId,
                     conversationId: runtime.conversationId,
                     message: waitingHelperNotice({ threadId: reporter.input.threadId, description, waitingFor, said: report }),
                     report: true,
-                  },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: lead.parentConversationId },
-                );
+                  });
               }
             }
             return { status: "terminal", outcome: { status: "completed", result: null } };
@@ -1322,13 +1353,13 @@ export function stellaAgents(host: StellaAgentsHost) {
             },
             self,
             reporter.input.threadId,
+            async (helpers) =>
+              (await helpersElsewhere(await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context), helpers, context)).some(
+                (helper) => helper.atWork,
+              ),
             async (to, message) => {
               await runtime.commit(async (tx) => {
-                await tx.createTask(
-                  Reporter,
-                  { threadId: to.threadId, conversationId: to.conversationId, message, report: true },
-                  { ownership: { kind: "conversation" }, background: true, conversationId: to.home },
-                );
+                await nextTurn(tx, to.home, { threadId: to.threadId, conversationId: to.conversationId, message, report: true });
                 return undefined;
               }, context);
             },
@@ -1396,15 +1427,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         }
         await runtime.commit(async (tx) => {
           if (!fromLedger && report !== undefined && self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId) {
-            await tx.createTask(
-              Reporter,
-              { threadId: self.threadId, conversationId: runtime.conversationId, message: report, report: true },
-              {
-                ownership: { kind: "conversation" },
-                background: true,
-                conversationId: self.parentConversationId as ConversationId,
-              },
-            );
+            await nextTurn(tx, self.parentConversationId as ConversationId, { threadId: self.threadId, conversationId: runtime.conversationId, message: report, report: true });
           }
           return { status: "terminal", outcome: { status: "completed", result: null } };
         }, context);
@@ -2123,6 +2146,37 @@ export function stellaAgents(host: StellaAgentsHost) {
     return host.remote?.(placement);
   };
 
+  /**
+   * How helpers that run on other hosts stand, as their records in the cloud
+   * say. Only when those can't be read now (offline) does what this chat last
+   * heard of them stand in: a helper started elsewhere counts as at work until
+   * its report or stop came back here, one that moved itself away as at work.
+   */
+  const helpersElsewhere = async (
+    state: Readonly<StellaAgents> | undefined,
+    helpers: ReadonlyArray<[string, AgentRecord]>,
+    context: Context,
+  ): Promise<Array<{ threadId: string; record: AgentRecord; atWork: boolean; waitingFor?: string }>> => {
+    if (helpers.length === 0) return [];
+    const listed = await host.directory
+      ?.list(context, { threadIds: helpers.map(([threadId]) => threadId).slice(0, DIRECTORY_THREAD_IDS_MAX) })
+      .catch(() => undefined);
+    const rows = listed && !listed.unavailable ? new Map(listed.agents.map((row) => [row.threadId, row])) : undefined;
+    return helpers.map(([threadId, record]) => {
+      const row = rows?.get(threadId);
+      if (row) {
+        return {
+          threadId,
+          record,
+          atWork: isLiveAgentStatus(row.status) && row.status !== "waiting",
+          ...(row.status === "waiting" && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
+        };
+      }
+      const lastHeard = record.remote && state ? remoteRunOf(record, callsFor(state as StellaAgents, threadId)) : undefined;
+      return { threadId, record, atWork: lastHeard ? lastHeard.phase !== "settled" : true };
+    });
+  };
+
   const computerOf = async (
     agent: AgentRecord,
     context: Context,
@@ -2257,27 +2311,15 @@ export function stellaAgents(host: StellaAgentsHost) {
       };
     }
     const located = { ...row, where: describePlacement(host.rootPlacement) };
-    const id = record.conversationId as ConversationId;
-    const live = await api.snapshot(LiveDoc, id, context);
-    const recent = await api.commit(async (tx) => (await tx.scanEntries({ conversationId: id, order: "descending" }, 10)).items, context);
-    const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+    const { live, recent, latest, standing } = await localView(api, record, context);
     const at = (recent[0]?.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
-    const stopped = live?.run === undefined && (wasStopped(record) || stoppedShort(recent));
-    const waiting = live?.run === undefined && !stopped && (await agentsBusy(busyReader(api, context), id).catch(() => false));
-    const waitingFor = live?.run === undefined && !stopped && !waiting ? record.waiting?.waitingFor : undefined;
+    const shown = deviceAgentStatus(standing);
     return {
       ...located,
-      status:
-        live?.run !== undefined || waiting
-          ? "running"
-          : stopped
-            ? "canceled"
-            : waitingFor !== undefined
-              ? "waiting"
-              : latest?.stopReason === "error"
-                ? "failed"
-                : "completed",
-      ...(waitingFor !== undefined ? { waitingFor, ...(record.waiting?.wakers ? { wakers: record.waiting.wakers } : {}) } : {}),
+      status: shown.agentStatus,
+      ...(shown.waitingFor !== undefined
+        ? { waitingFor: shown.waitingFor, ...(record.waiting?.wakers ? { wakers: record.waiting.wakers } : {}) }
+        : {}),
       ...(live?.run !== undefined ? await longCallOf(api, live, context).then((longCall) => (longCall ? { longCall } : {})) : {}),
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
       ...(live?.run !== undefined && host.directory?.usageLimitPaused?.(agent.threadId)
@@ -2739,29 +2781,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         ? { status: run.outcome === "failed" ? "error" : "completed", agentStatus: run.outcome, attempt }
         : { status: "running", agentStatus: "running", attempt };
     }
-    const conversationId = found.record.conversationId as ConversationId;
-    const [live, recent] = await Promise.all([
-      harness.snapshot(LiveDoc, conversationId, context),
-      harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items, context),
-    ]);
-    const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+    const { recent, standing } = await localView(harness, found.record, context);
     const lastText = recent
       .filter((entry) => entry.kind === "pi.assistant")
       .map((entry) => textOf(entry.model?.[0] as AssistantMessage | undefined))
       .find((text) => text.length > 0);
-    const idleStopped = live?.run === undefined && (wasStopped(found.record) || stoppedShort(recent));
-    const running =
-      live?.run !== undefined ||
-      (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
-    const shown = deviceAgentStatus(
-      standingOf({
-        running,
-        stopped: idleStopped,
-        waitingFor: found.record.waiting?.waitingFor,
-        outcome: latest?.stopReason === "error" ? "failed" : "completed",
-      }),
-    );
-    return { ...shown, attempt, ...(lastText ? { lastText } : {}) };
+    return { ...deviceAgentStatus(standing), attempt, ...(lastText ? { lastText } : {}) };
   };
 
   const agentRecords = async (harness: Harness, context: Context): Promise<StellaAgentRecord[]> => {
@@ -2804,16 +2829,9 @@ export function stellaAgents(host: StellaAgentsHost) {
     for (const [threadId, agent] of Object.entries(state?.agents ?? {})) {
       if (agent.remote) continue;
       const conversationId = agent.conversationId as ConversationId;
-      const [live, [first, recent]] = await Promise.all([
-        harness.snapshot(LiveDoc, conversationId, context),
-        harness.commit(
-          async (tx) =>
-            [
-              (await tx.scanEntries({ conversationId, order: "ascending" }, 1)).items[0],
-              (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items,
-            ] as const,
-          context,
-        ),
+      const [{ live, recent, standing }, first] = await Promise.all([
+        localView(harness, agent, context),
+        harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "ascending" }, 1)).items[0], context),
       ]);
       const answers = recent
         .filter((entry) => entry.kind === "pi.assistant")
@@ -2822,19 +2840,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       const latest = answers[0];
       const prose = answers.map(textOf).filter((text) => text.trim()).reverse().slice(-5);
       const oldest = first?.model?.[0] as { timestamp?: number } | undefined;
-      const idleStopped = live?.run === undefined && (wasStopped(agent) || stoppedShort(recent));
-      const running =
-        live?.run !== undefined ||
-        (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
-      const shown = deviceAgentStatus(
-        standingOf({
-          running,
-          stopped: idleStopped,
-          waitingFor: agent.waiting?.waitingFor,
-          outcome: latest?.stopReason === "error" ? "failed" : "completed",
-        }),
-      );
-      const longCall = running ? await longCallOf(harness, live, context) : undefined;
+      const shown = deviceAgentStatus(standing);
+      const longCall = standing.state === "running" ? await longCallOf(harness, live, context) : undefined;
       records.push({
         threadId,
         ...(longCall ? { longCall } : {}),
@@ -3337,16 +3344,17 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (role.agentType === "orchestrator" || !role.threadId) return undefined;
     const found: string[] = [];
     const read = busyReader(store, context);
-    const helpers = await read.agents(agentConversationId);
+    const helpers = await store.snapshot(StellaAgentsDoc, agentConversationId, context);
     const carrying = new Set((await read.reporters(agentConversationId)).map((reporter) => reporter.input.threadId));
-    for (const [threadId, agent] of Object.entries(helpers?.agents ?? {})) {
-      if (wasStopped(agent)) continue;
-      const name = `your helper "${agent.description.replace(/\s+/g, " ").trim().slice(0, 80)}"`;
-      if (agent.remote) {
-        if (helpers && remoteRunOf(agent, callsFor(helpers as StellaAgents, threadId)).phase === "running") found.push(`${name} at work elsewhere`);
-        continue;
-      }
-      if (agent.conversationId < 0) continue;
+    const named = (agent: AgentRecord) => `your helper "${agent.description.replace(/\s+/g, " ").trim().slice(0, 80)}"`;
+    const working = Object.entries(helpers?.agents ?? {}).filter(([, agent]) => !wasStopped(agent));
+    for (const helper of await helpersElsewhere(helpers, working.filter(([, agent]) => runsElsewhere(agent)), context)) {
+      if (helper.atWork) found.push(`${named(helper.record)} at work elsewhere`);
+      else if (helper.waitingFor) found.push(`${named(helper.record)}, itself waiting for ${helper.waitingFor}`);
+    }
+    for (const [threadId, agent] of working) {
+      const name = named(agent);
+      if (runsElsewhere(agent) || agent.conversationId < 0) continue;
       const id = agent.conversationId as ConversationId;
       if (carrying.has(threadId) || (await read.running(id)) || (await agentsBusy(read, id, 1))) found.push(`${name} at work`);
       else if (agent.waiting) found.push(`${name}, itself waiting for ${agent.waiting.waitingFor}`);

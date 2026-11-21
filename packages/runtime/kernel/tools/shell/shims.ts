@@ -175,10 +175,11 @@ const buildUnixGitShimScript = (): string =>
   ].join("\n");
 
 /**
- * `bun`, guarded for drafts: a draft whose dependencies match the app links
- * the app's node_modules (draft-deps.ts), and an install through that link
- * would write into the running app's packages. Before a command that
- * installs, the link is removed, so the draft gets packages of its own.
+ * `bun`, guarded for drafts: a draft links a package set shared with every
+ * draft that has its dependencies (draft-deps.ts; older drafts link the
+ * app's own node_modules), and an install through that link would write
+ * into packages others use. Before a command that installs, the link is
+ * removed, so the draft gets packages of its own.
  */
 const buildUnixBunShimScript = (): string =>
   [
@@ -206,9 +207,14 @@ const buildUnixBunShimScript = (): string =>
     '    if [ -n "$STELLA_APP_DIR" ] && [ -d "$STELLA_APP_DIR/node_modules" ]; then',
     '      __stella_here="$(pwd -P)"',
     '      while [ -n "$__stella_here" ]; do',
-    '        if [ -L "$__stella_here/node_modules" ] && [ "$__stella_here/node_modules" -ef "$STELLA_APP_DIR/node_modules" ]; then',
+    '        __stella_shared=""',
+    '        if [ -L "$__stella_here/node_modules" ]; then',
+    '          if [ "$__stella_here/node_modules" -ef "$STELLA_APP_DIR/node_modules" ]; then __stella_shared=1; fi',
+    '          case "$(readlink "$__stella_here/node_modules")" in "$STELLA_APP_DIR/.git/stella-packages/"*) __stella_shared=1 ;; esac',
+    "        fi",
+    '        if [ -n "$__stella_shared" ]; then',
     '          rm -f "$__stella_here/node_modules"',
-    '          echo "Stella: this draft used the app\'s packages; installing its own instead." >&2',
+    '          echo "Stella: this draft used shared packages; installing its own instead." >&2',
     "          break",
     "        fi",
     '        [ "$__stella_here" = "/" ] && break',

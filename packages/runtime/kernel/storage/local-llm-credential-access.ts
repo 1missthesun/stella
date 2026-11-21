@@ -94,7 +94,12 @@ export const getAccessibleLocalLlmOAuthApiKey = async (
 ): Promise<string | null> => {
   const normalized = normalizeProvider(provider);
   if (!broker) {
-    return await getLocalLlmOAuthApiKey(stellaDataDirPath, normalized, options);
+    return await getLocalLlmOAuthApiKey(stellaDataDirPath, normalized, {
+      ...options,
+      // The providers bring pi-ai; load them only when a sign-in is used.
+      resolve: async (...args) =>
+        await (await import("./llm-oauth-providers.js")).resolveLlmOAuthApiKey(...args),
+    });
   }
   return broker.hasOAuth(normalized)
     ? await broker.getOAuthApiKey(normalized, options)

@@ -233,6 +233,14 @@ export class RuntimeHostAdapter {
         this.emitAvailabilityChange();
         return this.lastHealth;
     }
+    /** One of the runtime's app services (RUNTIME_APP_SERVICE_CALLS). */
+    async callRuntime(method, ...args) {
+        const call = this.host[method];
+        if (typeof call !== "function") {
+            throw new Error(`Unknown runtime call: ${method}`);
+        }
+        return await call.apply(this.host, args);
+    }
     async listModels(request = {}) {
         return await this.host.listModels(request);
     }

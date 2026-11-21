@@ -1,3 +1,4 @@
+import { configureRuntimeAppServices } from "../services/runtime-app-services.js";
 import { registerAgentHandlers } from "../ipc/agent-handlers.js";
 import { registerRuntimeAvailabilityBridge } from "../ipc/runtime-availability-bridge.js";
 import { registerBrowserHandlers } from "../ipc/browser-handlers.js";
@@ -83,6 +84,10 @@ const readStellaWebBaseUrl = () => {
 };
 export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     const { config, lifecycle, services, state } = context;
+    configureRuntimeAppServices({
+        getRunner: lifecycle.getRunner,
+        onRunnerChanged: lifecycle.onRunnerChanged,
+    });
     if (!state.inAppBrowserService) {
         state.inAppBrowserService = new InAppBrowserService({
             stellaDataDir: state.stellaDataDirPath ?? config.stellaDataDirPath,

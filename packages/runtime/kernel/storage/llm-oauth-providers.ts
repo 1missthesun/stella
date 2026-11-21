@@ -69,6 +69,17 @@ export const getLlmOAuthApiKey = async (
   return { credentials, apiKey: auth.apiKey };
 };
 
+/** getLlmOAuthApiKey by provider id, in the shape the credential store takes. */
+export const resolveLlmOAuthApiKey = async (
+  providerId: string,
+  credentials: OAuthCredentials,
+  options: { forceRefresh?: boolean } = {},
+): Promise<{ credentials: OAuthCredentials; apiKey: string }> => {
+  const provider = getLlmOAuthProvider(providerId);
+  if (!provider) throw new Error(`Unknown OAuth provider: ${providerId}`);
+  return await getLlmOAuthApiKey(provider, credentials, options);
+};
+
 export type LlmOAuthLoginCallbacks = {
   prompt(prompt: AuthPrompt): Promise<string>;
   notify(event: AuthEvent): void;

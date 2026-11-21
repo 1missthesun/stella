@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { app, BrowserWindow, contentTracing, dialog, powerSaveBlocker, shell } from "electron";
 import { spawn } from "node:child_process";
 import { copyFile, readdir, stat, unlink } from "node:fs/promises";
@@ -21,7 +22,7 @@ import { deletePromptPreset, isCustomizablePromptAgentId, listPromptPresets, rea
 import { getPromptPresetSelection, setPromptPresetSelection, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
-import { loadLlmOAuthProviders, loadModelCatalog } from "../services/llm-provider-modules.js";
+import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchSignInProgress, } from "../services/runtime-app-services.js";
 import { loginChatGpt } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
@@ -979,13 +980,10 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted chatgpt:listModels request.");
         }
         const stellaAppDir = options.getStellaAppDir();
-        const catalog = async () => {
-            const { getModels } = await loadModelCatalog();
-            return {
-                source: "catalog",
-                models: getModels("chatgpt").map((model) => ({ id: model.id, name: model.name })),
-            };
-        };
+        const catalog = async () => ({
+            source: "catalog",
+            models: await callRuntimeAppService("listChatGptCatalogModels"),
+        });
         if (!stellaAppDir || !hasUsableChatGptProfile(stellaAppDir)) {
             return catalog();
         }
@@ -1003,8 +1001,7 @@ export const registerSystemHandlers = (options) => {
         const apiKey = stellaAppDir
             ? getLocalLlmCredential(stellaAppDir, "anthropic")
             : null;
-        const { listClaudeCodeModels } = await import("@stella/runtime/kernel/integrations/claude-code-session-runtime");
-        return listClaudeCodeModels({ apiKey }, stellaAppDir ?? undefined);
+        return await callRuntimeAppService("listClaudeCodeModels", apiKey ? { apiKey } : {});
     });
     handleIpc(IPC_PREFERENCES_LIST_MODELS, async (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_LIST_MODELS)) {
@@ -1143,12 +1140,7 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS)) {
             throw new Error("Blocked untrusted OAuth provider request.");
         }
-        const { getLlmOAuthProviders } = await loadLlmOAuthProviders();
-        return getLlmOAuthProviders()
-            .map((provider) => ({
-            provider: provider.id,
-            label: provider.name,
-        }));
+        return await callRuntimeAppService("listLlmOAuthProviders");
     });
     handleIpc(IPC_LLM_CREDENTIALS_LIST_OAUTH, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_LLM_CREDENTIALS_LIST_OAUTH)) {
@@ -1169,55 +1161,48 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Local Stella root is unavailable.");
         }
         const providerId = asTrimmedString(payload?.provider).toLowerCase();
-        const { describeLlmOAuthCredential, getLlmOAuthProvider, loginLlmOAuth } = await loadLlmOAuthProviders();
-        const provider = getLlmOAuthProvider(providerId);
-        if (!provider) {
-            throw new Error("Unsupported OAuth provider.");
-        }
+        // The runtime runs the provider's sign-in; main opens the page it
+        // names and keeps the result in the keychain-backed store.
         const loginKey = `${event.sender.id}:${providerId}`;
-        activeOAuthLogins.get(loginKey)?.abort();
-        const controller = new AbortController();
-        activeOAuthLogins.set(loginKey, controller);
-        const abortOnSenderDestroyed = () => controller.abort();
-        event.sender.once("destroyed", abortOnSenderDestroyed);
-        try {
-            const credentials = await loginLlmOAuth(provider, {
-                notify: (authEvent) => {
-                    if (authEvent.type === "auth_url") {
-                        void shell.openExternal(authEvent.url);
-                    }
-                    else if (authEvent.type === "device_code") {
-                        void shell.openExternal(authEvent.verificationUri);
-                        if (providerId !== "xai")
-                            return;
-                        void dialog.showMessageBox({
-                            type: "info",
-                            message: t("desktop.oauth.xaiCodeMessage"),
-                            detail: authEvent.userCode,
-                            buttons: [t("desktop.common.continue")],
-                        });
-                    }
-                },
-                prompt: async () => "",
-                signal: controller.signal,
-            });
-            if (controller.signal.aborted) {
-                throw controller.signal.reason instanceof Error
-                    ? controller.signal.reason
-                    : new Error("OAuth login was canceled.");
+        const previous = activeOAuthLogins.get(loginKey);
+        if (previous) {
+            void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId: previous }).catch(() => undefined);
+        }
+        const loginId = randomUUID();
+        activeOAuthLogins.set(loginKey, loginId);
+        const cancel = () => {
+            void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId }).catch(() => undefined);
+        };
+        event.sender.once("destroyed", cancel);
+        const stopWatching = watchSignInProgress(loginId, (notice) => {
+            if (notice.type === "auth_url") {
+                void shell.openExternal(notice.url);
             }
-            const savedCredential = saveLocalLlmOAuthCredential(stellaAppDir, {
-                provider: provider.id,
-                label: provider.name,
-                credentials,
-                ...describeLlmOAuthCredential(provider.id, credentials),
-            });
+            else if (notice.type === "device_code") {
+                void shell.openExternal(notice.verificationUri);
+                if (providerId !== "xai")
+                    return;
+                void dialog.showMessageBox({
+                    type: "info",
+                    message: t("desktop.oauth.xaiCodeMessage"),
+                    detail: notice.userCode,
+                    buttons: [t("desktop.common.continue")],
+                });
+            }
+        });
+        try {
+            const result = await callRuntimeAppService("signInLlmOAuth", { loginId, provider: providerId });
+            if (activeOAuthLogins.get(loginKey) !== loginId) {
+                throw new Error("OAuth login was canceled.");
+            }
+            const savedCredential = saveLocalLlmOAuthCredential(stellaAppDir, result);
             refreshLocalLlmCredentials();
             return savedCredential;
         }
         finally {
-            event.sender.removeListener("destroyed", abortOnSenderDestroyed);
-            if (activeOAuthLogins.get(loginKey) === controller) {
+            stopWatching();
+            event.sender.removeListener("destroyed", cancel);
+            if (activeOAuthLogins.get(loginKey) === loginId) {
                 activeOAuthLogins.delete(loginKey);
             }
         }
@@ -1390,9 +1375,12 @@ export const registerSystemHandlers = (options) => {
         }
         const providerId = asTrimmedString(payload?.provider).toLowerCase();
         const key = `${event.sender.id}:${providerId}`;
-        const controller = activeOAuthLogins.get(key);
-        controller?.abort();
-        return { canceled: Boolean(controller) };
+        const loginId = activeOAuthLogins.get(key);
+        if (!loginId)
+            return { canceled: false };
+        activeOAuthLogins.delete(key);
+        void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId }).catch(() => undefined);
+        return { canceled: true };
     });
     handleIpc(IPC_LLM_CREDENTIALS_VALIDATE_OAUTH, async (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_LLM_CREDENTIALS_VALIDATE_OAUTH)) {
@@ -1411,7 +1399,9 @@ export const registerSystemHandlers = (options) => {
             refreshLocalLlmCredentials();
         };
         try {
-            const key = await getLocalLlmOAuthApiKey(stellaAppDir, provider);
+            const key = await getLocalLlmOAuthApiKey(stellaAppDir, provider, {
+                resolve: resolveLlmOAuthApiKeyInRuntime,
+            });
             if (key)
                 return { connected: true, needsReauth: false };
             dropCredential();

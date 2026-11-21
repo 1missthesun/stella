@@ -1,12 +1,36 @@
 import fs from "fs";
 import path from "path";
-import type { OAuthCredentials } from "./llm-oauth-providers.js";
 import {
   deleteProtectedValue,
   protectValue,
   unprotectValue,
 } from "../shared/protected-storage.js";
 import { ensurePrivateDirSync, readPrivateJsonValueSync, writePrivateFileSync } from "../shared/private-fs.js";
+
+/**
+ * A provider's sign-in result as stored. Only the expiry and the two tokens are
+ * read here; refreshing them and turning them into a key needs the provider's
+ * own code, which the caller passes in (see LlmOAuthKeyResolver).
+ */
+export type OAuthCredentials = {
+  access: string;
+  refresh: string;
+  expires: number;
+  [key: string]: unknown;
+};
+
+/**
+ * Refreshes a provider's stored sign-in when it has expired (or always, with
+ * forceRefresh) and returns the key to sign requests with. The provider code
+ * lives in the runtime: Electron main passes a resolver that asks the runtime,
+ * and the runtime's own callers pass resolveLlmOAuthApiKey from
+ * llm-oauth-providers.
+ */
+export type LlmOAuthKeyResolver = (
+  provider: string,
+  credentials: OAuthCredentials,
+  options: { forceRefresh: boolean },
+) => Promise<{ credentials: OAuthCredentials; apiKey: string }>;
 
 const LLM_OAUTH_CREDENTIALS_FILE = "llm_oauth_credentials.json";
 const LLM_OAUTH_SCOPE_PREFIX = "llm-oauth-credential";
@@ -255,6 +279,7 @@ export const deleteLocalLlmOAuthCredential = (
 
 export type GetLocalLlmOAuthApiKeyOptions = {
   forceRefresh?: boolean;
+  resolve: LlmOAuthKeyResolver;
 };
 
 const updateRecordIfUnchanged = (
@@ -279,7 +304,7 @@ const inflightKeys = new Map<string, Promise<string>>();
 export const getLocalLlmOAuthApiKey = async (
   stellaAppDir: string,
   provider: string,
-  options: GetLocalLlmOAuthApiKeyOptions = {},
+  options: GetLocalLlmOAuthApiKeyOptions,
 ): Promise<string | null> => {
   const normalizedProvider = normalizeProvider(provider);
   const file = readCredentialFile(stellaAppDir);
@@ -292,13 +317,6 @@ export const getLocalLlmOAuthApiKey = async (
   );
   if (!credentials) return null;
 
-  const { getLlmOAuthApiKey, getLlmOAuthProvider } = await import(
-    "./llm-oauth-providers.js"
-  );
-  const oauthProvider = getLlmOAuthProvider(normalizedProvider);
-  if (!oauthProvider) {
-    throw new Error(`Unknown OAuth provider: ${normalizedProvider}`);
-  }
   const forceRefresh =
     options.forceRefresh === true || record.refreshRequired === true;
   const flightKey = `${normalizedProvider}\n${record.valueProtected}\n${forceRefresh}`;
@@ -306,9 +324,9 @@ export const getLocalLlmOAuthApiKey = async (
   if (inflight) return await inflight;
 
   const run = (async () => {
-    let result: Awaited<ReturnType<typeof getLlmOAuthApiKey>>;
+    let result: Awaited<ReturnType<LlmOAuthKeyResolver>>;
     try {
-      result = await getLlmOAuthApiKey(oauthProvider, credentials, {
+      result = await options.resolve(normalizedProvider, credentials, {
         forceRefresh,
       });
     } catch (error) {
@@ -322,7 +340,9 @@ export const getLocalLlmOAuthApiKey = async (
       }
       throw error;
     }
-    if (result.credentials !== credentials || record.refreshRequired) {
+    // A resolver in another process hands back a copy, so compare by value.
+    const refreshed = JSON.stringify(result.credentials) !== JSON.stringify(credentials);
+    if (refreshed || record.refreshRequired) {
       updateRecordIfUnchanged(
         stellaAppDir,
         normalizedProvider,
@@ -330,7 +350,7 @@ export const getLocalLlmOAuthApiKey = async (
         ({ refreshRequired: _cleared, ...current }) => ({
           ...current,
           valueProtected:
-            result.credentials === credentials
+            !refreshed
               ? current.valueProtected
               : protectValue(
                   credentialScope(normalizedProvider),

@@ -6,11 +6,7 @@ import { resolveStellaBrowserBinaryPath } from "../utils/stella-browser-paths.js
 import { getTotalSystemMemoryMb, isLowMemoryWindowsDevice, } from "../resource-profile.js";
 import { getCompanionEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
 import { noticeLinuxRealtimeLimitOnce } from "../linux-realtime-limit.js";
-import { warmLlmProviderModules } from "../services/llm-provider-modules.js";
 const OVERLAY_STARTUP_WARM_DELAY_MS = 5_000;
-// Long enough after the app paints that the first screen, the runtime worker
-// and the update check have settled; well before anyone opens Settings.
-const LLM_PROVIDER_WARM_DELAY_MS = 1_500;
 const runDeferredStartupTask = async (context, task) => {
     if (task.delayMs) {
         const completed = await context.state.processRuntime.wait(task.delayMs);
@@ -84,18 +80,6 @@ const createDeferredStartupTasks = (context) => {
             afterAppPaint: true,
             run: () => {
                 scheduleOverlayWarmup(context);
-            },
-        },
-        {
-            label: "llm-provider-warmup-schedule",
-            afterAppPaint: true,
-            run: () => {
-                state.processRuntime.setManagedTimeout(() => {
-                    if (state.isQuitting || state.processRuntime.isShuttingDown()) {
-                        return;
-                    }
-                    void warmLlmProviderModules();
-                }, LLM_PROVIDER_WARM_DELAY_MS);
             },
         },
         {

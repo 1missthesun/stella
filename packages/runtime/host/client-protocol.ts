@@ -1,3 +1,19 @@
+/**
+ * Work the app's Settings and pickers hand to the runtime instead of running
+ * it in Electron main: sign-in flows, model lists, prompts, connectors. Each
+ * is implemented in host/app-services.
+ */
+export const RUNTIME_APP_SERVICE_CALLS = [
+  "listLlmOAuthProviders",
+  "signInLlmOAuth",
+  "cancelLlmOAuthSignIn",
+  "resolveLlmOAuthApiKey",
+  "listChatGptCatalogModels",
+  "listClaudeCodeModels",
+] as const;
+
+export type RuntimeAppServiceCall = (typeof RUNTIME_APP_SERVICE_CALLS)[number];
+
 export const RUNTIME_HOST_CALLS = [
   "health",
   "healthCheck",
@@ -33,6 +49,7 @@ export const RUNTIME_HOST_CALLS = [
   "googleWorkspaceConnect",
   "googleWorkspaceDisconnect",
   "answerRemoteExecutionRequest",
+  ...RUNTIME_APP_SERVICE_CALLS,
 ] as const;
 
 export type RuntimeHostCall = (typeof RUNTIME_HOST_CALLS)[number];
@@ -72,6 +89,7 @@ export const RUNTIME_HOST_HANDLERS = [
   "openExternal",
   "showWindow",
   "focusWindow",
+  "signInProgress",
 ] as const;
 
 export type RuntimeHostHandler = (typeof RUNTIME_HOST_HANDLERS)[number];

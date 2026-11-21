@@ -113,7 +113,14 @@ export const createHeadlessHostHandlers = (
             : await getLocalLlmOAuthApiKey(
                 paths.stellaDataDirPath,
                 request.provider ?? "",
-                { forceRefresh: request.forceRefresh === true },
+                {
+                  forceRefresh: request.forceRefresh === true,
+                  // The providers bring pi-ai; load them only when a sign-in is used.
+                  resolve: async (...args) =>
+                    await (
+                      await import("../kernel/storage/llm-oauth-providers.js")
+                    ).resolveLlmOAuthApiKey(...args),
+                },
               );
         return { ok: true as const, value };
       } catch {

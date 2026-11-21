@@ -13,6 +13,7 @@ import { showStellaNotification } from "../services/notification-service.js";
 import { serveDeviceRequest } from "../services/device-request-service.js";
 import { requestMacPermission } from "../utils/macos-permissions.js";
 import { getMainLogger } from "../observability/main-logger.js";
+import { deliverSignInProgress, resolveLlmOAuthApiKeyInRuntime, } from "../services/runtime-app-services.js";
 import { getLocalLlmCredential, listLocalLlmCredentials, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
 import { getChatGptAccessToken, hasUsableChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
@@ -228,7 +229,10 @@ export const createHostRunnerHandlers = (context, options) => ({
             ? getLocalLlmCredential(stellaDataDir, request.provider)
             : request.provider === "chatgpt"
                 ? await getChatGptAccessToken(stellaDataDir, { forceRefresh })
-                : await getLocalLlmOAuthApiKey(stellaDataDir, request.provider, { forceRefresh });
+                : await getLocalLlmOAuthApiKey(stellaDataDir, request.provider, {
+                    forceRefresh,
+                    resolve: resolveLlmOAuthApiKeyInRuntime,
+                });
         return { ok: true, value };
     },
     requestConnectorTokenStore: async (request) => {
@@ -310,6 +314,9 @@ export const createHostRunnerHandlers = (context, options) => ({
     },
     focusWindow: async () => {
         context.state.windowManager?.getFullWindow()?.focus();
+    },
+    signInProgress: async (payload) => {
+        deliverSignInProgress(payload);
     },
 });
 const clearHostRunnerSubscriptions = (context) => {

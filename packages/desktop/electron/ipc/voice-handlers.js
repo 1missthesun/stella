@@ -3,6 +3,7 @@ import { getRealtimeVoicePreferences, loadLocalPreferences, resolveRealtimeVoice
 import { DEFAULT_OPENAI_REALTIME_VOICE, DEFAULT_XAI_REALTIME_VOICE, buildXaiRealtimeClientSecretRequest, } from "@stella/contracts/realtime-voice-catalog";
 import { getLocalLlmCredential } from "@stella/runtime/kernel/storage/llm-credentials";
 import { getLocalLlmOAuthApiKey } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
+import { resolveLlmOAuthApiKeyInRuntime } from "../services/runtime-app-services.js";
 import {
   IPC_VOICE_CREATE_OPENAI_SESSION,
   IPC_VOICE_ORCHESTRATOR_CONFIG,
@@ -188,7 +189,9 @@ export const registerVoiceHandlers = (options) => {
             throw new Error("OpenAI is not selected for voice.");
         }
         const apiKey = getLocalLlmCredential(options.stellaAppDir, "openai")?.trim() ||
-            (await getLocalLlmOAuthApiKey(options.stellaAppDir, "openai"))?.trim();
+            (await getLocalLlmOAuthApiKey(options.stellaAppDir, "openai", {
+                resolve: resolveLlmOAuthApiKeyInRuntime,
+            }))?.trim();
         if (!apiKey) {
             return voiceSetupRefusal("Add an OpenAI key in Models to use it for voice.");
         }

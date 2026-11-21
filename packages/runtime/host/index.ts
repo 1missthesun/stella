@@ -113,6 +113,7 @@ import type {
   PiChatSend,
 } from "@stella/contracts/pi-chat";
 import type { InprocWorkerAttach } from "./inproc-connection.js";
+import { appServiceCalls } from "./app-services/index.js";
 import {
   restartReason,
   staleRecordOf,
@@ -266,6 +267,12 @@ export class StellaRuntimeHost {
   hostDatabase: SqliteDatabase | null = null;
   constructor(options: StellaRuntimeHostOptions) {
     this.options = options;
+    // The app's Settings work (see RUNTIME_APP_SERVICE_CALLS) is served as
+    // host methods of the same names, which the client server dispatches to.
+    for (const [name, call] of Object.entries(appServiceCalls)) {
+      (this as unknown as Record<string, unknown>)[name] = (...args: unknown[]) =>
+        call(this.options, ...args);
+    }
     this.workerMode = this.options.workerMode === "inproc" ? "inproc" : "child";
     const onWorkerRpcError = (error: unknown) => {
       console.error("[runtime-host] worker RPC error:", error);

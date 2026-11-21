@@ -115,8 +115,8 @@
   -webkit-app-region: no-drag;
 }
 
-/* On Windows these windows are layered (Stella turns DirectComposition off,
-   see windows-composition.js), and a layered window passes clicks through every
+/* On Windows a transparent window can be a layered window (when
+   DirectComposition is off), and a layered window passes clicks through every
    fully transparent pixel. A 1/255 fill keeps the hit targets solid. */
 html[data-stella-platform="win32"] .companion-mark,
 html[data-stella-platform="win32"] .companion-mark-hit,

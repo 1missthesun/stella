@@ -894,6 +894,9 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
   if (process.env.STELLA_VERIFY_INSPECT_MAIN) {
     electronArgs.push(`--inspect=127.0.0.1:${process.env.STELLA_VERIFY_INSPECT_MAIN}`);
   }
+  for (const arg of (process.env.STELLA_VERIFY_ELECTRON_ARGS ?? "").split(/\s+/)) {
+    if (arg) electronArgs.push(arg);
+  }
   electronArgs.push(repoRoot, "--dev");
   const baseEnv = isolatedElectronEnvironment();
   const jail = homeJail(run, baseEnv);

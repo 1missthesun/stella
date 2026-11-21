@@ -15,6 +15,12 @@ import {
 } from "./llm-sign-in.js";
 import { integrationCalls } from "./integration-calls.js";
 import {
+  cancelClaudeCliInstall,
+  checkClaudeCliUpdate,
+  installClaudeCliForApp,
+  selectClaudeCliForApp,
+} from "./claude-cli.js";
+import {
   beginConnectorDeviceOAuthForApp,
   cancelConnectorOAuthFlowForApp,
   runConnectorOAuthFlowForApp,
@@ -43,13 +49,13 @@ const dataDir = (context: AppServiceContext) => context.initializeParams.stellaD
 type AppServiceCall = (context: AppServiceContext, ...args: any[]) => unknown;
 
 /** Tell the app what a running sign-in needs it to do (open a page, record a profile). */
-const reportSignInProgress = async (
+const reportAppServiceProgress = async (
   context: AppServiceContext,
   request: { loginId?: unknown; provider?: unknown } | null | undefined,
-  notice: LlmSignInNotice,
+  notice: LlmSignInNotice | { type: "install_progress"; progress: unknown },
 ): Promise<void> => {
   try {
-    await context.hostHandlers.signInProgress?.({
+    await context.hostHandlers.appServiceProgress?.({
       loginId: request?.loginId,
       provider: request?.provider,
       notice,
@@ -67,10 +73,10 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
   listLlmOAuthProviders: () => listLlmOAuthProviders(),
   signInLlmOAuth: (context, request) =>
     signInLlmOAuth(request, (notice) => {
-      void reportSignInProgress(context, request, notice);
+      void reportAppServiceProgress(context, request, notice);
     }),
   signInChatGpt: (context, request) =>
-    signInChatGpt(request, (notice) => reportSignInProgress(context, request, notice)),
+    signInChatGpt(request, (notice) => reportAppServiceProgress(context, request, notice)),
   openChatGptCallbackListener: (_context, request) => openChatGptCallbackListener(request),
   waitForChatGptCallback: (_context, request) => waitForChatGptCallback(request),
   closeChatGptCallbackListener: (_context, request) => closeChatGptCallbackListener(request),
@@ -98,4 +104,15 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
   beginConnectorDeviceOAuth: (_context, request) => beginConnectorDeviceOAuthForApp(request),
   runConnectorOAuthFlow: (context, request) => runConnectorOAuthFlowForApp(context, request),
   cancelConnectorOAuthFlow: (_context, request) => cancelConnectorOAuthFlowForApp(request),
+  selectClaudeCli: (_context, request) => selectClaudeCliForApp(request),
+  installClaudeCli: (context, request) =>
+    installClaudeCliForApp(request, (progress) => {
+      void reportAppServiceProgress(
+        context,
+        { loginId: request?.installId },
+        { type: "install_progress", progress },
+      );
+    }),
+  cancelClaudeCliInstall: (_context, request) => cancelClaudeCliInstall(request),
+  checkClaudeCliUpdate: (context, request) => checkClaudeCliUpdate(dataDir(context), request),
 };

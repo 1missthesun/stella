@@ -1,7 +1,7 @@
 /**
  * Connector sign-ins (device code, a provider's registered OAuth app, or
  * dynamic registration) run here. The app owns the approval UI and the
- * browser: it asks for a flow, opens the page each one names (signInProgress),
+ * browser: it asks for a flow, opens the page each one names (appServiceProgress),
  * and hands back a callback that returned through a stella:// link
  * (waitForConnectorOAuthCallback). Tokens are saved through the app's
  * keychain-backed store (requestConnectorTokenStore).
@@ -69,7 +69,7 @@ export const runConnectorOAuthFlowForApp = async (
   const signal = controller.signal;
   const stellaDataDir = context.initializeParams.stellaDataDirPath;
   const openUrl = async (url: string) => {
-    await context.hostHandlers.signInProgress?.({
+    await context.hostHandlers.appServiceProgress?.({
       loginId: flowId,
       notice: { type: "auth_url", url },
     });

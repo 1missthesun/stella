@@ -17,7 +17,7 @@ import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
 import { hasRealtimeVoiceSessionRouteChanged, } from "@stella/contracts/local-preferences";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
-import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchSignInProgress, } from "../services/runtime-app-services.js";
+import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchAppServiceProgress, } from "../services/runtime-app-services.js";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
 import {
@@ -1115,7 +1115,7 @@ export const registerSystemHandlers = (options) => {
             void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId }).catch(() => undefined);
         };
         event.sender.once("destroyed", cancel);
-        const stopWatching = watchSignInProgress(loginId, (notice) => {
+        const stopWatching = watchAppServiceProgress(loginId, (notice) => {
             if (notice.type === "auth_url") {
                 void shell.openExternal(notice.url);
             }
@@ -1238,7 +1238,7 @@ export const registerSystemHandlers = (options) => {
             void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId }).catch(() => undefined);
         };
         event.sender.once("destroyed", cancel);
-        const stopWatching = watchSignInProgress(loginId, (notice) => {
+        const stopWatching = watchAppServiceProgress(loginId, (notice) => {
             if (notice.type === "auth_url") {
                 void shell.openExternal(notice.url);
             }

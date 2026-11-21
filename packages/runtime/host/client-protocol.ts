@@ -34,6 +34,10 @@ export const RUNTIME_APP_SERVICE_CALLS = [
   "beginConnectorDeviceOAuth",
   "runConnectorOAuthFlow",
   "cancelConnectorOAuthFlow",
+  "selectClaudeCli",
+  "installClaudeCli",
+  "cancelClaudeCliInstall",
+  "checkClaudeCliUpdate",
 ] as const;
 
 export type RuntimeAppServiceCall = (typeof RUNTIME_APP_SERVICE_CALLS)[number];
@@ -113,7 +117,7 @@ export const RUNTIME_HOST_HANDLERS = [
   "openExternal",
   "showWindow",
   "focusWindow",
-  "signInProgress",
+  "appServiceProgress",
   "requestConnectorSignIn",
   "waitForConnectorOAuthCallback",
 ] as const;

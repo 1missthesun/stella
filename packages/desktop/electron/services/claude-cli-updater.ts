@@ -1,11 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { powerMonitor } from "electron";
-import {
-  updateClaudeCli,
-  type ClaudeCliUpdateOutcome,
-} from "@stella/runtime/kernel/integrations/claude-cli-update";
-import { forgetClaudeCodeResolvedAliases } from "@stella/runtime/kernel/integrations/claude-code-resolved-models";
+import { callRuntimeAppService } from "./runtime-app-services.js";
 import { getFileLogger } from "@stella/runtime/observability/file-logger";
 
 const STATE_FILE = "claude-cli-updates.json";
@@ -17,6 +13,24 @@ const UNUSABLE_INTERVAL_MS = 30 * 60_000;
 const AFTER_START_MS = 90_000;
 const RESTART_QUIET_MS = 10 * 60_000;
 const DUE_POLL_MS = 15 * 60_000;
+
+/** What one check found (the runtime's claude-cli-update.ts ClaudeCliUpdateOutcome). */
+type ClaudeCliUpdateOutcome = {
+  status:
+    | "not_installed"
+    | "turned_off"
+    | "current"
+    | "updated"
+    | "failed"
+    | "repaired"
+    | "unusable";
+  version?: string | null;
+  problem?: string;
+  method?: unknown;
+  repair?: { status?: string; output?: string; how?: string };
+  fallback?: string | null;
+  [key: string]: unknown;
+};
 
 type UpdaterState = {
   checkedAt?: number;
@@ -107,9 +121,13 @@ export class ClaudeCliUpdater {
   private async check(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    const previous = this.readState();
     let outcome: ClaudeCliUpdateOutcome;
     try {
-      outcome = await updateClaudeCli();
+      // How to update or repair the CLI is the runtime's; main keeps the schedule.
+      outcome = await callRuntimeAppService<ClaudeCliUpdateOutcome>("checkClaudeCliUpdate", {
+        previousVersion: previous.version ?? null,
+      });
     } catch (error) {
       outcome = {
         status: "failed",
@@ -120,11 +138,7 @@ export class ClaudeCliUpdater {
     this.running = false;
     if (this.abort.signal.aborted) return;
     this.lastStatus = outcome.status;
-    const version = "version" in outcome ? outcome.version : null;
-    const previous = this.readState();
-    if (version && previous.version && version !== previous.version) {
-      await forgetClaudeCodeResolvedAliases(this.stellaDataDir);
-    }
+    const version = outcome.version ?? null;
     this.writeState({
       checkedAt: Date.now(),
       status: outcome.status,
@@ -137,9 +151,9 @@ export class ClaudeCliUpdater {
       logger?.warn("claude-cli.unusable", {
         problem: outcome.problem,
         method: outcome.method,
-        repair: outcome.repair.status,
-        ...(outcome.repair.status === "failed" ? { repairOutput: outcome.repair.output } : {}),
-        ...(outcome.repair.status === "manual" ? { how: outcome.repair.how } : {}),
+        repair: outcome.repair?.status,
+        ...(outcome.repair?.status === "failed" ? { repairOutput: outcome.repair.output } : {}),
+        ...(outcome.repair?.status === "manual" ? { how: outcome.repair.how } : {}),
         fallback: outcome.fallback,
       });
     } else if (outcome.status === "repaired") {

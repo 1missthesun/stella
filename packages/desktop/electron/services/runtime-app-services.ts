@@ -62,33 +62,36 @@ export const resolveLlmOAuthApiKeyInRuntime = (
     forceRefresh: options.forceRefresh,
   });
 
-export type SignInNotice =
+export type AppServiceNotice =
   | { type: "auth_url"; url: string }
-  | { type: "device_code"; verificationUri: string; userCode: string };
+  | { type: "device_code"; verificationUri: string; userCode: string }
+  | { type: "registration"; clientId: string }
+  | { type: "install_progress"; progress: unknown };
 
-const signInWatchers = new Map<string, (notice: SignInNotice) => void>();
+const watchers = new Map<string, (notice: AppServiceNotice) => void>();
 
 /**
- * Follow a sign-in the runtime runs: it reports the page to open (or the
- * device code to show) through the signInProgress host handler, and main,
- * which owns the browser and dialogs, acts on it.
+ * Follow work the runtime runs for the app (a sign-in, an install): it
+ * reports what needs main (a page to open, a device code to show, progress)
+ * through the appServiceProgress host handler, keyed by the id the caller
+ * chose, and main, which owns the browser and windows, acts on it.
  */
-export const watchSignInProgress = (
-  loginId: string,
-  onNotice: (notice: SignInNotice) => void,
+export const watchAppServiceProgress = (
+  id: string,
+  onNotice: (notice: AppServiceNotice) => void,
 ): (() => void) => {
-  signInWatchers.set(loginId, onNotice);
+  watchers.set(id, onNotice);
   return () => {
-    if (signInWatchers.get(loginId) === onNotice) signInWatchers.delete(loginId);
+    if (watchers.get(id) === onNotice) watchers.delete(id);
   };
 };
 
-/** The signInProgress host handler. */
-export const deliverSignInProgress = (payload: unknown): void => {
+/** The appServiceProgress host handler. */
+export const deliverAppServiceProgress = (payload: unknown): void => {
   const { loginId, notice } = (payload ?? {}) as {
     loginId?: unknown;
-    notice?: SignInNotice;
+    notice?: AppServiceNotice;
   };
   if (typeof loginId !== "string" || !notice || typeof notice !== "object") return;
-  signInWatchers.get(loginId)?.(notice);
+  watchers.get(loginId)?.(notice);
 };

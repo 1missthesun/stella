@@ -13,15 +13,11 @@ import {
 import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backend/engines";
 import { readStoredClaudeLogin, type StoredClaudeLogin } from "@stella/contracts/claude-login";
 import { buildExternalCliChildEnv } from "@stella/runtime/kernel/integrations/external-cli-resolution";
-import {
-  ClaudeCliUnusableError,
-  selectClaudeCli,
-} from "@stella/runtime/kernel/integrations/claude-cli-launch";
-import {
-  installClaudeCli,
-  type ClaudeCliInstallProgress,
-  type ClaudeCliInstallResult,
-} from "./claude-cli-install.js";
+import type {
+  ClaudeCliInstallProgress,
+  ClaudeCliInstallResult,
+} from "@stella/contracts/claude-local-accounts";
+import { callRuntimeAppService, watchAppServiceProgress } from "./runtime-app-services.js";
 import type { EngineAccountAccess } from "./engine-account-access.js";
 
 const ACCOUNTS_DIR = "claude-accounts";
@@ -528,12 +524,23 @@ export class ClaudeLocalAccounts {
     this.installListeners.add(onProgress);
     try {
       if (!this.installing) {
-        this.installing = installClaudeCli({
-          signal: this.installAbort.signal,
-          onProgress: (progress) => {
-            for (const listener of this.installListeners) listener(progress);
-          },
+        // The runtime installs it and reports progress; main relays it.
+        const installId = randomBytes(12).toString("hex");
+        const stopWatching = watchAppServiceProgress(installId, (notice) => {
+          if (notice.type !== "install_progress") return;
+          const progress = notice.progress as ClaudeCliInstallProgress;
+          for (const listener of this.installListeners) listener(progress);
+        });
+        const cancel = () =>
+          void callRuntimeAppService("cancelClaudeCliInstall", { installId }).catch(
+            () => undefined,
+          );
+        this.installAbort.signal.addEventListener("abort", cancel, { once: true });
+        this.installing = callRuntimeAppService<ClaudeCliInstallResult>("installClaudeCli", {
+          installId,
         }).finally(() => {
+          this.installAbort.signal.removeEventListener("abort", cancel);
+          stopWatching();
           this.installing = null;
         });
       }
@@ -566,13 +573,25 @@ export class ClaudeLocalAccounts {
   private async resolveCli(): Promise<string | null> {
     let executable: string | null = null;
     let installed = false;
-    try {
-      executable = (await selectClaudeCli({ repair: "background" })).executable;
+    // The runtime finds (and in the background repairs) the CLI it runs.
+    const selected = await callRuntimeAppService<
+      | { ok: true; executable: string }
+      | { ok: false; unusable: boolean; message: string }
+    >("selectClaudeCli", { repair: "background" }).catch(
+      (error: unknown) =>
+        ({
+          ok: false,
+          unusable: false,
+          message: error instanceof Error ? error.message : String(error),
+        }) as const,
+    );
+    if (selected.ok) {
+      executable = selected.executable;
       installed = true;
       this.cliProblem = null;
-    } catch (error) {
-      installed = error instanceof ClaudeCliUnusableError;
-      this.cliProblem = installed ? (error as Error).message : null;
+    } else {
+      installed = selected.unusable;
+      this.cliProblem = installed ? selected.message : null;
     }
     const wasInstalled = this.cliInstalled;
     this.cliInstalled = installed;

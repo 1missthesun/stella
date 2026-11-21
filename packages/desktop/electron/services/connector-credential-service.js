@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { shell } from "electron";
 import { saveConnectorAccessToken, } from "@stella/runtime/kernel/connectors/oauth";
-import { callRuntimeAppService, watchSignInProgress, } from "./runtime-app-services.js";
+import { callRuntimeAppService, watchAppServiceProgress, } from "./runtime-app-services.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 const callerOf = (payload) => ({
@@ -495,7 +495,7 @@ export class ConnectorCredentialService {
     async runOauthFlow(args) {
         const flowId = randomUUID();
         this.runtimeOAuthFlows.set(flowId, args.signal);
-        const stopWatching = watchSignInProgress(flowId, (notice) => {
+        const stopWatching = watchAppServiceProgress(flowId, (notice) => {
             if (notice.type === "auth_url")
                 void shell.openExternal(notice.url);
         });

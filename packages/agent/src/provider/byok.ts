@@ -7,6 +7,7 @@ import { createProvider, type MutableModels, type Provider } from "@earendil-wor
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ModelRef } from "@earendil-works/pi-durable";
 import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
+import { antigravityProvider } from "./antigravity/provider.ts";
 import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "./chatgpt.ts";
 import { STELLA_PROVIDER_ID } from "./stella.ts";
 
@@ -98,8 +99,8 @@ export const storeOnlyAuthContext: AuthContext = {
 };
 
 export function byokModels(models: MutableModels, resolveDirect?: DirectModelResolver) {
-  let upstream: ReturnType<typeof builtinProviders> | undefined;
-  const upstreamProviders = () => (upstream ??= builtinProviders());
+  let upstream: Provider[] | undefined;
+  const upstreamProviders = () => (upstream ??= [...builtinProviders(), antigravityProvider()]);
   let registered = false;
   const registerUpstream = () => {
     if (registered) return;

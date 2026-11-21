@@ -21,6 +21,8 @@ const RETIRED_LLM_OAUTH_PROVIDERS = new Set([
 type StoredLlmOAuthCredentialRecord = {
   provider: string;
   label: string;
+  account?: string;
+  plan?: string;
   valueProtected: string;
   createdAt: number;
   updatedAt: number;
@@ -37,6 +39,8 @@ export type LocalLlmOAuthCredentialSummary = {
   label: string;
   status: "active";
   updatedAt: number;
+  account?: string;
+  plan?: string;
 };
 
 const normalizeProvider = (provider: string) => provider.trim().toLowerCase();
@@ -160,6 +164,8 @@ export const listLocalLlmOAuthCredentials = (
       label: record.label,
       status: "active" as const,
       updatedAt: record.updatedAt,
+      ...(record.account ? { account: record.account } : {}),
+      ...(record.plan ? { plan: record.plan } : {}),
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 };
@@ -185,6 +191,8 @@ export const saveLocalLlmOAuthCredential = (
     provider: string;
     label: string;
     credentials: OAuthCredentials;
+    account?: string;
+    plan?: string;
   },
 ): LocalLlmOAuthCredentialSummary => {
   const provider = normalizeProvider(payload.provider);
@@ -200,9 +208,13 @@ export const saveLocalLlmOAuthCredential = (
     credentialScope(provider),
     JSON.stringify(payload.credentials),
   );
+  const account = payload.account?.trim();
+  const plan = payload.plan?.trim();
   file.credentials[provider] = {
     provider,
     label,
+    ...(account ? { account } : {}),
+    ...(plan ? { plan } : {}),
     valueProtected,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -217,6 +229,8 @@ export const saveLocalLlmOAuthCredential = (
     label,
     status: "active",
     updatedAt: now,
+    ...(account ? { account } : {}),
+    ...(plan ? { plan } : {}),
   };
 };
 

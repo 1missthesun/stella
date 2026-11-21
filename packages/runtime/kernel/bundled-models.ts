@@ -20,6 +20,7 @@ import { XIAOMI_TOKEN_PLAN_CN_MODELS } from "@earendil-works/pi-ai/providers/xia
 import { XIAOMI_TOKEN_PLAN_SGP_MODELS } from "@earendil-works/pi-ai/providers/xiaomi-token-plan-sgp.models";
 import { XIAOMI_MODELS } from "@earendil-works/pi-ai/providers/xiaomi.models";
 import { ZAI_MODELS } from "@earendil-works/pi-ai/providers/zai.models";
+import { ANTIGRAVITY_PROVIDER_ID, antigravityModels } from "@stella/agent/provider/antigravity/models";
 
 type Catalog = Record<string, object>;
 
@@ -72,5 +73,6 @@ export const bundledModels = (): Map<string, Model<Api>[]> => {
       baseUrl: "https://api.openai.com/v1",
     })),
   );
+  bundled.set(ANTIGRAVITY_PROVIDER_ID, antigravityModels());
   return bundled;
 };

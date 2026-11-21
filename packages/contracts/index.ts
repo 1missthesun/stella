@@ -171,6 +171,10 @@ export type LocalLlmCredentialSummary = {
   label: string;
   status: "active";
   updatedAt: number;
+  /** The account a sign-in belongs to (an email), when the provider says. */
+  account?: string;
+  /** The plan that sign-in runs on, when the provider says. */
+  plan?: string;
 };
 
 export type {

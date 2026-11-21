@@ -7,6 +7,8 @@ import type {
 } from "@earendil-works/pi-ai";
 import { githubCopilotProvider } from "@earendil-works/pi-ai/providers/github-copilot";
 import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
+import { antigravityPlanName } from "@stella/agent/provider/antigravity/oauth";
+import { antigravityProvider } from "@stella/agent/provider/antigravity/provider";
 
 export type { OAuthCredentials } from "@earendil-works/pi-ai";
 
@@ -19,7 +21,7 @@ export type LlmOAuthProvider = {
 let providers: Map<string, LlmOAuthProvider> | undefined;
 const registry = (): Map<string, LlmOAuthProvider> =>
   (providers ??= new Map(
-    [githubCopilotProvider(), xaiProvider()].flatMap((provider) =>
+    [githubCopilotProvider(), xaiProvider(), antigravityProvider()].flatMap((provider) =>
       provider.auth.oauth
         ? [[provider.id, { id: provider.id, name: provider.auth.oauth.name, oauth: provider.auth.oauth }] as const]
         : [],
@@ -70,3 +72,13 @@ export const loginLlmOAuth = async (
   provider: LlmOAuthProvider,
   callbacks: LlmOAuthLoginCallbacks,
 ): Promise<OAuthCredentials> => asStored(await provider.oauth.login(callbacks));
+
+/** The account and plan a fresh sign-in belongs to, for Settings to show. */
+export const describeLlmOAuthCredential = (
+  providerId: string,
+  credentials: OAuthCredentials,
+): { account?: string; plan?: string } => {
+  const account = typeof credentials.email === "string" ? credentials.email.trim() : "";
+  const plan = providerId === "antigravity" ? antigravityPlanName(credentials) : undefined;
+  return { ...(account ? { account } : {}), ...(plan ? { plan } : {}) };
+};

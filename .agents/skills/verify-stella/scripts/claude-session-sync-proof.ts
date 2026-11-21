@@ -4,8 +4,8 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { BackendClient } from "../../../../packages/contracts/backend/client";
-import { migrateDesktopDatabase } from "@stella/node-shared/storage/schema";
-import { SessionStore } from "@stella/node-shared/storage/session-store";
+import { migrateDesktopDatabase } from "../../../../packages/node-shared/storage/schema";
+import { SessionStore } from "../../../../packages/node-shared/storage/session-store";
 import { createClaudeSessionSync } from "../../../../packages/runtime/kernel/runner/claude-session-sync";
 import { setClaudeSessionSyncSink } from "../../../../packages/runtime/kernel/integrations/claude-code-session-sync-sink";
 import {

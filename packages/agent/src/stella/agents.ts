@@ -240,13 +240,6 @@ export const StellaAgentsDoc = defineDoc<StellaAgents>({
 
 export const PLACED_CALL_PREFIX = "placed:";
 
-export const isAnotherHostsAgent = (
-  state: { agents: Record<string, AgentRecord>; calls: Record<string, { threadId: string }> } | undefined,
-  threadId: string,
-): boolean =>
-  state?.agents[threadId]?.origin !== undefined ||
-  Object.entries(state?.calls ?? {}).some(([key, call]) => call.threadId === threadId && key.startsWith(PLACED_CALL_PREFIX));
-
 export type AgentRun = {
   threadId: string;
   agentConversationId: ConversationId;

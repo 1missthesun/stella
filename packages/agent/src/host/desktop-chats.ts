@@ -104,7 +104,6 @@ import {
 import { recordEngineCompaction } from "../stella/journal-sync.ts";
 import {
   agentRunOutcome,
-  isAnotherHostsAgent,
   noteRemoteReport,
   remoteAgentHome,
   StellaAgentsDoc,
@@ -332,12 +331,6 @@ export type DesktopChatsOptions = {
     description: string;
     attempt: number;
     parentThreadId?: string;
-    /**
-     * A task placed here from elsewhere, running a turn this computer started
-     * by itself (its own background work, a schedule here). The cloud records it
-     * on the task's own thread, whose parent gets the report.
-     */
-    placed?: true;
   }): void;
   agentRunEnded?(agent: {
     conversationId: string;
@@ -1730,7 +1723,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                     threadId: run.threadId,
                     description: agent?.description ?? run.threadId,
                     attempt: run.attempt,
-                    ...(isAnotherHostsAgent(state, run.threadId) ? { placed: true as const } : {}),
                   });
                 },
                 ...(subagentEnded || agentRunEnded || agentWaiting

@@ -14,6 +14,7 @@ import {
   buildMobilePairingChallenge,
   canonicalDispatchPayloadJson,
   hasMobilePairingProofHeaders,
+  readMobileSessionPhone,
   sha256Hex as pairingSha256Hex,
   readMobilePairingProofHeaders,
   verifyMobilePairingProof,
@@ -608,8 +609,29 @@ const handleDispatchSubmitRoute = async (
   }
 
   if (caller.kind === "user" && submitted.ingress === "mobile") {
-    const { requestingDeviceId: _unverifiedDeviceId, ...unpaired } = submitted;
-    submitted = unpaired;
+    // A phone authorised by its session: the computer it may reach is the one
+    // it chose (or, letting Stella choose, the one it prefers); without one
+    // the send runs in the cloud.
+    const phone = readMobileSessionPhone(request.headers);
+    const desktopDeviceId =
+      submitted.targetMode === "device"
+        ? submitted.targetDeviceId
+        : submitted.targetMode === "cloud"
+          ? undefined
+          : phone?.desktopDeviceId;
+    const mobileDeviceId = submitted.requestingDeviceId ?? phone?.mobileDeviceId;
+    if (phone && mobileDeviceId && desktopDeviceId) {
+      caller = {
+        kind: "mobile",
+        ownerId: caller.ownerId,
+        mobileDeviceId,
+        desktopDeviceId,
+      };
+      submitted = { ...submitted, requestingDeviceId: mobileDeviceId };
+    } else {
+      const { requestingDeviceId: _unnamedDeviceId, ...unpaired } = submitted;
+      submitted = unpaired;
+    }
   }
 
   const gateAt = Date.now();

@@ -1,14 +1,13 @@
 import { fetch as expoFetch } from "expo/fetch";
 import { isRequestTimeout, withDeadline } from "@stella/contracts/request-deadline";
 import {
-  buildDeviceRequestChallenge,
   deviceRequestPath,
   type DeviceRequestErrorCode,
   type DeviceRequestMethod,
 } from "@stella/contracts/turn-plane/device-requests";
 import { getAuthToken } from "./auth-token";
 import { resolveExecutionBuilderOrigin } from "./execution-placement";
-import { phonePairingProofHeaders, sha256HexUtf8 } from "./phone-pair-proof";
+import { mobileSessionPhoneHeaders } from "@stella/contracts/turn-plane/pairing-proof";
 import type { StoredPhoneAccess } from "./phone-access";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -94,13 +93,6 @@ export const requestDevice = async (
 ): Promise<{ bytes: Uint8Array; contentType: string }> => {
   const requestId = createRequestId();
   const target = options?.targetDeviceId?.trim() || access.desktopDeviceId;
-  const paramsJson = JSON.stringify(params);
-  const challenge = buildDeviceRequestChallenge({
-    requestId,
-    method,
-    paramsHash: sha256HexUtf8(paramsJson),
-    ...(target !== access.desktopDeviceId ? { targetDeviceId: target } : {}),
-  });
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   try {
     return await withDeadline(
@@ -115,7 +107,7 @@ export const requestDevice = async (
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
-              ...phonePairingProofHeaders(access, challenge),
+              ...mobileSessionPhoneHeaders(access),
             },
             body: JSON.stringify({ requestId, method, params }),
             signal,

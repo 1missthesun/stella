@@ -1,4 +1,5 @@
 import {
+  DEVICE_REQUEST_CLOUD_ASKER,
   DEVICE_REQUEST_DEVICE_HEADERS,
   DEVICE_REQUEST_DEVICE_PROOF_MAX_SKEW_MS,
   DEVICE_REQUEST_LIMITS,
@@ -15,6 +16,8 @@ import {
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import {
   MOBILE_PAIRING_HEADERS,
+  hasMobilePairingProofHeaders,
+  readMobileSessionPhone,
   verifyMobilePairingProof,
 } from "@stella/contracts/turn-plane/pairing-proof";
 import { verifyDevicePresenceProof } from "../owner-gate/presence.js";
@@ -144,6 +147,27 @@ export const handleDeviceRequestRoute = async (
       );
     }
     asker = deviceRequesterLabel(requesterDeviceId);
+  } else if (!hasMobilePairingProofHeaders(request.headers)) {
+    // A phone authorised by its account session. It reaches the computers on
+    // its account: any of their files, and the rest only on the computer it
+    // chose.
+    const phone = readMobileSessionPhone(request.headers);
+    const notConnected = deviceRequestErrorResponse(
+      "forbidden",
+      "This phone isn't connected to that computer. Choose it again under Where Stella works in the chat settings.",
+    );
+    if (!phone || !isOwnerComputer(deviceId)) return notConnected;
+    const chosenDesktopId = phone.desktopDeviceId ?? deviceId;
+    if (chosenDesktopId !== deviceId && !isDeviceFileRequestMethod(method)) {
+      return notConnected;
+    }
+    if (
+      phone.mobileDeviceId === DEVICE_REQUEST_CLOUD_ASKER ||
+      phone.mobileDeviceId.startsWith(deviceRequesterLabel(""))
+    ) {
+      return deviceRequestErrorResponse("bad_request", "Malformed phone id.");
+    }
+    asker = phone.mobileDeviceId;
   } else {
     const mobileDeviceId =
       request.headers.get(MOBILE_PAIRING_HEADERS.mobileDeviceId)?.trim() ?? "";

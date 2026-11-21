@@ -233,9 +233,20 @@ const browserScriptPlugin = {
   },
 };
 
+// Where a workspace package's own third-party imports resolve when its
+// node_modules isn't there. An update's check builds the new main on a scratch
+// copy linked to the installed version's node_modules, before the update's own
+// install, so a package the update adds (node-shared was one) has none yet;
+// its dependencies are the runtime's, which the installed version has.
+const fallbackNodePaths = [
+  path.join(repoRootDir, "packages", "runtime", "node_modules"),
+  path.join(repoRootDir, "node_modules"),
+];
+
 const nodeBundleOptions = {
   absWorkingDir: repoRootDir,
   alias: workspaceAliases,
+  nodePaths: fallbackNodePaths,
   bundle: true,
   define: {
     "process.env.VITE_TURNSTILE_SITE_KEY": JSON.stringify(
@@ -284,6 +295,7 @@ const buildOptions = [
   {
     absWorkingDir: repoRootDir,
     alias: workspaceAliases,
+    nodePaths: fallbackNodePaths,
     bundle: true,
     external: ["electron"],
     entryPoints: preloadEntryPoints,

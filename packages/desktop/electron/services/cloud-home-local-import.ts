@@ -15,7 +15,6 @@ import {
   type LocalCloudSkillFile,
   type LocalCloudSkillPackage,
 } from "@stella/contracts/cloud-home-sync";
-import { extractFrontmatter } from "@stella/runtime/kernel/frontmatter";
 import { getLocalCloudHomeImportOwnership } from "./cloud-home-import-owner.js";
 
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
@@ -420,6 +419,8 @@ const scanSkill = async (args: {
   }
   let metadata: Record<string, unknown>;
   try {
+    // The YAML parser loads with the first import rather than with main.
+    const { extractFrontmatter } = await import("@stella/runtime/kernel/frontmatter");
     metadata = extractFrontmatter(UTF8.decode(skillMarkdown.bytes)).metadata;
   } catch {
     throw new LocalImportError(

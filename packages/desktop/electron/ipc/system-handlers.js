@@ -19,10 +19,13 @@ import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-ho
 import { loadAgentSystemPrompt } from "@stella/runtime/kernel/agents/home-agent-prompt";
 import { deletePromptPreset, isCustomizablePromptAgentId, listPromptPresets, readPromptPreset, savePromptPreset, } from "@stella/runtime/kernel/prompts/prompt-presets";
 import { getPromptPresetSelection, setPromptPresetSelection, } from "@stella/runtime/kernel/preferences/local-preferences";
-import { getModels } from "@stella/runtime/kernel/model-catalog";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
-import { describeLlmOAuthCredential, getLlmOAuthProvider, getLlmOAuthProviders, loginLlmOAuth, } from "@stella/runtime/kernel/storage/llm-oauth-providers";
+// The model catalog and the sign-in providers load pi-ai, its provider SDK
+// glue and ajv; they are read only from these handlers, so they load on first
+// use instead of with main at every launch.
+const loadModelCatalog = () => import("@stella/runtime/kernel/model-catalog");
+const loadLlmOAuthProviders = () => import("@stella/runtime/kernel/storage/llm-oauth-providers");
 import { loginChatGpt } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
@@ -980,10 +983,13 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted chatgpt:listModels request.");
         }
         const stellaAppDir = options.getStellaAppDir();
-        const catalog = () => ({
-            source: "catalog",
-            models: getModels("chatgpt").map((model) => ({ id: model.id, name: model.name })),
-        });
+        const catalog = async () => {
+            const { getModels } = await loadModelCatalog();
+            return {
+                source: "catalog",
+                models: getModels("chatgpt").map((model) => ({ id: model.id, name: model.name })),
+            };
+        };
         if (!stellaAppDir || !hasUsableChatGptProfile(stellaAppDir)) {
             return catalog();
         }
@@ -1137,10 +1143,11 @@ export const registerSystemHandlers = (options) => {
         }
         return listLocalLlmCredentials(stellaAppDir);
     });
-    handleIpc(IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS, (event) => {
+    handleIpc(IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS)) {
             throw new Error("Blocked untrusted OAuth provider request.");
         }
+        const { getLlmOAuthProviders } = await loadLlmOAuthProviders();
         return getLlmOAuthProviders()
             .map((provider) => ({
             provider: provider.id,
@@ -1166,6 +1173,7 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Local Stella root is unavailable.");
         }
         const providerId = asTrimmedString(payload?.provider).toLowerCase();
+        const { describeLlmOAuthCredential, getLlmOAuthProvider, loginLlmOAuth } = await loadLlmOAuthProviders();
         const provider = getLlmOAuthProvider(providerId);
         if (!provider) {
             throw new Error("Unsupported OAuth provider.");

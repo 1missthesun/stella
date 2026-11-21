@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { WebSocket, WebSocketServer, type RawData } from "ws";
+import type { RawData, WebSocket, WebSocketServer } from "ws";
 import {
   buildAgentCursorHideExpression,
   buildAgentCursorPresentationExpression,
@@ -237,8 +237,11 @@ const responseError = (error: unknown) => ({
   message: error instanceof Error ? error.message : String(error),
 });
 
+// ws's WebSocket.OPEN; the library itself loads when the endpoint starts.
+const WEBSOCKET_OPEN = 1;
+
 const sendJson = (socket: WebSocket, payload: unknown) => {
-  if (socket.readyState !== WebSocket.OPEN) return;
+  if (socket.readyState !== WEBSOCKET_OPEN) return;
   socket.send(JSON.stringify(payload));
 };
 
@@ -290,10 +293,19 @@ export class InAppBrowserCdpAdapter {
     );
   }
 
-  async start(): Promise<string> {
-    if (this.webSocketUrl) return this.webSocketUrl;
+  private starting: Promise<string> | null = null;
 
+  start(): Promise<string> {
+    if (this.webSocketUrl) return Promise.resolve(this.webSocketUrl);
+    this.starting ??= this.listen().finally(() => {
+      this.starting = null;
+    });
+    return this.starting;
+  }
+
+  private async listen(): Promise<string> {
     const path = `/devtools/browser/${this.token}`;
+    const { WebSocketServer } = await import("ws");
     const server = createServer((request, response) => {
       if (request.url === "/json/version") {
         response.writeHead(200, { "content-type": "application/json" });
@@ -949,7 +961,7 @@ export class InAppBrowserCdpAdapter {
       throw new Error("Browser did not return a frame session.");
     if (
       !this.clients.has(client) ||
-      client.socket.readyState !== WebSocket.OPEN ||
+      client.socket.readyState !== WEBSOCKET_OPEN ||
       (!client.sessions.has(parentSessionId) &&
         !client.childSessions.has(parentSessionId))
     ) {

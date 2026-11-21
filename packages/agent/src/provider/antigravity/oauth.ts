@@ -20,7 +20,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/experimentsandconfigs",
 ];
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_URL="https:...oken";
+const TOKEN_URL = new URL("/token", "https://oauth2.googleapis.com").href;
 const LOGIN_TIMEOUT_MS = 10 * 60 * 1000;
 /** The project Antigravity itself falls back to when an account has none of its own. */
 const DEFAULT_PROJECT_ID = "rising-fact-p41fc";

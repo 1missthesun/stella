@@ -84,7 +84,7 @@ export function AntigravityAccountSection() {
               <span aria-live="polite">{t(`${K}.antigravityBrowserWaiting`)}</span>
             </AiNote>
           ) : null}
-          {signedIn?.plan === "Free" ? <AiNote>{t(`${K}.antigravityFreeNote`)}</AiNote> : null}
+          {signedIn?.plan === "Free" || signedIn?.plan === "Google AI Plus" ? <AiNote>{t(`${K}.antigravityFreeNote`)}</AiNote> : null}
           <p className="ai-provider__hint">{t(`${K}.antigravityRisk`)}</p>
         </>
       }

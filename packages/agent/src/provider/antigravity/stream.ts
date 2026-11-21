@@ -240,7 +240,7 @@ const finishReasonStop = (reason: string): "stop" | "length" | "error" =>
   reason === "STOP" ? "stop" : reason === "MAX_TOKENS" || reason === "CONTINUATION" ? "length" : "error";
 
 /** Google's error body, as a sentence for the person reading the turn. */
-export const describeAntigravityFailure = (status: number, body: string): string => {
+export const describeAntigravityFailure = (status: number, body: string, modelName = "This model"): string => {
   let message = body.trim().slice(0, 600);
   let reason: string | undefined;
   try {
@@ -255,7 +255,11 @@ export const describeAntigravityFailure = (status: number, body: string): string
   if (status === 403 && /TOS_VIOLATION/i.test(`${reason ?? ""} ${message}`)) {
     return `Google suspended Antigravity on this Google account (TOS_VIOLATION): ${message}`;
   }
-  if (status === 403 || status === 404) return `Google Antigravity refused this model for your account: ${message}`;
+  // Google answers 404 for a model the account's plan doesn't include (it lists them as "-disabled").
+  if (status === 404) {
+    return `${modelName} isn't included in this Google account's plan. The Gemini 4 models need Google AI Pro or Ultra; Gemini 3.8 Flash works on every plan.`;
+  }
+  if (status === 403) return `Google Antigravity refused ${modelName} for this account: ${message}`;
   if (status === 429) return `Google Antigravity usage limit reached: ${message}`;
   return `Google Antigravity request failed (HTTP ${status}${reason ? `, ${reason}` : ""}): ${message}`;
 };
@@ -344,7 +348,7 @@ export function streamAntigravity(
         model,
       );
       if (!response.ok) {
-        throw new Error(describeAntigravityFailure(response.status, await response.text().catch(() => "")));
+        throw new Error(describeAntigravityFailure(response.status, await response.text().catch(() => ""), model.name));
       }
       stream.push({ type: "start", partial: output });
 

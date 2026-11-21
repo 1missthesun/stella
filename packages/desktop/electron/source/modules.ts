@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { moduleStateReason } from "./module-state.js";
 import type { OxcTools } from "./tools.js";
+import { touchCacheEntry } from "./cache-prune.js";
 
 export type ImportRef = {
   start: number;
@@ -273,9 +274,9 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     const remembered = known.get(file);
     if (remembered && remembered.mtimeMs === stat.mtimeMs && remembered.size === stat.size) {
       try {
-        const module = JSON.parse(
-          await fs.promises.readFile(path.join(moduleCacheDir, `${remembered.key}.json`), "utf8"),
-        ) as TransformedModule;
+        const cached = path.join(moduleCacheDir, `${remembered.key}.json`);
+        const module = JSON.parse(await fs.promises.readFile(cached, "utf8")) as TransformedModule;
+        touchCacheEntry(cached);
         memory.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, key: remembered.key, module });
         return module;
       } catch {
@@ -292,6 +293,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     if (cacheable) {
       try {
         module = JSON.parse(await fs.promises.readFile(diskPath, "utf8")) as TransformedModule;
+        touchCacheEntry(diskPath);
       } catch {
         module = null;
       }

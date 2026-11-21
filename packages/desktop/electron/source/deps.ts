@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DepTools } from "./tools.js";
+import { touchCacheEntry } from "./cache-prune.js";
 
 export type DepBundle = {
   dir: string;
@@ -107,6 +108,7 @@ export const bundleDependencies = (options: {
   const dir = path.join(options.cacheDir, "deps", key);
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8")) as Record<string, string>;
+    touchCacheEntry(path.join(dir, "manifest.json"));
     return Promise.resolve({ dir, entries: new Map(Object.entries(manifest)) });
   } catch {
     // Not built yet.

@@ -575,63 +575,6 @@ const withCurrentOpenLeaseTransaction = async <T>(
     );
   });
 
-const assertOpenWorldActivityLease = (
-  scopedOwnerId: string,
-  fence: TurnStateOwnerFence,
-  request: ReturnType<typeof parseCommonLease>,
-  now: number,
-): OwnerLease => {
-  assertOwnerScope(scopedOwnerId, fence, request.ownerId);
-  const active = fence.active[request.leaseId];
-  if (
-    fence.state !== "open" ||
-    request.generation !== fence.generation ||
-    !active ||
-    active.leaseId !== request.leaseId ||
-    active.sessionId !== request.sessionId ||
-    active.turnId !== request.turnId ||
-    active.ownerGeneration !== request.ownerGeneration ||
-    active.namespace !== "activity" ||
-    active.role !== "run" ||
-    !Number.isSafeInteger(active.expiresAt) ||
-    active.expiresAt! <= now
-  ) {
-    throw new TurnStateOwnerRouteError(
-      "The exact world purge lease is no longer open.",
-      409,
-      "owner_fence_changed",
-    );
-  }
-  return active;
-};
-
-const withCurrentOpenWorldActivityLeaseTransaction = async <T>(
-  args: {
-    storage: DurableObjectStorage;
-    scopedOwnerId: string;
-    now?: () => number;
-  },
-  request: ReturnType<typeof parseCommonLease>,
-  operation: (storage: StrongTurnStateStorage) => Promise<T>,
-): Promise<T> =>
-  await args.storage.transaction(async (transaction) => {
-    const fence = await transaction.get<TurnStateOwnerFence>(OWNER_FENCE_KEY);
-    if (!fence) {
-      throw new TurnStateOwnerRouteError(
-        "The durable owner fence is missing.",
-        409,
-        "owner_fence_changed",
-      );
-    }
-    assertOpenWorldActivityLease(
-      args.scopedOwnerId,
-      fence,
-      request,
-      routeNow(args.now),
-    );
-    return await operation(createTransactionTurnStateStorage(transaction));
-  });
-
 const routeNow = (now: (() => number) | undefined): number => {
   const value = now?.() ?? Date.now();
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -1190,67 +1133,6 @@ const exactRegistryObjectIdentity = (
     value.key === expected.key,
   );
 
-const createOpenWorldLeaseGuardedStorage = (
-  args: {
-    storage: DurableObjectStorage;
-    scopedOwnerId: string;
-    now?: () => number;
-  },
-  lease: ReturnType<typeof parseCommonLease>,
-): StrongTurnStateStorage => {
-  const base = createDurableObjectTurnStateStorage(args.storage);
-  return {
-    get: async <T = unknown>(key: string): Promise<T | undefined> =>
-      await base.get<T>(key),
-    list: async <T = unknown>(options = {}): Promise<Map<string, T>> =>
-      await base.list<T>(options),
-    put: async (key: string, value: unknown): Promise<void> =>
-      await withCurrentOpenWorldActivityLeaseTransaction(
-        args,
-        lease,
-        async (storage) => await storage.put(key, value),
-      ),
-    delete: async (key: string): Promise<boolean> =>
-      await withCurrentOpenWorldActivityLeaseTransaction(
-        args,
-        lease,
-        async (storage) => await storage.delete(key),
-      ),
-    transaction: async <T>(
-      closure: (storage: StrongTurnStateStorage) => Promise<T>,
-    ): Promise<T> =>
-      await withCurrentOpenWorldActivityLeaseTransaction(
-        args,
-        lease,
-        async (storage) => await closure(storage),
-      ),
-  };
-};
-
-const createOpenWorldLeaseGuardedObjectStore = (
-  args: {
-    storage: DurableObjectStorage;
-    scopedOwnerId: string;
-    now?: () => number;
-  },
-  lease: ReturnType<typeof parseCommonLease>,
-  bucket: R2Bucket,
-): TurnStateObjectStore => {
-  const base = createR2TurnStateObjectStore(bucket);
-  return {
-    list: async (prefix, cursor) => await base.list(prefix, cursor),
-    head: async (key) => await base.head(key),
-    delete: async (key) => {
-      await withCurrentOpenWorldActivityLeaseTransaction(
-        args,
-        lease,
-        async () => undefined,
-      );
-      await base.delete(key);
-    },
-  };
-};
-
 const COMMON_LEASE_KEYS = [
   "schemaVersion",
   "ownerId",
@@ -1655,29 +1537,6 @@ export const handleTurnStateOwnerRoute = async (args: {
       } catch (error) {
         routeConflict(error);
       }
-    }
-
-    if (args.path === "turn-state/purge-world") {
-      const row = exactObject(raw, [...COMMON_LEASE_KEYS]);
-      validateSchemaVersion(row);
-      const lease = parseCommonLease(row);
-      assertOpenWorldActivityLease(
-        args.scopedOwnerId,
-        args.fence,
-        lease,
-        routeNow(args.now),
-      );
-      const result = await purgeTurnState(
-        createOpenWorldLeaseGuardedStorage(args, lease),
-        createOpenWorldLeaseGuardedObjectStore(args, lease, args.bucket),
-        { ownerId: lease.ownerId, ownerPurgeFence: "blocked" },
-      );
-      await withCurrentOpenWorldActivityLeaseTransaction(
-        args,
-        lease,
-        async () => undefined,
-      );
-      return json(result, result.pending ? 202 : 200);
     }
 
     if (args.path === "turn-state/purge") {

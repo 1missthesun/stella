@@ -11,8 +11,9 @@ import type { OwnerDbReader } from "../registry.js";
  * - `report_to_stella_not_lead`: a helper's report went to Stella's chat
  *   although the cloud records the lead that started it (a note a task sends
  *   Stella on purpose is not one).
- * - `report_lost`: a report the cloud gave up delivering, or one the audit
- *   found never sent.
+ * - `report_lost`: a report the cloud gave up delivering, one the audit
+ *   found never sent, or a turn's end dropped because its computer gave it
+ *   the number of a turn that had already ended.
  * - `stopped_task_took_input`: a stopped task started again from something
  *   no one sent on purpose (a report, a schedule's fire, a note), or its
  *   computer finished a turn of it after the stop.
@@ -79,6 +80,14 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     since,
   )) {
     add("report_lost", `missing ${row.thread_id}:${row.attempt_generation ?? "?"}`);
+  }
+
+  for (const row of db.all<{ thread_id: string; attempt_generation: number | null }>(
+    `SELECT thread_id, attempt_generation FROM agent_events
+      WHERE kind = 'terminal_ignored' AND created_at >= ? AND event_key LIKE 'turn_end_dropped:%' LIMIT ${SCAN_MAX}`,
+    since,
+  )) {
+    add("report_lost", `turn end dropped ${row.thread_id}:${row.attempt_generation ?? "?"}`);
   }
 
   for (const row of db.all<{ seq: number; thread_id: string; detail: string | null }>(

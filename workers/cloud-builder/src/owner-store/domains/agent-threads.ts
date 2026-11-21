@@ -90,7 +90,7 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { agentInvariants } from "./agent-invariants.js";
-import { boundReportText, endedWaiting, fileLateTurn, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
+import { boundReportText, endedWaiting, fileLateTurn, HELD_WHILE_STOPPED, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
 import {
   NOTHING_CAN_WAKE_MARK,
   WAITING_FOR_MAX_CHARS,
@@ -2438,7 +2438,7 @@ const supersedeHeldStops = (ctx: OwnerContext, threadId: string, commandId: stri
 };
 
 /** Marks a message or resume that was on its way to an agent when it was stopped: it waits until the agent is resumed. */
-const STOP_HELD = "held_while_stopped";
+const STOP_HELD = HELD_WHILE_STOPPED;
 
 const stoppedByStop = (thread: Pick<ThreadRow, "status" | "error_message">): boolean =>
   agentStanding(recordedAgentFacts({ status: thread.status, errorMessage: thread.error_message })).state === "stopped";
@@ -4383,6 +4383,29 @@ const completeComputerThread = async (
       isPlaceholderAgentResult(row.result_json)
     ) {
       return upgradePlaceholderResult(ctx, row, result, args.originDeviceId);
+    }
+    // A second, different end of a turn that already ended: a computer that
+    // numbered a new turn as the one before (desktops before the fix gave the
+    // turns they start by themselves no number of their own). What it said
+    // reaches no one, so it is filed where the invariants count it.
+    if (
+      row.attempt_generation === args.attemptGeneration &&
+      row.status !== "running" &&
+      args.status === "completed" &&
+      result !== undefined &&
+      result.trim() !== resultTextOf(row.result_json)
+    ) {
+      appendAgentEvent(ctx.db, {
+        key: `turn_end_dropped:${row.thread_id}:${args.attemptGeneration}:${(await sha256Hex(result)).slice(0, 16)}`,
+        kind: "terminal_ignored",
+        source: `device:${args.originDeviceId}`,
+        threadId: row.thread_id,
+        conversationId: row.conversation_id,
+        attemptGeneration: args.attemptGeneration,
+        status: row.status,
+        detail: { reason: "attempt_already_ended", text: result.slice(0, 2_000) },
+        createdAt: ctx.now,
+      });
     }
     return { updated: false, status: row.status };
   }

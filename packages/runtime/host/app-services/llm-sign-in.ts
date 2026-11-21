@@ -6,12 +6,18 @@
  * sign-in returns, and asks resolveLlmOAuthApiKey to refresh them.
  */
 import type { OAuthCredentials } from "../../kernel/storage/llm-oauth-credentials.js";
+import type { ChatGptRegistration } from "@stella/contracts/chatgpt-siwc";
+import type {
+  ChatGptLoopback,
+  ChatGptSavedRegistration,
+} from "../../kernel/integrations/chatgpt-sign-in.js";
 
 const loadProviders = () => import("../../kernel/storage/llm-oauth-providers.js");
 
 export type LlmSignInNotice =
   | { type: "auth_url"; url: string }
-  | { type: "device_code"; verificationUri: string; userCode: string };
+  | { type: "device_code"; verificationUri: string; userCode: string }
+  | { type: "registration"; clientId: string };
 
 export type LlmSignInResult = {
   provider: string;
@@ -78,6 +84,85 @@ export const signInLlmOAuth = async (
   } finally {
     if (activeSignIns.get(loginId) === controller) activeSignIns.delete(loginId);
   }
+};
+
+const loadChatGptSignIn = () => import("../../kernel/integrations/chatgpt-sign-in.js");
+
+/** Sign in to a ChatGPT account on this computer (Sign in with ChatGPT). */
+export const signInChatGpt = async (
+  request:
+    | {
+        loginId?: unknown;
+        hostId?: unknown;
+        saved?: unknown;
+        reconsent?: unknown;
+      }
+    | null
+    | undefined,
+  notify: (notice: LlmSignInNotice) => Promise<void>,
+): Promise<ChatGptRegistration> => {
+  const loginId = typeof request?.loginId === "string" ? request.loginId : "";
+  const hostId = typeof request?.hostId === "string" ? request.hostId : "";
+  if (!loginId || !hostId) throw new Error("A sign-in id and host id are required.");
+  const saved =
+    request?.saved && typeof request.saved === "object"
+      ? (request.saved as ChatGptSavedRegistration)
+      : undefined;
+  const { loginChatGpt } = await loadChatGptSignIn();
+  activeSignIns.get(loginId)?.abort();
+  const controller = new AbortController();
+  activeSignIns.set(loginId, controller);
+  try {
+    return await loginChatGpt({
+      hostId,
+      ...(saved ? { saved } : {}),
+      reconsent: request?.reconsent === true,
+      openUrl: (url) => void notify({ type: "auth_url", url }),
+      onRegistration: (clientId) => notify({ type: "registration", clientId }),
+      signal: controller.signal,
+    });
+  } finally {
+    if (activeSignIns.get(loginId) === controller) activeSignIns.delete(loginId);
+  }
+};
+
+const chatGptListeners = new Map<string, ChatGptLoopback>();
+
+/**
+ * The loopback page ChatGPT redirects to, for the cloud connect, whose other
+ * steps go through Stella's backend from main: open it, wait for the callback,
+ * close it.
+ */
+export const openChatGptCallbackListener = async (
+  request: { listenerId?: unknown } | null | undefined,
+): Promise<{ port: number; redirectUri: string }> => {
+  const listenerId = typeof request?.listenerId === "string" ? request.listenerId : "";
+  if (!listenerId) throw new Error("A listener id is required.");
+  chatGptListeners.get(listenerId)?.close();
+  const { listenForChatGptCallback } = await loadChatGptSignIn();
+  const listener = await listenForChatGptCallback();
+  chatGptListeners.set(listenerId, listener);
+  return { port: listener.port, redirectUri: listener.redirectUri };
+};
+
+export const waitForChatGptCallback = async (
+  request: { listenerId?: unknown; state?: unknown } | null | undefined,
+): Promise<string> => {
+  const listener = chatGptListeners.get(
+    typeof request?.listenerId === "string" ? request.listenerId : "",
+  );
+  if (!listener) throw new Error("ChatGPT sign-in was canceled.");
+  return await listener.waitForCallback(typeof request?.state === "string" ? request.state : "");
+};
+
+export const closeChatGptCallbackListener = (
+  request: { listenerId?: unknown } | null | undefined,
+): { closed: boolean } => {
+  const listenerId = typeof request?.listenerId === "string" ? request.listenerId : "";
+  const listener = chatGptListeners.get(listenerId);
+  chatGptListeners.delete(listenerId);
+  listener?.close();
+  return { closed: Boolean(listener) };
 };
 
 export const cancelLlmOAuthSignIn = (

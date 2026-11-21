@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BackendClient,
   type TokenProvider,
@@ -6,7 +7,7 @@ import type {
   ClaudeLocalLogin,
   EngineSettings,
 } from "@stella/contracts/backend/engines";
-import { listenForChatGptCallback } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
+import { callRuntimeAppService } from "./runtime-app-services.js";
 
 export type EngineAccountAccessOptions = {
   getBackendUrl: () => string | null;
@@ -111,7 +112,19 @@ export class EngineAccountAccess {
     this.chatGptConnect = controller;
     const client = this.ensureClient();
     if (!client || !this.subject) throw new Error("Sign in to Stella first.");
-    const listener = await listenForChatGptCallback({ signal: controller.signal });
+    // The loopback page ChatGPT redirects to runs in the runtime; the
+    // connect itself goes through Stella's backend from here.
+    const listenerId = randomUUID();
+    const closeListener = () =>
+      void callRuntimeAppService("closeChatGptCallbackListener", { listenerId }).catch(
+        () => undefined,
+      );
+    const listener = await callRuntimeAppService<{ port: number; redirectUri: string }>(
+      "openChatGptCallbackListener",
+      { listenerId },
+    );
+    controller.signal.addEventListener("abort", closeListener, { once: true });
+    if (controller.signal.aborted) closeListener();
     let connectId: string | null = null;
     try {
       const started = await client.call("engines.startConnect", {
@@ -127,7 +140,10 @@ export class EngineAccountAccess {
         throw new Error("ChatGPT sign-in couldn't start. Try again.");
       }
       openUrl(started.authorizeUrl);
-      const callbackUrl = await listener.waitForCallback(state);
+      const callbackUrl = await callRuntimeAppService<string>("waitForChatGptCallback", {
+        listenerId,
+        state,
+      });
       const result = await client.call("engines.finishConnect", {
         connectId,
         pastedInput: callbackUrl,
@@ -135,7 +151,8 @@ export class EngineAccountAccess {
       connectId = null;
       return result;
     } finally {
-      listener.close();
+      controller.signal.removeEventListener("abort", closeListener);
+      closeListener();
       const unfinished = connectId;
       if (unfinished) {
         client.call("engines.cancelConnect", { connectId: unfinished }).catch(() => undefined);

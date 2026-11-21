@@ -23,7 +23,6 @@ import { getPromptPresetSelection, setPromptPresetSelection, } from "@stella/run
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
 import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchSignInProgress, } from "../services/runtime-app-services.js";
-import { loginChatGpt } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
 import {
@@ -1286,39 +1285,51 @@ export const registerSystemHandlers = (options) => {
         const shared = !profileId && sharedClientId
             ? { clientId: sharedClientId, email: options.engineAccountAccess.chatGptRegistration(sharedClientId)?.email }
             : null;
-        activeChatGptSignIn?.abort();
-        const controller = new AbortController();
-        activeChatGptSignIn = controller;
-        const abortOnSenderDestroyed = () => controller.abort();
-        event.sender.once("destroyed", abortOnSenderDestroyed);
+        // The runtime runs the sign-in and its loopback page; main opens the
+        // page it names and records the profile, which needs the keychain.
+        if (activeChatGptSignIn) {
+            void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId: activeChatGptSignIn }).catch(() => undefined);
+        }
+        const loginId = randomUUID();
+        activeChatGptSignIn = loginId;
+        const cancel = () => {
+            void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId }).catch(() => undefined);
+        };
+        event.sender.once("destroyed", cancel);
+        const stopWatching = watchSignInProgress(loginId, (notice) => {
+            if (notice.type === "auth_url") {
+                void shell.openExternal(notice.url);
+            }
+            else if (notice.type === "registration") {
+                beginChatGptRegistration(dir, notice.clientId);
+                chatGptProfilesChanged();
+            }
+        });
         try {
-            const registration = await loginChatGpt({
+            const saved = profileId
+                ? savedChatGptRegistration(dir, profileId)
+                : shared
+                    ? { clientId: shared.clientId, ...(shared.email ? { email: shared.email } : {}) }
+                    : undefined;
+            const registration = await callRuntimeAppService("signInChatGpt", {
+                loginId,
                 hostId: getChatGptHostId(dir),
-                ...(profileId
-                    ? { saved: savedChatGptRegistration(dir, profileId) }
-                    : shared
-                        ? { saved: { clientId: shared.clientId, ...(shared.email ? { email: shared.email } : {}) } }
-                        : {}),
+                ...(saved ? { saved } : {}),
                 reconsent: payload?.enablePlanUsage === true,
-                openUrl: (url) => void shell.openExternal(url),
-                onRegistration: (clientId) => {
-                    beginChatGptRegistration(dir, clientId);
-                    chatGptProfilesChanged();
-                },
-                signal: controller.signal,
             });
-            const saved = saveChatGptRegistration(dir, registration);
+            const savedProfile = saveChatGptRegistration(dir, registration);
             chatGptProfilesChanged();
             void options.engineAccountAccess.shareChatGptRegistration({
                 clientId: registration.clientId,
                 ...(registration.email ? { email: registration.email } : {}),
                 ...(registration.name ? { name: registration.name } : {}),
             });
-            return saved;
+            return savedProfile;
         }
         finally {
-            event.sender.removeListener("destroyed", abortOnSenderDestroyed);
-            if (activeChatGptSignIn === controller) {
+            stopWatching();
+            event.sender.removeListener("destroyed", cancel);
+            if (activeChatGptSignIn === loginId) {
                 activeChatGptSignIn = null;
             }
         }
@@ -1326,8 +1337,11 @@ export const registerSystemHandlers = (options) => {
     handleIpc(IPC_CHATGPT_CANCEL_SIGN_IN, (event) => {
         guardChatGpt(event, IPC_CHATGPT_CANCEL_SIGN_IN);
         const current = activeChatGptSignIn;
-        current?.abort();
-        return { canceled: Boolean(current) };
+        if (!current)
+            return { canceled: false };
+        activeChatGptSignIn = null;
+        void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId: current }).catch(() => undefined);
+        return { canceled: true };
     });
     handleIpc(IPC_CHATGPT_SET_ACTIVE, (event, payload) => {
         guardChatGpt(event, IPC_CHATGPT_SET_ACTIVE);

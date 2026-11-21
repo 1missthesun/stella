@@ -10,6 +10,10 @@ export const RUNTIME_APP_SERVICE_CALLS = [
   "resolveLlmOAuthApiKey",
   "listChatGptCatalogModels",
   "listClaudeCodeModels",
+  "signInChatGpt",
+  "openChatGptCallbackListener",
+  "waitForChatGptCallback",
+  "closeChatGptCallbackListener",
 ] as const;
 
 export type RuntimeAppServiceCall = (typeof RUNTIME_APP_SERVICE_CALLS)[number];

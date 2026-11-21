@@ -1,8 +1,7 @@
 import { randomUUID } from "crypto";
 import { BrowserWindow, shell } from "electron";
-import { enableNativeConnector, getNativeConnectorTools, } from "@stella/runtime/kernel/connectors/native-integrations";
 import { STELLA_BROWSER_EXTENSION_ID } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
-import { ensureNativeCredential, loadConfiguredOAuthProviders, resolveDesktopNativeConnectorEntry, } from "../ipc/native-integration-handlers.js";
+import { runIntegrationFlow } from "./integration-flows.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 import {
   IPC_CONNECTOR_CONNECT_REQUEST,
@@ -15,27 +14,6 @@ const BROWSER_EXTENSION_WEB_STORE_URL = `https://chromewebstore.google.com/detai
 const EXTENSION_POLL_INTERVAL_MS = 2_000;
 const EXTENSION_FLOW_TIMEOUT_MS = 4 * 60 * 1000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const isCanonicalConnectorConnectable = (entry) => Boolean(entry &&
-    entry.connectable &&
-    getNativeConnectorTools(entry).length > 0 &&
-    (entry.provider === "backend-composio" ||
-        entry.localExecution === "production-ready"));
-const connectorIdentityFingerprint = (target) => {
-    const { entry, catalog } = target;
-    return JSON.stringify({
-        id: entry.id,
-        catalogSource: catalog.sources[entry.id] ?? catalog.source,
-        provider: entry.provider,
-        backendToolkit: entry.backendConnector?.toolkit ?? null,
-        localExecution: entry.localExecution ?? null,
-        toolPrefix: entry.toolPrefix ?? null,
-        tools: getNativeConnectorTools(entry).map((tool) => tool.name),
-        connectable: entry.connectable,
-        auth: [...entry.auth],
-        catalogToolCount: entry.catalogToolCount,
-        oauthConfig: entry.oauthConfig ?? null,
-    });
-};
 export class ConnectorConnectService {
     options;
     pending = new PendingRequestStore();
@@ -48,14 +26,16 @@ export class ConnectorConnectService {
         if (!stellaAppDir) {
             return { ok: false, reason: "unsupported" };
         }
-        const target = await resolveDesktopNativeConnectorEntry({
+        // The runtime checks the connector can be connected and fingerprints
+        // it, so the accepted card connects the same connector.
+        const offer = await runIntegrationFlow("describeConnectorOffer", {
             getAuthToken: this.options.getAuthToken,
             getBackendUrl: this.options.getBackendUrl,
-        }, stellaAppDir, payload.id.trim().toLowerCase());
-        const { entry } = target;
-        if (!isCanonicalConnectorConnectable(entry)) {
+        }, { id: payload.id.trim().toLowerCase() });
+        if (!offer?.ok) {
             return { ok: false, reason: "connector_unavailable" };
         }
+        const { entry } = offer;
         const windowManager = this.options.windowManagerTarget.getWindowManager();
         const fullWindow = windowManager?.getFullWindow() ?? null;
         const targetWindows = fullWindow
@@ -72,10 +52,7 @@ export class ConnectorConnectService {
             state: "pending",
             ...(payload.offerId ? { offerId: payload.offerId } : {}),
             ...(payload.addAccount === true ? { addAccount: true } : {}),
-            canonicalFingerprint: connectorIdentityFingerprint({
-                catalog: target.catalog,
-                entry: entry,
-            }),
+            canonicalFingerprint: offer.fingerprint,
             oauthAbort: new AbortController(),
             windows: targetWindows,
         });
@@ -256,23 +233,12 @@ export class ConnectorConnectService {
             requestDeviceOAuth: (payload) => credentialService.requestDeviceOAuth(payload),
         };
         try {
-            const target = await resolveDesktopNativeConnectorEntry(flowOptions, stellaAppDir, meta.id);
-            const { catalog, entry } = target;
-            if (!isCanonicalConnectorConnectable(entry)) {
-                throw new Error(`${meta.name} is no longer available through an executable Store integration.`);
-            }
-            const acceptedTarget = { catalog, entry: entry };
-            if (!meta.canonicalFingerprint ||
-                connectorIdentityFingerprint(acceptedTarget) !==
-                    meta.canonicalFingerprint) {
-                throw new Error(`${meta.name} connector changed while the card was open. Retry the connection.`);
-            }
-            await ensureNativeCredential(flowOptions, stellaAppDir, entry.id, acceptedTarget, { addAccount: meta.addAccount === true });
-            const configuredOAuthProviders = await loadConfiguredOAuthProviders(flowOptions);
-            await enableNativeConnector(stellaAppDir, entry.id, "store", {
-                configuredBackendProviders: configuredOAuthProviders.backend,
-                configuredExternalCallbackProviders: configuredOAuthProviders.externalCallback,
-            }, catalog.entries);
+            await runIntegrationFlow("connectConnectorOffer", flowOptions, {
+                id: meta.id,
+                name: meta.name,
+                fingerprint: meta.canonicalFingerprint,
+                addAccount: meta.addAccount === true,
+            }, meta.oauthAbort.signal);
             this.settle(requestId, { ok: true, status: "connected" }, "connected");
         }
         catch (error) {

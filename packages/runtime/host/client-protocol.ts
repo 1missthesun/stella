@@ -22,6 +22,18 @@ export const RUNTIME_APP_SERVICE_CALLS = [
   "readRuntimePrompt",
   "resetCustomizations",
   "readSkillFrontmatter",
+  "listNativeIntegrations",
+  "enableNativeIntegration",
+  "disableNativeIntegration",
+  "addNativeIntegrationAccount",
+  "setPrimaryNativeIntegrationAccount",
+  "removeNativeIntegrationAccount",
+  "describeConnectorOffer",
+  "connectConnectorOffer",
+  "cancelIntegrationFlow",
+  "beginConnectorDeviceOAuth",
+  "runConnectorOAuthFlow",
+  "cancelConnectorOAuthFlow",
 ] as const;
 
 export type RuntimeAppServiceCall = (typeof RUNTIME_APP_SERVICE_CALLS)[number];
@@ -102,6 +114,8 @@ export const RUNTIME_HOST_HANDLERS = [
   "showWindow",
   "focusWindow",
   "signInProgress",
+  "requestConnectorSignIn",
+  "waitForConnectorOAuthCallback",
 ] as const;
 
 export type RuntimeHostHandler = (typeof RUNTIME_HOST_HANDLERS)[number];

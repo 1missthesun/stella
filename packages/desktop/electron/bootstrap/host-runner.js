@@ -12,6 +12,7 @@ import { showStellaNotification } from "../services/notification-service.js";
 import { serveDeviceRequest } from "../services/device-request-service.js";
 import { requestMacPermission } from "../utils/macos-permissions.js";
 import { getMainLogger } from "../observability/main-logger.js";
+import { deliverConnectorSignIn } from "../services/integration-flows.js";
 import { deliverSignInProgress, resolveLlmOAuthApiKeyInRuntime, } from "../services/runtime-app-services.js";
 import { getLocalLlmCredential, listLocalLlmCredentials, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
@@ -304,6 +305,8 @@ export const createHostRunnerHandlers = (context, options) => ({
     signInProgress: async (payload) => {
         deliverSignInProgress(payload);
     },
+    requestConnectorSignIn: (request) => deliverConnectorSignIn(request),
+    waitForConnectorOAuthCallback: (request) => context.services.connectorCredentialService.waitForRuntimeOAuthCallback(request),
 });
 const clearHostRunnerSubscriptions = (context) => {
     const { state } = context;

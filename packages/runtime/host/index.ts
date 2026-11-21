@@ -272,7 +272,7 @@ export class StellaRuntimeHost {
     // host methods of the same names, which the client server dispatches to.
     for (const [name, call] of Object.entries(appServiceCalls)) {
       (this as unknown as Record<string, unknown>)[name] = (...args: unknown[]) =>
-        call(this.options, ...args);
+        call({ ...this.options, host: this as never }, ...args);
     }
     this.workerMode = this.options.workerMode === "inproc" ? "inproc" : "child";
     const onWorkerRpcError = (error: unknown) => {

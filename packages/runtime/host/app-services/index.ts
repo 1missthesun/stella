@@ -13,6 +13,12 @@ import {
   signInLlmOAuth,
   type LlmSignInNotice,
 } from "./llm-sign-in.js";
+import { integrationCalls } from "./integration-calls.js";
+import {
+  beginConnectorDeviceOAuthForApp,
+  cancelConnectorOAuthFlowForApp,
+  runConnectorOAuthFlowForApp,
+} from "./connector-oauth-flows.js";
 import {
   deletePromptPresetForApp,
   listPromptPresetsForApp,
@@ -27,7 +33,10 @@ import {
 export type AppServiceContext = Pick<
   StellaRuntimeHostOptions,
   "hostHandlers" | "initializeParams"
->;
+> & {
+  /** The host's own calls (e.g. googleWorkspaceDisconnect), for services that use them. */
+  host?: { googleWorkspaceDisconnect?: () => Promise<unknown> };
+};
 
 const dataDir = (context: AppServiceContext) => context.initializeParams.stellaDataDirPath;
 
@@ -85,4 +94,8 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
   resetCustomizations: (context) =>
     resetCustomizationsForApp(context.initializeParams.stellaAppDir, dataDir(context)),
   readSkillFrontmatter: (_context, request) => readSkillFrontmatter(request),
+  ...integrationCalls,
+  beginConnectorDeviceOAuth: (_context, request) => beginConnectorDeviceOAuthForApp(request),
+  runConnectorOAuthFlow: (context, request) => runConnectorOAuthFlowForApp(context, request),
+  cancelConnectorOAuthFlow: (_context, request) => cancelConnectorOAuthFlowForApp(request),
 };

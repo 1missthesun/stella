@@ -76,6 +76,8 @@ export const setConnectorTokenStoreBroker = (
   tokenStoreBroker = broker;
 };
 
+export const hasConnectorTokenStoreBroker = (): boolean => tokenStoreBroker !== null;
+
 type OAuthProviderErrorLike = Error & {
   providerError?: string;
   providerErrorDescription?: string;

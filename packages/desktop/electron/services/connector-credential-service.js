@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { shell } from "electron";
-import { beginConnectorDeviceOAuth, completeConnectorDeviceOAuth, connectConnectorOAuth, connectPreregisteredConnectorOAuth, saveConnectorAccessToken, } from "@stella/runtime/kernel/connectors/oauth";
+import { saveConnectorAccessToken, } from "@stella/runtime/kernel/connectors/oauth";
+import { callRuntimeAppService, watchSignInProgress, } from "./runtime-app-services.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 const callerOf = (payload) => ({
@@ -72,11 +73,10 @@ export class ConnectorCredentialService {
             return { ok: false, reason: "unsupported" };
         }
         const oauthAbort = new AbortController();
-        const authorization = await beginConnectorDeviceOAuth({
+        const authorization = await callRuntimeAppService("beginConnectorDeviceOAuth", {
             clientId: payload.clientId,
             deviceAuthorizationEndpoint: payload.deviceAuthorizationEndpoint,
             scopes: payload.scopes,
-            signal: oauthAbort.signal,
         });
         const verificationUri = authorization.verification_uri_complete ||
             authorization.verification_uri ||
@@ -474,20 +474,49 @@ export class ConnectorCredentialService {
         });
         return true;
     }
+    // The flow runs in the runtime. Main opens the page it names, answers a
+    // callback that came back through a stella:// link, and cancels it when
+    // the request is withdrawn.
+    runtimeOAuthFlows = new Map();
+    waitForRuntimeOAuthCallback = async (request) => {
+        const signal = this.runtimeOAuthFlows.get(request?.flowId);
+        if (!signal)
+            throw new Error("Connector authorization cancelled.");
+        const { waitForCallback, waitForCode } = await this.waitForExternalOAuthCallback({
+            state: request.state,
+            redirectUri: request.redirectUri,
+            callbackId: request.callbackId,
+            signal,
+        });
+        // The runtime reads the code from the callback itself.
+        void waitForCode.catch(() => undefined);
+        return await waitForCallback;
+    };
     async runOauthFlow(args) {
+        const flowId = randomUUID();
+        this.runtimeOAuthFlows.set(flowId, args.signal);
+        const stopWatching = watchSignInProgress(flowId, (notice) => {
+            if (notice.type === "auth_url")
+                void shell.openExternal(notice.url);
+        });
+        const cancel = () => {
+            void callRuntimeAppService("cancelConnectorOAuthFlow", { flowId }).catch(() => undefined);
+        };
+        args.signal.addEventListener("abort", cancel, { once: true });
         try {
             if (args.type === "device") {
                 const verificationUri = args.verificationUri || args.authorization?.verification_uri;
                 if (verificationUri)
                     await shell.openExternal(verificationUri);
-                await completeConnectorDeviceOAuth(args.stellaAppDir, {
+                await callRuntimeAppService("runConnectorOAuthFlow", {
+                    flowId,
+                    type: "device",
                     tokenKey: args.tokenKey,
                     clientId: args.clientId,
                     tokenEndpoint: args.tokenEndpoint,
                     authorization: args.authorization,
                     resourceUrl: args.resourceUrl,
                     scopes: args.scopes,
-                    signal: args.signal,
                 });
             }
             else if (args.type === "preregistered") {
@@ -501,7 +530,9 @@ export class ConnectorCredentialService {
                     !backendTokenExchangeEndpoint) {
                     throw new Error("Stella backend OAuth exchange is unavailable.");
                 }
-                await connectPreregisteredConnectorOAuth(args.stellaAppDir, {
+                await callRuntimeAppService("runConnectorOAuthFlow", {
+                    flowId,
+                    type: "preregistered",
                     tokenKey: args.tokenKey,
                     clientId: args.clientId,
                     authorizationEndpoint: args.authorizationEndpoint,
@@ -511,9 +542,7 @@ export class ConnectorCredentialService {
                     oauthResource: args.oauthResource,
                     callbackUrl: args.callbackUrl,
                     callbackId: args.callbackId,
-                    callbackWaiter: args.callbackMode === "external"
-                        ? this.waitForExternalOAuthCallback
-                        : undefined,
+                    callbackMode: args.callbackMode,
                     scopes: args.scopes,
                     scopeSeparator: args.scopeSeparator,
                     usesPkce: args.usesPkce,
@@ -530,20 +559,18 @@ export class ConnectorCredentialService {
                             authToken: backendAuthToken,
                         }
                         : undefined,
-                    openUrl: (url) => shell.openExternal(url),
-                    signal: args.signal,
                 });
             }
             else {
-                await connectConnectorOAuth(args.stellaAppDir, {
+                await callRuntimeAppService("runConnectorOAuthFlow", {
+                    flowId,
+                    type: "dynamic",
                     tokenKey: args.tokenKey,
                     resourceUrl: args.resourceUrl,
                     oauthClientId: args.oauthClientId,
                     oauthResource: args.oauthResource ?? undefined,
                     callbackId: args.callbackId,
                     scopes: args.scopes,
-                    openUrl: (url) => shell.openExternal(url),
-                    signal: args.signal,
                 });
             }
             this.finish(args.requestId, { ok: true });
@@ -554,6 +581,11 @@ export class ConnectorCredentialService {
             const message = error instanceof Error ? error.message : "OAuth connection failed.";
             const reason = args.signal.aborted ? "cancelled" : message;
             this.finish(args.requestId, { ok: false, reason });
+        }
+        finally {
+            args.signal.removeEventListener("abort", cancel);
+            stopWatching();
+            this.runtimeOAuthFlows.delete(flowId);
         }
     }
     cancelAll() {

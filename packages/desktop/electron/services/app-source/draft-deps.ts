@@ -78,16 +78,23 @@ export const dependencyFingerprint = (root: string): string => {
 };
 
 /**
- * Package sets live in the app checkout's git folder: never part of a
- * worktree, so removing a draft can't reach them, and kept with the install
- * they serve. Short names: Windows paths into bun's store are already long.
+ * Package sets live beside the install they serve, never inside a worktree,
+ * so removing a draft can't reach them. On Windows they sit right next to
+ * the app with short names: bun's store paths are already long, and a set
+ * inside the app's git folder pushed some past 260 characters. Elsewhere,
+ * and for a developer checkout, in the app's git folder.
  */
 export const packageSetsDir = (appRoot: string) => {
+  const parent = path.dirname(path.resolve(appRoot));
+  const launcherInstall = ["launcher-state.json", "launcher.lock"].some((name) => fs.existsSync(path.join(parent, name)));
+  if (process.platform === "win32" && launcherInstall) return path.join(parent, "pkgs");
   const gitDir = path.join(appRoot, ".git");
   return lstat(gitDir)?.isDirectory()
     ? path.join(gitDir, "stella-packages")
     : path.join(os.homedir(), ".stella", "cache", "stella-packages");
 };
+
+const setName = (fingerprint: string) => fingerprint.slice(0, process.platform === "win32" ? 8 : 12);
 
 const READY = ".stella-ready";
 
@@ -191,7 +198,7 @@ export const ensurePackageSet = async (options: {
 }): Promise<{ store: string; built: boolean }> => {
   const fingerprint = dependencyFingerprint(options.source);
   const sets = packageSetsDir(options.appRoot);
-  const store = path.join(sets, fingerprint.slice(0, 12));
+  const store = path.join(sets, setName(fingerprint));
   const ready = () => {
     try {
       return fs.readFileSync(path.join(store, READY), "utf8").trim() === fingerprint && intact(store);
@@ -295,7 +302,7 @@ export const removeUnusedPackageSets = async (appRoot: string, keep: string[]) =
   } catch {
     return;
   }
-  const kept = new Set([dependencyFingerprint(appRoot), ...keep].map((fingerprint) => fingerprint.slice(0, 12)));
+  const kept = new Set([dependencyFingerprint(appRoot), ...keep].map(setName));
   for (const name of names) {
     if (name.endsWith(".lock") || kept.has(name)) continue;
     if (fs.existsSync(path.join(sets, `${name}.lock`))) continue;

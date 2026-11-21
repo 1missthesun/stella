@@ -1,4 +1,4 @@
-import type { OwnerFenceClient } from "../owner-fence-client.js";
+import { ownerFenceClient, type OwnerFenceClient } from "../owner-fence-client.js";
 import type { ExecutionSession } from "../sandbox-client.js";
 import type {
   TurnBrokerTurnStateCheckpointReceipt,
@@ -63,7 +63,6 @@ import {
   assertAgentExecutionActive,
   assertAgentTurnIdentity,
   assertTurnWritable,
-  callOwnerFence,
   callOwnerTurnState,
   cleanupOwnerPurgedTurnStorage,
   cleanupTransientWrites,
@@ -433,7 +432,7 @@ export const createBuildSessionHost = (
     trackTurn: <T,>(turnId: string, work: Promise<T>) =>
       trackTurn(host, turnId, work),
     startAgentTurn: bound(startAgentTurn),
-    callOwnerFence: bound(callOwnerFence),
+    ownerFence: (ownerId: string) => ownerFenceClient(env.OWNER_GATES, ownerId),
     callOwnerTurnState: <T,>(
       turn: TurnRequest,
       path: Parameters<BuildSessionInternals["callOwnerTurnState"]>[1],

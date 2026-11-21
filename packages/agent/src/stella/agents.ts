@@ -516,6 +516,9 @@ const markStopped = async (
 
 const wasStopped = (agent: AgentRecord): boolean => agent.stopped === true || agent.paused === true;
 
+/** It runs on another host now: started there, or moved itself there. Its record there says how it stands. */
+const runsElsewhere = (agent: AgentRecord): boolean => agent.remote === true || agent.away === true;
+
 const messageText = (message: { content?: unknown } | undefined): string =>
   typeof message?.content === "string"
     ? message.content
@@ -721,6 +724,7 @@ const wakeWaitingStarter = async (
   read: BusyReader,
   starter: StellaAgentRole,
   helperThreadId: string,
+  elsewhereAtWork: (helpers: ReadonlyArray<[string, AgentRecord]>) => Promise<boolean>,
   wake: (to: { threadId: string; conversationId: ConversationId; home: ConversationId }, message: string) => Promise<void>,
   context: Context,
 ): Promise<void> => {
@@ -732,9 +736,8 @@ const wakeWaitingStarter = async (
   const record = (await runtime.snapshot(StellaAgentsDoc, home, context))?.agents[starter.threadId];
   if (!record?.waiting || wasStopped(record)) return;
   const others = Object.entries((await read.agents(own))?.agents ?? {}).filter(([threadId]) => threadId !== helperThreadId);
-  // A helper elsewhere may still be at work; only a stopped one is known not to be.
-  if (others.some(([, agent]) => agent.remote && !wasStopped(agent))) return;
-  const helpers = others.filter(([, agent]) => !agent.remote && agent.conversationId >= 0);
+  if (await elsewhereAtWork(others.filter(([, agent]) => runsElsewhere(agent) && !wasStopped(agent)))) return;
+  const helpers = others.filter(([, agent]) => !runsElsewhere(agent) && agent.conversationId >= 0);
   const carrying = new Set((await read.reporters(own)).map((reporter) => reporter.input.threadId));
   for (const [threadId, agent] of helpers) {
     const id = agent.conversationId as ConversationId;
@@ -1343,6 +1346,10 @@ export function stellaAgents(host: StellaAgentsHost) {
             },
             self,
             reporter.input.threadId,
+            async (helpers) =>
+              (await helpersElsewhere(await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context), helpers, context)).some(
+                (helper) => helper.atWork,
+              ),
             async (to, message) => {
               await runtime.commit(async (tx) => {
                 await tx.createTask(
@@ -2139,6 +2146,37 @@ export function stellaAgents(host: StellaAgentsHost) {
     const placement = placementOf(agent.placement);
     if (!placement) return undefined;
     return host.remote?.(placement);
+  };
+
+  /**
+   * How helpers that run on other hosts stand, as their records in the cloud
+   * say. Only when those can't be read now (offline) does what this chat last
+   * heard of them stand in: a helper started elsewhere counts as at work until
+   * its report or stop came back here, one that moved itself away as at work.
+   */
+  const helpersElsewhere = async (
+    state: Readonly<StellaAgents> | undefined,
+    helpers: ReadonlyArray<[string, AgentRecord]>,
+    context: Context,
+  ): Promise<Array<{ threadId: string; record: AgentRecord; atWork: boolean; waitingFor?: string }>> => {
+    if (helpers.length === 0) return [];
+    const listed = await host.directory
+      ?.list(context, { threadIds: helpers.map(([threadId]) => threadId).slice(0, DIRECTORY_THREAD_IDS_MAX) })
+      .catch(() => undefined);
+    const rows = listed && !listed.unavailable ? new Map(listed.agents.map((row) => [row.threadId, row])) : undefined;
+    return helpers.map(([threadId, record]) => {
+      const row = rows?.get(threadId);
+      if (row) {
+        return {
+          threadId,
+          record,
+          atWork: isLiveAgentStatus(row.status) && row.status !== "waiting",
+          ...(row.status === "waiting" && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
+        };
+      }
+      const lastHeard = record.remote && state ? remoteRunOf(record, callsFor(state as StellaAgents, threadId)) : undefined;
+      return { threadId, record, atWork: lastHeard ? lastHeard.phase !== "settled" : true };
+    });
   };
 
   const computerOf = async (
@@ -3308,16 +3346,17 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (role.agentType === "orchestrator" || !role.threadId) return undefined;
     const found: string[] = [];
     const read = busyReader(store, context);
-    const helpers = await read.agents(agentConversationId);
+    const helpers = await store.snapshot(StellaAgentsDoc, agentConversationId, context);
     const carrying = new Set((await read.reporters(agentConversationId)).map((reporter) => reporter.input.threadId));
-    for (const [threadId, agent] of Object.entries(helpers?.agents ?? {})) {
-      if (wasStopped(agent)) continue;
-      const name = `your helper "${agent.description.replace(/\s+/g, " ").trim().slice(0, 80)}"`;
-      if (agent.remote) {
-        if (helpers && remoteRunOf(agent, callsFor(helpers as StellaAgents, threadId)).phase === "running") found.push(`${name} at work elsewhere`);
-        continue;
-      }
-      if (agent.conversationId < 0) continue;
+    const named = (agent: AgentRecord) => `your helper "${agent.description.replace(/\s+/g, " ").trim().slice(0, 80)}"`;
+    const working = Object.entries(helpers?.agents ?? {}).filter(([, agent]) => !wasStopped(agent));
+    for (const helper of await helpersElsewhere(helpers, working.filter(([, agent]) => runsElsewhere(agent)), context)) {
+      if (helper.atWork) found.push(`${named(helper.record)} at work elsewhere`);
+      else if (helper.waitingFor) found.push(`${named(helper.record)}, itself waiting for ${helper.waitingFor}`);
+    }
+    for (const [threadId, agent] of working) {
+      const name = named(agent);
+      if (runsElsewhere(agent) || agent.conversationId < 0) continue;
       const id = agent.conversationId as ConversationId;
       if (carrying.has(threadId) || (await read.running(id)) || (await agentsBusy(read, id, 1))) found.push(`${name} at work`);
       else if (agent.waiting) found.push(`${name}, itself waiting for ${agent.waiting.waitingFor}`);

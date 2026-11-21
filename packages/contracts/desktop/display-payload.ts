@@ -1,6 +1,14 @@
-import { z } from "zod";
 import type { OfficePreviewRef } from "@stella/contracts/office-preview";
-import { officePreviewRefSchema } from "@stella/contracts/office-preview";
+import { isOfficePreviewRef } from "@stella/contracts/office-preview";
+import {
+  hasFields,
+  isArrayOf,
+  isBoolean,
+  isFiniteNumber,
+  isOneOf,
+  isOptional,
+  isString,
+} from "@stella/contracts/value-guards";
 
 export type DisplayFileArtifactKind =
   | "office-document"
@@ -87,83 +95,77 @@ export type MediaAsset =
   | { kind: "download"; filePath: string; label: string }
   | { kind: "text"; text: string };
 
-const httpUrlSchema = z.string().refine((value) => {
+const isHttpUrl = (value: unknown): boolean => {
+  if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
-});
-
-const anyNumber = z.custom<number>((value) => typeof value === "number");
-
-const mediaAssetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("image"), filePaths: z.array(z.string()) }),
-  z.object({ kind: z.literal("video"), filePath: z.string() }),
-  z.object({ kind: z.literal("audio"), filePath: z.string() }),
-  z.object({ kind: z.literal("model3d"), filePath: z.string() }),
-  z.object({ kind: z.literal("download"), filePath: z.string() }),
-  z.object({ kind: z.literal("text"), text: z.string() }),
-]);
-
-const markdownLikeShape = {
-  filePath: z.string(),
-  title: z.string().optional(),
-  patch: z.string().optional(),
-  createdAt: z.number().optional(),
 };
 
-const displayPayloadSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("canvas-html"),
-    filePath: z.string(),
-    createdAt: z.number(),
-    title: z.string().optional(),
-    slug: z.string().optional(),
-    driveBacked: z.boolean().optional(),
-  }),
-  z.object({
-    kind: z.literal("url"),
-    url: httpUrlSchema,
-    title: z.string(),
-    tabId: z.string(),
-  }),
-  z.object({ kind: z.literal("office"), previewRef: officePreviewRefSchema }),
-  z.object({ kind: z.literal("markdown"), ...markdownLikeShape }),
-  z.object({ kind: z.literal("source-diff"), ...markdownLikeShape }),
-  z.object({
-    kind: z.literal("file-artifact"),
-    filePath: z.string(),
-    artifactKind: z.enum([
+// Media timestamps accept any number, NaN and Infinity included, as before.
+const isAnyNumber = (value: unknown): boolean => typeof value === "number";
+const isOptionalString = isOptional(isString);
+const isOptionalNumber = isOptional(isFiniteNumber);
+
+const MEDIA_ASSET_FIELDS: Record<MediaAsset["kind"], Record<string, (value: unknown) => boolean>> = {
+  image: { filePaths: isArrayOf(isString) },
+  video: { filePath: isString },
+  audio: { filePath: isString },
+  model3d: { filePath: isString },
+  download: { filePath: isString },
+  text: { text: isString },
+};
+
+const isMediaAsset = (value: unknown): boolean =>
+  hasFields(value, { kind: isString }) &&
+  Object.prototype.hasOwnProperty.call(MEDIA_ASSET_FIELDS, value.kind as string) &&
+  hasFields(value, MEDIA_ASSET_FIELDS[value.kind as MediaAsset["kind"]]);
+
+const MARKDOWN_LIKE_FIELDS = {
+  filePath: isString,
+  title: isOptionalString,
+  patch: isOptionalString,
+  createdAt: isOptionalNumber,
+};
+
+const DISPLAY_PAYLOAD_FIELDS: Record<
+  DisplayPayload["kind"],
+  Record<string, (value: unknown) => boolean>
+> = {
+  "canvas-html": {
+    filePath: isString,
+    createdAt: isFiniteNumber,
+    title: isOptionalString,
+    slug: isOptionalString,
+    driveBacked: isOptional(isBoolean),
+  },
+  url: { url: isHttpUrl, title: isString, tabId: isString },
+  office: { previewRef: isOfficePreviewRef },
+  markdown: MARKDOWN_LIKE_FIELDS,
+  "source-diff": MARKDOWN_LIKE_FIELDS,
+  "file-artifact": {
+    filePath: isString,
+    artifactKind: isOneOf([
       "office-document",
       "office-spreadsheet",
       "office-slides",
       "delimited-table",
     ]),
-    createdAt: z.number().optional(),
-  }),
-  z.object({ kind: z.literal("pdf"), filePath: z.string() }),
-  z.object({
-    kind: z.literal("folder"),
-    filePath: z.string(),
-    title: z.string().optional(),
-    createdAt: z.number().optional(),
-  }),
-  z.object({
-    kind: z.literal("trash"),
-    title: z.string().optional(),
-    createdAt: z.number().optional(),
-  }),
-  z.object({
-    kind: z.literal("media"),
-    asset: mediaAssetSchema,
-    createdAt: anyNumber,
-  }),
-]);
+    createdAt: isOptionalNumber,
+  },
+  pdf: { filePath: isString },
+  folder: { filePath: isString, title: isOptionalString, createdAt: isOptionalNumber },
+  trash: { title: isOptionalString, createdAt: isOptionalNumber },
+  media: { asset: isMediaAsset, createdAt: isAnyNumber },
+};
 
 export const isDisplayPayload = (value: unknown): value is DisplayPayload =>
-  displayPayloadSchema.safeParse(value).success;
+  hasFields(value, { kind: isString }) &&
+  Object.prototype.hasOwnProperty.call(DISPLAY_PAYLOAD_FIELDS, value.kind as string) &&
+  hasFields(value, DISPLAY_PAYLOAD_FIELDS[value.kind as DisplayPayload["kind"]]);
 
 export const isDisplayTabPayload = (
   value: unknown,

@@ -1,12 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
 import { ChatApp } from "@/app/chat/App";
 
-const ChatSearch = z.object({
-  c: z.string().optional(),
-});
+type ChatSearch = { c?: string };
 
 export const Route = createFileRoute("/chat")({
-  validateSearch: ChatSearch,
+  validateSearch: (search: Record<string, unknown>): ChatSearch =>
+    typeof search.c === "string" ? { c: search.c } : {},
   component: ChatApp,
 });

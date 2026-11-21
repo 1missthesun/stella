@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
-import { SETTINGS_TAB_KEYS } from "@/global/settings/settings-tabs";
+import { SETTINGS_TAB_KEYS, type SettingsTab } from "@/global/settings/settings-tabs";
 
-const SettingsSearch = z.object({
-  tab: z.enum(SETTINGS_TAB_KEYS).optional().catch(undefined),
-});
+type SettingsSearch = { tab?: SettingsTab };
+
+const isSettingsTab = (value: unknown): value is SettingsTab =>
+  (SETTINGS_TAB_KEYS as readonly unknown[]).includes(value);
 
 export const Route = createFileRoute("/settings")({
-  validateSearch: SettingsSearch,
+  validateSearch: (search: Record<string, unknown>): SettingsSearch =>
+    isSettingsTab(search.tab) ? { tab: search.tab } : {},
 });

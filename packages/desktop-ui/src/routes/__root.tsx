@@ -20,7 +20,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { z } from "zod";
 import { ChatRuntimeProvider } from "@/context/chat-runtime";
 import { ChatMessageAlerts } from "@/features/chat-alerts/ChatMessageAlerts";
 import { FirstReplyCounter } from "@/features/anonymous-counts/FirstReplyCounter";
@@ -751,11 +750,12 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
   );
 }
 
-const RootSearch = z.object({
-  dialog: z.enum(["auth", "connect"]).optional(),
-});
+type RootSearch = { dialog?: "auth" | "connect" };
 
 export const Route = createRootRoute({
-  validateSearch: RootSearch,
+  validateSearch: (search: Record<string, unknown>): RootSearch =>
+    search.dialog === "auth" || search.dialog === "connect"
+      ? { dialog: search.dialog }
+      : {},
   component: RootLayout,
 });

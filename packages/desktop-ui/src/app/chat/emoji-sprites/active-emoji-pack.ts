@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { z } from "zod";
+import { hasFields, isArrayOf } from "@stella/contracts/value-guards";
 import { uiState } from "@/platform/ui-state";
 import { getEmojiSpriteSheetCount } from "./sprite-map";
 
@@ -15,13 +15,14 @@ export const hasCompleteEmojiSpritePack = (
 ): pack is ActiveEmojiPack =>
   (pack?.sheetUrls.length ?? 0) >= getEmojiSpriteSheetCount();
 
-const activeEmojiPackSchema = z.looseObject({
-  packId: z.string().trim().min(1),
-  sheetUrls: z.array(z.string().trim().min(1)).min(1),
-});
+const isFilledString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
 
 const isActiveEmojiPack = (value: unknown): value is ActiveEmojiPack =>
-  activeEmojiPackSchema.safeParse(value).success;
+  hasFields(value, {
+    packId: isFilledString,
+    sheetUrls: isArrayOf(isFilledString, 1),
+  });
 
 export const readActiveEmojiPack = (): ActiveEmojiPack | null => {
   try {

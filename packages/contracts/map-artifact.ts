@@ -1,4 +1,12 @@
-import { z } from "zod";
+import {
+  hasFields,
+  isArrayOf,
+  isFiniteNumber,
+  isNonEmptyString,
+  isOptional,
+  isString,
+  type UnknownRecord,
+} from "./value-guards.js";
 
 export type MapTravelMode = "driving" | "walking" | "cycling" | "transit";
 
@@ -42,29 +50,29 @@ export const MAPS_SITE_BASE_URL = "https://stella.sh";
 export const MAPS_RESOLVE_PATH = "/api/maps/resolve";
 export const MAPS_EMBED_PATH = "/maps/embed";
 
-const markerSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  lat: z.number(),
-  lng: z.number(),
-});
+const isMarker = (value: unknown): value is UnknownRecord =>
+  hasFields(value, {
+    id: isString,
+    name: isString,
+    lat: isFiniteNumber,
+    lng: isFiniteNumber,
+  });
 
-const routeSchema = z.object({
-  polyline: z.string().min(1),
-  distanceMeters: z.number(),
-  durationSeconds: z.number(),
-});
-
-const mapRouteArtifactSchema = z.object({
-  kind: z.literal("map-route"),
-  markers: z.array(markerSchema).min(1),
-  route: routeSchema.optional(),
-});
+const isRoute = (value: unknown): value is UnknownRecord =>
+  hasFields(value, {
+    polyline: isNonEmptyString,
+    distanceMeters: isFiniteNumber,
+    durationSeconds: isFiniteNumber,
+  });
 
 export const isMapRouteArtifact = (
   value: unknown,
 ): value is MapRouteArtifact =>
-  mapRouteArtifactSchema.safeParse(value).success;
+  hasFields(value, {
+    kind: (kind) => kind === "map-route",
+    markers: isArrayOf(isMarker, 1),
+    route: isOptional(isRoute),
+  });
 
 const toBase64Url = (json: string): string => {
   const bytes = new TextEncoder().encode(json);

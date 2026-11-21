@@ -1,16 +1,14 @@
-import { z } from "zod";
+import { hasFields, isString } from "./value-guards.js";
 
 export type OfficePreviewStatus = "starting" | "ready" | "error" | "stopped";
 
 export type OfficePreviewFormat = "docx" | "xlsx" | "pptx" | null;
 
-export const officePreviewRefSchema = z.object({
-  sessionId: z.string(),
-  title: z.string(),
-  sourcePath: z.string(),
-});
-
-export type OfficePreviewRef = z.infer<typeof officePreviewRefSchema>;
+export type OfficePreviewRef = {
+  sessionId: string;
+  title: string;
+  sourcePath: string;
+};
 
 export type OfficePreviewSnapshot = {
   sessionId: string;
@@ -25,4 +23,4 @@ export type OfficePreviewSnapshot = {
 };
 
 export const isOfficePreviewRef = (value: unknown): value is OfficePreviewRef =>
-  officePreviewRefSchema.safeParse(value).success;
+  hasFields(value, { sessionId: isString, title: isString, sourcePath: isString });

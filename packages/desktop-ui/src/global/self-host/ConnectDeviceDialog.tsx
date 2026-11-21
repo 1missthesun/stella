@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { Button } from "@/ui/button";
 import { Copy } from "@/ui/icons";
@@ -45,6 +44,8 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
       setState({ kind: "failed", error: result.error });
       return;
     }
+    // The QR encoder loads with the dialog rather than with every window.
+    const { default: QRCode } = await import("qrcode");
     const qr = await QRCode.toDataURL(result.link, {
       width: 400,
       margin: 1,

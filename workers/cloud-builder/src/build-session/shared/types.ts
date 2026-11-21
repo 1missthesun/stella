@@ -16,7 +16,7 @@ export type Execution = {
 };
 
 export type TurnRequest = {
-  kind?: string;
+  kind: "agent";
   ownerId: string;
   appId: string;
   turnId: string;
@@ -73,17 +73,6 @@ export type BuildOwnerFenceLeaseSlot = {
   turnId: string;
   leaseId: string;
   kind: "run" | "aux";
-};
-
-export type PendingAppBuildPublication = {
-  turnId: string;
-  phase: "callback" | "cleanup";
-  artifactPrefix: string;
-  buildId?: string;
-  callbackBody: Record<string, unknown>;
-  completionSeq: number | "auto";
-  completionResult: Record<string, unknown>;
-  failureMessage?: string;
 };
 
 export type TurnStateCheckpointOperation =

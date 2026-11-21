@@ -13,6 +13,7 @@ import {
 } from "../sandbox-lifecycle.js";
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
 import type { BuildSessionInternals } from "./host.js";
+import { retireLegacyAppTurn } from "./session-core.js";
 import { validBuilderFallbackMessages } from "./public-helpers.js";
 import {
   AgentTurnAuthorityLostError,
@@ -31,14 +32,12 @@ import {
   exactTurnIdentityMatches,
   log,
   nativeStateIntegrityKeysFor,
-  pendingAppBuildPublicationKey,
   turnStateCheckpointOperationKey,
 } from "./shared/keys.js";
 import type {
   AgentExecutionMarker,
   BuilderFallbackInput,
   BuilderFallbackTranscript,
-  PendingAppBuildPublication,
   PendingTerminal,
   TurnRequest,
   TurnStateCheckpointOperation,
@@ -62,7 +61,6 @@ export type AlarmsRecoveryHost = Pick<
   | "deleteTurnStoragePreservingExactCancellations"
   | "deliverExecutorLossTerminal"
   | "deliverTerminal"
-  | "destroySandboxDurably"
   | "ensureBuilderFallbackTranscript"
   | "exactAgentExecutionMarker"
   | "exactTurnStateCheckpointOperations"
@@ -76,11 +74,9 @@ export type AlarmsRecoveryHost = Pick<
   | "reconcileAgentCheckpointAfterQuiescence"
   | "recoverAgentTurnAfterExecutorLoss"
   | "registerTurn"
-  | "retireTerminalAppTurnStorage"
   | "runAlarm"
   | "runAlarmWithLease"
   | "setExactTurnAlarm"
-  | "settleAgentTransientBackup"
   | "settleTerminalTransientWrites"
   | "terminateCurrentAgentSession"
   | "trackTurn"
@@ -92,7 +88,11 @@ export const runScheduledTurnAlarm = async (
 ): Promise<void> => {
   const turn = await host.ctx.storage.get<TurnRequest>("turn");
   if (!turn) return;
-  if (turn.kind === "agent" && host.agentTurnExecutions.has(turn.turnId)) {
+  if (turn.kind !== "agent") {
+    await retireLegacyAppTurn(host, turn);
+    return;
+  }
+  if (host.agentTurnExecutions.has(turn.turnId)) {
     const [watchdogDeadlineAt, recoveryPending] = await Promise.all([
       host.ctx.storage.get<number>(AGENT_WATCHDOG_DEADLINE_KEY),
       host.ctx.storage.get<string>(AGENT_RECOVERY_PENDING_KEY),
@@ -150,21 +150,6 @@ export const runScheduledTurnAlarm = async (
       }
     }
   }
-  const hasTransientBuild = Boolean(
-    await host.ctx.storage.get<string>(`transientBuild:${turn.turnId}`),
-  );
-  const hasPendingPublication = Boolean(
-    await host.ctx.storage.get<PendingAppBuildPublication>(
-      pendingAppBuildPublicationKey(turn.turnId),
-    ),
-  );
-  if (
-    (await host.ctx.storage.get<boolean>("terminalDelivered")) &&
-    turn.kind !== "agent" &&
-    !hasTransientBuild &&
-    !hasPendingPublication
-  )
-    return;
   const alarmTurn = { ...turn };
   await host.trackTurn(turn.turnId, host.runAlarmWithLease(alarmTurn));
 };
@@ -180,17 +165,16 @@ export const runAlarmWithLease = async (
   let retireOriginalLease = false;
   try {
     const useRunLeaseForRecovery =
-      turn.kind === "agent" &&
-      (Boolean(
+      Boolean(
         await host.ctx.storage.get<AgentExecutionMarker>(
           agentExecutionMarkerKey(turn.turnId, turn.attemptGeneration!),
         ),
       ) ||
-        Boolean(
-          await host.ctx.storage.get<BuilderFallbackTranscript>(
-            builderFallbackTranscriptKey(turn.turnId, turn.attemptGeneration!),
-          ),
-        ));
+      Boolean(
+        await host.ctx.storage.get<BuilderFallbackTranscript>(
+          builderFallbackTranscriptKey(turn.turnId, turn.attemptGeneration!),
+        ),
+      );
     if (useRunLeaseForRecovery) {
       turn.ownerPurgeGeneration = await host.registerTurn(turn);
     } else {
@@ -205,14 +189,8 @@ export const runAlarmWithLease = async (
     if (error instanceof OwnerPurgeFenceError) {
       if (!(await host.ownsExactTurn(turn))) return;
       const target = await host.currentSandboxTarget();
-      if (await host.ownsExactTurn(turn)) {
-        if (target) {
-          if (turn.kind === "agent") {
-            await host.terminateCurrentAgentSession(turn);
-          } else {
-            await host.destroySandboxDurably(target, "owner_fence_alarm");
-          }
-        }
+      if (target && (await host.ownsExactTurn(turn))) {
+        await host.terminateCurrentAgentSession(turn);
       }
       try {
         retireOriginalLease = await host.cleanupOwnerPurgedTurnStorage(turn);
@@ -341,81 +319,77 @@ export const runAlarm = async (
     }
   }
   const residentLeftover =
-    turn.kind === "agent" &&
-    turn.agentRole !== "orchestrator" &&
-    turn.execution?.engine === "stella";
-  if (turn.kind === "agent") {
-    let marker: AgentExecutionMarker | undefined;
+    turn.agentRole !== "orchestrator" && turn.execution?.engine === "stella";
+  let marker: AgentExecutionMarker | undefined;
+  try {
+    marker = await host.exactAgentExecutionMarker(turn);
+  } catch (error) {
+    log("error", "agent_recovery_marker_invalid", {
+      turnId: turn.turnId,
+      message: errorMessage(error),
+    });
+    await host.setExactTurnAlarm(turn, Date.now() + 30_000);
+    return;
+  }
+  if (marker) {
+    const lost =
+      "The agent stopped unexpectedly. Its workspace changes were saved, but its report could not be recovered.";
     try {
-      marker = await host.exactAgentExecutionMarker(turn);
-    } catch (error) {
-      log("error", "agent_recovery_marker_invalid", {
-        turnId: turn.turnId,
-        message: errorMessage(error),
-      });
-      await host.setExactTurnAlarm(turn, Date.now() + 30_000);
-      return;
-    }
-    if (marker) {
-      const lost =
-        "The agent stopped unexpectedly. Its workspace changes were saved, but its report could not be recovered.";
-      try {
-        await host.recoverAgentTurnAfterExecutorLoss(
-          turn,
-          marker,
-          lost,
-        );
-      } catch (error) {
-        const retries = await recordBuilderFallbackRetry(host, turn);
-        log("error", "agent_builder_fallback_alarm_retry", {
-          turnId: turn.turnId,
-          threadId: turn.threadId,
-          retries,
-          message: errorMessage(error),
-        });
-        if (retries < BUILDER_FALLBACK_MAX_RETRIES) {
-          await host.setExactTurnAlarm(turn, Date.now() + 30_000);
-          return;
-        }
-        // Every retry boots the lost container again to read its disk. A
-        // recovery that keeps failing must end, or the thread stays
-        // "running" forever while an alarm restarts a container every
-        // thirty seconds for nobody.
-        log("error", "agent_builder_fallback_abandoned", {
-          turnId: turn.turnId,
-          threadId: turn.threadId,
-          retries,
-        });
-        await host.deliverExecutorLossTerminal(turn, {
-          message:
-            "The agent stopped unexpectedly and its workspace could not be recovered afterwards. Its report was lost.",
-          threadError:
-            "The agent stopped unexpectedly and its workspace could not be recovered.",
-        });
-        return;
-      }
-      await host.deliverExecutorLossTerminal(
+      await host.recoverAgentTurnAfterExecutorLoss(
         turn,
-        residentLeftover
-          ? STOPPED_BY_UPDATE
-          : executorLossText(recoveredAgentReport(host, turn)),
+        marker,
+        lost,
       );
-      return;
-    }
-    if (residentLeftover) {
-      log("info", "resident_agent_turn_settled", {
+    } catch (error) {
+      const retries = await recordBuilderFallbackRetry(host, turn);
+      log("error", "agent_builder_fallback_alarm_retry", {
         turnId: turn.turnId,
         threadId: turn.threadId,
+        retries,
+        message: errorMessage(error),
       });
-      await host.deliverExecutorLossTerminal(turn, STOPPED_BY_UPDATE);
+      if (retries < BUILDER_FALLBACK_MAX_RETRIES) {
+        await host.setExactTurnAlarm(turn, Date.now() + 30_000);
+        return;
+      }
+      // Every retry boots the lost container again to read its disk. A
+      // recovery that keeps failing must end, or the thread stays
+      // "running" forever while an alarm restarts a container every
+      // thirty seconds for nobody.
+      log("error", "agent_builder_fallback_abandoned", {
+        turnId: turn.turnId,
+        threadId: turn.threadId,
+        retries,
+      });
+      await host.deliverExecutorLossTerminal(turn, {
+        message:
+          "The agent stopped unexpectedly and its workspace could not be recovered afterwards. Its report was lost.",
+        threadError:
+          "The agent stopped unexpectedly and its workspace could not be recovered.",
+      });
       return;
     }
+    await host.deliverExecutorLossTerminal(
+      turn,
+      residentLeftover
+        ? STOPPED_BY_UPDATE
+        : executorLossText(recoveredAgentReport(host, turn)),
+    );
+    return;
+  }
+  if (residentLeftover) {
+    log("info", "resident_agent_turn_settled", {
+      turnId: turn.turnId,
+      threadId: turn.threadId,
+    });
+    await host.deliverExecutorLossTerminal(turn, STOPPED_BY_UPDATE);
+    return;
   }
 
   const sandboxId = await host.ctx.storage.get<string>("sandboxId");
   let timeoutPending: PendingTerminal = {
     turnId: turn.turnId,
-    attemptGeneration: turn.kind === "agent" ? turn.attemptGeneration! : 1,
+    attemptGeneration: turn.attemptGeneration!,
     kind: "failed",
     payload: {
       message: "This took longer than expected, so Stella stopped. Try again.",

@@ -53,7 +53,6 @@ export type AdmissionHost = Pick<
   | "ctx"
   | "env"
   | "agentTurnExecutions"
-  | "appTurnExecutions"
   | "builderFallbackRecoveries"
 
   | "exactTurnCancellations"

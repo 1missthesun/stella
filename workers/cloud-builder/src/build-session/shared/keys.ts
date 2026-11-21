@@ -336,8 +336,6 @@ export const AGENT_RECOVERY_PENDING_KEY = "agentRecoveryPending";
 export const agentRecoveryIdentity = (turn: TurnRequest): string =>
   `${turn.turnId}:${turn.attemptGeneration ?? 0}`;
 
-export const pendingAppBuildPublicationKey = (turnId: string): string =>
-  `pendingAppBuildPublication:${turnId}`;
 
 export const ORCHESTRATOR_INTERNAL_ORIGIN = "https://orchestrator-session";
 export const HEADER_CONVERSATION_ID = "x-stella-conversation-id";

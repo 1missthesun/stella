@@ -46,7 +46,6 @@ export interface BuildSessionInternals {
   readonly ctx: DurableObjectState;
   readonly env: Env;
   readonly runningTurns: Map<string, Set<Promise<unknown>>>;
-  readonly appTurnExecutions: Map<string, TurnExecution<Response>>;
   readonly agentTurnExecutions: Map<string, TurnExecution<void>>;
 
   readonly builderFallbackRecoveries: Set<string>;
@@ -194,25 +193,18 @@ export interface BuildSessionInternals {
     generation?: string | undefined,
   ): Promise<boolean>;
   sweepNativeBackupDebt(workspaceKey: string): Promise<void>;
-  settleAgentTransientBackup(turn: TurnRequest): Promise<boolean>;
   cleanupTransientWrites(turn: TurnRequest): Promise<void>;
   cleanupOwnerPurgedTurnStorage(turn: TurnRequest): Promise<boolean>;
   settleTerminalTransientWrites(turn: TurnRequest): Promise<boolean>;
-  retireTerminalAppTurnStorage(turn: TurnRequest): Promise<void>;
   cancelForOwnerPurge(request: Request): Promise<Response>;
   redeliverOrphan(turn: TurnRequest, pending: PendingTerminal): Promise<void>;
   assertTurnWritable(turn: TurnRequest): Promise<void>;
   assertAgentTurnIdentity(turn: TurnRequest): void;
-  assertAppTurnIdentity(turn: TurnRequest): void;
   fetchCanonicalAgentHistory(
     turn: TurnRequest,
     options: { excludeCurrentTurn: boolean; signal?: AbortSignal },
   ): AgentHistoryRow[];
   assertAgentExecutionActive(
-    turn: TurnRequest,
-    execution: TurnExecutionContext,
-  ): Promise<void>;
-  assertAppExecutionActive(
     turn: TurnRequest,
     execution: TurnExecutionContext,
   ): Promise<void>;

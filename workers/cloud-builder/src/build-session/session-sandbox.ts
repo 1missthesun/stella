@@ -392,22 +392,12 @@ export const scheduleSandboxDestroyDebtAlarm = async (
 export const currentSandboxTarget = async (
   host: SessionSandboxHost,
 ): Promise<SandboxTarget | undefined> => {
-  const [storedSandboxId, storedSize, turn] = await Promise.all([
+  const [storedSandboxId, storedSize] = await Promise.all([
     host.ctx.storage.get<string>("sandboxId"),
     host.ctx.storage.get<InstanceSize>("sandboxSize"),
-    host.ctx.storage.get<TurnRequest>("turn"),
   ]);
   return storedSandboxId
-    ? {
-        sandboxId: storedSandboxId,
-        size: storedSize ?? "large",
-        workload:
-          turn?.kind === "agent" &&
-          Number.isSafeInteger(turn.attemptGeneration) &&
-          turn.attemptGeneration! >= 1
-            ? "world"
-            : "app-build",
-      }
+    ? { sandboxId: storedSandboxId, size: storedSize ?? "large", workload: "world" }
     : undefined;
 };
 
@@ -424,7 +414,6 @@ export const terminateCurrentAgentSession = async (
 ): Promise<void> => {
   const target = await host.ctx.storage.transaction(async (txn) => {
     const markerKey =
-      turn.kind === "agent" &&
       Number.isSafeInteger(turn.attemptGeneration) &&
       turn.attemptGeneration! >= 1
         ? agentExecutionMarkerKey(turn.turnId, turn.attemptGeneration!)
@@ -446,8 +435,7 @@ export const terminateCurrentAgentSession = async (
     return {
       sandboxId,
       size,
-      workload:
-        turn.kind === "agent" ? ("world" as const) : ("app-build" as const),
+      workload: "world" as const,
       sessionId: agentTurnSessionId(turn.turnId),
       daemonDirectory: attachedToolPaths({
         turnId: turn.turnId,
@@ -462,12 +450,7 @@ export const terminateCurrentAgentSession = async (
     };
   });
   if (!target) return;
-  if (turn.kind !== "agent") return;
-  await host.releaseAgentSessionResources({
-    ...target,
-    workload: "world",
-    warm: false,
-  });
+  await host.releaseAgentSessionResources({ ...target, warm: false });
 };
 
 export const releaseAgentSessionResources = async (

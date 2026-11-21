@@ -26,6 +26,7 @@ import {
   purgeThreadTranscript,
 } from "../thread-transcript.js";
 import type { BuildSessionInternals } from "./host.js";
+import { retireLegacyAppTurn } from "./session-core.js";
 import {
   AGENT_WATCHDOG_DEADLINE_KEY,
   OWNER_PURGE_STALE_LEASE_GRACE_MS,
@@ -46,7 +47,6 @@ export type TerminalDeliveryHost = Pick<
   | "ctx"
   | "env"
   | "runningTurns"
-  | "appTurnExecutions"
   | "agentTurnExecutions"
   | "exactTurnCancellations"
   | "acknowledgeExactAgentTurnCancellation"
@@ -56,7 +56,6 @@ export type TerminalDeliveryHost = Pick<
   | "currentSandboxTarget"
   | "deleteTurnStoragePreservingExactCancellations"
   | "deliverTerminal"
-  | "destroySandboxDurably"
   | "deliverOwnerEventsDurable"
   | "event"
   | "mutateExactTurn"
@@ -66,7 +65,7 @@ export type TerminalDeliveryHost = Pick<
   | "releaseOwnerGate"
   | "runAlarmWithLease"
   | "setExactTurnAlarm"
-  | "settleAgentTransientBackup"
+  | "settleTerminalTransientWrites"
   | "terminateCurrentAgentSession"
   | "unregisterTurnLease"
 >;
@@ -114,10 +113,8 @@ export const deliverTerminal = async (
   let pending = pendingInput;
   const owns = await host.ownsExactTurn(turn);
   if (
-    (turn.kind === "agent" &&
-      (!Number.isSafeInteger(turn.attemptGeneration) ||
-        pending.attemptGeneration !== turn.attemptGeneration)) ||
-    (turn.kind !== "agent" && pending.attemptGeneration !== 1)
+    !Number.isSafeInteger(turn.attemptGeneration) ||
+    pending.attemptGeneration !== turn.attemptGeneration
   ) {
     log("error", "terminal_attempt_generation_mismatch", {
       turnId: turn.turnId,
@@ -160,7 +157,7 @@ export const deliverTerminal = async (
     );
     if (turn.agentRole === "orchestrator") {
       await deliverOrchestratorCliTerminal(host, turn, pending);
-    } else if (turn.kind === "agent" && turn.threadId) {
+    } else if (turn.threadId) {
       const finalText =
         typeof pending.payload.finalText === "string"
           ? pending.payload.finalText
@@ -401,7 +398,6 @@ export const handleAgentAttemptState = async (
   ]);
   if (
     !stored ||
-    stored.kind !== "agent" ||
     stored.ownerId !== raw.ownerId ||
     stored.ownerGeneration !== raw.ownerGeneration ||
     stored.attemptGeneration !== attemptGeneration ||
@@ -458,7 +454,7 @@ export const deliverExecutorLossTerminal = async (
     terminateSandbox: false,
   });
   if (delivered && (await host.ownsExactTurn(turn))) {
-    if (await host.settleAgentTransientBackup(turn)) {
+    if (await host.settleTerminalTransientWrites(turn)) {
       await host.deleteTurnStoragePreservingExactCancellations(turn, true);
     } else {
       await host.setExactTurnAlarm(turn, Date.now() + 30_000);
@@ -478,7 +474,6 @@ export const expireCurrentAgentTurn = async (
   const turn = await host.ctx.storage.get<TurnRequest>("turn");
   if (
     !turn ||
-    turn.kind !== "agent" ||
     !Number.isSafeInteger(turn.attemptGeneration) ||
     turn.attemptGeneration! < 1
   ) {
@@ -883,12 +878,16 @@ export const cancelForOwnerPurge = async (
       ? json({ canceled: true, turnId, unregistered: true, orphan: true })
       : json({ error: "Owner lease retirement is pending." }, 409);
   }
+  if (stored.kind !== "agent") {
+    await retireLegacyAppTurn(host, stored);
+    return json({ canceled: true, turnId, unregistered: true });
+  }
   const turn = stored;
 
   await host.ctx.storage.put("terminal", true);
   await host.ctx.storage.deleteAlarm().catch(() => undefined);
   const turnExecution =
-    host.agentTurnExecutions.get(turnId) ?? host.appTurnExecutions.get(turnId);
+    host.agentTurnExecutions.get(turnId);
   if (turnExecution) {
     try {
       // Close the local admission latch before teardown. Destroying only the
@@ -906,11 +905,7 @@ export const cancelForOwnerPurge = async (
     const target = await host.currentSandboxTarget();
     if (target) {
       try {
-        if (turn.kind === "agent") {
-          await host.terminateCurrentAgentSession(turn);
-        } else {
-          await host.destroySandboxDurably(target, "owner_purge");
-        }
+        await host.terminateCurrentAgentSession(turn);
       } catch {
         return json({ error: "Owner turn is still unwinding." }, 409);
       }

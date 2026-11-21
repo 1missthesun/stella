@@ -168,7 +168,7 @@ export type ContainerTurnHost = Pick<
   | "sandbox"
   | "sandboxContainerRunning"
   | "setExactTurnAlarm"
-  | "settleAgentTransientBackup"
+  | "settleTerminalTransientWrites"
   | "terminateCurrentAgentSession"
   | "unregisterTurn"
 >;
@@ -1052,7 +1052,7 @@ export const runContainerAgentTurn = async (
       })
       .catch(() => undefined);
     if (delivered && (await host.ownsExactTurn(turn))) {
-      if (await host.settleAgentTransientBackup(turn)) {
+      if (await host.settleTerminalTransientWrites(turn)) {
         await host.deleteTurnStoragePreservingExactCancellations(turn, true);
       } else {
         await host.setExactTurnAlarm(turn, Date.now() + 30_000);
@@ -1196,7 +1196,7 @@ export const runContainerAgentTurn = async (
       threadError: friendly,
     });
     if (delivered && (await host.ownsExactTurn(turn))) {
-      if (await host.settleAgentTransientBackup(turn)) {
+      if (await host.settleTerminalTransientWrites(turn)) {
         await host.deleteTurnStoragePreservingExactCancellations(turn, true);
       } else {
         await host.setExactTurnAlarm(turn, Date.now() + 30_000);

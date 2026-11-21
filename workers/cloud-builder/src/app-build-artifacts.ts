@@ -23,13 +23,3 @@ export const isOwnerAppBuildPrefix = (
     BUILD_ID.test(prefix.slice(root.length + 1))
   );
 };
-
-export const retireTransientAppBuild = async (args: {
-  sweep: () => Promise<{ done: boolean }>;
-  clearRecovery: () => Promise<void>;
-}): Promise<boolean> => {
-  const swept = await args.sweep();
-  if (!swept.done) return false;
-  await args.clearRecovery();
-  return true;
-};

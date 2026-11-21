@@ -1,4 +1,3 @@
-import { retireTransientAppBuild } from "../app-build-artifacts.js";
 import { EXACT_TURN_CANCELLATIONS_KEY } from "../execution-placement-turn-cancellation.js";
 import {
   nativeStateCheckpointPrefix,
@@ -38,7 +37,6 @@ import {
 } from "./shared/keys.js";
 import {
   AgentTurnAuthorityLostError,
-  AppTurnAuthorityLostError,
   OwnerPurgeFenceError,
   TurnStateOwnerCallError,
 } from "./shared/errors.js";
@@ -89,7 +87,6 @@ export type SessionCoreHost = Pick<
   | "retireBuildOwnerFenceLease"
   | "scheduleDurabilityAlarm"
   | "scheduleSandboxDestroyDebtAlarm"
-  | "settleAgentTransientBackup"
   | "settleTerminalTransientWrites"
   | "unregisterTurn"
   | "unregisterTurnLease"
@@ -160,8 +157,7 @@ export const releaseOwnerGate = async (
   host: SessionCoreHost,
   turn: TurnRequest,
 ): Promise<void> => {
-  if (turn.kind !== "agent" || !turn.ownerId) return;
-  if (turn.agentRole === "orchestrator") return;
+  if (!turn.ownerId || turn.agentRole === "orchestrator") return;
   try {
     await host.ownerGateFor(turn.ownerId).release({ turnId: turn.turnId });
   } catch (error) {
@@ -285,7 +281,7 @@ export const emitTurnEvent = async (
     ...host.ownerEventBase(turn, `${turn.turnId}:${attemptGeneration}:${eventSeq}`),
     kind: "turn.event",
     turnId: turn.turnId,
-    ...(turn.kind === "agent" ? { attemptGeneration } : {}),
+    attemptGeneration,
     sessionId: turn.threadId ?? turn.sessionId ?? host.ctx.id.toString(),
     eventSeq,
     eventKind,
@@ -309,7 +305,7 @@ export const appendThreadTranscript = async (
   turn: TurnRequest,
   messages: readonly ThreadMessageInput[],
 ): Promise<void> => {
-  if (turn.kind !== "agent" || !turn.threadId) {
+  if (!turn.threadId) {
     throw new AgentTurnAuthorityLostError();
   }
   const attemptGeneration = turn.attemptGeneration ?? 1;
@@ -466,24 +462,20 @@ export const unregisterTurn = async (
   if (!turn.ownerPurgeLeaseId) return;
   const hasTransientWrites =
     Boolean(
-      await host.ctx.storage.get<string>(`transientBuild:${turn.turnId}`),
-    ) ||
-    Boolean(
       await host.ctx.storage.get<NativeTransientBackup>(
         nativeTransientBackupKey(turn.turnId),
       ),
     ) ||
-    (turn.kind === "agent" &&
-      (Boolean(
-        await host.ctx.storage.get<AgentExecutionMarker>(
-          agentExecutionMarkerKey(turn.turnId, turn.attemptGeneration!),
-        ),
-      ) ||
-        Boolean(
-          await host.ctx.storage.get<BuilderFallbackTranscript>(
-            builderFallbackTranscriptKey(turn.turnId, turn.attemptGeneration!),
-          ),
-        )));
+    Boolean(
+      await host.ctx.storage.get<AgentExecutionMarker>(
+        agentExecutionMarkerKey(turn.turnId, turn.attemptGeneration!),
+      ),
+    ) ||
+    Boolean(
+      await host.ctx.storage.get<BuilderFallbackTranscript>(
+        builderFallbackTranscriptKey(turn.turnId, turn.attemptGeneration!),
+      ),
+    );
   if (hasTransientWrites) {
     try {
       await host.assertTurnWritable(turn);
@@ -672,22 +664,13 @@ const settleNativeTransientBackup = async (
   }
 };
 
-export const settleAgentTransientBackup = async (
-  host: SessionCoreHost,
-  turn: TurnRequest,
-): Promise<boolean> => {
-  return await settleNativeTransientBackup(host, turn);
-};
-
 export const cleanupTransientWrites = async (
   host: SessionCoreHost,
   turn: TurnRequest,
 ): Promise<void> => {
-  const buildKey = `transientBuild:${turn.turnId}`;
   const nativeMarker = await host.ctx.storage.get<NativeTransientBackup>(
     nativeTransientBackupKey(turn.turnId),
   );
-  const buildPrefix = await host.ctx.storage.get<string>(buildKey);
   if (nativeMarker) {
     if (!BACKUP_ID_PATTERN.test(nativeMarker.backupId)) {
       throw new Error("Transient native backup descriptor is invalid.");
@@ -700,16 +683,6 @@ export const cleanupTransientWrites = async (
       throw new Error("Transient native backup cleanup was truncated.");
     }
     await host.ctx.storage.delete(nativeTransientBackupKey(turn.turnId));
-  }
-  if (buildPrefix) {
-    const retired = await retireTransientAppBuild({
-      sweep: async () =>
-        await sweepR2Prefix(host.env.APP_BUILDS, `${buildPrefix}/`),
-      clearRecovery: async () => {
-        await host.ctx.storage.delete(buildKey);
-      },
-    });
-    if (!retired) throw new Error("Transient build cleanup was truncated.");
   }
 };
 
@@ -725,34 +698,32 @@ export const cleanupOwnerPurgedTurnStorage = async (
 export const settleTerminalTransientWrites = async (
   host: SessionCoreHost,
   turn: TurnRequest,
-): Promise<boolean> => {
-  if (turn.kind === "agent") {
-    return await host.settleAgentTransientBackup(turn);
-  }
-  try {
-    await host.cleanupTransientWrites(turn);
-    return true;
-  } catch (error) {
-    log("error", "terminal_transient_cleanup_failed", {
-      turnId: turn.turnId,
-      message: errorMessage(error),
-    });
-    return false;
-  }
-};
+): Promise<boolean> => await settleNativeTransientBackup(host, turn);
 
-export const retireTerminalAppTurnStorage = async (
-  host: SessionCoreHost,
+/**
+ * A turn stored before app builds left BuildSession (1a6b6092e, 2026-09-11)
+ * has no live path left: retire its owner lease and storage so its alarm
+ * ends instead of entering agent recovery with an app turn's identity.
+ */
+export const retireLegacyAppTurn = async (
+  host: Pick<
+    SessionCoreHost,
+    "deleteTurnStoragePreservingExactCancellations" | "unregisterTurnLease"
+  >,
   turn: TurnRequest,
 ): Promise<void> => {
-  if (!(await host.ownsExactTurn(turn))) return;
-  if (await host.settleTerminalTransientWrites(turn)) {
-    await host.deleteTurnStoragePreservingExactCancellations(turn, true);
-    return;
+  log("info", "legacy_app_turn_retired", { turnId: turn.turnId });
+  if (turn.ownerPurgeLeaseId) {
+    await host
+      .unregisterTurnLease(turn, turn.ownerPurgeLeaseId, turn.ownerPurgeGeneration)
+      .catch((error: unknown) => {
+        log("error", "legacy_app_turn_lease_retire_failed", {
+          turnId: turn.turnId,
+          message: errorMessage(error),
+        });
+      });
   }
-  if (await host.ownsExactTurn(turn)) {
-    await host.ctx.storage.setAlarm(Date.now() + 30_000);
-  }
+  await host.deleteTurnStoragePreservingExactCancellations(turn, true);
 };
 
 export const redeliverOrphan = async (
@@ -808,27 +779,12 @@ export const assertAgentTurnIdentity = (
   turn: TurnRequest,
 ): void => {
   if (
-    turn.kind !== "agent" ||
     !turn.threadId ||
     !turn.conversationId ||
     !Number.isSafeInteger(turn.attemptGeneration) ||
     turn.attemptGeneration! < 1
   ) {
     throw new AgentTurnAuthorityLostError();
-  }
-};
-
-export const assertAppTurnIdentity = (
-  host: SessionCoreHost,
-  turn: TurnRequest,
-): void => {
-  if (
-    turn.kind === "agent" ||
-    !turn.appId ||
-    !turn.conversationId ||
-    !turn.sessionId
-  ) {
-    throw new AppTurnAuthorityLostError();
   }
 };
 
@@ -852,29 +808,6 @@ export const assertAgentExecutionActive = async (
   execution.assertActive();
   await assertAgentTurnActive(host, turn);
   host.assertAgentTurnIdentity(turn);
-  execution.assertActive();
-};
-
-const assertAppTurnActive = async (
-  host: SessionCoreHost,
-  turn: TurnRequest,
-): Promise<void> => {
-  await host.assertTurnWritable(turn);
-  if (
-    !(await host.ownsExactTurn(turn)) ||
-    (await host.ctx.storage.get<boolean>("terminal"))
-  ) {
-    throw new Error("The app-build turn is no longer active.");
-  }
-};
-
-export const assertAppExecutionActive = async (
-  host: SessionCoreHost,
-  turn: TurnRequest,
-  execution: TurnExecutionContext,
-): Promise<void> => {
-  execution.assertActive();
-  await assertAppTurnActive(host, turn);
   execution.assertActive();
 };
 

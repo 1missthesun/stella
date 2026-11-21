@@ -10,13 +10,6 @@ export type SandboxTarget = Readonly<{
   workload: SandboxWorkload;
 }>;
 
-export type SandboxLifecycleIdentity = Readonly<{
-  ownerId: string;
-  ownerGeneration: string;
-  turnId: string;
-  attemptGeneration: number;
-}>;
-
 export type WorldSandboxLifecycleIdentity = Readonly<{
   ownerId: string;
   workspaceKey: string;
@@ -41,11 +34,8 @@ const fingerprint = async (parts: readonly string[]): Promise<string> =>
   ).slice(0, 40);
 
 export const sandboxLifecycleId = async (
-  workloadPrefix: "agent" | "app" | "echo" | "world",
-  identity:
-    | SandboxLifecycleIdentity
-    | WorldSandboxLifecycleIdentity
-    | AgentSandboxLifecycleIdentity,
+  workloadPrefix: "agent" | "world",
+  identity: WorldSandboxLifecycleIdentity | AgentSandboxLifecycleIdentity,
 ): Promise<string> => {
   if (workloadPrefix === "agent") {
     if (
@@ -63,37 +53,17 @@ export const sandboxLifecycleId = async (
       identity.threadId,
     ])}`;
   }
-  if (workloadPrefix === "world") {
-    if (
-      !("workspaceKey" in identity) ||
-      "threadId" in identity ||
-      !identity.ownerId ||
-      !identity.workspaceKey
-    ) {
-      throw new TypeError("World sandbox lifecycle identity must be exact.");
-    }
-    return `world-${await fingerprint([
-      "world",
-      identity.ownerId,
-      identity.workspaceKey,
-    ])}`;
-  }
   if (
-    "workspaceKey" in identity ||
+    "threadId" in identity ||
     !identity.ownerId ||
-    !identity.ownerGeneration ||
-    !identity.turnId ||
-    !Number.isSafeInteger(identity.attemptGeneration) ||
-    identity.attemptGeneration < 1
+    !identity.workspaceKey
   ) {
-    throw new TypeError("Sandbox lifecycle identity must be exact.");
+    throw new TypeError("World sandbox lifecycle identity must be exact.");
   }
-  return `${workloadPrefix}-${await fingerprint([
-    workloadPrefix,
+  return `world-${await fingerprint([
+    "world",
     identity.ownerId,
-    identity.ownerGeneration,
-    identity.turnId,
-    String(identity.attemptGeneration),
+    identity.workspaceKey,
   ])}`;
 };
 

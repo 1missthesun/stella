@@ -49,8 +49,6 @@ import {
   appendThreadTranscript,
   assertAgentExecutionActive,
   assertAgentTurnIdentity,
-  assertAppExecutionActive,
-  assertAppTurnIdentity,
   assertTurnWritable,
   callOwnerFence as callOwnerFenceCore,
   callOwnerTurnState,
@@ -68,11 +66,9 @@ import {
   redeliverOrphan,
   registerTurn,
   releaseOwnerGate,
-  retireTerminalAppTurnStorage,
   retryOwnerEventDebt,
   scheduleDurabilityAlarm,
   setExactTurnAlarm,
-  settleAgentTransientBackup,
   settleTerminalTransientWrites,
   sweepNativeBackupDebt,
   trackTurn,
@@ -94,7 +90,6 @@ import {
 import type { Env } from "../build-session/shared/env.js";
 import {
   AgentTurnAuthorityLostError,
-  AppTurnAuthorityLostError,
   OwnerPurgeFenceError,
 } from "../build-session/shared/errors.js";
 import {
@@ -166,10 +161,6 @@ import type { BuildSessionInternals } from "./host.js";
 
 export class BuildSessionObject extends DurableObject<Env> {
   private readonly runningTurns = new Map<string, Set<Promise<unknown>>>();
-  private readonly appTurnExecutions = new Map<
-    string,
-    TurnExecution<Response>
-  >();
   private readonly agentTurnExecutions = new Map<string, TurnExecution<void>>();
 
   private readonly builderFallbackRecoveries = new Set<string>();
@@ -185,7 +176,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     ctx: this.ctx,
     env: this.env,
     runningTurns: this.runningTurns,
-    appTurnExecutions: this.appTurnExecutions,
     agentTurnExecutions: this.agentTurnExecutions,
     builderFallbackRecoveries: this.builderFallbackRecoveries,
     turnStateCheckpointRuns: this.turnStateCheckpointRuns,
@@ -226,19 +216,15 @@ export class BuildSessionObject extends DurableObject<Env> {
     unregisterTurnLease: this.unregisterTurnLease.bind(this),
     retireBuildOwnerFenceLease: this.retireBuildOwnerFenceLease.bind(this),
     sweepNativeBackupDebt: this.sweepNativeBackupDebt.bind(this),
-    settleAgentTransientBackup: this.settleAgentTransientBackup.bind(this),
     cleanupTransientWrites: this.cleanupTransientWrites.bind(this),
     cleanupOwnerPurgedTurnStorage: this.cleanupOwnerPurgedTurnStorage.bind(this),
     settleTerminalTransientWrites: this.settleTerminalTransientWrites.bind(this),
-    retireTerminalAppTurnStorage: this.retireTerminalAppTurnStorage.bind(this),
     cancelForOwnerPurge: this.cancelForOwnerPurge.bind(this),
     redeliverOrphan: this.redeliverOrphan.bind(this),
     assertTurnWritable: this.assertTurnWritable.bind(this),
     assertAgentTurnIdentity: this.assertAgentTurnIdentity.bind(this),
-    assertAppTurnIdentity: this.assertAppTurnIdentity.bind(this),
     fetchCanonicalAgentHistory: this.fetchCanonicalAgentHistory.bind(this),
     assertAgentExecutionActive: this.assertAgentExecutionActive.bind(this),
-    assertAppExecutionActive: this.assertAppExecutionActive.bind(this),
     sandbox: this.sandbox.bind(this),
     sandboxContainerRunning: this.sandboxContainerRunning.bind(this),
     destroySandboxDurably: this.destroySandboxDurably.bind(this),
@@ -555,10 +541,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return sweepNativeBackupDebt(this.self, workspaceKey);
   }
 
-  private settleAgentTransientBackup(turn: TurnRequest): Promise<boolean> {
-    return settleAgentTransientBackup(this.self, turn);
-  }
-
   private cleanupTransientWrites(turn: TurnRequest): Promise<void> {
     return cleanupTransientWrites(this.self, turn);
   }
@@ -569,10 +551,6 @@ export class BuildSessionObject extends DurableObject<Env> {
 
   private settleTerminalTransientWrites(turn: TurnRequest): Promise<boolean> {
     return settleTerminalTransientWrites(this.self, turn);
-  }
-
-  private retireTerminalAppTurnStorage(turn: TurnRequest): Promise<void> {
-    return retireTerminalAppTurnStorage(this.self, turn);
   }
 
   private cancelForOwnerPurge(request: Request): Promise<Response> {
@@ -594,10 +572,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return assertAgentTurnIdentity(this.self, turn);
   }
 
-  private assertAppTurnIdentity(turn: TurnRequest): void {
-    return assertAppTurnIdentity(this.self, turn);
-  }
-
   private fetchCanonicalAgentHistory(
     turn: TurnRequest,
     options: { excludeCurrentTurn: boolean; signal?: AbortSignal },
@@ -610,13 +584,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     execution: TurnExecutionContext,
   ): Promise<void> {
     return assertAgentExecutionActive(this.self, turn, execution);
-  }
-
-  private assertAppExecutionActive(
-    turn: TurnRequest,
-    execution: TurnExecutionContext,
-  ): Promise<void> {
-    return assertAppExecutionActive(this.self, turn, execution);
   }
 
   private sandbox(
@@ -882,7 +849,7 @@ export class BuildSessionObject extends DurableObject<Env> {
       request.headers.get(HEADER_BUILD_SESSION_NAME)?.trim() ?? "";
     const brokerEndpoint =
       request.headers.get(HEADER_TURN_BROKER_ENDPOINT)?.trim() ?? "";
-    if (turn?.kind === "agent" && (brokerSessionId || brokerEndpoint)) {
+    if (brokerSessionId || brokerEndpoint) {
       try {
         const endpoint = new URL(brokerEndpoint);
         const localHttp =
@@ -911,10 +878,9 @@ export class BuildSessionObject extends DurableObject<Env> {
       }
     }
     const dispatchOwnerGeneration = normalizeOwnerGeneration(
-      turn?.ownerGeneration,
+      turn.ownerGeneration,
     );
     if (
-      !turn ||
       typeof turn.ownerId !== "string" ||
       !turn.ownerId.trim() ||
       typeof turn.turnId !== "string" ||
@@ -939,27 +905,7 @@ export class BuildSessionObject extends DurableObject<Env> {
         400,
       );
     }
-    if (
-      turn.kind !== "agent" &&
-      (typeof turn.appId !== "string" ||
-        !turn.appId.trim() ||
-        typeof turn.conversationId !== "string" ||
-        !turn.conversationId.trim() ||
-        typeof turn.sessionId !== "string" ||
-        !turn.sessionId.trim())
-    ) {
-      return json(
-        { error: "App turns require appId, conversationId, and sessionId." },
-        400,
-      );
-    }
-    if (turn.kind === "agent") {
-      turn.threadId = turn.threadId!.trim();
-    } else {
-      turn.appId = turn.appId.trim();
-      turn.conversationId = turn.conversationId!.trim();
-      turn.sessionId = turn.sessionId!.trim();
-    }
+    turn.threadId = turn.threadId!.trim();
     const storedTurn = await this.ctx.storage.get<TurnRequest>("turn");
     if (storedTurn?.turnId === turn.turnId) {
       const [storedFingerprint, replayFingerprint] = await Promise.all([
@@ -967,7 +913,7 @@ export class BuildSessionObject extends DurableObject<Env> {
         stableValueMarker(turnDispatchIdentity(turn)),
       ]);
       if (storedFingerprint !== replayFingerprint) {
-        if (turn.kind === "agent") await this.releaseOwnerGate(turn);
+        await this.releaseOwnerGate(turn);
         return json(
           {
             error: "Turn dispatch was replayed with different input.",
@@ -978,71 +924,40 @@ export class BuildSessionObject extends DurableObject<Env> {
       }
       try {
         await this.assertTurnWritable(storedTurn);
-        if (turn.kind === "agent") {
-          this.assertAgentTurnIdentity(turn);
-          if (this.agentTurnExecutions.has(turn.turnId)) {
-            return this.agentTurnAccepted(turn, true, { inProgress: true });
-          }
-          const [executionMarker, fallbackJournal] = await Promise.all([
-            this.exactAgentExecutionMarker(storedTurn),
-            this.ctx.storage.get<BuilderFallbackTranscript>(
-              builderFallbackTranscriptKey(
-                storedTurn.turnId,
-                storedTurn.attemptGeneration!,
-              ),
+        this.assertAgentTurnIdentity(turn);
+        if (this.agentTurnExecutions.has(turn.turnId)) {
+          return this.agentTurnAccepted(turn, true, { inProgress: true });
+        }
+        const [executionMarker, fallbackJournal] = await Promise.all([
+          this.exactAgentExecutionMarker(storedTurn),
+          this.ctx.storage.get<BuilderFallbackTranscript>(
+            builderFallbackTranscriptKey(
+              storedTurn.turnId,
+              storedTurn.attemptGeneration!,
             ),
-          ]);
-          if (executionMarker || fallbackJournal) {
-            await this.setExactTurnAlarm(storedTurn, Date.now());
-            return json(
-              { accepted: false, replayed: true, recoveryPending: true },
-              425,
-            );
-          }
-          const pending: PendingTerminal = {
-            turnId: turn.turnId,
-            attemptGeneration: turn.attemptGeneration!,
-            kind: "failed",
-            payload: {
-              message:
-                "The cloud worker restarted before this agent could finish. Try again.",
-            },
-            threadError:
-              "The cloud worker restarted before this agent could finish.",
-            terminateSandbox: true,
-          };
-          if (!(await this.claimTerminalDecision(storedTurn, pending))) {
-            await this.releaseOwnerGate(turn);
-            return json(
-              { accepted: false, replayed: true, reason: "superseded" },
-              409,
-            );
-          }
+          ),
+        ]);
+        if (executionMarker || fallbackJournal) {
           await this.setExactTurnAlarm(storedTurn, Date.now());
           return json(
             { accepted: false, replayed: true, recoveryPending: true },
             425,
           );
         }
-        this.assertAppTurnIdentity(storedTurn);
-        const running = this.appTurnExecutions.get(turn.turnId);
-        if (running) {
-          return json(
-            { accepted: true, replayed: true, inProgress: true },
-            202,
-          );
-        }
         const pending: PendingTerminal = {
           turnId: turn.turnId,
-          attemptGeneration: turn.attemptGeneration ?? 1,
+          attemptGeneration: turn.attemptGeneration!,
           kind: "failed",
           payload: {
             message:
-              "The cloud worker restarted before this change could finish. Try again.",
+              "The cloud worker restarted before this agent could finish. Try again.",
           },
+          threadError:
+            "The cloud worker restarted before this agent could finish.",
           terminateSandbox: true,
         };
         if (!(await this.claimTerminalDecision(storedTurn, pending))) {
+          await this.releaseOwnerGate(turn);
           return json(
             { accepted: false, replayed: true, reason: "superseded" },
             409,
@@ -1063,39 +978,26 @@ export class BuildSessionObject extends DurableObject<Env> {
             409,
           );
         }
-        if (error instanceof AppTurnAuthorityLostError) {
-          return json({ error: "Cloud app attempt is no longer active." }, 409);
-        }
         throw error;
       }
     }
-    let admitted = false;
-    if (turn.kind === "agent") {
-      const gate = await this.admitAgentTurnThroughOwnerGate(turn);
-      if (!gate.ok) return gate.response;
-      admitted = true;
-    }
+    const gate = await this.admitAgentTurnThroughOwnerGate(turn);
+    if (!gate.ok) return gate.response;
     try {
       delete turn.ownerPurgeGeneration;
       delete turn.ownerPurgeLeaseId;
       turn.ownerPurgeGeneration = await this.registerTurn(turn);
       await this.assertTurnWritable(turn);
-      if (turn.kind === "agent") {
-        this.assertAgentTurnIdentity(turn);
-        return await this.acceptAgentTurn(turn);
-      }
-      return json({ error: "Unsupported turn kind." }, 400);
+      this.assertAgentTurnIdentity(turn);
+      return await this.acceptAgentTurn(turn);
     } catch (error) {
       await this.unregisterTurn(turn);
-      if (admitted) await this.releaseOwnerGate(turn);
+      await this.releaseOwnerGate(turn);
       if (error instanceof OwnerPurgeFenceError) {
         return json({ error: "Owner cloud activity is being purged." }, 409);
       }
       if (error instanceof AgentTurnAuthorityLostError) {
         return json({ error: "Cloud agent attempt is no longer active." }, 409);
-      }
-      if (error instanceof AppTurnAuthorityLostError) {
-        return json({ error: "Cloud app attempt is no longer active." }, 409);
       }
       throw error;
     }

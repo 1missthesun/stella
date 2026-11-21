@@ -12,13 +12,6 @@ export class AgentTurnAuthorityLostError extends Error {
   }
 }
 
-export class AppTurnAuthorityLostError extends Error {
-  constructor() {
-    super("Cloud app attempt authority was lost.");
-    this.name = "AppTurnAuthorityLostError";
-  }
-}
-
 export class OwnerPurgeFenceError extends Error {
   constructor() {
     super("This owner's cloud activity is being purged.");

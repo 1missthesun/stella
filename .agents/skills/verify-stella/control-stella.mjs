@@ -111,6 +111,8 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   "XDG_RUNTIME_DIR",
   "STELLA_RENDERER_MODE",
   "STELLA_CLAUDE_CLI_PATH",
+  // Points Google Antigravity requests at a local mock instead of Google.
+  "STELLA_ANTIGRAVITY_ENDPOINT",
   "STELLA_APP_SOURCE_INSTALLED",
   // Windows: without these a shell cannot resolve `git` to git.exe (PATHEXT)
   // or start cmd and PowerShell (SystemRoot, ComSpec).

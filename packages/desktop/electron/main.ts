@@ -3,6 +3,7 @@ import { app } from "electron";
 import "@stella/runtime/kernel/shared/http-proxy.js";
 import { configureLinuxGraphics } from "./linux-graphics.js";
 import { configureLinuxProtectedStorage } from "./linux-protected-storage.js";
+import { configureScrollCompositing } from "./scroll-compositing.js";
 import { configureDevHarnessProtectedStorage } from "./bootstrap/dev-harness-protected-storage.js";
 import { registerRendererScheme } from "./source/renderer-protocol.js";
 import { guardCanvasFrames } from "./source/canvas-protocol.js";
@@ -19,6 +20,9 @@ registerRendererScheme();
 guardCanvasFrames();
 guardWorkspaceAppFrames();
 configureLinuxGraphics({
+  commandLine: app.commandLine,
+});
+configureScrollCompositing({
   commandLine: app.commandLine,
 });
 const devHarnessProtectedStorage = configureDevHarnessProtectedStorage({

@@ -55,7 +55,13 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
-import { agentInputAction, agentStanding as standingOf, deviceAgentStatus, type AgentInputSender } from "@stella/contracts/agent-rules";
+import {
+  agentInputAction,
+  agentStanding as standingOf,
+  deviceAgentStatus,
+  type AgentInputSender,
+  type AgentStanding,
+} from "@stella/contracts/agent-rules";
 import {
   END_TURN_WAITING_DESCRIPTION,
   END_TURN_WAITING_MISSING,
@@ -764,6 +770,43 @@ const busyReader = (
   running: async (id) => (await store.snapshot(LiveDoc, id, context))?.run !== undefined,
   reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
 });
+
+/**
+ * How a task this host runs stands now, by the shared rules, with what was
+ * read to tell: one place for agent_status, the activity list and the
+ * directory, so they can't show it differently.
+ */
+const localView = async (
+  store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+  record: AgentRecord,
+  context: Context,
+): Promise<{
+  live: LiveState | undefined;
+  recent: Awaited<ReturnType<Tx["scanEntries"]>>["items"];
+  latest: AssistantMessage | undefined;
+  standing: AgentStanding;
+}> => {
+  const conversationId = record.conversationId as ConversationId;
+  const [live, recent] = await Promise.all([
+    store.snapshot(LiveDoc, conversationId, context),
+    store.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items, context),
+  ]);
+  const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+  const idle = live?.run === undefined;
+  const stopped = idle && (wasStopped(record) || stoppedShort(recent));
+  const running = !idle || (!stopped && (await agentsBusy(busyReader(store, context), conversationId).catch(() => false)));
+  return {
+    live,
+    recent,
+    latest,
+    standing: standingOf({
+      running,
+      stopped,
+      waitingFor: record.waiting?.waitingFor,
+      outcome: latest?.stopReason === "error" ? "failed" : "completed",
+    }),
+  };
+};
 
 type TreeAgent = {
   threadId: string;
@@ -2232,27 +2275,15 @@ export function stellaAgents(host: StellaAgentsHost) {
       };
     }
     const located = { ...row, where: describePlacement(host.rootPlacement) };
-    const id = record.conversationId as ConversationId;
-    const live = await api.snapshot(LiveDoc, id, context);
-    const recent = await api.commit(async (tx) => (await tx.scanEntries({ conversationId: id, order: "descending" }, 10)).items, context);
-    const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+    const { live, recent, latest, standing } = await localView(api, record, context);
     const at = (recent[0]?.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
-    const stopped = live?.run === undefined && (wasStopped(record) || stoppedShort(recent));
-    const waiting = live?.run === undefined && !stopped && (await agentsBusy(busyReader(api, context), id).catch(() => false));
-    const waitingFor = live?.run === undefined && !stopped && !waiting ? record.waiting?.waitingFor : undefined;
+    const shown = deviceAgentStatus(standing);
     return {
       ...located,
-      status:
-        live?.run !== undefined || waiting
-          ? "running"
-          : stopped
-            ? "canceled"
-            : waitingFor !== undefined
-              ? "waiting"
-              : latest?.stopReason === "error"
-                ? "failed"
-                : "completed",
-      ...(waitingFor !== undefined ? { waitingFor, ...(record.waiting?.wakers ? { wakers: record.waiting.wakers } : {}) } : {}),
+      status: shown.agentStatus,
+      ...(shown.waitingFor !== undefined
+        ? { waitingFor: shown.waitingFor, ...(record.waiting?.wakers ? { wakers: record.waiting.wakers } : {}) }
+        : {}),
       ...(live?.run !== undefined ? await longCallOf(api, live, context).then((longCall) => (longCall ? { longCall } : {})) : {}),
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
       ...(live?.run !== undefined && host.directory?.usageLimitPaused?.(agent.threadId)
@@ -2714,29 +2745,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         ? { status: run.outcome === "failed" ? "error" : "completed", agentStatus: run.outcome, attempt }
         : { status: "running", agentStatus: "running", attempt };
     }
-    const conversationId = found.record.conversationId as ConversationId;
-    const [live, recent] = await Promise.all([
-      harness.snapshot(LiveDoc, conversationId, context),
-      harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items, context),
-    ]);
-    const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+    const { recent, standing } = await localView(harness, found.record, context);
     const lastText = recent
       .filter((entry) => entry.kind === "pi.assistant")
       .map((entry) => textOf(entry.model?.[0] as AssistantMessage | undefined))
       .find((text) => text.length > 0);
-    const idleStopped = live?.run === undefined && (wasStopped(found.record) || stoppedShort(recent));
-    const running =
-      live?.run !== undefined ||
-      (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
-    const shown = deviceAgentStatus(
-      standingOf({
-        running,
-        stopped: idleStopped,
-        waitingFor: found.record.waiting?.waitingFor,
-        outcome: latest?.stopReason === "error" ? "failed" : "completed",
-      }),
-    );
-    return { ...shown, attempt, ...(lastText ? { lastText } : {}) };
+    return { ...deviceAgentStatus(standing), attempt, ...(lastText ? { lastText } : {}) };
   };
 
   const agentRecords = async (harness: Harness, context: Context): Promise<StellaAgentRecord[]> => {
@@ -2779,16 +2793,9 @@ export function stellaAgents(host: StellaAgentsHost) {
     for (const [threadId, agent] of Object.entries(state?.agents ?? {})) {
       if (agent.remote) continue;
       const conversationId = agent.conversationId as ConversationId;
-      const [live, [first, recent]] = await Promise.all([
-        harness.snapshot(LiveDoc, conversationId, context),
-        harness.commit(
-          async (tx) =>
-            [
-              (await tx.scanEntries({ conversationId, order: "ascending" }, 1)).items[0],
-              (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items,
-            ] as const,
-          context,
-        ),
+      const [{ live, recent, standing }, first] = await Promise.all([
+        localView(harness, agent, context),
+        harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "ascending" }, 1)).items[0], context),
       ]);
       const answers = recent
         .filter((entry) => entry.kind === "pi.assistant")
@@ -2797,19 +2804,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       const latest = answers[0];
       const prose = answers.map(textOf).filter((text) => text.trim()).reverse().slice(-5);
       const oldest = first?.model?.[0] as { timestamp?: number } | undefined;
-      const idleStopped = live?.run === undefined && (wasStopped(agent) || stoppedShort(recent));
-      const running =
-        live?.run !== undefined ||
-        (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
-      const shown = deviceAgentStatus(
-        standingOf({
-          running,
-          stopped: idleStopped,
-          waitingFor: agent.waiting?.waitingFor,
-          outcome: latest?.stopReason === "error" ? "failed" : "completed",
-        }),
-      );
-      const longCall = running ? await longCallOf(harness, live, context) : undefined;
+      const shown = deviceAgentStatus(standing);
+      const longCall = standing.state === "running" ? await longCallOf(harness, live, context) : undefined;
       records.push({
         threadId,
         ...(longCall ? { longCall } : {}),

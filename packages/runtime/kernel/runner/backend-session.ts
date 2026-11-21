@@ -1,7 +1,11 @@
 import {
-  BackendClient,
+  type BackendClient,
   backendTokenExpiryMs,
 } from "@stella/contracts/backend/client";
+import {
+  leaseBackendClient,
+  type BackendClientLease,
+} from "@stella/contracts/backend/shared-client";
 import type { OwnerIdentity } from "@stella/contracts/backend/conversations";
 import { raceWithTimeoutError } from "./cloud-effect-runtime.js";
 
@@ -42,7 +46,7 @@ export const createBackendSession = (
   getState: () => BackendSessionState,
   mintToken?: () => Promise<string | null>,
 ) => {
-  let client: BackendClient | null = null;
+  let lease: BackendClientLease | null = null;
   let clientUrl: string | null = null;
   let subject: string | null = null;
   let identity: { subject: string | null; value: Promise<OwnerIdentity> } | null = null;
@@ -80,15 +84,15 @@ export const createBackendSession = (
   const get = (): BackendClient | null => {
     const url = getState().backendUrl;
     if (!url) return null;
-    if (client && clientUrl === url) return client;
-    client?.dispose();
-    client = new BackendClient({
+    if (lease && clientUrl === url) return lease.client;
+    lease?.release();
+    lease = leaseBackendClient({
       baseUrl: url,
       getToken: async (options) =>
         options?.force ? await forceToken() : cachedToken(),
     });
     clientUrl = url;
-    return client;
+    return lease.client;
   };
 
   return {
@@ -107,7 +111,7 @@ export const createBackendSession = (
       if (next === subject) return;
       subject = next;
       identity = null;
-      client?.reconnect();
+      lease?.noteAuthToken(getState().authToken);
     },
     async ownerIdentity(): Promise<OwnerIdentity> {
       if (identity && identity.subject === subject) return await identity.value;
@@ -130,8 +134,8 @@ export const createBackendSession = (
       identity = null;
     },
     dispose(): void {
-      client?.dispose();
-      client = null;
+      lease?.release();
+      lease = null;
       clientUrl = null;
     },
   };

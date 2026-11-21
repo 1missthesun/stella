@@ -6,7 +6,7 @@ import {
   DISPATCH_SUBMIT_PATH,
   type DeviceDestination,
 } from "@stella/contracts/turn-plane/placement";
-import { phonePairingProofHeaders } from "./phone-pair-proof";
+import { mobileSessionPhoneHeaders } from "@stella/contracts/turn-plane/pairing-proof";
 import { getJson, HttpRequestError, postJson } from "./http";
 import { ensurePhoneAccess, type StoredPhoneAccess } from "./phone-access";
 import { env } from "../config/env";
@@ -313,11 +313,10 @@ export const submitAutomaticExecution = async (
       ? await ensurePhoneAccess(target.deviceId)
       : access;
   const pairedAccess = target.mode === "cloud" ? undefined : deviceAccess;
-  // Unchanged proof scheme, now addressed to the builder: HMAC-SHA256 keyed by
-  // sha256hex(pairSecret) over the same message, in the contract's header set.
-  // The HMAC itself stays on @noble because React Native has no WebCrypto.
+  // The account session authorises the send; the phone names itself and the
+  // computer it chose, which Stella offers the work to.
   const pairHeaders = pairedAccess
-    ? phonePairingProofHeaders(pairedAccess, admission.challenge)
+    ? mobileSessionPhoneHeaders(pairedAccess)
     : undefined;
   const origin = await resolveExecutionBuilderOrigin(builderOrigin);
   const result = await executionPlacementRequest(

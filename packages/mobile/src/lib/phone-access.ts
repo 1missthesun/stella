@@ -1,8 +1,6 @@
 import * as SecureStore from "./secure-store";
-import { Platform } from "react-native";
-import { assert, assertObject } from "./assert";
+import { assert } from "./assert";
 import { getBackendClient } from "./backend";
-import { backendOrigin, postJson } from "./http";
 
 const MOBILE_DEVICE_ID_KEY = "stella-mobile_phone-access.mobile-device-id";
 const PREFERRED_DESKTOP_DEVICE_ID_KEY =
@@ -10,10 +8,14 @@ const PREFERRED_DESKTOP_DEVICE_ID_KEY =
 const PAIRED_DESKTOP_IDS_KEY = "stella-mobile_phone-access.paired-desktop-ids";
 const DESKTOP_ACCESS_KEY_PREFIX = "stella-mobile_phone-access.desktop.";
 
+/**
+ * A computer this phone chose to work on. The account session is what lets
+ * the phone reach it; this only remembers the choice. Records written by
+ * older app versions also carry a pairing secret, which is no longer used.
+ */
 export type StoredPhoneAccess = {
   desktopDeviceId: string;
   mobileDeviceId: string;
-  pairSecret: string;
   approvedAt: number;
 };
 
@@ -81,7 +83,6 @@ const readStoredPhoneAccess = (
   if (
     typeof record.desktopDeviceId !== "string" ||
     typeof record.mobileDeviceId !== "string" ||
-    typeof record.pairSecret !== "string" ||
     typeof record.approvedAt !== "number"
   ) {
     return null;
@@ -90,43 +91,8 @@ const readStoredPhoneAccess = (
   return {
     desktopDeviceId: record.desktopDeviceId,
     mobileDeviceId: record.mobileDeviceId,
-    pairSecret: record.pairSecret,
     approvedAt: record.approvedAt,
   };
-};
-
-const readPairingResult = (
-  value: unknown,
-): { desktopDeviceId: string; approvedAt: number; pairSecret: string } => {
-  assertObject(value, "Pairing response must be an object.");
-  assert(
-    typeof value.desktopDeviceId === "string",
-    "Pairing response is missing the desktop id.",
-  );
-  assert(
-    typeof value.approvedAt === "number",
-    "Pairing response is missing the approval time.",
-  );
-  assert(
-    typeof value.pairSecret === "string",
-    "Pairing response is missing the phone credential.",
-  );
-  return {
-    desktopDeviceId: value.desktopDeviceId,
-    approvedAt: value.approvedAt,
-    pairSecret: value.pairSecret,
-  };
-};
-
-const readPlatformLabel = () => {
-  switch (Platform.OS) {
-    case "ios":
-      return "iPhone";
-    case "android":
-      return "Android";
-    default:
-      return "Phone";
-  }
 };
 
 export async function getOrCreateMobileDeviceId() {
@@ -211,18 +177,12 @@ export async function clearStoredPhoneAccess(desktopDeviceId: string) {
 }
 
 const storeGrantedPhoneAccess = async (
-  args: {
-    desktopDeviceId: string;
-    mobileDeviceId: string;
-    pairSecret: string;
-    approvedAt: number;
-  },
+  args: StoredPhoneAccess,
   options?: { keepPreferred?: boolean },
 ): Promise<StoredPhoneAccess> => {
   const access: StoredPhoneAccess = {
     desktopDeviceId: args.desktopDeviceId,
     mobileDeviceId: args.mobileDeviceId,
-    pairSecret: args.pairSecret,
     approvedAt: args.approvedAt,
   };
 
@@ -260,28 +220,29 @@ export async function getStoredPhoneAccess(
 
 export async function attachPhoneAccess(
   desktopDeviceId: string,
-  options?: { displayName?: string; keepPreferred?: boolean },
+  options?: { keepPreferred?: boolean },
 ): Promise<StoredPhoneAccess> {
-  const id = desktopDeviceId.trim();
-  assert(Boolean(id), "A computer is required to connect this phone.");
-  const mobileDeviceId = await getOrCreateMobileDeviceId();
-  const result = readPairingResult(
-    await postJson(
-      "/api/mobile/pairing/attach",
-      {
-        desktopDeviceId: id,
-        mobileDeviceId,
-        ...(options?.displayName?.trim()
-          ? { displayName: options.displayName.trim().slice(0, 64) }
-          : {}),
-        platform: readPlatformLabel(),
-      },
-      { origin: backendOrigin() },
-    ),
+  const requested = desktopDeviceId.trim();
+  assert(Boolean(requested), "A computer is required to connect this phone.");
+  const client = getBackendClient();
+  const identity = await client.call("devices.identity", {
+    deviceId: requested,
+  });
+  const id = identity.deviceId?.trim() || requested;
+  const { devices } = await client.read(
+    "devices.list",
+    {},
+    {
+      timeoutMs: 15_000,
+      timeoutMessage: "Stella couldn't check your computers. Try again.",
+    },
   );
-
+  if (!devices.some((device) => device.deviceId === id)) {
+    throw new Error("That computer is not signed in to this account.");
+  }
+  const mobileDeviceId = await getOrCreateMobileDeviceId();
   return await storeGrantedPhoneAccess(
-    { ...result, mobileDeviceId },
+    { desktopDeviceId: id, mobileDeviceId, approvedAt: Date.now() },
     { keepPreferred: options?.keepPreferred === true },
   );
 }

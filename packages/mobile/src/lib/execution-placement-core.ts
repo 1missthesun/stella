@@ -1,7 +1,6 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { utf8ToBytes } from "@noble/hashes/utils.js";
 import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
   DISPATCH_PAYLOAD_MAX_BYTES,
@@ -9,10 +8,7 @@ import {
   type DispatchPayload,
   type DispatchSubmitRequest,
 } from "@stella/contracts/turn-plane/placement";
-import {
-  buildMobilePairingChallenge,
-  canonicalDispatchPayloadJson,
-} from "@stella/contracts/turn-plane/pairing-proof";
+import { canonicalDispatchPayloadJson } from "@stella/contracts/turn-plane/pairing-proof";
 
 export type AutomaticExecutionKind = "chat" | "agent";
 export type AutomaticExecutionSubject = "portable" | "computer" | "cloud";
@@ -459,19 +455,6 @@ export const buildAutomaticExecutionAdmission = (
       `This message is too large to send (${Math.ceil(payloadBytes / 1024)} KB; the limit is ${DISPATCH_PAYLOAD_MAX_BYTES / 1024} KB). Send the long text as a file instead.`,
     );
   }
-  // The contract's `dispatchPayloadHash` is WebCrypto; React Native has no
-  // `crypto.subtle`, so the same digest is taken with @noble over the same
-  // canonical bytes.
-  const payloadHash = bytesToHex(sha256(utf8ToBytes(payloadJson)));
-  const challenge = buildMobilePairingChallenge({
-    idempotencyKey,
-    conversationId,
-    payloadHash,
-    kind: input.kind,
-    subject,
-    targetMode: target.mode,
-    targetDeviceId,
-  });
   const body: DispatchSubmitRequest = {
     protocol: PLACEMENT_PROTOCOL,
     idempotencyKey,
@@ -490,5 +473,5 @@ export const buildAutomaticExecutionAdmission = (
     ],
     payload,
   };
-  return { challenge, payloadJson, payloadHash, body };
+  return { payloadJson, body };
 };

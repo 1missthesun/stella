@@ -7,7 +7,7 @@ import {
   IPC_USER_ASK_OPENED,
   IPC_USER_ASK_UPDATED,
 } from "@stella/contracts/desktop/ipc-channels";
-import { BackendClient } from "@stella/contracts/backend/client";
+import { leaseBackendClient } from "@stella/contracts/backend/shared-client";
 import { redactSensitiveText } from "@stella/contracts/sensitive-data";
 import {
   EMPTY_SECRET_FINGERPRINTS,
@@ -369,6 +369,7 @@ export class UserAskService {
         void this.refreshMirror();
     }
     noteAuthToken(token) {
+        this.backend?.lease.noteAuthToken(token ?? null);
         if (!this.mirrorStarted) {
             return;
         }
@@ -1596,21 +1597,20 @@ export class UserAskService {
             return null;
         }
         if (this.backend?.baseUrl === baseUrl) {
-            return this.backend.client;
+            return this.backend.lease.client;
         }
-        this.backend?.client.dispose();
+        this.remoteWatchStop?.();
+        this.remoteWatchStop = null;
+        this.remoteLive = false;
+        this.backend?.lease.release();
         this.backend = {
             baseUrl,
-            client: new BackendClient({
+            lease: leaseBackendClient({
                 baseUrl,
                 getToken: async () => (await this.options.getAuthToken?.()) ?? null,
-                onConnectionChange: (connected) => {
-                    if (!connected)
-                        this.remoteLive = false;
-                },
             }),
         };
-        return this.backend.client;
+        return this.backend.lease.client;
     }
     startRemoteAnswerSync() {
         const client = this.ensureBackendClient();
@@ -1650,7 +1650,7 @@ export class UserAskService {
             this.remotePollTimer = null;
         }
         this.remoteLive = false;
-        this.backend?.client.dispose();
+        this.backend?.lease.release();
         this.backend = null;
     }
     claimRemoteAnswers() {

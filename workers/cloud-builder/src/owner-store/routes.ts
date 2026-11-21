@@ -28,7 +28,7 @@ import { RpcError, toBackendError } from "./errors.js";
 import type { CallName } from "@stella/contracts/backend/api";
 import type { OwnerCaller, OwnerRegistry, PublicCallDef } from "./registry.js";
 import { ownerGateStub } from "../rpc-release.js";
-import { stageClaudeSessionChunk } from "./domains/claude-sessions.js";
+import { stageClaudeSessionChunk, type StagedClaudeSessionChunk } from "./domains/claude-sessions.js";
 
 const MAX_RPC_BODY_BYTES = 1024 * 1024;
 
@@ -42,11 +42,26 @@ const appendClaudeSessionChunk = async (
   caller: OwnerCaller,
   args: unknown,
 ): Promise<RpcResponse> => {
-  const staged = await stageClaudeSessionChunk(env, caller.ownerId, args);
-  const response = (await ownerGateStub(env.OWNER_GATES, caller.ownerId).claudeSessionCommit({
-    staged,
-    caller,
-  })) as RpcResponse;
+  const commit = async (raw: boolean): Promise<{ staged: StagedClaudeSessionChunk; response: RpcResponse }> => {
+    const staged = await stageClaudeSessionChunk(env, caller.ownerId, args, { raw });
+    const response = (await ownerGateStub(env.OWNER_GATES, caller.ownerId).claudeSessionCommit({
+      staged,
+      caller,
+    })) as RpcResponse;
+    return { staged, response };
+  };
+  const first = await commit(false);
+  let response = first.response;
+  // An owner object still on code from before chunk encodings refuses the
+  // field for a few minutes after a deploy; store that chunk raw instead.
+  if (
+    !response.ok &&
+    first.staged.encoding &&
+    response.error.code === "BAD_REQUEST" &&
+    response.error.message === "encoding is not allowed."
+  ) {
+    response = (await commit(true)).response;
+  }
   if (!response.ok) return response;
   const { head, retired } = response.value as {
     head: unknown;

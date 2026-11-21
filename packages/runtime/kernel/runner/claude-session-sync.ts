@@ -39,7 +39,14 @@ import { forkDelayedCall, raceWithTimeoutError } from "./cloud-effect-runtime.js
 import { resolveJwtOwnerScope } from "@stella/node-shared/shared/jwt-owner-scope.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
-const STEP_DEBOUNCE_MS = 400;
+/**
+ * A running turn's steps upload together at most this often: a computer that
+ * disappears mid-turn leaves its last few seconds out of the cloud copy (its
+ * own restart uploads them from the local file). A turn's end, a move to
+ * another computer and a quit upload at once.
+ */
+const STEP_BATCH_MS = 5_000;
+const SHUTDOWN_FLUSH_MS = 5_000;
 const FINAL_RECHECK_MS = 1_500;
 const NO_AUTH_RETRY_MS = 5_000;
 const BASE_RETRY_MS = 1_000;
@@ -86,6 +93,8 @@ export type ClaudeSessionSync = ClaudeSessionSyncSink & {
   stop(): void;
   pending(): number;
   flush(timeoutMs?: number): Promise<boolean>;
+  /** Uploads what is waiting before the runtime stops, briefly and only when signed in. */
+  flushForShutdown(): Promise<void>;
   restore(args: {
     threadId: string;
     configDir: string | null;
@@ -788,7 +797,7 @@ export const createClaudeSessionSync = (options: {
     return running;
   };
 
-  const noteCheckpoint = (checkpoint: ClaudeSessionCheckpoint): void => {
+  const noteCheckpoint = (checkpoint: ClaudeSessionCheckpoint, recheck = false): void => {
     if (stopped || !isClaudeSessionId(checkpoint.sessionId)) return;
     const scope = ownerScope();
     if (!scope) return;
@@ -798,10 +807,10 @@ export const createClaudeSessionSync = (options: {
       logger.warn("claude-session-sync.note-failed", { error: errorMessage(error) });
       return;
     }
-    scheduleDrain(STEP_DEBOUNCE_MS);
+    scheduleDrain(checkpoint.final || recheck ? 0 : STEP_BATCH_MS);
     if (checkpoint.final) {
       forkDelayedCall(FINAL_RECHECK_MS, () =>
-        noteCheckpoint({ ...checkpoint, final: false }),
+        noteCheckpoint({ ...checkpoint, final: false }, true),
       );
     }
   };
@@ -1101,8 +1110,16 @@ export const createClaudeSessionSync = (options: {
     }
   };
 
+  const flushForShutdown = async (): Promise<void> => {
+    if (stopped || !ownerScope() || !options.getBackend() || pendingCount() === 0) return;
+    const flushed = await flush(SHUTDOWN_FLUSH_MS);
+    if (!flushed) {
+      logger.warn("claude-session-sync.shutdown-flush-incomplete", { pending: pendingCount() });
+    }
+  };
+
   return {
-    noteCheckpoint,
+    noteCheckpoint: (checkpoint) => noteCheckpoint(checkpoint),
     takeRestored,
     restoreForResume,
     prepareLocalResume,
@@ -1132,6 +1149,7 @@ export const createClaudeSessionSync = (options: {
     },
     pending: pendingCount,
     flush,
+    flushForShutdown,
     restore,
   };
 };

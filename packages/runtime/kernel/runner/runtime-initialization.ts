@@ -239,6 +239,8 @@ export const createRuntimeInitialization = (
   context: RunnerContext,
   deps: {
     disposeBackendClient: () => void;
+    /** Last uploads that need the backend client, before it goes. */
+    flushBeforeStop: () => Promise<void>;
     shutdownTasks: () => void | Promise<void>;
     lifecycle?: RuntimeInitializationLifecycleOverrides;
   },
@@ -646,6 +648,11 @@ export const createRuntimeInitialization = (
     // session-storage teardown. Even a user extension factory that ignores its
     // abort signal must settle before its captured services can be closed.
     await stopInitialization();
+    await deps.flushBeforeStop().catch((error: unknown) => {
+      logger.warn("runner.stop.flush-failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     deps.disposeBackendClient();
     context.cloudTranscript.stop();
     context.state.backgroundExitWake?.dispose();

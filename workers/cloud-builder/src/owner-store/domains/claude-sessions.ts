@@ -76,6 +76,17 @@ export const CLAUDE_SESSIONS_LEAN_MIGRATION = {
   statements: ["DROP INDEX IF EXISTS idx_claude_session_chunks_offset"],
 };
 
+export const CLAUDE_SESSIONS_CHUNK_ENCODING_MIGRATION = {
+  id: "claude-sessions.3-chunk-encoding",
+  statements: ["ALTER TABLE claude_session_chunks ADD COLUMN encoding TEXT"],
+};
+
+/**
+ * Chunks are stored gzipped when that saves at least this share; the hashes,
+ * chain and lengths always describe the raw bytes, so clients never see it.
+ */
+const GZIP_MIN_SAVING = 0.1;
+
 const SESSION_TOUCH_MS = 60_000;
 
 const HEX_SHA256 = /^[0-9a-f]{64}$/;
@@ -126,7 +137,10 @@ type ChunkRow = {
   sha256: string;
   chain: string;
   object_key: string;
+  encoding: string | null;
 };
+
+type ChunkEncoding = "gzip";
 
 const bucketOf = (ctx: OwnerContext): R2Bucket => {
   const bucket = ctx.env.CONVERSATION_ARCHIVE;
@@ -164,6 +178,21 @@ const decodeBase64 = (value: string): Uint8Array => {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+};
+
+const transform = async (
+  bytes: Uint8Array,
+  stream: CompressionStream | DecompressionStream,
+): Promise<Uint8Array> =>
+  new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+
+const gzipWhenSmaller = async (
+  bytes: Uint8Array,
+): Promise<{ body: Uint8Array; encoding?: ChunkEncoding }> => {
+  const gzipped = await transform(bytes, new CompressionStream("gzip"));
+  return gzipped.byteLength <= bytes.byteLength * (1 - GZIP_MIN_SAVING)
+    ? { body: gzipped, encoding: "gzip" }
+    : { body: bytes };
 };
 
 const encodeBase64 = (bytes: Uint8Array): string => {
@@ -328,6 +357,7 @@ const fileCount = (db: OwnerDb, args: { threadId: string; sessionId: string }): 
 export type StagedClaudeSessionChunk = Omit<ClaudeSessionAppendArgs, "data"> & {
   length: number;
   objectKey: string;
+  encoding?: ChunkEncoding;
 };
 
 const chunkShape = () => ({
@@ -349,6 +379,7 @@ const stagedParser = object({
   ...chunkShape(),
   length: number({ int: true, min: 1, max: CLAUDE_SESSION_CHUNK_MAX_BYTES }),
   objectKey: string({ min: 1, max: 1_024 }),
+  encoding: optional(literal("gzip")),
 });
 
 const assertAppendShape = (args: Omit<ClaudeSessionAppendArgs, "data">): void => {
@@ -361,10 +392,15 @@ const assertAppendShape = (args: Omit<ClaudeSessionAppendArgs, "data">): void =>
   }
 };
 
+/**
+ * Validates a chunk and stores it in R2, gzipped unless `raw` (an owner object
+ * still on code from before chunk encodings refuses the `encoding` field).
+ */
 export const stageClaudeSessionChunk = async (
   env: { CONVERSATION_ARCHIVE?: R2Bucket },
   ownerId: string,
   raw: unknown,
+  options: { raw?: boolean } = {},
 ): Promise<StagedClaudeSessionChunk> => {
   const { data, ...args } = appendParser(raw) as ClaudeSessionAppendArgs;
   assertAppendShape(args);
@@ -381,8 +417,14 @@ export const stageClaudeSessionChunk = async (
   const bucket = env.CONVERSATION_ARCHIVE;
   if (!bucket) throw new RpcError("UNAVAILABLE", "Session sync isn't available right now.");
   const objectKey = await chunkObjectKey(ownerId, args);
-  await bucket.put(objectKey, bytes);
-  return { ...args, length: bytes.byteLength, objectKey };
+  const stored = options.raw ? { body: bytes } : await gzipWhenSmaller(bytes);
+  await bucket.put(objectKey, stored.body);
+  return {
+    ...args,
+    length: bytes.byteLength,
+    objectKey,
+    ...(stored.encoding ? { encoding: stored.encoding } : {}),
+  };
 };
 
 type CommitResult = {
@@ -394,8 +436,8 @@ const insertChunk = (ctx: OwnerContext, args: StagedClaudeSessionChunk, chunkInd
   ctx.db.run(
     `INSERT INTO claude_session_chunks (
        thread_id, session_id, path, generation, chunk_index, offset, length,
-       sha256, chain, object_key, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       sha256, chain, object_key, created_at, encoding
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args.threadId,
     args.sessionId,
     args.path,
@@ -407,6 +449,7 @@ const insertChunk = (ctx: OwnerContext, args: StagedClaudeSessionChunk, chunkInd
     args.chain,
     args.objectKey,
     ctx.now,
+    args.encoding ?? null,
   );
 };
 
@@ -548,7 +591,7 @@ const latestSession = (
       ...headOf(file),
       chunks: ctx.db
         .all<ChunkRow>(
-          `SELECT chunk_index, offset, length, sha256, chain, object_key FROM claude_session_chunks
+          `SELECT chunk_index, offset, length, sha256, chain, object_key, encoding FROM claude_session_chunks
             WHERE thread_id = ? AND session_id = ? AND path = ? AND generation = ?
             ORDER BY chunk_index`,
           session.thread_id,
@@ -575,7 +618,7 @@ const readChunk = async (
     throw new RpcError("BAD_REQUEST", "path must be a file of this session.");
   }
   const chunk = ctx.db.one<ChunkRow>(
-    `SELECT chunk_index, offset, length, sha256, chain, object_key FROM claude_session_chunks
+    `SELECT chunk_index, offset, length, sha256, chain, object_key, encoding FROM claude_session_chunks
       WHERE thread_id = ? AND session_id = ? AND path = ? AND generation = ? AND chunk_index = ?`,
     args.threadId,
     args.sessionId,
@@ -586,7 +629,9 @@ const readChunk = async (
   if (!chunk) throw new RpcError("NOT_FOUND", "That part of the session isn't stored.");
   const object = await bucketOf(ctx).get(chunk.object_key);
   if (!object) throw new RpcError("NOT_FOUND", "That part of the session is missing.");
-  const bytes = new Uint8Array(await object.arrayBuffer());
+  const stored = new Uint8Array(await object.arrayBuffer());
+  const bytes =
+    chunk.encoding === "gzip" ? await transform(stored, new DecompressionStream("gzip")) : stored;
   if ((await sha256BytesHex(bytes)) !== chunk.sha256) {
     throw new RpcError("INTERNAL", "A stored session part failed its integrity check.");
   }
@@ -610,7 +655,11 @@ const purgeClaudeSessions = async (ctx: OwnerContext): Promise<{ pending: boolea
 
 export const claudeSessionsDomain = {
   name: "claude-sessions",
-  migrations: [CLAUDE_SESSIONS_MIGRATION, CLAUDE_SESSIONS_LEAN_MIGRATION],
+  migrations: [
+    CLAUDE_SESSIONS_MIGRATION,
+    CLAUDE_SESSIONS_LEAN_MIGRATION,
+    CLAUDE_SESSIONS_CHUNK_ENCODING_MIGRATION,
+  ],
   calls: {
     "claudeSessions.append": {
       scope: "owner",

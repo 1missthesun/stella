@@ -318,6 +318,7 @@ export const createStellaHostRunner = (
 
   const runtimeInitialization = createRuntimeInitialization(context, {
     disposeBackendClient: () => context.backend.dispose(),
+    flushBeforeStop: () => claudeSessionSync.flushForShutdown(),
     shutdownTasks: async () => {
       computerAgentCloudRecords.stop();
       claudeSessionSync.stop();

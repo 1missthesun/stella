@@ -910,11 +910,21 @@ export const runCloudClaude = async (options: {
   let handedOn = false;
   let stdin: { write(data: string): void; end(): void } | undefined;
   // Stella's tools answer on the CLI's stdin. A kept CLI that is picked up
-  // again already registered them (its first turn wrote the initialize
-  // request); this turn's host just answers its calls.
-  const toolChannel = options.toolHost.openControlChannel((line) =>
-    stdin?.write(`${line}\n`),
+  // again already registered and listed them (its first turn wrote the
+  // initialize request, and only a process that listed them is kept); it
+  // lists an SDK server's tools once per process, so this turn's host just
+  // answers its calls.
+  const toolChannel = options.toolHost.openControlChannel(
+    (line) => stdin?.write(`${line}\n`),
+    { listed: keeperReused },
   );
+  // The turn's prompt carries a uuid the CLI replays (--replay-user-messages)
+  // when it takes it up. Before that, a resumed or picked-up CLI can run a
+  // query of its own (a `task-notification` for a background command an
+  // earlier turn started), with its own init and an `origin`-marked result:
+  // neither is this turn's.
+  const promptUuid = crypto.randomUUID();
+  let promptReplayed = false;
   try {
     const args = argsFor(resume);
     let inputEnded = false;
@@ -978,6 +988,27 @@ export const runCloudClaude = async (options: {
     let quieted: Error | undefined;
     let lastEntryUuid: string | undefined;
     let quietResumeAt: string | undefined;
+    /** What the latest init said about Stella's tools, until it is judged. */
+    let initVerdict: string | undefined;
+    const judgeInit = (): void => {
+      const unavailable = initVerdict;
+      initVerdict = undefined;
+      if (unavailable && !cancellation.aborted) {
+        error = unavailable;
+        cancellation.abort(new Error(unavailable));
+      }
+    };
+    const addResultUsage = (event: ClaudeStreamJsonEvent): void => {
+      const usage =
+        event.usage && typeof event.usage === "object"
+          ? (event.usage as Record<string, unknown>)
+          : {};
+      inputTokens +=
+        numberAt(usage.input_tokens) +
+        numberAt(usage.cache_creation_input_tokens) +
+        numberAt(usage.cache_read_input_tokens);
+      outputTokens += numberAt(usage.output_tokens);
+    };
     const onJson = (event: ClaudeStreamJsonEvent): void => {
         if (toolChannel.handle(event)) return;
         options.onStreamEvent?.(event);
@@ -989,11 +1020,11 @@ export const runCloudClaude = async (options: {
           markTurnStep("claudeInit");
           initialized = true;
           void writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
-          const unavailable = stellaToolsUnavailable(event);
-          if (unavailable && !cancellation.aborted) {
-            error = unavailable;
-            cancellation.abort(new Error(unavailable));
-          }
+          // An init before the prompt's replay may open the CLI's own query,
+          // which can start before Stella's server is connected; it is judged
+          // when the prompt's query is known to be the one it opened.
+          initVerdict = stellaToolsUnavailable(event);
+          if (promptReplayed) judgeInit();
           return;
         }
         if (options.quiet && isClaudeCodeVisibleOutputNudge(event)) {
@@ -1005,6 +1036,15 @@ export const runCloudClaude = async (options: {
           return;
         }
         if (type === "user") {
+          if (
+            !promptReplayed &&
+            event.isReplay === true &&
+            event.uuid === promptUuid
+          ) {
+            promptReplayed = true;
+            judgeInit();
+            return;
+          }
           const text =
             event.isReplay === true && typeof event.uuid === "string"
               ? injected.get(event.uuid)
@@ -1042,7 +1082,21 @@ export const runCloudClaude = async (options: {
           for (const text of texts) finalText = text;
           return;
         }
+        if (
+          type === "result" &&
+          !promptReplayed &&
+          typeof (event.origin as { kind?: unknown } | undefined)?.kind ===
+            "string"
+        ) {
+          // The CLI's own query before this turn's prompt: its init is not
+          // the prompt's and its result is not this turn's answer.
+          markTurnStep("claudeOwnQueryResult");
+          initVerdict = undefined;
+          addResultUsage(event);
+          return;
+        }
         if (type === "result") {
+          if (!promptReplayed) judgeInit();
           markTurnStep("claudeResult");
           const resultText =
             typeof event.result === "string" ? event.result.trim() : "";
@@ -1050,15 +1104,7 @@ export const runCloudClaude = async (options: {
             answers.push(resultText);
             finalText = answers.join("\n\n");
           }
-          const usage =
-            event.usage && typeof event.usage === "object"
-              ? (event.usage as Record<string, unknown>)
-              : {};
-          inputTokens +=
-            numberAt(usage.input_tokens) +
-            numberAt(usage.cache_creation_input_tokens) +
-            numberAt(usage.cache_read_input_tokens);
-          outputTokens += numberAt(usage.output_tokens);
+          addResultUsage(event);
           if (typeof event.num_turns === "number") {
             reportedTurns += event.num_turns;
             llmCalls = reportedTurns;
@@ -1132,7 +1178,9 @@ export const runCloudClaude = async (options: {
           },
         };
         if (!keeperReused) stdin.write(`${toolChannel.initializeLine}\n`);
-        stdin.write(`${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`);
+        stdin.write(
+          `${streamJsonUserMessage(sessionId, options.inputPrompt, promptUuid)}\n`,
+        );
         markTurnStep("claudePromptSent");
       });
     const result = keeper
@@ -1142,7 +1190,7 @@ export const runCloudClaude = async (options: {
             stdin = input;
             input.write(`${toolChannel.initializeLine}\n`);
             input.write(
-              `${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`,
+              `${streamJsonUserMessage(sessionId, options.inputPrompt, promptUuid)}\n`,
             );
           },
           ...launchOf(args),
@@ -1196,7 +1244,9 @@ export const runCloudClaude = async (options: {
           ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toISOString()}.`
           : `Claude usage limit reached for ${options.claudeAccount.email}.`;
     }
-    if (kept && error) {
+    // Only a process that listed Stella's tools is kept: the next turn that
+    // picks it up counts them as listed.
+    if (kept && (error || !toolChannel.listed())) {
       await kept.discard().catch(() => undefined);
       kept = undefined;
     }

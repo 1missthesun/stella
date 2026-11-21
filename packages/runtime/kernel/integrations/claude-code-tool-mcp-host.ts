@@ -159,6 +159,8 @@ export type ClaudeCodeToolControlChannel = {
   initializeLine: string;
   /** Takes one stdout event; true when it was this channel's (answer written). */
   handle: (event: Record<string, unknown>) => boolean;
+  /** Whether the process on this channel has listed Stella's tools. */
+  listed: () => boolean;
   close: () => void;
 };
 
@@ -167,9 +169,16 @@ export type ClaudeCodeToolMcpHost = {
   /** The names Stella's tools carry in Claude Code, in catalog order. */
   claudeToolNames: readonly string[];
   postToolUseHook: { url: string; headers: { Authorization: string } };
-  /** Serve this host's tools over a Claude Code process's stdin/stdout. */
+  /**
+   * Serve this host's tools over a Claude Code process's stdin/stdout.
+   * `listed`: the process already listed this exact catalog on an earlier
+   * channel (a kept process picked up again). Claude Code lists an SDK
+   * server's tools once per process, so it will not list them again, and the
+   * host counts its catalog as loaded from the start.
+   */
   openControlChannel: (
     write: (line: string) => void,
+    options?: { listed?: boolean },
   ) => ClaudeCodeToolControlChannel;
   abortActiveCalls: (reason?: unknown) => void;
   waitForClientReady: (
@@ -670,7 +679,10 @@ export const createClaudeCodeToolMcpHost = async (
   const aliases = legacyClaudeCodeToolAliases(stellaNames);
   const openControlChannel = (
     write: (line: string) => void,
+    channelOptions?: { listed?: boolean },
   ): ClaudeCodeToolControlChannel => {
+    let listed = channelOptions?.listed === true;
+    if (listed) announceClientReady();
     const initializeRequestId = `stella-init-${crypto.randomUUID()}`;
     const initializeLine = JSON.stringify({
       type: "control_request",
@@ -725,7 +737,10 @@ export const createClaudeCodeToolMcpHost = async (
           if (waiting) {
             awaiting.delete(message.id);
             answer(waiting.requestId, message);
-            if (waiting.delivery.catalogListed) announceClientReady();
+            if (waiting.delivery.catalogListed) {
+              listed = true;
+              announceClientReady();
+            }
             for (const acknowledge of waiting.delivery.acknowledgements) {
               void Promise.resolve(acknowledge()).catch(() => undefined);
             }
@@ -807,7 +822,7 @@ export const createClaudeCodeToolMcpHost = async (
       answer(requestId, { jsonrpc: "2.0", result: {}, id: 0 });
       return true;
     };
-    return { initializeLine, handle, close: state.close };
+    return { initializeLine, handle, listed: () => listed, close: state.close };
   };
 
   const sockets = new Set<Socket>();

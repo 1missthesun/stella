@@ -1,7 +1,7 @@
 import { app } from "electron";
 import { hasMacPermission } from "../utils/macos-permissions.js";
 import path from "path";
-import { resolveStellaDataDir } from "@stella/runtime/kernel/home/stella-home";
+import { resolveStellaDataDir } from "./stella-data-dir.js";
 import { OverlayWindowController } from "../windows/overlay-window.js";
 import { CompanionWindowController } from "../windows/companion-window.js";
 import { broadcastCompanionVisibility } from "../ipc/companion-handlers.js";

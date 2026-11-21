@@ -9,7 +9,7 @@ import type {
   RuntimeOneShotCompletionResult,
 } from "@stella/contracts/protocol";
 import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
-import { readRuntimePrompt } from "@stella/runtime/kernel/prompts/home-prompts";
+import { callRuntimeAppService } from "../services/runtime-app-services.js";
 import { IPC_ONBOARDING_SYNTHESIZE } from "@stella/contracts/desktop/ipc-channels";
 import { handleIpc } from "./typed-ipc.js";
 
@@ -175,7 +175,9 @@ const synthesize = async (
   ].join("\n");
   if (!coreMemory) throw new Error("Failed to synthesize core memory.");
 
-  const startersPrompt = readRuntimePrompt("synthesis");
+  const startersPrompt = await callRuntimeAppService<string | null>("readRuntimePrompt", {
+    id: "synthesis",
+  }).catch(() => null);
   const [welcomeMessage, finale] = await Promise.all([
     complete("welcome", welcomeTemplate.replace("{{coreMemory}}", coreMemory)),
     startersPrompt

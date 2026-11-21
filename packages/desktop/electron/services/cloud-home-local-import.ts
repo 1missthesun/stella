@@ -1,3 +1,4 @@
+import { callRuntimeAppService } from "./runtime-app-services.js";
 import { createHash } from "node:crypto";
 import { constants as fileConstants, promises as fs } from "node:fs";
 import path from "node:path";
@@ -419,9 +420,10 @@ const scanSkill = async (args: {
   }
   let metadata: Record<string, unknown>;
   try {
-    // The YAML parser loads with the first import rather than with main.
-    const { extractFrontmatter } = await import("@stella/runtime/kernel/frontmatter");
-    metadata = extractFrontmatter(UTF8.decode(skillMarkdown.bytes)).metadata;
+    // The runtime parses the YAML; main carries no YAML parser.
+    metadata = await callRuntimeAppService<Record<string, unknown>>("readSkillFrontmatter", {
+      markdown: UTF8.decode(skillMarkdown.bytes),
+    });
   } catch {
     throw new LocalImportError(
       "skill_invalid",

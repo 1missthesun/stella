@@ -5,7 +5,6 @@ import path from "node:path";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
 import { clearSupersededDeviceId as clearStoredSupersededDeviceId, getOrCreateDeviceIdentity, getOrCreateDeviceSigner, } from "@stella/runtime/kernel/home/device";
 import { deleteConnectorAccessTokens, loadConnectorTokenPayload, saveConnectorTokenPayload, } from "@stella/runtime/kernel/connectors/oauth";
-import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-home";
 import { createStellaHostRunner, } from "../stella-host-runner.js";
 import { broadcastLocalChatUpdated, broadcastScheduleUpdated, broadcastToWindows, pendingRemoteExecutionRequest, } from "./context.js";
 import { startOfficePreviewBridge } from "./office-preview-bridge.js";
@@ -23,19 +22,6 @@ import {
   IPC_EXECUTION_TARGET_SET,
   IPC_PI_CHAT_EVENTS,
 } from "@stella/contracts/desktop/ipc-channels";
-let stellaDataDirSeedingPromise = null;
-const ensureStellaDataDirSeededOnce = (stellaAppDir, stellaDataDirPath) => {
-    if (!stellaDataDirSeedingPromise) {
-        const attempt = ensureStellaDataDirSeeded(stellaAppDir, stellaDataDirPath);
-        stellaDataDirSeedingPromise = attempt;
-        void attempt.catch(() => {
-            if (stellaDataDirSeedingPromise === attempt) {
-                stellaDataDirSeedingPromise = null;
-            }
-        });
-    }
-    return stellaDataDirSeedingPromise;
-};
 export const loadStellaDeviceIdentity = async (context) => {
     const { state } = context;
     const stellaDataDirPath = state.stellaDataDirPath;
@@ -381,7 +367,6 @@ export const initializeStellaHostRunner = async (context) => {
     if (!stellaAppDir || !stellaDataDirPath || !state.stellaWorkspacePath) {
         throw new Error("Stella root is not initialized.");
     }
-    await ensureStellaDataDirSeededOnce(stellaAppDir, stellaDataDirPath);
     await services.securityPolicyService.loadPolicy();
     const loadDeviceIdentity = async () => await loadStellaDeviceIdentity(context);
     const loadDeviceSigner = async () => await loadStellaDeviceSigner(context);

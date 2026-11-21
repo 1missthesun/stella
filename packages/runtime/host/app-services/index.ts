@@ -13,11 +13,23 @@ import {
   signInLlmOAuth,
   type LlmSignInNotice,
 } from "./llm-sign-in.js";
+import {
+  deletePromptPresetForApp,
+  listPromptPresetsForApp,
+  readPromptPresetForApp,
+  readRuntimePromptForApp,
+  readSkillFrontmatter,
+  resetCustomizationsForApp,
+  savePromptPresetForApp,
+  selectPromptPresetForApp,
+} from "./customizations.js";
 
 export type AppServiceContext = Pick<
   StellaRuntimeHostOptions,
   "hostHandlers" | "initializeParams"
 >;
+
+const dataDir = (context: AppServiceContext) => context.initializeParams.stellaDataDirPath;
 
 type AppServiceCall = (context: AppServiceContext, ...args: any[]) => unknown;
 
@@ -61,4 +73,16 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
       apiKey: request?.apiKey,
       stellaAppDir: context.initializeParams.stellaDataDirPath,
     }),
+  listPromptPresets: (context, request) =>
+    listPromptPresetsForApp(dataDir(context), request),
+  readPromptPreset: (context, request) => readPromptPresetForApp(dataDir(context), request),
+  savePromptPreset: (context, request) => savePromptPresetForApp(dataDir(context), request),
+  deletePromptPreset: (context, request) =>
+    deletePromptPresetForApp(dataDir(context), request),
+  selectPromptPreset: (context, request) =>
+    selectPromptPresetForApp(dataDir(context), request),
+  readRuntimePrompt: (_context, request) => readRuntimePromptForApp(request),
+  resetCustomizations: (context) =>
+    resetCustomizationsForApp(context.initializeParams.stellaAppDir, dataDir(context)),
+  readSkillFrontmatter: (_context, request) => readSkillFrontmatter(request),
 };

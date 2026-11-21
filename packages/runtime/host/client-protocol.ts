@@ -14,6 +14,14 @@ export const RUNTIME_APP_SERVICE_CALLS = [
   "openChatGptCallbackListener",
   "waitForChatGptCallback",
   "closeChatGptCallbackListener",
+  "listPromptPresets",
+  "readPromptPreset",
+  "savePromptPreset",
+  "deletePromptPreset",
+  "selectPromptPreset",
+  "readRuntimePrompt",
+  "resetCustomizations",
+  "readSkillFrontmatter",
 ] as const;
 
 export type RuntimeAppServiceCall = (typeof RUNTIME_APP_SERVICE_CALLS)[number];

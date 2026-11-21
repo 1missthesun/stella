@@ -15,11 +15,6 @@ import { coerceAgentRuntimeEngine } from "@stella/contracts/agent-engine";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
 import { hasRealtimeVoiceSessionRouteChanged, } from "@stella/contracts/local-preferences";
-import { resetStellaCustomizations } from "@stella/runtime/kernel/home/reset-customizations";
-import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-home";
-import { loadAgentSystemPrompt } from "@stella/runtime/kernel/agents/home-agent-prompt";
-import { deletePromptPreset, isCustomizablePromptAgentId, listPromptPresets, readPromptPreset, savePromptPreset, } from "@stella/runtime/kernel/prompts/prompt-presets";
-import { getPromptPresetSelection, setPromptPresetSelection, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
 import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchSignInProgress, } from "../services/runtime-app-services.js";
@@ -872,97 +867,44 @@ export const registerSystemHandlers = (options) => {
             };
         }
     });
-    const promptPresetContext = (event, channel, agentId) => {
+    // Prompt presets live in the runtime's home files; the runtime reads and
+    // writes them, and checks the agent id.
+    const guardPromptPresets = (event, channel) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, channel)) {
             throw new Error(`Blocked untrusted ${channel} request.`);
         }
-        if (!isCustomizablePromptAgentId(agentId)) {
-            throw new Error("Unknown prompt agent.");
-        }
-        const stellaAppDir = options.getStellaAppDir();
-        if (!stellaAppDir)
-            throw new Error("Stella data directory unavailable.");
-        return stellaAppDir;
     };
     handleIpc(IPC_PROMPT_PRESETS_LIST, async (event, agentId) => {
-        const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_LIST, agentId);
-        return {
-            presets: await listPromptPresets(dir, agentId),
-            selectedId: getPromptPresetSelection(dir, agentId),
-        };
+        guardPromptPresets(event, IPC_PROMPT_PRESETS_LIST);
+        return await callRuntimeAppService("listPromptPresets", { agentId });
     });
     handleIpc(IPC_PROMPT_PRESETS_READ, async (event, agentId, presetId) => {
-        const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_READ, agentId);
-        const id = String(presetId ?? "");
-        if (id === "default") {
-            const content = (await loadAgentSystemPrompt(agentId)) ?? "";
-            return { id: "default", name: "default", agentId, content };
-        }
-        return await readPromptPreset(dir, agentId, id);
+        guardPromptPresets(event, IPC_PROMPT_PRESETS_READ);
+        return await callRuntimeAppService("readPromptPreset", { agentId, presetId });
     });
     handleIpc(IPC_PROMPT_PRESETS_SAVE, async (event, payload) => {
-        const agentId = payload?.agentId;
-        const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_SAVE, agentId);
-        const result = await savePromptPreset(dir, {
-            agentId,
-            id: typeof payload?.id === "string" && payload.id ? payload.id : undefined,
-            name: String(payload?.name ?? ""),
-            content: String(payload?.content ?? ""),
+        guardPromptPresets(event, IPC_PROMPT_PRESETS_SAVE);
+        return await callRuntimeAppService("savePromptPreset", {
+            agentId: payload?.agentId,
+            id: payload?.id,
+            name: payload?.name,
+            content: payload?.content,
+            select: payload?.select === true,
         });
-        if (result.ok && payload?.select === true) {
-            setPromptPresetSelection(dir, agentId, result.preset.id);
-        }
-        return result;
     });
     handleIpc(IPC_PROMPT_PRESETS_DELETE, async (event, agentId, presetId) => {
-        const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_DELETE, agentId);
-        const id = String(presetId ?? "");
-        const ok = await deletePromptPreset(dir, agentId, id);
-        if (ok && getPromptPresetSelection(dir, agentId) === id) {
-            setPromptPresetSelection(dir, agentId, "default");
-        }
-        return { ok, selectedId: getPromptPresetSelection(dir, agentId) };
+        guardPromptPresets(event, IPC_PROMPT_PRESETS_DELETE);
+        return await callRuntimeAppService("deletePromptPreset", { agentId, presetId });
     });
     handleIpc(IPC_PROMPT_PRESETS_SELECT, async (event, agentId, presetId) => {
-        const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_SELECT, agentId);
-        const id = String(presetId ?? "default");
-        if (id !== "default" && !(await readPromptPreset(dir, agentId, id))) {
-            return { ok: false, selectedId: getPromptPresetSelection(dir, agentId) };
-        }
-        setPromptPresetSelection(dir, agentId, id);
-        return { ok: true, selectedId: getPromptPresetSelection(dir, agentId) };
+        guardPromptPresets(event, IPC_PROMPT_PRESETS_SELECT);
+        return await callRuntimeAppService("selectPromptPreset", { agentId, presetId });
     });
     handleIpc(IPC_CUSTOMIZATIONS_RESET, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CUSTOMIZATIONS_RESET)) {
             throw new Error("Blocked untrusted customizations:reset request.");
         }
-        const stellaAppDir = options.getStellaAppDir();
-        if (!stellaAppDir)
-            return { ok: false, movedEntries: [], error: "Stella data directory unavailable." };
-        try {
-            const result = await resetStellaCustomizations(stellaAppDir);
-            const stellaInstallDir = options.getStellaInstallDir?.();
-            if (stellaInstallDir &&
-                result.movedEntries.some((entry) => entry.startsWith(`skills${path.sep}`))) {
-                await ensureStellaDataDirSeeded(stellaInstallDir, stellaAppDir);
-            }
-            if (result.failed) {
-                return {
-                    ok: false,
-                    movedEntries: result.movedEntries,
-                    trashDir: result.trashDir,
-                    error: `Couldn't move ${result.failed.entry} (${result.failed.message}); it and everything after it are unchanged. ${result.movedEntries.length} moved to ${result.trashDir}.`,
-                };
-            }
-            return { ok: true, movedEntries: result.movedEntries, trashDir: result.trashDir };
-        }
-        catch (error) {
-            return {
-                ok: false,
-                movedEntries: [],
-                error: error instanceof Error ? error.message : String(error),
-            };
-        }
+        return await callRuntimeAppService("resetCustomizations");
     });
     handleIpc(IPC_PREFERENCES_GET_MODELS, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_GET_MODELS)) {

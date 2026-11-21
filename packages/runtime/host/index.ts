@@ -114,6 +114,7 @@ import type {
 } from "@stella/contracts/pi-chat";
 import type { InprocWorkerAttach } from "./inproc-connection.js";
 import { appServiceCalls } from "./app-services/index.js";
+import { seedStellaDataDir } from "./app-services/customizations.js";
 import {
   restartReason,
   staleRecordOf,
@@ -1165,6 +1166,19 @@ export class StellaRuntimeHost {
   async start() {
     if (this.started) return;
     this.started = true;
+    // The home folder is seeded here, before the worker reads it, rather than
+    // by the app: bundled skills and layout migrations are runtime concerns.
+    try {
+      await seedStellaDataDir(
+        this.options.initializeParams.stellaAppDir,
+        this.options.initializeParams.stellaDataDirPath,
+      );
+    } catch (error) {
+      console.error(
+        "[runtime-host] seeding the Stella home folder failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     await this.initializeHostServices();
     this.syncHostAccountServices();
     await this.syncHostExecutionPlacement();

@@ -102,6 +102,7 @@ const legacyRefusal = (status: number, body: unknown) => ({
 });
 
 const withLegacy = async <T>(
+  call: string,
   rpc: () => Promise<T>,
   legacy: () => Promise<T>,
 ): Promise<T> => {
@@ -109,6 +110,13 @@ const withLegacy = async <T>(
     return await rpc();
   } catch (error) {
     if (!notImplemented(error)) throw error;
+    console.info(
+      JSON.stringify({
+        service: "stella-v2-cloud-builder",
+        event: "owner_fence_legacy_route",
+        call,
+      }),
+    );
     return await legacy();
   }
 };
@@ -122,6 +130,7 @@ export const ownerFenceClient = (
   return {
     register: (input) =>
       withLegacy(
+        "register",
         () => gate().fenceRegister({ ...input, ownerId }),
         async () => {
           const { status, body } = await legacyFetch(gate(), ownerId, "register", input);
@@ -136,6 +145,7 @@ export const ownerFenceClient = (
       ),
     unregister: (input) =>
       withLegacy(
+        "unregister",
         () => gate().fenceUnregister({ ...input, ownerId }),
         async () => {
           const { status, body } = await legacyFetch(gate(), ownerId, "unregister", input);
@@ -144,6 +154,7 @@ export const ownerFenceClient = (
       ),
     assert: (input) =>
       withLegacy(
+        "assert",
         () => gate().fenceAssert({ ...input, ownerId }),
         async () => {
           const { status, body } = await legacyFetch(gate(), ownerId, "assert", input);
@@ -155,6 +166,7 @@ export const ownerFenceClient = (
       ),
     turnState: (op, body) =>
       withLegacy(
+        `turn-state/${op}`,
         () => gate().turnStateOperation(op, body),
         async () => {
           const result = await legacyFetch(gate(), ownerId, `turn-state/${op}`, body);

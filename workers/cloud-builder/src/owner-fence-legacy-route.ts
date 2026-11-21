@@ -82,6 +82,13 @@ export const serveLegacyOwnerFenceRoute = async (
 ): Promise<Response> => {
   if (request.method !== "POST")
     return json({ error: "Method not allowed." }, 405);
+  console.info(
+    JSON.stringify({
+      service: "stella-v2-cloud-builder",
+      event: "owner_fence_legacy_route_served",
+      path,
+    }),
+  );
   if (path.startsWith("turn-state/")) {
     const op = path.slice("turn-state/".length);
     if (!TURN_STATE_OPS.has(op)) return json({ error: "Not found." }, 404);

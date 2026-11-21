@@ -141,7 +141,7 @@ export const linkFailureOutput = (error: DirectoryLinkError) =>
   [
     "The build check couldn't run on this computer, because the app's packages could not be linked into the check's scratch folder:",
     error.message,
-    "Nothing is known to be wrong with the change itself. Make it in a draft, install the draft's own packages there (packages/desktop/scripts/draft-deps.ts), and check that Electron main and preload build.",
+    "Nothing is known to be wrong with the change itself. Make it in a draft, link the draft's packages there (packages/desktop/scripts/draft-deps.ts), and check that Electron main and preload build.",
   ].join("\n");
 
 export const copyEnvFiles = async (cwd: string, scratch: string) => {
@@ -416,7 +416,12 @@ export const warmDependencies = async (args: {
       signal,
     });
     let electron: number | null = null;
-    if (install.code === 0 && "electron" in dependencies) {
+    // A Mac launcher runs Stella from its signed Stella.app, so the binary in
+    // node_modules is never installed there and nothing needs its download.
+    const ownElectron =
+      process.platform !== "darwin" ||
+      process.execPath.includes(`${path.sep}node_modules${path.sep}`);
+    if (install.code === 0 && "electron" in dependencies && ownElectron) {
       const runner = path.join(scratch, "warm-electron.mjs");
       await fs.writeFile(runner, ELECTRON_WARM_SOURCE);
       electron = (

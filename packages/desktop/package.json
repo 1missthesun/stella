@@ -64,14 +64,12 @@
     "./electron/*": "./electron/*.ts"
   },
   "dependencies": {
-    "@zip.js/zip.js": "2.23.0",
     "@silvia-odwyer/photon-node": "0.3.4",
+    "@stella/contracts": "workspace:*",
+    "@stella/runtime": "workspace:*",
+    "@zip.js/zip.js": "2.23.0",
     "electron-log": "5.4.4",
     "mac-screen-capture-permissions": "^2.1.0",
     "uiohook-napi": "^1.5.5"
-  },
-  "devDependencies": {
-    "@stella/contracts": "workspace:*",
-    "@stella/runtime": "workspace:*"
   }
 }

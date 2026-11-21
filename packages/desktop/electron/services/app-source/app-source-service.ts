@@ -176,6 +176,8 @@ const AUTO_APPLY_RETRY_MS = 500;
 const SWAPS_BEFORE_RELOAD = 12;
 const RELOAD_WHEN_AWAY_POLL_MS = 30_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
+/** Packages an earlier install left are removed once Stella has settled after a start. */
+const TIDY_PACKAGES_DELAY_MS = 90_000;
 const SYNC_RETRY_MS = 30_000;
 const SYNC_RETRY_MAX_MS = 10 * 60_000;
 const RECENT_COUNT = 20;
@@ -407,6 +409,14 @@ export class AppSourceService {
     }, STATE_POLL_MS);
     poll.unref?.();
     this.timers = [poll];
+    if (this.options.installed && this.options.launcherPreparesOnRelaunch) {
+      const tidy = setTimeout(() => {
+        // In the queue, so no install runs while it looks at the packages.
+        this.queue = this.queue.then(() => this.tidyPackages());
+      }, TIDY_PACKAGES_DELAY_MS);
+      tidy.unref?.();
+      this.timers.push(tidy);
+    }
     this.syncNotBefore = Date.now() + LAUNCH_SYNC_DELAY_MS;
     this.wantSync("launch");
     void this.checkLinkedCheckout().then(() => this.followBackend());
@@ -1253,6 +1263,30 @@ export class AppSourceService {
         ...(restored.code === 0 ? {} : { message: restored.stderr.trim() }),
       });
       throw error;
+    }
+  }
+
+  private async tidyPackages() {
+    if (this.disposed) return;
+    const cwd = this.options.stellaAppDir;
+    const script = path.join(cwd, "packages", "desktop", "scripts", "tidy-packages.mjs");
+    if (!(await fs.stat(script).catch(() => null))) return;
+    const startedAt = Date.now();
+    try {
+      const result = await run(process.execPath, [script, cwd], {
+        cwd,
+        env: { ELECTRON_RUN_AS_NODE: "1" },
+        timeoutMs: 10 * 60_000,
+        background: true,
+      });
+      const summary = result.stdout.trim().split("\n").pop() ?? "";
+      this.options.log("app-source.packages-tidied", {
+        code: result.code,
+        ms: Date.now() - startedAt,
+        ...(result.code === 0 ? { summary: summary.slice(0, 300) } : { message: result.stderr.trim().slice(-400) }),
+      });
+    } catch (error) {
+      this.options.log("app-source.packages-tidied", { code: -1, message: errorMessage(error) });
     }
   }
 

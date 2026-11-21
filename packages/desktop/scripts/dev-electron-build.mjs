@@ -1,4 +1,8 @@
-import { build as runEsbuildBuild, stop as stopEsbuildService } from "esbuild";
+import {
+  build as runEsbuildBuild,
+  stop as stopEsbuildService,
+  transform as transformWithEsbuild,
+} from "esbuild";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -7,6 +11,7 @@ import {
   promises as fsPromises,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -18,9 +23,21 @@ const desktopDir = path.resolve(scriptDir, "..");
 const repoRootDir = path.resolve(desktopDir, "..", "..");
 const outdir = "dist-electron";
 const nodeTarget = `node${process.versions.node.split(".")[0]}`;
+// Main is split: what it reaches only through `import()` (provider SDKs,
+// sign-in providers, the zip library, the Claude Code session runtime, the
+// renderer's build tools) goes into chunk files beside main.js and loads on
+// first use instead of being read and compiled with main at every launch.
+// Chunks sit in main's own folder so `import.meta.url` and `__dirname` mean the
+// same folder wherever esbuild places a module.
+const splitMainEntryPoints = {
+  "electron/main": "packages/desktop/electron/main.ts",
+};
+const MAIN_CHUNK_NAMES = "electron/chunk-[hash]";
+const MAIN_CHUNK_FILE = /^chunk-[A-Z0-9]+\.js$/;
+// Launch and the worker entries stay single files: launch must inline nothing
+// and load main by path, and each worker runs in its own thread or process.
 const electronMainEntryPoints = {
   "electron/launch": "packages/desktop/electron/launch.ts",
-  "electron/main": "packages/desktop/electron/main.ts",
   "electron/cloud-conversation-cache-worker": "packages/desktop/electron/services/cloud-conversation-cache-worker.ts",
   "electron/source-worker": "packages/desktop/electron/source/source-worker.ts",
   "electron/tailwind-worker": "packages/desktop/electron/source/tailwind-worker.ts",
@@ -91,6 +108,7 @@ const bundleConfigFiles = [
   "packages/agent/package.json",
   "packages/contracts/package.json",
   "packages/desktop/package.json",
+  "packages/desktop/scripts/dev-electron-build.mjs",
   "packages/desktop/tsconfig.electron.json",
   "packages/desktop/tsconfig.preload.json",
   "packages/desktop/tsconfig.browser-pages.json",
@@ -171,36 +189,53 @@ const browserScriptPlugin = {
   },
 };
 
+const nodeBundleOptions = {
+  absWorkingDir: repoRootDir,
+  alias: workspaceAliases,
+  bundle: true,
+  define: {
+    "process.env.VITE_TURNSTILE_SITE_KEY": JSON.stringify(
+      publicTurnstileSiteKey,
+    ),
+    // CommonJS code in the bundle reads these as free variables. As defines
+    // rather than banner declarations they cannot collide with a module's own
+    // top-level `const __dirname`, which esbuild keeps unrenamed in a chunk
+    // where nothing else claims the name. Every output sits in one folder, so
+    // the folder is the same whichever file a module lands in.
+    __dirname: "import.meta.dirname",
+    __filename: "import.meta.filename",
+  },
+  external: [
+    "electron",
+    ...rendererSourceExternals,
+    "bun:*",
+    "@silvia-odwyer/photon-node",
+    "mac-screen-capture-permissions",
+    "uiohook-napi",
+  ],
+  banner: {
+    js: 'import { createRequire as __stellaCreateRequire } from "node:module"; const require = __stellaCreateRequire(import.meta.url);',
+  },
+  format: "esm",
+  metafile: true,
+  logLevel: "warning",
+  plugins: [pruneDependencyPackageMetadataPlugin, browserScriptPlugin],
+  outdir: path.join("packages", "desktop", outdir),
+  platform: "node",
+  target: nodeTarget,
+  tsconfig: path.join("packages", "desktop", "tsconfig.electron.json"),
+};
+
 const buildOptions = [
   {
-    absWorkingDir: repoRootDir,
-    alias: workspaceAliases,
-    bundle: true,
-    define: {
-      "process.env.VITE_TURNSTILE_SITE_KEY": JSON.stringify(
-        publicTurnstileSiteKey,
-      ),
-    },
+    ...nodeBundleOptions,
+    entryPoints: splitMainEntryPoints,
+    splitting: true,
+    chunkNames: MAIN_CHUNK_NAMES,
+  },
+  {
+    ...nodeBundleOptions,
     entryPoints: electronMainEntryPoints,
-    external: [
-      "electron",
-      ...rendererSourceExternals,
-      "bun:*",
-      "@silvia-odwyer/photon-node",
-      "mac-screen-capture-permissions",
-      "uiohook-napi",
-    ],
-    banner: {
-      js: 'import { createRequire as __stellaCreateRequire } from "node:module"; import { fileURLToPath as __stellaFileURLToPath } from "node:url"; import { dirname as __stellaDirname } from "node:path"; const require = __stellaCreateRequire(import.meta.url); const __filename = __stellaFileURLToPath(import.meta.url); const __dirname = __stellaDirname(__filename);',
-    },
-    format: "esm",
-    metafile: true,
-    logLevel: "warning",
-    plugins: [pruneDependencyPackageMetadataPlugin, browserScriptPlugin],
-    outdir: path.join("packages", "desktop", outdir),
-    platform: "node",
-    target: nodeTarget,
-    tsconfig: path.join("packages", "desktop", "tsconfig.electron.json"),
   },
   {
     absWorkingDir: repoRootDir,
@@ -236,6 +271,7 @@ export const mainStartupDeferredInputs = [
 ];
 const mainStartupRootInputs = [
   "packages/desktop/electron/main.ts",
+  "packages/desktop/electron/main-process.ts",
   "packages/desktop/electron/bootstrap.ts",
 ];
 const launchEntryInput = "packages/desktop/electron/launch.ts";
@@ -258,6 +294,36 @@ const collectStaticallyReachableInputs = (metafile, roots) => {
   return reached;
 };
 
+/**
+ * The external modules main loads before `ready`: those imported statically by
+ * main.js and by the chunks of the other startup roots (main-process,
+ * bootstrap), and by every chunk those import statically, transitively. A
+ * chunk reached only through `import()` from elsewhere loads on first use and
+ * is skipped.
+ */
+const mainStartupStaticImports = (metafile, mainOutputPath) => {
+  const found = [];
+  const seen = new Set();
+  const rootChunks = Object.entries(metafile?.outputs ?? {})
+    .filter(([, output]) => output.entryPoint && mainStartupRootInputs.includes(toPosix(output.entryPoint)))
+    .map(([file]) => file);
+  const pending = [mainOutputPath, ...rootChunks];
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    for (const imported of metafile?.outputs?.[file]?.imports ?? []) {
+      if (imported.kind !== "import-statement") continue;
+      if (imported.external) {
+        found.push([toPosix(path.basename(file)), imported.path]);
+      } else {
+        pending.push(imported.path);
+      }
+    }
+  }
+  return found;
+};
+
 export const assertMainBundleStartupBoundary = (metafile) => {
   const violations = [];
   for (const [outputPath, output] of Object.entries(metafile?.outputs ?? {})) {
@@ -271,14 +337,9 @@ export const assertMainBundleStartupBoundary = (metafile) => {
       }
     }
     if (outputPosix.endsWith("/electron/main.js")) {
-      for (const imported of output.imports ?? []) {
-        if (
-          imported.kind === "import-statement" &&
-          mainStartupDeferredExternals.includes(imported.path)
-        ) {
-          violations.push(
-            `electron/main.js statically imports ${imported.path}`,
-          );
+      for (const [file, imported] of mainStartupStaticImports(metafile, outputPath)) {
+        if (mainStartupDeferredExternals.includes(imported)) {
+          violations.push(`electron/main.js statically imports ${imported} (in ${file})`);
         }
       }
     }
@@ -333,23 +394,60 @@ export const buildElectronBundles = async () => {
         runEsbuildBuild({ ...options, write: false, metafile: true }),
       ),
     );
-    assertMainBundleStartupBoundary(results[0].metafile);
+    assertMainBundleStartupBoundary(mergeMetafiles(results.map((result) => result.metafile)));
+    await assertOutputsParse(results);
     const changedOutputs = [];
+    const outputs = [];
     for (const result of results) {
       for (const file of result.outputFiles ?? []) {
+        outputs.push(toPosix(path.relative(path.join(desktopDir, outdir), file.path)));
         if (writeOutputIfChanged(file.path, asciiOnly(file.contents))) {
           changedOutputs.push(file.path);
         }
       }
     }
     lastBuildInputs = sourceInputsOf(results.map((result) => result.metafile));
+    lastBuildOutputs = outputs.sort();
     return changedOutputs;
   } finally {
     await stopEsbuildService();
   }
 };
 
+/**
+ * The banner's `require` is text esbuild never sees, so a module declaring its
+ * own top-level `require` in the same output would only fail when Electron
+ * loads that file, possibly long after launch for a chunk. Parse each ESM
+ * output here so it fails the build instead.
+ */
+const assertOutputsParse = async (results) => {
+  const failures = [];
+  await Promise.all(
+    results.flatMap((result) =>
+      (result.outputFiles ?? [])
+        .filter((file) => file.path.endsWith(".js") && !file.path.includes("preload"))
+        .map(async (file) => {
+          try {
+            await transformWithEsbuild(file.text, { format: "esm", logLevel: "silent" });
+          } catch (error) {
+            const message = error?.errors?.[0]?.text ?? String(error);
+            failures.push(`${path.basename(file.path)}: ${message}`);
+          }
+        }),
+    ),
+  );
+  if (failures.length > 0) {
+    throw new Error(`Electron bundle output does not parse: ${failures.join("; ")}`);
+  }
+};
+
+const mergeMetafiles = (metafiles) => ({
+  inputs: Object.assign({}, ...metafiles.map((metafile) => metafile?.inputs ?? {})),
+  outputs: Object.assign({}, ...metafiles.map((metafile) => metafile?.outputs ?? {})),
+});
+
 let lastBuildInputs = [];
+let lastBuildOutputs = [];
 const sourceInputsOf = (metafiles) => {
   const inputs = new Set();
   for (const metafile of metafiles) {
@@ -462,12 +560,34 @@ export const installedPackagesStamp = () => {
   }
 };
 
-const writeBundleFingerprint = (fingerprint, inputs, packages = installedPackagesStamp()) => {
+/**
+ * Every file the build wrote, relative to dist-electron: the entries plus
+ * main's chunks, whose names change with their contents. A fingerprint from
+ * before main was split has none, and its build wrote only the entries.
+ */
+export const readBundleOutputs = (file = fingerprintFilePath) => {
+  const outputs = readFingerprintFile(file)?.outputs;
+  return Array.isArray(outputs) && outputs.every((output) => typeof output === "string")
+    ? outputs
+    : null;
+};
+
+const entryOutputs = () =>
+  [...Object.keys(splitMainEntryPoints), ...Object.keys(electronMainEntryPoints), ...Object.keys(preloadEntryPoints)].map(
+    (entry) => `${entry}.js`,
+  );
+
+const writeBundleFingerprint = (
+  fingerprint,
+  inputs,
+  outputs,
+  packages = installedPackagesStamp(),
+) => {
   try {
     writeFileSync(
       fingerprintFilePath,
       JSON.stringify(
-        { fingerprint, updatedAt: new Date().toISOString(), inputs, packages },
+        { fingerprint, updatedAt: new Date().toISOString(), inputs, outputs, packages },
         null,
         2,
       ),
@@ -479,14 +599,47 @@ const writeBundleFingerprint = (fingerprint, inputs, packages = installedPackage
 
 export const requiredOutputsExist = () => {
   const outBase = path.join(desktopDir, outdir);
-  return [
+  const entries = [
     "launch.js",
     "main.js",
     "preload.js",
     "offscreen-tab-mirror-preload.js",
-  ].every((name) =>
-    existsSync(path.join(outBase, "electron", name)),
+  ].map((name) => `electron/${name}`);
+  // main.js imports its chunks by name, so one missing is a launch that
+  // cannot load main: treat it like a missing entry and build again.
+  return [...entries, ...(readBundleOutputs() ?? [])].every((name) =>
+    existsSync(path.join(outBase, name)),
   );
+};
+
+/**
+ * Remove main's chunks that the current build no longer lists. Called by
+ * start.mjs before main loads: the build never deletes them itself, because
+ * an update rebuilds while the old main is still running and may yet load
+ * one of its own chunks on the way out.
+ */
+export const pruneStaleMainChunks = () => {
+  const outputs = readBundleOutputs();
+  if (!outputs) return 0;
+  const current = new Set(outputs);
+  const dir = path.join(desktopDir, outdir, "electron");
+  let removed = 0;
+  let names = [];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return 0;
+  }
+  for (const name of names) {
+    if (!MAIN_CHUNK_FILE.test(name) || current.has(`electron/${name}`)) continue;
+    try {
+      rmSync(path.join(dir, name), { force: true });
+      removed += 1;
+    } catch {
+      // A chunk that cannot be removed now is tried again next launch.
+    }
+  }
+  return removed;
 };
 
 export const cleanOutdir = async () => {
@@ -506,17 +659,20 @@ export const ensureElectronBundlesFresh = async ({ log } = {}) => {
   }
   const startedAt = Date.now();
   await buildElectronBundles();
-  writeBundleFingerprint(computeBundleInputsFingerprint(lastBuildInputs), lastBuildInputs);
+  writeBundleFingerprint(
+    computeBundleInputsFingerprint(lastBuildInputs),
+    lastBuildInputs,
+    lastBuildOutputs,
+  );
   log?.(`built main and preload in ${Date.now() - startedAt}ms`);
   return { built: true };
 };
 
 export const adoptElectronBundles = (from) => {
   const fromOut = path.join(from, outdir);
-  const inputs = readBundleInputs(path.join(from, path.basename(fingerprintFilePath)));
-  const outputs = [...Object.keys(electronMainEntryPoints), ...Object.keys(preloadEntryPoints)].map(
-    (entry) => `${entry}.js`,
-  );
+  const fromFingerprint = path.join(from, path.basename(fingerprintFilePath));
+  const inputs = readBundleInputs(fromFingerprint);
+  const outputs = readBundleOutputs(fromFingerprint) ?? entryOutputs();
   if (inputs.length === 0 || !outputs.every((name) => existsSync(path.join(fromOut, name)))) {
     return { adopted: false };
   }
@@ -528,7 +684,7 @@ export const adoptElectronBundles = (from) => {
   for (const name of outputs) {
     writeOutputIfChanged(path.join(desktopDir, outdir, name), readFileSync(path.join(fromOut, name)));
   }
-  writeBundleFingerprint(computeBundleInputsFingerprint(inputs), inputs);
+  writeBundleFingerprint(computeBundleInputsFingerprint(inputs), inputs, outputs);
   return { adopted: true };
 };
 
@@ -536,7 +692,11 @@ if (isEntryPoint(import.meta.url)) {
   try {
     await cleanOutdir();
     await buildElectronBundles();
-    writeBundleFingerprint(computeBundleInputsFingerprint(lastBuildInputs), lastBuildInputs);
+    writeBundleFingerprint(
+      computeBundleInputsFingerprint(lastBuildInputs),
+      lastBuildInputs,
+      lastBuildOutputs,
+    );
     process.exit(0);
   } catch (error) {
     console.error(

@@ -1,6 +1,4 @@
-import "./bootstrap/windows-hidden-spawns.js";
 import { app } from "electron";
-import "@stella/runtime/kernel/shared/http-proxy.js";
 import { configureLinuxGraphics } from "./linux-graphics.js";
 import { configureLinuxProtectedStorage } from "./linux-protected-storage.js";
 import { configureScrollCompositing } from "./scroll-compositing.js";

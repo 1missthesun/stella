@@ -1,9 +1,17 @@
-import { ensureElectronBundlesFresh } from "../scripts/dev-electron-build.mjs";
+import {
+  ensureElectronBundlesFresh,
+  pruneStaleMainChunks,
+} from "../scripts/dev-electron-build.mjs";
 
 const start = async () => {
   await ensureElectronBundlesFresh({
     log: (message) => console.log(`[electron-build] ${message}`),
   });
+  try {
+    pruneStaleMainChunks();
+  } catch {
+    // Leftover chunks only take disk space; never hold the launch for them.
+  }
   await import("../dist-electron/electron/launch.js");
 };
 

@@ -4384,6 +4384,29 @@ const completeComputerThread = async (
     ) {
       return upgradePlaceholderResult(ctx, row, result, args.originDeviceId);
     }
+    // A second, different end of a turn that already ended: a computer that
+    // numbered a new turn as the one before (desktops before the fix gave the
+    // turns they start by themselves no number of their own). What it said
+    // reaches no one, so it is filed where the invariants count it.
+    if (
+      row.attempt_generation === args.attemptGeneration &&
+      row.status !== "running" &&
+      args.status === "completed" &&
+      result !== undefined &&
+      result.trim() !== resultTextOf(row.result_json)
+    ) {
+      appendAgentEvent(ctx.db, {
+        key: `turn_end_dropped:${row.thread_id}:${args.attemptGeneration}:${(await sha256Hex(result)).slice(0, 16)}`,
+        kind: "terminal_ignored",
+        source: `device:${args.originDeviceId}`,
+        threadId: row.thread_id,
+        conversationId: row.conversation_id,
+        attemptGeneration: args.attemptGeneration,
+        status: row.status,
+        detail: { reason: "attempt_already_ended", text: result.slice(0, 2_000) },
+        createdAt: ctx.now,
+      });
+    }
     return { updated: false, status: row.status };
   }
   const status = agentThreadTerminalStatus(args.status);

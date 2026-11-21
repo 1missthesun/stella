@@ -21,11 +21,7 @@ import { deletePromptPreset, isCustomizablePromptAgentId, listPromptPresets, rea
 import { getPromptPresetSelection, setPromptPresetSelection, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
-// The model catalog and the sign-in providers load pi-ai, its provider SDK
-// glue and ajv; they are read only from these handlers, so they load on first
-// use instead of with main at every launch.
-const loadModelCatalog = () => import("@stella/runtime/kernel/model-catalog");
-const loadLlmOAuthProviders = () => import("@stella/runtime/kernel/storage/llm-oauth-providers");
+import { loadLlmOAuthProviders, loadModelCatalog } from "../services/llm-provider-modules.js";
 import { loginChatGpt } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";

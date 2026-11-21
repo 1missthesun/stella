@@ -61,7 +61,6 @@ export type OwnerModelGrantReader = Readonly<{
   conversationId: string;
   readerId: string;
   updatedAt: number;
-  expiresAt?: number;
 }>;
 
 export type OwnerModelGrantIdentity = Readonly<{
@@ -84,20 +83,19 @@ export type OwnerModelGrant = OwnerModelGrantIdentity &
     updatedAt: number;
   }>;
 
-export type OwnerModelGrantState =
-  | "active"
-  | "revoking"
-  | "revoked"
-  | "retired";
+/**
+ * `active` until revoked; `revoking` while readers are being frozen (a failed
+ * freeze leaves it there for the next revokeAll); `revoked` rows stay until
+ * expiry so a replayed issue answers `revoked` instead of re-issuing. The
+ * table's CHECK also allows `retired`, which nothing has ever written.
+ */
+export type OwnerModelGrantState = "active" | "revoking" | "revoked";
 
 export type OwnerModelGrantRecord = OwnerModelGrantIdentity &
   Readonly<{
     state: OwnerModelGrantState;
     issuedAt: number;
     updatedAt: number;
-    retiredAt?: number;
-    revokeOperationId?: string;
-    revokeReason?: OwnerModelGrantRevokeReason;
   }>;
 
 export type OwnerModelGrantIssueResult =
@@ -110,8 +108,7 @@ export type OwnerModelGrantIssueResult =
 export type OwnerModelGrantRevokeReason =
   | "memory_policy_change"
   | "memory_wipe"
-  | "owner_purge"
-  | "manual";
+  | "owner_purge";
 
 export type OwnerModelGrantFreezeGrant = Readonly<{
   grantId: string;
@@ -160,7 +157,6 @@ type ReaderRow = {
   conversation_id: string;
   reader_id: string;
   updated_at: number;
-  expires_at: number | null;
 };
 
 type GrantRow = {
@@ -239,29 +235,15 @@ const parseBarrierBody = (value: string): unknown =>
   JSON.parse(value) as unknown;
 
 const state = (value: string): OwnerModelGrantState | null =>
-  value === "active" ||
-  value === "revoking" ||
-  value === "revoked" ||
-  value === "retired"
+  value === "active" || value === "revoking" || value === "revoked"
     ? value
     : null;
-
-const revokeReason = (
-  value: string | null,
-): OwnerModelGrantRevokeReason | undefined =>
-  value === "memory_policy_change" ||
-  value === "memory_wipe" ||
-  value === "owner_purge" ||
-  value === "manual"
-    ? value
-    : undefined;
 
 const readerFromRow = (row: ReaderRow): OwnerModelGrantReader => ({
   ownerId: row.owner_id,
   conversationId: row.conversation_id,
   readerId: row.reader_id,
   updatedAt: row.updated_at,
-  ...(row.expires_at !== null ? { expiresAt: row.expires_at } : {}),
 });
 
 const grantFromRow = (row: GrantRow): OwnerModelGrantRecord | null => {
@@ -284,13 +266,6 @@ const grantFromRow = (row: GrantRow): OwnerModelGrantRecord | null => {
     state: grantState,
     issuedAt: row.issued_at,
     updatedAt: row.updated_at,
-    ...(row.retired_at !== null ? { retiredAt: row.retired_at } : {}),
-    ...(row.revoke_operation_id
-      ? { revokeOperationId: row.revoke_operation_id }
-      : {}),
-    ...(revokeReason(row.revoke_reason)
-      ? { revokeReason: revokeReason(row.revoke_reason) }
-      : {}),
   };
 };
 
@@ -404,48 +379,37 @@ export class OwnerModelGrantStore {
   private retireExpired(): void {
     const now = this.now();
     this.ctx.storage.sql.exec(
-      "DELETE FROM owner_model_grants WHERE expires_at <= ? OR state = 'retired'",
+      "DELETE FROM owner_model_grants WHERE expires_at <= ?",
       now - GATEWAY_UPSTREAM_MAX_DURATION_MS,
-    );
-    this.ctx.storage.sql.exec(
-      "DELETE FROM owner_model_grant_readers WHERE expires_at IS NOT NULL AND expires_at <= ?",
-      now,
     );
   }
 
   async registerReader(input: {
     conversationId: string;
     readerId: string;
-    expiresAt?: number;
   }): Promise<OwnerModelGrantReader> {
     if (!text(input.conversationId) || !text(input.readerId)) {
-      throw new OwnerModelGrantError("READER_INVALID");
-    }
-    if (input.expiresAt !== undefined && !safeTime(input.expiresAt)) {
       throw new OwnerModelGrantError("READER_INVALID");
     }
     const now = this.now();
     this.ctx.storage.sql.exec(
       `INSERT INTO owner_model_grant_readers
-         (conversation_id, owner_id, reader_id, updated_at, expires_at)
-       VALUES (?, ?, ?, ?, ?)
+         (conversation_id, owner_id, reader_id, updated_at)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(conversation_id) DO UPDATE SET
          owner_id = excluded.owner_id,
          reader_id = excluded.reader_id,
-         updated_at = excluded.updated_at,
-         expires_at = excluded.expires_at`,
+         updated_at = excluded.updated_at`,
       input.conversationId,
       this.ownerId,
       input.readerId,
       now,
-      input.expiresAt ?? null,
     );
     return {
       ownerId: this.ownerId,
       conversationId: input.conversationId,
       readerId: input.readerId,
       updatedAt: now,
-      ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
     };
   }
 
@@ -456,7 +420,7 @@ export class OwnerModelGrantStore {
     this.retireExpired();
     const row = this.ctx.storage.sql
       .exec<ReaderRow>(
-        `SELECT owner_id, conversation_id, reader_id, updated_at, expires_at
+        `SELECT owner_id, conversation_id, reader_id, updated_at
            FROM owner_model_grant_readers
           WHERE conversation_id = ? AND owner_id = ?`,
         conversationId,
@@ -616,7 +580,7 @@ export class OwnerModelGrantStore {
         `SELECT grant_id FROM owner_model_grants
           WHERE owner_id = ? AND owner_generation = ?
             AND (? IS NULL OR conversation_id = ?)
-            AND turn_id = ? AND lease_id = ? AND state != 'retired'
+            AND turn_id = ? AND lease_id = ?
           ORDER BY grant_id`,
         this.ownerId,
         input.ownerGeneration,

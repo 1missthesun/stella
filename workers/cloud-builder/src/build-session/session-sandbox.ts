@@ -268,7 +268,7 @@ export const sandbox = (
   host: Pick<SessionSandboxHost, "env">,
   id: string,
   size: InstanceSize = "large",
-  workload: SandboxWorkload = "app-build",
+  workload: SandboxWorkload = "world",
   world?: string,
   idleTimeoutMs: number | undefined = sandboxSleepAfterMs(host.env),
   owner?: string,

@@ -331,22 +331,6 @@ export const exactAgentExecutionMarker = async (
   return marker;
 };
 
-export const persistAgentExecutionMarker = async (
-  host: ContainerTurnHost,
-  turn: TurnRequest,
-  marker: AgentExecutionMarker,
-): Promise<void> => {
-  await host.ctx.storage.transaction(async (txn) => {
-    if (!exactTurnIdentityMatches(await txn.get<TurnRequest>("turn"), turn)) {
-      throw new AgentTurnAuthorityLostError();
-    }
-    await txn.put(
-      agentExecutionMarkerKey(turn.turnId, turn.attemptGeneration!),
-      marker,
-    );
-  });
-};
-
 export const interruptAgentForBuilderFallback = async (
   host: ContainerTurnHost,
   turn: TurnRequest,

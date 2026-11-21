@@ -24,12 +24,15 @@ import { git, gitRaw, run } from "./git.js";
  * `node_modules` is linked in rather than installed (a junction on Windows,
  * see `dir-links.ts`; removed link-first, never followed). The root directory
  * holds no workspace packages (bun puts `@stella/*` in each package's own
- * `node_modules`), and the bundle resolves `@stella/contracts` and
- * `@stella/runtime` through esbuild aliases computed from the tree it is
- * building — so the sources under test are the merged ones, while third-party
- * packages come from the checkout. A merge that needs dependencies the
- * checkout does not have yet therefore fails the gate rather than passing it
- * blindly, and the failure goes to an agent.
+ * `node_modules`), and the bundle resolves every workspace package main can
+ * reach (`@stella/agent`, `@stella/contracts`, `@stella/runtime`, …) through
+ * esbuild aliases computed from the tree it is building — so the sources
+ * under test are the merged ones, while third-party packages come from the
+ * checkout. A merge that needs dependencies the checkout does not have yet
+ * therefore fails the gate rather than passing it blindly, and the failure
+ * goes to an agent. A bundle kept for the relaunch was built against the
+ * checkout's packages from before the update's install; the apply only adopts
+ * it when the install left them unchanged (`adoptElectronBundles`).
  *
  * What it does not cover: the renderer, which is served from source and
  * type-checked nowhere on this path. A renderer that breaks is recoverable
@@ -66,6 +69,7 @@ try {
 
 const BUILD_ROOTS = [
   "scripts/lib/",
+  "packages/agent/",
   "packages/contracts/",
   "packages/desktop/",
   "packages/runtime/",
@@ -177,6 +181,7 @@ export const touchesBundleInputs = async (cwd: string, files: string[]) => {
     (file) =>
       recorded.has(file) ||
       !file.includes("/") ||
+      file.startsWith("packages/agent/") ||
       file.startsWith("packages/contracts/") ||
       file.startsWith("packages/desktop/") ||
       file.startsWith("packages/runtime/") ||

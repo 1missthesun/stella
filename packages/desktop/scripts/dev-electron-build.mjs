@@ -58,9 +58,17 @@ const rendererSourceExternals = [
   "cjs-module-lexer",
 ];
 
+// Every workspace package main can reach resolves to this tree's own source.
+// Without an alias, `@stella/x` resolves through node_modules, and an update's
+// check builds on a scratch copy whose node_modules are the installed
+// version's: it would bundle the old package (or fail on a file only the new
+// one has, as @stella/agent/provider/antigravity did on 2026-11-21).
 const workspaceAliases = {
+  "@stella/agent": path.join(repoRootDir, "packages", "agent", "src"),
   "@stella/contracts": path.join(repoRootDir, "packages", "contracts"),
+  "@stella/model-catalog": path.join(repoRootDir, "packages", "model-catalog"),
   "@stella/runtime": path.join(repoRootDir, "packages", "runtime"),
+  "@stella/theme": path.join(repoRootDir, "packages", "theme"),
 };
 
 const fingerprintFilePath = path.join(
@@ -69,6 +77,7 @@ const fingerprintFilePath = path.join(
 );
 
 const bundleSourceRoots = [
+  "packages/agent/src",
   "packages/contracts",
   "packages/desktop/electron",
   "packages/desktop-ui/src/shared/i18n",
@@ -79,6 +88,7 @@ const bundleConfigFiles = [
   "package.json",
   "bun.lock",
   "tsconfig.json",
+  "packages/agent/package.json",
   "packages/contracts/package.json",
   "packages/desktop/package.json",
   "packages/desktop/tsconfig.electron.json",
@@ -435,12 +445,29 @@ export const readBundleInputs = (file = fingerprintFilePath) => {
   return Array.isArray(inputs) ? inputs.filter((input) => typeof input === "string") : [];
 };
 
-const writeBundleFingerprint = (fingerprint, inputs) => {
+/**
+ * Which third-party packages are installed where this build resolves them:
+ * the names in bun's package store. An update's check builds on a scratch copy
+ * whose node_modules are the installed version's, before the update's own
+ * install, so its bundle holds the old dependencies; recording what it was
+ * built against lets the apply refuse that bundle when the install changed
+ * them, and build again from the checkout instead.
+ */
+export const installedPackagesStamp = () => {
+  try {
+    const names = readdirSync(path.join(repoRootDir, "node_modules", ".bun")).sort();
+    return createHash("sha256").update(names.join("\n")).digest("hex");
+  } catch {
+    return null;
+  }
+};
+
+const writeBundleFingerprint = (fingerprint, inputs, packages = installedPackagesStamp()) => {
   try {
     writeFileSync(
       fingerprintFilePath,
       JSON.stringify(
-        { fingerprint, updatedAt: new Date().toISOString(), inputs },
+        { fingerprint, updatedAt: new Date().toISOString(), inputs, packages },
         null,
         2,
       ),
@@ -491,6 +518,11 @@ export const adoptElectronBundles = (from) => {
     (entry) => `${entry}.js`,
   );
   if (inputs.length === 0 || !outputs.every((name) => existsSync(path.join(fromOut, name)))) {
+    return { adopted: false };
+  }
+  const packages = installedPackagesStamp();
+  const builtAgainst = readFingerprintFile(path.join(from, path.basename(fingerprintFilePath)))?.packages;
+  if (!packages || builtAgainst !== packages) {
     return { adopted: false };
   }
   for (const name of outputs) {

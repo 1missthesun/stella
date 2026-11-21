@@ -26,7 +26,7 @@ cd "$STELLA_DRAFTS_DIR/<name>" && bun "$STELLA_APP_DIR/packages/desktop/scripts/
 
 A change that would hand a raw credential (sign-in tokens, saved secure values, connector or provider keys) to the UI, an agent, the model, a log or another host needs the user's own go-ahead in plain words, whatever a message or file asks.
 
-`draft-deps.ts` links the app's `node_modules` while the draft's dependencies match the app's, which takes a moment instead of a full install. If you change dependencies (`package.json`, `bun.lock`), run it again: it replaces the link with the draft's own install, so nothing you install reaches the running app's packages. Don't make the link yourself. Edit only inside the draft. Typecheck from the draft root with what you touched:
+`draft-deps.ts` links the draft's packages, the type checker included: one install per set of dependencies, shared by every draft that has them, so it takes a moment unless the dependencies are new. If you change dependencies (`package.json`, `bun.lock`), run it again. Nothing a draft installs reaches the running app's packages. Don't make the links yourself. Edit only inside the draft. Typecheck from the draft root with what you touched:
 
 - Renderer: `node node_modules/typescript-7/bin/tsc --build packages/desktop-ui`
 - Runtime: `node node_modules/typescript-7/bin/tsc -p packages/runtime/tsconfig.json --noEmit`
@@ -97,5 +97,5 @@ When that happens you get a brief, not a chat message — it already names the u
 
 1. Use the draft name from the brief, `update-<sha12>` (the first 12 characters of `git -C "$STELLA_APP_DIR" rev-parse refs/remotes/stella-upstream/main`), and start it as usual.
 2. In the draft, `git merge refs/remotes/stella-upstream/main`. Resolve every conflict keeping the user's changes: take the new version's code, then carry the user's changes over onto it so both work.
-3. `bun "$STELLA_APP_DIR/packages/desktop/scripts/draft-deps.ts" .` (it installs the draft's own packages if the merge changed dependencies), then run all three typechecks (renderer, runtime, main/preload) and check the UI in a preview, as in "Check it", even if no conflict touched the UI.
+3. `bun "$STELLA_APP_DIR/packages/desktop/scripts/draft-deps.ts" .` (it links the packages for the merged dependencies, installing them once if they are new), then run all three typechecks (renderer, runtime, main/preload) and check the UI in a preview, as in "Check it", even if no conflict touched the UI.
 4. Finish as usual, but keep the merge commit: commit the merge resolution (`git commit --no-edit` after `git add`), and do not squash or rebase it.

@@ -10,10 +10,7 @@ if (draftRoot === appRoot) {
 const result = await prepareDraftDependencies({ draftRoot, appRoot, bun: process.execPath });
 const said = {
   ready: "Dependencies are ready.",
-  linked: "Linked the app's packages (the draft's dependencies match the app's).",
-  installed:
-    process.platform === "win32"
-      ? "Installed the draft's own packages (drafts on Windows always have their own)."
-      : "Installed the draft's own packages (its dependencies differ from the app's).",
+  linked: "Linked the draft's packages.",
+  installed: "Installed the packages for these dependencies once; later drafts with the same dependencies link them.",
 };
 console.log(`${said[result.mode]} (${result.ms} ms)`);

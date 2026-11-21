@@ -1,9 +1,20 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { isDirectoryLink, linkDirectorySync, removeDirectoryLinkSync } from "./dir-links.js";
+import { isDirectoryLink, linkDirectorySync, removeDirectoryLinkSync, removeTree } from "./dir-links.js";
+import { git } from "./git.js";
 
+/**
+ * A draft's packages come from a package set: one full install (the
+ * self-modification tools included) per set of dependencies, kept beside the
+ * app checkout and linked into every draft and scratch merge that has those
+ * dependencies. The app itself installs only what it runs, and nothing a
+ * draft does reaches its packages: a task that deletes a draft through its
+ * links (git and some shells follow Windows junctions) can only damage the
+ * package set, which is checked and rebuilt before its next use.
+ */
 export type DraftDependencies = { mode: "ready" | "linked" | "installed"; ms: number };
 
 const lstat = (file: string) => fs.lstatSync(file, { throwIfNoEntry: false });
@@ -33,9 +44,28 @@ const workspaceDirs = (root: string): string[] => {
   return dirs.filter((dir) => fs.existsSync(path.join(root, dir, "package.json"))).sort();
 };
 
+const patchFiles = (root: string): string[] => {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as {
+      patchedDependencies?: Record<string, string>;
+    };
+    return Object.values(manifest.patchedDependencies ?? {}).sort();
+  } catch {
+    return [];
+  }
+};
+
+/** What an install depends on: the lockfile, every manifest and every patch. */
+const manifestFiles = (root: string) => [
+  "bun.lock",
+  "package.json",
+  ...workspaceDirs(root).map((dir) => `${dir}/package.json`),
+  ...patchFiles(root),
+];
+
 export const dependencyFingerprint = (root: string): string => {
   const hash = createHash("sha256");
-  for (const file of ["bun.lock", "package.json", ...workspaceDirs(root).map((dir) => `${dir}/package.json`)]) {
+  for (const file of manifestFiles(root)) {
     hash.update(`${file}\0`);
     try {
       hash.update(fs.readFileSync(path.join(root, file)));
@@ -47,48 +77,48 @@ export const dependencyFingerprint = (root: string): string => {
   return hash.digest("hex");
 };
 
-export const isLinkedToApp = (draftRoot: string, appRoot: string): boolean => {
-  const modules = path.join(draftRoot, "node_modules");
-  if (!isDirectoryLink(modules)) return false;
+/**
+ * Package sets live in the app checkout's git folder: never part of a
+ * worktree, so removing a draft can't reach them, and kept with the install
+ * they serve. Short names: Windows paths into bun's store are already long.
+ */
+export const packageSetsDir = (appRoot: string) => {
+  const gitDir = path.join(appRoot, ".git");
+  return lstat(gitDir)?.isDirectory()
+    ? path.join(gitDir, "stella-packages")
+    : path.join(os.homedir(), ".stella", "cache", "stella-packages");
+};
+
+const READY = ".stella-ready";
+
+/** Every package in the set's store still has its files (a deletion through a link leaves holes). */
+const intact = (store: string): boolean => {
+  const bunStore = path.join(store, "node_modules", ".bun");
+  let entries: string[];
   try {
-    return fs.realpathSync(modules) === fs.realpathSync(path.join(appRoot, "node_modules"));
+    entries = fs.readdirSync(bunStore).filter((name) => name !== "node_modules" && !name.startsWith("."));
   } catch {
     return false;
   }
-};
-
-const copyWorkspaceLinks = (draftRoot: string, appRoot: string) => {
-  for (const dir of workspaceDirs(appRoot)) {
-    const from = path.join(appRoot, dir, "node_modules");
-    const into = path.join(draftRoot, dir, "node_modules");
-    if (!lstat(from)?.isDirectory() || !fs.existsSync(path.join(draftRoot, dir))) continue;
-    fs.rmSync(into, { recursive: true, force: true });
-    const scratch = path.join(from, ".tmp");
-    fs.cpSync(from, into, {
-      recursive: true,
-      verbatimSymlinks: true,
-      filter: (source) => source !== scratch && !source.startsWith(`${scratch}${path.sep}`),
-    });
+  if (entries.length === 0) return false;
+  for (const entry of entries) {
+    const at = entry.indexOf("@", entry.startsWith("@") ? 1 : 0);
+    if (at <= 0) continue;
+    const name = entry.slice(0, at).replace("+", "/");
+    if (!fs.existsSync(path.join(bunStore, entry, "node_modules", name, "package.json"))) return false;
   }
-};
-
-const link = (draftRoot: string, appRoot: string) => {
-  const modules = path.join(draftRoot, "node_modules");
-  const stat = lstat(modules);
-  if (stat && !stat.isSymbolicLink()) fs.rmSync(modules, { recursive: true, force: true });
-  else if (stat) removeDirectoryLinkSync(modules);
-  copyWorkspaceLinks(draftRoot, appRoot);
-  linkDirectorySync(path.join(appRoot, "node_modules"), modules);
-};
-
-export const unlinkFromApp = (draftRoot: string, appRoot: string): boolean => {
-  if (!isLinkedToApp(draftRoot, appRoot)) return false;
-  return removeDirectoryLinkSync(path.join(draftRoot, "node_modules"));
+  return true;
 };
 
 const install = (bun: string, cwd: string, timeoutMs: number) =>
   new Promise<void>((resolve, reject) => {
-    const child = spawn(bun, ["install", "--frozen-lockfile"], { cwd, stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    // No lifecycle scripts: a draft needs packages to typecheck and preview,
+    // not a second Electron, browser or Office binary.
+    const child = spawn(bun, ["install", "--frozen-lockfile", "--ignore-scripts", "--no-summary"], {
+      cwd,
+      stdio: ["ignore", "ignore", "pipe"],
+      windowsHide: true,
+    });
     let stderr = "";
     child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
       stderr = (stderr + chunk).slice(-2000);
@@ -101,9 +131,186 @@ const install = (bun: string, cwd: string, timeoutMs: number) =>
     child.on("close", (code) => {
       clearTimeout(timer);
       if (code === 0) resolve();
-      else reject(new Error(`Installing the draft's dependencies failed; run \`bun install\` in the draft. ${stderr.trim().slice(-400)}`));
+      else reject(new Error(`Installing the draft's packages failed. ${stderr.trim().slice(-400)}`));
     });
   });
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** One builder per set at a time; a lock left by a process that died is taken over. */
+const withLock = async <T>(lock: string, timeoutMs: number, work: () => Promise<T>): Promise<T> => {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      fs.mkdirSync(lock);
+      fs.writeFileSync(path.join(lock, "pid"), String(process.pid));
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      let holder = 0;
+      try {
+        holder = Number(fs.readFileSync(path.join(lock, "pid"), "utf8"));
+      } catch {
+        // Being written.
+      }
+      const alive = (() => {
+        if (!holder) return true;
+        try {
+          process.kill(holder, 0);
+          return true;
+        } catch (probe) {
+          return (probe as NodeJS.ErrnoException).code === "EPERM";
+        }
+      })();
+      const age = Date.now() - (lstat(lock)?.mtimeMs ?? Date.now());
+      if (!alive || age > timeoutMs) {
+        fs.rmSync(lock, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() > until) throw new Error("Timed out waiting for another install of the draft's packages.");
+      await delay(500);
+    }
+  }
+  try {
+    return await work();
+  } finally {
+    fs.rmSync(lock, { recursive: true, force: true });
+  }
+};
+
+/**
+ * The package set for `source`'s dependencies, built when missing or
+ * damaged. Built where it stays: Windows junctions hold absolute paths, so a
+ * set can't be built elsewhere and moved.
+ */
+export const ensurePackageSet = async (options: {
+  source: string;
+  appRoot: string;
+  bun?: string;
+  timeoutMs?: number;
+}): Promise<{ store: string; built: boolean }> => {
+  const fingerprint = dependencyFingerprint(options.source);
+  const sets = packageSetsDir(options.appRoot);
+  const store = path.join(sets, fingerprint.slice(0, 12));
+  const ready = () => {
+    try {
+      return fs.readFileSync(path.join(store, READY), "utf8").trim() === fingerprint && intact(store);
+    } catch {
+      return false;
+    }
+  };
+  if (ready()) return { store, built: false };
+  fs.mkdirSync(sets, { recursive: true });
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  return withLock(`${store}.lock`, timeoutMs + 60_000, async () => {
+    if (ready()) return { store, built: false };
+    await removeTree(store);
+    for (const file of manifestFiles(options.source)) {
+      const from = path.join(options.source, file);
+      if (!fs.existsSync(from)) continue;
+      fs.mkdirSync(path.dirname(path.join(store, file)), { recursive: true });
+      fs.copyFileSync(from, path.join(store, file));
+    }
+    await install(options.bun ?? (process.env.STELLA_BUN_PATH?.trim() || "bun"), store, timeoutMs);
+    if (!intact(store)) throw new Error("The draft's packages are incomplete after installing them.");
+    fs.writeFileSync(path.join(store, READY), fingerprint);
+    return { store, built: true };
+  });
+};
+
+const linkTarget = (link: string) => {
+  const raw = fs.readlinkSync(link).replace(/^\\\\\?\\/, "");
+  return path.resolve(path.dirname(link), raw);
+};
+
+const isInside = (parent: string, child: string) => {
+  const relative = path.relative(parent, child);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+};
+
+/**
+ * A workspace's own `node_modules` from the set, rebuilt in `into`: package
+ * links keep pointing into the set's store, links to a workspace package
+ * point at the draft's own copy of it.
+ */
+const mirrorWorkspaceModules = (store: string, root: string, from: string, into: string) => {
+  fs.mkdirSync(into, { recursive: true });
+  for (const entry of fs.readdirSync(from, { withFileTypes: true, encoding: "utf8" })) {
+    const source = path.join(from, entry.name);
+    const target = path.join(into, entry.name);
+    if (entry.isSymbolicLink()) {
+      let pointsAt = linkTarget(source);
+      if (isInside(store, pointsAt) && !isInside(path.join(store, "node_modules"), pointsAt)) {
+        pointsAt = path.join(root, path.relative(store, pointsAt));
+      }
+      if (fs.statSync(pointsAt, { throwIfNoEntry: false })?.isDirectory()) linkDirectorySync(pointsAt, target);
+      else if (process.platform === "win32") fs.copyFileSync(pointsAt, target);
+      else fs.symlinkSync(pointsAt, target);
+    } else if (entry.isDirectory()) {
+      mirrorWorkspaceModules(store, root, source, target);
+    } else {
+      fs.copyFileSync(source, target);
+    }
+  }
+};
+
+const clearModules = async (modules: string) => {
+  const stat = lstat(modules);
+  if (!stat) return;
+  if (stat.isSymbolicLink()) removeDirectoryLinkSync(modules);
+  else await removeTree(modules);
+};
+
+const linkedTo = (root: string, store: string) => {
+  const modules = path.join(root, "node_modules");
+  if (!isDirectoryLink(modules)) return false;
+  try {
+    return fs.realpathSync(modules) === fs.realpathSync(path.join(store, "node_modules"));
+  } catch {
+    return false;
+  }
+};
+
+/** Links `root` (a draft or a scratch merge) to its package set. */
+export const linkPackageSet = async (root: string, store: string) => {
+  const modules = path.join(root, "node_modules");
+  if (!linkedTo(root, store)) {
+    await clearModules(modules);
+    linkDirectorySync(path.join(store, "node_modules"), modules);
+  }
+  for (const dir of workspaceDirs(root)) {
+    const into = path.join(root, dir, "node_modules");
+    await clearModules(into);
+    const from = path.join(store, dir, "node_modules");
+    if (lstat(from)?.isDirectory()) mirrorWorkspaceModules(store, root, from, into);
+  }
+};
+
+/** Package sets nothing uses any more: not the app's, not a worktree's, not being built. */
+export const removeUnusedPackageSets = async (appRoot: string, keep: string[]) => {
+  const sets = packageSetsDir(appRoot);
+  let names: string[];
+  try {
+    names = fs.readdirSync(sets);
+  } catch {
+    return;
+  }
+  const kept = new Set([dependencyFingerprint(appRoot), ...keep].map((fingerprint) => fingerprint.slice(0, 12)));
+  for (const name of names) {
+    if (name.endsWith(".lock") || kept.has(name)) continue;
+    if (fs.existsSync(path.join(sets, `${name}.lock`))) continue;
+    await removeTree(path.join(sets, name)).catch(() => undefined);
+  }
+};
+
+const worktreeRoots = async (appRoot: string): Promise<string[]> => {
+  const listing = await git(appRoot, ["worktree", "list", "--porcelain"]).catch(() => "");
+  return listing
+    .split("\n")
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => line.slice("worktree ".length).trim())
+    .filter((dir) => path.resolve(dir) !== path.resolve(appRoot) && fs.existsSync(dir));
+};
 
 export const prepareDraftDependencies = async (options: {
   draftRoot: string;
@@ -113,42 +320,17 @@ export const prepareDraftDependencies = async (options: {
 }): Promise<DraftDependencies> => {
   const startedAt = Date.now();
   const { draftRoot, appRoot } = options;
-  const done = (mode: DraftDependencies["mode"]): DraftDependencies => ({ mode, ms: Date.now() - startedAt });
-  // Never on Windows. A draft is a git worktree that tasks remove with `git
-  // worktree remove`, and Git for Windows takes a junction for a directory
-  // (node_modules is ignored, so nothing stops it) and deletes the app's own
-  // packages through it. Windows drafts install their own.
-  const linkable =
-    process.platform !== "win32" &&
-    lstat(path.join(appRoot, "node_modules"))?.isDirectory() === true &&
-    dependencyFingerprint(draftRoot) === dependencyFingerprint(appRoot);
-  const uiModules = path.join(draftRoot, "packages", "desktop-ui", "node_modules");
-  if (linkable) {
-    if (isLinkedToApp(draftRoot, appRoot)) {
-      copyWorkspaceLinks(draftRoot, appRoot);
-      return done("ready");
-    }
-    if (lstat(path.join(draftRoot, "node_modules"))?.isDirectory() && lstat(uiModules)?.isDirectory()) {
-      return done("ready");
-    }
-    try {
-      link(draftRoot, appRoot);
-      return done("linked");
-    } catch {
-      unlinkFromApp(draftRoot, appRoot);
-    }
+  const { store, built } = await ensurePackageSet({
+    source: draftRoot,
+    appRoot,
+    ...(options.bun ? { bun: options.bun } : {}),
+    ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+  });
+  const already = linkedTo(draftRoot, store);
+  await linkPackageSet(draftRoot, store);
+  if (built) {
+    const others = await worktreeRoots(appRoot);
+    await removeUnusedPackageSets(appRoot, [draftRoot, ...others].map(dependencyFingerprint)).catch(() => undefined);
   }
-  unlinkFromApp(draftRoot, appRoot);
-  let missing = false;
-  for (const dir of [draftRoot, path.join(draftRoot, "packages", "desktop-ui")]) {
-    const modules = path.join(dir, "node_modules");
-    const stat = lstat(modules);
-    if (stat?.isDirectory()) continue;
-    if (stat?.isSymbolicLink()) removeDirectoryLinkSync(modules);
-    else if (stat) fs.rmSync(modules, { force: true });
-    missing = true;
-  }
-  if (!missing) return done("ready");
-  await install(options.bun ?? (process.env.STELLA_BUN_PATH?.trim() || "bun"), draftRoot, options.timeoutMs ?? 300_000);
-  return done("installed");
+  return { mode: built ? "installed" : already ? "ready" : "linked", ms: Date.now() - startedAt };
 };

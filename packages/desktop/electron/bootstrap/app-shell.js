@@ -15,7 +15,9 @@ import { startDeferredStartup } from "./deferred-startup.js";
 import { getMainLogger } from "../observability/main-logger.js";
 import { noteStartupAppPainted, onceAppPainted } from "../observability/app-paint.js";
 import { heldFirstPage, pendingHold } from "../services/app-source/update-transition.js";
+import { pruneRendererCache } from "../source/cache-prune.js";
 const STARTUP_APP_PAINT_FALLBACK_MS = 4_000;
+const RENDERER_CACHE_PRUNE_DELAY_MS = 5 * 60_000;
 const initializeBootstrapLocalState = async (context) => {
     const { config, lifecycle, services, state } = context;
     const stellaDataDir = await resolveStellaDataDir(app, config.stellaAppDir, config.stellaDataDirPath);
@@ -43,6 +45,13 @@ const initializeWindowShell = (context) => {
         log: (message) => getMainLogger()?.process("renderer.source", { message }),
         firstPage: hold ? (html) => heldFirstPage(html, hold) : undefined,
     });
+    const pruneCache = setTimeout(() => {
+        const startedAt = Date.now();
+        void pruneRendererCache(path.join(app.getPath("userData"), "Renderer Source Cache"))
+            .then((result) => getMainLogger()?.process("renderer.cache-pruned", { ...result, ms: Date.now() - startedAt }))
+            .catch(() => undefined);
+    }, RENDERER_CACHE_PRUNE_DELAY_MS);
+    pruneCache.unref?.();
     configureNotificationActivationHandling(context);
     state.overlayController = new OverlayWindowController({
         setupExternalLinkHandlers: (window) => services.externalLinkService.setupExternalLinkHandlers(window),

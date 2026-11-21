@@ -6,11 +6,9 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.7",
     "@stella/contracts": "workspace:*",
-    "@stella/node-shared": "workspace:*",
-    "@stella/theme": "workspace:*"
-  },
-  "devDependencies": {
     "@stella/desktop": "workspace:*",
-    "@stella/runtime": "workspace:*"
+    "@stella/node-shared": "workspace:*",
+    "@stella/runtime": "workspace:*",
+    "@stella/theme": "workspace:*"
   }
 }

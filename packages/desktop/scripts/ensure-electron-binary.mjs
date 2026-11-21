@@ -16,6 +16,7 @@ import {
 import { createRequire } from "node:module";
 import path from "node:path";
 import { isEntryPoint } from "../../../scripts/lib/entry-point.mjs";
+import { usesSignedElectron } from "./tidy-packages.mjs";
 
 // Electron's own postinstall (`node_modules/electron/install.js`) downloads the
 // binary fine but extracts it with `extract-zip`, which can die silently
@@ -254,6 +255,9 @@ function cloneSharedDist(zipPath, distDir, platformPath) {
 }
 
 export async function ensureElectronBinary() {
+  if (usesSignedElectron(repoRootDir)) {
+    return;
+  }
   if (isElectronBinaryHealthy()) {
     return;
   }

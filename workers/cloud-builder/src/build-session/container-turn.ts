@@ -1,3 +1,9 @@
+import {
+  agentContainerSize,
+  materializeAgentWorld,
+  openAgentSession,
+  probeAgentContainerPressure,
+} from "../agent-container.js";
 import { containerBudgetMessage } from "../container-meter.js";
 import { builderServiceSecret } from "../secret-rotation.js";
 import {
@@ -14,12 +20,10 @@ import { devAcceptanceProbesEnabled } from "../dev-acceptance-probes.js";
 import { executorSessionEnvironment } from "../executor-session-env.js";
 import { cloudNativeStateRoot } from "@stella/contracts/cloud-native-state";
 import {
-  describeInstanceSize,
   initialInstanceSize,
   INSTANCE_TIERS,
   isInstanceSize,
   isOutOfMemoryFailure,
-  sizeAfterOutOfDisk,
   sizeAfterOutOfMemory,
 } from "../instance-size.js";
 import type { InstanceSize } from "../instance-size.js";
@@ -55,7 +59,6 @@ import {
 } from "../workspace.js";
 import { issueWorldCapability } from "../world-capability.js";
 import { conversationWorldName } from "../slack/scope.js";
-import { worldMaterializationCommand, worldMaterializationFailure } from "../world-materialization.js";
 import {
   SANDBOX_EXECUTOR,
   SANDBOX_PAGE_CACHE_WARM_COMMAND,
@@ -83,12 +86,11 @@ import {
 } from "./shared/errors.js";
 import {
   AGENT_CONTAINER_SIZE_KEY,
-  CONTAINER_OOM_BASELINE_KEY,
   AGENT_RECOVERY_PENDING_KEY,
   AGENT_TURN_HEARTBEAT_MS,
   AGENT_WATCHDOG_DEADLINE_KEY,
-  agentContainerSize,
   agentExecutionMarkerKey,
+  BUILD_SESSION_CONTAINER_SIZE_KEYS,
   agentRecoveryIdentity,
   errorMessage,
   exactTurnIdentityMatches,
@@ -445,72 +447,6 @@ export const steerContainerAgent = async (
   });
 };
 
-const DISK_EXHAUSTED_BYTES = 1_500 * 1000 ** 2;
-
-const CONTAINER_PRESSURE_PROBE = `boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
-oom=$(awk '$1 == "oom_kill" { print $2 }' /proc/vmstat 2>/dev/null)
-set -- $( (df -B1 --output=avail,size /workspace 2>/dev/null || df -B1 --output=avail,size /) | tail -1)
-printf '%s %s %s %s\n' "\${boot:-unknown}" "\${oom:-0}" "\${1:-0}" "\${2:-0}"`;
-
-export type ContainerOomBaseline = { bootId: string; oomKills: number };
-
-const containerPressure = async (
-  host: ContainerTurnHost,
-  turn: TurnRequest,
-  sandbox: ReturnType<ContainerTurnHost["sandbox"]>,
-  size: InstanceSize,
-): Promise<{ note: string; resizedTo?: InstanceSize } | undefined> => {
-  if (!(await host.sandboxContainerRunning(sandbox))) return undefined;
-  const probe = await withInfrastructureDeadline(
-    sandbox.exec(CONTAINER_PRESSURE_PROBE),
-    10_000,
-    "Container pressure probe did not settle.",
-  );
-  if (!probe.success) return undefined;
-  const [bootId = "", oomRaw, availRaw, totalRaw] = probe.stdout.trim().split(/\s+/u);
-  const oomKills = Number(oomRaw);
-  const availBytes = Number(availRaw);
-  const totalBytes = Number(totalRaw);
-  if (!Number.isSafeInteger(oomKills) || !Number.isFinite(availBytes)) {
-    return undefined;
-  }
-  const baseline = await host.ctx.storage.get<ContainerOomBaseline>(
-    CONTAINER_OOM_BASELINE_KEY,
-  );
-  const outOfMemory =
-    oomKills > (baseline?.bootId === bootId ? baseline.oomKills : 0);
-  await host.ctx.storage.put(CONTAINER_OOM_BASELINE_KEY, {
-    bootId,
-    oomKills,
-  } satisfies ContainerOomBaseline);
-  const outOfDisk = totalBytes > 0 && availBytes < DISK_EXHAUSTED_BYTES;
-  log("info", "agent_container_pressure", {
-    turnId: turn.turnId,
-    threadId: turn.threadId,
-    instanceType: INSTANCE_TIERS[size].instanceType,
-    oomKills,
-    availBytes,
-    totalBytes,
-    outOfMemory,
-    outOfDisk,
-  });
-  if (!outOfMemory && !outOfDisk) return undefined;
-  const ran = outOfMemory && outOfDisk ? "memory and disk" : outOfMemory ? "memory" : "disk";
-  const next = outOfMemory ? sizeAfterOutOfMemory(size) : sizeAfterOutOfDisk(size);
-  const stored = await host.ctx.storage.get<InstanceSize>(AGENT_CONTAINER_SIZE_KEY);
-  if (next && (!isInstanceSize(stored) || stored !== next)) {
-    await host.ctx.storage.put(AGENT_CONTAINER_SIZE_KEY, next);
-  }
-  return next
-    ? {
-        resizedTo: next,
-        note: `[Workspace: this agent's cloud container (${describeInstanceSize(size)}) ran out of ${ran} during this run, so a command in it was killed or failed. Its next run gets a larger one (${describeInstanceSize(next)}); message it to continue.]`,
-      }
-    : {
-        note: `[Workspace: this agent's cloud container (${describeInstanceSize(size)}) ran out of ${ran} during this run, so a command in it was killed or failed. No cloud container has more ${outOfMemory ? "memory" : "disk"}.]`,
-      };
-};
-
 export const runContainerAgentTurn = async (
   host: ContainerTurnHost,
   turn: TurnRequest,
@@ -547,7 +483,11 @@ export const runContainerAgentTurn = async (
     const proposedSize: InstanceSize = initialInstanceSize({
       workspace: turn.workspace,
     });
-    let size = await agentContainerSize(host.ctx.storage, proposedSize);
+    let size = await agentContainerSize(
+      host.ctx.storage,
+      BUILD_SESSION_CONTAINER_SIZE_KEYS,
+      proposedSize,
+    );
     await host.ctx.storage.put({
       sandboxSize: size,
       ...(turn.agentRole !== "orchestrator" && size !== "small"
@@ -794,9 +734,14 @@ export const runContainerAgentTurn = async (
     const pressure =
       turn.agentRole === "orchestrator"
         ? undefined
-        : await containerPressure(host, turn, sandbox, size).catch(
-            () => undefined,
-          );
+        : await probeAgentContainerPressure({
+            sandbox,
+            size,
+            storage: host.ctx.storage,
+            keys: BUILD_SESSION_CONTAINER_SIZE_KEYS,
+            log,
+            fields: { turnId: turn.turnId, threadId: turn.threadId },
+          }).catch(() => undefined);
 
     if (result.checkpointPolicy === "builder_fallback") {
       try {
@@ -1230,15 +1175,7 @@ export const attachAgentWorld = async (
     commandTimeoutMs: args.commandTimeoutMs,
     env: executorSessionEnvironment(),
   };
-  // A failed attach leaves its session behind in the agent's container; the
-  // retry owns the same id, so an existing session is replaced, never reused.
-  const session = await sandbox
-    .createSession(sessionOptions)
-    .catch(async (error: unknown) => {
-      if (!/already exists/iu.test(errorMessage(error))) throw error;
-      await sandbox.deleteSession(args.sessionId).catch(() => undefined);
-      return await sandbox.createSession(sessionOptions);
-    });
+  const session = await openAgentSession(sandbox, sessionOptions);
   turnExecution.assertActive();
   const coldContainerStartMs = phaseMs(coldStarted);
 
@@ -1256,33 +1193,20 @@ export const attachAgentWorld = async (
   }
   const worldNameMs = phaseMs(worldNameStarted);
   const { name } = preparedName;
-  let capabilityMs = 0;
   let materializationMs = 0;
   if (materializeWorld) {
-    const capabilityStarted = performance.now();
-    const capability = await issueWorldCapability({
+    const materializationStarted = performance.now();
+    const materialized = await materializeAgentWorld(session, {
       secret: builderServiceSecret(host.env),
+      origin: host.env.CLOUD_BUILDER_PUBLIC_URL,
+      worldRoot,
       worldName: name,
       turnId: turn.turnId,
       attemptGeneration: turn.attemptGeneration!,
-      now: Date.now(),
       ttlMs: Math.max(1, Math.min(30 * 60_000, args.commandTimeoutMs)),
+      timeoutMs: args.commandTimeoutMs,
     });
-    capabilityMs = phaseMs(capabilityStarted);
-    const origin = host.env.CLOUD_BUILDER_PUBLIC_URL.replace(/\/+$/u, "");
-    const exportUrl = new URL(`${origin}/internal/worlds/${name}/export`);
-    const materializationStarted = performance.now();
-    const materialized = await session.exec(
-      worldMaterializationCommand({
-        worldRoot,
-        exportUrl: exportUrl.toString(),
-        capability,
-      }),
-      { timeout: args.commandTimeoutMs },
-    );
-    if (!materialized.success)
-      throw new AgentTurnError(worldMaterializationFailure(materialized));
-    await normalizeToolWorkspaceRoot(session, worldRoot);
+    if (!materialized.ok) throw new AgentTurnError(materialized.message);
     turnExecution.assertActive();
     materializationMs = phaseMs(materializationStarted);
   }
@@ -1385,7 +1309,6 @@ export const attachAgentWorld = async (
     coldContainerStartMs,
     worldNameMs,
     initialNormalizeMs,
-    capabilityMs,
     materializationMs,
     nativeRestoreMs,
     ...(nativeRestore ? { nativeRestore } : {}),

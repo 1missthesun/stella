@@ -1,9 +1,4 @@
-import { Effect } from "effect";
-import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
-import {
-  attachedToolPaths,
-  attachedToolPathsForDirectory,
-} from "@stella/executor-cloud/attached-tool-protocol";
+import { attachedToolPaths } from "@stella/executor-cloud/attached-tool-protocol";
 import {
   advanceSandboxDestroyDebt,
   clearSandboxDestroyDebt,
@@ -17,6 +12,13 @@ import {
   sandboxLifecycleFailureFields,
   SANDBOX_WORKLOADS,
 } from "../sandbox-lifecycle.js";
+import {
+  acquireAgentContainerSlot as acquireSharedAgentContainerSlot,
+  AgentContainerRefusedError,
+  agentContainerRunning,
+  agentContainerSize,
+  releaseAgentContainer,
+} from "../agent-container.js";
 import { sandboxClient } from "../sandbox-client.js";
 import { SANDBOX_PAGE_CACHE_WARM_COMMAND } from "../sandbox-code.js";
 import { snapshotAllowsCloudSandbox } from "../owner-gate.js";
@@ -33,8 +35,8 @@ import type { BuildSessionInternals } from "./host.js";
 import { AgentTurnError } from "./shared/errors.js";
 import type { Env } from "./shared/env.js";
 import {
-  agentContainerSize,
   agentExecutionMarkerKey,
+  BUILD_SESSION_CONTAINER_SIZE_KEYS,
   exactTurnIdentityMatches,
   json,
   log,
@@ -206,6 +208,7 @@ export const prewarmOrchestratorContainer = async (
   }
   const size = await agentContainerSize(
     host.ctx.storage,
+    BUILD_SESSION_CONTAINER_SIZE_KEYS,
     initialInstanceSize({}),
   );
   const handle = sandboxHandle(
@@ -254,9 +257,15 @@ export const acquireAgentContainerSlot = async (
 ): Promise<void> => {
   if (turn.agentRole === "orchestrator") return;
   execution.assertActive();
-  const gate = ownerGateStub(host.env.OWNER_GATES, turn.ownerId);
-  const slot = await gate.acquireAgentContainer({ sandboxId });
-  if (!slot.ok) throw new AgentTurnError(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
+  const slot = await acquireSharedAgentContainerSlot(
+    host.env,
+    turn.ownerId,
+    sandboxId,
+  ).catch((error: unknown) => {
+    throw error instanceof AgentContainerRefusedError
+      ? new AgentTurnError(error.message)
+      : error;
+  });
   log("info", "agent_container_acquired", {
     threadId: turn.threadId,
     sandbox: sandboxId.slice(0, 16),
@@ -281,33 +290,10 @@ export const sandbox = (
     owner,
   );
 
-/**
- * Whether the sandbox's container is running right now, answered by the
- * sandbox object itself and never by the container. Every container RPC
- * (process kills included) starts the instance if it is not running, so a
- * teardown that asks the container anything boots the very thing it is
- * retiring. An unanswerable state counts as not running: `destroy()` is the
- * authoritative SIGKILL either way, and a skipped process sweep only costs
- * a native child the prompt stop it would otherwise get.
- */
 export const sandboxContainerRunning = async (
   _host: SessionSandboxHost,
   sandbox: ReturnType<BuildSessionInternals["sandbox"]>,
-): Promise<boolean> => {
-  try {
-    const state = await withInfrastructureDeadline(
-      sandbox.getState(),
-      10_000,
-      "Sandbox state read did not settle.",
-    );
-    return state.status === "running";
-  } catch (error) {
-    log("error", "sandbox_state_read_failed", {
-      ...sandboxLifecycleFailureFields(error),
-    });
-    return false;
-  }
-};
+): Promise<boolean> => await agentContainerRunning(sandbox, log);
 
 export const destroySandboxDurably = async (
   host: SessionSandboxHost,
@@ -465,82 +451,23 @@ export const releaseAgentSessionResources = async (
   },
 ): Promise<void> => {
   const turn = await host.ctx.storage.get<TurnRequest>("turn");
-  const sandbox = host.sandbox(
-    target.sandboxId,
-    target.size,
-    target.workload,
-    undefined,
-    turnSleepAfterMs(host.env, turn),
-  );
-  if (turn?.ownerId) {
-    await ownerGateStub(host.env.OWNER_GATES, turn.ownerId)
-      .releaseAgentContainer({ sandboxId: target.sandboxId })
-      .catch(() => undefined);
-  }
-  if (!(await host.sandboxContainerRunning(sandbox))) return;
-  const paths = attachedToolPathsForDirectory(target.daemonDirectory);
-  const teardownExec = (command: string) => sandbox.exec(command);
-  const identity = await withInfrastructureDeadline(
-    teardownExec(`cat -- '${paths.daemonPid.replace(/'/gu, `'"'"'`)}'`),
-    5_000,
-    "Attached daemon identity read did not settle.",
-  )
-    .then((result) => {
-      if (!result.success) return undefined;
-      const value: unknown = JSON.parse(result.stdout);
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return undefined;
-      }
-      const pid = "pid" in value ? value.pid : undefined;
-      const pgid = "pgid" in value ? value.pgid : undefined;
-      return Number.isSafeInteger(pid) && pid === pgid && Number(pid) > 1
-        ? Number(pgid)
-        : undefined;
-    })
-    .catch(() => undefined);
-  if (identity !== undefined) {
-    await withInfrastructureDeadline(
-      teardownExec(`kill -TERM -- -${identity}`),
-      5_000,
-      "Attached daemon group SIGTERM did not settle.",
-    ).catch(() => undefined);
-    await withInfrastructureDeadline(
-      Effect.runPromise(Effect.sleep(500)),
-      1_000,
-      "Attached daemon group grace period did not settle.",
-    ).catch(() => undefined);
-    await withInfrastructureDeadline(
-      teardownExec(`kill -KILL -- -${identity}`),
-      5_000,
-      "Attached daemon group SIGKILL did not settle.",
-    ).catch(() => undefined);
-  }
-  await withInfrastructureDeadline(
-    sandbox.killProcess(
-      `attached-daemon-${target.sessionId}`.slice(0, 64),
-      "SIGKILL",
+  await releaseAgentContainer({
+    env: host.env,
+    ...(turn?.ownerId ? { ownerId: turn.ownerId } : {}),
+    sandbox: host.sandbox(
+      target.sandboxId,
+      target.size,
+      target.workload,
+      undefined,
+      turnSleepAfterMs(host.env, turn),
     ),
-    10_000,
-    "Attached daemon teardown did not settle.",
-  ).catch(() => undefined);
-  await withInfrastructureDeadline(
-    teardownExec(
-      `rm -rf -- '${target.daemonDirectory.replace(/'/gu, `'"'"'`)}'`,
-    ),
-    5_000,
-    "Attached daemon directory removal did not settle.",
-  ).catch(() => undefined);
-  await sandbox.deleteSession(target.sessionId).catch(() => undefined);
-  if (turn?.agentRole === "orchestrator") {
-    await sandbox
-      .release({
-        warmMs: orchestratorSleepAfterMs(host.env),
-        snapshot: false,
-      })
-      .catch(() => undefined);
-    return;
-  }
-  await sandbox
-    .release({ warm: target.warm !== false })
-    .catch(() => undefined);
+    sandboxId: target.sandboxId,
+    sessionId: target.sessionId,
+    daemonDirectory: target.daemonDirectory,
+    release:
+      turn?.agentRole === "orchestrator"
+        ? { warmMs: orchestratorSleepAfterMs(host.env), snapshot: false }
+        : { warm: target.warm !== false },
+    log,
+  });
 };

@@ -9,11 +9,6 @@ import { HEADER_OWNER } from "../../conversation-types.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../../hash.js";
 import { builderServiceSecret, builderServiceSecrets } from "../../secret-rotation.js";
-import {
-  isInstanceSize,
-  largerSize,
-  type InstanceSize,
-} from "../../instance-size.js";
 import { APP_BUILD_ROOT, WORLD_ROOT } from "../../workspace.js";
 import type { OwnerGateRefusalCode } from "../../owner-gate.js";
 import { AgentTurnAuthorityLostError } from "./errors.js";
@@ -28,19 +23,12 @@ export const AGENT_CONTAINER_SIZE_KEY = "agentContainerSize";
 
 export const CONTAINER_OOM_BASELINE_KEY = "containerOomBaseline";
 
-export const agentContainerSize = async (
-  storage: Pick<DurableObjectStorage, "get">,
-  initial: InstanceSize,
-): Promise<InstanceSize> => {
-  const [floor, legacyLarge] = await Promise.all([
-    storage.get<InstanceSize>(AGENT_CONTAINER_SIZE_KEY),
-    storage.get<boolean>(AGENT_CONTAINER_LARGE_KEY),
-  ]);
-  let size = initial;
-  if (isInstanceSize(floor)) size = largerSize(size, floor);
-  if (legacyLarge === true) size = "large";
-  return size;
-};
+/** A BuildSession is one agent thread, so its size keys are its own. */
+export const BUILD_SESSION_CONTAINER_SIZE_KEYS = {
+  size: AGENT_CONTAINER_SIZE_KEY,
+  oomBaseline: CONTAINER_OOM_BASELINE_KEY,
+  legacyLarge: AGENT_CONTAINER_LARGE_KEY,
+} as const;
 
 export const OWNER_EVENT_DEBT_MAX = 200;
 

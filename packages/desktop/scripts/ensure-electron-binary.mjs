@@ -9,6 +9,7 @@ import {
   mkdirSync,
   promises as fsPromises,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
 } from "node:fs";
@@ -165,7 +166,7 @@ function extractZipNatively(zipPath, distDir) {
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${distDir.replace(/'/g, "''")}' -Force`,
+                `$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${distDir.replace(/'/g, "''")}' -Force`,
               ],
             ],
           ]
@@ -174,9 +175,18 @@ function extractZipNatively(zipPath, distDir) {
             ["tar", ["-xf", zipPath, "-C", distDir]],
           ];
 
+  // Windows PowerShell 5.1 started from PowerShell 7 inherits its module path
+  // and loads 7's Expand-Archive, which fails; give it its own.
+  const env = { ...process.env };
+  if (process.platform === "win32") {
+    for (const key of Object.keys(env)) {
+      if (key.toLowerCase() === "psmodulepath") delete env[key];
+    }
+  }
+
   let lastError = "no extraction tool succeeded";
   for (const [command, args] of attempts) {
-    const result = spawnSync(command, args, { stdio: "ignore" });
+    const result = spawnSync(command, args, { stdio: "ignore", env });
     if (!result.error && result.status === 0) {
       return;
     }
@@ -287,7 +297,10 @@ export async function ensureElectronBinary() {
     arch,
   });
 
-  const distDir = path.join(electronDir, "dist");
+  // node_modules/electron is a link into bun's store. Windows' tar.exe
+  // (November 2026 and later) refuses to extract through it ("too many
+  // symbolic link levels"), so write into the store folder itself.
+  const distDir = path.join(realpathSync(electronDir), "dist");
   if (cloneSharedDist(zipPath, distDir, platformPath)) {
     log("Cloned the shared unpacked Electron (copy-on-write).");
   } else {

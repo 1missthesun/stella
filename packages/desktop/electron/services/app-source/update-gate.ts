@@ -175,6 +175,17 @@ const recordedBundleInputs = async (cwd: string) => {
   }
 };
 
+/**
+ * Whether the update changes a file the running main process was built from
+ * (the inputs recorded with its bundle). The main bundle carries runtime, agent
+ * and contracts code too, so such a change needs a relaunch onto a rebuilt
+ * main, not only a runtime restart or a renderer swap.
+ */
+export const changesMainBundle = async (cwd: string, files: string[]) => {
+  const recorded = await recordedBundleInputs(cwd);
+  return files.some((file) => recorded.has(file));
+};
+
 export const touchesBundleInputs = async (cwd: string, files: string[]) => {
   const recorded = await recordedBundleInputs(cwd);
   return files.some(

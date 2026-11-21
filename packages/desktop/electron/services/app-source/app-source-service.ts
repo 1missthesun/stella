@@ -62,6 +62,7 @@ import {
 } from "./update-plan.js";
 import {
   buildOnScratch,
+  changesMainBundle,
   checkMergedUpdate,
   prebuildElectronBundles,
   prepareInstallAhead,
@@ -595,7 +596,7 @@ export class AppSourceService {
     const rejected = this.rejected.get(sha);
     return {
       files: paths.length,
-      restart: relaunches(paths),
+      restart: relaunches(paths) || (await changesMainBundle(cwd, paths)),
       interfaceOnly: interfaceOnly(paths),
       ...(rejected ? { problem: rejected } : {}),
     };
@@ -1019,7 +1020,7 @@ export class AppSourceService {
       .filter(Boolean);
     this.mark("diff");
     const install = installs(paths);
-    const restart = relaunches(paths);
+    const restart = relaunches(paths) || (await changesMainBundle(cwd, paths));
     let bundles = prepared?.bundles && prepared.to === to ? prepared.dir : undefined;
     if (restart && !bundles) {
       bundles = `${this.options.updateScratchDir}-apply-bundles`;

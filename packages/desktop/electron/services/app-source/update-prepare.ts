@@ -4,6 +4,7 @@ import { removeScratchDir } from "./dir-links.js";
 import { git, gitRaw } from "./git.js";
 import {
   buildOnScratch,
+  changesMainBundle,
   checkMergedUpdate,
   warmDependencies,
   type GateResult,
@@ -256,7 +257,8 @@ export class UpdatePreparer {
         .split("\n")
         .filter(Boolean);
       const install = installs(paths);
-      const keep = relaunches(paths) && !install ? dir : undefined;
+      const keep =
+        (relaunches(paths) || (await changesMainBundle(cwd, paths))) && !install ? dir : undefined;
       const checked =
         plan.kind === "conflict" || (plan.kind === "clean" && !(job.trustIdenticalTree && plan.identical));
       let gate: GateResult | null = null;

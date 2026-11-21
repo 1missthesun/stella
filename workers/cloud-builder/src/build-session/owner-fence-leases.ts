@@ -1,5 +1,6 @@
+import type { OwnerFenceClient } from "../owner-fence-client.js";
 import { sha256Hex } from "../hash.js";
-import { OWNER_FENCE_LEASE_TTL_MS } from "../owner-fence-do.js";
+import { OWNER_FENCE_LEASE_TTL_MS } from "../owner-fence.js";
 import type { BuildSessionInternals } from "./host.js";
 import { OwnerPurgeFenceError } from "./shared/errors.js";
 import {
@@ -20,7 +21,7 @@ export type OwnerFenceLeaseHost = Pick<
   BuildSessionInternals,
   | "ctx"
   | "armOwnerFenceLeaseReconciliationAlarm"
-  | "callOwnerFence"
+  | "ownerFence"
   | "hasOwnerFenceLeaseRetirementDebt"
   | "ownerFenceReceiptMatches"
   | "retireBuildOwnerFenceLease"
@@ -168,14 +169,15 @@ export const registerBuildOwnerFenceLease = async (
     if (args.mutateTurn) args.turn.ownerPurgeLeaseId = leaseId;
   });
 
-  let response: Response;
+  let response: Awaited<ReturnType<OwnerFenceClient["register"]>>;
   const expiresAt = Date.now() + OWNER_FENCE_LEASE_TTL_MS;
   try {
-    response = await host.callOwnerFence(args.turn.ownerId, "register", {
+    response = await host.ownerFence(args.turn.ownerId).register({
       leaseId: receipt.leaseId,
       sessionId: host.ctx.id.toString(),
       turnId: args.turn.turnId,
       ownerGeneration: args.turn.ownerGeneration,
+      namespace: "build",
       role: args.role,
       expiresAt,
       ...(receipt.registrationGeneration
@@ -191,23 +193,18 @@ export const registerBuildOwnerFenceLease = async (
     });
     throw new OwnerPurgeFenceError();
   }
-  const body = (await response.json().catch(() => null)) as {
-    generation?: string;
-    expiresAt?: number;
-    code?: unknown;
-  } | null;
-  if (!response.ok || !body?.generation) {
-    const rawCode = typeof body?.code === "string" ? body.code : "";
+  if (!response.ok) {
     log("info", "agent_turn_owner_fence_registration_rejected", {
       turnId: args.turn.turnId,
       threadId: args.turn.threadId,
       attemptGeneration: args.turn.attemptGeneration,
       status: response.status,
-      code: rawCode || "unknown",
+      code: response.code ?? "unknown",
       kind: args.kind,
     });
     throw new OwnerPurgeFenceError();
   }
+  const body = response;
   let committed = false;
   await host.ctx.storage.transaction(async (txn) => {
     const key = buildOwnerFenceLeaseReceiptKey(receipt.leaseId);
@@ -230,7 +227,8 @@ export const registerBuildOwnerFenceLease = async (
   });
   if (!committed) {
     await host
-      .callOwnerFence(receipt.ownerId, "unregister", {
+      .ownerFence(receipt.ownerId)
+      .unregister({
         leaseId: receipt.leaseId,
         sessionId: host.ctx.id.toString(),
         turnId: receipt.turnId,
@@ -245,10 +243,7 @@ export const registerBuildOwnerFenceLease = async (
   }
   return {
     generation: body.generation,
-    expiresAt:
-      typeof body.expiresAt === "number" && Number.isFinite(body.expiresAt)
-        ? body.expiresAt
-        : expiresAt,
+    expiresAt: body.expiresAt,
     leaseId: receipt.leaseId,
   };
 };
@@ -275,9 +270,9 @@ export const retireBuildOwnerFenceLease = async (
     };
     await txn.put(key, pending);
   });
-  let response: Response;
+  let response: Awaited<ReturnType<OwnerFenceClient["unregister"]>>;
   try {
-    response = await host.callOwnerFence(pending.ownerId, "unregister", {
+    response = await host.ownerFence(pending.ownerId).unregister({
       leaseId: pending.leaseId,
       sessionId: host.ctx.id.toString(),
       turnId: pending.turnId,

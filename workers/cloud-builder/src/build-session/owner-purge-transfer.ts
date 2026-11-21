@@ -13,13 +13,9 @@ import {
   isOwnerAppBuildPrefix,
   ownerAppBuildRoot,
 } from "../app-build-artifacts.js";
-import {
-  HEADER_OWNER_FENCE_ID,
-  type OwnerPurgeFence,
-  type OwnerPurgeMode,
-} from "../owner-fence-do.js";
 import type { CloudHomeLeaseRunner } from "../cloud-home-routes.js";
 import { withOwnerActivityLease } from "../owner-activity-lease.js";
+import { ownerFenceClient } from "../owner-fence-client.js";
 import {
   verifyWorldCapability,
   worldCapabilityFromRequest,
@@ -58,34 +54,17 @@ import {
 } from "./shared/keys.js";
 import { ownerGateStub, released, releasingStub } from "../rpc-release.js";
 
-const ownerFenceStub = (env: Env, ownerId: string) =>
-  ownerGateStub(env.OWNER_GATES, ownerId);
-
-export const callOwnerFence = async (
-  env: Env,
-  ownerId: string,
-  path: string,
-  body: Record<string, unknown>,
-): Promise<Response> =>
-  ownerFenceStub(env, ownerId).fetch(`https://owner-gate/owner-fence/${path}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      [HEADER_OWNER_FENCE_ID]: ownerId,
-    },
-    body: JSON.stringify({ ...body, ownerId }),
-  });
-
 export const cloudHomeLeaseRunner =
   (env: Env): CloudHomeLeaseRunner =>
-  async (ownerId, ownerGeneration, activityId, operation) =>
-    await withOwnerActivityLease(
-      (path, body) => callOwnerFence(env, ownerId, path, body),
+  async (ownerId, ownerGeneration, activityId, operation) => {
+    const fence = ownerFenceClient(env.OWNER_GATES, ownerId);
+    return await withOwnerActivityLease(
+      fence,
       ownerGeneration,
       activityId,
       async (generation, leaseId) =>
         await operation(async () => {
-          const asserted = await callOwnerFence(env, ownerId, "assert", {
+          const asserted = await fence.assert({
             ownerGeneration,
             generation,
             leaseId,
@@ -93,75 +72,7 @@ export const cloudHomeLeaseRunner =
           if (!asserted.ok) throw new OwnerPurgeFenceError();
         }),
     );
-
-export const beginOwnerPurge = async (
-  env: Env,
-  ownerId: string,
-  mode: OwnerPurgeMode,
-  requestId: string,
-  expectedGeneration?: string,
-): Promise<{ generation: string; rejoined?: true }> => {
-  let response = await callOwnerFence(env, ownerId, "begin", {
-    mode,
-    requestId,
-    ...(expectedGeneration !== undefined ? { expectedGeneration } : {}),
-  });
-  if (!response.ok) throw new Error("Owner purge fence could not be created.");
-  let state = (await response.json()) as {
-    generation?: string;
-    active?: OwnerPurgeFence["active"];
-    rejoined?: boolean;
   };
-  if (!state.generation) throw new Error("Owner purge fence was unreadable.");
-  const generation = state.generation;
-  const rejoined = state.rejoined === true;
-  for (let attempt = 0; attempt < 200; attempt += 1) {
-    const active = Object.values(state.active ?? {});
-    if (active.length === 0) {
-      return { generation, ...(rejoined ? { rejoined: true } : {}) };
-    }
-    await Promise.all(
-      active.map(
-        async ({ leaseId, sessionId, turnId, namespace, ownerGeneration }) => {
-          if (namespace === "activity") return;
-          try {
-            const target =
-              namespace === "orchestrator"
-                ? env.ORCHESTRATOR_SESSIONS
-                : env.BUILD_SESSIONS;
-            const id = target.idFromString(sessionId);
-            await target
-              .get(id)
-              .fetch("https://build-session/owner-purge-cancel", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                  ownerId,
-                  turnId,
-                  ownerGeneration: ownerGeneration ?? "legacy",
-                  generation,
-                  leaseId,
-                }),
-              });
-          } catch (error) {
-            log("error", "owner_purge_turn_cancel_failed", {
-              sessionId,
-              message: errorMessage(error),
-            });
-          }
-        },
-      ),
-    );
-    await scheduler.wait(250);
-    response = await callOwnerFence(env, ownerId, "assert-blocked", {
-      generation,
-    });
-    if (!response.ok)
-      throw new Error("Owner purge fence changed unexpectedly.");
-    state = (await response.json()) as typeof state;
-  }
-  throw new Error("Owner cloud turns did not quiesce before purge.");
-};
 
 export const APP_SLUG_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 export const LEGACY_BUILD_PREFIX_PATTERN = /^builds\/[A-Za-z0-9_-]{1,64}$/;

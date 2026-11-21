@@ -481,7 +481,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
   protected async retireCloudChatHandoff(a: AdmittedCloudChat): Promise<void> {
     const sessions = this.env.ORCHESTRATOR_SESSIONS;
     if (!sessions) throw new Error("Orchestrator sessions unavailable.");
-    const retired = await this.ownerFenceCall("unregister", {
+    const retired = await this.ownerFence().unregister({
       ownerId: a.ownerId,
       ownerGeneration: a.ownerGeneration,
       leaseId: a.leaseId,

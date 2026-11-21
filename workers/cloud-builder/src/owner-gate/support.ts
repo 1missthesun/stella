@@ -36,17 +36,6 @@ export const withTimeout = <T>(
   return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 };
 
-export const ownerFenceRequest = (
-  path: string,
-  body: unknown,
-  headers?: Record<string, string>,
-): Request =>
-  new Request(`https://owner-gate/owner-fence/${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...headers },
-    body: JSON.stringify(body),
-  });
-
 export class OwnerGateSnapshotError extends Error {
   constructor(
     readonly code: "owner_purged" | "internal",

@@ -1,3 +1,7 @@
+import {
+  ownerFenceClient,
+  type OwnerFenceClient,
+} from "../owner-fence-client.js";
 import { storageKeks } from "../secret-rotation.js";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { isManagedModelAudience } from "@stella/contracts/gateway/capability";
@@ -52,7 +56,6 @@ import {
   assertAppExecutionActive,
   assertAppTurnIdentity,
   assertTurnWritable,
-  callOwnerFence as callOwnerFenceCore,
   callOwnerTurnState,
   cleanupOwnerPurgedTurnStorage,
   cleanupTransientWrites,
@@ -200,7 +203,7 @@ export class BuildSessionObject extends DurableObject<Env> {
     appendThreadTranscript: this.appendThreadTranscript.bind(this),
     trackTurn: this.trackTurn.bind(this),
     startAgentTurn: this.startAgentTurn.bind(this),
-    callOwnerFence: this.callOwnerFence.bind(this),
+    ownerFence: this.ownerFence.bind(this),
     callOwnerTurnState: this.callOwnerTurnState.bind(this),
     resolveAgentTurnState: this.resolveAgentTurnState.bind(this),
     publishAgentTurnWorkspace: this.publishAgentTurnWorkspace.bind(this),
@@ -350,12 +353,8 @@ export class BuildSessionObject extends DurableObject<Env> {
     return startAgentTurn(this.self, turn, sandboxId);
   }
 
-  private callOwnerFence(
-    ownerId: string,
-    path: string,
-    body: Record<string, unknown>,
-  ): Promise<Response> {
-    return callOwnerFenceCore(this.self, ownerId, path, body);
+  private ownerFence(ownerId: string): OwnerFenceClient {
+    return ownerFenceClient(this.env.OWNER_GATES, ownerId);
   }
 
   private callOwnerTurnState<T>(

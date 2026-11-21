@@ -26,7 +26,6 @@ import type {
 import {
   ORCHESTRATOR_FENCE_LEASE_RECEIPT_PREFIX,
   OWNER_FENCE_RUN_SLOT_PREFIX,
-  OWNER_FENCE_ID_HEADER,
   OWNER_EVENT_BATCH_PREFIX,
   OWNER_EVENT_DEBT_RETRY_MS,
   ownerPurgeImportedLeaseKey,
@@ -43,24 +42,14 @@ import {
 } from "./support.js";
 import { OrchestratorSessionCore } from "./session-core.js";
 import { ownerGateStub } from "../rpc-release.js";
+import {
+  ownerFenceClient,
+  type OwnerFenceClient,
+} from "../owner-fence-client.js";
 
 export abstract class OrchestratorOwner extends OrchestratorSessionCore {
-  protected async callOwnerFence(
-    ownerId: string,
-    path: string,
-    body: Record<string, unknown>,
-  ): Promise<Response> {
-    return ownerGateStub(this.env.OWNER_GATES, ownerId).fetch(
-      `https://owner-gate/owner-fence/${path}`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [OWNER_FENCE_ID_HEADER]: ownerId,
-        },
-        body: JSON.stringify({ ...body, ownerId }),
-      },
-    );
+  protected ownerFence(ownerId: string): OwnerFenceClient {
+    return ownerFenceClient(this.env.OWNER_GATES, ownerId);
   }
 
   protected ownerFenceReceiptMatches(
@@ -149,9 +138,9 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       await this.ctx.storage.put(receiptKey, pending);
     });
 
-    let response: Response;
+    let response: Awaited<ReturnType<OwnerFenceClient["unregister"]>>;
     try {
-      response = await this.callOwnerFence(pending.ownerId, "unregister", {
+      response = await this.ownerFence(pending.ownerId).unregister({
         ownerGeneration: pending.ownerGeneration,
         leaseId: pending.leaseId,
         sessionId: this.ctx.id.toString(),
@@ -353,7 +342,7 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       committed = true;
     });
     if (!committed) {
-      await this.callOwnerFence(receipt.ownerId, "unregister", {
+      await this.ownerFence(receipt.ownerId).unregister({
         ownerGeneration: receipt.ownerGeneration,
         leaseId: receipt.leaseId,
         sessionId: this.ctx.id.toString(),
@@ -371,13 +360,8 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     ownerId: string,
     body: OwnerFenceRegisterRequest,
   ): Promise<{ generation: string } | null> {
-    const response = await this.callOwnerFence(ownerId, "register", body);
-    const parsed = (await response.json().catch(() => null)) as {
-      generation?: string;
-    } | null;
-    return response.ok && parsed?.generation
-      ? { generation: parsed.generation }
-      : null;
+    const result = await this.ownerFence(ownerId).register(body);
+    return result.ok ? { generation: result.generation } : null;
   }
 
   protected async registerOwnerTurnWithSnapshot(
@@ -446,12 +430,12 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     if (!turn.ownerPurgeGeneration || !turn.ownerPurgeLeaseId) {
       throw new OwnerPurgeFenceError();
     }
-    const response = await this.callOwnerFence(turn.ownerId, "assert", {
+    const result = await this.ownerFence(turn.ownerId).assert({
       ownerGeneration: turn.ownerGeneration,
       generation: turn.ownerPurgeGeneration,
       leaseId: turn.ownerPurgeLeaseId,
     });
-    if (!response.ok) throw new OwnerPurgeFenceError();
+    if (!result.ok) throw new OwnerPurgeFenceError();
   }
 
   protected async assertOwnerFenceLeaseReceiptActive(

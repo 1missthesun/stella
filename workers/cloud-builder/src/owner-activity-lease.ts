@@ -1,13 +1,9 @@
 import { OwnerPurgeFenceError } from "./build-session/shared/errors.js";
 import { OWNER_FENCE_DEFAULT_MAX_LEASE_MS } from "./owner-fence-store.js";
-
-export type OwnerFenceCaller = (
-  path: string,
-  body: Record<string, unknown>,
-) => Promise<Response>;
+import type { OwnerFenceClient } from "./owner-fence-client.js";
 
 export const withOwnerActivityLease = async <T>(
-  fence: OwnerFenceCaller,
+  fence: OwnerFenceClient,
   ownerGeneration: string,
   activityId: string,
   operation: (generation: string, leaseId: string) => Promise<T>,
@@ -21,7 +17,7 @@ export const withOwnerActivityLease = async <T>(
   // The fence clamps the request to its own maximum and tolerates a caller
   // clock that runs ahead, so asking for the full maximum is safe.
   const expiresAt = Date.now() + OWNER_FENCE_DEFAULT_MAX_LEASE_MS;
-  const registered = await fence("register", {
+  const registered = await fence.register({
     leaseId,
     sessionId,
     turnId,
@@ -30,21 +26,18 @@ export const withOwnerActivityLease = async <T>(
     role: "activity",
     expiresAt,
   });
-  const registration = (await registered.json().catch(() => null)) as {
-    generation?: string;
-  } | null;
-  if (!registered.ok || !registration?.generation) {
-    throw new OwnerPurgeFenceError();
-  }
+  if (!registered.ok) throw new OwnerPurgeFenceError();
   try {
-    return await operation(registration.generation, leaseId);
+    return await operation(registered.generation, leaseId);
   } finally {
-    await fence("unregister", {
-      leaseId,
-      sessionId,
-      turnId,
-      ownerGeneration,
-      generation: registration.generation,
-    }).catch(() => undefined);
+    await fence
+      .unregister({
+        leaseId,
+        sessionId,
+        turnId,
+        ownerGeneration,
+        generation: registered.generation,
+      })
+      .catch(() => undefined);
   }
 };

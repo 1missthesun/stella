@@ -81,7 +81,6 @@ const CHAT_TURN_ADMISSION_PREFIX = "chatTurnAdmission:";
 export const ORCHESTRATOR_FENCE_LEASE_RECEIPT_PREFIX =
   "orchestratorFenceLeaseReceipt:";
 export const OWNER_FENCE_RUN_SLOT_PREFIX = "ownerFenceRunSlot:";
-export const OWNER_FENCE_ID_HEADER = "x-stella-owner-fence-id";
 export const localTurnReceiptKey = (turnId: string): string =>
   `${LOCAL_TURN_RECEIPT_PREFIX}${turnId}`;
 export const localClientMessageKey = (clientMsgId: string): string =>

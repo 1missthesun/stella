@@ -25,31 +25,70 @@ import {
   type TurnStateNativeCheckpoint,
   type TurnStateObjectStore,
 } from "./turn-state-registry.js";
-import { json } from "./http/response.js";
+import {
+  OWNER_FENCE_KEY,
+  type OwnerPurgeFence,
+} from "./owner-fence.js";
+import type { OwnerFenceStore } from "./owner-fence-store.js";
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_STORAGE_KEY_BYTES = 4_096;
 const MAX_CURSOR_BYTES = 4_096;
 const ROUTE_OPERATION_PREFIX = "turn-state:v1:route-operation:";
 const ABORT_UNPUBLISHED_PREFIX = "turn-state:v1:abort-unpublished:";
-const OWNER_FENCE_KEY = "ownerPurgeFence";
 type OwnerLease = {
   leaseId: string;
   sessionId: string;
   turnId: string;
   namespace: "build" | "orchestrator" | "activity";
   role: "run" | "aux" | "orchestrator" | "activity";
-  reservationGeneration?: string;
-  ownerGeneration?: string;
-  expiresAt?: number;
+  ownerGeneration: string;
 };
 
-export type TurnStateOwnerFence = {
+/** The fence as these routes check it: the KV record plus live SQL leases. */
+type TurnStateOwnerFence = {
   ownerId: string;
   generation: string;
   state: "open" | "blocked";
-  active: Record<string, OwnerLease>;
+  lease(leaseId: string): OwnerLease | undefined;
+  activeCount(): number;
 };
+
+const turnStateFence = (
+  record: OwnerPurgeFence | undefined,
+  leases: OwnerFenceStore,
+  now: number,
+): TurnStateOwnerFence | undefined =>
+  record?.ownerId
+    ? {
+        ownerId: record.ownerId,
+        generation: record.generation,
+        state: record.state,
+        lease: (leaseId) => leases.activeLease(leaseId, now) ?? undefined,
+        activeCount: () => leases.activeLeaseCount(now),
+      }
+    : undefined;
+
+export type TurnStateOwnerOp =
+  | "prepare"
+  | "mark-uploaded"
+  | "commit"
+  | "publish-workspace"
+  | "abort-unpublished"
+  | "resolve"
+  | "confirm-restore"
+  | "drain"
+  | "purge";
+
+export type TurnStateOwnerResult =
+  | { ok: true; status: 200 | 202; value: unknown }
+  | { ok: false; status: number; code: string; error: string };
+
+const ok = (value: unknown, status: 200 | 202 = 200): TurnStateOwnerResult => ({
+  ok: true,
+  status,
+  value,
+});
 
 type RouteOperationAuthorization = {
   schemaVersion: typeof TURN_STATE_SCHEMA_VERSION;
@@ -235,7 +274,9 @@ const requiredHex = (row: Record<string, unknown>, key: string): string => {
   return value;
 };
 
-const readBoundedJson = async (request: Request): Promise<unknown> => {
+export const readTurnStateRequestJson = async (
+  request: Request,
+): Promise<unknown> => {
   const contentType = request.headers
     .get("content-type")
     ?.split(";", 1)[0]
@@ -527,10 +568,11 @@ const assertOpenLease = (
   request: ReturnType<typeof parseCommonLease>,
 ): OwnerLease => {
   assertOwnerScope(scopedOwnerId, fence, request.ownerId);
-  const active = fence.active[request.leaseId];
+  const active =
+    fence.state === "open" && request.generation === fence.generation
+      ? fence.lease(request.leaseId)
+      : undefined;
   if (
-    fence.state !== "open" ||
-    request.generation !== fence.generation ||
     !active ||
     active.leaseId !== request.leaseId ||
     active.sessionId !== request.sessionId ||
@@ -552,6 +594,8 @@ const withCurrentOpenLeaseTransaction = async <T>(
   args: {
     storage: DurableObjectStorage;
     scopedOwnerId: string;
+    leases: OwnerFenceStore;
+    now?: () => number;
   },
   request: ReturnType<typeof parseCommonLease>,
   operation: (
@@ -560,7 +604,11 @@ const withCurrentOpenLeaseTransaction = async <T>(
   ) => Promise<T>,
 ): Promise<T> =>
   await args.storage.transaction(async (transaction) => {
-    const fence = await transaction.get<TurnStateOwnerFence>(OWNER_FENCE_KEY);
+    const fence = turnStateFence(
+      await transaction.get<OwnerPurgeFence>(OWNER_FENCE_KEY),
+      args.leases,
+      routeNow(args.now),
+    );
     if (!fence) {
       throw new TurnStateOwnerRouteError(
         "The durable owner fence is missing.",
@@ -585,14 +633,20 @@ const routeNow = (now: (() => number) | undefined): number => {
 
 const currentBlockedFence = async (
   storage: DurableObjectStorage,
+  leases: OwnerFenceStore,
   scopedOwnerId: string,
   row: Record<string, unknown>,
+  now: number,
 ): Promise<{
   fence: TurnStateOwnerFence;
   ownerId: string;
   generation: string;
 }> => {
-  const fence = await storage.get<TurnStateOwnerFence>(OWNER_FENCE_KEY);
+  const fence = turnStateFence(
+    await storage.get<OwnerPurgeFence>(OWNER_FENCE_KEY),
+    leases,
+    now,
+  );
   if (!fence) {
     throw new TurnStateOwnerRouteError(
       "The durable owner fence is missing.",
@@ -615,7 +669,7 @@ const assertBlockedFence = (
   if (
     fence.state !== "blocked" ||
     fence.generation !== generation ||
-    Object.keys(fence.active).length !== 0
+    fence.activeCount() !== 0
   ) {
     throw new TurnStateOwnerRouteError(
       "The blocked owner purge generation is not drained.",
@@ -1166,34 +1220,50 @@ const routeConflict = (error: unknown): never => {
 };
 
 /**
- * Private route handler for the owner-fence Durable Object. It intentionally
- * performs no public authentication: its caller has already selected the
- * owner-named stub. It still treats every JSON field as untrusted and repeats
+ * One turn-state operation, run inside OwnerGate (the owner fence lives
+ * there). It performs no public authentication: its caller already selected
+ * the owner-named object. It still treats every field as untrusted and repeats
  * the exact durable owner/generation/lease checks before touching state.
  * `createdAt`, `requireNative`, and the canonical workspace are trusted Builder
  * facts, but remain strictly typed and bounded here. In particular, createdAt
  * must be persisted once by the caller so a lost prepare response replays the
  * identical registry operation instead of introducing a new timestamp.
  */
-export const handleTurnStateOwnerRoute = async (args: {
-  path: string;
-  request: Request;
+export const runTurnStateOwnerOperation = async (args: {
+  op: TurnStateOwnerOp;
+  body: unknown;
   scopedOwnerId: string;
-  fence: TurnStateOwnerFence;
   storage: DurableObjectStorage;
+  leases: OwnerFenceStore;
   bucket: R2Bucket;
   now?: () => number;
-}): Promise<Response | null> => {
-  if (!args.path.startsWith("turn-state/")) return null;
-  if (args.request.method !== "POST") {
-    return json({ error: "Method not allowed." }, 405);
-  }
+}): Promise<TurnStateOwnerResult> => {
   try {
-    const raw = await readBoundedJson(args.request);
+    const serialized = JSON.stringify(args.body ?? null);
+    if (new TextEncoder().encode(serialized).byteLength > MAX_REQUEST_BYTES) {
+      throw new TurnStateOwnerRouteError(
+        "Turn state request is too large.",
+        413,
+        "request_too_large",
+      );
+    }
+    const raw: unknown = JSON.parse(serialized);
     const storage = createDurableObjectTurnStateStorage(args.storage);
     const objectStore = createR2TurnStateObjectStore(args.bucket);
+    const fence = turnStateFence(
+      await args.storage.get<OwnerPurgeFence>(OWNER_FENCE_KEY),
+      args.leases,
+      routeNow(args.now),
+    );
+    if (!fence) {
+      throw new TurnStateOwnerRouteError(
+        "Owner fence identity does not match.",
+        409,
+        "owner_scope_mismatch",
+      );
+    }
 
-    if (args.path === "turn-state/prepare") {
+    if (args.op === "prepare") {
       const row = exactObject(
         raw,
         [
@@ -1208,7 +1278,7 @@ export const handleTurnStateOwnerRoute = async (args: {
       );
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const historyCursor = requiredText(row, "historyCursor", 1_024);
       const identity: TurnStateIdentity = {
         ownerId: lease.ownerId,
@@ -1274,10 +1344,10 @@ export const handleTurnStateOwnerRoute = async (args: {
           return result;
         },
       ).catch(routeConflict);
-      return json(prepared);
+      return ok(prepared);
     }
 
-    if (args.path === "turn-state/mark-uploaded") {
+    if (args.op === "mark-uploaded") {
       const row = exactObject(raw, [
         ...COMMON_LEASE_KEYS,
         "operationId",
@@ -1285,7 +1355,7 @@ export const handleTurnStateOwnerRoute = async (args: {
       ]);
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const operationId = requiredHex(row, "operationId");
       const authorization = await requireOperationAuthorization(
         storage,
@@ -1327,14 +1397,14 @@ export const handleTurnStateOwnerRoute = async (args: {
           });
         },
       ).catch(routeConflict);
-      return json(uploaded);
+      return ok(uploaded);
     }
 
-    if (args.path === "turn-state/commit") {
+    if (args.op === "commit") {
       const row = exactObject(raw, [...COMMON_LEASE_KEYS, "operationId"]);
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const operationId = requiredHex(row, "operationId");
       await requireOperationAuthorization(storage, operationId, lease);
       const committed = await withCurrentOpenLeaseTransaction(
@@ -1345,10 +1415,10 @@ export const handleTurnStateOwnerRoute = async (args: {
           return await commitTurnStateOperation(transaction, { operationId });
         },
       ).catch(routeConflict);
-      return json(committed);
+      return ok(committed);
     }
 
-    if (args.path === "turn-state/publish-workspace") {
+    if (args.op === "publish-workspace") {
       const row = exactObject(raw, [
         ...COMMON_LEASE_KEYS,
         "threadId",
@@ -1357,7 +1427,7 @@ export const handleTurnStateOwnerRoute = async (args: {
       ]);
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const operationId = requiredHex(row, "operationId");
       const threadId = requiredText(row, "threadId");
       const canonicalHistoryCursor = requiredText(
@@ -1379,10 +1449,10 @@ export const handleTurnStateOwnerRoute = async (args: {
             operationId,
           }),
       ).catch(routeConflict);
-      return json(published);
+      return ok(published);
     }
 
-    if (args.path === "turn-state/abort-unpublished") {
+    if (args.op === "abort-unpublished") {
       const row = exactObject(raw, [
         ...COMMON_LEASE_KEYS,
         "threadId",
@@ -1392,7 +1462,7 @@ export const handleTurnStateOwnerRoute = async (args: {
       ]);
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const candidateHistoryCursor = requiredText(
         row,
         "candidateHistoryCursor",
@@ -1423,10 +1493,10 @@ export const handleTurnStateOwnerRoute = async (args: {
             canonicalHistoryCursor,
           }),
       ).catch(routeConflict);
-      return json(aborted);
+      return ok(aborted);
     }
 
-    if (args.path === "turn-state/resolve") {
+    if (args.op === "resolve") {
       const row = exactObject(raw, [
         ...COMMON_LEASE_KEYS,
         "threadId",
@@ -1435,7 +1505,7 @@ export const handleTurnStateOwnerRoute = async (args: {
       ]);
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       if (typeof row.requireNative !== "boolean") {
         throw new TurnStateOwnerRouteError(
           "requireNative is invalid.",
@@ -1462,10 +1532,10 @@ export const handleTurnStateOwnerRoute = async (args: {
             requireNative,
           }),
       ).catch(routeConflict);
-      return json(resolved);
+      return ok(resolved);
     }
 
-    if (args.path === "turn-state/confirm-restore") {
+    if (args.op === "confirm-restore") {
       const row = exactObject(
         raw,
         [...COMMON_LEASE_KEYS, "threadId", "canonicalHistoryCursor"],
@@ -1473,7 +1543,7 @@ export const handleTurnStateOwnerRoute = async (args: {
       );
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const threadOperationId = Object.hasOwn(row, "threadOperationId")
         ? requiredHex(row, "threadOperationId")
         : undefined;
@@ -1507,14 +1577,14 @@ export const handleTurnStateOwnerRoute = async (args: {
             now,
           }),
       ).catch(routeConflict);
-      return json(confirmed);
+      return ok(confirmed);
     }
 
-    if (args.path === "turn-state/drain") {
+    if (args.op === "drain") {
       const row = exactObject(raw, [...COMMON_LEASE_KEYS], ["limit"]);
       validateSchemaVersion(row);
       const lease = parseCommonLease(row);
-      assertOpenLease(args.scopedOwnerId, args.fence, lease);
+      assertOpenLease(args.scopedOwnerId, fence, lease);
       const limit = Object.hasOwn(row, "limit")
         ? requiredSafeInteger(row, "limit", 1, 128)
         : undefined;
@@ -1533,36 +1603,49 @@ export const handleTurnStateOwnerRoute = async (args: {
               ownerGeneration: lease.ownerGeneration,
             }),
         );
-        return json(result, result.pending ? 202 : 200);
+        return ok(result, result.pending ? 202 : 200);
       } catch (error) {
         routeConflict(error);
       }
     }
 
-    if (args.path === "turn-state/purge") {
+    if (args.op === "purge") {
       const row = exactObject(raw, ["schemaVersion", "ownerId", "generation"]);
       validateSchemaVersion(row);
-      assertBlockedFence(args.scopedOwnerId, args.fence, row);
+      assertBlockedFence(args.scopedOwnerId, fence, row);
       const blocked = await currentBlockedFence(
         args.storage,
+        args.leases,
         args.scopedOwnerId,
         row,
+        routeNow(args.now),
       );
       const result = await purgeTurnState(storage, objectStore, {
         ownerId: blocked.ownerId,
         ownerPurgeFence: "blocked",
       });
-      return json(result, result.pending ? 202 : 200);
+      return ok(result, result.pending ? 202 : 200);
     }
 
-    return json({ error: "Not found." }, 404);
+    throw new TurnStateOwnerRouteError(
+      "Unknown turn state operation.",
+      404,
+      "not_found",
+    );
   } catch (error) {
     if (error instanceof TurnStateOwnerRouteError) {
-      return json({ error: error.message, code: error.code }, error.status);
+      return {
+        ok: false,
+        status: error.status,
+        code: error.code,
+        error: error.message,
+      };
     }
-    return json(
-      { error: "Turn state owner route failed.", code: "internal_error" },
-      500,
-    );
+    return {
+      ok: false,
+      status: 500,
+      code: "internal_error",
+      error: "Turn state owner route failed.",
+    };
   }
 };

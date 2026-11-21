@@ -20,7 +20,6 @@ import type {
   AgentStopDeviceOutcome,
 } from "@stella/contracts/turn-plane/placement";
 import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
-import { OwnerFenceStore } from "../owner-fence-store.js";
 import {
   type OwnerModelGrant,
   type OwnerModelGrantRevokeAllInput,
@@ -36,9 +35,15 @@ import type {
   MemoryPolicyChange,
 } from "@stella/contracts/turn-plane/memory-policy";
 import {
-  createOwnerFenceHost,
-  HEADER_OWNER_FENCE_ID,
-} from "../owner-fence-do.js";
+  OwnerFence,
+  type OwnerFenceBeginInput,
+  type OwnerFenceBeginResult,
+} from "../owner-fence.js";
+import {
+  runTurnStateOwnerOperation,
+  type TurnStateOwnerOp,
+  type TurnStateOwnerResult,
+} from "../turn-state-owner-routes.js";
 import type {
   OwnerGateEnv,
   OwnerGateFenceLeaseRequest,
@@ -57,7 +62,7 @@ import {
   dispatchesCopySql,
   dispatchesTableDdl,
 } from "./schema.js";
-import { withTimeout, ownerFenceRequest, log } from "./support.js";
+import { withTimeout, log } from "./support.js";
 
 export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected schemaReady = false;
@@ -82,6 +87,7 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected homeContextState?: OwnerHomeContextCache;
 
   protected ownerModelGrantState?: OwnerModelGrantStore;
+  protected ownerFenceState?: OwnerFence;
   protected cloudChatReaderPreparationState?: Map<string, Promise<void>>;
   protected cloudChatReaderPreparedState?: Set<string>;
 
@@ -127,6 +133,18 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
       mode,
       requestId,
       purgeOwnerData: () => this.purgeOwnerData({ mode }),
+      fence: {
+        begin: (input) => this.beginOwnerFence(input),
+        assertBlocked: (generation) =>
+          this.ownerFence().assertBlocked(generation),
+        release: (generation) => this.ownerFence().release(generation),
+        purgeTurnState: (generation) =>
+          this.runTurnStateOperation("purge", {
+            schemaVersion: 1,
+            generation,
+            ownerId: this.ownerId(),
+          }),
+      },
     });
   }
 
@@ -209,15 +227,22 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     });
   }
 
-  protected ownerFenceCall(
-    path: string,
-    body: unknown,
-    headers?: Record<string, string>,
-  ): Promise<Response> {
-    return createOwnerFenceHost({ ctx: this.ctx, env: this.env }).fetch(
-      path,
-      ownerFenceRequest(path, body, headers),
-    );
+  protected ownerFence(): OwnerFence {
+    return (this.ownerFenceState ??= new OwnerFence(this.ctx, this.ownerId()));
+  }
+
+  protected async runTurnStateOperation(
+    op: TurnStateOwnerOp,
+    body: Record<string, unknown>,
+  ): Promise<TurnStateOwnerResult> {
+    return await runTurnStateOwnerOperation({
+      op,
+      body,
+      scopedOwnerId: this.ownerId(),
+      storage: this.ctx.storage,
+      leases: this.ownerFence().leases(),
+      bucket: this.env.BACKUP_BUCKET,
+    });
   }
 
   protected async issueModelGrant(args: {
@@ -235,9 +260,7 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
       args.policy,
       args.fenceGeneration,
       async () => {
-        const lease = new OwnerFenceStore(this.ctx.storage.sql).activeLease(
-          args.leaseId,
-        );
+        const lease = this.ownerFence().leases().activeLease(args.leaseId);
         const sessions = this.env.ORCHESTRATOR_SESSIONS;
         if (
           !lease ||
@@ -448,35 +471,22 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected async registerFenceLease(
     lease: OwnerGateFenceLeaseRequest,
   ): Promise<OwnerGateFenceLeaseOutcome> {
-    const ownerId = this.ownerId();
-    const response = await this.ownerFenceCall(
-      "register",
-      { ...lease, ownerId },
-      { [HEADER_OWNER_FENCE_ID]: ownerId },
-    );
-    const body = (await response.json().catch(() => null)) as {
-      generation?: unknown;
-      expiresAt?: unknown;
-      code?: unknown;
-      error?: unknown;
-    } | null;
-    if (
-      response.ok &&
-      typeof body?.generation === "string" &&
-      typeof body.expiresAt === "number"
-    ) {
-      return {
-        status: "registered",
-        generation: body.generation,
-        expiresAt: body.expiresAt,
-      };
-    }
-    return {
-      status: "refused",
-      httpStatus: response.status,
-      ...(typeof body?.code === "string" ? { code: body.code } : {}),
-      ...(typeof body?.error === "string" ? { error: body.error } : {}),
-    };
+    const result = await this.ownerFence().register({
+      ...lease,
+      ownerId: this.ownerId(),
+    });
+    return result.ok
+      ? {
+          status: "registered",
+          generation: result.generation,
+          expiresAt: result.expiresAt,
+        }
+      : {
+          status: "refused",
+          httpStatus: result.status,
+          ...(result.code ? { code: result.code } : {}),
+          error: result.error,
+        };
   }
 
   protected prune(now: number): void {
@@ -486,43 +496,46 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     );
   }
 
-  protected async fetchOwnerFence(
-    path: string,
-    request: Request,
-    body: unknown,
-  ): Promise<Response> {
-    if (path !== "begin")
-      return createOwnerFenceHost({ ctx: this.ctx, env: this.env }).fetch(
-        path,
-        request,
-      );
+  /**
+   * Blocks the owner fence for a purge. Grant issuance closes (a durable
+   * barrier, replayed by the alarm if this isolate dies) and every model
+   * reader is frozen before the fence changes, so no model request carrying
+   * owner memory starts or continues across a purge.
+   */
+  protected async beginOwnerFence(
+    input: OwnerFenceBeginInput,
+  ): Promise<OwnerFenceBeginResult> {
+    // Same key order as the old `/owner-fence/begin` body, so a barrier left
+    // by the previous Worker is the same operation.
+    const body = {
+      mode: input.mode,
+      requestId: input.requestId,
+      ownerId: input.ownerId,
+    };
     const outcome = await this.ctx.blockConcurrencyWhile(async () => {
       try {
-        const operationId = await sha256Hex(JSON.stringify({ path, body }));
-        const response = await createOwnerFenceHost({
-          ctx: this.ctx,
-          env: this.env,
-          beforeAuthorityChange: async (change) => {
-            await this.modelGrants().beginFenceBarrier({
-              operationId,
-              path: change.path,
-              body: change.body,
-            });
-            await this.revokeModelReaders({
-              operationId,
-              reason: "owner_purge",
-            });
-          },
-        }).fetch(path, request);
-        if (response.ok || response.status < 500)
-          await this.modelGrants().completeFenceBarrier(operationId);
-        return { ok: true as const, response };
+        const operationId = await sha256Hex(
+          JSON.stringify({ path: "begin", body }),
+        );
+        const result = await this.ownerFence().begin(body, async () => {
+          await this.modelGrants().beginFenceBarrier({
+            operationId,
+            path: "begin",
+            body,
+          });
+          await this.revokeModelReaders({
+            operationId,
+            reason: "owner_purge",
+          });
+        });
+        await this.modelGrants().completeFenceBarrier(operationId);
+        return { ok: true as const, result };
       } catch (error) {
         return { ok: false as const, error };
       }
     });
     if (!outcome.ok) throw outcome.error;
-    return outcome.response;
+    return outcome.result;
   }
 
   abstract ownerStore(): OwnerStore;
@@ -537,7 +550,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected abstract scheduleAlarm(
     now: number,
     options?: {
-      fenceDeadline?: number | null;
       preserveExisting?: boolean;
       afterAlarm?: boolean;
     },

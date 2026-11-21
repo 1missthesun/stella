@@ -13,15 +13,21 @@ export type ExecutionDestination =
   | { kind: "cloud" }
   | { kind: "device"; deviceId: string; label: string };
 
-export type DeviceEngine = "claude-code" | "chatgpt";
+export type DeviceEngine = "claude-code" | "chatgpt" | "antigravity";
 
 export type ExecutionContextDevice = Pick<
   DeviceDestination,
   "deviceId" | "label" | "online" | "remoteExecutionEnabled" | "remoteExecution"
 > & { signedIn?: DeviceEngine[] };
 
-const DEVICE_ENGINES: readonly DeviceEngine[] = ["claude-code", "chatgpt"];
-const DEVICE_ENGINE_NAMES: Record<DeviceEngine, string> = { "claude-code": "Claude Code", chatgpt: "ChatGPT" };
+const DEVICE_ENGINES: readonly DeviceEngine[] = ["claude-code", "chatgpt", "antigravity"];
+/** Engines most computers have: a computer without one says so. Google Antigravity is only named where it's signed in. */
+const EXPECTED_DEVICE_ENGINES: readonly DeviceEngine[] = ["claude-code", "chatgpt"];
+const DEVICE_ENGINE_NAMES: Record<DeviceEngine, string> = {
+  "claude-code": "Claude Code",
+  chatgpt: "ChatGPT",
+  antigravity: "Google Antigravity (antigravity/<model> runs there, e.g. antigravity/gemini-4-neon)",
+};
 
 /** The engines a computer is signed in to, when it reports them (`engine-sign-ins`); older computers report none. */
 export const deviceEngineSignIns = (capabilities: readonly unknown[] | undefined): DeviceEngine[] | undefined =>
@@ -230,7 +236,7 @@ const signInNote = (device: ExecutionContextDevice): string => {
   if (!device.online || !device.signedIn) return "";
   const names = (engines: readonly DeviceEngine[]) => engines.map((engine) => DEVICE_ENGINE_NAMES[engine]);
   const have = names(device.signedIn);
-  const missing = names(DEVICE_ENGINES.filter((engine) => !device.signedIn!.includes(engine)));
+  const missing = names(EXPECTED_DEVICE_ENGINES.filter((engine) => !device.signedIn!.includes(engine)));
   if (have.length === 0) return `; not signed in to ${missing.join(" or ")}`;
   return `; signed in to ${have.join(" and ")}${missing.length ? `, not ${missing.join(" or ")}` : ""}`;
 };

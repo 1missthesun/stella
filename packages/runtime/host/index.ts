@@ -261,7 +261,7 @@ export class StellaRuntimeHost {
   placedDispatchByRunId = new Map<string, PlacedDispatch>();
   placements = new ConversationPlacements();
   claudeCodeLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
-  chatGptLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
+  planLogins: { providers: string[]; at: number; pending?: Promise<void> } = { providers: [], at: 0 };
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
   hostDatabase: SqliteDatabase | null = null;
   constructor(options: StellaRuntimeHostOptions) {
@@ -808,7 +808,11 @@ export class StellaRuntimeHost {
           process.platform === "darwin" || process.platform === "win32"
             ? ["computer-use"]
             : [];
-        const [claudeCode, chatGpt] = await Promise.all([this.claudeCodeSignedIn(), this.chatGptSignedIn()]);
+        const [claudeCode, chatGpt, antigravity] = await Promise.all([
+          this.claudeCodeSignedIn(),
+          this.chatGptSignedIn(),
+          this.oauthSignedIn("antigravity"),
+        ]);
         return {
           ready: Boolean(
             this.started &&
@@ -826,6 +830,7 @@ export class StellaRuntimeHost {
             "email-page",
             ...(claudeCode ? (["claude-code"] as const) : []),
             ...(chatGpt ? (["chatgpt"] as const) : []),
+            ...(antigravity ? (["antigravity"] as const) : []),
           ],
         };
       },
@@ -1328,20 +1333,28 @@ export class StellaRuntimeHost {
     }
   }
   private async chatGptSignedIn(): Promise<boolean> {
-    const known = this.chatGptLogin;
+    return await this.oauthSignedIn("chatgpt");
+  }
+
+  /** Which plan sign-ins this computer holds, read at most once a minute. */
+  private async oauthSignedIn(provider: string): Promise<boolean> {
+    const known = this.planLogins;
     if (Date.now() - known.at >= 60_000 && !known.pending) {
       known.pending = (async () => {
         const answer = (await this.options.hostHandlers
           .requestLlmCredentials?.({ operation: "list" })
           .catch(() => undefined)) as { ok?: boolean; oauthProviders?: unknown } | undefined;
-        this.chatGptLogin = {
-          signedIn: answer?.ok === true && Array.isArray(answer.oauthProviders) && answer.oauthProviders.includes("chatgpt"),
+        this.planLogins = {
+          providers:
+            answer?.ok === true && Array.isArray(answer.oauthProviders)
+              ? answer.oauthProviders.filter((entry): entry is string => typeof entry === "string")
+              : [],
           at: Date.now(),
         };
       })();
       if (known.at === 0) await known.pending;
     }
-    return this.chatGptLogin.signedIn;
+    return this.planLogins.providers.includes(provider);
   }
 
   private async claudeCodeSignedIn(): Promise<boolean> {

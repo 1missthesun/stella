@@ -115,6 +115,7 @@ export const EXECUTION_CAPABILITIES = [
   "attachments",
   "claude-code",
   "chatgpt",
+  "antigravity",
   "engine-sign-ins",
   // Has the email tool that keeps the Email page; a device without it gets no email turns.
   "email-page",

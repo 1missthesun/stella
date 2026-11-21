@@ -15,6 +15,9 @@ export const isValidCloudSpawnModel = (model: string): boolean =>
 export const CLOUD_SPAWN_MODEL_HELP =
   'Cloud spawn model must be "claude[/model]" (or "claude-code[/model]"), "codex[/model]", a canonical "stella/..." model, or "<provider>/<model>" for a key saved to the account, optionally followed by :low, :medium, :high, :xhigh, or :max.';
 
+const ANTIGRAVITY_IN_CLOUD =
+  'Google Antigravity models ("antigravity/<model>") run only on a computer signed in to Google Antigravity, never in the cloud. Start the task on that computer (its device_id as destination).';
+
 export const DEFAULT_CLOUD_ANTHROPIC_EXECUTION: CloudExecutionSelection = {
   engine: "anthropic",
   provider: "anthropic",
@@ -52,6 +55,7 @@ export const resolveCloudSpawnExecution = (
         (accountRoute[3] as SpawnEffort | undefined) ?? inheritedEffort(inherited),
     };
   }
+  if (/^antigravity\//u.test(trimmed)) throw new Error(ANTIGRAVITY_IN_CLOUD);
   if (!isValidCloudSpawnModel(trimmed)) throw new Error(CLOUD_SPAWN_MODEL_HELP);
   const effortMatch = /:(low|medium|high|xhigh|max)$/.exec(trimmed);
   const reasoningEffort: CloudExecutionSelection["reasoningEffort"] =

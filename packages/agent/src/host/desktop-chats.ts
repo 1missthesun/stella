@@ -131,6 +131,7 @@ import {
   type ModelPick,
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
+import { ANTIGRAVITY_PROVIDER_ID } from "../provider/antigravity/models.ts";
 import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
 import { effectiveContextModels } from "../provider/effective-context.ts";
 import {
@@ -1154,6 +1155,11 @@ export function desktopChats(options: DesktopChatsOptions) {
         `"${reference}" runs on your ChatGPT plan, and this computer isn't signed in to ChatGPT. Sign in with ChatGPT in Settings › Claude and ChatGPT on this computer, or pick another model.`,
       );
     }
+    if (pick?.kind === "direct" && pick.provider === ANTIGRAVITY_PROVIDER_ID && !(await hasOwnKey(pick.provider, pick.modelId))) {
+      throw new Error(
+        `"${reference}" runs on your Google Antigravity plan, and this computer isn't signed in to it. Sign in with Google under Google Antigravity in Settings › Claude and ChatGPT on this computer, or pick another model.`,
+      );
+    }
     const model = await modelOfPick(pick, "general");
     const thinkingLevel = (effort?.[2] as ModelThinkingLevel | undefined) ?? options.thinkingLevel?.();
     return { runsOn: { model, ...(thinkingLevel ? { thinkingLevel } : {}) } };
@@ -1243,6 +1249,16 @@ export function desktopChats(options: DesktopChatsOptions) {
             const name = there?.label?.trim() || deviceId;
             throw new Error(
               `${name} isn't signed in to ChatGPT, so "${model}" can't run there and nothing was started. Pick a model that runs there (see the devices list), or ask the user to sign in with ChatGPT in Settings › Claude and ChatGPT on ${name}.`,
+            );
+          }
+        }
+        if (pick?.kind === "direct" && pick.provider === ANTIGRAVITY_PROVIDER_ID) {
+          const there = await device();
+          const signedIn = there?.online ? deviceEngineSignIns(there.availability?.capabilities) : undefined;
+          if (signedIn && !signedIn.includes("antigravity")) {
+            const name = there?.label?.trim() || deviceId;
+            throw new Error(
+              `${name} isn't signed in to Google Antigravity, so "${model}" can't run there and nothing was started. Pick a computer that is (see the devices list), or ask the user to sign in with Google under Settings › Claude and ChatGPT on ${name}.`,
             );
           }
         }

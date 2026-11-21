@@ -1019,7 +1019,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
   protected async scheduleAlarm(
     now: number,
     options: {
-      fenceDeadline?: number | null;
       preserveExisting?: boolean;
       afterAlarm?: boolean;
     } = {},
@@ -1031,7 +1030,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         deadlines.push([source, at]);
       }
     };
-    add("owner_fence", options.fenceDeadline);
     if (await this.memoryPolicy().pending()) add("memory_policy", now + 5_000);
     if (await this.modelGrants().pendingFenceBarrier()) {
       add("grant_fence_barrier", now + 5_000);

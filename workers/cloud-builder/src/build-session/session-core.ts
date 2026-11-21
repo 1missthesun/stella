@@ -4,7 +4,6 @@ import {
   parseNativeStateCheckpointRecord,
 } from "../native-state-checkpoint.js";
 import { deliverOwnerEvents } from "../owner-events.js";
-import { HEADER_OWNER_FENCE_ID } from "../owner-fence-do.js";
 import { isSandboxDestroyDebtKey } from "../sandbox-lifecycle.js";
 import {
   appendThreadMessages,
@@ -68,7 +67,7 @@ export type SessionCoreHost = Pick<
   | "assertAgentTurnIdentity"
   | "assertTurnWritable"
   | "appendThreadTranscript"
-  | "callOwnerFence"
+  | "ownerFence"
   | "cleanupTransientWrites"
   | "deleteTurnStoragePreservingExactCancellations"
   | "deliverTerminal"
@@ -335,29 +334,6 @@ export const trackTurn = <T>(
   return tracked;
 };
 
-const ownerFence = (host: SessionCoreHost, ownerId: string) => {
-  return ownerGateStub(host.env.OWNER_GATES, ownerId);
-};
-
-export const callOwnerFence = async (
-  host: SessionCoreHost,
-  ownerId: string,
-  path: string,
-  body: Record<string, unknown>,
-): Promise<Response> => {
-  return ownerFence(host, ownerId).fetch(
-    `https://owner-gate/owner-fence/${path}`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        [HEADER_OWNER_FENCE_ID]: ownerId,
-      },
-      body: JSON.stringify({ ...body, ownerId }),
-    },
-  );
-};
-
 const ownerTurnStateEnvelope = (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -402,40 +378,17 @@ export const callOwnerTurnState = async <T>(
     | "drain",
   body: Record<string, unknown>,
 ): Promise<T> => {
-  const response = await host.callOwnerFence(
-    turn.ownerId,
-    `turn-state/${path}`,
-    { ...body, ...ownerTurnStateEnvelope(host, turn) },
-  );
-  const text = await response.text();
-  if (new TextEncoder().encode(text).byteLength > 256 * 1024) {
+  const result = await host
+    .ownerFence(turn.ownerId)
+    .turnState(path, { ...body, ...ownerTurnStateEnvelope(host, turn) });
+  if (!result.ok) throw new TurnStateOwnerCallError(result.status, result.code);
+  if (
+    new TextEncoder().encode(JSON.stringify(result.value ?? null)).byteLength >
+    256 * 1024
+  ) {
     throw new Error("Turn state owner response exceeded its bound.");
   }
-  if (!response.ok) {
-    let code: string | undefined;
-    try {
-      const body: unknown = JSON.parse(text);
-      if (
-        body &&
-        typeof body === "object" &&
-        !Array.isArray(body) &&
-        "code" in body &&
-        typeof body.code === "string"
-      ) {
-        code = body.code;
-      }
-    } catch {
-      code = undefined;
-    }
-    throw new TurnStateOwnerCallError(response.status, code);
-  }
-  try {
-    return JSON.parse(text) as T;
-  } catch (error) {
-    throw new Error("Turn state owner response was invalid.", {
-      cause: error,
-    });
-  }
+  return result.value as T;
 };
 
 export const registerTurn = async (
@@ -753,12 +706,12 @@ export const assertTurnWritable = async (
   ) {
     throw new OwnerPurgeFenceError();
   }
-  const response = await host.callOwnerFence(turn.ownerId, "assert", {
+  const result = await host.ownerFence(turn.ownerId).assert({
     ownerGeneration: turn.ownerGeneration,
     generation: turn.ownerPurgeGeneration,
     leaseId: turn.ownerPurgeLeaseId,
   });
-  if (!response.ok) throw new OwnerPurgeFenceError();
+  if (!result.ok) throw new OwnerPurgeFenceError();
 };
 
 const assertAgentTurnActive = async (

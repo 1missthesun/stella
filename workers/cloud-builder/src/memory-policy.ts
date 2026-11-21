@@ -3,7 +3,7 @@ import {
   type MemoryPolicy,
   type MemoryPolicyChange,
 } from "@stella/contracts/turn-plane/memory-policy";
-import type { OwnerPurgeFence } from "./owner-fence-do.js";
+import { OWNER_FENCE_KEY, type OwnerPurgeFence } from "./owner-fence.js";
 
 const CACHE_KEY = "memoryPolicy:cache:v1";
 const CHANGE_KEY = "memoryPolicy:change:v1";
@@ -90,7 +90,7 @@ export class OwnerMemoryPolicy {
     expected: MemoryPolicy,
     fenceGeneration: string,
   ): Promise<void> {
-    const fence = await this.get<OwnerPurgeFence>("ownerPurgeFence");
+    const fence = await this.get<OwnerPurgeFence>(OWNER_FENCE_KEY);
     if (fence?.state !== "open" || fence.generation !== fenceGeneration) {
       throw new MemoryPolicyError("OWNER_FENCE_CHANGED");
     }
@@ -177,7 +177,7 @@ export class OwnerMemoryPolicy {
       ) {
         throw new MemoryPolicyError("MEMORY_WIPE_PENDING", 503);
       }
-      const fence = await this.get<OwnerPurgeFence>("ownerPurgeFence");
+      const fence = await this.get<OwnerPurgeFence>(OWNER_FENCE_KEY);
       await this.put(CACHE_KEY, {
         fenceGeneration: fence?.generation ?? "",
         policy,

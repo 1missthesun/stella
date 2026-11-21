@@ -163,7 +163,20 @@ import type {
   MemoryPolicy,
   MemoryPolicyChange,
 } from "@stella/contracts/turn-plane/memory-policy";
-import { createOwnerFenceHost } from "./owner-fence-do.js";
+import type {
+  OwnerFenceAssertInput,
+  OwnerFenceAssertResult,
+  OwnerFenceBeginInput,
+  OwnerFenceLeaseInput,
+  OwnerFenceRegisterResult,
+  OwnerFenceUnregisterInput,
+  OwnerFenceUnregisterResult,
+} from "./owner-fence.js";
+import { serveLegacyOwnerFenceRoute } from "./owner-fence-legacy-route.js";
+import type {
+  TurnStateOwnerOp,
+  TurnStateOwnerResult,
+} from "./turn-state-owner-routes.js";
 import type {
   OwnerGateAdmitInput,
   OwnerGateAdmission,
@@ -194,7 +207,6 @@ import {
 } from "./owner-gate/presence.js";
 import {
   withTimeout,
-  ownerFenceRequest,
   OwnerGateSnapshotError,
   log,
   isRecord,
@@ -973,25 +985,73 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       throw new MemoryPolicyError("OWNER_MISMATCH", 403);
     const sessions = this.env.ORCHESTRATOR_SESSIONS;
     if (!sessions) throw new Error("Conversation execution is not configured.");
-    const response = await this.ownerFenceCall("assert", {
+    const lease = await this.ownerFence().assert({
       ownerId: args.ownerId,
       ownerGeneration: args.ownerGeneration,
       generation: args.fenceGeneration,
       leaseId: args.leaseId,
-      turnId: args.turnId,
-      sessionId: sessions.idFromName(args.conversationId).toString(),
     });
-    if (!response.ok) throw new MemoryPolicyError("OWNER_FENCE_CHANGED");
-    const lease: unknown = await response.json();
-    if (
-      !lease ||
-      typeof lease !== "object" ||
-      !("expiresAt" in lease) ||
-      typeof lease.expiresAt !== "number" ||
-      !Number.isFinite(lease.expiresAt)
-    )
-      throw new MemoryPolicyError("OWNER_FENCE_CHANGED");
+    if (!lease.ok) throw new MemoryPolicyError("OWNER_FENCE_CHANGED");
     return await this.issueModelGrant({ ...args, expiresAt: lease.expiresAt });
+  }
+
+  /** Typed owner fence calls for BuildSession, OrchestratorSession and the Worker. */
+  async fenceRegister(
+    input: OwnerFenceLeaseInput,
+  ): Promise<OwnerFenceRegisterResult> {
+    return await this.ownerFence().register(input);
+  }
+
+  async fenceAssert(
+    input: OwnerFenceAssertInput,
+  ): Promise<OwnerFenceAssertResult> {
+    return await this.ownerFence().assert(input);
+  }
+
+  /** Retires a lease, then the model grants and cloud chat admission it held. */
+  async fenceUnregister(
+    input: OwnerFenceUnregisterInput,
+  ): Promise<OwnerFenceUnregisterResult> {
+    const result = await this.ownerFence().unregister(input);
+    if (!result.ok) return result;
+    if (typeof input.ownerGeneration === "string") {
+      await this.modelGrants().retireExactTurnLease({
+        ownerGeneration: input.ownerGeneration,
+        turnId: input.turnId,
+        leaseId: input.leaseId,
+      });
+    }
+    const dispatchId = await this.ctx.storage.get<string>(
+      cloudChatTurnKey(input.turnId),
+    );
+    const handoff = dispatchId
+      ? await this.ctx.storage.get<CloudChatHandoff>(
+          cloudChatHandoffKey(dispatchId),
+        )
+      : undefined;
+    const identity =
+      handoff?.phase === "registered" ? handoff.authority : handoff;
+    if (
+      dispatchId &&
+      identity?.turnId === input.turnId &&
+      identity.leaseId === input.leaseId
+    ) {
+      await this.ctx.storage.put(cloudChatHandoffKey(dispatchId), {
+        phase: "retired",
+        turnId: identity.turnId,
+        leaseId: identity.leaseId,
+      } satisfies CloudChatHandoff);
+      await this.release({ turnId: identity.turnId });
+      this.setGateHeld(dispatchId, false);
+    }
+    return result;
+  }
+
+  async turnStateOperation(
+    op: TurnStateOwnerOp,
+    body: Record<string, unknown>,
+  ): Promise<TurnStateOwnerResult> {
+    return await this.runTurnStateOperation(op, body);
   }
 
   async changeMemoryPolicy(
@@ -1026,13 +1086,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   ): Promise<void> {
     const invokedAt = Date.now();
     const startedAt = performance.now();
-    const response = await this.ownerFenceCall("assert", {
+    const lease = await this.ownerFence().assert({
       ownerId: this.ownerId(),
       ownerGeneration: policy.ownerGeneration,
       generation: fenceGeneration,
       leaseId,
     });
-    if (!response.ok) throw new MemoryPolicyError("OWNER_FENCE_CHANGED");
+    if (!lease.ok) throw new MemoryPolicyError("OWNER_FENCE_CHANGED");
     const fenceMs = performance.now() - startedAt;
     await this.memoryPolicy().assert(policy, fenceGeneration);
     log("info", "owner_memory_assertion_timing", {
@@ -1426,60 +1486,20 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/owner-fence/")) {
-      if (request.method !== "POST") {
-        return Response.json({ error: "Method not allowed." }, { status: 405 });
-      }
-      const path = url.pathname.slice("/owner-fence/".length);
-      const body: unknown =
-        path === "begin" || path === "register" || path === "unregister"
-          ? await request.clone().json()
-          : undefined;
-      const unregister = path === "unregister" ? body : undefined;
-      const response = await this.fetchOwnerFence(path, request, body);
-      if (
-        response.ok &&
-        unregister &&
-        typeof unregister === "object" &&
-        "turnId" in unregister &&
-        typeof unregister.turnId === "string" &&
-        "leaseId" in unregister &&
-        typeof unregister.leaseId === "string"
-      ) {
-        if (
-          "ownerGeneration" in unregister &&
-          typeof unregister.ownerGeneration === "string"
-        ) {
-          await this.modelGrants().retireExactTurnLease({
-            ownerGeneration: unregister.ownerGeneration,
-            turnId: unregister.turnId,
-            leaseId: unregister.leaseId,
-          });
-        }
-        const dispatchId = await this.ctx.storage.get<string>(
-          cloudChatTurnKey(unregister.turnId),
-        );
-        const handoff = dispatchId
-          ? await this.ctx.storage.get<CloudChatHandoff>(
-              cloudChatHandoffKey(dispatchId),
-            )
-          : undefined;
-        const identity =
-          handoff?.phase === "registered" ? handoff.authority : handoff;
-        if (
-          dispatchId &&
-          identity?.turnId === unregister.turnId &&
-          identity.leaseId === unregister.leaseId
-        ) {
-          await this.ctx.storage.put(cloudChatHandoffKey(dispatchId), {
-            phase: "retired",
-            turnId: identity.turnId,
-            leaseId: identity.leaseId,
-          } satisfies CloudChatHandoff);
-          await this.release({ turnId: identity.turnId });
-          this.setGateHeld(dispatchId, false);
-        }
-      }
-      return response;
+      return await serveLegacyOwnerFenceRoute(
+        {
+          register: (input) => this.fenceRegister(input),
+          unregister: (input) => this.fenceUnregister(input),
+          assert: (input) => this.fenceAssert(input),
+          begin: (input) => this.beginOwnerFence(input),
+          assertBlocked: (generation) =>
+            this.ownerFence().assertBlocked(generation),
+          release: (generation) => this.ownerFence().release(generation),
+          turnState: (op, body) => this.turnStateOperation(op, body),
+        },
+        url.pathname.slice("/owner-fence/".length),
+        request,
+      );
     }
     if (url.pathname === "/live") {
       if (
@@ -2369,19 +2389,11 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   async alarm(): Promise<void> {
     this.ensureSchema();
     const now = Date.now();
-    const ownerFenceHost = createOwnerFenceHost({
-      ctx: this.ctx,
-      env: this.env,
-    });
-    let fenceDeadline: number | null = null;
-    let fenceAlarmCompleted = false;
     try {
       const pendingFence = await this.modelGrants().pendingFenceBarrier();
-      if (pendingFence) {
-        await this.fetchOwnerFence(
-          pendingFence.path,
-          ownerFenceRequest(pendingFence.path, pendingFence.body),
-          pendingFence.body,
+      if (pendingFence?.path === "begin") {
+        await this.beginOwnerFence(
+          pendingFence.body as OwnerFenceBeginInput,
         ).catch((error: unknown) => {
           log("error", "owner_grant_fence_retry_pending", {
             message:
@@ -2391,8 +2403,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           });
         });
       }
-      fenceDeadline = await ownerFenceHost.alarm(now);
-      fenceAlarmCompleted = true;
       await this.expirePresence(now);
       await this.expireDispatches(now);
       await this.ownerStore().onAlarm(now);
@@ -2407,11 +2417,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           });
         });
     } finally {
-      if (!fenceAlarmCompleted) {
-        fenceDeadline = await ownerFenceHost.nextDeadline();
-      }
       await this.scheduleAlarm(now, {
-        fenceDeadline,
         preserveExisting: false,
         afterAlarm: true,
       });

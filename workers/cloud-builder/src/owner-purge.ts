@@ -1,22 +1,73 @@
 import { purgeSlackOwner } from "./slack/store.js";
 import type { Env } from "./build-session/shared/env.js";
 import { errorMessage, log } from "./build-session/shared/keys.js";
-import {
-  beginOwnerPurge,
-  callOwnerFence,
-  purgeOwnerStorage,
-} from "./build-session/owner-purge-transfer.js";
+import { purgeOwnerStorage } from "./build-session/owner-purge-transfer.js";
 import type { OwnerPurgeMode } from "./owner-store/registry.js";
+import type {
+  OwnerFenceBeginInput,
+  OwnerFenceBeginResult,
+  OwnerFenceBlockedResult,
+  OwnerFenceReleaseResult,
+} from "./owner-fence.js";
+import type { TurnStateOwnerResult } from "./turn-state-owner-routes.js";
 
 export type OwnerPurgePass = {
   pending: string[];
 };
 
-const purgeTurnState = async (env: Env, ownerId: string, generation: string): Promise<boolean> => {
+/** The owner fence as the purge drives it; OwnerGate passes its own. */
+export type OwnerPurgeFenceHandle = {
+  begin(input: OwnerFenceBeginInput): Promise<OwnerFenceBeginResult>;
+  assertBlocked(generation: string): Promise<OwnerFenceBlockedResult>;
+  release(generation: string): Promise<OwnerFenceReleaseResult>;
+  purgeTurnState(generation: string): Promise<TurnStateOwnerResult>;
+};
+
+/**
+ * Blocks the owner fence, then asks every object holding a lease on it to
+ * stop its turn, until no lease is left. Activity leases are not canceled;
+ * they end on their own (or expire).
+ */
+const blockAndDrain = async (
+  env: Env,
+  ownerId: string,
+  fence: OwnerPurgeFenceHandle,
+  mode: "temporary" | "permanent",
+  requestId: string,
+): Promise<string> => {
+  const begun = await fence.begin({ mode, requestId, ownerId });
+  if (!begun.ok) throw new Error("Owner purge fence could not be created.");
+  const { generation } = begun;
+  let active = begun.active;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (active.length === 0) return generation;
+    await Promise.all(
+      active.map(async ({ leaseId, sessionId, turnId, namespace, ownerGeneration }) => {
+        if (namespace === "activity") return;
+        try {
+          const target = namespace === "orchestrator" ? env.ORCHESTRATOR_SESSIONS : env.BUILD_SESSIONS;
+          await target.get(target.idFromString(sessionId)).fetch("https://build-session/owner-purge-cancel", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ownerId, turnId, ownerGeneration, generation, leaseId }),
+          });
+        } catch (error) {
+          log("error", "owner_purge_turn_cancel_failed", { sessionId, message: errorMessage(error) });
+        }
+      }),
+    );
+    await scheduler.wait(250);
+    const blocked = await fence.assertBlocked(generation);
+    if (!blocked.ok) throw new Error("Owner purge fence changed unexpectedly.");
+    active = blocked.active;
+  }
+  throw new Error("Owner cloud turns did not quiesce before purge.");
+};
+
+const purgeTurnState = async (fence: OwnerPurgeFenceHandle, generation: string): Promise<boolean> => {
   try {
-    const response = await callOwnerFence(env, ownerId, "turn-state/purge", { schemaVersion: 1, generation });
-    const result = (await response.json().catch(() => null)) as { pending?: unknown } | null;
-    return !response.ok || result?.pending !== false;
+    const result = await fence.purgeTurnState(generation);
+    return !result.ok || (result.value as { pending?: unknown } | null)?.pending !== false;
   } catch (error) {
     log("error", "owner_storage_purge_step_failed", { store: "turn-state", message: errorMessage(error) });
     return true;
@@ -46,16 +97,18 @@ export const runOwnerPurge = async (input: {
   mode: OwnerPurgeMode;
   requestId: string;
   purgeOwnerData: () => Promise<{ pending: string[] }>;
+  fence: OwnerPurgeFenceHandle;
 }): Promise<OwnerPurgePass> => {
-  const { env, ownerId, mode } = input;
-  const { generation } = await beginOwnerPurge(
+  const { env, ownerId, mode, fence } = input;
+  const generation = await blockAndDrain(
     env,
     ownerId,
+    fence,
     mode === "delete" ? "permanent" : "temporary",
     input.requestId,
   );
   const pending: string[] = [];
-  if (await purgeTurnState(env, ownerId, generation)) pending.push("turn-state");
+  if (await purgeTurnState(fence, generation)) pending.push("turn-state");
   if (await purgeBrowserProfile(env, ownerId)) pending.push("browser-profile:default");
   try {
     await purgeSlackOwner(env as unknown as Cloudflare.Env, ownerId, mode === "delete" ? "delete" : "reset");
@@ -73,7 +126,7 @@ export const runOwnerPurge = async (input: {
   const storage = await purgeOwnerStorage(env, ownerId, { ownerId, purgeGeneration: generation, mode });
   pending.push(...storage.pending);
   if (pending.length === 0 && mode === "reset") {
-    const released = await callOwnerFence(env, ownerId, "release", { generation });
+    const released = await fence.release(generation);
     if (!released.ok) pending.push("fence");
   }
   log("info", "owner_purge_pass", { mode, deleted: storage.deleted, pending });

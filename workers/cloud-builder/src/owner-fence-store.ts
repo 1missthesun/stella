@@ -9,8 +9,6 @@ export const OWNER_FENCE_DEFAULT_MAX_LEASE_MS = 30 * 60_000;
 export const OWNER_FENCE_CLOCK_SKEW_MS = 5 * 60_000;
 export const OWNER_FENCE_RETIRED_RETENTION_MS = 2 * 60 * 60_000;
 export const OWNER_FENCE_RETIRED_PRUNE_LIMIT = 256;
-export const OWNER_FENCE_LEGACY_GRACE_MS = 60 * 60_000;
-export const OWNER_FENCE_LEGACY_MIRROR_MAX_ENTRIES = 512;
 
 export type OwnerFenceLeaseNamespace = "build" | "orchestrator" | "activity";
 
@@ -66,24 +64,6 @@ export type OwnerFenceLeaseMutationResult =
       existing?: OwnerFenceLease;
     }>;
 
-/** The shape retained temporarily so the immediately previous Worker can roll back. */
-export type LegacyOwnerFenceLease = Readonly<{
-  leaseId: string;
-  sessionId: string;
-  turnId: string;
-  namespace: OwnerFenceLeaseNamespace;
-  role: OwnerFenceLeaseRole;
-  ownerGeneration?: string;
-  reservationGeneration?: string;
-  workspace?: string;
-  expiresAt?: number;
-}>;
-
-export type LegacyOwnerFenceActiveMirror = Record<
-  string,
-  LegacyOwnerFenceLease
->;
-
 type OwnerFenceLeaseRow = {
   lease_id: string;
   owner_id: string;
@@ -103,8 +83,6 @@ type OwnerFenceLeaseRow = {
 export type OwnerFenceStoreOptions = Readonly<{
   maxLeaseMs?: number;
   clockSkewMs?: number;
-  legacyGraceMs?: number;
-  maxLegacyLeaseMs?: number;
 }>;
 
 export class OwnerFenceLeaseValidationError extends Error {
@@ -220,8 +198,6 @@ const isConstraintError = (error: unknown): boolean =>
 export class OwnerFenceStore {
   readonly maxLeaseMs: number;
   readonly clockSkewMs: number;
-  readonly legacyGraceMs: number;
-  readonly maxLegacyLeaseMs: number;
 
   constructor(
     private readonly sql: SqlStorage,
@@ -229,14 +205,9 @@ export class OwnerFenceStore {
   ) {
     this.maxLeaseMs = options.maxLeaseMs ?? OWNER_FENCE_DEFAULT_MAX_LEASE_MS;
     this.clockSkewMs = options.clockSkewMs ?? OWNER_FENCE_CLOCK_SKEW_MS;
-    this.legacyGraceMs = options.legacyGraceMs ?? OWNER_FENCE_LEGACY_GRACE_MS;
-    this.maxLegacyLeaseMs =
-      options.maxLegacyLeaseMs ?? OWNER_FENCE_LEGACY_GRACE_MS;
     for (const [field, value] of Object.entries({
       maxLeaseMs: this.maxLeaseMs,
       clockSkewMs: this.clockSkewMs,
-      legacyGraceMs: this.legacyGraceMs,
-      maxLegacyLeaseMs: this.maxLegacyLeaseMs,
     })) {
       if (!Number.isSafeInteger(value) || value < 1) {
         throw new OwnerFenceLeaseValidationError(`${field} is invalid.`);
@@ -307,20 +278,8 @@ export class OwnerFenceStore {
     registration: OwnerFenceLeaseRegistration,
     now = Date.now(),
   ): OwnerFenceLeaseRegistrationResult {
-    return this.registerLeaseExactBounded(registration, now, this.maxLeaseMs);
-  }
-
-  private registerLeaseExactBounded(
-    registration: OwnerFenceLeaseRegistration,
-    now: number,
-    maxLeaseMs: number,
-  ): OwnerFenceLeaseRegistrationResult {
     assertIdentity(registration);
-    const expiresAt = this.boundedExpiry(
-      registration.expiresAt,
-      now,
-      maxLeaseMs,
-    );
+    const expiresAt = this.boundedExpiry(registration.expiresAt, now);
     this.expireDueLeases(now);
     const existing = this.lease(registration.leaseId);
     if (existing) {
@@ -375,7 +334,7 @@ export class OwnerFenceStore {
     now = Date.now(),
   ): OwnerFenceLeaseMutationResult {
     assertIdentity(identity);
-    const bounded = this.boundedExpiry(expiresAt, now, this.maxLeaseMs);
+    const bounded = this.boundedExpiry(expiresAt, now);
     const existing = this.lease(identity.leaseId);
     if (!existing) return { status: "missing" };
     if (!exactIdentityMatches(existing, identity)) {
@@ -449,131 +408,6 @@ export class OwnerFenceStore {
     }));
   }
 
-  nextExpiry(): number | null {
-    const row = this.sql
-      .exec<{ expires_at: number | null }>(
-        `SELECT MIN(expires_at) AS expires_at
-           FROM owner_fence_leases
-          WHERE state = 'active'`,
-      )
-      .one();
-    return row.expires_at;
-  }
-
-  /**
-   * Convert the legacy KV map to SQL. Call this inside the same transaction
-   * that writes `leaseStorageVersion: 2` and the compatibility mirror.
-   */
-  migrateLegacyActiveMirror(args: {
-    ownerId: string;
-    fenceGeneration: string;
-    active: LegacyOwnerFenceActiveMirror;
-    now?: number;
-  }): Readonly<{
-    inserted: number;
-    replayed: number;
-    expired: number;
-    invalid: readonly string[];
-    conflicts: readonly string[];
-  }> {
-    assertText(args.ownerId, "ownerId");
-    assertText(args.fenceGeneration, "fenceGeneration");
-    const now = args.now ?? Date.now();
-    assertSafeTime(now, "now");
-    let inserted = 0;
-    let replayed = 0;
-    let expired = 0;
-    const invalid: string[] = [];
-    const conflicts: string[] = [];
-    for (const [mapLeaseId, legacy] of Object.entries(args.active).sort(
-      ([left], [right]) => left.localeCompare(right),
-    )) {
-      if (
-        mapLeaseId !== legacy.leaseId ||
-        !legacy.ownerGeneration ||
-        !NAMESPACES.has(legacy.namespace) ||
-        !ROLES.has(legacy.role)
-      ) {
-        invalid.push(mapLeaseId);
-        continue;
-      }
-      if (
-        legacy.expiresAt !== undefined &&
-        (!Number.isSafeInteger(legacy.expiresAt) || legacy.expiresAt <= now)
-      ) {
-        expired += 1;
-        continue;
-      }
-      const expiresAt = Math.min(
-        legacy.expiresAt ?? now + this.legacyGraceMs,
-        now + this.maxLegacyLeaseMs,
-      );
-      let result: OwnerFenceLeaseRegistrationResult;
-      try {
-        result = this.registerLeaseExactBounded(
-          {
-            leaseId: legacy.leaseId,
-            ownerId: args.ownerId,
-            ownerGeneration: legacy.ownerGeneration,
-            reservationGeneration:
-              legacy.reservationGeneration ?? args.fenceGeneration,
-            sessionId: legacy.sessionId,
-            turnId: legacy.turnId,
-            namespace: legacy.namespace,
-            role: legacy.role,
-            expiresAt,
-          },
-          now,
-          this.maxLegacyLeaseMs,
-        );
-      } catch (error) {
-        if (!(error instanceof OwnerFenceLeaseValidationError)) throw error;
-        invalid.push(mapLeaseId);
-        continue;
-      }
-      if (result.status === "registered") inserted += 1;
-      else if (result.status === "replayed") replayed += 1;
-      else conflicts.push(mapLeaseId);
-    }
-    return { inserted, replayed, expired, invalid, conflicts };
-  }
-
-  /**
-   * Build the rollback mirror. A caller must not persist anything when the
-   * result is `too_many_active_leases`; active identities are never truncated.
-   */
-  boundedLegacyActiveMirror(
-    now = Date.now(),
-    maxEntries = OWNER_FENCE_LEGACY_MIRROR_MAX_ENTRIES,
-  ):
-    | Readonly<{ status: "complete"; active: LegacyOwnerFenceActiveMirror }>
-    | Readonly<{
-        status: "too_many_active_leases";
-        activeLeaseCount: number;
-        maxEntries: number;
-      }> {
-    if (!Number.isSafeInteger(maxEntries) || maxEntries < 1) {
-      throw new OwnerFenceLeaseValidationError("maxEntries is invalid.");
-    }
-    const leases = this.activeLeases(now);
-    if (leases.length > maxEntries) {
-      return {
-        status: "too_many_active_leases",
-        activeLeaseCount: leases.length,
-        maxEntries,
-      };
-    }
-    return {
-      status: "complete",
-      active: Object.fromEntries(
-        leases.map((lease) => [
-          lease.leaseId,
-          ownerFenceLeaseToLegacyLease(lease),
-        ]),
-      ),
-    };
-  }
-
   pruneRetiredLeases(
     now = Date.now(),
     retainMs = OWNER_FENCE_RETIRED_RETENTION_MS,
@@ -600,17 +434,16 @@ export class OwnerFenceStore {
     );
   }
 
-  private boundedExpiry(
-    expiresAt: number,
-    now: number,
-    maxLeaseMs: number,
-  ): number {
+  private boundedExpiry(expiresAt: number, now: number): number {
     assertSafeTime(now, "now");
     assertSafeTime(expiresAt, "expiresAt");
-    if (expiresAt <= now || expiresAt > now + maxLeaseMs + this.clockSkewMs) {
+    if (
+      expiresAt <= now ||
+      expiresAt > now + this.maxLeaseMs + this.clockSkewMs
+    ) {
       throw new OwnerFenceLeaseValidationError("expiresAt is out of bounds.");
     }
-    return Math.min(expiresAt, now + maxLeaseMs);
+    return Math.min(expiresAt, now + this.maxLeaseMs);
   }
 
   private retireExpired(lease: OwnerFenceLease, now: number): void {
@@ -625,15 +458,3 @@ export class OwnerFenceStore {
   }
 }
 
-export const ownerFenceLeaseToLegacyLease = (
-  lease: OwnerFenceLease,
-): LegacyOwnerFenceLease => ({
-  leaseId: lease.leaseId,
-  sessionId: lease.sessionId,
-  turnId: lease.turnId,
-  namespace: lease.namespace,
-  role: lease.role,
-  ownerGeneration: lease.ownerGeneration,
-  reservationGeneration: lease.reservationGeneration,
-  expiresAt: lease.expiresAt,
-});

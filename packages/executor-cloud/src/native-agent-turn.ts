@@ -698,9 +698,7 @@ export type ClaudeStreamJsonEvent = Record<string, unknown>;
  * without it, and a model without Stella's tools writes its tool calls out
  * as text and makes up their results.
  */
-const stellaToolsUnavailable = (
-  event: ClaudeStreamJsonEvent,
-): string | undefined => {
+const stellaServerStatus = (event: ClaudeStreamJsonEvent): string => {
   const servers = Array.isArray(event.mcp_servers) ? event.mcp_servers : [];
   const stella = servers.find(
     (server): server is { name: string; status?: unknown } =>
@@ -708,8 +706,14 @@ const stellaToolsUnavailable = (
       typeof server === "object" &&
       (server as { name?: unknown }).name === CLOUD_CLAUDE_MCP_SERVER_NAME,
   );
-  if (stella?.status === "connected") return undefined;
-  const status = typeof stella?.status === "string" ? stella.status : "missing";
+  return typeof stella?.status === "string" ? stella.status : "missing";
+};
+
+const stellaToolsUnavailable = (
+  event: ClaudeStreamJsonEvent,
+): string | undefined => {
+  const status = stellaServerStatus(event);
+  if (status === "connected") return undefined;
   return `Claude Code could not load Stella's tools (their server was ${status}), so it stopped before answering. Try again.`;
 };
 
@@ -990,10 +994,12 @@ export const runCloudClaude = async (options: {
     let quietResumeAt: string | undefined;
     /** What the latest init said about Stella's tools, until it is judged. */
     let initVerdict: string | undefined;
+    let initCount = 0;
     const judgeInit = (): void => {
       const unavailable = initVerdict;
       initVerdict = undefined;
       if (unavailable && !cancellation.aborted) {
+        markTurnStep("claudeStellaToolsUnavailable");
         error = unavailable;
         cancellation.abort(new Error(unavailable));
       }
@@ -1010,7 +1016,10 @@ export const runCloudClaude = async (options: {
       outputTokens += numberAt(usage.output_tokens);
     };
     const onJson = (event: ClaudeStreamJsonEvent): void => {
-        if (toolChannel.handle(event)) return;
+        if (toolChannel.handle(event)) {
+          if (toolChannel.listed()) markTurnStep("claudeToolsListed");
+          return;
+        }
         options.onStreamEvent?.(event);
         const type = event.type;
         if ((type === "assistant" || (type === "user" && event.isMeta !== true && event.isSynthetic !== true)) && typeof event.uuid === "string") {
@@ -1024,6 +1033,11 @@ export const runCloudClaude = async (options: {
           // which can start before Stella's server is connected; it is judged
           // when the prompt's query is known to be the one it opened.
           initVerdict = stellaToolsUnavailable(event);
+          initCount += 1;
+          // Which init said what, in the turn's timing log.
+          markTurnStep(
+            `claudeInit${initCount}${promptReplayed ? "AfterPrompt" : ""}_${initVerdict ? stellaServerStatus(event) : "connected"}`,
+          );
           if (promptReplayed) judgeInit();
           return;
         }
@@ -1042,6 +1056,7 @@ export const runCloudClaude = async (options: {
             event.uuid === promptUuid
           ) {
             promptReplayed = true;
+            markTurnStep("claudePromptReplayed");
             judgeInit();
             return;
           }

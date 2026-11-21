@@ -411,6 +411,12 @@ export type StellaAgentsHost = {
   beginAgentRun?(run: AgentRun, context: Context): Promise<void>;
   ensureModel?(model: ModelRef, context: Context): Promise<void>;
   endAgentRun?(run: AgentRun, context: Context, end?: AgentRunEnd): Promise<void>;
+  /**
+   * What the host adds to a run's report, asked once the run has settled and
+   * before its report is written: a cloud container that ran out of memory or
+   * disk during it, say.
+   */
+  runNote?(run: AgentRun, context: Context): Promise<string | undefined>;
   deliverReport?(report: AgentReport, context: Context): Promise<void>;
   deliverNote?(note: AgentNote, context: Context): Promise<void>;
   reportsFromLedger?(): boolean;
@@ -1072,6 +1078,10 @@ export function stellaAgents(host: StellaAgentsHost) {
                 })
               : undefined;
           if (wakersAtEnd) console.info("[stella-agents] task ended its turn waiting", { threadId, wakers: wakersAtEnd });
+          const hostNote =
+            settled?.status === "done" && settled.type === "input"
+              ? await host.runNote?.(run, context).catch(() => undefined)
+              : undefined;
           await runtime.commit(async (tx) => {
             const finished =
               settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
@@ -1123,9 +1133,14 @@ export function stellaAgents(host: StellaAgentsHost) {
             const earlier = failed
               ? []
               : await answersBetween(tx, agentConversationId, Math.max(0, ...agent.reported.map(Number)), settled.answer);
-            const said = failed
-              ? textOf(answer)
-              : withClosingNotes(notes.closing.map((note) => note.message), [...earlier, textOf(answer)].filter((text) => text.trim()).join("\n\n"));
+            const said = [
+              failed
+                ? textOf(answer)
+                : withClosingNotes(notes.closing.map((note) => note.message), [...earlier, textOf(answer)].filter((text) => text.trim()).join("\n\n")),
+              hostNote ?? "",
+            ]
+              .filter((text) => text.trim())
+              .join("\n\n");
             if (waitedFor !== undefined && !failed) {
               end = { answer: said, waiting: true, waitingFor: waitedFor, ...(wakersAtEnd ? { wakers: wakersAtEnd } : {}) };
               if (agent.reported.includes(settled.answer)) return next();

@@ -482,6 +482,8 @@ type AgentLease = {
   inFlight: number;
   used: boolean;
   linked: Set<string>;
+  /** The pressure probe raised its size: its container stops at release instead of staying warm. */
+  resized?: boolean;
 };
 
 const BROWSER_CHECKPOINT_MS = 30_000;
@@ -571,8 +573,6 @@ export class PiConversationRuntime {
   #modelKey: string | undefined;
   readonly #runs = new Map<string, ActiveRun[]>();
   readonly #leases = new Map<number, Promise<AgentLease>>();
-  /** A run's container ran out of memory or disk: the note its report carries, by thread. */
-  readonly #pressureNotes = new Map<string, string>();
   readonly #ending = new Map<string, { runs: number; ended: Promise<void>; resolve: () => void }>();
   readonly #live = new Map<string, AgentLease>();
   #brokerClaims: Promise<unknown> = Promise.resolve();
@@ -1121,6 +1121,13 @@ export class PiConversationRuntime {
         const turnId = this.#cardTurnId(threadId, info);
         if (turnId) this.#options.agentStopped?.({ threadId, turnId, ...info });
       },
+      runNote: async (run) => {
+        const held = await this.#leases.get(run.agentConversationId)?.catch(() => undefined);
+        if (!held?.used || !(await held.lease.ready.then(() => true, () => false))) return undefined;
+        const pressure = await held.lease.probePressure();
+        if (pressure?.resizedTo !== undefined) held.resized = true;
+        return pressure?.note;
+      },
       endAgentRun: async (run, context, end) => {
         let ended: ActiveRun | undefined;
         for (const [sessionId, runs] of this.#runs) {
@@ -1173,11 +1180,8 @@ export class PiConversationRuntime {
         this.#options.log("pi_agent_run_ended", { threadId: run.threadId, turnId: ended?.turnId });
       },
       reportsFromLedger: () => true,
-      deliverReport: async (reported, context) => {
-        await this.#agentRunsEnded(reported.threadId);
-        const pressureNote = this.#pressureNotes.get(reported.threadId);
-        this.#pressureNotes.delete(reported.threadId);
-        const report = pressureNote ? { ...reported, text: `${reported.text}\n\n${pressureNote}`.trim() } : reported;
+      deliverReport: async (report, context) => {
+        await this.#agentRunsEnded(report.threadId);
         const { authority } = await this.#agentState();
         if (report.origin) {
           const filesKey = deliveredFilesKey(report.threadId);
@@ -1607,7 +1611,6 @@ export class PiConversationRuntime {
     const { record } = lease;
     if (end.aborted) lease.abort();
     const up = !end.aborted && held.used && (await lease.ready.then(() => true, () => false));
-    let resized = false;
     if (up) {
       try {
         const linked = [...new Set([...held.linked, ...answerLinkedPaths(end.answer ?? "")])];
@@ -1616,12 +1619,8 @@ export class PiConversationRuntime {
       } catch (error) {
         this.#options.report(error);
       }
-      const pressure = await lease.probePressure();
-      if (pressure) {
-        this.#pressureNotes.set(held.threadId, pressure.note);
-        resized = pressure.resizedTo !== undefined;
-      }
     }
+    const resized = held.resized === true;
     lease.abort();
     await Promise.race([lease.ready.catch(() => undefined), scheduler.wait(LEASE_STOP_WAIT_MS)]);
     // A resized agent's container must stop now, or its next run soon after

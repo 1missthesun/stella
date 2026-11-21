@@ -90,7 +90,7 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { agentInvariants } from "./agent-invariants.js";
-import { boundReportText, endedWaiting, fileLateTurn, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
+import { boundReportText, endedWaiting, fileLateTurn, HELD_WHILE_STOPPED, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
 import {
   NOTHING_CAN_WAKE_MARK,
   WAITING_FOR_MAX_CHARS,
@@ -2438,7 +2438,7 @@ const supersedeHeldStops = (ctx: OwnerContext, threadId: string, commandId: stri
 };
 
 /** Marks a message or resume that was on its way to an agent when it was stopped: it waits until the agent is resumed. */
-const STOP_HELD = "held_while_stopped";
+const STOP_HELD = HELD_WHILE_STOPPED;
 
 const stoppedByStop = (thread: Pick<ThreadRow, "status" | "error_message">): boolean =>
   agentStanding(recordedAgentFacts({ status: thread.status, errorMessage: thread.error_message })).state === "stopped";

@@ -159,6 +159,9 @@ const queuedInput = (db: OwnerDbReader, thread: ThreadRow): boolean =>
     ),
   );
 
+/** The outcome of an input held because its task was stopped: it waits for a resume, so it is not work under way. */
+export const HELD_WHILE_STOPPED = "held_while_stopped";
+
 export const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
   db
     .all<{ thread_id: string }>(
@@ -172,7 +175,8 @@ export const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =
        SELECT DISTINCT t.thread_id FROM tree CROSS JOIN agent_threads t ON t.thread_id = tree.thread_id
         WHERE t.status IN ${WORKING_STATUSES_SQL}
            OR EXISTS (SELECT 1 FROM agent_commands c
-                       WHERE c.thread_id = t.thread_id AND c.state = 'pending' AND c.kind IN ('message', 'resume'))
+                       WHERE c.thread_id = t.thread_id AND c.state = 'pending' AND c.kind IN ('message', 'resume')
+                         AND COALESCE(c.outcome, '') <> '${HELD_WHILE_STOPPED}')
            OR EXISTS (SELECT 1 FROM agent_report_outbox o
                        WHERE o.requester_kind = 'agent' AND o.requester_id = t.thread_id
                          AND o.requester_generation = t.attempt_generation

@@ -114,6 +114,13 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   // Points Google Antigravity requests at a local mock instead of Google.
   "STELLA_ANTIGRAVITY_ENDPOINT",
   "STELLA_APP_SOURCE_INSTALLED",
+  // Proxy claims: Electron main routes fetch through these only when one is set.
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "NO_PROXY",
+  "no_proxy",
   // Windows: without these a shell cannot resolve `git` to git.exe (PATHEXT)
   // or start cmd and PowerShell (SystemRoot, ComSpec).
   ...(process.platform === "win32"

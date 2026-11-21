@@ -1035,8 +1035,9 @@ export const runCloudClaude = async (options: {
           initVerdict = stellaToolsUnavailable(event);
           initCount += 1;
           // Which init said what, in the turn's timing log.
+          // Step names are letters only (the backend drops other timings).
           markTurnStep(
-            `claudeInit${initCount}${promptReplayed ? "AfterPrompt" : ""}_${initVerdict ? stellaServerStatus(event) : "connected"}`,
+            `claudeInit${["", "First", "Second", "Third"][initCount] ?? "Later"}${promptReplayed ? "AfterPrompt" : ""}Stella${stellaServerStatus(event).replace(/[^A-Za-z]/gu, "").replace(/^./u, (first) => first.toUpperCase())}`,
           );
           if (promptReplayed) judgeInit();
           return;

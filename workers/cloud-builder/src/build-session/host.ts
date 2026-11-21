@@ -4,7 +4,6 @@ import type {
   TurnBrokerTurnStateCheckpointRequest,
 } from "@stella/contracts/turn-credential-broker";
 import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
-import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
 import type {
   CloudHomeStore,
@@ -24,7 +23,6 @@ import type {
   TurnExecution,
   TurnExecutionContext,
 } from "../turn-cancellation.js";
-import type { TurnBrokerTarget } from "../turn-credential-broker.js";
 import type {
   ResolvedTurnState,
   TurnStateCandidate,

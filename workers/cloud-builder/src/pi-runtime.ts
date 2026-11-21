@@ -1530,6 +1530,13 @@ export class PiConversationRuntime {
       const { harness } = await this.open();
       const role = await harness.snapshot(StellaAgentDoc, agentConversationId, context);
       const threadId = role?.threadId ?? active.run.threadId;
+      if (role?.workspace) {
+        await raiseAgentContainerSize(
+          this.#options.storage,
+          piAgentContainerSizeKeys(threadId),
+          initialInstanceSize({ workspace: role.workspace }),
+        );
+      }
       const lease = await openPiComputeLease(this.#computeHost(), {
         owner: this.#owner(authority),
         agentConversationId,

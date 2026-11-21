@@ -1459,6 +1459,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       cwd?: string;
       startedBy?: AgentMessageSender;
       adoptAs?: string;
+      workspace?: AgentWorkspaceSize;
     },
   ): Promise<{ threadId: string; existing: boolean }> => {
     const { parentConversationId, depth, description, runsOn, placement } = args;
@@ -1500,6 +1501,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     role.threadId = threadId;
     role.parentConversationId = parentConversationId;
     if (args.startedBy) role.startedBy = { threadId: args.startedBy.threadId, label: args.startedBy.label };
+    if (args.workspace) role.workspace = args.workspace;
     if (arriving) {
       arriving.conversationId = child.id;
       arriving.placedAs = args.adoptAs!;
@@ -1691,6 +1693,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             placement,
             ...(directory ? { cwd: directory } : {}),
             startedBy,
+            ...(args.workspace === "large" ? { workspace: "large" as const } : {}),
           }),
         context,
       );

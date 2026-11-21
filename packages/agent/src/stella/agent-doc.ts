@@ -16,6 +16,8 @@ export type StellaAgentRole = {
   stellaReplied?: { tool: string; at: number };
   /** An ask this agent put to Stella first and is waiting on; her next message lands in `reply`, not the inbox. */
   askingStella?: { key: string; reply?: string };
+  /** Its spawn asked for a large cloud workspace (`workspace: "large"`); a cloud host sizes its container from it. */
+  workspace?: "large";
 };
 
 export type StellaPendingNote = {

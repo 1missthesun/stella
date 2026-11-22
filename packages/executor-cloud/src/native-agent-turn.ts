@@ -940,7 +940,8 @@ export const runCloudClaude = async (options: {
   const promptUuid = crypto.randomUUID();
   let promptReplayed = false;
   let promptSent = false;
-  const toolsWait = new AbortController();
+  /** The wait for Stella's tools to be listed; interrupted when the process ends. */
+  let toolsWait: { interruptUnsafe: () => void } | undefined;
   try {
     const args = argsFor(resume);
     let inputEnded = false;
@@ -1035,15 +1036,27 @@ export const runCloudClaude = async (options: {
         send();
         return;
       }
-      options.toolHost
-        .waitForClientReady(toolsWait.signal, CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS)
-        .then(send, () => {
-          if (toolsWait.signal.aborted || cancellation.aborted) return;
-          markTurnStep("claudeToolsNotListed");
-          const unavailable = `Claude Code did not load Stella's tools within ${Math.round(CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS / 1000)}s, so it stopped before answering. Try again.`;
-          error = unavailable;
-          cancellation.abort(new Error(unavailable));
-        });
+      toolsWait = Effect.runFork(
+        Effect.tryPromise({
+          try: (signal) =>
+            options.toolHost.waitForClientReady(
+              signal,
+              CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS,
+            ),
+          catch: (failure) => failure,
+        }).pipe(
+          Effect.match({
+            onSuccess: send,
+            onFailure: () => {
+              if (cancellation.aborted) return;
+              markTurnStep("claudeToolsNotListed");
+              const unavailable = `Claude Code did not load Stella's tools within ${Math.round(CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS / 1000)}s, so it stopped before answering. Try again.`;
+              error = unavailable;
+              cancellation.abort(new Error(unavailable));
+            },
+          }),
+        ),
+      );
     };
     const addResultUsage = (event: ClaudeStreamJsonEvent): void => {
       const usage =
@@ -1251,7 +1264,7 @@ export const runCloudClaude = async (options: {
           cancellation,
           onJson,
         }).finally(endInput);
-    toolsWait.abort();
+    toolsWait?.interruptUnsafe();
     if (keeper && "parked" in result && result.parked) {
       const client = keeper;
       kept = {
@@ -1313,7 +1326,7 @@ export const runCloudClaude = async (options: {
       ...(kept ? { kept } : {}),
     };
   } finally {
-    toolsWait.abort();
+    toolsWait?.interruptUnsafe();
     toolChannel.close();
     if (keeper && !handedOn) {
       if (kept) await kept.discard().catch(() => undefined);

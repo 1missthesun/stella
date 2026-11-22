@@ -23,6 +23,24 @@ const sleep = (ms) =>
 const random = (min, max) => min + Math.random() * (max - min);
 const noise = (scale) =>
   (Math.random() + Math.random() + Math.random() - 1.5) * scale;
+/**
+ * Timing of the input model, in ms: a quick, practised user. Typing comes out
+ * around 150-160 wpm with natural variation; Castle's behavioural check
+ * passed at this pace and at slower ones alike, so it is as fast as stays
+ * comfortably human.
+ */
+export const PACE = Object.freeze({
+  moveBase: 45,
+  movePerDoubling: 65,
+  moveMax: 420,
+  settle: [25, 70],
+  hold: [40, 90],
+  afterKeys: [90, 220],
+  typingLead: [110, 260],
+  typingInterval: 85,
+  keyDwell: [45, 100],
+});
+
 const minimumJerk = (t) => t * t * t * (10 - 15 * t + 6 * t * t);
 const round1 = (value) => Math.round(value * 10) / 10;
 
@@ -41,8 +59,9 @@ export function trajectory(from, to) {
   const distance = Math.hypot(dx, dy);
   if (distance < 2) return [];
   const duration = Math.min(
-    (60 + 80 * Math.log2(distance / 40 + 1)) * random(0.85, 1.15),
-    520,
+    (PACE.moveBase + PACE.movePerDoubling * Math.log2(distance / 40 + 1)) *
+      random(0.85, 1.15),
+    PACE.moveMax,
   );
   const normal = { x: -dy / distance, y: dx / distance };
   const bow = (Math.random() < 0.5 ? -1 : 1) * random(0.04, 0.16) * distance;
@@ -437,7 +456,7 @@ export class HumanInput {
 
   /** Moves the pointer to `to` along a human path; returns where it landed. */
   async moveTo(to, { box = null, exact = false } = {}) {
-    await sleep(random(140, 380) - (performance.now() - this.state.lastKeyAt));
+    await sleep(random(...PACE.afterKeys) - (performance.now() - this.state.lastKeyAt));
     const target = exact ? to : this.aim(to, box);
     const from = this.startPoint(target);
     for (const [point, delay] of trajectory(from, target)) {
@@ -451,7 +470,7 @@ export class HumanInput {
 
   async down(button = "left", clickCount = 1) {
     const at = this.state.pointer ?? { x: 0, y: 0 };
-    await sleep(random(40, 110) - Math.min(1000, performance.now() - this.state.arrivedAt));
+    await sleep(random(...PACE.settle) - Math.min(1000, performance.now() - this.state.arrivedAt));
     this.state.pressedAt = performance.now();
     this.state.buttons |= BUTTON_BITS[button] ?? 0;
     await this.send("Input.dispatchMouseEvent", {
@@ -467,7 +486,7 @@ export class HumanInput {
 
   async up(button = "left", clickCount = 1) {
     const at = this.state.pointer ?? { x: 0, y: 0 };
-    await sleep(random(45, 110) - (performance.now() - this.state.pressedAt));
+    await sleep(random(...PACE.hold) - (performance.now() - this.state.pressedAt));
     this.state.buttons &= ~(BUTTON_BITS[button] ?? 0);
     this.state.releasedAt = performance.now();
     await this.send("Input.dispatchMouseEvent", {
@@ -485,8 +504,11 @@ export class HumanInput {
    * Moves to `point` and clicks. `beforePress` runs after the pointer arrives
    * and before the press, to confirm the target hasn't moved.
    */
-  async click(point, { box = null, button = "left", count = 1, beforePress = null, onPress = null } = {}) {
-    await this.moveTo(point, { box });
+  async click(
+    point,
+    { box = null, exact = false, button = "left", count = 1, beforePress = null, onPress = null } = {},
+  ) {
+    await this.moveTo(point, { box, exact });
     if (beforePress) await beforePress();
     for (let n = 1; n <= Math.max(1, count); n += 1) {
       if (n === 1 && onPress) onPress();
@@ -612,7 +634,8 @@ export class HumanInput {
     const KEYED_LIMIT = 160;
     const keyed = chars.slice(0, KEYED_LIMIT);
     const mean =
-      meanIntervalMs ?? Math.max(40, Math.min(115, (115 * 30) / keyed.length));
+      meanIntervalMs ??
+      Math.max(40, Math.min(PACE.typingInterval, (PACE.typingInterval * 30) / keyed.length));
     const events = [];
     const shift = NAMED_KEYS.Shift;
     let t = 0;
@@ -642,7 +665,7 @@ export class HumanInput {
         shiftUp = { t, kind: "up", key: shift };
         events.push(shiftUp);
       }
-      const dwell = random(55, 120) * (mean < 70 ? 0.7 : 1);
+      const dwell = random(...PACE.keyDwell) * (mean < 70 ? 0.7 : 1);
       const upAt = t + dwell;
       events.push({ t, kind: "down", key });
       events.push({ t: upAt, kind: "up", key });
@@ -654,7 +677,7 @@ export class HumanInput {
     const sinceClick = performance.now() - (this.state.releasedAt ?? 0);
     const lead = Math.max(
       since < 1000 ? random(60, 140) - since : 0,
-      random(180, 420) - sinceClick,
+      random(...PACE.typingLead) - sinceClick,
       0,
     );
     const start = performance.now() + lead;

@@ -113,7 +113,65 @@ export const createLocators = (context: BrowserWorkerContext) => {
   });
   let nextMarker = 1;
 
-  const makeMarkerChain = async (
+  const runMarked = async (
+    state: LocatorState,
+    action: BrowserProtocolAction,
+    extra: Record<string, unknown>,
+    markScript: string,
+    markWorld: Record<string, unknown>,
+    selector: string,
+    cleanupScript: string,
+  ): Promise<unknown> => {
+    let actionError: unknown;
+    try {
+      const result = await sendChain(
+        [
+          Object.freeze({
+            action: "evaluate",
+            params: Object.freeze({
+              tabId: state.tabId,
+              ...tabGenerationParams(state.tabGeneration),
+              script: markScript,
+              ...markWorld,
+            }),
+          }),
+          Object.freeze({
+            action,
+            params: Object.freeze({
+              tabId: state.tabId,
+              ...tabGenerationParams(state.tabGeneration),
+              selector,
+              ...extra,
+            }),
+          }),
+        ],
+        Object.freeze({ abortOnError: false, waitForSelector: false }),
+        state.backend,
+      );
+      chainStepData(result, 0);
+      return chainStepData(result, 1);
+    } catch (error) {
+      actionError = error;
+      throw error;
+    } finally {
+      try {
+        await command(
+          "evaluate",
+          {
+            tabId: state.tabId,
+            ...tabGenerationParams(state.tabGeneration),
+            script: cleanupScript,
+            ...markWorld,
+          },
+          state.backend,
+        );
+      } catch (cleanupError) {
+        if (actionError === undefined) throw cleanupError;
+      }
+    }
+  };
+
+  const markWithAttribute = async (
     state: LocatorState,
     action: BrowserProtocolAction,
     extra: Record<string, unknown>,
@@ -156,51 +214,53 @@ export const createLocators = (context: BrowserWorkerContext) => {
       }
       return true;
     })()`;
-    let actionError: unknown;
+    return await runMarked(
+      state,
+      action,
+      extra,
+      script,
+      {},
+      markerSelector,
+      cleanupScript,
+    );
+  };
+
+  /**
+   * Acts on the element a filtered locator matched. The element is kept in
+   * Stella's isolated world (`stella-mark=<id>`), which the page can't see;
+   * browser services and extensions from before that existed don't know the
+   * form, so they get an attribute on the element instead.
+   */
+  const makeMarkerChain = async (
+    state: LocatorState,
+    action: BrowserProtocolAction,
+    extra: Record<string, unknown>,
+  ): Promise<unknown> => {
+    const marks = `(globalThis[Symbol.for("stella.marks")] ??= new Map())`;
+    const marker = JSON.stringify(state.marker);
     try {
-      const result = await sendChain(
-        [
-          Object.freeze({
-            action: "evaluate",
-            params: Object.freeze({
-              tabId: state.tabId,
-              ...tabGenerationParams(state.tabGeneration),
-              script,
-            }),
-          }),
-          Object.freeze({
-            action,
-            params: Object.freeze({
-              tabId: state.tabId,
-              ...tabGenerationParams(state.tabGeneration),
-              selector: markerSelector,
-              ...extra,
-            }),
-          }),
-        ],
-        Object.freeze({ abortOnError: false, waitForSelector: false }),
-        state.backend,
+      return await runMarked(
+        state,
+        action,
+        extra,
+        `(() => {
+      const element = ${queryExpression(state)}[0];
+      if (!element) throw new Error("Locator did not match an element");
+      ${marks}.set(${marker}, new WeakRef(element));
+      return true;
+    })()`,
+        { world: "isolated" },
+        `stella-mark=${state.marker}`,
+        `(${marks}.delete(${marker}), true)`,
       );
-      chainStepData(result, 0);
-      return chainStepData(result, 1);
     } catch (error) {
-      actionError = error;
-      throw error;
-    } finally {
-      try {
-        await command(
-          "evaluate",
-          {
-            tabId: state.tabId,
-            ...tabGenerationParams(state.tabGeneration),
-            script: cleanupScript,
-          },
-          state.backend,
-        );
-      } catch (cleanupError) {
-        if (actionError === undefined) throw cleanupError;
-      }
+      const message = error instanceof Error ? error.message : String(error);
+      const unsupported =
+        message.includes("stella-mark=") &&
+        /not a valid selector|Element not found/i.test(message);
+      if (!unsupported) throw error;
     }
+    return await markWithAttribute(state, action, extra);
   };
 
   class Locator implements BrowserWorkerLocator {

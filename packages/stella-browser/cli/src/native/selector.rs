@@ -551,7 +551,29 @@ fn css_match_result_expression(css_selector: &str) -> String {
     )
 }
 
+/// Selector for an element a locator marked in Stella's isolated world
+/// (`stella-mark=<id>`), instead of tagging it with an attribute the page
+/// could see.
+pub const MARK_PREFIX: &str = "stella-mark=";
+
+/// Page source for the isolated-world registry of marked elements.
+pub const MARKS_JS: &str = "(globalThis[Symbol.for('stella.marks')] ??= new Map())";
+
 fn css_match_expression(css_selector: &str, return_statement: &str) -> String {
+    if let Some(id) = css_selector.strip_prefix(MARK_PREFIX) {
+        return format!(
+            r#"(() => {{
+      const el = {marks}.get({id})?.deref();
+      if (!el || !el.isConnected) throw new Error('The element this locator matched is no longer in the page');
+      const matches = [el];
+      const blockedFrames = 0;
+      {return_statement}
+    }})()"#,
+            marks = MARKS_JS,
+            id = json_quote(id),
+            return_statement = return_statement,
+        );
+    }
     format!(
         r#"(() => {{
       {collect_roots}

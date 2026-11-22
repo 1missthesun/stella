@@ -40,6 +40,7 @@ struct InputState {
     pressed_at: Option<Instant>,
     released_at: Option<Instant>,
     last_key_at: Option<Instant>,
+    modifiers: i64,
 }
 
 static STATES: LazyLock<Mutex<HashMap<String, InputState>>> =
@@ -73,6 +74,25 @@ fn next_u64() -> u64 {
 
 fn unit() -> f64 {
     (next_u64() >> 11) as f64 / (1u64 << 53) as f64
+}
+
+/// Timing of the input model, in ms: a quick, practised user (the extension's
+/// `PACE` in `extension/lib/human-input.js` uses the same values). Typing
+/// comes out around 150-160 wpm with natural variation.
+pub mod pace {
+    pub const MOVE_BASE: f64 = 45.0;
+    pub const MOVE_PER_DOUBLING: f64 = 65.0;
+    pub const MOVE_MAX: f64 = 420.0;
+    pub const SETTLE: (f64, f64) = (25.0, 70.0);
+    pub const HOLD: (f64, f64) = (40.0, 90.0);
+    pub const AFTER_KEYS: (f64, f64) = (90.0, 220.0);
+    pub const TYPING_LEAD: (f64, f64) = (110.0, 260.0);
+    pub const TYPING_INTERVAL: f64 = 85.0;
+    pub const KEY_DWELL: (f64, f64) = (45.0, 100.0);
+}
+
+fn between(range: (f64, f64)) -> f64 {
+    random(range.0, range.1)
 }
 
 pub fn random(min: f64, max: f64) -> f64 {
@@ -119,7 +139,9 @@ pub fn trajectory(from: Point, to: Point) -> Vec<(Point, f64)> {
     if distance < 2.0 {
         return Vec::new();
     }
-    let duration = ((60.0 + 80.0 * (distance / 40.0 + 1.0).log2()) * random(0.85, 1.15)).min(520.0);
+    let duration = ((pace::MOVE_BASE + pace::MOVE_PER_DOUBLING * (distance / 40.0 + 1.0).log2())
+        * random(0.85, 1.15))
+    .min(pace::MOVE_MAX);
     let normal = Point {
         x: -dy / distance,
         y: dx / distance,
@@ -333,10 +355,11 @@ pub async fn move_to(
 ) -> Result<Point, String> {
     sync_document(client, session_id).await;
     let last_key = with_state(session_id, |s| s.last_key_at);
-    sleep_ms(random(140.0, 380.0) - since_ms(last_key)).await;
+    sleep_ms(between(pace::AFTER_KEYS) - since_ms(last_key)).await;
     let bounds = viewport(client, session_id).await;
     let target = if exact { to } else { aim(session_id, to, size) };
     let from = start_point(with_state(session_id, |s| s.pointer), target, bounds);
+    let modifiers = with_state(session_id, |s| s.modifiers);
     for (point, delay) in trajectory(from, target) {
         let p = clamp_point(point, bounds);
         pace(
@@ -344,14 +367,14 @@ pub async fn move_to(
             session_id,
             delay,
             "Input.dispatchMouseEvent",
-            json!({ "type": "mouseMoved", "x": p.x, "y": p.y, "button": "none", "buttons": 0 }),
+            json!({ "type": "mouseMoved", "x": p.x, "y": p.y, "button": "none", "buttons": 0, "modifiers": modifiers }),
         )
         .await;
     }
     client
         .send_command(
             "Input.dispatchMouseEvent",
-            Some(json!({ "type": "mouseMoved", "x": target.x, "y": target.y, "button": "none", "buttons": 0 })),
+            Some(json!({ "type": "mouseMoved", "x": target.x, "y": target.y, "button": "none", "buttons": 0, "modifiers": modifiers })),
             Some(session_id),
         )
         .await?;
@@ -380,26 +403,27 @@ pub async fn press_release(
 ) -> Result<(), String> {
     let at = with_state(session_id, |s| s.pointer).unwrap_or(Point { x: 0.0, y: 0.0 });
     let bit = button_bit(button);
+    let modifiers = with_state(session_id, |s| s.modifiers);
     for n in 1..=click_count.max(1) {
         let arrived = with_state(session_id, |s| s.arrived_at);
         if n == 1 {
-            sleep_ms(random(40.0, 110.0) - since_ms(arrived).min(1000.0)).await;
+            sleep_ms(between(pace::SETTLE) - since_ms(arrived).min(1000.0)).await;
         } else {
             sleep_ms(random(60.0, 120.0)).await;
         }
         client
             .send_command(
                 "Input.dispatchMouseEvent",
-                Some(json!({ "type": "mousePressed", "x": at.x, "y": at.y, "button": button, "buttons": bit, "clickCount": n })),
+                Some(json!({ "type": "mousePressed", "x": at.x, "y": at.y, "button": button, "buttons": bit, "clickCount": n, "modifiers": modifiers })),
                 Some(session_id),
             )
             .await?;
         with_state(session_id, |s| s.pressed_at = Some(Instant::now()));
-        sleep_ms(random(45.0, 110.0)).await;
+        sleep_ms(between(pace::HOLD)).await;
         client
             .send_command(
                 "Input.dispatchMouseEvent",
-                Some(json!({ "type": "mouseReleased", "x": at.x, "y": at.y, "button": button, "buttons": 0, "clickCount": n })),
+                Some(json!({ "type": "mouseReleased", "x": at.x, "y": at.y, "button": button, "buttons": 0, "clickCount": n, "modifiers": modifiers })),
                 Some(session_id),
             )
             .await?;
@@ -548,8 +572,9 @@ pub async fn type_text(
         return Ok(());
     }
     let keyed = &chars[..chars.len().min(KEYED_LIMIT)];
-    let mean =
-        mean_interval_ms.unwrap_or_else(|| (115.0 * 30.0 / keyed.len() as f64).clamp(40.0, 115.0));
+    let mean = mean_interval_ms.unwrap_or_else(|| {
+        (pace::TYPING_INTERVAL * 30.0 / keyed.len() as f64).clamp(40.0, pace::TYPING_INTERVAL)
+    });
     let mut events: Vec<(f64, TimedEvent)> = Vec::new();
     let mut t = 0.0;
     let mut shift_up: Option<usize> = None;
@@ -598,7 +623,7 @@ pub async fn type_text(
             ));
             shift_up = Some(events.len() - 1);
         }
-        let dwell = random(55.0, 120.0) * if mean < 70.0 { 0.7 } else { 1.0 };
+        let dwell = between(pace::KEY_DWELL) * if mean < 70.0 { 0.7 } else { 1.0 };
         let up_at = t + dwell;
         events.push((
             t,
@@ -630,7 +655,7 @@ pub async fn type_text(
         } else {
             0.0
         },
-        random(180.0, 420.0) - since_ms(released),
+        between(pace::TYPING_LEAD) - since_ms(released),
         0.0,
     ]
     .into_iter()
@@ -706,6 +731,32 @@ pub async fn type_text(
             )
             .await?;
     }
+    Ok(())
+}
+
+/// Holds or releases the key that adds a click to a selection (Cmd on macOS, Ctrl elsewhere).
+pub async fn toggle_modifier(client: &CdpClient, session_id: &str, down: bool) -> Result<(), String> {
+    let (key, code, key_code, bit) = if cfg!(target_os = "macos") {
+        ("Meta", "MetaLeft", 91, 4)
+    } else {
+        ("Control", "ControlLeft", 17, 2)
+    };
+    if down {
+        sleep_ms(random(40.0, 110.0)).await;
+    } else {
+        sleep_ms(between(pace::SETTLE)).await;
+    }
+    let modifiers = with_state(session_id, |s| {
+        s.modifiers = if down { s.modifiers | bit } else { s.modifiers & !bit };
+        s.modifiers
+    });
+    client
+        .send_command(
+            "Input.dispatchKeyEvent",
+            Some(json!({ "type": if down { "rawKeyDown" } else { "keyUp" }, "key": key, "code": code, "windowsVirtualKeyCode": key_code, "nativeVirtualKeyCode": key_code, "modifiers": modifiers, "location": 1 })),
+            Some(session_id),
+        )
+        .await?;
     Ok(())
 }
 

@@ -1,3 +1,4 @@
+import { AIM_POINT_SOURCE } from "./aim.js";
 import {
   ensureDebugger,
   onCdpEvent,
@@ -334,12 +335,14 @@ export async function exactElementPoint(
     if (${scroll}) el.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height) throw new Error('Element has no clickable area');
-    const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
-    const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+    const cx = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+    const cy = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
     const root = el.getRootNode();
-    const hit = (root.elementFromPoint ? root : document).elementFromPoint(x, y);
-    if (!${boxOnly} && (!hit || hit !== el && !el.contains(hit))) throw new Error('Element is occluded');
-    return {x,y,left:rect.left,top:rect.top,width:rect.width,height:rect.height};
+    const hitSource = root.elementFromPoint ? root : document;
+    ${AIM_POINT_SOURCE}
+    const aim = ${boxOnly} ? { x: cx, y: cy } : aimPoint(el, rect, hitSource, innerWidth, innerHeight);
+    if (!aim) throw new Error('Element is occluded');
+    return {x:aim.x,y:aim.y,cx,cy,left:rect.left,top:rect.top,width:rect.width,height:rect.height};
   `,
   );
   for (const owner of owners) {
@@ -363,6 +366,8 @@ export async function exactElementPoint(
       ...point,
       x: geometry.x,
       y: geometry.y,
+      cx: point.cx + geometry.dx,
+      cy: point.cy + geometry.dy,
       left: point.left + geometry.dx,
       top: point.top + geometry.dy,
     };

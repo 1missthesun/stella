@@ -280,9 +280,24 @@ export function resolveSelector(selector, ownerId, tabId) {
   return { css: selector, isRef: false };
 }
 
+/**
+ * `stella-mark=<id>` names an element a locator marked in Stella's isolated
+ * world, instead of tagging it with an attribute the page could see.
+ */
+export const MARK_PREFIX = "stella-mark=";
+
 export function buildComposedCssMatcherAllScript(selector) {
   if (typeof selector !== "string" || selector.length === 0) {
     throw new Error("CSS selector must be a non-empty string");
+  }
+  if (selector.startsWith(MARK_PREFIX)) {
+    return `
+    (() => {
+      const el = globalThis[Symbol.for("stella.marks")]?.get(${JSON.stringify(selector.slice(MARK_PREFIX.length))})?.deref();
+      if (!el || !el.isConnected) throw new Error("The element this locator matched is no longer in the page");
+      return [el];
+    })()
+  `;
   }
 
   return `

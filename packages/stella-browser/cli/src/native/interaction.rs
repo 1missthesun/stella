@@ -9,8 +9,12 @@ use super::human::{self, Point};
 pub struct ActionablePoint {
     pub object_id: String,
     pub session_id: String,
+    /// Where to point: a human-like spot on the element.
     pub x: f64,
     pub y: f64,
+    /// The centre of its visible part, to tell whether it moved.
+    pub cx: f64,
+    pub cy: f64,
 }
 
 const ACTIONABILITY_TIMEOUT_MS: u64 = 2500;
@@ -253,33 +257,35 @@ const ACTIONABILITY_CHECK_JS: &str = r#"function(requireHit, scopedFrame) {
             },
         });
     }
-    if (!requireHit) return { status: 'ok', x: point.x, y: point.y };
+    if (!requireHit) return { status: 'ok', x: point.x, y: point.y, cx: point.x, cy: point.y };
     const describeHit = describeNode;
-    let hit = doc.elementFromPoint(lp.x, lp.y);
-    // Descend through open shadow roots to the deepest hit target.
-    while (hit && hit.shadowRoot) {
-        const inner = hit.shadowRoot.elementFromPoint(lp.x, lp.y);
-        if (!inner || inner === hit) break;
-        hit = inner;
-    }
-    if (!hit) return fail('covered', { by: 'unknown element', x: round(point.x), y: round(point.y) });
-    let related = false;
-    let node = hit;
-    while (node) {
-        if (node === el) { related = true; break; }
-        const root = node.getRootNode ? node.getRootNode() : null;
-        node = node.parentElement || (root && root.host ? root.host : null);
-    }
-    if (!related && el.contains(hit)) related = true;
-    if (!related && hit.contains(el)) related = true;
-    if (!related) {
+    const hitAt = (x, y) => {
+        let hit = doc.elementFromPoint(x, y);
+        // Descend through open shadow roots to the deepest hit target.
+        while (hit && hit.shadowRoot) {
+            const inner = hit.shadowRoot.elementFromPoint(x, y);
+            if (!inner || inner === hit) break;
+            hit = inner;
+        }
+        return hit;
+    };
+    const relatedTo = hit => {
+        let node = hit;
+        while (node) {
+            if (node === el) return true;
+            const root = node.getRootNode ? node.getRootNode() : null;
+            node = node.parentElement || (root && root.host ? root.host : null);
+        }
+        if (el.contains(hit) || hit.contains(el)) return true;
         // A <label> hit that targets this control still delivers the click.
         const label = hit.closest ? hit.closest('label') : null;
-        if (label && label.control === el) related = true;
+        if (label && label.control === el) return true;
         const ownLabel = el.closest ? el.closest('label') : null;
-        if (ownLabel && (ownLabel === hit || ownLabel.contains(hit))) related = true;
-    }
-    if (!related) return fail('covered', {
+        return !!ownLabel && (ownLabel === hit || ownLabel.contains(hit));
+    };
+    const hit = hitAt(lp.x, lp.y);
+    if (!hit) return fail('covered', { by: 'unknown element', x: round(point.x), y: round(point.y) });
+    if (!relatedTo(hit)) return fail('covered', {
         by: describeHit(hit),
         x: round(point.x),
         y: round(point.y),
@@ -315,7 +321,30 @@ const ACTIONABILITY_CHECK_JS: &str = r#"function(requireHit, scopedFrame) {
         }
         w = parentDoc.defaultView;
     }
-    return { status: 'ok', x: point.x, y: point.y };
+    // Where a person would click: spread over the visible part like real
+    // clicks, a few pixels inside its edges, away from the exact centre that
+    // bot checks look for, and still on the element.
+    const gauss = () => {
+        let u = 0, v = 0;
+        while (!u) u = Math.random();
+        while (!v) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    };
+    const r = el.getBoundingClientRect();
+    const left = Math.max(r.left, 0), right = Math.min(r.right, vw - 1);
+    const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, vh - 1);
+    const roomX = Math.max(0, (right - left) / 2 - 3), roomY = Math.max(0, (bottom - top) / 2 - 3);
+    const centreX = r.left + r.width / 2, centreY = r.top + r.height / 2;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+        const x = (left + right) / 2 + Math.max(-roomX, Math.min(roomX, gauss() * (right - left) * 0.18));
+        const y = (top + bottom) / 2 + Math.max(-roomY, Math.min(roomY, gauss() * (bottom - top) * 0.2));
+        if (Math.abs(x - centreX) <= 4 && Math.abs(y - centreY) <= 4 && (roomX > 6 || roomY > 6)) continue;
+        const aimed = hitAt(x, y);
+        if (!aimed || !relatedTo(aimed)) continue;
+        const aimedTop = toTop(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
+        if (aimedTop) return { status: 'ok', x: aimedTop.x, y: aimedTop.y, cx: point.x, cy: point.y };
+    }
+    return { status: 'ok', x: point.x, y: point.y, cx: point.x, cy: point.y };
 }"#;
 
 fn actionability_diagnostic_suffix(details: Option<&Value>) -> String {
@@ -546,19 +575,24 @@ async fn actionability_check_once(
         .unwrap_or("unknown");
 
     if status == "ok" {
-        let x = value.get("x").and_then(|v| v.as_f64());
-        let y = value.get("y").and_then(|v| v.as_f64());
-        if let (Some(x), Some(y)) = (x, y) {
-            let (x, y) = if let Some(scope) = frame_scope {
-                translate_frame_point(client, scope, x, y, require_hit).await?
+        let field = |name: &str| value.get(name).and_then(Value::as_f64);
+        if let (Some(x), Some(y)) = (field("x"), field("y")) {
+            let (cx, cy) = (field("cx").unwrap_or(x), field("cy").unwrap_or(y));
+            let ((x, y), (cx, cy)) = if let Some(scope) = frame_scope {
+                (
+                    translate_frame_point(client, scope, x, y, require_hit).await?,
+                    translate_frame_point(client, scope, cx, cy, false).await?,
+                )
             } else {
-                (x, y)
+                ((x, y), (cx, cy))
             };
             return Ok(Ok(ActionablePoint {
                 object_id,
                 session_id: session_id.to_string(),
                 x,
                 y,
+                cx,
+                cy,
             }));
         }
     }
@@ -719,8 +753,7 @@ pub async fn click(
         session_id,
         ref_map,
         selector_or_ref,
-        point.x,
-        point.y,
+        &point,
         button,
         click_count,
     )
@@ -751,7 +784,7 @@ pub async fn hover(
             y: point.y,
         },
         None,
-        false,
+        true,
     )
     .await?;
     Ok(())
@@ -891,8 +924,7 @@ async fn focus_by_click(
             session_id,
             ref_map,
             selector_or_ref,
-            hit.x,
-            hit.y,
+            &hit,
             "left",
             1,
         )
@@ -1258,6 +1290,9 @@ async fn scroll_directly(
     Ok(())
 }
 
+/// Chooses options the way a person does with a closed dropdown: focus it and
+/// type the option's label. Lists, multiple choices and labels typing can't
+/// reach (duplicates) are set directly, with the events a change fires.
 pub async fn select_option(
     client: &CdpClient,
     session_id: &str,
@@ -1267,35 +1302,142 @@ pub async fn select_option(
 ) -> Result<(), String> {
     let point = wait_for_actionable(client, session_id, ref_map, selector_or_ref, false).await?;
     let session_id = point.session_id.as_str();
-    let object_id = point.object_id;
+    let object_id = point.object_id.as_str();
+    let values_js = serde_json::to_string(values).unwrap_or_else(|_| "[]".into());
 
-    let js = r#"function(vals) {
+    let plan = call_on(
+        client,
+        session_id,
+        object_id,
+        &format!(
+            r#"function() {{
+            const values = {values_js};
+            if (!this.options) throw new Error('Element is not a <select>');
             const options = Array.from(this.options);
-            for (const opt of options) {
-                opt.selected = vals.includes(opt.value) || vals.includes(opt.textContent.trim());
-            }
-            this.dispatchEvent(new Event('change', { bubbles: true }));
-        }"#
-    .to_string();
+            const matches = options.filter((o) => values.includes(o.value) || values.includes(o.textContent.trim()));
+            const label = matches[0] ? matches[0].textContent.trim() : '';
+            const sameLabel = options.filter((o) => o.textContent.trim().toLowerCase() === label.toLowerCase()).length;
+            const done = matches.length > 0 && matches.every((o) => o.selected) && options.filter((o) => o.selected).length === matches.length;
+            return {{ multiple: this.multiple, listbox: this.size > 1, disabled: this.disabled, label, sameLabel, done, value: matches[0] ? matches[0].value : null, indices: matches.map((o) => o.index) }};
+        }}"#
+        ),
+    )
+    .await?;
+    if plan["done"].as_bool().unwrap_or(false) {
+        return Ok(());
+    }
 
-    client
-        .send_command_typed::<_, Value>(
-            "Runtime.callFunctionOn",
-            &CallFunctionOnParams {
-                function_declaration: js,
-                object_id: Some(object_id),
-                arguments: Some(vec![CallArgument {
-                    value: Some(serde_json::json!(values)),
-                    object_id: None,
-                }]),
-                return_by_value: Some(true),
-                await_promise: Some(false),
-            },
-            Some(session_id),
-        )
-        .await?;
+    let typeable = values.len() == 1
+        && !plan["multiple"].as_bool().unwrap_or(true)
+        && !plan["listbox"].as_bool().unwrap_or(true)
+        && !plan["disabled"].as_bool().unwrap_or(true)
+        && plan["sameLabel"].as_u64() == Some(1);
+    if let (true, Some(label)) = (typeable, plan["label"].as_str().filter(|l| !l.is_empty())) {
+        human::move_to(client, session_id, Point { x: point.x, y: point.y }, None, false).await?;
+        call_on(client, session_id, object_id, "function() { this.focus(); return true; }").await?;
+        human::type_text(client, session_id, label, Some(60.0)).await?;
+        let chosen = call_on(client, session_id, object_id, "function() { return this.value; }").await?;
+        if chosen == plan["value"] {
+            return Ok(());
+        }
+    }
 
+    let list = plan["multiple"].as_bool().unwrap_or(false) || plan["listbox"].as_bool().unwrap_or(false);
+    let indices = plan["indices"].clone();
+    let count = indices.as_array().map_or(0, Vec::len);
+    let clickable = list
+        && !plan["disabled"].as_bool().unwrap_or(true)
+        && count > 0
+        && (count == 1 || plan["multiple"].as_bool().unwrap_or(false));
+    if clickable && click_list_options(client, session_id, object_id, &point, &indices).await? {
+        return Ok(());
+    }
+
+    call_on(
+        client,
+        session_id,
+        object_id,
+        &format!(
+            r#"function() {{
+            const values = {values_js};
+            for (const option of this.options) {{
+                option.selected = values.includes(option.value) || values.includes(option.textContent.trim());
+            }}
+            this.dispatchEvent(new Event('input', {{ bubbles: true, composed: true }}));
+            this.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            return true;
+        }}"#
+        ),
+    )
+    .await?;
     Ok(())
+}
+
+/// Clicks the wanted rows of a list box like a person: a plain click on the first, then
+/// Cmd/Ctrl-click on the rest. Returns false when a row is scrolled out of the box or the
+/// clicks did not produce the wanted selection.
+async fn click_list_options(
+    client: &CdpClient,
+    session_id: &str,
+    object_id: &str,
+    select: &ActionablePoint,
+    indices: &Value,
+) -> Result<bool, String> {
+    let rows = call_on(
+        client,
+        session_id,
+        object_id,
+        &format!(
+            r#"function() {{
+            const box = this.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const cx = (Math.max(box.left, 0) + Math.min(box.right, vw)) / 2;
+            const cy = (Math.max(box.top, 0) + Math.min(box.bottom, vh)) / 2;
+            const top = Math.max(box.top + this.clientTop, 0), bottom = Math.min(box.top + this.clientTop + this.clientHeight, vh);
+            const left = Math.max(box.left + this.clientLeft, 0), right = Math.min(box.left + this.clientLeft + this.clientWidth, vw);
+            const rows = {indices}.map((i) => {{
+                const r = this.options[i].getBoundingClientRect();
+                if (r.height < 4 || r.top < top || r.bottom > bottom) return null;
+                const from = Math.max(r.left, left), width = Math.min(r.right, right) - from;
+                if (width < 8) return null;
+                return {{ dx: from + width * (0.12 + Math.random() * 0.5) - cx, dy: r.top + r.height * (0.3 + Math.random() * 0.4) - cy }};
+            }});
+            return rows.every(Boolean) ? rows : null;
+        }}"#
+        ),
+    )
+    .await?;
+    let Some(rows) = rows.as_array() else {
+        return Ok(false);
+    };
+    for (n, row) in rows.iter().enumerate() {
+        let (Some(dx), Some(dy)) = (row["dx"].as_f64(), row["dy"].as_f64()) else {
+            return Ok(false);
+        };
+        if n == 1 {
+            human::toggle_modifier(client, session_id, true).await?;
+        }
+        let clicked = async {
+            human::move_to(client, session_id, Point { x: select.cx + dx, y: select.cy + dy }, None, true).await?;
+            human::press_release(client, session_id, "left", 1).await
+        }
+        .await;
+        if clicked.is_err() && n >= 1 {
+            let _ = human::toggle_modifier(client, session_id, false).await;
+        }
+        clicked?;
+    }
+    if rows.len() > 1 {
+        human::toggle_modifier(client, session_id, false).await?;
+    }
+    let picked = call_on(
+        client,
+        session_id,
+        object_id,
+        "function() { return Array.from(this.selectedOptions).map((o) => o.index); }",
+    )
+    .await?;
+    Ok(&picked == indices)
 }
 
 pub async fn check(
@@ -1514,6 +1656,7 @@ pub async fn scroll_into_view(
     ref_map: &RefMap,
     selector_or_ref: &str,
 ) -> Result<(), String> {
+    wheel_into_view(client, session_id, ref_map, selector_or_ref).await;
     let (object_id, session_id) =
         resolve_element_object_id(client, session_id, ref_map, selector_or_ref).await?;
 
@@ -1521,9 +1664,13 @@ pub async fn scroll_into_view(
         .send_command_typed::<_, Value>(
             "Runtime.callFunctionOn",
             &CallFunctionOnParams {
-                function_declaration:
-                    "function() { this.scrollIntoView({ block: 'center', inline: 'center' }); }"
-                        .to_string(),
+                function_declaration: r#"function() {
+                    const r = this.getBoundingClientRect();
+                    const win = this.ownerDocument.defaultView;
+                    if (r.top >= 0 && r.left >= 0 && r.bottom <= win.innerHeight && r.right <= win.innerWidth) return;
+                    this.scrollIntoView({ block: 'center', inline: 'center' });
+                }"#
+                .to_string(),
                 object_id: Some(object_id),
                 arguments: None,
                 return_by_value: Some(true),
@@ -1648,17 +1795,26 @@ async fn dispatch_click(
     session_id: &str,
     ref_map: &RefMap,
     selector_or_ref: &str,
-    x: f64,
-    y: f64,
+    target: &ActionablePoint,
     button: &str,
     click_count: i32,
 ) -> Result<(), String> {
-    human::move_to(client, session_id, Point { x, y }, None, false).await?;
+    human::move_to(
+        client,
+        session_id,
+        Point {
+            x: target.x,
+            y: target.y,
+        },
+        None,
+        true,
+    )
+    .await?;
 
     if ref_frame_scope(ref_map, selector_or_ref).is_some() {
         let point =
             actionability_check_once(client, session_id, ref_map, selector_or_ref, true).await??;
-        if (point.x - x).abs() > 0.5 || (point.y - y).abs() > 0.5 {
+        if (point.cx - target.cx).abs() > 0.5 || (point.cy - target.cy).abs() > 0.5 {
             return Err("AX target moved while the cursor travelled. Capture a new snapshot before clicking.".into());
         }
     }

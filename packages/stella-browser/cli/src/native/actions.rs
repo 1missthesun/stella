@@ -1596,6 +1596,12 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
         }
     }
 
+    if action == "console" || action == "errors" {
+        if let Some(ref browser) = state.browser {
+            let _ = browser.observe_console().await;
+        }
+    }
+
     let (pending_acks, new_targets, destroyed_targets, fetch_paused) = state.drain_cdp_events();
     // Bodies are read here rather than at har_stop because a navigation clears
     // the CDP buffer, which would silently drop every payload recorded before it.
@@ -3609,7 +3615,18 @@ async fn handle_evaluate(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
         .and_then(|v| v.as_str())
         .ok_or("Missing 'script' parameter")?;
 
-    let result = mgr.evaluate(script, None).await?;
+    let session_id = mgr.active_session_id()?.to_string();
+    let requested = cmd.get("world").and_then(Value::as_str);
+    let main_world =
+        super::world::agent_script_in_main_world(&mgr.client, &session_id, script, requested).await;
+    let result = match mgr.evaluate_in(script, main_world).await {
+        Err(error)
+            if !main_world && requested.is_none() && super::world::needs_page_world(&error) =>
+        {
+            mgr.evaluate_in(script, true).await?
+        }
+        result => result?,
+    };
     let url = mgr.active_url_cached();
     Ok(json!({ "result": result, "origin": url }))
 }
@@ -3623,7 +3640,15 @@ async fn handle_evaluate_detached(cmd: &Value, state: &DaemonState) -> Result<Va
         .get("script")
         .and_then(Value::as_str)
         .ok_or("Missing 'script' parameter")?;
-    mgr.evaluate_detached(script).await?;
+    let session_id = mgr.active_session_id()?.to_string();
+    let main_world = super::world::agent_script_in_main_world(
+        &mgr.client,
+        &session_id,
+        script,
+        cmd.get("world").and_then(Value::as_str),
+    )
+    .await;
+    mgr.evaluate_detached(script, main_world).await?;
     Ok(json!({ "scheduled": true, "origin": mgr.active_url_cached() }))
 }
 
@@ -4415,12 +4440,15 @@ async fn wait_for_function(
     timeout_ms: u64,
 ) -> Result<(), String> {
     let check_fn = format!("!!({})", fn_str);
-    poll_until_true(
+    let main_world =
+        super::world::agent_script_in_main_world(client, session_id, fn_str, None).await;
+    poll_until_true_in(
         client,
         session_id,
         &check_fn,
         timeout_ms,
         "page function to return true",
+        main_world,
     )
     .await
 }
@@ -4488,23 +4516,43 @@ async fn poll_until_true(
     timeout_ms: u64,
     expectation: &str,
 ) -> Result<(), String> {
+    poll_until_true_in(
+        client,
+        session_id,
+        expression,
+        timeout_ms,
+        expectation,
+        false,
+    )
+    .await
+}
+
+async fn poll_until_true_in(
+    client: &super::cdp::client::CdpClient,
+    session_id: &str,
+    expression: &str,
+    timeout_ms: u64,
+    expectation: &str,
+    main_world: bool,
+) -> Result<(), String> {
     let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_millis(timeout_ms);
     let probe_expression = wait_observation_expression(expression);
     let mut last_observation: Option<Value> = None;
     let mut last_transport_error: Option<String>;
 
     loop {
+        let mut params = json!({
+            "expression": probe_expression,
+            "returnByValue": true,
+            "awaitPromise": true,
+        });
+        if main_world {
+            params[super::cdp::client::MAIN_WORLD_PARAM] = Value::Bool(true);
+        }
         let result: Result<super::cdp::types::EvaluateResult, String> = client
-            .send_command_typed(
-                "Runtime.evaluate",
-                &super::cdp::types::EvaluateParams {
-                    expression: probe_expression.clone(),
-                    return_by_value: Some(true),
-                    await_promise: Some(true),
-                },
-                Some(session_id),
-            )
-            .await;
+            .send_command("Runtime.evaluate", Some(params), Some(session_id))
+            .await
+            .and_then(|value| serde_json::from_value(value).map_err(|error| error.to_string()));
 
         match result {
             Ok(result) => {
@@ -6029,20 +6077,14 @@ async fn handle_waitforfunction(cmd: &Value, state: &DaemonState) -> Result<Valu
 
     wait_for_function(&mgr.client, &session_id, expression, timeout_ms).await?;
 
-    let result: super::cdp::types::EvaluateResult = mgr
-        .client
-        .send_command_typed(
-            "Runtime.evaluate",
-            &super::cdp::types::EvaluateParams {
-                expression: format!("({})", expression),
-                return_by_value: Some(true),
-                await_promise: Some(true),
-            },
-            Some(&session_id),
-        )
-        .await?;
+    let main_world =
+        super::world::agent_script_in_main_world(&mgr.client, &session_id, expression, None).await;
+    let result = mgr
+        .evaluate_in(&format!("({})", expression), main_world)
+        .await
+        .unwrap_or(Value::Null);
 
-    Ok(json!({ "result": result.result.value.unwrap_or(Value::Null) }))
+    Ok(json!({ "result": result }))
 }
 
 async fn handle_frame(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
@@ -6244,7 +6286,6 @@ async fn handle_getbytestid(cmd: &Value, state: &mut DaemonState) -> Result<Valu
 
 async fn handle_nth(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
     let selector = cmd
         .get("selector")
         .and_then(|v| v.as_str())
@@ -6254,53 +6295,39 @@ async fn handle_nth(cmd: &Value, state: &mut DaemonState) -> Result<Value, Strin
         .and_then(|v| v.as_i64())
         .ok_or("Missing 'index' parameter")?;
 
+    static NEXT_MARK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let mark = format!(
+        "nth-{}",
+        NEXT_MARK.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    let marks = super::selector::MARKS_JS;
+    let mark_literal = serde_json::to_string(&mark).unwrap_or_default();
     let js = format!(
         r#"(() => {{
             const els = document.querySelectorAll({sel});
             const idx = {idx} < 0 ? els.length + {idx} : {idx};
             if (idx < 0 || idx >= els.length) return false;
-            els[idx].setAttribute('data-stella-browser-located', 'true');
+            {marks}.set({mark_literal}, new WeakRef(els[idx]));
             return true;
         }})()"#,
         sel = serde_json::to_string(selector).unwrap_or_default(),
         idx = index,
     );
 
-    let result: super::cdp::types::EvaluateResult = mgr
-        .client
-        .send_command_typed(
-            "Runtime.evaluate",
-            &super::cdp::types::EvaluateParams {
-                expression: js,
-                return_by_value: Some(true),
-                await_promise: Some(false),
-            },
-            Some(&session_id),
-        )
-        .await?;
-
-    if !result
-        .result
-        .value
-        .as_ref()
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
+    let found = mgr.evaluate(&js, None).await?;
+    if found != Value::Bool(true) {
         return Err(format!(
             "No element at index {} for selector '{}'",
             index, selector
         ));
     }
 
-    let located = "[data-stella-browser-located='true']";
-    let action_result = execute_subaction(cmd, state, located).await;
+    let located = format!("{}{}", super::selector::MARK_PREFIX, mark);
+    let action_result = execute_subaction(cmd, state, &located).await;
 
     if let Some(ref browser) = state.browser {
         let _ = browser
-            .evaluate(
-                "document.querySelector('[data-stella-browser-located]')?.removeAttribute('data-stella-browser-located')",
-                None,
-            )
+            .evaluate(&format!("{marks}.delete({mark_literal})"), None)
             .await;
     }
 
@@ -6340,18 +6367,18 @@ async fn handle_evalhandle(cmd: &Value, state: &DaemonState) -> Result<Value, St
         .and_then(|v| v.as_str())
         .ok_or("Missing 'script' parameter")?;
 
-    let result: super::cdp::types::EvaluateResult = mgr
-        .client
-        .send_command_typed(
-            "Runtime.evaluate",
-            &super::cdp::types::EvaluateParams {
-                expression: script.to_string(),
-                return_by_value: Some(false),
-                await_promise: Some(true),
-            },
-            Some(&session_id),
-        )
-        .await?;
+    let main_world =
+        super::world::agent_script_in_main_world(&mgr.client, &session_id, script, None).await;
+    let mut params = json!({ "expression": script, "returnByValue": false, "awaitPromise": true });
+    if main_world {
+        params[super::cdp::client::MAIN_WORLD_PARAM] = Value::Bool(true);
+    }
+    let result: super::cdp::types::EvaluateResult = serde_json::from_value(
+        mgr.client
+            .send_command("Runtime.evaluate", Some(params), Some(&session_id))
+            .await?,
+    )
+    .map_err(|error| error.to_string())?;
 
     let handle = result.result.object_id.unwrap_or_default();
     Ok(json!({ "handle": handle }))

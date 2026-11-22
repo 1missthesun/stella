@@ -50,6 +50,7 @@ pub mod stream;
 pub mod tracing;
 #[allow(dead_code)]
 pub mod webdriver;
+pub mod world;
 
 #[cfg(test)]
 mod contract_tests;

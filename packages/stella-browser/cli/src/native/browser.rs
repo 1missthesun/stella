@@ -599,10 +599,17 @@ impl BrowserManager {
         self.enable_domains(session_id).await
     }
 
+    // Runtime.enable makes the page's console.log(error) read Error.prepareStackTrace, which bot
+    // detectors use to spot an attached debugger, so it is only enabled when console output is asked for.
     async fn enable_domains(&self, session_id: &str) -> Result<(), String> {
         self.client
             .send_command_no_params("Page.enable", Some(session_id))
             .await?;
+        Ok(())
+    }
+
+    pub async fn observe_console(&self) -> Result<(), String> {
+        let session_id = self.active_session_id()?;
         self.client
             .send_command_no_params("Runtime.enable", Some(session_id))
             .await?;
@@ -792,57 +799,61 @@ impl BrowserManager {
     }
 
     pub async fn evaluate(&self, script: &str, _args: Option<Value>) -> Result<Value, String> {
-        let session_id = self.active_session_id()?.to_string();
-
-        let result: EvaluateResult = self
-            .client
-            .send_command_typed(
-                "Runtime.evaluate",
-                &EvaluateParams {
-                    expression: script.to_string(),
-                    return_by_value: Some(true),
-                    await_promise: Some(true),
-                },
-                Some(&session_id),
-            )
-            .await?;
-
-        if let Some(ref details) = result.exception_details {
-            let msg = details
-                .exception
-                .as_ref()
-                .and_then(|e| e.description.as_deref())
-                .unwrap_or(&details.text);
-            return Err(format!("Evaluation error: {}", msg));
-        }
-
-        Ok(result.result.value.unwrap_or(Value::Null))
+        self.evaluate_in(script, false).await
     }
 
-    pub async fn evaluate_detached(&self, script: &str) -> Result<(), String> {
+    /// Evaluates in Stella's isolated world, or the page's own when
+    /// `main_world` (see `world::agent_script_in_main_world`).
+    pub async fn evaluate_in(&self, script: &str, main_world: bool) -> Result<Value, String> {
         let session_id = self.active_session_id()?.to_string();
-        let result: EvaluateResult = self
+        let result = self
             .client
-            .send_command_typed(
+            .send_command(
                 "Runtime.evaluate",
-                &EvaluateParams {
-                    expression: script.to_string(),
-                    return_by_value: Some(false),
-                    await_promise: Some(false),
-                },
+                Some(Self::evaluate_params(script, true, true, main_world)),
                 Some(&session_id),
             )
             .await?;
+        if let Some(message) = exception_message(&result) {
+            return Err(format!("Evaluation error: {}", message));
+        }
+        Ok(result
+            .pointer("/result/value")
+            .cloned()
+            .unwrap_or(Value::Null))
+    }
 
-        if let Some(ref details) = result.exception_details {
-            let message = details
-                .exception
-                .as_ref()
-                .and_then(|exception| exception.description.as_deref())
-                .unwrap_or(&details.text);
+    pub async fn evaluate_detached(&self, script: &str, main_world: bool) -> Result<(), String> {
+        let session_id = self.active_session_id()?.to_string();
+        let result = self
+            .client
+            .send_command(
+                "Runtime.evaluate",
+                Some(Self::evaluate_params(script, false, false, main_world)),
+                Some(&session_id),
+            )
+            .await?;
+        if let Some(message) = exception_message(&result) {
             return Err(format!("Detached evaluation error: {}", message));
         }
         Ok(())
+    }
+
+    fn evaluate_params(
+        script: &str,
+        by_value: bool,
+        await_promise: bool,
+        main_world: bool,
+    ) -> Value {
+        let mut params = serde_json::json!({
+            "expression": script,
+            "returnByValue": by_value,
+            "awaitPromise": await_promise,
+        });
+        if main_world {
+            params[super::cdp::client::MAIN_WORLD_PARAM] = Value::Bool(true);
+        }
+        params
     }
 
     async fn evaluate_simple(&self, expression: &str) -> Result<Value, String> {
@@ -2392,4 +2403,16 @@ fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) {
             });
         }
     });
+}
+
+fn exception_message(result: &Value) -> Option<String> {
+    let details = result.get("exceptionDetails")?;
+    Some(
+        details
+            .pointer("/exception/description")
+            .or_else(|| details.get("text"))
+            .and_then(Value::as_str)
+            .unwrap_or("Uncaught")
+            .to_string(),
+    )
 }

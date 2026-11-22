@@ -9,6 +9,7 @@ import {
 import { ensureDebugger, evaluateRuntime } from "../lib/debugger.js";
 import { callExactElement, exactElementPoint } from "../lib/frame-elements.js";
 import { trackAgentCursorTab } from "../lib/agent-cursor-overlay.js";
+import { AIM_POINT_SOURCE } from "../lib/aim.js";
 import { keyDefinition, withHumanInput } from "../lib/human-input.js";
 import {
   abortableCommandDelay,
@@ -177,10 +178,22 @@ async function bringIntoView(command, tabId, resolved, input) {
 }
 
 /** The element's clickable point, which must be the element itself (not something covering it). */
+/**
+ * Where to click the element: a human-like point on it (see aim.js), in
+ * top-level viewport coordinates, plus its centre and size to check it
+ * hasn't moved by the time the pointer arrives.
+ */
 async function clickablePoint(tabId, resolved) {
   if (resolved.exactNode) {
     const point = await exactElementPoint(tabId, resolved, { scroll: false });
-    return { x: point.x, y: point.y, width: point.width, height: point.height };
+    return {
+      x: point.x,
+      y: point.y,
+      cx: point.cx,
+      cy: point.cy,
+      width: point.width,
+      height: point.height,
+    };
   }
   const point = await injectScript(
     tabId,
@@ -191,20 +204,21 @@ async function clickablePoint(tabId, resolved) {
       throw new Error('Element has no clickable area');
     }
     const elementWindow = el.ownerDocument?.defaultView || window;
-    const localX = Math.max(0, Math.min(elementWindow.innerWidth - 1, rect.left + rect.width / 2));
-    const localY = Math.max(0, Math.min(elementWindow.innerHeight - 1, rect.top + rect.height / 2));
     const elementRoot = el.getRootNode ? el.getRootNode() : el.ownerDocument;
     const hitSource = typeof elementRoot?.elementFromPoint === 'function'
       ? elementRoot
       : el.ownerDocument;
-    const hit = hitSource.elementFromPoint(localX, localY);
-    if (!hit || (hit !== el && !el.contains(hit))) {
+    ${AIM_POINT_SOURCE}
+    const aim = aimPoint(el, rect, hitSource, elementWindow.innerWidth, elementWindow.innerHeight);
+    if (!aim) {
       throw new Error('Element is not clickable at its center point');
     }
     ${buildTopLevelRectSource("el")}
     return {
-      x: topX + (localX - rect.left),
-      y: topY + (localY - rect.top),
+      x: topX + (aim.x - rect.left),
+      y: topY + (aim.y - rect.top),
+      cx: topX + rect.width / 2,
+      cy: topY + rect.height / 2,
       width: rect.width,
       height: rect.height,
     };
@@ -231,12 +245,12 @@ async function clickElement(command, tabId, resolved, { count = 1, button = "lef
     await bringIntoView(command, tabId, resolved, input);
     const point = await clickablePoint(tabId, resolved);
     await input.click(point, {
-      box: { width: point.width, height: point.height },
+      exact: true,
       button,
       count,
       beforePress: async () => {
         const now = await clickablePoint(tabId, resolved);
-        if (Math.abs(now.x - point.x) > 2 || Math.abs(now.y - point.y) > 2) {
+        if (Math.abs(now.cx - point.cx) > 2 || Math.abs(now.cy - point.cy) > 2) {
           throw new Error(
             "Element moved while the pointer travelled to it. Observe and retry the click.",
           );
@@ -287,7 +301,7 @@ export async function handleHover(command) {
     await bringIntoView(command, tab.id, resolved, input);
     const point = await clickablePoint(tab.id, resolved);
     markCommandMutationDispatched(command);
-    await input.moveTo(point, { box: point });
+    await input.moveTo(point, { exact: true });
   });
 
   return { id: command.id, success: true, data: { hovered: true } };
@@ -347,7 +361,7 @@ async function focusByClick(command, tabId, resolved, input) {
     }
     if (point) {
       markCommandMutationDispatched(command);
-      await input.click(point, { box: point });
+      await input.click(point, { exact: true });
     }
     const after = await injectScript(tabId, resolved, FOCUS_STATE);
     if (!after.focused) {
@@ -736,9 +750,9 @@ export async function handleSelect(command) {
     const options = Array.from(el.options);
     const matches = options.filter((o) => values.includes(o.value) || values.includes(o.textContent.trim()));
     const label = matches[0] ? matches[0].textContent.trim() : '';
-    const unique = label && options.filter((o) => o.textContent.trim().toLowerCase().startsWith(label.toLowerCase())).length === 1;
+    const unique = !!label && options.filter((o) => o.textContent.trim().toLowerCase() === label.toLowerCase()).length === 1;
     const done = matches.length > 0 && matches.every((o) => o.selected) && options.filter((o) => o.selected).length === matches.length;
-    return { multiple: el.multiple, disabled: el.disabled, label, unique, done, value: matches[0]?.value ?? null };
+    return { multiple: el.multiple || el.size > 1, multi: el.multiple, disabled: el.disabled, label, unique, done, value: matches[0]?.value ?? null, indices: matches.map((o) => o.index) };
   `,
   );
   if (plan.done) {
@@ -753,7 +767,7 @@ export async function handleSelect(command) {
       async (input) => {
         await bringIntoView(command, tab.id, resolved, input);
         const point = await clickablePoint(tab.id, resolved).catch(() => null);
-        if (point) await input.moveTo(point, { box: point });
+        if (point) await input.moveTo(point, { exact: true });
         await injectScript(tab.id, resolved, "el.focus(); return true;");
         markCommandMutationDispatched(command);
         await input.typeText(plan.label, { meanIntervalMs: 60 });
@@ -761,6 +775,19 @@ export async function handleSelect(command) {
       },
     );
     if (chosen === plan.value) {
+      return { id: command.id, success: true, data: { selected: values } };
+    }
+  }
+
+  const count = plan.indices.length;
+  if (plan.multiple && !plan.disabled && count > 0 && (count === 1 || plan.multi)) {
+    await ensureDebugger(tab.id);
+    const picked = await withHumanInput(
+      tab.id,
+      humanInputOptions(command, tab.id),
+      (input) => clickListOptions(command, tab.id, resolved, input, plan.indices),
+    );
+    if (picked) {
       return { id: command.id, success: true, data: { selected: values } };
     }
   }
@@ -781,6 +808,54 @@ export async function handleSelect(command) {
   );
 
   return { id: command.id, success: true, data: { selected: values } };
+}
+
+/**
+ * Clicks the wanted rows of a list box like a person: a plain click on the first, then
+ * Cmd/Ctrl-click on the rest. Returns false when a row is scrolled out of the box or the
+ * clicks did not produce the wanted selection.
+ */
+async function clickListOptions(command, tabId, resolved, input, indices) {
+  await bringIntoView(command, tabId, resolved, input);
+  const select = await clickablePoint(tabId, resolved).catch(() => null);
+  if (!select) return false;
+  const rows = await injectScript(
+    tabId,
+    resolved,
+    `
+    const box = el.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const cx = (Math.max(box.left, 0) + Math.min(box.right, vw)) / 2;
+    const cy = (Math.max(box.top, 0) + Math.min(box.bottom, vh)) / 2;
+    const top = Math.max(box.top + el.clientTop, 0), bottom = Math.min(box.top + el.clientTop + el.clientHeight, vh);
+    const left = Math.max(box.left + el.clientLeft, 0), right = Math.min(box.left + el.clientLeft + el.clientWidth, vw);
+    const rows = ${JSON.stringify(indices)}.map((i) => {
+      const r = el.options[i].getBoundingClientRect();
+      if (r.height < 4 || r.top < top || r.bottom > bottom) return null;
+      const from = Math.max(r.left, left), width = Math.min(r.right, right) - from;
+      if (width < 8) return null;
+      return { dx: from + width * (0.12 + Math.random() * 0.5) - cx, dy: r.top + r.height * (0.3 + Math.random() * 0.4) - cy };
+    });
+    return rows.every(Boolean) ? rows : null;
+  `,
+  );
+  if (!rows) return false;
+  const toggle = keyDefinition(input.mac ? "Meta" : "Control");
+  markCommandMutationDispatched(command);
+  try {
+    for (const [n, row] of rows.entries()) {
+      if (n === 1) await input.keyDown(toggle);
+      await input.click({ x: select.cx + row.dx, y: select.cy + row.dy }, { exact: true });
+    }
+  } finally {
+    if (rows.length > 1) await input.keyUp(toggle);
+  }
+  const picked = await injectScript(
+    tabId,
+    resolved,
+    "return Array.from(el.selectedOptions).map((o) => o.index);",
+  );
+  return JSON.stringify(picked) === JSON.stringify(indices);
 }
 
 export async function handleFocus(command) {

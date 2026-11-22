@@ -298,19 +298,17 @@ const consumeJsonLine = (
   }
 };
 
-const credentialsIdentity = async (accountDirectory: string): Promise<string> => {
-  const details = await stat(path.join(accountDirectory, ".credentials.json"));
-  return `${details.dev}:${details.ino}:${details.size}:${details.mtimeMs}`;
-};
-
-/** Diagnostic: the credentials and session files by content alone. */
-const contentIdentity = async (
-  accountDirectory: string,
-  root: string,
-): Promise<{ credentials: string; files: string }> => {
-  const credentials = createHash("sha256")
+// What a parked Claude Code process holds, by content: its login file and
+// every file of its session state. A turn picks the process up only when
+// both are exactly what they were when it was parked; timestamps and inodes
+// do not count, since each turn rewrites the login file with the same
+// credential.
+const credentialsIdentity = async (accountDirectory: string): Promise<string> =>
+  createHash("sha256")
     .update(await readFile(path.join(accountDirectory, ".credentials.json")))
     .digest("hex");
+
+const stateFilesIdentity = async (root: string): Promise<string> => {
   const parts: string[] = [];
   const walk = async (directory: string, relative: string): Promise<void> => {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -321,27 +319,9 @@ const contentIdentity = async (
         parts.push(`${name}/`);
         await walk(full, name);
       } else {
-        parts.push(`${name}\0${createHash("sha256").update(await readFile(full)).digest("hex")}`);
+        const digest = createHash("sha256").update(await readFile(full)).digest("hex");
+        parts.push(`${name}\0${digest}`);
       }
-    }
-  };
-  await walk(root, "");
-  return {
-    credentials,
-    files: createHash("sha256").update(parts.sort().join("\n")).digest("hex"),
-  };
-};
-
-const stateFilesIdentity = async (root: string): Promise<string> => {
-  const parts: string[] = [];
-  const walk = async (directory: string, relative: string): Promise<void> => {
-    const entries = await readdir(directory, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = path.join(directory, entry.name);
-      const name = relative ? `${relative}/${entry.name}` : entry.name;
-      const details = await stat(full);
-      parts.push(`${name}\0${details.ino}\0${details.size}\0${details.mtimeMs}`);
-      if (entry.isDirectory()) await walk(full, name);
     }
   };
   await walk(root, "");
@@ -920,7 +900,6 @@ export const runCloudClaude = async (options: {
           mac: options.keeper.sealedMac,
           credentials: await credentialsIdentity(accountDirectory),
           files: await stateFilesIdentity(stateRoot),
-          content: await contentIdentity(accountDirectory, stateRoot),
         }
       : null;
     try {
@@ -1307,7 +1286,6 @@ export const runCloudClaude = async (options: {
               mac,
               credentials: await credentialsIdentity(accountDirectory),
               files: await stateFilesIdentity(stateRoot),
-              content: await contentIdentity(accountDirectory, stateRoot),
             });
           } catch (failure) {
             await client.kill();

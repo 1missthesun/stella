@@ -153,12 +153,6 @@ const stateDifferences = (
   if (released.mac !== requested.mac) differs.push("mac");
   if (released.credentials !== requested.credentials) differs.push("credentials");
   if (released.files !== requested.files) differs.push("files");
-  if (released.content && requested.content) {
-    if (released.content.credentials !== requested.content.credentials) {
-      differs.push("credentialsContent");
-    }
-    if (released.content.files !== requested.content.files) differs.push("filesContent");
-  }
   return differs;
 };
 

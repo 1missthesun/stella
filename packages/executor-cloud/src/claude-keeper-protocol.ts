@@ -6,8 +6,6 @@ export type ClaudeKeeperState = {
   mac: string;
   credentials: string;
   files: string;
-  /** Diagnostic only: the same two by content (which part differs, by what). */
-  content?: { credentials: string; files: string };
 };
 
 export type ClaudeKeeperSpawn = {

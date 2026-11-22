@@ -141,7 +141,8 @@ const sameState = (
       right &&
       left.mac === right.mac &&
       left.credentials === right.credentials &&
-      left.files === right.files,
+      left.files === right.files &&
+      left.folders === right.folders,
   );
 
 const stateDifferences = (
@@ -153,6 +154,7 @@ const stateDifferences = (
   if (released.mac !== requested.mac) differs.push("mac");
   if (released.credentials !== requested.credentials) differs.push("credentials");
   if (released.files !== requested.files) differs.push("files");
+  if (released.folders !== requested.folders) differs.push("folders");
   return differs;
 };
 

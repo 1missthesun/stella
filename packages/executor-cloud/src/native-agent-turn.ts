@@ -308,6 +308,14 @@ const credentialsIdentity = async (accountDirectory: string): Promise<string> =>
     .update(await readFile(path.join(accountDirectory, ".credentials.json")))
     .digest("hex");
 
+const foldersIdentity = async (
+  accountDirectory: string,
+  stateRoot: string,
+): Promise<string> => {
+  const [account, state] = await Promise.all([stat(accountDirectory), stat(stateRoot)]);
+  return `${account.dev}:${account.ino}|${state.dev}:${state.ino}`;
+};
+
 const stateFilesIdentity = async (root: string): Promise<string> => {
   const parts: string[] = [];
   const walk = async (directory: string, relative: string): Promise<void> => {
@@ -900,6 +908,7 @@ export const runCloudClaude = async (options: {
           mac: options.keeper.sealedMac,
           credentials: await credentialsIdentity(accountDirectory),
           files: await stateFilesIdentity(stateRoot),
+          folders: await foldersIdentity(accountDirectory, stateRoot),
         }
       : null;
     try {
@@ -1286,6 +1295,7 @@ export const runCloudClaude = async (options: {
               mac,
               credentials: await credentialsIdentity(accountDirectory),
               files: await stateFilesIdentity(stateRoot),
+              folders: await foldersIdentity(accountDirectory, stateRoot),
             });
           } catch (failure) {
             await client.kill();

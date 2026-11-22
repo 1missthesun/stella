@@ -238,6 +238,17 @@ restore)
   rm -f -- "$archive"
   name=$(basename "$accounts")
   if [ ! -d "$stage/$name" ] || [ -L "$stage/$name" ]; then rm -rf -- "$stage"; fail "The Claude Code login backup is malformed."; fi
+  # The same logins keep the same directory: a Claude process kept from the
+  # last turn sees its account folder through a bind mount, and a replaced
+  # folder would leave it with none. (An agent container's backups merge, so
+  # its marker never names the stored backup and every turn gets here.)
+  tree() { (cd "$1" && find . -mindepth 1 -printf '%P %y %m %U %G\n' | LC_ALL=C sort && find . -type f -exec sha256sum {} + | LC_ALL=C sort); }
+  if [ -d "$accounts" ] && [ ! -L "$accounts" ] && [ "$(tree "$stage/$name")" = "$(tree "$accounts")" ]; then
+    rm -rf -- "$stage"
+    if [ -n "$fetched" ]; then printf '%s\n' "$fetched" >"$marker"; fi
+    json '{ok:true,restored:false,current:true}'
+    exit 0
+  fi
   rm -rf -- "$accounts.old"
   [ -e "$accounts" ] && mv -- "$accounts" "$accounts.old"
   mv -- "$stage/$name" "$accounts" && chown root:root "$accounts" && chmod 700 "$accounts"

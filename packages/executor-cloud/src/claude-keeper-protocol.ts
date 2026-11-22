@@ -6,6 +6,12 @@ export type ClaudeKeeperState = {
   mac: string;
   credentials: string;
   files: string;
+  /**
+   * The login and session folders themselves: the process sees them through
+   * bind mounts made when it started, so a folder replaced since (even with
+   * the same contents) is one it can no longer see.
+   */
+  folders: string;
 };
 
 export type ClaudeKeeperSpawn = {

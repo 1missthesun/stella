@@ -188,6 +188,8 @@ export async function handleContent(command) {
 }
 
 const PAGE_STATE_HINT = /__react|_reactRootContainer|__vue|__ngContext__|__svelte|\$\$typeof/;
+const GLOBAL_WRITE =
+  /\b(?:window|globalThis|self)\s*(?:\.\s*[A-Za-z_$][\w$]*|\[[^\]]+\])\s*=(?!=)/;
 const GLOBAL_READ =
   /\b(?:window|globalThis|self)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)|\b(?:window|globalThis|self)\s*\[\s*["'`]([^"'`]+)["'`]\s*\]/g;
 
@@ -195,12 +197,14 @@ const GLOBAL_READ =
  * Agent scripts run in Stella's isolated world, which sees the same DOM but
  * none of the page's JavaScript, so the page can't observe them. A script
  * that reads the page's own state (framework internals on elements, or
- * globals the page defined) runs in the page's world instead: it asked for
- * it, and would get nothing in the isolated one.
+ * globals the page defined) or sets a global for the page (such as replacing
+ * `window.confirm`) runs in the page's world instead: it asked for it, and
+ * would get nothing, or change nothing, in the isolated one.
  */
 async function evaluationWorld(tabId, expression, requested) {
   if (requested === "main" || requested === "isolated") return requested;
-  if (PAGE_STATE_HINT.test(expression)) return "main";
+  if (PAGE_STATE_HINT.test(expression) || GLOBAL_WRITE.test(expression))
+    return "main";
   const names = [
     ...new Set(
       [...expression.matchAll(GLOBAL_READ)].map((m) => m[1] || m[2]),

@@ -1,7 +1,14 @@
 import { agentCursorHighlightParams } from "./agent-cursor.js";
 
 const overlayReady = new Map();
+const idleHides = new Map();
 const cursorTabsByOwner = new Map();
+const IDLE_HIDE_MS = 20_000;
+
+function cancelIdleHide(tabId) {
+  clearTimeout(idleHides.get(tabId));
+  idleHides.delete(tabId);
+}
 
 function enableOverlay(tabId) {
   let ready = overlayReady.get(tabId);
@@ -16,16 +23,22 @@ function enableOverlay(tabId) {
   return ready;
 }
 
-export async function drawAgentCursor(tabId, point) {
+export async function drawAgentCursor(tabId, point, overlayScale = 1) {
+  cancelIdleHide(tabId);
+  idleHides.set(
+    tabId,
+    setTimeout(() => void hideAgentCursor(tabId), IDLE_HIDE_MS),
+  );
   await enableOverlay(tabId);
   await chrome.debugger.sendCommand(
     { tabId },
     "Overlay.highlightQuad",
-    agentCursorHighlightParams(point),
+    agentCursorHighlightParams(point, overlayScale),
   );
 }
 
 export async function hideAgentCursor(tabId) {
+  cancelIdleHide(tabId);
   if (!overlayReady.has(tabId)) return;
   await chrome.debugger
     .sendCommand({ tabId }, "Overlay.hideHighlight", {})
@@ -33,9 +46,14 @@ export async function hideAgentCursor(tabId) {
 }
 
 chrome.debugger.onDetach.addListener((source) => {
-  if (source.tabId) overlayReady.delete(source.tabId);
+  if (!source.tabId) return;
+  overlayReady.delete(source.tabId);
+  cancelIdleHide(source.tabId);
 });
-chrome.tabs.onRemoved.addListener((tabId) => overlayReady.delete(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  overlayReady.delete(tabId);
+  cancelIdleHide(tabId);
+});
 
 export const trackAgentCursorTab = (ownerId, tabId) => {
   const key = typeof ownerId === "string" && ownerId ? ownerId : "default";

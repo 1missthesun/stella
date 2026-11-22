@@ -2,7 +2,10 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { RawData, WebSocket, WebSocketServer } from "ws";
-import { agentCursorHighlightParams } from "../../../stella-browser/extension/lib/agent-cursor.js";
+import {
+  agentCursorHighlightParams,
+  overlayScaleFromLayoutMetrics,
+} from "../../../stella-browser/extension/lib/agent-cursor.js";
 import { buildInAppBrowserUserAgent } from "./in-app-browser-auth-policy.js";
 
 export type InAppBrowserDebuggerTarget = {
@@ -258,6 +261,7 @@ export class InAppBrowserCdpAdapter {
   private readonly recoveryTimeoutMs: number;
   private readonly token = randomBytes(32).toString("hex");
   private readonly clients = new Set<ClientState>();
+  private readonly cursorOverlayScales = new Map<string, number>();
   private readonly ownerRoutes = new Map<
     string,
     Readonly<{ ownerId: string; expiresAt: number }>
@@ -863,12 +867,27 @@ export class InAppBrowserCdpAdapter {
       this.controller.sendDebuggerCommand(
         tabId,
         "Overlay.highlightQuad",
-        agentCursorHighlightParams({ x, y }),
+        agentCursorHighlightParams(
+          { x, y },
+          this.cursorOverlayScales.get(tabId) ?? 1,
+        ),
         client.ownerId,
       );
     const enable = async () => {
       await this.controller.sendDebuggerCommand(tabId, "DOM.enable", {}, client.ownerId);
       await this.controller.sendDebuggerCommand(tabId, "Overlay.enable", {}, client.ownerId);
+      const metrics = await Promise.resolve(
+        this.controller.sendDebuggerCommand(
+          tabId,
+          "Page.getLayoutMetrics",
+          {},
+          client.ownerId,
+        ),
+      ).catch(() => null);
+      this.cursorOverlayScales.set(
+        tabId,
+        overlayScaleFromLayoutMetrics(metrics),
+      );
     };
     try {
       if (firstOnTab) await enable();

@@ -15,6 +15,7 @@
  * rust/crates/browse-page/src/human.rs and input.rs.
  */
 
+import { overlayScaleFromLayoutMetrics } from "./agent-cursor.js";
 import { drawAgentCursor } from "./agent-cursor-overlay.js";
 
 const sleep = (ms) =>
@@ -329,6 +330,7 @@ export class HumanInput {
     this.cursor = options.cursor ?? null;
     this.abortCheck = options.abortCheck ?? (() => {});
     this.viewport = null;
+    this.overlayScale = 1;
     this.mac = false;
   }
 
@@ -338,6 +340,7 @@ export class HumanInput {
     const metrics = await chrome.debugger
       .sendCommand({ tabId }, "Page.getLayoutMetrics", {})
       .catch(() => null);
+    input.overlayScale = overlayScaleFromLayoutMetrics(metrics);
     const layout = metrics?.cssLayoutViewport;
     if (layout?.clientWidth > 0 && layout?.clientHeight > 0) {
       input.viewport = { width: layout.clientWidth, height: layout.clientHeight };
@@ -426,7 +429,8 @@ export class HumanInput {
       buttons: this.state.buttons,
       modifiers: this.state.modifiers,
     };
-    if (this.cursor) void this.cursor(point).catch(() => undefined);
+    if (this.cursor)
+      void this.cursor(point, this.overlayScale).catch(() => undefined);
     if (gapMs == null) await this.send("Input.dispatchMouseEvent", params);
     else await this.pace(gapMs, "Input.dispatchMouseEvent", params);
   }
@@ -701,7 +705,7 @@ export async function withHumanInput(tabId, options, work) {
   await previous.catch(() => undefined);
   try {
     const cursor = options?.showCursor
-      ? (point) => drawAgentCursor(tabId, point)
+      ? (point, overlayScale) => drawAgentCursor(tabId, point, overlayScale)
       : null;
     const input = await HumanInput.open(tabId, { ...options, cursor });
     try {

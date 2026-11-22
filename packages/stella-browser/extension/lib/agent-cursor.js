@@ -21,9 +21,23 @@ export const agentCursorQuad = ({ x, y }) => [
   y + 14.2,
 ];
 
-/** Overlay.highlightQuad parameters that draw the cursor at `point`; Overlay needs DOM and Overlay enabled first. */
-export const agentCursorHighlightParams = (point) => ({
-  quad: agentCursorQuad(point),
+/**
+ * Chrome scales highlight quads by the device pixel ratio once more than CSS
+ * pixels need, so on a 2x display a quad given in CSS pixels lands at twice
+ * its position and size. This is that ratio, read from Page.getLayoutMetrics.
+ */
+export const overlayScaleFromLayoutMetrics = (metrics) => {
+  const device = metrics?.layoutViewport?.clientWidth;
+  const css = metrics?.cssLayoutViewport?.clientWidth;
+  return device > 0 && css > 0 ? device / css : 1;
+};
+
+/**
+ * Overlay.highlightQuad parameters that draw the cursor at `point` (CSS
+ * pixels); Overlay needs DOM and Overlay enabled first.
+ */
+export const agentCursorHighlightParams = (point, overlayScale = 1) => ({
+  quad: agentCursorQuad(point).map((value) => value / overlayScale),
   color: CURSOR_FILL,
   outlineColor: CURSOR_OUTLINE,
 });

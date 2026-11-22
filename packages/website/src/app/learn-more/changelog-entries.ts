@@ -13,6 +13,241 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    "release": "A two-step setup and a lighter install",
+    "date": "November 22, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "Setting up Stella takes two steps: choose your AI, then turn on any extras you want, like Gmail, the Chrome extension, and the Mac permissions for seeing and using your screen. Then you’re in the chat.",
+      "Stella takes up less room on your computer: installs are roughly half a gigabyte to 1.3 GB smaller. The tools Stella uses to change its own code arrive the first time you ask for a change.",
+      "Changing Stella on Windows is much faster. After the first change, the next ones start almost at once instead of reinstalling every time."
+    ],
+    "more": [
+      "New installs follow your system’s light or dark mode.",
+      "“How did you find Stella?” and the suggestion to get the phone app now show once, after you’ve used Stella for a while, instead of during setup.",
+      "A Claude Code task in the cloud that leaves a long command running now reports back when the command finishes."
+    ]
+  },
+  {
+    "release": "Gemini on your Google plan, and a faster start",
+    "date": "November 21, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "Sign in to Google Antigravity in Settings, next to Claude and ChatGPT, to use Gemini models on your own Google plan. They appear in the model picker on your computer and your phone, and run on the computer you signed in on.",
+      "Stella’s window opens up to twice as fast, and new installs download less.",
+      "Scrolling on Windows is smooth, keeping up with high-refresh screens instead of dropping frames."
+    ],
+    "more": [
+      "After you sign in to a service, your browser shows a Stella page that says plainly whether it worked.",
+      "A computer whose clock is wrong can still use Stella’s models.",
+      "Fresh installs on some Windows PCs that stopped at launch start again.",
+      "The composer has a clean bottom edge, with no dark shadow and nothing cut off.",
+      "Claude Code conversations sync between your devices with fewer, smaller uploads."
+    ]
+  },
+  {
+    "release": "Email moves into Stella",
+    "date": "November 18–20, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Stella reads your Gmail at set times (three times a day on paid plans, once a day on Free) and keeps one Email page on desktop, web, and phone: what needs you, with her suggestion and a drafted reply, what she handled, with undo, and what’s waiting on someone else.",
+      "Replies stay drafts until you say yes. Tell Stella an email doesn’t matter and she leaves mail like it alone; anything she marks urgent reaches your phone.",
+      "Canvases can talk back: buttons and forms in a canvas Stella made send your choice straight to the chat."
+    ],
+    "more": [
+      "Drafts Stella replaced, sent, or dropped leave your Gmail Drafts folder.",
+      "Check now picks up new mail even before Gmail has passed it on.",
+      "The Email page shows when each item’s newest email arrived.",
+      "Background tasks are steadier: a report is never lost when another reply arrives, a task you stopped stays stopped, and each report covers every answer since the last one.",
+      "Stella no longer flashes console windows on Windows.",
+      {
+        "text": "Long pastes send as “Pasted text” instead of failing.",
+        "product": "Mobile"
+      },
+      {
+        "text": "Typing in the Email page’s Tell Stella box no longer zooms the page on iPhone.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "release": "A new reading voice and self-repairing Claude Code",
+    "date": "November 16–17, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Read aloud has a new, more natural voice.",
+      "Send feedback from the app straight to the Stella team, even when you’re not signed in. The dialog says exactly what it sends.",
+      "Claude Code repairs itself: Stella only starts a copy that works, falls back to the last one that did, and fixes a broken install."
+    ],
+    "more": [
+      "Scheduled tasks are more dependable: a run that fails is retried or reported, never quietly counted as done, and each run reaches the right computer.",
+      "When a task fails, it shows the real reason, whichever AI it runs on.",
+      "Links inside a canvas open the same way chat links do, on desktop, web, and phone.",
+      "Copy and Share work reliably, including for files in Stella Drive.",
+      "Files open faster in the viewer, its thumbnail strip stays put when you click it, and a reply’s Drive files show real thumbnails right away.",
+      "When a model runs into a problem, the message opens the model picker instead of pointing to a Settings page that doesn’t exist.",
+      "On Linux, Stella starts even when the system sets a zero real-time CPU limit."
+    ]
+  },
+  {
+    "release": "Linux computer use and clearer task status",
+    "date": "November 13–15, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Stella can use apps on Linux (Hyprland) in the background. On Windows, it now stays in the background unless you ask it to take over.",
+      "Tasks that are waiting show a clock and “Waiting”, tasks on hold sit in their own quiet Paused group, and a task stuck on one step is flagged as possibly stuck.",
+      "Settings has a new Claude and ChatGPT tab for your AI sign-ins, and a shorter Account tab where you can see your signed-in devices, delete your data, or delete your account."
+    ],
+    "more": [
+      "Claude Code tasks cut off by an update, restart, or crash continue where they left off.",
+      "If work on a computer is waiting for a Claude sign-in, your phone tells you, and the task says so instead of looking busy.",
+      "Stella stays quiet when a background check has nothing to say, instead of posting an empty message.",
+      "Stopping a task also stops every helper under it and the programs they started.",
+      "A file you replace in Stella Drive shows as changed everywhere it’s linked.",
+      "Memory syncs files of any ordinary size, and the bell tells you when one is too big.",
+      "Schedule notices that arrive together share one card, and deleting a schedule asks once, in place.",
+      "Browser tasks wait for pages to settle before they click or read, and computer use on Mac is quicker.",
+      "“Show in composer” for the model picker stays on after a restart.",
+      {
+        "text": "Dictation keeps every word when you switch apps mid-recording, and keeps recording in the background on iPhone.",
+        "product": "Mobile"
+      },
+      {
+        "text": "Send securely stays in view while you type into a secure card.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "release": "Email, a notification bell, and one Update for every computer",
+    "date": "November 11–12, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "Email arrives: turn it on and Stella sorts your new Gmail, keeps a list of what needs you, and prepares replies. (It became the Email page a week later.)",
+      "Notifications live in a bell in the top bar instead of piling up above the composer.",
+      "Changes you’ve asked Stella to make to itself reach all your computers with one Update. They’re merged before they’re offered, and you choose which computers get them."
+    ],
+    "more": [
+      "Tell Stella a rule once and every task follows it.",
+      "When a task has a question, Stella answers it herself when she can and only asks you what she can’t settle.",
+      "Tasks pause when you quit and continue by themselves when Stella starts again. Stella can also move a task from an offline computer to the cloud or another computer.",
+      "If your Claude Code sign-in ends, the reply waits for you to sign back in instead of failing.",
+      "A message you send before Stella is ready is kept and goes out by itself.",
+      "Stella asks once whether your other devices may start tasks on this computer. Change it later in Settings › Privacy.",
+      "Browser tabs Stella opened for a task close a few minutes after it ends and come back if it resumes; tabs you took over stay open.",
+      "Install Claude Code in one click wherever Stella says it’s missing.",
+      "A tidier top bar: icons first, then Models beside Account.",
+      "On Windows, Stella has its own window icon and can apply changes to itself without admin rights.",
+      "Your own OpenRouter key can power Email."
+    ]
+  },
+  {
+    "release": "Record your screen, and new models right away",
+    "date": "November 9–10, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "Record screen: press ⌥⇧S (Alt+Shift+S) or pick it from the + menu, then talk and draw on your screen to show Stella what you mean. It works from any app, on Mac and Windows.",
+      "New models from your providers show up in the model picker as soon as they’re released, without waiting for a Stella update.",
+      "Stella’s app icon shows an unread badge, and a soft sound plays when Stella messages you."
+    ],
+    "more": [
+      "Right-click menus throughout the app.",
+      "If a model blocks a reply for safety reasons, a card lets you remove those messages or carry on with another model.",
+      "Changes to Stella’s look apply in place, and undo themselves if they break something.",
+      "A reload or restart keeps your window where it was, along with your open files and your unsent drafts and attachments.",
+      "Claude Code stays up to date without a terminal, and setup can install it for you in one click.",
+      "Macs without a dictation service transcribe on the device.",
+      "When your free trial of Stella’s models runs out, Stella offers to connect your ChatGPT or Claude plan first.",
+      "Drag top-bar tabs to reorder them; they stay usable in narrow windows.",
+      "Stella says “tasks” instead of “agents” everywhere.",
+      {
+        "text": "Wide tables, code, and media scroll sideways, and you can select text inside a message.",
+        "product": "Mobile"
+      },
+      {
+        "text": "The composer’s mic button is easier to tap.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "release": "A floating file viewer and tabs in the top bar",
+    "date": "November 3–8, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "The right sidebar is gone. Files open in a floating viewer you can move and resize, and the browser, apps, and canvases open as tabs in the top bar (⌘T for a new one, ⌘1–9 to switch).",
+      "Connect more than one Google account, and connect Google through Stella’s own sign-in.",
+      "If your session ends, your chat stays on screen and new messages wait until you sign back in, instead of signing you out."
+    ],
+    "more": [
+      "The top bar’s + opens a quick menu with search and everything you can open.",
+      "The viewer puts your media first, with its actions in the top bar and one thumbnail strip for every kind of file.",
+      "Attach files of any size.",
+      "Long chats with many images keep working; images are resized as they come in.",
+      "Claude Code and ChatGPT plans search the web with their own tools.",
+      "“Hey Stella” works again after a voice conversation ends, and follows your system microphone.",
+      "Attachments keep their original names, and dropped images keep their thumbnails after sending.",
+      "Stella no longer posts a partial answer and then repeats it.",
+      "Web chat shows when Stella is working, and Stop stops the reply.",
+      "Saved private values have their own page in Settings.",
+      "Stopping dictation while the mic is still opening works, and a crash no longer leaves your Mac muted.",
+      "On Windows, the window no longer opens blank, and the pet takes clicks and drags again.",
+      {
+        "text": "Attachments send right away, and the composer follows a model you pick on another device.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "release": "Use Stella without an account",
+    "date": "October 16–23, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Use the desktop app without an account, with Claude Code, ChatGPT, your own API keys, or local models. Your chats stay on your computer until you sign in and choose to add them to your account.",
+      "Setup picks Claude Code for you when it’s already installed and signed in.",
+      "On the Free plan, scheduled tasks run on your computer, and wait for it if it’s off or asleep."
+    ],
+    "more": [
+      "Long answers from Stella’s models are no longer cut short, and long thinking doesn’t time out.",
+      "Images are prepared as soon as you attach them, so sending is quicker.",
+      "Video generation uses a newer model that always includes sound.",
+      "Web pages in Stella Drive open and play with the files beside them.",
+      "Secure cards ask for a whole login or card at once, with the right keyboard and autofill.",
+      "Shared video links play on iPhone.",
+      "Files Stella downloads in its browser are there for her tasks to use.",
+      {
+        "text": "Dictation keeps recording when you switch apps.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
     "release": "New plans and clearer task updates",
     "date": "October 15, 2026",
     "tags": [

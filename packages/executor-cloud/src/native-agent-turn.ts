@@ -159,6 +159,25 @@ export type CloudClaudeToolHost = Pick<
   "openControlChannel" | "claudeToolNames" | "waitForClientReady"
 >;
 
+/**
+ * An agent that ends its turn waiting while a background command it started
+ * is still running: the turn stays open (the process is not parked, so the
+ * command keeps running) and Claude Code wakes the agent itself when the
+ * command finishes, as on the desktop. `waiting` says whether the agent
+ * ended waiting; `resume` tells the turn the agent was woken in place.
+ */
+export type CloudClaudeBackgroundWait = {
+  waiting: () => boolean;
+  resume: () => void;
+};
+
+/**
+ * How long after the executor starts a turn may stay open for background
+ * commands; the BuildSession watchdog ends a turn 15 minutes after it
+ * starts, and sealing and checkpointing need the rest.
+ */
+const CLOUD_CLAUDE_BACKGROUND_HOLD_LIMIT_MS = 11 * 60_000;
+
 /** How long a starting Claude Code may take to list Stella's tools (as on the desktop). */
 const CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS = 40_000;
 
@@ -748,6 +767,7 @@ export const runCloudClaude = async (options: {
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
+  backgroundWait?: CloudClaudeBackgroundWait;
   quiet?: boolean;
   keeper?: CloudClaudeKeeperInput & {
     reusable: boolean;
@@ -987,6 +1007,7 @@ export const runCloudClaude = async (options: {
     const endInput = (): void => {
       if (inputEnded) return;
       inputEnded = true;
+      endBackgroundHold();
       inboxPoll?.interruptUnsafe();
       stdin?.end();
     };
@@ -1079,6 +1100,40 @@ export const runCloudClaude = async (options: {
         ),
       );
     };
+    /** Background commands Claude Code reports running (its own task list). */
+    let liveBackgroundTasks = 0;
+    let heldForBackground = false;
+    let backgroundHoldTimer: { interruptUnsafe: () => void } | undefined;
+    const endBackgroundHold = (): void => {
+      heldForBackground = false;
+      backgroundHoldTimer?.interruptUnsafe();
+      backgroundHoldTimer = undefined;
+    };
+    /** Keeps the turn open while the waiting agent's own background command runs. */
+    const holdForBackground = (): boolean => {
+      const wait = options.backgroundWait;
+      const until = performance.timeOrigin + CLOUD_CLAUDE_BACKGROUND_HOLD_LIMIT_MS;
+      if (!wait || liveBackgroundTasks === 0 || !wait.waiting() || Date.now() >= until) {
+        return false;
+      }
+      if (heldForBackground) return true;
+      heldForBackground = true;
+      markTurnStep("claudeHeldForBackground");
+      backgroundHoldTimer = Effect.runFork(
+        Effect.sleep(Math.max(0, until - Date.now())).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              if (!heldForBackground) return;
+              heldForBackground = false;
+              backgroundHoldTimer = undefined;
+              markTurnStep("claudeBackgroundHoldEnded");
+              void finishInput();
+            }),
+          ),
+        ),
+      );
+      return true;
+    };
     const addResultUsage = (event: ClaudeStreamJsonEvent): void => {
       const usage =
         event.usage && typeof event.usage === "object"
@@ -1115,6 +1170,18 @@ export const runCloudClaude = async (options: {
             `claudeInit${["", "First", "Second", "Third"][initCount] ?? "Later"}${promptReplayed ? "AfterPrompt" : ""}Stella${stellaServerStatus(event).replace(/[^A-Za-z]/gu, "").replace(/^./u, (first) => first.toUpperCase())}`,
           );
           if (promptReplayed) judgeInit();
+          return;
+        }
+        if (type === "system" && event.subtype === "background_tasks_changed") {
+          liveBackgroundTasks = Array.isArray(event.tasks) ? event.tasks.length : 0;
+          return;
+        }
+        if (type === "system" && event.subtype === "task_notification" && heldForBackground) {
+          // The command finished: Claude Code now runs a query of its own
+          // that wakes the agent, which is no longer waiting.
+          endBackgroundHold();
+          markTurnStep("claudeWokenByBackground");
+          options.backgroundWait?.resume();
           return;
         }
         if (options.quiet && isClaudeCodeVisibleOutputNudge(event)) {
@@ -1225,7 +1292,7 @@ export const runCloudClaude = async (options: {
             void serialInput(async () => endInput());
           } else if (!inbox) {
             void serialInput(async () => endInput());
-          } else if (injected.size === 0) {
+          } else if (injected.size === 0 && !holdForBackground()) {
             void finishInput();
           }
         }
@@ -1493,6 +1560,7 @@ export const runNativeAgentTurn = async (options: {
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
+  backgroundWait?: CloudClaudeBackgroundWait;
   quiet?: boolean;
   keeper?: CloudClaudeKeeperInput;
 }): Promise<NativeAgentTurnResult> => {
@@ -1600,6 +1668,7 @@ export const runNativeAgentTurn = async (options: {
       onStreamEvent,
       ...(options.cancellation ? { cancellation: options.cancellation } : {}),
       ...(options.inbox ? { inbox: options.inbox } : {}),
+      ...(options.backgroundWait ? { backgroundWait: options.backgroundWait } : {}),
       ...(options.quiet ? { quiet: true } : {}),
       ...(keeper
         ? {

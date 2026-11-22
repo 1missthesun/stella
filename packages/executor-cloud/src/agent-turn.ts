@@ -729,6 +729,14 @@ export const runAgentTurn = (
                 },
                 reopen: () => inbox.reopen(),
               },
+              // Its own background command finishing wakes the agent in
+              // place, as a message does.
+              backgroundWait: {
+                waiting: () => waitingFor !== undefined,
+                resume: () => {
+                  waitingFor = undefined;
+                },
+              },
               ...(await claudeKeeper.then((client) =>
                 client
                   ? {

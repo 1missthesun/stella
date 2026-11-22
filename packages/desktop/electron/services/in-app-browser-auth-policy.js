@@ -15,22 +15,19 @@ export const buildInAppBrowserUserAgent = (
   chromiumVersion = process.versions.chrome,
   platform = process.platform,
 ) => {
-  const sanitized = String(runtimeUserAgent || "")
-    .replace(/(?:^|\s)(?:Electron|Stella)\/[^\s]+/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-  if (/\b(?:Chrome|Chromium)\/\d+/i.test(sanitized)) {
-    // Match Chrome's UA reduction while client hints retain the full runtime
-    // version. The major remains identical across both surfaces.
-    return sanitized.replace(
-      /\b(Chrome|Chromium)\/(\d+)(?:\.\d+){0,3}/i,
-      "$1/$2.0.0.0",
-    );
-  }
-
-  const major = String(chromiumVersion || "").match(/^\d+/)?.[0] || "0";
+  // Chrome's reduced UA, rebuilt rather than filtered: Electron inserts the
+  // app's name and version (which differ between product, dev and test
+  // copies), and no Chrome sends such a token.
+  const runtime = String(runtimeUserAgent || "");
+  const platformToken =
+    runtime.match(/^Mozilla\/5\.0 \(([^)]+)\)/)?.[1] ||
+    fallbackPlatformToken(platform);
+  const major =
+    runtime.match(/\b(?:Chrome|Chromium)\/(\d+)/i)?.[1] ||
+    String(chromiumVersion || "").match(/^\d+/)?.[0] ||
+    "0";
   return (
-    `Mozilla/5.0 (${fallbackPlatformToken(platform)}) ` +
+    `Mozilla/5.0 (${platformToken}) ` +
     "AppleWebKit/537.36 (KHTML, like Gecko) " +
     `Chrome/${major}.0.0.0 Safari/537.36`
   );

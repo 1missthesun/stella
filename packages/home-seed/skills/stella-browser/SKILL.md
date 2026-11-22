@@ -146,6 +146,10 @@ await tab.axSnapshot();
 
 Use `await tab.axSnapshot({ mode: "full" })` after context compaction, output pruning, or whenever the referenced baseline is no longer in context. `mode: "diff"` requests differences even if larger; a missing or incompatible baseline or exhausted computation budget still returns full output. AX options are `mode`, `interactive`, `compact`, `maxDepth`, and `selector`. Keep using the same options to retain the baseline. The DOM snapshot APIs remain full-output and do not share the AX baseline.
 
+## Secrets in Browser Output
+
+Credentials never reach your code. Passwords, cookies, auth headers, tokens, CSRF values and API keys in anything the browser returns (captured requests and responses, HAR files, `evaluate()` results, input values, URLs) come back as placeholders such as `stella-secret-k3j9x2m4q7ab`, the same placeholder for the same value throughout the task. To use one, send it back through the browser to the site it came from: in `tab.network.fetch()` headers, URL or body, in a `page.evaluate()` argument or script, or in a `goto()` URL. The real value goes in on the way out. It is refused for any other site, and a page script that uses one may only name URLs on that site, so use relative URLs there. Passwords and one-time codes can't be sent from a placeholder: type them with `use_secure_value`. There is no way to reveal a value.
+
 ## Dialogs and Unresponsive Tabs
 
 Page dialogs never block you:

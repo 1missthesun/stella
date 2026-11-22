@@ -1,5 +1,6 @@
 import { isUserAskSecretHandle } from "@stella/contracts/user-ask";
 import { redactWrappedSecretTokens } from "@stella/contracts/secret-redaction";
+import { isBrowserSecretPlaceholder } from "../browser-use/secret-placeholder.js";
 
 const STRUCTURAL_TAG_RE =
   /<\/?(?:tool_call|function_call|result|response|output|input|system|assistant|user)>/gi;
@@ -95,6 +96,7 @@ const INVISIBLE_CHARS = new Set([
 
 const maskSecret = (value: string): string => {
   if (isUserAskSecretHandle(value as unknown)) return value;
+  if (isBrowserSecretPlaceholder(value)) return value;
   if (value.length < 18) return "***";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 };
@@ -149,7 +151,8 @@ const redactUrlSecretParams = (text: string): string =>
       for (const [key, value] of parsed.searchParams.entries()) {
         if (
           URL_SECRET_PARAM_NAMES.has(key.toLowerCase()) &&
-          value.length >= 6
+          value.length >= 6 &&
+          !isBrowserSecretPlaceholder(value)
         ) {
           parsed.searchParams.set(key, maskSecret(value));
           changed = true;

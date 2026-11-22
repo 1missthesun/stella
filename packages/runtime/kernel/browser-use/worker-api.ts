@@ -424,6 +424,7 @@ export function installBrowserWorkerApi(
         "Prefer state reads before snapshots.",
         "On desktop, use tab.axSnapshot() for repeated structural observations; mode:'full' restores context after compaction.",
         "Screenshots attach automatically.",
+        "Credentials in browser output come back as stella-secret-… placeholders; send one back through the browser to the site it came from (fetch headers, evaluate arguments, goto URLs) and the real value is used.",
         "Reuse one task-owned tab.",
         "In Stella's browser a download never opens a save dialog: var file = await tab.waitForDownload(() => locator.click()) gives file.path; browser.downloads() lists recent ones.",
       ]),

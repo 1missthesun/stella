@@ -18,9 +18,13 @@ read them; run `bun ~/.stella/skills/derive-site-api/scripts/program.js <har>
 redacts credentials. Pick the two or three endpoints the task actually needs.
 
 The session is the auth. Make calls from the site's own origin with `evaluate`
-so the browser attaches cookies itself. Never copy captured cookies, tokens, or
-CSRF values into code or files. If a call needs a header the page sets, read it
-live from the page.
+so the browser attaches cookies itself. Captured cookies, tokens and CSRF
+values reach you only as `stella-secret-…` placeholders; to test a call that
+needs one, pass the placeholder in its headers, URL or body through the browser
+on that site (a `page.evaluate` fetch or `tab.network.fetch`) and the real
+value goes in on the way. Placeholders last only for the task, so a saved
+client reads each such header live from the page (localStorage, a meta tag, a
+bootstrap response) instead of storing it.
 
 Check each endpoint with a real call before relying on it, then save the result
 as a small skill of its own (`~/.stella/skills/<site>-client/`) noting the

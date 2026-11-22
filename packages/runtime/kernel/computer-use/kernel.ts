@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { Worker } from "node:worker_threads";
@@ -70,6 +70,20 @@ import {
   TASK_TABS_SWEEP_INTERVAL_MS,
   type TaskTabs,
 } from "../browser-use/task-tabs.js";
+import {
+  BrowserSecretMaskRun,
+  FIELD_EXPOSING_ACTIONS,
+  PAGE_SECRET_FIELDS_SCRIPT,
+  browserSecretVault,
+  mayCarryPageValues,
+  protectActionData,
+  protectHar,
+  rememberFilledSecret,
+  rememberPageSecretFields,
+  siteOfUrl,
+  substituteBrowserPlaceholders,
+  type BrowserSecretVault,
+} from "../browser-use/secret-masking.js";
 import { saveBrowserScreenshot } from "./browser-screenshot-store.js";
 import { resolveStatePath } from "@stella/node-shared/cli/shared.js";
 import { expandHomePath, toolContextHome } from "../tools/utils.js";
@@ -719,6 +733,7 @@ class NodeReplKernel {
   private readonly worker: NodeReplTransport;
   private readonly sky: SkyClient;
   private readonly browser: BrowserSessionClient;
+  private readonly browserSecrets: BrowserSecretVault;
   readonly browserSessionId: string;
   private browserBackend: BrowserBackend = "in-app";
   private readonly requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
@@ -799,6 +814,7 @@ class NodeReplKernel {
     this.connectClient = options.connectClient;
     this.cloudBrowser = options.deviceControl ? undefined : options.cloudBrowser;
     this.browserSessionId = options.browserSessionId;
+    this.browserSecrets = browserSecretVault(options.browserSessionId);
     this.workingDirectory = cwd;
     const getSignal = () => this.active?.controller.signal;
     const session = options.sessionFactory({
@@ -952,6 +968,7 @@ class NodeReplKernel {
       tabId = chosen.tabId as number;
     }
     const mode = target.mode ?? "fill";
+    rememberFilledSecret(this.browserSecrets, target.value);
     const seed = Math.floor(Math.random() * 2 ** 31);
     const hash = secureFillHash(target.value, seed);
     const inspect = async (
@@ -1676,7 +1693,9 @@ class NodeReplKernel {
 
     if (message.method === "downloads") {
       try {
-        const value = await this.readInAppBrowserDownloads(active);
+        const value = new BrowserSecretMaskRun(this.browserSecrets).deep(
+          await this.readInAppBrowserDownloads(active),
+        );
         if (!this.closed && this.active === active) {
           this.post({
             type: "browser-result",
@@ -1693,6 +1712,7 @@ class NodeReplKernel {
       return;
     }
 
+    let inserted: ReadonlyMap<string, string> | undefined;
     try {
       const turnId =
         active.context.runId ??
@@ -1703,9 +1723,20 @@ class NodeReplKernel {
         active,
         message,
       );
+      const substitution = await substituteBrowserPlaceholders(
+        this.browserSecrets,
+        forwarded.method,
+        forwarded.args,
+        (tabId) =>
+          this.browserTabSite(tabId, this.browserCallBackend(forwarded)),
+      );
+      inserted = substitution?.inserted;
+      const outgoing = substitution
+        ? { ...forwarded, args: substitution.args }
+        : forwarded;
       let value: unknown;
       try {
-        value = await this.executeBrowserMessage(active, forwarded);
+        value = await this.executeBrowserMessage(active, outgoing);
       } catch (error) {
         const outcome = await this.whileAwaitingUser(active, () =>
           maybeRequestBrowserExtensionConnect({
@@ -1718,7 +1749,7 @@ class NodeReplKernel {
           }),
         );
         if (!outcome?.ok) throw error;
-        value = await this.executeBrowserMessage(active, forwarded);
+        value = await this.executeBrowserMessage(active, outgoing);
       }
       value = await this.prepareBrowserScreenshotResult(
         active,
@@ -1726,6 +1757,7 @@ class NodeReplKernel {
         value,
         savePaths,
       );
+      value = await this.maskBrowserResult(forwarded, value, inserted);
       if (serializedSize(value) > MAX_NODE_REPL_PROTOCOL_MESSAGE_BYTES) {
         throw new Error("browser result exceeds the protocol limit.");
       }
@@ -1740,9 +1772,207 @@ class NodeReplKernel {
       }
     } catch (error) {
       if (!this.closed && this.active === active) {
-        this.postBrowserError(message.callId, error);
+        this.postBrowserError(
+          message.callId,
+          this.maskBrowserError(error, inserted),
+        );
       }
     }
+  }
+
+  private browserCallBackend(
+    message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
+  ): BrowserBackend {
+    const routing = this.recordValue(message.args[1]);
+    const bound = routing?.[WORKER_BOUND_BACKEND_PARAM];
+    return bound === "in-app" || bound === "external"
+      ? bound
+      : this.browserBackend;
+  }
+
+  private async browserTabSite(
+    tabId: number | undefined,
+    backend: BrowserBackend,
+  ): Promise<string | undefined> {
+    try {
+      const receipt = await this.browser.command<Record<string, unknown>>(
+        "url",
+        {
+          ...(tabId === undefined ? {} : { tabId }),
+          [WORKER_BOUND_BACKEND_PARAM]: backend,
+        },
+      );
+      const data: unknown = receipt.result.data;
+      return siteOfUrl(
+        typeof data === "string" ? data : this.recordValue(data)?.url,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Registers password and secret hidden-field values of the page; returns its site. */
+  private async rememberPageSecrets(
+    tabId: number | undefined,
+    backend: BrowserBackend,
+  ): Promise<string | undefined> {
+    try {
+      const receipt = await this.browser.command<Record<string, unknown>>(
+        "evaluate",
+        {
+          ...(tabId === undefined ? {} : { tabId }),
+          script: PAGE_SECRET_FIELDS_SCRIPT,
+          [WORKER_BOUND_BACKEND_PARAM]: backend,
+        },
+      );
+      const data = this.recordValue(receipt.result.data);
+      return rememberPageSecretFields(
+        this.browserSecrets,
+        data && "result" in data ? data.result : data,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Credentials in browser output reach the agent's code only as placeholders
+  // (secret-masking.ts); the real values stay in this process.
+  private async maskBrowserResult(
+    message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
+    value: unknown,
+    inserted: ReadonlyMap<string, string> | undefined,
+  ): Promise<unknown> {
+    if (message.method === "use") return value;
+    const backend = this.browserCallBackend(message);
+    const run = new BrowserSecretMaskRun(this.browserSecrets, {
+      ...(inserted ? { reverse: inserted } : {}),
+    });
+    const receipt = this.recordValue(value);
+    const result = this.recordValue(receipt?.result);
+    let masked: unknown = value;
+    let tabId: number | undefined;
+    if (message.method === "command" && receipt && result) {
+      const action = String(message.args[0] ?? "");
+      const params = this.recordValue(message.args[1]);
+      tabId = typeof params?.tabId === "number" ? params.tabId : undefined;
+      if (FIELD_EXPOSING_ACTIONS.has(action) && mayCarryPageValues(result.data)) {
+        run.site = await this.rememberPageSecrets(tabId, backend);
+      }
+      let data = protectActionData(run, action, params, result.data);
+      if (action === "har_stop") data = await this.maskHarFile(run, data);
+      masked = {
+        ...receipt,
+        ...(params ? { params } : {}),
+        result: { ...result, data },
+      };
+    } else if (message.method === "chain" && receipt && result) {
+      const steps = Array.isArray(message.args[0]) ? message.args[0] : [];
+      const data = this.recordValue(result.data);
+      const results = Array.isArray(data?.results) ? data.results : [];
+      const pageSites = new Map<number | undefined, string | undefined>();
+      const maskedResults: unknown[] = [];
+      for (let index = 0; index < results.length; index += 1) {
+        const step = this.recordValue(steps[index]);
+        const stepResult = this.recordValue(results[index]);
+        const action = typeof step?.action === "string" ? step.action : "";
+        const params = this.recordValue(step?.params);
+        if (!stepResult) {
+          maskedResults.push(results[index]);
+          continue;
+        }
+        const stepTabId =
+          typeof params?.tabId === "number" ? params.tabId : undefined;
+        tabId ??= stepTabId;
+        if (
+          FIELD_EXPOSING_ACTIONS.has(action) &&
+          mayCarryPageValues(stepResult.data) &&
+          !pageSites.has(stepTabId)
+        ) {
+          pageSites.set(
+            stepTabId,
+            await this.rememberPageSecrets(stepTabId, backend),
+          );
+        }
+        run.site = pageSites.get(stepTabId);
+        let stepData = protectActionData(run, action, params, stepResult.data);
+        if (action === "har_stop") stepData = await this.maskHarFile(run, stepData);
+        maskedResults.push({ ...stepResult, data: stepData });
+      }
+      run.site = undefined;
+      masked = {
+        ...receipt,
+        result: { ...result, data: { ...data, results: maskedResults } },
+      };
+    }
+    const before = run.masked;
+    masked = run.deep(masked);
+    if (run.masked !== before) masked = run.deep(masked);
+    if (run.hasPendingSites) {
+      run.bindPendingSites(await this.browserTabSite(tabId, backend));
+    }
+    return masked;
+  }
+
+  /** HAR on disk is masked too: an agent reads it with Bash. */
+  private async maskHarFile(
+    run: BrowserSecretMaskRun,
+    data: unknown,
+  ): Promise<unknown> {
+    const record = this.recordValue(data);
+    if (!record) return data;
+    const target =
+      typeof record.path === "string" && record.path.trim()
+        ? path.resolve(this.workingDirectory, record.path)
+        : record.log !== undefined
+          ? path.join(
+              os.homedir(),
+              ".stella-browser",
+              "tmp",
+              "har",
+              `har-${Date.now()}.har`,
+            )
+          : undefined;
+    if (!target) return data;
+    if (record.log !== undefined) {
+      const { log, ...rest } = record;
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, JSON.stringify({ log }, null, 2), {
+        mode: 0o600,
+      });
+      return { ...rest, path: target };
+    }
+    let text: string;
+    try {
+      text = await readFile(target, "utf8");
+    } catch {
+      return data;
+    }
+    let har: unknown;
+    try {
+      har = JSON.parse(text);
+    } catch {
+      await writeFile(target, run.text(text), { mode: 0o600 });
+      return data;
+    }
+    await writeFile(target, JSON.stringify(protectHar(run, har), null, 2), {
+      mode: 0o600,
+    });
+    return data;
+  }
+
+  private maskBrowserError(
+    error: unknown,
+    inserted: ReadonlyMap<string, string> | undefined,
+  ): unknown {
+    if (!(error instanceof Error)) return error;
+    const run = new BrowserSecretMaskRun(this.browserSecrets, {
+      ...(inserted ? { reverse: inserted } : {}),
+    });
+    const message = run.text(error.message);
+    if (message === error.message) return error;
+    const masked = new Error(message);
+    masked.name = error.name;
+    return masked;
   }
 
   /** Desktop main records this session's in-app browser downloads here. */

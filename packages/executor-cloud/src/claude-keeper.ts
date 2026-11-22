@@ -144,6 +144,24 @@ const sameState = (
       left.files === right.files,
   );
 
+const stateDifferences = (
+  released: ClaudeKeeperState,
+  requested: ClaudeKeeperState | null,
+): string[] => {
+  if (!requested) return ["noState"];
+  const differs: string[] = [];
+  if (released.mac !== requested.mac) differs.push("mac");
+  if (released.credentials !== requested.credentials) differs.push("credentials");
+  if (released.files !== requested.files) differs.push("files");
+  if (released.content && requested.content) {
+    if (released.content.credentials !== requested.content.credentials) {
+      differs.push("credentialsContent");
+    }
+    if (released.content.files !== requested.content.files) differs.push("filesContent");
+  }
+  return differs;
+};
+
 const attach = async (
   socket: net.Socket,
   request: Extract<ClaudeKeeperRequest, { t: "attach" }>,
@@ -159,10 +177,14 @@ const attach = async (
   attached = socket;
   const current = child;
   let fresh: ClaudeKeeperFreshReason = "none";
+  let differs: string[] | undefined;
   if (current && !current.exited && current.parked && current.released) {
     if (!request.reusable) fresh = "unreusable";
     else if (current.key !== request.key) fresh = "key";
-    else if (!sameState(current.released, request.state)) fresh = "state";
+    else if (!sameState(current.released, request.state)) {
+      fresh = "state";
+      differs = stateDifferences(current.released, request.state);
+    }
   } else if (current) {
     fresh = "exited";
   }
@@ -177,7 +199,7 @@ const attach = async (
   await killChild();
   if (attached !== socket) return;
   await startChild(request);
-  send(socket, { t: "attached", reused: false, fresh });
+  send(socket, { t: "attached", reused: false, fresh, ...(differs ? { differs } : {}) });
 };
 
 const fingerprint = async (root: string): Promise<string> => {

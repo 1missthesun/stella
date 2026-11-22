@@ -30,7 +30,7 @@ type Exit = { code: number | null; signal: string | null; stderr: string };
 export type ClaudeKeeperClient = {
   attach(
     request: Extract<ClaudeKeeperRequest, { t: "attach" }>,
-  ): Promise<{ reused: boolean; fresh: ClaudeKeeperFreshReason }>;
+  ): Promise<{ reused: boolean; fresh: ClaudeKeeperFreshReason; differs?: string[] }>;
   write(data: string): void;
   park(stateRoot: string): Promise<void>;
   release(state: ClaudeKeeperState): Promise<void>;
@@ -169,9 +169,15 @@ const client = (socket: net.Socket, socketPath: string): ClaudeKeeperClient => {
   return {
     attach: (request) =>
       withTimeout(
-        expect<{ reused: boolean; fresh: ClaudeKeeperFreshReason }>(request, (event) =>
+        expect<{ reused: boolean; fresh: ClaudeKeeperFreshReason; differs?: string[] }>(request, (event) =>
           event.t === "attached"
-            ? { value: { reused: event.reused, fresh: event.fresh } }
+            ? {
+                value: {
+                  reused: event.reused,
+                  fresh: event.fresh,
+                  ...(event.differs ? { differs: event.differs } : {}),
+                },
+              }
             : event.t === "error"
               ? { error: event.message }
               : undefined,

@@ -6,6 +6,8 @@ export type ClaudeKeeperState = {
   mac: string;
   credentials: string;
   files: string;
+  /** Diagnostic only: the same two by content (which part differs, by what). */
+  content?: { credentials: string; files: string };
 };
 
 export type ClaudeKeeperSpawn = {
@@ -36,7 +38,13 @@ export type ClaudeKeeperFreshReason =
   | "exited";
 
 export type ClaudeKeeperEvent =
-  | { t: "attached"; reused: boolean; fresh: ClaudeKeeperFreshReason }
+  | {
+      t: "attached";
+      reused: boolean;
+      fresh: ClaudeKeeperFreshReason;
+      /** For fresh "state": which parts differed. */
+      differs?: string[];
+    }
   | { t: "line"; line: string }
   | { t: "exit"; code: number | null; signal: string | null; stderr: string }
   | { t: "parked" }

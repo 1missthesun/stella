@@ -303,6 +303,35 @@ const credentialsIdentity = async (accountDirectory: string): Promise<string> =>
   return `${details.dev}:${details.ino}:${details.size}:${details.mtimeMs}`;
 };
 
+/** Diagnostic: the credentials and session files by content alone. */
+const contentIdentity = async (
+  accountDirectory: string,
+  root: string,
+): Promise<{ credentials: string; files: string }> => {
+  const credentials = createHash("sha256")
+    .update(await readFile(path.join(accountDirectory, ".credentials.json")))
+    .digest("hex");
+  const parts: string[] = [];
+  const walk = async (directory: string, relative: string): Promise<void> => {
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(directory, entry.name);
+      const name = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        parts.push(`${name}/`);
+        await walk(full, name);
+      } else {
+        parts.push(`${name}\0${createHash("sha256").update(await readFile(full)).digest("hex")}`);
+      }
+    }
+  };
+  await walk(root, "");
+  return {
+    credentials,
+    files: createHash("sha256").update(parts.sort().join("\n")).digest("hex"),
+  };
+};
+
 const stateFilesIdentity = async (root: string): Promise<string> => {
   const parts: string[] = [];
   const walk = async (directory: string, relative: string): Promise<void> => {
@@ -891,6 +920,7 @@ export const runCloudClaude = async (options: {
           mac: options.keeper.sealedMac,
           credentials: await credentialsIdentity(accountDirectory),
           files: await stateFilesIdentity(stateRoot),
+          content: await contentIdentity(accountDirectory, stateRoot),
         }
       : null;
     try {
@@ -912,6 +942,9 @@ export const runCloudClaude = async (options: {
         markTurnStep(
           `claudeFresh${attached.fresh[0]!.toUpperCase()}${attached.fresh.slice(1)}`,
         );
+      }
+      for (const part of attached.differs ?? []) {
+        markTurnStep(`claudeStateDiffers${part[0]!.toUpperCase()}${part.slice(1)}`);
       }
     } catch (error) {
       console.error(
@@ -1274,6 +1307,7 @@ export const runCloudClaude = async (options: {
               mac,
               credentials: await credentialsIdentity(accountDirectory),
               files: await stateFilesIdentity(stateRoot),
+              content: await contentIdentity(accountDirectory, stateRoot),
             });
           } catch (failure) {
             await client.kill();

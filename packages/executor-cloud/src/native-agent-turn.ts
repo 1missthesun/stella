@@ -848,7 +848,14 @@ export const runCloudClaude = async (options: {
       .filter((line) => line.startsWith("FAIL "))
       .map((line) => line.slice(5));
     for (const check of failed.length > 0 ? failed : [`error ${escaped}`]) {
-      markTurnStep(`claudeSandboxFailed_${check.replace(/[^A-Za-z0-9_]+/gu, "_").slice(0, 80)}`);
+      // Letters only, at most 64: the backend drops a turn's whole timing
+      // log for any other step name.
+      markTurnStep(
+        `claudeSandboxFailed${check
+          .split(/[^A-Za-z]+/u)
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join("")}`.slice(0, 64),
+      );
     }
     return {
       finalText: "",

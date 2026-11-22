@@ -51,6 +51,7 @@ import {
   handleKeyDown,
   handleKeyUp,
   handleInsertText,
+  handleScrollIntoView,
 } from "./commands/interaction.js";
 import {
   handleScreenshot,
@@ -74,7 +75,6 @@ import {
   handleInputValue,
   handleBoundingBox,
   handleWaitForUrl,
-  handleScrollIntoView,
   handleIsVisible,
   handleIsEnabled,
   handleIsChecked,
@@ -99,31 +99,14 @@ import {
   handleSiteModToggle,
   syncContentScriptRegistration,
 } from "./commands/site-mods.js";
-import { evaluateRuntime } from "./lib/debugger.js";
-import {
-  buildAgentCursorHideExpression,
-  takeAgentCursorTabs,
-} from "./lib/agent-cursor.js";
+import { hideAgentCursor, takeAgentCursorTabs } from "./lib/agent-cursor-overlay.js";
 
 async function hideOwnerAgentCursors(command) {
-  const turnKey = [command.ownerId, command.sessionId, command.turnId]
-    .filter(Boolean)
-    .join(":");
   const tabIds = new Set(takeAgentCursorTabs(command.ownerId));
   for (const tabId of await getOwnerTabIds(command).catch(() => [])) {
     tabIds.add(tabId);
   }
-  await Promise.all(
-    [...tabIds].map((tabId) =>
-      evaluateRuntime(
-        tabId,
-        buildAgentCursorHideExpression({
-          turnKey: turnKey || "external-browser",
-        }),
-        { timeoutMs: 1_000 },
-      ).catch(() => undefined),
-    ),
-  );
+  await Promise.all([...tabIds].map((tabId) => hideAgentCursor(tabId)));
 }
 
 const HANDLERS = {

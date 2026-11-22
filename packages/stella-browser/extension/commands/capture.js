@@ -8,6 +8,7 @@ import {
 import { captureFrameSnapshot } from "../lib/frame-snapshot.js";
 import { callExactElement, exactElementPoint } from "../lib/frame-elements.js";
 import { ensureDebugger, evaluateRuntime } from "../lib/debugger.js";
+import { takeAnsweredDialogs } from "../lib/dialogs.js";
 
 function buildElementExpression(selector, ownerId, tabId, onFoundSource) {
   const resolved = resolveSelector(selector, ownerId, tabId);
@@ -186,15 +187,79 @@ export async function handleContent(command) {
   };
 }
 
+const PAGE_STATE_HINT = /__react|_reactRootContainer|__vue|__ngContext__|__svelte|\$\$typeof/;
+const GLOBAL_READ =
+  /\b(?:window|globalThis|self)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)|\b(?:window|globalThis|self)\s*\[\s*["'`]([^"'`]+)["'`]\s*\]/g;
+
+/**
+ * Agent scripts run in Stella's isolated world, which sees the same DOM but
+ * none of the page's JavaScript, so the page can't observe them. A script
+ * that reads the page's own state (framework internals on elements, or
+ * globals the page defined) runs in the page's world instead: it asked for
+ * it, and would get nothing in the isolated one.
+ */
+async function evaluationWorld(tabId, expression, requested) {
+  if (requested === "main" || requested === "isolated") return requested;
+  if (PAGE_STATE_HINT.test(expression)) return "main";
+  const names = [
+    ...new Set(
+      [...expression.matchAll(GLOBAL_READ)].map((m) => m[1] || m[2]),
+    ),
+  ].slice(0, 40);
+  if (names.length === 0) return "isolated";
+  const list = JSON.stringify(names);
+  const missing = await evaluateRuntime(
+    tabId,
+    `${list}.filter((name) => !(name in globalThis))`,
+    { timeoutMs: 2_000 },
+  ).catch(() => []);
+  if (!Array.isArray(missing) || missing.length === 0) return "isolated";
+  const pageDefined = await evaluateRuntime(
+    tabId,
+    `${JSON.stringify(missing)}.some((name) => name in globalThis)`,
+    { timeoutMs: 2_000, world: "main" },
+  ).catch(() => false);
+  return pageDefined === true ? "main" : "isolated";
+}
+
+/**
+ * The bridge asks before and after each interaction for dialogs the page
+ * opened (`<id>#guard`, `<id>#dialogs`). Dialogs are answered by the debugger,
+ * so its page script is not run.
+ */
+function dialogProbe(command) {
+  const id = String(command.id ?? "");
+  if (id.endsWith("#guard")) return "guard";
+  if (id.endsWith("#dialogs")) return "dialogs";
+  return null;
+}
+
 export async function handleEvaluate(command) {
   const tab = await getActiveTab(command);
   const expression = command.expression || command.script;
 
   if (!expression) throw new Error("Expression is required for evaluate");
 
-  const value = await evaluateRuntime(tab.id, expression, {
-    timeoutMs: Math.min(command.timeout ?? 30_000, 30_000),
-  });
+  const probe = dialogProbe(command);
+  if (probe) {
+    await ensureDebugger(tab.id);
+    const dialogs = probe === "dialogs" ? takeAnsweredDialogs(tab.id) : [];
+    return { id: command.id, success: true, data: { result: dialogs } };
+  }
+
+  const timeoutMs = Math.min(command.timeout ?? 30_000, 30_000);
+  const world = await evaluationWorld(tab.id, expression, command.world);
+  let value;
+  try {
+    value = await evaluateRuntime(tab.id, expression, { timeoutMs, world });
+  } catch (error) {
+    if (world !== "isolated" || command.world === "isolated") throw error;
+    if (!/^ReferenceError\b/.test(String(error?.message || ""))) throw error;
+    value = await evaluateRuntime(tab.id, expression, {
+      timeoutMs,
+      world: "main",
+    });
+  }
   return {
     id: command.id,
     success: true,

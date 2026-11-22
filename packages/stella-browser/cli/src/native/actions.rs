@@ -8835,13 +8835,7 @@ async fn handle_inserttext(cmd: &Value, state: &DaemonState) -> Result<Value, St
         .and_then(|v| v.as_str())
         .ok_or("Missing 'text' parameter")?;
 
-    mgr.client
-        .send_command(
-            "Input.insertText",
-            Some(json!({ "text": text })),
-            Some(&session_id),
-        )
-        .await?;
+    super::human::type_text(&mgr.client, &session_id, text, None).await?;
     Ok(json!({ "inserted": true }))
 }
 

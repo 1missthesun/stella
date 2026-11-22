@@ -11,7 +11,7 @@ const AUTO_ATTACH = {
   waitForDebuggerOnStart: false,
   flatten: true,
 };
-const WORLD = "stella-observation";
+import { ISOLATED_WORLD as WORLD } from "./debugger.js";
 let nextRef = 0;
 let nextAttachment = 0;
 

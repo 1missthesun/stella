@@ -18,6 +18,7 @@ pub mod element;
 #[allow(dead_code)]
 pub mod extension_bridge;
 pub mod extension_clients;
+pub mod human;
 #[allow(dead_code)]
 pub mod inspect_server;
 #[allow(dead_code)]

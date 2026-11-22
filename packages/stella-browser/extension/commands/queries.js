@@ -114,23 +114,6 @@ export async function handleBoundingBox(command) {
   return { id: command.id, success: true, data: { box } };
 }
 
-export async function handleScrollIntoView(command) {
-  const tab = await getActiveTab(command);
-  const selector = command.selector || command.ref;
-  if (!selector) throw new Error("Selector is required for scrollintoview");
-
-  await queryElement(
-    tab.id,
-    command.ownerId,
-    selector,
-    `
-    el.scrollIntoView({ block: 'center', behavior: 'instant' });
-    return true;
-  `,
-  );
-  return { id: command.id, success: true, data: { scrolled: true } };
-}
-
 export async function handleIsVisible(command) {
   const tab = await getActiveTab(command);
   const selector = command.selector || command.ref;

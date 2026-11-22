@@ -1,3 +1,5 @@
+import { enableDialogHandling } from "./dialogs.js";
+
 const debuggerAttachments = new Map();
 /**
  * Tabs that must stay attached regardless of idle time. A long-running capture
@@ -85,14 +87,51 @@ async function keepPageRunning(tabId) {
       .sendCommand({ tabId }, 'Page.setWebLifecycleState', { state: 'active' })
       .catch(() => undefined),
     chrome.tabs.update(tabId, { autoDiscardable: false }).catch(() => undefined),
+    enableDialogHandling(tabId).catch(() => undefined),
   ]);
 }
 
+export const ISOLATED_WORLD = "stella-observation";
+const isolatedContexts = new Map();
+const CONTEXT_GONE =
+  /Cannot find context with specified id|Execution context was destroyed|Cannot find default execution context|Inspected target navigated or closed/i;
+
 /**
- * Evaluate an expression in the page and await promise results.
+ * The execution context of Stella's isolated world in the tab's main frame.
+ * It shares the page's DOM but not its JavaScript, so the page cannot observe
+ * Stella's scripts through patched prototypes, globals or stack traces.
+ */
+async function isolatedContext(tabId, fresh = false) {
+  if (!fresh && isolatedContexts.has(tabId)) return isolatedContexts.get(tabId);
+  const pending = (async () => {
+    const tree = await chrome.debugger.sendCommand(
+      { tabId },
+      "Page.getFrameTree",
+      {},
+    );
+    const frameId = tree?.frameTree?.frame?.id;
+    if (!frameId) throw new Error("The page has no main frame yet");
+    const created = await chrome.debugger.sendCommand(
+      { tabId },
+      "Page.createIsolatedWorld",
+      { frameId, worldName: ISOLATED_WORLD },
+    );
+    return created.executionContextId;
+  })();
+  isolatedContexts.set(tabId, pending);
+  pending.catch(() => {
+    if (isolatedContexts.get(tabId) === pending) isolatedContexts.delete(tabId);
+  });
+  return pending;
+}
+
+/**
+ * Evaluate an expression in the page and await promise results. Runs in
+ * Stella's isolated world unless `world: "main"` asks for the page's own
+ * JavaScript (its globals and framework state).
  * @param {number} tabId
  * @param {string} expression
- * @param {{userGesture?: boolean, timeoutMs?: number}} [options]
+ * @param {{userGesture?: boolean, timeoutMs?: number, world?: "isolated" | "main"}} [options]
  * @returns {Promise<unknown>}
  */
 export async function evaluateRuntime(tabId, expression, options = {}) {
@@ -108,23 +147,34 @@ export async function evaluateRuntime(tabId, expression, options = {}) {
     timeout: timeoutMs,
   };
   if (options.userGesture === true) params.userGesture = true;
-  // Runtime.evaluate's own timeout stops running script only; it never ends
-  // the wait for a promise the page does not settle.
-  let timer;
-  const result = await Promise.race([
-    chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', params),
-    new Promise((_, reject) => {
-      timer = setTimeout(
-        () =>
-          reject(
-            new Error(
-              `The page did not finish evaluating within ${timeoutMs}ms; it may be frozen, blocked by a dialog, or waiting on something that never settles.`,
+  const isolated = options.world !== "main";
+  const run = async (fresh) => {
+    if (isolated) params.contextId = await isolatedContext(tabId, fresh);
+    // Runtime.evaluate's own timeout stops running script only; it never ends
+    // the wait for a promise the page does not settle.
+    let timer;
+    return await Promise.race([
+      chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', params),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `The page did not finish evaluating within ${timeoutMs}ms; it may be frozen, blocked by a dialog, or waiting on something that never settles.`,
+              ),
             ),
-          ),
-        timeoutMs + 1_000,
-      );
-    }),
-  ]).finally(() => clearTimeout(timer));
+          timeoutMs + 1_000,
+        );
+      }),
+    ]).finally(() => clearTimeout(timer));
+  };
+  let result;
+  try {
+    result = await run(false);
+  } catch (error) {
+    if (!isolated || !CONTEXT_GONE.test(String(error?.message || error))) throw error;
+    result = await run(true);
+  }
 
   if (result.exceptionDetails) {
     const message =
@@ -245,6 +295,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 // held would keep the idle timer rescheduling against an attachment that can
 // never be satisfied again.
 chrome.tabs.onRemoved.addListener((tabId) => {
+  isolatedContexts.delete(tabId);
   attachedFrameSessions.delete(tabId);
   debuggerAttachments.delete(tabId);
   releaseDebugger(tabId);
@@ -253,6 +304,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.debugger.onDetach.addListener((source) => {
   if (source.tabId) {
+    isolatedContexts.delete(source.tabId);
     attachedFrameSessions.delete(source.tabId);
     debuggerAttachments.delete(source.tabId);
     releaseDebugger(source.tabId);

@@ -179,8 +179,13 @@ const buildUnixGitShimScript = (): string =>
  * draft that has its dependencies (draft-deps.ts; older drafts link the
  * app's own node_modules), and an install through that link would write
  * into packages others use. Before a command that installs, the link is
- * removed, so the draft gets packages of its own.
+ * removed, so the draft gets packages of its own. An install inside a draft
+ * also brings the self-modification tools (the type checker), which the
+ * app's own install leaves out (its bunfig says `dev = false`).
  */
+const BUN_DRAFT_CONFIG = "bun-draft-install.toml";
+const BUN_DRAFT_CONFIG_SOURCE = "[install]\ndev = true\n";
+
 const buildUnixBunShimScript = (): string =>
   [
     "#!/bin/sh",
@@ -206,6 +211,7 @@ const buildUnixBunShimScript = (): string =>
     "  install|i|add|a|remove|rm|update|ci|link|unlink|patch)",
     '    if [ -n "$STELLA_APP_DIR" ] && [ -d "$STELLA_APP_DIR/node_modules" ]; then',
     '      __stella_here="$(pwd -P)"',
+    '      __stella_draft=""',
     '      while [ -n "$__stella_here" ]; do',
     '        __stella_shared=""',
     '        if [ -L "$__stella_here/node_modules" ]; then',
@@ -215,11 +221,24 @@ const buildUnixBunShimScript = (): string =>
     '        if [ -n "$__stella_shared" ]; then',
     '          rm -f "$__stella_here/node_modules"',
     '          echo "Stella: this draft used shared packages; installing its own instead." >&2',
+    "        fi",
+    '        if [ -f "$__stella_here/.git" ]; then',
+    '          case "$(sed -n "s/^gitdir: //p" "$__stella_here/.git")" in "$STELLA_APP_DIR/.git/worktrees/"*) __stella_draft=1 ;; esac',
     "          break",
     "        fi",
+    '        [ -d "$__stella_here/.git" ] && break',
     '        [ "$__stella_here" = "/" ] && break',
     '        __stella_here="$(dirname -- "$__stella_here")"',
     "      done",
+    '      if [ -n "$__stella_draft" ]; then',
+    '        case "$1" in',
+    "          install|i|add|a|remove|rm|update|ci)",
+    '            __stella_verb="$1"',
+    "            shift",
+    `            exec "$__stella_bun" "$__stella_verb" --config="$(dirname -- "$0")/${BUN_DRAFT_CONFIG}" "$@"`,
+    "            ;;",
+    "        esac",
+    "      fi",
     "    fi",
     "    ;;",
     "esac",
@@ -230,10 +249,11 @@ const buildUnixBunShimScript = (): string =>
 const BUN_DRAFT_GUARD = "bun-draft-guard.cjs";
 
 /**
- * Windows' `bun`, guarded for drafts like the Unix one: before a command that
- * installs, a guard (run by the real Bun) removes the draft's link to shared
- * packages. Package sets sit in `<app>\.git\stella-packages` or, for a
- * launcher install, `<install root>\pkgs` (draft-deps.ts).
+ * Windows' `bun`, guarded for drafts like the Unix one: a command that
+ * installs goes through a guard (run by the real Bun) that removes the
+ * draft's link to shared packages and runs the install with the draft's
+ * config. Package sets sit in `<app>\.git\stella-packages` or, for a launcher
+ * install, `<install root>\pkgs` (draft-deps.ts).
  */
 const buildWindowsBunShimScript = (): string =>
   [
@@ -241,13 +261,16 @@ const buildWindowsBunShimScript = (): string =>
     "setlocal",
     'set "__stella_bun=%STELLA_REAL_BUN_BIN%"',
     'if not defined __stella_bun set "__stella_bun=%STELLA_BUN_PATH%"',
-    'if not defined __stella_bun for /f "delims=" %%b in (\'where bun.exe 2^>nul\') do if not defined __stella_bun set "__stella_bun=%%b"',
+    `if not defined __stella_bun for /f "delims=" %%b in ('where bun.exe 2^>nul') do if not defined __stella_bun set "__stella_bun=%%b"`,
     "if not defined __stella_bun (",
     "  echo bun executable not found 1>&2",
     "  exit /b 127",
     ")",
-    'for %%c in (install i add a remove rm update ci link unlink patch) do if /I "%~1"=="%%c" "%__stella_bun%" "%~dp0' + BUN_DRAFT_GUARD + '"',
+    "for %%c in (install i add a remove rm update ci link unlink patch) do if /I \"%~1\"==\"%%c\" goto guarded",
     '"%__stella_bun%" %*',
+    "exit /b %ERRORLEVEL%",
+    ":guarded",
+    `"%__stella_bun%" "%~dp0${BUN_DRAFT_GUARD}" %*`,
     "exit /b %ERRORLEVEL%",
     "",
   ].join("\r\n");
@@ -257,6 +280,8 @@ const bunDraftGuardSource = (): string =>
     '"use strict";',
     'const fs = require("fs");',
     'const path = require("path");',
+    'const { spawnSync } = require("child_process");',
+    "const args = process.argv.slice(2);",
     "const app = process.env.STELLA_APP_DIR;",
     "const real = (file) => {",
     "  try {",
@@ -265,11 +290,13 @@ const bunDraftGuardSource = (): string =>
     "    return null;",
     "  }",
     "};",
-    "if (app && real(path.join(app, \"node_modules\"))) {",
-    "  const shared = real(path.join(app, \"node_modules\"));",
+    "const shared = app ? real(path.join(app, \"node_modules\")) : null;",
+    "let draft = false;",
+    "if (shared) {",
     "  const sets = [path.join(app, \".git\", \"stella-packages\"), path.join(path.dirname(app), \"pkgs\")]",
     "    .map(real)",
     "    .filter(Boolean);",
+    "  const worktrees = real(path.join(app, \".git\", \"worktrees\"));",
     "  let dir = process.cwd();",
     "  for (;;) {",
     "    const link = path.join(dir, \"node_modules\");",
@@ -282,13 +309,24 @@ const bunDraftGuardSource = (): string =>
     "        fs.rmdirSync(link);",
     "      }",
     "      console.error(\"Stella: this draft used shared packages; installing its own instead.\");",
-    "      break;",
     "    }",
+    "    const git = fs.lstatSync(path.join(dir, \".git\"), { throwIfNoEntry: false });",
+    "    if (git && git.isFile()) {",
+    "      const line = fs.readFileSync(path.join(dir, \".git\"), \"utf8\").match(/^gitdir:\\s*(.+?)\\s*$/m);",
+    "      const gitdir = line ? real(path.resolve(dir, line[1])) : null;",
+    "      draft = Boolean(worktrees && gitdir && gitdir.startsWith(worktrees + path.sep));",
+    "    }",
+    "    if (git) break;",
     "    const up = path.dirname(dir);",
     "    if (up === dir) break;",
     "    dir = up;",
     "  }",
     "}",
+    "const configured = draft && [\"install\", \"i\", \"add\", \"a\", \"remove\", \"rm\", \"update\", \"ci\"].includes(args[0])",
+    `  ? [args[0], "--config=" + path.join(__dirname, "${BUN_DRAFT_CONFIG}"), ...args.slice(1)]`,
+    "  : args;",
+    "const result = spawnSync(process.execPath, configured, { stdio: \"inherit\" });",
+    "process.exit(result.status ?? 1);",
     "",
   ].join("\n");
 
@@ -315,6 +353,7 @@ export const ensureNodeShim = (
       writeFileSync(path.join(shimDir, "bun.cmd"), buildWindowsBunShimScript(), "utf-8");
       writeFileSync(path.join(shimDir, BUN_DRAFT_GUARD), bunDraftGuardSource(), "utf-8");
     }
+    writeFileSync(path.join(shimDir, BUN_DRAFT_CONFIG), BUN_DRAFT_CONFIG_SOURCE, "utf-8");
     if (process.platform === "win32" && process.env.STELLA_PYTHON_BIN?.trim()) {
       for (const command of ["python", "python3", "py"]) {
         writeFileSync(

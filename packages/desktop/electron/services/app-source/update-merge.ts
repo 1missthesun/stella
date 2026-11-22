@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { git, gitRaw, run } from "./git.js";
 import { removeScratchDir } from "./dir-links.js";
-import { ensurePackageSet, linkPackageSet } from "./draft-deps.js";
+import { ensurePackageSet, ignoreLinkedModules, linkPackageSet } from "./draft-deps.js";
 import { copyEnvFiles } from "./update-gate.js";
 
 /**
@@ -352,6 +352,7 @@ export const mergeInBackground = async (args: {
     // package set for these dependencies, not with the app's own install.
     const { store } = await ensurePackageSet({ source: dir, appRoot: cwd });
     await linkPackageSet(dir, store);
+    ignoreLinkedModules(cwd);
     await copyEnvFiles(cwd, dir);
     const merged = await typecheck(dir, signal);
     if (merged.errors.size > 0) {

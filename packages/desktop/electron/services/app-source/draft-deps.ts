@@ -319,6 +319,24 @@ const worktreeRoots = async (appRoot: string): Promise<string[]> => {
     .filter((dir) => path.resolve(dir) !== path.resolve(appRoot) && fs.existsSync(dir));
 };
 
+/**
+ * The repo ignores `/node_modules/`, a folder; a draft's is a link, which git
+ * sees as a file and would offer to commit. The app's exclude file covers
+ * every worktree of it.
+ */
+export const ignoreLinkedModules = (appRoot: string) => {
+  const exclude = path.join(appRoot, ".git", "info", "exclude");
+  try {
+    if (!fs.statSync(path.join(appRoot, ".git")).isDirectory()) return;
+    const text = fs.existsSync(exclude) ? fs.readFileSync(exclude, "utf8") : "";
+    if (text.split(/\r?\n/).includes("/node_modules")) return;
+    fs.mkdirSync(path.dirname(exclude), { recursive: true });
+    fs.appendFileSync(exclude, `${text && !text.endsWith("\n") ? "\n" : ""}/node_modules\n`);
+  } catch {
+    // Not a checkout we can write: git shows the link, nothing breaks.
+  }
+};
+
 export const prepareDraftDependencies = async (options: {
   draftRoot: string;
   appRoot: string;
@@ -335,6 +353,7 @@ export const prepareDraftDependencies = async (options: {
   });
   const already = linkedTo(draftRoot, store);
   await linkPackageSet(draftRoot, store);
+  ignoreLinkedModules(appRoot);
   if (built) {
     const others = await worktreeRoots(appRoot);
     await removeUnusedPackageSets(appRoot, [draftRoot, ...others].map(dependencyFingerprint)).catch(() => undefined);

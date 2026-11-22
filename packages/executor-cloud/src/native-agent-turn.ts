@@ -156,8 +156,11 @@ export const CLOUD_CLAUDE_MCP_SERVER_NAME = CLAUDE_CODE_STELLA_SERVER_NAME;
  */
 export type CloudClaudeToolHost = Pick<
   ClaudeCodeToolMcpHost,
-  "openControlChannel" | "claudeToolNames"
+  "openControlChannel" | "claudeToolNames" | "waitForClientReady"
 >;
+
+/** How long a starting Claude Code may take to list Stella's tools (as on the desktop). */
+const CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS = 40_000;
 
 export const cloudNativeStateRootForThread = (threadId: string): string =>
   cloudNativeStateRoot(createHash("sha256").update(threadId).digest("hex"));
@@ -929,6 +932,8 @@ export const runCloudClaude = async (options: {
   // neither is this turn's.
   const promptUuid = crypto.randomUUID();
   let promptReplayed = false;
+  let promptSent = false;
+  const toolsWait = new AbortController();
   try {
     const args = argsFor(resume);
     let inputEnded = false;
@@ -972,7 +977,7 @@ export const runCloudClaude = async (options: {
           Effect.forever(
             Effect.promise(() =>
               serialInput(async () => {
-                if (inputEnded || !stdin) return;
+                if (inputEnded || !stdin || !promptSent) return;
                 writeMessages(await inbox.take());
               }),
             ).pipe(Effect.andThen(Effect.sleep(INBOX_POLL_MS))),
@@ -1003,6 +1008,35 @@ export const runCloudClaude = async (options: {
         error = unavailable;
         cancellation.abort(new Error(unavailable));
       }
+    };
+    // The prompt goes in once the process has listed Stella's tools, as on
+    // the desktop. A resumed session can start a query of its own at launch
+    // (a `task-notification` for a background command an earlier turn
+    // started), before it reads the initialize request; a prompt written
+    // with it then opens a query that began before Stella's server was
+    // connected, so it has none of Stella's tools.
+    const sendPromptOnceListed = (): void => {
+      const send = () => {
+        if (promptSent || inputEnded || cancellation.aborted) return;
+        promptSent = true;
+        stdin?.write(
+          `${streamJsonUserMessage(sessionId, options.inputPrompt, promptUuid)}\n`,
+        );
+        markTurnStep("claudePromptSent");
+      };
+      if (toolChannel.listed() || options.toolHost.claudeToolNames.length === 0) {
+        send();
+        return;
+      }
+      options.toolHost
+        .waitForClientReady(toolsWait.signal, CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS)
+        .then(send, () => {
+          if (toolsWait.signal.aborted || cancellation.aborted) return;
+          markTurnStep("claudeToolsNotListed");
+          const unavailable = `Claude Code did not load Stella's tools within ${Math.round(CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS / 1000)}s, so it stopped before answering. Try again.`;
+          error = unavailable;
+          cancellation.abort(new Error(unavailable));
+        });
     };
     const addResultUsage = (event: ClaudeStreamJsonEvent): void => {
       const usage =
@@ -1194,10 +1228,7 @@ export const runCloudClaude = async (options: {
           },
         };
         if (!keeperReused) stdin.write(`${toolChannel.initializeLine}\n`);
-        stdin.write(
-          `${streamJsonUserMessage(sessionId, options.inputPrompt, promptUuid)}\n`,
-        );
-        markTurnStep("claudePromptSent");
+        sendPromptOnceListed();
       });
     const result = keeper
       ? await runKept(keeper).finally(endInput)
@@ -1205,9 +1236,7 @@ export const runCloudClaude = async (options: {
           feedInput: (input: NodeJS.WritableStream) => {
             stdin = input;
             input.write(`${toolChannel.initializeLine}\n`);
-            input.write(
-              `${streamJsonUserMessage(sessionId, options.inputPrompt, promptUuid)}\n`,
-            );
+            sendPromptOnceListed();
           },
           ...launchOf(args),
           cwd: profile.cwd,
@@ -1215,6 +1244,7 @@ export const runCloudClaude = async (options: {
           cancellation,
           onJson,
         }).finally(endInput);
+    toolsWait.abort();
     if (keeper && "parked" in result && result.parked) {
       const client = keeper;
       kept = {
@@ -1276,6 +1306,7 @@ export const runCloudClaude = async (options: {
       ...(kept ? { kept } : {}),
     };
   } finally {
+    toolsWait.abort();
     toolChannel.close();
     if (keeper && !handedOn) {
       if (kept) await kept.discard().catch(() => undefined);

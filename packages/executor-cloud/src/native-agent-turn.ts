@@ -1182,6 +1182,10 @@ export const runCloudClaude = async (options: {
           endBackgroundHold();
           markTurnStep("claudeWokenByBackground");
           options.backgroundWait?.resume();
+          // What the agent said while it waited is not its report; what it
+          // says once woken is (as on the desktop, where the waiting turn's
+          // words are not delivered).
+          answers.length = 0;
           return;
         }
         if (options.quiet && isClaudeCodeVisibleOutputNudge(event)) {

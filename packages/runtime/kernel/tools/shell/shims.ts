@@ -227,6 +227,71 @@ const buildUnixBunShimScript = (): string =>
     "",
   ].join("\n");
 
+const BUN_DRAFT_GUARD = "bun-draft-guard.cjs";
+
+/**
+ * Windows' `bun`, guarded for drafts like the Unix one: before a command that
+ * installs, a guard (run by the real Bun) removes the draft's link to shared
+ * packages. Package sets sit in `<app>\.git\stella-packages` or, for a
+ * launcher install, `<install root>\pkgs` (draft-deps.ts).
+ */
+const buildWindowsBunShimScript = (): string =>
+  [
+    "@echo off",
+    "setlocal",
+    'set "__stella_bun=%STELLA_REAL_BUN_BIN%"',
+    'if not defined __stella_bun set "__stella_bun=%STELLA_BUN_PATH%"',
+    'if not defined __stella_bun for /f "delims=" %%b in (\'where bun.exe 2^>nul\') do if not defined __stella_bun set "__stella_bun=%%b"',
+    "if not defined __stella_bun (",
+    "  echo bun executable not found 1>&2",
+    "  exit /b 127",
+    ")",
+    'for %%c in (install i add a remove rm update ci link unlink patch) do if /I "%~1"=="%%c" "%__stella_bun%" "%~dp0' + BUN_DRAFT_GUARD + '"',
+    '"%__stella_bun%" %*',
+    "exit /b %ERRORLEVEL%",
+    "",
+  ].join("\r\n");
+
+const bunDraftGuardSource = (): string =>
+  [
+    '"use strict";',
+    'const fs = require("fs");',
+    'const path = require("path");',
+    "const app = process.env.STELLA_APP_DIR;",
+    "const real = (file) => {",
+    "  try {",
+    "    return fs.realpathSync(file).toLowerCase();",
+    "  } catch {",
+    "    return null;",
+    "  }",
+    "};",
+    "if (app && real(path.join(app, \"node_modules\"))) {",
+    "  const shared = real(path.join(app, \"node_modules\"));",
+    "  const sets = [path.join(app, \".git\", \"stella-packages\"), path.join(path.dirname(app), \"pkgs\")]",
+    "    .map(real)",
+    "    .filter(Boolean);",
+    "  let dir = process.cwd();",
+    "  for (;;) {",
+    "    const link = path.join(dir, \"node_modules\");",
+    "    const stat = fs.lstatSync(link, { throwIfNoEntry: false });",
+    "    const target = stat && stat.isSymbolicLink() ? real(link) : null;",
+    "    if (target && (target === shared || sets.some((set) => target.startsWith(set + path.sep)))) {",
+    "      try {",
+    "        fs.unlinkSync(link);",
+    "      } catch {",
+    "        fs.rmdirSync(link);",
+    "      }",
+    "      console.error(\"Stella: this draft used shared packages; installing its own instead.\");",
+    "      break;",
+    "    }",
+    "    const up = path.dirname(dir);",
+    "    if (up === dir) break;",
+    "    dir = up;",
+    "  }",
+    "}",
+    "",
+  ].join("\n");
+
 export const ensureNodeShim = (
   secretStateRoot: string,
   options?: ShellStateOptions,
@@ -246,6 +311,10 @@ export const ensureNodeShim = (
       "utf-8",
     );
     writeElectronNodePreload(shimDir);
+    if (process.platform === "win32") {
+      writeFileSync(path.join(shimDir, "bun.cmd"), buildWindowsBunShimScript(), "utf-8");
+      writeFileSync(path.join(shimDir, BUN_DRAFT_GUARD), bunDraftGuardSource(), "utf-8");
+    }
     if (process.platform === "win32" && process.env.STELLA_PYTHON_BIN?.trim()) {
       for (const command of ["python", "python3", "py"]) {
         writeFileSync(

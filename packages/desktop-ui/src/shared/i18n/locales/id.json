@@ -1716,50 +1716,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Saya menemukan tempat yang tepat, mengisi formulirnya, dan memasukkannya ke kalender Anda, persis seperti yang akan Anda lakukan.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Putar demo ini",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Jadwalkan apa saja dan saya akan mengerjakannya tepat waktu, bahkan saat Anda tidur.",
-          "title": "Minta sekali. Terjadi setiap hari.",
-          "word": "Rutinitas"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Saya bekerja di dalam aplikasi sungguhan di komputer ini, dan bisa menjalankan lebih dari satu pekerjaan sekaligus.",
-          "title": "File sungguhan. Beberapa pekerjaan sekaligus.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1771,13 +1731,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Tambahan opsional",
+        "lead": "Tidak ada yang wajib, tapi masing-masing membuatku lebih berguna.",
+        "start": "Mulai mengobrol"
       },
       "gmail": {
         "body": "Cari email, ikuti percakapan, dan buat draf balasan, cukup dengan meminta.",
@@ -1785,116 +1742,15 @@
         "connected": "Terhubung",
         "connecting": "Menunggu Google…",
         "error": "Gagal menghubungkan Gmail. Coba lagi, atau lewati dulu.",
-        "settledDesc": "Kelola kapan saja di Konektor.",
-        "settledSkippedTitle": "Belum pakai Gmail",
-        "settledTitle": "Gmail terhubung",
-        "skip": "Nanti saja",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Halo, saya Stella.\n\nSaya bukan chatbot. Saya memakai komputer ini untuk benar-benar menyelesaikan pekerjaan Anda, di latar belakang, sementara Anda terus melanjutkan aktivitas.\n\nBeginilah tampaknya.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Banyak urusan hidup lewat email. Hubungkan Gmail dan aku bisa membantu mengurusnya.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Aku juga ada di ponselmu.",
-        "quickstart": "Itu saja. Satu hal terakhir, dan ini opsional: panduan mulai cepat.",
-        "quickstartDone": "Selesai. Ini yang saya pelajari, dan beberapa hal yang bisa kita mulai.",
-        "quickstartFailed": "Kali ini saya tidak bisa selesai membaca browser Anda. Kita tetap bisa mulai, dan saya akan belajar seiring berjalan.",
-        "selfmod": "Dan karena saya berada di komputer Anda, saya bisa mengubah diri saya sendiri.",
-        "signin": "Sekarang pilih cara aku berpikir. Pakai paket Claude atau ChatGPT yang sudah kamu punya, kunci milikmu sendiri, atau akun Stella.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Pertanyaan singkat, opsional: bagaimana kamu menemukanku?"
+        "signin": "Halo, saya Stella. Pertama, pilih cara aku berpikir: paket Claude atau ChatGPT yang sudah kamu punya, kunci milikmu sendiri, atau akun Stella."
       },
       "progress": "Kemajuan penyiapan",
-      "quickstart": {
-        "body": "Kebanyakan asisten mulai dari nol. Arahkan saya ke browser Anda dan saya akan membacanya sekali untuk membangun memori awal, sehingga saya berguna sejak hari pertama.",
-        "continueInBackground": "Mulai mengobrol, selesaikan di latar belakang",
-        "eyebrow": "Mulai cepat",
-        "failedBody": "Ada yang menghentikan pembacaan. Coba lagi, atau mulai mengobrol dan saya akan belajar seiring berjalan.",
-        "failedTitle": "Belum selesai",
-        "run": "Jalankan mulai cepat",
-        "runningBody": "Sekitar satu menit. Silakan masuk kapan saja, saya akan menyelesaikannya di latar belakang.",
-        "runningTitle": "Mengenal Anda",
-        "skip": "Lewati",
-        "stages": {
-          "notice": "Memperhatikan hal yang penting bagi Anda",
-          "read": "Membaca yang Anda pilih",
-          "write": "Menulis memori awal Anda"
-        },
-        "title": "Beri saya awal yang baik"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Selesai.",
-        "gmailSkipped": "Nanti saja.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Keren sekali.",
-        "signinDone": "Selesai.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Lewati yang ini."
-      },
-      "selfmod": {
-        "body": "Ada fitur yang kurang, atau ingin sesuatu bekerja dengan cara lain? Cukup minta. Saya akan menulis ulang kode saya sendiri, Anda mencobanya, dan Anda yang memutuskan apakah akan dipertahankan.",
-        "hint": "Perubahan tetap berada di komputer ini.",
-        "settledDesc": "Minta, pratinjau, perbarui. Urungkan kapan saja.",
-        "settledTitle": "Saya bisa mengubah diri sendiri",
-        "steps": {
-          "ask": {
-            "body": "Jelaskan perubahannya dengan kata-kata sederhana.",
-            "title": "Minta"
-          },
-          "preview": {
-            "body": "Sebuah tugas membuatnya dan membuka pratinjau langsung.",
-            "title": "Pratinjau"
-          },
-          "update": {
-            "body": "Satu klik untuk menerapkannya. Urungkan kapan saja.",
-            "title": "Perbarui"
-          }
-        },
-        "title": "Saya bisa mengubah diri sendiri"
+        "signinDone": "Selesai."
       },
       "send": "Send",
       "signin": {
@@ -1902,7 +1758,6 @@
         "claudeCliMissing": "Pasang Claude Code terlebih dahulu, lalu coba lagi.",
         "connect": "Hubungkan",
         "error": "Tidak tersambung. Coba lagi?",
-        "fine": "Ubah kapan saja di Pengaturan.",
         "hint": "Gratis untuk memulai.",
         "inUse": "Digunakan",
         "options": {
@@ -1934,47 +1789,7 @@
         "settledNoneDesc": "Masuk atau hubungkan paket kapan saja untuk mulai mengobrol.",
         "fineOwnPlan": "ChatGPT dan Claude Code memakai langganan Anda sendiri di OpenAI atau Anthropic. Ubah kapan saja di Pengaturan."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Bagaimana kamu menemukan Stella?",
-        "body": "Opsional. Jawabanmu hanya dikirim sebagai hitungan anonim, tanpa apa pun yang mengidentifikasi kamu.",
-        "skip": "Lewati",
-        "settledTitle": "Cara kamu menemukan Stella",
-        "settledSkipped": "Dilewati",
-        "answers": {
-          "google": "Pencarian Google",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok atau Instagram",
-          "reddit": "Reddit",
-          "friend": "Teman",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT atau AI lain menyarankannya",
-          "other": "Lainnya"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Dengan menggunakan Stella, Anda menyetujui {terms} dan {privacy} kami.",
     "privacyPolicy": "Kebijakan Privasi",
@@ -3854,6 +3669,27 @@
       "lineServer": "Dengan kunci OpenRouter server ini: {sorted} dipilah bulan ini · {cost}",
       "deviceKeyHint": "Untuk memakai kunci OpenRouter milik Anda, tambahkan di Model saat sedang masuk agar tersimpan di akun Anda. Kunci yang hanya disimpan di komputer ini tidak bisa dipakai saat komputer mati.",
       "deviceKeyHintPhone": "Untuk memakai kunci OpenRouter milik Anda, tambahkan di pengaturan obrolan saat sedang masuk agar tersimpan di akun Anda. Kunci yang hanya disimpan di ponsel ini tidak bisa dipakai untuk email."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Bagaimana kamu menemukan Stella?",
+      "body": "Opsional. Jawabanmu hanya dikirim sebagai hitungan anonim, tanpa apa pun yang mengidentifikasi kamu.",
+      "skip": "Lewati",
+      "answers": {
+        "google": "Pencarian Google",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok atau Instagram",
+        "reddit": "Reddit",
+        "friend": "Teman",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT atau AI lain menyarankannya",
+        "other": "Lainnya"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella juga ada di ponselmu",
+      "detail": "Dapatkan aplikasinya untuk mengirim pesan ke Stella dan memantau tugasmu saat kamu jauh dari komputer ini."
     }
   }
 }

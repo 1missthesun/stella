@@ -1726,50 +1726,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Löydän oikean paikan, täytän lomakkeen ja lisään sen kalenteriisi, aivan kuten sinäkin tekisit.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Toista tämä esittely",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Ajasta mitä tahansa, niin teen sen ajallaan, vaikka nukkuisit.",
-          "title": "Pyydä kerran. Se tapahtuu joka päivä.",
-          "word": "Rutiinit"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Työskentelen tämän tietokoneen oikeissa sovelluksissa, ja voin hoitaa useampaa työtä yhtä aikaa.",
-          "title": "Oikeita tiedostoja. Useita töitä yhtä aikaa.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1781,13 +1741,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Valinnaiset lisät",
+        "lead": "Mikään näistä ei ole pakollinen, mutta jokainen tekee minusta hyödyllisemmän.",
+        "start": "Aloita keskustelu"
       },
       "gmail": {
         "body": "Etsi viestejä, pysy keskustelujen tasalla ja luonnostele vastauksia pelkällä pyynnöllä.",
@@ -1795,116 +1752,15 @@
         "connected": "Yhdistetty",
         "connecting": "Odotetaan Googlea…",
         "error": "Gmailin yhdistäminen epäonnistui. Yritä uudelleen tai ohita toistaiseksi.",
-        "settledDesc": "Hallitse sitä milloin tahansa kohdassa Liitännät.",
-        "settledSkippedTitle": "Ei Gmailia toistaiseksi",
-        "settledTitle": "Gmail yhdistetty",
-        "skip": "Ei nyt",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Hei, olen Stella.\n\nEn ole chatbotti. Käytän tätä tietokonetta saadakseni asioita oikeasti tehtyä puolestasi taustalla, kun sinä jatkat omiasi.\n\nNäin se näyttää.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Suuri osa elämästä kulkee sähköpostin kautta. Yhdistä Gmail, niin autan sinua sen kanssa.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Olen myös puhelimessasi.",
-        "quickstart": "Siinä kaikki. Vielä yksi asia, ja se on valinnainen: pikaopastus.",
-        "quickstartDone": "Valmis. Tämän opin, ja tässä muutamia asioita, joista voisimme aloittaa.",
-        "quickstartFailed": "En saanut selaintasi luettua loppuun tällä kertaa. Voimme aloittaa silti, ja opin matkan varrella.",
-        "selfmod": "Ja koska asun tietokoneellasi, voin muuttaa itseäni.",
-        "signin": "Valitse seuraavaksi, miten ajattelen. Käytä Claude- tai ChatGPT-tilaustasi, omaa avaintasi tai Stella-tiliä.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Nopea ja vapaaehtoinen kysymys: miten löysit minut?"
+        "signin": "Hei, olen Stella. Valitse ensin, miten ajattelen: Claude- tai ChatGPT-tilauksesi, oma avaimesi tai Stella-tili."
       },
       "progress": "Käyttöönoton eteneminen",
-      "quickstart": {
-        "body": "Useimmat avustajat aloittavat tyhjästä. Osoita minut selaimeesi, niin luen sen kerran ja rakennan alkumuistin, jotta olen hyödyksi heti ensimmäisestä päivästä.",
-        "continueInBackground": "Aloita keskustelu, viimeistele taustalla",
-        "eyebrow": "Pikaopastus",
-        "failedBody": "Jokin keskeytti lukemisen. Yritä uudelleen tai aloita keskustelu, niin opin matkan varrella.",
-        "failedTitle": "Tämä ei valmistunut",
-        "run": "Aloita pikaopastus",
-        "runningBody": "Noin minuutti. Siirry keskusteluun milloin haluat, niin viimeistelen taustalla.",
-        "runningTitle": "Tutustun sinuun",
-        "skip": "Ohita",
-        "stages": {
-          "notice": "Huomaan, mikä sinulle on tärkeää",
-          "read": "Luen valitsemasi",
-          "write": "Kirjoitan alkumuistisi"
-        },
-        "title": "Anna minulle hyvä alku"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Valmis.",
-        "gmailSkipped": "Ei nyt.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Todella hienoa.",
-        "signinDone": "Valmis.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Ohita tämä."
-      },
-      "selfmod": {
-        "body": "Puuttuuko ominaisuus, vai haluatko jonkin toimivan toisin? Pyydä vain. Kirjoitan oman koodini uusiksi, annan sinun kokeilla sitä, ja sinä päätät, pidätkö muutoksen.",
-        "hint": "Muutokset pysyvät tällä tietokoneella.",
-        "settledDesc": "Pyydä, esikatsele, päivitä. Kumoa milloin tahansa.",
-        "settledTitle": "Voin muuttaa itseäni",
-        "steps": {
-          "ask": {
-            "body": "Kuvaile muutos tavallisin sanoin.",
-            "title": "Pyydä"
-          },
-          "preview": {
-            "body": "Tehtävä rakentaa sen ja avaa suoran esikatselun.",
-            "title": "Esikatsele"
-          },
-          "update": {
-            "body": "Yksi napsautus ottaa sen käyttöön. Kumoa milloin tahansa.",
-            "title": "Päivitä"
-          }
-        },
-        "title": "Voin muuttaa itseäni"
+        "signinDone": "Valmis."
       },
       "send": "Send",
       "signin": {
@@ -1912,7 +1768,6 @@
         "claudeCliMissing": "Asenna ensin Claude Code ja yritä sitten uudelleen.",
         "connect": "Yhdistä",
         "error": "Yhdistäminen ei onnistunut. Yritetäänkö uudelleen?",
-        "fine": "Voit muuttaa tämän milloin tahansa asetuksissa.",
         "hint": "Aloittaminen on ilmaista.",
         "inUse": "Käytössä",
         "options": {
@@ -1944,47 +1799,7 @@
         "settledNoneDesc": "Kirjaudu tai yhdistä tilaus milloin tahansa aloittaaksesi.",
         "fineOwnPlan": "ChatGPT ja Claude Code käyttävät omaa OpenAI- tai Anthropic-tilaustasi. Voit muuttaa tämän milloin tahansa asetuksista."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Miten löysit Stellan?",
-        "body": "Vapaaehtoinen. Vastauksesi lähetetään vain anonyyminä laskurina ilman mitään, mikä tunnistaisi sinut.",
-        "skip": "Ohita",
-        "settledTitle": "Miten löysit Stellan",
-        "settledSkipped": "Ohitettu",
-        "answers": {
-          "google": "Google-haku",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok tai Instagram",
-          "reddit": "Reddit",
-          "friend": "Kaveri",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT tai muu tekoäly ehdotti sitä",
-          "other": "Muu"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Käyttämällä Stellaa hyväksyt {terms} ja {privacy}.",
     "privacyPolicy": "tietosuojakäytäntömme",
@@ -3910,6 +3725,27 @@
       "lineServer": "Tämän palvelimen OpenRouter-avaimella: {sorted} lajiteltu tässä kuussa · {cost}",
       "deviceKeyHint": "Jos haluat käyttää omaa OpenRouter-avaintasi, lisää se kohdassa Mallit kirjautuneena, niin se tallentuu tiliisi. Vain tälle tietokoneelle tallennettua avainta ei voi käyttää, kun tietokone on pois päältä.",
       "deviceKeyHintPhone": "Jos haluat käyttää omaa OpenRouter-avaintasi, lisää se keskustelun asetuksissa kirjautuneena, niin se tallentuu tiliisi. Vain tälle puhelimelle tallennettua avainta ei voi käyttää sähköpostiin."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Miten löysit Stellan?",
+      "body": "Vapaaehtoinen. Vastauksesi lähetetään vain anonyyminä laskurina ilman mitään, mikä tunnistaisi sinut.",
+      "skip": "Ohita",
+      "answers": {
+        "google": "Google-haku",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok tai Instagram",
+        "reddit": "Reddit",
+        "friend": "Kaveri",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT tai muu tekoäly ehdotti sitä",
+        "other": "Muu"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella on myös puhelimessasi",
+      "detail": "Hanki sovellus, niin voit viestiä Stellalle ja seurata tehtäviäsi, kun olet poissa tämän tietokoneen ääreltä."
     }
   }
 }

@@ -1,9 +1,3 @@
-export type DiscoveryCategory =
-  | "browsing_bookmarks"
-  | "dev_environment"
-  | "apps_system"
-  | "messages_notes";
-
 export type WindowBounds = {
   x: number;
   y: number;
@@ -109,49 +103,6 @@ export type ChatContext = {
 export type ChatContextUpdate = {
   context: ChatContext | null;
   version: number;
-};
-
-export type BrowserType =
-  | "chrome"
-  | "edge"
-  | "brave"
-  | "arc"
-  | "opera"
-  | "vivaldi";
-
-export type BrowsingSignals = {
-  browsers: string[];
-  visitCount: number;
-  text: string;
-};
-
-export type PreferredBrowserProfile = {
-  browser: BrowserType | null;
-  profile: string | null;
-};
-
-export type BrowserProfile = {
-  id: string;
-  name: string;
-};
-
-export type DevProject = {
-  name: string;
-  path: string;
-  lastActivity: number;
-  tech?: string[];
-};
-
-export type AllUserSignals = {
-  browsing: BrowsingSignals | null;
-  devProjects: DevProject[];
-};
-
-export type AllUserSignalsResult = {
-  data: AllUserSignals | null;
-  formatted: string | null;
-  formattedSections?: Partial<Record<DiscoveryCategory, string>> | null;
-  error?: string;
 };
 
 export type AgentHealth =

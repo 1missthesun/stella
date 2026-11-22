@@ -12,6 +12,9 @@ import {
   usageLimitCardId,
 } from "@/features/chat/usage-limit-card";
 import { presentSafeguardBlock } from "@/features/chat/safeguard-card";
+import { classifyStellaProviderError } from "@/features/chat/streaming/stella-provider-error-classifier";
+import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
+import { FOUND_VIA_NOTICE_ID, noteStellaReply } from "@/features/nudges/usage-nudges-store";
 import { isSafeguardBlock, type SafeguardAction } from "@stella/contracts/safeguard-block";
 import {
   clearComposerNotices,
@@ -87,6 +90,7 @@ const clearStaleNotices = (
     conversationId,
     (notice) =>
       notice.id === usageLimit ||
+      notice.id === FOUND_VIA_NOTICE_ID ||
       (options.keepVoiceFailure === true &&
         notice.id === VOICE_FAILURE_NOTICE_ID),
   );
@@ -125,10 +129,12 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
       continue;
     }
     if (event.type === "engine_status" && (event.state === "usage-limit" || event.state === "usage-limit-end")) {
+      if (event.state === "usage-limit") recordAnonymousCount({ type: "turn_error", kind: "usage-limit-paused" });
       presentUsageLimit(conversationId, event);
       continue;
     }
     if (event.type === "engine_status" && event.state === "login-required") {
+      recordAnonymousCount({ type: "turn_error", kind: "login-required" });
       presentClaudeLoginHeld(conversationId, event.email);
       continue;
     }
@@ -150,10 +156,15 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     if (message?.role !== "assistant") continue;
     if (isSafeguardBlock(message)) continue;
     if (message.stopReason === "error") {
+      recordAnonymousCount({
+        type: "turn_error",
+        kind: classifyStellaProviderError(message.errorMessage ?? null).kind,
+      });
       if (!presentAllowanceConnectPlan(message.errorMessage ?? null, conversationId)) {
         presentStellaProviderError(message.errorMessage ?? null, { conversationId });
       }
     } else if (message.stopReason !== "aborted") {
+      if (message.stopReason === "stop") noteStellaReply();
       clearStaleNotices(conversationId, { keepVoiceFailure: true });
     }
   }
@@ -265,12 +276,6 @@ desktopSendOutbox.setDeliver(async (entry) => {
     ...(entry.send ? { send: entry.send } : {}),
   });
 });
-
-export const submitPiWelcome = async (conversationId: string, message: string): Promise<void> => {
-  const chat = api();
-  if (!chat) throw new Error("Stella's runtime is not available.");
-  await chat.request({ op: "welcome", conversationId, message });
-};
 
 export const importLocalPiChat = async (conversationId: string, fromConversationId: string): Promise<number> => {
   const chat = api();

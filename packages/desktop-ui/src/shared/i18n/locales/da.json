@@ -1726,50 +1726,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Jeg finder det rette sted, udfylder formularen og sætter det i din kalender, ligesom du selv ville gøre.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Afspil denne demo",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Planlæg hvad som helst, så gør jeg det til tiden, selv mens du sover.",
-          "title": "Bed om det én gang. Det sker hver dag.",
-          "word": "Rutiner"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Jeg arbejder i de rigtige apps på denne computer, og jeg kan køre mere end én opgave ad gangen.",
-          "title": "Rigtige filer. Flere opgaver på én gang.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1781,13 +1741,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Valgfrie ekstra",
+        "lead": "Intet af dette er påkrævet, men hver af dem gør mig mere nyttig.",
+        "start": "Begynd at chatte"
       },
       "gmail": {
         "body": "Find e-mails, indhent tråde og skriv udkast til svar, bare ved at spørge.",
@@ -1795,116 +1752,15 @@
         "connected": "Forbundet",
         "connecting": "Venter på Google…",
         "error": "Gmail kunne ikke forbindes. Prøv igen, eller spring over indtil videre.",
-        "settledDesc": "Administrer det når som helst under Forbindelser.",
-        "settledSkippedTitle": "Ingen Gmail lige nu",
-        "settledTitle": "Gmail forbundet",
-        "skip": "Ikke nu",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Hej, jeg er Stella.\n\nJeg er ikke en chatbot. Jeg bruger denne computer til rent faktisk at få tingene gjort for dig, i baggrunden, mens du fortsætter med dit.\n\nSådan ser det ud.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Meget af livet foregår via e-mail. Forbind Gmail, så kan jeg hjælpe med din.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Jeg er også på din telefon.",
-        "quickstart": "Det var det hele. Én sidste ting, og den er valgfri: en lynstart.",
-        "quickstartDone": "Færdig. Her er, hvad jeg har lært, og et par ting, vi kunne begynde med.",
-        "quickstartFailed": "Jeg kunne ikke nå at læse din browser færdig denne gang. Vi kan starte alligevel, og jeg lærer undervejs.",
-        "selfmod": "Og fordi jeg lever på din computer, kan jeg ændre mig selv.",
-        "signin": "Vælg nu, hvordan jeg tænker. Brug dit Claude- eller ChatGPT-abonnement, din egen nøgle eller en Stella-konto.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Et hurtigt spørgsmål, helt frivilligt: hvordan fandt du mig?"
+        "signin": "Hej, jeg er Stella. Vælg først, hvordan jeg tænker: dit Claude- eller ChatGPT-abonnement, din egen nøgle eller en Stella-konto."
       },
       "progress": "Opsætningsforløb",
-      "quickstart": {
-        "body": "De fleste assistenter starter fra nul. Peg mig hen på din browser, så læser jeg den én gang for at bygge en starthukommelse, så jeg er til nytte fra første dag.",
-        "continueInBackground": "Begynd at chatte, bliv færdig i baggrunden",
-        "eyebrow": "Lynstart",
-        "failedBody": "Noget afbrød læsningen. Prøv igen, eller begynd at chatte, så lærer jeg undervejs.",
-        "failedTitle": "Det blev ikke færdigt",
-        "run": "Kør lynstart",
-        "runningBody": "Cirka et minut. Gå bare i gang, når du vil, så bliver jeg færdig i baggrunden.",
-        "runningTitle": "Lærer dig at kende",
-        "skip": "Spring over",
-        "stages": {
-          "notice": "Opdager, hvad der betyder noget for dig",
-          "read": "Læser det, du valgte",
-          "write": "Skriver din starthukommelse"
-        },
-        "title": "Giv mig et forspring"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Færdig.",
-        "gmailSkipped": "Ikke nu.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Meget cool.",
-        "signinDone": "Færdig.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Spring denne over."
-      },
-      "selfmod": {
-        "body": "Mangler du en funktion, eller vil du have noget til at fungere anderledes? Bare spørg. Jeg omskriver min egen kode, lader dig prøve den, og du bestemmer, om du vil beholde den.",
-        "hint": "Ændringer bliver på denne computer.",
-        "settledDesc": "Spørg, forhåndsvis, opdater. Fortryd når som helst.",
-        "settledTitle": "Jeg kan ændre mig selv",
-        "steps": {
-          "ask": {
-            "body": "Beskriv ændringen med almindelige ord.",
-            "title": "Spørg"
-          },
-          "preview": {
-            "body": "En opgave bygger den og åbner en live-forhåndsvisning.",
-            "title": "Forhåndsvis"
-          },
-          "update": {
-            "body": "Ét klik for at anvende den. Fortryd når som helst.",
-            "title": "Opdater"
-          }
-        },
-        "title": "Jeg kan ændre mig selv"
+        "signinDone": "Færdig."
       },
       "send": "Send",
       "signin": {
@@ -1912,7 +1768,6 @@
         "claudeCliMissing": "Installer Claude Code først, og prøv så igen.",
         "connect": "Forbind",
         "error": "Det blev ikke forbundet. Vil du prøve igen?",
-        "fine": "Du kan ændre det når som helst i Indstillinger.",
         "hint": "Gratis at starte.",
         "inUse": "I brug",
         "options": {
@@ -1944,47 +1799,7 @@
         "settledNoneDesc": "Log ind eller forbind et abonnement når som helst for at begynde at chatte.",
         "fineOwnPlan": "ChatGPT og Claude Code bruger dit eget abonnement hos OpenAI eller Anthropic. Du kan ændre det når som helst i Indstillinger."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Hvordan fandt du Stella?",
-        "body": "Frivilligt. Dit svar sendes kun som en anonym optælling uden noget, der identificerer dig.",
-        "skip": "Spring over",
-        "settledTitle": "Hvordan du fandt Stella",
-        "settledSkipped": "Sprunget over",
-        "answers": {
-          "google": "Google-søgning",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok eller Instagram",
-          "reddit": "Reddit",
-          "friend": "En ven",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT eller en anden AI foreslog det",
-          "other": "Andet"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Ved at bruge Stella accepterer du vores {terms} og {privacy}.",
     "privacyPolicy": "Privatlivspolitik",
@@ -3910,6 +3725,27 @@
       "lineServer": "På denne servers OpenRouter-nøgle: {sorted} sorteret denne måned · {cost}",
       "deviceKeyHint": "Vil du bruge din egen OpenRouter-nøgle, så tilføj den under Modeller, mens du er logget ind, så den gemmes på din konto. En nøgle, der kun ligger på denne computer, kan ikke bruges, mens computeren er slukket.",
       "deviceKeyHintPhone": "Vil du bruge din egen OpenRouter-nøgle, så tilføj den i chatindstillingerne, mens du er logget ind, så den gemmes på din konto. En nøgle, der kun ligger på denne telefon, kan ikke bruges til e-mail."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Hvordan fandt du Stella?",
+      "body": "Frivilligt. Dit svar sendes kun som en anonym optælling uden noget, der identificerer dig.",
+      "skip": "Spring over",
+      "answers": {
+        "google": "Google-søgning",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok eller Instagram",
+        "reddit": "Reddit",
+        "friend": "En ven",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT eller en anden AI foreslog det",
+        "other": "Andet"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella er også på din telefon",
+      "detail": "Hent appen for at skrive til Stella og følge dine opgaver, når du er væk fra denne computer."
     }
   }
 }

@@ -113,6 +113,8 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   "STELLA_CLAUDE_CLI_PATH",
   // Points Google Antigravity requests at a local mock instead of Google.
   "STELLA_ANTIGRAVITY_ENDPOINT",
+  // Points anonymous counts at a local telemetry worker instead of dev.
+  "STELLA_ANONYMOUS_COUNTS_ENDPOINT",
   "STELLA_APP_SOURCE_INSTALLED",
   // Proxy claims: Electron main routes fetch through these only when one is set.
   "HTTP_PROXY",

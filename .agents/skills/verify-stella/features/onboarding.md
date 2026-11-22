@@ -4,7 +4,9 @@ First run is a chat-style walkthrough (`global/onboarding/chat/OnboardingChat.ts
 
 ## Steps
 
-In order: **capabilities**, **selfmod**, **memory** (each a demo film resting on a poster with a play button; demos never autoplay and replay when ended), **signin** (titled "Choose your AI": picks Claude Code once when the CLI is installed and signed in, otherwise Stella; installs Claude Code when it's missing, with progress), **foundVia** (only when anonymous counts are on), **gmail**, **theme**, **extras**, **phone**, **quickstart** (an on-device digest of browsing and recent repos becomes 10–20 lines of "Who the user is" in `main.md`; it waits in memory for an account and never sends data before sign-in). Every step opens at its top and fits the window (`--obc-demo-max-width`). Progress and answers persist in ui-state, so a reload resumes.
+Two steps: **signin** (titled "Choose your AI", the first thing on launch: picks Claude Code once when the CLI is installed and signed in, otherwise Stella; installs Claude Code when it's missing, with progress), then **extras** (one optional card: Connect Gmail when signed in to a Stella account, the Chrome extension, and on macOS Accessibility and Screen Recording; "Start chatting" goes straight into the chat). Progress and answers persist in ui-state, so a reload resumes; someone part-way through the old ten-step setup resumes at the step that replaced theirs (demos → signin, later steps → extras). New desktop installs follow the system light/dark setting; Theme lives in Settings and the top-bar menu.
+
+After use, two one-time nudges (`features/nudges/`, state in ui-state `stella:usage-nudges`): "How did you find Stella?" above the composer after 3 finished replies (only when anonymous counts are on; one tap answers, ✕ counts as skipped), and the phone app in the bell on a second day with a reply, or after 6 replies (its action opens the phone dialog; dismissing ends it). One per app run. Installs that finished the old setup start with both done.
 
 After onboarding a signed-out desktop opens a local chat (`local_…`) with a sign-in banner; signing in later asks keep-local or sync (`SignedOutLocalChoice`), and sync imports the local chat's text. A self-hosted install pairs with its server instead.
 
@@ -20,5 +22,6 @@ After onboarding a signed-out desktop opens a local chat (`local_…`) with a si
 ## Gotchas
 
 - Onboarding-complete is per install, not per account.
-- The profile synthesis wants task-useful lines, never site lists; it has no category filters by design.
+- Trigger the nudges without many real turns: edit `stella:usage-nudges` in the run's `data/ui-state.json` (`replies`, `days`), which the app picks up live.
+- Anonymous counts from a test copy go to the dev dataset (`stella_anonymous_counts_dev`); `node scripts/awareness/weekly-counts.mjs --dev` summarises the setup funnel, day-1 messages and failed replies.
 - Phone pairing has no codes or QR any more: the phone signs in to the same account (see [mobile account](./mobile-account-pairing.md)).

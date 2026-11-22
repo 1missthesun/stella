@@ -412,18 +412,6 @@ export class RuntimeHostAdapter {
     async killAllShells() {
         await this.host.killAllShells();
     }
-    collectAllSignals(options) {
-        return this.host.collectAllSignals(options);
-    }
-    writeCoreMemory(content, options) {
-        return this.host.writeCoreMemory(content, options);
-    }
-    detectPreferredBrowserProfile() {
-        return this.host.detectPreferredBrowserProfile();
-    }
-    listBrowserProfiles(browserType) {
-        return this.host.listBrowserProfiles(browserType);
-    }
     googleWorkspaceGetAuthStatus() {
         return this.host.googleWorkspaceGetAuthStatus();
     }

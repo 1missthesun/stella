@@ -3,7 +3,6 @@ import { registerAgentHandlers } from "../ipc/agent-handlers.js";
 import { registerRuntimeAvailabilityBridge } from "../ipc/runtime-availability-bridge.js";
 import { registerBrowserHandlers } from "../ipc/browser-handlers.js";
 import { registerInAppBrowserHandlers } from "../ipc/in-app-browser-handlers.js";
-import { registerDiscoveryHandlers } from "../ipc/discovery-handlers.js";
 import { registerRemoteExecutionConsentHandlers } from "../ipc/remote-execution-consent-handlers.js";
 import { registerCaptureHandlers } from "../ipc/capture-handlers.js";
 import { registerCloudHomeSyncHandlers } from "../ipc/cloud-home-sync-handlers.js";
@@ -12,7 +11,6 @@ import { registerMeetingCaptureHandlers } from "../ipc/meeting-capture-handlers.
 import { registerDisplayHandlers } from "../ipc/display-handlers.js";
 import { registerLocalChatHandlers } from "../ipc/local-chat-handlers.js";
 import { registerNativeIntegrationHandlers } from "../ipc/native-integration-handlers.js";
-import { registerOnboardingHandlers } from "../ipc/onboarding-handlers.js";
 import { app, BrowserWindow, powerMonitor, shell } from "electron";
 import { toggleRealtimeVoice, } from "../services/realtime-voice-control.js";
 import { WakewordService } from "../services/wakeword-service.js";
@@ -331,16 +329,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerBrowserHandlers({
         getStellaDataDir: lifecycle.getStellaDataDir,
-        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
-    });
-    registerDiscoveryHandlers({
-        getStellaHostRunner: lifecycle.getRunner,
-        onStellaHostRunnerChanged: lifecycle.onRunnerChanged,
-        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
-    });
-    registerOnboardingHandlers({
-        getStellaHostRunner: lifecycle.getRunner,
-        whenRuntimeAuthenticated: () => services.authService.whenRuntimeAuthenticated(),
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerRemoteExecutionConsentHandlers({

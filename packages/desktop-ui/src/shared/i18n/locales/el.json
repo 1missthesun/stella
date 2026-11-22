@@ -1726,50 +1726,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Βρίσκω το σωστό μέρος, συμπληρώνω τη φόρμα και την προσθέτω στο ημερολόγιό σου, όπως θα έκανες κι εσύ.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Αναπαραγωγή αυτής της επίδειξης",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Προγραμμάτισε οτιδήποτε και θα το κάνω στην ώρα του, ακόμη κι όταν κοιμάσαι.",
-          "title": "Ζήτα το μία φορά. Γίνεται κάθε μέρα.",
-          "word": "Ρουτίνες"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Δουλεύω μέσα στις πραγματικές εφαρμογές αυτού του υπολογιστή και μπορώ να τρέχω περισσότερες από μία δουλειές ταυτόχρονα.",
-          "title": "Πραγματικά αρχεία. Πολλές δουλειές ταυτόχρονα.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1781,13 +1741,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Προαιρετικά επιπλέον",
+        "lead": "Κανένα από αυτά δεν είναι υποχρεωτικό, αλλά το καθένα με κάνει πιο χρήσιμη.",
+        "start": "Ξεκινήστε τη συνομιλία"
       },
       "gmail": {
         "body": "Βρες email, ενημερώσου για συζητήσεις και γράψε πρόχειρες απαντήσεις, απλώς ζητώντας το.",
@@ -1795,116 +1752,15 @@
         "connected": "Συνδέθηκε",
         "connecting": "Αναμονή για Google…",
         "error": "Δεν ήταν δυνατή η σύνδεση του Gmail. Δοκίμασε ξανά ή παράλειψέ το προς το παρόν.",
-        "settledDesc": "Διαχειρίσου το οποτεδήποτε από τις Συνδέσεις.",
-        "settledSkippedTitle": "Χωρίς Gmail προς το παρόν",
-        "settledTitle": "Το Gmail συνδέθηκε",
-        "skip": "Όχι τώρα",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Γεια, είμαι η Stella.\n\nΔεν είμαι chatbot. Χρησιμοποιώ αυτόν τον υπολογιστή για να κάνω πραγματικά πράγματα για σένα, στο παρασκήνιο, ενώ εσύ συνεχίζεις τη δουλειά σου.\n\nΝα πώς φαίνεται αυτό.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Μεγάλο μέρος της ζωής περνά από το email. Σύνδεσε το Gmail και θα σε βοηθήσω με το δικό σου.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Είμαι και στο κινητό σας.",
-        "quickstart": "Αυτό ήταν όλο. Ένα τελευταίο πράγμα, προαιρετικό: μια γρήγορη εκκίνηση.",
-        "quickstartDone": "Έτοιμο. Να τι έμαθα και μερικά πράγματα με τα οποία θα μπορούσαμε να ξεκινήσουμε.",
-        "quickstartFailed": "Αυτή τη φορά δεν κατάφερα να διαβάσω ολόκληρο το πρόγραμμα περιήγησής σου. Μπορούμε να ξεκινήσουμε έτσι κι αλλιώς και θα μαθαίνω όσο προχωράμε.",
-        "selfmod": "Και επειδή ζω στον υπολογιστή σου, μπορώ να αλλάζω τον εαυτό μου.",
-        "signin": "Τώρα επιλέξτε πώς σκέφτομαι. Χρησιμοποιήστε το πρόγραμμα Claude ή ChatGPT που ήδη έχετε, το δικό σας κλειδί ή έναν λογαριασμό Stella.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Μια γρήγορη, προαιρετική ερώτηση: πώς με βρήκες;"
+        "signin": "Γεια, είμαι η Stella. Πρώτα, επιλέξτε πώς σκέφτομαι: το πρόγραμμα Claude ή ChatGPT που ήδη έχετε, το δικό σας κλειδί ή έναν λογαριασμό Stella."
       },
       "progress": "Πρόοδος ρύθμισης",
-      "quickstart": {
-        "body": "Οι περισσότεροι βοηθοί ξεκινούν από το μηδέν. Δείξε μου το πρόγραμμα περιήγησής σου και θα το διαβάσω μία φορά για να φτιάξω μια αρχική μνήμη, ώστε να είμαι χρήσιμη από την πρώτη μέρα.",
-        "continueInBackground": "Ξεκίνα συνομιλία, τελείωσε στο παρασκήνιο",
-        "eyebrow": "Γρήγορη εκκίνηση",
-        "failedBody": "Κάτι διέκοψε την ανάγνωση. Δοκίμασε ξανά ή ξεκίνα συνομιλία και θα μαθαίνω όσο προχωράμε.",
-        "failedTitle": "Δεν ολοκληρώθηκε",
-        "run": "Εκτέλεση γρήγορης εκκίνησης",
-        "runningBody": "Περίπου ένα λεπτό. Μπες όποτε θέλεις και θα τελειώσω στο παρασκήνιο.",
-        "runningTitle": "Σε γνωρίζω",
-        "skip": "Παράλειψη",
-        "stages": {
-          "notice": "Εντοπίζω τι έχει σημασία για σένα",
-          "read": "Διαβάζω ό,τι επέλεξες",
-          "write": "Γράφω την αρχική σου μνήμη"
-        },
-        "title": "Δώσε μου ένα προβάδισμα"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Έγινε.",
-        "gmailSkipped": "Όχι τώρα.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Πολύ ωραίο.",
-        "signinDone": "Έγινε.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Παράλειψη αυτής."
-      },
-      "selfmod": {
-        "body": "Σου λείπει μια λειτουργία ή θέλεις κάτι να δουλεύει διαφορετικά; Απλώς ζήτα το. Θα ξαναγράψω τον δικό μου κώδικα, θα σε αφήσω να τον δοκιμάσεις και εσύ αποφασίζεις αν θα τον κρατήσεις.",
-        "hint": "Οι αλλαγές μένουν σε αυτόν τον υπολογιστή.",
-        "settledDesc": "Ζήτα, δες προεπισκόπηση, ενημέρωσε. Αναίρεση όποτε θέλεις.",
-        "settledTitle": "Μπορώ να αλλάζω τον εαυτό μου",
-        "steps": {
-          "ask": {
-            "body": "Περίγραψε την αλλαγή με απλά λόγια.",
-            "title": "Ζήτα"
-          },
-          "preview": {
-            "body": "Μια εργασία το φτιάχνει και ανοίγει ζωντανή προεπισκόπηση.",
-            "title": "Προεπισκόπηση"
-          },
-          "update": {
-            "body": "Ένα κλικ για εφαρμογή. Αναίρεση όποτε θέλεις.",
-            "title": "Ενημέρωση"
-          }
-        },
-        "title": "Μπορώ να αλλάζω τον εαυτό μου"
+        "signinDone": "Έγινε."
       },
       "send": "Send",
       "signin": {
@@ -1912,7 +1768,6 @@
         "claudeCliMissing": "Εγκαταστήστε πρώτα το Claude Code και δοκιμάστε ξανά.",
         "connect": "Σύνδεση",
         "error": "Δεν συνδέθηκε. Να δοκιμάσεις ξανά;",
-        "fine": "Άλλαξέ το όποτε θέλεις στις Ρυθμίσεις.",
         "hint": "Δωρεάν για να ξεκινήσεις.",
         "inUse": "Σε χρήση",
         "options": {
@@ -1944,47 +1799,7 @@
         "settledNoneDesc": "Συνδεθείτε ή συνδέστε μια συνδρομή οποιαδήποτε στιγμή για να ξεκινήσετε.",
         "fineOwnPlan": "Το ChatGPT και το Claude Code χρησιμοποιούν τη δική σας συνδρομή στην OpenAI ή στην Anthropic. Αλλάξτε το οποιαδήποτε στιγμή στις Ρυθμίσεις."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Πώς βρήκες τη Stella;",
-        "body": "Προαιρετικό. Η απάντησή σου στέλνεται μόνο ως ανώνυμη καταμέτρηση, χωρίς τίποτα που να σε ταυτοποιεί.",
-        "skip": "Παράλειψη",
-        "settledTitle": "Πώς βρήκες τη Stella",
-        "settledSkipped": "Παραλείφθηκε",
-        "answers": {
-          "google": "Αναζήτηση Google",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok ή Instagram",
-          "reddit": "Reddit",
-          "friend": "Ένας φίλος",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "Το πρότεινε το ChatGPT ή άλλη ΤΝ",
-          "other": "Άλλο"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Χρησιμοποιώντας τη Stella, αποδέχεστε τους {terms} και την {privacy}.",
     "privacyPolicy": "Πολιτική απορρήτου",
@@ -3910,6 +3725,27 @@
       "lineServer": "Με το κλειδί OpenRouter αυτού του διακομιστή: {sorted} ταξινομήθηκαν αυτόν τον μήνα · {cost}",
       "deviceKeyHint": "Για να χρησιμοποιήσετε το δικό σας κλειδί OpenRouter, προσθέστε το στα Μοντέλα ενώ είστε συνδεδεμένοι, ώστε να αποθηκευτεί στον λογαριασμό σας. Ένα κλειδί που υπάρχει μόνο σε αυτόν τον υπολογιστή δεν μπορεί να χρησιμοποιηθεί όσο ο υπολογιστής είναι κλειστός.",
       "deviceKeyHintPhone": "Για να χρησιμοποιήσετε το δικό σας κλειδί OpenRouter, προσθέστε το στις ρυθμίσεις συνομιλίας ενώ είστε συνδεδεμένοι, ώστε να αποθηκευτεί στον λογαριασμό σας. Ένα κλειδί που υπάρχει μόνο σε αυτό το τηλέφωνο δεν μπορεί να χρησιμοποιηθεί για το email."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Πώς βρήκες τη Stella;",
+      "body": "Προαιρετικό. Η απάντησή σου στέλνεται μόνο ως ανώνυμη καταμέτρηση, χωρίς τίποτα που να σε ταυτοποιεί.",
+      "skip": "Παράλειψη",
+      "answers": {
+        "google": "Αναζήτηση Google",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok ή Instagram",
+        "reddit": "Reddit",
+        "friend": "Ένας φίλος",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "Το πρότεινε το ChatGPT ή άλλη ΤΝ",
+        "other": "Άλλο"
+      }
+    },
+    "phoneApp": {
+      "title": "Η Stella είναι και στο τηλέφωνό σας",
+      "detail": "Αποκτήστε την εφαρμογή για να στέλνετε μηνύματα στη Stella και να βλέπετε τις εργασίες σας όταν είστε μακριά από αυτόν τον υπολογιστή."
     }
   }
 }

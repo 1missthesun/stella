@@ -5,7 +5,6 @@ import { useT } from "@/shared/i18n";
 import { useOnboardingState } from "@/global/onboarding/use-onboarding-state";
 import { clearOnboardingChatProgress } from "./onboarding-chat-flow";
 import { clearPendingHandoff } from "./pending-handoff";
-import { resetDiscoveryJob } from "./discovery-job";
 
 export function OnboardingReplayCard() {
   const t = useT();
@@ -14,7 +13,6 @@ export function OnboardingReplayCard() {
   const handleReplay = useCallback(() => {
     clearOnboardingChatProgress();
     clearPendingHandoff();
-    resetDiscoveryJob();
     reset();
   }, [reset]);
 

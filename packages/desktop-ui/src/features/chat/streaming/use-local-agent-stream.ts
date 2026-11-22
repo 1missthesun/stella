@@ -5,6 +5,8 @@ import {
   isStellaLimitOrAuthReason,
   resolveStellaProviderErrorToast,
 } from "./stella-provider-error-toast";
+import { classifyStellaProviderError } from "./stella-provider-error-classifier";
+import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
 import { abortPiChat, submitPiChat } from "@/features/chat/pi/pi-chat-store";
 import {
   isRetryingHeldSend,
@@ -139,6 +141,7 @@ export function useLocalAgentStream({
               : current,
           );
         }
+        recordAnonymousCount({ type: "message_sent" });
         return true;
       } catch (error) {
         const message = (error as Error).message;
@@ -149,6 +152,14 @@ export function useLocalAgentStream({
           );
         }
         const reason = message || null;
+        if (!isRetryingHeldSend()) {
+          recordAnonymousCount({
+            type: "turn_error",
+            kind: needsEngineToSend(reason)
+              ? "no-engine"
+              : classifyStellaProviderError(reason).kind,
+          });
+        }
         if (needsEngineToSend(reason)) {
           presentHeldSendNotice(activeConversationId);
           args.onNeedsEngine?.();

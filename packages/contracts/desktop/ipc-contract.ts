@@ -1,15 +1,11 @@
 import type {
-  AllUserSignalsResult,
-  BrowserProfile,
   ChatContext,
   ChatContextUpdate,
-  DiscoveryCategory,
   LocalCronJobRecord,
   LocalCronJobUpdatePatch,
   LocalHeartbeatConfigRecord,
   LocalHeartbeatUpsertInput,
   LocalLlmCredentialSummary,
-  PreferredBrowserProfile,
   ScheduledConversationEvent,
   VoiceRuntimeSnapshot,
 } from "../index.js";
@@ -123,10 +119,6 @@ import type {
 } from "./companion.js";
 import type { ExternalOpener } from "./external-openers.js";
 import type { MemorySyncEraseResult, MemorySyncStatus } from "./memory-sync.js";
-import type {
-  OnboardingSynthesisRequest,
-  OnboardingSynthesisResponse,
-} from "./onboarding.js";
 import type { UiState } from "./ui.js";
 import type {
   ContextMenuCollectReply,
@@ -286,10 +278,6 @@ import {
   IPC_SHOW_STELLA_SEND,
   IPC_SHOW_STELLA_SENT,
   IPC_SHOW_STELLA_OVERLAY_INFO,
-  IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
-  IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
-  IPC_DISCOVERY_LIST_BROWSER_PROFILES,
-  IPC_DISCOVERY_WRITE_CORE_MEMORY,
   IPC_DISPLAY_CANVAS_DRIVE_URL,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_CHANGED,
@@ -357,7 +345,6 @@ import {
   IPC_OFFICE_PREVIEW_LIST,
   IPC_OFFICE_PREVIEW_START,
   IPC_OFFICE_PREVIEW_UPDATE,
-  IPC_ONBOARDING_SYNTHESIZE,
   IPC_OVERLAY_END_REGION_CAPTURE,
   IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT,
@@ -1380,30 +1367,6 @@ export type IpcInvokeContract = {
   [IPC_CONNECTOR_CONNECT_RESPOND]: Invoke<
     [payload: { requestId: string; action: "accept" | "decline" | "cancel" }],
     OkErrorResult
-  >;
-
-  [IPC_ONBOARDING_SYNTHESIZE]: Invoke<
-    [payload: OnboardingSynthesisRequest],
-    OnboardingSynthesisResponse
-  >;
-  [IPC_DISCOVERY_DETECT_PREFERRED_BROWSER]: Invoke<[], PreferredBrowserProfile>;
-  [IPC_DISCOVERY_LIST_BROWSER_PROFILES]: Invoke<
-    [browserType: string],
-    BrowserProfile[]
-  >;
-  [IPC_DISCOVERY_WRITE_CORE_MEMORY]: Invoke<
-    [payload: { content: string; includeLocation: boolean }],
-    OkErrorResult
-  >;
-  [IPC_DISCOVERY_COLLECT_ALL_SIGNALS]: Invoke<
-    [
-      options?: {
-        categories?: DiscoveryCategory[];
-        selectedBrowser?: string;
-        selectedProfile?: string;
-      },
-    ],
-    AllUserSignalsResult
   >;
 
   [IPC_BROWSER_VIEW_GET_STATE]: Invoke<[], BrowserViewState>;

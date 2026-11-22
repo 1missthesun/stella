@@ -1726,50 +1726,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Megkeresem a megfelelő oldalt, kitöltöm az űrlapot, és felveszem a naptáradba, pont úgy, ahogy te tennéd.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "A bemutató lejátszása",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Ütemezz bármit, és időben elvégzem, még akkor is, amikor alszol.",
-          "title": "Kérd meg egyszer. Minden nap megtörténik.",
-          "word": "Rutinok"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "A számítógép valódi alkalmazásaiban dolgozom, és egyszerre több feladatot is tudok futtatni.",
-          "title": "Valódi fájlok. Több feladat egyszerre.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1781,13 +1741,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Opcionális extrák",
+        "lead": "Egyik sem kötelező, de mindegyik hasznosabbá tesz.",
+        "start": "Csevegés indítása"
       },
       "gmail": {
         "body": "Keress e-maileket, zárkózz fel a beszélgetésekre, és írass válaszvázlatokat, csak kérned kell.",
@@ -1795,116 +1752,15 @@
         "connected": "Csatlakoztatva",
         "connecting": "Várakozás a Google-re…",
         "error": "Nem sikerült csatlakoztatni a Gmailt. Próbáld újra, vagy most hagyd ki.",
-        "settledDesc": "Bármikor kezelheted itt: Összekötők.",
-        "settledSkippedTitle": "Egyelőre Gmail nélkül",
-        "settledTitle": "Gmail csatlakoztatva",
-        "skip": "Most nem",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Szia, én Stella vagyok.\n\nNem vagyok chatbot. Ezt a számítógépet használom, hogy valóban elvégezzem helyetted a dolgokat, a háttérben, miközben te haladsz tovább.\n\nÍgy néz ez ki.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Az élet nagy része e-mailen zajlik. Csatlakoztasd a Gmailt, és segítek vele.",
-        "memory": "One more thing that makes me different.",
-        "phone": "A telefonodon is ott vagyok.",
-        "quickstart": "Ez minden. Még egy dolog, és az is opcionális: egy gyorsindítás.",
-        "quickstartDone": "Kész. Ezt tanultam meg rólad, és néhány dolog, amivel kezdhetjük.",
-        "quickstartFailed": "Ezúttal nem tudtam végigolvasni a böngésződet. Kezdhetjük így is, és menet közben tanulok.",
-        "selfmod": "És mivel a te számítógépeden élek, magamat is át tudom alakítani.",
-        "signin": "Most válaszd ki, hogyan gondolkodjak. Használd a meglévő Claude- vagy ChatGPT-előfizetésed, a saját kulcsod vagy egy Stella-fiókot.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Egy gyors, nem kötelező kérdés: hogyan találtál rám?"
+        "signin": "Szia, én Stella vagyok. Először válaszd ki, hogyan gondolkodjak: a meglévő Claude- vagy ChatGPT-előfizetésed, a saját kulcsod vagy egy Stella-fiók."
       },
       "progress": "Beállítás állapota",
-      "quickstart": {
-        "body": "A legtöbb asszisztens a nulláról indul. Mutasd meg a böngésződet, és egyszer elolvasom, hogy kezdeti memóriát építsek belőle, így már az első naptól hasznos lehetek.",
-        "continueInBackground": "Kezdj beszélgetni, a többi a háttérben készül el",
-        "eyebrow": "Gyorsindítás",
-        "failedBody": "Valami megszakította az olvasást. Próbáld újra, vagy kezdj beszélgetni, és menet közben tanulok.",
-        "failedTitle": "Ez nem fejeződött be",
-        "run": "Gyorsindítás futtatása",
-        "runningBody": "Körülbelül egy perc. Nyugodtan lépj be, a háttérben befejezem.",
-        "runningTitle": "Megismerlek",
-        "skip": "Kihagyás",
-        "stages": {
-          "notice": "Annak megfigyelése, mi fontos neked",
-          "read": "Az általad kiválasztottak olvasása",
-          "write": "A kezdeti memóriád megírása"
-        },
-        "title": "Adj egy kis előnyt"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Kész.",
-        "gmailSkipped": "Most nem.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Nagyon menő.",
-        "signinDone": "Kész.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Ezt kihagyom."
-      },
-      "selfmod": {
-        "body": "Hiányzik egy funkció, vagy valamit másképp szeretnél? Csak kérd. Átírom a saját kódomat, kipróbálhatod, és te döntöd el, megtartod-e.",
-        "hint": "A módosítások ezen a számítógépen maradnak.",
-        "settledDesc": "Kérés, előnézet, frissítés. Bármikor visszavonható.",
-        "settledTitle": "Át tudom alakítani magamat",
-        "steps": {
-          "ask": {
-            "body": "Írd le a változtatást egyszerű szavakkal.",
-            "title": "Kérés"
-          },
-          "preview": {
-            "body": "Egy feladat megépíti, és megnyit egy élő előnézetet.",
-            "title": "Előnézet"
-          },
-          "update": {
-            "body": "Egy kattintással alkalmazod. Bármikor visszavonhatod.",
-            "title": "Frissítés"
-          }
-        },
-        "title": "Át tudom alakítani magamat"
+        "signinDone": "Kész."
       },
       "send": "Send",
       "signin": {
@@ -1912,7 +1768,6 @@
         "claudeCliMissing": "Előbb telepítsd a Claude Code-ot, majd próbáld újra.",
         "connect": "Csatlakozás",
         "error": "Nem sikerült csatlakozni. Próbáljuk újra?",
-        "fine": "Bármikor módosíthatod a Beállításokban.",
         "hint": "Az indulás ingyenes.",
         "inUse": "Használatban",
         "options": {
@@ -1944,47 +1799,7 @@
         "settledNoneDesc": "Jelentkezz be vagy kapcsolj össze egy előfizetést bármikor, és kezdhetsz is.",
         "fineOwnPlan": "A ChatGPT és a Claude Code a saját OpenAI- vagy Anthropic-előfizetésedet használja. Ezt bármikor módosíthatod a Beállításokban."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Hogyan találtál rá a Stellára?",
-        "body": "Nem kötelező. A válaszod csak névtelen számlálásként kerül elküldésre, semmi olyannal, ami azonosítana.",
-        "skip": "Kihagyás",
-        "settledTitle": "Hogyan találtál rá a Stellára",
-        "settledSkipped": "Kihagyva",
-        "answers": {
-          "google": "Google-keresés",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok vagy Instagram",
-          "reddit": "Reddit",
-          "friend": "Egy barát",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "A ChatGPT vagy egy másik MI ajánlotta",
-          "other": "Egyéb"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "A Stella használatával elfogadod a {terms} és az {privacy} feltételeit.",
     "privacyPolicy": "Adatvédelmi szabályzat",
@@ -3910,6 +3725,27 @@
       "lineServer": "A szerver OpenRouter-kulcsáról: ebben a hónapban {sorted} rendezve · {cost}",
       "deviceKeyHint": "A saját OpenRouter-kulcsod használatához bejelentkezve add meg a Modellek alatt, így a fiókodba mentődik. A csak ezen a számítógépen tárolt kulcs nem használható, amíg a gép ki van kapcsolva.",
       "deviceKeyHintPhone": "A saját OpenRouter-kulcsod használatához bejelentkezve add meg a csevegés beállításaiban, így a fiókodba mentődik. A csak ezen a telefonon tárolt kulcs nem használható az e-mailekhez."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Hogyan találtál rá a Stellára?",
+      "body": "Nem kötelező. A válaszod csak névtelen számlálásként kerül elküldésre, semmi olyannal, ami azonosítana.",
+      "skip": "Kihagyás",
+      "answers": {
+        "google": "Google-keresés",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok vagy Instagram",
+        "reddit": "Reddit",
+        "friend": "Egy barát",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "A ChatGPT vagy egy másik MI ajánlotta",
+        "other": "Egyéb"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella a telefonodon is ott van",
+      "detail": "Töltsd le az appot, hogy írhass Stellának és követhesd a feladataidat, amikor nem ennél a számítógépnél vagy."
     }
   }
 }

@@ -16,22 +16,13 @@ import type { StellaMarkHandle } from "@/ui/stella-character/rig";
 import { LOCALE_NATIVE_LABELS, useI18n, useT } from "@/shared/i18n";
 import { useWindowFocus } from "@/shared/hooks/use-window-focus";
 import { OnboardingComposer } from "./OnboardingComposer";
-import { CapabilitiesCard } from "./cards/CapabilitiesCard";
-import { SelfModCard } from "./cards/SelfModCard";
-import { MemoryCard } from "./cards/MemoryCard";
 import { SignInCard } from "./cards/SignInCard";
-import { FoundViaCard } from "./cards/FoundViaCard";
+import { ExtrasCard } from "./cards/ExtrasCard";
 import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
+import { startUsageNudges } from "@/features/nudges/usage-nudges-store";
 import { useDesktopServerState } from "@/global/self-host/self-host-store";
 import { useSelfHostedServer, useServerDiscovery } from "@/platform/backend/server-discovery";
-import { ThemeCard } from "./cards/ThemeCard";
-import { ExtrasCard } from "./cards/ExtrasCard";
-import { GmailCard } from "./cards/GmailCard";
-import { PhoneAppCard } from "./cards/PhoneAppCard";
-import { QuickstartCard } from "./cards/QuickstartCard";
-import { useDiscoveryJob } from "./discovery-job";
 import type { OnboardingChatStep } from "./onboarding-chat-flow";
-import type { PendingComposerDraft } from "./pending-handoff";
 import {
   useOnboardingChat,
   type OnboardingChatEntry,
@@ -50,19 +41,10 @@ type LegalDocument = "terms" | "privacy";
 const MARK_SIZE_PX = 40;
 const MARK_OFFSET_PX = MARK_SIZE_PX + 6;
 const SPEAKING_MS = 1600;
-const MIN_DEMO_HEIGHT_PX = 200;
 
 const STEP_MOODS: Record<OnboardingChatStep, StellaCharacterState> = {
-  capabilities: "idle",
-  selfmod: "idle",
-  memory: "idle",
   signin: "listening",
-  foundVia: "listening",
-  gmail: "idle",
-  theme: "listening",
-  extras: "idle",
-  phone: "idle",
-  quickstart: "happy",
+  extras: "happy",
 };
 
 function LegalLine({
@@ -108,7 +90,6 @@ function LegalLine({
 export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatProps) {
   const t = useT();
   const { locale, setLocale, supportedLocales } = useI18n();
-  const job = useDiscoveryJob();
   const windowFocused = useWindowFocus();
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocument | null>(null);
   const markRef = useRef<StellaMarkHandle | null>(null);
@@ -130,8 +111,11 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
       recordAnonymousCount({ type: "engine_chosen" });
       onComplete(handoff);
     },
-    skipGmail: !canConnectGmail,
   });
+
+  useEffect(() => {
+    startUsageNudges(false);
+  }, []);
 
   const [message, setMessage] = useState("");
 
@@ -140,14 +124,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     if (!text) return;
     finish({ composerDraft: { text, send: true } });
   }, [finish, message]);
-
-  const handleStart = useCallback(
-    (draft?: PendingComposerDraft) => {
-      markRef.current?.sparkle();
-      finish(draft ? { composerDraft: draft } : {});
-    },
-    [finish],
-  );
 
   const handleSkipAll = useCallback(() => finish({}), [finish]);
 
@@ -210,40 +186,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
 
   const contentRef = useRef<HTMLDivElement | null>(null);
 
-  useLayoutEffect(() => {
-    const scroller = scrollRef.current;
-    const content = contentRef.current;
-    if (!scroller || !content || typeof ResizeObserver === "undefined") return;
-    let frameRequest = 0;
-    const fit = () => {
-      frameRequest = 0;
-      const rows = content.querySelectorAll<HTMLElement>(".obc-row--assistant");
-      const entry = rows[rows.length - 1];
-      const demo = entry?.querySelector<HTMLElement>(".obc-cap-frame");
-      if (!entry || !demo || !demo.offsetHeight) {
-        content.style.removeProperty("--obc-demo-max-width");
-        return;
-      }
-      const ratio = demo.offsetWidth / demo.offsetHeight;
-      const topSpace = parseFloat(getComputedStyle(entry).scrollMarginTop) || 0;
-      const below = content.offsetHeight - (entry.offsetTop + entry.offsetHeight);
-      const spare = scroller.clientHeight - topSpace - entry.offsetHeight - below;
-      const height = Math.max(MIN_DEMO_HEIGHT_PX, demo.offsetHeight + spare);
-      content.style.setProperty("--obc-demo-max-width", `${Math.floor(height * ratio)}px`);
-    };
-    const schedule = () => {
-      if (!frameRequest) frameRequest = window.requestAnimationFrame(fit);
-    };
-    fit();
-    const observer = new ResizeObserver(schedule);
-    observer.observe(scroller);
-    observer.observe(content);
-    return () => {
-      observer.disconnect();
-      if (frameRequest) window.cancelAnimationFrame(frameRequest);
-    };
-  }, [entries.length]);
-
   const [markTop, setMarkTop] = useState<number | null>(null);
   const lastAssistantId =
     [...entries].reverse().find((entry) => entry.kind === "assistant")?.id ?? null;
@@ -284,26 +226,13 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
 
   const progressCount = exiting ? steps.length : steps.indexOf(currentStep);
 
-  const jobBusy =
-    job.status === "collecting" ||
-    job.status === "synthesizing" ||
-    job.status === "saving";
   const mood: StellaCharacterState = exiting
     ? "celebrate"
     : indicator.active
       ? "writing"
       : speaking
         ? "speaking"
-        : jobBusy
-            ? "reading"
-            : STEP_MOODS[currentStep];
-
-  useEffect(() => {
-    if (currentStep === "quickstart") markRef.current?.sparkle();
-  }, [currentStep]);
-  useEffect(() => {
-    if (job.status === "done") markRef.current?.sparkle();
-  }, [job.status]);
+        : STEP_MOODS[currentStep];
 
   const selfHosted = useSelfHostedServer();
   const discovery = useServerDiscovery();
@@ -313,40 +242,13 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     if (step === "signin" && selfHosted) {
       return t("selfHost.onboarding.prose", { name: serverName });
     }
-    if (step !== "quickstart") return t(`onboarding.chat.messages.${step}`);
-    if (job.status === "done") return t("onboarding.chat.messages.quickstartDone");
-    if (job.status === "failed") return t("onboarding.chat.messages.quickstartFailed");
-    return t("onboarding.chat.messages.quickstart");
+    return t(`onboarding.chat.messages.${step}`);
   };
 
   const cardFor = (step: OnboardingChatStep): ReactNode => {
     const active = currentStep === step && !exiting;
     const answered = answers[step];
     switch (step) {
-      case "capabilities":
-        return (
-          <CapabilitiesCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
-      case "selfmod":
-        return (
-          <SelfModCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
-      case "memory":
-        return (
-          <MemoryCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
       case "signin":
         return (
           <SignInCard
@@ -358,53 +260,16 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
             }}
           />
         );
-      case "foundVia":
-        return (
-          <FoundViaCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
-      case "gmail":
-        return (
-          <GmailCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
-      case "theme":
-        return (
-          <ThemeCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
       case "extras":
         return (
           <ExtrasCard
             active={active}
             answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
-      case "phone":
-        return (
-          <PhoneAppCard
-            active={active}
-            answered={answered}
-            onAnswer={(kind) => answer(step, kind)}
-          />
-        );
-      case "quickstart":
-        return (
-          <QuickstartCard
-            active={active}
-            isAuthenticated={isAuthenticated}
-            onStart={handleStart}
-            onSkip={handleSkipAll}
+            canConnectGmail={canConnectGmail}
+            onAnswer={(kind) => {
+              markRef.current?.sparkle();
+              answer(step, kind);
+            }}
           />
         );
       default: {

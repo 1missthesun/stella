@@ -163,10 +163,6 @@ import {
   IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED,
   IPC_DICTATION_TOGGLE,
   IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER,
-  IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
-  IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
-  IPC_DISCOVERY_LIST_BROWSER_PROFILES,
-  IPC_DISCOVERY_WRITE_CORE_MEMORY,
   IPC_DISPLAY_CANVAS_DRIVE_URL,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_CHANGED,
@@ -234,7 +230,6 @@ import {
   IPC_OFFICE_PREVIEW_LIST,
   IPC_OFFICE_PREVIEW_START,
   IPC_OFFICE_PREVIEW_UPDATE,
-  IPC_ONBOARDING_SYNTHESIZE,
   IPC_OVERLAY_END_REGION_CAPTURE,
   IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT,
@@ -850,24 +845,6 @@ export const createElectronApi = (
       onConnectorConnectRequest: onWithEvent(IPC_CONNECTOR_CONNECT_REQUEST),
       onConnectorConnectUpdate: onWithEvent(IPC_CONNECTOR_CONNECT_UPDATE),
       respondConnectorConnect: invoker(IPC_CONNECTOR_CONNECT_RESPOND),
-    },
-
-    onboarding: {
-      synthesizeCoreMemory: invoker(IPC_ONBOARDING_SYNTHESIZE),
-    },
-
-    discovery: {
-      detectPreferred: invoker(IPC_DISCOVERY_DETECT_PREFERRED_BROWSER),
-      listProfiles: invoker(IPC_DISCOVERY_LIST_BROWSER_PROFILES),
-      writeCoreMemory: (
-        content: string,
-        options?: { includeLocation?: boolean },
-      ) =>
-        ipc.invoke(IPC_DISCOVERY_WRITE_CORE_MEMORY, {
-          content,
-          includeLocation: options?.includeLocation === true,
-        }),
-      collectAllSignals: invoker(IPC_DISCOVERY_COLLECT_ALL_SIGNALS),
     },
 
     browser: {

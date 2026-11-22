@@ -106,7 +106,7 @@ const windowStart = now - days * DAY_MS;
 const installCounts = async () => {
   // Rows are tiny (one per event); 60 days covers the cohort for 7-day return.
   const { rows, error } = await sqlOrEmpty(
-    `SELECT index1 AS install, blob1 AS type, blob2 AS detail, blob3 AS platform, double1 AS at, _sample_interval AS weight
+    `SELECT index1 AS install, blob1 AS type, blob2 AS detail, blob3 AS platform, blob7 AS engine, double1 AS at, _sample_interval AS weight
      FROM ${COUNTS}
      WHERE timestamp > NOW() - INTERVAL '${Math.max(days * 2, 14) + 1}' DAY
      LIMIT 100000 FORMAT JSON`,
@@ -115,7 +115,7 @@ const installCounts = async () => {
   const byInstall = new Map();
   for (const row of rows) {
     const entry = byInstall.get(row.install) ?? { events: [] };
-    entry.events.push({ type: row.type, detail: row.detail, platform: row.platform, at: Number(row.at) });
+    entry.events.push({ type: row.type, detail: row.detail, platform: row.platform, engine: row.engine, at: Number(row.at) });
     byInstall.set(row.install, entry);
   }
   const firstOf = (events, type) =>
@@ -128,6 +128,12 @@ const installCounts = async () => {
   const foundVia = [];
   const activeInWindow = new Set();
   const cohort = { size: 0, returned: 0 };
+  // Setup funnel for installs first run in the window: the furthest step each reached.
+  const SETUP_ORDER = ["signin", "extras", "chat"];
+  const lastSetupStep = [];
+  const day1Messages = [];
+  const turnErrors = [];
+  const turnErrorEngines = [];
   for (const [install, { events }] of byInstall) {
     const firstRun = firstOf(events, "first_run");
     if (firstRun && firstRun.at >= windowStart) {
@@ -140,6 +146,24 @@ const installCounts = async () => {
     const answer = firstOf(events, "found_via");
     if (answer && answer.at >= windowStart) foundVia.push(answer.detail);
     if (events.some((event) => event.type === "active_day" && event.at >= windowStart)) activeInWindow.add(install);
+    if (firstRun?.detail === "new" && firstRun.at >= windowStart) {
+      const reached = events
+        .filter((event) => event.type === "setup_step")
+        .map((event) => SETUP_ORDER.indexOf(event.detail))
+        .filter((index) => index >= 0);
+      lastSetupStep.push(reached.length ? SETUP_ORDER[Math.max(...reached)] : "(none)");
+      const sent = events
+        .filter((event) => event.type === "day1_message")
+        .map((event) => Number(event.detail))
+        .filter(Number.isFinite);
+      const n = sent.length ? Math.max(...sent) : 0;
+      day1Messages.push(n === 0 ? "0" : n === 1 ? "1" : n <= 3 ? "2-3" : n <= 9 ? "4-9" : "10+");
+    }
+    for (const event of events) {
+      if (event.type !== "turn_error" || event.at < windowStart) continue;
+      turnErrors.push(event.detail);
+      turnErrorEngines.push(event.engine || "(unknown)");
+    }
     // 7-day return: installs from 8-14 days ago that were opened on another
     // local day within their first 7 days (one active_day per local day).
     if (firstRun?.detail === "new" && firstRun.at <= now - 8 * DAY_MS && firstRun.at > now - 15 * DAY_MS) {
@@ -162,6 +186,9 @@ const installCounts = async () => {
       ? { cohort: cohort.size, returned: cohort.returned, rate: `${Math.round((100 * cohort.returned) / cohort.size)}%` }
       : { cohort: 0, note: "no installs 8-14 days ago yet" },
     foundVia: tally(foundVia),
+    setupFunnel: { lastStepReached: tally(lastSetupStep) },
+    day1MessagesPerNewInstall: tally(day1Messages),
+    turnErrors: { total: turnErrors.length, byKind: tally(turnErrors), byEngine: tally(turnErrorEngines) },
     // Analytics Engine samples bursts from one install; true means some rows stand for several events.
     sampled: rows.some((row) => Number(row.weight) > 1),
   };

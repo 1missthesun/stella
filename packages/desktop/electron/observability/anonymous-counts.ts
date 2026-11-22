@@ -7,8 +7,12 @@ import {
   ANONYMOUS_COUNTS_MAX_EVENTS,
   ANONYMOUS_COUNTS_SCHEMA_VERSION,
   ANONYMOUS_COUNT_PLATFORMS,
+  DAY1_MESSAGE_CAP,
+  TURN_ERRORS_PER_DAY,
   isAnonymousCountsInstallId,
   isFoundViaChoice,
+  isSetupStep,
+  isTurnErrorKind,
   type AnonymousCountEngine,
   type AnonymousCountEvent,
   type AnonymousCountItem,
@@ -24,13 +28,33 @@ import {
 } from "@stella/node-shared/preferences/local-preferences";
 import { releaseLabel } from "./release-info.js";
 
-type OnceEvent = "first_run" | "engine_chosen" | "first_reply" | "found_via";
-
 type CountsState = {
   installId: string;
-  recorded: Partial<Record<OnceEvent, true>>;
+  /** Once-only events already counted: the event type, or `setup_step:<step>`. */
+  recorded: Record<string, true>;
   lastActiveDay: string | null;
+  /** When this install's first run was counted; unset for installs counted before day-1 messages existed. */
+  firstRunAtMs?: number;
+  day1Messages?: number;
+  turnErrorDay?: string;
+  turnErrorsThatDay?: number;
   queue: AnonymousCountItem[];
+};
+
+const DAY_MS = 24 * 60 * 60_000;
+
+const onceKey = (event: AnonymousCountEvent): string | null => {
+  switch (event.type) {
+    case "first_run":
+    case "engine_chosen":
+    case "first_reply":
+    case "found_via":
+      return event.type;
+    case "setup_step":
+      return `setup_step:${event.step}`;
+    default:
+      return null;
+  }
 };
 
 export type AnonymousCountsStatus = { available: boolean; enabled: boolean };
@@ -137,66 +161,103 @@ export class AnonymousCounts {
 
   async record(request: AnonymousCountRequest): Promise<void> {
     if (!this.active()) return;
-    const event = await this.resolve(request);
-    if (!event) return;
-    await this.enqueue(event, true);
+    await this.ensureFirstRun();
+    const queued = await this.resolve(request);
+    if (!queued) return;
     void this.flush();
   }
 
-  private async resolve(request: AnonymousCountRequest): Promise<AnonymousCountEvent | null> {
+  private async engine(): Promise<AnonymousCountEngine> {
+    return classifyAnonymousCountEngine(
+      this.options.stellaDataDirPath,
+      await this.options.isSignedIn().catch(() => false),
+    );
+  }
+
+  private async resolve(request: AnonymousCountRequest): Promise<boolean> {
     switch (request?.type) {
       case "engine_chosen":
       case "first_reply":
-        return {
-          type: request.type,
-          engine: classifyAnonymousCountEngine(
-            this.options.stellaDataDirPath,
-            await this.options.isSignedIn().catch(() => false),
-          ),
-        };
+        return await this.enqueueOnce({ type: request.type, engine: await this.engine() });
       case "found_via":
         return isFoundViaChoice(request.answer)
-          ? { type: "found_via", answer: request.answer }
-          : null;
+          ? await this.enqueueOnce({ type: "found_via", answer: request.answer })
+          : false;
+      case "setup_step":
+        return isSetupStep(request.step)
+          ? await this.enqueueOnce({ type: "setup_step", step: request.step })
+          : false;
+      case "message_sent": {
+        const engine = await this.engine();
+        return await this.enqueueWhen((state) => {
+          const firstRunAt = state.firstRunAtMs;
+          if (firstRunAt === undefined || Date.now() - firstRunAt > DAY_MS) return null;
+          const n = (state.day1Messages ?? 0) + 1;
+          if (n > DAY1_MESSAGE_CAP) return null;
+          state.day1Messages = n;
+          return { type: "day1_message", n, engine };
+        });
+      }
+      case "turn_error": {
+        if (!isTurnErrorKind(request.kind)) return false;
+        const kind = request.kind;
+        const engine = await this.engine();
+        return await this.enqueueWhen((state) => {
+          const today = localDay();
+          const count = state.turnErrorDay === today ? (state.turnErrorsThatDay ?? 0) : 0;
+          if (count >= TURN_ERRORS_PER_DAY) return null;
+          state.turnErrorDay = today;
+          state.turnErrorsThatDay = count + 1;
+          return { type: "turn_error", kind, engine };
+        });
+      }
       default:
-        return null;
+        return false;
     }
+  }
+
+  private async ensureFirstRun(): Promise<void> {
+    await this.enqueueOnce({
+      type: "first_run",
+      existingInstall: getOnboardingCompleted(this.options.stellaDataDirPath),
+    });
   }
 
   private async tick(): Promise<void> {
     if (!this.active()) return;
-    const state = await this.serial(() => this.load());
-    if (!state.recorded.first_run) {
-      await this.enqueue(
-        {
-          type: "first_run",
-          existingInstall: getOnboardingCompleted(this.options.stellaDataDirPath),
-        },
-        true,
-      );
-    }
-    await this.enqueue({ type: "active_day" }, false);
+    await this.ensureFirstRun();
+    await this.enqueueWhen((state) => {
+      const today = localDay();
+      if (state.lastActiveDay === today) return null;
+      state.lastActiveDay = today;
+      return { type: "active_day" };
+    });
     await this.flush();
   }
 
-  private enqueue(event: AnonymousCountEvent, once: boolean): Promise<void> {
+  private enqueueOnce(event: AnonymousCountEvent): Promise<boolean> {
+    return this.enqueueWhen((state) => {
+      const key = onceKey(event);
+      if (!key || state.recorded[key]) return null;
+      state.recorded[key] = true;
+      if (event.type === "first_run" && !event.existingInstall) state.firstRunAtMs = Date.now();
+      return event;
+    });
+  }
+
+  /** `decide` may update the state; the event it returns is queued (a repeating one is dropped when the queue is full). */
+  private enqueueWhen(
+    decide: (state: CountsState) => AnonymousCountEvent | null,
+  ): Promise<boolean> {
     return this.serial(async () => {
       const state = await this.load();
-      if (once) {
-        const kind = event.type as OnceEvent;
-        if (state.recorded[kind]) return;
-        state.recorded[kind] = true;
-      } else {
-        const today = localDay();
-        if (state.lastActiveDay === today) return;
-        state.lastActiveDay = today;
-        if (state.queue.length >= MAX_QUEUE) {
-          await this.save(state);
-          return;
-        }
+      const event = decide(state);
+      if (!event) return false;
+      if (state.queue.length < MAX_QUEUE || onceKey(event) !== null) {
+        state.queue.push({ eventId: randomUUID(), occurredAtMs: Date.now(), event });
       }
-      state.queue.push({ eventId: randomUUID(), occurredAtMs: Date.now(), event });
       await this.save(state);
+      return true;
     });
   }
 
@@ -276,6 +337,12 @@ export class AnonymousCounts {
         parsed?.recorded && typeof parsed.recorded === "object" ? parsed.recorded : {},
       lastActiveDay:
         typeof parsed?.lastActiveDay === "string" ? parsed.lastActiveDay : null,
+      ...(typeof parsed?.firstRunAtMs === "number" ? { firstRunAtMs: parsed.firstRunAtMs } : {}),
+      ...(typeof parsed?.day1Messages === "number" ? { day1Messages: parsed.day1Messages } : {}),
+      ...(typeof parsed?.turnErrorDay === "string" ? { turnErrorDay: parsed.turnErrorDay } : {}),
+      ...(typeof parsed?.turnErrorsThatDay === "number"
+        ? { turnErrorsThatDay: parsed.turnErrorsThatDay }
+        : {}),
       queue: Array.isArray(parsed?.queue) ? parsed.queue.slice(-MAX_QUEUE) : [],
     };
     this.state = state;

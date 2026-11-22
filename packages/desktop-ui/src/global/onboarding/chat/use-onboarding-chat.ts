@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WORKING_INDICATOR_HANDOFF_MS } from "@/features/chat/working-indicator-state";
 import { useT } from "@/shared/i18n";
+import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
 import {
   clearOnboardingChatProgress,
   nextOnboardingChatStep,
@@ -28,7 +29,6 @@ export type OnboardingChatHandoff = {
 
 type UseOnboardingChatArgs = {
   onFinished: (handoff: OnboardingChatHandoff) => void;
-  skipGmail: boolean;
 };
 
 const TYPING_DELAY_MS = 420;
@@ -44,40 +44,10 @@ const ANSWER_TEXT_KEYS: Record<
   OnboardingChatStep,
   Partial<Record<OnboardingChatAnswer, string>>
 > = {
-  capabilities: {
-    done: "onboarding.chat.replies.capabilitiesDone",
-    skipped: "onboarding.chat.replies.capabilitiesSkipped",
-  },
-  selfmod: {
-    done: "onboarding.chat.replies.selfmodDone",
-  },
-  memory: {
-    done: "onboarding.chat.replies.memoryDone",
-    skipped: "onboarding.chat.replies.memorySkipped",
-  },
   signin: {
     done: "onboarding.chat.replies.signinDone",
   },
-  foundVia: {
-    skipped: "onboarding.chat.replies.foundViaSkipped",
-  },
-  gmail: {
-    done: "onboarding.chat.replies.gmailDone",
-    skipped: "onboarding.chat.replies.gmailSkipped",
-  },
-  theme: {
-    done: "onboarding.chat.replies.themeDone",
-    skipped: "onboarding.chat.replies.themeSkipped",
-  },
-  extras: {
-    done: "onboarding.chat.replies.extrasDone",
-    skipped: "onboarding.chat.replies.extrasSkipped",
-  },
-  phone: {
-    done: "onboarding.chat.replies.capabilitiesDone",
-    skipped: "onboarding.chat.replies.gmailSkipped",
-  },
-  quickstart: {},
+  extras: {},
 };
 
 const assistantEntry = (
@@ -115,13 +85,10 @@ const buildResumedEntries = (
   return entries;
 };
 
-export function useOnboardingChat({
-  onFinished,
-  skipGmail,
-}: UseOnboardingChatArgs) {
+export function useOnboardingChat({ onFinished }: UseOnboardingChatArgs) {
   const t = useT();
   const [progress, setProgress] = useState<OnboardingChatProgress>(
-    () => readOnboardingChatProgress() ?? { step: "capabilities", answers: {} },
+    () => readOnboardingChatProgress() ?? { step: "signin", answers: {} },
   );
   const resumedRef = useRef(readOnboardingChatProgress() !== null);
   const [entries, setEntries] = useState<OnboardingChatEntry[]>(() =>
@@ -136,12 +103,11 @@ export function useOnboardingChat({
   const onFinishedRef = useRef(onFinished);
   onFinishedRef.current = onFinished;
 
-  const steps = useMemo(() => {
-    if (!skipGmail) return ONBOARDING_CHAT_STEPS;
-    if (progress.step === "gmail") return ONBOARDING_CHAT_STEPS;
-    if (progress.answers.gmail !== undefined) return ONBOARDING_CHAT_STEPS;
-    return ONBOARDING_CHAT_STEPS.filter((step) => step !== "gmail");
-  }, [progress.answers.gmail, progress.step, skipGmail]);
+  const steps = ONBOARDING_CHAT_STEPS;
+
+  useEffect(() => {
+    recordAnonymousCount({ type: "setup_step", step: progress.step });
+  }, [progress.step]);
 
   const schedule = useCallback((ms: number, fn: () => void) => {
     const id = window.setTimeout(() => {
@@ -164,6 +130,7 @@ export function useOnboardingChat({
       if (finishedRef.current) return;
       finishedRef.current = true;
       busyRef.current = true;
+      recordAnonymousCount({ type: "setup_step", step: "chat" });
       clearOnboardingChatProgress();
       setExiting(true);
       schedule(prefersReducedMotion() ? 0 : EXIT_MS, () => {

@@ -27,14 +27,6 @@ html[data-low-power] .assistant-reply-peek {
   }
 }
 
-html[data-low-power] .ofilm-thread__flow,
-html[data-low-power] .ofilm-cursor[data-click] svg,
-html[data-low-power] .ofilm .odemo-working__label,
-html[data-low-power] .orecall__scan,
-html[data-low-power] .obc-skeleton {
-  animation: none !important;
-}
-
 html[data-low-power] .inline-generated-image-cards--strip-pending::before,
 html[data-low-power] .inline-generated-image-card__placeholder::before {
   animation: none !important;

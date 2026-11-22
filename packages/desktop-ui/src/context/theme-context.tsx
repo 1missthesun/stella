@@ -66,6 +66,14 @@ const COLOR_MODE_STORAGE_KEY = "stella-color-mode";
 const GRADIENT_MODE_STORAGE_KEY = "stella-gradient-mode";
 const GRADIENT_COLOR_STORAGE_KEY = "stella-gradient-color";
 
+// A new desktop install follows the system's light or dark setting; installs
+// set up before that, and the website, keep dark. Mirrored in
+// public/stella-boot.js.
+function defaultColorMode(): ColorMode {
+  if (!window.electronAPI) return "dark";
+  return uiState.getItem("stella-onboarding-complete") === "true" ? "dark" : "system";
+}
+
 function getSystemColorMode(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
@@ -140,7 +148,7 @@ function useThemePersistence(clearPreviews: () => void): PersistedThemeState {
   const [colorMode, setColorModeRaw] = useState<ColorMode>(
     () =>
       readLegacyForcedAppearance() ??
-      readStorage<ColorMode>(COLOR_MODE_STORAGE_KEY, "dark"),
+      readStorage<ColorMode>(COLOR_MODE_STORAGE_KEY, defaultColorMode()),
   );
   const [gradientMode, setGradientModeRaw] = useState(() =>
     readStorage<GradientMode>(GRADIENT_MODE_STORAGE_KEY, "soft"),
@@ -195,6 +203,12 @@ function useThemePersistence(clearPreviews: () => void): PersistedThemeState {
     uiState.setItem(COLOR_MODE_STORAGE_KEY, legacy);
     setColorModeRaw(legacy);
   }, []);
+
+  useEffect(() => {
+    if (uiState.getItem(COLOR_MODE_STORAGE_KEY) === null) {
+      uiState.setItem(COLOR_MODE_STORAGE_KEY, colorMode);
+    }
+  }, [colorMode]);
 
   useEffect(() => {
     return uiState.onExternalChange((key, value) => {

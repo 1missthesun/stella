@@ -21,6 +21,8 @@ export type ComposerNotice = {
   claudeSignIn?: { email?: string; place?: "cloud"; continues?: boolean; dismissKey?: string };
   /** Renders the connect-your-plan card (features/chat/connect-plan). */
   connectPlan?: ConnectPlanNoticeState;
+  /** Renders the one-time "How did you find Stella?" question (features/nudges). */
+  foundVia?: true;
 };
 
 export type ComposerNoticeInput = Omit<ComposerNotice, "id"> & {

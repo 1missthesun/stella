@@ -1716,50 +1716,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "ふさわしい場所を見つけ、フォームに入力し、カレンダーに入れます。あなたがやるのと同じ手順です。",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "このデモを再生",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "何でもスケジュールしてください。眠っている間も、時間どおりにこなします。",
-          "title": "一度頼むだけ。毎日、実行されます。",
-          "word": "ルーティン"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "このコンピューターにある本物のアプリの中で作業し、複数の作業を同時に進められます。",
-          "title": "本物のファイル。複数の作業を同時に。",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1771,13 +1731,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "オプションの追加機能",
+        "lead": "どれも必須ではありませんが、それぞれが私をもっと役立つようにします。",
+        "start": "チャットを始める"
       },
       "gmail": {
         "body": "メールを探したり、スレッドに追いついたり、返信の下書きを作ったり。頼むだけです。",
@@ -1785,116 +1742,15 @@
         "connected": "連携済み",
         "connecting": "Google を待っています…",
         "error": "Gmail を連携できませんでした。もう一度試すか、今はスキップしてください。",
-        "settledDesc": "コネクタ からいつでも管理できます。",
-        "settledSkippedTitle": "今は Gmail なし",
-        "settledTitle": "Gmail を連携しました",
-        "skip": "今はしない",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "こんにちは、Stella です。\n\n私はチャットボットではありません。このコンピューターを使って、あなたが別のことをしている間も、バックグラウンドで実際に作業を進めます。\n\nどんな感じか、お見せします。",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "暮らしの多くはメールで動いています。Gmail を連携すれば、メールのことも手伝えます。",
-        "memory": "One more thing that makes me different.",
-        "phone": "スマホでも使えます。",
-        "quickstart": "以上です。最後にひとつだけ、任意ですがクイックスタートがあります。",
-        "quickstartDone": "完了しました。私が把握したことと、最初に取りかかれそうなことをいくつかご紹介します。",
-        "quickstartFailed": "今回はブラウザーを最後まで読み取れませんでした。このまま始めても大丈夫です。進めながら覚えていきます。",
-        "selfmod": "そして、あなたのコンピューターの中にいるので、私は自分自身を変えることもできます。",
-        "signin": "次に、私の考え方を選んでください。お持ちのClaudeやChatGPTのプラン、ご自身のキー、またはStellaアカウントを使えます。",
-        "theme": "Now, how should I look?",
-        "foundVia": "ちょっとした質問です（任意）：どうやって私を見つけましたか？"
+        "signin": "こんにちは、Stella です。まず、私の考え方を選んでください。お持ちの Claude や ChatGPT のプラン、ご自身のキー、または Stella アカウントを使えます。"
       },
       "progress": "セットアップの進行状況",
-      "quickstart": {
-        "body": "多くのアシスタントはゼロから始まります。ブラウザーを教えてもらえれば、一度だけ読み取って最初のメモリーを作り、初日からお役に立てるようにします。",
-        "continueInBackground": "チャットを始めて、残りはバックグラウンドで",
-        "eyebrow": "クイックスタート",
-        "failedBody": "読み取りが途中で中断されました。もう一度試すか、チャットを始めてください。進めながら覚えていきます。",
-        "failedTitle": "完了しませんでした",
-        "run": "クイックスタートを実行",
-        "runningBody": "1分ほどかかります。いつでも先に進んでください。残りはバックグラウンドで仕上げます。",
-        "runningTitle": "あなたを知っているところです",
-        "skip": "スキップ",
-        "stages": {
-          "notice": "大切にしていることを見つけています",
-          "read": "選んだ内容を読み取っています",
-          "write": "最初のメモリーを書いています"
-        },
-        "title": "最初の一歩を手伝わせてください"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "完了しました。",
-        "gmailSkipped": "今はいいです。",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "すごいですね。",
-        "signinDone": "完了しました。",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "これはスキップ。"
-      },
-      "selfmod": {
-        "body": "足りない機能がある、または動きを変えたいときは、頼むだけです。私が自分のコードを書き直し、あなたが試して、残すかどうかを決めます。",
-        "hint": "変更はこのコンピューターの中だけに残ります。",
-        "settledDesc": "頼む、プレビュー、アップデート。いつでも元に戻せます。",
-        "settledTitle": "私は自分を変えられます",
-        "steps": {
-          "ask": {
-            "body": "変更内容を普通の言葉で伝えます。",
-            "title": "頼む"
-          },
-          "preview": {
-            "body": "タスクが作成し、ライブプレビューを開きます。",
-            "title": "プレビュー"
-          },
-          "update": {
-            "body": "ワンクリックで適用。いつでも元に戻せます。",
-            "title": "アップデート"
-          }
-        },
-        "title": "私は自分を変えられます"
+        "signinDone": "完了しました。"
       },
       "send": "Send",
       "signin": {
@@ -1902,7 +1758,6 @@
         "claudeCliMissing": "先に Claude Code をインストールしてから、もう一度お試しください。",
         "connect": "接続",
         "error": "接続できませんでした。もう一度試しますか？",
-        "fine": "設定でいつでも変更できます。",
         "hint": "無料で始められます。",
         "inUse": "使用中",
         "options": {
@@ -1934,47 +1789,7 @@
         "settledNoneDesc": "いつでもサインインするかプランを接続すると、チャットを始められます。",
         "fineOwnPlan": "ChatGPT と Claude Code は、OpenAI または Anthropic のご自身のサブスクリプションを使います。設定からいつでも変更できます。"
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Stella をどこで知りましたか？",
-        "body": "任意です。回答は匿名のカウントとしてのみ送信され、あなたを特定できる情報は含まれません。",
-        "skip": "スキップ",
-        "settledTitle": "Stella を知ったきっかけ",
-        "settledSkipped": "スキップしました",
-        "answers": {
-          "google": "Google 検索",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok または Instagram",
-          "reddit": "Reddit",
-          "friend": "友人から",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT などの AI に勧められた",
-          "other": "その他"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Stella を利用することで、{terms}および{privacy}に同意したことになります。",
     "privacyPolicy": "プライバシーポリシー",
@@ -3854,6 +3669,27 @@
       "lineServer": "このサーバーの OpenRouter キー：今月 {sorted}件を仕分け · {cost}",
       "deviceKeyHint": "ご自身の OpenRouter キーを使うには、サインインした状態でモデルから追加してください。アカウントに保存されます。このコンピュータだけに保存したキーは、コンピュータの電源が切れている間は使えません。",
       "deviceKeyHintPhone": "ご自身の OpenRouter キーを使うには、サインインした状態でチャット設定から追加してください。アカウントに保存されます。この電話だけに保存したキーはメールには使えません。"
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Stella をどこで知りましたか？",
+      "body": "任意です。回答は匿名のカウントとしてのみ送信され、あなたを特定できる情報は含まれません。",
+      "skip": "スキップ",
+      "answers": {
+        "google": "Google 検索",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok または Instagram",
+        "reddit": "Reddit",
+        "friend": "友人から",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT などの AI に勧められた",
+        "other": "その他"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella はスマートフォンでも使えます",
+      "detail": "アプリを入手すると、このコンピュータから離れているときも Stella にメッセージを送ったり、タスクを確認したりできます。"
     }
   }
 }

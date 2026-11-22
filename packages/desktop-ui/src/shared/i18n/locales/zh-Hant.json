@@ -1716,50 +1716,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "我會找到對的地方，填好表單，再加進你的行事曆，就像你自己做的一樣。",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "播放此示範",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "任何事都可以排程，我會準時完成，就算你正在睡覺。",
-          "title": "說一次，每天都會做。",
-          "word": "例行任務"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "我在這台電腦上的真實應用程式裡工作，還能同時處理多項任務。",
-          "title": "真實的檔案。多項任務同時進行。",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1771,13 +1731,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "選用功能",
+        "lead": "這些都不是必要的，但每一項都能讓我更有用。",
+        "start": "開始聊天"
       },
       "gmail": {
         "body": "尋找郵件、跟上對話、草擬回覆，只要開口。",
@@ -1785,116 +1742,15 @@
         "connected": "已連接",
         "connecting": "正在等待 Google…",
         "error": "無法連接 Gmail。請重試，或暫時略過。",
-        "settledDesc": "隨時可在連接器中管理。",
-        "settledSkippedTitle": "暫不使用 Gmail",
-        "settledTitle": "Gmail 已連接",
-        "skip": "暫不",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "你好，我是 Stella。\n\n我不是聊天機器人。我會用這台電腦在背景真正把事情做完，你只管忙你的。\n\n來看看是什麼樣子。",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "生活中很多事都透過電子郵件進行。連接 Gmail，我就能幫你處理郵件。",
-        "memory": "One more thing that makes me different.",
-        "phone": "手機上也有我。",
-        "quickstart": "就這些了。還有最後一件事，可選：快速上手。",
-        "quickstartDone": "好了。這是我了解到的內容，還有幾件我們可以先做的事。",
-        "quickstartFailed": "這次我沒能讀完你的瀏覽器。我們可以直接開始，我會邊用邊了解。",
-        "selfmod": "因為我就住在你的電腦上，所以我可以改變自己。",
-        "signin": "接下來，選擇我的思考方式。使用你已有的 Claude 或 ChatGPT 方案、你自己的金鑰，或 Stella 帳戶。",
-        "theme": "Now, how should I look?",
-        "foundVia": "問個簡單的問題（可略過）：你是怎麼找到我的？"
+        "signin": "你好，我是 Stella。首先，選擇我的思考方式：你已有的 Claude 或 ChatGPT 方案、你自己的金鑰，或 Stella 帳戶。"
       },
       "progress": "設定進度",
-      "quickstart": {
-        "body": "大多數助理都是從零開始。讓我讀一次你的瀏覽器，建立一份初始記憶，這樣我從第一天起就能幫上忙。",
-        "continueInBackground": "開始聊天，在背景完成",
-        "eyebrow": "快速上手",
-        "failedBody": "讀取被打斷了。再試一次，或直接開始聊天，我會邊用邊了解。",
-        "failedTitle": "沒有完成",
-        "run": "執行快速上手",
-        "runningBody": "大約一分鐘。你想進去就進去，我會在背景完成。",
-        "runningTitle": "正在認識你",
-        "skip": "略過",
-        "stages": {
-          "notice": "正在留意對你重要的事",
-          "read": "正在讀取你選擇的內容",
-          "write": "正在寫入你的初始記憶"
-        },
-        "title": "讓我先走一步"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "好了。",
-        "gmailSkipped": "暫不。",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "太酷了。",
-        "signinDone": "好了。",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "略過這題。"
-      },
-      "selfmod": {
-        "body": "缺少某個功能，或是想讓某樣東西換種方式運作？直接告訴我。我會重寫自己的程式碼，讓你試用，是否保留由你決定。",
-        "hint": "變更只保留在這台電腦上。",
-        "settledDesc": "提出、預覽、更新。隨時可以復原。",
-        "settledTitle": "我可以改變自己",
-        "steps": {
-          "ask": {
-            "body": "用平常的話描述你想要的變更。",
-            "title": "提出"
-          },
-          "preview": {
-            "body": "由任務建置，並開啟即時預覽。",
-            "title": "預覽"
-          },
-          "update": {
-            "body": "點一下即可套用。隨時可以復原。",
-            "title": "更新"
-          }
-        },
-        "title": "我可以改變自己"
+        "signinDone": "好了。"
       },
       "send": "Send",
       "signin": {
@@ -1902,7 +1758,6 @@
         "claudeCliMissing": "請先安裝 Claude Code，然後再試一次。",
         "connect": "連接",
         "error": "沒能連上。再試一次？",
-        "fine": "隨時可以在「設定」中變更。",
         "hint": "免費開始。",
         "inUse": "使用中",
         "options": {
@@ -1934,47 +1789,7 @@
         "settledNoneDesc": "隨時登入或連結方案即可開始聊天。",
         "fineOwnPlan": "ChatGPT 和 Claude Code 使用你自己在 OpenAI 或 Anthropic 的訂閱。可隨時在設定中更改。"
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "你是怎麼知道 Stella 的？",
-        "body": "選填。你的回答只會以匿名計數傳送，不含任何能識別你的資訊。",
-        "skip": "略過",
-        "settledTitle": "你是怎麼知道 Stella 的",
-        "settledSkipped": "已略過",
-        "answers": {
-          "google": "Google 搜尋",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok 或 Instagram",
-          "reddit": "Reddit",
-          "friend": "朋友推薦",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT 或其他 AI 推薦的",
-          "other": "其他"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "使用 Stella 即表示您同意我們的{terms}與{privacy}。",
     "privacyPolicy": "隱私權政策",
@@ -3854,6 +3669,27 @@
       "lineServer": "使用此伺服器的 OpenRouter 金鑰：本月已分類 {sorted} 封 · {cost}",
       "deviceKeyHint": "若要使用你自己的 OpenRouter 金鑰，請在登入狀態下到「模型」中加入，這樣它會儲存到你的帳戶。只儲存在這台電腦上的金鑰，在電腦關機時無法使用。",
       "deviceKeyHintPhone": "若要使用你自己的 OpenRouter 金鑰，請在登入狀態下到聊天設定中加入，這樣它會儲存到你的帳戶。只儲存在這支手機上的金鑰無法用於郵件。"
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "你是怎麼知道 Stella 的？",
+      "body": "選填。你的回答只會以匿名計數傳送，不含任何能識別你的資訊。",
+      "skip": "略過",
+      "answers": {
+        "google": "Google 搜尋",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok 或 Instagram",
+        "reddit": "Reddit",
+        "friend": "朋友推薦",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT 或其他 AI 推薦的",
+        "other": "其他"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella 也在你的手機上",
+      "detail": "取得 App，離開這台電腦時也能傳訊息給 Stella、查看任務進度。"
     }
   }
 }

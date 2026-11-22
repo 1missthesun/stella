@@ -1736,50 +1736,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "אני מוצאת את המקום הנכון, ממלאת את הטופס ומוסיפה ליומן, בדיוק כמו שהיית עושה.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "הפעלת ההדגמה",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "תזמן כל דבר ואני אבצע אותו בזמן, גם כשאתה ישן.",
-          "title": "מבקשים פעם אחת. זה קורה כל יום.",
-          "word": "שגרות"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "אני עובדת בתוך האפליקציות האמיתיות שבמחשב הזה, ויכולה להריץ יותר ממשימה אחת בו-זמנית.",
-          "title": "קבצים אמיתיים. כמה משימות במקביל.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1791,13 +1751,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "תוספות אופציונליות",
+        "lead": "אף אחת מאלה אינה חובה, אבל כל אחת הופכת אותי למועילה יותר.",
+        "start": "להתחיל לשוחח"
       },
       "gmail": {
         "body": "מצא הודעות, התעדכן בשרשורים וכתוב טיוטות תשובה, פשוט בבקשה.",
@@ -1805,116 +1762,15 @@
         "connected": "מחובר",
         "connecting": "ממתין ל-Google…",
         "error": "לא הצלחתי לחבר את Gmail. נסה שוב או דלג לעת עתה.",
-        "settledDesc": "אפשר לנהל אותו בכל עת במחברים.",
-        "settledSkippedTitle": "בלי Gmail בינתיים",
-        "settledTitle": "Gmail מחובר",
-        "skip": "לא עכשיו",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "היי, אני Stella.\n\nאני לא צ'אטבוט. אני משתמשת במחשב הזה כדי לבצע דברים באמת בשבילך, ברקע, בזמן שאתה ממשיך הלאה.\n\nכך זה נראה.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "הרבה מהחיים עובר דרך האימייל. חבר את Gmail ואעזור לך עם שלך.",
-        "memory": "One more thing that makes me different.",
-        "phone": "אני גם בטלפון שלך.",
-        "quickstart": "זה הכול. עוד דבר אחד, והוא אופציונלי: התחלה מהירה.",
-        "quickstartDone": "סיימתי. הנה מה שלמדתי, וכמה דברים שאפשר להתחיל מהם.",
-        "quickstartFailed": "הפעם לא הצלחתי לסיים לקרוא את הדפדפן שלך. אפשר להתחיל בכל זאת, ואני אלמד תוך כדי תנועה.",
-        "selfmod": "ומכיוון שאני חיה על המחשב שלך, אני יכולה לשנות את עצמי.",
-        "signin": "עכשיו בחרו איך אני חושבת. השתמשו במנוי Claude או ChatGPT שכבר יש לכם, במפתח משלכם או בחשבון Stella.",
-        "theme": "Now, how should I look?",
-        "foundVia": "שאלה קצרה, לא חובה: איך מצאת אותי?"
+        "signin": "היי, אני Stella. קודם כול, בחרו איך אני חושבת: מנוי Claude או ChatGPT שכבר יש לכם, מפתח משלכם או חשבון Stella."
       },
       "progress": "התקדמות ההגדרה",
-      "quickstart": {
-        "body": "רוב העוזרים מתחילים מאפס. הצג לי את הדפדפן שלך ואקרא אותו פעם אחת כדי לבנות זיכרון התחלתי, כך שאהיה שימושית כבר מהיום הראשון.",
-        "continueInBackground": "התחל לשוחח, סיים ברקע",
-        "eyebrow": "התחלה מהירה",
-        "failedBody": "משהו קטע את הקריאה. נסה שוב, או התחל לשוחח ואלמד תוך כדי תנועה.",
-        "failedTitle": "זה לא הסתיים",
-        "run": "הפעל התחלה מהירה",
-        "runningBody": "כדקה. אפשר להיכנס מתי שתרצה, ואסיים ברקע.",
-        "runningTitle": "מכירה אותך",
-        "skip": "דלג",
-        "stages": {
-          "notice": "מבחינה במה שחשוב לך",
-          "read": "קוראת את מה שבחרת",
-          "write": "כותבת את הזיכרון ההתחלתי שלך"
-        },
-        "title": "תן לי יתרון בהתחלה"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "בוצע.",
-        "gmailSkipped": "לא עכשיו.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "מגניב מאוד.",
-        "signinDone": "בוצע.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "לדלג על זו."
-      },
-      "selfmod": {
-        "body": "חסר לך משהו, או שאתה רוצה שדבר מסוים יעבוד אחרת? פשוט בקש. אכתוב מחדש את הקוד של עצמי, תנסה אותו, ואתה מחליט אם לשמור.",
-        "hint": "השינויים נשארים במחשב הזה.",
-        "settledDesc": "בקש, צפה בתצוגה מקדימה, עדכן. אפשר לבטל בכל רגע.",
-        "settledTitle": "אני יכולה לשנות את עצמי",
-        "steps": {
-          "ask": {
-            "body": "תאר את השינוי במילים פשוטות.",
-            "title": "בקש"
-          },
-          "preview": {
-            "body": "משימה בונה אותו ופותחת תצוגה מקדימה חיה.",
-            "title": "תצוגה מקדימה"
-          },
-          "update": {
-            "body": "לחיצה אחת כדי להחיל. אפשר לבטל בכל רגע.",
-            "title": "עדכן"
-          }
-        },
-        "title": "אני יכולה לשנות את עצמי"
+        "signinDone": "בוצע."
       },
       "send": "Send",
       "signin": {
@@ -1922,7 +1778,6 @@
         "claudeCliMissing": "קודם צריך להתקין את Claude Code, ואז לנסות שוב.",
         "connect": "חבר",
         "error": "ההתחברות לא הצליחה. לנסות שוב?",
-        "fine": "אפשר לשנות זאת בכל רגע בהגדרות.",
         "hint": "ההתחלה בחינם.",
         "inUse": "בשימוש",
         "options": {
@@ -1954,47 +1809,7 @@
         "settledNoneDesc": "התחבר או חבר מינוי בכל עת כדי להתחיל לשוחח.",
         "fineOwnPlan": "ChatGPT ו-Claude Code משתמשים במינוי שלך אצל OpenAI או Anthropic. אפשר לשנות זאת בכל עת בהגדרות."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "איך מצאת את Stella?",
-        "body": "לא חובה. התשובה נשלחת רק כספירה אנונימית, בלי שום דבר שמזהה אותך.",
-        "skip": "דילוג",
-        "settledTitle": "איך מצאת את Stella",
-        "settledSkipped": "דילגת",
-        "answers": {
-          "google": "חיפוש בגוגל",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok או Instagram",
-          "reddit": "Reddit",
-          "friend": "חבר או חברה",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT או בינה מלאכותית אחרת הציעו",
-          "other": "אחר"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "השימוש ב-Stella מהווה הסכמה ל{terms} ול{privacy} שלנו.",
     "privacyPolicy": "מדיניות הפרטיות",
@@ -3964,6 +3779,27 @@
       "lineServer": "על מפתח ה-OpenRouter של השרת הזה: {sorted} מוינו החודש · {cost}",
       "deviceKeyHint": "כדי להשתמש במפתח OpenRouter משלכם, הוסיפו אותו במודלים כשאתם מחוברים, כך שיישמר בחשבון שלכם. מפתח שנשמר רק במחשב הזה לא יכול לשמש כשהמחשב כבוי.",
       "deviceKeyHintPhone": "כדי להשתמש במפתח OpenRouter משלכם, הוסיפו אותו בהגדרות הצ׳אט כשאתם מחוברים, כך שיישמר בחשבון שלכם. מפתח שנשמר רק בטלפון הזה לא יכול לשמש לדוא\"ל."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "איך מצאת את Stella?",
+      "body": "לא חובה. התשובה נשלחת רק כספירה אנונימית, בלי שום דבר שמזהה אותך.",
+      "skip": "דילוג",
+      "answers": {
+        "google": "חיפוש בגוגל",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok או Instagram",
+        "reddit": "Reddit",
+        "friend": "חבר או חברה",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT או בינה מלאכותית אחרת הציעו",
+        "other": "אחר"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella גם בטלפון שלכם",
+      "detail": "הורידו את האפליקציה כדי לשלוח הודעות ל-Stella ולעקוב אחרי המשימות שלכם כשאתם רחוקים מהמחשב הזה."
     }
   }
 }

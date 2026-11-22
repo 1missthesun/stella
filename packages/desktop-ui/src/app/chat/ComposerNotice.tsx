@@ -11,6 +11,7 @@ import {
 import { useT } from "@/shared/i18n";
 import { ClaudeSignInNotice } from "@/features/claude/ClaudeSignInNotice";
 import { ConnectPlanNotice } from "@/features/chat/connect-plan/ConnectPlanNotice";
+import { FoundViaNotice } from "@/features/nudges/FoundViaNotice";
 import { useConnectPlanHeadsUp } from "@/features/chat/connect-plan/use-connect-plan-heads-up";
 import { useClaudeLoginHeadsUp } from "@/features/claude/use-claude-login-heads-up";
 import "./composer-notice.css";
@@ -46,6 +47,16 @@ export const ComposerNotice = ({
         notice={notice}
         compact={compact}
         onDismiss={() => dismissComposerNotice(notice.id)}
+      />
+    );
+  }
+
+  if (notice.foundVia) {
+    return (
+      <FoundViaNotice
+        key={notice.id}
+        compact={compact}
+        onClose={() => dismissComposerNotice(notice.id)}
       />
     );
   }

@@ -1,13 +1,6 @@
 type PromptTemplateValues = {
   "voice_orchestrator.base": undefined
   "voice_orchestrator.function_call_handoff": undefined
-  "synthesis.profile.system": undefined
-  "synthesis.profile.user": {
-    signals: string
-  }
-  "synthesis.welcome_message.user": {
-    coreMemory: string
-  }
 }
 
 export type PromptId = keyof PromptTemplateValues

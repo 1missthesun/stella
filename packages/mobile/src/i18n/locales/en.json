@@ -1726,50 +1726,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "I find the right place, fill in the form, and put it on your calendar, the same way you would.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Play this demo",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Schedule anything and I'll do it on time, even while you sleep.",
-          "title": "Ask once. It happens every day.",
-          "word": "Routines"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "I work inside the real apps on this computer, and I can run more than one job at a time.",
-          "title": "Real files. Several jobs at once.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1781,13 +1741,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Optional extras",
+        "lead": "None of these are required, but each one makes me more useful.",
+        "start": "Start chatting"
       },
       "gmail": {
         "body": "Find emails, catch up on threads, and draft replies, just by asking.",
@@ -1795,116 +1752,15 @@
         "connected": "Connected",
         "connecting": "Waiting for Google…",
         "error": "Couldn't connect Gmail. Try again, or skip for now.",
-        "settledDesc": "Manage it any time in Connectors.",
-        "settledSkippedTitle": "No Gmail for now",
-        "settledTitle": "Gmail connected",
-        "skip": "Not now",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Hi, I'm Stella.\n\nI'm not a chatbot. I use this computer to actually get things done for you, in the background, while you keep going.\n\nHere's what that looks like.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "So much of life runs through email. Connect Gmail and I can help with yours.",
-        "memory": "One more thing that makes me different.",
-        "phone": "I'm on your phone too.",
-        "quickstart": "That's everything. One last thing, and it's optional: a quickstart.",
-        "quickstartDone": "Done. Here's what I picked up, and a few things we could start with.",
-        "quickstartFailed": "I couldn't finish reading your browser this time. We can start anyway, and I'll learn as we go.",
-        "selfmod": "And because I live on your computer, I can change myself.",
-        "signin": "Next, choose how I think. Use the Claude or ChatGPT plan you already have, your own key, or a Stella account.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Quick question, and it's optional: how did you find me?"
+        "signin": "Hi, I'm Stella. First, choose how I think: the Claude or ChatGPT plan you already have, your own key, or a Stella account."
       },
       "progress": "Setup progress",
-      "quickstart": {
-        "body": "Most assistants start from zero. Point me at your browser and I'll read it once to build a starting memory, so I'm useful from day one.",
-        "continueInBackground": "Start chatting, finish in the background",
-        "eyebrow": "Quickstart",
-        "failedBody": "Something interrupted the read. Try again, or start chatting and I'll learn as we go.",
-        "failedTitle": "That didn't finish",
-        "run": "Run quickstart",
-        "runningBody": "About a minute. Head in whenever you like, and I'll finish in the background.",
-        "runningTitle": "Getting to know you",
-        "skip": "Skip",
-        "stages": {
-          "notice": "Noticing what matters to you",
-          "read": "Reading what you picked",
-          "write": "Writing your starting memory"
-        },
-        "title": "Give me a head start"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Done.",
-        "gmailSkipped": "Not now.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Very cool.",
-        "signinDone": "Done.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Skip this one."
-      },
-      "selfmod": {
-        "body": "Missing a feature, or want something to work differently? Just ask. I'll rewrite my own code, let you try it, and you decide whether to keep it.",
-        "hint": "Changes stay on this computer.",
-        "settledDesc": "Ask, preview, Update. Undo any time.",
-        "settledTitle": "I can change myself",
-        "steps": {
-          "ask": {
-            "body": "Describe the change in plain words.",
-            "title": "Ask"
-          },
-          "preview": {
-            "body": "A task builds it and opens a live preview.",
-            "title": "Preview"
-          },
-          "update": {
-            "body": "One click to apply it. Undo any time.",
-            "title": "Update"
-          }
-        },
-        "title": "I can change myself"
+        "signinDone": "Done."
       },
       "send": "Send",
       "signin": {
@@ -1912,7 +1768,6 @@
         "claudeCliMissing": "Install Claude Code first, then try again.",
         "connect": "Connect",
         "error": "That didn't connect. Try again?",
-        "fine": "Change this any time in Settings.",
         "hint": "Free to start.",
         "inUse": "In use",
         "options": {
@@ -1944,47 +1799,7 @@
         "settledNoneDesc": "Sign in or connect a plan any time to start chatting.",
         "fineOwnPlan": "ChatGPT and Claude Code use your own subscription with OpenAI or Anthropic. Change this any time in Settings."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "How did you find Stella?",
-        "body": "Optional. Your answer is sent only as an anonymous count, with nothing that identifies you.",
-        "skip": "Skip",
-        "settledTitle": "How you found Stella",
-        "settledSkipped": "Skipped",
-        "answers": {
-          "google": "Google search",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok or Instagram",
-          "reddit": "Reddit",
-          "friend": "A friend",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT or another AI suggested it",
-          "other": "Other"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "By using Stella, you agree to our {terms} and {privacy}.",
     "privacyPolicy": "Privacy Policy",
@@ -3910,6 +3725,27 @@
       "lineServer": "On this server's OpenRouter key: {sorted} sorted this month · {cost}",
       "deviceKeyHint": "To use your own OpenRouter key, add it in Models while signed in so it's saved to your account. A key kept only on this computer can't be used while the computer is off.",
       "deviceKeyHintPhone": "To use your own OpenRouter key, add it in Chat's settings while signed in so it's saved to your account. A key kept only on this phone can't be used for email."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "How did you find Stella?",
+      "body": "Optional. Your answer is sent only as an anonymous count, with nothing that identifies you.",
+      "skip": "Skip",
+      "answers": {
+        "google": "Google search",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok or Instagram",
+        "reddit": "Reddit",
+        "friend": "A friend",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT or another AI suggested it",
+        "other": "Other"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella is on your phone too",
+      "detail": "Get the app to message Stella and check on your tasks when you're away from this computer."
     }
   }
 }

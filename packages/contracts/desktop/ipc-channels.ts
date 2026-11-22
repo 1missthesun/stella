@@ -343,9 +343,6 @@ export const IPC_CONNECTOR_CONNECT_UPDATE = "connector-connect:update" as const;
 export const IPC_CONNECTOR_CONNECT_RESPOND =
   "connector-connect:respond" as const;
 
-export const IPC_ONBOARDING_SYNTHESIZE =
-  "onboarding:synthesizeCoreMemory" as const;
-
 export const IPC_CLOUD_HOME_SCAN_LOCAL = "cloudHome:scanLocal" as const;
 export const IPC_CLOUD_HOME_GET_IMPORT_OWNERSHIP =
   "cloudHome:getImportOwnership" as const;
@@ -357,15 +354,6 @@ export const IPC_MEMORY_SYNC_STATUS = "memorySync:status" as const;
 export const IPC_MEMORY_SYNC_NOW = "memorySync:syncNow" as const;
 export const IPC_MEMORY_SYNC_ERASE_LOCAL = "memorySync:eraseLocal" as const;
 export const IPC_MEMORY_SYNC_SET_HELD = "memorySync:setHeld" as const;
-
-export const IPC_DISCOVERY_DETECT_PREFERRED_BROWSER =
-  "discovery:detectPreferredBrowser" as const;
-export const IPC_DISCOVERY_LIST_BROWSER_PROFILES =
-  "discovery:listBrowserProfiles" as const;
-export const IPC_DISCOVERY_WRITE_CORE_MEMORY =
-  "discovery:writeCoreMemory" as const;
-export const IPC_DISCOVERY_COLLECT_ALL_SIGNALS =
-  "discovery:collectAllSignals" as const;
 
 export const IPC_BROWSER_BRIDGE_STATUS = "browser:bridgeStatus" as const;
 

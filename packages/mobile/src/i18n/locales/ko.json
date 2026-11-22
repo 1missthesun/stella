@@ -1716,50 +1716,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "알맞은 곳을 찾고, 양식을 채우고, 캘린더에 넣어 둘게요. 직접 하시는 것과 똑같은 방식으로요.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "이 데모 재생",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "무엇이든 예약해 두세요. 주무시는 동안에도 제때 처리할게요.",
-          "title": "한 번만 요청하세요. 매일 해 둘게요.",
-          "word": "루틴"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "저는 이 컴퓨터의 실제 앱 안에서 일하고, 한 번에 여러 작업을 진행할 수 있어요.",
-          "title": "진짜 파일. 여러 작업을 동시에.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1771,13 +1731,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "선택 기능",
+        "lead": "모두 필수는 아니지만, 하나하나가 저를 더 유용하게 만들어요.",
+        "start": "채팅 시작하기"
       },
       "gmail": {
         "body": "이메일 찾기, 스레드 따라잡기, 답장 초안 작성까지 말만 하면 돼요.",
@@ -1785,116 +1742,15 @@
         "connected": "연결됨",
         "connecting": "Google을 기다리는 중…",
         "error": "Gmail을 연결하지 못했어요. 다시 시도하거나 지금은 건너뛰세요.",
-        "settledDesc": "커넥터에서 언제든 관리할 수 있어요.",
-        "settledSkippedTitle": "지금은 Gmail 없이",
-        "settledTitle": "Gmail 연결됨",
-        "skip": "나중에",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "안녕하세요, Stella예요.\n\n저는 챗봇이 아니에요. 이 컴퓨터를 직접 사용해서 필요한 일을 실제로 해내요. 하시던 일을 계속하시는 동안 백그라운드에서요.\n\n어떤 모습인지 보여 드릴게요.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "생활의 많은 부분이 이메일로 오가요. Gmail을 연결하면 이메일도 도와드릴게요.",
-        "memory": "One more thing that makes me different.",
-        "phone": "휴대폰에서도 만날 수 있어요.",
-        "quickstart": "이게 전부예요. 마지막으로 하나만 남았고, 선택 사항이에요. 바로 퀵스타트예요.",
-        "quickstartDone": "완료했어요. 제가 파악한 내용과 함께 시작해 볼 만한 일 몇 가지를 정리했어요.",
-        "quickstartFailed": "이번에는 브라우저를 끝까지 읽지 못했어요. 그래도 먼저 시작해요. 하면서 배울게요.",
-        "selfmod": "그리고 저는 이 컴퓨터 안에 있기 때문에 스스로를 바꿀 수 있어요.",
-        "signin": "이제 제가 생각하는 방식을 고르세요. 이미 있는 Claude 또는 ChatGPT 요금제, 내 키, 또는 Stella 계정을 사용할 수 있어요.",
-        "theme": "Now, how should I look?",
-        "foundVia": "짧은 질문 하나, 선택 사항이에요: 저를 어떻게 알게 되셨나요?"
+        "signin": "안녕하세요, Stella예요. 먼저 제가 생각하는 방식을 고르세요. 이미 있는 Claude 또는 ChatGPT 요금제, 내 키, 또는 Stella 계정을 사용할 수 있어요."
       },
       "progress": "설정 진행 상황",
-      "quickstart": {
-        "body": "대부분의 어시스턴트는 처음부터 시작해요. 브라우저를 알려 주시면 한 번 읽고 기본 메모리를 만들어서, 첫날부터 도움이 되도록 할게요.",
-        "continueInBackground": "대화를 시작하고, 백그라운드에서 마무리",
-        "eyebrow": "퀵스타트",
-        "failedBody": "읽는 도중에 문제가 생겼어요. 다시 시도하거나, 대화를 시작하세요. 하면서 배울게요.",
-        "failedTitle": "끝내지 못했어요",
-        "run": "퀵스타트 실행",
-        "runningBody": "약 1분 걸려요. 편할 때 들어오세요. 나머지는 백그라운드에서 마칠게요.",
-        "runningTitle": "사용자를 알아가는 중",
-        "skip": "건너뛰기",
-        "stages": {
-          "notice": "중요한 것을 파악하는 중",
-          "read": "선택하신 내용을 읽는 중",
-          "write": "기본 메모리를 작성하는 중"
-        },
-        "title": "먼저 시작할 수 있게 도와드릴게요"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "완료했어요.",
-        "gmailSkipped": "나중에 할게요.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "정말 멋지네요.",
-        "signinDone": "완료했어요.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "이건 건너뛸게요."
-      },
-      "selfmod": {
-        "body": "기능이 없거나 다르게 동작하길 원하세요? 그냥 요청하세요. 제가 제 코드를 직접 고쳐서 써 보실 수 있게 하고, 유지할지는 직접 정하세요.",
-        "hint": "변경 사항은 이 컴퓨터에만 남아요.",
-        "settledDesc": "요청하고, 미리 보고, 업데이트하세요. 언제든 실행 취소할 수 있어요.",
-        "settledTitle": "저는 스스로를 바꿀 수 있어요",
-        "steps": {
-          "ask": {
-            "body": "바꾸고 싶은 점을 쉬운 말로 설명하세요.",
-            "title": "요청"
-          },
-          "preview": {
-            "body": "작업이 만들어서 실시간 미리보기를 열어 줘요.",
-            "title": "미리보기"
-          },
-          "update": {
-            "body": "한 번 클릭하면 적용돼요. 언제든 실행 취소할 수 있어요.",
-            "title": "업데이트"
-          }
-        },
-        "title": "저는 스스로를 바꿀 수 있어요"
+        "signinDone": "완료했어요."
       },
       "send": "Send",
       "signin": {
@@ -1902,7 +1758,6 @@
         "claudeCliMissing": "먼저 Claude Code를 설치한 후 다시 시도하세요.",
         "connect": "연결",
         "error": "연결하지 못했어요. 다시 시도할까요?",
-        "fine": "설정에서 언제든 바꿀 수 있어요.",
         "hint": "무료로 시작할 수 있어요.",
         "inUse": "사용 중",
         "options": {
@@ -1934,47 +1789,7 @@
         "settledNoneDesc": "언제든 로그인하거나 요금제를 연결하면 채팅을 시작할 수 있습니다.",
         "fineOwnPlan": "ChatGPT와 Claude Code는 OpenAI 또는 Anthropic의 본인 구독을 사용합니다. 설정에서 언제든 바꿀 수 있습니다."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Stella를 어떻게 알게 되셨나요?",
-        "body": "선택 사항입니다. 답변은 익명 집계로만 전송되며, 사용자를 식별할 수 있는 정보는 포함되지 않습니다.",
-        "skip": "건너뛰기",
-        "settledTitle": "Stella를 알게 된 경로",
-        "settledSkipped": "건너뜀",
-        "answers": {
-          "google": "Google 검색",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok 또는 Instagram",
-          "reddit": "Reddit",
-          "friend": "친구 추천",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT 등 다른 AI의 추천",
-          "other": "기타"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Stella를 사용하면 {terms} 및 {privacy}에 동의하게 됩니다.",
     "privacyPolicy": "개인정보 처리방침",
@@ -3854,6 +3669,27 @@
       "lineServer": "이 서버의 OpenRouter 키: 이번 달 {sorted}개 분류 · {cost}",
       "deviceKeyHint": "본인의 OpenRouter 키를 쓰려면 로그인한 상태에서 모델에 추가하세요. 그래야 계정에 저장돼요. 이 컴퓨터에만 저장된 키는 컴퓨터가 꺼져 있는 동안 쓸 수 없어요.",
       "deviceKeyHintPhone": "본인의 OpenRouter 키를 쓰려면 로그인한 상태에서 채팅 설정에 추가하세요. 그래야 계정에 저장돼요. 이 휴대폰에만 저장된 키는 이메일에 쓸 수 없어요."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Stella를 어떻게 알게 되셨나요?",
+      "body": "선택 사항입니다. 답변은 익명 집계로만 전송되며, 사용자를 식별할 수 있는 정보는 포함되지 않습니다.",
+      "skip": "건너뛰기",
+      "answers": {
+        "google": "Google 검색",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok 또는 Instagram",
+        "reddit": "Reddit",
+        "friend": "친구 추천",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT 등 다른 AI의 추천",
+        "other": "기타"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella는 휴대폰에도 있어요",
+      "detail": "앱을 받으면 이 컴퓨터에서 떨어져 있을 때도 Stella에게 메시지를 보내고 작업을 확인할 수 있어요."
     }
   }
 }

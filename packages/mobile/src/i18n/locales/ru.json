@@ -1746,50 +1746,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Я нахожу нужное место, заполняю форму и добавляю в календарь, точно так же, как сделали бы вы.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Воспроизвести демонстрацию",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Запланируйте что угодно, и я сделаю это вовремя, даже пока вы спите.",
-          "title": "Попросите один раз. Это будет происходить каждый день.",
-          "word": "Рутины"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Я работаю в настоящих приложениях на этом компьютере и могу выполнять больше одной задачи одновременно.",
-          "title": "Настоящие файлы. Несколько задач сразу.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1801,13 +1761,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Дополнительно, по желанию",
+        "lead": "Ничего из этого не обязательно, но каждое делает меня полезнее.",
+        "start": "Начать чат"
       },
       "gmail": {
         "body": "Находите письма, догоняйте переписки и готовьте черновики ответов, просто попросив.",
@@ -1815,116 +1772,15 @@
         "connected": "Подключено",
         "connecting": "Ждём Google…",
         "error": "Не удалось подключить Gmail. Попробуйте ещё раз или пропустите пока.",
-        "settledDesc": "Управлять можно в любое время в разделе «Коннекторы».",
-        "settledSkippedTitle": "Пока без Gmail",
-        "settledTitle": "Gmail подключён",
-        "skip": "Не сейчас",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Привет, я Stella.\n\nЯ не чат-бот. Я использую этот компьютер, чтобы на самом деле делать дела за вас, в фоновом режиме, пока вы занимаетесь своими.\n\nВот как это выглядит.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Большая часть жизни проходит через почту. Подключите Gmail, и я помогу с вашей.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Я есть и на вашем телефоне.",
-        "quickstart": "Это всё. Остался один шаг, необязательный: быстрый старт.",
-        "quickstartDone": "Готово. Вот что я узнала, и несколько дел, с которых можно начать.",
-        "quickstartFailed": "На этот раз я не смогла дочитать ваш браузер. Мы можем начать и так, а я буду учиться по ходу дела.",
-        "selfmod": "А поскольку я живу на вашем компьютере, я могу менять саму себя.",
-        "signin": "Теперь выберите, как я думаю. Используйте подписку Claude или ChatGPT, свой ключ или аккаунт Stella.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Короткий и необязательный вопрос: как вы меня нашли?"
+        "signin": "Привет, я Stella. Сначала выберите, как я думаю: подписка Claude или ChatGPT, которая у вас уже есть, свой ключ или аккаунт Stella."
       },
       "progress": "Ход настройки",
-      "quickstart": {
-        "body": "Большинство ассистентов начинают с нуля. Укажите мне свой браузер, и я прочитаю его один раз, чтобы собрать начальную память и быть полезной с первого дня.",
-        "continueInBackground": "Начать чат, закончу в фоне",
-        "eyebrow": "Быстрый старт",
-        "failedBody": "Что-то прервало чтение. Повторите попытку или начните чат, а я буду учиться по ходу дела.",
-        "failedTitle": "Не получилось",
-        "run": "Запустить быстрый старт",
-        "runningBody": "Около минуты. Можете заходить, когда захотите, а я закончу в фоновом режиме.",
-        "runningTitle": "Знакомлюсь с вами",
-        "skip": "Пропустить",
-        "stages": {
-          "notice": "Замечаю, что для вас важно",
-          "read": "Читаю то, что вы выбрали",
-          "write": "Записываю вашу начальную память"
-        },
-        "title": "Помогите мне начать"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Готово.",
-        "gmailSkipped": "Не сейчас.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Очень круто.",
-        "signinDone": "Готово.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Пропустить этот."
-      },
-      "selfmod": {
-        "body": "Не хватает функции или хочется, чтобы что-то работало иначе? Просто попросите. Я перепишу собственный код, дам вам его попробовать, а вы решите, оставить ли изменение.",
-        "hint": "Изменения остаются на этом компьютере.",
-        "settledDesc": "Попросите, посмотрите, обновите. Отменить можно в любой момент.",
-        "settledTitle": "Я могу менять саму себя",
-        "steps": {
-          "ask": {
-            "body": "Опишите изменение простыми словами.",
-            "title": "Попросите"
-          },
-          "preview": {
-            "body": "Задача создаст его и откроет живой предпросмотр.",
-            "title": "Предпросмотр"
-          },
-          "update": {
-            "body": "Один клик, чтобы применить. Отменить можно в любой момент.",
-            "title": "Обновить"
-          }
-        },
-        "title": "Я могу менять саму себя"
+        "signinDone": "Готово."
       },
       "send": "Send",
       "signin": {
@@ -1932,7 +1788,6 @@
         "claudeCliMissing": "Сначала установите Claude Code, затем попробуйте ещё раз.",
         "connect": "Подключить",
         "error": "Подключиться не удалось. Повторить?",
-        "fine": "Это можно изменить в любой момент в Настройках.",
         "hint": "Начать можно бесплатно.",
         "inUse": "Используется",
         "options": {
@@ -1964,47 +1819,7 @@
         "settledNoneDesc": "Войдите или подключите подписку в любой момент, чтобы начать общение.",
         "fineOwnPlan": "ChatGPT и Claude Code используют вашу собственную подписку OpenAI или Anthropic. Это можно изменить в любой момент в Настройках."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Как вы узнали о Stella?",
-        "body": "Необязательно. Ответ отправляется только как анонимный подсчёт, без чего-либо, что вас идентифицирует.",
-        "skip": "Пропустить",
-        "settledTitle": "Как вы узнали о Stella",
-        "settledSkipped": "Пропущено",
-        "answers": {
-          "google": "Поиск Google",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok или Instagram",
-          "reddit": "Reddit",
-          "friend": "От друга",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "Посоветовал ChatGPT или другой ИИ",
-          "other": "Другое"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Используя Stella, вы соглашаетесь с нашими {terms} и {privacy}.",
     "privacyPolicy": "Политикой конфиденциальности",
@@ -4018,6 +3833,27 @@
       "lineServer": "За счёт ключа OpenRouter этого сервера: в этом месяце отсортировано {sorted} · {cost}",
       "deviceKeyHint": "Чтобы использовать свой ключ OpenRouter, добавьте его в разделе «Модели», войдя в аккаунт, — тогда он сохранится в вашем аккаунте. Ключ, который хранится только на этом компьютере, нельзя использовать, пока компьютер выключен.",
       "deviceKeyHintPhone": "Чтобы использовать свой ключ OpenRouter, добавьте его в настройках чата, войдя в аккаунт, — тогда он сохранится в вашем аккаунте. Ключ, который хранится только на этом телефоне, нельзя использовать для почты."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Как вы узнали о Stella?",
+      "body": "Необязательно. Ответ отправляется только как анонимный подсчёт, без чего-либо, что вас идентифицирует.",
+      "skip": "Пропустить",
+      "answers": {
+        "google": "Поиск Google",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok или Instagram",
+        "reddit": "Reddit",
+        "friend": "От друга",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "Посоветовал ChatGPT или другой ИИ",
+        "other": "Другое"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella есть и на вашем телефоне",
+      "detail": "Скачайте приложение, чтобы писать Stella и следить за задачами, когда вы не за этим компьютером."
     }
   }
 }

@@ -79,7 +79,6 @@ import {
 } from "./device-signing-method.js";
 import { isDelegatedDeviceSigningInput } from "@stella/contracts/gateway/dpop";
 import { piBrainHandoffPrompt } from "@stella/contracts/turn-plane/pi-brain";
-import type { BrowserType } from "@stella/contracts";
 import type {
   HostDeviceIdentity,
   RuntimeAttachmentRef,
@@ -2162,36 +2161,6 @@ export class StellaRuntimeHost {
       undefined,
       { ensureWorker: false, recordActivity: true },
     );
-  }
-  async collectAllSignals(options: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_DISCOVERY_COLLECT_ALL_SIGNALS,
-      options,
-      { ensureWorker: true, recordActivity: false },
-    );
-  }
-  async writeCoreMemory(
-    content: string,
-    options?: { includeLocation?: boolean },
-  ) {
-    const { writeCoreMemory } = await import("../discovery/browser-data.js");
-    await writeCoreMemory(
-      this.options.initializeParams.stellaDataDirPath,
-      content,
-      options,
-    );
-  }
-  async detectPreferredBrowserProfile() {
-    const { detectPreferredBrowserProfile } = await import(
-      "../discovery/browser-data.js"
-    );
-    return await detectPreferredBrowserProfile();
-  }
-  async listBrowserProfiles(browserType: BrowserType) {
-    const { listBrowserProfiles } = await import(
-      "../discovery/browser-data.js"
-    );
-    return await listBrowserProfiles(browserType);
   }
   ensureScheduler() {
     if (!this.schedulerService) {

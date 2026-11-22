@@ -4,7 +4,7 @@ Stella's memory is plain Markdown under `~/.stella/memories/`, synced through th
 
 ## Layout and who reads what
 
-- `main.md`: loaded into the orchestrator's context every turn (with a budget; past it, it is cut off and Stella is told). Onboarding's quickstart writes its "Who the user is" section.
+- `main.md`: loaded into the orchestrator's context every turn (with a budget; past it, it is cut off and Stella is told).
 - `rules.md`: the user's standing rules, 6k cap, written only by Stella. It reaches every task and helper on every host as the resident "standing-rules" section (`packages/agent/src/stella/standing-rules.ts`; cloud pi via `pi-runtime`, cloud Claude Code via `build-session/agent-rules.ts`). Memory off means no rules.
 - `areas/<area>.md`: per-area memory a task is pointed at in its brief; nothing loads it automatically.
 - `archive/`: read by nothing.

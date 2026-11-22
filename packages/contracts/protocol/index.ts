@@ -128,8 +128,6 @@ export const METHOD_NAMES = {
     "internal.worker.localChat.listEvents",
   INTERNAL_WORKER_LOCAL_CHAT_GET_EVENT_COUNT:
     "internal.worker.localChat.getEventCount",
-  INTERNAL_WORKER_DISCOVERY_COLLECT_ALL_SIGNALS:
-    "internal.worker.discovery.collectAllSignals",
   INTERNAL_WORKER_ONE_SHOT_COMPLETION: "internal.worker.oneShotCompletion",
   INTERNAL_SCHEDULE_LIST_CRON_JOBS: "internal.schedule.listCronJobs",
   /** Schedules with whether every one could be listed (the cloud's may fail or not be loaded yet). */

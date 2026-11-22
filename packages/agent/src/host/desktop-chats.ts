@@ -148,7 +148,7 @@ import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/t
 import type { LiveProviderModel } from "@stella/contracts/provider-live-models";
 import { journalMirror, journalTurnGate, placedTaskGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
-import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
+import { localLogMirror, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
 import { afterStop, stopStella } from "../stella/stop.ts";
@@ -2078,21 +2078,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  const welcome = async (conversationId: string, message: string): Promise<void> => {
-    const text = message.trim();
-    if (!text) return;
-    const chat = await open(conversationId);
-    const reply = writtenReply(text, Date.now(), "welcome");
-    await chat.root.submit(
-      {
-        type: "write",
-        requestId: `welcome:${randomUUID()}`,
-        entry: { kind: "pi.assistant", model: [reply], data: { localOnly: true } },
-      },
-      context,
-    );
-  };
-
   /**
    * Copies what was said in a chat kept on this computer into an account
    * conversation: the user's messages and Stella's written replies, without
@@ -3099,9 +3084,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             conversationId: request.conversationId,
             events: [{ type: "send_failed", requestId: request.requestId, message: request.message }],
           });
-          return { ok: true };
-        case "welcome":
-          await welcome(request.conversationId, request.message);
           return { ok: true };
         case "files":
           return linkedFiles(request.conversationId);

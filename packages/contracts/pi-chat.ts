@@ -201,7 +201,6 @@ export type PiChatRequest =
   | { op: "sendFailed"; conversationId: string; requestId: string; message: string }
   | { op: "sendMoved"; conversationId: string; requestId: string; userMessageId: string }
   | { op: "journaled"; conversationId: string; requestId: string }
-  | { op: "welcome"; conversationId: string; message: string }
   | { op: "files"; conversationId: string }
   | { op: "journal"; conversationId: string }
   /** A choice on the safety-block card: remove the blocked messages, continue on another model, or start fresh. */

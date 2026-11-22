@@ -1746,50 +1746,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Najdu správné místo, vyplním formulář a přidám to do tvého kalendáře, stejně jako bys to udělal ty.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Přehrát tuto ukázku",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Naplánuj cokoli a udělám to načas, i když budeš spát.",
-          "title": "Řekni to jednou. Stane se to každý den.",
-          "word": "Rutiny"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Pracuju ve skutečných aplikacích na tomto počítači a zvládnu víc než jednu úlohu najednou.",
-          "title": "Skutečné soubory. Několik úloh najednou.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1801,13 +1761,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Volitelné doplňky",
+        "lead": "Nic z toho není povinné, ale každá z nich mě udělá užitečnější.",
+        "start": "Začít chatovat"
       },
       "gmail": {
         "body": "Najdi e-maily, dožeň konverzace a nech si napsat odpovědi, stačí říct.",
@@ -1815,116 +1772,15 @@
         "connected": "Připojeno",
         "connecting": "Čekám na Google…",
         "error": "Gmail se nepodařilo připojit. Zkus to znovu, nebo to zatím přeskoč.",
-        "settledDesc": "Spravovat ho můžeš kdykoli v sekci Konektory.",
-        "settledSkippedTitle": "Zatím bez Gmailu",
-        "settledTitle": "Gmail připojen",
-        "skip": "Teď ne",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Ahoj, jsem Stella.\n\nNejsem chatbot. Používám tento počítač, abych za tebe skutečně dělala věci, na pozadí, zatímco ty pokračuješ ve svém.\n\nTakhle to vypadá.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Spousta života se odehrává v e-mailu. Připoj Gmail a pomůžu ti s ním.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Jsem i ve vašem telefonu.",
-        "quickstart": "To je všechno. Ještě jedna věc, a je nepovinná: rychlý start.",
-        "quickstartDone": "Hotovo. Tohle jsem se dozvěděla a tady je pár věcí, kterými bychom mohli začít.",
-        "quickstartFailed": "Tentokrát jsem nestihla dočíst tvůj prohlížeč. Můžeme začít i tak a já se budu učit za pochodu.",
-        "selfmod": "A protože žiju na tvém počítači, můžu měnit sama sebe.",
-        "signin": "Teď vyberte, jak budu přemýšlet. Použijte předplatné Claude nebo ChatGPT, vlastní klíč nebo účet Stella.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Rychlá a nepovinná otázka: jak jste mě našli?"
+        "signin": "Ahoj, jsem Stella. Nejdřív vyberte, jak budu přemýšlet: předplatné Claude nebo ChatGPT, které už máte, vlastní klíč nebo účet Stella."
       },
       "progress": "Průběh nastavení",
-      "quickstart": {
-        "body": "Většina asistentů začíná od nuly. Ukaž mi svůj prohlížeč a já ho jednou přečtu, abych vytvořila počáteční paměť a byla ti užitečná od prvního dne.",
-        "continueInBackground": "Začít chatovat, dokončit na pozadí",
-        "eyebrow": "Rychlý start",
-        "failedBody": "Něco čtení přerušilo. Zkus to znovu, nebo začni chatovat a já se budu učit za pochodu.",
-        "failedTitle": "Nedokončilo se to",
-        "run": "Spustit rychlý start",
-        "runningBody": "Asi minutu. Klidně pokračuj, já to dokončím na pozadí.",
-        "runningTitle": "Poznávám tě",
-        "skip": "Přeskočit",
-        "stages": {
-          "notice": "Všímám si, co je pro tebe důležité",
-          "read": "Čtu, co jsi vybral",
-          "write": "Zapisuju tvou počáteční paměť"
-        },
-        "title": "Dej mi náskok"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Hotovo.",
-        "gmailSkipped": "Teď ne.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Moc pěkné.",
-        "signinDone": "Hotovo.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Tuto přeskočit."
-      },
-      "selfmod": {
-        "body": "Chybí ti funkce, nebo chceš, aby něco fungovalo jinak? Stačí říct. Přepíšu svůj vlastní kód, nechám tě to vyzkoušet a ty rozhodneš, jestli to necháš.",
-        "hint": "Změny zůstávají na tomto počítači.",
-        "settledDesc": "Zeptej se, prohlédni si, aktualizuj. Kdykoli vrať zpět.",
-        "settledTitle": "Můžu měnit sama sebe",
-        "steps": {
-          "ask": {
-            "body": "Popiš změnu jednoduchými slovy.",
-            "title": "Zeptej se"
-          },
-          "preview": {
-            "body": "Úloha to vytvoří a otevře živý náhled.",
-            "title": "Náhled"
-          },
-          "update": {
-            "body": "Jedno kliknutí to použije. Kdykoli můžeš vrátit zpět.",
-            "title": "Aktualizovat"
-          }
-        },
-        "title": "Můžu měnit sama sebe"
+        "signinDone": "Hotovo."
       },
       "send": "Send",
       "signin": {
@@ -1932,7 +1788,6 @@
         "claudeCliMissing": "Nejdřív nainstalujte Claude Code a pak to zkuste znovu.",
         "connect": "Připojit",
         "error": "Nepodařilo se připojit. Zkusit znovu?",
-        "fine": "Změnit to můžeš kdykoli v Nastavení.",
         "hint": "Začít je zdarma.",
         "inUse": "Používá se",
         "options": {
@@ -1964,47 +1819,7 @@
         "settledNoneDesc": "Kdykoli se přihlaste nebo připojte předplatné a můžete začít chatovat.",
         "fineOwnPlan": "ChatGPT a Claude Code používají vaše vlastní předplatné u OpenAI nebo Anthropic. Změnit to můžete kdykoli v Nastavení."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Jak jste našli Stellu?",
-        "body": "Nepovinné. Vaše odpověď se odešle jen jako anonymní počet, bez čehokoli, co by vás identifikovalo.",
-        "skip": "Přeskočit",
-        "settledTitle": "Jak jste našli Stellu",
-        "settledSkipped": "Přeskočeno",
-        "answers": {
-          "google": "Vyhledávání Google",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok nebo Instagram",
-          "reddit": "Reddit",
-          "friend": "Od přítele",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "Doporučil to ChatGPT nebo jiná AI",
-          "other": "Jiné"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Používáním Stelly souhlasíte s našimi {terms} a {privacy}.",
     "privacyPolicy": "Zásadami ochrany osobních údajů",
@@ -4018,6 +3833,27 @@
       "lineServer": "Z klíče OpenRouter tohoto serveru: tento měsíc roztříděno {sorted} · {cost}",
       "deviceKeyHint": "Chcete-li použít vlastní klíč OpenRouter, přidejte ho v sekci Modely, když jste přihlášeni, aby se uložil do vašeho účtu. Klíč uložený jen v tomto počítači nelze použít, když je počítač vypnutý.",
       "deviceKeyHintPhone": "Chcete-li použít vlastní klíč OpenRouter, přidejte ho v nastavení chatu, když jste přihlášeni, aby se uložil do vašeho účtu. Klíč uložený jen v tomto telefonu nelze pro e-mail použít."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Jak jste našli Stellu?",
+      "body": "Nepovinné. Vaše odpověď se odešle jen jako anonymní počet, bez čehokoli, co by vás identifikovalo.",
+      "skip": "Přeskočit",
+      "answers": {
+        "google": "Vyhledávání Google",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok nebo Instagram",
+        "reddit": "Reddit",
+        "friend": "Od přítele",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "Doporučil to ChatGPT nebo jiná AI",
+        "other": "Jiné"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella je i ve vašem telefonu",
+      "detail": "Stáhněte si aplikaci a pište Stelle a sledujte své úkoly, i když nejste u tohoto počítače."
     }
   }
 }

@@ -1716,50 +1716,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "Tôi tìm đúng nơi, điền biểu mẫu và đưa vào lịch của bạn, giống như cách bạn vẫn làm.",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "Phát bản demo này",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "Hẹn giờ bất cứ việc gì, tôi sẽ làm đúng giờ, kể cả khi bạn đang ngủ.",
-          "title": "Nhờ một lần. Việc diễn ra mỗi ngày.",
-          "word": "Tác vụ định kỳ"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "Tôi làm việc bên trong các ứng dụng thật trên máy tính này, và có thể chạy nhiều việc cùng lúc.",
-          "title": "Tệp thật. Nhiều việc cùng lúc.",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1771,13 +1731,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "Tiện ích tùy chọn",
+        "lead": "Không mục nào là bắt buộc, nhưng mỗi mục giúp tôi hữu ích hơn.",
+        "start": "Bắt đầu trò chuyện"
       },
       "gmail": {
         "body": "Tìm email, theo kịp các chuỗi thư và soạn nháp trả lời, chỉ cần nhờ.",
@@ -1785,116 +1742,15 @@
         "connected": "Đã kết nối",
         "connecting": "Đang chờ Google…",
         "error": "Không thể kết nối Gmail. Hãy thử lại hoặc bỏ qua lúc này.",
-        "settledDesc": "Quản lý bất cứ lúc nào trong Trình kết nối.",
-        "settledSkippedTitle": "Chưa dùng Gmail",
-        "settledTitle": "Đã kết nối Gmail",
-        "skip": "Để sau",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "Xin chào, tôi là Stella.\n\nTôi không phải chatbot. Tôi dùng chiếc máy tính này để thực sự hoàn thành công việc cho bạn, chạy ngầm, trong lúc bạn tiếp tục việc của mình.\n\nĐây là cách nó diễn ra.",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "Phần lớn cuộc sống diễn ra qua email. Kết nối Gmail và mình sẽ giúp bạn xử lý.",
-        "memory": "One more thing that makes me different.",
-        "phone": "Mình cũng có trên điện thoại của bạn.",
-        "quickstart": "Vậy là xong. Còn một việc cuối, và không bắt buộc: khởi động nhanh.",
-        "quickstartDone": "Xong rồi. Đây là những gì tôi đã nắm được, và vài việc chúng ta có thể bắt đầu.",
-        "quickstartFailed": "Lần này tôi không đọc xong trình duyệt của bạn. Chúng ta vẫn có thể bắt đầu, và tôi sẽ học dần.",
-        "selfmod": "Và vì tôi sống trên máy tính của bạn, tôi có thể tự thay đổi chính mình.",
-        "signin": "Giờ hãy chọn cách tôi suy nghĩ. Dùng gói Claude hoặc ChatGPT bạn đang có, khóa riêng của bạn hoặc tài khoản Stella.",
-        "theme": "Now, how should I look?",
-        "foundVia": "Một câu hỏi nhanh, không bắt buộc: bạn tìm thấy tôi bằng cách nào?"
+        "signin": "Xin chào, tôi là Stella. Trước tiên, hãy chọn cách tôi suy nghĩ: gói Claude hoặc ChatGPT bạn đang có, khóa riêng của bạn hoặc tài khoản Stella."
       },
       "progress": "Tiến trình thiết lập",
-      "quickstart": {
-        "body": "Hầu hết trợ lý đều bắt đầu từ con số không. Hãy chỉ tôi đến trình duyệt của bạn, tôi sẽ đọc một lần để tạo bộ nhớ ban đầu, để tôi hữu ích ngay từ ngày đầu.",
-        "continueInBackground": "Bắt đầu trò chuyện, hoàn tất ngầm",
-        "eyebrow": "Khởi động nhanh",
-        "failedBody": "Có điều gì đó đã làm gián đoạn việc đọc. Hãy thử lại, hoặc bắt đầu trò chuyện và tôi sẽ học dần.",
-        "failedTitle": "Chưa hoàn tất",
-        "run": "Chạy khởi động nhanh",
-        "runningBody": "Khoảng một phút. Cứ vào bất cứ lúc nào, tôi sẽ hoàn tất ngầm.",
-        "runningTitle": "Đang làm quen với bạn",
-        "skip": "Bỏ qua",
-        "stages": {
-          "notice": "Đang nhận ra điều quan trọng với bạn",
-          "read": "Đang đọc những gì bạn đã chọn",
-          "write": "Đang viết bộ nhớ ban đầu của bạn"
-        },
-        "title": "Cho tôi một khởi đầu thuận lợi"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "Xong.",
-        "gmailSkipped": "Để sau.",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "Tuyệt thật.",
-        "signinDone": "Xong.",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "Bỏ qua câu này."
-      },
-      "selfmod": {
-        "body": "Thiếu một tính năng, hay muốn thứ gì đó hoạt động khác đi? Cứ nói. Tôi sẽ viết lại mã của chính mình, để bạn dùng thử, và bạn quyết định có giữ lại hay không.",
-        "hint": "Thay đổi chỉ nằm trên máy tính này.",
-        "settledDesc": "Nhờ, xem trước, cập nhật. Hoàn tác bất cứ lúc nào.",
-        "settledTitle": "Tôi có thể tự thay đổi mình",
-        "steps": {
-          "ask": {
-            "body": "Mô tả thay đổi bằng lời đơn giản.",
-            "title": "Nhờ"
-          },
-          "preview": {
-            "body": "Một tác vụ xây dựng nó và mở bản xem trước trực tiếp.",
-            "title": "Xem trước"
-          },
-          "update": {
-            "body": "Một cú nhấp để áp dụng. Hoàn tác bất cứ lúc nào.",
-            "title": "Cập nhật"
-          }
-        },
-        "title": "Tôi có thể tự thay đổi mình"
+        "signinDone": "Xong."
       },
       "send": "Send",
       "signin": {
@@ -1902,7 +1758,6 @@
         "claudeCliMissing": "Hãy cài Claude Code trước rồi thử lại.",
         "connect": "Kết nối",
         "error": "Chưa kết nối được. Thử lại nhé?",
-        "fine": "Bạn có thể đổi bất cứ lúc nào trong Cài đặt.",
         "hint": "Bắt đầu miễn phí.",
         "inUse": "Đang dùng",
         "options": {
@@ -1934,47 +1789,7 @@
         "settledNoneDesc": "Đăng nhập hoặc kết nối một gói bất cứ lúc nào để bắt đầu trò chuyện.",
         "fineOwnPlan": "ChatGPT và Claude Code dùng gói đăng ký của chính bạn với OpenAI hoặc Anthropic. Đổi bất cứ lúc nào trong Cài đặt."
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "Bạn biết đến Stella bằng cách nào?",
-        "body": "Không bắt buộc. Câu trả lời chỉ được gửi dưới dạng một lượt đếm ẩn danh, không có gì nhận diện bạn.",
-        "skip": "Bỏ qua",
-        "settledTitle": "Cách bạn biết đến Stella",
-        "settledSkipped": "Đã bỏ qua",
-        "answers": {
-          "google": "Tìm kiếm Google",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok hoặc Instagram",
-          "reddit": "Reddit",
-          "friend": "Bạn bè",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT hoặc một AI khác gợi ý",
-          "other": "Khác"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Khi sử dụng Stella, bạn đồng ý với {terms} và {privacy} của chúng tôi.",
     "privacyPolicy": "Chính sách bảo mật",
@@ -3854,6 +3669,27 @@
       "lineServer": "Dùng khóa OpenRouter của máy chủ này: đã phân loại {sorted} trong tháng này · {cost}",
       "deviceKeyHint": "Để dùng khóa OpenRouter của riêng bạn, hãy thêm khóa trong Mô hình khi đã đăng nhập để khóa được lưu vào tài khoản. Khóa chỉ lưu trên máy tính này sẽ không dùng được khi máy tắt.",
       "deviceKeyHintPhone": "Để dùng khóa OpenRouter của riêng bạn, hãy thêm khóa trong cài đặt trò chuyện khi đã đăng nhập để khóa được lưu vào tài khoản. Khóa chỉ lưu trên điện thoại này sẽ không dùng được cho email."
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "Bạn biết đến Stella bằng cách nào?",
+      "body": "Không bắt buộc. Câu trả lời chỉ được gửi dưới dạng một lượt đếm ẩn danh, không có gì nhận diện bạn.",
+      "skip": "Bỏ qua",
+      "answers": {
+        "google": "Tìm kiếm Google",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok hoặc Instagram",
+        "reddit": "Reddit",
+        "friend": "Bạn bè",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT hoặc một AI khác gợi ý",
+        "other": "Khác"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella cũng có trên điện thoại của bạn",
+      "detail": "Tải ứng dụng để nhắn tin cho Stella và theo dõi công việc khi bạn không ở bên máy tính này."
     }
   }
 }

@@ -26,10 +26,15 @@
     root.setAttribute("data-platform", "mobile");
   }
 
-  // Dark is the default appearance; mirrors theme-context.tsx. Retired theme
-  // ids were pinned to one appearance and still win until React migrates them.
+  // Mirrors theme-context.tsx: a new desktop install follows the system; one
+  // set up before that, and the website, keep dark. Retired theme ids were
+  // pinned to one appearance and still win until React migrates them.
   var themeId = readStorage("stella-theme-id");
-  var colorMode = readStorage("stella-color-mode") || "dark";
+  var colorMode =
+    readStorage("stella-color-mode") ||
+    (window.electronAPI && readStorage("stella-onboarding-complete") !== "true"
+      ? "system"
+      : "dark");
   var resolvedColorMode = "dark";
   if (themeId === "noir" || themeId === "dark") {
     resolvedColorMode = "dark";

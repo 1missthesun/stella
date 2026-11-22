@@ -23,6 +23,7 @@ import {
 import { ChatRuntimeProvider } from "@/context/chat-runtime";
 import { ChatMessageAlerts } from "@/features/chat-alerts/ChatMessageAlerts";
 import { FirstReplyCounter } from "@/features/anonymous-counts/FirstReplyCounter";
+import { UsageNudges } from "@/features/nudges/UsageNudges";
 import { ANONYMOUS_COUNTS_ENABLED } from "@stella/contracts/telemetry/anonymous-counts";
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useUiState } from "@/context/ui-state";
@@ -101,7 +102,6 @@ import {
 import "@/shell/error-boundary.css";
 import { platformCapabilities } from "@/platform/capabilities";
 import { dismissLaunchSplash } from "@/shell/launch-splash";
-import { usePendingDiscoveryWelcome } from "@/global/onboarding/chat/pending-handoff";
 import { ContextMenuHost } from "@/platform/context-menu/ContextMenuHost";
 
 function CloudStartupFailure({
@@ -292,7 +292,6 @@ function RootLayout() {
           ownerSubject,
         })
       : null;
-  usePendingDiscoveryWelcome(conversationId);
 
   const settledAccountScope = cloudSession.sessionGate.sessionIsLoading
     ? null
@@ -462,6 +461,9 @@ function RootLayout() {
         ) : null}
         {platformCapabilities.nativeBridges && ANONYMOUS_COUNTS_ENABLED ? (
           <FirstReplyCounter />
+        ) : null}
+        {platformCapabilities.nativeBridges && platformCapabilities.onboarding ? (
+          <UsageNudges />
         ) : null}
         <RootChrome conversationId={conversationId} />
       </ChatRuntimeProvider>

@@ -1726,50 +1726,10 @@
   },
   "onboarding": {
     "chat": {
-      "capabilities": {
-        "build": {
-          "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online.",
-          "title": "Say it. I'll build it.",
-          "word": "Build"
-        },
-        "errands": {
-          "caption": "मैं सही जगह ढूँढती हूँ, फ़ॉर्म भरती हूँ और उसे आपके कैलेंडर में जोड़ देती हूँ, ठीक वैसे ही जैसे आप करते।",
-          "title": "Ask once. Consider it handled.",
-          "word": "Errands"
-        },
-        "play": "यह डेमो चलाएं",
-        "replay": "Replay this demo",
-        "routines": {
-          "caption": "कुछ भी शेड्यूल कीजिए और मैं उसे समय पर कर दूँगी, आपके सोते समय भी।",
-          "title": "एक बार कहिए। यह रोज़ होगा।",
-          "word": "रूटीन"
-        },
-        "settledTitle": "The quick tour",
-        "shopping": {
-          "caption": "I find it and get it to checkout. You confirm the total, and I place the order.",
-          "title": "I can buy things, with your OK.",
-          "word": "Shopping"
-        },
-        "tablist": "Capability demos",
-        "work": {
-          "caption": "मैं इस कंप्यूटर के असली ऐप्स के अंदर काम करती हूँ, और एक साथ एक से ज़्यादा काम चला सकती हूँ।",
-          "title": "असली फ़ाइलें। एक साथ कई काम।",
-          "word": "Work"
-        }
-      },
       "composerPlaceholder": "Or just ask me something to get started",
-      "discovery": {
-        "alsoLabel": "Also include",
-        "assurance": "A one-time read, kept on this computer. You can see and edit what I keep at any time.",
-        "browserLabel": "Your browser",
-        "hint": "About a minute, in the background.",
-        "includeDev": "My coding setup"
-      },
       "extras": {
         "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
         "accessibilityTitle": "Accessibility",
-        "body": "Neither is required, but both make me a lot more useful.",
-        "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
         "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
@@ -1781,13 +1741,10 @@
         "restartHint": "Screen access needs a quick restart to take effect.",
         "screenDesc": "So I can see the screen when you ask me to.",
         "screenTitle": "Screen Recording",
-        "settledExtension": "Extension",
-        "settledPermissions": "Permissions",
-        "settledSkippedTitle": "Extras skipped",
         "settledTitle": "Extras",
-        "skip": "Skip for now",
-        "title": "Two quick extras",
-        "titleOne": "One quick extra"
+        "heading": "वैकल्पिक अतिरिक्त",
+        "lead": "इनमें से कुछ भी ज़रूरी नहीं है, पर हर एक मुझे और उपयोगी बनाता है।",
+        "start": "चैट शुरू करें"
       },
       "gmail": {
         "body": "ईमेल खोजें, थ्रेड्स पर अपडेट रहें और जवाबों के ड्राफ़्ट लिखवाएँ, बस कहकर।",
@@ -1795,116 +1752,15 @@
         "connected": "कनेक्ट हो गया",
         "connecting": "Google का इंतज़ार…",
         "error": "Gmail कनेक्ट नहीं हो सका। फिर से कोशिश करें, या अभी छोड़ दें।",
-        "settledDesc": "इसे कभी भी कनेक्टर में मैनेज करें।",
-        "settledSkippedTitle": "अभी Gmail नहीं",
-        "settledTitle": "Gmail कनेक्ट हो गया",
-        "skip": "अभी नहीं",
         "title": "Gmail"
       },
-      "memory": {
-        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
-        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
-        "settledDesc": "No threads to manage. I remember.",
-        "settledTitle": "One conversation",
-        "showStella": "Now ask me",
-        "skip": "Skip",
-        "titleChatbot": "You know this one",
-        "titleStella": "With me it's one conversation"
-      },
       "messages": {
-        "capabilities": "नमस्ते, मैं Stella हूँ।\n\nमैं कोई चैटबॉट नहीं हूँ। मैं इस कंप्यूटर का इस्तेमाल करके सचमुच आपके काम निपटाती हूँ, बैकग्राउंड में, जबकि आप अपने काम में लगे रहते हैं।\n\nदेखिए, यह कैसा दिखता है।",
         "extras": "Almost done. A little housekeeping, then we start.",
-        "gmail": "ज़िंदगी का बहुत कुछ ईमेल से होकर गुज़रता है। Gmail कनेक्ट करें और मैं आपके ईमेल में मदद करूँगी।",
-        "memory": "One more thing that makes me different.",
-        "phone": "मैं आपके फ़ोन पर भी हूँ।",
-        "quickstart": "बस इतना ही। एक आख़िरी बात, और वह भी वैकल्पिक है: क्विकस्टार्ट।",
-        "quickstartDone": "हो गया। यह रहा जो मैंने सीखा, और कुछ चीज़ें जिनसे हम शुरू कर सकते हैं।",
-        "quickstartFailed": "इस बार मैं आपका ब्राउज़र पूरा नहीं पढ़ पाई। हम फिर भी शुरू कर सकते हैं, और मैं साथ-साथ सीखती जाऊँगी।",
-        "selfmod": "और क्योंकि मैं आपके कंप्यूटर पर रहती हूँ, मैं खुद को बदल सकती हूँ।",
-        "signin": "अब चुनें कि मैं कैसे सोचूँ। अपना मौजूदा Claude या ChatGPT प्लान, अपनी कुंजी या Stella खाता इस्तेमाल करें।",
-        "theme": "Now, how should I look?",
-        "foundVia": "एक छोटा-सा, वैकल्पिक सवाल: आपने मुझे कैसे ढूँढा?"
+        "signin": "नमस्ते, मैं Stella हूँ। पहले चुनें कि मैं कैसे सोचूँ: आपका मौजूदा Claude या ChatGPT प्लान, आपकी अपनी कुंजी या Stella खाता।"
       },
       "progress": "सेटअप की प्रगति",
-      "quickstart": {
-        "body": "ज़्यादातर असिस्टेंट शून्य से शुरू करते हैं। मुझे अपना ब्राउज़र दिखाइए, मैं उसे एक बार पढ़कर शुरुआती मेमोरी बना लूँगी, ताकि पहले दिन से आपके काम आ सकूँ।",
-        "continueInBackground": "चैट शुरू करें, बाकी बैकग्राउंड में पूरा हो",
-        "eyebrow": "क्विकस्टार्ट",
-        "failedBody": "किसी वजह से पढ़ना रुक गया। फिर कोशिश करें, या चैट शुरू करें और मैं साथ-साथ सीखती जाऊँगी।",
-        "failedTitle": "यह पूरा नहीं हो पाया",
-        "run": "क्विकस्टार्ट चलाएँ",
-        "runningBody": "लगभग एक मिनट। आप जब चाहें अंदर जाइए, मैं बैकग्राउंड में पूरा कर दूँगी।",
-        "runningTitle": "आपको जान रही हूँ",
-        "skip": "छोड़ें",
-        "stages": {
-          "notice": "आपके लिए क्या मायने रखता है, यह समझ रही हूँ",
-          "read": "आपने जो चुना, उसे पढ़ रही हूँ",
-          "write": "आपकी शुरुआती मेमोरी लिख रही हूँ"
-        },
-        "title": "मुझे एक अच्छी शुरुआत दीजिए"
-      },
-      "ready": {
-        "generic": {
-          "browse": {
-            "prompt": "Find a well-reviewed dinner spot near me for this weekend and hold a reservation for two.",
-            "title": "Find me a good dinner spot"
-          },
-          "file": {
-            "prompt": "I have a document that needs cleaning up. I'll share it and you fix the structure and wording.",
-            "title": "Tidy up a document"
-          },
-          "plan": {
-            "prompt": "Help me plan my week. Ask me what's on my plate and lay it out day by day.",
-            "title": "Plan my week"
-          },
-          "watch": {
-            "prompt": "Keep an eye on a web page for me and tell me when it changes.",
-            "title": "Watch a site for changes"
-          }
-        },
-        "highlightsLabel": "What I picked up",
-        "hint": "Or type anything below.",
-        "notesFoot": "To change these notes, just tell Stella. You can turn memory off in {place}.",
-        "notesSummary": "See everything I noted",
-        "start": "Start chatting",
-        "startersLabel": "Try one of these",
-        "startersLabelPersonal": "Made for you"
-      },
       "replies": {
-        "capabilitiesDone": "Got it.",
-        "capabilitiesSkipped": "Skip the tour.",
-        "extrasDone": "Done.",
-        "extrasSkipped": "Skip for now.",
-        "gmailDone": "हो गया।",
-        "gmailSkipped": "अभी नहीं।",
-        "memoryDone": "Nice.",
-        "memorySkipped": "Skip it.",
-        "selfmodDone": "बहुत बढ़िया।",
-        "signinDone": "हो गया।",
-        "themeDone": "That one.",
-        "themeSkipped": "Keep the default.",
-        "foundViaSkipped": "इसे छोड़ें।"
-      },
-      "selfmod": {
-        "body": "कोई फ़ीचर कम है, या कुछ अलग तरह से चलाना है? बस कहिए। मैं अपना कोड खुद दोबारा लिखूँगी, आप उसे आज़माइए, और रखना है या नहीं, यह आप तय कीजिए।",
-        "hint": "बदलाव इसी कंप्यूटर पर रहते हैं।",
-        "settledDesc": "कहें, पूर्वावलोकन देखें, अपडेट करें। कभी भी पूर्ववत करें।",
-        "settledTitle": "मैं खुद को बदल सकती हूँ",
-        "steps": {
-          "ask": {
-            "body": "बदलाव को आसान शब्दों में बताइए।",
-            "title": "कहें"
-          },
-          "preview": {
-            "body": "एक कार्य उसे बनाता है और लाइव पूर्वावलोकन खोलता है।",
-            "title": "पूर्वावलोकन"
-          },
-          "update": {
-            "body": "लागू करने के लिए एक क्लिक। कभी भी पूर्ववत करें।",
-            "title": "अपडेट करें"
-          }
-        },
-        "title": "मैं खुद को बदल सकती हूँ"
+        "signinDone": "हो गया।"
       },
       "send": "Send",
       "signin": {
@@ -1912,7 +1768,6 @@
         "claudeCliMissing": "पहले Claude Code इंस्टॉल करें, फिर से कोशिश करें।",
         "connect": "कनेक्ट करें",
         "error": "कनेक्ट नहीं हो पाया। फिर कोशिश करें?",
-        "fine": "इसे कभी भी सेटिंग्स में बदलें।",
         "hint": "शुरू करना मुफ़्त है।",
         "inUse": "इस्तेमाल में",
         "options": {
@@ -1944,47 +1799,7 @@
         "settledNoneDesc": "चैट शुरू करने के लिए कभी भी साइन इन करें या प्लान जोड़ें।",
         "fineOwnPlan": "ChatGPT और Claude Code, OpenAI या Anthropic के साथ आपकी अपनी सदस्यता का उपयोग करते हैं। इसे सेटिंग्स में कभी भी बदलें।"
       },
-      "skipSetup": "Skip setup",
-      "theme": {
-        "appearance": "Appearance",
-        "body": "Hover to try one on. Click to keep it.",
-        "confirm": "Done",
-        "gradient": {
-          "flat": "Flat",
-          "relative": "Relative",
-          "soft": "Soft",
-          "strong": "Strong"
-        },
-        "gradientColor": "Gradient color",
-        "gradientStyle": "Gradient style",
-        "hint": "Everything here changes live.",
-        "mode": {
-          "dark": "Dark",
-          "light": "Light",
-          "system": "System"
-        },
-        "settledTitle": "Default",
-        "skip": "Keep the default",
-        "themes": "Theme",
-        "title": "Pick a look"
-      },
-      "foundVia": {
-        "title": "आपको Stella के बारे में कैसे पता चला?",
-        "body": "वैकल्पिक। आपका जवाब सिर्फ़ एक गुमनाम गिनती के रूप में भेजा जाता है, ऐसी किसी चीज़ के बिना जो आपकी पहचान करे।",
-        "skip": "छोड़ें",
-        "settledTitle": "आपको Stella कैसे मिली",
-        "settledSkipped": "छोड़ा गया",
-        "answers": {
-          "google": "Google खोज",
-          "youtube": "YouTube",
-          "tiktok_instagram": "TikTok या Instagram",
-          "reddit": "Reddit",
-          "friend": "किसी दोस्त से",
-          "app_store": "App Store / Google Play",
-          "ai_suggested": "ChatGPT या किसी दूसरे AI ने सुझाया",
-          "other": "अन्य"
-        }
-      }
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Stella का उपयोग करके, आप हमारी {terms} और {privacy} से सहमत होते हैं।",
     "privacyPolicy": "गोपनीयता नीति",
@@ -3910,6 +3725,27 @@
       "lineServer": "इस सर्वर की OpenRouter कुंजी से: इस महीने {sorted} छाँटे गए · {cost}",
       "deviceKeyHint": "अपनी OpenRouter कुंजी इस्तेमाल करने के लिए, साइन इन रहते हुए उसे मॉडल में जोड़ें ताकि वह आपके खाते में सहेजी जाए। सिर्फ़ इस कंप्यूटर पर रखी कुंजी कंप्यूटर बंद होने पर इस्तेमाल नहीं हो सकती।",
       "deviceKeyHintPhone": "अपनी OpenRouter कुंजी इस्तेमाल करने के लिए, साइन इन रहते हुए उसे चैट सेटिंग्स में जोड़ें ताकि वह आपके खाते में सहेजी जाए। सिर्फ़ इस फ़ोन पर रखी कुंजी ईमेल के लिए इस्तेमाल नहीं हो सकती।"
+    }
+  },
+  "nudges": {
+    "foundVia": {
+      "title": "आपको Stella के बारे में कैसे पता चला?",
+      "body": "वैकल्पिक। आपका जवाब सिर्फ़ एक गुमनाम गिनती के रूप में भेजा जाता है, ऐसी किसी चीज़ के बिना जो आपकी पहचान करे।",
+      "skip": "छोड़ें",
+      "answers": {
+        "google": "Google खोज",
+        "youtube": "YouTube",
+        "tiktok_instagram": "TikTok या Instagram",
+        "reddit": "Reddit",
+        "friend": "किसी दोस्त से",
+        "app_store": "App Store / Google Play",
+        "ai_suggested": "ChatGPT या किसी दूसरे AI ने सुझाया",
+        "other": "अन्य"
+      }
+    },
+    "phoneApp": {
+      "title": "Stella आपके फ़ोन पर भी है",
+      "detail": "ऐप पाएं ताकि इस कंप्यूटर से दूर होने पर भी Stella को संदेश भेज सकें और अपने काम देख सकें।"
     }
   }
 }

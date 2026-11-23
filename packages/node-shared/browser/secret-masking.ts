@@ -240,8 +240,14 @@ const looksLikeTokenSegment = (segment: string): boolean => {
 // Vault
 // ---------------------------------------------------------------------------
 
+/** What a vault needs to recognize its placeholders again, without the values that can't be sent back. */
+export type SavedBrowserSecrets = Readonly<{
+  key: string;
+  secrets: readonly (readonly [value: string, sites: readonly string[]])[];
+}>;
+
 export class BrowserSecretVault {
-  readonly #key = randomBytes(32);
+  readonly #key: Uint8Array;
   readonly #byValue = new Map<string, SecretEntry>();
   readonly #byPlaceholder = new Map<string, SecretEntry>();
   #index: VariantIndex | null = null;
@@ -253,8 +259,34 @@ export class BrowserSecretVault {
       }
     | undefined;
 
+  constructor(saved?: SavedBrowserSecrets) {
+    this.#key = saved
+      ? Uint8Array.from(atob(saved.key), (char) => char.charCodeAt(0))
+      : randomBytes(32);
+    for (const [value, sites] of saved?.secrets ?? []) {
+      const entry = this.remember(value, undefined, true);
+      for (const site of sites) entry.sites.add(site);
+    }
+  }
+
   get size(): number {
     return this.#byValue.size;
+  }
+
+  /** The newest values that fit, oldest first. */
+  save(maxChars: number): SavedBrowserSecrets {
+    const secrets: (readonly [string, readonly string[]])[] = [];
+    let room = maxChars;
+    for (const entry of [...this.#byValue.values()].reverse()) {
+      if (!entry.replayable) continue;
+      room -= entry.value.length + [...entry.sites].join().length;
+      if (room < 0) break;
+      secrets.push([entry.value, [...entry.sites]]);
+    }
+    return {
+      key: btoa(String.fromCharCode(...this.#key)),
+      secrets: secrets.reverse(),
+    };
   }
 
   remember(

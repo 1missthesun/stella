@@ -261,6 +261,10 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     );
   }
 
+  pageUrl(): string | undefined {
+    return this.page?.url();
+  }
+
   private requiredPage(): Page {
     if (!this.page) throw new GatewayError("browser_unavailable", 503);
     return this.page;

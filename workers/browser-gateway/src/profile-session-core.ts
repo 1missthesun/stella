@@ -15,6 +15,11 @@ import type {
   DeviceCodeGrant,
 } from "./device-code-fixture-client.js";
 import type { BrowserSessionMeter } from "./browser-meter.js";
+import {
+  ThreadBrowserSecrets,
+  ThreadSecretCache,
+  type SecretPage,
+} from "./browser-secrets.js";
 import { GatewayError } from "./errors.js";
 import { parseAgentSelector } from "./selectors.js";
 import {
@@ -290,6 +295,8 @@ const UNRECEIPTED_ACTIONS: ReadonlySet<string> = new Set([
   "browser.text",
 ]);
 
+const MAX_SAVED_SECRET_CHARS = 512 * 1024;
+
 const interactionTerminal = (state: InteractionRecord["state"]): boolean =>
   ["completed", "canceled", "expired", "failed"].includes(state);
 
@@ -367,6 +374,7 @@ export class BrowserProfileSessionCore {
   private readonly handoffTimeoutMs: number;
   private readonly deviceCodeFixture: DeviceCodeFixtureClient | undefined;
   private readonly meter: BrowserSessionMeter | undefined;
+  private readonly secrets = new ThreadSecretCache();
   private purgedOwnerDigest: string | undefined;
 
   constructor(dependencies: ProfileCoreDependencies) {
@@ -449,6 +457,58 @@ export class BrowserProfileSessionCore {
     } catch {
       throw new GatewayError("internal_error", 500);
     }
+  }
+
+  private secretsAad(state: ProfileState, threadDigest: string): ProfileAad {
+    return {
+      schemaVersion: 1,
+      keyVersion: PROFILE_KEY_VERSION,
+      ownerDigest: state.ownerDigest,
+      profileDigest: threadDigest,
+      profileEpoch: state.profileEpoch,
+      snapshotRevision: 1,
+    };
+  }
+
+  private secretsDigest(authority: TurnAuthority): Promise<string> {
+    return sha256Hex(`browser-secrets\u0000${authority.threadId}`);
+  }
+
+  private async threadSecrets(
+    state: ProfileState,
+    threadDigest: string,
+  ): Promise<ThreadBrowserSecrets> {
+    const cached = this.secrets.get(threadDigest);
+    if (cached) return cached;
+    const sealed = this.store.getSecrets(threadDigest);
+    const saved = sealed
+      ? await decryptStorageState({
+          bytes: sealed,
+          aad: this.secretsAad(state, threadDigest),
+          kekV1: this.kekV1,
+        }).catch(() => undefined)
+      : undefined;
+    const secrets = ThreadBrowserSecrets.from(
+      saved as Parameters<typeof ThreadBrowserSecrets.from>[0],
+    );
+    this.secrets.put(threadDigest, secrets);
+    return secrets;
+  }
+
+  private async saveThreadSecrets(
+    state: ProfileState,
+    threadDigest: string,
+    secrets: ThreadBrowserSecrets,
+    before: string,
+  ): Promise<void> {
+    const saved = secrets.save(MAX_SAVED_SECRET_CHARS);
+    if (saved.secrets.length === 0 || stableJson(saved) === before) return;
+    const { bytes } = await encryptStorageState({
+      storageState: saved,
+      aad: this.secretsAad(state, threadDigest),
+      kekV1: this.kekV1,
+    });
+    this.store.putSecrets(threadDigest, bytes, this.now());
   }
 
   private async decryptDeviceGrant(
@@ -767,8 +827,23 @@ export class BrowserProfileSessionCore {
       ...(data === undefined ? {} : { data }),
     });
 
+    const threadDigest = await this.secretsDigest(envelope.authority);
+    const secrets = await this.threadSecrets(state, threadDigest);
+    const secretsBefore = stableJson(secrets.save(MAX_SAVED_SECRET_CHARS));
+    const page: SecretPage = {
+      url: async () => {
+        state = await this.ensureBrowser(state);
+        return this.browser.pageUrl();
+      },
+      evaluate: (script) => this.browser.evaluate(script, undefined),
+    };
+    const { params, inserted } = await secrets.substitute(
+      envelope.command.action,
+      envelope.command.params,
+      page,
+    );
+
     let response: unknown;
-    const params = envelope.command.params;
     switch (envelope.command.action) {
       case "browser.open": {
         const value = exactObject(params, ["allowedOrigins"], ["startUrl"]);
@@ -1257,6 +1332,20 @@ export class BrowserProfileSessionCore {
         };
         break;
       }
+    }
+
+    const outcome = response as { outcome: string; data?: unknown };
+    if (outcome.outcome === "completed") {
+      response = completed(
+        await secrets.mask(
+          envelope.command.action,
+          params,
+          outcome.data,
+          page,
+          inserted,
+        ),
+      );
+      await this.saveThreadSecrets(state, threadDigest, secrets, secretsBefore);
     }
 
     if (!UNRECEIPTED_ACTIONS.has(envelope.command.action)) {
@@ -2021,6 +2110,8 @@ export class BrowserProfileSessionCore {
     this.store.putState(updated);
     this.store.deleteReceipts();
     this.store.deleteInteractions();
+    this.store.deleteSecrets();
+    this.secrets.clear();
     if (state.browserSessionId) {
       await this.closeRemoteSession(state.browserSessionId);
     }
@@ -2074,6 +2165,7 @@ export class BrowserProfileSessionCore {
     }
     await this.deletePrefix(`browser-profiles/${owner}/${profile}/`);
     await this.store.destroy();
+    this.secrets.clear();
     this.purgedOwnerDigest = owner;
     return {
       schemaVersion: 1,

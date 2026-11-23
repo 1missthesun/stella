@@ -148,6 +148,7 @@ export interface BrowserBackend {
   }): Promise<void>;
   sessionId(): string | undefined;
   policyDigest(): string | undefined;
+  pageUrl(): string | undefined;
   navigate(url: string): Promise<SafeObservation>;
   observe(): Promise<SafeObservation>;
   history(direction: "back" | "forward" | "reload"): Promise<SafeObservation>;

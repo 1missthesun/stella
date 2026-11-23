@@ -195,7 +195,13 @@ const parseGatewayResponse = (
     typeof value.code === "string" &&
     /^[a-z_]{1,64}$/u.test(value.code)
   ) {
-    return { outcome: "failed", code: value.code };
+    return {
+      outcome: "failed",
+      code: value.code,
+      ...(typeof value.detail === "string"
+        ? { detail: value.detail.slice(0, 2_000) }
+        : {}),
+    };
   }
   if (
     isRecord(value.error) &&

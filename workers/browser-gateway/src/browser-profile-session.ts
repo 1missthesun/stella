@@ -154,6 +154,9 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
               requestId: envelope.command.requestId,
               code: safe.code,
               message: safe.message,
+              ...(safe.code === "secret_refused" && safe.detail
+                ? { detail: safe.detail }
+                : {}),
               ...(safe.code === "browser_unavailable"
                 ? { outcomeUnknown: true }
                 : {}),

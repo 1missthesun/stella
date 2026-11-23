@@ -83,7 +83,7 @@ import {
   siteOfUrl,
   substituteBrowserPlaceholders,
   type BrowserSecretVault,
-} from "../browser-use/secret-masking.js";
+} from "@stella/node-shared/browser/secret-masking.js";
 import { saveBrowserScreenshot } from "./browser-screenshot-store.js";
 import { resolveStatePath } from "@stella/node-shared/cli/shared.js";
 import { expandHomePath, toolContextHome } from "../tools/utils.js";

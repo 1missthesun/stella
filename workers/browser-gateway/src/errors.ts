@@ -12,6 +12,7 @@ export type GatewayErrorCode =
   | "interaction_expired"
   | "snapshot_unavailable"
   | "evaluation_failed"
+  | "secret_refused"
   | "budget_exhausted"
   | "internal_error";
 
@@ -29,6 +30,7 @@ const PUBLIC_MESSAGES: Record<GatewayErrorCode, string> = {
   interaction_expired: "The browser interaction expired.",
   snapshot_unavailable: "The saved browser profile is unavailable.",
   evaluation_failed: "The page script threw an error.",
+  secret_refused: "A masked value can't be sent there.",
   budget_exhausted: "The Stella budget has no room left for the cloud browser.",
   internal_error: "The browser request could not be completed.",
 };

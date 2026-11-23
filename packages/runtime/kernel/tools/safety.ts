@@ -1,6 +1,6 @@
 import { isUserAskSecretHandle } from "@stella/contracts/user-ask";
 import { redactWrappedSecretTokens } from "@stella/contracts/secret-redaction";
-import { isBrowserSecretPlaceholder } from "../browser-use/secret-placeholder.js";
+import { isBrowserSecretPlaceholder } from "@stella/node-shared/browser/secret-placeholder.js";
 
 const STRUCTURAL_TAG_RE =
   /<\/?(?:tool_call|function_call|result|response|output|input|system|assistant|user)>/gi;

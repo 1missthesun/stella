@@ -69,12 +69,17 @@ export interface ProfileStore {
   getReceipt(requestId: string): CommandReceipt | null;
   putReceipt(receipt: CommandReceipt): void;
   deleteReceipts(): void;
+  getSecrets(threadDigest: string): Uint8Array | null;
+  putSecrets(threadDigest: string, sealed: Uint8Array, now: number): void;
+  deleteSecrets(): void;
   deleteInteractions(): void;
   pendingRemoteCloses(): readonly string[];
   putPendingRemoteClose(sessionId: string, recordedAt: number): void;
   deletePendingRemoteClose(sessionId: string): void;
   destroy(): Promise<void>;
 }
+
+const THREAD_SECRETS_TTL_MS = 24 * 60 * 60_000;
 
 const DDL = [
   `CREATE TABLE IF NOT EXISTS profile_state (
@@ -122,6 +127,11 @@ const DDL = [
   ) STRICT`,
   `CREATE INDEX IF NOT EXISTS interactions_by_state
    ON interactions (state, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS thread_secrets (
+    thread_digest TEXT PRIMARY KEY,
+    sealed BLOB NOT NULL,
+    updated_at INTEGER NOT NULL
+  ) STRICT`,
   `CREATE TABLE IF NOT EXISTS pending_remote_closes (
     session_id TEXT PRIMARY KEY,
     recorded_at INTEGER NOT NULL
@@ -388,6 +398,36 @@ export class SqliteProfileStore implements ProfileStore {
 
   deleteReceipts(): void {
     this.storage.sql.exec("DELETE FROM command_receipts");
+  }
+
+  getSecrets(threadDigest: string): Uint8Array | null {
+    const row = this.storage.sql
+      .exec<{ sealed: ArrayBuffer }>(
+        "SELECT sealed FROM thread_secrets WHERE thread_digest = ?",
+        threadDigest,
+      )
+      .toArray()[0];
+    return row ? new Uint8Array(row.sealed) : null;
+  }
+
+  putSecrets(threadDigest: string, sealed: Uint8Array, now: number): void {
+    this.storage.sql.exec(
+      `INSERT INTO thread_secrets (thread_digest, sealed, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(thread_digest) DO UPDATE SET
+         sealed = excluded.sealed, updated_at = excluded.updated_at`,
+      threadDigest,
+      sealed,
+      now,
+    );
+    this.storage.sql.exec(
+      "DELETE FROM thread_secrets WHERE updated_at < ?",
+      now - THREAD_SECRETS_TTL_MS,
+    );
+  }
+
+  deleteSecrets(): void {
+    this.storage.sql.exec("DELETE FROM thread_secrets");
   }
 
   deleteInteractions(): void {

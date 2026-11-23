@@ -74,13 +74,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         body: "Connect the e-reader and use Send to device, or copy the file across. Kindles take EPUB through Amazon's Send to Kindle, which converts it on their side.",
       },
     ],
-    limits: [
-      "This works for PDFs with real text. A scanned book (pictures of pages) needs text recognition first, which is slower and introduces typos.",
-      "Pictures, footnotes, tables and two-column layouts don't reflow as cleanly as plain novel text. Check those pages yourself.",
-      "The book's text goes to the AI model you use in Stella while it works out the layout, along with a few page images. The EPUB is built on your computer.",
-      "Recorded on Linux, where PDF text tools were already installed. On a Mac or Windows PC Stella may install a PDF library or Calibre first, which wasn't recorded. It also fetched a Java runtime and the EPUBCheck validator, about 200 MB, into its work folder.",
-      "Stella won't convert DRM-protected store books.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -171,12 +164,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         title: "Check the pages",
         body: "Look for tables cut off at the right edge, pictures split across pages and code lines running off the page. Landscape pages or a smaller font fix wide tables.",
       },
-    ],
-    limits: [
-      "Very wide tables may wrap or need landscape pages on a portrait PDF.",
-      "The PDF follows Stella's own clean styling. Ask for a font, page size or margins you prefer and it redoes them.",
-      "The notes' text goes to the AI model you use in Stella while it converts them, along with page images it checks. The PDFs are made on your computer.",
-      "Recorded on Linux, where a browser for printing was already installed. Stella added a small Markdown library to its own work folder. On a Mac or Windows PC it would use the browser you have, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -271,13 +258,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         body: "Open the EPUB in Calibre's viewer. Check the table of contents lists every chapter, the cover shows in the library, and italics and scene breaks survived. Copy it to your reader or send it to a Kindle with Send to Kindle.",
       },
     ],
-    limits: [
-      "Text boxes, columns, tracked changes and complicated tables don't carry over well to an ebook, which has no fixed pages.",
-      "Stella built the book's code itself rather than using Calibre. It passed the standard validator, but check it on your own reader before publishing.",
-      "It doesn't add an ISBN, publisher or publication date unless you give them; it offered to.",
-      "The manuscript's text goes to the AI model you use in Stella while it builds the book. The EPUB is written on your computer.",
-      "Recorded on Linux, using Python (built in on Mac and Linux). On Windows Stella may install Python first. To validate the book it downloaded EPUBCheck, which needs Java, into its work folder.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -369,12 +349,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         body: "Open it in Calibre's viewer, check the contents list starts with book one, and look at a picture or map from each book to make sure the right one shows in each.",
       },
     ],
-    limits: [
-      "Only DRM-free books can be merged. Most books bought from big ebook stores are locked to your account and Stella won't remove that.",
-      "A merged file is for your own reading. Sharing it is still sharing the books.",
-      "Stella reads the books' titles, metadata and chapter openings through the AI model you use to work out the order. The merging runs on your computer.",
-      "Recorded on Linux, using Python (built in on Mac and Linux). On Windows Stella may install Python first. It used a Java runtime and the EPUBCheck validator to check the result.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -465,12 +439,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         title: "Make the PDF",
         body: "On a Mac, select the pages in Finder, open them in Preview, select all thumbnails and choose File, Print, Save as PDF. On Windows, select the images, right-click, Print, choose Microsoft Print to PDF and untick “Fit picture to frame” so pages aren't cropped.",
       },
-    ],
-    limits: [
-      "Comics bought from stores with DRM can't be converted. These were DRM-free files.",
-      "The PDF is only as sharp as the scans inside the comic file; Stella keeps them at full quality but can't add detail.",
-      "Thumbnails of the pages go to the AI model you use in Stella so it can check the order. The PDFs are built on your computer.",
-      "Recorded on Linux, where a tool that opens RAR files was already installed. On a Mac or Windows PC Stella may install one first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -566,12 +534,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         title: "Check the result",
         body: "Open each document and look at tables, nested lists and pictures. Tick-box lists become ☐ and ☒ symbols, because Word has no Markdown-style checklist.",
       },
-    ],
-    limits: [
-      "Word has no checklist like Markdown's `- [ ]`. Stella's documents show ☒ and ☐ symbols you can't click.",
-      "The documents use Calibri, with Consolas for code. Previews on a computer without those fonts look slightly off; in Word they look normal.",
-      "The notes' text goes to the AI model you use in Stella while it converts them. The documents are written on your computer.",
-      "Recorded on Linux. Stella used its own built-in Office tool, which works the same on Mac and Windows, and checked the pages with LibreOffice, which was already on the test computer.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -669,12 +631,6 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         title: "Check each literary agent's guidelines",
         body: "Some literary agents want no header, a different font or a particular file name. Their own submission page wins over any general format.",
       },
-    ],
-    limits: [
-      "Each literary agent's own guidelines win where they differ. Stella followed the common standard; ask it for Courier, all-caps chapter titles or no header if someone wants that.",
-      "Stella changed the layout only and left typos alone, flagging them instead. Ask if you want them fixed.",
-      "The manuscript's text goes to the AI model you use in Stella while it reformats it. The new file is written on your computer.",
-      "Recorded on Linux. Stella used its built-in Office document tool, which works the same on Mac and Windows; it checked the pages with LibreOffice, which was on the test computer.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

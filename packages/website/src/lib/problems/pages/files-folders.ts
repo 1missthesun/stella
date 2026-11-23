@@ -78,12 +78,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "Open a few folders and make sure the files open before deleting the zips. A zip that says it's damaged or asks for a password needs a fresh download or the password from whoever sent it.",
       },
     ],
-    limits: [
-      "Password-protected zips need the password; Stella reports them instead of skipping silently.",
-      "If a zip holds another zip, the inner one stays zipped unless you ask Stella to open those too.",
-      "Folder and file names are seen by the AI model you use in Stella. The unzipping itself happens on your computer; nothing is uploaded.",
-      "Recorded on Linux, where Stella used the unzip tools already there. On a Mac it can use the built-in tools too; on Windows it uses what's available, such as PowerShell's Expand-Archive, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -184,12 +178,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "A scanned letter is a picture of text, so no search finds words in it until it has been through text recognition (OCR). If you expect scans, see [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable).",
       },
     ],
-    limits: [
-      "Scanned PDFs need text recognition first. Stella can do that, but it's slower; in this run every file already had text.",
-      "Stella reads the files to search them, and the matching lines go to the AI model you use in Stella so it can report them. Files are not uploaded anywhere else.",
-      "It left the possible match out of the main list and asked. If you want spelling variants counted, say so in the prompt.",
-      "Recorded on Linux, where Stella used Python libraries to read PDF, Word and Excel files. On a Mac or Windows PC it may install those first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -287,12 +275,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "Once the files are out, the year and month folders are empty. Delete them, or see [delete empty folders](/how/pc-cleanup/delete-empty-folders) for a way to clear every empty folder at once.",
       },
     ],
-    limits: [
-      "Stella chose to rename clashing files with their old folder path in front. If you'd rather keep names as they are with “(2)” added, or keep exact copies only once, say so in the prompt.",
-      "One file was an exact copy of another; Stella kept both, which the answer key allows. Ask it to drop identical copies if you want.",
-      "It deleted a hidden `.DS_Store` file (Mac folder settings, not a scan) without asking, and told you afterwards.",
-      "Recorded on Linux. The move works the same on a Mac or Windows PC with their own built-in tools; that wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -389,12 +371,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         title: "Check, then tidy up",
         body: "Open a few photos to make sure they're whole. Then delete the parts and any joined copy if you don't need them.",
       },
-    ],
-    limits: [
-      "Every part must be there and complete; a missing or half-downloaded part can't be worked around.",
-      "Password-protected archives need the password.",
-      "File names are seen by the AI model you use in Stella. The photos are unpacked on your computer and aren't uploaded.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may download the free 7-Zip command-line tool or a small Python library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -498,12 +474,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "Files named `.part1.rar`, `.part2.rar` belong together. Put them all in one folder and open part 1; the others are read automatically.",
       },
     ],
-    limits: [
-      "Stella can't open a password-protected RAR unless you give it the password.",
-      "A multi-part RAR needs every part in the same folder.",
-      "It extracts on your computer and nothing is uploaded, but file names are seen by the AI model you use in Stella.",
-      "Recorded on Linux, where a RAR-reading tool was already installed. The Mac's tar reads RAR too; on Windows 10 Stella may install 7-Zip's command-line tool first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -603,12 +573,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         title: "Keep a list of old names",
         body: "Before renaming a big batch, take a screenshot of the folder or copy the names into a note. Neither tool keeps an undo list once you close it.",
       },
-    ],
-    limits: [
-      "When names depend on what's inside, Stella opens each file. For scans, that means text recognition, which is slower.",
-      "It doesn't keep a list of old and new names unless you ask; add “keep a list of the old names” to the prompt if you want an undo record.",
-      "The first lines of each PDF go to the AI model you use in Stella so it can read the titles. The renaming happens on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install a small PDF-reading library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -710,12 +674,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "For anything much over 50 MB, a shared link from Google Drive, OneDrive or iCloud Drive is easier than several emails. Gmail does this for you when an attachment is too big.",
       },
     ],
-    limits: [
-      "Photos and videos are already compressed, so zipping barely shrinks them. Stella can also make smaller copies of photos if you say so; it didn't here, as you didn't ask.",
-      "A single file bigger than the limit can't fit in an ordinary zip. Stella says so instead of cutting it into parts that won't open.",
-      "Stella makes the zips; it doesn't send the emails unless you connect your email account and ask it to.",
-      "Recorded on Linux. On a Mac or Windows PC Stella uses their own zip tools, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -809,12 +767,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "Open the merged file in a map viewer or gpx.studio. Look for straight lines between days, a missing piece, or times shown as missing. Then upload it to Strava, Garmin Connect or Komoot.",
       },
     ],
-    limits: [
-      "Gaps stay as gaps: if a watch was off for a stretch, Stella doesn't invent the missing path.",
-      "It doesn't upload to Strava or Garmin for you unless you ask and are signed in there in your browser.",
-      "The merge runs on your computer and nothing is uploaded, but what Stella reads while working, such as file names, times and place names, goes to the AI model you use in Stella.",
-      "Recorded on Linux, where Stella used only Python, which is built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -906,13 +858,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         title: "Or use GPSBabel",
         body: "In [GPSBabel](https://www.gpsbabel.org/), add the GPX files as input, choose Google Earth (Keyhole) Markup Language as output, and convert. Track names come from the GPX files, so you may still need to rename them by date.",
       },
-    ],
-    limits: [
-      "Google My Maps limits how much you can import per layer. For a big archive, Google Earth Pro or a KMZ works better.",
-      "Stella kept full detail here. If you need a smaller file, ask and it simplifies the lines.",
-      "It flagged that the tracks looked like walks but still made the file as asked. Check the remarks it adds; they come from the data, not from guesswork about you.",
-      "What Stella reads while working, such as dates, distances and file names, goes to the AI model you use in Stella. The conversion runs on your computer.",
-      "Recorded on Linux, where Stella used only Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1014,12 +959,6 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         title: "Check the same-name files",
         body: "Name-based tools skip a file that exists in both places even if the photos are different. Look at those by eye and copy any different ones across with a new name.",
       },
-    ],
-    limits: [
-      "It copies one way, as asked. Two-way syncing, where deletions are mirrored too, is a different job; say so if that's what you want.",
-      "A photo that was edited in one copy (rotated, cropped) counts as different, so both versions are kept.",
-      "File names and folder structure go to the AI model you use in Stella; the photos themselves are compared on your computer.",
-      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

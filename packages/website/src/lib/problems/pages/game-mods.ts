@@ -81,14 +81,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Download a shader pack .zip (Complementary or BSL are common picks), then go to Options, Video Settings, Shader Packs, click Open Shader Pack Folder, drop the .zip in and select it. Don't unzip it. Lower the render distance if frames drop.",
       },
     ],
-    limits: [
-      "Java Edition only. Bedrock (the Microsoft Store and console version) uses add-ons, not Fabric mods.",
-      "Stella only downloads from Modrinth, CurseForge and the projects' own sites. It won't fetch mods or cracked launchers from re-upload sites.",
-      "It won't touch server anti-cheat or install mods a server bans. Check a server's rules before joining with mods.",
-      "On Linux, Stella can't click inside the Minecraft Launcher. It installs Fabric with the official installer from the terminal instead, and you press Play yourself.",
-      "It won't sign in to your Microsoft account for you. Signing in and pressing Play stay with you.",
-      "Shaders cost real graphics power. On a weak or older laptop GPU, Stella can pick lighter settings, but it can't make shaders run smoothly on hardware that can't handle them.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -201,12 +193,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Start the pack after each fix and read the new log; fixing one error often reveals the next. If a pack updated itself and broke, CurseForge's ⋮ menu can switch it back to the previous version.",
       },
     ],
-    limits: [
-      "The recording is a Fabric server on Linux, where the log named both problems. A CurseForge client on Windows works the same way in the files, but Stella hasn't been recorded doing it there, and it doesn't sign in to your Minecraft account or launch the game for you.",
-      "Forge and NeoForge crashes (mixin conflicts, client-only mods on a server, out-of-memory) are harder to read, and may take a few rounds of launch, read, fix.",
-      "Stella doesn't say how to start the server again unless you ask; it's the same start.bat or start.sh as before.",
-      "If the crash is in your graphics driver (an `hs_err_pid` file, or exit code -1073741819), mods aren't the cause; update the driver first.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -297,12 +283,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Move half of your Mods folder to the desktop and test. If the problem is gone, the culprit is in the half you moved; if not, it's in the half that stayed. Keep halving the guilty half until one file is left. Twelve rounds narrow down thousands of files.",
       },
     ],
-    limits: [
-      "Stella can't fix a mod its creator hasn't updated yet. Until then the right move is to take it out, and it says so rather than guessing at a patch.",
-      "It downloads only from the creator's own pages, CurseForge or the links creators post. It won't fetch early-access Patreon mods from re-upload sites.",
-      "It doesn't play-test for you. You start the game and say what happened; Stella reads the new exception files and goes on from there.",
-      "If all you ever fix is The Sims, a dedicated scanner like the free [SimSweep](https://simsweep.com) or [TS4 Mod Hound](https://app.ts4modhound.com) may be all you need. Stella's difference is that it reads the logs, checks the pages and moves the files in one go, and handles your next problem that isn't about The Sims too.",
-    ],
     platforms: ["windows", "mac"],
     faq: [
       {
@@ -390,12 +370,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         title: "REDmod deploy stuck at script compilation?",
         body: "Since 2.5, REDmod deploys that include scripts fail at stage 2 of 5 even with an empty test mod. The community [REDmod 2.5 Deploy Fix](https://www.nexusmods.com/cyberpunk2077/mods/36429) addresses it. For simple mods, the game's new built-in Mods menu (run with mod.io) is another route.",
       },
-    ],
-    limits: [
-      "Stella can't update a mod its author hasn't updated. It parks it in quarantine and tells you, so the rest of your mods work in the meantime.",
-      "It only downloads from the frameworks' and mods' own GitHub and Nexus pages. No re-uploads, no paid early-access mods for free, and nothing that unlocks DLC you don't own.",
-      "You launch the game and say how far it got. Stella reads the logs between tries; it doesn't play the game.",
-      "On consoles, the in-game Mods menu is the only route, and Stella runs on your computer, so it can't help there. On Linux (Proton) it works with the files and logs only.",
     ],
     platforms: ["windows"],
     faq: [
@@ -500,13 +474,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Launchers like CurseForge, Prism or Modrinth keep each instance in its own folder with its own resourcepacks. Use Open Pack Folder from inside the game you actually play, so the pack lands in the right place.",
       },
     ],
-    limits: [
-      "Checked in the files only: the test computer had no copy of Minecraft, so the game wasn't started and the textures weren't seen in game.",
-      "Java Edition only. Bedrock packs (.mcpack files) install by opening them, and weren't covered.",
-      "If Minecraft is open while options.txt is edited, the game can overwrite the change when it quits. Close it first, or switch the pack on in the menu yourself.",
-      "Stella installs packs you've already downloaded, and checked this one held only images and a settings file. Get packs from the creator's page or a site like Modrinth or CurseForge.",
-      "Recorded on Linux, where the game folder is ~/.minecraft. On a Mac or Windows PC the folder is different, as listed above, but the fix is the same.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -606,13 +573,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         title: "Test it",
         body: "Start the modpack and load the world that crashed. Press F3: the Mem line shows the new maximum. If it still crashes with memory to spare, a mod is probably leaking memory; check that mod's issue tracker.",
       },
-    ],
-    limits: [
-      "Checked in the files only: the test computer had no copy of Minecraft, so the game wasn't launched and the fix wasn't play-tested.",
-      "More RAM only fixes out-of-memory crashes. Stella read the crash log first for that reason; a crash from a broken or mismatched mod needs a different fix.",
-      "It edits the official launcher's settings file, which the launcher can overwrite if it's open at the time. Close it before asking.",
-      "Recorded on Linux, where the game folder is ~/.minecraft. On Windows it's %APPDATA%\\.minecraft and on a Mac ~/Library/Application Support/minecraft; other launchers keep their own settings, which this run didn't cover.",
-      "The crash log and launcher settings go to the AI model you use in Stella while it reads them.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -716,13 +676,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Pick the Fabric profile in the launcher, not the plain Latest release one, and press Play. If it stops with “Incompatible mods found”, the message names the mod and what it wanted; remove or replace that one and try again.",
       },
     ],
-    limits: [
-      "This was checked at file level only: no Minecraft account was used and the game wasn't launched, so a mod that is broken inside would only show when you play.",
-      "Forge-only mods can't run on Fabric. Stella says so instead of forcing them in; you need a Fabric build or a Forge profile.",
-      "Stella installs the files you downloaded. To fetch new mods, it uses Modrinth, CurseForge or the project's own site, never re-upload sites.",
-      "Recorded on Linux, where the game folder is `~/.minecraft`. On Windows it's `%appdata%\\.minecraft`, on a Mac `~/Library/Application Support/minecraft`; Stella finds it either way.",
-      "Only file names and the mods' built-in descriptions go to the AI model you use in Stella.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -823,13 +776,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         title: "Select it and apply",
         body: "Back in Shader Packs, click the pack name, then Apply and Done. If it's still missing, press the refresh by closing and reopening the menu. Lower render distance or shader quality if frames drop.",
       },
-    ],
-    limits: [
-      "Checked at file level only: no Minecraft account was used and the game wasn't launched, so we didn't see the shader render.",
-      "Shaders need a capable graphics card. Stella can switch a pack on and choose lighter settings, but it can't make a weak laptop run one smoothly.",
-      "Iris rewrites its settings file when the game closes, so quit Minecraft before asking Stella to change shader settings.",
-      "Recorded on Linux (`~/.minecraft`). On Windows the folder is `%appdata%\\.minecraft\\shaderpacks`, on a Mac `~/Library/Application Support/minecraft/shaderpacks`.",
-      "Only folder and file names and Iris's small settings file go to the AI model you use in Stella.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -932,13 +878,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Start the game (or go back to the title screen) and open Singleplayer. The map is listed by its own name. If the game warns the world was made in a newer version, update the game or choose a version of the map that matches.",
       },
     ],
-    limits: [
-      "Checked at file level only: no Minecraft account was used and the game wasn't launched.",
-      "Java maps only. Bedrock maps come as `.mcworld` files, which you open by double-clicking.",
-      "A map built for a newer version may not load in an older game. Stella reads the version from the map and tells you.",
-      "Only download maps from sites you trust. Stella installs the file you give it; it doesn't vet the map maker.",
-      "Recorded on Linux. On Windows and Mac the saves folder is in a different place (above); Stella looks in the usual places for each.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1038,13 +977,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         title: "Copy to the new computer",
         body: "Put the zips on a USB stick or cloud drive. On the new computer, unzip each into the saves folder there, so `saves/<world>/level.dat` exists. Modded worlds go into an instance with the same mods and game version.",
       },
-    ],
-    limits: [
-      "Checked at file level only: no Minecraft account was used and the game wasn't launched.",
-      "In this run Stella uploaded the backup zips to the user's own Stella Drive so the new computer could download them. If you'd rather keep them local, say “only on this computer” or name a USB drive.",
-      "Close Minecraft first. A world that's open while it's copied can be caught mid-save.",
-      "Stella copies backups between your own computers once both are signed in to Stella; it can't reach a computer that isn't.",
-      "Recorded on Linux; on Windows and Mac the game folder is elsewhere (above). Only folder names go to the AI model; the world files themselves aren't read by it.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1147,13 +1079,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Start Minecraft and load the world. You'll be where you were at the previous save, a few minutes earlier. If chunks are missing or the game still crashes, the region files are damaged too: a region tool such as the free MCA Selector can remove the broken chunks so they regenerate.",
       },
     ],
-    limits: [
-      "Checked at file level only: no Minecraft account was used and the game wasn't launched to load the world.",
-      "You lose whatever happened between the last two saves, usually a few minutes.",
-      "If the region files themselves are damaged, some chunks can still be missing. That needs a region tool; Stella checks they look intact but can't vouch for every block.",
-      "Recorded on Linux. The saves folder is elsewhere on Windows and Mac (above); the fix is the same.",
-      "Only file names, sizes and the game log go to the AI model you use in Stella.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1255,13 +1180,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Start Minecraft and load the world. Type `/time set day` to check. If the world won't load, put your backup `level.dat` back.",
       },
     ],
-    limits: [
-      "Checked at file level only: no Minecraft account was used and the game wasn't launched.",
-      "Turning cheats on in a survival world disables advancements and achievements for that world. That's the game's rule.",
-      "Java Edition only. Bedrock has a cheats switch in the world's settings, so no file edit is needed.",
-      "Minecraft must be closed (or the world quit) when the change is made; the game rewrites level.dat when it saves.",
-      "Recorded on Linux. On Windows and Mac the saves folder is elsewhere; the file and the setting are the same. Only world names and the settings file's values go to the AI model.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1359,13 +1277,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         body: "Start the world (with cheats on, or as a server operator) and run `/datapack list`. Your packs should be under enabled. If one's missing, run `/reload` and look for an error in the chat.",
       },
     ],
-    limits: [
-      "Checked in the files only: the test computer had no copy of Minecraft, so the world wasn't opened and `/datapack list` wasn't run.",
-      "Stella checks a pack's structure and version, not whether its own commands are bug-free.",
-      "A pack made for a much older version can't be fixed by changing its number; Stella says so and leaves it out.",
-      "Java Edition only. Bedrock add-ons (.mcaddon, .mcpack) install differently and weren't covered.",
-      "Recorded on Linux, where the game folder is ~/.minecraft. On a Mac or Windows PC the folder is in the place listed above; nothing needs installing.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1457,12 +1368,6 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         title: "Sort oldest first",
         body: "Minecraft names screenshots by date and time (`2025-06-02_19.04.11.png`), so sorting by name puts them oldest first. Copies renamed with “(1)” or “2” still sort close to their date.",
       },
-    ],
-    limits: [
-      "Stella finds screenshots saved on this computer. Ones only shared to Discord, Xbox or a cloud service aren't on the disk.",
-      "Bedrock Edition and console screenshots are stored differently and weren't covered.",
-      "Only file names and folder paths go to the AI model you use in Stella; it doesn't need to look at the pictures.",
-      "Recorded on Linux. On a Mac or Windows PC the game and launcher folders are in the places listed above; nothing needs installing.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

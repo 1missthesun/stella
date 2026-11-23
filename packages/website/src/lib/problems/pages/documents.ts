@@ -77,13 +77,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "Word has no button for this. Copy each letter into its own document and save it under the person's name, or save the merged document as a PDF and split that by page range. For dozens of people, a VBA macro or a paid add-in automates it.",
       },
     ],
-    limits: [
-      "Stella fills the template it's given and keeps its layout. Word IF fields, a different picture per person or optional paragraphs weren't part of this test; describe the rule in your prompt.",
-      "It copied values exactly as typed, so “Full plot” kept its capital letter mid-sentence. It pointed this out and offered to fix it; tidy the spreadsheet first if the wording matters.",
-      "It makes the letters. It doesn't print, email or post them.",
-      "Names and addresses from the spreadsheet go to the AI model you use in Stella. For member or customer data, choose your model accordingly.",
-      "Recorded on Linux without Word installed. The letters are ordinary .docx files that open in Word, Pages or Google Docs.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -190,13 +183,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "The free LibreOffice Writer has Insert, Text from File too. Open the first chapter, add a page break with Ctrl+Enter, insert the next file, and save the result as a .docx.",
       },
     ],
-    limits: [
-      "Every chapter's text and formatting came through here, but page setup that differs per file (different margins or headers per chapter) follows the first file unless each chapter keeps its own section.",
-      "Comments and tracked changes come across as they are. Stella doesn't accept or reject them unless you ask.",
-      "Stella decides the order from chapter numbers and names like Prologue and Epilogue. If your files are called things like “The storm” and “Arrival”, say the order in the prompt.",
-      "The joining runs on your computer. The AI model you use in Stella sees file names and whatever chapter text it reads to check the result.",
-      "Recorded on Linux without Word installed. The manuscript is an ordinary .docx that opens in Word, Pages or Google Docs.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -294,12 +280,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         title: "Check before printing",
         body: "Open each PDF and scroll through: every slide should have its own notes underneath. Hidden slides are usually skipped; unhide them first if the handout needs them.",
       },
-    ],
-    limits: [
-      "The handout is the notes-page layout: one slide per page, notes below. Three slides per page with lines for writing is a different handout setting; ask for it by name.",
-      "Hidden slides are normally left out. Say so if you want them in.",
-      "Stella reads the notes to check the handouts, so slide text and notes go to the AI model you use. The export itself runs on your computer.",
-      "Recorded on Linux, where Stella used LibreOffice for the export. On Windows or a Mac it may use PowerPoint or install LibreOffice; fonts the deck uses but your computer lacks are swapped for similar ones.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -405,13 +385,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "For dozens of documents, a VBA macro that loops through a folder and runs the replacement in every story (body, headers, footers, text boxes) saves the clicking. Search “Word VBA find replace all files in folder”, test it on a copy, and keep the backup.",
       },
     ],
-    limits: [
-      "Text inside pictures, logos and embedded PDFs isn't changed. A letterhead image with the old address needs a new image.",
-      "Stella replaces the exact wording you give. Abbreviations or spellings you don't list (“ART”, “Ashcombe Riverside Tst”) stay as they are, so name every variant.",
-      "Files are changed in place, with a backup made first in this run. Ask for updated copies instead if you'd rather keep the originals where they are.",
-      "Each Word file's small preview picture still showed the old details until the file is next saved in Word. The document itself was fully updated.",
-      "Document text goes to the AI model you use in Stella as it checks the files. Recorded on Linux without Word; Stella edited the .docx files directly.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -509,13 +482,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         title: "Save as a new .docx",
         body: "File, Save As, Word Document, with a new name. The PDF stays as it was. LibreOffice opens PDFs in its Draw program, where every line is a separate box: fine for small fixes, poor for editing paragraphs.",
       },
-    ],
-    limits: [
-      "Best for PDFs made from documents. Scanned PDFs need OCR first, and complex layouts (columns, text over pictures, forms) can shift.",
-      "Fonts the PDF uses may be swapped for similar ones on your computer.",
-      "Typed-in clause numbers stay typed in. Stella pointed this out; ask it to make them a numbered list if you'll be adding clauses.",
-      "The conversion runs on your computer and nothing is uploaded to a converter site. Stella reads the text to check the result, so the agreement's wording goes to the AI model you use.",
-      "Recorded on Linux, where Stella installed a free Python conversion tool. On Windows or a Mac it may use Word, if you have it, or install the same tool.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -617,13 +583,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         title: "Check before you send",
         body: "Add up the invoice totals and compare them with the sum of the price column. If they don't match, a job was missed or copied twice.",
       },
-    ],
-    limits: [
-      "Stella makes the PDFs. It doesn't email them, send reminders or track who has paid.",
-      "VAT is only added when you say so and give the rate. This run's business was “Not VAT registered”, so no VAT was shown.",
-      "It invoices what's in the sheet. It flagged a likely double entry and two odd prices here but didn't change them; you decide.",
-      "Customer names, addresses and prices go to the AI model you use in Stella. The PDFs are made on your computer.",
-      "Recorded on Linux, where Stella made the PDFs with free Python tools it set up. On Windows or a Mac it works the same way; the PDFs open anywhere.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -729,12 +688,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "Open the longest document, one with pictures and any landscape page. Fonts you don't have installed are swapped for similar ones, which can move a line or a table row to the next page.",
       },
     ],
-    limits: [
-      "The PDFs follow LibreOffice's layout, which is very close to Word's. A document using fonts the computer lacks can shift slightly; here one table's last row moved to page 2.",
-      "Password-protected documents need the password first.",
-      "The conversion runs on your computer and nothing is uploaded. Only file names, and whatever text Stella reads to check the PDFs, go to the AI model you use.",
-      "Recorded on Linux with LibreOffice. On Windows or a Mac Stella may use Word if you have it, or LibreOffice.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -838,13 +791,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "For a printed book, check the print shop's page size and margins before laying out. Most print-on-demand services take a PDF at their size.",
       },
     ],
-    limits: [
-      "The contents page numbers were right for 13 of the 16 recipes; three pointed to the wrong page. The contents links are clickable, but check the printed numbers before you print.",
-      "Recipes are copied as written. Stella flagged vague steps and an odd oven temperature but didn't change them.",
-      "Photos of handwritten cards need reading first. Stella can do that, but check the quantities.",
-      "Print layout for a print shop (trim size, bleed) is a separate step; give Stella the shop's size.",
-      "The recipe text goes to the AI model you use in Stella; the PDF is made on your computer. Recorded on Linux with free Python tools.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -944,12 +890,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "File, Save As with a name like “final”, so the version with the history stays. Repeat for each document. In LibreOffice it's Edit, Track Changes, Manage, Accept All, then delete comments from the Comments menu.",
       },
     ],
-    limits: [
-      "Accepting means agreeing to every change. Stella doesn't pick and choose unless you tell it which edits to reject.",
-      "Text that says “draft” or a version number is ordinary text, not a tracked change; Stella points it out but leaves it.",
-      "The documents' text goes to the AI model you use in Stella as it checks the result; the files are edited on your computer.",
-      "Recorded on Linux without Word installed; Stella edited the .docx files directly. On a Mac or Windows PC it works the same way, and the clean copies open in Word, Pages or Google Docs.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1046,12 +986,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         title: "Read single words closely",
         body: "The changes that matter in a contract are often one word: who may do something, “may” against “must”, a number of days. Read every small change, not only the long ones.",
       },
-    ],
-    limits: [
-      "Stella reports what changed in the wording and why it might matter; it isn't legal advice. Take anything important to whoever advises you on contracts.",
-      "Changes inside pictures or scanned pages aren't seen; a scanned contract needs OCR first.",
-      "Both documents' text goes to the AI model you use in Stella; the comparison file is made on your computer.",
-      "Recorded on Linux without Word installed; Stella read the .docx files directly. On a Mac or Windows PC it works the same way, and the list opens in Word, Pages or Google Docs.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1150,12 +1084,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         body: "In Keynote, drag slides from one presentation's navigator into the other's; they keep their own master. In Google Slides use File, Import slides and tick Keep original theme.",
       },
     ],
-    limits: [
-      "Animations, transitions and embedded videos are kept only as far as the copy method supports; Stella checks the result slide by slide and says if anything didn't carry over.",
-      "Fonts a deck uses but your computer lacks are swapped for similar ones when the merged file is shown elsewhere.",
-      "Slide text and notes go to the AI model you use in Stella as it checks the result; the merge happens on your computer.",
-      "Recorded on Linux without PowerPoint installed; Stella edited the .pptx files directly. On a Mac or Windows PC it works the same way, and the file opens in PowerPoint, Keynote or Google Slides.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1252,13 +1180,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         title: "Other things that bloat a deck",
         body: "Embedded videos and fonts add a lot. Compress media (File, Info, Compress Media on Windows) and untick Embed fonts in Save options if the recipient has the fonts. Or send a link to the file in OneDrive, Google Drive or iCloud instead.",
       },
-    ],
-    limits: [
-      "The smaller copy is meant for screens and projectors. Someone pulling a photo out of it to print large would get a lower-resolution version; keep the original for that.",
-      "Hidden camera details in the photos (date, location) were removed in this run; ask Stella to keep them if you need them.",
-      "Videos inside a deck need re-encoding, which takes longer.",
-      "Stella looks at slide renders to compare before and after, so slide images go to the AI model you use in Stella; the shrinking happens on your computer.",
-      "Recorded on Linux without PowerPoint installed; Stella resized the pictures inside the .pptx directly. A Mac or Windows PC works the same way.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

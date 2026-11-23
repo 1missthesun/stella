@@ -85,12 +85,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "If you can't select the text in the PDF, it's a picture. Run it through OCR (Adobe Acrobat's Scan & OCR, or the free [OCRmyPDF](https://ocrmypdf.readthedocs.io)) before importing, then check the numbers carefully: OCR misreads 1s, 7s and decimal points.",
       },
     ],
-    limits: [
-      "Stella works from the statements you give it. It doesn't need, and won't ask for, your online banking password.",
-      "The statement text goes to the AI model you use in Stella (your ChatGPT or Claude plan, or a local model if you'd rather it stayed on your computer). Choose accordingly for sensitive files.",
-      "Scanned or photographed statements are harder to read accurately. Stella flags the months that don't add up, but check those by eye.",
-      "It isn't tax or accounting advice. It gets the numbers into a sheet; categorising them for a tax return is still your call or your accountant's.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -206,12 +200,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Split the file into two emails (in Preview, drag pages out into a new document; or `qpdf --split-pages`), or upload it to OneDrive or Google Drive and send a link. Online compressors like iLovePDF and Smallpdf work, but you're uploading tax papers or IDs to their servers.",
       },
     ],
-    limits: [
-      "It compressed much harder than it needed to: 4.96 MB for a 25 MB limit. It's clearly readable, but say “keep as much quality as fits under 20 MB” if you'd rather have sharper pages.",
-      "It didn't offer to make the scan searchable. Ask for OCR in the same chat if you want to search or copy the text later.",
-      "Ghostscript was already installed on the test computer. On Windows, expect Stella to install it or another tool first, which hasn't been recorded yet.",
-      "To check readability, Stella looks at rendered pages, so page images go to the AI model you use in Stella. Choose your model accordingly for very sensitive documents.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -323,12 +311,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Only two or three files? Copy and paste",
         body: "Open each file, check its columns are in the same order as the first, and paste the rows under each other without the header row. Use Paste Special, Values if the source has formulas.",
       },
-    ],
-    limits: [
-      "It saved a new sheet rather than a Power Query connection, so it won't refresh when you add files next month. Ask Stella again with the new files, or build the From Folder query above if you need a live link.",
-      "It didn't tell the user about the file with its columns in a different order or the one with a title row; it handled both correctly but silently. Ask for a summary of what it fixed if you want to see that.",
-      "The recording ran on Linux without Excel, using Stella's own spreadsheet tool. The result is an ordinary .xlsx that opens in Excel, Numbers or Google Sheets.",
-      "The rows go to the AI model you use in Stella while it reads and checks them. For confidential sheets, choose your model accordingly.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -449,12 +431,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Below the last row, type `=SUM(` and select the Total column, so it updates if you fix a row. Then count the rows against the number of receipts and spot-check a few against the paper. Many expense apps (Expensify, Zoho Expense, your company's own) also scan receipts one by one if you'd rather not keep a sheet.",
       },
     ],
-    limits: [
-      "The test receipts were computer-printed and photographed clearly, if at an angle. Crumpled, handwritten, foreign-language or very long supermarket receipts are harder and weren't tested; check those rows yourself.",
-      "Stella reads the photos with the AI model you use in Stella, so the receipt images are sent to that model (here Claude). The spreadsheet itself is made and kept on your computer.",
-      "It made an Excel file in the receipts folder. If your company wants its own template or an upload to its expense system, say so in the prompt or copy the rows across.",
-      "It picks a category and flags possible personal items from what's printed. Your company's rules decide what's allowed, so check the yellow rows before you submit.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -555,12 +531,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check and name every file",
         body: "Open each new PDF and check its first and last pages belong together. Name it sender, then what it is, then date, for example “Brightwater Plumbing - invoice - 2026-10”. File names can't contain a slash, so write “2026-27”, not “2026/27”.",
       },
-    ],
-    limits: [
-      "The test scan had selectable text and a footer on every page naming its document, which made the split certain. A real scan that's only pictures, with no footers, is harder: Stella has to look at each page image, which is slower and worth checking by eye.",
-      "It didn't put dates in the file names, because none of the letters showed one. If yours do, ask for the date in the name.",
-      "The pages' text goes to the AI model you use in Stella (here Claude) so it can tell the documents apart. For very private paperwork, choose your model accordingly.",
-      "This one was recorded on a Mac (macOS 15). The same job works on Windows and Linux; it just wasn't recorded there for this guide.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -664,12 +634,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Or skip the PDF next time",
         body: "If your bank locks every statement, look in its online banking for a transaction download as CSV or Excel. The same numbers arrive without a password and are easier to work with than the PDF anyway.",
       },
-    ],
-    limits: [
-      "Stella needs the password. It won't guess, crack or get around one, and it's only for files you're entitled to open.",
-      "The password is part of your message, so it reaches the AI model you use in Stella along with the rest of the chat. Change it afterwards if you use it anywhere else.",
-      "Unlocked copies open for anyone with access to the computer or the folder. Stella said so and offered to delete the locked ones; keep the originals if the copies are for a one-off job.",
-      "Recorded on Linux, where the PDF tools Stella used were already installed. On a Mac or Windows PC it may install a small PDF tool first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -775,12 +739,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Open the saved copy, press Cmd-F or Ctrl+F and search for the last four digits of a few numbers. Then select the text around a box and paste it into a note. If any digit turns up, the redaction didn't take.",
       },
     ],
-    limits: [
-      "The test PDF had real text. Scanned pages are pictures, so Stella would need to read them with OCR before it could find the numbers, which wasn't part of this run; check scanned pages by eye.",
-      "It decides what to remove from your description. In the recording it kept the routing number on purpose and said so. Name everything you want gone (dates of birth, home addresses) to be safe.",
-      "The PDF's text goes to the AI model you use in Stella so it can find the numbers, which is the very data you're protecting. For highly sensitive files, choose your model accordingly.",
-      "Recorded on Linux. Stella installed a PDF library (PyMuPDF) for the redaction, and does the same on a Mac or Windows PC, which adds a little time the first run.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -879,12 +837,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check the bottom of every page",
         body: "Page through the result at full size. Numbers can land on footnotes, table rows or an existing footer; if they do, raise the bottom margin setting or shrink the font and run it again.",
       },
-    ],
-    limits: [
-      "It added plain numbers (1, 2, 3) centred at the bottom. For “Page 3 of 16”, another position, Roman numerals for front matter or an unnumbered cover, say so in the prompt.",
-      "The numbers are stamped onto the pages of the PDF. If you later change the original Word file and export again, the new PDF needs numbering again.",
-      "The report's text goes to the AI model you use in Stella while it works on the layout. For confidential documents, choose your model accordingly.",
-      "Recorded on Linux, where Stella had the PDF tools it needed. On a Mac or Windows PC it may install a small PDF library first; that step wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -986,12 +938,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Highlight instead of list",
         body: "To see differences in place, select the October prices, choose Conditional Formatting, New Rule, Use a formula, and enter `=D2<>XLOOKUP(A2, March!A:A, March!D:D, D2)` with a fill colour. It only works when both sheets share an ID column.",
       },
-    ],
-    limits: [
-      "Stella matched on the SKU column. If your files have no unique ID, it has to match on names or several columns together; ask it to say which columns it used.",
-      "It compared values, not formatting, formulas or comments. Ask separately if a colour or a formula change matters to you.",
-      "Recorded on Linux with no Excel installed. The result is an ordinary .xlsx with several tabs, which opens in Excel, Numbers or Google Sheets.",
-      "The rows of both lists go to the AI model you use in Stella while it compares them. For commercially sensitive price lists, choose your model accordingly.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1097,12 +1043,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Search for a name, a date and a number from different pages. OCR misreads small print and smudged figures (1 and 7, 0 and O), so check any amount that matters against the page itself.",
       },
     ],
-    limits: [
-      "OCR can misread small print, handwriting and smudged numbers. The test scan was clean enough that every search worked, but check figures that matter on your own documents.",
-      "Handwritten notes and signatures stay as pictures; they aren't turned into text.",
-      "Recorded on Linux, where the Tesseract text-recognition engine was already installed and Stella added OCRmyPDF. A Mac usually has neither, and installing them normally needs Homebrew, so Stella would take a different route there, such as macOS's built-in text recognition; that wasn't recorded.",
-      "Recognition runs on your computer, but the recognised text goes to the AI model you use in Stella when it checks the result. For confidential papers, choose your model accordingly.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1203,13 +1143,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Short book? Print from a reader",
         body: "Some desktop ebook readers can print a chapter at a time, and on a Mac you can choose PDF in the print dialog to save it. It's slower than Calibre for a whole book but needs nothing installed beyond the reader.",
       },
-    ],
-    limits: [
-      "No chapter bookmarks: the PDF has a contents page and page numbers, but no clickable chapter list in the PDF viewer's sidebar. Ask for bookmarks if you'll read it on screen.",
-      "It made US Letter pages. Ask for A4 if that's your paper; Stella offered to make an A4 copy.",
-      "It only works on DRM-free ebooks. Stella won't remove DRM from books bought on Kindle, Apple Books or Kobo; many shops sell DRM-free EPUBs, and public-domain books are DRM-free.",
-      "Recorded on Linux, where a browser engine was already installed for the layout. On a Mac or Windows PC Stella may need to install a converter first, which wasn't recorded.",
-      "The book's text goes to the AI model you use in Stella while it lays out and checks the pages.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1313,12 +1246,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Windows: File, Export, Create PDF/XPS, Options, Entire workbook. Mac: File, Save As, File Format PDF, and choose Workbook. Open the PDF and check the last column is on every page.",
       },
     ],
-    limits: [
-      "Very wide sheets shrink a lot when squeezed onto one page. Here the smallest text was 8.2 pt; for something wider, Stella can say a sheet really needs two pages or suggest A3.",
-      "Stella left the spreadsheet's own print settings alone. Ask it to change them if you want Excel's Print to come out the same way.",
-      "The PDF is made on your computer; nothing goes to a converter site. Stella read the rota to check the PDF, so staff names went to the AI model you use.",
-      "Recorded on Linux without Excel: Stella set the page layout on a copy and exported with the free LibreOffice. On Windows or a Mac it may use Excel instead, if you have it.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1416,13 +1343,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Command line, for many books",
         body: "Calibre includes `ebook-convert`. In a terminal: `ebook-convert \"book.mobi\" \"book.epub\"`, one line per book, or loop over a folder.",
       },
-    ],
-    limits: [
-      "Books bought from the Kindle store are usually DRM-protected. Stella won't remove DRM, so those can't be converted; it lists them separately.",
-      "Comics, picture books and fixed-layout ebooks may not convert well. Ordinary novels and non-fiction convert cleanly.",
-      "Stella installed Calibre (about 100 MB) in the home folder to do this. It stays there for next time; ask Stella to remove it if you'd rather.",
-      "The conversion runs on your computer. Only file names and the books' metadata go to the AI model you use; it doesn't need to read the books.",
-      "Recorded on Linux. On Windows and Mac Stella uses the same Calibre converter from its normal installer.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1525,12 +1445,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Sort the folder by name: page 10 should follow page 9. Open one image on your phone and zoom in on small print. If it's soft, redo it at 200 dpi.",
       },
     ],
-    limits: [
-      "Large pages at high resolution make big files. Stella aims for phone-readable sizes unless you ask for print quality.",
-      "Every page becomes a flat picture: the text is no longer selectable or searchable in the JPGs.",
-      "The conversion runs on your computer and nothing is uploaded. Stella may look at a page or two to check sharpness, so page content goes to the AI model you use.",
-      "Recorded on Linux with poppler's free tools. On Windows or a Mac Stella uses the same kind of tool, installing it if needed.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1631,12 +1545,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Avoid screenshots and copy",
         body: "Copying a picture in Preview or Acrobat, or screenshotting it, gives you what's on screen, often a fraction of the stored size. Use those only if nothing above is available.",
       },
-    ],
-    limits: [
-      "This gets the pictures stored in the PDF. In a scanned PDF each whole page is one picture, so the photos would have to be cropped out of the page instead.",
-      "Some PDFs store pictures already shrunk; full quality means the size stored in the file, which may be smaller than the original photo.",
-      "Extraction runs on your computer, nothing uploaded. Stella reads the brochure's captions to name the files, so that text goes to the AI model you use.",
-      "Recorded on Linux with free tools. On a Mac or Windows Stella uses the same kind of tool, installing it if needed.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1739,13 +1647,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Open a few saved copies in a different PDF reader. Some apps save field values without drawing them, so the form looks blank elsewhere. If that happens, print to PDF to flatten it.",
       },
     ],
-    limits: [
-      "Works on fillable forms with real fields. A flat or scanned form needs text placed onto the page, which Stella can do but takes more checking.",
-      "Stella doesn't sign forms. In this run the form said parents sign on paper, so signatures were left blank.",
-      "Blank cells stay blank. Stella listed the five children with nothing under medical needs rather than guessing.",
-      "The children's details go to the AI model you use in Stella. The forms are filled on your computer and nothing is uploaded to a form service.",
-      "Recorded on Linux with a free Python PDF library. On Windows or a Mac Stella uses the same kind of tool.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1845,13 +1746,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Work out the yearly cost",
         body: "For each one, multiply the current amount by how often it's charged in a year (12, 52, 26 or 1). Variable bills like utilities: add up the last 12 months instead.",
       },
-    ],
-    limits: [
-      "The answer key had one optional point marked missed: a gaming membership that stopped in February should be left out or marked cancelled. Stella's summary did mark it “Stopped, looks cancelled” and left it out of the totals, but its old charges are listed unmarked on the second tab, which the check counted against it.",
-      "Stella finds and lists. Cancelling happens on each service's own site or app; Stella can open the page for you.",
-      "Your transactions go to the AI model you use in Stella. Remove account numbers from the exports first if you prefer; Stella never needs your banking login.",
-      "Charges billed through someone else (app stores, PayPal) show under that name, so the service behind them may need checking.",
-      "Recorded on Linux with free tools. Works the same with exports on Windows or a Mac; the spreadsheet opens in Excel, Numbers or Google Sheets.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1957,12 +1851,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Text dates that won't sort can be turned into dates with Data, Text to Columns, Next, Next, Column data format Date: MDY. Swapped dates are harder: they look like valid dates, so you can't tell which ones flipped. Re-import from the original CSV instead.",
       },
     ],
-    limits: [
-      "Stella needs to know which order the file uses. Here the nights column proved it for every booking; for a file that mixes both orders, it lists the rows it can't decide.",
-      "It makes a new Excel file. Re-exports from the site have the same problem; give Stella the next one too.",
-      "The bookings, including guest names, go to the AI model you use in Stella. The conversion runs on your computer.",
-      "Recorded on Linux, where Stella wrote the .xlsx with a free Python library. The file opens the same in Excel on Windows or Mac.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2066,12 +1954,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Copy the new columns and Paste Special, Values, so the file no longer depends on the Customers tab. Older Excel without XLOOKUP: use `=IFERROR(VLOOKUP(…, Customers!A:D, 3, FALSE), \"not found\")`.",
       },
     ],
-    limits: [
-      "Stella matches on the column you name. If the two sheets use different kinds of IDs (an account number on one, an email on the other), say what to match on.",
-      "It added the details to a new file and left both originals alone. It also offered to tidy the ID column; that's your call.",
-      "Both spreadsheets' contents, including customer emails and phone numbers, go to the AI model you use in Stella. The merge runs on your computer.",
-      "Recorded on Linux with a free Python library. The result is an ordinary .xlsx for Excel on Windows or Mac.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2169,12 +2051,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Remove Duplicates on the key",
         body: "Select the data, Data, Remove Duplicates, untick every column except the key, and click OK. Excel says how many it removed. Delete the key column after, or keep it to check.",
       },
-    ],
-    limits: [
-      "Stella decided who is the same person by email address. People with no email, or one person with two addresses, need a rule from you; it listed eight same-name, different-email pairs rather than guess.",
-      "It made a copy and left the original as it was. Ask for the duplicates on a separate tab if you want to see what was merged.",
-      "The list's names, emails and phone numbers go to the AI model you use in Stella. The clean-up runs on your computer.",
-      "Recorded on Linux with a free Python library; the clean copy is a normal .xlsx for Excel or Numbers. The same works for CSV files.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -2279,12 +2155,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Scan fronts and backs as separate PDFs. Many tools (PDF24, Acrobat) have a merge that alternates pages and reverses the second file in one step.",
       },
     ],
-    limits: [
-      "Here the order came from page numbers printed on each page. Pages without numbers are put back by the fronts-then-backs pattern, which assumes the pile went through in one go.",
-      "A blank page with faint marks is a judgement call. Stella checked each one up close; for legal documents, look at what was removed yourself.",
-      "Stella looked at the scanned pages to read their numbers, so page images go to the AI model you use. The new PDF is made on your computer.",
-      "Recorded on Linux with free PDF tools. On Windows or a Mac Stella uses the same kind of tool.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2385,12 +2255,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Command line, for many files",
         body: "The free qpdf can rotate given pages: `qpdf in.pdf --rotate=+90:3,9 --rotate=180:7 -- out.pdf` turns pages 3 and 9 a quarter turn clockwise and page 7 upside down.",
       },
-    ],
-    limits: [
-      "Stella turns whole pages by quarter turns. It doesn't straighten pages that were scanned slightly crooked; that needs a deskew tool.",
-      "It saved a fixed copy. It can replace the original instead, if you say so.",
-      "To decide which way is up, Stella looks at the pages, so page images go to the AI model you use. The rotation runs on your computer.",
-      "Recorded on Linux with free PDF tools. On Windows or a Mac Stella uses the same kind of tool; the fixed PDF opens upright everywhere.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -2494,12 +2358,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Money one sharer paid another directly (a repayment) is a row paid by the payer, split to the receiver only. Months when someone was away need the split column changed for those rows.",
       },
     ],
-    limits: [
-      "Stella works out the payments; it doesn't send money or request it.",
-      "It follows the “Split between” column and notes as written, and says how it read anything ambiguous. Here it counted concert tickets because they were logged, and showed what changes if they shouldn't count.",
-      "The expenses and names go to the AI model you use in Stella. The sums are worked out on your computer.",
-      "Recorded on Linux with a free Python library; the settle-up file is an ordinary .xlsx that opens in Excel, Numbers or Google Sheets.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2597,12 +2455,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Without a PivotTable",
         body: "Type the categories down the side and months across the top, then use `=SUMIFS(Amount, Category, $A2, Date, \">=\"&B$1, Date, \"<\"&EDATE(B$1,1))` with the first of each month in row 1.",
       },
-    ],
-    limits: [
-      "Stella summarises the categories in your sheet. It can suggest new ones but won't invent them.",
-      "Refunds reduce the category in the month they happened, so a month can show a negative total (Fun was −£32 in October here).",
-      "The spending data goes to the AI model you use in Stella. The summary is built on your computer.",
-      "Recorded on Linux with a free Python library; the summary is an ordinary .xlsx for Excel, Numbers or Google Sheets.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -2710,13 +2562,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Flick through the merged file once: page count, nothing upside down, nothing doubled. If a lender or office has a size limit, see the guide to [compressing a PDF that's too large to email](/how/pdf-excel/compress-pdf-too-large-to-email).",
       },
     ],
-    limits: [
-      "Stella follows the checklist or order it's given and says what it left out. If nothing says what belongs, it merges everything and tells you the order it chose.",
-      "This run made a plain PDF with no bookmarks, which was an optional point in the answer key. Ask for bookmarks per document if the reader will want to jump around.",
-      "Password-protected PDFs need the password first: see [remove a password from a PDF](/how/pdf-excel/remove-password-from-pdf).",
-      "Stella reads the documents to know what each one is, so their text (and the photo) goes to the AI model you use in Stella. The merging happens on your computer, and nothing is uploaded to a PDF website.",
-      "Recorded on Linux with free Python PDF tools. On a Mac or Windows PC Stella uses the same kind of tool, installing it if needed.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2820,12 +2665,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "When the unwanted pages move around from file to file, check each one in thumbnail view. Don't go by a word like “terms”: a page that matters can mention it in a footer.",
       },
     ],
-    limits: [
-      "Stella decides what counts as an advert or small print from what's on each page, and says what it dropped and any page it was unsure about. Tell it if something it removed should stay.",
-      "Scanned bills (pictures of pages) are read with OCR first, which is slower.",
-      "The text of each page goes to the AI model you use in Stella so it can sort them. The new PDFs are made on your computer.",
-      "Recorded on Linux with free Python PDF tools; on a Mac or Windows PC Stella uses the same kind of tool.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2925,12 +2764,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Adobe Acrobat (paid) and similar editors change existing text in place and match the font when it's available. Worth it if you edit PDFs every week.",
       },
     ],
-    limits: [
-      "This works on PDFs that hold real text. On a scan (a picture of a page) Stella can only paint over the old words and letter the new ones to match, and it says so.",
-      "When a PDF carries only some letters of a font, a new digit or letter may need a close match; Stella compares the pages afterwards and tells you if anything looks different.",
-      "The PDF's text goes to the AI model you use in Stella; the edit happens on your computer.",
-      "Recorded on Linux with free Python PDF tools. On a Mac or Windows PC Stella uses the same kind of tool.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -3027,12 +2860,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check before you send it",
         body: "Open the new file and check each page belongs to the right person. Pages keep their old footers (“page 9 of 27”), and other names on the page, like an approver, go with them.",
       },
-    ],
-    limits: [
-      "Stella ties pages to a person through their text: names, claim numbers, references. A scanned pack is read with OCR first, which takes longer.",
-      "The extracted pages are copies, so footers and any other names printed on them stay. Stella points these out but doesn't edit them unless you ask.",
-      "The pack's text goes to the AI model you use in Stella so it can find the pages; the new PDF is made on your computer.",
-      "Recorded on Linux with free Python PDF tools. On a Mac or Windows PC Stella uses the same kind of tool.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -3132,12 +2959,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Some lenders, courts and employers need a certified digital signature or a signing service that records who signed and when. Ask the sender; if so, use the service they name.",
       },
     ],
-    limits: [
-      "This places a picture of your signature on the page, like signing a printout and scanning it. It isn't a certified digital signature: there's no certificate, no proof of who signed, and the PDF can still be edited. Where one is required, use the signing service the other side asks for.",
-      "Stella looks at the signature photo and the document to place it, so both go to the AI model you use in Stella. The signed PDF is made on your computer.",
-      "In this run Stella signed only the Tenant line and left the date blank, offering to fill it in. If you want the date or initials on every page, say so in the prompt.",
-      "Recorded on Linux, where Stella installed free Python image and PDF tools. On a Mac or Windows PC it uses the same kind of tool.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -3234,12 +3055,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check the order",
         body: "A stapled booklet taken apart and scanned flat is in printer's order (the last page next to page 1). If the page numbers jump, reorder the halves after splitting.",
       },
-    ],
-    limits: [
-      "This run's booklet was scanned in reading order. A stapled booklet taken apart (printer's order) also needs reordering; Stella checks the page numbers and does it if needed.",
-      "Spreads where the fold isn't in the middle, or a picture runs across both pages, may need the cut placed by eye; Stella says if it isn't sure.",
-      "Stella looks at the scanned pages to read their numbers, so page images go to the AI model you use in Stella. The new PDF is made on your computer.",
-      "Recorded on Linux, where Stella installed a free Python PDF library. On a Mac or Windows PC it uses the same kind of tool.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -3338,12 +3153,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Many files: Tesseract",
         body: "The free Tesseract OCR engine runs from the command line on Mac, Windows and Linux. It reads images, so turn each scanned page into a PNG first (or use a tool like OCRmyPDF that does it for you), then run `tesseract page.png out`.",
       },
-    ],
-    limits: [
-      "Handwriting and very poor scans come out with mistakes; Stella checks OCR text against the page and says where it's unsure.",
-      "Tables come out as lines of text, not columns. For a spreadsheet, see [extract a table from a PDF to Excel](/how/pdf-excel/extract-table-from-pdf-to-excel).",
-      "Text and page images go to the AI model you use in Stella as it checks the result; the OCR itself runs on your computer.",
-      "Recorded on Linux, where the OCR engine and PDF tools were already installed. On a Mac or Windows PC Stella may install Tesseract first; scans in languages other than English need their language pack added.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -3444,12 +3253,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "If prices sit on the left of their cells or SUM gives 0, they're text. Use Find and Replace to remove “£” and the thousands commas, then Data, Text to Columns, Finish, which turns them into numbers.",
       },
     ],
-    limits: [
-      "This works on PDFs that hold real text. A scanned price list needs OCR first, which Stella can do, more slowly and with a closer check of every number.",
-      "Stella copies what the PDF says, mistakes included; it flags values that look wrong but doesn't change them.",
-      "The price list's text goes to the AI model you use in Stella; the spreadsheet is made on your computer.",
-      "Recorded on Linux with free Python tools. On a Mac or Windows PC Stella uses the same kind of tool; the .xlsx opens in Excel, Numbers or Google Sheets.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -3548,12 +3351,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Numbers can't read the export, and Excel for Mac's XML support is limited. The Power Query steps above work in recent Microsoft 365 builds of Excel for Mac (Data, Get Data); otherwise use a Windows PC or a script.",
       },
     ],
-    limits: [
-      "When an iPhone and a watch both count steps, the export holds both and a plain sum counts the overlap twice; the Health app hides that. Stella checks for two step sources and says what it did. In this run there was only one.",
-      "Real exports can be several GB after years of data. Stella reads them in a stream, but it takes a few minutes.",
-      "Stella looks at the structure and a sample of the records; the totals are worked out on your computer, so your full health history isn't sent to the AI model.",
-      "Recorded on Linux with Python's built-in XML reader. A Mac or Windows PC works the same way.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -3650,12 +3447,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "iCloud in a browser",
         body: "With an Apple Account, upload the file to iCloud.com, open it in Numbers for iCloud, and download a copy as Excel. This works from a PC but uploads the file to Apple.",
       },
-    ],
-    limits: [
-      "Formulas come across as their values when the file only stores results, and colours, fonts, charts and pictures may not. Stella lists what changed, as it did here.",
-      "Password-protected Numbers files need the password.",
-      "Stella reads the file's content to check the conversion, so the budget's text and numbers go to the AI model you use. The conversion runs on your computer.",
-      "Recorded on Linux, where Stella installed a free Python library that reads Numbers files and also used LibreOffice. On Windows it does the same; on a Mac it can use Numbers itself.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -3754,12 +3545,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Add a column like Event and fill it for each pasted block before pasting the next one. Then delete blank rows and repeated header rows (sort by name; they bunch together).",
       },
     ],
-    limits: [
-      "Merged cells and tables inside tables need a look afterwards; Stella says where it found them.",
-      "Stella keeps cell text exactly as written: it flags likely typos and duplicates but doesn't fix them unless you ask.",
-      "The tables' text goes to the AI model you use in Stella; the spreadsheet is made on your computer.",
-      "Recorded on Linux without Word installed; Stella read the .docx files directly. A Mac or Windows PC works the same way.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -3857,12 +3642,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Recent Microsoft 365 builds of Excel for Mac have Data, Get Data with a JSON option and the same steps. Numbers can't open JSON. A converter website works but uploads your customers' names and addresses.",
       },
     ],
-    limits: [
-      "This run made one row per order as asked, with no separate sheet of line items (an optional point in the answer key). Ask for one if you want item-level detail.",
-      "Very large exports (hundreds of MB) take longer, and Excel stops at 1,048,576 rows a sheet.",
-      "Stella reads the structure and some sample records, which go to the AI model you use; the conversion of the full file runs on your computer.",
-      "Recorded on Linux with Python's built-in JSON reader and a free spreadsheet library. A Mac or Windows PC works the same way.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -3959,12 +3738,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Fix trailing minus signs",
         body: "Old systems write money owed as 45.00-. In a new column use =IF(RIGHT(F2)=\"-\",-VALUE(SUBSTITUTE(F2,\"-\",\"\")),VALUE(F2)), fill down, then copy and Paste Values over the original column.",
       },
-    ],
-    limits: [
-      "Works for text reports and exports. A paper printout that was scanned needs OCR first, which is slower and less exact.",
-      "When the report doesn't say what a negative balance means (owed or in credit), Stella reads the minus sign as written and says it couldn't tell.",
-      "A sample of the file's lines goes to the AI model you use in Stella to work out the layout; the conversion runs on your computer and the original is kept.",
-      "Recorded on Linux with free Python tools. A Mac or Windows PC works the same way; the .xlsx opens in Excel, Numbers or Google Sheets.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -4065,12 +3838,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "If you only need totals, Excel can load the whole file into its Data Model: Data, From Text/CSV, Load To, Only Create Connection, and tick Add to Data Model. Then summarise it with a PivotTable.",
       },
     ],
-    limits: [
-      "Splitting doesn't add up or analyse anything; ask for a summary if that's what you need.",
-      "Very large files (several GB) take a few minutes and need free disk space for the parts.",
-      "Only the first lines go to the AI model you use in Stella to see the layout; the split itself runs on your computer.",
-      "Recorded on Linux with Python's built-in CSV reader. A Mac or Windows PC works the same way.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -4166,12 +3933,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check in a text editor",
         body: "Open the CSV in Notepad or TextEdit, not Excel: Excel drops leading zeros again when it opens a CSV, even when they're in the file. Look for 00417 and a few dates.",
       },
-    ],
-    limits: [
-      "A CSV holds values only: colours, formulas and several sheets in one file can't survive. Totals are written as their values, or left out if they'd be read as data.",
-      "Opening the CSV in Excel again hides the leading zeros on screen, even though they are in the file.",
-      "The workbook's content goes to the AI model you use in Stella as it checks the export; the files are written on your computer.",
-      "Recorded on Linux with free Python spreadsheet tools. A Mac or Windows PC works the same way.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -4269,12 +4030,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check the counts",
         body: "Add up the row counts of the new files; they should match the original. A PivotTable of the tidied column gives the count per rep to compare against.",
       },
-    ],
-    limits: [
-      "Stella decides which spellings are the same person and lists the variants it merged; check that list if two staff have similar names.",
-      "The new files hold values: formulas that point at other sheets won't work in them.",
-      "The workbook's content goes to the AI model you use in Stella as it checks the split; the files are written on your computer.",
-      "Recorded on Linux with free Python spreadsheet tools. A Mac or Windows PC works the same way; the files open in Excel, Numbers or Google Sheets.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -4374,13 +4129,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Save so Excel reads it next time",
         body: "File, Save As, CSV UTF-8 (Comma delimited). That version starts with a marker (a BOM) that tells Excel the encoding, so a double-click opens it correctly.",
       },
-    ],
-    limits: [
-      "Characters already turned into `?` or `�` are gone from the file. Stella can only guess them from context and should say which ones it guessed; none came up in this run.",
-      "It saved a clean copy and kept the original; ask if you want the file fixed in place.",
-      "Email addresses that simply lack accented letters aren't garbled, so Stella left them and flagged them to check.",
-      "The file's contents go to the AI model you use in Stella while it checks them.",
-      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -4493,12 +4241,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         title: "Check before you send",
         body: "Open each copy, look at every page, and try selecting text in the payslip. Send the copies, not the originals, and keep the agency's name in the wording so a reused copy shows where it came from.",
       },
-    ],
-    limits: [
-      "A watermark discourages reuse; it doesn't prevent it. Anyone with PDF editing software can try to cover or remove it, which Stella said in its reply.",
-      "Stella kept the text selectable. If you'd rather have flattened picture-only pages, which are harder to strip, ask for them; the text then can't be selected or searched.",
-      "Stella reads the documents to find and mark them, so their names and text go to the AI model you use. The watermarking runs on your computer and nothing goes to a PDF website.",
-      "Recorded on Linux, where Stella used a PDF library already set up there. On a Mac or Windows PC it may install a similar free PDF tool first; the copies come out the same.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

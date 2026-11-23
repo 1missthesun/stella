@@ -8,8 +8,8 @@ import type { Niche, ProblemPage } from "./types";
  * it out of the site while it's being written.
  */
 
-/** Words of page-specific content (answer, Stella steps, prompt, manual steps, limits, FAQ). */
-export const MIN_UNIQUE_WORDS = 450;
+/** Words of page-specific content (answer, Stella steps, prompt, manual steps, FAQ). */
+export const MIN_UNIQUE_WORDS = 380;
 /** Share of a page's 5-word phrases that may also appear in any one other page. */
 export const MAX_OVERLAP = 0.25;
 /** Published pages allowed without a proof run at once. */
@@ -30,6 +30,11 @@ const BANNED: { pattern: RegExp; why: string }[] = [
   { pattern: /log ?in with claude|sign in with claude/i, why: "say “use your Claude plan”" },
   { pattern: /\b(revolutionary|game-?changer|supercharge|seamless(ly)?|effortless(ly)?|magic(al)?)\b/i, why: "no hype" },
   { pattern: /\bunlimited\b/i, why: "never imply unlimited use" },
+  // Pages show how the job is done; cautions live in the terms of service.
+  { pattern: /\bStella (?:won['’]t|can['’]t|cannot|can not|doesn['’]t|does not|will not|refuses?|stops short)\b/i, why: "no “Stella can't/won't” lines" },
+  { pattern: /\b(?:copyright(?:ed)?|illegal(?:ly)?|legally|at your own risk|be careful|beware|disclaimer|not (?:legal|medical|financial|tax) advice)\b/i, why: "no cautions or disclaimers" },
+  { pattern: /\bonly (?:for|with|use this on) (?:content|files|software|things) you own\b/i, why: "no cautions or disclaimers" },
+  { pattern: /\bmake sure you have (?:permission|the right)/i, why: "no cautions or disclaimers" },
 ];
 
 const STOP = new Set(
@@ -52,7 +57,6 @@ export function uniqueText(page: ProblemPage): string {
     page.prompt,
     page.costNote ?? "",
     ...page.manualSteps.flatMap((step) => [step.title, step.body]),
-    ...page.limits,
     ...page.faq.flatMap((item) => [item.q, item.a]),
   ].join(" ");
 }
@@ -151,7 +155,6 @@ export function checkProblemPages(
     for (const step of page.manualSteps) {
       need(words(step.body).length >= 12, `manual step “${step.title}” is too thin`);
     }
-    need(page.limits.length >= 2, "at least 2 honest limits");
     need(page.faq.length >= 3, "at least 3 FAQ entries");
     need(page.platforms.length > 0, "list the platforms");
     need(page.sources.length >= 1, "cite at least one source");
@@ -191,7 +194,7 @@ export function checkProblemPages(
       for (const shot of proof.shots ?? []) need(shot.alt.length >= 10, `shot ${shot.src} needs real alt text`);
     }
 
-    const text = [page.title, page.h1, page.description, uniqueText(page)].join(" ");
+    const text = [page.title, page.h1, page.description, page.lede, uniqueText(page), proof.kind === "steps-only" ? "" : `${proof.result} ${proof.note ?? ""}`].join(" ");
     for (const rule of BANNED) {
       const match = text.match(rule.pattern);
       if (match) errors.push(`“${match[0]}”: ${rule.why}`);

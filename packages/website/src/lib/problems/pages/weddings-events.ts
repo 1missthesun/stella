@@ -75,12 +75,6 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
         body: "Compare the number each household said is coming against how many were invited. Fewer can be right (one partner can't come) or a typo worth a quick message.",
       },
     ],
-    limits: [
-      "Stella counts what the form says. It doesn't email guests; it can draft reminder messages for the no-replies if you ask.",
-      "It matches replies to invitations by email and name. A guest who used a different email and spelled their name differently may need you to confirm the match; Stella lists anything it couldn't match.",
-      "Guest names, emails and meal choices go to the AI model you use in Stella. The spreadsheet is made on your computer, with no RSVP website involved.",
-      "Recorded on Linux, where Stella used Python tools already on the computer. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -168,12 +162,6 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
         title: "Check the totals",
         body: "Make sure the count of Yes guests equals the sum of the table counts, and look for anyone who said yes without a table before you print.",
       },
-    ],
-    limits: [
-      "Stella uses the tables already in your guest list. It doesn't decide who sits where unless you ask, and then you should check its plan.",
-      "The layout is a clean printable list, not a decorated board. For a styled sign, give Stella the design or take the PDF to a print shop as the source list.",
-      "Guest names, replies, tables and meals go to the AI model you use in Stella. The chart is made on your computer.",
-      "Recorded on Linux, where Stella used Python, a browser and LibreOffice already on the computer to write the PDF and the spreadsheet. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -265,13 +253,6 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
         body: "Set the printer's paper type to card stock or heavy paper and print at 100%. Print one page on plain paper first and fold it to check the names sit the right way up.",
       },
     ],
-    limits: [
-      "Card stock thickness varies. Check your printer's maximum paper weight and choose the heavy paper setting.",
-      "The design is simple and clean. For a particular font or motif, describe it or give Stella a sample card.",
-      "Guest names, replies and tables go to the AI model you use in Stella. The cards are made on your computer.",
-      "It makes the PDF; it doesn't print it unless you ask. Cutting and folding is up to you: the cards have cut and fold lines, not perforations.",
-      "Recorded on Linux, where Stella used Python and a browser already on the computer to write the PDF. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -359,13 +340,6 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
         title: "Print and cut",
         body: "Print a page on plain paper to check the numbers match, then the rest. Cut along the outlines and score or fold along the stub line so it tears cleanly.",
       },
-    ],
-    limits: [
-      "The tickets have cut lines and a dashed tear line, not perforations. Cutting 250 tickets takes a while; a paper trimmer helps.",
-      "Stella uses the details in your notes and leaves out anything they don't say, such as whether winners must be present. Check local raffle rules, which some states and towns set for fundraisers.",
-      "The event details go to the AI model you use in Stella. The tickets are made on your computer.",
-      "It makes the PDF; it doesn't print it unless you ask.",
-      "Recorded on Linux, where Stella installed a small PDF library for Python. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

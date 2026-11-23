@@ -75,13 +75,6 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
         body: "Paste the text into a document, then at each “file attached” line insert the matching photo (Insert, Pictures) and delete the file name. Save as PDF when done. For a long chat this is the slow part.",
       },
     ],
-    limits: [
-      "Voice notes and videos can't play on paper. Stella put a note in their place and the files stay in the zip.",
-      "Stella works with the export you make on your phone; it can't reach WhatsApp or your phone itself. Disappearing and view-once messages aren't in exports at all.",
-      "The chat text goes to the AI model you use in Stella while it lays out the PDF. Nothing is uploaded to a converter site.",
-      "Some emoji may come out as plain symbols, depending on the fonts on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a PDF library, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -180,13 +173,6 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
         body: "The JSON files aren't meant to be read directly, and accents show garbled. Either request the download again in HTML, or use a tool that re-reads the text as UTF-8.",
       },
     ],
-    limits: [
-      "End-to-end encrypted Messenger chats are stored separately and may not be in the Facebook download; Messenger has its own option for downloading those.",
-      "You request the download from Facebook yourself; Stella works on the zip after it arrives and doesn't log in to your account.",
-      "The messages Stella reads go to the AI model you use in Stella while it builds the PDF.",
-      "Stella showed times in the computer's time zone. If the chat happened somewhere else, say which time zone you want.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a PDF library, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -284,12 +270,6 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
         title: "Find who's missing",
         body: "Append the followers files into one query, then Merge Queries with following.json on the username using a Left Anti join. The rows left are the accounts that don't follow you back. In Numbers or Google Sheets, a lookup column (`MATCH` or `XLOOKUP`) does the same.",
       },
-    ],
-    limits: [
-      "The list is as of the day you requested the download. It doesn't update, and it can't say when someone unfollowed.",
-      "Stella doesn't log in to Instagram or unfollow anyone for you; you request the data and act on the list yourself.",
-      "Usernames from the download go to the AI model you use in Stella while it compares them.",
-      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -398,13 +378,6 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
         title: "Hours per year",
         body: "Add a column with the year from `ts` (the time the play ended, in UTC) and sum `ms_played` per year.",
       },
-    ],
-    limits: [
-      "Spotify Wrapped uses its own rules and dates, so these all-time numbers won't match a Wrapped exactly.",
-      "Times in the history are in UTC, so a play just after midnight can land in the neighbouring day or year.",
-      "You request the history from Spotify yourself and it can take weeks; Stella doesn't log in to your account.",
-      "The play history goes to the AI model you use in Stella while it adds up the numbers.",
-      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

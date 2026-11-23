@@ -69,12 +69,6 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         body: "In classic Outlook on Windows: File, Open & Export, Import/Export, Import from another program or file, Comma Separated Values, then map the columns.",
       },
     ],
-    limits: [
-      "Contact details go to the AI model you use in Stella as far as it reads the file to understand the columns. The file itself is made on your computer and not uploaded to a converter.",
-      "Stella makes the file; importing it on the phone is a few taps you do.",
-      "It didn't correct email addresses that had lost their accented letters in the spreadsheet, and pointed them out instead.",
-      "Recorded on Linux, where Stella used only Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -169,12 +163,6 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         title: "On a Mac without Google",
         body: "Import the .vcf into the Contacts app, but note it can't export to CSV or Excel; for that you need Google, a converter, or Stella.",
       },
-    ],
-    limits: [
-      "Contact photos aren't put in the spreadsheet.",
-      "Stella left email addresses that the old phone had saved without their accented letters as they were, and pointed them out.",
-      "The Google route uploads your contacts to your Google account. Stella's doesn't, but what it reads while working, names and numbers included, goes to the AI model you use in Stella.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install a small spreadsheet library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -271,12 +259,6 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         body: "Search for a few surnames and phone numbers you know were on both lists. Nicknames, maiden names and old work emails are where duplicates hide.",
       },
     ],
-    limits: [
-      "Stella makes a new merged file; it doesn't change the contacts on your phone or in your account until you import it there and remove the old ones.",
-      "Two people with the same name and no shared number or email are kept apart and listed, so you decide. It also merged two pairs on name alone where nothing conflicted, and told you which.",
-      "Names, numbers and emails it reads go to the AI model you use in Stella. Nothing is uploaded to a contacts service.",
-      "Recorded on Linux, where Stella used only Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -368,13 +350,6 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         title: "Check the times",
         body: "Invites from other people are often stored in universal time (UTC). If a 10 AM call shows as 4 PM, the converter didn't change it to your time zone.",
       },
-    ],
-    limits: [
-      "Stella reads the file you export; it doesn't connect to your calendar account.",
-      "Times are shown in the time zone you name. Say which one, as in the prompt here.",
-      "It added a Notes sheet that mentions some appointments by name. If you sort or filter, use the first sheet; delete the Notes sheet if you don't want it.",
-      "Event titles, times and places go to the AI model you use in Stella while it works. The spreadsheet is made on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install a calendar and a spreadsheet library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -470,12 +445,6 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         title: "Add attachments",
         body: "Photos and documents attached to the emails aren't included in a printed email. Save them separately and add them after the email they came with.",
       },
-    ],
-    limits: [
-      "Stella works on saved emails (.eml or .mbox files). It doesn't sign in to your email; save the emails from your mail app first.",
-      "The email text is read by the AI model you use in Stella so it can tell who sent what. The PDF is made on your computer and nothing is uploaded to a converter.",
-      "It includes only what you asked for. Here it left your replies out and offered to add them, marked as yours.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install a small PDF library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -574,12 +543,6 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         title: "List the emails and save attachments",
         body: "Right-click the imported folder, ImportExportTools NG, Export all messages in the folder, Spreadsheet (CSV) for a list. To save attachments, select all messages and use the add-on's save attachments option. Check for files with the same name, which some tools overwrite or skip.",
       },
-    ],
-    limits: [
-      "A mailbox of many gigabytes takes a while; Stella works through it on your computer, so allow time and disk space.",
-      "Stella reads the mailbox to build the list, and the headers and email text it reads go to the AI model you use in Stella.",
-      "It can't repair an attachment that was already broken in the email; in the run it said which one and who to ask for it.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

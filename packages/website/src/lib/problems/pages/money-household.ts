@@ -80,13 +80,6 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         body: "Excel: Insert, PivotTable, Category in Rows, Sum of Amount in Values. Numbers 13 and later has Pivot Tables too, or use SUMIF per category. Divide each total by the number of months for the monthly average.",
       },
     ],
-    limits: [
-      "Categories are Stella's reading of merchant names. It listed the choices you might want to change, but read the Transactions tab before you trust the totals.",
-      "Your transactions go to the AI model you use in Stella while it sorts them. Delete account numbers from the downloads first if you like; it never needs your banking login.",
-      "A budget from three months is an average, not a plan: yearly bills, holidays and one-off purchases need adding by hand.",
-      "Not financial advice. Stella adds up what you spent; what to cut is your call.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded. The file opens in Excel, Numbers or Google Sheets.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -194,14 +187,6 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         body: "Contact the merchant first, then the card issuer through its app, website or the number on the card. US law gives you 60 days from the statement date to dispute a billing error in writing.",
       },
     ],
-    limits: [
-      "Stella finds and lists. It doesn't contact your bank or the merchant; it said so in the run.",
-      "It can't know whether you really bought two tickets or two of an item, so pairs like that come back as questions, not disputes.",
-      "A download taken while charges are still pending can show a temporary hold next to the final charge. Use posted transactions.",
-      "Your transactions go to the AI model you use in Stella. It doesn't need your card number or banking login, and the list leaves blanks for you to fill in.",
-      "Not legal or financial advice: dispute rules and deadlines depend on your card and country.",
-      "Recorded on Linux, where Stella used Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -303,13 +288,6 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         body: "Compare the first and last few rows with your online banking. A QIF date like 1/5 can mean 5 January or 1 May, and some programs drop the minus sign on spending.",
       },
     ],
-    limits: [
-      "Investment (brokerage) OFX files hold trades and holdings as well as cash; those come out differently from a bank account and weren't part of this run.",
-      "QIF dates don't say whether they're US or day-first. Stella reads the file to tell, but check one known transaction if your bank isn't American.",
-      "Stella left out the QIF's own spending categories because the prompt asked for four columns. Ask for them if you want them.",
-      "The transactions go to the AI model you use in Stella while it reads them. The spreadsheets are written on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -407,12 +385,6 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         title: "Subtract the refunds",
         body: "Open the refunds file from the same zip (its folder name mentions Returns or Refunds), do the same pivot by year on the refund amount, and subtract it from each year's total.",
       },
-    ],
-    limits: [
-      "Only what's in the export you requested. Kindle books, apps, video and membership fees sit in other parts of Amazon's data, and Stella said they weren't counted.",
-      "Totals can differ a little from your card charges where gift cards, promotions or split shipments are involved.",
-      "Your order list goes to the AI model you use in Stella while it adds up. Stella doesn't log in to your Amazon account; you request the data yourself.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -516,13 +488,6 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         title: "Keep the log itself",
         body: "The IRS expects a record made at the time: date, miles, where and why. Keep the original log with your tax papers, not only the totals.",
       },
-    ],
-    limits: [
-      "Not tax advice. Whether you can claim mileage, and whether the standard rate or actual costs suit you better, depends on your situation; ask a tax professional.",
-      "Stella counted everything not marked Personal as business, because that's how the log was kept. If your log mixes in commuting without saying so, it can't tell.",
-      "It uses the rate IRS.gov shows on the day you ask. If the IRS changes it again, an old spreadsheet won't update itself.",
-      "Your trip notes go to the AI model you use in Stella while it reads them, and it looks the rate up on the web.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -636,13 +601,6 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         title: "Check the gaps",
         body: "Sort by clock-out and look for blanks: a missed punch makes a shift zero or wildly long. Ask the person and type the real time in; don't guess.",
       },
-    ],
-    limits: [
-      "Overtime rules differ by state, country and contract: daily overtime, double time, or a different week. Stella applied the rule in the prompt (over 40 a week); tell it yours.",
-      "It doesn't fill in missed punches. In the run it left the shift at zero until you add the real time.",
-      "Not payroll or legal advice. Check the totals before anyone is paid.",
-      "Names and times go to the AI model you use in Stella while it works. The spreadsheet is written on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may first install Python or a small spreadsheet library, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

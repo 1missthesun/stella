@@ -76,13 +76,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Print the first page at 100% (no Fit to page) on plain paper, hold it against a label sheet up to a light, and only then load the labels. Printers can shift a millimetre or two.",
       },
     ],
-    limits: [
-      "Stella makes the PDF. It doesn't print it unless you ask it to send the file to your printer.",
-      "Printers shift slightly. Print one sheet on plain paper and hold it over a label sheet before using the real labels.",
-      "The names and addresses go to the AI model you use in Stella while it reads the list. The PDF is written on your computer and nothing is uploaded to a label website.",
-      "It works from what's in the sheet: a misspelled street or a wrong ZIP is printed as typed. Stella flags blanks and duplicates but doesn't check addresses against the postal service.",
-      "Recorded on Linux, where Stella used Python and small spreadsheet and PDF libraries it installed. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -175,13 +168,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Finish & Merge, Edit Individual Documents. Print the first page on one envelope, or on paper cut to size, to learn which way up and which flap side your printer wants. Print the rest at 100%, a few at a time.",
       },
     ],
-    limits: [
-      "Printers feed envelopes differently (face up or down, flap left or right) and some can't take thick ones. Test with one envelope first.",
-      "Stella decides what a household is from the names and addresses in the list and says how it grouped them; check its notes before printing 31 envelopes.",
-      "Names and addresses go to the AI model you use in Stella while it reads the list. The PDF is made on your computer.",
-      "It makes the file; it doesn't print it unless you ask. It also doesn't change etiquette like “and Guest” unless you tell it to.",
-      "Recorded on Linux, where Stella used Python and a browser already on the computer to write the PDF. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -272,13 +258,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         title: "Preview, merge and test",
         body: "Preview Results and page through looking for long company names that wrap and for broken accents. Finish & Merge, then print page one on plain paper at 100% and hold it against a badge sheet before printing the rest.",
       },
-    ],
-    limits: [
-      "Stella decides what counts as a duplicate (same email here) and says who it merged. If two people share one email, check its list before printing.",
-      "Very long names or company names are made smaller to fit, so a few badges may have smaller text than the rest.",
-      "Attendee names, emails and companies go to the AI model you use in Stella while it reads the export. The badge file is made on your computer.",
-      "It makes the PDF; it doesn't print it unless you ask. Print one plain-paper test sheet first.",
-      "Recorded on Linux, where Stella installed a small PDF library for Python and used a font that has the accented letters. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -371,13 +350,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Finish & Merge, Edit Individual Documents, All. Page through to check long names fit, then save as PDF. Each record lands on its own page.",
       },
     ],
-    limits: [
-      "The design is clean and simple. For your organisation's look, give Stella a template, a logo file or a description of the style.",
-      "It follows the sheet: if someone's result or date is wrong there, the certificate is wrong too. Stella lists who was left out and why so you can check.",
-      "Names, results and dates go to the AI model you use in Stella while it reads the sheet. The certificates are made on your computer.",
-      "It doesn't sign or print them unless asked. The signature line is left blank for the instructor.",
-      "Recorded on Linux, where Stella used Python, a small spreadsheet library it installed, and a browser already on the computer to write the PDF. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -469,13 +441,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Print one code at the size you'll use and scan it with a phone camera from a normal distance. Around 2 cm (¾ in) square is a safe minimum on a home printer.",
       },
     ],
-    limits: [
-      "The codes are plain, static links: they never expire, but they can't be redirected later. If a page moves, make and print a new code.",
-      "Stella checks each code scans to the link in the sheet. It doesn't check that the web page itself loads.",
-      "It makes codes for every row with a link, so rows like gift cards get one too; Stella flags those, and you delete what you don't need.",
-      "The links and item names go to the AI model you use in Stella. The images are made on your computer, with no QR website involved.",
-      "Recorded on Linux, where Stella installed small Python libraries to read the spreadsheet and draw the codes. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -565,13 +530,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         title: "Scan one before printing all",
         body: "Print a test sheet at 100% on plain paper and scan a few labels with your actual scanner or point-of-sale app. Small barcodes from inkjet printers sometimes need to be printed larger.",
       },
-    ],
-    limits: [
-      "Stella makes barcodes from the codes you already have. It doesn't assign new UPCs; those come from GS1 if you sell through retailers.",
-      "The barcodes were checked by scanning the PDF with software. Scan a printed label with your own scanner before printing them all.",
-      "Product names, prices and codes go to the AI model you use in Stella. The labels are made on your computer.",
-      "It makes the PDF; it doesn't print it unless you ask. Print at Actual size, not Fit to page, or the labels won't line up.",
-      "Recorded on Linux, where Stella installed small Python libraries for the PDF and barcodes. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -664,13 +622,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Word's mail merge makes one page per row, not per order, so either use a Directory merge grouped by order number or make a pivot table of items per order and print with a page break per order (PivotTable Options, Print, page breaks between items).",
       },
     ],
-    limits: [
-      "Stella works from the export. It doesn't mark orders as shipped or buy shipping labels in your shop.",
-      "Customer names, addresses and order lines go to the AI model you use in Stella while it reads the export. The slips are made on your computer.",
-      "It follows the export's status columns. An order fulfilled after you exported still gets a slip, so export just before you pack.",
-      "It makes the PDF; it doesn't print it unless you ask.",
-      "Recorded on Linux, where Stella used Python and a browser already on the computer to write the PDF. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -762,13 +713,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Print both pages double-sided on plain paper at Actual size or 100%, flip on long edge. Hold it to a light to see the backs behind the fronts, and over a card sheet to check the perforations, then print on the card stock.",
       },
     ],
-    limits: [
-      "Printers vary in how well they line the two sides up. Stella's layout is exact, but a sheet fed slightly off-centre shows a thin white sliver along one side of designs coloured to the edge.",
-      "Stella lays out the design you give it; it doesn't design the card unless you ask, and then it's a simple layout, not a designer's work.",
-      "The AI model you use in Stella sees the file names and sizes, and may look at the card images and the finished pages to check the layout. The PDF is made on your computer.",
-      "It makes the PDF; it doesn't print it unless you ask. Choose the card stock or heavy paper setting on your printer.",
-      "Recorded on Linux. Stella placed the images with tools already on the computer; on a Mac or Windows PC it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -857,14 +801,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Upload the 6 × 4 image to a drugstore photo counter as a 4 × 6 print, with auto-crop or fill turned off. When you collect it, measure one square with a ruler: exactly 2 in, head 1 to 1⅜ in. Cut carefully on the lines.",
       },
     ],
-    limits: [
-      "Stella only sizes and lays out the photo. The State Department also checks things a crop can't change: lighting, shadows, expression, a white or off-white background, no glasses, and a photo taken in the last 6 months.",
-      "It doesn't retouch or replace the background, and you shouldn't: the State Department rejects photos changed with software, apps or filters. If the background or lighting is wrong, take a new photo.",
-      "Printing on plain paper at home won't do: the photo must be on matte or glossy photo-quality paper with no visible printer dots. Order a 4 × 6 photo print, or use photo paper on a good photo printer.",
-      "Online passport renewal uses an uploaded digital photo with its own requirements, which this run didn't check.",
-      "Stella reads the photo to measure it, so the image goes to the AI model you use in Stella. The print file is made on your computer.",
-      "Recorded on Linux, where Stella used Python tools already on the computer. On a Mac or Windows PC it may install Python and an image library first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -951,13 +887,6 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         title: "Trim and tape",
         body: "Lay the pages out in order face down, trim the margin off one edge of each overlapping pair, line the pictures up face up, and tape along the back. Work row by row, then join the rows.",
       },
-    ],
-    limits: [
-      "If you say “print” and a printer is set up, Stella may send the pages straight to it. Ask for “a PDF to print” if you want to check it first.",
-      "Home printers can't print to the edge of the page, so you trim and overlap; a print shop can print the poster on one large sheet from the same image if you'd rather.",
-      "A small or low-resolution image looks soft or blocky at poster size. Stella says how sharp it will be, but can't add detail that isn't there.",
-      "The image stays on your computer for the tiling; the AI model sees file names and sizes, and the picture itself if Stella looks at it to check the result.",
-      "Recorded on Linux, where Stella installed small Python libraries for the images and PDF. On a Mac or Windows PC it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

@@ -77,12 +77,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Players cache tags. In Music, remove the songs and add them again; on a phone or car stereo, copy the files over again. If a car still shows Unknown, it may only read ID3v2.3 tags, which Mp3tag can write (Options, Tags, Mpeg).",
       },
     ],
-    limits: [
-      "Stella filled the tags from information you already had: the file and folder names and the cover in the folder. It didn't look the album up online, and won't identify unknown songs by their sound unless you ask it to search.",
-      "It left genre and composer empty rather than guess. Tell it what to put if you want them filled.",
-      "File and folder names go to the AI model you use in Stella so it can work out the tags; the tagging itself happens on your computer.",
-      "Recorded on Linux. Stella installed a small Python tag library (mutagen) for the job, and does the same on a Mac or Windows PC.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -184,12 +178,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "MP3 is lossy, so converting back won't restore the quality. Keep the FLAC files as your masters and treat the MP3s as copies for the car or phone.",
       },
     ],
-    limits: [
-      "MP3 is lossy. At 320 kbps the difference is hard to hear, but the MP3s are smaller copies, not replacements for the FLACs.",
-      "It doesn't format the USB stick or copy the files to it. Ask in the same chat with the stick plugged in if you want that too.",
-      "Recorded on Linux, where ffmpeg was already installed. A Mac or Windows PC usually doesn't have it, so Stella would download it first, which wasn't recorded.",
-      "File names and tags go to the AI model you use in Stella; the audio is converted on your computer and isn't uploaded to a converter site.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -290,13 +278,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Fix the names",
         body: "Speech recognition guesses at names, places and jargon. Skim each transcript for capitalised words and correct them; most tools let you add a vocabulary list or prompt to get them right next time.",
       },
-    ],
-    limits: [
-      "Names and unusual words are best guesses. Stella said so; tell it the right spellings and it can correct them.",
-      "The free local tool is slower than a hosted service and takes about 2 GB of disk space. Stella offered to delete it afterwards.",
-      "The audio stayed on the computer, but the finished transcripts go to the AI model you use in Stella when it summarises them. Ask for transcripts only if you'd rather it didn't read them.",
-      "The test memos were clear speech with light background noise. Noisy rooms, several people talking at once or strong accents will be less accurate. Labelling who is speaking wasn't part of this test.",
-      "Recorded on Linux. On a Mac or Windows PC Stella installs a similar local tool, which wasn't recorded.",
     ],
     costNote:
       "Yes. In the recording the account was on Stella's free plan, so Stella installed a free speech tool on the computer and nothing was paid; it's just slower. Stella's own built-in transcription isn't part of the free plan.",
@@ -402,12 +383,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Many car stereos only read sticks formatted FAT32, and some want the files in a folder no more than a level or two deep. If the car shows nothing, check its manual for the formats and folder layout it supports.",
       },
     ],
-    limits: [
-      "MP3 is lossy. For speech at 192 kbps you won't hear a difference, but keep the originals if they matter.",
-      "It made the files; it didn't format a USB stick or copy them onto one. Ask in the same chat with the stick plugged in if you want that too.",
-      "File names, folder contents and each file's format details go to the AI model you use in Stella. The audio itself is converted on your computer and isn't uploaded anywhere.",
-      "Recorded on Linux, where ffmpeg was already installed. A Mac or Windows PC usually doesn't have it, so Stella would download it first, which this recording doesn't show.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -509,12 +484,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Keep them in order",
         body: "Start each file name with a number padded to two digits (01, 02 … 10), so phones and podcast apps play them in the right order instead of putting 10 before 2.",
       },
-    ],
-    limits: [
-      "A video with no sound has nothing to extract. Stella said so for Week 4 rather than making a silent MP3.",
-      "MP3 re-encodes the sound. For the original quality, ask for M4A instead (most phone videos already carry AAC sound, which can be copied out as-is).",
-      "File names and each video's stream details go to the AI model you use in Stella; the videos and their sound stay on your computer.",
-      "Recorded on Linux, where ffmpeg was already installed. On a Mac or Windows PC Stella would usually download it first, which isn't shown here.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -618,12 +587,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "On iPhone, drag the .m4b into Books through Finder (Mac) or the Apple Devices app (Windows). On Android, copy it to the phone and open it in an audiobook app that reads M4B chapters, such as Smart AudioBook Player or Voice.",
       },
     ],
-    limits: [
-      "The MP3s are re-encoded once to AAC, the format .m4b uses. For speech you won't hear it, but the chapter MP3s stay as your originals.",
-      "Only for audiobooks you own without copy protection. Files from Audible or other stores with DRM can't be joined this way.",
-      "File names, tags and lengths go to the AI model you use in Stella so it can name and order the chapters; the audio stays on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -723,12 +686,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Android is simpler",
         body: "Android plays MP3 ringtones. Copy the cut MP3 into the phone's Ringtones folder, then pick it in Settings, Sound, Phone ringtone.",
       },
-    ],
-    limits: [
-      "Stella makes the file; it can't reach your phone. Putting it on the iPhone needs Finder, the Apple Devices app or GarageBand, as above.",
-      "It cut at the time you gave and didn't listen for the chorus. If the start is a little off, say how much to move it.",
-      "Only use songs you own. Copy-protected tracks can't be cut.",
-      "The song's name and tags go to the AI model you use in Stella; the audio is cut on your computer. Recorded on Linux with ffmpeg already there; on Mac or Windows Stella would usually download ffmpeg first.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -831,12 +788,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Skip to each place one lesson ends and the next begins. A click, a jump in speed or a gap means the files had different formats and need re-encoding to one.",
       },
     ],
-    limits: [
-      "Joining re-encodes the MP3s once. For spoken lessons you won't hear it; the lesson files stay as they were.",
-      "It ordered the lessons by the numbers in their names. If your files have no numbers, say what order you want.",
-      "File names, lengths and format details go to the AI model you use in Stella; the audio is joined on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -937,12 +888,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Or let the player do it",
         body: "Apple Music's Sound Check and Spotify's volume normalisation even out playback without touching files, but only inside that app. For a USB stick, a party speaker or a DJ set, the files themselves need fixing.",
       },
-    ],
-    limits: [
-      "The songs are rewritten. Stella kept the originals in a backup folder, which it said how to restore from; delete it once you're happy.",
-      "The quietest, peakiest song had its loudest hits turned down a little to avoid distortion, so they may sound slightly less punchy.",
-      "File names, tags and loudness measurements go to the AI model you use in Stella; the songs are processed on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1045,12 +990,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Live sets where songs run into each other can't be split by silence. Note the time each song starts while listening, then cut at those times in Audacity or ffmpeg.",
       },
     ],
-    limits: [
-      "Songs that run into each other with no quiet gap can't be split this way; give Stella the start times instead.",
-      "The files are numbered, not titled, because the recording has no names in it. Send the setlist and it will rename them.",
-      "File names and the loudness measurements go to the AI model you use in Stella; the recording itself stays on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1152,12 +1091,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Play the shifted version through. Voices moved more than three or four semitones start to sound unnatural; instruments cope better.",
       },
     ],
-    limits: [
-      "Big shifts sound less natural, especially on voices. Two semitones is comfortable; beyond three or four, expect a processed sound.",
-      "It changes the audio only. Chord sheets or lyrics with chords aren't rewritten unless you give them to Stella too.",
-      "The song's name and format details go to the AI model you use in Stella; the audio is processed on your computer. Nobody listened to the result in the recording; the check measured it.",
-      "Recorded on Linux, where the installed ffmpeg already had the rubberband pitch shifter. On a Mac or Windows PC Stella would need to download an ffmpeg that includes it, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1258,12 +1191,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Get them onto your phone",
         body: "Copy the MP3s with a cable, AirDrop or a cloud folder you already use, and play them in any music app. On iPhone, the Files app plays MP3s directly.",
       },
-    ],
-    limits: [
-      "The sound depends on the sound bank. The free piano Stella used is good for practice, not a concert grand.",
-      "Long rests inside a piece were shortened when Stella trimmed silences. Ask it not to trim if a piece has deliberate long pauses.",
-      "On Linux without admin rights Stella fetched FluidSynth and the sound bank (about 150 MB) into its own folder. On a Mac or Windows PC it would install similar free tools, which wasn't recorded.",
-      "File names and the files' details go to the AI model you use in Stella. The MP3s were uploaded to your own Stella Drive so your phone can reach them; ask for a local copy only if you'd rather not.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1368,12 +1295,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Play the result through. Faint echoes of the voice, reverb tails, or a thin sound where an instrument shares the singer's range are normal side effects. Trying a different model sometimes helps.",
       },
     ],
-    limits: [
-      "Separation is very good but not perfect: faint vocal echoes and reverb can remain, and instruments close to the voice may sound thinner. The check measured the result; nobody listened to it in the recording.",
-      "It's a big install: Stella's private Python environment for Demucs took about 5 GB, mostly PyTorch, plus a 320 MB model. Ask Stella to delete it afterwards if you won't need it again.",
-      "For personal practice. Sharing a karaoke version of someone else's song is a copyright question, not a technical one.",
-      "The song's name goes to the AI model you use in Stella; the song itself is separated on your computer and isn't uploaded. Recorded on Linux with a graphics card; on a Mac or Windows PC the same model runs, more slowly without a supported graphics card, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1477,12 +1398,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         body: "Cut the tricky section out of the slowed copy in Audacity (select it, File, Export Audio, Export Selected Audio) and set your player to repeat that one file.",
       },
     ],
-    limits: [
-      "Big slowdowns, below about 50%, sound smeary with any tool. 70 to 90% is where practice copies sound natural.",
-      "It works on files you have. Songs on streaming services can't be processed; use the service's own speed control if it has one.",
-      "The song's name and format details go to the AI model you use in Stella; the audio is stretched on your computer.",
-      "Recorded on Linux, where ffmpeg with rubberband was already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1583,12 +1498,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Copy to the car",
         body: "Most car stereos read a FAT32 USB stick and show the ID3 tags. Copy the whole converted folder across; keeping the artist and album folders makes browsing easier on the dashboard.",
       },
-    ],
-    limits: [
-      "WMA files with copy protection (DRM), often bought from old online music stores, can't be converted. Stella said it would list any; none of these had it.",
-      "Converting one lossy format to another can't improve the sound. The MP3s sound the same as the 128 kbps WMAs, not better.",
-      "File and folder names and the songs' tags went to the AI model you use in Stella. The music was converted on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1691,12 +1600,6 @@ export const AUDIO_PAGES: ProblemPage[] = [
         title: "Listen to the ends",
         body: "Play the first and last few seconds of each trimmed file. A very quiet first word, or a handling noise loud enough to look like speech, is the usual way automatic trimming goes wrong.",
       },
-    ],
-    limits: [
-      "A very quiet first or last word can be mistaken for silence. The check confirmed the words were intact here, but nobody listened; play the ends of each file.",
-      "Stella replaced the files in place under their own names and moved the originals into a subfolder. Say so if you'd rather keep the originals where they are and get trimmed copies.",
-      "File names and measurements of the sound went to the AI model you use in Stella. The recordings were trimmed on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

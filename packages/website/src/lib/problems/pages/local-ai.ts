@@ -86,13 +86,6 @@ export const LOCAL_AI_PAGES: ProblemPage[] = [
         body: "A loaded model uses memory. Quit Ollama from the tray or menu bar icon, or eject the model in LM Studio. To remove a model, run `ollama rm llama3.2:1b`.",
       },
     ],
-    limits: [
-      "This is for the curious. A 2B model is good for quick questions, drafts and summaries, and clearly worse than ChatGPT or Claude at hard reasoning, facts and code; Stella said so too.",
-      "Speed depends heavily on your computer. The test machine had a top graphics card; our own offline check on its processor alone ran at about 25 tokens a second, and an ordinary laptop will be slower.",
-      "It used llama.cpp rather than Ollama, since it needs no installer or background service. Ask for Ollama by name if you want it.",
-      "Recorded on Linux. On Windows or a Mac the steps differ (and a Mac uses its own chip instead of a graphics card); that hasn't been recorded yet.",
-      "Stella itself still uses your ChatGPT or Claude plan to do the setting up. Only the model it installs runs offline.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {

@@ -88,13 +88,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Send the new file to your phone and play it full screen. TikTok puts its buttons on the right and the description along the bottom, so the safe area is roughly the middle two-thirds of a 1080×1920 frame.",
       },
     ],
-    limits: [
-      "Stella doesn't post to TikTok or any other account for you. You upload the finished file yourself.",
-      "Its own transcription comes with paid Stella plans. On the free path (your ChatGPT or Claude plan) it can't use it, so hand it a subtitle file or have it set up Whisper on your computer, which this recording doesn't show.",
-      "Transcription is good but not perfect, especially over loud music, heavy accents or several people talking at once. Add “show me the text before you burn it in” to the prompt to check the words first.",
-      "Rendering takes as long as your computer takes. A one-minute clip is quick; an hour-long video on an older laptop can take a while.",
-      "Animated word-by-word caption templates are CapCut's strength. Stella makes clean, readable captions, not CapCut's full template library.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -216,13 +209,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Or just find the silences with ffmpeg",
         body: "To see where the gaps are without changing anything, run `ffmpeg -i talk.mp4 -af silencedetect=noise=-30dB:d=0.5 -f null -`. It prints a `silence_start` and `silence_end` for every pause longer than half a second.",
       },
-    ],
-    limits: [
-      "Silence detection goes by loudness. With music or constant background noise under the voice, pauses and speech are hard to tell apart; expect to adjust, and check the result.",
-      "In the recording it also shortened the natural gaps between sentences to about a quarter of a second, so the pacing came out brisk. Ask for a longer pad (say 0.3 s) if you want the speech to breathe.",
-      "It removes dead air, not filler words like “um” or retakes. Cutting those needs a transcript-based edit, which is more careful work.",
-      "Rendering the new file takes as long as your computer takes; long 4K recordings on a laptop can take a while.",
-      "Stella doesn't upload or post the result anywhere. It stays on your computer.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -350,12 +336,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Cut the clip to the part that matters, drop to 480p for fast-moving game footage, or upload it to YouTube (unlisted), Google Drive or Streamable and paste the link. Nitro raises the limit to 500 MB, Nitro Basic to 50 MB.",
       },
     ],
-    limits: [
-      "This was slow-moving launch footage. Fast game clips with lots of motion look worse at the same size; expect Stella to drop to 480p or suggest trimming, which hasn't been recorded yet.",
-      "It aimed for 10 MB because the prompt said so. Discord's free limit has been 20 MB since August 2026, so say “under 20 MB” if that's your limit and you'd like a sharper file.",
-      "ffmpeg was already installed on the Linux computer in the recording. On a Windows PC, Stella has to install it first, which hasn't been recorded yet.",
-      "Stella looks at one frame to check the quality, so that frame goes to the AI model you use in Stella. The video itself stays on your computer.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -458,13 +438,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Subtitles still don't show?",
         body: "Many TVs ignore subtitles stored inside an MP4 but show a separate file. Save the subtitles as `Movie Name.srt` next to `Movie Name.mp4` (in ffmpeg, `ffmpeg -i movie.mkv -map 0:s:0 movie.srt`), or burn them into the picture in HandBrake if you always want them on. Image subtitles from Blu-rays (PGS) can't go into an MP4 as text; burn them in instead.",
       },
-    ],
-    limits: [
-      "We didn't play the MP4s on a real TV. “Works” here means they decode start to end with no errors in H.264 and AAC, which most TVs since about 2012 play; check one on yours before deleting the MKVs.",
-      "The subtitles ended up switched on by default in all three files, and Stella said it couldn't change that back. It also didn't make separate .srt files, which some TVs need to show subtitles at all; ask for them if yours ignores the built-in ones.",
-      "The test films were half a minute long. A two-hour film that only needs repackaging still takes seconds, but one that needs HEVC re-encoded can take an hour or more on a laptop, and the H.264 file comes out bigger (here 2.8 MB became 5.1 MB).",
-      "ffmpeg was already on the Linux computer in the recording. On Windows or a Mac, Stella would install it first, which hasn't been recorded yet.",
-      "Copy-protected files (from a streaming app or an encrypted Blu-ray) can't be converted.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -569,12 +542,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "ffmpeg's concat demuxer joins clips without re-encoding only if every clip has the same size, frame rate and codec. Phone clips rarely do, so scale and pad each to one size and frame rate first, or use the concat filter, which re-encodes them all together.",
       },
     ],
-    limits: [
-      "It joins clips and makes them fit one frame. Transitions, titles, music and trimming weren't asked for; say so in the prompt if you want them.",
-      "Clips are re-encoded to match, which takes longer for long or 4K footage and costs a little quality.",
-      "To describe the clips it looked at frames from them, which go to the AI model you use in Stella along with file details. The video itself is joined on your computer.",
-      "Recorded on Linux, where ffmpeg was already installed. On a Mac or Windows PC Stella would download it first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -676,13 +643,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Mind portrait photos",
         body: "Mixed portrait and landscape photos either get black bars or are cropped to fill the frame. Both are fine; stretching is not. Check one portrait photo in the preview before exporting.",
       },
-    ],
-    limits: [
-      "It made a plain slideshow with cuts between photos. Pan-and-zoom effects, titles and transitions weren't asked for; describe them in the prompt if you want them.",
-      "It used the photos' saved order. If they're out of order, say “in the order they were taken” or name the order.",
-      "Use music you're allowed to share if you post the video online; platforms may mute or remove videos with copyrighted songs.",
-      "Recorded on Linux, where ffmpeg was already installed. On a Mac or Windows PC Stella would download it first, which wasn't recorded. It saved to Videos here; on a Mac that's Movies.",
-      "File names and details go to the AI model you use in Stella; the photos and song are put together on your computer.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -786,12 +746,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Windows can play HEVC with Microsoft's HEVC Video Extensions from the Microsoft Store (a small charge) or a player like VLC. TVs usually can't be updated this way.",
       },
     ],
-    limits: [
-      "Converting re-encodes the video. H.264 files are a little bigger than HEVC at the same quality; here they grew by a few hundred KB each.",
-      "HDR clips become standard dynamic range so ordinary screens show them correctly.",
-      "File names and each clip's format details go to the AI model you use in Stella; the videos are converted on your computer and aren't uploaded.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown. It can't test playback on your TV.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -890,12 +844,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Hook it up on the page",
         body: "In HTML, add `<track kind=\"subtitles\" src=\"E01.vtt\" srclang=\"en\" label=\"English\">` inside the `<video>` element. The .vtt must be served from the same site, or with CORS allowed.",
       },
-    ],
-    limits: [
-      "It converts files; it doesn't upload them to your site or edit your player's code unless you ask.",
-      "Styling beyond italics and bold may not show the same in every player.",
-      "The subtitle text was read by the AI model you use in Stella to work out encodings and check the conversion. Fine for most subtitles; keep in mind for unreleased material.",
-      "Recorded on Linux. The conversion used Stella's built-in scripting, nothing installed, so it works the same on a Mac or Windows PC.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -999,12 +947,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "A video frame is only as sharp as the video. Fast movement is often blurred in a single frame, and phone video is compressed, so frames look softer than a photo taken at the same resolution.",
       },
     ],
-    limits: [
-      "One picture per second can miss a split-second moment. Ask for more per second around the part you care about.",
-      "It didn't pick the best shot for you. It looked at one sample frame to check its work; it can look through them for the woodpecker if you ask, which sends those pictures to the AI model.",
-      "File names, the video's details and that one sample frame went to the AI model you use in Stella; the frames were saved on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1106,12 +1048,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Most chat apps play short videos inline, often with better colour, sound and a smaller file than a GIF. Send a GIF when the app or the joke needs one.",
       },
     ],
-    limits: [
-      "GIFs have no sound and only 256 colours per frame, so gradients can band a little. A short MP4 often looks better where the chat app allows one.",
-      "It cut the times you gave. If the moment lands at the very end, say so and it will extend the clip.",
-      "File names, the video's details and a few frames from the GIF (to check it) went to the AI model you use in Stella; the GIF was made on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1212,12 +1148,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Name it like the video",
         body: "Save it as the video's name with .srt (Interview.mp4 and Interview.srt). Players like VLC load it automatically, and upload pages for YouTube or Vimeo take it as a separate caption file.",
       },
-    ],
-    limits: [
-      "Names and rare words are best guesses. Stella flagged the guest's first name and one phrase to check; read the file before uploading.",
-      "Speaker labels aren't added. Ask if you want them.",
-      "The speech models are big: about 5 GB downloaded, since Stella tried three sizes on the hard-to-hear name, and transcription on a processor is slow for long videos. The sound stayed on the computer; the transcript text went to the AI model you use in Stella to build and check the subtitles.",
-      "Recorded on Linux. On a Mac or Windows PC Stella would set up the same free speech tool, which wasn't recorded.",
     ],
     costNote:
       "Yes. The recording was on Stella's free plan, so the speech recognition ran on the computer with a free model and nothing was paid; it's just slower than a hosted service.",
@@ -1323,12 +1253,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "VLC's Tools, Effects and Filters, Geometry, Transform rotates the picture during playback, but doesn't change the file unless you also run it through Convert / Save with that filter on.",
       },
     ],
-    limits: [
-      "Rotating doesn't add picture. A portrait video shows with black bars on a landscape TV.",
-      "Turning the picture means re-encoding it. Stella used a very high quality setting, so it looks the same, but the file is a fresh copy.",
-      "To decide which way to turn it, Stella looked at frames from the video, so those few pictures went to the AI model you use in Stella. The video itself was rotated on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1430,12 +1354,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Fit the platform",
         body: "Reels and TikTok are vertical (9:16). A landscape video will show with bars or be cropped; reframe it to vertical in the editor, and add captions, since fast speech is easier to follow with them.",
       },
-    ],
-    limits: [
-      "At 2× speech is fast but clear. Above about 3× it gets hard to follow, whichever tool you use.",
-      "It doesn't post to Instagram or reframe to vertical unless you ask; Stella offered both.",
-      "File names, the video's details and one frame from the new copy went to the AI model you use in Stella; the video was processed on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1539,12 +1457,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Store the AVI, WMV, 3GP and VOB files somewhere safe after converting. Converting is lossy, and the originals are what you'd go back to if a better tool or setting comes along.",
       },
     ],
-    limits: [
-      "Converting doesn't add detail. A 2009 phone clip at 352×288 still looks soft on a big TV, and low frame rates still look choppy; Stella pointed both out.",
-      "Copy-protected DVDs aren't covered. This is for VOB files you already have on your computer.",
-      "File names and the clips' technical details, plus one frame from each clip, went to the AI model you use in Stella. The videos were converted on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1645,12 +1557,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Screen recordings from a browser",
         body: "Browser recorders often write WebMs with no length in the header, so players show 0:00 or can't seek. A full re-encode fixes that, because the new file gets a proper length.",
       },
-    ],
-    limits: [
-      "Re-encoding takes time and is slightly lossy. Stella used a high-quality setting, which is invisible on short clips; long films take minutes each.",
-      "A WebM with transparency loses it in MP4, which has no see-through video.",
-      "File names and the videos' technical details went to the AI model you use in Stella. The videos were converted on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1754,13 +1660,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "A vertical crop keeps only about a third of a landscape frame. Watch the whole video first and note how far left and right the subject goes; if it's wider than the slice, split the clip and frame each part separately.",
       },
     ],
-    limits: [
-      "A vertical slice keeps about a third of the width, so the rest of the scene is lost. Here the shelf and window on the left went.",
-      "The slice is enlarged to fill a phone screen, so a 720p source looks a little softer than video filmed upright. Stella said so.",
-      "Stella used one fixed crop because the cook barely moved. For someone walking around the room the crop would need to follow them, which this run didn't test.",
-      "Frames from the video went to the AI model you use in Stella so it could see the scene. The video was cropped on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1862,12 +1761,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Check the join",
         body: "Play a few seconds either side of the cut. The sound should match the picture, and nothing from the removed part should flash up.",
       },
-    ],
-    limits: [
-      "An exact cut means re-encoding the video. Stella used a very high quality setting, so it looks the same, but the file is a fresh copy.",
-      "Checked by measurement, not by ear. Stella said nobody had listened to the join and suggested checking it.",
-      "File names, the video's details and a few frames around the cut went to the AI model you use in Stella. The video was cut on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1971,12 +1864,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "VLC can play up to 125% (200% in some versions), but that changes nothing in the file. To share it, you need a louder copy.",
       },
     ],
-    limits: [
-      "Raising the voice raises the room noise too. Stella cut back some hiss, but a distant recording won't sound like a close microphone.",
-      "Checked by measurement only. Stella said it hadn't listened and suggested a quick listen, noting the last few seconds stayed about 10 dB quieter.",
-      "File names and measurements of the sound went to the AI model you use in Stella. The video was processed on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2078,12 +1965,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Long videos",
         body: "Reversing holds every frame in memory. For anything over a minute or two, cut out just the moment you want first, or split it into pieces, reverse each and join them in reverse order.",
       },
-    ],
-    limits: [
-      "Reversed speech is gibberish. Stella reversed the sound too and suggested listening; for a clip with talking you may prefer to mute it or add music.",
-      "Long videos need a lot of memory to reverse. This was a 12-second clip; for long ones, cut the moment you want first.",
-      "File names, the video's details and a few frames went to the AI model you use in Stella. The video was reversed on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -2187,12 +2068,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Instagram, TikTok and YouTube may mute or block videos with copyrighted songs. Their own music libraries, or royalty-free tracks, avoid that.",
       },
     ],
-    limits: [
-      "The music level was set by measurement. Stella said it hadn't listened and offered to make the music louder or softer.",
-      "The song started from its beginning; picking a different section of the song, or ducking it further while people talk, would be a follow-up request.",
-      "File names and measurements of the sound went to the AI model you use in Stella. The video and song were mixed on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -2294,13 +2169,6 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Keep the walk, lose the wobble",
         body: "Very strong smoothing makes a walking shot float oddly and zooms in a lot. A moderate setting, like the one Stella chose, keeps the forward movement and removes the hand shake.",
       },
-    ],
-    limits: [
-      "Stabilising crops in. Stella zoomed about 4.5%, so the edges of the picture are lost and it's a little less sharp.",
-      "Motion blur from the shaking stays; each frame is only moved, not un-blurred.",
-      "About a quarter of the shake remained, including a few quick jolts Stella pointed out. A stronger setting would remove more but zoom in further.",
-      "File names, the video's details and a few frames went to the AI model you use in Stella. The video was stabilised on your computer.",
-      "Recorded on Linux with ffmpeg already installed. On a Mac or Windows PC Stella would usually download ffmpeg first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

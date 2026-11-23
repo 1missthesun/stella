@@ -30,7 +30,7 @@ export const NICHES: Niche[] = [
     description:
       "Sort a messy Downloads folder, find what's taking up space, delete empty folders and clear duplicates on Windows or Mac, by hand or with Stella (stella.sh).",
     intro:
-      "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and the Stella (stella.sh) way, and says exactly what Stella deleted in the recorded run and what it left for you to decide.",
+      "Cleaning up is mostly finding what's big, sorting what's left and deciding what can go. Each guide covers the manual way and the Stella (stella.sh) way, with every file it moved or removed in the recorded run.",
   },
   {
     slug: "photos-files",
@@ -132,7 +132,7 @@ export const NICHES: Niche[] = [
     description:
       "Make a budget from bank downloads, find double charges, open OFX and QIF files, total mileage or timesheets, and see your Amazon spending, with Stella (stella.sh).",
     intro:
-      "Bank downloads, order histories and logs already hold the answer; the work is adding them up without counting anything twice. Each guide gives the spreadsheet route, and Stella (stella.sh) doing it from files you download yourself, with no bank login shared. None of it is financial or tax advice.",
+      "Bank downloads, order histories and logs already hold the answer; the work is adding them up without counting anything twice. Each guide gives the spreadsheet route, and Stella (stella.sh) doing it from files you download yourself, with no bank login shared.",
   },
   {
     slug: "documents",
@@ -152,7 +152,7 @@ export const NICHES: Niche[] = [
     description:
       "Convert WMA or FLAC to MP3, fix tags, trim silence, even out volume, make ringtones and audiobooks, or practice tracks, with free tools or Stella (stella.sh).",
     intro:
-      "Audio goes wrong in batches: memos the car won't play, lessons in the wrong order, songs at different volumes. Musicians want practice copies: slower, in their key, without the singer. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files, with what it installed and how good the result is.",
+      "Audio goes wrong in batches: memos the car won't play, lessons in the wrong order, songs at different volumes. Musicians want practice copies: slower, in their key, without the singer. Each guide gives the free tool route, and Stella (stella.sh) doing it on real files, with what it installed and how the result measured up.",
   },
   {
     slug: "contacts-calendar-email",
@@ -232,7 +232,7 @@ export const NICHES: Niche[] = [
     description:
       "Set up a small AI model that runs offline on your own computer with Ollama, LM Studio or llama.cpp, or let Stella (stella.sh) install and test one for you.",
     intro:
-      "Small AI models now run on ordinary computers with no internet, if you're curious and don't mind them being slower and less clever than ChatGPT or Claude. Each guide gives the manual setup and Stella (stella.sh) doing it on a real computer.",
+      "Small AI models now run on ordinary computers with no internet. Each guide gives the manual setup and Stella (stella.sh) doing it on a real computer.",
   },
 ];
 

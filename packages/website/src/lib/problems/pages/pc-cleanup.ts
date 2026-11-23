@@ -88,12 +88,6 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         body: "Windows: Settings, System, Storage, Storage Sense, then set “Delete files in my Downloads folder if they haven't been opened for more than” to 30 or 60 days. Mac: there's no built-in timer for Downloads, so put a monthly reminder in your calendar.",
       },
     ],
-    limits: [
-      "In the recording Stella deleted nothing until it was told to, because the prompt said so. Its deletes are permanent, not to the Recycle Bin or Trash. If you want a safety net, say “move the extra copies to the Trash” in your go-ahead.",
-      "It won't open or run installers it finds. It only reports what they are.",
-      "If Downloads syncs with OneDrive or iCloud, moving files also moves them in the cloud copy. Say so in the prompt if you'd rather it left synced files alone.",
-      "It sorts by names and file types, so a file called `scan_0012.pdf` lands in Documents, not in the exact subfolder you'd choose. Check the report and move the odd one by hand, or tell Stella your own folder names first.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -199,13 +193,6 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         body: "Remove Empty Directories and similar free tools show a list of empty folders before deleting, and can treat `Thumbs.db` and `desktop.ini` as junk. Check the list before you click delete.",
       },
     ],
-    limits: [
-      "Stella counts any file as a file, hidden system files included, unless you say they're junk. Here it kept four folders holding only `.DS_Store` or `Thumbs.db` and asked; add “ignore .DS_Store and Thumbs.db” to the prompt to clear those too.",
-      "Empty folders are deleted outright, not moved to the Trash or Recycle Bin. There was nothing in them, but say so if you'd rather they went to the Trash.",
-      "Folder names are seen by the AI model you use in Stella. The work happens on your computer.",
-      "Cloud-synced folders (OneDrive, iCloud Drive, Dropbox) may bring placeholders back.",
-      "Recorded on Linux. On a Mac Stella can use the same built-in tools; on Windows it uses PowerShell, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -307,12 +294,6 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         body: "Copy old videos and backups to an external drive before deleting them. Installers and zips you've already extracted can usually go straight away.",
       },
     ],
-    limits: [
-      "Stella scanned your user folders, as asked; system files, apps and other users' folders aren't covered unless you ask for the whole drive.",
-      "It suggests what's usually safe to clear but deletes nothing until you say which.",
-      "File and folder names and sizes go to the AI model you use in Stella. The scan itself runs on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella uses their own tools to measure folders, which wasn't recorded, and the system folders worth checking differ.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -401,13 +382,6 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       },
     ],
     manualTitle: "Do it yourself (about 20 minutes)",
-    limits: [
-      "Stella won't delete Windows system files by hand. For those it uses Windows' own tools, the ones Microsoft documents.",
-      "It won't install “PC cleaner” or registry cleaner apps, and it won't recommend them.",
-      "Some drives are simply too small: a 128 GB SSD with Windows and a couple of modern games fills up whatever you do. Stella can tell you that; it can't add space.",
-      "If the drive itself is failing, cleaning up isn't the fix. Stella can read the drive's health report and tell you to back up first.",
-      "This guide is for Windows. On a Mac the equivalent is “System Data”: ask Stella about local Time Machine snapshots, caches and iPhone backups instead.",
-    ],
     platforms: ["windows"],
     faq: [
       {
@@ -511,12 +485,6 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         title: "Move extras to the Trash, not away for good",
         body: "Delete them in File Explorer or Finder so they go to the Recycle Bin or Trash. Leave it a few days before emptying, in case something was needed.",
       },
-    ],
-    limits: [
-      "Only exact copies. An edited version or a photo re-saved at another quality is a different file and is kept; for similar-looking photos see [find duplicate photos](/how/photos-files/find-duplicate-photos).",
-      "Files in a cloud-synced folder can come back from the cloud copy, or the deletion can sync to your other devices. Check how your sync service handles the Trash.",
-      "File names and folder layout go to the AI model you use in Stella; the files themselves are compared on your computer.",
-      "Recorded on Linux, where the Trash is a folder in your home. On a Mac or Windows PC Stella uses the Trash or Recycle Bin and may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

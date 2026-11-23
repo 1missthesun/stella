@@ -62,7 +62,7 @@ export function problemBody(page: ProblemPage, level = 2): string {
     "",
   );
   page.manualSteps.forEach((step, i) => lines.push(`${i + 1}. **${step.title}.** ${step.body}`));
-  lines.push("", `${h} Where Stella stops`, "", ...page.limits.map((limit) => `- ${limit}`), "", `${h} Questions`, "");
+  lines.push("", `${h} Questions`, "");
   for (const item of [...page.faq, ...sharedFaq(page)]) lines.push(`**${item.q}**`, item.a, "");
   lines.push(`Sources: ${page.sources.map((s) => `[${s.label}](${s.href})`).join(", ")}.`, "");
   const near = neighbours(page);

@@ -69,12 +69,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         body: "Kindle never edits an entry: if you highlight a sentence and then extend it, both are saved. Delete exact repeats, and any highlight that is the start of a longer one at the same location.",
       },
     ],
-    limits: [
-      "My Clippings.txt is the only source. If you deleted a highlight on the Kindle, the file still has it, so Stella can't tell it was deleted.",
-      "If a publisher limits clippings, the Kindle may have saved cut-off highlights; Stella can't restore the missing text.",
-      "The highlights go to the AI model you use in Stella while it sorts them. The files are written on your computer.",
-      "Recorded on Linux, where Stella used only Python, built in on Mac and Linux. On Windows it may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -161,13 +155,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         title: "Check a few cards",
         body: "Browse the new deck and fix any card where a definition has split across fields, usually because it contained a comma and wasn't in quotes.",
       },
-    ],
-    limits: [
-      "Stella makes cards from what's in your notes and doesn't add facts. Read through the deck before relying on it.",
-      "It made a text file for Anki's Import, not an .apkg deck package; ask for an .apkg if you want one. It didn't open Anki to test the import.",
-      "Image cards (labelling a diagram) aren't covered.",
-      "Your notes go to the AI model you use in Stella so it can find the terms. Nothing is uploaded to a flashcard site.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install a small Word-reading library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -260,13 +247,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         title: "Cut along the lines",
         body: "Use a ruler and craft knife or a paper trimmer. Card stock or thicker paper stops the backs showing through.",
       },
-    ],
-    limits: [
-      "Printers differ: some flip the back sheet differently. Print one test sheet before the rest.",
-      "Stella makes the PDF; it doesn't print it unless you ask it to send the file to your printer.",
-      "The file was set up for A4. Stella said US Letter works at 100%, but the margins differ; ask for Letter if that's your paper.",
-      "It made cards for words your list marked as done too, and offered a version without them.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install a small PDF library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -361,12 +341,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         body: "Insert a 15×15 table in Word with square cells. Write the words in first, in pencil on a printout if easier, then fill every empty square with a random letter. Copy the table to a second page and shade the words for the key.",
       },
     ],
-    limits: [
-      "Stella makes a standard rectangular grid. Shaped puzzles (a heart, a pumpkin) weren't covered.",
-      "It set US Letter paper and offered A4; ask for A4 up front if that's your paper.",
-      "The spelling sheet's text goes to the AI model you use in Stella while it picks out the words. The PDF is made on your computer.",
-      "Recorded on Linux, using Python (built in on Mac and Linux) with a PDF library that was already installed. On a Mac or Windows PC Stella may install one first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -455,12 +429,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         title: "Print both pages",
         body: "Print the blank puzzle with its clues, then the answer key separately. Save each as PDF if you'll reuse it.",
       },
-    ],
-    limits: [
-      "With some word lists one or two words won't interlock with the rest. Here all 12 fitted; with a longer or awkward list Stella may leave one out and say so.",
-      "Clues are your definitions as written. Stella pointed out two clues that mention other answers but left them, since neither gives away its own answer.",
-      "The vocabulary list goes to the AI model you use in Stella while it builds the puzzle. The PDF is made on your computer.",
-      "Recorded on Linux, using Python (built in on Mac and Linux); Stella installed two small libraries into its own work folder. On Windows it may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -551,12 +519,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         body: "A guide should be shorter than the notes. If a section runs long, cut examples and keep the definitions. The [UNC Learning Center](https://learningcenter.unc.edu/tips-and-tools/studying-101-study-smarter-not-harder/) suggests turning it into practice questions too.",
       },
     ],
-    limits: [
-      "The guide is only as complete as the notes. Stella doesn't add material from the textbook or the web unless you ask.",
-      "It covered 11 of the 12 main points the answer key listed; read it against your notes before relying on it.",
-      "Your notes go to the AI model you use in Stella while it writes the guide. Nothing is uploaded to a study site.",
-      "It saved a web page; ask for Word or PDF if you prefer. Recorded on Linux, where Stella read the notes with tools already installed; on a Mac or Windows PC it may install a PDF or Word reader first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -645,12 +607,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         title: "Fit it to one page",
         body: "In Excel choose Page Layout, Orientation, Landscape, and under Scale to Fit set Width and Height to 1 page. Check File, Print preview before printing.",
       },
-    ],
-    limits: [
-      "Stella reads what the registration says. Room or time changes made after it was printed won't be in it; tell Stella and it updates the sheet.",
-      "Classes that meet on alternate weeks or only some weeks need a note; a weekly grid can't show them on its own.",
-      "The registration's contents go to the AI model you use in Stella while it reads them. The spreadsheet is made on your computer.",
-      "Recorded on Linux. Stella used its built-in Office document tool, which works the same on Mac and Windows, and a PDF text tool that was already installed; on a Mac or Windows PC it may install one first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -756,13 +712,6 @@ export const STUDY_PAGES: ProblemPage[] = [
         title: "Fill gaps honestly",
         body: "If there's no date, APA uses (n.d.). If you lack an author's initials, find the original article rather than guessing. Then set a hanging indent of 0.5 inch in the paragraph settings (Special: Hanging).",
       },
-    ],
-    limits: [
-      "Stella formats what's in your notes. Where they lack details, it may leave a highlighted gap, such as a surname without initials or (n.d.), rather than make something up. Check every flagged entry and fill it in from the original source before you submit.",
-      "In an earlier run with the same Stella prompts, the gap was left as the text “[initials]” in the document, highlighted and mentioned in Stella's reply. Search the finished list for brackets before you hand it in.",
-      "It can look sources up online when the DOIs and links are real. Here they were made up for the test, so Stella checked, found they don't open, and worked from the notes.",
-      "Check the list against your course's style sheet, since some courses change APA details. It set the page to A4 here; ask for US Letter if your class uses it.",
-      "Your list of sources goes to the AI model you use in Stella. Recorded on Linux, where Stella wrote the Word file with a tool it set up there; on a Mac or Windows PC it may install a similar one first.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

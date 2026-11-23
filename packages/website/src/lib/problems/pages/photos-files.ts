@@ -96,13 +96,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Open a handful of photos from different years in your photo app and check the dates, including a screenshot and a photo saved from a chat app, since those never had a camera date of their own. Once they're right, delete the .json files (on Windows, search the folder for *.json; in Finder, search for .json with the folder selected), or move them to a folder of their own if you'd rather keep the GPS and descriptions.",
       },
     ],
-    limits: [
-      "The recording was on Linux, where the tools it needed were already installed. On Windows or a Mac the same job needs a metadata tool such as ExifTool, so expect Stella to install one first.",
-      "It deleted the JSON files without asking, because the prompt said to get rid of them. It made a full backup first and linked it in the chat, but the backup sits in Stella's own outputs folder, not next to your photos. Say “move the JSON files to a folder” if you'd rather keep them.",
-      "It fixed dates only. It didn't sort photos into year folders, remove the copies that albums duplicate, or write GPS locations, because the prompt didn't ask; ask for those by name.",
-      "It skipped the -edited copies on the first pass and needed a one-line follow-up for them. Check the list of skipped files it gives you.",
-      "Your photos stay on your computer, but file names and the JSON text go to the AI model you use in Stella while it works.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -234,13 +227,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Apps like renamer.ai read each file with AI and suggest a name. Its free plan covers 25 files a month, paid plans start at $9.95 for 200, and files go to its servers by default. Check a handful of names before you trust a whole batch.",
       },
     ],
-    limits: [
-      "In the recording Stella renamed straight away, without showing the new names first, and the chat didn't list them. Add “show me the new names before you rename” to the prompt if you want to check them, or ask for a list of old and new names afterwards.",
-      "There's no undo file. Renaming is easy to reverse while you have the list, so keep it, or copy the folder first for anything important.",
-      "Each document gets one date. Stella used the first date of a bank statement's period and the date a tenancy was signed; say which date you want (issue, due, period end) if it matters.",
-      "The OCR tool was already installed on the test computer. On a typical Windows PC, Stella has to install one first or read scans with the AI model, which hasn't been recorded yet.",
-      "The text of your documents goes to the AI model you use in Stella. For payslips or bank letters, choose your model accordingly.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -344,12 +330,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Stop it happening next time",
         body: "On the iPhone, Settings, Camera, Formats, Most Compatible makes new photos JPG. Or keep HEIC on the phone and set Settings, Apps, Photos, Transfer to Mac or PC to Automatic, which converts to JPG when you copy photos to a computer over a cable.",
       },
-    ],
-    limits: [
-      "The JPGs take more space: about 38 MB for 30 photos that were 17 MB as HEIC. That's normal for JPG at high quality, and the originals are kept, so the folder roughly triples. Ask Stella to move the HEIC files to the Trash afterwards if you want the space back.",
-      "The new files' “Date modified” is the day the photos were copied to the computer, not the day they were taken. Photos apps and Windows' “Date taken” column read the date inside the photo, which is kept; ask Stella to set the file dates too if you sort by Date modified.",
-      "The recording is on Linux, where the HEIC converter was already installed. On a Windows PC, Stella has to install a converter first, which hasn't been recorded yet.",
-      "Live Photos come as a photo plus a short video. Stella converts the photo and leaves the .MOV alone; the movement part doesn't become a JPG.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -467,13 +447,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "On a Mac or iPhone, open Photos, then the Duplicates album under Utilities, and use Merge. It combines each group into the best-quality version and keeps the details. It only covers photos inside the Photos library, not loose folders.",
       },
     ],
-    limits: [
-      "Stella asked first here because the prompt said “show me before deleting anything”. Keep that sentence in your prompt; the recording doesn't show what it does without it.",
-      "The review page was saved in your Pictures folder. Stella moved it to the Trash with the copies afterwards without mentioning it.",
-      "It compares photos, not videos. Duplicate videos need a separate ask, and comparing them takes longer.",
-      "Comparing pictures took a Python image library that Stella installed in its own folder first; on this Linux computer Python was already there. A Windows run hasn't been recorded yet.",
-      "To check borderline pairs, Stella looks at small previews, so a few thumbnails go to the AI model you use in Stella. The full photos stay on your computer.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -577,12 +550,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Compare the file count before and after (right-click > Properties on Windows, Get Info on a Mac), and look out for names that clashed. ExifTool never overwrites a file with the same name; it leaves that photo where it was, so check the old folders for any left behind.",
       },
     ],
-    limits: [
-      "Files are moved, not copied, because that's what the prompt asks. The log makes every move reversible, but there's no second copy; ask for a copy instead if you want one.",
-      "WhatsApp and screenshot dates come from their file names, which is usually right but not guaranteed. Photos with no date anywhere stay unsorted in Undated.",
-      "33 files took under a minute. Tens of thousands will take longer, mainly to read each file's date, and photos in a cloud folder that aren't downloaded yet (OneDrive, iCloud) have to download first.",
-      "It also deleted the subfolders that were left empty, and said so. Say “keep the old folders” if you'd rather it didn't.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -685,12 +652,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Cameras and phones often store photos sideways with a tag telling viewers to turn them. If a resized copy shows sideways on your site, rotate it in Preview or the Photos app and save, so the pixels themselves are upright.",
       },
     ],
-    limits: [
-      "JPEGs are re-saved, so a little quality is lost. Stella aimed well under the limit (about 100 KB each); ask for “as close to 300 KB as possible” if you'd rather keep more detail.",
-      "It removed camera and location details from the copies without being asked. That's usually what you want on a website, but say so if you need them kept.",
-      "The resizing runs on your computer with ordinary image tools, so the photos aren't uploaded to a resizing site.",
-      "Recorded on Linux, where Stella used image tools that were already installed. A Mac has the built-in sips tool for this; on Windows it may install a small image library first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -791,13 +752,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Check before you post",
         body: "Open a cleaned copy's info (Preview's Inspector, or Properties, Details on Windows) and look for latitude and longitude. Some sites strip location when you upload, but email, messaging apps and your own website usually pass the file on as it is.",
       },
-    ],
-    limits: [
-      "It only changes files on your computer. Photos already posted, or still in a cloud library with their location, keep it there.",
-      "The originals still have the location. Post from the cleaned folder; Stella left the originals alone for you to keep or delete.",
-      "It kept the camera model, because it was only asked to remove location. Ask if you also want camera details or all metadata removed.",
-      "The details Stella reads while working, which include the coordinates, go to the AI model you use in Stella. The photos are cleaned on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella may install ExifTool or a small Python library first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -901,11 +855,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "The Notes app on iPhone (Scan Documents) and Google Drive on Android scan pages straight into one PDF, cropped and flattened, which saves this whole job.",
       },
     ],
-    limits: [
-      "It didn't crop or straighten the pages, so a bit of desk shows at the edges and some pages are slightly tilted. It said so and offered to fix it; ask for it in the prompt if you want a clean scan look.",
-      "Stella read each page to find its page number, so the page images or their text go to the AI model you use in Stella (here Claude). For very private documents, choose your model accordingly.",
-      "Recorded on Linux, where the image tools it needed, including HEIC support, were available. A Mac has the built-in sips tool for HEIC; on Windows Stella may install an image library first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1007,12 +956,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Always write to a new folder. You'll want clean photos later for print, a marketplace that forbids watermarks, or a new logo.",
       },
     ],
-    limits: [
-      "A visible watermark deters casual reuse, but it can be cropped or edited out.",
-      "This run used text. A logo image works the same way, but wasn't part of the test.",
-      "To check placement, Stella looked at a few of the watermarked copies, so those images went to the AI model you use in Stella, along with file names. The watermarking itself ran on your computer.",
-      "Recorded on Linux, where ImageMagick and the font were already installed. On a Mac or Windows PC Stella would usually install ImageMagick or use Python first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1113,12 +1056,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Check the print size",
         body: "For a sharp print you need about 300 pixels per inch: a 1800×1200 picture prints well at 6×4 inches. Pictures saved from websites are often smaller, so look for a larger original before ordering big prints.",
       },
-    ],
-    limits: [
-      "JPG has no transparency, so stickers and logos get a solid white background.",
-      "JPG is lossy. Keep the originals if you might edit the pictures again.",
-      "File names, picture sizes and a small contact sheet of the results went to the AI model you use in Stella; the conversion ran on your computer, not on a converter website.",
-      "Recorded on Linux, where ImageMagick was already installed. On a Mac or Windows PC Stella would usually install a converter first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1222,12 +1159,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Set the date and time in the camera's menu after a battery change, ideally from your phone's clock to the minute. Some cameras sync time from a phone app.",
       },
     ],
-    limits: [
-      "It needs one photo whose real time you know; everything else shifts by the same amount.",
-      "Videos from the same camera need the same shift in their own date fields; there were none in this test.",
-      "File names, camera details and dates went to the AI model you use in Stella; the photos weren't opened as pictures and their dates were changed on your computer.",
-      "Recorded on Linux, where the exiv2 photo-data tool was already installed. On a Mac or Windows PC Stella would usually install ExifTool or a similar tool first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1329,12 +1260,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Put screenshots in their own folder first and look through them later. Some hold receipts, tickets or confirmation numbers you may still need.",
       },
     ],
-    limits: [
-      "A photo of a screen taken with a camera counts as a photo, and a screenshot that somehow carries camera details can't be told apart.",
-      "Pictures sent through chat apps lose their camera details and may look like screenshots; check the moved list if you save a lot from chats.",
-      "File names, sizes and camera details went to the AI model you use in Stella, plus the one screenshot it opened to check. It moved files only; nothing was deleted.",
-      "Recorded on Linux, where ImageMagick was already installed to read the picture details. On a Mac or Windows PC Stella would usually install a similar tool first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1435,12 +1360,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Keep the TIFFs",
         body: "JPG is smaller because it throws away detail. Keep the TIFFs as your archive copies and upload the JPGs.",
       },
-    ],
-    limits: [
-      "JPG is lossy and 8-bit. The copies look the same on screen, but the TIFFs remain the better archive.",
-      "CMYK scans are converted with a generic colour profile, so colours can differ slightly from the printed original.",
-      "File names, the scans' technical details and a small sheet of thumbnails went to the AI model you use in Stella. The scans were converted on your computer.",
-      "Recorded on Linux with ImageMagick already installed. On a Mac or Windows PC Stella would usually download a converter first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1544,12 +1463,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Print at 100% or Actual size, not Fit to page, so the thumbnails stay the size you chose and names stay readable.",
       },
     ],
-    limits: [
-      "Thumbnails are small by design. Check sharpness and closed eyes on the full photo before ordering.",
-      "It shows file names only. Dates or captions under each photo would be a follow-up request.",
-      "A low-resolution preview of the photos went to the AI model you use in Stella so it could check them. The PDF was made on your computer.",
-      "Recorded on Linux with ImageMagick and Python's picture libraries already installed. On a Mac or Windows PC Stella would usually install them first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1652,12 +1565,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Look at the result at full size: neither photo should look squashed, the order should read before then after, and if the photos carry location data you may want to remove it.",
       },
     ],
-    limits: [
-      "The photos are matched in height. A portrait next to a landscape leaves very different widths; making them match means cropping one, which Stella didn't need to do here.",
-      "No “Before” and “After” labels unless you ask; Stella can add them.",
-      "Small previews of both photos went to the AI model you use in Stella so it could check which way was up. The picture was made on your computer.",
-      "Recorded on Linux with ImageMagick already installed. On a Mac or Windows PC Stella would usually download it first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1758,13 +1665,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Save as PNG or WebP",
         body: "JPG has no transparency, so a JPG “cut-out” comes back with a white or black box. Save as PNG, or WebP if your shop accepts it.",
       },
-    ],
-    limits: [
-      "Edges came out crisp rather than softened. Stella said that looks right at full size, but small thumbnails on a dark background may show a slightly jagged outline, and offered to soften them.",
-      "Hair, fur, glass and very fine detail are harder than ceramics; expect to touch some of those up.",
-      "The drop shadow goes with the background. Add one back in your shop's editor if you want it.",
-      "Stella downloaded and ran a background-removal model (about 170 MB) on your computer, so the photos weren't uploaded. A small preview sheet and close-ups did go to the AI model you use in Stella so it could check the edges.",
-      "Recorded on Linux. On a Mac or Windows PC the same tool runs, after Stella installs Python and it, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -1868,13 +1768,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "Leave space between prints, keep them away from the edge of the glass, and put a dark sheet behind pale or white-bordered prints so they stand out from the lid.",
       },
     ],
-    limits: [
-      "Prints that touch or overlap on the glass can't be separated reliably; leave a gap between them.",
-      "A thin strip is trimmed from each edge so no scanner bed shows. Stella said so; a print's very edge may be lost.",
-      "A white-bordered print on a white lid may be cut at its picture rather than its border.",
-      "Small previews of the scans and crops went to the AI model you use in Stella so it could check them. The photos were cut out on your computer.",
-      "Recorded on Linux. On a Mac or Windows PC Stella would install Python and OpenCV first, which isn't shown.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -1976,13 +1869,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Keep the originals",
         body: "A stamp is part of the picture once it's saved. Always write stamped copies to a new folder.",
       },
-    ],
-    limits: [
-      "Photos sent through chat apps often lose the date taken. Stella said it would report any photo without one and what date it used instead; here all 12 had one.",
-      "The stamp is burned into the copies. Stella kept the originals unchanged in their folder.",
-      "The style is a judgement: Stella went for the film look, year-month-day. Ask for another format, like 14/08/2026, if you prefer.",
-      "File names, the photos' dates and three stamped copies went to the AI model you use in Stella. The stamping was done on your computer.",
-      "Recorded on Linux with ImageMagick and Python already installed. On a Mac or Windows PC Stella would usually install them first, which isn't shown.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -2087,12 +1973,6 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         title: "Check what you got",
         body: "Open a JPG's details. If it's around 1600 pixels wide or smaller from a modern camera, the tool took the embedded preview. A very dark or green picture means the RAW data wasn't developed properly.",
       },
-    ],
-    limits: [
-      "Every RAW developer renders colour a little differently, so these JPGs may not match the camera's own JPEG exactly. For edits like exposure or white balance, a RAW editor gives you more control.",
-      "The test files were DNG, an open RAW format. Canon CR2/CR3, Nikon NEF and Sony ARW files go through the same free RAW library, but a camera newer than that library may not open yet.",
-      "Stella works out the steps with the AI model you use, but the photos are developed on your computer; nothing goes to a converter website.",
-      "Recorded on Linux, where the RAW tools were already installed. On a Mac or Windows PC Stella may install a free RAW tool first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

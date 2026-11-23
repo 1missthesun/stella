@@ -239,16 +239,6 @@ export default async function ProblemPageRoute({ params }: Params) {
             </ol>
           </Section>
 
-          <Section id="limits" title="Where it stops.">
-            <ul className={h.rows} data-plain="">
-              {page.limits.map((limit) => (
-                <li key={limit}>
-                  <LinkedText text={limit} />
-                </li>
-              ))}
-            </ul>
-          </Section>
-
           <section className={f.faq} aria-labelledby="faq-title" id="faq">
             <div className={f.head}>
               <h2 id="faq-title" className={f.title}>

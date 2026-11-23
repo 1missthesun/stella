@@ -2,7 +2,7 @@
  * Problem pages: one page per specific problem someone searches for
  * ("install Sodium and Iris on Minecraft 1.21"), answered properly: a direct
  * answer, Stella doing it on a real computer, the prompt to paste, the manual
- * way, and where Stella stops. Served at /how/<niche>/<slug>.
+ * way. Served at /how/<niche>/<slug>.
  *
  * Text fields accept the same light markup as the /ai pages: `code` spans and
  * [label](href) links. Keep them plain and specific.
@@ -131,14 +131,12 @@ export type ProblemPage = {
   manualSteps: Step[];
   /** Heading over the manual steps; defaults to "Do it yourself". */
   manualTitle?: string;
-  /** What Stella won't or can't do here. */
-  limits: string[];
   /**
    * Replaces the shared "Is Stella free for this?" answer when part of the job
    * needs a paid Stella plan (e.g. Stella's own transcription or media models).
    */
   costNote?: string;
-  /** Where Stella can do this. Linux-only gaps belong in `limits` too. */
+  /** Where Stella can do this. */
   platforms: Platform[];
   faq: Faq[];
   /** Slugs of neighbouring pages ("<niche>/<slug>"), shown as related problems. */

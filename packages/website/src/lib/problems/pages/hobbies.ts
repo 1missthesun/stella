@@ -74,12 +74,6 @@ export const HOBBIES_PAGES: ProblemPage[] = [
         body: "Chords sit in square brackets, such as `[G]`. Change each one, or open the file in a ChordPro app and use its transpose setting before saving under a new name.",
       },
     ],
-    limits: [
-      "Stella changes the written chords. To change the key of a recording, see [change the key of a song](/how/audio/change-key-of-song).",
-      "Chord sheets in PDF or image form need the text read out first, which is less reliable than plain text files.",
-      "The songs' text, lyrics included, goes to the AI model you use in Stella while it reads them. The new files are written on your computer.",
-      "Recorded on Linux, using Python (built in on Mac and Linux). On Windows Stella may install Python first, which wasn't recorded.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -176,12 +170,6 @@ export const HOBBIES_PAGES: ProblemPage[] = [
         body: "Use Save As (or File, Duplicate in TextEdit and Pages) with the new serving count in the name, so the original recipe stays as it was.",
       },
     ],
-    limits: [
-      "Baking doesn't always scale in a straight line: leavening, salt and spices sometimes need less than a full multiple in very large batches. Stella scales them evenly and you may want to hold back a little.",
-      "Its pan and timing advice is a suggestion based on the recipe; check doneness as you would normally.",
-      "The recipes' text goes to the AI model you use in Stella while it rewrites them. The new files are saved on your computer.",
-      "Recorded on Linux. Stella used its built-in Office document tool for the Word recipe, which works the same on Mac and Windows; nothing was installed.",
-    ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
@@ -269,12 +257,6 @@ export const HOBBIES_PAGES: ProblemPage[] = [
         title: "Check and print",
         body: "Open the PDF, check that people with the same name are the right ones (birth years help), and print at Actual size or Fit to page. A copy shop can print large poster sizes.",
       },
-    ],
-    limits: [
-      "A large tree won't fit one readable page. Ask Stella to split it by branch or use a poster-size page.",
-      "Family data includes living relatives. The GEDCOM's names, dates and places go to the AI model you use in Stella while it reads the file; nothing is uploaded to a genealogy site.",
-      "Stella draws a standard parents-above-children chart. Fan charts and decorative designs weren't covered.",
-      "Recorded on Linux, using Python (built in on Mac and Linux) and the browser already on the computer to make the PDF. On Windows Stella may install Python first, which wasn't recorded.",
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [

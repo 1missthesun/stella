@@ -9,7 +9,6 @@ import {
   STELLA_APP_NAME,
   STELLA_DEV_APP_NAME,
   STELLA_SESSION_PARTITION,
-  STELLA_WINDOWS_APP_USER_MODEL_ID,
 } from "./bootstrap/constants.js";
 import { createBootstrapContext } from "./bootstrap/context.js";
 import { initMainProcessLogging } from "./observability/main-logger.js";
@@ -34,6 +33,7 @@ import { connectLauncher } from "./launcher-client.js";
 import { startLinuxRealtimeLimitCheck } from "./linux-realtime-limit.js";
 import { applyDesktopIdentityEnv } from "./source/env.js";
 import { applySelfHostedServerEnv } from "./services/self-host-service.js";
+import { applyWindowsIdentity } from "./windows-identity.js";
 import { resolveRendererBuildMode } from "./source/renderer-protocol.js";
 const __dirname = import.meta.dirname;
 const install = resolveAppInstall({ isPackaged: app.isPackaged });
@@ -115,7 +115,7 @@ export const bootstrapMainProcess = () => {
     Menu.setApplicationMenu(null);
   }
   if (process.platform === "win32") {
-    app.setAppUserModelId(STELLA_WINDOWS_APP_USER_MODEL_ID);
+    applyWindowsIdentity({ isInstalledProduct });
   }
   if (isLowMemoryWindowsDevice()) {
     console.log(

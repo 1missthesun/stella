@@ -1,6 +1,9 @@
 export const STELLA_APP_NAME = "Stella";
 export const STELLA_DEV_APP_NAME = "Stella v2 Development";
 export const STELLA_WINDOWS_APP_USER_MODEL_ID = "com.stella.app";
+export const STELLA_WINDOWS_DEV_APP_USER_MODEL_ID = "com.stella.app.dev";
+export const STELLA_WINDOWS_TOAST_ACTIVATOR_CLSID =
+  "{B65FDC23-8A07-4722-A659-22E6E8F37F47}";
 export const AUTH_PROTOCOL = "Stella";
 export const STELLA_SESSION_PARTITION = "persist:Stella";
 export const STARTUP_STAGE_DELAY_MS = 250;

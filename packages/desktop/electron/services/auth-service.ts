@@ -1309,6 +1309,8 @@ export class AuthService {
   }
 
   registerAuthProtocol() {
+    // A test copy must not take the sign-in links away from the installed Stella.
+    if (isDevHarness()) return;
     app.setAsDefaultProtocolClient(this.options.authProtocol, process.execPath, [
       app.getAppPath(),
     ]);

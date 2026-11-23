@@ -468,6 +468,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           [ANTIGRAVITY_ALLOWED_TOOLS_ENV]: allowedTools,
         },
         stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
       },
     );
     let nextId = 0;

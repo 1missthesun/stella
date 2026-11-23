@@ -136,6 +136,9 @@ pub enum WaitUntil {
     NetworkIdle,
 }
 
+/// A page too busy to answer doesn't hold up the result of loading it.
+const PAGE_ANSWER_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// How far a navigation got within its time.
 #[derive(PartialEq)]
 enum Progress {
@@ -724,18 +727,24 @@ impl BrowserManager {
             self.ensure_network_domain(&session_id).await?;
         }
         let mut events = self.client.subscribe();
+        let deadline = Instant::now() + self.load_timeout(timeout_ms);
 
-        let started: PageNavigateResult = self
-            .client
-            .send_command_typed(
-                "Page.navigate",
-                &PageNavigateParams {
-                    url: url.to_string(),
-                    referrer: None,
-                },
-                Some(&session_id),
-            )
-            .await?;
+        let params = PageNavigateParams {
+            url: url.to_string(),
+            referrer: None,
+        };
+        let answered = tokio::time::timeout_at(
+            deadline.into(),
+            self.client
+                .send_command_typed("Page.navigate", &params, Some(&session_id)),
+        )
+        .await;
+        let Ok(started) = answered else {
+            return self
+                .navigated(url, wait_until, Progress::NotStarted, timeout_ms)
+                .await;
+        };
+        let started: PageNavigateResult = started?;
 
         if let Some(ref error_text) = started.error_text {
             return Err(format!("Navigation failed: {}", error_text));
@@ -750,7 +759,7 @@ impl BrowserManager {
                 &session_id,
                 &mut events,
                 Progress::Committed,
-                timeout_ms,
+                deadline,
             )
             .await?
         };
@@ -760,6 +769,7 @@ impl BrowserManager {
     pub async fn reload(&mut self, timeout_ms: Option<u64>) -> Result<Value, String> {
         let session_id = self.active_session_id()?.to_string();
         let mut events = self.client.subscribe();
+        let deadline = Instant::now() + self.load_timeout(timeout_ms);
         self.client
             .send_command_no_params("Page.reload", Some(&session_id))
             .await?;
@@ -769,11 +779,16 @@ impl BrowserManager {
                 &session_id,
                 &mut events,
                 Progress::NotStarted,
-                timeout_ms,
+                deadline,
             )
             .await?;
-        self.navigated("", WaitUntil::Load, progress, timeout_ms)
+        let url = self.active_url_cached();
+        self.navigated(&url, WaitUntil::Load, progress, timeout_ms)
             .await
+    }
+
+    fn load_timeout(&self, timeout_ms: Option<u64>) -> Duration {
+        Duration::from_millis(timeout_ms.unwrap_or(self.default_timeout_ms))
     }
 
     async fn navigated(
@@ -783,14 +798,20 @@ impl BrowserManager {
         progress: Progress,
         timeout_ms: Option<u64>,
     ) -> Result<Value, String> {
-        let waited = timeout_ms.unwrap_or(self.default_timeout_ms);
+        let waited = self.load_timeout(timeout_ms).as_millis();
         if progress == Progress::NotStarted {
             return Err(format!(
                 "Navigation timeout after {waited}ms: the page never started loading"
             ));
         }
-        let page_url = self.get_url().await.unwrap_or_else(|_| url.to_string());
-        let title = self.get_title().await.unwrap_or_default();
+        let (page_url, title) = tokio::time::timeout(PAGE_ANSWER_TIMEOUT, async {
+            (
+                self.get_url().await.unwrap_or_else(|_| url.to_string()),
+                self.get_title().await.unwrap_or_default(),
+            )
+        })
+        .await
+        .unwrap_or_else(|_| (url.to_string(), String::new()));
         if let Some(page) = self.pages.get_mut(self.active_page_index) {
             page.url = page_url.clone();
             page.title = title.clone();
@@ -812,9 +833,9 @@ impl BrowserManager {
         session_id: &str,
         events: &mut broadcast::Receiver<CdpEvent>,
         mut progress: Progress,
-        timeout_ms: Option<u64>,
+        deadline: Instant,
     ) -> Result<Progress, String> {
-        let timeout = Duration::from_millis(timeout_ms.unwrap_or(self.default_timeout_ms));
+        let timeout = deadline.saturating_duration_since(Instant::now());
         let reached = match wait_until {
             WaitUntil::NetworkIdle => {
                 return Ok(
@@ -1012,7 +1033,7 @@ impl BrowserManager {
                 session_id,
                 &mut events,
                 Progress::Committed,
-                None,
+                Instant::now() + self.load_timeout(None),
             )
             .await?
         {

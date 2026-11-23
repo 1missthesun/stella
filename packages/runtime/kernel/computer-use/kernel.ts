@@ -419,7 +419,6 @@ const READ_ONLY_BROWSER_ACTIONS = new Set([
   "requests",
   "responsebody",
   "cookies_get",
-  "site_mod_list",
   "tab_list",
   "wait",
   "waitforurl",

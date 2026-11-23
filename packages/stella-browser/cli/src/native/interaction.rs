@@ -449,7 +449,7 @@ async fn frame_owner(
     owner
         .get("backendNodeId")
         .and_then(Value::as_i64)
-        .ok_or_else(|| "Frame owner is no longer available. Capture a new AX snapshot.".to_string())
+        .ok_or_else(|| "Frame owner is no longer available. Take a new snapshot.".to_string())
 }
 
 /// `in_view` refuses a point outside its frame's viewport.
@@ -497,7 +497,8 @@ pub(super) async fn translate_frame_point(
                 const py = r.top + (y + this.clientTop) * r.height / this.offsetHeight;
                 if (inView && (px < 0 || py < 0 || px >= win.innerWidth || py >= win.innerHeight)) return {error:'Frame point is outside viewport'};
                 if (requireHit) {
-                    let hit = doc.elementFromPoint(px, py);
+                    const root = this.getRootNode();
+                    let hit = (root.elementFromPoint ? root : doc).elementFromPoint(px, py);
                     while(hit?.shadowRoot) {const inner = hit.shadowRoot.elementFromPoint(px, py); if (!inner || inner === hit) break; hit=inner;}
                     if (hit !== this && !this.contains(hit)) return {error:'Frame is covered by another element'};
                 }

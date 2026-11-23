@@ -239,12 +239,12 @@ pub async fn validate_ref_scope<'a>(
         .is_some_and(|frame| frame.session_id == session_id)
     {
         return Err(
-            "This ref belongs to a different browser tab. Capture a new AX snapshot.".into(),
+            "This ref belongs to a different browser tab. Take a new snapshot.".into(),
         );
     }
     for frame in scope {
         if !frame_is_current(client, frame).await? {
-            return Err("This ref is stale because its document or ancestor frame navigated. Capture a new AX snapshot.".into());
+            return Err("This ref is stale because its document or ancestor frame navigated. Take a new snapshot.".into());
         }
     }
     Ok(scope
@@ -259,7 +259,7 @@ async fn refresh_backend_node_id(
     entry: &RefEntry,
 ) -> Result<i64, String> {
     if entry.frame_scope.is_some() {
-        return Err("This AX ref no longer resolves. Capture a new AX snapshot.".into());
+        return Err("This ref no longer resolves. Take a new snapshot.".into());
     }
     find_node_id_by_ref_entry(client, session_id, entry).await
 }

@@ -114,17 +114,6 @@ function normalizeSemanticSelector(value) {
   };
 }
 
-export function encodeSemanticSelector(value) {
-  const normalized = normalizeSemanticSelector(value);
-  const selector = `${SEMANTIC_SELECTOR_PREFIX}${encodeURIComponent(JSON.stringify(normalized))}`;
-  if (selector.length > MAX_SEMANTIC_SELECTOR_LENGTH) {
-    throw new Error(
-      `Semantic selector exceeds the ${MAX_SEMANTIC_SELECTOR_LENGTH} character limit`,
-    );
-  }
-  return selector;
-}
-
 export function parseSemanticSelector(selector) {
   if (
     typeof selector !== "string" ||

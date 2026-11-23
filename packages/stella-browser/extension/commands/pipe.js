@@ -14,8 +14,6 @@ import {
   requireOwnedTab,
 } from "./tabs.js";
 
-const MAX_BATCH = 200;
-
 async function openTab(command) {
   await authorizeOwnerLease(command);
   const tab = await getActiveTab(command);
@@ -135,32 +133,12 @@ async function sendToDebugger(tabId, { method, params, debuggerSession }) {
   }
 }
 
-async function sendBatch(tabId, commands) {
-  if (commands.length > MAX_BATCH) {
-    throw new Error(`A batch holds at most ${MAX_BATCH} commands`);
-  }
-  const results = [];
-  for (const command of commands) {
-    try {
-      results.push({ result: await sendToDebugger(tabId, command) });
-    } catch (error) {
-      results.push({ error: error.message });
-    }
-  }
-  return { results };
-}
-
 /** Commands run in the order they arrive: nothing may be awaited before the debugger is called. */
 export const PIPE_HANDLERS = {
   pipe_tab: openTab,
   pipe_attach: attach,
   pipe_blank: blank,
-  pipe_send: (command) => {
-    const tabId = requireOwnedTab(command);
-    return Array.isArray(command.commands)
-      ? sendBatch(tabId, command.commands)
-      : sendToDebugger(tabId, command);
-  },
+  pipe_send: (command) => sendToDebugger(requireOwnedTab(command), command),
   pipe_release: async (command) => {
     await releaseHeldInput(requireOwnedTab(command));
     return {};

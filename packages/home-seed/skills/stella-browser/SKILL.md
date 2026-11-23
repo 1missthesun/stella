@@ -152,7 +152,7 @@ Credentials never reach your code. Passwords, cookies, auth headers, tokens, CSR
 
 ## Network
 
-A tab records its own requests from its first command, before the first page loads, so the page's initial calls are already there:
+A tab you open records its own requests before its first page loads, so the page's initial calls are already there (a tab that a page opened records from your first command on it, and the first instants of a cross-origin frame or worker can be missing):
 
 ```js
 await tab.goto("https://example.com/orders");

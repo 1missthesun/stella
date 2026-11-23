@@ -113,7 +113,13 @@ export class ThreadBrowserSecrets {
       }
     } catch (error) {
       if (error instanceof BrowserSecretPlaceholderError) {
-        throw new GatewayError("secret_refused", 409, error.message);
+        throw new GatewayError(
+          "secret_refused",
+          409,
+          error.unreplayable
+            ? `${error.unreplayable} stands for a password or one-time code, which can't be sent from a placeholder. Have the user sign in with browser.requestLoginTakeover instead.`
+            : error.message,
+        );
       }
       throw error;
     }

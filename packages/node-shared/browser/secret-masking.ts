@@ -1291,7 +1291,11 @@ const hasMaskableText = (value: unknown, depth = 0): boolean => {
 // ---------------------------------------------------------------------------
 
 export class BrowserSecretPlaceholderError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** The placeholder of a password or one-time code, which never goes back. */
+    readonly unreplayable?: string,
+  ) {
     super(message);
     this.name = "BrowserSecretPlaceholderError";
   }
@@ -1365,6 +1369,7 @@ class Substitution {
       if (!entry.replayable) {
         throw new BrowserSecretPlaceholderError(
           `${placeholder} stands for a password or one-time code, which can't be sent from a placeholder. Fill it with use_secure_value and its handle instead.`,
+          placeholder,
         );
       }
       if (!destination) {

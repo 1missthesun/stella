@@ -125,7 +125,7 @@ Do not take a snapshot after every action. Snapshot only when page structure is 
 
 Semantic snapshots are bounded to 200 emitted entries and 20,000 characters. When a page exceeds that budget, metadata reports truncation and unavailable frames; narrow with `selector`, `interactive`, `compact`, or `maxDepth` instead of requesting repeated full-page snapshots. Selector-scoped captures omit descendant frames.
 
-Frame-qualified refs are bound to the document they were observed in: a cross-origin ref rejects a detached node or a replaced document instead of falling back to a same-named control, and pointer geometry through a transformed or CSS-zoomed iframe is rejected when it cannot be mapped safely. If a snapshot fails closed because an operator-configured domain filter (`STELLA_BROWSER_ALLOWED_DOMAINS`) applies to the external browser, use the in-app browser instead; never disable the filter.
+Frame-qualified refs are bound to the document they were observed in: a cross-origin ref rejects a detached node or a replaced document instead of falling back to a same-named control, and pointer geometry through a transformed or CSS-zoomed iframe is rejected when it cannot be mapped safely.
 
 ### Incremental AX observations
 
@@ -145,6 +145,37 @@ await tab.axSnapshot();
 ```
 
 Use `await tab.axSnapshot({ mode: "full" })` after context compaction, output pruning, or whenever the referenced baseline is no longer in context. `mode: "diff"` requests differences even if larger; a missing or incompatible baseline or exhausted computation budget still returns full output. AX options are `mode`, `interactive`, `compact`, `maxDepth`, and `selector`. Keep using the same options to retain the baseline. The DOM snapshot APIs remain full-output and do not share the AX baseline.
+
+## Secrets in Browser Output
+
+Credentials never reach your code. Passwords, cookies, auth headers, tokens, CSRF values and API keys in anything the browser returns (captured requests and responses, HAR files, `evaluate()` results, input values, URLs) come back as placeholders such as `stella-secret-k3j9x2m4q7ab`, the same placeholder for the same value throughout the task. To use one, send it back through the browser to the site it came from: in `tab.network.fetch()` headers, URL or body, in a `page.evaluate()` argument or script, or in a `goto()` URL. The real value goes in on the way out. It is refused for any other site, and a page script that uses one may only name URLs on that site, so use relative URLs there. Passwords and one-time codes can't be sent from a placeholder: type them with `use_secure_value`. There is no way to reveal a value.
+
+## Network
+
+A tab records its own requests from its first command, before the first page loads, so the page's initial calls are already there:
+
+```js
+await tab.goto("https://example.com/orders");
+var calls = await tab.network.requests({ filter: "/api/" });
+calls.map(({ method, status, url }) => [method, status, url]);
+```
+
+- `tab.network.requests({ filter?, after?, limit?, clear? })` returns the tab's newest 256 requests, oldest first: `url`, `method`, `status`, `resourceType`, `headers`, `postData`, `responseHeaders`, `mimeType`, `body`, `timestamp`, `completed`. `filter` matches part of the URL, `after` is a timestamp in milliseconds, and `clear: true` empties the log first.
+- `tab.network.waitForResponse(urlPart, action?, { timeout? })` runs the action and returns the response it caused.
+- `tab.network.fetch(url, { method?, headers?, body?, timeout?, maxBodyBytes? })` requests with the tab's session, on the tab's own origin; `fetchAll(requests, { concurrency?, timeout? })` sends up to 100 of them.
+- `tab.network.rewriteRequest(urlPattern, { method?, postData?, jsonPatch?, headers? })` changes matching requests until `clearRequestRewrite(urlPattern?)`.
+
+Bodies are cut at 128 KB, and each tab keeps 2 MB of them, newest first. JSON and API bodies are read as they arrive. The rest are read when you first call `requests()`, so a page you have already left no longer has them; after that call every body is read as it arrives. In the user's browser a tab you leave untouched for five minutes stops recording until your next command, unless you have called `requests()` on one of your tabs.
+
+To save everything a flow sends as a HAR file, record it with two `browser.chain()` steps (there is no other HAR method) and drive the tab normally in between:
+
+```js
+await browser.chain([{ action: "har_start", params: { tabId: tab.id } }]);
+await tab.goto("https://example.com/orders");
+await browser.chain([{ action: "har_stop", params: { tabId: tab.id, path: "~/.stella/tmp/orders.har" } }]);
+```
+
+The second call's result names the saved file's `path`.
 
 ## Dialogs and Unresponsive Tabs
 
@@ -264,6 +295,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `screenshot(options?)`                                                | Pixel observation.                       |
 | `press(key)`                                                          | Page-level key press to current focus.   |
 | `keyboard.type(text)`, `keyboard.press(key)`                          | Raw text insertion / key press.          |
+| `network`                                                             | Requests, responses, fetch; see Network. |
 | `scroll(options?)`                                                    | Scroll page or element.                  |
 | `expectNewTab(action, { timeoutMs? })`                                | Capture exactly one new owned tab.       |
 | `waitForDownload(action, { timeoutMs? })`                             | The file a download saved (Stella's browser). |

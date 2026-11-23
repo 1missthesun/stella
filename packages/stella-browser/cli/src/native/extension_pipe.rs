@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use serde_json::{json, Value};
 use tokio::sync::{mpsc, Mutex, Notify};
 
-use super::actions::{execute_piped, DaemonState};
+use super::actions::{execute_piped, execute_piped_open, is_site_url, DaemonState};
 use super::browser::BrowserManager;
 use super::cdp::client::CdpClient;
 use super::extension_bridge::ExtensionBridge;
@@ -175,7 +175,12 @@ impl PipeOwners {
             }
             return PipeOutcome::UseExtension;
         }
-        if !is_piped_action(action) {
+        let opens_site = action == "tab_new"
+            && command
+                .get("url")
+                .and_then(Value::as_str)
+                .is_some_and(is_site_url);
+        if !is_piped_action(action) && !opens_site {
             return PipeOutcome::UseExtension;
         }
 
@@ -189,8 +194,13 @@ impl PipeOwners {
             armed: true,
         };
         let limit = command_timeout(action, command);
-        let outcome =
-            tokio::time::timeout(limit, execute_piped(command, &mut owner.state, &link)).await;
+        let outcome = tokio::time::timeout(limit, async {
+            match opens_site {
+                true => execute_piped_open(command, &mut owner.state, &link).await,
+                false => execute_piped(command, &mut owner.state, &link).await,
+            }
+        })
+        .await;
         owner.last_used = Instant::now();
         match outcome {
             Ok(response) => {

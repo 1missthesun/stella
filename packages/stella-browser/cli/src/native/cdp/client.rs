@@ -60,6 +60,7 @@ pub struct CdpClient {
     next_id: AtomicU64,
     pending: PendingMap,
     event_tx: broadcast::Sender<CdpEvent>,
+    page_event_tx: broadcast::Sender<CdpEvent>,
     raw_tx: broadcast::Sender<RawCdpMessage>,
     _reader_handle: tokio::task::JoinHandle<()>,
     frame_sessions: Arc<Mutex<HashMap<(String, String), String>>>,
@@ -141,6 +142,7 @@ impl CdpClient {
     fn start(sink: CdpSink, mut incoming: mpsc::UnboundedReceiver<String>) -> Self {
         let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
         let (event_tx, _) = broadcast::channel(4096);
+        let (page_event_tx, _) = broadcast::channel(4096);
         let (raw_tx, _) = broadcast::channel(512);
 
         let frame_sessions: Arc<Mutex<HashMap<(String, String), String>>> =
@@ -148,6 +150,7 @@ impl CdpClient {
 
         let pending_clone = pending.clone();
         let event_tx_clone = event_tx.clone();
+        let page_event_tx_clone = page_event_tx.clone();
         let raw_tx_clone = raw_tx.clone();
         let frame_sessions_clone = frame_sessions.clone();
         let worlds: WorldMap = Arc::new(Mutex::new(HashMap::new()));
@@ -211,6 +214,9 @@ impl CdpClient {
                         params: parsed.params.clone().unwrap_or(Value::Null),
                         session_id: parsed.session_id.clone(),
                     };
+                    if !method.starts_with("Network.") {
+                        let _ = page_event_tx_clone.send(event.clone());
+                    }
                     let _ = event_tx_clone.send(event);
                 }
             }
@@ -223,6 +229,7 @@ impl CdpClient {
             next_id: AtomicU64::new(1),
             pending,
             event_tx,
+            page_event_tx,
             raw_tx,
             _reader_handle: reader_handle,
             frame_sessions,
@@ -387,6 +394,11 @@ impl CdpClient {
 
     pub fn subscribe(&self) -> broadcast::Receiver<CdpEvent> {
         self.event_tx.subscribe()
+    }
+
+    /// Everything but network traffic, for a reader that may fall behind it.
+    pub fn subscribe_to_pages(&self) -> broadcast::Receiver<CdpEvent> {
+        self.page_event_tx.subscribe()
     }
 
     pub fn subscribe_raw(&self) -> broadcast::Receiver<RawCdpMessage> {

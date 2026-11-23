@@ -1720,7 +1720,7 @@ class NodeReplKernel {
       this.browser.beginTurn?.(turnId);
       const { message: forwarded, savePaths } = this.takeScreenshotSavePaths(
         active,
-        message,
+        this.withAbsoluteHarPaths(active, message),
       );
       const substitution = await substituteBrowserPlaceholders(
         this.browserSecrets,
@@ -2120,12 +2120,12 @@ class NodeReplKernel {
     return screenshotPath?.toLowerCase().endsWith(".png") ? "png" : "jpeg";
   }
 
-  private resolveScreenshotSavePath(
+  private resolveSavePath(
     active: ActiveEvaluation,
     value: unknown,
   ): string {
     if (typeof value !== "string" || !value.trim()) {
-      throw new TypeError("screenshot path must be a non-empty string.");
+      throw new TypeError("path must be a non-empty string.");
     }
     const base = resolveToolFallbackCwd(
       active.context.toolWorkspaceRoot ??
@@ -2148,7 +2148,7 @@ class NodeReplKernel {
     const record = this.recordValue(value);
     if (!record || record.path === undefined) return { params: value };
     const { path: rawPath, ...params } = record;
-    const savePath = this.resolveScreenshotSavePath(active, rawPath);
+    const savePath = this.resolveSavePath(active, rawPath);
     if (params.format === undefined) {
       const extension = path.extname(savePath).toLowerCase();
       if (extension === ".png") params.format = "png";
@@ -2157,6 +2157,38 @@ class NodeReplKernel {
       }
     }
     return { params, savePath };
+  }
+
+  /** The browser service resolves a relative path against its own directory. */
+  private withAbsoluteHarPaths(
+    active: ActiveEvaluation,
+    message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
+  ): Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }> {
+    const absolute = (action: unknown, rawParams: unknown): unknown => {
+      const params = this.recordValue(rawParams);
+      return action === "har_stop" &&
+        typeof params?.path === "string" &&
+        params.path.trim()
+        ? {
+            ...params,
+            path: this.resolveSavePath(active, params.path),
+          }
+        : rawParams;
+    };
+    if (message.method === "command") {
+      const [action, params, ...rest] = message.args;
+      return { ...message, args: [action, absolute(action, params), ...rest] };
+    }
+    if (message.method !== "chain" || !Array.isArray(message.args[0])) {
+      return message;
+    }
+    const steps = (message.args[0] as unknown[]).map((rawStep) => {
+      const step = this.recordValue(rawStep);
+      return step?.action === "har_stop"
+        ? { ...step, params: absolute(step.action, step.params) }
+        : rawStep;
+    });
+    return { ...message, args: [steps, ...message.args.slice(1)] };
   }
 
   private takeScreenshotSavePaths(

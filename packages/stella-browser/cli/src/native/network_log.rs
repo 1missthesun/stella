@@ -3,7 +3,7 @@
 //! paused request is answered and a body read while the browser still has it,
 //! whether or not a command is running.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex as SyncMutex, Weak};
 use std::time::Duration;
 
@@ -20,6 +20,10 @@ use super::network::DomainFilter;
 pub const MAX_TRACKED_REQUESTS: usize = 256;
 pub const MAX_TRACKED_BODY_BYTES: usize = 128 * 1024;
 pub const MAX_TRACKED_TOTAL_BODY_BYTES: usize = 2 * 1024 * 1024;
+/// Bodies worth reading before anyone asks for them.
+const EAGER_BODY_BYTES: i64 = 1024 * 1024;
+const CAPTURE_WAIT: Duration = Duration::from_secs(2);
+const LEFT_BODY_WAIT: Duration = Duration::from_secs(5);
 const MAX_TRACKED_REQUEST_BODY_BYTES: usize = 128 * 1024;
 const MAX_TRACKED_HEADERS: usize = 128;
 const MAX_TRACKED_HEADER_VALUE_BYTES: usize = 8 * 1024;
@@ -96,6 +100,8 @@ pub struct TrackedRequest {
     pub source_session: String,
     #[serde(skip)]
     pub body_pending: bool,
+    #[serde(skip)]
+    pub body_read: bool,
     pub url: String,
     pub method: String,
     pub headers: Value,
@@ -124,6 +130,12 @@ pub struct TrackedRequest {
     pub completed: bool,
     #[serde(rename = "failureText", skip_serializing_if = "Option::is_none")]
     pub failure_text: Option<String>,
+}
+
+impl TrackedRequest {
+    fn left_in_browser(&self) -> bool {
+        self.completed && !self.body_read && !self.body_pending && self.failure_text.is_none()
+    }
 }
 
 struct HarEntry {
@@ -169,10 +181,14 @@ pub struct HarCapture {
 
 #[derive(Default)]
 struct LogState {
+    /// Page sessions whose requests are kept.
+    pages: HashSet<String>,
+    /// Whether a task asked to see requests, so the tab must stay attached and
+    /// every body is read before the page can drop it.
     tracking: bool,
     tracked: Vec<TrackedRequest>,
-    tracked_body_bytes: usize,
-    har: Option<Har>,
+    /// By page session.
+    har: HashMap<String, Har>,
     /// Bodies being read; HAR waits for them.
     reading: usize,
     /// Frame and worker sessions, by the page session they belong to.
@@ -182,7 +198,61 @@ struct LogState {
 
 impl LogState {
     fn active(&self) -> bool {
-        self.tracking || self.har.is_some()
+        !self.pages.is_empty() || !self.har.is_empty()
+    }
+
+    fn wants_every_body(&self) -> bool {
+        self.tracking || !self.har.is_empty()
+    }
+
+    fn buffers(&self) -> Value {
+        buffers(self.wants_every_body())
+    }
+
+    fn body_bytes(&self, page: &str) -> usize {
+        self.tracked
+            .iter()
+            .filter(|entry| entry.session_id == page)
+            .filter_map(|entry| entry.body.as_ref())
+            .map(String::len)
+            .sum()
+    }
+
+    /// Drops a page's oldest bodies until `room` bytes fit.
+    fn make_room(&mut self, page: &str, room: usize) {
+        let mut held = self.body_bytes(page);
+        for entry in self.tracked.iter_mut() {
+            if held + room <= MAX_TRACKED_TOTAL_BODY_BYTES {
+                return;
+            }
+            if entry.session_id != page {
+                continue;
+            }
+            if let Some(body) = entry.body.as_mut().filter(|body| !body.is_empty()) {
+                held -= body.len();
+                *body = String::new();
+                entry.body_truncated = true;
+            }
+        }
+    }
+
+    fn push_tracked(&mut self, request: TrackedRequest) {
+        let page = request.session_id.clone();
+        self.tracked.push(request);
+        let held = self.tracked.iter().filter(|entry| entry.session_id == page).count();
+        if held > MAX_TRACKED_REQUESTS {
+            if let Some(oldest) = self.tracked.iter().position(|entry| entry.session_id == page) {
+                self.tracked.remove(oldest);
+            }
+        }
+    }
+
+    fn forget(&mut self, session: &str) {
+        self.roots.remove(session);
+        if self.pages.remove(session) {
+            self.tracked.retain(|entry| entry.session_id != session);
+            self.roots.retain(|_, root| root != session);
+        }
     }
 
     fn root_of(&self, session_id: &str) -> String {
@@ -200,8 +270,9 @@ impl LogState {
     }
 
     fn har_mut(&mut self, source: &str, request_id: &str) -> Option<&mut HarEntry> {
+        let page = self.root_of(source);
         self.har
-            .as_mut()?
+            .get_mut(&page)?
             .entries
             .iter_mut()
             .rev()
@@ -209,7 +280,8 @@ impl LogState {
     }
 
     fn push_har(&mut self, entry: HarEntry) {
-        let Some(har) = self.har.as_mut() else {
+        let page = self.root_of(&entry.source_session);
+        let Some(har) = self.har.get_mut(&page) else {
             return;
         };
         if har.entries.len() >= HAR_MAX_ENTRIES {
@@ -257,36 +329,103 @@ impl NetworkLog {
 
     pub fn is_active(&self) -> bool {
         let state = self.shared.state.lock().unwrap();
-        state.active() || !state.rules.routes.is_empty() || !state.rules.rewrites.is_empty()
+        state.wants_every_body() || !state.rules.routes.is_empty() || !state.rules.rewrites.is_empty()
+    }
+
+    /// Keeps what a page sends from now on, without holding its tab attached.
+    pub async fn capture(&self, session_id: &str) {
+        if !self.shared.state.lock().unwrap().pages.insert(session_id.to_string()) {
+            return;
+        }
+        let observed = tokio::time::timeout(CAPTURE_WAIT, self.observe(session_id)).await;
+        if matches!(observed, Ok(Err(_))) {
+            self.shared.state.lock().unwrap().pages.remove(session_id);
+        }
+    }
+
+    /// The pages' tabs are no longer attached. What they sent is kept.
+    pub fn forget_pages(&self) {
+        let mut state = self.shared.state.lock().unwrap();
+        state.pages.clear();
+        state.roots.clear();
     }
 
     pub async fn track(&self, session_id: &str) -> Result<(), String> {
-        self.shared.state.lock().unwrap().tracking = true;
+        {
+            let mut state = self.shared.state.lock().unwrap();
+            state.tracking = true;
+            state.pages.insert(session_id.to_string());
+        }
         self.observe(session_id).await
     }
 
     async fn observe(&self, session_id: &str) -> Result<(), String> {
-        self.client
-            .send_command("Network.enable", Some(buffers()), Some(session_id))
-            .await?;
-        if self.auto_attach {
-            let _ = self
-                .client
-                .send_command("Target.setAutoAttach", Some(flat()), Some(session_id))
-                .await;
+        let buffers = self.shared.state.lock().unwrap().buffers();
+        let enable = self
+            .client
+            .send_command("Network.enable", Some(buffers), Some(session_id));
+        if !self.auto_attach {
+            return enable.await.map(drop);
         }
-        Ok(())
+        let attach = self
+            .client
+            .send_command("Target.setAutoAttach", Some(flat()), Some(session_id));
+        tokio::join!(enable, attach).0.map(drop)
     }
 
     pub fn clear_tracked(&self, session_id: &str) {
         let mut state = self.shared.state.lock().unwrap();
         state.tracked.retain(|entry| entry.session_id != session_id);
-        state.tracked_body_bytes = state
-            .tracked
-            .iter()
-            .filter_map(|entry| entry.body.as_ref())
-            .map(String::len)
-            .sum();
+    }
+
+    /// Reads the bodies that were left in the browser. Pictures, fonts and
+    /// media are read only when one is asked for by URL.
+    pub async fn read_left_bodies(
+        &self,
+        session_id: &str,
+        filter: Option<&str>,
+        after: u64,
+        limit: usize,
+    ) {
+        let wanted: Vec<(String, String)> = {
+            let mut state = self.shared.state.lock().unwrap();
+            let picked: Vec<(String, String)> = state
+                .tracked
+                .iter()
+                .rev()
+                .filter(|entry| {
+                    entry.session_id == session_id
+                        && entry.timestamp >= after
+                        && filter.is_none_or(|filter| entry.url.contains(filter))
+                })
+                .take(limit)
+                .filter(|entry| {
+                    entry.left_in_browser()
+                        && !matches!(
+                            entry.resource_type.as_str(),
+                            "Image" | "Font" | "Media" | "Stylesheet"
+                        )
+                })
+                .map(|entry| (entry.source_session.clone(), entry.request_id.clone()))
+                .collect();
+            for (source, request_id) in &picked {
+                if let Some(entry) = state.tracked_mut(source, request_id) {
+                    entry.body_pending = true;
+                }
+            }
+            state.reading += picked.len();
+            picked
+        };
+        let reads = wanted.into_iter().map(|(source, request_id)| {
+            tokio::spawn(read_bodies(
+                self.client.clone(),
+                self.shared.clone(),
+                source,
+                request_id,
+                Keep::IfRoom,
+            ))
+        });
+        let _ = tokio::time::timeout(LEFT_BODY_WAIT, futures_util::future::join_all(reads)).await;
     }
 
     pub fn tracked(
@@ -342,6 +481,19 @@ impl NetworkLog {
                     .filter(|entry| entry.completed && !entry.body_pending)
                     .cloned()
             };
+            if let Some(entry) = found.as_ref().filter(|entry| entry.left_in_browser()) {
+                self.shared.state.lock().unwrap().reading += 1;
+                let read = read_bodies(
+                    self.client.clone(),
+                    self.shared.clone(),
+                    entry.source_session.clone(),
+                    entry.request_id.clone(),
+                    Keep::Newest,
+                );
+                if tokio::time::timeout_at(deadline, tokio::spawn(read)).await.is_ok() {
+                    continue;
+                }
+            }
             if let Some(entry) = found {
                 return match (&entry.failure_text, entry.status) {
                     (Some(failure), _) => Err(format!(
@@ -361,7 +513,11 @@ impl NetworkLog {
     }
 
     pub async fn start_har(&self, session_id: &str) -> Result<(), String> {
-        self.shared.state.lock().unwrap().har = Some(Har::default());
+        {
+            let mut state = self.shared.state.lock().unwrap();
+            state.har.insert(session_id.to_string(), Har::default());
+            state.pages.insert(session_id.to_string());
+        }
         self.observe(session_id).await
     }
 
@@ -377,25 +533,10 @@ impl NetworkLog {
                 break;
             }
         }
-        let (har, quiet) = {
+        let har = {
             let mut state = self.shared.state.lock().unwrap();
-            let har = state.har.take();
-            let sessions: Vec<String> = match state.tracking {
-                true => Vec::new(),
-                false => session_id
-                    .map(str::to_string)
-                    .into_iter()
-                    .chain(state.roots.keys().cloned())
-                    .collect(),
-            };
-            (har, sessions)
+            state.har.remove(session_id?)
         };
-        for session in quiet {
-            let _ = self
-                .client
-                .send_command_no_params("Network.disable", Some(&session))
-                .await;
-        }
         let har = har?;
         Some(HarCapture {
             bodies_captured: har
@@ -435,12 +576,14 @@ impl NetworkLog {
     }
 }
 
-/// CDP keeps response bodies in a ring buffer sized for one page in DevTools.
-fn buffers() -> Value {
-    json!({
-        "maxTotalBufferSize": 100 * 1024 * 1024,
-        "maxResourceBufferSize": 20 * 1024 * 1024,
-    })
+/// CDP keeps response bodies in the page's process, dropping the oldest. A page
+/// nobody asked about keeps fewer.
+fn buffers(every_body: bool) -> Value {
+    let (total, resource) = match every_body {
+        true => (100 * 1024 * 1024, 20 * 1024 * 1024),
+        false => (16 * 1024 * 1024, 4 * 1024 * 1024),
+    };
+    json!({ "maxTotalBufferSize": total, "maxResourceBufferSize": resource })
 }
 
 fn flat() -> Value {
@@ -472,7 +615,7 @@ async fn watch(
             }
             "Target.detachedFromTarget" => {
                 if let Some(session) = text(&event.params, "sessionId") {
-                    shared.state.lock().unwrap().roots.remove(session);
+                    shared.state.lock().unwrap().forget(session);
                 }
             }
             method if method.starts_with("Network.") => {
@@ -517,15 +660,16 @@ fn follow_target(
             },
             (None, None) => return,
         };
-        {
+        let buffers = {
             let mut state = shared.state.lock().unwrap();
             let root = state.root_of(&parent);
             if state.roots.insert(session.clone(), root).is_some() {
                 return;
             }
-        }
+            state.buffers()
+        };
         let _ = client
-            .send_command("Network.enable", Some(buffers()), Some(&session))
+            .send_command("Network.enable", Some(buffers), Some(&session))
             .await;
         if auto_attach {
             let _ = client
@@ -570,6 +714,8 @@ fn record(client: &Arc<CdpClient>, shared: &Arc<Shared>, event: &CdpEvent) {
         "Network.loadingFinished" => {
             let finished = params.get("timestamp").and_then(Value::as_f64);
             let length = params.get("encodedDataLength").and_then(Value::as_i64);
+            let every_body = state.wants_every_body();
+            let small = length.is_none_or(|length| length <= EAGER_BODY_BYTES);
             let mut wanted = false;
             if let Some(entry) = state.har_mut(source, request_id) {
                 entry.loading_finished_timestamp = finished;
@@ -580,8 +726,12 @@ fn record(client: &Arc<CdpClient>, shared: &Arc<Shared>, event: &CdpEvent) {
             }
             if let Some(entry) = state.tracked_mut(source, request_id) {
                 entry.completed = true;
-                entry.body_pending = true;
-                wanted = true;
+                let api = har_is_api_shaped(
+                    &entry.resource_type,
+                    entry.mime_type.as_deref().unwrap_or(""),
+                );
+                entry.body_pending = wanted || every_body || (api && small);
+                wanted = entry.body_pending;
             }
             if wanted {
                 state.reading += 1;
@@ -590,6 +740,7 @@ fn record(client: &Arc<CdpClient>, shared: &Arc<Shared>, event: &CdpEvent) {
                     shared.clone(),
                     source.to_string(),
                     request_id.to_string(),
+                    Keep::Newest,
                 ));
             }
         }
@@ -636,6 +787,7 @@ fn request_sent(state: &mut LogState, source: &str, request_id: &str, params: &V
         response_received(state, source, request_id, response);
         if let Some(entry) = state.tracked_mut(source, request_id) {
             entry.completed = true;
+            entry.body_read = true;
         }
     }
     let Some(request) = params.get("request") else {
@@ -646,7 +798,7 @@ fn request_sent(state: &mut LogState, source: &str, request_id: &str, params: &V
     let resource_type = text(params, "type").unwrap_or("Other").to_string();
     let post_data = text(request, "postData").map(str::to_string);
     let has_post_data = request.get("hasPostData").and_then(Value::as_bool) == Some(true);
-    if state.har.is_some() {
+    if state.har.contains_key(&state.root_of(source)) {
         let request_body_size = post_data.as_ref().map_or(0, |body| body.len() as i64);
         state.push_har(HarEntry {
             request_id: request_id.to_string(),
@@ -665,9 +817,6 @@ fn request_sent(state: &mut LogState, source: &str, request_id: &str, params: &V
             ..stream_entry(source, request_id, String::new(), "")
         });
     }
-    if !state.tracking {
-        return;
-    }
     let (post_data, post_data_truncated) = match post_data {
         Some(body) => {
             let (body, truncated) = truncate_utf8(&body, MAX_TRACKED_REQUEST_BODY_BYTES);
@@ -676,11 +825,12 @@ fn request_sent(state: &mut LogState, source: &str, request_id: &str, params: &V
         None => (None, false),
     };
     let session_id = state.root_of(source);
-    state.tracked.push(TrackedRequest {
+    state.push_tracked(TrackedRequest {
         request_id: request_id.to_string(),
         session_id,
         source_session: source.to_string(),
         body_pending: false,
+        body_read: false,
         url,
         method,
         headers: bounded_header_object(request.get("headers")),
@@ -697,12 +847,6 @@ fn request_sent(state: &mut LogState, source: &str, request_id: &str, params: &V
         completed: false,
         failure_text: None,
     });
-    while state.tracked.len() > MAX_TRACKED_REQUESTS {
-        let evicted = state.tracked.remove(0);
-        state.tracked_body_bytes = state
-            .tracked_body_bytes
-            .saturating_sub(evicted.body.as_ref().map_or(0, String::len));
-    }
 }
 
 fn response_received(state: &mut LogState, source: &str, request_id: &str, response: &Value) {
@@ -784,11 +928,19 @@ fn push_frame(state: &mut LogState, source: &str, request_id: &str, frame: Value
     entry.frames.push(frame);
 }
 
+/// Whether a body may push out older ones.
+#[derive(Clone, Copy)]
+enum Keep {
+    Newest,
+    IfRoom,
+}
+
 async fn read_bodies(
     client: Arc<CdpClient>,
     shared: Arc<Shared>,
     source: String,
     request_id: String,
+    keep: Keep,
 ) {
     let params = json!({ "requestId": request_id });
     let wants_post_data = shared
@@ -817,7 +969,8 @@ async fn read_bodies(
     let base64 = response.get("base64Encoded").and_then(Value::as_bool) == Some(true);
 
     let mut state = shared.state.lock().unwrap();
-    let har_room = state.har.as_ref().map_or(0, |har| {
+    let page = state.root_of(&source);
+    let har_room = state.har.get(&page).map_or(0, |har| {
         HAR_MAX_TOTAL_BODY_BYTES.saturating_sub(har.body_bytes)
     });
     let mut kept = 0;
@@ -835,22 +988,23 @@ async fn read_bodies(
             entry.response_body_truncated = truncated;
         }
     }
-    if let Some(har) = state.har.as_mut() {
+    if let Some(har) = state.har.get_mut(&page) {
         har.body_bytes += kept;
     }
-    let tracked_room = MAX_TRACKED_TOTAL_BODY_BYTES.saturating_sub(state.tracked_body_bytes);
-    let mut kept = 0;
+    if let (Some(body), Keep::Newest) = (body, keep) {
+        state.make_room(&page, body.len().min(MAX_TRACKED_BODY_BYTES));
+    }
+    let room = MAX_TRACKED_TOTAL_BODY_BYTES.saturating_sub(state.body_bytes(&page));
     if let Some(entry) = state.tracked_mut(&source, &request_id) {
         entry.body_pending = false;
+        entry.body_read = true;
         if let Some(body) = body {
-            let (body, truncated) = truncate_utf8(body, MAX_TRACKED_BODY_BYTES.min(tracked_room));
-            kept = body.len();
+            let (body, truncated) = truncate_utf8(body, MAX_TRACKED_BODY_BYTES.min(room));
             entry.body = Some(body);
             entry.body_base64 = base64;
             entry.body_truncated = truncated;
         }
     }
-    state.tracked_body_bytes += kept;
     state.reading = state.reading.saturating_sub(1);
     drop(state);
     shared.changed.notify_waiters();

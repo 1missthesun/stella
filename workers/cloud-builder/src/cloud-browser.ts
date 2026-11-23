@@ -461,7 +461,7 @@ export const createCloudBrowserClient = (
     if (outcome.outcome === "failed") {
       if (outcome.code === "budget_exhausted") throw new Error(BROWSER_BUDGET_MESSAGE);
       throw new Error(
-        `Cloud browser ${plan.action} failed: ${outcome.code}${outcome.detail ? ` — ${outcome.detail}` : ""}.`,
+        `Cloud browser ${plan.action} failed: ${outcome.code}${outcome.detail ? ` — ${outcome.detail.replace(/\.$/u, "")}` : ""}.`,
       );
     }
     if (outcome.outcome === "suspended") {

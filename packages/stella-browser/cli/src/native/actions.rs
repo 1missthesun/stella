@@ -931,7 +931,20 @@ impl DaemonState {
         self.network.as_ref().is_some_and(NetworkLog::is_active)
     }
 
+    /// Network capture covers a tab from its first command.
+    async fn capture_active_tab(&self) {
+        let (Some(browser), Some(network)) = (&self.browser, &self.network) else {
+            return;
+        };
+        if let Ok(session_id) = browser.active_session_id() {
+            network.capture(session_id).await;
+        }
+    }
+
     pub(super) fn forget_pipe_pages(&mut self) {
+        if let Some(network) = self.network.as_ref() {
+            network.forget_pages();
+        }
         if let Some(browser) = self.browser.as_mut() {
             browser.forget_pages();
         }
@@ -949,7 +962,7 @@ impl DaemonState {
 
     fn subscribe_to_browser_events(&mut self) {
         if let Some(ref browser) = self.browser {
-            self.event_rx = Some(browser.client.subscribe());
+            self.event_rx = Some(browser.client.subscribe_to_pages());
             self.network = Some(NetworkLog::new(
                 browser.client.clone(),
                 self.domain_filter.clone(),
@@ -1181,6 +1194,9 @@ async fn absorb_browser_events(state: &mut DaemonState) {
                 .await;
             if let Ok(attach) = attach_result {
                 let _ = mgr.enable_domains_pub(&attach.session_id).await;
+                if let Some(network) = state.network.as_ref() {
+                    network.capture(&attach.session_id).await;
+                }
 
                 if let Some(ref filter) = state.domain_filter {
                     let _ = network::install_domain_filter(
@@ -1280,6 +1296,19 @@ pub(super) async fn execute_piped(
         }
     }
     response
+}
+
+pub(super) async fn execute_piped_open(
+    cmd: &Value,
+    state: &mut DaemonState,
+    link: &Arc<PipeLink>,
+) -> Value {
+    let id = cmd.get("id").and_then(Value::as_str).unwrap_or("");
+    absorb_browser_events(state).await;
+    match open_piped_tab(cmd, state, link).await {
+        Ok(data) => success_response(id, data),
+        Err(error) => error_response(id, &super::browser::to_ai_friendly_error(&error)),
+    }
 }
 
 async fn select_piped_tab(
@@ -1642,9 +1671,18 @@ async fn dispatch_action(
     state: &mut DaemonState,
 ) -> Result<Value, String> {
     if let Some(link) = state.pipe.clone() {
+        if action == "tab_new" {
+            return open_piped_tab(cmd, state, &link).await;
+        }
         if !is_piped_action(action) {
             return link.extension_command(cmd).await;
         }
+    }
+    if !matches!(
+        action,
+        "tab_list" | "tab_new" | "tab_switch" | "tab_close" | "mark_tab" | "close" | "healthcheck"
+    ) {
+        state.capture_active_tab().await;
     }
     match action {
         "healthcheck" => Ok(json!({ "status": "ok" })),
@@ -2017,6 +2055,28 @@ async fn dispatch_chain_output_with_deadline(
     .await?
 }
 
+fn changes_page(action: &str) -> bool {
+    matches!(
+        action,
+        "navigate"
+            | "open"
+            | "reload"
+            | "back"
+            | "forward"
+            | "click"
+            | "dblclick"
+            | "fill"
+            | "type"
+            | "press"
+            | "check"
+            | "uncheck"
+            | "select"
+            | "hover"
+            | "scroll"
+            | "evaluate"
+    )
+}
+
 async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
     let steps: Vec<Value> = cmd
         .get("steps")
@@ -2053,9 +2113,13 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
     let chain_start = tokio::time::Instant::now();
     let deadline = chain_start + tokio::time::Duration::from_millis(chain_budget_ms);
     let mut results: Vec<Value> = Vec::new();
+    let mut acted_at: Option<u64> = None;
 
     for (index, step) in steps.iter().enumerate() {
         let action = step.get("action").and_then(Value::as_str).unwrap_or("");
+        if acted_at.is_none() && changes_page(action) {
+            acted_at = Some(unix_timestamp_millis() as u64);
+        }
         let step_start = tokio::time::Instant::now();
 
         if tokio::time::Instant::now() >= deadline {
@@ -2071,6 +2135,12 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
         let mut step_cmd = step.clone();
         if let Some(step_object) = step_cmd.as_object_mut() {
             step_object.insert("id".to_string(), json!(format!("{}_s{}", id, index)));
+            // A response asked for after acting on the page is one the chain caused.
+            if let (Some(acted_at), "responsebody", false) =
+                (acted_at, action, step_object.contains_key("after"))
+            {
+                step_object.insert("after".to_string(), json!(acted_at));
+            }
             if !step_object.contains_key("tabId") {
                 if let Some(tab_id) = chain_tab_id {
                     step_object.insert("tabId".to_string(), json!(tab_id));
@@ -4733,14 +4803,63 @@ async fn handle_tab_list(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
 async fn handle_tab_new(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
     let url = cmd.get("url").and_then(|v| v.as_str());
-    let result = mgr.tab_new(url).await?;
+    let site = url.filter(|url| is_site_url(url));
+    let mut result = mgr.tab_new(url.filter(|_| site.is_none())).await?;
     if let Some(owner_id) = command_owner_id(cmd) {
         if let Some(tab_id) = result.get("tabId").and_then(Value::as_u64) {
             mgr.record_owner_tab(owner_id, tab_id);
         }
     }
     state.follow_active_tab();
+    if let Some(site) = site {
+        state.capture_active_tab().await;
+        load_in_active_tab(state, site).await?;
+        result["url"] = json!(site);
+    }
     Ok(result)
+}
+
+pub(super) fn is_site_url(url: &str) -> bool {
+    url::Url::parse(url).is_ok_and(|url| matches!(url.scheme(), "http" | "https"))
+}
+
+/// Starts loading a page in a new tab, without waiting for the site to answer.
+async fn load_in_active_tab(state: &DaemonState, url: &str) -> Result<(), String> {
+    let browser = state.browser.as_ref().ok_or("Browser not launched")?;
+    let session_id = browser.active_session_id()?;
+    let load = browser.client.send_command(
+        "Page.navigate",
+        Some(json!({ "url": url })),
+        Some(session_id),
+    );
+    match tokio::time::timeout(Duration::from_secs(1), load).await {
+        Ok(Err(error)) => Err(error),
+        _ => Ok(()),
+    }
+}
+
+/// A tab of the user's browser, attached before its first page loads.
+async fn open_piped_tab(
+    cmd: &Value,
+    state: &mut DaemonState,
+    link: &Arc<PipeLink>,
+) -> Result<Value, String> {
+    let site = cmd
+        .get("url")
+        .and_then(Value::as_str)
+        .filter(|url| is_site_url(url));
+    let Some(site) = site else {
+        return link.extension_command(cmd).await;
+    };
+    let mut blank = cmd.clone();
+    if let Some(blank) = blank.as_object_mut() {
+        blank.remove("url");
+    }
+    let opened = link.extension_command(&blank).await?;
+    select_piped_tab(&json!({ "tabId": opened.get("tabId") }), state, link).await?;
+    state.capture_active_tab().await;
+    load_in_active_tab(state, site).await?;
+    Ok(opened)
 }
 
 async fn handle_mark_tab(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
@@ -7158,6 +7277,9 @@ async fn handle_requests(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .and_then(Value::as_u64)
         .unwrap_or(MAX_TRACKED_REQUESTS as u64)
         .clamp(1, MAX_TRACKED_REQUESTS as u64) as usize;
+    network
+        .read_left_bodies(&session_id, filter, after, limit)
+        .await;
     let requests = network.tracked(&session_id, filter, after, limit);
 
     Ok(json!({

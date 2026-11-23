@@ -18,6 +18,7 @@ pub mod element;
 #[allow(dead_code)]
 pub mod extension_bridge;
 pub mod extension_clients;
+pub(crate) mod extension_pipe;
 pub mod human;
 #[allow(dead_code)]
 pub mod inspect_server;
@@ -27,6 +28,7 @@ pub mod interaction;
 pub mod native_host;
 #[allow(dead_code)]
 pub mod network;
+mod network_log;
 pub mod parent_watch;
 #[allow(dead_code)]
 pub mod policy;

@@ -1,4 +1,5 @@
 import { clearCdpEvents, ensureDebugger } from "../lib/debugger.js";
+import { closePipedTab } from "./pipe.js";
 import { clearOwnerRefMaps, clearTabRefMap } from "../lib/selector.js";
 
 let agentWindowId = null;
@@ -345,6 +346,29 @@ export async function assertCurrentOwnerLease(command) {
   }
 }
 
+/**
+ * The tab a pipe command names, when the command carries its owner's current
+ * lease and the owner holds that tab. Synchronous so commands keep their order.
+ */
+export function requireOwnedTab(command) {
+  const ownerId = getCommandOwnerId(command);
+  const lease = ownerLeaseState[ownerId];
+  if (
+    !lease ||
+    lease.id !== command.ownerLeaseId ||
+    lease.issuedAt !== command.ownerLeaseIssuedAt
+  ) {
+    throw new Error(
+      `Stale browser owner lease rejected for owner "${ownerId}"; a replacement kernel already owns this browser session.`,
+    );
+  }
+  const tabId = getRequestedTabId(command);
+  if (tabId == null || !ownerTabState[ownerId]?.tabIds.includes(tabId)) {
+    throw new Error(`Tab ${tabId} is not owned by command owner "${ownerId}"`);
+  }
+  return tabId;
+}
+
 export async function handleMarkTab(command) {
   await assertCurrentOwnerLease(command);
   const ownerId = getCommandOwnerId(command);
@@ -390,6 +414,7 @@ function forgetOwnedTab(ownerId, tabId) {
   }
   clearTabRefMap(ownerId, tabId);
   clearCdpEvents(tabId);
+  closePipedTab(tabId);
   if (state.tabIds.length === 0) {
     deleteOwnerState(ownerId);
     clearOwnerRefMaps(ownerId);

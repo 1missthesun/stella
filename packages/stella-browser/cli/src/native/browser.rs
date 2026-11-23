@@ -12,6 +12,7 @@ use super::cdp::client::CdpClient;
 use super::cdp::discovery::discover_cdp_url;
 use super::cdp::lightpanda::{launch_lightpanda, LightpandaLaunchOptions, LightpandaProcess};
 use super::cdp::types::*;
+use super::extension_pipe::{tab_session, PipeTab};
 
 pub fn validate_launch_options(
     extensions: Option<&[String]>,
@@ -174,7 +175,12 @@ pub struct BrowserManager {
     target_tab_ids: HashMap<String, u64>,
     target_tab_generations: HashMap<String, String>,
     owner_tabs: OwnerTabRegistry,
+    dialogs: AnsweredDialogs,
 }
+
+/// Dialogs (alert, confirm, prompt) answered for the agent since it was last told.
+type AnsweredDialogs = Arc<std::sync::Mutex<Vec<Value>>>;
+const MAX_ANSWERED_DIALOGS: usize = 20;
 
 #[derive(Default)]
 pub struct OwnerTabRegistry {
@@ -339,8 +345,9 @@ impl BrowserManager {
             initialize_lightpanda_manager(ws_url, process).await?
         } else {
             let client = Arc::new(CdpClient::connect(&ws_url).await?);
-            spawn_dialog_auto_handler(&client);
+            let dialogs = spawn_dialog_auto_handler(&client);
             let mut manager = Self {
+                dialogs,
                 client,
                 browser_process: Some(process),
                 ws_url,
@@ -408,8 +415,9 @@ impl BrowserManager {
     pub async fn connect_cdp(url: &str) -> Result<Self, String> {
         let ws_url = resolve_cdp_url(url).await?;
         let client = Arc::new(CdpClient::connect(&ws_url).await?);
-        spawn_dialog_auto_handler(&client);
+        let dialogs = spawn_dialog_auto_handler(&client);
         let mut manager = Self {
+            dialogs,
             client,
             browser_process: None,
             ws_url,
@@ -423,6 +431,60 @@ impl BrowserManager {
 
         manager.discover_and_attach_targets().await?;
         Ok(manager)
+    }
+
+    /// Drives tabs the Stella Browser extension attaches, through `client`.
+    pub fn over_pipe(client: Arc<CdpClient>) -> Self {
+        let dialogs = spawn_dialog_auto_handler(&client);
+        Self {
+            dialogs,
+            client,
+            browser_process: None,
+            ws_url: String::new(),
+            pages: Vec::new(),
+            active_page_index: 0,
+            default_timeout_ms: 25_000,
+            target_tab_ids: HashMap::new(),
+            target_tab_generations: HashMap::new(),
+            owner_tabs: OwnerTabRegistry::default(),
+        }
+    }
+
+    /// Makes a tab of the user's browser the active page, without bringing it
+    /// to the front. `known` is false when it was just attached.
+    pub async fn show_pipe_tab(&mut self, tab: PipeTab, known: bool) -> Result<(), String> {
+        let session_id = tab_session(tab.tab_id);
+        if !known {
+            self.remove_page_by_target_id(&session_id);
+        }
+        if let Some(index) = self.tab_index_by_id(tab.tab_id) {
+            self.active_page_index = index;
+            self.pages[index].url = tab.url;
+            self.pages[index].title = tab.title;
+            return Ok(());
+        }
+        self.enable_domains(&session_id).await?;
+        self.target_tab_ids.insert(session_id.clone(), tab.tab_id);
+        self.pages.push(PageInfo {
+            target_id: session_id.clone(),
+            session_id,
+            tab_id: tab.tab_id,
+            tab_generation: String::new(),
+            url: tab.url,
+            title: tab.title,
+            target_type: "page".to_string(),
+        });
+        self.active_page_index = self.pages.len() - 1;
+        Ok(())
+    }
+
+    pub fn forget_pages(&mut self) {
+        self.pages.clear();
+        self.active_page_index = 0;
+    }
+
+    pub fn take_dialogs(&self) -> Vec<Value> {
+        std::mem::take(&mut *self.dialogs.lock().unwrap())
     }
 
     pub async fn connect_auto() -> Result<Self, String> {
@@ -1670,6 +1732,7 @@ async fn initialize_lightpanda_manager(
         };
 
         let mut manager = BrowserManager {
+            dialogs: AnsweredDialogs::default(),
             client: Arc::new(client),
             browser_process: None,
             ws_url: ws_url.clone(),
@@ -2349,7 +2412,9 @@ mod tests {
     }
 }
 
-fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) {
+fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) -> AnsweredDialogs {
+    let answered = AnsweredDialogs::default();
+    let record = answered.clone();
     let mut events = client.subscribe();
     let weak = Arc::downgrade(client);
     tokio::spawn(async move {
@@ -2380,6 +2445,18 @@ fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) {
                 .take(200)
                 .collect::<String>();
             let accept = kind == "beforeunload";
+            let answer = match kind.as_str() {
+                "alert" => Some(json!("ok")),
+                "confirm" => Some(json!(false)),
+                "prompt" => Some(Value::Null),
+                _ => None,
+            };
+            if let Some(answer) = answer {
+                let mut answered = record.lock().unwrap();
+                if answered.len() < MAX_ANSWERED_DIALOGS {
+                    answered.push(json!({ "type": kind, "message": message, "answer": answer }));
+                }
+            }
             let session_id = event.session_id.clone();
             tokio::spawn(async move {
                 let result = client
@@ -2403,6 +2480,7 @@ fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) {
             });
         }
     });
+    answered
 }
 
 fn exception_message(result: &Value) -> Option<String> {

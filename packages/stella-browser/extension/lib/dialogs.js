@@ -4,8 +4,10 @@
  * person would: alert is acknowledged, confirm and prompt are cancelled.
  * Nothing in the page is replaced, so the page still sees its native dialog
  * functions. Answered dialogs are kept per tab until the command that caused
- * them collects them.
+ * them collects them. In tabs driven over the pipe the service answers them.
  */
+
+import { pipedTabs } from "./piped-tabs.js";
 
 const answered = new Map();
 
@@ -21,6 +23,7 @@ export function takeAnsweredDialogs(tabId) {
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
   if (method !== "Page.javascriptDialogOpening" || !source.tabId) return;
+  if (pipedTabs.has(source.tabId)) return;
   const type = params?.type;
   if (type !== "alert" && type !== "confirm" && type !== "prompt") return;
   const accept = type === "alert";

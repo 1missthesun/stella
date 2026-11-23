@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
-use tokio::sync::{broadcast, oneshot, Mutex};
+use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::Message;
 
@@ -27,17 +27,36 @@ pub struct RawCdpMessage {
     pub session_id: Option<String>,
 }
 
+type WsSink = futures_util::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    Message,
+>;
+
+/// Where commands go: a browser's DevTools WebSocket, or an in-process peer
+/// that speaks the same JSON (the extension pipe).
+enum CdpSink {
+    WebSocket(Mutex<WsSink>),
+    Channel(mpsc::UnboundedSender<String>),
+}
+
+impl CdpSink {
+    async fn send(&self, json: String) -> Result<(), String> {
+        match self {
+            CdpSink::WebSocket(sink) => sink
+                .lock()
+                .await
+                .send(Message::Text(json))
+                .await
+                .map_err(|e| e.to_string()),
+            CdpSink::Channel(sender) => sender
+                .send(json)
+                .map_err(|_| "the browser connection closed".to_string()),
+        }
+    }
+}
+
 pub struct CdpClient {
-    ws_tx: Arc<
-        Mutex<
-            futures_util::stream::SplitSink<
-                tokio_tungstenite::WebSocketStream<
-                    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-                >,
-                Message,
-            >,
-        >,
-    >,
+    sink: Arc<CdpSink>,
     next_id: AtomicU64,
     pending: PendingMap,
     event_tx: broadcast::Sender<CdpEvent>,
@@ -84,10 +103,44 @@ impl CdpClient {
                 .map_err(|e| format!("CDP WebSocket connect failed: {}", e))?;
 
         let (ws_tx, mut ws_rx) = ws_stream.split();
-        let ws_tx = Arc::new(Mutex::new(ws_tx));
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            while let Some(msg) = ws_rx.next().await {
+                // Accept both Text and Binary frames — remote CDP proxies
+                // (e.g. Browserless) may send responses as Binary frames.
+                let text = match msg {
+                    Ok(Message::Text(text)) => text,
+                    Ok(Message::Binary(data)) => match String::from_utf8(data) {
+                        Ok(text) => text,
+                        Err(_) => continue,
+                    },
+                    Ok(Message::Close(_)) => break,
+                    Ok(_) => continue,
+                    Err(_) => break,
+                };
+                if incoming_tx.send(text).is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(Self::start(
+            CdpSink::WebSocket(Mutex::new(ws_tx)),
+            incoming_rx,
+        ))
+    }
 
+    /// A client whose peer is in this process: `outgoing` receives each command
+    /// and `incoming` carries responses and events, all as CDP JSON.
+    pub fn over_channel(
+        outgoing: mpsc::UnboundedSender<String>,
+        incoming: mpsc::UnboundedReceiver<String>,
+    ) -> Self {
+        Self::start(CdpSink::Channel(outgoing), incoming)
+    }
+
+    fn start(sink: CdpSink, mut incoming: mpsc::UnboundedReceiver<String>) -> Self {
         let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
-        let (event_tx, _) = broadcast::channel(256);
+        let (event_tx, _) = broadcast::channel(4096);
         let (raw_tx, _) = broadcast::channel(512);
 
         let frame_sessions: Arc<Mutex<HashMap<(String, String), String>>> =
@@ -101,20 +154,7 @@ impl CdpClient {
         let worlds_clone = worlds.clone();
 
         let reader_handle = tokio::spawn(async move {
-            while let Some(msg) = ws_rx.next().await {
-                // Accept both Text and Binary frames — remote CDP proxies
-                // (e.g. Browserless) may send responses as Binary frames.
-                let msg = match msg {
-                    Ok(Message::Text(text)) => text,
-                    Ok(Message::Binary(data)) => match String::from_utf8(data) {
-                        Ok(text) => text,
-                        Err(_) => continue,
-                    },
-                    Ok(Message::Close(_)) => break,
-                    Ok(_) => continue,
-                    Err(_) => break,
-                };
-
+            while let Some(msg) = incoming.recv().await {
                 if raw_tx_clone.receiver_count() > 0 {
                     let session_id = serde_json::from_str::<serde_json::Value>(&msg)
                         .ok()
@@ -178,8 +218,8 @@ impl CdpClient {
             pending_clone.lock().await.clear();
         });
 
-        Ok(Self {
-            ws_tx,
+        Self {
+            sink: Arc::new(sink),
             next_id: AtomicU64::new(1),
             pending,
             event_tx,
@@ -187,7 +227,7 @@ impl CdpClient {
             _reader_handle: reader_handle,
             frame_sessions,
             worlds,
-        })
+        }
     }
 
     /// Sends a command. Page reads and calls (Runtime.evaluate,
@@ -283,13 +323,10 @@ impl CdpClient {
         }
 
         let operation = async {
-            {
-                let mut ws_tx = self.ws_tx.lock().await;
-                ws_tx
-                    .send(Message::Text(json))
-                    .await
-                    .map_err(|e| format!("Failed to send CDP command: {}", e))?;
-            }
+            self.sink
+                .send(json)
+                .await
+                .map_err(|e| format!("Failed to send CDP command: {}", e))?;
             rx.await
                 .map_err(|_| "CDP response channel closed".to_string())
         };
@@ -358,7 +395,7 @@ impl CdpClient {
 
     pub fn inspect_handle(&self) -> InspectProxyHandle {
         InspectProxyHandle {
-            ws_tx: self.ws_tx.clone(),
+            sink: self.sink.clone(),
             raw_tx: self.raw_tx.clone(),
         }
     }
@@ -387,35 +424,22 @@ impl CdpClient {
     }
 
     pub async fn send_raw(&self, json: String) -> Result<(), String> {
-        let mut ws_tx = self.ws_tx.lock().await;
-        ws_tx
-            .send(Message::Text(json))
+        self.sink
+            .send(json)
             .await
             .map_err(|e| format!("Failed to send raw CDP message: {}", e))
     }
 }
 
-type WsTx = Arc<
-    Mutex<
-        futures_util::stream::SplitSink<
-            tokio_tungstenite::WebSocketStream<
-                tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-            >,
-            Message,
-        >,
-    >,
->;
-
 pub struct InspectProxyHandle {
-    ws_tx: WsTx,
+    sink: Arc<CdpSink>,
     raw_tx: broadcast::Sender<RawCdpMessage>,
 }
 
 impl InspectProxyHandle {
     pub async fn send_raw(&self, json: String) -> Result<(), String> {
-        let mut ws_tx = self.ws_tx.lock().await;
-        ws_tx
-            .send(Message::Text(json))
+        self.sink
+            .send(json)
             .await
             .map_err(|e| format!("Failed to send raw CDP message: {}", e))
     }

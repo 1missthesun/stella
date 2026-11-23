@@ -93,6 +93,11 @@ import {
 import { handleDownload } from "./commands/downloads.js";
 import { handleChain } from "./commands/chain.js";
 import {
+  PIPE_HANDLERS,
+  closePipe,
+  detachLeftoverDebuggers,
+} from "./commands/pipe.js";
+import {
   handleSiteModSet,
   handleSiteModList,
   handleSiteModRemove,
@@ -274,6 +279,20 @@ const UNSUPPORTED = new Set([
 async function handleCommand(message) {
   const { action, id } = message;
 
+  if (Object.hasOwn(PIPE_HANDLERS, action)) {
+    try {
+      const data = await PIPE_HANDLERS[action](message);
+      return { type: "response", id, success: true, data };
+    } catch (err) {
+      return {
+        type: "response",
+        id,
+        success: false,
+        error: err.message || String(err),
+      };
+    }
+  }
+
   if (action === "close") {
     if (typeof message.ownerId === "string" && message.ownerId.trim()) {
       await authorizeOwnerLease(message);
@@ -340,6 +359,7 @@ onStatus((connected) => {
     "[background] Connection status:",
     connected ? "connected" : "disconnected",
   );
+  if (!connected) closePipe();
 });
 // Keep service worker alive via offscreen document port
 chrome.runtime.onConnect.addListener((port) => {
@@ -370,6 +390,7 @@ async function ensureOffscreen() {
 
 ensureOffscreen();
 
+detachLeftoverDebuggers().catch(() => {});
 cleanupStaleGroups();
 cleanupStaleTabs();
 

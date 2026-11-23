@@ -55,6 +55,7 @@ import { isPiCompactionBoundary } from "../stella/handover.ts";
 import { isSafeguardContextBoundary } from "../stella/safeguard.ts";
 import { ANTIGRAVITY_CLI_ENGINE_EXTENSION, ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 import { abandonToolCall } from "./abandoned-calls.ts";
+import { noteNativeToolCall } from "./native-calls.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
 export const CLAUDE_CODE_API = "claude-code-cli";
@@ -1635,6 +1636,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     });
 
   const nativeResult = (toolUseId: string, context: Context): Promise<NativeResult> => {
+    noteNativeToolCall(toolUseId);
     const known = nativeResults.get(toolUseId);
     if (known) {
       nativeResults.delete(toolUseId);

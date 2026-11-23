@@ -25,13 +25,13 @@ import { TaskTabs } from "../browser-use/task-tabs.js";
 import {
   buildAgentShellEnvironment,
   createShellState,
-  listRunningShellSessionsOwnedBy,
+  claimShellExit,
   listRunningTaskShells,
-  readShellExitSnapshot,
+  listUntoldTaskShells,
+  releaseShellExit,
   shutdownManagedShells,
   waitForShellExit,
   watchShellExit,
-  type ShellSessionAccess,
   type ShellState,
 } from "./shell.js";
 import { registerExtensionToolHandlers } from "./registry.js";
@@ -624,10 +624,11 @@ export const createToolHost = ({
 
   const killAllShells = () => shutdownManagedShells(shellState);
 
-  const killShell = async (sessionId: string) => {
+  const stopTaskShell = async (sessionId: string) => {
     const shell = shellState.shells.get(sessionId);
     if (!shell) return;
     if (shell.running) {
+      shell.stoppedWithTask = true;
       shell.kill();
     }
     await waitForShellExit(shell, 1_500);
@@ -700,16 +701,15 @@ export const createToolHost = ({
       }
       return running;
     },
-    listRunningShellSessionsOwnedBy: (access: ShellSessionAccess) =>
-      listRunningShellSessionsOwnedBy(shellState, access),
     listRunningTaskShells: () => listRunningTaskShells(shellState),
     onTaskShellsChanged: (listener: (() => void) | undefined) => {
       shellState.onTaskShellsChanged = listener;
     },
     watchShellExit: (sessionId: string, listener: () => void) =>
       watchShellExit(shellState, sessionId, listener),
-    readShellExitSnapshot: (sessionId: string) =>
-      readShellExitSnapshot(shellState, sessionId),
+    listUntoldTaskShells: (agentId: string) => listUntoldTaskShells(shellState, agentId),
+    claimShellExit: (sessionId: string) => claimShellExit(shellState, sessionId),
+    releaseShellExit: (sessionId: string) => releaseShellExit(shellState, sessionId),
     releaseAgentComputerSessions: (agentId: string) =>
       nodeReplRegistry.releaseAgentNativeSessions(agentId),
     browserTaskStarted: (agentId: string) =>
@@ -717,7 +717,7 @@ export const createToolHost = ({
     browserTaskEnded: (agentId: string, keepTabs: boolean, report?: string) =>
       nodeReplRegistry.browserTaskEnded(agentId, keepTabs, report),
     killAllShells,
-    killShell,
+    stopTaskShell,
     shutdown,
     registerExtensionTools: (tools: ToolDefinition[]) => {
       const accepted: ToolDefinition[] = [];

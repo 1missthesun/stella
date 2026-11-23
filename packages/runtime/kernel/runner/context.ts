@@ -439,7 +439,8 @@ export const createRunnerContext = ({
 
   context.state.backgroundExitWake = createBackgroundExitWake({
     watchShellExit: toolHost.watchShellExit,
-    readShellExitSnapshot: toolHost.readShellExitSnapshot,
+    claimShellExit: toolHost.claimShellExit,
+    releaseShellExit: toolHost.releaseShellExit,
     getThreadStatus: async (agentId: string, conversationId: string) =>
       (await context.state.backgroundExitTarget?.status(agentId, conversationId)) ??
       "canceled",

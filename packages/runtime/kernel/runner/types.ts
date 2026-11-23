@@ -192,13 +192,15 @@ export type RunnerContext = {
     browserTaskEnded: (agentId: string, keepTabs: boolean, report?: string) => void;
     registerExtensionTools: (tools: ToolDefinition[]) => void;
     unregisterExtensionTools: () => void;
-    listRunningShellSessionsOwnedBy: (
-      access: import("../tools/shell.js").ShellSessionAccess,
-    ) => string[];
+    listUntoldTaskShells: (agentId: string) => import("../tools/shell.js").UntoldTaskShell[];
+    claimShellExit: (
+      sessionId: string,
+    ) => import("../tools/shell.js").ShellExitSnapshot | null;
+    releaseShellExit: (sessionId: string) => void;
     listRunningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
     onTaskShellsChanged: (listener: (() => void) | undefined) => void;
     killAllShells: () => Promise<void>;
-    killShell: (sessionId: string) => Promise<void> | void;
+    stopTaskShell: (sessionId: string) => Promise<void> | void;
     shutdown: () => Promise<void>;
   };
 };
@@ -273,11 +275,14 @@ export type RunnerPublicApi = {
     arm: (args: {
       conversationId: string;
       agentId: string;
-      runningSessionIds: string[];
+      sessionIds: string[];
       interrupted?: boolean;
     }) => string[];
     disarm: (owner: { conversationId: string; agentId: string }) => void;
-    runningSessions: (owner: { conversationId: string; agentId: string }) => string[];
+    /** The agent's background commands it has not been told the end of. */
+    untold: (agentId: string) => import("../tools/shell.js").UntoldTaskShell[];
+    /** Tells a working agent, once, of its background commands that ended; undefined when there are none. */
+    takeEnded: (agentId: string) => Promise<string | undefined>;
     /** Ends the shell sessions an agent left running; resolves with how many. */
     endAgentSessions: (agentId: string) => Promise<number>;
   };

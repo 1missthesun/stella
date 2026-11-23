@@ -95,6 +95,7 @@ type ExecToolPayload = {
   cwd: string;
   command: string;
   hint?: string;
+  stopped_with_task?: true;
 };
 
 const buildExecToolPayload = (
@@ -129,6 +130,7 @@ const buildExecToolPayload = (
     cwd: record.cwd,
     command: record.command,
   };
+  if (record.stoppedWithTask) payload.stopped_with_task = true;
   if (!record.running && record.exitCode !== 0) {
     const hint = getTerminalRecoveryHint({
       command: record.command,
@@ -177,8 +179,10 @@ const formatExecToolResult = (
   const status = payload.running
     ? state.shellsEndWithTurn
       ? `Process still running with session ID ${payload.session_id}. It is stopped when your turn ends, so poll it with write_stdin until it's done.`
-      : `Process still running with session ID ${payload.session_id}. If your turn ends while it runs, its exit and output are delivered to you automatically; use write_stdin only to interact with it or to wait for it within this turn.`
-    : `Process exited with code ${payload.exit_code ?? "unknown"}`;
+      : `Process still running with session ID ${payload.session_id}. When it ends you are told, with its output: with your next tool result, or in a new turn if yours is over. No need to poll; use write_stdin to interact with it, or to wait when nothing else is left to do this turn.`
+    : payload.stopped_with_task
+      ? "Process was stopped when you were stopped; it did not finish."
+      : `Process exited with code ${payload.exit_code ?? "unknown"}`;
   return [
     `Wall time: ${payload.wall_time_seconds.toFixed(4)} seconds`,
     status,
@@ -361,6 +365,7 @@ export const handleExecCommand = async (
 
     const drained = drainUnreadOutput(record);
     const payload = buildExecToolPayload(state, record, drained, callStartedAt);
+    record.untold = payload.running;
     return {
       result: formatExecToolResult(state, payload, drained),
       details: buildExecToolDetails(payload, drained),
@@ -574,6 +579,7 @@ export const handleWriteStdin = async (
       callStartedAt,
       receipt,
     );
+    record.untold = payload.running;
     return {
       result: formatExecToolResult(state, payload, drained),
       details: buildExecToolDetails(payload, drained),

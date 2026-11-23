@@ -375,6 +375,8 @@ export type DesktopChatsOptions = {
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
   /** Ends the shell sessions a stopped task left running here; resolves with how many. */
   endAgentShells?(threadId: string): Promise<number>;
+  /** Tells a working task, once, of its background commands that ended meanwhile. */
+  endedCommands?(threadId: string): Promise<string | undefined>;
   /** What here could wake a task by itself: its background commands and monitors, schedules aimed at it. */
   wakeSources?(threadId: string): Promise<string[]>;
   localLog?(conversationId: string): DesktopLocalLog | undefined;
@@ -1699,6 +1701,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
                 ...(options.endAgentShells ? { endAgentShells: options.endAgentShells } : {}),
+                ...(options.endedCommands ? { endedCommands: options.endedCommands } : {}),
                 ...(options.wakeSources ? { wakeSources: options.wakeSources } : {}),
                 execution: execution.host,
                 ...(agentLog && agentLogTransport

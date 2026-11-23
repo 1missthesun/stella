@@ -624,13 +624,17 @@ export const piChatsFor = (
         void runner.piTools
           .releaseAgentComputerUse(threadId)
           .catch((error) => console.warn("[pi-chat] stopping the agent's computer-use helper failed", error));
-        const owner = { conversationId, agentId: threadId };
-        const runningSessionIds = runner.backgroundExits.runningSessions(owner);
-        if (runningSessionIds.length === 0) return;
-        runner.backgroundExits.arm({ ...owner, runningSessionIds, ...(interrupted ? { interrupted: true } : {}) });
+        // One that ended with a stop is no news to start a turn for, unless the task waits for it.
+        const sessionIds = runner.backgroundExits
+          .untold(threadId)
+          .filter((shell) => waiting || !shell.stoppedWithTask)
+          .map((shell) => shell.sessionId);
+        if (sessionIds.length === 0) return;
+        runner.backgroundExits.arm({ conversationId, agentId: threadId, sessionIds, ...(interrupted ? { interrupted: true } : {}) });
       },
       endAgentShells: async (threadId) =>
         (await session.runnerCell.get()?.backgroundExits.endAgentSessions(threadId)) ?? 0,
+      endedCommands: async (threadId) => await session.runnerCell.get()?.backgroundExits.takeEnded(threadId),
       wakeSources: (threadId) => taskWakeSources(session, hostBus, threadId),
       agentStarted: (agent) => {
         session.runnerCell.get()?.backgroundExits.disarm({ conversationId: agent.conversationId, agentId: agent.threadId });
@@ -862,6 +866,9 @@ const taskWakeSources = async (session: OpenSession, hostBus: HostBus.Interface,
   const found: string[] = [];
   for (const shell of session.runnerCell.get()?.runningTaskShells() ?? []) {
     if (shell.agentId === threadId) found.push(`your background command \`${clip(shell.command)}\``);
+  }
+  for (const shell of session.runnerCell.get()?.backgroundExits.untold(threadId) ?? []) {
+    if (shell.ended) found.push(`your background command \`${clip(shell.command)}\`, which just ended`);
   }
   for (const task of claudeCodeBackgroundOf(threadId)) {
     found.push(`your ${/monitor/i.test(task.kind ?? "") ? "monitor" : "background command"} "${clip(task.description)}"`);

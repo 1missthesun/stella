@@ -12,6 +12,7 @@ import {
   GenerationTask,
   hook,
   LiveDoc,
+  ToolTask,
   type Conversation,
   type ConversationHandle,
   type ConversationId,
@@ -88,12 +89,14 @@ import {
   safeguardModelLabel,
   safeguardTaskFailure,
 } from "@stella/contracts/safeguard-block";
+import { takeNativeToolCall } from "../engine/native-calls.ts";
 import { cliEnginePick, engineExtensionChange, onClaudeCode, onCliEngine } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
 import {
   AGENT_MOVE_CLOUD,
+  SWITCH_DESTINATION_TOOL_NAME,
   switchDestinationTool,
   untilOnline,
   whileDeviceOffline,
@@ -431,6 +434,8 @@ export type StellaAgentsHost = {
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
   /** A stopped agent's own processes (its shells, tools and what they started) end; resolves with how many. */
   endAgentProcesses?(threadId: string): Promise<number>;
+  /** Tells a working agent, once, of its background commands that ended meanwhile; undefined when none did. */
+  endedCommands?(threadId: string): Promise<string | undefined>;
   /**
    * What on this host could start a task's next turn by itself, in words: its
    * background commands and monitors still running, schedules aimed at it.
@@ -1868,6 +1873,29 @@ export function stellaAgents(host: StellaAgentsHost) {
           // Its run's end sends it again.
         }
       }
+    },
+  });
+
+  /** Results of calls that were cut off: their run ends or their model reads them late. */
+  const UNREAD_RESULT_CODES: ReadonlySet<string> = new Set(["aborted", "abandoned", "interrupted", "restart_limit"]);
+
+  /**
+   * A background command that ends while its task works is told with the
+   * task's next tool result. Not with one its model may never read: a call
+   * that ends or moves the turn, a CLI's own tool, a nested or aborted call.
+   * One not told by the turn's end starts the task's next turn.
+   */
+  const endedCommandsHook = hook(ToolTask, {
+    afterTool: async (call, result, api, context) => {
+      const native = takeNativeToolCall(call.id);
+      if (!host.endedCommands || native || call.parent || result.control) return undefined;
+      if (call.name === END_TURN_WAITING_TOOL || call.name === SWITCH_DESTINATION_TOOL_NAME) return undefined;
+      if (result.diagnostics?.some((note) => note.code !== undefined && UNREAD_RESULT_CODES.has(note.code))) return undefined;
+      const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
+      if (!role?.threadId || role.agentType === "orchestrator" || role.waiting) return undefined;
+      const message = await host.endedCommands(role.threadId);
+      if (!message) return undefined;
+      return { ...result, diagnostics: [...(result.diagnostics ?? []), { severity: "info" as const, code: "background_command_ended", message }] };
     },
   });
 
@@ -3495,7 +3523,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const extension = defineExtension({
     name: STELLA_AGENTS_EXTENSION,
     tasks: [Anchor, Reporter],
-    hooks: [notesHook],
+    hooks: [notesHook, endedCommandsHook],
     wraps: stellaFirstWraps({ tellStella }),
     tools: [
       spawnAgent,

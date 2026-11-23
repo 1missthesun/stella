@@ -4,7 +4,7 @@ import {
   onCdpEvent,
   offCdpEvent,
   getAttachedFrameSessions,
-} from "./debugger.js";
+} from "./page-debugger.js";
 
 const tabs = new Map();
 const AUTO_ATTACH = {
@@ -12,7 +12,7 @@ const AUTO_ATTACH = {
   waitForDebuggerOnStart: false,
   flatten: true,
 };
-import { ISOLATED_WORLD as WORLD } from "./debugger.js";
+import { ISOLATED_WORLD as WORLD } from "./page-debugger.js";
 let nextRef = 0;
 let nextAttachment = 0;
 

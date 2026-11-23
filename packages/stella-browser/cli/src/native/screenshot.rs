@@ -44,7 +44,7 @@ pub struct ScreenshotAnnotation {
 
 #[derive(Debug, Clone)]
 pub struct ScreenshotResult {
-    pub path: String,
+    pub path: Option<String>,
     pub base64: String,
     pub annotations: Vec<ScreenshotAnnotation>,
 }
@@ -58,6 +58,8 @@ pub struct ScreenshotOptions {
     pub quality: Option<i32>,
     pub annotate: bool,
     pub output_dir: Option<String>,
+    /// Also save the image to a file.
+    pub keep: bool,
 }
 
 impl Default for ScreenshotOptions {
@@ -70,6 +72,7 @@ impl Default for ScreenshotOptions {
             quality: None,
             annotate: false,
             output_dir: None,
+            keep: true,
         }
     }
 }
@@ -145,12 +148,16 @@ pub async fn take_screenshot(
     } else {
         "png"
     };
-    let path = save_screenshot(
-        &base64,
-        options.path.as_deref(),
-        ext,
-        options.output_dir.as_deref(),
-    )?;
+    let path = if options.keep {
+        Some(save_screenshot(
+            &base64,
+            options.path.as_deref(),
+            ext,
+            options.output_dir.as_deref(),
+        )?)
+    } else {
+        None
+    };
 
     Ok(ScreenshotResult {
         path,
@@ -198,15 +205,9 @@ async fn capture_screenshot_base64(
             });
         }
     } else if let Some(ref selector) = options.selector {
-        if let Some(rect) = get_rect_for_selector(client, session_id, ref_map, selector).await? {
-            params.clip = Some(Viewport {
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-                scale: 1.0,
-            });
-        }
+        let (clip, in_view) = element_clip(client, session_id, ref_map, selector).await?;
+        params.clip = Some(clip);
+        params.capture_beyond_viewport = Some(!in_view);
     }
 
     let result: CaptureScreenshotResult = client
@@ -303,6 +304,51 @@ async fn collect_annotations(
     }
 
     Ok(annotations)
+}
+
+/// The element's rectangle on the page after scrolling it into view, and
+/// whether the viewport shows all of it.
+async fn element_clip(
+    client: &CdpClient,
+    session_id: &str,
+    ref_map: &RefMap,
+    selector: &str,
+) -> Result<(Viewport, bool), String> {
+    let (object_id, object_session) =
+        super::element::resolve_element_object_id(client, session_id, ref_map, selector).await?;
+    client
+        .send_command(
+            "DOM.scrollIntoViewIfNeeded",
+            Some(serde_json::json!({ "objectId": object_id })),
+            Some(object_session),
+        )
+        .await
+        .map_err(|_| format!("Selector not found or not visible: {selector}"))?;
+    let bounds =
+        super::element::get_element_bounding_box(client, session_id, ref_map, selector).await?;
+    let rect = parse_rect(&bounds)
+        .filter(|rect| rect.width > 0.0 && rect.height > 0.0)
+        .ok_or_else(|| format!("Selector not found or not visible: {selector}"))?;
+    let metrics = client
+        .send_command_no_params("Page.getLayoutMetrics", Some(session_id))
+        .await?;
+    let viewport = |name: &str| {
+        metrics["cssVisualViewport"][name]
+            .as_f64()
+            .unwrap_or_default()
+    };
+    let in_view = rect.x >= 0.0
+        && rect.y >= 0.0
+        && rect.x + rect.width <= viewport("clientWidth")
+        && rect.y + rect.height <= viewport("clientHeight");
+    let clip = Viewport {
+        x: rect.x + viewport("pageX"),
+        y: rect.y + viewport("pageY"),
+        width: rect.width,
+        height: rect.height,
+        scale: 1.0,
+    };
+    Ok((clip, in_view))
 }
 
 async fn get_rect_for_selector(

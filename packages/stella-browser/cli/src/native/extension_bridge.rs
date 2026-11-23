@@ -888,6 +888,7 @@ impl ExtensionBridge {
             PipeOutcome::Done(response) => return Ok(response),
             PipeOutcome::UseExtension => {}
         }
+        let runs_whole_commands = !self.has_debugger_pipe(generation).await;
 
         let leaves_page = |name: &str| {
             matches!(
@@ -906,7 +907,7 @@ impl ExtensionBridge {
                             .is_some_and(leaves_page)
                     })
                 });
-        if leaves_page(action) || chain_leaves_page {
+        if runs_whole_commands && (leaves_page(action) || chain_leaves_page) {
             let _ = self
                 .run_page_script(generation, &forwarded, "unload", DISARM_BEFOREUNLOAD, 1500)
                 .await;
@@ -938,7 +939,7 @@ impl ExtensionBridge {
                             .is_some_and(interaction)
                     })
                 });
-        let guard_dialogs = interaction(action) || chain_interacts;
+        let guard_dialogs = runs_whole_commands && (interaction(action) || chain_interacts);
         if guard_dialogs {
             let _ = self
                 .run_page_script(generation, &forwarded, "guard", DIALOG_GUARD, 1500)
@@ -1478,20 +1479,33 @@ async fn probe_profile(
     info: ClientInfo,
 ) -> IdentifyOutcome {
     let marker = probe_marker();
+    let debugger_pipe = inner
+        .lock()
+        .await
+        .connections
+        .get(&generation)
+        .is_some_and(|connection| connection.debugger_pipe);
+    // Extensions without the debugger pipe keep the marker as a site mod.
     let pattern = format!("{}.invalid", marker);
-    let set = send_to_generation(
-        inner,
-        generation,
-        json!({
-            "action": "site_mod_set",
-            "id": format!("_probe_{}", marker),
-            "pattern": pattern,
-            "css": format!("/*{}*/", marker),
-            "label": "Stella profile check",
-        }),
-        Duration::from_secs(5),
-    )
-    .await;
+    let (mut mark, mut unmark) = if debugger_pipe {
+        (
+            json!({ "action": "profile_mark", "marker": marker }),
+            json!({ "action": "profile_unmark" }),
+        )
+    } else {
+        (
+            json!({
+                "action": "site_mod_set",
+                "pattern": pattern,
+                "css": format!("/*{}*/", marker),
+                "label": "Stella profile check",
+            }),
+            json!({ "action": "site_mod_remove", "pattern": pattern }),
+        )
+    };
+    mark["id"] = json!(format!("_probe_{}", marker));
+    unmark["id"] = json!(format!("_probe_rm_{}", marker));
+    let set = send_to_generation(inner, generation, mark, Duration::from_secs(5)).await;
     let mut profile_dir = None;
     if set.is_ok_and(|r| r.get("success").and_then(Value::as_bool) == Some(true)) {
         for scan in 0..IDENTIFY_SCAN_ATTEMPTS {
@@ -1511,17 +1525,7 @@ async fn probe_profile(
             }
         }
     }
-    let _ = send_to_generation(
-        inner,
-        generation,
-        json!({
-            "action": "site_mod_remove",
-            "id": format!("_probe_rm_{}", marker),
-            "pattern": pattern,
-        }),
-        Duration::from_secs(5),
-    )
-    .await;
+    let _ = send_to_generation(inner, generation, unmark, Duration::from_secs(5)).await;
     let Some(profile_dir) = profile_dir else {
         return IdentifyOutcome::Failed;
     };

@@ -1,74 +1,24 @@
-import { enableDialogHandling } from "./dialogs.js";
+const attached = new Set();
 
-const debuggerAttachments = new Map();
-/**
- * Tabs that must stay attached regardless of idle time. A long-running capture
- * (HAR recording) receives CDP events without issuing commands, so the idle
- * timer would otherwise detach mid-recording and silently end it.
- */
-const detachHolds = new Set();
-let detachTimer = null;
-const DETACH_TIMEOUT = 300000;
-
-function scheduleIdleDetach() {
-  // The handle is a bare number in the service worker, where `unref` is absent
-  // and the optional call is a no-op; under Node (tests) it keeps this idle
-  // timer from holding the process open for five minutes.
-  clearTimeout(detachTimer);
-  detachTimer = setTimeout(() => detachIdleDebuggers(), DETACH_TIMEOUT);
-  detachTimer.unref?.();
-}
-
-/**
- * Keep a tab attached until the matching release. Safe to call repeatedly.
- * @param {number} tabId
- */
-export function holdDebugger(tabId) {
-  detachHolds.add(tabId);
-}
-
-/**
- * Drop a hold taken by `holdDebugger` and let the tab idle out again.
- * @param {number} tabId
- */
-export function releaseDebugger(tabId) {
-  detachHolds.delete(tabId);
-}
-
-async function detachIdleDebuggers() {
-  detachTimer = null;
-  for (const [tabId] of [...debuggerAttachments]) {
-    if (detachHolds.has(tabId)) continue;
-    try {
-      await chrome.debugger.detach({ tabId });
-    } catch {
-      // Tab may have closed
-    }
-    debuggerAttachments.delete(tabId);
+export async function attachDebugger(tabId) {
+  if (attached.has(tabId)) return;
+  try {
+    await chrome.debugger.attach({ tabId }, "1.3");
+  } catch (error) {
+    // A service worker restart forgets attachments Chrome still holds.
+    if (!/already attached/i.test(String(error?.message || error))) throw error;
+    await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+      expression: "1",
+      returnByValue: true,
+    });
   }
-  if (detachHolds.size > 0) scheduleIdleDetach();
+  attached.add(tabId);
+  await keepPageRunning(tabId);
 }
 
-/**
- * Ensure chrome.debugger is attached to the given tab.
- * @param {number} tabId
- */
-export async function ensureDebugger(tabId) {
-  if (!debuggerAttachments.has(tabId)) {
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (error) {
-      // A service worker restart forgets attachments Chrome still holds.
-      if (!/already attached/i.test(String(error?.message || error))) throw error;
-      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: '1',
-        returnByValue: true,
-      });
-    }
-    debuggerAttachments.set(tabId, true);
-    await keepPageRunning(tabId);
-  }
-  scheduleIdleDetach();
+export async function detachDebugger(tabId) {
+  attached.delete(tabId);
+  await chrome.debugger.detach({ tabId }).catch(() => undefined);
 }
 
 /**
@@ -87,226 +37,11 @@ async function keepPageRunning(tabId) {
       .sendCommand({ tabId }, 'Page.setWebLifecycleState', { state: 'active' })
       .catch(() => undefined),
     chrome.tabs.update(tabId, { autoDiscardable: false }).catch(() => undefined),
-    enableDialogHandling(tabId).catch(() => undefined),
   ]);
 }
 
-export const ISOLATED_WORLD = "stella-observation";
-const isolatedContexts = new Map();
-const CONTEXT_GONE =
-  /Cannot find context with specified id|Execution context was destroyed|Cannot find default execution context|Inspected target navigated or closed/i;
-
-/**
- * The execution context of Stella's isolated world in the tab's main frame.
- * It shares the page's DOM but not its JavaScript, so the page cannot observe
- * Stella's scripts through patched prototypes, globals or stack traces.
- */
-async function isolatedContext(tabId, fresh = false) {
-  if (!fresh && isolatedContexts.has(tabId)) return isolatedContexts.get(tabId);
-  const pending = (async () => {
-    const tree = await chrome.debugger.sendCommand(
-      { tabId },
-      "Page.getFrameTree",
-      {},
-    );
-    const frameId = tree?.frameTree?.frame?.id;
-    if (!frameId) throw new Error("The page has no main frame yet");
-    const created = await chrome.debugger.sendCommand(
-      { tabId },
-      "Page.createIsolatedWorld",
-      { frameId, worldName: ISOLATED_WORLD },
-    );
-    return created.executionContextId;
-  })();
-  isolatedContexts.set(tabId, pending);
-  pending.catch(() => {
-    if (isolatedContexts.get(tabId) === pending) isolatedContexts.delete(tabId);
-  });
-  return pending;
-}
-
-/**
- * Evaluate an expression in the page and await promise results. Runs in
- * Stella's isolated world unless `world: "main"` asks for the page's own
- * JavaScript (its globals and framework state).
- * @param {number} tabId
- * @param {string} expression
- * @param {{userGesture?: boolean, timeoutMs?: number, world?: "isolated" | "main"}} [options]
- * @returns {Promise<unknown>}
- */
-export async function evaluateRuntime(tabId, expression, options = {}) {
-  await ensureDebugger(tabId);
-  const timeoutMs = options.timeoutMs ?? 30_000;
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30_000) {
-    throw new TypeError('Runtime evaluation timeout must be between 1 and 30000ms');
-  }
-  const params = {
-    expression,
-    returnByValue: true,
-    awaitPromise: true,
-    timeout: timeoutMs,
-  };
-  if (options.userGesture === true) params.userGesture = true;
-  const isolated = options.world !== "main";
-  const run = async (fresh) => {
-    if (isolated) params.contextId = await isolatedContext(tabId, fresh);
-    // Runtime.evaluate's own timeout stops running script only; it never ends
-    // the wait for a promise the page does not settle.
-    let timer;
-    return await Promise.race([
-      chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', params),
-      new Promise((_, reject) => {
-        timer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `The page did not finish evaluating within ${timeoutMs}ms; it may be frozen, blocked by a dialog, or waiting on something that never settles.`,
-              ),
-            ),
-          timeoutMs + 1_000,
-        );
-      }),
-    ]).finally(() => clearTimeout(timer));
-  };
-  let result;
-  try {
-    result = await run(false);
-  } catch (error) {
-    if (!isolated || !CONTEXT_GONE.test(String(error?.message || error))) throw error;
-    result = await run(true);
-  }
-
-  if (result.exceptionDetails) {
-    const message =
-      result.exceptionDetails.exception?.description ||
-      result.exceptionDetails.text ||
-      'Runtime evaluation failed';
-    throw new Error(message);
-  }
-
-  return result.result?.value;
-}
-
-export async function detachAllDebuggers() {
-  clearTimeout(detachTimer);
-  detachTimer = null;
-  for (const [tabId] of debuggerAttachments) {
-    try {
-      await chrome.debugger.detach({ tabId });
-    } catch {
-      // Tab may have closed
-    }
-  }
-  debuggerAttachments.clear();
-  // An explicit teardown overrides every hold; leaving them would keep the
-  // idle timer rescheduling forever against tabs that are no longer attached.
-  detachHolds.clear();
-}
-
-/**
- * Check if debugger is attached to a tab.
- * @param {number} tabId
- * @returns {boolean}
- */
-export function isDebuggerAttached(tabId) {
-  return debuggerAttachments.has(tabId);
-}
-
-const eventListeners = new Map();
-const attachedFrameSessions = new Map();
-
-export function getAttachedFrameSessions(tabId) {
-  return new Map(attachedFrameSessions.get(tabId) || []);
-}
-
-/**
- * Register a listener for a CDP event on a specific tab.
- * @param {number} tabId
- * @param {string} method - CDP event method (e.g. 'Network.requestWillBeSent')
- * @param {(params: any) => void} callback
- */
-export function onCdpEvent(tabId, method, callback) {
-  const key = `${tabId}:${method}`;
-  if (!eventListeners.has(key)) {
-    eventListeners.set(key, new Set());
-  }
-  eventListeners.get(key).add(callback);
-}
-
-/**
- * Remove a listener for a CDP event on a specific tab.
- * @param {number} tabId
- * @param {string} method
- * @param {(params: any) => void} callback
- */
-export function offCdpEvent(tabId, method, callback) {
-  const key = `${tabId}:${method}`;
-  const listeners = eventListeners.get(key);
-  if (listeners) {
-    listeners.delete(callback);
-    if (listeners.size === 0) eventListeners.delete(key);
-  }
-}
-
-/**
- * Remove all CDP event listeners for a specific tab.
- * @param {number} tabId
- */
-export function clearCdpEvents(tabId) {
-  for (const key of eventListeners.keys()) {
-    if (key.startsWith(`${tabId}:`)) {
-      eventListeners.delete(key);
-    }
-  }
-}
-
-// Global CDP event listener - dispatches to registered per-tab listeners.
-// `source` is forwarded as a second argument because auto-attached targets
-// (cross-origin iframes, workers) deliver events under the same tabId with a
-// `sessionId`, and commands about those requests must carry it back.
-chrome.debugger.onEvent.addListener((source, method, params) => {
-  if (!source.tabId) return;
-  if (
-    method === "Target.attachedToTarget" &&
-    params?.targetInfo?.type === "iframe"
-  ) {
-    if (!attachedFrameSessions.has(source.tabId))
-      attachedFrameSessions.set(source.tabId, new Map());
-    attachedFrameSessions
-      .get(source.tabId)
-      .set(params.sessionId, params.targetInfo.targetId);
-  } else if (method === "Target.detachedFromTarget") {
-    attachedFrameSessions.get(source.tabId)?.delete(params.sessionId);
-  }
-  const key = `${source.tabId}:${method}`;
-  const listeners = eventListeners.get(key);
-  if (listeners) {
-    for (const cb of listeners) {
-      try {
-        cb(params, source);
-      } catch (err) {
-        console.error(`[debugger] Event listener error for ${method}:`, err);
-      }
-    }
-  }
-});
-
-// Clean up on tab close. Dropping the hold matters: a closed tab that stayed
-// held would keep the idle timer rescheduling against an attachment that can
-// never be satisfied again.
-chrome.tabs.onRemoved.addListener((tabId) => {
-  isolatedContexts.delete(tabId);
-  attachedFrameSessions.delete(tabId);
-  debuggerAttachments.delete(tabId);
-  releaseDebugger(tabId);
-  clearCdpEvents(tabId);
-});
+chrome.tabs.onRemoved.addListener((tabId) => attached.delete(tabId));
 
 chrome.debugger.onDetach.addListener((source) => {
-  if (source.tabId) {
-    isolatedContexts.delete(source.tabId);
-    attachedFrameSessions.delete(source.tabId);
-    debuggerAttachments.delete(source.tabId);
-    releaseDebugger(source.tabId);
-  }
+  if (source.tabId && !source.sessionId) attached.delete(source.tabId);
 });

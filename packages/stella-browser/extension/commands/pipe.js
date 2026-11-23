@@ -5,11 +5,12 @@
  */
 import { assertAllowedMethod } from "../lib/cdp-policy.js";
 import { send } from "../lib/connection.js";
-import { ensureDebugger, holdDebugger, releaseDebugger } from "../lib/debugger.js";
+import { attachDebugger, detachDebugger } from "../lib/debugger.js";
 import { pipedTabs } from "../lib/piped-tabs.js";
 import {
   authorizeOwnerLease,
   getActiveTab,
+  onForgotten,
   requireOwnedTab,
 } from "./tabs.js";
 
@@ -27,12 +28,24 @@ async function openTab(command) {
 
 async function attach(command) {
   const tabId = requireOwnedTab(command);
-  await ensureDebugger(tabId);
-  holdDebugger(tabId);
+  await attachDebugger(tabId);
   if (!pipedTabs.has(tabId)) {
     pipedTabs.set(tabId, { buttons: new Map(), keys: new Map() });
   }
   return { tabId };
+}
+
+/** Chrome refuses to debug its own pages; an empty page can take over from one. */
+async function blank(command) {
+  const tabId = requireOwnedTab(command);
+  await chrome.tabs.update(tabId, { url: "about:blank" });
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.url === "about:blank" && tab.status === "complete") return {};
+    if (Date.now() > deadline) throw new Error("The tab did not leave its page");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 }
 
 function noteHeldInput(held, method, params) {
@@ -91,8 +104,7 @@ async function detach(tabId) {
   if (!pipedTabs.has(tabId)) return;
   await releaseHeldInput(tabId);
   pipedTabs.delete(tabId);
-  releaseDebugger(tabId);
-  await chrome.debugger.detach({ tabId }).catch(() => undefined);
+  await detachDebugger(tabId);
 }
 
 function debuggerError(error) {
@@ -142,6 +154,7 @@ async function sendBatch(tabId, commands) {
 export const PIPE_HANDLERS = {
   pipe_tab: openTab,
   pipe_attach: attach,
+  pipe_blank: blank,
   pipe_send: (command) => {
     const tabId = requireOwnedTab(command);
     return Array.isArray(command.commands)
@@ -158,13 +171,13 @@ export const PIPE_HANDLERS = {
   },
 };
 
+onForgotten((ownerId, tabId) => {
+  if (tabId != null) void detach(tabId);
+});
+
 /** The service is gone: nobody will release what it holds or use its tabs. */
 export function closePipe() {
   for (const tabId of [...pipedTabs.keys()]) void detach(tabId);
-}
-
-export function closePipedTab(tabId) {
-  void detach(tabId);
 }
 
 /** Debuggers a previous service worker left attached belong to nobody now. */

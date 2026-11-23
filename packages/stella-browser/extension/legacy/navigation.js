@@ -1,5 +1,5 @@
-import { getActiveTab } from "./tabs.js";
-import { ensureDebugger } from "../lib/debugger.js";
+import { getActiveTab } from "../commands/tabs.js";
+import { ensureDebugger } from "./page-debugger.js";
 import {
   markCommandMutationDispatched,
   markCommandMutationOutcomeKnown,
@@ -195,24 +195,4 @@ export async function handleReload(command) {
   } catch {}
 
   return navigationResult(command, updated, "load", outcome);
-}
-
-export async function handleUrl(command) {
-  throwIfCommandAborted(command);
-  const tab = await getActiveTab(command);
-  return {
-    id: command.id,
-    success: true,
-    data: { url: tab.url || "" },
-  };
-}
-
-export async function handleTitle(command) {
-  throwIfCommandAborted(command);
-  const tab = await getActiveTab(command);
-  return {
-    id: command.id,
-    success: true,
-    data: { title: tab.title || "" },
-  };
 }

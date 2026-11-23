@@ -452,11 +452,13 @@ async fn frame_owner(
         .ok_or_else(|| "Frame owner is no longer available. Capture a new AX snapshot.".to_string())
 }
 
-async fn translate_frame_point(
+/// `in_view` refuses a point outside its frame's viewport.
+pub(super) async fn translate_frame_point(
     client: &CdpClient,
     scope: &[RefFrame],
     mut x: f64,
     mut y: f64,
+    in_view: bool,
     require_hit: bool,
 ) -> Result<(f64, f64), String> {
     for pair in scope.windows(2).rev() {
@@ -477,7 +479,7 @@ async fn translate_frame_point(
             .object_id
             .ok_or("Frame owner is no longer attached")?;
         let result: EvaluateResult = client.send_command_typed("Runtime.callFunctionOn", &CallFunctionOnParams {
-            function_declaration: r#"function(x, y, requireHit) {
+            function_declaration: r#"function(x, y, inView, requireHit) {
                 const doc = this.ownerDocument, win = doc.defaultView;
                 if (!this.isConnected || !win) return {error:'Frame detached'};
                 const style = win.getComputedStyle(this);
@@ -493,7 +495,7 @@ async fn translate_frame_point(
                 if (!r.width || !r.height || !this.offsetWidth || !this.offsetHeight) return {error:'Frame has no visible bounds'};
                 const px = r.left + (x + this.clientLeft) * r.width / this.offsetWidth;
                 const py = r.top + (y + this.clientTop) * r.height / this.offsetHeight;
-                if (px < 0 || py < 0 || px >= win.innerWidth || py >= win.innerHeight) return {error:'Frame point is outside viewport'};
+                if (inView && (px < 0 || py < 0 || px >= win.innerWidth || py >= win.innerHeight)) return {error:'Frame point is outside viewport'};
                 if (requireHit) {
                     let hit = doc.elementFromPoint(px, py);
                     while(hit?.shadowRoot) {const inner = hit.shadowRoot.elementFromPoint(px, py); if (!inner || inner === hit) break; hit=inner;}
@@ -501,7 +503,7 @@ async fn translate_frame_point(
                 }
                 return {x:px,y:py};
             }"#.to_string(), object_id: Some(object_id),
-            arguments: Some(vec![CallArgument {value: Some(serde_json::json!(x)),object_id: None},CallArgument {value: Some(serde_json::json!(y)),object_id: None},CallArgument {value: Some(serde_json::json!(require_hit)),object_id: None}]),
+            arguments: Some(vec![CallArgument {value: Some(serde_json::json!(x)),object_id: None},CallArgument {value: Some(serde_json::json!(y)),object_id: None},CallArgument {value: Some(serde_json::json!(in_view)),object_id: None},CallArgument {value: Some(serde_json::json!(require_hit)),object_id: None}]),
             return_by_value: Some(true), await_promise: Some(false),
         }, Some(&pair[0].session_id)).await?;
         let value = result
@@ -580,8 +582,8 @@ async fn actionability_check_once(
             let (cx, cy) = (field("cx").unwrap_or(x), field("cy").unwrap_or(y));
             let ((x, y), (cx, cy)) = if let Some(scope) = frame_scope {
                 (
-                    translate_frame_point(client, scope, x, y, require_hit).await?,
-                    translate_frame_point(client, scope, cx, cy, false).await?,
+                    translate_frame_point(client, scope, x, y, true, require_hit).await?,
+                    translate_frame_point(client, scope, cx, cy, true, false).await?,
                 )
             } else {
                 ((x, y), (cx, cy))
@@ -1790,6 +1792,8 @@ pub async fn tap_touch(
     Ok(())
 }
 
+/// Moves to the target and presses it, following it when the page shifts under
+/// the travelling pointer (a hover that changes the layout).
 async fn dispatch_click(
     client: &CdpClient,
     session_id: &str,
@@ -1799,27 +1803,17 @@ async fn dispatch_click(
     button: &str,
     click_count: i32,
 ) -> Result<(), String> {
-    human::move_to(
-        client,
-        session_id,
-        Point {
-            x: target.x,
-            y: target.y,
-        },
-        None,
-        true,
-    )
-    .await?;
-
-    if ref_frame_scope(ref_map, selector_or_ref).is_some() {
-        let point =
-            actionability_check_once(client, session_id, ref_map, selector_or_ref, true).await??;
-        if (point.cx - target.cx).abs() > 0.5 || (point.cy - target.cy).abs() > 0.5 {
-            return Err("AX target moved while the cursor travelled. Capture a new snapshot before clicking.".into());
+    let (mut at, mut centre) = ((target.x, target.y), (target.cx, target.cy));
+    for _ in 0..3 {
+        let to = Point { x: at.0, y: at.1 };
+        human::move_to(client, session_id, to, None, true).await?;
+        let now = wait_for_actionable(client, session_id, ref_map, selector_or_ref, true).await?;
+        if (now.cx - centre.0).abs() <= 2.0 && (now.cy - centre.1).abs() <= 2.0 {
+            return human::press_release(client, session_id, button, click_count).await;
         }
+        (at, centre) = ((now.x, now.y), (now.cx, now.cy));
     }
-
-    human::press_release(client, session_id, button, click_count).await
+    Err("The element keeps moving while the pointer travels to it. Observe and retry the click.".into())
 }
 
 fn char_to_key_info(ch: char) -> (String, String, i32) {

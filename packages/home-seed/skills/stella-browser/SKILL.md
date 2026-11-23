@@ -150,9 +150,9 @@ Use `await tab.axSnapshot({ mode: "full" })` after context compaction, output pr
 
 Page dialogs never block you:
 
-- `alert()` is dismissed, `confirm()` answers Cancel and `prompt()` returns null. Actions that may trigger one (`click`, `press`, `check`, `selectOption`, …) return `{ dialogs: [{ type, message, answer }] }` when one fired, so read it to learn what the page said.
-- To accept a confirm (for example "Delete this item?"), override it before the click: `await page.evaluate(() => { window.confirm = () => true; })`.
-- "Leave site?" (beforeunload) prompts are accepted automatically when you navigate, go back or close your tab.
+- `alert()` is dismissed, `confirm()` answers Cancel and `prompt()` returns null. In the user's browser, actions that may trigger one (`click`, `press`, `check`, `selectOption`, …) return `{ dialogs: [{ type, message, answer }] }` when one fired, so read it to learn what the page said.
+- To accept a confirm (for example "Delete this item?"), override it just before the click: `await page.evaluate(() => { window.confirm = () => true; })`. The page can see that, so do it only when the task needs the dialog accepted.
+- "Leave site?" (beforeunload) prompts are accepted while one of your commands runs; in the user's browser, a dialog at any other time is left for the user until your next command on that tab.
 
 If a tab stops answering (a command times out with a message saying the page may be blocked), don't retry the same command on it. `await tab.goto(url)` usually recovers it; if not, `await tab.close()` and continue in `await browser.tabs.new()`. After a timeout on a mutating action, check the page state before repeating it.
 
@@ -179,7 +179,7 @@ var confirmation = page.getByText("Saved", { exact: true });
 await confirmation.waitFor({ state: "visible", timeout: 30000 });
 ```
 
-`Locator.waitFor()` supports `attached`, `detached`, `visible`, and `hidden`. Prefer it, `waitForURL()`, or `expectNewTab()` over fixed delays. Although `page.waitForTimeout(ms)` exists, do not use it for routine synchronization or insert sleeps between deterministic actions.
+`Locator.waitFor()` supports `attached`, `detached`, `visible`, and `hidden`. Prefer it, `waitForURL()` (`*` matches anything; a pattern without one matches any URL containing it), or `expectNewTab()` over fixed delays. Although `page.waitForTimeout(ms)` exists, do not use it for routine synchronization or insert sleeps between deterministic actions.
 
 ## New Tabs
 

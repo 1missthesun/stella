@@ -1,4 +1,4 @@
-import { agentCursorHighlightParams } from "./agent-cursor.js";
+import { agentCursorHighlightParams } from "../lib/agent-cursor.js";
 
 const overlayReady = new Map();
 const idleHides = new Map();

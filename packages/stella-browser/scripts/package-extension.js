@@ -38,7 +38,6 @@ const rootFiles = [
   "popup.css",
   "popup.html",
   "popup.js",
-  "site-mods.js",
 ];
 
 const copyRuntimeDirectory = (directory, extension) => {
@@ -62,15 +61,16 @@ const copyRuntimeDirectory = (directory, extension) => {
 };
 
 try {
-  if (manifest.version !== "1.2.16") {
+  if (manifest.version !== "1.2.17") {
     throw new Error(
-      `Expected extension version 1.2.16, found ${manifest.version}.`,
+      `Expected extension version 1.2.17, found ${manifest.version}.`,
     );
   }
   for (const file of rootFiles) {
     cpSync(path.join(extensionDir, file), path.join(stagingDir, file));
   }
   copyRuntimeDirectory("commands", ".js");
+  copyRuntimeDirectory("legacy", ".js");
   copyRuntimeDirectory("lib", ".js");
   copyRuntimeDirectory("icons", ".png");
 

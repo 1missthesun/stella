@@ -20,6 +20,7 @@ use super::cdp::types::{
     CreateTargetResult, ExceptionThrownEvent, TargetCreatedEvent, TargetDestroyedEvent,
 };
 use super::cookies;
+use super::dialogs::Dialogs;
 use super::diff;
 use super::element::RefMap;
 use super::extension_bridge::ExtensionBridge;
@@ -829,7 +830,9 @@ pub struct DaemonState {
     /// Set when this state drives tabs in the user's own browser.
     pipe: Option<Arc<PipeLink>>,
     /// Refs of the tabs other than the active one, which is in `ref_map`.
-    pipe_refs: HashMap<u64, RefMap>,
+    /// Refs of the tabs that aren't active, and the tab `ref_map` belongs to.
+    tab_refs: HashMap<u64, RefMap>,
+    refs_tab: Option<u64>,
 }
 
 impl DaemonState {
@@ -884,7 +887,8 @@ impl DaemonState {
             daemon_shutdown_tx: None,
             deferred_extension_forward: None,
             pipe: None,
-            pipe_refs: HashMap::new(),
+            tab_refs: HashMap::new(),
+            refs_tab: None,
         }
     }
 
@@ -898,6 +902,29 @@ impl DaemonState {
     pub(super) fn attach_browser(&mut self, browser: BrowserManager) {
         self.browser = Some(browser);
         self.subscribe_to_browser_events();
+    }
+
+    /// Puts away the refs of the tab that was active and brings back those of
+    /// the one that is.
+    fn follow_active_tab(&mut self) {
+        let Some(browser) = self.browser.as_ref() else {
+            return;
+        };
+        let current = browser.active_tab_id();
+        self.tab_refs
+            .retain(|tab_id, _| browser.tab_index_by_id(*tab_id).is_some());
+        if current == self.refs_tab {
+            return;
+        }
+        let incoming = current
+            .and_then(|tab_id| self.tab_refs.remove(&tab_id))
+            .unwrap_or_else(RefMap::new);
+        let outgoing = std::mem::replace(&mut self.ref_map, incoming);
+        if let Some(previous) = std::mem::replace(&mut self.refs_tab, current) {
+            if browser.tab_index_by_id(previous).is_some() {
+                self.tab_refs.insert(previous, outgoing);
+            }
+        }
     }
 
     pub(super) fn observes_network(&self) -> bool {
@@ -1188,28 +1215,29 @@ async fn absorb_browser_events(state: &mut DaemonState) {
     }
 }
 
-enum PipedTabError {
-    /// The tab can't be debugged (a browser page, or DevTools is holding it).
-    NotAttachable(String),
-    Other(String),
-}
+struct AnsweringDialogs(Dialogs);
 
-impl PipedTabError {
-    fn into_message(self) -> String {
-        match self {
-            PipedTabError::NotAttachable(message) | PipedTabError::Other(message) => message,
-        }
+impl AnsweringDialogs {
+    async fn start(dialogs: &Dialogs) -> Self {
+        let answering = Self(dialogs.clone());
+        dialogs.take_answered();
+        dialogs.resume().await;
+        answering
     }
 }
 
-/// Runs a command on the user's own browser over the extension pipe. `None`
-/// leaves it to the extension, which can still act on tabs that can't be
-/// debugged (to navigate away from them, for one).
+impl Drop for AnsweringDialogs {
+    fn drop(&mut self) {
+        self.0.hold();
+    }
+}
+
+/// Runs a command on the user's own browser over the extension pipe.
 pub(super) async fn execute_piped(
     cmd: &Value,
     state: &mut DaemonState,
     link: &Arc<PipeLink>,
-) -> Option<Value> {
+) -> Value {
     let action = match cmd.get("action").and_then(Value::as_str).unwrap_or("") {
         "open" => "navigate",
         action => action,
@@ -1221,17 +1249,14 @@ pub(super) async fn execute_piped(
         .to_string();
 
     absorb_browser_events(state).await;
+    let _answering = match state.browser.as_ref() {
+        Some(browser) => Some(AnsweringDialogs::start(&browser.dialogs).await),
+        None => None,
+    };
 
-    if let Err(error) = select_piped_tab(cmd, state, link).await {
-        return match error {
-            PipedTabError::NotAttachable(_) => None,
-            PipedTabError::Other(message) => Some(error_response(&id, &message)),
-        };
+    if let Err(message) = select_piped_tab(cmd, state, link).await {
+        return error_response(&id, &message);
     }
-    if let Some(browser) = state.browser.as_ref() {
-        browser.take_dialogs();
-    }
-
     let mut response = if action == "chain" {
         handle_chain(cmd, state, &id).await
     } else {
@@ -1244,7 +1269,7 @@ pub(super) async fn execute_piped(
     let dialogs = state
         .browser
         .as_ref()
-        .map(BrowserManager::take_dialogs)
+        .map(|browser| browser.dialogs.take_answered())
         .unwrap_or_default();
     if !dialogs.is_empty() {
         let data = response
@@ -1254,50 +1279,48 @@ pub(super) async fn execute_piped(
             data.insert("dialogs".to_string(), Value::Array(dialogs));
         }
     }
-    Some(response)
+    response
 }
 
 async fn select_piped_tab(
     cmd: &Value,
     state: &mut DaemonState,
     link: &Arc<PipeLink>,
-) -> Result<(), PipedTabError> {
+) -> Result<(), String> {
     let requested = match cmd.get("tabId") {
         None | Some(Value::Null) => None,
-        Some(value) => Some(value.as_u64().filter(|tab_id| *tab_id > 0).ok_or_else(|| {
-            PipedTabError::Other("'tabId' must be a positive integer".to_string())
-        })?),
+        Some(value) => Some(
+            value
+                .as_u64()
+                .filter(|tab_id| *tab_id > 0)
+                .ok_or("'tabId' must be a positive integer")?,
+        ),
     };
-    let tab = link
-        .resolve_tab(requested)
-        .await
-        .map_err(PipedTabError::Other)?;
+    let mut tab = link.resolve_tab(requested).await?;
     let attached = link.is_attached(tab.tab_id);
     if !attached {
-        link.attach(tab.tab_id)
-            .await
-            .map_err(PipedTabError::NotAttachable)?;
-    }
-    let browser = state
-        .browser
-        .as_mut()
-        .ok_or_else(|| PipedTabError::Other("Browser not launched".to_string()))?;
-    let previous = browser.active_tab_id();
-    browser
-        .show_pipe_tab(tab, attached)
-        .await
-        .map_err(PipedTabError::NotAttachable)?;
-    let current = browser.active_tab_id();
-    if previous != current {
-        let incoming = current
-            .and_then(|tab_id| state.pipe_refs.remove(&tab_id))
-            .unwrap_or_else(RefMap::new);
-        let outgoing = std::mem::replace(&mut state.ref_map, incoming);
-        if let Some(previous) = previous {
-            state.pipe_refs.insert(previous, outgoing);
+        if let Err(error) = link.attach(tab.tab_id).await {
+            if !opens_page(cmd) {
+                return Err(error);
+            }
+            link.blank(tab.tab_id).await?;
+            link.attach(tab.tab_id).await?;
+            tab.url = "about:blank".to_string();
         }
     }
+    let browser = state.browser.as_mut().ok_or("Browser not launched")?;
+    browser.show_pipe_tab(tab, attached).await?;
+    state.follow_active_tab();
     Ok(())
+}
+
+/// Chrome refuses to debug its own pages, and a navigation can leave them.
+fn opens_page(cmd: &Value) -> bool {
+    match cmd.get("action").and_then(Value::as_str) {
+        Some("navigate" | "open") => true,
+        Some("chain") => cmd.pointer("/steps/0").is_some_and(opens_page),
+        _ => false,
+    }
 }
 
 /// `confirmed` lists the actions of this exact command the owner already
@@ -1492,6 +1515,7 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
             }
         }
 
+        state.follow_active_tab();
         if let Some(ref mut mgr) = state.browser {
             if let Some(owner_id) = command_owner_id(cmd) {
                 if mgr.owner_tab_ids(owner_id).is_empty()
@@ -1502,7 +1526,6 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                         Ok(result) => {
                             if let Some(tab_id) = result.get("tabId").and_then(Value::as_u64) {
                                 mgr.record_owner_tab(owner_id, tab_id);
-                                state.ref_map.clear();
                             }
                         }
                         Err(error) => return error_response(&id, &error),
@@ -1516,13 +1539,8 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                     && !matches!(action, "tab_list" | "tab_new" | "tab_switch" | "tab_close")
                 {
                     if let Some(tab_id) = mgr.active_tab_id_for_owner(Some(owner_id)) {
-                        match mgr.select_tab_by_id(tab_id).await {
-                            Ok(switched) => {
-                                if switched {
-                                    state.ref_map.clear();
-                                }
-                            }
-                            Err(error) => return error_response(&id, &error),
+                        if let Err(error) = mgr.select_tab_by_id(tab_id).await {
+                            return error_response(&id, &error);
                         }
                     }
                 }
@@ -1532,6 +1550,7 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                 }
             }
         }
+        state.follow_active_tab();
     }
 
     if matches!(state.backend_type, BackendType::WebDriver)
@@ -1591,17 +1610,15 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                 Some(tab_id) => {
                     if let Some(ref mut mgr) = state.browser {
                         match mgr.select_tab_by_id(tab_id).await {
-                            Ok(switched) => {
+                            Ok(()) => {
                                 if let Some(owner_id) = command_owner_id(cmd) {
                                     mgr.mark_owner_tab_active(owner_id, tab_id);
-                                }
-                                if switched {
-                                    state.ref_map.clear();
                                 }
                             }
                             Err(e) => return error_response(&id, &e),
                         }
                     }
+                    state.follow_active_tab();
                 }
             }
         }
@@ -1664,7 +1681,7 @@ async fn dispatch_action(
         "ischecked" => handle_ischecked(cmd, state).await,
         "back" => handle_back(state).await,
         "forward" => handle_forward(state).await,
-        "reload" => handle_reload(state).await,
+        "reload" => handle_reload(cmd, state).await,
         "cookies_get" => handle_cookies_get(cmd, state).await,
         "cookies_set" => handle_cookies_set(cmd, state).await,
         "cookies_clear" => handle_cookies_clear(state).await,
@@ -1975,10 +1992,9 @@ async fn chain_select_tab(state: &mut DaemonState, tab_id: Option<u64>) {
     }
     let Some(tab_id) = tab_id else { return };
     if let Some(ref mut mgr) = state.browser {
-        if let Ok(true) = mgr.select_tab_by_id(tab_id).await {
-            state.ref_map.clear();
-        }
+        let _ = mgr.select_tab_by_id(tab_id).await;
     }
+    state.follow_active_tab();
 }
 
 async fn dispatch_chain_output_with_deadline(
@@ -2084,7 +2100,7 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
                 .await;
                 let error = match selected {
                     Ok(Ok(())) => None,
-                    Ok(Err(error)) => Some(error.into_message()),
+                    Ok(Err(error)) => Some(error),
                     Err(error) => Some(error),
                 };
                 if let Some(error) = error {
@@ -2152,18 +2168,16 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
                             )
                             .await
                             {
-                                Ok(Ok(switched)) => {
+                                Ok(Ok(())) => {
                                     if let Some(owner_id) = command_owner_id(&step_cmd) {
                                         mgr.mark_owner_tab_active(owner_id, tab_id);
-                                    }
-                                    if switched {
-                                        state.ref_map.clear();
                                     }
                                 }
                                 Ok(Err(error)) => switch_error = Some(error),
                                 Err(error) => switch_error = Some(error),
                             }
                         }
+                        state.follow_active_tab();
                         if let Some(error) = switch_error {
                             results.push(chain_step_failure(
                                 index,
@@ -3231,7 +3245,8 @@ async fn handle_navigate(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
     }
 
     state.ref_map.clear();
-    let result = mgr.navigate(url, wait_until).await;
+    let timeout = cmd.get("timeout").and_then(Value::as_u64);
+    let result = mgr.navigate(url, wait_until, timeout).await;
 
     if scoped_headers.is_some() {
         if let Ok(session_id) = mgr.active_session_id() {
@@ -3571,7 +3586,7 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
         .get("format")
         .or_else(|| cmd.get("type"))
         .and_then(|v| v.as_str())
-        .unwrap_or("png")
+        .unwrap_or(if state.pipe.is_some() { "jpeg" } else { "png" })
         .to_string();
 
     let options = ScreenshotOptions {
@@ -3588,12 +3603,14 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
         quality: cmd
             .get("quality")
             .and_then(|v| v.as_i64())
-            .map(|q| q as i32),
+            .map(|q| q as i32)
+            .or(state.pipe.is_some().then_some(60)),
         annotate,
         output_dir: cmd
             .get("screenshotDir")
             .and_then(|v| v.as_str())
             .map(String::from),
+        keep: state.pipe.is_none() || cmd.get("path").is_some(),
     };
 
     if annotate {
@@ -3616,11 +3633,10 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
     let result =
         screenshot::take_screenshot(&mgr.client, &session_id, &state.ref_map, &options).await?;
 
-    let mut response = json!({
-        "path": result.path,
-        "base64": result.base64,
-        "format": format,
-    });
+    let mut response = json!({ "base64": result.base64, "format": format });
+    if let Some(path) = result.path {
+        response["path"] = json!(path);
+    }
     if !result.annotations.is_empty() {
         response["annotations"] = serde_json::to_value(&result.annotations)
             .map_err(|e| format!("Failed to serialize annotations: {}", e))?;
@@ -3957,8 +3973,12 @@ async fn handle_isvisible(cmd: &Value, state: &mut DaemonState) -> Result<Value,
         .ok_or("Missing 'selector' parameter")?;
 
     let visible =
-        super::element::is_element_visible(&mgr.client, &session_id, &state.ref_map, selector)
-            .await?;
+        match super::element::is_element_visible(&mgr.client, &session_id, &state.ref_map, selector)
+            .await
+        {
+            Err(error) if error.starts_with("Element not found") => false,
+            visible => visible?,
+        };
     let url = mgr.get_url().await.unwrap_or_default();
     Ok(json!({ "visible": visible, "origin": url }))
 }
@@ -4004,9 +4024,9 @@ async fn handle_back(state: &mut DaemonState) -> Result<Value, String> {
         }
     }
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let url = mgr.navigate_history(-1).await?;
+    let result = mgr.navigate_history(-1).await?;
     state.ref_map.clear();
-    Ok(json!({ "url": url }))
+    Ok(result)
 }
 
 async fn handle_forward(state: &mut DaemonState) -> Result<Value, String> {
@@ -4020,12 +4040,12 @@ async fn handle_forward(state: &mut DaemonState) -> Result<Value, String> {
         }
     }
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let url = mgr.navigate_history(1).await?;
+    let result = mgr.navigate_history(1).await?;
     state.ref_map.clear();
-    Ok(json!({ "url": url }))
+    Ok(result)
 }
 
-async fn handle_reload(state: &mut DaemonState) -> Result<Value, String> {
+async fn handle_reload(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     if let Some(ref wb) = state.webdriver_backend {
         if state.browser.is_none() {
             wb.reload().await?;
@@ -4035,34 +4055,11 @@ async fn handle_reload(state: &mut DaemonState) -> Result<Value, String> {
             return Ok(json!({ "url": url }));
         }
     }
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
-
-    let mut rx = mgr.client.subscribe();
-    mgr.client
-        .send_command_no_params("Page.reload", Some(&session_id))
-        .await?;
-
-    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(10), async {
-        loop {
-            match rx.recv().await {
-                Ok(event) => {
-                    if event.method == "Page.loadEventFired"
-                        && event.session_id.as_deref() == Some(&session_id)
-                    {
-                        return;
-                    }
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => break,
-            }
-        }
-    })
-    .await;
-
-    let url = mgr.get_url().await.unwrap_or_default();
+    let timeout = cmd.get("timeout").and_then(Value::as_u64);
+    let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
+    let result = mgr.reload(timeout).await?;
     state.ref_map.clear();
-    Ok(json!({ "url": url }))
+    Ok(result)
 }
 
 async fn wait_for_selector(
@@ -4125,6 +4122,7 @@ async fn wait_for_selector(
     .await
 }
 
+/// `*` matches anything; a pattern without one matches any URL containing it.
 async fn wait_for_url(
     client: &super::cdp::client::CdpClient,
     session_id: &str,
@@ -4132,7 +4130,9 @@ async fn wait_for_url(
     timeout_ms: u64,
 ) -> Result<(), String> {
     let check_fn = format!(
-        "location.href.includes({})",
+        r"((pattern, url) => pattern.includes('*')
+            ? new RegExp('^' + pattern.replace(/[.+?^${{}}()|[\]\\]/g, '\\$&').replace(/\*+/g, '.*') + '$').test(url)
+            : url.includes(pattern))({}, location.href)",
         serde_json::to_string(pattern).unwrap_or_default()
     );
     poll_until_true(
@@ -4140,7 +4140,7 @@ async fn wait_for_url(
         session_id,
         &check_fn,
         timeout_ms,
-        &format!("URL containing {:?}", pattern),
+        &format!("URL matching {:?}", pattern),
     )
     .await
 }
@@ -4585,14 +4585,14 @@ async fn handle_diff_url(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .map(WaitUntil::from_str)
         .unwrap_or(WaitUntil::Load);
 
-    mgr.navigate(url1, wait_until).await?;
+    mgr.navigate(url1, wait_until, None).await?;
     let session_id = mgr.active_session_id()?.to_string();
     let options = SnapshotOptions::default();
     let snap1 =
         snapshot::take_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map, None)
             .await?;
 
-    mgr.navigate(url2, wait_until).await?;
+    mgr.navigate(url2, wait_until, None).await?;
     state.ref_map.clear();
     let snap2 =
         snapshot::take_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map, None)
@@ -4713,8 +4713,9 @@ async fn handle_keyboard(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
     Ok(json!({ "dispatched": event_type }))
 }
 
-async fn handle_tab_list(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
+async fn handle_tab_list(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
+    let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
+    mgr.refresh_pages().await;
     let owner_id = command_owner_id(cmd);
     let tabs = mgr.tab_list_for_owner(owner_id);
     Ok(json!({
@@ -4726,13 +4727,13 @@ async fn handle_tab_list(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
 async fn handle_tab_new(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
     let url = cmd.get("url").and_then(|v| v.as_str());
-    state.ref_map.clear();
     let result = mgr.tab_new(url).await?;
     if let Some(owner_id) = command_owner_id(cmd) {
         if let Some(tab_id) = result.get("tabId").and_then(Value::as_u64) {
             mgr.record_owner_tab(owner_id, tab_id);
         }
     }
+    state.follow_active_tab();
     Ok(result)
 }
 
@@ -4842,12 +4843,8 @@ async fn handle_finalize_tabs(
                 closed_tab_ids.push(tab_id);
             }
         }
-        if !closed_tab_ids.is_empty() {
-            // Closing tabs can move the active page; stale element refs must
-            // not resolve against the wrong tab.
-            state.ref_map.clear();
-        }
     }
+    state.follow_active_tab();
 
     let kept: Vec<Value> = keep_entries
         .iter()
@@ -4909,11 +4906,11 @@ async fn handle_tab_switch(cmd: &Value, state: &mut DaemonState) -> Result<Value
         .tab_list()
         .get(index)
         .and_then(|tab| tab["tabId"].as_u64());
-    state.ref_map.clear();
     let result = mgr.tab_switch(index).await?;
     if let (Some(owner_id), Some(tab_id)) = (command_owner_id(cmd), tab_id) {
         mgr.mark_owner_tab_active(owner_id, tab_id);
     }
+    state.follow_active_tab();
     Ok(result)
 }
 
@@ -4929,11 +4926,11 @@ async fn handle_tab_close(cmd: &Value, state: &mut DaemonState) -> Result<Value,
             index = mgr.tab_index_by_id(tab_id);
         }
     }
-    state.ref_map.clear();
     let mut result = mgr.tab_close(index).await?;
     if let Some(owner_id) = command_owner_id(cmd) {
         result["activeTabId"] = json!(mgr.active_tab_id_for_owner(Some(owner_id)));
     }
+    state.follow_active_tab();
     Ok(result)
 }
 
@@ -5641,7 +5638,7 @@ async fn handle_clipboard(cmd: &Value, state: &DaemonState) -> Result<Value, Str
                 "navigator.clipboard.writeText({})",
                 serde_json::to_string(text).unwrap_or_default()
             );
-            mgr.evaluate(&js, None).await?;
+            clipboard_evaluate(mgr, &js).await?;
             Ok(json!({ "written": text }))
         }
         "copy" => {
@@ -5655,10 +5652,21 @@ async fn handle_clipboard(cmd: &Value, state: &DaemonState) -> Result<Value, Str
             Ok(json!({ "pasted": true }))
         }
         _ => {
-            let result = mgr.evaluate("navigator.clipboard.readText()", None).await?;
+            let result = clipboard_evaluate(mgr, "navigator.clipboard.readText()").await?;
             Ok(json!({ "text": result }))
         }
     }
+}
+
+/// The page's clipboard promise stays open while Chrome asks for permission,
+/// or while the tab is in the background.
+async fn clipboard_evaluate(mgr: &BrowserManager, script: &str) -> Result<Value, String> {
+    tokio::time::timeout(
+        tokio::time::Duration::from_secs(5),
+        mgr.evaluate(script, None),
+    )
+    .await
+    .map_err(|_| "The page could not use the clipboard: its tab must be in front and allowed to use the clipboard.".to_string())?
 }
 
 async fn handle_wheel(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
@@ -6798,6 +6806,7 @@ async fn handle_diff_screenshot(cmd: &Value, state: &DaemonState) -> Result<Valu
         quality: None,
         annotate: false,
         output_dir: None,
+        keep: false,
     };
 
     let result =
@@ -7221,7 +7230,7 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     let password = cred.password;
 
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
-    mgr.navigate(&url, WaitUntil::Load).await?;
+    mgr.navigate(&url, WaitUntil::Load, None).await?;
 
     let session_id = mgr.active_session_id()?.to_string();
 

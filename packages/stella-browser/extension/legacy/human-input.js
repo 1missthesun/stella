@@ -15,7 +15,7 @@
  * rust/crates/browse-page/src/human.rs and input.rs.
  */
 
-import { overlayScaleFromLayoutMetrics } from "./agent-cursor.js";
+import { overlayScaleFromLayoutMetrics } from "../lib/agent-cursor.js";
 import { drawAgentCursor } from "./agent-cursor-overlay.js";
 
 const sleep = (ms) =>

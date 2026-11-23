@@ -12,6 +12,7 @@ pub mod cookies;
 #[allow(dead_code)]
 pub mod daemon;
 #[allow(dead_code)]
+pub mod dialogs;
 pub mod diff;
 #[allow(dead_code)]
 pub mod element;

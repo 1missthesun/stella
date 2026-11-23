@@ -5,8 +5,8 @@ import {
   offCdpEvent,
   clearCdpEvents,
   releaseDebugger,
-} from '../lib/debugger.js';
-import { getActiveTab } from './tabs.js';
+} from "./page-debugger.js";
+import { getActiveTab } from "../commands/tabs.js";
 
 const trackedRequests = new Map();
 const activeRoutes = new Map();

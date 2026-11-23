@@ -1,16 +1,16 @@
-import { getActiveTab } from "./tabs.js";
+import { getActiveTab } from "../commands/tabs.js";
 import {
   resolveSelector,
   buildResolvedElementMatcherScript,
   buildRoleMatcherScript,
   buildComposedCssMatcherScript,
   buildTopLevelRectSource,
-} from "../lib/selector.js";
-import { ensureDebugger, evaluateRuntime } from "../lib/debugger.js";
-import { callExactElement, exactElementPoint } from "../lib/frame-elements.js";
-import { trackAgentCursorTab } from "../lib/agent-cursor-overlay.js";
-import { AIM_POINT_SOURCE } from "../lib/aim.js";
-import { keyDefinition, withHumanInput } from "../lib/human-input.js";
+} from "./selector.js";
+import { ensureDebugger, evaluateRuntime } from "./page-debugger.js";
+import { callExactElement, exactElementPoint } from "./frame-elements.js";
+import { trackAgentCursorTab } from "./agent-cursor-overlay.js";
+import { AIM_POINT_SOURCE } from "./aim.js";
+import { keyDefinition, withHumanInput } from "./human-input.js";
 import {
   abortableCommandDelay,
   markCommandMutationDispatched,

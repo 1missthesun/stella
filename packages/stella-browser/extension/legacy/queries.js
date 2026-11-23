@@ -1,18 +1,18 @@
-import { getActiveTab } from "./tabs.js";
+import { getActiveTab } from "../commands/tabs.js";
 import {
   resolveSelector,
   buildComposedCssMatcherAllScript,
   buildRoleMatcherAllScript,
   buildResolvedElementMatcherScript,
   buildTopLevelRectSource,
-} from "../lib/selector.js";
-import { evaluateRuntime } from "../lib/debugger.js";
+} from "./selector.js";
+import { evaluateRuntime } from "./page-debugger.js";
 import {
   callExactElement,
   exactElementPoint,
   frameVisible,
   getObservationFrames,
-} from "../lib/frame-elements.js";
+} from "./frame-elements.js";
 
 /**
  * Inject a script that finds an element and runs code on it.
@@ -311,11 +311,4 @@ export async function handleWaitForUrl(command) {
     await new Promise((r) => setTimeout(r, 200));
   }
   throw new Error(`Timeout waiting for URL matching: ${pattern}`);
-}
-
-export async function handleBringToFront(command) {
-  const tab = await getActiveTab(command);
-  await chrome.tabs.update(tab.id, { active: true });
-  await chrome.windows.update(tab.windowId, { focused: true });
-  return { id: command.id, success: true, data: { focused: true } };
 }

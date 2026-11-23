@@ -19,49 +19,7 @@ import {
   cleanupStaleGroups,
   cleanupStaleTabs,
   closeStrayStellaTabs,
-  getOwnerTabIds,
 } from "./commands/tabs.js";
-import {
-  handleNavigate,
-  handleBack,
-  handleForward,
-  handleReload,
-  handleUrl,
-  handleTitle,
-} from "./commands/navigation.js";
-import {
-  handleClick,
-  handleFill,
-  handleType,
-  handleHover,
-  handleSelect,
-  handlePress,
-  handleScroll,
-  handleClear,
-  handleCheck,
-  handleUncheck,
-  handleFocus,
-  handleDblclick,
-  handleWait,
-  handleClipboard,
-  handleMouseMove,
-  handleMouseDown,
-  handleMouseUp,
-  handleDrag,
-  handleKeyDown,
-  handleKeyUp,
-  handleInsertText,
-  handleScrollIntoView,
-} from "./commands/interaction.js";
-import {
-  handleScreenshot,
-  handleSnapshot,
-  handleContent,
-  handleEvaluate,
-  handleGetText,
-  handleGetAttribute,
-  handlePdf,
-} from "./commands/capture.js";
 import {
   handleCookiesGet,
   handleCookiesExportAll,
@@ -70,114 +28,30 @@ import {
   handleCookiesClear,
 } from "./commands/cookies.js";
 import {
-  handleInnerText,
-  handleInnerHtml,
-  handleInputValue,
-  handleBoundingBox,
-  handleWaitForUrl,
-  handleIsVisible,
-  handleIsEnabled,
-  handleIsChecked,
-  handleCount,
-  handleStyles,
   handleBringToFront,
-} from "./commands/queries.js";
-import {
-  handleRequests,
-  handleResponseBody,
-  handleRoute,
-  handleUnroute,
-  handleHarStart,
-  handleHarStop,
-} from "./commands/network.js";
+  handleTitle,
+  handleUrl,
+} from "./commands/tab-info.js";
 import { handleDownload } from "./commands/downloads.js";
-import { handleChain } from "./commands/chain.js";
 import {
   PIPE_HANDLERS,
   closePipe,
   detachLeftoverDebuggers,
 } from "./commands/pipe.js";
 import {
-  handleSiteModSet,
-  handleSiteModList,
-  handleSiteModRemove,
-  handleSiteModToggle,
-  syncContentScriptRegistration,
-} from "./commands/site-mods.js";
-import { hideAgentCursor, takeAgentCursorTabs } from "./lib/agent-cursor-overlay.js";
-
-async function hideOwnerAgentCursors(command) {
-  const tabIds = new Set(takeAgentCursorTabs(command.ownerId));
-  for (const tabId of await getOwnerTabIds(command).catch(() => [])) {
-    tabIds.add(tabId);
-  }
-  await Promise.all([...tabIds].map((tabId) => hideAgentCursor(tabId)));
-}
+  handleProfileMark,
+  handleProfileUnmark,
+} from "./commands/profile-mark.js";
+import { hideOwnerAgentCursors, legacyHandlers } from "./legacy/index.js";
 
 const HANDLERS = {
   healthcheck: async (cmd) => ({ id: cmd.id, success: true, data: {} }),
 
-  navigate: handleNavigate,
-  open: handleNavigate,
-  back: handleBack,
-  forward: handleForward,
-  reload: handleReload,
   url: handleUrl,
   title: handleTitle,
-
-  click: handleClick,
-  fill: handleFill,
-  type: handleType,
-  hover: handleHover,
-  select: handleSelect,
-  press: handlePress,
-  scroll: handleScroll,
-  clear: handleClear,
-  check: handleCheck,
-  uncheck: handleUncheck,
-  focus: handleFocus,
-  dblclick: handleDblclick,
-  wait: handleWait,
-
-  screenshot: handleScreenshot,
-  snapshot: handleSnapshot,
-  content: handleContent,
-  evaluate: handleEvaluate,
-  gettext: handleGetText,
-  getattribute: handleGetAttribute,
-  pdf: handlePdf,
-
-  innertext: handleInnerText,
-  innerhtml: handleInnerHtml,
-  inputvalue: handleInputValue,
-  boundingbox: handleBoundingBox,
-  scrollintoview: handleScrollIntoView,
-  isvisible: handleIsVisible,
-  isenabled: handleIsEnabled,
-  ischecked: handleIsChecked,
-  count: handleCount,
-  styles: handleStyles,
-  waitforurl: handleWaitForUrl,
   bringtofront: handleBringToFront,
 
-  requests: handleRequests,
-  responsebody: handleResponseBody,
-  route: handleRoute,
-  unroute: handleUnroute,
-  har_start: handleHarStart,
-  har_stop: handleHarStop,
-
   download: handleDownload,
-
-  clipboard: handleClipboard,
-
-  mousemove: handleMouseMove,
-  mousedown: handleMouseDown,
-  mouseup: handleMouseUp,
-  drag: handleDrag,
-  keydown: handleKeyDown,
-  keyup: handleKeyUp,
-  inserttext: handleInsertText,
 
   tab_new: handleTabNew,
   tab_list: handleTabList,
@@ -207,74 +81,11 @@ const HANDLERS = {
   cookies_set: handleCookiesSet,
   cookies_clear: handleCookiesClear,
 
-  chain: (cmd) => handleChain(cmd, HANDLERS),
-
-  site_mod_set: handleSiteModSet,
-  site_mod_list: handleSiteModList,
-  site_mod_remove: handleSiteModRemove,
-  site_mod_toggle: handleSiteModToggle,
+  profile_mark: handleProfileMark,
+  profile_unmark: handleProfileUnmark,
 };
 
-const UNSUPPORTED = new Set([
-  "launch",
-  "trace_start",
-  "trace_stop",
-  "state_save",
-  "state_load",
-  "video_start",
-  "video_stop",
-  "recording_start",
-  "recording_stop",
-  "recording_restart",
-  "screencast_start",
-  "screencast_stop",
-  "input_mouse",
-  "input_keyboard",
-  "input_touch",
-  "frame",
-  "mainframe",
-  "expose",
-  "highlight",
-  "dialog",
-  "geolocation",
-  "permissions",
-  "viewport",
-  "device",
-  "useragent",
-  "emulatemedia",
-  "offline",
-  "headers",
-  "credentials",
-  "timezone",
-  "locale",
-  "addscript",
-  "addstyle",
-  "addinitscript",
-  "console",
-  "errors",
-  "keyboard",
-  "window_new",
-  "upload",
-  "getbyrole",
-  "getbytext",
-  "getbylabel",
-  "getbyplaceholder",
-  "getbyalttext",
-  "getbytitle",
-  "getbytestid",
-  "nth",
-  "tap",
-  "wheel",
-  "multiselect",
-  "selectall",
-  "dispatch",
-  "evalhandle",
-  "pause",
-  "waitforloadstate",
-  "waitforfunction",
-  "waitfordownload",
-  "getboundingbox",
-]);
+const LEGACY_HANDLERS = legacyHandlers(HANDLERS);
 
 async function handleCommand(message) {
   const { action, id } = message;
@@ -314,7 +125,7 @@ async function handleCommand(message) {
     };
   }
 
-  const handler = HANDLERS[action];
+  const handler = HANDLERS[action] ?? LEGACY_HANDLERS[action];
   if (handler) {
     try {
       if (
@@ -335,20 +146,11 @@ async function handleCommand(message) {
     }
   }
 
-  if (UNSUPPORTED.has(action)) {
-    return {
-      type: "response",
-      id,
-      success: false,
-      error: `Command '${action}' is not supported in extension mode`,
-    };
-  }
-
   return {
     type: "response",
     id,
     success: false,
-    error: `Unknown command: ${action}`,
+    error: `Command '${action}' is not supported in extension mode`,
   };
 }
 
@@ -403,8 +205,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     void closeStrayStellaTabs().catch(() => {});
   }
 });
-
-syncContentScriptRegistration();
 
 const COOKIE_EVENT_DEBOUNCE_MS = 120;
 const COOKIE_EVENT_MAX_BATCH = 200;
@@ -472,27 +272,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
   } else if (message.type === "getStatus") {
     sendResponse({ connected: isConnected() });
-  } else if (message.type === "hookHistory" && sender.tab) {
-    chrome.scripting
-      .executeScript({
-        target: { tabId: sender.tab.id },
-        world: "MAIN",
-        func: () => {
-          if (window.__stellaHistoryHooked) return;
-          window.__stellaHistoryHooked = true;
-          const origPush = history.pushState;
-          const origReplace = history.replaceState;
-          history.pushState = function () {
-            origPush.apply(this, arguments);
-            window.dispatchEvent(new Event("stella:urlchange"));
-          };
-          history.replaceState = function () {
-            origReplace.apply(this, arguments);
-            window.dispatchEvent(new Event("stella:urlchange"));
-          };
-        },
-      })
-      .catch(() => {});
-    sendResponse({ ok: true });
   }
 });

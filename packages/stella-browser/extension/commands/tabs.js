@@ -1,6 +1,16 @@
-import { clearCdpEvents, ensureDebugger } from "../lib/debugger.js";
-import { closePipedTab } from "./pipe.js";
-import { clearOwnerRefMaps, clearTabRefMap } from "../lib/selector.js";
+const forgetListeners = new Set();
+
+/**
+ * `listener(ownerId, tabId)` runs when an owner stops holding a tab; without a
+ * tab, all of the owner's; without an owner, everyone's.
+ */
+export function onForgotten(listener) {
+  forgetListeners.add(listener);
+}
+
+function forget(ownerId = null, tabId = null) {
+  for (const listener of forgetListeners) listener(ownerId, tabId);
+}
 
 let agentWindowId = null;
 let stellaGroupId = null;
@@ -220,7 +230,7 @@ function resetAgentState({ clearLeases = false } = {}) {
     ownerLeaseState = createRecord();
     ownerLeaseHighWater = createRecord();
   }
-  clearOwnerRefMaps();
+  forget();
 }
 
 async function loadState() {
@@ -412,12 +422,10 @@ function forgetOwnedTab(ownerId, tabId) {
   if (state.activeTabId === tabId) {
     state.activeTabId = state.tabIds[0] ?? null;
   }
-  clearTabRefMap(ownerId, tabId);
-  clearCdpEvents(tabId);
-  closePipedTab(tabId);
+  forget(ownerId, tabId);
   if (state.tabIds.length === 0) {
     deleteOwnerState(ownerId);
-    clearOwnerRefMaps(ownerId);
+    forget(ownerId);
   }
 }
 
@@ -610,7 +618,7 @@ async function pruneOwnerTabs(ownerId) {
   for (const tabId of state.tabIds) {
     const tab = await getTabIfValid(tabId);
     if (!tab) {
-      clearTabRefMap(normalized, tabId);
+      forget(normalized, tabId);
       changed = true;
       continue;
     }
@@ -637,7 +645,7 @@ async function pruneOwnerTabs(ownerId) {
 
   if (state.tabIds.length === 0) {
     deleteOwnerState(normalized);
-    clearOwnerRefMaps(normalized);
+    forget(normalized);
     changed = true;
   }
 
@@ -766,10 +774,7 @@ export async function getActiveTab(command) {
   return await wakeTab(await resolveActiveTab(command));
 }
 
-/**
- * Memory Saver discards background tabs and energy saving freezes them; a
- * discarded tab has no page until it reloads, and a frozen one runs no script.
- */
+/** Memory Saver discards background tabs; one has no page until it reloads. */
 async function wakeTab(tab) {
   if (tab.discarded) {
     await chrome.tabs.reload(tab.id);
@@ -779,14 +784,6 @@ async function wakeTab(tab) {
       if (current.status === "complete" || Date.now() > deadline) return current;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-  }
-  if (tab.frozen) {
-    try {
-      await ensureDebugger(tab.id);
-      await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.setWebLifecycleState", {
-        state: "active",
-      });
-    } catch {}
   }
   return tab;
 }
@@ -866,8 +863,7 @@ async function cleanupStaleTabsInternal({ now = Date.now() } = {}) {
     for (const tabId of state.tabIds) {
       const tab = await getTabIfValid(tabId);
       if (!tab) {
-        clearTabRefMap(ownerId, tabId);
-        clearCdpEvents(tabId);
+        forget(ownerId, tabId);
         changed = true;
         continue;
       }
@@ -903,15 +899,14 @@ async function cleanupStaleTabsInternal({ now = Date.now() } = {}) {
 
     if (state.tabIds.length === 0) {
       deleteOwnerState(ownerId);
-      clearOwnerRefMaps(ownerId);
+      forget(ownerId);
       changed = true;
     }
   }
 
   if (staleTabIds.length > 0) {
     for (const { ownerId, tabId } of staleTabIds) {
-      clearTabRefMap(ownerId, tabId);
-      clearCdpEvents(tabId);
+      forget(ownerId, tabId);
     }
 
     try {
@@ -1295,12 +1290,10 @@ export async function handleTabClose(command) {
 
   tab ??= tabs[index];
   await assertCurrentOwnerLease(command);
-  clearTabRefMap(ownerId, tab.id);
-  clearCdpEvents(tab.id);
-
   try {
     await chrome.tabs.remove(tab.id);
   } catch {}
+  forget(ownerId, tab.id);
 
   state.tabIds = state.tabIds.filter((tabId) => tabId !== tab.id);
   delete state.lastTouchedAtByTabId?.[String(tab.id)];
@@ -1308,7 +1301,7 @@ export async function handleTabClose(command) {
 
   if (state.tabIds.length === 0) {
     deleteOwnerState(ownerId);
-    clearOwnerRefMaps(ownerId);
+    forget(ownerId);
   }
 
   await saveState();
@@ -1359,12 +1352,11 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
         state.activeTabId = state.tabIds[0] ?? null;
       }
 
-      clearTabRefMap(ownerId, tabId);
-      clearCdpEvents(tabId);
+      forget(ownerId, tabId);
 
       if (state.tabIds.length === 0) {
         deleteOwnerState(ownerId);
-        clearOwnerRefMaps(ownerId);
+        forget(ownerId);
       }
 
       changed = true;
@@ -1400,8 +1392,7 @@ chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
         marks[String(addedTabId)] = marks[String(removedTabId)];
         delete marks[String(removedTabId)];
       }
-      clearTabRefMap(ownerId, removedTabId);
-      clearCdpEvents(removedTabId);
+      forget(ownerId, removedTabId);
       changed = true;
     }
     if (changed) await saveState();

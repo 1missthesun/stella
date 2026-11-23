@@ -1,14 +1,14 @@
-import { getActiveTab } from "./tabs.js";
+import { getActiveTab } from "../commands/tabs.js";
 import {
   setRefMap,
   resolveSelector,
   buildResolvedElementMatcherScript,
   buildTopLevelRectSource,
-} from "../lib/selector.js";
-import { captureFrameSnapshot } from "../lib/frame-snapshot.js";
-import { callExactElement, exactElementPoint } from "../lib/frame-elements.js";
-import { ensureDebugger, evaluateRuntime } from "../lib/debugger.js";
-import { takeAnsweredDialogs } from "../lib/dialogs.js";
+} from "./selector.js";
+import { captureFrameSnapshot } from "./frame-snapshot.js";
+import { callExactElement, exactElementPoint } from "./frame-elements.js";
+import { ensureDebugger, evaluateRuntime } from "./page-debugger.js";
+import { expectLeaving, takeAnsweredDialogs } from "./dialogs.js";
 
 function buildElementExpression(selector, ownerId, tabId, onFoundSource) {
   const resolved = resolveSelector(selector, ownerId, tabId);
@@ -227,12 +227,14 @@ async function evaluationWorld(tabId, expression, requested) {
 }
 
 /**
- * The bridge asks before and after each interaction for dialogs the page
- * opened (`<id>#guard`, `<id>#dialogs`). Dialogs are answered by the debugger,
- * so its page script is not run.
+ * The bridge asks before a command leaves the page (`<id>#unload`), and before
+ * and after each interaction for dialogs the page opened (`<id>#guard`,
+ * `<id>#dialogs`). Dialogs are answered by the debugger, so its page scripts
+ * are not run.
  */
 function dialogProbe(command) {
   const id = String(command.id ?? "");
+  if (id.endsWith("#unload")) return "unload";
   if (id.endsWith("#guard")) return "guard";
   if (id.endsWith("#dialogs")) return "dialogs";
   return null;
@@ -247,6 +249,7 @@ export async function handleEvaluate(command) {
   const probe = dialogProbe(command);
   if (probe) {
     await ensureDebugger(tab.id);
+    if (probe === "unload") expectLeaving(tab.id);
     const dialogs = probe === "dialogs" ? takeAnsweredDialogs(tab.id) : [];
     return { id: command.id, success: true, data: { result: dialogs } };
   }

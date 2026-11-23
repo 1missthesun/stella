@@ -133,12 +133,19 @@ impl PipeOwners {
             .and_then(Value::as_str)
             .map(str::trim)
             .filter(|owner| !owner.is_empty());
-        let Some(owner_id) = owner_id else {
-            return PipeOutcome::UseExtension;
-        };
         if !bridge.has_debugger_pipe(generation).await {
             return PipeOutcome::UseExtension;
         }
+        let Some(owner_id) = owner_id else {
+            if !is_piped_action(action) {
+                return PipeOutcome::UseExtension;
+            }
+            return PipeOutcome::Done(json!({
+                "id": command.get("id").cloned().unwrap_or(Value::Null),
+                "success": false,
+                "error": format!("{action} in the user's browser needs an ownerId"),
+            }));
+        };
         let key: OwnerKey = (owner_id.to_string(), generation);
         if matches!(
             action,
@@ -162,6 +169,9 @@ impl PipeOwners {
                 let owner = owner.lock().await;
                 owner.link.set_lease(command);
                 let _ = owner.link.attach(tab_id).await;
+                if let Some(browser) = owner.state.browser.as_ref() {
+                    browser.dialogs.resume().await;
+                }
             }
             return PipeOutcome::UseExtension;
         }
@@ -183,13 +193,9 @@ impl PipeOwners {
             tokio::time::timeout(limit, execute_piped(command, &mut owner.state, &link)).await;
         owner.last_used = Instant::now();
         match outcome {
-            Ok(Some(response)) => {
+            Ok(response) => {
                 held.armed = false;
                 PipeOutcome::Done(response)
-            }
-            Ok(None) => {
-                held.armed = false;
-                PipeOutcome::UseExtension
             }
             Err(_) => PipeOutcome::Done(json!({
                 "id": command.get("id").cloned().unwrap_or(Value::Null),
@@ -458,6 +464,13 @@ impl PipeLink {
                 Err(error)
             }
         }
+    }
+
+    /// Opens an empty page in a tab that can't be debugged as it is.
+    pub(crate) async fn blank(&self, tab_id: u64) -> Result<(), String> {
+        self.call("pipe_blank", json!({ "tabId": tab_id }))
+            .await
+            .map(drop)
     }
 
     pub(crate) async fn detach_all(&self) {

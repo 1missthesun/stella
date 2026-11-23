@@ -621,7 +621,11 @@ export const piChatsFor = (
         void runner.piTools
           .releaseAgentComputerUse(threadId)
           .catch((error) => console.warn("[pi-chat] stopping the agent's computer-use helper failed", error));
-        const sessionIds = runner.backgroundExits.untold(threadId).map((shell) => shell.sessionId);
+        // One that ended with a stop is no news to start a turn for, unless the task waits for it.
+        const sessionIds = runner.backgroundExits
+          .untold(threadId)
+          .filter((shell) => waiting || !shell.stoppedWithTask)
+          .map((shell) => shell.sessionId);
         if (sessionIds.length === 0) return;
         runner.backgroundExits.arm({ conversationId, agentId: threadId, sessionIds, ...(interrupted ? { interrupted: true } : {}) });
       },

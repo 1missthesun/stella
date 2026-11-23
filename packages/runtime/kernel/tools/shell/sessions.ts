@@ -81,6 +81,7 @@ export type ShellExitSnapshot = {
   startedAt: number;
   completedAt: number;
   output: string;
+  stoppedWithTask?: boolean;
   owner?: ShellSessionOwner;
 };
 
@@ -107,6 +108,8 @@ export type ManagedShellRecord = ShellRecord & {
   acceptedWriteIds: Map<string, { fingerprint: string; acceptedAt: number }>;
   /** Left running in the background, and its owner has not been told that it ended. */
   untold?: boolean;
+  /** Ended because the task that ran it was stopped. */
+  stoppedWithTask?: boolean;
 };
 
 type PrunedShellSession = {
@@ -317,6 +320,7 @@ export const readShellExitSnapshot = (
     startedAt: record.startedAt,
     completedAt: record.completedAt ?? Date.now(),
     output: sanitizeToolVisibleText(record.output),
+    ...(record.stoppedWithTask ? { stoppedWithTask: true } : {}),
     ...(record.owner ? { owner: record.owner } : {}),
   };
 };
@@ -348,6 +352,7 @@ export type UntoldTaskShell = {
   sessionId: string;
   command: string;
   ended: boolean;
+  stoppedWithTask?: boolean;
 };
 
 export const listUntoldTaskShells = (
@@ -361,6 +366,7 @@ export const listUntoldTaskShells = (
       command: shell.command,
       // One whose owner is reading it right now is told by that call.
       ended: !shell.running && shell.pendingInteractions === 0,
+      ...(shell.stoppedWithTask ? { stoppedWithTask: true } : {}),
     }));
 
 /** Takes the end of a background command to tell its owner; whoever takes it is the one to tell. */
@@ -382,16 +388,6 @@ export const releaseShellExit = (
 ): void => {
   const record = state.shells.get(sessionId);
   if (record) record.untold = true;
-};
-
-/** A stopped owner is not told of the commands its stop ended. */
-export const dropUntoldShellExits = (
-  state: ShellState,
-  agentId: string,
-): void => {
-  for (const record of state.shells.values()) {
-    if (record.owner?.agentId === agentId) record.untold = false;
-  }
 };
 
 /** Background commands a task started that are still running (what a quit would stop). */

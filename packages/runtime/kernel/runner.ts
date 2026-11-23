@@ -367,8 +367,7 @@ export const createStellaHostRunner = (
       endAgentSessions: async (agentId) => {
         context.state.backgroundExitWake?.disarm(agentId);
         const owned = context.toolHost.listRunningTaskShells().filter((shell) => shell.agentId === agentId);
-        context.toolHost.dropUntoldShellExits(agentId);
-        await Promise.all(owned.map((shell) => context.toolHost.killShell(shell.sessionId)));
+        await Promise.all(owned.map((shell) => context.toolHost.stopTaskShell(shell.sessionId)));
         return owned.length;
       },
     },

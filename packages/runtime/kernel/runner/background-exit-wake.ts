@@ -68,8 +68,9 @@ export const truncateMiddle = (value: string, max = INLINE_OUTPUT_CHARS) => {
   ].join("");
 };
 const describeExit = (exit: ShellExitSnapshot, logPath: string | null) => {
-  const outcome =
-    exit.exitCode === 0
+  const outcome = exit.stoppedWithTask
+    ? "was stopped when you were stopped,"
+    : exit.exitCode === 0
       ? "succeeded"
       : exit.exitCode === null
         ? "ended without an exit code"

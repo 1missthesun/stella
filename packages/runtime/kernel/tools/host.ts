@@ -26,7 +26,6 @@ import {
   buildAgentShellEnvironment,
   createShellState,
   claimShellExit,
-  dropUntoldShellExits,
   listRunningTaskShells,
   listUntoldTaskShells,
   releaseShellExit,
@@ -625,10 +624,11 @@ export const createToolHost = ({
 
   const killAllShells = () => shutdownManagedShells(shellState);
 
-  const killShell = async (sessionId: string) => {
+  const stopTaskShell = async (sessionId: string) => {
     const shell = shellState.shells.get(sessionId);
     if (!shell) return;
     if (shell.running) {
+      shell.stoppedWithTask = true;
       shell.kill();
     }
     await waitForShellExit(shell, 1_500);
@@ -710,7 +710,6 @@ export const createToolHost = ({
     listUntoldTaskShells: (agentId: string) => listUntoldTaskShells(shellState, agentId),
     claimShellExit: (sessionId: string) => claimShellExit(shellState, sessionId),
     releaseShellExit: (sessionId: string) => releaseShellExit(shellState, sessionId),
-    dropUntoldShellExits: (agentId: string) => dropUntoldShellExits(shellState, agentId),
     releaseAgentComputerSessions: (agentId: string) =>
       nodeReplRegistry.releaseAgentNativeSessions(agentId),
     browserTaskStarted: (agentId: string) =>
@@ -718,7 +717,7 @@ export const createToolHost = ({
     browserTaskEnded: (agentId: string, keepTabs: boolean, report?: string) =>
       nodeReplRegistry.browserTaskEnded(agentId, keepTabs, report),
     killAllShells,
-    killShell,
+    stopTaskShell,
     shutdown,
     registerExtensionTools: (tools: ToolDefinition[]) => {
       const accepted: ToolDefinition[] = [];

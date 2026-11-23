@@ -95,6 +95,7 @@ type ExecToolPayload = {
   cwd: string;
   command: string;
   hint?: string;
+  stopped_with_task?: true;
 };
 
 const buildExecToolPayload = (
@@ -129,6 +130,7 @@ const buildExecToolPayload = (
     cwd: record.cwd,
     command: record.command,
   };
+  if (record.stoppedWithTask) payload.stopped_with_task = true;
   if (!record.running && record.exitCode !== 0) {
     const hint = getTerminalRecoveryHint({
       command: record.command,
@@ -178,7 +180,9 @@ const formatExecToolResult = (
     ? state.shellsEndWithTurn
       ? `Process still running with session ID ${payload.session_id}. It is stopped when your turn ends, so poll it with write_stdin until it's done.`
       : `Process still running with session ID ${payload.session_id}. When it ends you are told, with its output: with your next tool result, or in a new turn if yours is over. No need to poll; use write_stdin to interact with it, or to wait when nothing else is left to do this turn.`
-    : `Process exited with code ${payload.exit_code ?? "unknown"}`;
+    : payload.stopped_with_task
+      ? "Process was stopped when you were stopped; it did not finish."
+      : `Process exited with code ${payload.exit_code ?? "unknown"}`;
   return [
     `Wall time: ${payload.wall_time_seconds.toFixed(4)} seconds`,
     status,

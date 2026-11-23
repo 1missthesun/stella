@@ -12,7 +12,6 @@ export {
   claimShellExit,
   cleanupShellSessions,
   createShellState,
-  dropUntoldShellExits,
   listRunningTaskShells,
   listUntoldTaskShells,
   type RunningTaskShell,

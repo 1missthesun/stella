@@ -197,11 +197,10 @@ export type RunnerContext = {
       sessionId: string,
     ) => import("../tools/shell.js").ShellExitSnapshot | null;
     releaseShellExit: (sessionId: string) => void;
-    dropUntoldShellExits: (agentId: string) => void;
     listRunningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
     onTaskShellsChanged: (listener: (() => void) | undefined) => void;
     killAllShells: () => Promise<void>;
-    killShell: (sessionId: string) => Promise<void> | void;
+    stopTaskShell: (sessionId: string) => Promise<void> | void;
     shutdown: () => Promise<void>;
   };
 };

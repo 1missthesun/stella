@@ -12,11 +12,11 @@ import {
   mutationOutcomeIsUnknown,
 } from "./cancellation.js";
 
-export const MAX_CHAIN_STEPS = 100;
-export const DEFAULT_CHAIN_RUNTIME_MS = 45_000;
-export const MAX_CHAIN_RUNTIME_MS = 240_000;
+const MAX_CHAIN_STEPS = 100;
+const DEFAULT_CHAIN_RUNTIME_MS = 45_000;
+const MAX_CHAIN_RUNTIME_MS = 240_000;
 const MAX_CHAIN_STEP_TIMEOUT_MS = 30_000;
-export const CHAIN_ACTION_ALLOWLIST = new Set([
+const CHAIN_ACTION_ALLOWLIST = new Set([
   "healthcheck",
   "navigate",
   "open",
@@ -162,7 +162,7 @@ function validateOptionalBoolean(command, key) {
   }
 }
 
-export function validateChainCommand(command) {
+function validateChainCommand(command) {
   if (!isPlainObject(command)) {
     throw new Error("Chain command must be a plain object");
   }

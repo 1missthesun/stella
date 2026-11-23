@@ -3,7 +3,6 @@ import {
   holdDebugger,
   onCdpEvent,
   offCdpEvent,
-  clearCdpEvents,
   releaseDebugger,
 } from "./page-debugger.js";
 import { getActiveTab } from "../commands/tabs.js";

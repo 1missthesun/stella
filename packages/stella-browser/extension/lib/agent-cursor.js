@@ -10,7 +10,7 @@ const CURSOR_FILL = { r: 51, g: 156, b: 255, a: 1 };
 const CURSOR_OUTLINE = { r: 255, g: 255, b: 255, a: 1 };
 
 /** An arrow pointer with its tip at `point`, as an Overlay.highlightQuad quad. */
-export const agentCursorQuad = ({ x, y }) => [
+const agentCursorQuad = ({ x, y }) => [
   x,
   y,
   x,

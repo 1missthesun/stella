@@ -29,7 +29,7 @@ const noise = (scale) =>
  * passed at this pace and at slower ones alike, so it is as fast as stays
  * comfortably human.
  */
-export const PACE = Object.freeze({
+const PACE = Object.freeze({
   moveBase: 45,
   movePerDoubling: 65,
   moveMax: 420,
@@ -53,7 +53,7 @@ function bezier(p0, p1, p2, p3, t) {
 }
 
 /** Samples (with the delay before each, in ms) of one movement, excluding `to`. */
-export function trajectory(from, to) {
+function trajectory(from, to) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.hypot(dx, dy);
@@ -105,7 +105,7 @@ export function trajectory(from, to) {
 }
 
 /** Per-frame wheel deltas for one scroll gesture: quick start, eased stop. */
-export function glide(dx, dy) {
+function glide(dx, dy) {
   const distance = Math.hypot(dx, dy);
   if (distance < 40) return [{ x: dx, y: dy }];
   const frames = Math.max(
@@ -138,10 +138,10 @@ const clampToViewport = (point, viewport) => {
   };
 };
 
-export const ALT = 1;
-export const CONTROL = 2;
-export const META = 4;
-export const SHIFT = 8;
+const ALT = 1;
+const CONTROL = 2;
+const META = 4;
+const SHIFT = 8;
 
 const def = (key, code, keyCode, text = "", location = 0) => ({
   key,
@@ -195,7 +195,7 @@ const PUNCTUATION = [
 ];
 
 /** The US-layout key for a typed character and whether it needs Shift. */
-export function charDefinition(c) {
+function charDefinition(c) {
   if (/^[a-z]$/.test(c)) return [def(c, `Key${c.toUpperCase()}`, c.toUpperCase().charCodeAt(0), c), false];
   if (/^[A-Z]$/.test(c)) return [def(c, `Key${c}`, c.charCodeAt(0), c), true];
   if (/^[0-9]$/.test(c)) return [def(c, `Digit${c}`, c.charCodeAt(0), c), false];
@@ -239,7 +239,7 @@ const MODIFIER_ALIASES = {
 };
 
 /** Splits "Control+Shift+K" into modifiers and key; ControlOrMeta is Meta on macOS. */
-export function parseCombo(combo, mac) {
+function parseCombo(combo, mac) {
   const trimmed = String(combo).trim();
   if (!trimmed) throw new Error("Empty key");
   const parts = [];
@@ -323,7 +323,7 @@ function tabState(tabId) {
   return state;
 }
 
-export function forgetTabInput(tabId) {
+function forgetTabInput(tabId) {
   tabStates.delete(tabId);
 }
 
@@ -342,7 +342,7 @@ async function isMac() {
  * Input for one tab. Holding the tab's queue serialises input, so a press
  * never overtakes the movement before it.
  */
-export class HumanInput {
+class HumanInput {
   constructor(tabId, options = {}) {
     this.tabId = tabId;
     this.state = tabState(tabId);

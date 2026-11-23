@@ -73,7 +73,7 @@ function touchOwnerTab(ownerId, tabId, timestamp = Date.now()) {
   state.lastTouchedAtByTabId[String(tabId)] = timestamp;
 }
 
-export function getCommandOwnerId(command) {
+function getCommandOwnerId(command) {
   return normalizeOwnerId(command?.ownerId);
 }
 

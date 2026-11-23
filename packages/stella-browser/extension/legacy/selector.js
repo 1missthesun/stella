@@ -114,7 +114,7 @@ function normalizeSemanticSelector(value) {
   };
 }
 
-export function parseSemanticSelector(selector) {
+function parseSemanticSelector(selector) {
   if (
     typeof selector !== "string" ||
     !selector.startsWith(SEMANTIC_SELECTOR_PREFIX)
@@ -172,7 +172,7 @@ export function setRefMap(ownerId, tabId, refs) {
   ownerMap.set(tabId, refs || {});
 }
 
-export function getRefMap(ownerId, tabId) {
+function getRefMap(ownerId, tabId) {
   if (!Number.isInteger(tabId)) return {};
   return getOwnerRefMap(ownerId)?.get(tabId) || {};
 }
@@ -213,7 +213,7 @@ export function isRef(selector) {
  * @param {string} selector
  * @returns {string|null}
  */
-export function parseRef(selector) {
+function parseRef(selector) {
   if (typeof selector !== "string") return null;
   if (selector.startsWith("@")) return selector.slice(1);
   if (selector.startsWith("ref=")) return selector.slice(4);
@@ -273,7 +273,7 @@ export function resolveSelector(selector, ownerId, tabId) {
  * `stella-mark=<id>` names an element a locator marked in Stella's isolated
  * world, instead of tagging it with an attribute the page could see.
  */
-export const MARK_PREFIX = "stella-mark=";
+const MARK_PREFIX = "stella-mark=";
 
 export function buildComposedCssMatcherAllScript(selector) {
   if (typeof selector !== "string" || selector.length === 0) {

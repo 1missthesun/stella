@@ -13,6 +13,13 @@ import {
   signInLlmOAuth,
   type LlmSignInNotice,
 } from "./llm-sign-in.js";
+import {
+  answerAntigravitySignInForApp,
+  antigravityStatusForApp,
+  cancelAntigravitySignInForApp,
+  signInAntigravityForApp,
+  signOutAntigravityForApp,
+} from "./antigravity.js";
 import { integrationCalls } from "./integration-calls.js";
 import { saveMediaOutput } from "./media-output.js";
 import {
@@ -82,6 +89,14 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
   waitForChatGptCallback: (_context, request) => waitForChatGptCallback(request),
   closeChatGptCallbackListener: (_context, request) => closeChatGptCallbackListener(request),
   cancelLlmOAuthSignIn: (_context, request) => cancelLlmOAuthSignIn(request),
+  antigravityStatus: (context) => antigravityStatusForApp(dataDir(context)),
+  signInAntigravity: (context, request) =>
+    signInAntigravityForApp(dataDir(context), request, (url) => {
+      void reportAppServiceProgress(context, request, { type: "auth_url", url });
+    }),
+  answerAntigravitySignIn: (_context, request) => answerAntigravitySignInForApp(request),
+  cancelAntigravitySignIn: (_context, request) => cancelAntigravitySignInForApp(request),
+  signOutAntigravity: (context) => signOutAntigravityForApp(dataDir(context)),
   resolveLlmOAuthApiKey: (_context, request) => resolveLlmOAuthApiKeyForApp(request),
   listChatGptCatalogModels: () => listChatGptCatalogModels(),
   listClaudeCodeModels: (context, request) =>

@@ -76,6 +76,12 @@ import {
   IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN,
   IPC_CLAUDE_ACCOUNTS_CHANGED,
   IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN,
+  IPC_ANTIGRAVITY_ANSWER,
+  IPC_ANTIGRAVITY_CANCEL,
+  IPC_ANTIGRAVITY_SIGN_IN,
+  IPC_ANTIGRAVITY_SIGN_IN_PROGRESS,
+  IPC_ANTIGRAVITY_SIGN_OUT,
+  IPC_ANTIGRAVITY_STATUS,
   IPC_CLAUDE_ACCOUNTS_INSTALL_CLI,
   IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS,
   IPC_CLAUDE_ACCOUNTS_LIST,
@@ -781,6 +787,13 @@ export const createElectronApi = (
       listLlmOAuthCredentials: invoker(IPC_LLM_CREDENTIALS_LIST_OAUTH),
       loginLlmOAuthCredential: (provider: string) =>
         ipc.invoke(IPC_LLM_CREDENTIALS_LOGIN_OAUTH, { provider }),
+      antigravityStatus: invoker(IPC_ANTIGRAVITY_STATUS),
+      signInAntigravity: invoker(IPC_ANTIGRAVITY_SIGN_IN),
+      onAntigravitySignInProgress: on(IPC_ANTIGRAVITY_SIGN_IN_PROGRESS),
+      answerAntigravitySignIn: (loginId: string, code: string) =>
+        ipc.invoke(IPC_ANTIGRAVITY_ANSWER, { loginId, code }),
+      cancelAntigravitySignIn: invoker(IPC_ANTIGRAVITY_CANCEL),
+      signOutAntigravity: invoker(IPC_ANTIGRAVITY_SIGN_OUT),
       listClaudeLocalAccounts: invoker(IPC_CLAUDE_ACCOUNTS_LIST),
       startClaudeLocalLogin: (options?: {
         configId?: string;

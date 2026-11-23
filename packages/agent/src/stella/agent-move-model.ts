@@ -1,5 +1,5 @@
 import type { ModelRef } from "@earendil-works/pi-durable";
-import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
+import { cliEnginePick, onCliEngine } from "../engine/selection.ts";
 import { accountProviderOfRegistryId } from "../provider/account-byok.ts";
 import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 
@@ -12,8 +12,6 @@ export const agentMoveModel = (model: ModelRef | undefined, thinkingLevel?: stri
     const alias = parseStellaModelId(model.modelId)?.alias;
     return alias ? `${alias.startsWith("stella/") ? alias : `stella/${alias}`}${effort}` : undefined;
   }
-  if (onClaudeCode(model)) {
-    return `${CLAUDE_CODE_PROVIDER_ID}${model.modelId && model.modelId !== "default" ? `/${model.modelId}` : ""}${effort}`;
-  }
+  if (onCliEngine(model)) return cliEnginePick(model, thinkingLevel && REASONING_EFFORTS.has(thinkingLevel) ? thinkingLevel : undefined);
   return `${accountProviderOfRegistryId(model.provider) ?? model.provider}/${model.modelId}${effort}`;
 };

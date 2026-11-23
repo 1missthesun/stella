@@ -28,7 +28,7 @@
 import { GenerationTask, hook } from "@earendil-works/pi-durable";
 import type { Message, ModelThinkingLevel, SystemMessage, UserMessage } from "@earendil-works/pi-ai";
 import { SYSTEM_REMINDER_TAG, wrapSystemReminder } from "@stella/contracts/system-reminders";
-import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
+import { ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
 import { accountProviderOfRegistryId } from "../provider/account-byok.ts";
 import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 
@@ -48,7 +48,7 @@ export const RESIDENT_SECTION_KEYS: ReadonlySet<string> = new Set([
 
 export const ENGINE_MODEL_SECTION = "engine-model";
 
-export type RunsOn = { engine: "Stella" | "Claude Code"; model: string; reasoning?: string };
+export type RunsOn = { engine: "Stella" | "Claude Code" | "Google Antigravity"; model: string; reasoning?: string };
 
 const CLAUDE_CODE_ALIASES = ["opus", "sonnet", "haiku", "fable"];
 
@@ -58,7 +58,7 @@ const describeRunsOn = (run: RunsOn): string =>
 export const engineModelText = (run: RunsOn): string => `You run on ${describeRunsOn(run)}.`;
 
 const sectionRunsOn = (text: string | undefined): RunsOn | undefined => {
-  const match = text?.match(/You run on (Stella|Claude Code), model (.+?)(?:, reasoning (\w+))?\.\n?<\/engine-model>/);
+  const match = text?.match(/You run on (Stella|Claude Code|Google Antigravity), model (.+?)(?:, reasoning (\w+))?\.\n?<\/engine-model>/);
   if (!match) return undefined;
   return { engine: match[1] as RunsOn["engine"], model: match[2]!, ...(match[3] ? { reasoning: match[3] } : {}) };
 };
@@ -66,6 +66,7 @@ const sectionRunsOn = (text: string | undefined): RunsOn | undefined => {
 export const runsOn = (provider: string, modelId: string, thinkingLevel?: ModelThinkingLevel): RunsOn => {
   const reasoning = thinkingLevel === undefined || thinkingLevel === "off" ? {} : { reasoning: thinkingLevel };
   if (provider === CLAUDE_CODE_PROVIDER_ID) return { engine: "Claude Code", model: modelId, ...reasoning };
+  if (provider === ANTIGRAVITY_CLI_PROVIDER_ID) return { engine: "Google Antigravity", model: modelId, ...reasoning };
   const model =
     provider === STELLA_PROVIDER_ID
       ? (parseStellaModelId(modelId)?.alias ?? modelId)

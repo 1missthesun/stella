@@ -2165,13 +2165,13 @@
       "stellaModelsHint": "包含在你的 Stella 方案中",
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "使用 Google 登入",
-      "antigravitySwitch": "使用其他 Google 帳戶登入",
-      "antigravityBrowserWaiting": "請在瀏覽器中完成 Google 登入。",
       "antigravitySignedIn": "這台電腦已登入 Google Antigravity。",
       "antigravityHint": "使用你的 Google 方案執行 Gemini，用於這台電腦上的任務",
-      "antigravityFreeNote": "此帳戶需要 Google AI Pro 或 Ultra 才能使用 Gemini 4 Neon 及其他 Gemini 4 模型。免費方案可使用 Gemini 3.8 Flash。",
-      "antigravityRisk": "如果 Google 發現帳戶在其自家應用程式以外使用，可能會暫停該帳戶的 Antigravity。",
-      "antigravityPlanFree": "免費方案"
+      "antigravityOpened": "Google 登入頁面已在瀏覽器中開啟。請在那裡登入，然後貼上顯示的代碼。",
+      "antigravityCode": "貼上 Google 顯示的代碼",
+      "antigravityPreparing": "正在準備 Google 的 Antigravity CLI…",
+      "antigravityAgain": "Stella 現在透過 Google 自己的 Antigravity CLI 執行 Gemini。請再登入一次以繼續使用。",
+      "antigravityRisk": "Stella 執行 Google 自己的 Antigravity CLI，由它保存您的 Google 登入。Google 可能會限制用於無人值守工作的帳號。"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

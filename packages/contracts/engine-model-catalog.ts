@@ -56,8 +56,9 @@ export const CHATGPT_ENGINE_MODELS: readonly EngineModelOption[] = [
 ];
 
 /**
- * Gemini on the user's Google Antigravity plan, which runs only on a computer
- * signed in to it. Keep in step with `agent/src/provider/antigravity/models.ts`.
+ * Gemini on the user's Google Antigravity plan, run inside Google's own
+ * Antigravity CLI on a computer signed in to it. Keep in step with
+ * `ANTIGRAVITY_MODEL_ALIASES` in `agent/src/engine/claude-code.ts`.
  */
 export const ANTIGRAVITY_ENGINE_MODELS: readonly EngineModelOption[] = [
   {

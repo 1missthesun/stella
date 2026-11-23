@@ -2175,13 +2175,13 @@
       "stellaModelsHint": "A Stella-csomagod része",
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Bejelentkezés Google-fiókkal",
-      "antigravitySwitch": "Bejelentkezés másik Google-fiókkal",
-      "antigravityBrowserWaiting": "Fejezd be a Google-bejelentkezést a böngészőben.",
       "antigravitySignedIn": "Ez a számítógép be van jelentkezve a Google Antigravitybe.",
       "antigravityHint": "Gemini a Google-előfizetéseddel, a gépen futó feladatokhoz",
-      "antigravityFreeNote": "A Gemini 4 Neonhoz és a többi Gemini 4 modellhez Google AI Pro vagy Ultra kell ezen a fiókon. A Gemini 3.8 Flash az ingyenes csomaggal is működik.",
-      "antigravityRisk": "A Google felfüggesztheti az Antigravityt egy fiókon, ha azt a saját alkalmazásain kívül használják.",
-      "antigravityPlanFree": "Ingyenes csomag"
+      "antigravityOpened": "Megnyílt a Google bejelentkezési oldala a böngésződben. Jelentkezz be ott, majd illeszd be a megjelenő kódot.",
+      "antigravityCode": "Illeszd be a Google által mutatott kódot",
+      "antigravityPreparing": "A Google Antigravity CLI előkészítése…",
+      "antigravityAgain": "A Stella mostantól a Google saját Antigravity CLI-jében futtatja a Geminit. Jelentkezz be még egyszer, hogy tovább használhasd.",
+      "antigravityRisk": "A Stella a Google saját Antigravity CLI-jét futtatja, amely megőrzi a Google-bejelentkezésedet. A Google korlátozhatja a felügyelet nélküli munkára használt fiókokat."
     },
     "engineModels": {
       "ariaLabel": "{engine} modellek",

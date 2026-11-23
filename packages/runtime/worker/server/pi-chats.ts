@@ -435,7 +435,8 @@ export const piChatsFor = (
     import("./claude-code-engine.js").then(({ claudeCodeEngineFor }) => claudeCodeEngineFor(session)),
     import("@stella/agent/host/desktop-execution"),
     import("../../kernel/model-runtime.js"),
-  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }, { modelRuntime }]) =>
+    import("./antigravity-cli-engine.js").then(async (module) => ({ module, engine: await module.antigravityCliEngineFor(session) })),
+  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }, { modelRuntime }, antigravity]) =>
     desktopChats({
       dataDir: session.config.get().stellaDataDirPath,
       placementSettled: () => placementReconciled(RESTART_NOTE_WAIT_MS),
@@ -457,6 +458,8 @@ export const piChatsFor = (
         const auth = await checkClaudeCodeAuth();
         return auth.status === "ok" ? undefined : auth.message;
       },
+      antigravityCliEngine: antigravity.engine,
+      antigravityCliProblem: async () => antigravity.module.antigravityCliProblemFor(session),
       shellEnv: (target) => session.runnerCell.get()?.piTools.shellEnvironment(target),
       userReminders: ({ text, sentAt, previousUserAt, timezone }) =>
         piUserReminders(session.config.get().stellaDataDirPath, {

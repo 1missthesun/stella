@@ -15,6 +15,8 @@ import { listReasoningEffortOptions, type ReasoningEffortOptionId, } from "@/glo
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { recordRecentModel } from "@/global/settings/lib/recent-models";
 import { getPlanLabel, isRestrictedModelOverrideAudience, } from "@/global/billing/audience";
+import { AntigravityModelSection } from "@/features/antigravity/AntigravityModelSection";
+import { ANTIGRAVITY_ENGINE_MODELS } from "@stella/contracts/engine-model-catalog";
 import { announceChatGptPlanUse, ChatGptPlanInUse } from "@/features/chatgpt/ChatGptBrand";
 import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
 import { showToast } from "@/ui/toast";
@@ -69,12 +71,14 @@ const ENGINE_PENDING_TARGET = "__engine__";
 const NATIVE_CLAUDE_CODE_RUNTIME_PENDING_TARGET = "__native_claude_code_runtime__";
 const CHATGPT_SECTION_KEY = "chatgpt-engine";
 const CLAUDE_CODE_SECTION_KEY = "claude-code-engine";
-const HIDDEN_CATALOG_PROVIDERS = ["chatgpt"];
+const ANTIGRAVITY_SECTION_KEY = "antigravity";
+const ANTIGRAVITY_MODELS = ANTIGRAVITY_ENGINE_MODELS.map((model) => ({ id: model.id, label: model.name, description: model.description }));
+const HIDDEN_CATALOG_PROVIDERS = ["chatgpt", ANTIGRAVITY_SECTION_KEY];
 const SECTION_ORDER = [
     "stella",
     CLAUDE_CODE_SECTION_KEY,
     CHATGPT_SECTION_KEY,
-    "antigravity",
+    ANTIGRAVITY_SECTION_KEY,
     "xai",
     "meta",
     "openrouter",
@@ -862,6 +866,15 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                                 ? selectedClaudeCodeModel
                                 : ""} onSelect={(modelId) => void handleEngineModelSelect("claude_code_local", modelId)} loading={claudeCodeModelsLoading} disabled={!preferences || pendingAgent !== null}/>
                       </>)),
+                },
+                {
+                    key: ANTIGRAVITY_SECTION_KEY,
+                    label: "Google Antigravity",
+                    brandKey: "antigravity",
+                    selected: current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`),
+                    content: () => (<AntigravityModelSection>
+                        <EngineScopedModelList engineLabel="Google Antigravity" hideHead selectedRowExtra={reasoningControl} models={ANTIGRAVITY_MODELS} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? current.slice(ANTIGRAVITY_SECTION_KEY.length + 1) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>
+                      </AntigravityModelSection>),
                 },
                 {
                     key: CHATGPT_SECTION_KEY,

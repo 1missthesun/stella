@@ -7,7 +7,6 @@ import { createProvider, type MutableModels, type Provider } from "@earendil-wor
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ModelRef } from "@earendil-works/pi-durable";
 import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
-import { antigravityProvider } from "./antigravity/provider.ts";
 import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "./chatgpt.ts";
 import { STELLA_PROVIDER_ID } from "./stella.ts";
 
@@ -37,7 +36,7 @@ const PROVIDER_ALIASES: Record<string, string> = {
   codex: CHATGPT_PROVIDER_ID,
 };
 const PROVIDER_FAMILIES: Record<string, string[]> = { moonshotai: ["moonshotai", "kimi-coding"] };
-const ENGINE_PROVIDERS = new Set(["claude-code"]);
+const ENGINE_PROVIDERS = new Set(["claude-code", "antigravity"]);
 
 const parseLocal = (raw: string): ModelPick | undefined => {
   const trimmed = raw.trim();
@@ -100,7 +99,7 @@ export const storeOnlyAuthContext: AuthContext = {
 
 export function byokModels(models: MutableModels, resolveDirect?: DirectModelResolver) {
   let upstream: Provider[] | undefined;
-  const upstreamProviders = () => (upstream ??= [...builtinProviders(), antigravityProvider()]);
+  const upstreamProviders = () => (upstream ??= [...builtinProviders()]);
   let registered = false;
   const registerUpstream = () => {
     if (registered) return;

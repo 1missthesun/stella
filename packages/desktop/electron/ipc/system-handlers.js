@@ -16,7 +16,7 @@ import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effor
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
 import { hasRealtimeVoiceSessionRouteChanged, } from "@stella/contracts/local-preferences";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/node-shared/storage/llm-credentials";
-import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/node-shared/storage/llm-oauth-credentials";
+import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, hadRetiredLlmOAuthSignIn, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/node-shared/storage/llm-oauth-credentials";
 import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchAppServiceProgress, } from "../services/runtime-app-services.js";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/node-shared/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
@@ -93,6 +93,12 @@ import {
   IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN,
   IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN,
   IPC_CLAUDE_ACCOUNTS_SIGN_OUT,
+  IPC_ANTIGRAVITY_ANSWER,
+  IPC_ANTIGRAVITY_CANCEL,
+  IPC_ANTIGRAVITY_SIGN_IN,
+  IPC_ANTIGRAVITY_SIGN_IN_PROGRESS,
+  IPC_ANTIGRAVITY_SIGN_OUT,
+  IPC_ANTIGRAVITY_STATUS,
   IPC_CLAUDE_ACCOUNTS_INSTALL_CLI,
   IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS,
   IPC_CHATGPT_PROFILES_CHANGED,
@@ -1147,6 +1153,72 @@ export const registerSystemHandlers = (options) => {
                 activeOAuthLogins.delete(loginKey);
             }
         }
+    });
+    const guardAntigravity = (event, channel) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, channel)) {
+            throw new Error(`Blocked untrusted ${channel} request.`);
+        }
+    };
+    const antigravityStatus = async () => {
+        const stellaAppDir = options.getStellaAppDir();
+        const status = await callRuntimeAppService("antigravityStatus");
+        return {
+            ...status,
+            signInAgain: !status.signedIn && Boolean(stellaAppDir && hadRetiredLlmOAuthSignIn(stellaAppDir, "antigravity")),
+        };
+    };
+    let antigravityLogin = null;
+    const cancelAntigravityLogin = (loginId) => {
+        void callRuntimeAppService("cancelAntigravitySignIn", { loginId }).catch(() => undefined);
+    };
+    handleIpc(IPC_ANTIGRAVITY_STATUS, async (event) => {
+        guardAntigravity(event, IPC_ANTIGRAVITY_STATUS);
+        return await antigravityStatus();
+    });
+    handleIpc(IPC_ANTIGRAVITY_SIGN_IN, async (event) => {
+        guardAntigravity(event, IPC_ANTIGRAVITY_SIGN_IN);
+        if (antigravityLogin) cancelAntigravityLogin(antigravityLogin);
+        const loginId = randomUUID();
+        antigravityLogin = loginId;
+        const sender = event.sender;
+        const report = (progress) => {
+            if (!sender.isDestroyed()) sender.send(IPC_ANTIGRAVITY_SIGN_IN_PROGRESS, progress);
+        };
+        const cancel = () => cancelAntigravityLogin(loginId);
+        sender.once("destroyed", cancel);
+        const stopWatching = watchAppServiceProgress(loginId, (notice) => {
+            if (notice.type !== "auth_url") return;
+            void shell.openExternal(notice.url);
+            report({ phase: "code", loginId, url: notice.url });
+        });
+        try {
+            report({ phase: "preparing" });
+            await callRuntimeAppService("signInAntigravity", { loginId });
+            return await antigravityStatus();
+        }
+        finally {
+            stopWatching();
+            sender.removeListener("destroyed", cancel);
+            if (antigravityLogin === loginId) antigravityLogin = null;
+        }
+    });
+    handleIpc(IPC_ANTIGRAVITY_ANSWER, async (event, payload) => {
+        guardAntigravity(event, IPC_ANTIGRAVITY_ANSWER);
+        await callRuntimeAppService("answerAntigravitySignIn", {
+            loginId: asTrimmedString(payload?.loginId),
+            code: typeof payload?.code === "string" ? payload.code : "",
+        });
+    });
+    handleIpc(IPC_ANTIGRAVITY_CANCEL, (event) => {
+        guardAntigravity(event, IPC_ANTIGRAVITY_CANCEL);
+        if (!antigravityLogin) return { canceled: false };
+        cancelAntigravityLogin(antigravityLogin);
+        return { canceled: true };
+    });
+    handleIpc(IPC_ANTIGRAVITY_SIGN_OUT, async (event) => {
+        guardAntigravity(event, IPC_ANTIGRAVITY_SIGN_OUT);
+        await callRuntimeAppService("signOutAntigravity");
+        return await antigravityStatus();
     });
     const claudeAccounts = options.claudeLocalAccounts;
     const guardClaude = (event, channel) => {

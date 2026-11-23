@@ -20,6 +20,7 @@ import {
   type ContextEdit,
   defineDoc,
   LiveDoc,
+  type Agent,
   type Conversation,
   type ConversationId,
   type Cursor,
@@ -113,7 +114,7 @@ import {
   type RunsOn,
   unansweredText,
 } from "../stella/agents.ts";
-import type { StellaToolHost } from "../stella/host-tools.ts";
+import { agentToolSelection, type StellaToolHost } from "../stella/host-tools.ts";
 import {
   parseStellaModelId,
   STELLA_PROVIDER_ID,
@@ -130,7 +131,6 @@ import {
   type ModelPick,
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
-import { ANTIGRAVITY_PROVIDER_ID } from "../provider/antigravity/models.ts";
 import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
 import { effectiveContextModels } from "../provider/effective-context.ts";
 import {
@@ -161,7 +161,7 @@ import {
 import { ownHistoryQuery } from "../stella/own-history.ts";
 import { ownHistorySql } from "@stella/runtime/kernel/storage/own-history-sql";
 import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
-import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
+import { ANTIGRAVITY_CLI_ENGINE_EXTENSION, ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onAntigravityCli, onClaudeCode, onCliEngine } from "../engine/selection.ts";
 import { agentLogDeviceHolder, type AgentLogCalls } from "@stella/contracts/backend/agent-logs";
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/agent-log-sync.ts";
@@ -293,6 +293,9 @@ export type DesktopChatsOptions = {
   journal?(conversationId: string): DesktopJournal | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
   claudeCodeProblem?(): Promise<string | undefined>;
+  /** Google's own Antigravity CLI as an engine, on the same machinery as Claude Code's. */
+  antigravityCliEngine?: ClaudeCodeEngine;
+  antigravityCliProblem?(): Promise<string | undefined>;
   userReminders?(input: {
     conversationId: string;
     text: string;
@@ -811,7 +814,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (card.resume) {
       // Resume pressed on another device: wake what this computer holds.
       if (card.requestId && ownResumes.has(card.requestId)) return;
-      if (Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS) claudeCodeEngine?.wakeUsageLimitHolds(conversationId);
+      if (Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS) for (const engine of cliEngines) engine.wakeUsageLimitHolds(conversationId);
     }
     applyUsageLimitCard(pauses, card, at);
     if (pauses.held.size > 0 || before > 0 || card.resume) {
@@ -820,7 +823,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
   /** Resume pressed here: continue everything the limit paused in this chat, wherever it runs. */
   const resumeUsageLimit = async (conversationId: string): Promise<{ woken: number; cloud: number }> => {
-    const woken = claudeCodeEngine?.wakeUsageLimitHolds(conversationId) ?? 0;
+    const woken = cliEngines.reduce((sum, engine) => sum + engine.wakeUsageLimitHolds(conversationId), 0);
     const pauses = pausesOf(conversationId);
     const now = Date.now();
     applyUsageLimitCard(pauses, { type: "usage-limit", state: "resumed", resume: true }, now);
@@ -976,10 +979,20 @@ export function desktopChats(options: DesktopChatsOptions) {
   const usageLimitPaused = (conversationId: string, threadId: string): boolean =>
     heldThreads.has(threadId) || (usageLimitPauses.get(conversationId)?.held.has(threadId) ?? false);
   const claudeCodeEngine = options.claudeCodeEngine;
-  if (claudeCodeEngine) {
-    models.setProvider(claudeCodeEngine.provider());
-    claudeCodeEngine.onProviderChange((provider) => models.setProvider(provider));
-    claudeCodeEngine.onStatus((session, status) => {
+  const antigravityCliEngine = options.antigravityCliEngine;
+  const cliEngines: ClaudeCodeEngine[] = [claudeCodeEngine, antigravityCliEngine].filter(
+    (engine): engine is ClaudeCodeEngine => engine !== undefined,
+  );
+  const cliEngineOf = (provider: string | undefined): ClaudeCodeEngine | undefined =>
+    provider === CLAUDE_CODE_PROVIDER_ID ? claudeCodeEngine : provider === ANTIGRAVITY_CLI_PROVIDER_ID ? antigravityCliEngine : undefined;
+  for (const [engineName, cliEngine] of [
+    ["claude-code", claudeCodeEngine],
+    ["antigravity", antigravityCliEngine],
+  ] as const) {
+    if (!cliEngine) continue;
+    models.setProvider(cliEngine.provider());
+    cliEngine.onProviderChange((provider) => models.setProvider(provider));
+    cliEngine.onStatus((session, status) => {
       if (status.state === "usage-limit" || status.state === "usage-limit-end") {
         noteUsageLimit(session.conversationId, session.threadId, status);
         return;
@@ -1000,15 +1013,15 @@ export function desktopChats(options: DesktopChatsOptions) {
         })
         .catch(() => undefined);
     });
-    claudeCodeEngine.onCompaction((session, compaction, conversationId) => {
+    cliEngine.onCompaction((session, compaction, conversationId) => {
       void (async () => {
         const chat = await ready(session.conversationId);
         const conversation = session.threadId ? await chat.harness.conversation(conversationId, context) : chat.root;
         if (!conversation) return;
-        await recordEngineCompaction(chat.harness, conversation, { ...compaction, engine: "claude-code" }, context);
+        await recordEngineCompaction(chat.harness, conversation, { ...compaction, engine: engineName }, context);
       })().catch((error: unknown) => options.report(error));
     });
-    claudeCodeEngine.onBackgroundWake((session, wake) => {
+    cliEngine.onBackgroundWake((session, wake) => {
       const threadId = session.threadId;
       if (!threadId) return;
       void (async () => {
@@ -1019,7 +1032,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         // later resume had not cleared), and their turn then ran with no Stella
         // turn: every tool call refused and the reply reached no one.
         if (!(await chat.agentStanding(threadId, context))) return;
-        await chat.messageAgent({ key: `claude-code-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true, wake: true }, context);
+        await chat.messageAgent({ key: `${engineName}-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true, wake: true }, context);
       })().catch((error: unknown) => options.report(error));
     });
   }
@@ -1113,10 +1126,9 @@ export function desktopChats(options: DesktopChatsOptions) {
       return stellaModelRef(agentType, alias);
     }
     if (pick.kind === "engine") {
-      if (pick.engine !== CLAUDE_CODE_PROVIDER_ID || !claudeCodeEngine) {
-        throw new Error(`${pick.engine} doesn't run on this computer.`);
-      }
-      return claudeCodeEngine.ensureModel(pick.modelId);
+      const engine = cliEngineOf(pick.engine);
+      if (!engine) throw new Error(`${pick.engine} doesn't run on this computer.`);
+      return engine.ensureModel(pick.modelId);
     }
     if (pick.kind === "direct" && isAccountProviderId(pick.provider) && !(await hasOwnKey(pick.provider, pick.modelId))) {
       return await ensureAccountModel(pick.provider, pick.modelId);
@@ -1148,10 +1160,13 @@ export function desktopChats(options: DesktopChatsOptions) {
         `"${reference}" runs on your ChatGPT plan, and this computer isn't signed in to ChatGPT. Sign in with ChatGPT in Settings › Claude and ChatGPT on this computer, or pick another model.`,
       );
     }
-    if (pick?.kind === "direct" && pick.provider === ANTIGRAVITY_PROVIDER_ID && !(await hasOwnKey(pick.provider, pick.modelId))) {
-      throw new Error(
-        `"${reference}" runs on your Google Antigravity plan, and this computer isn't signed in to it. Sign in with Google under Google Antigravity in Settings › Claude and ChatGPT on this computer, or pick another model.`,
-      );
+    if (pick?.kind === "engine" && pick.engine === ANTIGRAVITY_CLI_PROVIDER_ID) {
+      const problem = await options.antigravityCliProblem?.().catch(() => undefined);
+      if (problem) {
+        throw new Error(
+          `"${reference}" runs on your Google Antigravity plan and can't run here yet: ${problem} Pick another model, or ask the user to sign in.`,
+        );
+      }
     }
     const model = await modelOfPick(pick, "general");
     const thinkingLevel = (effort?.[2] as ModelThinkingLevel | undefined) ?? options.thinkingLevel?.();
@@ -1245,7 +1260,7 @@ export function desktopChats(options: DesktopChatsOptions) {
             );
           }
         }
-        if (pick?.kind === "direct" && pick.provider === ANTIGRAVITY_PROVIDER_ID) {
+        if (pick?.kind === "engine" && pick.engine === ANTIGRAVITY_CLI_PROVIDER_ID) {
           const there = await device();
           const signedIn = there?.online ? deviceEngineSignIns(there.availability?.capabilities) : undefined;
           if (signedIn && !signedIn.includes("antigravity")) {
@@ -1296,9 +1311,15 @@ export function desktopChats(options: DesktopChatsOptions) {
     else restoreOwnModel(ref);
   };
 
+  /** A conversation from when Antigravity was a provider of Stella's own: its model says Antigravity, its extensions don't. */
+  const lacksAntigravityEngine = (agent: Agent): boolean =>
+    antigravityCliEngine !== undefined &&
+    onAntigravityCli(agent.model) &&
+    !agent.extensions.some((extension) => extension.name === ANTIGRAVITY_CLI_ENGINE_EXTENSION);
+
   const restoreOwnModel = (ref: ModelRef): void => {
-    if (onClaudeCode(ref)) {
-      claudeCodeEngine?.ensureModel(ref.modelId);
+    if (onCliEngine(ref)) {
+      cliEngineOf(ref.provider)?.ensureModel(ref.modelId);
       return;
     }
     byok.restore(ref);
@@ -1468,7 +1489,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const chat = await ready(conversationId);
     const stopped = await chat.stopAgent(threadId, context);
     if (!stopped) return "not_found";
-    for (const local of stopped.local) claudeCodeEngine?.stop(conversationId, local);
+    for (const local of stopped.local) for (const engine of cliEngines) engine.stop(conversationId, local);
     return { elsewhere: stopped.elsewhere };
   };
 
@@ -1835,7 +1856,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                   ]
                 : []),
               ...(agentLog ? [agentLog.extension()] : []),
-              ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : []),
+              ...cliEngines.map((engine) => engine.extension(conversationId)),
             ],
             env: environments.env,
             onReport: options.report,
@@ -1850,12 +1871,21 @@ export function desktopChats(options: DesktopChatsOptions) {
         const resumed = resumedRun !== undefined;
         const log = options.localLog?.(conversationId);
         const localLog = log ? await localLogMirror({ harness, root, log, report: options.report, context }) : undefined;
-        const rootModel = (await root.agent(context)).model;
+        const rootAgent = await root.agent(context);
+        const rootModel = rootAgent.model;
+        if (rootModel && lacksAntigravityEngine(rootAgent)) {
+          await root.configure({ extensions: orchestratorAgent(rootModel).extensions }, context);
+        }
         const aliases = new Set<string>();
         const accountRefs: ModelRef[] = [];
         for (const agent of Object.values((await harness.snapshot(StellaAgentsDoc, root.id, context))?.agents ?? {})) {
           if (agent.remote) continue;
-          const model = (await (await harness.conversation(agent.conversationId as ConversationId, context))?.agent(context))?.model;
+          const conversation = await harness.conversation(agent.conversationId as ConversationId, context);
+          const settings = await conversation?.agent(context);
+          const model = settings?.model;
+          if (conversation && settings && lacksAntigravityEngine(settings)) {
+            await conversation.configure({ extensions: { ...agentToolSelection, ...engineExtensionChange(model) } }, context);
+          }
           if (model && accountProviderOfRegistryId(model.provider)) accountRefs.push(model);
           else if (model && model.provider !== STELLA_PROVIDER_ID) restoreOwnModel(model);
           else if (model && (await harness.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run) {
@@ -2426,8 +2456,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     const thinkingLevel = options.thinkingLevel?.() ?? "off";
     const moved = agent.model?.provider !== model.provider || agent.model?.modelId !== model.modelId;
     if (moved) {
-      const window = onClaudeCode(model)
-        ? (options.claudeCodeEngine?.contextWindow(model.modelId) ?? 0)
+      const window = onCliEngine(model)
+        ? (cliEngineOf(model.provider)?.contextWindow(model.modelId) ?? 0)
         : (models.getModel(model.provider, model.modelId)?.contextWindow ?? 0);
       const fit = await fitForHandover({ harness: chat.harness, conversation: chat.root, window, context, report: options.report }).catch(
         (error: unknown) => options.report(error),
@@ -2726,6 +2756,16 @@ export function desktopChats(options: DesktopChatsOptions) {
           };
         }
       }
+      if (engineModel?.provider === ANTIGRAVITY_CLI_PROVIDER_ID) {
+        const problem = await options.antigravityCliProblem?.().catch(() => undefined);
+        if (problem) {
+          return {
+            threadId: run.threadId ?? run.agentKey,
+            status: "error",
+            error: `${problem} This agent was started from another device to run on Google Antigravity here; once Antigravity is signed in on this computer, message it to try again.`,
+          };
+        }
+      }
       const result = await chat.runPlacedAgent({ ...placedRun, ...(runsOn ? { runsOn } : {}), signal: placed.cancel.signal }, context);
       // Wakes from its own background work, monitors and schedules here find it
       // (after a restart too); the turns they start are recorded on its thread.
@@ -2817,7 +2857,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       const pending = stopsLanding.get(conversationId) ?? new Set<Promise<unknown>>();
       stopsLanding.set(conversationId, pending.add(stop));
       const ended = await stop.finally(() => pending.delete(stop));
-      for (const local of ended?.local ?? []) claudeCodeEngine?.stop(conversationId, local);
+      for (const local of ended?.local ?? []) for (const engine of cliEngines) engine.stop(conversationId, local);
       return true;
     }
     return true;
@@ -3048,7 +3088,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         case "abort": {
           const chat = await open(request.conversationId);
           await modelsSettled(chat);
-          claudeCodeEngine?.abort(request.conversationId);
+          for (const engine of cliEngines) engine.abort(request.conversationId);
           await stopStella(chat.harness, chat.root, context);
           return { ok: true };
         }
@@ -3114,7 +3154,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       const opened = await Promise.all([...chats.values()].map((chat) => chat.catch(() => undefined)));
       chats.clear();
       const sealed = opened.map((chat) => chat?.harness.close(context).catch(() => undefined));
-      for (const conversationId of ids) claudeCodeEngine?.close(conversationId);
+      for (const conversationId of ids) for (const engine of cliEngines) engine.close(conversationId);
       for (const chat of opened) {
         if (!chat) continue;
         clearInterval(chat.idleCheck);

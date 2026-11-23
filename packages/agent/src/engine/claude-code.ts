@@ -44,6 +44,7 @@ import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safe
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
 import { stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
 import { createHash } from "node:crypto";
+import { ANTIGRAVITY_NATIVE_TOOLS, resolveAntigravityToolSet } from "@stella/runtime/kernel/integrations/antigravity-native-tools";
 import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
 import { fitCodeDescriptionForClaudeCode } from "@stella/runtime/kernel/tools/code-catalog";
@@ -52,7 +53,7 @@ import { residentContextAsOf, residentContextKind, withResidentContext } from ".
 import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "@stella/runtime/kernel/integrations/claude-code-transcript";
 import { isPiCompactionBoundary } from "../stella/handover.ts";
 import { isSafeguardContextBoundary } from "../stella/safeguard.ts";
-import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
+import { ANTIGRAVITY_CLI_ENGINE_EXTENSION, ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 import { abandonToolCall } from "./abandoned-calls.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
@@ -91,6 +92,70 @@ export const CLAUDE_CODE_MODEL_ALIASES = [
   "sonnet[1m]",
   "opus[1m]",
 ] as const;
+
+/**
+ * What differs between the vendor CLIs this engine drives: how Stella names
+ * the engine, which of the CLI's own tools it registers, and which of Stella's
+ * tools the CLI's own replace.
+ */
+export type CliEngineFlavor = {
+  providerId: string;
+  extensionName: string;
+  api: string;
+  label: string;
+  modelAliases: readonly string[];
+  /** The CLI's own tools, registered so its calls appear in the conversation. */
+  engineOnlyTools: readonly string[];
+  /** The CLI's own tools that share a name and shape with Stella's. */
+  wrappedTools: readonly (typeof WRAPPED_TOOLS)[number][];
+  builtinTools: readonly string[];
+  webTools: readonly string[];
+  contextWindow(model: string): number;
+  toolSet(args: { role: ClaudeCodeRole; catalog: ClaudeCodeToolSpec[]; builtinsOff: boolean }): {
+    tools: ClaudeCodeToolSpec[];
+    nativeTools: readonly string[];
+  };
+};
+
+export const CLAUDE_CODE_FLAVOR: CliEngineFlavor = {
+  providerId: CLAUDE_CODE_PROVIDER_ID,
+  extensionName: CLAUDE_CODE_ENGINE_EXTENSION,
+  api: CLAUDE_CODE_API,
+  label: "Claude Code",
+  modelAliases: CLAUDE_CODE_MODEL_ALIASES,
+  engineOnlyTools: ENGINE_ONLY_TOOLS,
+  wrappedTools: WRAPPED_TOOLS,
+  builtinTools: CLAUDE_CODE_BUILTIN_TOOLS,
+  webTools: CLI_WEB_TOOLS,
+  contextWindow: claudeCodeContextWindow,
+  toolSet: ({ role, catalog, builtinsOff }) => resolveClaudeCodeToolSet({ role, catalog, builtinsOff }),
+};
+
+export const ANTIGRAVITY_CLI_API = "antigravity-cli-acp";
+/** Antigravity's own tools carry this prefix in Stella, so none collides with a Stella tool (both have `send_message`). */
+export const ANTIGRAVITY_NATIVE_PREFIX = "agy_";
+/** Any other tool of Antigravity's: its real name travels in the call's arguments. */
+export const ANTIGRAVITY_OTHER_TOOL = `${ANTIGRAVITY_NATIVE_PREFIX}tool`;
+export const ANTIGRAVITY_MODEL_ALIASES = [
+  "gemini-4-neon",
+  "gemini-4-carbon",
+  "gemini-4-argon",
+  "gemini-4-hydrogen",
+  "gemini-3.8-flash",
+] as const;
+export const ANTIGRAVITY_CLI_FLAVOR: CliEngineFlavor = {
+  providerId: ANTIGRAVITY_CLI_PROVIDER_ID,
+  extensionName: ANTIGRAVITY_CLI_ENGINE_EXTENSION,
+  api: ANTIGRAVITY_CLI_API,
+  label: "Google Antigravity",
+  modelAliases: ANTIGRAVITY_MODEL_ALIASES,
+  engineOnlyTools: [...ANTIGRAVITY_NATIVE_TOOLS.map((name) => `${ANTIGRAVITY_NATIVE_PREFIX}${name}`), ANTIGRAVITY_OTHER_TOOL],
+  wrappedTools: [],
+  builtinTools: [...ANTIGRAVITY_NATIVE_TOOLS.map((name) => `${ANTIGRAVITY_NATIVE_PREFIX}${name}`), ANTIGRAVITY_OTHER_TOOL],
+  webTools: [],
+  contextWindow: () => 1_048_576,
+  toolSet: resolveAntigravityToolSet,
+};
 
 const CLAUDE_CODE_CONTEXT_WINDOW = 100_000_000;
 const CLAUDE_CODE_MAX_TOKENS = 128_000;
@@ -555,6 +620,7 @@ const thinkingLevelOf = (options: SimpleStreamOptions | undefined): ModelThinkin
 
 export type ClaudeCodeEngineOptions = {
   transport: ClaudeCodeTransport;
+  flavor?: CliEngineFlavor;
   sessions: ClaudeCodeSessionStore;
   builtins?: "here" | "never";
   resolveModel?(alias: string): string | undefined;
@@ -565,7 +631,8 @@ export type ClaudeCodeEngineOptions = {
 export type ClaudeCodeEngine = ReturnType<typeof createClaudeCodeEngine>;
 
 export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
-  const report = options.report ?? ((error: unknown) => console.error("[claude-code-engine]", error));
+  const flavor = options.flavor ?? CLAUDE_CODE_FLAVOR;
+  const report = options.report ?? ((error: unknown) => console.error(`[${flavor.extensionName}]`, error));
   const sessions = new Map<string, Session>();
   const calls = new Map<string, CallRecord>();
   const nativeResults = new Map<string, NativeResult>();
@@ -575,15 +642,15 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const compactionListeners = new Set<
     (session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction, conversation: ConversationId) => void
   >();
-  const modelIds = new Set<string>(CLAUDE_CODE_MODEL_ALIASES);
+  const modelIds = new Set<string>(flavor.modelAliases);
   let providerListener: ((provider: Provider) => void) | undefined;
 
   const model = (id: string): Model<Api> =>
     ({
       id,
-      name: id === "default" ? "Claude Code" : `Claude Code · ${id}`,
-      api: CLAUDE_CODE_API,
-      provider: CLAUDE_CODE_PROVIDER_ID,
+      name: id === "default" ? flavor.label : `${flavor.label} · ${id}`,
+      api: flavor.api,
+      provider: flavor.providerId,
       baseUrl: "",
       reasoning: true,
       input: ["text", "image"],
@@ -644,7 +711,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     context: Context,
   ): Promise<{ piSessionId: string; binding: Binding; model: string } | undefined> => {
     const agent = await api.snapshot(AgentDoc, api.conversationId, context);
-    if (agent?.model?.provider !== CLAUDE_CODE_PROVIDER_ID) return undefined;
+    if (agent?.model?.provider !== flavor.providerId) return undefined;
     const identity = await api.snapshot(ProviderDoc, api.conversationId, context);
     if (!identity?.sessionId) return undefined;
     const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
@@ -744,7 +811,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     for (const [id, record] of calls) {
       if (record.turn !== turn) continue;
       if (record.native) {
-        if (!nativeResults.has(id)) settleNative(id, { text: "Claude Code stopped before this call finished.", isError: true });
+        if (!nativeResults.has(id)) settleNative(id, { text: `${flavor.label} stopped before this call finished.`, isError: true });
         continue;
       }
       calls.delete(id);
@@ -788,7 +855,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const block = asRecord(raw);
       if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
       if (turn.claimed.has(block.tool_use_id) || turn.refused.has(block.tool_use_id)) continue;
-      turn.refused.set(block.tool_use_id, cliResultText(block.content) || "Claude Code did not run this call.");
+      turn.refused.set(block.tool_use_id, cliResultText(block.content) || `${flavor.label} did not run this call.`);
       changed = true;
     }
     if (changed) reconsiderGates(turn);
@@ -815,7 +882,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
       if (!turn.waiting.has(block.tool_use_id)) continue;
       const said = cliResultText(block.content).trim().slice(0, 300);
-      abandonWaiting(turn, block.tool_use_id, `Claude Code stopped waiting for this call${said ? ` (${said})` : ""}, so Stella stopped it.`);
+      abandonWaiting(turn, block.tool_use_id, `${flavor.label} stopped waiting for this call${said ? ` (${said})` : ""}, so Stella stopped it.`);
     }
   };
 
@@ -825,8 +892,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const gate = (): boolean => {
         let verdict: { run: true } | { refused: string } | undefined;
         if (turn.claimed.has(toolUseId)) verdict = { run: true };
-        else if (turn.refused.has(toolUseId)) verdict = { refused: `Claude Code did not run ${name}; it answered: ${turn.refused.get(toolUseId)}` };
-        else if (turn.done) verdict = { refused: `Claude Code ended its step without running ${name}, so it did not run.` };
+        else if (turn.refused.has(toolUseId)) verdict = { refused: `${flavor.label} did not run ${name}; it answered: ${turn.refused.get(toolUseId)}` };
+        else if (turn.done) verdict = { refused: `${flavor.label} ended its step without running ${name}, so it did not run.` };
         else if (signal?.aborted) verdict = { refused: "Stopped." };
         else if ([...turn.waiting.keys()].some((id) => id !== toolUseId)) verdict = { run: true };
         if (!verdict) return false;
@@ -842,14 +909,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
 
   const toolSetFor = (binding: Binding, tools: readonly { name: string; description: string; parameters: unknown }[]) => {
     const offered = new Set(tools.map((tool) => tool.name));
-    const catalog = tools.filter((tool) => !(ENGINE_ONLY_TOOLS as readonly string[]).includes(tool.name)).map(toolSpec);
-    if (!offered.has("web")) for (const name of CLI_WEB_TOOLS) offered.delete(name);
-    const set = resolveClaudeCodeToolSet({
+    const catalog = tools.filter((tool) => !flavor.engineOnlyTools.includes(tool.name)).map(toolSpec);
+    if (!offered.has("web")) for (const name of flavor.webTools) offered.delete(name);
+    const set = flavor.toolSet({
       role: binding.session.role,
       catalog,
       builtinsOff: binding.builtinsOff,
     });
-    const nativeTools = set.nativeTools.filter((name) => offered.has(name));
+    const nativeTools = flavor === CLAUDE_CODE_FLAVOR ? set.nativeTools.filter((name) => offered.has(name)) : set.nativeTools;
     return { tools: set.tools, nativeTools };
   };
 
@@ -1078,7 +1145,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             turn.waiting.set(toolUseId, resolve);
             reconsiderGates(turn);
             const abandon = () => {
-              if (turn.waiting.get(toolUseId) === resolve) abandonWaiting(turn, toolUseId, "Claude Code canceled this call, so Stella stopped it.");
+              if (turn.waiting.get(toolUseId) === resolve) abandonWaiting(turn, toolUseId, `${flavor.label} canceled this call, so Stella stopped it.`);
             };
             if (signal?.aborted) abandon();
             else signal?.addEventListener("abort", abandon, { once: true });
@@ -1419,7 +1486,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const piSessionId = streamOptions?.sessionId;
     const session = piSessionId ? sessions.get(piSessionId) : undefined;
     if (!session) {
-      fail("Claude Code can't run this conversation here: it was not opened on the Claude Code engine.");
+      fail(`${flavor.label} can't run this conversation here: it was not opened on the ${flavor.label} engine.`);
       return;
     }
     const messages = context.messages;
@@ -1555,12 +1622,12 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
 
   const buildProvider = (): Provider =>
     createProvider({
-      id: CLAUDE_CODE_PROVIDER_ID,
-      name: "Claude Code",
+      id: flavor.providerId,
+      name: flavor.label,
       auth: {
         apiKey: {
-          name: "Claude Code login",
-          resolve: async () => ({ auth: { apiKey: CLAUDE_CODE_PROVIDER_ID }, source: "Claude Code on this computer" }),
+          name: `${flavor.label} login`,
+          resolve: async () => ({ auth: { apiKey: flavor.providerId }, source: `${flavor.label} on this computer` }),
         },
       },
       models: [...modelIds].map(model),
@@ -1640,10 +1707,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       },
     }));
 
-  const engineOnly = (name: (typeof ENGINE_ONLY_TOOLS)[number]) =>
+  const engineOnly = (name: string) =>
     defineTool({
       name,
-      description: `Claude Code's ${name}.`,
+      description: `${flavor.label}'s ${name}.`,
       parameters: obj({}, { open: true }),
       async execute(_args, api, context) {
         if (isNativeCall(api.callId)) return await nativeOutcome(api, context);
@@ -1662,17 +1729,17 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         modelIds.add(modelId);
         providerListener?.(buildProvider());
       }
-      return { provider: CLAUDE_CODE_PROVIDER_ID, modelId };
+      return { provider: flavor.providerId, modelId };
     },
     contextWindow(model: string): number {
       const resolved = options.resolveModel?.(model) ?? model;
-      return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(model) ?? claudeCodeContextWindow(resolved);
+      return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(model) ?? flavor.contextWindow(resolved);
     },
     extension(conversationId: string): Extension {
       return defineExtension({
-        name: CLAUDE_CODE_ENGINE_EXTENSION,
-        tools: ENGINE_ONLY_TOOLS.map((name) => engineOnly(name)),
-        wraps: WRAPPED_TOOLS.map(wrapBuiltin),
+        name: flavor.extensionName,
+        tools: flavor.engineOnlyTools.map((name) => engineOnly(name)),
+        wraps: flavor.wrappedTools.map(wrapBuiltin),
         hooks: [
           hook(GenerationTask, {
             beforeRequest: async (_request, api, context) => {
@@ -1708,10 +1775,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               if (!record) return undefined;
               if (record.truncated) return { block: record.truncated };
               if (record.native) {
-                if ((CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(record.name)) return undefined;
+                if (flavor.builtinTools.includes(record.name)) return undefined;
                 const result = await nativeResult(call.id, context);
                 calls.delete(call.id);
-                return { block: `Claude Code did not run ${record.name} as a Stella tool; it answered: ${result.text || "(no output)"}` };
+                return { block: `${flavor.label} did not run ${record.name} as a Stella tool; it answered: ${result.text || "(no output)"}` };
               }
               const refused = await cliRuns(record.turn, call.id, record.name, context);
               return refused === undefined ? undefined : { block: refused };

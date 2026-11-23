@@ -180,6 +180,15 @@ export type ClaudeCodeToolMcpHost = {
     write: (line: string) => void,
     options?: { listed?: boolean },
   ) => ClaudeCodeToolControlChannel;
+  /**
+   * Serve this host's tools over a plain MCP JSON-RPC message stream, for an
+   * agent CLI that runs MCP servers itself (Antigravity's `agy acp`) and
+   * reaches this one through a small bridge process.
+   */
+  openJsonRpcChannel: (write: (message: JSONRPCMessage) => void) => {
+    handle: (message: JSONRPCMessage) => void;
+    close: () => void;
+  };
   abortActiveCalls: (reason?: unknown) => void;
   waitForClientReady: (
     signal?: AbortSignal,
@@ -825,6 +834,55 @@ export const createClaudeCodeToolMcpHost = async (
     return { initializeLine, handle, listed: () => listed, close: state.close };
   };
 
+  const openJsonRpcChannel = (write: (message: JSONRPCMessage) => void) => {
+    const server = new Server(
+      { name: "stella", version: "1.0.0" },
+      { capabilities: { tools: {} } },
+    );
+    configureMcpServer(server);
+    const pending = new Map<string | number, { catalogListed: boolean }>();
+    let ended = false;
+    const transport: Transport = {
+      sessionId: crypto.randomUUID(),
+      start: async () => undefined,
+      send: async (message: JSONRPCMessage) => {
+        if (ended) return;
+        if ("id" in message && message.id !== undefined && ("result" in message || "error" in message)) {
+          const delivery = pending.get(message.id);
+          pending.delete(message.id);
+          if (delivery?.catalogListed) announceClientReady();
+        }
+        write(message);
+      },
+      close: async () => {
+        if (ended) return;
+        ended = true;
+        pending.clear();
+        transport.onclose?.();
+      },
+    };
+    void server.connect(transport).catch(() => undefined);
+    const state: ControlChannelState = {
+      server,
+      close: () => {
+        channels.delete(state);
+        void server.close().catch(() => undefined);
+      },
+    };
+    channels.add(state);
+    const handle = (message: JSONRPCMessage) => {
+      if (ended) return;
+      if ("method" in message && "id" in message && message.id !== null && message.id !== undefined) {
+        const delivery = { acknowledgements: new Set<() => void | Promise<void>>(), catalogListed: false };
+        pending.set(message.id, delivery);
+        responseDelivery.run(delivery, () => transport.onmessage?.(message));
+        return;
+      }
+      transport.onmessage?.(message);
+    };
+    return { handle, close: state.close };
+  };
+
   const sockets = new Set<Socket>();
   let closed = false;
   const answerHook = async (
@@ -944,6 +1002,7 @@ export const createClaudeCodeToolMcpHost = async (
       headers: { Authorization: bearer },
     },
     openControlChannel,
+    openJsonRpcChannel,
     abortActiveCalls,
     waitForClientReady,
     resetClientSessions,

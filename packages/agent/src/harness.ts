@@ -13,7 +13,7 @@ import {
   type Registry,
   type Storage,
 } from "@earendil-works/pi-durable";
-import { CLAUDE_CODE_ENGINE_EXTENSION, engineExtensionChange } from "./engine/selection.ts";
+import { CLI_ENGINE_EXTENSIONS, engineExtensionChange } from "./engine/selection.ts";
 import { STELLA_PROVIDER_ID, stellaModelId } from "./provider/stella.ts";
 import {
   stellaAgents,
@@ -153,7 +153,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     ...base,
     get extensions() {
       return (base.extensions ?? registry.snapshot().installed()).filter(
-        (extension) => extension.name !== CLAUDE_CODE_ENGINE_EXTENSION,
+        (extension) => !CLI_ENGINE_EXTENSIONS.has(extension.name),
       );
     },
   };

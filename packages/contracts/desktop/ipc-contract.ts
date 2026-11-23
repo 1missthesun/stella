@@ -48,6 +48,7 @@ import type {
   ChatGptProfileSummary,
   ChatGptProfilesState,
 } from "../chatgpt-siwc-types.js";
+import type { AntigravitySignInProgress, AntigravityStatus } from "../antigravity.js";
 import type {
   ClaudeCliInstallProgress,
   ClaudeCliInstallResult,
@@ -190,6 +191,12 @@ import {
   IPC_CHATGPT_SIGN_OUT,
   IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN,
   IPC_CLAUDE_ACCOUNTS_CHANGED,
+  IPC_ANTIGRAVITY_ANSWER,
+  IPC_ANTIGRAVITY_CANCEL,
+  IPC_ANTIGRAVITY_SIGN_IN,
+  IPC_ANTIGRAVITY_SIGN_IN_PROGRESS,
+  IPC_ANTIGRAVITY_SIGN_OUT,
+  IPC_ANTIGRAVITY_STATUS,
   IPC_CLAUDE_ACCOUNTS_INSTALL_CLI,
   IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS,
   IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN,
@@ -1269,6 +1276,11 @@ export type IpcInvokeContract = {
     [payload: { provider: string }],
     { removed: boolean }
   >;
+  [IPC_ANTIGRAVITY_STATUS]: Invoke<[], AntigravityStatus>;
+  [IPC_ANTIGRAVITY_SIGN_IN]: Invoke<[], AntigravityStatus>;
+  [IPC_ANTIGRAVITY_ANSWER]: Invoke<[payload: { loginId: string; code: string }], void>;
+  [IPC_ANTIGRAVITY_CANCEL]: Invoke<[], { canceled: boolean }>;
+  [IPC_ANTIGRAVITY_SIGN_OUT]: Invoke<[], AntigravityStatus>;
   [IPC_LLM_CREDENTIALS_SAVE]: Invoke<
     [payload: { provider: string; label: string; plaintext: string }],
     LocalLlmCredentialSummary
@@ -1721,6 +1733,7 @@ export type IpcEventContract = {
   [IPC_PREFERENCES_WAKE_WORD_CHANGED]: boolean;
   [IPC_PREFERENCES_MODELS_UPDATED]: RuntimeModelCatalogSnapshot;
   [IPC_CLAUDE_ACCOUNTS_CHANGED]: void;
+  [IPC_ANTIGRAVITY_SIGN_IN_PROGRESS]: AntigravitySignInProgress;
   [IPC_CLAUDE_ACCOUNTS_INSTALL_PROGRESS]: ClaudeCliInstallProgress;
   [IPC_CHATGPT_PROFILES_CHANGED]: void;
   [IPC_USER_ASK_OPENED]: UserAsk;

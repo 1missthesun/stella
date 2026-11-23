@@ -2185,13 +2185,13 @@
       "stellaModelsHint": "Incluido en tu plan de Stella",
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Iniciar sesión con Google",
-      "antigravitySwitch": "Iniciar sesión con otra cuenta de Google",
-      "antigravityBrowserWaiting": "Termina de iniciar sesión en Google en tu navegador.",
       "antigravitySignedIn": "Este ordenador ha iniciado sesión en Google Antigravity.",
       "antigravityHint": "Gemini con tu plan de Google, para tareas en este ordenador",
-      "antigravityFreeNote": "Gemini 4 Neon y los demás modelos Gemini 4 necesitan Google AI Pro o Ultra en esta cuenta. Gemini 3.8 Flash funciona con el plan gratuito.",
-      "antigravityRisk": "Google puede suspender Antigravity en una cuenta que vea usada fuera de sus propias apps.",
-      "antigravityPlanFree": "Plan gratuito"
+      "antigravityOpened": "La página de inicio de sesión de Google se abrió en tu navegador. Inicia sesión ahí y luego pega el código que te muestra.",
+      "antigravityCode": "Pega el código que muestra Google",
+      "antigravityPreparing": "Preparando Antigravity CLI de Google…",
+      "antigravityAgain": "Stella ahora ejecuta Gemini dentro de Antigravity CLI, la herramienta de Google. Inicia sesión una vez más para seguir usándolo.",
+      "antigravityRisk": "Stella ejecuta Antigravity CLI, la herramienta de Google, que guarda tu inicio de sesión de Google. Google puede limitar las cuentas usadas para trabajo sin supervisión."
     },
     "engineModels": {
       "ariaLabel": "Modelos de {engine}",

@@ -821,7 +821,7 @@ export class StellaRuntimeHost {
         const [claudeCode, chatGpt, antigravity] = await Promise.all([
           this.claudeCodeSignedIn(),
           this.chatGptSignedIn(),
-          this.oauthSignedIn("antigravity"),
+          this.antigravitySignedIn(),
         ]);
         return {
           ready: Boolean(
@@ -1357,6 +1357,15 @@ export class StellaRuntimeHost {
   }
   private async chatGptSignedIn(): Promise<boolean> {
     return await this.oauthSignedIn("chatgpt");
+  }
+
+  /** Whether Google's own Antigravity CLI is installed and signed in for Stella here. */
+  private async antigravitySignedIn(): Promise<boolean> {
+    const { antigravityCliProblem, antigravityHomeFor, findAntigravityCli } = await import(
+      "../kernel/integrations/antigravity-cli-acp.js"
+    );
+    const dataDir = this.options.initializeParams.stellaDataDirPath;
+    return antigravityCliProblem({ binary: findAntigravityCli, home: () => antigravityHomeFor(dataDir) }) === undefined;
   }
 
   /** Which plan sign-ins this computer holds, read at most once a minute. */

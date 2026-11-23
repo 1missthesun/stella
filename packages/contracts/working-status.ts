@@ -444,8 +444,15 @@ const RAW_TOOL_STATUS_PATTERN =
 
 const MCP_TOOL_PREFIX = /^mcp__.+?__/;
 
-const toToolStatusKey = (value: string): string =>
-  value
+const ANTIGRAVITY_TOOL_KEYS: Readonly<Record<string, string>> = {
+  agy_read_file: "read",
+  agy_write_file: "write",
+  agy_edit_file: "edit",
+  agy_search_web: "web",
+};
+
+const toToolStatusKey = (value: string): string => {
+  const key = value
     .trim()
     .replace(MCP_TOOL_PREFIX, "")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
@@ -453,6 +460,8 @@ const toToolStatusKey = (value: string): string =>
     .replace(/[_\s-]+/g, "_")
     .replace(/:+$/g, "")
     .toLowerCase();
+  return ANTIGRAVITY_TOOL_KEYS[key] ?? key;
+};
 
 const CODE_TOOL_KEYS = new Set(["code", "node_repl"]);
 

@@ -2175,13 +2175,13 @@
       "stellaModelsHint": "Osa Stella-tilaustasi",
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Kirjaudu Googlella",
-      "antigravitySwitch": "Kirjaudu toisella Google-tilillä",
-      "antigravityBrowserWaiting": "Viimeistele Google-kirjautuminen selaimessa.",
       "antigravitySignedIn": "Tämä tietokone on kirjautunut Google Antigravityyn.",
       "antigravityHint": "Gemini Google-tilauksellasi tämän tietokoneen tehtäviin",
-      "antigravityFreeNote": "Gemini 4 Neon ja muut Gemini 4 -mallit vaativat tälle tilille Google AI Pron tai Ultran. Gemini 3.8 Flash toimii ilmaisella tilauksella.",
-      "antigravityRisk": "Google voi keskeyttää Antigravityn tililtä, jota se näkee käytettävän omien sovellustensa ulkopuolella.",
-      "antigravityPlanFree": "Ilmainen tilaus"
+      "antigravityOpened": "Googlen kirjautumissivu avautui selaimeesi. Kirjaudu siellä sisään ja liitä sitten sen näyttämä koodi.",
+      "antigravityCode": "Liitä Googlen näyttämä koodi",
+      "antigravityPreparing": "Valmistellaan Googlen Antigravity CLI:tä…",
+      "antigravityAgain": "Stella käyttää Geminiä nyt Googlen omassa Antigravity CLI:ssä. Kirjaudu vielä kerran, niin voit jatkaa sen käyttöä.",
+      "antigravityRisk": "Stella käyttää Googlen omaa Antigravity CLI:tä, joka säilyttää Google-kirjautumisesi. Google voi rajoittaa tilejä, joita käytetään valvomattomaan työhön."
     },
     "engineModels": {
       "ariaLabel": "Mallit: {engine}",

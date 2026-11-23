@@ -7,8 +7,6 @@ import type {
 } from "@earendil-works/pi-ai";
 import { githubCopilotProvider } from "@earendil-works/pi-ai/providers/github-copilot";
 import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
-import { antigravityPlanName } from "@stella/agent/provider/antigravity/oauth";
-import { antigravityProvider } from "@stella/agent/provider/antigravity/provider";
 
 export type { OAuthCredentials } from "@earendil-works/pi-ai";
 
@@ -22,13 +20,12 @@ export type LlmOAuthProvider = {
  * GitHub Copilot and xAI sign in with a device code on the provider's own
  * site. pi-ai's browser-redirect sign-ins (Anthropic, Codex, ChatGPT,
  * OpenRouter) answer the redirect with Pi's own page, so a redirect sign-in
- * belongs in Stella's code with @stella/contracts/sign-in-page, the way
- * Google Antigravity's does.
+ * belongs in Stella's code with @stella/contracts/sign-in-page.
  */
 let providers: Map<string, LlmOAuthProvider> | undefined;
 const registry = (): Map<string, LlmOAuthProvider> =>
   (providers ??= new Map(
-    [githubCopilotProvider(), xaiProvider(), antigravityProvider()].flatMap((provider) =>
+    [githubCopilotProvider(), xaiProvider()].flatMap((provider) =>
       provider.auth.oauth
         ? [[provider.id, { id: provider.id, name: provider.auth.oauth.name, oauth: provider.auth.oauth }] as const]
         : [],
@@ -91,12 +88,11 @@ export const loginLlmOAuth = async (
   callbacks: LlmOAuthLoginCallbacks,
 ): Promise<OAuthCredentials> => asStored(await provider.oauth.login(callbacks));
 
-/** The account and plan a fresh sign-in belongs to, for Settings to show. */
+/** The account a fresh sign-in belongs to, for Settings to show. */
 export const describeLlmOAuthCredential = (
-  providerId: string,
+  _providerId: string,
   credentials: OAuthCredentials,
 ): { account?: string; plan?: string } => {
   const account = typeof credentials.email === "string" ? credentials.email.trim() : "";
-  const plan = providerId === "antigravity" ? antigravityPlanName(credentials) : undefined;
-  return { ...(account ? { account } : {}), ...(plan ? { plan } : {}) };
+  return account ? { account } : {};
 };

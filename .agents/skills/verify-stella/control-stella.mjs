@@ -111,8 +111,9 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   "XDG_RUNTIME_DIR",
   "STELLA_RENDERER_MODE",
   "STELLA_CLAUDE_CLI_PATH",
-  // Points Google Antigravity requests at a local mock instead of Google.
-  "STELLA_ANTIGRAVITY_ENDPOINT",
+  // Lets a run use a Google Antigravity CLI (agy) profile signed in outside it, for the Antigravity engine.
+  "STELLA_ANTIGRAVITY_CLI_BIN",
+  "STELLA_ANTIGRAVITY_CLI_HOME",
   // Points anonymous counts at a local telemetry worker instead of dev.
   "STELLA_ANONYMOUS_COUNTS_ENDPOINT",
   "STELLA_APP_SOURCE_INSTALLED",

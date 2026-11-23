@@ -297,6 +297,12 @@ export const IPC_LLM_CREDENTIALS_CANCEL_OAUTH =
   "llmCredentials:cancelOAuth" as const;
 export const IPC_LLM_CREDENTIALS_VALIDATE_OAUTH =
   "llmCredentials:validateOAuth" as const;
+export const IPC_ANTIGRAVITY_STATUS = "antigravity:status" as const;
+export const IPC_ANTIGRAVITY_SIGN_IN = "antigravity:signIn" as const;
+export const IPC_ANTIGRAVITY_SIGN_IN_PROGRESS = "antigravity:signInProgress" as const;
+export const IPC_ANTIGRAVITY_ANSWER = "antigravity:answer" as const;
+export const IPC_ANTIGRAVITY_CANCEL = "antigravity:cancel" as const;
+export const IPC_ANTIGRAVITY_SIGN_OUT = "antigravity:signOut" as const;
 export const IPC_CLAUDE_ACCOUNTS_LIST = "claudeAccounts:list" as const;
 export const IPC_CLAUDE_ACCOUNTS_START_LOGIN =
   "claudeAccounts:startLogin" as const;

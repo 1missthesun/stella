@@ -35,6 +35,9 @@ export type LlmOAuthKeyResolver = (
 const LLM_OAUTH_CREDENTIALS_FILE = "llm_oauth_credentials.json";
 const LLM_OAUTH_SCOPE_PREFIX = "llm-oauth-credential";
 const RETIRED_LLM_OAUTH_PROVIDERS = new Set([
+  // Google Antigravity now signs in inside Google's own CLI (`agy`); the
+  // sign-in Stella held for calling Google itself is removed (2026-11-22).
+  "antigravity",
   "google-antigravity",
   "google-gemini-cli",
   "openai-codex",
@@ -56,6 +59,8 @@ type StoredLlmOAuthCredentialRecord = {
 type StoredLlmOAuthCredentialFile = {
   version: 1;
   credentials: Record<string, StoredLlmOAuthCredentialRecord>;
+  /** Retired providers a sign-in was removed for, so Settings can ask for the new one. */
+  retired?: string[];
 };
 
 export type LocalLlmOAuthCredentialSummary = {
@@ -134,6 +139,7 @@ const pruneRetiredLlmOAuthCredentials = (
   const next: StoredLlmOAuthCredentialFile = {
     ...payload,
     credentials,
+    retired: [...new Set([...(payload.retired ?? []), ...removed.map(({ provider }) => provider)])],
   };
   try {
     writeCredentialFile(stellaAppDir, next);
@@ -199,6 +205,10 @@ export const cleanupRetiredLocalLlmOAuthCredentials = (
 ): void => {
   readCredentialFile(stellaAppDir);
 };
+
+/** Whether a sign-in for `provider` was removed here because Stella retired it. */
+export const hadRetiredLlmOAuthSignIn = (stellaAppDir: string, provider: string): boolean =>
+  readCredentialFile(stellaAppDir).retired?.includes(normalizeProvider(provider)) === true;
 
 export const hasLocalLlmOAuthCredential = (
   stellaAppDir: string,

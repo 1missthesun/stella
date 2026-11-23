@@ -1,6 +1,6 @@
 /**
  * The page a browser lands on when a sign-in hands back to Stella on this
- * computer (Google Antigravity, ChatGPT, connector sign-ins). Every local
+ * computer (ChatGPT, connector sign-ins). Every local
  * sign-in callback uses this one page, never a library's own (pi-ai ships a
  * Pi-branded one).
  */

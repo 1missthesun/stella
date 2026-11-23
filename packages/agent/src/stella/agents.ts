@@ -88,7 +88,7 @@ import {
   safeguardModelLabel,
   safeguardTaskFailure,
 } from "@stella/contracts/safeguard-block";
-import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
+import { cliEnginePick, engineExtensionChange, onClaudeCode, onCliEngine } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
@@ -1450,10 +1450,8 @@ export function stellaAgents(host: StellaAgentsHost) {
   };
 
   const sameEngine = (caller: RunsOn): string | undefined => {
-    if (!onClaudeCode(caller.model)) return undefined;
-    const modelId = caller.model?.modelId.trim();
-    const effort = caller.thinkingLevel && caller.thinkingLevel !== "off" && caller.thinkingLevel !== "minimal" ? `:${caller.thinkingLevel}` : "";
-    return `${CLAUDE_CODE_PROVIDER_ID}${modelId && modelId !== "default" ? `/${modelId}` : ""}${effort}`;
+    if (!caller.model || !onCliEngine(caller.model)) return undefined;
+    return cliEnginePick(caller.model, caller.thinkingLevel);
   };
 
   const chooseAgentModel = async (

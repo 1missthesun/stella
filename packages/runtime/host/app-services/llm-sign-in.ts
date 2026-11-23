@@ -1,7 +1,7 @@
 /**
  * Model-provider sign-ins and model lists the app's Settings asks for. They
  * run in the runtime, which already carries the provider code (pi-ai, the
- * Antigravity provider, the model catalog), so Electron main never loads it.
+ * model catalog), so Electron main never loads it.
  * Main keeps only what needs the OS keychain: it stores the credentials a
  * sign-in returns, and asks resolveLlmOAuthApiKey to refresh them.
  */

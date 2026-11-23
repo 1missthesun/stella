@@ -2195,13 +2195,13 @@
       "stellaModelsHint": "Součást vašeho plánu Stelly",
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Přihlásit se přes Google",
-      "antigravitySwitch": "Přihlásit se jiným účtem Google",
-      "antigravityBrowserWaiting": "Dokončete přihlášení ke Googlu v prohlížeči.",
       "antigravitySignedIn": "Tento počítač je přihlášen do Google Antigravity.",
       "antigravityHint": "Gemini z vašeho tarifu Google pro úkoly na tomto počítači",
-      "antigravityFreeNote": "Gemini 4 Neon a další modely Gemini 4 vyžadují na tomto účtu Google AI Pro nebo Ultra. Gemini 3.8 Flash funguje i v bezplatném tarifu.",
-      "antigravityRisk": "Google může Antigravity pozastavit na účtu, který podle něj používáte mimo jeho vlastní aplikace.",
-      "antigravityPlanFree": "Bezplatný tarif"
+      "antigravityOpened": "V prohlížeči se otevřela přihlašovací stránka Googlu. Přihlaste se tam a vložte kód, který se zobrazí.",
+      "antigravityCode": "Vložte kód zobrazený Googlem",
+      "antigravityPreparing": "Připravuje se Antigravity CLI od Googlu…",
+      "antigravityAgain": "Stella teď spouští Gemini přímo v Antigravity CLI od Googlu. Chcete-li ho dál používat, přihlaste se ještě jednou.",
+      "antigravityRisk": "Stella spouští Antigravity CLI od Googlu, které uchovává vaše přihlášení ke Googlu. Google může omezit účty používané pro práci bez dozoru."
     },
     "engineModels": {
       "ariaLabel": "Modely {engine}",

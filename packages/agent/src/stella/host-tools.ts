@@ -11,7 +11,7 @@ import {
 } from "@stella/runtime/kernel/tools/provider-tool-schema";
 import { watchToolCallAbandonment } from "../engine/abandoned-calls.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
-import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
+import { ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
 import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
 
 /**
@@ -21,6 +21,7 @@ import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
  */
 const WITHHELD_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
   [CLAUDE_CODE_PROVIDER_ID]: ["web"],
+  [ANTIGRAVITY_CLI_PROVIDER_ID]: ["web"],
   [CHATGPT_PROVIDER_ID]: ["web"],
 };
 

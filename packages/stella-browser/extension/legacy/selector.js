@@ -114,18 +114,7 @@ function normalizeSemanticSelector(value) {
   };
 }
 
-export function encodeSemanticSelector(value) {
-  const normalized = normalizeSemanticSelector(value);
-  const selector = `${SEMANTIC_SELECTOR_PREFIX}${encodeURIComponent(JSON.stringify(normalized))}`;
-  if (selector.length > MAX_SEMANTIC_SELECTOR_LENGTH) {
-    throw new Error(
-      `Semantic selector exceeds the ${MAX_SEMANTIC_SELECTOR_LENGTH} character limit`,
-    );
-  }
-  return selector;
-}
-
-export function parseSemanticSelector(selector) {
+function parseSemanticSelector(selector) {
   if (
     typeof selector !== "string" ||
     !selector.startsWith(SEMANTIC_SELECTOR_PREFIX)
@@ -183,7 +172,7 @@ export function setRefMap(ownerId, tabId, refs) {
   ownerMap.set(tabId, refs || {});
 }
 
-export function getRefMap(ownerId, tabId) {
+function getRefMap(ownerId, tabId) {
   if (!Number.isInteger(tabId)) return {};
   return getOwnerRefMap(ownerId)?.get(tabId) || {};
 }
@@ -224,7 +213,7 @@ export function isRef(selector) {
  * @param {string} selector
  * @returns {string|null}
  */
-export function parseRef(selector) {
+function parseRef(selector) {
   if (typeof selector !== "string") return null;
   if (selector.startsWith("@")) return selector.slice(1);
   if (selector.startsWith("ref=")) return selector.slice(4);
@@ -280,9 +269,24 @@ export function resolveSelector(selector, ownerId, tabId) {
   return { css: selector, isRef: false };
 }
 
+/**
+ * `stella-mark=<id>` names an element a locator marked in Stella's isolated
+ * world, instead of tagging it with an attribute the page could see.
+ */
+const MARK_PREFIX = "stella-mark=";
+
 export function buildComposedCssMatcherAllScript(selector) {
   if (typeof selector !== "string" || selector.length === 0) {
     throw new Error("CSS selector must be a non-empty string");
+  }
+  if (selector.startsWith(MARK_PREFIX)) {
+    return `
+    (() => {
+      const el = globalThis[Symbol.for("stella.marks")]?.get(${JSON.stringify(selector.slice(MARK_PREFIX.length))})?.deref();
+      if (!el || !el.isConnected) throw new Error("The element this locator matched is no longer in the page");
+      return [el];
+    })()
+  `;
   }
 
   return `

@@ -3,13 +3,18 @@ use serde_json::Value;
 use super::cdp::client::CdpClient;
 use super::cdp::types::*;
 use super::element::{ref_frame_scope, resolve_element_object_id, RefFrame, RefMap};
+use super::human::{self, Point};
 
 #[derive(Debug, Clone)]
 pub struct ActionablePoint {
     pub object_id: String,
     pub session_id: String,
+    /// Where to point: a human-like spot on the element.
     pub x: f64,
     pub y: f64,
+    /// The centre of its visible part, to tell whether it moved.
+    pub cx: f64,
+    pub cy: f64,
 }
 
 const ACTIONABILITY_TIMEOUT_MS: u64 = 2500;
@@ -252,33 +257,35 @@ const ACTIONABILITY_CHECK_JS: &str = r#"function(requireHit, scopedFrame) {
             },
         });
     }
-    if (!requireHit) return { status: 'ok', x: point.x, y: point.y };
+    if (!requireHit) return { status: 'ok', x: point.x, y: point.y, cx: point.x, cy: point.y };
     const describeHit = describeNode;
-    let hit = doc.elementFromPoint(lp.x, lp.y);
-    // Descend through open shadow roots to the deepest hit target.
-    while (hit && hit.shadowRoot) {
-        const inner = hit.shadowRoot.elementFromPoint(lp.x, lp.y);
-        if (!inner || inner === hit) break;
-        hit = inner;
-    }
-    if (!hit) return fail('covered', { by: 'unknown element', x: round(point.x), y: round(point.y) });
-    let related = false;
-    let node = hit;
-    while (node) {
-        if (node === el) { related = true; break; }
-        const root = node.getRootNode ? node.getRootNode() : null;
-        node = node.parentElement || (root && root.host ? root.host : null);
-    }
-    if (!related && el.contains(hit)) related = true;
-    if (!related && hit.contains(el)) related = true;
-    if (!related) {
+    const hitAt = (x, y) => {
+        let hit = doc.elementFromPoint(x, y);
+        // Descend through open shadow roots to the deepest hit target.
+        while (hit && hit.shadowRoot) {
+            const inner = hit.shadowRoot.elementFromPoint(x, y);
+            if (!inner || inner === hit) break;
+            hit = inner;
+        }
+        return hit;
+    };
+    const relatedTo = hit => {
+        let node = hit;
+        while (node) {
+            if (node === el) return true;
+            const root = node.getRootNode ? node.getRootNode() : null;
+            node = node.parentElement || (root && root.host ? root.host : null);
+        }
+        if (el.contains(hit) || hit.contains(el)) return true;
         // A <label> hit that targets this control still delivers the click.
         const label = hit.closest ? hit.closest('label') : null;
-        if (label && label.control === el) related = true;
+        if (label && label.control === el) return true;
         const ownLabel = el.closest ? el.closest('label') : null;
-        if (ownLabel && (ownLabel === hit || ownLabel.contains(hit))) related = true;
-    }
-    if (!related) return fail('covered', {
+        return !!ownLabel && (ownLabel === hit || ownLabel.contains(hit));
+    };
+    const hit = hitAt(lp.x, lp.y);
+    if (!hit) return fail('covered', { by: 'unknown element', x: round(point.x), y: round(point.y) });
+    if (!relatedTo(hit)) return fail('covered', {
         by: describeHit(hit),
         x: round(point.x),
         y: round(point.y),
@@ -314,7 +321,30 @@ const ACTIONABILITY_CHECK_JS: &str = r#"function(requireHit, scopedFrame) {
         }
         w = parentDoc.defaultView;
     }
-    return { status: 'ok', x: point.x, y: point.y };
+    // Where a person would click: spread over the visible part like real
+    // clicks, a few pixels inside its edges, away from the exact centre that
+    // bot checks look for, and still on the element.
+    const gauss = () => {
+        let u = 0, v = 0;
+        while (!u) u = Math.random();
+        while (!v) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    };
+    const r = el.getBoundingClientRect();
+    const left = Math.max(r.left, 0), right = Math.min(r.right, vw - 1);
+    const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, vh - 1);
+    const roomX = Math.max(0, (right - left) / 2 - 3), roomY = Math.max(0, (bottom - top) / 2 - 3);
+    const centreX = r.left + r.width / 2, centreY = r.top + r.height / 2;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+        const x = (left + right) / 2 + Math.max(-roomX, Math.min(roomX, gauss() * (right - left) * 0.18));
+        const y = (top + bottom) / 2 + Math.max(-roomY, Math.min(roomY, gauss() * (bottom - top) * 0.2));
+        if (Math.abs(x - centreX) <= 4 && Math.abs(y - centreY) <= 4 && (roomX > 6 || roomY > 6)) continue;
+        const aimed = hitAt(x, y);
+        if (!aimed || !relatedTo(aimed)) continue;
+        const aimedTop = toTop(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
+        if (aimedTop) return { status: 'ok', x: aimedTop.x, y: aimedTop.y, cx: point.x, cy: point.y };
+    }
+    return { status: 'ok', x: point.x, y: point.y, cx: point.x, cy: point.y };
 }"#;
 
 fn actionability_diagnostic_suffix(details: Option<&Value>) -> String {
@@ -419,14 +449,16 @@ async fn frame_owner(
     owner
         .get("backendNodeId")
         .and_then(Value::as_i64)
-        .ok_or_else(|| "Frame owner is no longer available. Capture a new AX snapshot.".to_string())
+        .ok_or_else(|| "Frame owner is no longer available. Take a new snapshot.".to_string())
 }
 
-async fn translate_frame_point(
+/// `in_view` refuses a point outside its frame's viewport.
+pub(super) async fn translate_frame_point(
     client: &CdpClient,
     scope: &[RefFrame],
     mut x: f64,
     mut y: f64,
+    in_view: bool,
     require_hit: bool,
 ) -> Result<(f64, f64), String> {
     for pair in scope.windows(2).rev() {
@@ -447,7 +479,7 @@ async fn translate_frame_point(
             .object_id
             .ok_or("Frame owner is no longer attached")?;
         let result: EvaluateResult = client.send_command_typed("Runtime.callFunctionOn", &CallFunctionOnParams {
-            function_declaration: r#"function(x, y, requireHit) {
+            function_declaration: r#"function(x, y, inView, requireHit) {
                 const doc = this.ownerDocument, win = doc.defaultView;
                 if (!this.isConnected || !win) return {error:'Frame detached'};
                 const style = win.getComputedStyle(this);
@@ -463,15 +495,16 @@ async fn translate_frame_point(
                 if (!r.width || !r.height || !this.offsetWidth || !this.offsetHeight) return {error:'Frame has no visible bounds'};
                 const px = r.left + (x + this.clientLeft) * r.width / this.offsetWidth;
                 const py = r.top + (y + this.clientTop) * r.height / this.offsetHeight;
-                if (px < 0 || py < 0 || px >= win.innerWidth || py >= win.innerHeight) return {error:'Frame point is outside viewport'};
+                if (inView && (px < 0 || py < 0 || px >= win.innerWidth || py >= win.innerHeight)) return {error:'Frame point is outside viewport'};
                 if (requireHit) {
-                    let hit = doc.elementFromPoint(px, py);
+                    const root = this.getRootNode();
+                    let hit = (root.elementFromPoint ? root : doc).elementFromPoint(px, py);
                     while(hit?.shadowRoot) {const inner = hit.shadowRoot.elementFromPoint(px, py); if (!inner || inner === hit) break; hit=inner;}
                     if (hit !== this && !this.contains(hit)) return {error:'Frame is covered by another element'};
                 }
                 return {x:px,y:py};
             }"#.to_string(), object_id: Some(object_id),
-            arguments: Some(vec![CallArgument {value: Some(serde_json::json!(x)),object_id: None},CallArgument {value: Some(serde_json::json!(y)),object_id: None},CallArgument {value: Some(serde_json::json!(require_hit)),object_id: None}]),
+            arguments: Some(vec![CallArgument {value: Some(serde_json::json!(x)),object_id: None},CallArgument {value: Some(serde_json::json!(y)),object_id: None},CallArgument {value: Some(serde_json::json!(in_view)),object_id: None},CallArgument {value: Some(serde_json::json!(require_hit)),object_id: None}]),
             return_by_value: Some(true), await_promise: Some(false),
         }, Some(&pair[0].session_id)).await?;
         let value = result
@@ -545,19 +578,24 @@ async fn actionability_check_once(
         .unwrap_or("unknown");
 
     if status == "ok" {
-        let x = value.get("x").and_then(|v| v.as_f64());
-        let y = value.get("y").and_then(|v| v.as_f64());
-        if let (Some(x), Some(y)) = (x, y) {
-            let (x, y) = if let Some(scope) = frame_scope {
-                translate_frame_point(client, scope, x, y, require_hit).await?
+        let field = |name: &str| value.get(name).and_then(Value::as_f64);
+        if let (Some(x), Some(y)) = (field("x"), field("y")) {
+            let (cx, cy) = (field("cx").unwrap_or(x), field("cy").unwrap_or(y));
+            let ((x, y), (cx, cy)) = if let Some(scope) = frame_scope {
+                (
+                    translate_frame_point(client, scope, x, y, true, require_hit).await?,
+                    translate_frame_point(client, scope, cx, cy, true, false).await?,
+                )
             } else {
-                (x, y)
+                ((x, y), (cx, cy))
             };
             return Ok(Ok(ActionablePoint {
                 object_id,
                 session_id: session_id.to_string(),
                 x,
                 y,
+                cx,
+                cy,
             }));
         }
     }
@@ -571,6 +609,111 @@ async fn actionability_check_once(
     )))
 }
 
+const VIEW_STATE_JS: &str = r#"function() {
+    const el = this;
+    if (!el.isConnected || el.getClientRects().length === 0) return null;
+    const win = el.ownerDocument && el.ownerDocument.defaultView;
+    if (!win || win !== win.top) return null;
+    const r = el.getBoundingClientRect();
+    const vw = win.innerWidth, vh = win.innerHeight, m = 8;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const fitsY = r.height > vh - 2 * m ? (cy >= m && cy <= vh - m) : (r.top >= m && r.bottom <= vh - m);
+    const visible = fitsY && cx >= m && cx <= vw - m;
+    let anchor = null;
+    for (let node = el.parentElement; node && node !== el.ownerDocument.body && node !== el.ownerDocument.documentElement; node = node.parentElement) {
+        const style = win.getComputedStyle(node);
+        const scrolls = (/(auto|scroll|overlay)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1)
+            || (/(auto|scroll|overlay)/.test(style.overflowX) && node.scrollWidth > node.clientWidth + 1);
+        if (!scrolls) continue;
+        const b = node.getBoundingClientRect();
+        const left = Math.max(0, b.left), top = Math.max(0, b.top), right = Math.min(vw, b.right), bottom = Math.min(vh, b.bottom);
+        if (right - left > 4 && bottom - top > 4) anchor = { x: left + (right - left) * (0.35 + Math.random() * 0.3), y: top + (bottom - top) * (0.35 + Math.random() * 0.3), cx: (left + right) / 2, cy: (top + bottom) / 2 };
+        break;
+    }
+    if (!anchor) anchor = { x: vw * (0.4 + Math.random() * 0.2), y: vh * (0.4 + Math.random() * 0.2), cx: vw / 2, cy: vh / 2 };
+    const outX = cx < m || cx > vw - m;
+    return { visible, top: r.top, left: r.left, dx: outX ? cx - anchor.cx : 0, dy: cy - anchor.cy, anchor };
+}"#;
+
+async fn view_state(
+    client: &CdpClient,
+    session_id: &str,
+    ref_map: &RefMap,
+    selector_or_ref: &str,
+) -> Option<Value> {
+    let (object_id, session_id) =
+        resolve_element_object_id(client, session_id, ref_map, selector_or_ref)
+            .await
+            .ok()?;
+    let result = client
+        .send_command(
+            "Runtime.callFunctionOn",
+            Some(serde_json::json!({ "functionDeclaration": VIEW_STATE_JS, "objectId": object_id, "returnByValue": true })),
+            Some(session_id),
+        )
+        .await
+        .ok()?;
+    result
+        .pointer("/result/value")
+        .filter(|v| !v.is_null())
+        .cloned()
+}
+
+/// Brings a top-level element into view with the mouse wheel, the way a person
+/// scrolls to it. Anything it can't settle (frames, pages that ignore the
+/// wheel) is left to the actionability check, which scrolls it directly.
+async fn wheel_into_view(
+    client: &CdpClient,
+    session_id: &str,
+    ref_map: &RefMap,
+    selector_or_ref: &str,
+) {
+    if ref_frame_scope(ref_map, selector_or_ref).is_some() {
+        return;
+    }
+    for _ in 0..5 {
+        let Some(state) = view_state(client, session_id, ref_map, selector_or_ref).await else {
+            return;
+        };
+        if state["visible"].as_bool().unwrap_or(true) {
+            return;
+        }
+        let at = Point {
+            x: state["anchor"]["x"].as_f64().unwrap_or(400.0),
+            y: state["anchor"]["y"].as_f64().unwrap_or(300.0),
+        };
+        let (dx, dy) = (
+            state["dx"].as_f64().unwrap_or(0.0).round(),
+            state["dy"].as_f64().unwrap_or(0.0).round(),
+        );
+        if human::wheel(client, session_id, at, dx, dy).await.is_err() {
+            return;
+        }
+        let mut previous = (
+            state["top"].as_f64().unwrap_or(0.0),
+            state["left"].as_f64().unwrap_or(0.0),
+        );
+        let start = previous;
+        for _ in 0..12 {
+            human::sleep_ms(45.0).await;
+            let Some(now) = view_state(client, session_id, ref_map, selector_or_ref).await else {
+                return;
+            };
+            let current = (
+                now["top"].as_f64().unwrap_or(0.0),
+                now["left"].as_f64().unwrap_or(0.0),
+            );
+            if (current.0 - previous.0).abs() < 0.5 && (current.1 - previous.1).abs() < 0.5 {
+                break;
+            }
+            previous = current;
+        }
+        if (previous.0 - start.0).abs() < 1.0 && (previous.1 - start.1).abs() < 1.0 {
+            return;
+        }
+    }
+}
+
 pub async fn wait_for_actionable(
     client: &CdpClient,
     session_id: &str,
@@ -578,6 +721,7 @@ pub async fn wait_for_actionable(
     selector_or_ref: &str,
     require_hit: bool,
 ) -> Result<ActionablePoint, String> {
+    wheel_into_view(client, session_id, ref_map, selector_or_ref).await;
     let deadline =
         tokio::time::Instant::now() + tokio::time::Duration::from_millis(ACTIONABILITY_TIMEOUT_MS);
     let mut last_error: String;
@@ -612,8 +756,7 @@ pub async fn click(
         session_id,
         ref_map,
         selector_or_ref,
-        point.x,
-        point.y,
+        &point,
         button,
         click_count,
     )
@@ -636,23 +779,17 @@ pub async fn hover(
     selector_or_ref: &str,
 ) -> Result<(), String> {
     let point = wait_for_actionable(client, session_id, ref_map, selector_or_ref, true).await?;
-    client
-        .send_command_typed::<_, Value>(
-            "Input.dispatchMouseEvent",
-            &DispatchMouseEventParams {
-                event_type: "mouseMoved".to_string(),
-                x: point.x,
-                y: point.y,
-                button: None,
-                buttons: None,
-                click_count: None,
-                delta_x: None,
-                delta_y: None,
-                modifiers: None,
-            },
-            Some(session_id),
-        )
-        .await?;
+    human::move_to(
+        client,
+        session_id,
+        Point {
+            x: point.x,
+            y: point.y,
+        },
+        None,
+        true,
+    )
+    .await?;
     Ok(())
 }
 
@@ -664,6 +801,24 @@ pub async fn fill(
     value: &str,
 ) -> Result<(), String> {
     let point = wait_for_actionable(client, session_id, ref_map, selector_or_ref, false).await?;
+    let state = call_on(client, &point.session_id, &point.object_id, FOCUS_STATE_JS).await?;
+    if state["typeable"].as_bool().unwrap_or(false) {
+        focus_by_click(client, session_id, ref_map, selector_or_ref, &point).await?;
+        let input_session = point.session_id.as_str();
+        let current = call_on(client, input_session, &point.object_id, FOCUS_STATE_JS).await?;
+        if current["value"].as_str() != Some(value) {
+            if !current["value"].as_str().unwrap_or("").is_empty() {
+                call_on(client, input_session, &point.object_id, SELECT_CONTENTS_JS).await?;
+                erase_selection(client, input_session).await?;
+            }
+            human::type_text(client, input_session, value, None).await?;
+        }
+        human::sleep_ms(40.0).await;
+        let typed = call_on(client, input_session, &point.object_id, FOCUS_STATE_JS).await?;
+        if typed["value"].as_str() == Some(value) {
+            return Ok(());
+        }
+    }
     let session_id = point.session_id.as_str();
     let object_id = point.object_id;
 
@@ -717,6 +872,119 @@ pub async fn fill(
     Ok(())
 }
 
+const FOCUS_STATE_JS: &str = r#"function() {
+    const root = this.getRootNode ? this.getRootNode() : document;
+    const active = (root && root.activeElement) || document.activeElement;
+    const tag = (this.tagName || '').toLowerCase();
+    const inputType = tag === 'input' ? String(this.type || 'text').toLowerCase() : null;
+    const typeable = this.isContentEditable || tag === 'textarea'
+        || (tag === 'input' && ['text', 'search', 'email', 'password', 'tel', 'url', 'number'].includes(inputType));
+    return {
+        focused: active === this || (this.contains && this.contains(active)),
+        typeable,
+        value: this.isContentEditable ? (this.textContent || '') : String(this.value ?? ''),
+    };
+}"#;
+
+async fn call_on(
+    client: &CdpClient,
+    session_id: &str,
+    object_id: &str,
+    declaration: &str,
+) -> Result<Value, String> {
+    let result = client
+        .send_command(
+            "Runtime.callFunctionOn",
+            Some(serde_json::json!({ "functionDeclaration": declaration, "objectId": object_id, "returnByValue": true, "awaitPromise": true })),
+            Some(session_id),
+        )
+        .await?;
+    Ok(result
+        .pointer("/result/value")
+        .cloned()
+        .unwrap_or(Value::Null))
+}
+
+/// Puts the keyboard focus in the element the way a person does, by clicking
+/// it; falls back to focusing it directly when the click didn't land there.
+/// Returns whether it was already focused.
+async fn focus_by_click(
+    client: &CdpClient,
+    session_id: &str,
+    ref_map: &RefMap,
+    selector_or_ref: &str,
+    point: &ActionablePoint,
+) -> Result<bool, String> {
+    let state = call_on(client, &point.session_id, &point.object_id, FOCUS_STATE_JS).await?;
+    if state["focused"].as_bool().unwrap_or(false) {
+        return Ok(true);
+    }
+    if let Ok(hit) =
+        actionability_check_once(client, session_id, ref_map, selector_or_ref, true).await?
+    {
+        dispatch_click(
+            client,
+            session_id,
+            ref_map,
+            selector_or_ref,
+            &hit,
+            "left",
+            1,
+        )
+        .await?;
+    }
+    let after = call_on(client, &point.session_id, &point.object_id, FOCUS_STATE_JS).await?;
+    if !after["focused"].as_bool().unwrap_or(false) {
+        call_on(
+            client,
+            &point.session_id,
+            &point.object_id,
+            "function() { this.focus(); }",
+        )
+        .await?;
+    }
+    Ok(false)
+}
+
+const CARET_TO_END_JS: &str = r#"function() {
+    if (typeof this.setSelectionRange === 'function' && typeof this.value === 'string') {
+        try { this.setSelectionRange(this.value.length, this.value.length); } catch (e) {}
+    } else if (this.isContentEditable) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(this);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+}"#;
+
+const SELECT_CONTENTS_JS: &str = r#"function() {
+    if (typeof this.select === 'function') { this.select(); return; }
+    const range = document.createRange();
+    range.selectNodeContents(this);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+}"#;
+
+async fn erase_selection(client: &CdpClient, session_id: &str) -> Result<(), String> {
+    human::before_key(session_id).await;
+    for kind in ["rawKeyDown", "keyUp"] {
+        client
+            .send_command(
+                "Input.dispatchKeyEvent",
+                Some(serde_json::json!({ "type": kind, "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8, "nativeVirtualKeyCode": 8 })),
+                Some(session_id),
+            )
+            .await?;
+        if kind == "rawKeyDown" {
+            human::key_hold().await;
+        }
+    }
+    Ok(())
+}
+
 pub async fn type_text(
     client: &CdpClient,
     session_id: &str,
@@ -727,100 +995,19 @@ pub async fn type_text(
     delay_ms: Option<u64>,
 ) -> Result<(), String> {
     let point = wait_for_actionable(client, session_id, ref_map, selector_or_ref, false).await?;
-    let session_id = point.session_id.as_str();
-    let object_id = point.object_id;
-
-    client
-        .send_command_typed::<_, Value>(
-            "Runtime.callFunctionOn",
-            &CallFunctionOnParams {
-                function_declaration: "function() { this.focus(); }".to_string(),
-                object_id: Some(object_id.clone()),
-                arguments: None,
-                return_by_value: Some(true),
-                await_promise: Some(false),
-            },
-            Some(session_id),
-        )
-        .await?;
-
+    let was_focused = focus_by_click(client, session_id, ref_map, selector_or_ref, &point).await?;
+    let input_session = point.session_id.as_str();
     if clear {
-        client
-            .send_command_typed::<_, Value>(
-                "Runtime.callFunctionOn",
-                &CallFunctionOnParams {
-                    function_declaration: r#"function() {
-                        this.select && this.select();
-                        this.value = '';
-                        this.dispatchEvent(new Event('input', { bubbles: true }));
-                    }"#
-                    .to_string(),
-                    object_id: Some(object_id),
-                    arguments: None,
-                    return_by_value: Some(true),
-                    await_promise: Some(false),
-                },
-                Some(session_id),
-            )
-            .await?;
-    }
-
-    let delay = delay_ms.unwrap_or(0);
-
-    for ch in text.chars() {
-        let text_str = ch.to_string();
-        let (key, code, key_code) = char_to_key_info(ch);
-
-        if key_code == 0 && code.is_empty() {
-            client
-                .send_command_typed::<_, Value>(
-                    "Input.insertText",
-                    &InsertTextParams { text: text_str },
-                    Some(session_id),
-                )
-                .await?;
-        } else {
-            client
-                .send_command_typed::<_, Value>(
-                    "Input.dispatchKeyEvent",
-                    &DispatchKeyEventParams {
-                        event_type: "keyDown".to_string(),
-                        key: Some(key.clone()),
-                        code: Some(code.clone()),
-                        text: Some(text_str.clone()),
-                        unmodified_text: Some(text_str.clone()),
-                        windows_virtual_key_code: Some(key_code),
-                        native_virtual_key_code: Some(key_code),
-                        modifiers: None,
-                    },
-                    Some(session_id),
-                )
-                .await?;
-
-            client
-                .send_command_typed::<_, Value>(
-                    "Input.dispatchKeyEvent",
-                    &DispatchKeyEventParams {
-                        event_type: "keyUp".to_string(),
-                        key: Some(key),
-                        code: Some(code),
-                        text: None,
-                        unmodified_text: None,
-                        windows_virtual_key_code: Some(key_code),
-                        native_virtual_key_code: Some(key_code),
-                        modifiers: None,
-                    },
-                    Some(session_id),
-                )
-                .await?;
+        let state = call_on(client, input_session, &point.object_id, FOCUS_STATE_JS).await?;
+        if !state["value"].as_str().unwrap_or("").is_empty() {
+            call_on(client, input_session, &point.object_id, SELECT_CONTENTS_JS).await?;
+            erase_selection(client, input_session).await?;
         }
-
-        if delay > 0 {
-            tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-        }
+    } else if !was_focused {
+        call_on(client, input_session, &point.object_id, CARET_TO_END_JS).await?;
     }
-
-    Ok(())
+    let mean = delay_ms.filter(|d| *d > 0).map(|d| d as f64);
+    human::type_text(client, input_session, text, mean).await
 }
 
 pub async fn press_key(client: &CdpClient, session_id: &str, key: &str) -> Result<(), String> {
@@ -878,9 +1065,11 @@ async fn dispatch_key_combo(
     combo: &KeyCombo,
 ) -> Result<(), String> {
     let mut held = 0;
+    human::before_key(session_id).await;
     for (info, bit) in &combo.modifier_keys {
         held |= bit;
         dispatch_key_event(client, session_id, "keyDown", info, held, false).await?;
+        human::sleep_ms(human::random(25.0, 60.0)).await;
     }
     dispatch_key_event(
         client,
@@ -891,6 +1080,7 @@ async fn dispatch_key_combo(
         true,
     )
     .await?;
+    human::key_hold().await;
     dispatch_key_event(
         client,
         session_id,
@@ -962,6 +1152,104 @@ pub async fn scroll(
     delta_x: f64,
     delta_y: f64,
 ) -> Result<(), String> {
+    let at = match selector_or_ref {
+        Some(sel) => {
+            let point = wait_for_actionable(client, session_id, ref_map, sel, false).await?;
+            Some(Point {
+                x: point.x,
+                y: point.y,
+            })
+        }
+        None => client
+            .send_command(
+                "Page.getLayoutMetrics",
+                Some(serde_json::json!({})),
+                Some(session_id),
+            )
+            .await
+            .ok()
+            .and_then(|m| {
+                let w = m["cssLayoutViewport"]["clientWidth"].as_f64()?;
+                let h = m["cssLayoutViewport"]["clientHeight"].as_f64()?;
+                Some(Point {
+                    x: w * human::random(0.4, 0.6),
+                    y: h * human::random(0.4, 0.6),
+                })
+            }),
+    };
+    if let Some(at) = at {
+        let before = scroll_offsets(client, session_id, ref_map, selector_or_ref).await;
+        human::wheel(client, session_id, at, delta_x, delta_y).await?;
+        let mut previous = before.clone();
+        for _ in 0..12 {
+            human::sleep_ms(45.0).await;
+            let now = scroll_offsets(client, session_id, ref_map, selector_or_ref).await;
+            if now == previous {
+                break;
+            }
+            previous = now;
+        }
+        if previous != before || (delta_x == 0.0 && delta_y == 0.0) {
+            return Ok(());
+        }
+    }
+    scroll_directly(
+        client,
+        session_id,
+        ref_map,
+        selector_or_ref,
+        delta_x,
+        delta_y,
+    )
+    .await
+}
+
+async fn scroll_offsets(
+    client: &CdpClient,
+    session_id: &str,
+    ref_map: &RefMap,
+    selector_or_ref: Option<&str>,
+) -> Option<Value> {
+    match selector_or_ref {
+        Some(sel) => {
+            let (object_id, session_id) =
+                resolve_element_object_id(client, session_id, ref_map, sel)
+                    .await
+                    .ok()?;
+            call_on(
+                client,
+                session_id,
+                &object_id,
+                "function() { return [this.scrollLeft, this.scrollTop]; }",
+            )
+            .await
+            .ok()
+        }
+        None => client
+            .send_command(
+                "Page.getLayoutMetrics",
+                Some(serde_json::json!({})),
+                Some(session_id),
+            )
+            .await
+            .ok()
+            .map(|m| {
+                serde_json::json!([
+                    m["cssVisualViewport"]["pageX"],
+                    m["cssVisualViewport"]["pageY"]
+                ])
+            }),
+    }
+}
+
+async fn scroll_directly(
+    client: &CdpClient,
+    session_id: &str,
+    ref_map: &RefMap,
+    selector_or_ref: Option<&str>,
+    delta_x: f64,
+    delta_y: f64,
+) -> Result<(), String> {
     if let Some(sel) = selector_or_ref {
         let (object_id, session_id) =
             resolve_element_object_id(client, session_id, ref_map, sel).await?;
@@ -1005,6 +1293,9 @@ pub async fn scroll(
     Ok(())
 }
 
+/// Chooses options the way a person does with a closed dropdown: focus it and
+/// type the option's label. Lists, multiple choices and labels typing can't
+/// reach (duplicates) are set directly, with the events a change fires.
 pub async fn select_option(
     client: &CdpClient,
     session_id: &str,
@@ -1014,35 +1305,142 @@ pub async fn select_option(
 ) -> Result<(), String> {
     let point = wait_for_actionable(client, session_id, ref_map, selector_or_ref, false).await?;
     let session_id = point.session_id.as_str();
-    let object_id = point.object_id;
+    let object_id = point.object_id.as_str();
+    let values_js = serde_json::to_string(values).unwrap_or_else(|_| "[]".into());
 
-    let js = r#"function(vals) {
+    let plan = call_on(
+        client,
+        session_id,
+        object_id,
+        &format!(
+            r#"function() {{
+            const values = {values_js};
+            if (!this.options) throw new Error('Element is not a <select>');
             const options = Array.from(this.options);
-            for (const opt of options) {
-                opt.selected = vals.includes(opt.value) || vals.includes(opt.textContent.trim());
-            }
-            this.dispatchEvent(new Event('change', { bubbles: true }));
-        }"#
-    .to_string();
+            const matches = options.filter((o) => values.includes(o.value) || values.includes(o.textContent.trim()));
+            const label = matches[0] ? matches[0].textContent.trim() : '';
+            const sameLabel = options.filter((o) => o.textContent.trim().toLowerCase() === label.toLowerCase()).length;
+            const done = matches.length > 0 && matches.every((o) => o.selected) && options.filter((o) => o.selected).length === matches.length;
+            return {{ multiple: this.multiple, listbox: this.size > 1, disabled: this.disabled, label, sameLabel, done, value: matches[0] ? matches[0].value : null, indices: matches.map((o) => o.index) }};
+        }}"#
+        ),
+    )
+    .await?;
+    if plan["done"].as_bool().unwrap_or(false) {
+        return Ok(());
+    }
 
-    client
-        .send_command_typed::<_, Value>(
-            "Runtime.callFunctionOn",
-            &CallFunctionOnParams {
-                function_declaration: js,
-                object_id: Some(object_id),
-                arguments: Some(vec![CallArgument {
-                    value: Some(serde_json::json!(values)),
-                    object_id: None,
-                }]),
-                return_by_value: Some(true),
-                await_promise: Some(false),
-            },
-            Some(session_id),
-        )
-        .await?;
+    let typeable = values.len() == 1
+        && !plan["multiple"].as_bool().unwrap_or(true)
+        && !plan["listbox"].as_bool().unwrap_or(true)
+        && !plan["disabled"].as_bool().unwrap_or(true)
+        && plan["sameLabel"].as_u64() == Some(1);
+    if let (true, Some(label)) = (typeable, plan["label"].as_str().filter(|l| !l.is_empty())) {
+        human::move_to(client, session_id, Point { x: point.x, y: point.y }, None, false).await?;
+        call_on(client, session_id, object_id, "function() { this.focus(); return true; }").await?;
+        human::type_text(client, session_id, label, Some(60.0)).await?;
+        let chosen = call_on(client, session_id, object_id, "function() { return this.value; }").await?;
+        if chosen == plan["value"] {
+            return Ok(());
+        }
+    }
 
+    let list = plan["multiple"].as_bool().unwrap_or(false) || plan["listbox"].as_bool().unwrap_or(false);
+    let indices = plan["indices"].clone();
+    let count = indices.as_array().map_or(0, Vec::len);
+    let clickable = list
+        && !plan["disabled"].as_bool().unwrap_or(true)
+        && count > 0
+        && (count == 1 || plan["multiple"].as_bool().unwrap_or(false));
+    if clickable && click_list_options(client, session_id, object_id, &point, &indices).await? {
+        return Ok(());
+    }
+
+    call_on(
+        client,
+        session_id,
+        object_id,
+        &format!(
+            r#"function() {{
+            const values = {values_js};
+            for (const option of this.options) {{
+                option.selected = values.includes(option.value) || values.includes(option.textContent.trim());
+            }}
+            this.dispatchEvent(new Event('input', {{ bubbles: true, composed: true }}));
+            this.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            return true;
+        }}"#
+        ),
+    )
+    .await?;
     Ok(())
+}
+
+/// Clicks the wanted rows of a list box like a person: a plain click on the first, then
+/// Cmd/Ctrl-click on the rest. Returns false when a row is scrolled out of the box or the
+/// clicks did not produce the wanted selection.
+async fn click_list_options(
+    client: &CdpClient,
+    session_id: &str,
+    object_id: &str,
+    select: &ActionablePoint,
+    indices: &Value,
+) -> Result<bool, String> {
+    let rows = call_on(
+        client,
+        session_id,
+        object_id,
+        &format!(
+            r#"function() {{
+            const box = this.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const cx = (Math.max(box.left, 0) + Math.min(box.right, vw)) / 2;
+            const cy = (Math.max(box.top, 0) + Math.min(box.bottom, vh)) / 2;
+            const top = Math.max(box.top + this.clientTop, 0), bottom = Math.min(box.top + this.clientTop + this.clientHeight, vh);
+            const left = Math.max(box.left + this.clientLeft, 0), right = Math.min(box.left + this.clientLeft + this.clientWidth, vw);
+            const rows = {indices}.map((i) => {{
+                const r = this.options[i].getBoundingClientRect();
+                if (r.height < 4 || r.top < top || r.bottom > bottom) return null;
+                const from = Math.max(r.left, left), width = Math.min(r.right, right) - from;
+                if (width < 8) return null;
+                return {{ dx: from + width * (0.12 + Math.random() * 0.5) - cx, dy: r.top + r.height * (0.3 + Math.random() * 0.4) - cy }};
+            }});
+            return rows.every(Boolean) ? rows : null;
+        }}"#
+        ),
+    )
+    .await?;
+    let Some(rows) = rows.as_array() else {
+        return Ok(false);
+    };
+    for (n, row) in rows.iter().enumerate() {
+        let (Some(dx), Some(dy)) = (row["dx"].as_f64(), row["dy"].as_f64()) else {
+            return Ok(false);
+        };
+        if n == 1 {
+            human::toggle_modifier(client, session_id, true).await?;
+        }
+        let clicked = async {
+            human::move_to(client, session_id, Point { x: select.cx + dx, y: select.cy + dy }, None, true).await?;
+            human::press_release(client, session_id, "left", 1).await
+        }
+        .await;
+        if clicked.is_err() && n >= 1 {
+            let _ = human::toggle_modifier(client, session_id, false).await;
+        }
+        clicked?;
+    }
+    if rows.len() > 1 {
+        human::toggle_modifier(client, session_id, false).await?;
+    }
+    let picked = call_on(
+        client,
+        session_id,
+        object_id,
+        "function() { return Array.from(this.selectedOptions).map((o) => o.index); }",
+    )
+    .await?;
+    Ok(&picked == indices)
 }
 
 pub async fn check(
@@ -1261,6 +1659,7 @@ pub async fn scroll_into_view(
     ref_map: &RefMap,
     selector_or_ref: &str,
 ) -> Result<(), String> {
+    wheel_into_view(client, session_id, ref_map, selector_or_ref).await;
     let (object_id, session_id) =
         resolve_element_object_id(client, session_id, ref_map, selector_or_ref).await?;
 
@@ -1268,9 +1667,13 @@ pub async fn scroll_into_view(
         .send_command_typed::<_, Value>(
             "Runtime.callFunctionOn",
             &CallFunctionOnParams {
-                function_declaration:
-                    "function() { this.scrollIntoView({ block: 'center', inline: 'center' }); }"
-                        .to_string(),
+                function_declaration: r#"function() {
+                    const r = this.getBoundingClientRect();
+                    const win = this.ownerDocument.defaultView;
+                    if (r.top >= 0 && r.left >= 0 && r.bottom <= win.innerHeight && r.right <= win.innerWidth) return;
+                    this.scrollIntoView({ block: 'center', inline: 'center' });
+                }"#
+                .to_string(),
                 object_id: Some(object_id),
                 arguments: None,
                 return_by_value: Some(true),
@@ -1390,85 +1793,28 @@ pub async fn tap_touch(
     Ok(())
 }
 
+/// Moves to the target and presses it, following it when the page shifts under
+/// the travelling pointer (a hover that changes the layout).
 async fn dispatch_click(
     client: &CdpClient,
     session_id: &str,
     ref_map: &RefMap,
     selector_or_ref: &str,
-    x: f64,
-    y: f64,
+    target: &ActionablePoint,
     button: &str,
     click_count: i32,
 ) -> Result<(), String> {
-    client
-        .send_command_typed::<_, Value>(
-            "Input.dispatchMouseEvent",
-            &DispatchMouseEventParams {
-                event_type: "mouseMoved".to_string(),
-                x,
-                y,
-                button: None,
-                buttons: None,
-                click_count: None,
-                delta_x: None,
-                delta_y: None,
-                modifiers: None,
-            },
-            Some(session_id),
-        )
-        .await?;
-
-    if ref_frame_scope(ref_map, selector_or_ref).is_some() {
-        let point =
-            actionability_check_once(client, session_id, ref_map, selector_or_ref, true).await??;
-        if (point.x - x).abs() > 0.5 || (point.y - y).abs() > 0.5 {
-            return Err("AX target moved while the cursor travelled. Capture a new snapshot before clicking.".into());
+    let (mut at, mut centre) = ((target.x, target.y), (target.cx, target.cy));
+    for _ in 0..3 {
+        let to = Point { x: at.0, y: at.1 };
+        human::move_to(client, session_id, to, None, true).await?;
+        let now = wait_for_actionable(client, session_id, ref_map, selector_or_ref, true).await?;
+        if (now.cx - centre.0).abs() <= 2.0 && (now.cy - centre.1).abs() <= 2.0 {
+            return human::press_release(client, session_id, button, click_count).await;
         }
+        (at, centre) = ((now.x, now.y), (now.cx, now.cy));
     }
-
-    let button_value = match button {
-        "right" => 2,
-        "middle" => 4,
-        _ => 1,
-    };
-
-    client
-        .send_command_typed::<_, Value>(
-            "Input.dispatchMouseEvent",
-            &DispatchMouseEventParams {
-                event_type: "mousePressed".to_string(),
-                x,
-                y,
-                button: Some(button.to_string()),
-                buttons: Some(button_value),
-                click_count: Some(click_count),
-                delta_x: None,
-                delta_y: None,
-                modifiers: None,
-            },
-            Some(session_id),
-        )
-        .await?;
-
-    client
-        .send_command_typed::<_, Value>(
-            "Input.dispatchMouseEvent",
-            &DispatchMouseEventParams {
-                event_type: "mouseReleased".to_string(),
-                x,
-                y,
-                button: Some(button.to_string()),
-                buttons: Some(0),
-                click_count: Some(click_count),
-                delta_x: None,
-                delta_y: None,
-                modifiers: None,
-            },
-            Some(session_id),
-        )
-        .await?;
-
-    Ok(())
+    Err("The element keeps moving while the pointer travels to it. Observe and retry the click.".into())
 }
 
 fn char_to_key_info(ch: char) -> (String, String, i32) {

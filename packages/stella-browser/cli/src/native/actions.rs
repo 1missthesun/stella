@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 
 use super::auth;
@@ -20,12 +20,18 @@ use super::cdp::types::{
     CreateTargetResult, ExceptionThrownEvent, TargetCreatedEvent, TargetDestroyedEvent,
 };
 use super::cookies;
+use super::dialogs::Dialogs;
 use super::diff;
 use super::element::RefMap;
 use super::extension_bridge::ExtensionBridge;
+use super::extension_pipe::{is_piped_action, PipeLink};
 use super::inspect_server::InspectServer;
 use super::interaction;
 use super::network::{self, DomainFilter, EventTracker};
+use super::network_log::{
+    NetworkLog, RequestRewriteEntry, RouteEntry, RouteResponse,
+    MAX_TRACKED_BODY_BYTES, MAX_TRACKED_REQUESTS, MAX_TRACKED_TOTAL_BODY_BYTES,
+};
 use super::policy::{ActionPolicy, ConfirmActions, PolicyResult};
 use super::providers;
 use super::recording::{self, RecordingState};
@@ -738,134 +744,18 @@ fn validate_mark_tab(cmd: &Value) -> Result<(), String> {
     }
 }
 
-pub struct HarEntry {
-    pub request_id: String,
-    pub wall_time: f64,
-    pub method: String,
-    pub url: String,
-    pub request_headers: Vec<(String, String)>,
-    pub post_data: Option<String>,
-    pub request_body_size: i64,
-    pub resource_type: String,
-    pub status: Option<i64>,
-    pub status_text: String,
-    pub http_version: String,
-    pub response_headers: Vec<(String, String)>,
-    pub mime_type: String,
-    pub redirect_url: String,
-    pub response_body_size: i64,
-    pub response_body: Option<String>,
-    pub response_body_base64: bool,
-    pub response_body_truncated: bool,
-    pub cdp_timing: Option<Value>,
-    pub loading_finished_timestamp: Option<f64>,
-}
 
-pub struct RouteEntry {
-    pub url_pattern: String,
-    pub response: Option<RouteResponse>,
-    pub abort: bool,
-}
 
-pub struct RouteResponse {
-    pub status: Option<u16>,
-    pub body: Option<String>,
-    pub content_type: Option<String>,
-    pub headers: Option<std::collections::HashMap<String, String>>,
-}
 
-pub struct RequestRewriteEntry {
-    pub session_id: String,
-    pub url_pattern: String,
-    pub method: Option<String>,
-    pub post_data: Option<String>,
-    pub json_patch: Option<Value>,
-    pub headers: HashMap<String, String>,
-}
 
-#[derive(Clone, serde::Serialize)]
-pub struct TrackedRequest {
-    #[serde(skip)]
-    pub request_id: String,
-    #[serde(skip)]
-    pub session_id: String,
-    pub url: String,
-    pub method: String,
-    pub headers: Value,
-    #[serde(rename = "postData", skip_serializing_if = "Option::is_none")]
-    pub post_data: Option<String>,
-    #[serde(
-        rename = "postDataTruncated",
-        skip_serializing_if = "std::ops::Not::not"
-    )]
-    pub post_data_truncated: bool,
-    pub timestamp: u64,
-    #[serde(rename = "resourceType")]
-    pub resource_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<i64>,
-    #[serde(rename = "responseHeaders", skip_serializing_if = "Option::is_none")]
-    pub response_headers: Option<Value>,
-    #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
-    pub mime_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub body: Option<String>,
-    #[serde(rename = "bodyBase64", skip_serializing_if = "std::ops::Not::not")]
-    pub body_base64: bool,
-    #[serde(rename = "bodyTruncated", skip_serializing_if = "std::ops::Not::not")]
-    pub body_truncated: bool,
-    pub completed: bool,
-    #[serde(rename = "failureText", skip_serializing_if = "Option::is_none")]
-    pub failure_text: Option<String>,
-}
 
-pub struct FetchPausedRequest {
-    pub request_id: String,
-    pub url: String,
-    pub resource_type: String,
-    pub session_id: String,
-    pub method: String,
-    pub headers: Value,
-    pub post_data: Option<String>,
-}
 
 /// First AX ref number. DOM snapshots restart at `e1` on every capture, so AX
 /// refs, which keep counting across captures, start far above that range and
 /// the two ref families never share an id.
 const AX_REF_START: usize = 1_000_000;
-const MAX_TRACKED_REQUESTS: usize = 256;
-const MAX_TRACKED_BODY_BYTES: usize = 128 * 1024;
-const MAX_TRACKED_TOTAL_BODY_BYTES: usize = 2 * 1024 * 1024;
-const MAX_TRACKED_REQUEST_BODY_BYTES: usize = 128 * 1024;
-const MAX_TRACKED_HEADERS: usize = 128;
-const MAX_TRACKED_HEADER_VALUE_BYTES: usize = 8 * 1024;
 
-fn truncate_utf8(value: &str, max_bytes: usize) -> (String, bool) {
-    if value.len() <= max_bytes {
-        return (value.to_string(), false);
-    }
-    let mut end = max_bytes;
-    while end > 0 && !value.is_char_boundary(end) {
-        end -= 1;
-    }
-    (value[..end].to_string(), true)
-}
 
-fn bounded_header_object(headers: Option<&Value>) -> Value {
-    Value::Object(
-        headers
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
-            .take(MAX_TRACKED_HEADERS)
-            .map(|(name, value)| {
-                let (text, _) =
-                    truncate_utf8(value.as_str().unwrap_or(""), MAX_TRACKED_HEADER_VALUE_BYTES);
-                (name.clone(), Value::String(text))
-            })
-            .collect(),
-    )
-}
 
 pub enum BackendType {
     Cdp,
@@ -927,22 +817,9 @@ pub struct DaemonState {
     pub screencasting: bool,
     pub policy: Option<ActionPolicy>,
     pub pending_confirmation: Option<PendingConfirmation>,
-    pub har_recording: bool,
-    pub har_entries: Vec<HarEntry>,
-    /// Request IDs whose response bodies still need to be pulled from CDP.
-    /// Bodies cannot be read from inside the synchronous event drain, and they
-    /// are evicted from the CDP buffer on navigation, so they are collected
-    /// here and fetched on the next command tick.
-    pub har_pending_bodies: Vec<String>,
-    pub har_body_bytes: usize,
     pub confirm_actions: Option<ConfirmActions>,
     pub inspect_server: Option<InspectServer>,
-    pub routes: Vec<RouteEntry>,
-    pub request_rewrites: Vec<RequestRewriteEntry>,
-    pub tracked_requests: Vec<TrackedRequest>,
-    pub tracked_pending_bodies: Vec<(String, String)>,
-    pub tracked_body_bytes: usize,
-    pub request_tracking: bool,
+    network: Option<NetworkLog>,
     pub active_frame_id: Option<String>,
     pub download_dir: Option<String>,
     pub stream_client: Option<Arc<RwLock<Option<Arc<CdpClient>>>>>,
@@ -950,6 +827,12 @@ pub struct DaemonState {
     pub daemon_shutdown_tx: Option<mpsc::UnboundedSender<()>>,
     owner_leases: OwnerLeaseRegistry,
     deferred_extension_forward: Option<ExtensionForward>,
+    /// Set when this state drives tabs in the user's own browser.
+    pipe: Option<Arc<PipeLink>>,
+    /// Refs of the tabs other than the active one, which is in `ref_map`.
+    /// Refs of the tabs that aren't active, and the tab `ref_map` belongs to.
+    tab_refs: HashMap<u64, RefMap>,
+    refs_tab: Option<u64>,
 }
 
 impl DaemonState {
@@ -991,18 +874,9 @@ impl DaemonState {
             screencasting: false,
             policy: ActionPolicy::load_if_exists(),
             pending_confirmation: None,
-            har_recording: false,
-            har_entries: Vec::new(),
-            har_pending_bodies: Vec::new(),
-            har_body_bytes: 0,
             confirm_actions: ConfirmActions::from_env(),
             inspect_server: None,
-            routes: Vec::new(),
-            request_rewrites: Vec::new(),
-            tracked_requests: Vec::new(),
-            tracked_pending_bodies: Vec::new(),
-            tracked_body_bytes: 0,
-            request_tracking: false,
+            network: None,
             active_frame_id: None,
             download_dir: env::var("STELLA_BROWSER_DOWNLOAD_PATH")
                 .ok()
@@ -1012,6 +886,54 @@ impl DaemonState {
             stream_server: None,
             daemon_shutdown_tx: None,
             deferred_extension_forward: None,
+            pipe: None,
+            tab_refs: HashMap::new(),
+            refs_tab: None,
+        }
+    }
+
+    pub(super) fn for_pipe(link: Arc<PipeLink>) -> Self {
+        let mut state = Self::new();
+        state.extension_proxy = None;
+        state.pipe = Some(link);
+        state
+    }
+
+    pub(super) fn attach_browser(&mut self, browser: BrowserManager) {
+        self.browser = Some(browser);
+        self.subscribe_to_browser_events();
+    }
+
+    /// Puts away the refs of the tab that was active and brings back those of
+    /// the one that is.
+    fn follow_active_tab(&mut self) {
+        let Some(browser) = self.browser.as_ref() else {
+            return;
+        };
+        let current = browser.active_tab_id();
+        self.tab_refs
+            .retain(|tab_id, _| browser.tab_index_by_id(*tab_id).is_some());
+        if current == self.refs_tab {
+            return;
+        }
+        let incoming = current
+            .and_then(|tab_id| self.tab_refs.remove(&tab_id))
+            .unwrap_or_else(RefMap::new);
+        let outgoing = std::mem::replace(&mut self.ref_map, incoming);
+        if let Some(previous) = std::mem::replace(&mut self.refs_tab, current) {
+            if browser.tab_index_by_id(previous).is_some() {
+                self.tab_refs.insert(previous, outgoing);
+            }
+        }
+    }
+
+    pub(super) fn observes_network(&self) -> bool {
+        self.network.as_ref().is_some_and(NetworkLog::is_active)
+    }
+
+    pub(super) fn forget_pipe_pages(&mut self) {
+        if let Some(browser) = self.browser.as_mut() {
+            browser.forget_pages();
         }
     }
 
@@ -1028,6 +950,11 @@ impl DaemonState {
     fn subscribe_to_browser_events(&mut self) {
         if let Some(ref browser) = self.browser {
             self.event_rx = Some(browser.client.subscribe());
+            self.network = Some(NetworkLog::new(
+                browser.client.clone(),
+                self.domain_filter.clone(),
+                self.pipe.is_some(),
+            ));
         }
     }
 
@@ -1080,17 +1007,15 @@ impl DaemonState {
         Vec<i64>,
         Vec<TargetCreatedEvent>,
         Vec<String>,
-        Vec<FetchPausedRequest>,
     ) {
         let rx = match self.event_rx.as_mut() {
             Some(rx) => rx,
-            None => return (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+            None => return (Vec::new(), Vec::new(), Vec::new()),
         };
 
         let mut pending_acks: Vec<i64> = Vec::new();
         let mut new_targets: Vec<TargetCreatedEvent> = Vec::new();
         let mut destroyed_targets: Vec<String> = Vec::new();
-        let mut fetch_paused: Vec<FetchPausedRequest> = Vec::new();
 
         loop {
             match rx.try_recv() {
@@ -1134,19 +1059,7 @@ impl DaemonState {
                         false
                     };
 
-                    // Network observation is tab-scoped, but events can arrive
-                    // after another owned tab becomes active. Preserve traffic
-                    // from every attached page session; non-network events keep
-                    // their historical active-tab-only behavior.
-                    let attached_network_session = event.method.starts_with("Network.")
-                        && self.browser.as_ref().is_some_and(|browser| {
-                            event
-                                .session_id
-                                .as_deref()
-                                .is_some_and(|session_id| browser.has_session_id(session_id))
-                        });
-
-                    if !session_matches && !attached_network_session {
+                    if !session_matches {
                         continue;
                     }
 
@@ -1191,258 +1104,6 @@ impl DaemonState {
                                 );
                             }
                         }
-                        "Network.requestWillBeSent"
-                            if self.har_recording || self.request_tracking =>
-                        {
-                            if let Some(request) = event.params.get("request") {
-                                let method = request
-                                    .get("method")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("GET")
-                                    .to_string();
-                                let url = request
-                                    .get("url")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let request_id = event
-                                    .params
-                                    .get("requestId")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                if self.har_recording {
-                                    let wall_time = event
-                                        .params
-                                        .get("wallTime")
-                                        .and_then(|v| v.as_f64())
-                                        .unwrap_or(0.0);
-                                    let request_headers =
-                                        har_extract_headers(request.get("headers"));
-                                    let post_data = request
-                                        .get("postData")
-                                        .and_then(|v| v.as_str())
-                                        .map(String::from);
-                                    let request_body_size =
-                                        post_data.as_ref().map(|s| s.len() as i64).unwrap_or(0);
-                                    let resource_type = event
-                                        .params
-                                        .get("type")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("Other")
-                                        .to_string();
-                                    self.har_entries.push(HarEntry {
-                                        request_id: request_id.clone(),
-                                        wall_time,
-                                        method: method.clone(),
-                                        url: url.clone(),
-                                        request_headers,
-                                        post_data,
-                                        request_body_size,
-                                        resource_type,
-                                        status: None,
-                                        status_text: String::new(),
-                                        http_version: "HTTP/1.1".to_string(),
-                                        response_headers: Vec::new(),
-                                        mime_type: String::new(),
-                                        redirect_url: String::new(),
-                                        response_body_size: -1,
-                                        response_body: None,
-                                        response_body_base64: false,
-                                        response_body_truncated: false,
-                                        cdp_timing: None,
-                                        loading_finished_timestamp: None,
-                                    });
-                                }
-                                if self.request_tracking {
-                                    let headers = bounded_header_object(request.get("headers"));
-                                    let resource_type = event
-                                        .params
-                                        .get("type")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("Other")
-                                        .to_string();
-                                    let timestamp = std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .map(|d| d.as_millis() as u64)
-                                        .unwrap_or(0);
-                                    let (post_data, post_data_truncated) = request
-                                        .get("postData")
-                                        .and_then(Value::as_str)
-                                        .map(|post_data| {
-                                            let (body, truncated) = truncate_utf8(
-                                                post_data,
-                                                MAX_TRACKED_REQUEST_BODY_BYTES,
-                                            );
-                                            (Some(body), truncated)
-                                        })
-                                        .unwrap_or((None, false));
-                                    self.tracked_requests.push(TrackedRequest {
-                                        request_id,
-                                        session_id: event.session_id.clone().unwrap_or_default(),
-                                        url,
-                                        method,
-                                        headers,
-                                        post_data,
-                                        post_data_truncated,
-                                        timestamp,
-                                        resource_type,
-                                        status: None,
-                                        response_headers: None,
-                                        mime_type: None,
-                                        body: None,
-                                        body_base64: false,
-                                        body_truncated: false,
-                                        completed: false,
-                                        failure_text: None,
-                                    });
-                                    while self.tracked_requests.len() > MAX_TRACKED_REQUESTS {
-                                        let evicted = self.tracked_requests.remove(0);
-                                        self.tracked_body_bytes =
-                                            self.tracked_body_bytes.saturating_sub(
-                                                evicted.body.as_ref().map_or(0, String::len),
-                                            );
-                                    }
-                                }
-                            }
-                        }
-                        "Network.responseReceived"
-                            if self.har_recording || self.request_tracking =>
-                        {
-                            if let Some(response) = event.params.get("response") {
-                                let request_id = event
-                                    .params
-                                    .get("requestId")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("");
-                                let status = response.get("status").and_then(|v| v.as_i64());
-                                let status_text = response
-                                    .get("statusText")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let mime_type = response
-                                    .get("mimeType")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let http_version = response
-                                    .get("protocol")
-                                    .and_then(|v| v.as_str())
-                                    .map(har_cdp_protocol_to_http_version)
-                                    .unwrap_or_else(|| "HTTP/1.1".to_string());
-                                let response_headers = har_extract_headers(response.get("headers"));
-                                let redirect_url = response_headers
-                                    .iter()
-                                    .find(|(k, _)| k.eq_ignore_ascii_case("location"))
-                                    .map(|(_, v)| v.clone())
-                                    .unwrap_or_default();
-                                let encoded_data_length = response
-                                    .get("encodedDataLength")
-                                    .and_then(|v| v.as_i64())
-                                    .unwrap_or(-1);
-                                let cdp_timing = response.get("timing").cloned();
-                                if let Some(entry) = self
-                                    .har_entries
-                                    .iter_mut()
-                                    .rev()
-                                    .find(|e| e.request_id == request_id)
-                                {
-                                    entry.status = status;
-                                    entry.status_text = status_text;
-                                    entry.mime_type = mime_type;
-                                    entry.http_version = http_version;
-                                    entry.response_headers = response_headers;
-                                    entry.redirect_url = redirect_url;
-                                    entry.response_body_size = encoded_data_length;
-                                    entry.cdp_timing = cdp_timing;
-                                }
-                                if self.request_tracking {
-                                    if let Some(entry) =
-                                        self.tracked_requests.iter_mut().rev().find(|entry| {
-                                            entry.request_id == request_id
-                                                && event.session_id.as_deref()
-                                                    == Some(entry.session_id.as_str())
-                                        })
-                                    {
-                                        entry.status = status;
-                                        entry.response_headers =
-                                            Some(bounded_header_object(response.get("headers")));
-                                        entry.mime_type = response
-                                            .get("mimeType")
-                                            .and_then(Value::as_str)
-                                            .map(String::from);
-                                    }
-                                }
-                            }
-                        }
-                        "Network.loadingFinished"
-                            if self.har_recording || self.request_tracking =>
-                        {
-                            let request_id = event
-                                .params
-                                .get("requestId")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            let timestamp = event.params.get("timestamp").and_then(|v| v.as_f64());
-                            let encoded_data_length = event
-                                .params
-                                .get("encodedDataLength")
-                                .and_then(|v| v.as_i64());
-                            let mut wants_body = false;
-                            if let Some(entry) = self
-                                .har_entries
-                                .iter_mut()
-                                .rev()
-                                .find(|e| e.request_id == request_id)
-                            {
-                                if let Some(ts) = timestamp {
-                                    entry.loading_finished_timestamp = Some(ts);
-                                }
-                                if let Some(len) = encoded_data_length {
-                                    entry.response_body_size = len;
-                                }
-                                wants_body =
-                                    har_is_api_shaped(&entry.resource_type, &entry.mime_type);
-                            }
-                            if wants_body {
-                                self.har_pending_bodies.push(request_id.to_string());
-                            }
-                            if self.request_tracking {
-                                if let Some(entry) =
-                                    self.tracked_requests.iter_mut().rev().find(|entry| {
-                                        entry.request_id == request_id
-                                            && event.session_id.as_deref()
-                                                == Some(entry.session_id.as_str())
-                                    })
-                                {
-                                    entry.completed = true;
-                                    self.tracked_pending_bodies
-                                        .push((entry.session_id.clone(), request_id.to_string()));
-                                }
-                            }
-                        }
-                        "Network.loadingFailed" if self.request_tracking => {
-                            let request_id = event
-                                .params
-                                .get("requestId")
-                                .and_then(Value::as_str)
-                                .unwrap_or("");
-                            if let Some(entry) =
-                                self.tracked_requests.iter_mut().rev().find(|entry| {
-                                    entry.request_id == request_id
-                                        && event.session_id.as_deref()
-                                            == Some(entry.session_id.as_str())
-                                })
-                            {
-                                entry.completed = true;
-                                entry.failure_text = event
-                                    .params
-                                    .get("errorText")
-                                    .and_then(Value::as_str)
-                                    .map(String::from);
-                            }
-                        }
                         "Page.screencastFrame" => {
                             if self.stream_server.is_none() {
                                 if let Some(sid) =
@@ -1451,49 +1112,6 @@ impl DaemonState {
                                     pending_acks.push(sid);
                                 }
                             }
-                        }
-                        "Fetch.requestPaused" => {
-                            let request_id = event
-                                .params
-                                .get("requestId")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let request_url = event
-                                .params
-                                .get("request")
-                                .and_then(|r| r.get("url"))
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let resource_type = event
-                                .params
-                                .get("resourceType")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let sid = event.session_id.clone().unwrap_or_default();
-                            let request = event.params.get("request");
-
-                            fetch_paused.push(FetchPausedRequest {
-                                request_id,
-                                url: request_url,
-                                resource_type,
-                                session_id: sid,
-                                method: request
-                                    .and_then(|request| request.get("method"))
-                                    .and_then(Value::as_str)
-                                    .unwrap_or("GET")
-                                    .to_string(),
-                                headers: request
-                                    .and_then(|request| request.get("headers"))
-                                    .cloned()
-                                    .unwrap_or_else(|| json!({})),
-                                post_data: request
-                                    .and_then(|request| request.get("postData"))
-                                    .and_then(Value::as_str)
-                                    .map(String::from),
-                            });
                         }
                         _ => {}
                     }
@@ -1507,7 +1125,7 @@ impl DaemonState {
             }
         }
 
-        (pending_acks, new_targets, destroyed_targets, fetch_paused)
+        (pending_acks, new_targets, destroyed_targets)
     }
 }
 
@@ -1526,6 +1144,182 @@ pub async fn prepare_command(cmd: &Value, state: &mut DaemonState) -> PreparedCo
     match state.deferred_extension_forward.take() {
         Some(forward) => PreparedCommand::Extension(forward),
         None => PreparedCommand::Ready(response),
+    }
+}
+
+async fn absorb_browser_events(state: &mut DaemonState) {
+    let (pending_acks, new_targets, destroyed_targets) = state.drain_cdp_events();
+    if !pending_acks.is_empty() {
+        if let Some(ref browser) = state.browser {
+            if let Ok(session_id) = browser.active_session_id() {
+                for ack_sid in pending_acks {
+                    let _ =
+                        stream::ack_screencast_frame(&browser.client, session_id, ack_sid).await;
+                }
+            }
+        }
+    }
+
+    for target_id in &destroyed_targets {
+        if let Some(ref mut mgr) = state.browser {
+            mgr.remove_page_by_target_id(target_id);
+        }
+    }
+
+    for te in &new_targets {
+        if let Some(ref mut mgr) = state.browser {
+            let attach_result: Result<AttachToTargetResult, String> = mgr
+                .client
+                .send_command_typed(
+                    "Target.attachToTarget",
+                    &AttachToTargetParams {
+                        target_id: te.target_info.target_id.clone(),
+                        flatten: true,
+                    },
+                    None,
+                )
+                .await;
+            if let Ok(attach) = attach_result {
+                let _ = mgr.enable_domains_pub(&attach.session_id).await;
+
+                if let Some(ref filter) = state.domain_filter {
+                    let _ = network::install_domain_filter(
+                        &mgr.client,
+                        &attach.session_id,
+                        &filter.allowed_domains,
+                    )
+                    .await;
+                }
+
+                let tab_id = mgr.add_page(super::browser::PageInfo {
+                    target_id: te.target_info.target_id.clone(),
+                    session_id: attach.session_id,
+                    tab_id: 0,
+                    tab_generation: String::new(),
+                    url: te.target_info.url.clone(),
+                    title: te.target_info.title.clone(),
+                    target_type: te.target_info.target_type.clone(),
+                });
+
+                let opener_owner = te
+                    .target_info
+                    .opener_id
+                    .as_deref()
+                    .and_then(|opener_target_id| mgr.known_tab_id_for_target(opener_target_id))
+                    .and_then(|opener_tab_id| mgr.owner_of_tab(opener_tab_id));
+                if let Some(owner_id) = opener_owner {
+                    mgr.record_owner_tab(&owner_id, tab_id);
+                }
+            }
+        }
+    }
+}
+
+struct AnsweringDialogs(Dialogs);
+
+impl AnsweringDialogs {
+    async fn start(dialogs: &Dialogs) -> Self {
+        let answering = Self(dialogs.clone());
+        dialogs.take_answered();
+        dialogs.resume().await;
+        answering
+    }
+}
+
+impl Drop for AnsweringDialogs {
+    fn drop(&mut self) {
+        self.0.hold();
+    }
+}
+
+/// Runs a command on the user's own browser over the extension pipe.
+pub(super) async fn execute_piped(
+    cmd: &Value,
+    state: &mut DaemonState,
+    link: &Arc<PipeLink>,
+) -> Value {
+    let action = match cmd.get("action").and_then(Value::as_str).unwrap_or("") {
+        "open" => "navigate",
+        action => action,
+    };
+    let id = cmd
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    absorb_browser_events(state).await;
+    let _answering = match state.browser.as_ref() {
+        Some(browser) => Some(AnsweringDialogs::start(&browser.dialogs).await),
+        None => None,
+    };
+
+    if let Err(message) = select_piped_tab(cmd, state, link).await {
+        return error_response(&id, &message);
+    }
+    let mut response = if action == "chain" {
+        handle_chain(cmd, state, &id).await
+    } else {
+        match dispatch_action(action, cmd, state).await {
+            Ok(data) => success_response(&id, data),
+            Err(error) => error_response(&id, &super::browser::to_ai_friendly_error(&error)),
+        }
+    };
+
+    let dialogs = state
+        .browser
+        .as_ref()
+        .map(|browser| browser.dialogs.take_answered())
+        .unwrap_or_default();
+    if !dialogs.is_empty() {
+        let data = response
+            .as_object_mut()
+            .map(|object| object.entry("data").or_insert_with(|| json!({})));
+        if let Some(Value::Object(data)) = data {
+            data.insert("dialogs".to_string(), Value::Array(dialogs));
+        }
+    }
+    response
+}
+
+async fn select_piped_tab(
+    cmd: &Value,
+    state: &mut DaemonState,
+    link: &Arc<PipeLink>,
+) -> Result<(), String> {
+    let requested = match cmd.get("tabId") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_u64()
+                .filter(|tab_id| *tab_id > 0)
+                .ok_or("'tabId' must be a positive integer")?,
+        ),
+    };
+    let mut tab = link.resolve_tab(requested).await?;
+    let attached = link.is_attached(tab.tab_id);
+    if !attached {
+        if let Err(error) = link.attach(tab.tab_id).await {
+            if !opens_page(cmd) {
+                return Err(error);
+            }
+            link.blank(tab.tab_id).await?;
+            link.attach(tab.tab_id).await?;
+            tab.url = "about:blank".to_string();
+        }
+    }
+    let browser = state.browser.as_mut().ok_or("Browser not launched")?;
+    browser.show_pipe_tab(tab, attached).await?;
+    state.follow_active_tab();
+    Ok(())
+}
+
+/// Chrome refuses to debug its own pages, and a navigation can leave them.
+fn opens_page(cmd: &Value) -> bool {
+    match cmd.get("action").and_then(Value::as_str) {
+        Some("navigate" | "open") => true,
+        Some("chain") => cmd.pointer("/steps/0").is_some_and(opens_page),
+        _ => false,
     }
 }
 
@@ -1596,88 +1390,13 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
         }
     }
 
-    let (pending_acks, new_targets, destroyed_targets, fetch_paused) = state.drain_cdp_events();
-    // Bodies are read here rather than at har_stop because a navigation clears
-    // the CDP buffer, which would silently drop every payload recorded before it.
-    har_collect_pending_bodies(state).await;
-    tracked_collect_pending_bodies(state).await;
-    if !pending_acks.is_empty() {
+    if action == "console" || action == "errors" {
         if let Some(ref browser) = state.browser {
-            if let Ok(session_id) = browser.active_session_id() {
-                for ack_sid in pending_acks {
-                    let _ =
-                        stream::ack_screencast_frame(&browser.client, session_id, ack_sid).await;
-                }
-            }
+            let _ = browser.observe_console().await;
         }
     }
 
-    for target_id in &destroyed_targets {
-        if let Some(ref mut mgr) = state.browser {
-            mgr.remove_page_by_target_id(target_id);
-        }
-    }
-
-    for te in &new_targets {
-        if let Some(ref mut mgr) = state.browser {
-            let attach_result: Result<AttachToTargetResult, String> = mgr
-                .client
-                .send_command_typed(
-                    "Target.attachToTarget",
-                    &AttachToTargetParams {
-                        target_id: te.target_info.target_id.clone(),
-                        flatten: true,
-                    },
-                    None,
-                )
-                .await;
-            if let Ok(attach) = attach_result {
-                let _ = mgr.enable_domains_pub(&attach.session_id).await;
-
-                if let Some(ref filter) = state.domain_filter {
-                    let _ = network::install_domain_filter(
-                        &mgr.client,
-                        &attach.session_id,
-                        &filter.allowed_domains,
-                    )
-                    .await;
-                }
-
-                let tab_id = mgr.add_page(super::browser::PageInfo {
-                    target_id: te.target_info.target_id.clone(),
-                    session_id: attach.session_id,
-                    tab_id: 0,
-                    tab_generation: String::new(),
-                    url: te.target_info.url.clone(),
-                    title: te.target_info.title.clone(),
-                    target_type: te.target_info.target_type.clone(),
-                });
-
-                let opener_owner = te
-                    .target_info
-                    .opener_id
-                    .as_deref()
-                    .and_then(|opener_target_id| mgr.known_tab_id_for_target(opener_target_id))
-                    .and_then(|opener_tab_id| mgr.owner_of_tab(opener_tab_id));
-                if let Some(owner_id) = opener_owner {
-                    mgr.record_owner_tab(&owner_id, tab_id);
-                }
-            }
-        }
-    }
-
-    for paused in &fetch_paused {
-        if let Some(ref browser) = state.browser {
-            resolve_fetch_paused(
-                browser,
-                state.domain_filter.as_ref(),
-                &state.routes,
-                &state.request_rewrites,
-                paused,
-            )
-            .await;
-        }
-    }
+    absorb_browser_events(state).await;
 
     if let Some(ref mut policy) = state.policy {
         let _ = policy.reload();
@@ -1796,6 +1515,7 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
             }
         }
 
+        state.follow_active_tab();
         if let Some(ref mut mgr) = state.browser {
             if let Some(owner_id) = command_owner_id(cmd) {
                 if mgr.owner_tab_ids(owner_id).is_empty()
@@ -1806,7 +1526,6 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                         Ok(result) => {
                             if let Some(tab_id) = result.get("tabId").and_then(Value::as_u64) {
                                 mgr.record_owner_tab(owner_id, tab_id);
-                                state.ref_map.clear();
                             }
                         }
                         Err(error) => return error_response(&id, &error),
@@ -1820,13 +1539,8 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                     && !matches!(action, "tab_list" | "tab_new" | "tab_switch" | "tab_close")
                 {
                     if let Some(tab_id) = mgr.active_tab_id_for_owner(Some(owner_id)) {
-                        match mgr.select_tab_by_id(tab_id).await {
-                            Ok(switched) => {
-                                if switched {
-                                    state.ref_map.clear();
-                                }
-                            }
-                            Err(error) => return error_response(&id, &error),
+                        if let Err(error) = mgr.select_tab_by_id(tab_id).await {
+                            return error_response(&id, &error);
                         }
                     }
                 }
@@ -1836,6 +1550,7 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                 }
             }
         }
+        state.follow_active_tab();
     }
 
     if matches!(state.backend_type, BackendType::WebDriver)
@@ -1895,17 +1610,15 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                 Some(tab_id) => {
                     if let Some(ref mut mgr) = state.browser {
                         match mgr.select_tab_by_id(tab_id).await {
-                            Ok(switched) => {
+                            Ok(()) => {
                                 if let Some(owner_id) = command_owner_id(cmd) {
                                     mgr.mark_owner_tab_active(owner_id, tab_id);
-                                }
-                                if switched {
-                                    state.ref_map.clear();
                                 }
                             }
                             Err(e) => return error_response(&id, &e),
                         }
                     }
+                    state.follow_active_tab();
                 }
             }
         }
@@ -1928,6 +1641,11 @@ async fn dispatch_action(
     cmd: &Value,
     state: &mut DaemonState,
 ) -> Result<Value, String> {
+    if let Some(link) = state.pipe.clone() {
+        if !is_piped_action(action) {
+            return link.extension_command(cmd).await;
+        }
+    }
     match action {
         "healthcheck" => Ok(json!({ "status": "ok" })),
         "extension_status" => Ok(handle_extension_status(state, cmd).await),
@@ -1963,7 +1681,7 @@ async fn dispatch_action(
         "ischecked" => handle_ischecked(cmd, state).await,
         "back" => handle_back(state).await,
         "forward" => handle_forward(state).await,
-        "reload" => handle_reload(state).await,
+        "reload" => handle_reload(cmd, state).await,
         "cookies_get" => handle_cookies_get(cmd, state).await,
         "cookies_set" => handle_cookies_set(cmd, state).await,
         "cookies_clear" => handle_cookies_clear(state).await,
@@ -2264,12 +1982,19 @@ async fn wait_for_chain_step_selector(
 /// Re-select the chain's addressed tab before a trailing snapshot/screenshot,
 /// since per-step tabIds may have moved the active page.
 async fn chain_select_tab(state: &mut DaemonState, tab_id: Option<u64>) {
+    if let Some(link) = state.pipe.clone() {
+        let cmd = match tab_id {
+            Some(tab_id) => json!({ "tabId": tab_id }),
+            None => json!({}),
+        };
+        let _ = select_piped_tab(&cmd, state, &link).await;
+        return;
+    }
     let Some(tab_id) = tab_id else { return };
     if let Some(ref mut mgr) = state.browser {
-        if let Ok(true) = mgr.select_tab_by_id(tab_id).await {
-            state.ref_map.clear();
-        }
+        let _ = mgr.select_tab_by_id(tab_id).await;
     }
+    state.follow_active_tab();
 }
 
 async fn dispatch_chain_output_with_deadline(
@@ -2364,7 +2089,34 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
             }
         }
 
-        if let Some(tab_id) = step_cmd
+        if let Some(link) = state.pipe.clone() {
+            if is_piped_action(action) {
+                let selected = within_chain_deadline(
+                    deadline,
+                    chain_budget_ms,
+                    "while selecting the step tab",
+                    select_piped_tab(&step_cmd, state, &link),
+                )
+                .await;
+                let error = match selected {
+                    Ok(Ok(())) => None,
+                    Ok(Err(error)) => Some(error),
+                    Err(error) => Some(error),
+                };
+                if let Some(error) = error {
+                    results.push(chain_step_failure(
+                        index,
+                        action,
+                        error,
+                        step_start.elapsed().as_millis() as u64,
+                    ));
+                    if abort_on_error || tokio::time::Instant::now() >= deadline {
+                        break;
+                    }
+                    continue;
+                }
+            }
+        } else if let Some(tab_id) = step_cmd
             .get("tabId")
             .and_then(Value::as_u64)
             .filter(|tab_id| *tab_id > 0)
@@ -2388,7 +2140,9 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
         // Route the step to its addressed tab. This mirrors execute_command's
         // pre-dispatch tabId resolution: tab_* actions resolve their own
         // targets, every other action runs against the active page.
-        if !matches!(action, "tab_list" | "tab_new" | "tab_switch" | "tab_close") {
+        if state.pipe.is_none()
+            && !matches!(action, "tab_list" | "tab_new" | "tab_switch" | "tab_close")
+        {
             if let Some(tab_id_value) = step_cmd.get("tabId") {
                 match tab_id_value.as_u64().filter(|tab_id| *tab_id > 0) {
                     None => {
@@ -2414,18 +2168,16 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
                             )
                             .await
                             {
-                                Ok(Ok(switched)) => {
+                                Ok(Ok(())) => {
                                     if let Some(owner_id) = command_owner_id(&step_cmd) {
                                         mgr.mark_owner_tab_active(owner_id, tab_id);
-                                    }
-                                    if switched {
-                                        state.ref_map.clear();
                                     }
                                 }
                                 Ok(Err(error)) => switch_error = Some(error),
                                 Err(error) => switch_error = Some(error),
                             }
                         }
+                        state.follow_active_tab();
                         if let Some(error) = switch_error {
                             results.push(chain_step_failure(
                                 index,
@@ -3493,7 +3245,8 @@ async fn handle_navigate(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
     }
 
     state.ref_map.clear();
-    let result = mgr.navigate(url, wait_until).await;
+    let timeout = cmd.get("timeout").and_then(Value::as_u64);
+    let result = mgr.navigate(url, wait_until, timeout).await;
 
     if scoped_headers.is_some() {
         if let Ok(session_id) = mgr.active_session_id() {
@@ -3609,7 +3362,18 @@ async fn handle_evaluate(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
         .and_then(|v| v.as_str())
         .ok_or("Missing 'script' parameter")?;
 
-    let result = mgr.evaluate(script, None).await?;
+    let session_id = mgr.active_session_id()?.to_string();
+    let requested = cmd.get("world").and_then(Value::as_str);
+    let main_world =
+        super::world::agent_script_in_main_world(&mgr.client, &session_id, script, requested).await;
+    let result = match mgr.evaluate_in(script, main_world).await {
+        Err(error)
+            if !main_world && requested.is_none() && super::world::needs_page_world(&error) =>
+        {
+            mgr.evaluate_in(script, true).await?
+        }
+        result => result?,
+    };
     let url = mgr.active_url_cached();
     Ok(json!({ "result": result, "origin": url }))
 }
@@ -3623,7 +3387,15 @@ async fn handle_evaluate_detached(cmd: &Value, state: &DaemonState) -> Result<Va
         .get("script")
         .and_then(Value::as_str)
         .ok_or("Missing 'script' parameter")?;
-    mgr.evaluate_detached(script).await?;
+    let session_id = mgr.active_session_id()?.to_string();
+    let main_world = super::world::agent_script_in_main_world(
+        &mgr.client,
+        &session_id,
+        script,
+        cmd.get("world").and_then(Value::as_str),
+    )
+    .await;
+    mgr.evaluate_detached(script, main_world).await?;
     Ok(json!({ "scheduled": true, "origin": mgr.active_url_cached() }))
 }
 
@@ -3745,8 +3517,14 @@ async fn handle_snapshot(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
     let options = snapshot_options(cmd);
 
     state.ref_map.clear();
-    let tree =
-        snapshot::take_dom_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map).await?;
+    let tree = snapshot::take_dom_snapshot(
+        &mgr.client,
+        &session_id,
+        &options,
+        state.domain_filter.as_ref(),
+        &mut state.ref_map,
+    )
+    .await?;
 
     let url = mgr.get_url().await.unwrap_or_default();
 
@@ -3814,7 +3592,7 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
         .get("format")
         .or_else(|| cmd.get("type"))
         .and_then(|v| v.as_str())
-        .unwrap_or("png")
+        .unwrap_or(if state.pipe.is_some() { "jpeg" } else { "png" })
         .to_string();
 
     let options = ScreenshotOptions {
@@ -3831,12 +3609,14 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
         quality: cmd
             .get("quality")
             .and_then(|v| v.as_i64())
-            .map(|q| q as i32),
+            .map(|q| q as i32)
+            .or(state.pipe.is_some().then_some(60)),
         annotate,
         output_dir: cmd
             .get("screenshotDir")
             .and_then(|v| v.as_str())
             .map(String::from),
+        keep: state.pipe.is_none() || cmd.get("path").is_some(),
     };
 
     if annotate {
@@ -3859,11 +3639,10 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
     let result =
         screenshot::take_screenshot(&mgr.client, &session_id, &state.ref_map, &options).await?;
 
-    let mut response = json!({
-        "path": result.path,
-        "base64": result.base64,
-        "format": format,
-    });
+    let mut response = json!({ "base64": result.base64, "format": format });
+    if let Some(path) = result.path {
+        response["path"] = json!(path);
+    }
     if !result.annotations.is_empty() {
         response["annotations"] = serde_json::to_value(&result.annotations)
             .map_err(|e| format!("Failed to serialize annotations: {}", e))?;
@@ -4200,8 +3979,12 @@ async fn handle_isvisible(cmd: &Value, state: &mut DaemonState) -> Result<Value,
         .ok_or("Missing 'selector' parameter")?;
 
     let visible =
-        super::element::is_element_visible(&mgr.client, &session_id, &state.ref_map, selector)
-            .await?;
+        match super::element::is_element_visible(&mgr.client, &session_id, &state.ref_map, selector)
+            .await
+        {
+            Err(error) if error.starts_with("Element not found") => false,
+            visible => visible?,
+        };
     let url = mgr.get_url().await.unwrap_or_default();
     Ok(json!({ "visible": visible, "origin": url }))
 }
@@ -4247,9 +4030,9 @@ async fn handle_back(state: &mut DaemonState) -> Result<Value, String> {
         }
     }
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let url = mgr.navigate_history(-1).await?;
+    let result = mgr.navigate_history(-1).await?;
     state.ref_map.clear();
-    Ok(json!({ "url": url }))
+    Ok(result)
 }
 
 async fn handle_forward(state: &mut DaemonState) -> Result<Value, String> {
@@ -4263,12 +4046,12 @@ async fn handle_forward(state: &mut DaemonState) -> Result<Value, String> {
         }
     }
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let url = mgr.navigate_history(1).await?;
+    let result = mgr.navigate_history(1).await?;
     state.ref_map.clear();
-    Ok(json!({ "url": url }))
+    Ok(result)
 }
 
-async fn handle_reload(state: &mut DaemonState) -> Result<Value, String> {
+async fn handle_reload(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     if let Some(ref wb) = state.webdriver_backend {
         if state.browser.is_none() {
             wb.reload().await?;
@@ -4278,34 +4061,11 @@ async fn handle_reload(state: &mut DaemonState) -> Result<Value, String> {
             return Ok(json!({ "url": url }));
         }
     }
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
-
-    let mut rx = mgr.client.subscribe();
-    mgr.client
-        .send_command_no_params("Page.reload", Some(&session_id))
-        .await?;
-
-    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(10), async {
-        loop {
-            match rx.recv().await {
-                Ok(event) => {
-                    if event.method == "Page.loadEventFired"
-                        && event.session_id.as_deref() == Some(&session_id)
-                    {
-                        return;
-                    }
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => break,
-            }
-        }
-    })
-    .await;
-
-    let url = mgr.get_url().await.unwrap_or_default();
+    let timeout = cmd.get("timeout").and_then(Value::as_u64);
+    let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
+    let result = mgr.reload(timeout).await?;
     state.ref_map.clear();
-    Ok(json!({ "url": url }))
+    Ok(result)
 }
 
 async fn wait_for_selector(
@@ -4368,6 +4128,7 @@ async fn wait_for_selector(
     .await
 }
 
+/// `*` matches anything; a pattern without one matches any URL containing it.
 async fn wait_for_url(
     client: &super::cdp::client::CdpClient,
     session_id: &str,
@@ -4375,7 +4136,9 @@ async fn wait_for_url(
     timeout_ms: u64,
 ) -> Result<(), String> {
     let check_fn = format!(
-        "location.href.includes({})",
+        r"((pattern, url) => pattern.includes('*')
+            ? new RegExp('^' + pattern.replace(/[.+?^${{}}()|[\]\\]/g, '\\$&').replace(/\*+/g, '.*') + '$').test(url)
+            : url.includes(pattern))({}, location.href)",
         serde_json::to_string(pattern).unwrap_or_default()
     );
     poll_until_true(
@@ -4383,7 +4146,7 @@ async fn wait_for_url(
         session_id,
         &check_fn,
         timeout_ms,
-        &format!("URL containing {:?}", pattern),
+        &format!("URL matching {:?}", pattern),
     )
     .await
 }
@@ -4415,12 +4178,15 @@ async fn wait_for_function(
     timeout_ms: u64,
 ) -> Result<(), String> {
     let check_fn = format!("!!({})", fn_str);
-    poll_until_true(
+    let main_world =
+        super::world::agent_script_in_main_world(client, session_id, fn_str, None).await;
+    poll_until_true_in(
         client,
         session_id,
         &check_fn,
         timeout_ms,
         "page function to return true",
+        main_world,
     )
     .await
 }
@@ -4488,23 +4254,43 @@ async fn poll_until_true(
     timeout_ms: u64,
     expectation: &str,
 ) -> Result<(), String> {
+    poll_until_true_in(
+        client,
+        session_id,
+        expression,
+        timeout_ms,
+        expectation,
+        false,
+    )
+    .await
+}
+
+async fn poll_until_true_in(
+    client: &super::cdp::client::CdpClient,
+    session_id: &str,
+    expression: &str,
+    timeout_ms: u64,
+    expectation: &str,
+    main_world: bool,
+) -> Result<(), String> {
     let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_millis(timeout_ms);
     let probe_expression = wait_observation_expression(expression);
     let mut last_observation: Option<Value> = None;
     let mut last_transport_error: Option<String>;
 
     loop {
+        let mut params = json!({
+            "expression": probe_expression,
+            "returnByValue": true,
+            "awaitPromise": true,
+        });
+        if main_world {
+            params[super::cdp::client::MAIN_WORLD_PARAM] = Value::Bool(true);
+        }
         let result: Result<super::cdp::types::EvaluateResult, String> = client
-            .send_command_typed(
-                "Runtime.evaluate",
-                &super::cdp::types::EvaluateParams {
-                    expression: probe_expression.clone(),
-                    return_by_value: Some(true),
-                    await_promise: Some(true),
-                },
-                Some(session_id),
-            )
-            .await;
+            .send_command("Runtime.evaluate", Some(params), Some(session_id))
+            .await
+            .and_then(|value| serde_json::from_value(value).map_err(|error| error.to_string()));
 
         match result {
             Ok(result) => {
@@ -4805,14 +4591,14 @@ async fn handle_diff_url(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .map(WaitUntil::from_str)
         .unwrap_or(WaitUntil::Load);
 
-    mgr.navigate(url1, wait_until).await?;
+    mgr.navigate(url1, wait_until, None).await?;
     let session_id = mgr.active_session_id()?.to_string();
     let options = SnapshotOptions::default();
     let snap1 =
         snapshot::take_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map, None)
             .await?;
 
-    mgr.navigate(url2, wait_until).await?;
+    mgr.navigate(url2, wait_until, None).await?;
     state.ref_map.clear();
     let snap2 =
         snapshot::take_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map, None)
@@ -4933,8 +4719,9 @@ async fn handle_keyboard(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
     Ok(json!({ "dispatched": event_type }))
 }
 
-async fn handle_tab_list(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
+async fn handle_tab_list(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
+    let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
+    mgr.refresh_pages().await;
     let owner_id = command_owner_id(cmd);
     let tabs = mgr.tab_list_for_owner(owner_id);
     Ok(json!({
@@ -4946,13 +4733,13 @@ async fn handle_tab_list(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
 async fn handle_tab_new(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
     let url = cmd.get("url").and_then(|v| v.as_str());
-    state.ref_map.clear();
     let result = mgr.tab_new(url).await?;
     if let Some(owner_id) = command_owner_id(cmd) {
         if let Some(tab_id) = result.get("tabId").and_then(Value::as_u64) {
             mgr.record_owner_tab(owner_id, tab_id);
         }
     }
+    state.follow_active_tab();
     Ok(result)
 }
 
@@ -5062,12 +4849,8 @@ async fn handle_finalize_tabs(
                 closed_tab_ids.push(tab_id);
             }
         }
-        if !closed_tab_ids.is_empty() {
-            // Closing tabs can move the active page; stale element refs must
-            // not resolve against the wrong tab.
-            state.ref_map.clear();
-        }
     }
+    state.follow_active_tab();
 
     let kept: Vec<Value> = keep_entries
         .iter()
@@ -5129,11 +4912,11 @@ async fn handle_tab_switch(cmd: &Value, state: &mut DaemonState) -> Result<Value
         .tab_list()
         .get(index)
         .and_then(|tab| tab["tabId"].as_u64());
-    state.ref_map.clear();
     let result = mgr.tab_switch(index).await?;
     if let (Some(owner_id), Some(tab_id)) = (command_owner_id(cmd), tab_id) {
         mgr.mark_owner_tab_active(owner_id, tab_id);
     }
+    state.follow_active_tab();
     Ok(result)
 }
 
@@ -5149,11 +4932,11 @@ async fn handle_tab_close(cmd: &Value, state: &mut DaemonState) -> Result<Value,
             index = mgr.tab_index_by_id(tab_id);
         }
     }
-    state.ref_map.clear();
     let mut result = mgr.tab_close(index).await?;
     if let Some(owner_id) = command_owner_id(cmd) {
         result["activeTabId"] = json!(mgr.active_tab_id_for_owner(Some(owner_id)));
     }
+    state.follow_active_tab();
     Ok(result)
 }
 
@@ -5861,7 +5644,7 @@ async fn handle_clipboard(cmd: &Value, state: &DaemonState) -> Result<Value, Str
                 "navigator.clipboard.writeText({})",
                 serde_json::to_string(text).unwrap_or_default()
             );
-            mgr.evaluate(&js, None).await?;
+            clipboard_evaluate(mgr, &js).await?;
             Ok(json!({ "written": text }))
         }
         "copy" => {
@@ -5875,10 +5658,21 @@ async fn handle_clipboard(cmd: &Value, state: &DaemonState) -> Result<Value, Str
             Ok(json!({ "pasted": true }))
         }
         _ => {
-            let result = mgr.evaluate("navigator.clipboard.readText()", None).await?;
+            let result = clipboard_evaluate(mgr, "navigator.clipboard.readText()").await?;
             Ok(json!({ "text": result }))
         }
     }
+}
+
+/// The page's clipboard promise stays open while Chrome asks for permission,
+/// or while the tab is in the background.
+async fn clipboard_evaluate(mgr: &BrowserManager, script: &str) -> Result<Value, String> {
+    tokio::time::timeout(
+        tokio::time::Duration::from_secs(5),
+        mgr.evaluate(script, None),
+    )
+    .await
+    .map_err(|_| "The page could not use the clipboard: its tab must be in front and allowed to use the clipboard.".to_string())?
 }
 
 async fn handle_wheel(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
@@ -6029,20 +5823,14 @@ async fn handle_waitforfunction(cmd: &Value, state: &DaemonState) -> Result<Valu
 
     wait_for_function(&mgr.client, &session_id, expression, timeout_ms).await?;
 
-    let result: super::cdp::types::EvaluateResult = mgr
-        .client
-        .send_command_typed(
-            "Runtime.evaluate",
-            &super::cdp::types::EvaluateParams {
-                expression: format!("({})", expression),
-                return_by_value: Some(true),
-                await_promise: Some(true),
-            },
-            Some(&session_id),
-        )
-        .await?;
+    let main_world =
+        super::world::agent_script_in_main_world(&mgr.client, &session_id, expression, None).await;
+    let result = mgr
+        .evaluate_in(&format!("({})", expression), main_world)
+        .await
+        .unwrap_or(Value::Null);
 
-    Ok(json!({ "result": result.result.value.unwrap_or(Value::Null) }))
+    Ok(json!({ "result": result }))
 }
 
 async fn handle_frame(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
@@ -6244,7 +6032,6 @@ async fn handle_getbytestid(cmd: &Value, state: &mut DaemonState) -> Result<Valu
 
 async fn handle_nth(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
     let selector = cmd
         .get("selector")
         .and_then(|v| v.as_str())
@@ -6254,53 +6041,39 @@ async fn handle_nth(cmd: &Value, state: &mut DaemonState) -> Result<Value, Strin
         .and_then(|v| v.as_i64())
         .ok_or("Missing 'index' parameter")?;
 
+    static NEXT_MARK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let mark = format!(
+        "nth-{}",
+        NEXT_MARK.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    let marks = super::selector::MARKS_JS;
+    let mark_literal = serde_json::to_string(&mark).unwrap_or_default();
     let js = format!(
         r#"(() => {{
             const els = document.querySelectorAll({sel});
             const idx = {idx} < 0 ? els.length + {idx} : {idx};
             if (idx < 0 || idx >= els.length) return false;
-            els[idx].setAttribute('data-stella-browser-located', 'true');
+            {marks}.set({mark_literal}, new WeakRef(els[idx]));
             return true;
         }})()"#,
         sel = serde_json::to_string(selector).unwrap_or_default(),
         idx = index,
     );
 
-    let result: super::cdp::types::EvaluateResult = mgr
-        .client
-        .send_command_typed(
-            "Runtime.evaluate",
-            &super::cdp::types::EvaluateParams {
-                expression: js,
-                return_by_value: Some(true),
-                await_promise: Some(false),
-            },
-            Some(&session_id),
-        )
-        .await?;
-
-    if !result
-        .result
-        .value
-        .as_ref()
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
+    let found = mgr.evaluate(&js, None).await?;
+    if found != Value::Bool(true) {
         return Err(format!(
             "No element at index {} for selector '{}'",
             index, selector
         ));
     }
 
-    let located = "[data-stella-browser-located='true']";
-    let action_result = execute_subaction(cmd, state, located).await;
+    let located = format!("{}{}", super::selector::MARK_PREFIX, mark);
+    let action_result = execute_subaction(cmd, state, &located).await;
 
     if let Some(ref browser) = state.browser {
         let _ = browser
-            .evaluate(
-                "document.querySelector('[data-stella-browser-located]')?.removeAttribute('data-stella-browser-located')",
-                None,
-            )
+            .evaluate(&format!("{marks}.delete({mark_literal})"), None)
             .await;
     }
 
@@ -6340,18 +6113,18 @@ async fn handle_evalhandle(cmd: &Value, state: &DaemonState) -> Result<Value, St
         .and_then(|v| v.as_str())
         .ok_or("Missing 'script' parameter")?;
 
-    let result: super::cdp::types::EvaluateResult = mgr
-        .client
-        .send_command_typed(
-            "Runtime.evaluate",
-            &super::cdp::types::EvaluateParams {
-                expression: script.to_string(),
-                return_by_value: Some(false),
-                await_promise: Some(true),
-            },
-            Some(&session_id),
-        )
-        .await?;
+    let main_world =
+        super::world::agent_script_in_main_world(&mgr.client, &session_id, script, None).await;
+    let mut params = json!({ "expression": script, "returnByValue": false, "awaitPromise": true });
+    if main_world {
+        params[super::cdp::client::MAIN_WORLD_PARAM] = Value::Bool(true);
+    }
+    let result: super::cdp::types::EvaluateResult = serde_json::from_value(
+        mgr.client
+            .send_command("Runtime.evaluate", Some(params), Some(&session_id))
+            .await?,
+    )
+    .map_err(|error| error.to_string())?;
 
     let handle = result.result.object_id.unwrap_or_default();
     Ok(json!({ "handle": handle }))
@@ -6596,13 +6369,7 @@ async fn handle_multiselect(cmd: &Value, state: &DaemonState) -> Result<Value, S
 }
 
 async fn handle_responsebody(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let (client, session_id) = {
-        let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-        (
-            Arc::clone(&mgr.client),
-            mgr.active_session_id()?.to_string(),
-        )
-    };
+    let (session_id, network) = observed_page(state)?;
     let url_pattern = cmd
         .get("url")
         .and_then(|v| v.as_str())
@@ -6610,233 +6377,35 @@ async fn handle_responsebody(cmd: &Value, state: &mut DaemonState) -> Result<Val
     let timeout_ms = cmd.get("timeout").and_then(|v| v.as_u64()).unwrap_or(30000);
     let after = cmd.get("after").and_then(Value::as_u64).unwrap_or(0);
 
-    if let Some(entry) = state
-        .tracked_requests
-        .iter()
-        .rev()
-        .find(|entry| tracked_response_matches(entry, &session_id, url_pattern, after))
-    {
-        return Ok(json!({
-            "url": entry.url,
-            "method": entry.method,
-            "status": entry.status.unwrap_or(0),
-            "headers": entry.response_headers.clone().unwrap_or_else(|| json!({})),
-            "body": entry.body.clone().unwrap_or_default(),
-            "base64Encoded": entry.body_base64,
-            "truncated": entry.body_truncated,
-            "completed": entry.completed,
-        }));
-    }
-
-    let pending_cached = state.tracked_requests.iter().rev().find(|entry| {
-        entry.session_id == session_id
-            && entry.timestamp >= after
-            && entry.url.contains(url_pattern)
-            && entry.status.is_some()
-            && !entry.completed
-    });
-    if let Some(entry) = pending_cached {
-        let request_id = entry.request_id.clone();
-        let response_url = entry.url.clone();
-        let method = entry.method.clone();
-        let status = entry.status.unwrap_or(0);
-        let headers = entry.response_headers.clone().unwrap_or_else(|| json!({}));
-        let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_millis(timeout_ms);
-        loop {
-            match client
-                .send_command(
-                    "Network.getResponseBody",
-                    Some(json!({ "requestId": request_id })),
-                    Some(&session_id),
-                )
-                .await
-            {
-                Ok(body_result) => {
-                    let body = body_result
-                        .get("body")
-                        .and_then(Value::as_str)
-                        .unwrap_or("");
-                    let (captured, truncated) = truncate_utf8(body, MAX_TRACKED_BODY_BYTES);
-                    return Ok(json!({
-                        "url": response_url,
-                        "method": method,
-                        "status": status,
-                        "headers": headers,
-                        "body": captured,
-                        "base64Encoded": body_result
-                            .get("base64Encoded")
-                            .and_then(Value::as_bool)
-                            .unwrap_or(false),
-                        "truncated": truncated,
-                        "completed": true,
-                    }));
-                }
-                Err(_) if tokio::time::Instant::now() < deadline => {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                }
-                Err(_) => {
-                    return Err(format!(
-                        "Timeout waiting for response body matching '{}'",
-                        url_pattern
-                    ));
-                }
-            }
-        }
-    }
-
-    client
-        .send_command_no_params("Network.enable", Some(&session_id))
+    network.track(&session_id).await?;
+    let entry = network
+        .wait_for_response(
+            &session_id,
+            url_pattern,
+            after,
+            Duration::from_millis(timeout_ms),
+        )
         .await?;
-    state.request_tracking = true;
-
-    let mut rx = client.subscribe();
-    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_millis(timeout_ms);
-
-    loop {
-        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() {
-            return Err(format!(
-                "Timeout waiting for response matching '{}'",
-                url_pattern
-            ));
-        }
-
-        match tokio::time::timeout(remaining, rx.recv()).await {
-            Ok(Ok(event)) => {
-                if event.method == "Network.responseReceived"
-                    && event.session_id.as_deref() == Some(&session_id)
-                {
-                    if let Some(resp_url) = event
-                        .params
-                        .get("response")
-                        .and_then(|r| r.get("url"))
-                        .and_then(|u| u.as_str())
-                    {
-                        if resp_url.contains(url_pattern) {
-                            let request_id = event
-                                .params
-                                .get("requestId")
-                                .and_then(|v| v.as_str())
-                                .ok_or("No requestId in response event")?
-                                .to_string();
-                            let status = event
-                                .params
-                                .get("response")
-                                .and_then(|r| r.get("status"))
-                                .and_then(|v| v.as_i64())
-                                .unwrap_or(0);
-                            let headers = event
-                                .params
-                                .get("response")
-                                .and_then(|r| r.get("headers"))
-                                .cloned()
-                                .unwrap_or(json!({}));
-
-                            loop {
-                                let remaining =
-                                    deadline.saturating_duration_since(tokio::time::Instant::now());
-                                if remaining.is_zero() {
-                                    return Err(format!(
-                                        "Timeout waiting for response body matching '{}'",
-                                        url_pattern
-                                    ));
-                                }
-                                match tokio::time::timeout(remaining, rx.recv()).await {
-                                    Ok(Ok(finished))
-                                        if finished.session_id.as_deref() == Some(&session_id)
-                                            && finished
-                                                .params
-                                                .get("requestId")
-                                                .and_then(Value::as_str)
-                                                == Some(request_id.as_str())
-                                            && finished.method == "Network.loadingFinished" =>
-                                    {
-                                        break;
-                                    }
-                                    Ok(Ok(failed))
-                                        if failed.session_id.as_deref() == Some(&session_id)
-                                            && failed
-                                                .params
-                                                .get("requestId")
-                                                .and_then(Value::as_str)
-                                                == Some(request_id.as_str())
-                                            && failed.method == "Network.loadingFailed" =>
-                                    {
-                                        return Err(format!(
-                                            "Response matching '{}' failed to load: {}",
-                                            url_pattern,
-                                            failed
-                                                .params
-                                                .get("errorText")
-                                                .and_then(Value::as_str)
-                                                .unwrap_or("unknown network error")
-                                        ));
-                                    }
-                                    Ok(Ok(_)) | Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
-                                    }
-                                    Ok(Err(_)) => return Err("Event stream closed".to_string()),
-                                    Err(_) => {
-                                        return Err(format!(
-                                            "Timeout waiting for response body matching '{}'",
-                                            url_pattern
-                                        ));
-                                    }
-                                }
-                            }
-
-                            let body_result = client
-                                .send_command(
-                                    "Network.getResponseBody",
-                                    Some(json!({ "requestId": request_id })),
-                                    Some(&session_id),
-                                )
-                                .await?;
-                            let body = body_result
-                                .get("body")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-
-                            let (captured, truncated) = truncate_utf8(body, MAX_TRACKED_BODY_BYTES);
-                            return Ok(json!({
-                                "url": resp_url,
-                                "body": captured,
-                                "status": status,
-                                "headers": headers,
-                                "base64Encoded": body_result
-                                    .get("base64Encoded")
-                                    .and_then(Value::as_bool)
-                                    .unwrap_or(false),
-                                "truncated": truncated,
-                                "completed": true,
-                            }));
-                        }
-                    }
-                }
-            }
-            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => continue,
-            Ok(Err(_)) => return Err("Event stream closed".to_string()),
-            Err(_) => {
-                return Err(format!(
-                    "Timeout waiting for response matching '{}'",
-                    url_pattern
-                ));
-            }
-        }
-    }
+    Ok(json!({
+        "url": entry.url,
+        "method": entry.method,
+        "status": entry.status.unwrap_or(0),
+        "headers": entry.response_headers.unwrap_or_else(|| json!({})),
+        "body": entry.body.unwrap_or_default(),
+        "base64Encoded": entry.body_base64,
+        "truncated": entry.body_truncated,
+        "completed": entry.completed,
+    }))
 }
 
-fn tracked_response_matches(
-    entry: &TrackedRequest,
-    session_id: &str,
-    url_pattern: &str,
-    after: u64,
-) -> bool {
-    entry.session_id == session_id
-        && entry.timestamp >= after
-        && entry.url.contains(url_pattern)
-        && entry.status.is_some()
-        && entry.completed
+/// The active page's session and the log of what it sends.
+fn observed_page(state: &DaemonState) -> Result<(String, NetworkLog), String> {
+    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
+    let session_id = mgr.active_session_id()?.to_string();
+    let network = state.network.clone().ok_or("Browser not launched")?;
+    Ok((session_id, network))
 }
+
 
 async fn handle_authenticated_request(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
@@ -7243,6 +6812,7 @@ async fn handle_diff_screenshot(cmd: &Value, state: &DaemonState) -> Result<Valu
         quality: None,
         annotate: false,
         output_dir: None,
+        keep: false,
     };
 
     let result =
@@ -7310,42 +6880,29 @@ async fn handle_video_stop(state: &mut DaemonState) -> Result<Value, String> {
 }
 
 async fn handle_har_start(state: &mut DaemonState) -> Result<Value, String> {
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
-    mgr.client
-        .send_command_no_params("Network.enable", Some(&session_id))
-        .await?;
-    state.har_recording = true;
-    state.har_entries.clear();
-    state.har_pending_bodies.clear();
-    state.har_body_bytes = 0;
+    let (session_id, network) = observed_page(state)?;
+    network.start_har(&session_id).await?;
     Ok(json!({ "started": true }))
 }
 
 async fn handle_har_stop(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let path = har_output_path(cmd.get("path").and_then(|v| v.as_str()));
 
-    har_collect_pending_bodies(state).await;
-    state.har_recording = false;
-
-    if !state.request_tracking {
-        if let Some(mgr) = state.browser.as_ref() {
-            if let Ok(session_id) = mgr.active_session_id() {
-                let session_id = session_id.to_string();
-                mgr.disable_network_domain(&session_id).await;
-            }
-        }
-    }
-
-    let bodies_captured = state
-        .har_entries
-        .iter()
-        .filter(|e| e.response_body.is_some())
-        .count();
-    let entries: Vec<Value> = state.har_entries.drain(..).map(har_entry_to_json).collect();
+    let session_id = state
+        .browser
+        .as_ref()
+        .and_then(|mgr| mgr.active_session_id().ok())
+        .map(str::to_string);
+    let capture = match state.network.clone() {
+        Some(network) => network.stop_har(session_id.as_deref()).await,
+        None => None,
+    };
+    let recording_was_open = capture.is_some();
+    let (entries, bodies_captured, truncated) = match capture {
+        Some(capture) => (capture.entries, capture.bodies_captured, capture.truncated),
+        None => (Vec::new(), 0, false),
+    };
     let request_count = entries.len();
-    state.har_pending_bodies.clear();
-    state.har_body_bytes = 0;
     let browser = har_browser_metadata(state).await;
 
     let mut log = json!({
@@ -7365,399 +6922,28 @@ async fn handle_har_stop(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .map_err(|e| format!("Failed to serialize HAR: {}", e))?;
     std::fs::write(&path, har_str).map_err(|e| format!("Failed to write HAR: {}", e))?;
 
-    Ok(json!({
+    let mut result = json!({
         "path": path,
         "requestCount": request_count,
         "bodiesCaptured": bodies_captured,
-    }))
-}
-
-fn har_entry_to_json(e: HarEntry) -> Value {
-    let started_date_time = har_wall_time_to_rfc3339(e.wall_time);
-
-    let request_cookies = e
-        .request_headers
-        .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case("cookie"))
-        .map(|(_, v)| har_parse_request_cookies(v))
-        .unwrap_or_default();
-
-    let query_string = har_parse_query_string(&e.url);
-
-    let req_headers: Vec<Value> = e
-        .request_headers
-        .iter()
-        .map(|(k, v)| json!({ "name": k, "value": v }))
-        .collect();
-
-    let resp_cookies: Vec<Value> = e
-        .response_headers
-        .iter()
-        .filter(|(k, _)| k.eq_ignore_ascii_case("set-cookie"))
-        .map(|(_, v)| {
-            let name_value = v.split(';').next().unwrap_or("");
-            let (name, value) = name_value.split_once('=').unwrap_or((name_value, ""));
-            json!({ "name": name.trim(), "value": value.trim() })
-        })
-        .collect();
-
-    let resp_headers: Vec<Value> = e
-        .response_headers
-        .iter()
-        .map(|(k, v)| json!({ "name": k, "value": v }))
-        .collect();
-
-    let (timings, total_time) =
-        har_compute_timings(e.cdp_timing.as_ref(), e.loading_finished_timestamp);
-
-    let mime_type = if e.mime_type.is_empty() {
-        "application/octet-stream".to_string()
-    } else {
-        e.mime_type
-    };
-
-    let post_content_type = e
-        .request_headers
-        .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("text/plain")
-        .to_string();
-
-    let mut request = json!({
-        "method": e.method,
-        "url": e.url,
-        "httpVersion": e.http_version,
-        "cookies": request_cookies,
-        "headers": req_headers,
-        "queryString": query_string,
-        "headersSize": -1,
-        "bodySize": e.request_body_size,
+        "recordingWasOpen": recording_was_open,
     });
-    if let Some(body) = e.post_data {
-        request["postData"] = json!({ "mimeType": post_content_type, "text": body });
+    if truncated {
+        result["truncated"] = json!(true);
     }
-
-    let mut content = json!({
-        "size": e.response_body_size,
-        "mimeType": mime_type,
-    });
-    if let Some(body) = e.response_body {
-        content["text"] = json!(body);
-        if e.response_body_base64 {
-            content["encoding"] = json!("base64");
-        }
-        if e.response_body_truncated {
-            content["_truncated"] = json!(true);
-        }
-    }
-
-    json!({
-        "startedDateTime": started_date_time,
-        "time": total_time,
-        "request": request,
-        "response": {
-            "status": e.status.unwrap_or(0),
-            "statusText": e.status_text,
-            "httpVersion": e.http_version,
-            "cookies": resp_cookies,
-            "headers": resp_headers,
-            "content": content,
-            "redirectURL": e.redirect_url,
-            "headersSize": -1,
-            "bodySize": e.response_body_size,
-        },
-        "cache": {},
-        "timings": timings,
-        "_resourceType": e.resource_type,
-    })
+    Ok(result)
 }
 
-const HAR_MAX_BODY_BYTES: usize = 512 * 1024;
-const HAR_MAX_TOTAL_BODY_BYTES: usize = 8 * 1024 * 1024;
 
-fn har_is_api_shaped(resource_type: &str, mime_type: &str) -> bool {
-    if resource_type == "XHR" || resource_type == "Fetch" {
-        return true;
-    }
-    let mime = mime_type.to_ascii_lowercase();
-    mime.contains("json") || mime.contains("graphql")
-}
 
-async fn har_collect_pending_bodies(state: &mut DaemonState) {
-    if state.har_pending_bodies.is_empty() {
-        return;
-    }
 
-    let pending: Vec<String> = std::mem::take(&mut state.har_pending_bodies);
-    let session_id = match state
-        .browser
-        .as_ref()
-        .and_then(|mgr| mgr.active_session_id().ok())
-    {
-        Some(id) => id.to_string(),
-        None => return,
-    };
 
-    for request_id in pending {
-        if state.har_body_bytes >= HAR_MAX_TOTAL_BODY_BYTES {
-            break;
-        }
-        if state
-            .har_entries
-            .iter()
-            .rev()
-            .find(|e| e.request_id == request_id)
-            .map(|e| e.response_body.is_some())
-            .unwrap_or(true)
-        {
-            continue;
-        }
 
-        let client = match state.browser.as_ref() {
-            Some(mgr) => &mgr.client,
-            None => return,
-        };
-        let result: Result<Value, String> = client
-            .send_command(
-                "Network.getResponseBody",
-                Some(json!({ "requestId": request_id })),
-                Some(&session_id),
-            )
-            .await;
-        let Ok(value) = result else { continue };
-        let Some(body) = value.get("body").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        let base64_encoded = value
-            .get("base64Encoded")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
 
-        let (text, truncated) = truncate_utf8(body, HAR_MAX_BODY_BYTES);
-        state.har_body_bytes += text.len();
 
-        if let Some(entry) = state
-            .har_entries
-            .iter_mut()
-            .rev()
-            .find(|e| e.request_id == request_id)
-        {
-            entry.response_body = Some(text);
-            entry.response_body_base64 = base64_encoded;
-            entry.response_body_truncated = truncated;
-        }
-    }
-}
 
-async fn tracked_collect_pending_bodies(state: &mut DaemonState) {
-    if state.tracked_pending_bodies.is_empty() {
-        return;
-    }
-    let pending = std::mem::take(&mut state.tracked_pending_bodies);
-    for (session_id, request_id) in pending {
-        if state.tracked_body_bytes >= MAX_TRACKED_TOTAL_BODY_BYTES {
-            break;
-        }
-        if state
-            .tracked_requests
-            .iter()
-            .rev()
-            .find(|entry| entry.request_id == request_id && entry.session_id == session_id)
-            .is_none_or(|entry| entry.body.is_some())
-        {
-            continue;
-        }
-        let Some(client) = state.browser.as_ref().map(|browser| &browser.client) else {
-            return;
-        };
-        let Ok(value) = client
-            .send_command(
-                "Network.getResponseBody",
-                Some(json!({ "requestId": request_id })),
-                Some(&session_id),
-            )
-            .await
-        else {
-            continue;
-        };
-        let Some(body) = value.get("body").and_then(Value::as_str) else {
-            continue;
-        };
-        let remaining = MAX_TRACKED_TOTAL_BODY_BYTES.saturating_sub(state.tracked_body_bytes);
-        let body_limit = MAX_TRACKED_BODY_BYTES.min(remaining);
-        let (text, truncated) = truncate_utf8(body, body_limit);
-        let captured = text.len();
-        if let Some(entry) = state
-            .tracked_requests
-            .iter_mut()
-            .rev()
-            .find(|entry| entry.request_id == request_id && entry.session_id == session_id)
-        {
-            entry.body = Some(text);
-            entry.body_base64 = value
-                .get("base64Encoded")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            entry.body_truncated = truncated;
-            state.tracked_body_bytes += captured;
-        }
-    }
-}
 
-fn har_extract_headers(headers_val: Option<&Value>) -> Vec<(String, String)> {
-    headers_val
-        .and_then(|v| v.as_object())
-        .map(|obj| {
-            obj.iter()
-                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
 
-fn har_cdp_protocol_to_http_version(protocol: &str) -> String {
-    match protocol.to_ascii_lowercase().as_str() {
-        "h2" => "HTTP/2.0".to_string(),
-        "h3" => "HTTP/3.0".to_string(),
-        "http/1.0" => "HTTP/1.0".to_string(),
-        _ => "HTTP/1.1".to_string(),
-    }
-}
-
-fn har_parse_query_string(url_str: &str) -> Vec<Value> {
-    url::Url::parse(url_str)
-        .map(|u| {
-            u.query_pairs()
-                .map(|(k, v)| json!({ "name": k.as_ref(), "value": v.as_ref() }))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn har_parse_request_cookies(cookie_header: &str) -> Vec<Value> {
-    cookie_header
-        .split(';')
-        .filter_map(|pair| {
-            let pair = pair.trim();
-            if pair.is_empty() {
-                return None;
-            }
-            let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
-            Some(json!({ "name": name.trim(), "value": value.trim() }))
-        })
-        .collect()
-}
-
-fn har_compute_timings(
-    cdp_timing: Option<&Value>,
-    loading_finished_ts: Option<f64>,
-) -> (Value, f64) {
-    let Some(t) = cdp_timing else {
-        return (json!({ "send": 0, "wait": 0, "receive": 0 }), 0.0);
-    };
-
-    let get = |key: &str| t.get(key).and_then(|v| v.as_f64()).unwrap_or(-1.0);
-
-    let request_time = get("requestTime");
-    let dns_start = get("dnsStart");
-    let dns_end = get("dnsEnd");
-    let connect_start = get("connectStart");
-    let connect_end = get("connectEnd");
-    let ssl_start = get("sslStart");
-    let ssl_end = get("sslEnd");
-    let send_start = get("sendStart");
-    let send_end = get("sendEnd");
-    let recv_headers_start = get("receiveHeadersStart");
-    let recv_headers_end = get("receiveHeadersEnd");
-
-    let dns = if dns_start >= 0.0 && dns_end >= 0.0 {
-        dns_end - dns_start
-    } else {
-        -1.0
-    };
-    let connect = if connect_start >= 0.0 && connect_end >= 0.0 {
-        connect_end - connect_start
-    } else {
-        -1.0
-    };
-    let ssl = if ssl_start >= 0.0 && ssl_end >= 0.0 {
-        ssl_end - ssl_start
-    } else {
-        -1.0
-    };
-    let send = (send_end - send_start).max(0.0);
-
-    let wait_end = if recv_headers_start >= 0.0 {
-        recv_headers_start
-    } else {
-        recv_headers_end
-    };
-    let wait = if send_end >= 0.0 && wait_end >= send_end {
-        wait_end - send_end
-    } else {
-        0.0
-    };
-
-    let receive = loading_finished_ts
-        .filter(|_| request_time >= 0.0 && recv_headers_end >= 0.0)
-        .map(|lf_ts| {
-            let recv_start_abs = request_time + recv_headers_end / 1000.0;
-            ((lf_ts - recv_start_abs) * 1000.0).max(0.0)
-        })
-        .unwrap_or(0.0);
-
-    let blocked = if dns_start > 0.0 {
-        dns_start
-    } else if connect_start > 0.0 {
-        connect_start
-    } else if send_start > 0.0 {
-        send_start
-    } else {
-        -1.0
-    };
-
-    let total: f64 = [
-        if blocked > 0.0 { blocked } else { 0.0 },
-        if dns >= 0.0 { dns } else { 0.0 },
-        if connect >= 0.0 { connect } else { 0.0 },
-        send,
-        wait,
-        receive,
-    ]
-    .iter()
-    .sum();
-
-    let mut timings = json!({ "send": send, "wait": wait, "receive": receive });
-    if blocked > 0.0 {
-        timings["blocked"] = json!(blocked);
-    }
-    if dns >= 0.0 {
-        timings["dns"] = json!(dns);
-    }
-    if connect >= 0.0 {
-        timings["connect"] = json!(connect);
-    }
-    if ssl >= 0.0 {
-        timings["ssl"] = json!(ssl);
-    }
-
-    (timings, total)
-}
-
-fn har_wall_time_to_rfc3339(wall_time: f64) -> String {
-    if wall_time > 0.0 {
-        let nanos = (wall_time * 1_000_000_000.0).round() as i128;
-        if let Ok(dt) = OffsetDateTime::from_unix_timestamp_nanos(nanos) {
-            if let Ok(s) = dt.format(&Rfc3339) {
-                return s;
-            }
-        }
-    }
-    OffsetDateTime::now_utc()
-        .format(&Rfc3339)
-        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
-}
 
 fn har_output_path(explicit_path: Option<&str>) -> String {
     match explicit_path {
@@ -7810,253 +6996,11 @@ fn browser_metadata_from_version(version: &Value) -> Option<Value> {
     }))
 }
 
-async fn resolve_fetch_paused(
-    browser: &BrowserManager,
-    domain_filter: Option<&DomainFilter>,
-    routes: &[RouteEntry],
-    request_rewrites: &[RequestRewriteEntry],
-    paused: &FetchPausedRequest,
-) {
-    let session_id = &paused.session_id;
 
-    if let Some(filter) = domain_filter {
-        if let Ok(parsed) = url::Url::parse(&paused.url) {
-            let scheme = parsed.scheme();
-            if scheme != "http" && scheme != "https" {
-                if paused.resource_type.eq_ignore_ascii_case("document") {
-                    let _ = browser
-                        .client
-                        .send_command(
-                            "Fetch.failRequest",
-                            Some(json!({
-                                "requestId": paused.request_id,
-                                "errorReason": "BlockedByClient"
-                            })),
-                            Some(session_id),
-                        )
-                        .await;
-                } else {
-                    let _ = browser
-                        .client
-                        .send_command(
-                            "Fetch.continueRequest",
-                            Some(json!({ "requestId": paused.request_id })),
-                            Some(session_id),
-                        )
-                        .await;
-                }
-                return;
-            }
 
-            if let Some(hostname) = parsed.host_str() {
-                if !filter.is_allowed(hostname) {
-                    if paused.resource_type.eq_ignore_ascii_case("document") {
-                        let error_body = format!(
-                            "<html><body><h1>Blocked</h1><p>Navigation to {} is not allowed by domain filter.</p></body></html>",
-                            hostname
-                        );
-                        let encoded = base64::Engine::encode(
-                            &base64::engine::general_purpose::STANDARD,
-                            error_body.as_bytes(),
-                        );
-                        let _ = browser
-                            .client
-                            .send_command(
-                                "Fetch.fulfillRequest",
-                                Some(json!({
-                                    "requestId": paused.request_id,
-                                    "responseCode": 403,
-                                    "responseHeaders": [
-                                        { "name": "Content-Type", "value": "text/html" },
-                                    ],
-                                    "body": encoded,
-                                })),
-                                Some(session_id),
-                            )
-                            .await;
-                    } else {
-                        let _ = browser
-                            .client
-                            .send_command(
-                                "Fetch.failRequest",
-                                Some(json!({
-                                    "requestId": paused.request_id,
-                                    "errorReason": "BlockedByClient"
-                                })),
-                                Some(session_id),
-                            )
-                            .await;
-                    }
-                    return;
-                }
-            }
-        }
-    }
-
-    for route in routes {
-        let matches = url_pattern_matches(&route.url_pattern, &paused.url);
-
-        if matches {
-            if route.abort {
-                let _ = browser
-                    .client
-                    .send_command(
-                        "Fetch.failRequest",
-                        Some(json!({
-                            "requestId": paused.request_id,
-                            "errorReason": "Failed"
-                        })),
-                        Some(session_id),
-                    )
-                    .await;
-                return;
-            }
-
-            if let Some(ref resp) = route.response {
-                let status = resp.status.unwrap_or(200);
-                let body_str = resp.body.as_deref().unwrap_or("");
-                let encoded = base64::Engine::encode(
-                    &base64::engine::general_purpose::STANDARD,
-                    body_str.as_bytes(),
-                );
-                let mut headers = vec![];
-                if let Some(ct) = &resp.content_type {
-                    headers.push(json!({ "name": "Content-Type", "value": ct }));
-                }
-                if let Some(h) = &resp.headers {
-                    for (k, v) in h {
-                        headers.push(json!({ "name": k, "value": v }));
-                    }
-                }
-
-                let _ = browser
-                    .client
-                    .send_command(
-                        "Fetch.fulfillRequest",
-                        Some(json!({
-                            "requestId": paused.request_id,
-                            "responseCode": status,
-                            "responseHeaders": headers,
-                            "body": encoded,
-                        })),
-                        Some(session_id),
-                    )
-                    .await;
-                return;
-            }
-        }
-    }
-
-    if let Some(rewrite) = request_rewrites.iter().rev().find(|rewrite| {
-        rewrite.session_id == paused.session_id
-            && url_pattern_matches(&rewrite.url_pattern, &paused.url)
-    }) {
-        let mut params = json!({ "requestId": paused.request_id });
-        if let Some(method) = &rewrite.method {
-            params["method"] = json!(method);
-        }
-        let rewritten_post_data = if let Some(json_patch) = &rewrite.json_patch {
-            paused
-                .post_data
-                .as_deref()
-                .and_then(|post_data| serde_json::from_str::<Value>(post_data).ok())
-                .map(|mut body| {
-                    merge_json_value(&mut body, json_patch);
-                    body.to_string()
-                })
-                .or_else(|| rewrite.post_data.clone())
-        } else {
-            rewrite.post_data.clone()
-        };
-        if let Some(post_data) = rewritten_post_data {
-            params["postData"] = json!(base64::Engine::encode(
-                &base64::engine::general_purpose::STANDARD,
-                post_data.as_bytes(),
-            ));
-        }
-        if !rewrite.headers.is_empty() {
-            let mut headers: HashMap<String, String> = paused
-                .headers
-                .as_object()
-                .into_iter()
-                .flatten()
-                .filter_map(|(name, value)| {
-                    value
-                        .as_str()
-                        .map(|value| (name.clone(), value.to_string()))
-                })
-                .collect();
-            for (name, value) in &rewrite.headers {
-                headers.insert(name.clone(), value.clone());
-            }
-            params["headers"] = json!(headers
-                .into_iter()
-                .map(|(name, value)| json!({ "name": name, "value": value }))
-                .collect::<Vec<_>>());
-        }
-        let _ = browser
-            .client
-            .send_command("Fetch.continueRequest", Some(params), Some(session_id))
-            .await;
-        return;
-    }
-
-    let _ = browser
-        .client
-        .send_command(
-            "Fetch.continueRequest",
-            Some(json!({ "requestId": paused.request_id })),
-            Some(session_id),
-        )
-        .await;
-}
-
-fn url_pattern_matches(pattern: &str, url: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-    if !pattern.contains('*') {
-        return url.contains(pattern);
-    }
-    let mut remainder = url;
-    let mut first = true;
-    for part in pattern.split('*').filter(|part| !part.is_empty()) {
-        let Some(index) = remainder.find(part) else {
-            return false;
-        };
-        if first && !pattern.starts_with('*') && index != 0 {
-            return false;
-        }
-        remainder = &remainder[index + part.len()..];
-        first = false;
-    }
-    pattern.ends_with('*') || remainder.is_empty()
-}
-
-fn merge_json_value(target: &mut Value, patch: &Value) {
-    let Value::Object(patch_object) = patch else {
-        *target = patch.clone();
-        return;
-    };
-    if !target.is_object() {
-        *target = json!({});
-    }
-    let target_object = target.as_object_mut().expect("target converted to object");
-    for (key, patch_value) in patch_object {
-        if patch_value.is_null() {
-            target_object.remove(key);
-            continue;
-        }
-        merge_json_value(
-            target_object.entry(key.clone()).or_insert(Value::Null),
-            patch_value,
-        );
-    }
-}
 
 async fn handle_route(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
+    let (session_id, network) = observed_page(state)?;
     let url_pattern = cmd
         .get("url")
         .and_then(|v| v.as_str())
@@ -8070,7 +7014,11 @@ async fn handle_route(cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
         }
         Some(RouteResponse {
             status: v.get("status").and_then(|s| s.as_u64()).map(|s| s as u16),
-            body: v.get("body").and_then(|s| s.as_str()).map(String::from),
+            body: v.get("body").filter(|body| !body.is_null()).map(|body| {
+                body.as_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| body.to_string())
+            }),
             content_type: v
                 .get("contentType")
                 .and_then(|s| s.as_str())
@@ -8085,102 +7033,35 @@ async fn handle_route(cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
         })
     });
 
-    state.routes.push(RouteEntry {
+    let route = RouteEntry {
         url_pattern: url_pattern.clone(),
         response,
         abort,
-    });
-
-    let mut patterns: Vec<Value> = state
-        .routes
-        .iter()
-        .map(|r| json!({ "urlPattern": r.url_pattern }))
-        .collect();
-    patterns.extend(
-        state
-            .request_rewrites
-            .iter()
-            .filter(|rewrite| rewrite.session_id == session_id)
-            .map(|rewrite| json!({ "urlPattern": rewrite.url_pattern })),
-    );
-    if state.domain_filter.is_some() && !patterns.iter().any(|p| p["urlPattern"] == "*") {
-        patterns.push(json!({ "urlPattern": "*" }));
-    }
-
-    mgr.client
-        .send_command(
-            "Fetch.enable",
-            Some(json!({ "patterns": patterns })),
-            Some(&session_id),
-        )
+    };
+    network
+        .change_rules(&session_id, |rules| {
+            rules.routes.retain(|known| known.url_pattern != route.url_pattern);
+            rules.routes.push(route);
+        })
         .await?;
 
     Ok(json!({ "routed": url_pattern }))
 }
 
 async fn handle_unroute(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-    let session_id = mgr.active_session_id()?.to_string();
-
+    let (session_id, network) = observed_page(state)?;
     let url = cmd.get("url").and_then(|v| v.as_str());
-
-    match url {
-        Some(pattern) => {
-            state.routes.retain(|r| r.url_pattern != pattern);
-        }
-        None => {
-            state.routes.clear();
-        }
-    }
-
-    let rewrite_patterns: Vec<Value> = state
-        .request_rewrites
-        .iter()
-        .filter(|rewrite| rewrite.session_id == session_id)
-        .map(|rewrite| json!({ "urlPattern": rewrite.url_pattern }))
-        .collect();
-    if state.routes.is_empty() && rewrite_patterns.is_empty() {
-        if state.domain_filter.is_some() {
-            mgr.client
-                .send_command(
-                    "Fetch.enable",
-                    Some(json!({ "patterns": [{ "urlPattern": "*" }] })),
-                    Some(&session_id),
-                )
-                .await?;
-        } else {
-            mgr.client
-                .send_command("Fetch.disable", None, Some(&session_id))
-                .await?;
-        }
-    } else {
-        let mut patterns: Vec<Value> = state
-            .routes
-            .iter()
-            .map(|r| json!({ "urlPattern": r.url_pattern }))
-            .collect();
-        patterns.extend(rewrite_patterns);
-        mgr.client
-            .send_command(
-                "Fetch.enable",
-                Some(json!({ "patterns": patterns })),
-                Some(&session_id),
-            )
-            .await?;
-    }
-
-    let label = url.unwrap_or("all");
-    Ok(json!({ "unrouted": label }))
+    network
+        .change_rules(&session_id, |rules| match url {
+            Some(pattern) => rules.routes.retain(|route| route.url_pattern != pattern),
+            None => rules.routes.clear(),
+        })
+        .await?;
+    Ok(json!({ "unrouted": url.unwrap_or("all") }))
 }
 
 async fn handle_rewrite_request(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let (client, session_id) = {
-        let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-        (
-            Arc::clone(&mgr.client),
-            mgr.active_session_id()?.to_string(),
-        )
-    };
+    let (session_id, network) = observed_page(state)?;
     let url_pattern = cmd
         .get("url")
         .and_then(Value::as_str)
@@ -8230,113 +7111,45 @@ async fn handle_rewrite_request(cmd: &Value, state: &mut DaemonState) -> Result<
         );
     }
 
-    state
-        .request_rewrites
-        .retain(|rewrite| rewrite.session_id != session_id || rewrite.url_pattern != url_pattern);
-    state.request_rewrites.push(RequestRewriteEntry {
+    let rewrite = RequestRewriteEntry {
         session_id: session_id.clone(),
         url_pattern: url_pattern.clone(),
         method,
         post_data,
         json_patch,
         headers,
-    });
-    let patterns: Vec<Value> = state
-        .routes
-        .iter()
-        .map(|route| json!({ "urlPattern": route.url_pattern }))
-        .chain(
-            state
-                .request_rewrites
-                .iter()
-                .filter(|rewrite| rewrite.session_id == session_id)
-                .map(|rewrite| json!({ "urlPattern": rewrite.url_pattern })),
-        )
-        .collect();
-    client
-        .send_command(
-            "Fetch.enable",
-            Some(json!({ "patterns": patterns })),
-            Some(&session_id),
-        )
+    };
+    network
+        .change_rules(&session_id, |rules| {
+            rules.rewrites.retain(|known| {
+                known.session_id != rewrite.session_id || known.url_pattern != rewrite.url_pattern
+            });
+            rules.rewrites.push(rewrite);
+        })
         .await?;
     Ok(json!({ "rewritten": url_pattern }))
 }
 
 async fn handle_unrewrite_request(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let (client, session_id) = {
-        let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-        (
-            Arc::clone(&mgr.client),
-            mgr.active_session_id()?.to_string(),
-        )
-    };
+    let (session_id, network) = observed_page(state)?;
     let url_pattern = cmd.get("url").and_then(Value::as_str);
-    state.request_rewrites.retain(|rewrite| {
-        rewrite.session_id != session_id
-            || url_pattern.is_some_and(|pattern| rewrite.url_pattern != pattern)
-    });
-    let mut patterns: Vec<Value> = state
-        .routes
-        .iter()
-        .map(|route| json!({ "urlPattern": route.url_pattern }))
-        .chain(
-            state
-                .request_rewrites
-                .iter()
-                .filter(|rewrite| rewrite.session_id == session_id)
-                .map(|rewrite| json!({ "urlPattern": rewrite.url_pattern })),
-        )
-        .collect();
-    if state.domain_filter.is_some() && !patterns.iter().any(|pattern| pattern["urlPattern"] == "*")
-    {
-        patterns.push(json!({ "urlPattern": "*" }));
-    }
-    if patterns.is_empty() {
-        client
-            .send_command("Fetch.disable", None, Some(&session_id))
-            .await?;
-    } else {
-        client
-            .send_command(
-                "Fetch.enable",
-                Some(json!({ "patterns": patterns })),
-                Some(&session_id),
-            )
-            .await?;
-    }
+    network
+        .change_rules(&session_id, |rules| {
+            rules.rewrites.retain(|rewrite| {
+                rewrite.session_id != session_id
+                    || url_pattern.is_some_and(|pattern| rewrite.url_pattern != pattern)
+            });
+        })
+        .await?;
     Ok(json!({ "unrewritten": url_pattern.unwrap_or("all") }))
 }
 
 async fn handle_requests(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let (client, session_id) = {
-        let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
-        (
-            Arc::clone(&mgr.client),
-            mgr.active_session_id()?.to_string(),
-        )
-    };
+    let (session_id, network) = observed_page(state)?;
     if cmd.get("clear").and_then(|v| v.as_bool()).unwrap_or(false) {
-        state
-            .tracked_requests
-            .retain(|entry| entry.session_id != session_id);
-        state
-            .tracked_pending_bodies
-            .retain(|(pending_session, _)| pending_session != &session_id);
-        state.tracked_body_bytes = state
-            .tracked_requests
-            .iter()
-            .filter_map(|entry| entry.body.as_ref())
-            .map(String::len)
-            .sum();
+        network.clear_tracked(&session_id);
     }
-
-    if !state.request_tracking {
-        state.request_tracking = true;
-    }
-    client
-        .send_command_no_params("Network.enable", Some(&session_id))
-        .await?;
+    network.track(&session_id).await?;
 
     let filter = cmd.get("filter").and_then(|v| v.as_str());
     let after = cmd.get("after").and_then(Value::as_u64).unwrap_or(0);
@@ -8345,18 +7158,7 @@ async fn handle_requests(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .and_then(Value::as_u64)
         .unwrap_or(MAX_TRACKED_REQUESTS as u64)
         .clamp(1, MAX_TRACKED_REQUESTS as u64) as usize;
-    let mut requests: Vec<&TrackedRequest> = state
-        .tracked_requests
-        .iter()
-        .rev()
-        .filter(|request| {
-            request.session_id == session_id
-                && request.timestamp >= after
-                && filter.is_none_or(|filter| request.url.contains(filter))
-        })
-        .take(limit)
-        .collect();
-    requests.reverse();
+    let requests = network.tracked(&session_id, filter, after, limit);
 
     Ok(json!({
         "requests": requests,
@@ -8434,7 +7236,7 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     let password = cred.password;
 
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
-    mgr.navigate(&url, WaitUntil::Load).await?;
+    mgr.navigate(&url, WaitUntil::Load, None).await?;
 
     let session_id = mgr.active_session_id()?.to_string();
 
@@ -8835,13 +7637,7 @@ async fn handle_inserttext(cmd: &Value, state: &DaemonState) -> Result<Value, St
         .and_then(|v| v.as_str())
         .ok_or("Missing 'text' parameter")?;
 
-    mgr.client
-        .send_command(
-            "Input.insertText",
-            Some(json!({ "text": text })),
-            Some(&session_id),
-        )
-        .await?;
+    super::human::type_text(&mgr.client, &session_id, text, None).await?;
     Ok(json!({ "inserted": true }))
 }
 

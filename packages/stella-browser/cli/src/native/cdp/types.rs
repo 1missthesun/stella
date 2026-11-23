@@ -154,12 +154,6 @@ pub struct TargetDestroyedEvent {
     pub target_id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TargetInfoChangedEvent {
-    pub target_info: TargetInfo,
-}
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PageNavigateParams {

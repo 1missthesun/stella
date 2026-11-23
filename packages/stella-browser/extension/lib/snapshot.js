@@ -1,7 +1,6 @@
 /**
- * Execute snapshot directly in the page context.
- * This function is passed to chrome.scripting.executeScript as `func`,
- * avoiding new Function() / eval() which are blocked by CSP on many sites.
+ * Runs inside the page: the service embeds this file's source and evaluates
+ * it there, so it can't use anything outside this function.
  *
  * @param {object} options
  * @returns {{ tree: string, refs: Record<string, object> }}

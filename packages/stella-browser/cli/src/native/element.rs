@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use super::cdp::client::CdpClient;
 use super::cdp::types::*;
+use super::interaction::translate_frame_point;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RefLocatorHints {
@@ -238,12 +239,12 @@ pub async fn validate_ref_scope<'a>(
         .is_some_and(|frame| frame.session_id == session_id)
     {
         return Err(
-            "This ref belongs to a different browser tab. Capture a new AX snapshot.".into(),
+            "This ref belongs to a different browser tab. Take a new snapshot.".into(),
         );
     }
     for frame in scope {
         if !frame_is_current(client, frame).await? {
-            return Err("This ref is stale because its document or ancestor frame navigated. Capture a new AX snapshot.".into());
+            return Err("This ref is stale because its document or ancestor frame navigated. Take a new snapshot.".into());
         }
     }
     Ok(scope
@@ -258,7 +259,7 @@ async fn refresh_backend_node_id(
     entry: &RefEntry,
 ) -> Result<i64, String> {
     if entry.frame_scope.is_some() {
-        return Err("This AX ref no longer resolves. Capture a new AX snapshot.".into());
+        return Err("This ref no longer resolves. Take a new snapshot.".into());
     }
     find_node_id_by_ref_entry(client, session_id, entry).await
 }
@@ -1062,6 +1063,7 @@ pub async fn get_element_bounding_box(
 ) -> Result<Value, String> {
     let (object_id, session_id) =
         resolve_element_object_id(client, session_id, ref_map, selector_or_ref).await?;
+    let scope = ref_frame_scope(ref_map, selector_or_ref);
 
     let result: EvaluateResult = client
         .send_command_typed(
@@ -1069,7 +1071,10 @@ pub async fn get_element_bounding_box(
             &CallFunctionOnParams {
                 function_declaration: BOUNDING_BOX_JS.to_string(),
                 object_id: Some(object_id),
-                arguments: None,
+                arguments: Some(vec![CallArgument {
+                    value: Some(serde_json::json!(scope.is_some())),
+                    object_id: None,
+                }]),
                 return_by_value: Some(true),
                 await_promise: Some(false),
             },
@@ -1077,21 +1082,29 @@ pub async fn get_element_bounding_box(
         )
         .await?;
 
-    result
+    let mut bounds = result
         .result
         .value
-        .ok_or_else(|| format!("Could not get bounding box for: {}", selector_or_ref))
+        .ok_or_else(|| format!("Could not get bounding box for: {}", selector_or_ref))?;
+    if let Some(scope) = scope {
+        let field = |name: &str| bounds[name].as_f64().unwrap_or(0.0);
+        let (x, y) =
+            translate_frame_point(client, scope, field("x"), field("y"), false, false).await?;
+        bounds["x"] = serde_json::json!(x);
+        bounds["y"] = serde_json::json!(y);
+    }
+    Ok(bounds)
 }
 
-/// and the extension backend. `getBoundingClientRect()` is frame-local, so a
-/// same-origin iframe result must accumulate every ancestor frame's content
-/// offset and border before it is exposed to callers.
-const BOUNDING_BOX_JS: &str = r#"function() {
+/// The element's box in the top-level viewport. `getBoundingClientRect()` is
+/// frame-local, so a same-origin iframe adds every ancestor frame's offset;
+/// with `frameOnly` the caller does it, across origins too.
+const BOUNDING_BOX_JS: &str = r#"function(frameOnly) {
     const r = this.getBoundingClientRect();
     let x = r.x;
     let y = r.y;
     let win = this.ownerDocument && this.ownerDocument.defaultView;
-    for (let depth = 0; depth < 16 && win && win !== win.parent; depth += 1) {
+    for (let depth = 0; !frameOnly && depth < 16 && win && win !== win.parent; depth += 1) {
         let frame = null;
         try { frame = win.frameElement; } catch (_) { frame = null; }
         if (!frame) break;

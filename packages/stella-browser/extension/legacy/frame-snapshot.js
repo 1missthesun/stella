@@ -1,4 +1,4 @@
-import { executeSnapshot } from "./snapshot.js";
+import { executeSnapshot } from "../lib/snapshot.js";
 import {
   exactRef,
   evaluateFrame,

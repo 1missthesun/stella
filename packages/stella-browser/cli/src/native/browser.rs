@@ -12,6 +12,8 @@ use super::cdp::client::CdpClient;
 use super::cdp::discovery::discover_cdp_url;
 use super::cdp::lightpanda::{launch_lightpanda, LightpandaLaunchOptions, LightpandaProcess};
 use super::cdp::types::*;
+use super::dialogs::Dialogs;
+use super::extension_pipe::{tab_session, PipeTab};
 
 pub fn validate_launch_options(
     extensions: Option<&[String]>,
@@ -128,17 +130,39 @@ pub struct PageInfo {
 
 #[derive(Debug, Clone, Copy)]
 pub enum WaitUntil {
+    None,
     Load,
     DomContentLoaded,
     NetworkIdle,
 }
 
+/// A page too busy to answer doesn't hold up the result of loading it.
+const PAGE_ANSWER_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// How far a navigation got within its time.
+#[derive(PartialEq)]
+enum Progress {
+    Reached,
+    Committed,
+    NotStarted,
+}
+
 impl WaitUntil {
     pub fn from_str(s: &str) -> Self {
         match s {
+            "none" => Self::None,
             "domcontentloaded" => Self::DomContentLoaded,
             "networkidle" => Self::NetworkIdle,
             _ => Self::Load,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Load => "load",
+            Self::DomContentLoaded => "domcontentloaded",
+            Self::NetworkIdle => "networkidle",
         }
     }
 }
@@ -174,6 +198,7 @@ pub struct BrowserManager {
     target_tab_ids: HashMap<String, u64>,
     target_tab_generations: HashMap<String, String>,
     owner_tabs: OwnerTabRegistry,
+    pub dialogs: Dialogs,
 }
 
 #[derive(Default)]
@@ -339,8 +364,9 @@ impl BrowserManager {
             initialize_lightpanda_manager(ws_url, process).await?
         } else {
             let client = Arc::new(CdpClient::connect(&ws_url).await?);
-            spawn_dialog_auto_handler(&client);
+            let dialogs = Dialogs::answer_always(&client);
             let mut manager = Self {
+                dialogs,
                 client,
                 browser_process: Some(process),
                 ws_url,
@@ -408,8 +434,9 @@ impl BrowserManager {
     pub async fn connect_cdp(url: &str) -> Result<Self, String> {
         let ws_url = resolve_cdp_url(url).await?;
         let client = Arc::new(CdpClient::connect(&ws_url).await?);
-        spawn_dialog_auto_handler(&client);
+        let dialogs = Dialogs::answer_always(&client);
         let mut manager = Self {
+            dialogs,
             client,
             browser_process: None,
             ws_url,
@@ -423,6 +450,56 @@ impl BrowserManager {
 
         manager.discover_and_attach_targets().await?;
         Ok(manager)
+    }
+
+    /// Drives tabs the Stella Browser extension attaches, through `client`.
+    pub fn over_pipe(client: Arc<CdpClient>) -> Self {
+        let dialogs = Dialogs::answer_during_commands(&client);
+        Self {
+            dialogs,
+            client,
+            browser_process: None,
+            ws_url: String::new(),
+            pages: Vec::new(),
+            active_page_index: 0,
+            default_timeout_ms: 25_000,
+            target_tab_ids: HashMap::new(),
+            target_tab_generations: HashMap::new(),
+            owner_tabs: OwnerTabRegistry::default(),
+        }
+    }
+
+    /// Makes a tab of the user's browser the active page, without bringing it
+    /// to the front. `known` is false when it was just attached.
+    pub async fn show_pipe_tab(&mut self, tab: PipeTab, known: bool) -> Result<(), String> {
+        let session_id = tab_session(tab.tab_id);
+        if !known {
+            self.remove_page_by_target_id(&session_id);
+        }
+        if let Some(index) = self.tab_index_by_id(tab.tab_id) {
+            self.active_page_index = index;
+            self.pages[index].url = tab.url;
+            self.pages[index].title = tab.title;
+            return Ok(());
+        }
+        self.enable_domains(&session_id).await?;
+        self.target_tab_ids.insert(session_id.clone(), tab.tab_id);
+        self.pages.push(PageInfo {
+            target_id: session_id.clone(),
+            session_id,
+            tab_id: tab.tab_id,
+            tab_generation: String::new(),
+            url: tab.url,
+            title: tab.title,
+            target_type: "page".to_string(),
+        });
+        self.active_page_index = self.pages.len() - 1;
+        Ok(())
+    }
+
+    pub fn forget_pages(&mut self) {
+        self.pages.clear();
+        self.active_page_index = 0;
     }
 
     pub async fn connect_auto() -> Result<Self, String> {
@@ -599,10 +676,17 @@ impl BrowserManager {
         self.enable_domains(session_id).await
     }
 
+    // Runtime.enable makes the page's console.log(error) read Error.prepareStackTrace, which bot
+    // detectors use to spot an attached debugger, so it is only enabled when console output is asked for.
     async fn enable_domains(&self, session_id: &str) -> Result<(), String> {
         self.client
             .send_command_no_params("Page.enable", Some(session_id))
             .await?;
+        Ok(())
+    }
+
+    pub async fn observe_console(&self) -> Result<(), String> {
+        let session_id = self.active_session_id()?;
         self.client
             .send_command_no_params("Runtime.enable", Some(session_id))
             .await?;
@@ -632,87 +716,165 @@ impl BrowserManager {
             })
     }
 
-    pub async fn navigate(&mut self, url: &str, wait_until: WaitUntil) -> Result<Value, String> {
+    pub async fn navigate(
+        &mut self,
+        url: &str,
+        wait_until: WaitUntil,
+        timeout_ms: Option<u64>,
+    ) -> Result<Value, String> {
         let session_id = self.active_session_id()?.to_string();
         if matches!(wait_until, WaitUntil::NetworkIdle) {
             self.ensure_network_domain(&session_id).await?;
         }
-        let mut lifecycle_rx = self.client.subscribe();
+        let mut events = self.client.subscribe();
+        let deadline = Instant::now() + self.load_timeout(timeout_ms);
 
-        let nav_result: PageNavigateResult = self
-            .client
-            .send_command_typed(
-                "Page.navigate",
-                &PageNavigateParams {
-                    url: url.to_string(),
-                    referrer: None,
-                },
-                Some(&session_id),
-            )
-            .await?;
+        let params = PageNavigateParams {
+            url: url.to_string(),
+            referrer: None,
+        };
+        let answered = tokio::time::timeout_at(
+            deadline.into(),
+            self.client
+                .send_command_typed("Page.navigate", &params, Some(&session_id)),
+        )
+        .await;
+        let Ok(started) = answered else {
+            return self
+                .navigated(url, wait_until, Progress::NotStarted, timeout_ms)
+                .await;
+        };
+        let started: PageNavigateResult = started?;
 
-        if let Some(ref error_text) = nav_result.error_text {
+        if let Some(ref error_text) = started.error_text {
             return Err(format!("Navigation failed: {}", error_text));
         }
 
-        self.wait_for_lifecycle(wait_until, &session_id, &mut lifecycle_rx)
+        // A change of the page's fragment has no loader and fires no load event.
+        let progress = if started.loader_id.is_none() || matches!(wait_until, WaitUntil::None) {
+            Progress::Reached
+        } else {
+            self.wait_for_load(
+                wait_until,
+                &session_id,
+                &mut events,
+                Progress::Committed,
+                deadline,
+            )
+            .await?
+        };
+        self.navigated(url, wait_until, progress, timeout_ms).await
+    }
+
+    pub async fn reload(&mut self, timeout_ms: Option<u64>) -> Result<Value, String> {
+        let session_id = self.active_session_id()?.to_string();
+        let mut events = self.client.subscribe();
+        let deadline = Instant::now() + self.load_timeout(timeout_ms);
+        self.client
+            .send_command_no_params("Page.reload", Some(&session_id))
             .await?;
+        let progress = self
+            .wait_for_load(
+                WaitUntil::Load,
+                &session_id,
+                &mut events,
+                Progress::NotStarted,
+                deadline,
+            )
+            .await?;
+        let url = self.active_url_cached();
+        self.navigated(&url, WaitUntil::Load, progress, timeout_ms)
+            .await
+    }
 
-        let page_url = self.get_url().await.unwrap_or_else(|_| url.to_string());
-        let title = self.get_title().await.unwrap_or_default();
+    fn load_timeout(&self, timeout_ms: Option<u64>) -> Duration {
+        Duration::from_millis(timeout_ms.unwrap_or(self.default_timeout_ms))
+    }
 
+    async fn navigated(
+        &mut self,
+        url: &str,
+        wait_until: WaitUntil,
+        progress: Progress,
+        timeout_ms: Option<u64>,
+    ) -> Result<Value, String> {
+        let waited = self.load_timeout(timeout_ms).as_millis();
+        if progress == Progress::NotStarted {
+            return Err(format!(
+                "Navigation timeout after {waited}ms: the page never started loading"
+            ));
+        }
+        let (page_url, title) = tokio::time::timeout(PAGE_ANSWER_TIMEOUT, async {
+            (
+                self.get_url().await.unwrap_or_else(|_| url.to_string()),
+                self.get_title().await.unwrap_or_default(),
+            )
+        })
+        .await
+        .unwrap_or_else(|_| (url.to_string(), String::new()));
         if let Some(page) = self.pages.get_mut(self.active_page_index) {
             page.url = page_url.clone();
             page.title = title.clone();
         }
-
-        Ok(json!({ "url": page_url, "title": title }))
+        let mut result = json!({ "url": page_url, "title": title });
+        if progress == Progress::Committed {
+            result["loadState"] = json!("committed");
+            result["warning"] = json!(format!(
+                "The page navigated but had not reached '{}' after {waited}ms; it is still loading. Wait for the element you need instead of navigating again.",
+                wait_until.name()
+            ));
+        }
+        Ok(result)
     }
 
-    async fn wait_for_lifecycle(
+    async fn wait_for_load(
         &self,
         wait_until: WaitUntil,
         session_id: &str,
-        rx: &mut broadcast::Receiver<CdpEvent>,
-    ) -> Result<(), String> {
-        let event_name = match wait_until {
-            WaitUntil::Load => "Page.loadEventFired",
+        events: &mut broadcast::Receiver<CdpEvent>,
+        mut progress: Progress,
+        deadline: Instant,
+    ) -> Result<Progress, String> {
+        let timeout = deadline.saturating_duration_since(Instant::now());
+        let reached = match wait_until {
+            WaitUntil::NetworkIdle => {
+                return Ok(
+                    match poll_network_idle(session_id, events, timeout).await {
+                        Ok(()) => Progress::Reached,
+                        Err(_) => progress,
+                    },
+                )
+            }
             WaitUntil::DomContentLoaded => "Page.domContentEventFired",
-            WaitUntil::NetworkIdle => return self.wait_for_network_idle(session_id, rx).await,
+            WaitUntil::Load | WaitUntil::None => "Page.loadEventFired",
         };
-
-        let timeout = tokio::time::Duration::from_millis(self.default_timeout_ms);
-
-        tokio::time::timeout(timeout, async {
+        let waiting = async {
             loop {
-                match rx.recv().await {
-                    Ok(event) => {
-                        if event.method == event_name
-                            && event.session_id.as_deref() == Some(session_id)
-                        {
+                match events.recv().await {
+                    Ok(event) if event.session_id.as_deref() == Some(session_id) => {
+                        if event.method == reached && progress != Progress::NotStarted {
                             return Ok(());
                         }
+                        if event.method == "Page.frameNavigated"
+                            && event.params.pointer("/frame/parentId").is_none()
+                        {
+                            progress = Progress::Committed;
+                        }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Closed) => {
+                        return Err("Event stream closed".to_string())
+                    }
+                    _ => continue,
                 }
             }
-            Err("Event stream closed".to_string())
-        })
-        .await
-        .map_err(|_| format!("Timeout waiting for {}", event_name))?
+        };
+        match tokio::time::timeout(timeout, waiting).await {
+            Ok(outcome) => outcome.map(|()| Progress::Reached),
+            Err(_) => Ok(progress),
+        }
     }
 
-    async fn wait_for_network_idle(
-        &self,
-        session_id: &str,
-        rx: &mut broadcast::Receiver<CdpEvent>,
-    ) -> Result<(), String> {
-        let timeout = tokio::time::Duration::from_millis(self.default_timeout_ms);
-        poll_network_idle(session_id, rx, timeout).await
-    }
-
-    pub async fn navigate_history(&self, delta: i32) -> Result<String, String> {
+    pub async fn navigate_history(&self, delta: i32) -> Result<Value, String> {
         let session_id = self.active_session_id()?;
         let frame_tree = self
             .client
@@ -743,7 +905,10 @@ impl BrowserManager {
             }
         })
         .await;
-        self.get_url().await
+        Ok(json!({
+            "url": self.get_url().await?,
+            "title": self.get_title().await.unwrap_or_default(),
+        }))
     }
 
     pub async fn get_url(&self) -> Result<String, String> {
@@ -792,57 +957,61 @@ impl BrowserManager {
     }
 
     pub async fn evaluate(&self, script: &str, _args: Option<Value>) -> Result<Value, String> {
-        let session_id = self.active_session_id()?.to_string();
-
-        let result: EvaluateResult = self
-            .client
-            .send_command_typed(
-                "Runtime.evaluate",
-                &EvaluateParams {
-                    expression: script.to_string(),
-                    return_by_value: Some(true),
-                    await_promise: Some(true),
-                },
-                Some(&session_id),
-            )
-            .await?;
-
-        if let Some(ref details) = result.exception_details {
-            let msg = details
-                .exception
-                .as_ref()
-                .and_then(|e| e.description.as_deref())
-                .unwrap_or(&details.text);
-            return Err(format!("Evaluation error: {}", msg));
-        }
-
-        Ok(result.result.value.unwrap_or(Value::Null))
+        self.evaluate_in(script, false).await
     }
 
-    pub async fn evaluate_detached(&self, script: &str) -> Result<(), String> {
+    /// Evaluates in Stella's isolated world, or the page's own when
+    /// `main_world` (see `world::agent_script_in_main_world`).
+    pub async fn evaluate_in(&self, script: &str, main_world: bool) -> Result<Value, String> {
         let session_id = self.active_session_id()?.to_string();
-        let result: EvaluateResult = self
+        let result = self
             .client
-            .send_command_typed(
+            .send_command(
                 "Runtime.evaluate",
-                &EvaluateParams {
-                    expression: script.to_string(),
-                    return_by_value: Some(false),
-                    await_promise: Some(false),
-                },
+                Some(Self::evaluate_params(script, true, true, main_world)),
                 Some(&session_id),
             )
             .await?;
+        if let Some(message) = exception_message(&result) {
+            return Err(format!("Evaluation error: {}", message));
+        }
+        Ok(result
+            .pointer("/result/value")
+            .cloned()
+            .unwrap_or(Value::Null))
+    }
 
-        if let Some(ref details) = result.exception_details {
-            let message = details
-                .exception
-                .as_ref()
-                .and_then(|exception| exception.description.as_deref())
-                .unwrap_or(&details.text);
+    pub async fn evaluate_detached(&self, script: &str, main_world: bool) -> Result<(), String> {
+        let session_id = self.active_session_id()?.to_string();
+        let result = self
+            .client
+            .send_command(
+                "Runtime.evaluate",
+                Some(Self::evaluate_params(script, false, false, main_world)),
+                Some(&session_id),
+            )
+            .await?;
+        if let Some(message) = exception_message(&result) {
             return Err(format!("Detached evaluation error: {}", message));
         }
         Ok(())
+    }
+
+    fn evaluate_params(
+        script: &str,
+        by_value: bool,
+        await_promise: bool,
+        main_world: bool,
+    ) -> Value {
+        let mut params = serde_json::json!({
+            "expression": script,
+            "returnByValue": by_value,
+            "awaitPromise": await_promise,
+        });
+        if main_world {
+            params[super::cdp::client::MAIN_WORLD_PARAM] = Value::Bool(true);
+        }
+        params
     }
 
     async fn evaluate_simple(&self, expression: &str) -> Result<Value, String> {
@@ -857,9 +1026,20 @@ impl BrowserManager {
         if matches!(wait_until, WaitUntil::NetworkIdle) {
             self.ensure_network_domain(session_id).await?;
         }
-        let mut rx = self.client.subscribe();
-        self.wait_for_lifecycle(wait_until, session_id, &mut rx)
-            .await
+        let mut events = self.client.subscribe();
+        match self
+            .wait_for_load(
+                wait_until,
+                session_id,
+                &mut events,
+                Progress::Committed,
+                Instant::now() + self.load_timeout(None),
+            )
+            .await?
+        {
+            Progress::Reached => Ok(()),
+            _ => Err(format!("Timeout waiting for {}", wait_until.name())),
+        }
     }
 
     pub async fn close(&mut self) -> Result<(), String> {
@@ -1028,18 +1208,38 @@ impl BrowserManager {
         self.pages.iter().position(|p| p.tab_id == tab_id)
     }
 
-    pub async fn select_tab_by_id(&mut self, tab_id: u64) -> Result<bool, String> {
+    pub async fn select_tab_by_id(&mut self, tab_id: u64) -> Result<(), String> {
         let index = self.tab_index_by_id(tab_id).ok_or_else(|| {
             format!(
                 "Unknown tabId {}. The tab may have been closed; run tab_list to see current tabs.",
                 tab_id
             )
         })?;
-        if index == self.active_page_index {
-            return Ok(false);
+        if index != self.active_page_index {
+            self.tab_switch(index).await?;
         }
-        self.tab_switch(index).await?;
-        Ok(true)
+        Ok(())
+    }
+
+    /// Brings the pages' URLs and titles up to date with the browser.
+    pub async fn refresh_pages(&mut self) {
+        let Ok(targets) = self
+            .client
+            .send_command_typed::<_, GetTargetsResult>("Target.getTargets", &json!({}), None)
+            .await
+        else {
+            return;
+        };
+        for target in targets.target_infos {
+            if let Some(page) = self
+                .pages
+                .iter_mut()
+                .find(|page| page.target_id == target.target_id)
+            {
+                page.url = target.url;
+                page.title = target.title;
+            }
+        }
     }
 
     pub fn known_tab_id_for_target(&self, target_id: &str) -> Option<u64> {
@@ -1659,6 +1859,7 @@ async fn initialize_lightpanda_manager(
         };
 
         let mut manager = BrowserManager {
+            dialogs: Dialogs::default(),
             client: Arc::new(client),
             browser_process: None,
             ws_url: ws_url.clone(),
@@ -2338,58 +2539,14 @@ mod tests {
     }
 }
 
-fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) {
-    let mut events = client.subscribe();
-    let weak = Arc::downgrade(client);
-    tokio::spawn(async move {
-        loop {
-            let event = match events.recv().await {
-                Ok(event) => event,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => break,
-            };
-            if event.method != "Page.javascriptDialogOpening" {
-                continue;
-            }
-            let Some(client) = weak.upgrade() else {
-                break;
-            };
-            let kind = event
-                .params
-                .get("type")
-                .and_then(Value::as_str)
-                .unwrap_or("alert")
-                .to_string();
-            let message = event
-                .params
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .chars()
-                .take(200)
-                .collect::<String>();
-            let accept = kind == "beforeunload";
-            let session_id = event.session_id.clone();
-            tokio::spawn(async move {
-                let result = client
-                    .send_command(
-                        "Page.handleJavaScriptDialog",
-                        Some(json!({ "accept": accept })),
-                        session_id.as_deref(),
-                    )
-                    .await;
-                let _ = writeln!(
-                    std::io::stderr(),
-                    "[stella-browser] auto-{} {} dialog \"{}\"{}",
-                    if accept { "accepted" } else { "dismissed" },
-                    kind,
-                    message,
-                    result
-                        .err()
-                        .map(|e| format!(" (failed: {})", e))
-                        .unwrap_or_default()
-                );
-            });
-        }
-    });
+fn exception_message(result: &Value) -> Option<String> {
+    let details = result.get("exceptionDetails")?;
+    Some(
+        details
+            .pointer("/exception/description")
+            .or_else(|| details.get("text"))
+            .and_then(Value::as_str)
+            .unwrap_or("Uncaught")
+            .to_string(),
+    )
 }

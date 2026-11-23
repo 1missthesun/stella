@@ -1,22 +1,22 @@
-import { assertCurrentOwnerLease, getActiveTab } from "./tabs.js";
+import { assertCurrentOwnerLease, getActiveTab } from "../commands/tabs.js";
 import {
   resolveSelector,
   buildRoleMatcherScript,
   buildComposedCssMatcherScript,
-} from "../lib/selector.js";
-import { evaluateRuntime } from "../lib/debugger.js";
-import { callExactElement } from "../lib/frame-elements.js";
+} from "./selector.js";
+import { evaluateRuntime } from "./page-debugger.js";
+import { callExactElement } from "./frame-elements.js";
 import {
   attachCommandExecution,
   markCommandMutationOutcomeKnown,
   mutationOutcomeIsUnknown,
 } from "./cancellation.js";
 
-export const MAX_CHAIN_STEPS = 100;
-export const DEFAULT_CHAIN_RUNTIME_MS = 45_000;
-export const MAX_CHAIN_RUNTIME_MS = 240_000;
+const MAX_CHAIN_STEPS = 100;
+const DEFAULT_CHAIN_RUNTIME_MS = 45_000;
+const MAX_CHAIN_RUNTIME_MS = 240_000;
 const MAX_CHAIN_STEP_TIMEOUT_MS = 30_000;
-export const CHAIN_ACTION_ALLOWLIST = new Set([
+const CHAIN_ACTION_ALLOWLIST = new Set([
   "healthcheck",
   "navigate",
   "open",
@@ -77,10 +77,6 @@ export const CHAIN_ACTION_ALLOWLIST = new Set([
   "cookies_get",
   "cookies_set",
   "cookies_clear",
-  "site_mod_set",
-  "site_mod_list",
-  "site_mod_remove",
-  "site_mod_toggle",
 ]);
 
 // Actions whose timeout cannot leave page, browser, or extension state
@@ -110,7 +106,6 @@ const CHAIN_READ_ONLY_ACTIONS = new Set([
   "responsebody",
   "tab_list",
   "cookies_get",
-  "site_mod_list",
 ]);
 
 const MAX_JSON_DEPTH = 20;
@@ -167,7 +162,7 @@ function validateOptionalBoolean(command, key) {
   }
 }
 
-export function validateChainCommand(command) {
+function validateChainCommand(command) {
   if (!isPlainObject(command)) {
     throw new Error("Chain command must be a plain object");
   }

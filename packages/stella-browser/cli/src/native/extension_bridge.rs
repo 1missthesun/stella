@@ -5,6 +5,7 @@ use super::bridge_auth::{self, create_private_dir, write_private_file};
 use super::extension_clients::{
     find_profile_with_marker, probe_marker, read_profile_identity, ActivityRanker, ClientInfo,
 };
+use super::extension_pipe::{PipeOutcome, PipeOwners};
 use std::env;
 use std::fs;
 use std::io::Write as IoWrite;
@@ -38,6 +39,11 @@ const IDENTIFY_SCAN_ATTEMPTS: u32 = 4;
 const IDENTIFY_SCAN_GAP_MS: u64 = 400;
 const IDENTIFY_WAIT_MS: u64 = 10_000;
 const EXTENSION_PROTOCOL_VERSION: &str = "2.1";
+/// Chrome drops host-to-extension messages over 1 MiB, so longer ones go to a
+/// pipe-capable extension in parts; a part stays under the limit even with
+/// every character escaped.
+const MAX_EXTENSION_MESSAGE_BYTES: usize = 1_000_000;
+const MESSAGE_PART_BYTES: usize = 256 * 1024;
 const MIN_EXTENSION_VERSION: (u64, u64, u64) = (1, 2, 12);
 
 fn parse_extension_version(value: &str) -> Option<(u64, u64, u64)> {
@@ -118,6 +124,7 @@ enum IdentifyOutcome {
 struct Connection {
     cmd_tx: mpsc::Sender<String>,
     info: ClientInfo,
+    debugger_pipe: bool,
     identity: Identity,
     connected_at_ms: u64,
     last_health_check: Instant,
@@ -141,6 +148,7 @@ struct BridgeInner {
     preferred_key: Option<String>,
     disabled_keys: HashSet<String>,
     events_tx: broadcast::Sender<String>,
+    pipe_tabs: HashMap<(u64, u64), mpsc::UnboundedSender<Value>>,
 }
 
 impl BridgeInner {
@@ -268,6 +276,7 @@ pub struct ExtensionBridge {
     connected_notify: Arc<Notify>,
     shutdown_tx: Option<mpsc::Sender<()>>,
     events_tx: broadcast::Sender<String>,
+    pipes: PipeOwners,
 }
 
 impl ExtensionBridge {
@@ -300,10 +309,64 @@ impl ExtensionBridge {
                 preferred_key: None,
                 disabled_keys: HashSet::new(),
                 events_tx: events_tx.clone(),
+                pipe_tabs: HashMap::new(),
             })),
             connected_notify: Arc::new(Notify::new()),
             shutdown_tx: None,
             events_tx,
+            pipes: PipeOwners::default(),
+        }
+    }
+
+    pub(super) async fn has_debugger_pipe(&self, generation: u64) -> bool {
+        self.inner
+            .lock()
+            .await
+            .connections
+            .get(&generation)
+            .is_some_and(|connection| connection.debugger_pipe)
+    }
+
+    pub(super) async fn live_generations(&self) -> HashSet<u64> {
+        self.inner.lock().await.connections.keys().copied().collect()
+    }
+
+    /// Queues a command on a connection; commands reach the extension in the
+    /// order they are queued.
+    pub(super) async fn queue(
+        &self,
+        generation: u64,
+        command: Value,
+    ) -> Result<PendingReply, String> {
+        queue_command(&self.inner, generation, command)
+            .await
+            .map_err(SendFailure::into_message)
+    }
+
+    pub(super) async fn reply(
+        &self,
+        pending: PendingReply,
+        timeout: Duration,
+    ) -> Result<Value, String> {
+        await_reply(&self.inner, pending, timeout)
+            .await
+            .map_err(SendFailure::into_message)
+    }
+
+    pub(super) async fn route_pipe_tab(
+        &self,
+        generation: u64,
+        tab_id: u64,
+        events: Option<mpsc::UnboundedSender<Value>>,
+    ) {
+        let mut guard = self.inner.lock().await;
+        match events {
+            Some(events) if guard.connections.contains_key(&generation) => {
+                guard.pipe_tabs.insert((generation, tab_id), events);
+            }
+            _ => {
+                guard.pipe_tabs.remove(&(generation, tab_id));
+            }
         }
     }
 
@@ -821,6 +884,12 @@ impl ExtensionBridge {
             })?;
         }
 
+        match self.pipes.run(self, generation, &forwarded).await {
+            PipeOutcome::Done(response) => return Ok(response),
+            PipeOutcome::UseExtension => {}
+        }
+        let runs_whole_commands = !self.has_debugger_pipe(generation).await;
+
         let leaves_page = |name: &str| {
             matches!(
                 name,
@@ -838,7 +907,7 @@ impl ExtensionBridge {
                             .is_some_and(leaves_page)
                     })
                 });
-        if leaves_page(action) || chain_leaves_page {
+        if runs_whole_commands && (leaves_page(action) || chain_leaves_page) {
             let _ = self
                 .run_page_script(generation, &forwarded, "unload", DISARM_BEFOREUNLOAD, 1500)
                 .await;
@@ -870,7 +939,7 @@ impl ExtensionBridge {
                             .is_some_and(interaction)
                     })
                 });
-        let guard_dialogs = interaction(action) || chain_interacts;
+        let guard_dialogs = runs_whole_commands && (interaction(action) || chain_interacts);
         if guard_dialogs {
             let _ = self
                 .run_page_script(generation, &forwarded, "guard", DIALOG_GUARD, 1500)
@@ -1087,6 +1156,22 @@ async fn send_to_generation_outcome(
     command: Value,
     timeout: Duration,
 ) -> Result<Value, SendFailure> {
+    let pending = queue_command(inner, generation, command).await?;
+    await_reply(inner, pending, timeout).await
+}
+
+pub(super) struct PendingReply {
+    id: String,
+    generation: u64,
+    label: String,
+    rx: oneshot::Receiver<Value>,
+}
+
+async fn queue_command(
+    inner: &Arc<Mutex<BridgeInner>>,
+    generation: u64,
+    command: Value,
+) -> Result<PendingReply, SendFailure> {
     let id = command
         .get("id")
         .and_then(Value::as_str)
@@ -1110,19 +1195,24 @@ async fn send_to_generation_outcome(
         .map_err(|e| SendFailure::NotSent(format!("Failed to serialize command: {}", e)))?;
 
     let (tx, rx) = oneshot::channel();
-    let label = {
-        let mut guard = inner.lock().await;
-        let Some(connection) = guard.connections.get(&generation) else {
-            return Err(SendFailure::NotSent(
-                "Extension disconnected before the command was sent. Nothing was sent; retry."
-                    .to_string(),
-            ));
-        };
-        let cmd_tx = connection.cmd_tx.clone();
-        let label = connection.info.label();
-        guard
-            .pending
-            .insert(id.clone(), PendingCommand { tx, generation });
+    let mut guard = inner.lock().await;
+    let Some(connection) = guard.connections.get(&generation) else {
+        return Err(SendFailure::NotSent(
+            "Extension disconnected before the command was sent. Nothing was sent; retry."
+                .to_string(),
+        ));
+    };
+    let cmd_tx = connection.cmd_tx.clone();
+    let label = connection.info.label();
+    let lines = if connection.debugger_pipe && line.len() > MAX_EXTENSION_MESSAGE_BYTES {
+        message_parts(&id, &line)
+    } else {
+        vec![line]
+    };
+    guard
+        .pending
+        .insert(id.clone(), PendingCommand { tx, generation });
+    for line in lines {
         if cmd_tx.send(line).await.is_err() {
             remove_pending_for_generation(&mut guard, &id, generation);
             return Err(SendFailure::NotSent(
@@ -1130,9 +1220,53 @@ async fn send_to_generation_outcome(
                     .to_string(),
             ));
         }
-        label
-    };
+    }
+    Ok(PendingReply {
+        id,
+        generation,
+        label,
+        rx,
+    })
+}
 
+fn message_parts(id: &str, line: &str) -> Vec<String> {
+    let mut bounds = vec![0];
+    let mut end = 0;
+    while end < line.len() {
+        end = (end + MESSAGE_PART_BYTES).min(line.len());
+        while !line.is_char_boundary(end) {
+            end -= 1;
+        }
+        bounds.push(end);
+    }
+    let count = bounds.len() - 1;
+    bounds
+        .windows(2)
+        .enumerate()
+        .map(|(index, range)| {
+            json!({
+                "type": "command_part",
+                "id": id,
+                "index": index,
+                "count": count,
+                "data": &line[range[0]..range[1]],
+            })
+            .to_string()
+        })
+        .collect()
+}
+
+async fn await_reply(
+    inner: &Arc<Mutex<BridgeInner>>,
+    pending: PendingReply,
+    timeout: Duration,
+) -> Result<Value, SendFailure> {
+    let PendingReply {
+        id,
+        generation,
+        label,
+        rx,
+    } = pending;
     match tokio::time::timeout(timeout, rx).await {
         Ok(Ok(response)) => {
             let mut guard = inner.lock().await;
@@ -1209,6 +1343,7 @@ async fn activate_connection(
     inner: &Arc<Mutex<BridgeInner>>,
     cmd_tx: mpsc::Sender<String>,
     info: ClientInfo,
+    debugger_pipe: bool,
 ) -> u64 {
     let mut guard = inner.lock().await;
     guard.next_generation = guard
@@ -1222,6 +1357,7 @@ async fn activate_connection(
         Connection {
             cmd_tx,
             info,
+            debugger_pipe,
             identity: Identity::Identifying,
             connected_at_ms: now_ms(),
             last_health_check: Instant::now(),
@@ -1238,6 +1374,9 @@ async fn deactivate_connection(inner: &Arc<Mutex<BridgeInner>>, generation: u64)
         let Some(connection) = guard.connections.remove(&generation) else {
             return false;
         };
+        guard
+            .pipe_tabs
+            .retain(|(of_generation, _), _| *of_generation != generation);
         guard.emit_clients_changed();
         (
             take_pending_for_generation(&mut guard, generation),
@@ -1340,20 +1479,33 @@ async fn probe_profile(
     info: ClientInfo,
 ) -> IdentifyOutcome {
     let marker = probe_marker();
+    let debugger_pipe = inner
+        .lock()
+        .await
+        .connections
+        .get(&generation)
+        .is_some_and(|connection| connection.debugger_pipe);
+    // Extensions without the debugger pipe keep the marker as a site mod.
     let pattern = format!("{}.invalid", marker);
-    let set = send_to_generation(
-        inner,
-        generation,
-        json!({
-            "action": "site_mod_set",
-            "id": format!("_probe_{}", marker),
-            "pattern": pattern,
-            "css": format!("/*{}*/", marker),
-            "label": "Stella profile check",
-        }),
-        Duration::from_secs(5),
-    )
-    .await;
+    let (mut mark, mut unmark) = if debugger_pipe {
+        (
+            json!({ "action": "profile_mark", "marker": marker }),
+            json!({ "action": "profile_unmark" }),
+        )
+    } else {
+        (
+            json!({
+                "action": "site_mod_set",
+                "pattern": pattern,
+                "css": format!("/*{}*/", marker),
+                "label": "Stella profile check",
+            }),
+            json!({ "action": "site_mod_remove", "pattern": pattern }),
+        )
+    };
+    mark["id"] = json!(format!("_probe_{}", marker));
+    unmark["id"] = json!(format!("_probe_rm_{}", marker));
+    let set = send_to_generation(inner, generation, mark, Duration::from_secs(5)).await;
     let mut profile_dir = None;
     if set.is_ok_and(|r| r.get("success").and_then(Value::as_bool) == Some(true)) {
         for scan in 0..IDENTIFY_SCAN_ATTEMPTS {
@@ -1373,17 +1525,7 @@ async fn probe_profile(
             }
         }
     }
-    let _ = send_to_generation(
-        inner,
-        generation,
-        json!({
-            "action": "site_mod_remove",
-            "id": format!("_probe_rm_{}", marker),
-            "pattern": pattern,
-        }),
-        Duration::from_secs(5),
-    )
-    .await;
+    let _ = send_to_generation(inner, generation, unmark, Duration::from_secs(5)).await;
     let Some(profile_dir) = profile_dir else {
         return IdentifyOutcome::Failed;
     };
@@ -1558,7 +1700,10 @@ async fn handle_extension_connection(
                 ) {
                     authenticated = true;
                     let info = ClientInfo::from_hello(&parsed, &extension_version);
-                    let generation = activate_connection(&inner, cmd_tx.clone(), info).await;
+                    let debugger_pipe =
+                        parsed.get("debuggerPipe").and_then(Value::as_u64) == Some(1);
+                    let generation =
+                        activate_connection(&inner, cmd_tx.clone(), info, debugger_pipe).await;
                     connection_generation = Some(generation);
                     active_generation.store(generation, Ordering::Release);
                     connected_notify.notify_waiters();
@@ -1618,6 +1763,17 @@ async fn handle_extension_connection(
             "event" => {
                 if !authenticated {
                     break;
+                }
+                if parsed.get("event").and_then(Value::as_str) == Some("pipe") {
+                    let Some(generation) = connection_generation else {
+                        continue;
+                    };
+                    let tab_id = parsed.get("tabId").and_then(Value::as_u64).unwrap_or(0);
+                    let guard = inner.lock().await;
+                    if let Some(events) = guard.pipe_tabs.get(&(generation, tab_id)) {
+                        let _ = events.send(parsed);
+                    }
+                    continue;
                 }
                 let _ = events_tx.send(trimmed.to_string());
             }

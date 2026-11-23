@@ -3,8 +3,8 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { RawData, WebSocket, WebSocketServer } from "ws";
 import {
-  buildAgentCursorHideExpression,
-  buildAgentCursorPresentationExpression,
+  agentCursorHighlightParams,
+  overlayScaleFromLayoutMetrics,
 } from "../../../stella-browser/extension/lib/agent-cursor.js";
 import { buildInAppBrowserUserAgent } from "./in-app-browser-auth-policy.js";
 
@@ -261,6 +261,7 @@ export class InAppBrowserCdpAdapter {
   private readonly recoveryTimeoutMs: number;
   private readonly token = randomBytes(32).toString("hex");
   private readonly clients = new Set<ClientState>();
+  private readonly cursorOverlayScales = new Map<string, number>();
   private readonly ownerRoutes = new Map<
     string,
     Readonly<{ ownerId: string; expiresAt: number }>
@@ -860,28 +861,42 @@ export class InAppBrowserCdpAdapter {
     const x = Number(params.x);
     const y = Number(params.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    const dragging =
-      params.type === "mouseMoved" &&
-      (params.button === "left" || Number(params.buttons) > 0);
-    const expression = buildAgentCursorPresentationExpression({
-      x,
-      y,
-      animateMovement: !dragging,
-      turnKey: client.ownerId,
-    });
+    const firstOnTab = !client.cursorTabs.has(tabId);
     client.cursorTabs.add(tabId);
-    await Promise.resolve(
+    const draw = () =>
       this.controller.sendDebuggerCommand(
         tabId,
-        "Runtime.evaluate",
-        {
-          expression,
-          returnByValue: true,
-          awaitPromise: true,
-        },
+        "Overlay.highlightQuad",
+        agentCursorHighlightParams(
+          { x, y },
+          this.cursorOverlayScales.get(tabId) ?? 1,
+        ),
         client.ownerId,
-      ),
-    ).catch(() => undefined);
+      );
+    const enable = async () => {
+      await this.controller.sendDebuggerCommand(tabId, "DOM.enable", {}, client.ownerId);
+      await this.controller.sendDebuggerCommand(tabId, "Overlay.enable", {}, client.ownerId);
+      const metrics = await Promise.resolve(
+        this.controller.sendDebuggerCommand(
+          tabId,
+          "Page.getLayoutMetrics",
+          {},
+          client.ownerId,
+        ),
+      ).catch(() => null);
+      this.cursorOverlayScales.set(
+        tabId,
+        overlayScaleFromLayoutMetrics(metrics),
+      );
+    };
+    try {
+      if (firstOnTab) await enable();
+      await draw();
+    } catch {
+      await enable()
+        .then(draw)
+        .catch(() => undefined);
+    }
   }
 
   private async hideClientAgentCursors(client: ClientState) {
@@ -892,14 +907,8 @@ export class InAppBrowserCdpAdapter {
         Promise.resolve(
           this.cleanupPageCommand(
             tabId,
-            "Runtime.evaluate",
-            {
-              expression: buildAgentCursorHideExpression({
-                turnKey: client.ownerId,
-              }),
-              returnByValue: true,
-              awaitPromise: true,
-            },
+            "Overlay.hideHighlight",
+            {},
             client.ownerId,
           ),
         ).catch(() => undefined),

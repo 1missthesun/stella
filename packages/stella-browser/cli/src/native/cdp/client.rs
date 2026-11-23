@@ -4,13 +4,21 @@ use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
-use tokio::sync::{broadcast, oneshot, Mutex};
+use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::Message;
 
 use super::types::{CdpCommand, CdpEvent, CdpMessage};
 
 type PendingMap = Arc<Mutex<HashMap<u64, oneshot::Sender<CdpMessage>>>>;
+type WorldMap = Arc<Mutex<HashMap<String, i64>>>;
+
+/// Stella's own JavaScript world in each page (shared with the extension):
+/// it sees the page's DOM but none of its scripts, so the page cannot observe
+/// what Stella reads, calls or leaves behind there.
+pub const ISOLATED_WORLD: &str = "stella-observation";
+/// Set on params to run a command in the page's own world instead.
+pub const MAIN_WORLD_PARAM: &str = "stellaMainWorld";
 const CDP_COMMAND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 #[derive(Debug, Clone)]
@@ -19,23 +27,63 @@ pub struct RawCdpMessage {
     pub session_id: Option<String>,
 }
 
+type WsSink = futures_util::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    Message,
+>;
+
+/// Where commands go: a browser's DevTools WebSocket, or an in-process peer
+/// that speaks the same JSON (the extension pipe).
+enum CdpSink {
+    WebSocket(Mutex<WsSink>),
+    Channel(mpsc::UnboundedSender<String>),
+}
+
+impl CdpSink {
+    async fn send(&self, json: String) -> Result<(), String> {
+        match self {
+            CdpSink::WebSocket(sink) => sink
+                .lock()
+                .await
+                .send(Message::Text(json))
+                .await
+                .map_err(|e| e.to_string()),
+            CdpSink::Channel(sender) => sender
+                .send(json)
+                .map_err(|_| "the browser connection closed".to_string()),
+        }
+    }
+}
+
 pub struct CdpClient {
-    ws_tx: Arc<
-        Mutex<
-            futures_util::stream::SplitSink<
-                tokio_tungstenite::WebSocketStream<
-                    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-                >,
-                Message,
-            >,
-        >,
-    >,
+    sink: Arc<CdpSink>,
     next_id: AtomicU64,
     pending: PendingMap,
     event_tx: broadcast::Sender<CdpEvent>,
     raw_tx: broadcast::Sender<RawCdpMessage>,
     _reader_handle: tokio::task::JoinHandle<()>,
     frame_sessions: Arc<Mutex<HashMap<(String, String), String>>>,
+    worlds: WorldMap,
+}
+
+/// The context parameter that places `method` in a world, when the caller
+/// left it to the default (the page's own world).
+fn world_param(method: &str, params: &Value) -> Option<&'static str> {
+    let has = |key: &str| params.get(key).is_some();
+    match method {
+        "Runtime.evaluate" if !has("contextId") && !has("uniqueContextId") => Some("contextId"),
+        "Runtime.callFunctionOn" if !has("objectId") && !has("executionContextId") => {
+            Some("executionContextId")
+        }
+        "DOM.resolveNode" if !has("executionContextId") => Some("executionContextId"),
+        _ => None,
+    }
+}
+
+fn context_gone(error: &str) -> bool {
+    error.contains("Cannot find context")
+        || error.contains("Execution context was destroyed")
+        || error.contains("Cannot find execution context")
 }
 
 impl CdpClient {
@@ -55,25 +103,12 @@ impl CdpClient {
                 .map_err(|e| format!("CDP WebSocket connect failed: {}", e))?;
 
         let (ws_tx, mut ws_rx) = ws_stream.split();
-        let ws_tx = Arc::new(Mutex::new(ws_tx));
-
-        let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
-        let (event_tx, _) = broadcast::channel(256);
-        let (raw_tx, _) = broadcast::channel(512);
-
-        let frame_sessions: Arc<Mutex<HashMap<(String, String), String>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-
-        let pending_clone = pending.clone();
-        let event_tx_clone = event_tx.clone();
-        let raw_tx_clone = raw_tx.clone();
-        let frame_sessions_clone = frame_sessions.clone();
-
-        let reader_handle = tokio::spawn(async move {
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
             while let Some(msg) = ws_rx.next().await {
                 // Accept both Text and Binary frames — remote CDP proxies
                 // (e.g. Browserless) may send responses as Binary frames.
-                let msg = match msg {
+                let text = match msg {
                     Ok(Message::Text(text)) => text,
                     Ok(Message::Binary(data)) => match String::from_utf8(data) {
                         Ok(text) => text,
@@ -83,7 +118,43 @@ impl CdpClient {
                     Ok(_) => continue,
                     Err(_) => break,
                 };
+                if incoming_tx.send(text).is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(Self::start(
+            CdpSink::WebSocket(Mutex::new(ws_tx)),
+            incoming_rx,
+        ))
+    }
 
+    /// A client whose peer is in this process: `outgoing` receives each command
+    /// and `incoming` carries responses and events, all as CDP JSON.
+    pub fn over_channel(
+        outgoing: mpsc::UnboundedSender<String>,
+        incoming: mpsc::UnboundedReceiver<String>,
+    ) -> Self {
+        Self::start(CdpSink::Channel(outgoing), incoming)
+    }
+
+    fn start(sink: CdpSink, mut incoming: mpsc::UnboundedReceiver<String>) -> Self {
+        let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
+        let (event_tx, _) = broadcast::channel(4096);
+        let (raw_tx, _) = broadcast::channel(512);
+
+        let frame_sessions: Arc<Mutex<HashMap<(String, String), String>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+
+        let pending_clone = pending.clone();
+        let event_tx_clone = event_tx.clone();
+        let raw_tx_clone = raw_tx.clone();
+        let frame_sessions_clone = frame_sessions.clone();
+        let worlds: WorldMap = Arc::new(Mutex::new(HashMap::new()));
+        let worlds_clone = worlds.clone();
+
+        let reader_handle = tokio::spawn(async move {
+            while let Some(msg) = incoming.recv().await {
                 if raw_tx_clone.receiver_count() > 0 {
                     let session_id = serde_json::from_str::<serde_json::Value>(&msg)
                         .ok()
@@ -107,6 +178,18 @@ impl CdpClient {
                         }
                     }
                 } else if let Some(ref method) = parsed.method {
+                    let main_frame_navigated = method == "Page.frameNavigated"
+                        && parsed
+                            .params
+                            .as_ref()
+                            .and_then(|params| params.pointer("/frame/parentId"))
+                            .is_none();
+                    if main_frame_navigated || method == "Runtime.executionContextsCleared" {
+                        worlds_clone
+                            .lock()
+                            .await
+                            .remove(parsed.session_id.as_deref().unwrap_or_default());
+                    }
                     if method == "Target.detachedFromTarget" {
                         if let Some(detached) = parsed
                             .params
@@ -114,6 +197,7 @@ impl CdpClient {
                             .and_then(|params| params.get("sessionId"))
                             .and_then(Value::as_str)
                         {
+                            worlds_clone.lock().await.remove(detached);
                             frame_sessions_clone
                                 .lock()
                                 .await
@@ -134,18 +218,86 @@ impl CdpClient {
             pending_clone.lock().await.clear();
         });
 
-        Ok(Self {
-            ws_tx,
+        Self {
+            sink: Arc::new(sink),
             next_id: AtomicU64::new(1),
             pending,
             event_tx,
             raw_tx,
             _reader_handle: reader_handle,
             frame_sessions,
-        })
+            worlds,
+        }
     }
 
+    /// Sends a command. Page reads and calls (Runtime.evaluate,
+    /// Runtime.callFunctionOn without an object, DOM.resolveNode) run in
+    /// Stella's isolated world unless they name a context or set
+    /// `MAIN_WORLD_PARAM`; targets without one (workers) use their own.
     pub async fn send_command(
+        &self,
+        method: &str,
+        params: Option<Value>,
+        session_id: Option<&str>,
+    ) -> Result<Value, String> {
+        let mut params = params;
+        let main_world = params
+            .as_mut()
+            .and_then(Value::as_object_mut)
+            .and_then(|object| object.remove(MAIN_WORLD_PARAM))
+            .is_some_and(|value| value != Value::Bool(false));
+        let key = match (&params, main_world) {
+            (Some(p), false) => world_param(method, p),
+            _ => None,
+        };
+        let Some(key) = key else {
+            return self.dispatch(method, params, session_id).await;
+        };
+        for fresh in [false, true] {
+            let Some(context) = self.isolated_context(session_id, fresh).await else {
+                break;
+            };
+            let mut scoped = params
+                .clone()
+                .unwrap_or_else(|| Value::Object(Default::default()));
+            scoped[key] = Value::from(context);
+            match self.dispatch(method, Some(scoped), session_id).await {
+                Err(error) if context_gone(&error) => continue,
+                result => return result,
+            }
+        }
+        self.dispatch(method, params, session_id).await
+    }
+
+    async fn isolated_context(&self, session_id: Option<&str>, fresh: bool) -> Option<i64> {
+        let key = session_id.unwrap_or_default().to_string();
+        if !fresh {
+            if let Some(context) = self.worlds.lock().await.get(&key) {
+                return Some(*context);
+            }
+        }
+        let tree = self
+            .dispatch("Page.getFrameTree", None, session_id)
+            .await
+            .ok()?;
+        let frame_id = tree.pointer("/frameTree/frame/id")?.as_str()?.to_string();
+        let world = self
+            .dispatch(
+                "Page.createIsolatedWorld",
+                Some(serde_json::json!({
+                    "frameId": frame_id,
+                    "worldName": ISOLATED_WORLD,
+                })),
+                session_id,
+            )
+            .await
+            .ok()?;
+        let context = world.get("executionContextId")?.as_i64()?;
+        self.worlds.lock().await.insert(key, context);
+        Some(context)
+    }
+
+    async fn dispatch(
         &self,
         method: &str,
         params: Option<Value>,
@@ -171,13 +323,10 @@ impl CdpClient {
         }
 
         let operation = async {
-            {
-                let mut ws_tx = self.ws_tx.lock().await;
-                ws_tx
-                    .send(Message::Text(json))
-                    .await
-                    .map_err(|e| format!("Failed to send CDP command: {}", e))?;
-            }
+            self.sink
+                .send(json)
+                .await
+                .map_err(|e| format!("Failed to send CDP command: {}", e))?;
             rx.await
                 .map_err(|_| "CDP response channel closed".to_string())
         };
@@ -246,7 +395,7 @@ impl CdpClient {
 
     pub fn inspect_handle(&self) -> InspectProxyHandle {
         InspectProxyHandle {
-            ws_tx: self.ws_tx.clone(),
+            sink: self.sink.clone(),
             raw_tx: self.raw_tx.clone(),
         }
     }
@@ -275,35 +424,22 @@ impl CdpClient {
     }
 
     pub async fn send_raw(&self, json: String) -> Result<(), String> {
-        let mut ws_tx = self.ws_tx.lock().await;
-        ws_tx
-            .send(Message::Text(json))
+        self.sink
+            .send(json)
             .await
             .map_err(|e| format!("Failed to send raw CDP message: {}", e))
     }
 }
 
-type WsTx = Arc<
-    Mutex<
-        futures_util::stream::SplitSink<
-            tokio_tungstenite::WebSocketStream<
-                tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-            >,
-            Message,
-        >,
-    >,
->;
-
 pub struct InspectProxyHandle {
-    ws_tx: WsTx,
+    sink: Arc<CdpSink>,
     raw_tx: broadcast::Sender<RawCdpMessage>,
 }
 
 impl InspectProxyHandle {
     pub async fn send_raw(&self, json: String) -> Result<(), String> {
-        let mut ws_tx = self.ws_tx.lock().await;
-        ws_tx
-            .send(Message::Text(json))
+        self.sink
+            .send(json)
             .await
             .map_err(|e| format!("Failed to send raw CDP message: {}", e))
     }

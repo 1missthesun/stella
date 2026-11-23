@@ -12,12 +12,15 @@ pub mod cookies;
 #[allow(dead_code)]
 pub mod daemon;
 #[allow(dead_code)]
+pub mod dialogs;
 pub mod diff;
 #[allow(dead_code)]
 pub mod element;
 #[allow(dead_code)]
 pub mod extension_bridge;
 pub mod extension_clients;
+pub(crate) mod extension_pipe;
+pub mod human;
 #[allow(dead_code)]
 pub mod inspect_server;
 #[allow(dead_code)]
@@ -26,6 +29,7 @@ pub mod interaction;
 pub mod native_host;
 #[allow(dead_code)]
 pub mod network;
+mod network_log;
 pub mod parent_watch;
 #[allow(dead_code)]
 pub mod policy;
@@ -49,6 +53,7 @@ pub mod stream;
 pub mod tracing;
 #[allow(dead_code)]
 pub mod webdriver;
+pub mod world;
 
 #[cfg(test)]
 mod contract_tests;

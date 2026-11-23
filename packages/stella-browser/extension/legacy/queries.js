@@ -1,18 +1,18 @@
-import { getActiveTab } from "./tabs.js";
+import { getActiveTab } from "../commands/tabs.js";
 import {
   resolveSelector,
   buildComposedCssMatcherAllScript,
   buildRoleMatcherAllScript,
   buildResolvedElementMatcherScript,
   buildTopLevelRectSource,
-} from "../lib/selector.js";
-import { evaluateRuntime } from "../lib/debugger.js";
+} from "./selector.js";
+import { evaluateRuntime } from "./page-debugger.js";
 import {
   callExactElement,
   exactElementPoint,
   frameVisible,
   getObservationFrames,
-} from "../lib/frame-elements.js";
+} from "./frame-elements.js";
 
 /**
  * Inject a script that finds an element and runs code on it.
@@ -112,23 +112,6 @@ export async function handleBoundingBox(command) {
   `,
   );
   return { id: command.id, success: true, data: { box } };
-}
-
-export async function handleScrollIntoView(command) {
-  const tab = await getActiveTab(command);
-  const selector = command.selector || command.ref;
-  if (!selector) throw new Error("Selector is required for scrollintoview");
-
-  await queryElement(
-    tab.id,
-    command.ownerId,
-    selector,
-    `
-    el.scrollIntoView({ block: 'center', behavior: 'instant' });
-    return true;
-  `,
-  );
-  return { id: command.id, success: true, data: { scrolled: true } };
 }
 
 export async function handleIsVisible(command) {
@@ -328,11 +311,4 @@ export async function handleWaitForUrl(command) {
     await new Promise((r) => setTimeout(r, 200));
   }
   throw new Error(`Timeout waiting for URL matching: ${pattern}`);
-}
-
-export async function handleBringToFront(command) {
-  const tab = await getActiveTab(command);
-  await chrome.tabs.update(tab.id, { active: true });
-  await chrome.windows.update(tab.windowId, { focused: true });
-  return { id: command.id, success: true, data: { focused: true } };
 }

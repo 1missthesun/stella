@@ -12,6 +12,7 @@ const MAX_SNAPSHOT_CHARS: usize = 20_000;
 const MAX_SNAPSHOT_ELEMENTS: usize = 200;
 const MAX_SNAPSHOT_FRAMES: usize = 32;
 const MAX_FRAME_DEPTH: usize = 8;
+const FRAMES_AT_ONCE: usize = 4;
 
 pub async fn take_ax_snapshot(
     client: &CdpClient,
@@ -170,39 +171,176 @@ pub async fn take_ax_snapshot(
 
 const PAGE_WALKER_SOURCE: &str = include_str!("../../../extension/lib/snapshot.js");
 const PAGE_WALKER_WORLD: &str = "stella-browser-snapshot";
-const PAGE_WALKER_OBJECT_GROUP: &str = "stella-browser-snapshot";
+const FRAME_OWNER_OBJECT_GROUP: &str = "stella-browser-frame-owners";
 
 struct PageFrame {
     id: String,
     url: String,
-    child_frames: usize,
+    loader_id: String,
+    session_id: String,
+    parent: Option<usize>,
+    owner: usize,
+    hidden: bool,
+}
+
+struct FrameOwner {
+    frame_id: String,
+    hidden: bool,
 }
 
 struct PageFrameCapture {
     tree: String,
     truncated: bool,
     refs: Vec<(String, Value, Option<i64>)>,
-    frame_elements: usize,
 }
 
-fn collect_page_frames(tree: &Value, frames: &mut Vec<PageFrame>) {
+const FRAME_HIDDEN_JS: &str = r#"function() {
+    const box = this.getBoundingClientRect();
+    return box.width < 2 || box.height < 2 || !this.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+}"#;
+
+/// The frame elements of every document in a session, in document order. A
+/// search also reaches the ones in closed shadow roots.
+async fn frame_owners(client: &CdpClient, session_id: &str) -> Result<Vec<FrameOwner>, String> {
+    client
+        .send_command_no_params("DOM.enable", Some(session_id))
+        .await?;
+    client
+        .send_command(
+            "DOM.getDocument",
+            Some(serde_json::json!({ "depth": 0 })),
+            Some(session_id),
+        )
+        .await?;
+    let mut owners = Vec::new();
+    for query in ["<iframe>", "<frame>"] {
+        let search = client
+            .send_command(
+                "DOM.performSearch",
+                Some(serde_json::json!({ "query": query })),
+                Some(session_id),
+            )
+            .await?;
+        let Some(search_id) = search.get("searchId").and_then(Value::as_str) else {
+            continue;
+        };
+        let count = search
+            .get("resultCount")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        if count > 0 {
+            let found = client
+                .send_command(
+                    "DOM.getSearchResults",
+                    Some(serde_json::json!({ "searchId": search_id, "fromIndex": 0, "toIndex": count })),
+                    Some(session_id),
+                )
+                .await?;
+            let nodes = found
+                .get("nodeIds")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            owners.extend(
+                futures_util::future::join_all(
+                    nodes
+                        .iter()
+                        .map(|node| frame_owner(client, session_id, node)),
+                )
+                .await
+                .into_iter()
+                .flatten(),
+            );
+        }
+        client
+            .send_command(
+                "DOM.discardSearchResults",
+                Some(serde_json::json!({ "searchId": search_id })),
+                Some(session_id),
+            )
+            .await?;
+    }
+    let _ = client
+        .send_command(
+            "Runtime.releaseObjectGroup",
+            Some(serde_json::json!({ "objectGroup": FRAME_OWNER_OBJECT_GROUP })),
+            Some(session_id),
+        )
+        .await;
+    Ok(owners)
+}
+
+async fn frame_owner(client: &CdpClient, session_id: &str, node_id: &Value) -> Option<FrameOwner> {
+    let described = client
+        .send_command(
+            "DOM.describeNode",
+            Some(serde_json::json!({ "nodeId": node_id })),
+            Some(session_id),
+        )
+        .await
+        .ok()?;
+    let frame_id = described
+        .pointer("/node/frameId")
+        .and_then(Value::as_str)?
+        .to_string();
+    let element = client
+        .send_command(
+            "DOM.resolveNode",
+            Some(serde_json::json!({ "nodeId": node_id, "objectGroup": FRAME_OWNER_OBJECT_GROUP })),
+            Some(session_id),
+        )
+        .await
+        .ok()?;
+    let hidden = client
+        .send_command(
+            "Runtime.callFunctionOn",
+            Some(serde_json::json!({
+                "functionDeclaration": FRAME_HIDDEN_JS,
+                "objectId": element.pointer("/object/objectId")?,
+                "returnByValue": true,
+            })),
+            Some(session_id),
+        )
+        .await
+        .ok()?
+        .pointer("/result/value")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    Some(FrameOwner { frame_id, hidden })
+}
+
+fn add_frame_tree(
+    tree: &Value,
+    session_id: &str,
+    parent: Option<usize>,
+    owner: Option<(usize, bool)>,
+    frames: &mut Vec<PageFrame>,
+) {
     let Some(frame) = tree.get("frame") else {
         return;
     };
-    let Some(id) = frame.get("id").and_then(Value::as_str) else {
-        return;
-    };
-    frames.push(PageFrame {
-        id: id.to_string(),
-        url: frame
-            .get("url")
+    let text = |key: &str| {
+        frame
+            .get(key)
             .and_then(Value::as_str)
             .unwrap_or_default()
-            .to_string(),
-        child_frames: tree
-            .get("childFrames")
-            .and_then(Value::as_array)
-            .map_or(0, Vec::len),
+            .to_string()
+    };
+    let parent = frame
+        .get("parentId")
+        .and_then(Value::as_str)
+        .and_then(|id| frames.iter().position(|frame| frame.id == id))
+        .or(parent);
+    let (owner, hidden) = owner.unwrap_or((0, false));
+    let index = frames.len();
+    frames.push(PageFrame {
+        id: text("id"),
+        url: text("url"),
+        loader_id: text("loaderId"),
+        session_id: session_id.to_string(),
+        parent,
+        owner,
+        hidden,
     });
     for child in tree
         .get("childFrames")
@@ -210,8 +348,122 @@ fn collect_page_frames(tree: &Value, frames: &mut Vec<PageFrame>) {
         .into_iter()
         .flatten()
     {
-        collect_page_frames(child, frames);
+        add_frame_tree(child, session_id, Some(index), None, frames);
     }
+}
+
+/// Every frame of the page, the main one first. Cross-origin frames live in
+/// sessions of their own and are found through their frame elements.
+async fn page_frames(
+    client: &CdpClient,
+    session_id: &str,
+    main_only: bool,
+) -> Result<(Vec<PageFrame>, usize), String> {
+    let root = client
+        .send_command_no_params("Page.getFrameTree", Some(session_id))
+        .await?;
+    let mut frames = Vec::new();
+    add_frame_tree(
+        root.get("frameTree")
+            .ok_or("Browser did not return a frame tree")?,
+        session_id,
+        None,
+        None,
+        &mut frames,
+    );
+    let mut unreadable = 0;
+    if main_only {
+        frames.truncate(1);
+        return Ok((frames, unreadable));
+    }
+    let mut sessions = vec![session_id.to_string()];
+    while let Some(session) = sessions.pop() {
+        let owners = match frame_owners(client, &session).await {
+            Ok(owners) => owners,
+            Err(error) if session == session_id => return Err(error),
+            Err(_) => {
+                unreadable += 1;
+                continue;
+            }
+        };
+        for (order, owner) in owners.into_iter().enumerate() {
+            if let Some(known) = frames.iter_mut().find(|frame| frame.id == owner.frame_id) {
+                known.owner = order;
+                known.hidden = owner.hidden;
+                continue;
+            }
+            if owner.hidden || frames.len() >= MAX_SNAPSHOT_FRAMES {
+                unreadable += usize::from(!owner.hidden);
+                continue;
+            }
+            match attached_frame_tree(client, &session, &owner.frame_id).await {
+                Ok((child_session, tree)) => {
+                    let parent = frames.iter().position(|frame| frame.session_id == session);
+                    add_frame_tree(
+                        &tree,
+                        &child_session,
+                        parent,
+                        Some((order, false)),
+                        &mut frames,
+                    );
+                    sessions.push(child_session);
+                }
+                Err(_) => unreadable += 1,
+            }
+        }
+    }
+    Ok((frames, unreadable))
+}
+
+async fn attached_frame_tree(
+    client: &CdpClient,
+    parent_session: &str,
+    frame_id: &str,
+) -> Result<(String, Value), String> {
+    let session = client.attach_frame(parent_session, frame_id).await?;
+    client
+        .send_command_no_params("Page.enable", Some(&session))
+        .await?;
+    let tree = client
+        .send_command_no_params("Page.getFrameTree", Some(&session))
+        .await?;
+    let tree = tree
+        .get("frameTree")
+        .cloned()
+        .ok_or("Browser did not return a frame tree")?;
+    Ok((session, tree))
+}
+
+/// The readable frames in reading order, each with the chain of frames that
+/// leads to it. A hidden frame hides the frames inside it.
+fn frames_in_order(
+    frames: &[PageFrame],
+    domain_filter: Option<&super::network::DomainFilter>,
+) -> Vec<(usize, Vec<RefFrame>)> {
+    let mut ordered = Vec::new();
+    let mut pending = vec![(0usize, Vec::new())];
+    while let Some((index, mut scope)) = pending.pop() {
+        let frame = &frames[index];
+        if frame.hidden
+            || scope.len() >= MAX_FRAME_DEPTH
+            || (index > 0
+                && domain_filter.is_some_and(|filter| filter.check_url(&frame.url).is_err()))
+        {
+            continue;
+        }
+        scope.push(RefFrame {
+            frame_id: frame.id.clone(),
+            loader_id: frame.loader_id.clone(),
+            session_id: frame.session_id.clone(),
+        });
+        let mut children = (1..frames.len())
+            .filter(|child| frames[*child].parent == Some(index))
+            .collect::<Vec<_>>();
+        children.sort_by_key(|child| std::cmp::Reverse(frames[*child].owner));
+        pending.extend(children.into_iter().map(|child| (child, scope.clone())));
+        ordered.push((index, scope));
+    }
+    ordered
 }
 
 fn page_walker_options(options: &SnapshotOptions) -> Value {
@@ -245,12 +497,12 @@ async fn capture_page_frame(
         .get("executionContextId")
         .and_then(Value::as_i64)
         .ok_or("Frame has no snapshot context")?;
+    let object_group = format!("stella-browser-snapshot-{frame_id}");
     let walker = PAGE_WALKER_SOURCE.replacen("export function", "function", 1);
     let expression = format!(
         "(() => {{ {walker}\nconst elements = []; const order = [];\
          const capture = executeSnapshot({{ ...{options}, onRef: (ref, el) => {{ order.push(ref); elements.push(el); }} }});\
-         elements.capture = JSON.stringify({{ tree: capture.tree, refs: capture.refs, truncated: capture.truncated, order,\
-           frameElements: document.querySelectorAll('iframe, frame').length }});\
+         elements.capture = JSON.stringify({{ tree: capture.tree, refs: capture.refs, truncated: capture.truncated, order }});\
          return elements; }})()",
         options = page_walker_options(options),
     );
@@ -262,7 +514,7 @@ async fn capture_page_frame(
                     "expression": expression,
                     "contextId": context_id,
                     "returnByValue": false,
-                    "objectGroup": PAGE_WALKER_OBJECT_GROUP,
+                    "objectGroup": object_group,
                 })),
                 Some(session_id),
             )
@@ -364,17 +616,13 @@ async fn capture_page_frame(
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
             refs,
-            frame_elements: summary
-                .get("frameElements")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as usize,
         })
     }
     .await;
     let _ = client
         .send_command(
             "Runtime.releaseObjectGroup",
-            Some(serde_json::json!({ "objectGroup": PAGE_WALKER_OBJECT_GROUP })),
+            Some(serde_json::json!({ "objectGroup": object_group })),
             Some(session_id),
         )
         .await;
@@ -410,77 +658,80 @@ pub async fn take_dom_snapshot(
     client: &CdpClient,
     session_id: &str,
     options: &SnapshotOptions,
+    domain_filter: Option<&super::network::DomainFilter>,
     ref_map: &mut RefMap,
 ) -> Result<String, String> {
-    let root = client
-        .send_command_no_params("Page.getFrameTree", Some(session_id))
-        .await?;
-    let mut frames = Vec::new();
-    collect_page_frames(
-        root.get("frameTree")
-            .ok_or("Browser did not return a frame tree")?,
-        &mut frames,
-    );
+    let (frames, mut skipped_frames) =
+        page_frames(client, session_id, options.selector.is_some()).await?;
+    let mut ordered = frames_in_order(&frames, domain_filter);
+    let mut truncated = ordered.len() > MAX_SNAPSHOT_FRAMES;
+    ordered.truncate(MAX_SNAPSHOT_FRAMES);
     let mut next_ref = ref_map.next_ref_num();
     let mut output = String::new();
-    let mut truncated = frames.len() > MAX_SNAPSHOT_FRAMES;
-    let mut skipped_frames = 0usize;
-    for (index, frame) in frames.iter().take(MAX_SNAPSHOT_FRAMES).enumerate() {
-        let main = index == 0;
-        if !main && options.selector.is_some() {
-            continue;
-        }
-        let capture = match capture_page_frame(client, session_id, &frame.id, options).await {
-            Ok(capture) => capture,
-            Err(error) if main => return Err(error),
-            Err(_) => {
-                skipped_frames += 1;
-                continue;
-            }
-        };
-        truncated |= capture.truncated;
-        skipped_frames += capture.frame_elements.saturating_sub(frame.child_frames);
-        if capture.tree.trim().is_empty() || capture.tree == "(empty)" {
-            continue;
-        }
-        let mut renamed = HashMap::new();
-        for (walker_id, data, backend_id) in capture.refs {
-            let Some(backend_id) = backend_id else {
-                continue;
-            };
-            let ref_id = format!("e{next_ref}");
-            next_ref += 1;
-            ref_map.add_with_hints(
-                ref_id.clone(),
-                Some(backend_id),
-                data.get("role").and_then(Value::as_str).unwrap_or_default(),
-                data.get("name").and_then(Value::as_str).unwrap_or_default(),
-                data.get("nth")
-                    .and_then(Value::as_u64)
-                    .map(|nth| nth as usize),
-                RefLocatorHints::default(),
-            );
-            renamed.insert(walker_id, ref_id);
-        }
-        let tree = rename_walker_refs(&capture.tree, &renamed);
-        if main {
-            output.push_str(&tree);
-        } else {
-            output.push_str(&format!(
-                "\n- frame [frame={}] {}",
-                frame.id,
-                serde_json::to_string(&frame.url).unwrap_or_default()
-            ));
-            for line in tree.lines() {
-                output.push_str("\n  ");
-                output.push_str(line);
-            }
-        }
-        if output.encode_utf16().count() >= MAX_SNAPSHOT_CHARS {
+    for group in ordered.chunks(FRAMES_AT_ONCE) {
+        if output.encode_utf16().count() >= MAX_SNAPSHOT_CHARS
+            || output.lines().count() >= MAX_SNAPSHOT_ELEMENTS
+        {
             truncated = true;
             break;
         }
+        let captures = futures_util::future::join_all(group.iter().map(|(index, _)| {
+            let frame = &frames[*index];
+            capture_page_frame(client, &frame.session_id, &frame.id, options)
+        }))
+        .await;
+        for ((index, scope), capture) in group.iter().zip(captures) {
+            let main = *index == 0;
+            let capture = match capture {
+                Ok(capture) => capture,
+                Err(error) if main => return Err(error),
+                Err(_) => {
+                    skipped_frames += 1;
+                    continue;
+                }
+            };
+            truncated |= capture.truncated;
+            if capture.tree.trim().is_empty() || capture.tree == "(empty)" {
+                continue;
+            }
+            ref_map.set_capture_scope((!main).then(|| scope.clone()));
+            let mut renamed = HashMap::new();
+            for (walker_id, data, backend_id) in capture.refs {
+                let Some(backend_id) = backend_id else {
+                    continue;
+                };
+                let ref_id = format!("e{next_ref}");
+                next_ref += 1;
+                ref_map.add_with_hints(
+                    ref_id.clone(),
+                    Some(backend_id),
+                    data.get("role").and_then(Value::as_str).unwrap_or_default(),
+                    data.get("name").and_then(Value::as_str).unwrap_or_default(),
+                    data.get("nth")
+                        .and_then(Value::as_u64)
+                        .map(|nth| nth as usize),
+                    RefLocatorHints::default(),
+                );
+                renamed.insert(walker_id, ref_id);
+            }
+            let tree = rename_walker_refs(&capture.tree, &renamed);
+            if main {
+                output.push_str(&tree);
+            } else {
+                let frame = &frames[*index];
+                output.push_str(&format!(
+                    "\n- frame [frame={}] {}",
+                    frame.id,
+                    serde_json::to_string(&frame.url).unwrap_or_default()
+                ));
+                for line in tree.lines() {
+                    output.push_str("\n  ");
+                    output.push_str(line);
+                }
+            }
+        }
     }
+    ref_map.set_capture_scope(None);
     ref_map.set_next_ref_num(next_ref);
 
     let trimmed = output.trim();

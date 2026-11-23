@@ -166,9 +166,15 @@ function doConnect(generation) {
   }
   nativePort = port;
   let welcomed = false;
+  const partial = new Map();
 
-  port.onMessage.addListener(async (msg) => {
+  port.onMessage.addListener(async (received) => {
     if (generation !== connectionGeneration || nativePort !== port) return;
+    let msg = received;
+    if (msg.type === "command_part") {
+      msg = joinParts(partial, msg);
+      if (!msg) return;
+    }
 
     if (msg.type === "welcome") {
       console.log("[connection] Authenticated, session:", msg.session);
@@ -235,7 +241,29 @@ function doConnect(generation) {
     extensionVersion,
     protocolVersion: EXTENSION_PROTOCOL_VERSION,
     token: "",
+    debuggerPipe: 1,
   });
+}
+
+/** Commands over Chrome's 1 MiB message limit arrive in order, in parts. */
+function joinParts(partial, { id, index, count, data }) {
+  const parts = index === 0 ? [] : partial.get(id);
+  if (!parts || parts.length !== index || typeof data !== "string") {
+    partial.delete(id);
+    return null;
+  }
+  parts.push(data);
+  if (parts.length < count) {
+    partial.set(id, parts);
+    return null;
+  }
+  partial.delete(id);
+  try {
+    const message = JSON.parse(parts.join(""));
+    return message?.type === "command" ? message : null;
+  } catch {
+    return null;
+  }
 }
 
 function setStatus(connected) {

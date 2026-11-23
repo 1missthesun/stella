@@ -1,10 +1,11 @@
 Pod::Spec.new do |s|
   s.name           = 'StellaReactFlags'
   s.version        = '1.0.0'
-  s.summary        = 'Stella overrides for React Native native feature flags and text layout.'
+  s.summary        = 'Stella fixes for React Native native code the app links prebuilt.'
   s.description    = 'Turns on React Native feature flags that guard against known crashes, ' \
-                     'on top of the stable release level the app factory installs, and keeps ' \
-                     'text views from dropping their last line when layout rounds them short.'
+                     'on top of the stable release level the app factory installs, keeps ' \
+                     'text views from dropping their last line when layout rounds them short, ' \
+                     'and keeps Appearance color scheme changes off CarPlay scenes.'
   s.author         = 'FromYou, LLC'
   s.homepage       = 'https://stella.sh'
   s.platforms      = { :ios => '16.4' }

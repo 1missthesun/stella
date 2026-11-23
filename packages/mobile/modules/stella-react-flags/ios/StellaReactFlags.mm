@@ -3,6 +3,9 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
+#import <React/RCTConvert.h>
+#import <React/RCTUtils.h>
+
 #import <react/featureflags/ReactNativeFeatureFlags.h>
 #import <react/featureflags/ReactNativeFeatureFlagsOverridesOSSStable.h>
 #import <react/renderer/attributedstring/ParagraphAttributes.h>
@@ -53,6 +56,35 @@ void giveTextContainersRoom()
       (TextStorageForSize)method_setImplementation(method, (IMP)textStorageWithRoom);
 }
 
+// RCTAppearance.setColorScheme treats every connected scene as a
+// UIWindowScene. A connected CarPlay head unit adds a
+// CPTemplateApplicationScene, which has no `windows`, so applying a color
+// scheme with CarPlay attached crashed the app ("unrecognized selector").
+void setColorSchemeOnWindowScenes(id self, SEL _cmd, NSString *style)
+{
+  UIUserInterfaceStyle userInterfaceStyle = [RCTConvert UIUserInterfaceStyle:style];
+  NSMutableArray<UIWindow *> *windows = [NSMutableArray new];
+  for (UIScene *scene in RCTSharedApplication().connectedScenes) {
+    if ([scene isKindOfClass:[UIWindowScene class]]) {
+      [windows addObjectsFromArray:((UIWindowScene *)scene).windows];
+    }
+  }
+  for (UIWindow *window in windows) {
+    window.overrideUserInterfaceStyle = userInterfaceStyle;
+  }
+}
+
+void applyColorSchemeOnlyToWindowScenes()
+{
+  Class appearance = NSClassFromString(@"RCTAppearance");
+  Method method = appearance ? class_getInstanceMethod(appearance, NSSelectorFromString(@"setColorScheme:")) : nullptr;
+  if (method == nullptr) {
+    NSLog(@"[StellaReactFlags] RCTAppearance setColorScheme: not found; CarPlay may crash on color scheme changes");
+    return;
+  }
+  method_setImplementation(method, (IMP)setColorSchemeOnWindowScenes);
+}
+
 }
 
 @implementation StellaReactFlags
@@ -67,6 +99,7 @@ void giveTextContainersRoom()
       NSLog(@"[StellaReactFlags] Flags were read before the override: %s", accessed->c_str());
     }
     giveTextContainersRoom();
+    applyColorSchemeOnlyToWindowScenes();
   });
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import {
   Platform,
   StyleSheet,
@@ -15,6 +15,8 @@ import {
   estimateMarkdownTableColumnWidths,
   extractMarkdownTable,
   fitMarkdownTableColumnWidths,
+  measuredMarkdownTableColumnWidths,
+  splitMarkdownWords,
 } from "../lib/markdown-table-layout";
 import type { Colors } from "../theme/colors";
 import { SelectableMarkdownText, nativeMarkdownSelectionAvailable } from "./SelectableMarkdownText";
@@ -84,13 +86,56 @@ export function AssistantMarkdownTable({
   const [viewportWidth, setViewportWidth] = useState(0);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const data = useMemo(() => extractMarkdownTable(node), [node]);
+  const columns = useMemo(
+    () =>
+      data.headers.map((header, columnIndex) => {
+        const cells = [
+          { node: header, header: true },
+          ...data.rows.map((row) => ({ node: row[columnIndex], header: false })),
+        ];
+        return {
+          natural: cells,
+          words: cells.map((cell) => ({
+            ...cell,
+            node: cell.node && splitMarkdownWords(cell.node),
+          })),
+        };
+      }),
+    [data],
+  );
+  const measureViews = useRef<(View | null)[]>([]);
+  const [textWidths, setTextWidths] = useState<{ natural: number[]; words: number[] } | null>(null);
+  const readTextWidths = useCallback(() => {
+    const widths = measureViews.current
+      .slice(0, columns.length * 2)
+      .map((view) => view?.offsetWidth);
+    if (widths.length < columns.length * 2 || widths.some((width) => width === undefined)) return;
+    const natural = widths.filter((_, index) => index % 2 === 0) as number[];
+    const words = widths.filter((_, index) => index % 2 === 1) as number[];
+    setTextWidths((current) =>
+      current &&
+      current.natural.every((width, index) => Math.abs(width - natural[index]!) < 0.5) &&
+      current.words.every((width, index) => Math.abs(width - words[index]!) < 0.5)
+        ? current
+        : { natural, words },
+    );
+  }, [columns.length]);
+  useLayoutEffect(readTextWidths, [readTextWidths, columns]);
+
   const estimatedWidths = useMemo(
     () => estimateMarkdownTableColumnWidths(data),
     [data],
   );
+  const contentWidths = useMemo(
+    () =>
+      textWidths?.natural.length === columns.length
+        ? measuredMarkdownTableColumnWidths(textWidths.natural, textWidths.words)
+        : estimatedWidths,
+    [textWidths, columns.length, estimatedWidths],
+  );
   const columnWidths = useMemo(
-    () => fitMarkdownTableColumnWidths(estimatedWidths, viewportWidth),
-    [estimatedWidths, viewportWidth],
+    () => fitMarkdownTableColumnWidths(contentWidths, viewportWidth),
+    [contentWidths, viewportWidth],
   );
   const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
 
@@ -107,6 +152,39 @@ export function AssistantMarkdownTable({
       style={styles.container}
       onLayout={(event) => setViewportWidth(event.nativeEvent.layout.width)}
     >
+      <View
+        style={styles.measureLayer}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={styles.measureSpace}>
+          {columns.flatMap((column, columnIndex) =>
+            [column.natural, column.words].map((cells, kind) => (
+              <View
+                key={`measure-${columnIndex}-${kind}`}
+                ref={(view) => {
+                  measureViews.current[columnIndex * 2 + kind] = view;
+                }}
+                style={styles.measureColumn}
+                onLayout={readTextWidths}
+              >
+                {cells.map((cell, cellIndex) => (
+                  <View key={cellIndex} style={styles.measureCell}>
+                    <TableCellContent
+                      node={cell.node}
+                      Renderer={Renderer}
+                      selectable={selectable}
+                      colors={colors}
+                      textStyle={cell.header ? styles.headerText : styles.bodyText}
+                    />
+                  </View>
+                ))}
+              </View>
+            )),
+          )}
+        </View>
+      </View>
       <SideScroller showsIndicator style={styles.scroller}>
         <View style={{ width: tableWidth }}>
           <View style={styles.headerRow}>
@@ -182,6 +260,25 @@ const makeStyles = (colors: Colors) =>
     },
     scroller: {
       width: "100%",
+    },
+    measureLayer: {
+      height: 0,
+      left: 0,
+      opacity: 0,
+      overflow: "hidden",
+      position: "absolute",
+      top: 0,
+      width: 0,
+    },
+    measureSpace: {
+      alignItems: "flex-start",
+      width: 4096,
+    },
+    measureColumn: {
+      alignItems: "flex-start",
+    },
+    measureCell: {
+      alignSelf: "flex-start",
     },
     headerRow: {
       borderBottomColor: fadeHex(colors.text, 0.32),

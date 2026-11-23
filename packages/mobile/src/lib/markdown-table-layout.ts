@@ -8,8 +8,9 @@ export type MarkdownTableData = {
 
 const MIN_COLUMN_WIDTH = 88;
 const MAX_COLUMN_WIDTH = 280;
+const MAX_WORD_COLUMN_WIDTH = 360;
 const APPROX_CHARACTER_WIDTH = 7;
-const CELL_HORIZONTAL_PADDING = 24;
+export const CELL_HORIZONTAL_PADDING = 24;
 const WIDTH_STEP = 24;
 
 export function extractMarkdownTable(node: MarkdownNode): MarkdownTableData {
@@ -78,4 +79,28 @@ export function fitMarkdownTableColumnWidths(
 
   const extraPerColumn = (viewportWidth - totalWidth) / widths.length;
   return widths.map((width) => width + extraPerColumn);
+}
+
+export function splitMarkdownWords(node: MarkdownNode): MarkdownNode {
+  if (node.type === "soft_break") return { ...node, type: "line_break" };
+  return {
+    ...node,
+    ...(node.content != null && { content: node.content.replace(/\s+/g, "\n") }),
+    ...(node.children && { children: node.children.map(splitMarkdownWords) }),
+  };
+}
+
+export function measuredMarkdownTableColumnWidths(
+  naturalTextWidths: number[],
+  longestWordWidths: number[],
+): number[] {
+  const lastColumn = naturalTextWidths.length - 1;
+  return naturalTextWidths.map((natural, columnIndex) => {
+    const padding = columnIndex === lastColumn ? 0 : CELL_HORIZONTAL_PADDING;
+    const wrapped = Math.min(natural, MAX_COLUMN_WIDTH - padding);
+    const word = Math.min(longestWordWidths[columnIndex] ?? 0, MAX_WORD_COLUMN_WIDTH - padding);
+    // Widths arrive rounded to whole points; a point over keeps the text on its lines.
+    const text = Math.ceil(Math.max(wrapped, word)) + 1;
+    return Math.max(MIN_COLUMN_WIDTH, text + padding);
+  });
 }

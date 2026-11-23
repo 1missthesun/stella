@@ -165,7 +165,7 @@ calls.map(({ method, status, url }) => [method, status, url]);
 - `tab.network.fetch(url, { method?, headers?, body?, timeout?, maxBodyBytes? })` requests with the tab's session, on the tab's own origin; `fetchAll(requests, { concurrency?, timeout? })` sends up to 100 of them.
 - `tab.network.rewriteRequest(urlPattern, { method?, postData?, jsonPatch?, headers? })` changes matching requests until `clearRequestRewrite(urlPattern?)`.
 
-Bodies are cut at 128 KB, and each tab keeps 2 MB of them, newest first. JSON and API bodies are read as they arrive. The rest are read when you first call `requests()`, so a page you have already left no longer has them; after that call every body is read as it arrives. In the user's browser a tab you leave untouched for five minutes stops recording until your next command, unless you have called `requests()` on one of your tabs.
+Bodies are cut at 128 KB, and each tab keeps 2 MB of them, newest first. JSON and API bodies are read as they arrive. The rest are read when you first call `requests()`, so a page you have already left no longer has them; after that call every body is read as it arrives. In the user's browser a tab you leave untouched for five minutes stops recording until your next command, unless you have called `requests()` on one of your tabs. If `requests()` is empty right after a load there, that browser has an older extension, which records from the first `requests()` call: reload and call it again.
 
 To save everything a flow sends as a HAR file, record it with two `browser.chain()` steps (there is no other HAR method) and drive the tab normally in between:
 

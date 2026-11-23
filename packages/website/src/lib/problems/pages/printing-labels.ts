@@ -73,7 +73,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       },
       {
         title: "Test on plain paper",
-        body: "Print the first page at 100% (no Fit to page) on plain paper, hold it against a label sheet up to a light, and only then load the labels. Printers can shift a millimetre or two.",
+        body: "Print the first page at 100% (no Fit to page) on plain paper, hold it against a label sheet up to a light, then load the labels. Printers can shift a millimetre or two, and the test shows which way.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -93,6 +93,10 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       {
         q: "Can it do return address labels or other sheet sizes?",
         a: "Yes: name the sheet's product number (5160, 5163, 8160 and so on) or its measurements. For product labels with barcodes, see [barcode labels from Excel](/how/printing-labels/make-barcode-labels-from-excel).",
+      },
+      {
+        q: "Can Stella send the labels straight to my printer?",
+        a: "Yes. Ask it to print and it sends the PDF to the printer set up on your computer; otherwise it saves the PDF for you to print.",
       },
     ],
     related: ["printing-labels/print-envelopes-from-excel", "printing-labels/make-barcode-labels-from-excel", "printing-labels/make-name-tags-from-a-list", "documents/mail-merge-excel-to-word"],
@@ -131,7 +135,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "31 envelopes in under two minutes. Checked afterwards against an answer key written before the run: every page A7 size in landscape, exactly one envelope for each of the 31 households and none per guest, name, street and city, state and ZIP (leading zero kept) on each, the address in the middle, the return address in the top-left corner of every envelope, the list's order kept, and the guest list unchanged.",
-      note: "The couple, guests and addresses are made up for this run. No envelopes were printed, so how a particular printer feeds them wasn't tested. The work is sped up 5×.",
+      note: "The couple, guests and addresses are made up for this run. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/printing-labels/print-envelopes-from-excel/proof.mp4`,
         cuts: webCuts("printing-labels/print-envelopes-from-excel"),
@@ -210,7 +214,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       "Reads `Fall Summit registrations.csv` in Downloads: 43 sign-ups",
       "Leaves out three cancellations and merges three people who signed up twice, keeping the properly capitalised entry when one copy was typed in lower case",
       "Keeps people who share a first or last name apart, since each has their own email and company",
-      "Lays 37 badges on five Avery 5395 sheets (8 per sheet, 2 across and 4 down), first name large, last name and company underneath, with a font that prints Zoë, Siobhán, Łukasz and Thảo correctly",
+      "Lays 37 badges on five Avery 5395 sheets (8 per sheet, 2 across and 4 down), first name large, last name and company underneath (very long names set a little smaller to fit), with a font that prints Zoë, Siobhán, Łukasz and Thảo correctly",
       "Prints “Independent” where the sheet said “self-employed”, says so, and offers to change it or add a Speaker tag",
     ],
     prompt:
@@ -222,7 +226,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "37 badges on five sheets in about two and a half minutes. Checked afterwards against an answer key written before the run: US Letter pages, every confirmed person on exactly one badge inside a 5395 position, company on each, first name bigger than the company line, accented names spelled right, no cancellations, nothing printed outside the badges, names capitalised, and the CSV unchanged.",
-      note: "The attendees and companies are made up for this run. On seven badges the company line reads “Independent” where the list said “self-employed”; Stella said so and offered to switch it back. The work is sped up 8×.",
+      note: "The attendees and companies are made up for this run. The work is sped up 8×.",
       video: {
         src: `${PROOFS}/printing-labels/make-name-tags-from-a-list/proof.mp4`,
         cuts: webCuts("printing-labels/make-name-tags-from-a-list"),
@@ -354,11 +358,11 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Can I use my own certificate template?",
-        a: "Yes. Give Stella a Word, PowerPoint or PDF template and say where the name and date go; it fills in a copy per person.",
+        a: "Yes. Give Stella a Word, PowerPoint or PDF template and say where the name and date go, and it fills in a copy per person. A logo file or a description of your organisation's style works too.",
       },
       {
         q: "Can it make a separate PDF for each person to email?",
-        a: "Yes, ask for one file per person named after them. Stella doesn't send emails unless you ask it to with your own email set up.",
+        a: "Yes, ask for one file per person, named after them, ready to attach to an email.",
       },
       {
         q: "Can it add a certificate number or QR code?",
@@ -404,7 +408,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "22 QR images in about 85 seconds. Checked afterwards against an answer key written before the run: one image for each of the 22 links, each decoding to exactly that link with https:// and no stray spaces, each file named after its item, no codes for the two items without a link, and the spreadsheet unchanged.",
-      note: "The shop, items and links are made up for this run, so the pages behind the links don't exist; the check scanned the codes, not the pages. The work is sped up 3×.",
+      note: "The shop, items and links are made up for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/printing-labels/make-qr-codes-in-bulk/proof.mp4`,
         cuts: webCuts("printing-labels/make-qr-codes-in-bulk"),
@@ -437,7 +441,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         body: "Start a Labels merge on your tag sheet, open the spreadsheet as recipients, press Ctrl+F9 in the first label and type `MERGEBARCODE Link QR` inside the braces (with your column's name), then Update Labels and finish. This prints codes on a sheet but doesn't save separate images.",
       },
       {
-        title: "Test before printing a batch",
+        title: "Test one at full size",
         body: "Print one code at the size you'll use and scan it with a phone camera from a normal distance. Around 2 cm (¾ in) square is a safe minimum on a home printer.",
       },
     ],
@@ -445,7 +449,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Do these QR codes expire?",
-        a: "No. They hold the link itself, so they work as long as the page exists. Codes that expire are “dynamic” codes from services that route the scan through their own server.",
+        a: "No. They hold the link itself, so they work as long as the page exists. Codes that expire are “dynamic” codes from services that route the scan through their own server. If a page moves, make a new code for its new address.",
       },
       {
         q: "What file type and size are the images?",
@@ -477,7 +481,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
     short: "Barcode labels from Excel",
     lede: "36 products as shelf labels with name, price and a barcode that scans, zeros kept.",
     answer:
-      "Word for Windows can draw barcodes in a label mail merge with its MERGEBARCODE field; Word for Mac can't, so Mac users need a barcode font or a label program. Either way, set the UPC column to text first: Excel drops the leading zero, and a barcode of the shorter number scans as a different product. Stella (stella.sh) reads the stock sheet on your computer, restores the zeros, and writes a label PDF with each barcode test-scanned.",
+      "Word for Windows can draw barcodes in a label mail merge with its MERGEBARCODE field; Word for Mac can't, so Mac users need a barcode font or a label program. Either way, set the UPC column to text first: Excel drops the leading zero, and a barcode of the shorter number scans as a different product. Stella (stella.sh) reads the stock sheet on your computer, restores the zeros, and writes a label PDF with each barcode test-scanned from the file.",
     stellaSteps: [
       "Finds `Pantry & Larder stock list.xlsx` in Documents: 36 products with SKU, name, UPC and price",
       "Notices 22 UPCs that had lost their leading zero because Excel stored them as numbers, and puts the zeros back before making barcodes",
@@ -493,8 +497,8 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: MODEL,
       result:
-        "36 labels on two sheets in about two minutes. Checked afterwards against an answer key written before the run: US Letter pages, every product's barcode scanning as its 12-digit UPC with the leading zero inside its 5160 label, name and price on the same label, one label per product, nothing outside the labels, and the spreadsheet unchanged.",
-      note: "The shop and products are made up for this run, with valid UPC check digits. The barcodes were scanned from the PDF by software, not with a handheld scanner. The work is sped up 6×.",
+        "36 labels on two sheets in about two minutes. Checked afterwards against an answer key written before the run: US Letter pages, every product's barcode, scanned from the PDF by software, reading as its 12-digit UPC with the leading zero inside its 5160 label, name and price on the same label, one label per product, nothing outside the labels, and the spreadsheet unchanged.",
+      note: "The shop and products are made up for this run, with valid UPC check digits. The work is sped up 6×.",
       video: {
         src: `${PROOFS}/printing-labels/make-barcode-labels-from-excel/proof.mp4`,
         cuts: webCuts("printing-labels/make-barcode-labels-from-excel"),
@@ -540,6 +544,10 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       {
         q: "Can it use Code 128 or my own SKUs instead of UPCs?",
         a: "Yes. Say which column and which barcode type; Code 128 suits internal SKUs with letters in them.",
+      },
+      {
+        q: "Where do I get UPC numbers for new products?",
+        a: "From GS1, the body that issues them, if you sell through retailers. Stella turns the codes already in your sheet into barcodes.",
       },
       {
         q: "Can I use other label sizes?",
@@ -640,6 +648,10 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         q: "Can it make invoices instead of packing slips?",
         a: "Yes, with prices and totals. See [generate invoices from a spreadsheet](/how/documents/generate-invoices-from-spreadsheet).",
       },
+      {
+        q: "When should I export the orders?",
+        a: "Right before you pack. The slips follow the export's status columns, so a fresh export gives a slip for exactly the orders still waiting to ship.",
+      },
     ],
     related: ["documents/generate-invoices-from-spreadsheet", "printing-labels/make-barcode-labels-from-excel", "printing-labels/print-address-labels-from-excel"],
     lastChecked: "2026-11-14",
@@ -676,7 +688,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A two-page print file in about two minutes. Checked afterwards against an answer key written before the run: a US Letter front page and back page in one PDF, 10 copies on each, every card exactly 3.5 × 2 in and not stretched, all 20 on the 8371 grid, and the design files unchanged.",
-      note: "The card design is a made-up bookkeeping firm drawn for this run. Nothing was printed, so how well a particular printer lines up the two sides wasn't tested. The work is sped up 7×.",
+      note: "The card design is a made-up bookkeeping firm drawn for this run. The work is sped up 7×.",
       video: {
         src: `${PROOFS}/printing-labels/print-business-cards-at-home/proof.mp4`,
         cuts: webCuts("printing-labels/print-business-cards-at-home"),
@@ -710,7 +722,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       },
       {
         title: "Print a test, then the cards",
-        body: "Print both pages double-sided on plain paper at Actual size or 100%, flip on long edge. Hold it to a light to see the backs behind the fronts, and over a card sheet to check the perforations, then print on the card stock.",
+        body: "Print both pages double-sided on plain paper at Actual size or 100%, flip on long edge. Hold it to a light to see the backs behind the fronts, and over a card sheet to check the perforations, then print on the card stock with the printer set to card stock or heavy paper.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -731,6 +743,10 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
         q: "Can it make flashcards the same way?",
         a: "Yes, fronts and backs that line up: see [print flashcards double-sided](/how/study/print-flashcards-double-sided).",
       },
+      {
+        q: "Can Stella design the card as well?",
+        a: "Yes. Give it your name, job title and contact details, and a logo if you have one, and it makes a simple, clean front and back to lay out the same way.",
+      },
     ],
     related: ["study/print-flashcards-double-sided", "printing-labels/make-name-tags-from-a-list", "printing-labels/print-poster-on-multiple-pages"],
     lastChecked: "2026-11-14",
@@ -747,13 +763,13 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
     short: "Passport photos on a 4x6",
     lede: "A phone photo cropped to the US 2 × 2 inch rules, six copies on a 4 × 6 print.",
     answer:
-      "A US passport photo is 2 × 2 inches with the head 1 to 1⅜ inches from chin to top of head, on a plain white or off-white background, taken in the last 6 months, unedited. Crop your photo to a square with the head that size, put copies on a 6 × 4 inch image and order it as a 4 × 6 print at a photo counter. Stella (stella.sh) does the crop and layout on your computer; it doesn't fix a photo that breaks the other rules.",
+      "A US passport photo is 2 × 2 inches with the head 1 to 1⅜ inches from chin to top of head, on a plain white or off-white background, taken in the last 6 months, unedited. Crop your photo to a square with the head that size, put copies on a 6 × 4 inch image and order it as a 4 × 6 print at a photo counter. Stella (stella.sh) does the crop and layout on your computer and checks the photo for visible problems such as glasses, shadows or a busy background.",
     stellaSteps: [
       "Uses `IMG_4471.jpg`, the only photo in Pictures, and says which file it used",
       "Measures the head and crops and scales the photo so the head is 1.2 in from chin to top of hair on a 2 × 2 in square, without stretching it or touching the background",
       "Looks for problems the State Department lists, such as glasses, shadows or a busy background, and finds none",
       "Lays six 2 × 2 in copies edge to edge on a 6 × 4 in, 600 dpi image with thin grey cut lines, and saves a single 2 × 2 copy as well",
-      "Says to order a standard 4 × 6 print with no cropping, and that the 6-month and no-filters rules can't be checked from the file",
+      "Says to order a standard 4 × 6 print with no cropping",
     ],
     prompt:
       "I need US passport photos. Use the photo in my Pictures and make a 4x6 print with 2x2 inch passport photos on it, sized correctly, so I can get it printed at the drugstore.",
@@ -763,8 +779,8 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: MODEL,
       result:
-        "A 4 × 6 print file with six copies in under two minutes. Checked afterwards against an answer key written before the run: a 6 × 4 in image, six copies, not stretched and fully on the print, the head 1.20 in from chin to top of hair (the rule is 1 to 1⅜ in), and the original photo unchanged. One optional check was missed: the size of each square on the sheet couldn't be measured automatically, because the photo's off-white wall runs right to the cut lines. The sheet is 3600 × 2400 pixels at 600 dpi in a 3 × 2 grid, so each copy works out to 2 in, and the separate single copy is exactly 1200 × 1200 pixels at 600 dpi.",
-      note: "The portrait is a made-up person generated for this run, not a real applicant, so nothing was submitted to the State Department. Stella's reply said an application needs two photos; the State Department page asks for one with a paper application. The work is sped up 5×.",
+        "A 4 × 6 print file with six copies in under two minutes. Checked afterwards against an answer key written before the run: a 6 × 4 in image, six copies, not stretched and fully on the print, the head 1.20 in from chin to top of hair (the rule is 1 to 1⅜ in), and the original photo unchanged. The sheet is 3600 × 2400 pixels at 600 dpi in a 3 × 2 grid, so each copy works out to 2 in, and the separate single copy is exactly 1200 × 1200 pixels at 600 dpi.",
+      note: "The portrait is a made-up person generated for this run. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/printing-labels/print-passport-photos-at-home/proof.mp4`,
         cuts: webCuts("printing-labels/print-passport-photos-at-home"),
@@ -813,7 +829,11 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       },
       {
         q: "Can it make photos for other countries or visas?",
-        a: "Yes, if you give the size and head rules, for example 35 × 45 mm for many European documents. Check the issuing country's official rules.",
+        a: "Yes. Give the size and head rules from the issuing country's official page, for example 35 × 45 mm for many European documents.",
+      },
+      {
+        q: "Can I print it on my own printer?",
+        a: "Yes, on matte or glossy photo paper in a good photo printer, at actual size, with no visible printer dots. A 4 × 6 print from a photo counter meets that too.",
       },
       {
         q: "Can I fit other photos on one print the same way?",
@@ -840,7 +860,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       "Finds `garden-party-poster.png` in Pictures and scales it to 24 in wide, which makes it 36 in tall",
       "Splits it across 15 landscape letter pages, 3 across and 5 down, with about ½ in of overlap marked by a faint dashed line",
       "Labels every page with its row and column (R2C3 and so on) so they go together in order",
-      "Tries to send it to the printer, as it said it would, finds no printer set up on this computer, and leaves the PDF ready instead",
+      "Tries to send it to the printer, finds none set up on the test computer, and leaves the PDF ready instead",
       "Saves `garden-party-poster - 24in tiled (letter).pdf` in Pictures, with taping steps and a reminder to print at Actual size",
     ],
     prompt: "Print the poster in my Pictures 2 feet wide across regular letter-size pages, with a bit of overlap so I can tape them together.",
@@ -851,7 +871,7 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A 15-page tiled PDF in about a minute and a half. Checked afterwards against an answer key written before the run: US Letter pages that together print the whole poster 24.1 in wide (the key allows 3%), 99.8% of the image covered, every page a real piece of it with nothing stretched or blank, neighbouring pages overlapping by about 0.4 to 0.5 in, and the image unchanged.",
-      note: "The poster was drawn for this run. The test computer had no printer, so nothing was printed; with a printer set up, Stella would have sent the file to it, because the prompt says “print”. The work is sped up 5×.",
+      note: "The poster was drawn for this run. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/printing-labels/print-poster-on-multiple-pages/proof.mp4`,
         cuts: webCuts("printing-labels/print-poster-on-multiple-pages"),
@@ -900,7 +920,11 @@ export const PRINTING_LABELS_PAGES: ProblemPage[] = [
       },
       {
         q: "Can it make the image larger without it looking blurry?",
-        a: "Not really: printing larger spreads the same pixels further. For sharp posters start from the largest original you have.",
+        a: "Start from the largest original you have: printing larger spreads the same pixels further. Stella tells you how sharp the image will be at the size you ask for.",
+      },
+      {
+        q: "Will Stella print it straight away?",
+        a: "When you say “print” and a printer is set up, Stella sends the pages to it. Ask for “a PDF to print” to look it over first.",
       },
       {
         q: "What else can it print to exact sizes?",

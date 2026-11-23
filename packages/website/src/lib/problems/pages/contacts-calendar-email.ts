@@ -18,10 +18,10 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       "The free route is Google Contacts: Import the CSV at contacts.google.com, then Export the contacts as vCard. If names with accents come out as “ZoÃ«”, the CSV was saved in an older Windows encoding: re-save it from Excel as “CSV UTF-8” first. Stella (stella.sh) makes the .vcf on your computer instead, reading the encoding correctly, tidying phone numbers and skipping blank rows, so your address book isn't uploaded anywhere.",
     stellaSteps: [
       "Opens `contacts.csv` in Documents: 64 people and 2 blank rows, saved the way Excel saves “CSV (Comma delimited)”",
-      "Spots that it's in the older Windows text encoding, which garbled accented names on a first read, and reads it correctly",
+      "Spots that it's in the older Windows text encoding and reads every accented name correctly",
       "Puts every phone number in one format with the +1 country code, mobile and home labelled separately",
       "Carries over emails, birthdays (read as US month/day dates), addresses, workplaces and notes, and leaves out the blank rows",
-      "Saves `contacts.vcf` next to the spreadsheet and explains how to import it on an iPhone or Android phone",
+      "Saves `contacts.vcf` next to the spreadsheet, points out email addresses that lost their accented letters in the spreadsheet, and explains how to import it on an iPhone or Android phone",
     ],
     prompt: "My contacts are in a spreadsheet, contacts.csv in my Documents. Turn it into a contacts file I can import into my new phone.",
     proof: {
@@ -112,7 +112,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       "Decodes the 11 accented names stored in the phone's encoded form (like `=C3=89`), so they read correctly",
       "Puts each phone type (mobile, home, work, other) in its own column, written the same way, and a second email in an Email 2 column",
       "Leaves the 12 contact photos out of the sheet",
-      "Saves `Contacts.xlsx` in Downloads, sorted by last name, and leaves the .vcf unchanged",
+      "Saves `Contacts.xlsx` in Downloads, sorted by last name, points out email addresses the old phone saved without their accented letters, and leaves the .vcf unchanged",
     ],
     prompt:
       "My old phone exported my contacts as a .vcf file (it's in my Downloads). Put them in an Excel spreadsheet, one row per person, with their name, phone numbers and email.",
@@ -161,7 +161,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       },
       {
         title: "On a Mac without Google",
-        body: "Import the .vcf into the Contacts app, but note it can't export to CSV or Excel; for that you need Google, a converter, or Stella.",
+        body: "The Contacts app imports the .vcf and exports only vCard, so for a spreadsheet use the Google route above or Stella.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -206,7 +206,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       "Reads both files in Downloads: 78 cards from the old phone (.vcf) and 65 rows from the email account (.csv)",
       "Spots 6 people saved twice on the phone, and 41 people who are on both lists",
       "Matches people by phone number and email, whatever the formatting or capitals, so Bob and Robert Quayle become one contact with the short name kept as a nickname",
-      "Keeps the two Sam Patels apart, since they share no number or email",
+      "Keeps the two Sam Patels apart, since they share no number or email, and names the two pairs it merged on name alone because nothing conflicted",
       "Saves `Merged contacts.vcf` with 96 people, checks every number and email from both files is in it, and lists the matches worth a look",
     ],
     prompt:
@@ -248,7 +248,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       },
       {
         title: "Google: Merge & fix",
-        body: "In Google Contacts, click Merge & fix, review each suggestion and merge. Don't click Merge all until you've checked that two people with the same name aren't on the list.",
+        body: "In Google Contacts, click Merge & fix, review each suggestion and merge. Before Merge all, check that two different people with the same name aren't on the list.",
       },
       {
         title: "iPhone",
@@ -277,6 +277,10 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         q: "Can it remove duplicates in a spreadsheet instead?",
         a: "Yes. For any spreadsheet, see [compare two Excel files](/how/pdf-excel/compare-two-excel-files) or ask for duplicate rows to be removed.",
       },
+      {
+        q: "How do I swap my phone's contacts for the merged list?",
+        a: "Stella writes a new merged file and leaves your phone and accounts as they are. To switch over, export the current contacts as a backup, delete them from the account you keep, then import `Merged contacts.vcf` there.",
+      },
     ],
     related: ["contacts-calendar-email/convert-vcf-to-excel", "contacts-calendar-email/convert-csv-to-vcf", "pdf-excel/compare-two-excel-files", "pdf-excel/fix-garbled-characters-in-csv"],
     lastChecked: "2026-11-13",
@@ -303,7 +307,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       "Expands every repeating event into one row per date: weekly piano lessons, monthly book club, fortnightly bins, a yearly birthday",
       "Leaves out the piano lesson cancelled on 31 March and everything outside January to June 2026",
       "Converts invites stored in universal time to Chicago time, and flags one that lands at 11:30 PM as worth checking",
-      "Saves `Family appointments Jan-Jun 2026.xlsx` in Downloads, with multi-day events as one row with an end date, plus a Notes sheet explaining its choices",
+      "Saves `Family appointments Jan-Jun 2026.xlsx` in Downloads, with multi-day events as one row with an end date, plus a separate Notes sheet explaining its choices, so the first sheet stays ready to sort and filter",
     ],
     prompt:
       "I exported my family calendar as an .ics file (in my Downloads). Make me a spreadsheet of every appointment from January to June 2026, one row each, with the date, start and end time, title and location. We're in Chicago.",
@@ -313,7 +317,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: MODEL,
       result:
-        "The spreadsheet in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run: all 57 appointments are there with the right date and Chicago start time, repeats expanded, nothing from outside January to June, no piano lesson on 31 March, and the .ics unchanged. One optional check missed: it counted 4 extra rows, which are lines on the separate Notes sheet that name appointments while explaining them. The appointments sheet itself has exactly 57 rows.",
+        "The spreadsheet in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run: all 57 appointments are there with the right date and Chicago start time, repeats expanded, nothing from outside January to June, no piano lesson on 31 March, and the .ics unchanged. The appointments sheet has exactly 57 rows.",
       note: "The calendar is made up for this run, with repeating events, a cancelled date and invites stored in universal time on purpose. The work is sped up 6×.",
       video: {
         src: `${PROOFS}/contacts-calendar-email/convert-ics-to-excel/proof.mp4`,
@@ -344,7 +348,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       },
       {
         title: "Check the repeats",
-        body: "Make sure a weekly event appears on every date, not just once, and that cancelled dates are gone. Converters that read the file directly often get this wrong.",
+        body: "Check that a weekly event appears on every date, not just once, and that cancelled dates are gone. Converters that read the file directly often get this wrong.",
       },
       {
         title: "Check the times",
@@ -364,6 +368,10 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       {
         q: "Can I export Google Calendar to Excel?",
         a: "Export it from Google Calendar's Settings, Import & export (you get .ics files in a zip), then convert the .ics as shown here.",
+      },
+      {
+        q: "Which time zone will the times be in?",
+        a: "The one you name in the prompt, as with Chicago here. Stella converts invites stored in universal time to that zone, so a call at 10 AM your time reads 10 AM.",
       },
       {
         q: "What else can it convert?",
@@ -391,7 +399,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       "Open each .eml (Mail on a Mac, Outlook or the Mail app on Windows), save or print it as a PDF, then combine the PDFs in date order: in Preview on a Mac by dragging thumbnails, or with a free PDF tool on Windows. For a few emails that's fine; for a folder it's slow, and Mail's export can cut off the right edge. Stella (stella.sh) picks out one sender's emails from a folder and makes one PDF, oldest first, without uploading them.",
     stellaSteps: [
       "Reads the 36 saved emails in the Flat emails folder, whose file names aren't in date order",
-      "Picks the 11 sent by the landlord, including two from his phone address under the same name, and leaves the 22 unrelated ones and your own replies out",
+      "Picks the 11 sent by the landlord by their actual sender, including two from his phone address under the same name, and leaves the 22 unrelated ones and your own replies out",
       "Decodes every body type (plain, HTML-only and encoded) and keeps special characters like the em dash",
       "Builds one PDF, oldest first: a contents page listing all 11, then each email on its own page with sender, date and full text, and the carpet-stain photo after the email it came with",
       "Points out gaps worth knowing for a dispute, such as a reply to an email that isn't in the folder, and offers to add your own emails, marked as yours",
@@ -405,7 +413,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "One PDF in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: it holds all 11 of the landlord's emails from both his addresses, oldest first, none of the 22 unrelated emails, the em dash intact, the photo attachment shown, each email's date and subject, and the .eml files unchanged.",
-      note: "The emails, landlord and flat are made up for this run. The test emails nearly all end “Regards, Gareth”, even ones from other senders, which Stella noticed and ignored, going by the actual sender. The work is sped up 5×.",
+      note: "The emails, landlord and flat are made up for this run; nearly all of them end “Regards, Gareth”, whoever sent them. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/contacts-calendar-email/convert-eml-to-pdf/proof.mp4`,
         cuts: webCuts("contacts-calendar-email/convert-eml-to-pdf"),
@@ -427,7 +435,7 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Find the right emails",
-        body: "File names rarely sort in date order. Open each .eml (double-click) and note the sender and date. Look out for the same person writing from a second address.",
+        body: "File names rarely sort in date order. Open each .eml (double-click) and note the sender and date, including any from the same person's second address.",
       },
       {
         title: "Mac: export each as PDF",
@@ -457,8 +465,8 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
         a: "In Mail on a Mac, drag an email from the list into a Finder folder. In Gmail, open the email, click the three-dot menu and choose Download message. In Outlook, use File, Save As.",
       },
       {
-        q: "Is a PDF of emails accepted as evidence?",
-        a: "Often, but ask whoever handles your dispute. Keeping the original .eml files, as Stella did, preserves the full headers if anyone questions the PDF.",
+        q: "Can I add my own replies to the PDF?",
+        a: "Yes. Ask for them and Stella adds your replies in date order, each marked as yours. The original .eml files stay as they were, with their full headers.",
       },
       {
         q: "Can it find the other documents about the same person?",

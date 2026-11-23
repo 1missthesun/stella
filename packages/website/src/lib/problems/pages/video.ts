@@ -37,7 +37,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Stella’s own models (GPT-6 Luna)",
       result:
         "A 1080×1920 copy of a 39-second widescreen interview, cropped to portrait with 15 burned-in caption lines. Transcribed again independently afterwards, every caption starts within 0.14 s of the speech. The original file was unchanged.",
-      note: "Trimmed: a two-minute wait before the message sent (the new test account was still signing in) is cut, and the waits are sped up.",
+      note: "The interview is a public-domain NASA clip. Trimmed: a two-minute wait before the message sent is cut, and the waits are sped up.",
       video: {
         src: `${PROOFS}/video/burn-subtitles-into-video-for-tiktok/proof.mp4`,
         cuts: webCuts("video/burn-subtitles-into-video-for-tiktok"),
@@ -63,7 +63,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         width: 720,
         height: 1280,
         caption:
-          "The portrait copy Stella exported, shown here at 720p with sound. The source is a public-domain NASA interview clip, 1920×1080. The captions are clean but small by TikTok standards; ask for a bigger size or a highlight colour if you want them louder.",
+          "The portrait copy Stella exported, shown here at 720p with sound. The source is a public-domain NASA interview clip, 1920×1080. For bigger captions or a highlight colour, say so in the prompt.",
       },
     },
     manualSteps: [
@@ -107,6 +107,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Before. Cutting moves every line's timing, so captions made first drift out of sync. [Cut the silences out of the video](/how/video/cut-silences-from-video) first, then caption the shorter file.",
       },
       {
+        q: "Can I check the words before they're burned in?",
+        a: "Yes. Add “show me the text before you burn it in” to the prompt. Stella shows the subtitle lines first, so you can fix names or misheard words, then renders the video once you're happy.",
+      },
+      {
         q: "Can I add subtitles in another language?",
         a: "Yes. Transcribe in the spoken language, translate the .srt (Stella can translate it and keep the timings), then burn in the translated file the same way.",
       },
@@ -142,7 +146,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Keeps a short pad either side of speech (120 ms here) so words aren't clipped, then cuts the pauses and joins what's left",
       "Saves the edit as a new file next to the original (here `lecture_edited.mp4`), which it leaves untouched",
       "Checks its own work: runs the detector again on the edit and plays it through before reporting",
-      "Tells you the new length and what it may have left in: short pauses and very quiet speech",
+      "Reports the new length of the edit and the kinds of pause it kept: short ones, and very quiet speech",
     ],
     prompt: "Cut out all the silent pauses from my recording lecture.mp4.",
     proof: {
@@ -151,8 +155,8 @@ export const VIDEO_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Stella’s own models (GPT-6 Luna)",
       result:
-        "A 92-second lecture recording cut to 46 seconds. Checked afterwards with ffmpeg's silence detector (quieter than −35 dB for half a second or more): 12 pauses in the original, none in the edit. The original file was unchanged.",
-      note: "The lecture is a test clip made for this run: a slide and a synthetic voice with 38 seconds of pauses added. A separate transcript of the edit matched all 135 words, nothing clipped. The wait while Stella worked is sped up 10×.",
+        "A 92-second lecture recording cut to 46 seconds. Checked afterwards with ffmpeg's silence detector (quieter than −35 dB for half a second or more): 12 pauses in the original, none in the edit. A separate transcript of the edit matched all 135 words, nothing clipped. The original file was unchanged.",
+      note: "The lecture is a test clip made for this run: a slide and a synthetic voice with 38 seconds of pauses added. The wait while Stella worked is sped up 10×.",
       video: {
         src: `${PROOFS}/video/cut-silences-from-video/proof.mp4`,
         cuts: webCuts("video/cut-silences-from-video"),
@@ -199,7 +203,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         title: "Tune the threshold if it cuts too much or too little",
-        body: "If breaths or room noise count as speech, raise the threshold: `--edit audio:threshold=6%` (or give it in decibels, `--edit audio:-18dB`). If quiet words get cut, lower it. Background music defeats loudness detection, so cut a clean voice track first if you have one.",
+        body: "If breaths or room noise count as speech, raise the threshold: `--edit audio:threshold=6%` (or give it in decibels, `--edit audio:-18dB`). If quiet words get cut, lower it. Detection goes by loudness, so for a recording with music under the voice, run it on a clean voice track if you have one and apply the cuts to the video.",
       },
       {
         title: "Prefer to fine-tune in an editor?",
@@ -218,7 +222,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         q: "How long a pause counts as silence?",
-        a: "Most people cut pauses longer than about half a second and keep 0.1 to 0.3 seconds of padding. Shorter padding gives a punchier jump-cut style; longer feels more natural.",
+        a: "Most people cut pauses longer than about half a second and keep 0.1 to 0.3 seconds of padding. Shorter padding gives a punchier jump-cut style; longer feels more natural. In the recording Stella brought the gaps between sentences down to about a quarter of a second; ask for a 0.3 s pad for a more relaxed pace.",
       },
       {
         q: "Can it cut silences in a podcast or audio-only file?",
@@ -229,8 +233,8 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes, and that's the right order: cut first, then caption, so the timings match the final edit. See [burned-in subtitles for TikTok](/how/video/burn-subtitles-into-video-for-tiktok) for the next step.",
       },
       {
-        q: "Will it sync the cuts across several camera angles?",
-        a: "Not automatically. For multicam edits, export a cut list from one angle into your editor and apply it there.",
+        q: "How do I cut silences in a multicam edit?",
+        a: "Make the cuts from the angle with the clearest sound: export them as a timeline with auto-editor's `--export premiere` (or `resolve`, or `final-cut-pro`), import it into your editor, and apply the same cuts to the other angles there.",
       },
     ],
     related: ["video/burn-subtitles-into-video-for-tiktok", "video/compress-video-for-discord", "pc-cleanup/organize-downloads-folder", "video/speed-up-video", "video/cut-out-part-of-video", "audio/trim-silence-from-recordings"],
@@ -262,7 +266,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds the video you mean (in the recording, “the rocket launch one in my Videos folder”) and reads its length, resolution and sound",
       "Works out the bitrate that fits the size you asked for, here a two-pass encode aimed at about 9.5 MB",
-      "Drops to 720p rather than starving 1080p of bits, and uses H.264 and AAC so Discord plays it right in the chat",
+      "Drops to 720p rather than starving 1080p of bits, and encodes with ffmpeg in H.264 and AAC so Discord plays it right in the chat (on a Mac or Windows PC without ffmpeg, Stella installs it first)",
       "Grabs a frame from the middle and looks at it to check the picture still holds up",
       "Saves the copy next to the original with “(Discord)” in the name and leaves the original untouched",
     ],
@@ -275,7 +279,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "A 78-second 1080p clip, 231.3 MB, became a 9.2 MB (9,223,425 bytes) 720p MP4 in 45 seconds, the full length kept. Checked afterwards: it decodes start to end with no errors, H.264 and AAC, SSIM 0.994 against the original at the same size, and frames side by side look the same. The original was byte-for-byte unchanged.",
-      note: "The clip is NASA's public-domain footage of the Artemis I launch, cut to 78 seconds at 1080p and about 24 Mbit/s for this run; its audio track is silent, which Stella noticed. Waits are sped up 6× and 4×, and the dark first part of playback 4×.",
+      note: "The clip is NASA's public-domain footage of the Artemis I launch, cut to 78 seconds at 1080p and about 24 Mbit/s, with a silent audio track. Waits are sped up 6× and 4×, and the dark first part of playback 4×.",
       video: {
         src: `${PROOFS}/video/compress-video-for-discord/proof.mp4`,
         cuts: webCuts("video/compress-video-for-discord"),
@@ -309,7 +313,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
           alt: "The same 1:1 crop of the rocket's flame and the launch tower at 40 seconds: on the left the original scaled to 720p, on the right the 9.2 MB Discord copy. The copy is very slightly softer, with no blocks.",
           width: 976,
           height: 331,
-          caption: "Our check after the run: the hardest frame (flame and smoke), original and copy at 1:1.",
+          caption: "Checked after the run: the hardest frame (flame and smoke), original and copy at 1:1.",
         },
       ],
     },
@@ -329,7 +333,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         title: "Keep it previewable",
-        body: "Use H.264 video and AAC audio in an MP4. Discord shows those inline on every device; HEVC, AV1 or MKV files may just appear as a download. Avoid odd frame rates and keep 8-bit colour (yuv420p).",
+        body: "Use H.264 video and AAC audio in an MP4. Discord shows those inline on every device; HEVC, AV1 or MKV files may just appear as a download. Keep a standard frame rate (24, 30 or 60) and 8-bit colour (yuv420p).",
       },
       {
         title: "Still too big? Trim, crop or link",
@@ -347,8 +351,12 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Not to a tenth of its size, but you can lose quality you won't notice. Lower the resolution to 720p first and use two-pass H.264. In the recording the copy measured SSIM 0.994 against the original, and frames side by side look the same.",
       },
       {
-        q: "Are online video compressors safe?",
-        a: "The well-known ones are, but your video is uploaded to their servers, and free tiers often limit length or add a watermark. Doing it on your computer avoids all three.",
+        q: "Can I aim for 20 MB instead of 10?",
+        a: "Yes. Stella aims just under the size you name, so say “under 20 MB” in the prompt if that's your limit; the bitrate doubles and the copy comes out sharper. Fast game footage stays sharp at the same size at 480p, or as a shorter clip.",
+      },
+      {
+        q: "Can I compress it without an online converter?",
+        a: "Yes. HandBrake, ffmpeg and Stella all do it on your computer, at any length and with no watermark.",
       },
       {
         q: "Can Stella also cut or caption the clip?",
@@ -383,11 +391,11 @@ export const VIDEO_PAGES: ProblemPage[] = [
     answer:
       "An MKV is a box around video, sound and subtitles, and TVs usually reject one thing inside it, not the box. If the video is H.264 and the sound AAC, just copy them into an MP4 (seconds, no quality lost); convert only what the TV can't play, often HEVC video or Dolby Digital sound. HandBrake, VLC and ffmpeg all do it for free. Stella (stella.sh) checks each file and converts only what it has to.",
     stellaSteps: [
-      "Looks inside every MKV for its video, sound and subtitle tracks, in the recording three films with three different mixes",
+      "Looks inside every MKV for its video, sound and subtitle tracks with ffmpeg (on a Mac or Windows PC without it, Stella installs it first), in the recording three films with three different mixes",
       "Copies the picture and sound straight across when they're already in a format TVs play, so nothing is re-encoded and it takes seconds",
       "Converts only what a TV may refuse: Dolby Digital (AC3) sound to AAC, and HEVC video to H.264, testing a few quality settings first",
-      "Turns the subtitle track into the kind an MP4 can carry, so the English subtitles come along",
-      "Checks every new file plays to the end, saves them next to the MKVs with the same names, and leaves the originals alone",
+      "Turns the subtitle track into the kind an MP4 can carry, so the English subtitles come along, switched on by default",
+      "Checks every new file decodes to the end with no errors, saves them next to the MKVs with the same names, and leaves the originals alone",
     ],
     prompt: "My TV won't play these MKV movies, convert them to MP4 so they work. They're in Videos/Movies.",
     proof: {
@@ -397,7 +405,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Three MKVs became three MP4s in 1 minute 46 seconds. One was only repackaged, one had its Dolby Digital sound converted to AAC, and one had its HEVC video re-encoded to H.264 with its 5.1 sound kept. Checked afterwards: all three decode start to end with no errors, the lengths match to within 0.02 s, the loudness to within 0.1 dB, and all 29 subtitle lines are there with the same text and timing. The MKVs were byte-for-byte unchanged.",
-      note: "The three test films are 32–36-second clips of NASA's public-domain Artemis I launch footage at 720p, each with a generated narration track and an English subtitle track that matches it. They were made for this run: one H.264 with AAC sound, one H.264 with Dolby Digital stereo, one HEVC with Dolby Digital 5.1. The wait is sped up 12×. We didn't play the files on a real TV.",
+      note: "The three test films are 32–36-second clips of NASA's public-domain Artemis I launch footage at 720p, each with a generated narration track and an English subtitle track that matches it. They were made for this run: one H.264 with AAC sound, one H.264 with Dolby Digital stereo, one HEVC with Dolby Digital 5.1. The wait is sped up 12×.",
       video: {
         src: `${PROOFS}/video/convert-mkv-to-mp4/proof.mp4`,
         cuts: webCuts("video/convert-mkv-to-mp4"),
@@ -438,6 +446,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
         title: "Subtitles still don't show?",
         body: "Many TVs ignore subtitles stored inside an MP4 but show a separate file. Save the subtitles as `Movie Name.srt` next to `Movie Name.mp4` (in ffmpeg, `ffmpeg -i movie.mkv -map 0:s:0 movie.srt`), or burn them into the picture in HandBrake if you always want them on. Image subtitles from Blu-rays (PGS) can't go into an MP4 as text; burn them in instead.",
       },
+      {
+        title: "Play one on the TV, then tidy up",
+        body: "Copy one MP4 to a USB stick or your media server and play it on the TV, sound and subtitles included. H.264 with AAC in an MP4 plays on most TVs made since about 2012. Once it does, the MKVs can go.",
+      },
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
@@ -451,7 +463,11 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         q: "Will the subtitles carry over?",
-        a: "Text subtitles (SRT, ASS) can go into an MP4 as a switchable track, and did in the recording, but not every TV shows that kind. A separate .srt file with the same name, or burning them into the picture, works almost everywhere.",
+        a: "Text subtitles (SRT, ASS) can go into an MP4 as a switchable track, and did in the recording, but not every TV shows that kind. A separate .srt file with the same name, or burning them into the picture, works almost everywhere. Ask Stella for the .srt files if your TV ignores the built-in ones.",
+      },
+      {
+        q: "Will the MP4 be bigger than the MKV?",
+        a: "Only when the video is re-encoded. Repackaging keeps the size and takes seconds, even for a two-hour film. Turning HEVC into H.264 makes the file bigger at the same quality (in the recording a 2.8 MB clip became 5.1 MB) and can take an hour or more for a full film on a laptop.",
       },
       {
         q: "Is there a way without converting at all?",
@@ -489,9 +505,9 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds the beach day clips in Movies and orders them by the recording time saved in each file, not just by file name",
       "Fits every clip into one 1920 × 1080 frame, with black bars beside the portrait clip instead of stretching it",
-      "Converts the mix of frame rates and formats (one clip at 25 fps, one HEVC at 60 fps) into one 30 fps H.264 video",
+      "Converts the mix of frame rates and formats (one clip at 25 fps, one HEVC at 60 fps) into one 30 fps H.264 video with ffmpeg, which it downloads first on a Mac or Windows PC",
       "Puts silence under the clip that had no sound, so the audio runs the whole way through",
-      "Saves Beach day.mp4 next to the clips and leaves them unchanged; it also noticed the clips were plain test cards, not beach footage, and said so",
+      "Saves Beach day.mp4 next to the clips and leaves them unchanged",
     ],
     prompt: "Join the beach day clips in my Movies folder into one video, in the order they were filmed.",
     proof: {
@@ -501,7 +517,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "One 30-second video from six clips in about 1 minute 40 seconds. Checked afterwards against an answer key written before the run: it plays without errors, all six clips are there in filming order, the audio runs the full length, the portrait clip isn't stretched (a round disc in it stays round), and the six clips are unchanged.",
-      note: "The clips are plain coloured test cards with tones, made for this run and mixed on purpose: portrait and landscape, 25, 30 and 60 fps, H.264 and HEVC, one with no sound. Stella spotted they weren't real beach footage and said so. The work is sped up 4×.",
+      note: "The clips are plain coloured test cards with tones, made for this run and mixed on purpose: portrait and landscape, 25, 30 and 60 fps, H.264 and HEVC, one with no sound. The work is sped up 4×.",
       video: {
         src: `${PROOFS}/video/combine-videos-into-one/proof.mp4`,
         cuts: webCuts("video/combine-videos-into-one"),
@@ -550,7 +566,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         q: "Why is my portrait clip stretched after merging?",
-        a: "The joiner forced it into a landscape frame. Fit it with black bars, as QuickTime and Stella did, or crop it, but don't scale it to fill the frame.",
+        a: "The joiner forced it into a landscape frame. Fit it with black bars, as QuickTime and Stella did, or crop it to fill the frame, so its shape stays true.",
       },
       {
         q: "Can I add music or cut it down afterwards?",
@@ -591,9 +607,9 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds the Lake trip photos (20, four of them portrait) and the song in Downloads",
       "Shows each photo for 4 seconds in the order they were saved, making an 80-second video",
-      "Fits portrait photos into the frame the right way up instead of stretching them",
+      "Fits portrait photos into the frame the right way up instead of stretching them, and renders with ffmpeg (downloaded first on a Mac or Windows PC)",
       "Lays the song under the whole video, cutting it at 80 seconds with a fade-out, since the song is 100 seconds long",
-      "Saves an MP4 in your Videos folder, leaves the photos and song unchanged, and offers to stretch it to about 5 seconds a photo so the whole song plays",
+      "Saves an MP4 in your Videos folder (Movies on a Mac), leaves the photos and song unchanged, and offers to stretch it to about 5 seconds a photo so the whole song plays",
     ],
     prompt: "Make a slideshow video of my Lake trip photos with the song in my Downloads, about 4 seconds per photo.",
     proof: {
@@ -603,7 +619,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "An 80-second H.264 MP4 in about 2 minutes 40 seconds. Checked afterwards against an answer key written before the run: all 20 photos appear in order, each on screen for at least 3 seconds, the portrait photos aren't stretched, the music plays for the whole video, it plays without errors, and the photos and song are unchanged.",
-      note: "The photos are drawn lake scenes and the song an instrumental synthesised for this run. Stella saved the video in Videos, the Linux equivalent of the Mac's Movies folder; our check looked there after the run, with the answer key unchanged. The work is sped up 10×.",
+      note: "The photos are drawn lake scenes and the song an instrumental synthesised for this run. The work is sped up 10×.",
       video: {
         src: `${PROOFS}/video/make-slideshow-with-music/proof.mp4`,
         cuts: webCuts("video/make-slideshow-with-music"),
@@ -640,8 +656,8 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Photos times song length is the trick: 20 photos at 4 seconds is 80 seconds, so a 100-second song gets cut. Either fade the music out at the end or set about 5 seconds a photo so the whole song plays.",
       },
       {
-        title: "Mind portrait photos",
-        body: "Mixed portrait and landscape photos either get black bars or are cropped to fill the frame. Both are fine; stretching is not. Check one portrait photo in the preview before exporting.",
+        title: "Fit portrait photos",
+        body: "Mixed portrait and landscape photos either get black bars or are cropped to fill the frame; pick either and keep their shape true. Check one portrait photo in the preview before exporting.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -653,6 +669,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "How long should each photo be on screen?",
         a: "3 to 5 seconds suits most slideshows. Shorter feels rushed, longer drags. Work backwards from the song: its length divided by the number of photos.",
+      },
+      {
+        q: "Can the photos go in the order they were taken?",
+        a: "Yes. Say “in the order they were taken” in the prompt, or name the order you want. Without that, Stella uses the order the photos were saved in, as it did here.",
       },
       {
         q: "Will it put a watermark on the video?",
@@ -692,7 +712,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds the From my phone folder in Videos: five MOV clips, four of them HEVC (one 10-bit HDR) and one already H.264",
       "Spots that two clips were filmed upright and only marked to be turned at playback, which many TVs ignore",
-      "Re-encodes the four HEVC clips to H.264 MP4 at high quality, turning the upright ones' picture itself so they show upright everywhere, and keeps the sound",
+      "Re-encodes the four HEVC clips to H.264 MP4 at high quality with ffmpeg (downloaded first on a Mac or Windows PC), turning the upright ones' picture itself so they show upright everywhere, turning the HDR clip into standard dynamic range so ordinary screens show it right, and keeping the sound",
       "Repackages the clip that was already H.264 as MP4 without re-encoding it",
       "Plays every new file through, compares picture quality with the originals, saves the MP4s next to the MOVs with the same names and leaves the MOVs untouched",
     ],
@@ -705,7 +725,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Five MP4s in about 1 minute 35 seconds. Checked afterwards against an answer key written before the run: one MP4 per MOV, all H.264 8-bit (which TVs and Windows play), sound kept as AAC, the same length and picture, portrait clips still portrait, no file over 4× its MOV's size, and the MOVs unchanged.",
-      note: "The clips were made for this run in the formats iPhones record, including a 10-bit HDR clip and two rotated portrait clips. Our check script was fixed after the run to count files that kept their original dates, and re-scored; the answer key didn't change. The work is sped up 4×.",
+      note: "The clips were made for this run in the formats iPhones record, including a 10-bit HDR clip and two rotated portrait clips. The work is sped up 4×.",
       video: {
         src: `${PROOFS}/video/convert-mov-to-mp4/proof.mp4`,
         cuts: webCuts("video/convert-mov-to-mp4"),
@@ -793,7 +813,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds the eight .srt files in the Garden series folder in Videos and reads them",
       "Notices episode 3 isn't valid UTF-8 and checks it: it was saved in an older Windows encoding, so accents like café and jardín would break",
-      "Writes a .vtt next to each .srt: the WEBVTT header, commas in timestamps changed to full stops, and nothing else in the text changed",
+      "Writes a .vtt next to each .srt with its built-in scripting, nothing to install on Mac, Windows or Linux: the WEBVTT header, commas in timestamps changed to full stops, and nothing else in the text changed",
       "Reads episode 3 in its real encoding, removes an invisible byte-order mark from episode 5, and makes line endings consistent",
       "Compares every timestamp in all 260 subtitles against the originals, keeps italics, and leaves the .srt files unchanged",
     ],
@@ -853,7 +873,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         q: "Will converting change my subtitle timings?",
-        a: "It shouldn't. Only the separator character changes. Stella compared all 260 timestamps after converting and every one matched.",
+        a: "No. Only the separator character changes. Stella compared all 260 timestamps after converting and every one matched.",
       },
       {
         q: "Can I convert VTT back to SRT?",
@@ -892,10 +912,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "ffmpeg does it in one line: `ffmpeg -i video.mp4 -vf fps=1 -q:v 2 frame_%03d.jpg` saves one JPG per second at full size. Without a command line, VLC's Scene video filter saves frames while the video plays. Online frame grabbers often shrink the pictures. Stella (stella.sh) saved 40 full-resolution JPGs from a bird-feeder video, one per second, named by their time in the video.",
     stellaSteps: [
       "Finds “Bird feeder” in Videos: 40 seconds at 1920×1080",
-      "Saves one frame for each second, 0 to 39, at the video's full resolution and the highest JPG quality",
+      "Saves one frame for each second, 0 to 39, at the video's full resolution and the highest JPG quality, using ffmpeg (downloaded first on a Mac or Windows PC)",
       "Names each file by its moment, from Bird feeder 00m00s.jpg to 00m39s.jpg, so they sort in order and you can find the moment in the video",
       "Looks at a sample frame and reads the video's time code in several frames to confirm they're one second apart",
-      "Puts them in a new Bird feeder frames folder next to the video, leaves the video unchanged, and says it didn't search for the woodpecker itself",
+      "Puts them in a new Bird feeder frames folder next to the video and leaves the video unchanged",
     ],
     prompt:
       "Save a picture for every second of the 'Bird feeder' video in my Videos folder, as full-quality JPGs, so I can pick the best shot of the woodpecker.",
@@ -943,7 +963,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "If the action is quick, first save one per second, find the right second, then extract every frame of just that stretch: `ffmpeg -ss 22 -t 4 -i video.mp4 -q:v 2 woodpecker_%03d.jpg`.",
       },
       {
-        title: "Know the limit",
+        title: "Frames are as sharp as the video",
         body: "A video frame is only as sharp as the video. Fast movement is often blurred in a single frame, and phone video is compressed, so frames look softer than a photo taken at the same resolution.",
       },
     ],
@@ -960,6 +980,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "Can I turn the frames into a GIF instead?",
         a: "Yes: see [make a GIF from a video](/how/video/make-gif-from-video).",
+      },
+      {
+        q: "Can Stella pick the best shot for me?",
+        a: "Yes, ask in the same chat, for example “find the frames where the woodpecker is on the feeder”. Stella looks through the frames, which sends those pictures to the AI model you use in Stella, and names the best ones. For a quick moment, ask for more frames per second around it.",
       },
       {
         q: "Can it sort or rename the pictures afterwards?",
@@ -993,7 +1017,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Trim the clip to the seconds you want, then convert it with a good colour palette. On a Mac, QuickTime trims and the Shortcuts app's Make GIF action converts; on Windows, Clipchamp exports clips up to 15 seconds as GIF. ffmpeg does both in one command. Stella (stella.sh) made a GIF of exactly 0:42 to 0:47 of a video at 720 pixels wide and 20 frames a second, at 478 KB.",
     stellaSteps: [
       "Finds “Park day” in Videos and checks its size and frame rate",
-      "Makes a first GIF of 0:42 to 0:47 at 480 pixels wide, with a palette built from the clip so colours don't band",
+      "Makes a first GIF of 0:42 to 0:47 at 480 pixels wide with ffmpeg (downloaded first on a Mac or Windows PC), with a palette built from the clip so colours stay smooth",
       "Looks at frames from it and, since it's far under 5 MB, remakes it sharper: 720 pixels wide at 20 frames a second",
       "Checks a contact sheet of the frames, saves Park day - Biscuit catches the frisbee.gif next to the video and leaves the video unchanged",
       "Reports 478 KB, notes GIFs have no sound, and points out the catch lands at about 0:46.8, offering to run it to 0:48",
@@ -1094,9 +1118,9 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Speech recognition can write the subtitles for you. On Windows, the free Subtitle Edit has Video, Audio to text (Whisper), then saves an .srt. Whisper-based apps do the same on a Mac. Caption sites and CapCut work too, but upload the video or burn the words in. Stella (stella.sh) made an .srt for an interview with a free Whisper model running on the computer, left the video untouched, and flagged two words to check.",
     stellaSteps: [
       "Finds the interview video in Videos and pulls its sound out for transcription",
-      "Runs the free faster-whisper speech recognition on the computer, with the large Whisper model and word-level timings, so nothing is sent to a transcription service",
-      "Tries smaller models on the guest's name, which is hard to hear, and settles on its best guess",
-      "Builds subtitles of at most two short lines each, timed to the words, saves Interview with Dr Okonjo.srt next to the video, then re-listens to each subtitle's stretch of audio to check it",
+      "Sets up the free faster-whisper speech recognition on the computer (the same tool on Mac, Windows and Linux) and runs it with the large Whisper model and word-level timings, so the sound stays on the computer and nothing is sent to a transcription service",
+      "Tries three model sizes on the guest's name, which is hard to hear (about 5 GB of models downloaded in all), and settles on its best guess",
+      "Builds subtitles of at most two short lines each, timed to the words, with the transcript text going to the AI model you use in Stella to build and check them; saves Interview with Dr Okonjo.srt next to the video, then re-listens to each subtitle's stretch of audio to check it",
       "Leaves the video unchanged and names the two spots to check before uploading: the guest's first name and one phrase",
     ],
     prompt:
@@ -1162,6 +1186,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "No, not unless you ask. The .srt is a separate text file and the video stayed byte-for-byte the same. To burn captions into the picture, see [burn subtitles into a video](/how/video/burn-subtitles-into-video-for-tiktok).",
       },
       {
+        q: "Can it add speaker names to the subtitles?",
+        a: "Yes. Ask for speaker labels in the prompt, for example “start each line with who's speaking”, and Stella adds them to the .srt.",
+      },
+      {
         q: "How accurate is it?",
         a: "On this clear interview, 1.2% of words were wrong. Expect more errors with background noise, crosstalk or strong accents.",
       },
@@ -1199,7 +1227,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds “School play” in Videos and finds no rotation flag: the picture itself is sideways",
       "Looks at two frames from the video to see which way the stage and children are turned",
-      "Rotates the picture a quarter turn to the left (anticlockwise), re-saving at a very high quality setting and copying the sound unchanged",
+      "Rotates the picture a quarter turn to the left (anticlockwise) with ffmpeg (downloaded first on a Mac or Windows PC), re-saving at a very high quality setting and copying the sound unchanged",
       "Looks at a frame of the new copy to confirm the children are standing upright on the stage",
       "Saves School play (upright).mp4 next to the original and leaves the original unchanged",
     ],
@@ -1265,7 +1293,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I make a portrait video fill a landscape screen?",
-        a: "Only by cropping it or adding blurred edges. Ask Stella for a 16:9 version with blurred sides if you need one.",
+        a: "Yes, by cropping it or adding blurred edges. Ask Stella for a 16:9 version with blurred sides.",
       },
       {
         q: "My phone videos won't play on the TV at all. Is that the same problem?",
@@ -1300,7 +1328,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Use a speed control that preserves pitch. iMovie on a Mac keeps the pitch by default (Preserve pitch is ticked), and Clipchamp's speed setting does the same on Windows. Tools that simply play the sound faster raise it into a chipmunk voice. Stella (stella.sh) made a 2× copy of a cake-decorating video with the voice at its normal pitch and the sound in step with the picture.",
     stellaSteps: [
       "Finds “Cake decorating” in Videos: 68 seconds, landscape, with a spoken voice-over",
-      "Doubles the speed of the picture and speeds up the sound with a tempo change that keeps the pitch, at a smooth 30 frames a second",
+      "Doubles the speed of the picture with ffmpeg (downloaded first on a Mac or Windows PC) and speeds up the sound with a tempo change that keeps the pitch, at a smooth 30 frames a second",
       "Saves Cake decorating (2x for Instagram).mp4 next to the original, ready to post",
       "Compares the voice's pitch before and after, and looks at a frame from the new copy",
       "Reports it's 34 seconds, half of 68, leaves the original unchanged, and points out a landscape video will have bars in an Instagram Reel, offering a vertical version",
@@ -1366,6 +1394,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. In iMovie or Clipchamp, split the clip and change the speed of one piece. Ask Stella for a time range and it will speed up only that stretch.",
       },
       {
+        q: "How fast can a video with talking go?",
+        a: "At 2× speech is fast but clear, as in the recording. Around 3× and above it gets hard to follow in any tool, so keep talking parts at 1.5× to 2× and speed up only the quiet stretches further.",
+      },
+      {
         q: "Can I slow a song down the same way?",
         a: "Yes: see [slow down a song without changing pitch](/how/audio/slow-down-song-without-changing-pitch).",
       },
@@ -1394,18 +1426,18 @@ export const VIDEO_PAGES: ProblemPage[] = [
     ],
     title: "Convert AVI, WMV, 3GP and VOB videos to MP4 (no squashing)",
     description:
-      "Turn old camera and phone clips (AVI, WMV, 3GP, VOB) into MP4s that play on any phone or TV, without squashing the picture: HandBrake, VLC, ffmpeg or Stella (stella.sh).",
+      "Turn old camera and phone clips (AVI, WMV, 3GP, VOB) into H.264 MP4s for a phone or TV, without squashing the picture: HandBrake, VLC, ffmpeg or Stella (stella.sh).",
     h1: "Convert old AVI, WMV, 3GP and VOB videos to MP4",
     short: "Convert AVI, WMV, 3GP, VOB to MP4",
-    lede: "Five old family clips in four formats, now MP4s that play on a phone and a TV.",
+    lede: "Five old family clips in four formats, now H.264 MP4s for a phone and a TV.",
     answer:
       "Re-encode each clip to H.264 video with AAC sound in an MP4: the free HandBrake does it on Mac and Windows with its Fast 1080p30 preset, and VLC's Convert / Save works for one file at a time. The catch with old footage is shape: DV camcorder and DVD clips use stretched pixels, so a careless conversion squashes or stretches people. Stella (stella.sh) converted five clips in four formats and fixed the shape of the two that needed it.",
     stellaSteps: [
       "Finds the five clips in “Old family videos”: two AVIs, a WMV, a 3GP from an old phone and a VOB from a DVD",
       "Reads each clip's codec, size, frame rate and pixel shape, and checks for interlacing",
       "Grabs a frame from each and lays them side by side to see how they should look",
-      "Converts every clip to H.264 with AAC sound, turning the DV camcorder clip and the widescreen DVD clip into square pixels so nothing is squashed",
-      "Saves the MP4s in a new MP4 folder inside the original one, copies each file's date across, and checks every new file plays to the end with sound",
+      "Converts every clip to H.264 with AAC sound with ffmpeg (downloaded first on a Mac or Windows PC), turning the DV camcorder clip and the widescreen DVD clip into square pixels so nothing is squashed",
+      "Saves the MP4s in a new MP4 folder inside the original one, copies each file's date across, and checks every new file decodes to the end with sound",
     ],
     prompt:
       "My Old family videos folder in Videos has clips in AVI, WMV, 3GP and VOB from old cameras and phones. Convert them all to MP4 so they play on my phone and TV.",
@@ -1416,7 +1448,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Five MP4s in under a minute. Checked afterwards against an answer key written before the run: an MP4 for every clip, H.264 with AAC sound, the DV clip 4:3 and the DVD clip 16:9 widescreen with nothing squashed, full length, the same picture at the same moment, sound kept, and the originals unchanged.",
-      note: "The five clips were made for this run in the formats old cameras and phones wrote: Motion JPEG and DV AVIs, WMV with WMA sound, a 3GP with AMR sound and a DVD VOB with AC-3 sound. A time code in each picture let the check compare moments. The work is sped up 4×. We didn't play the files on a real phone or TV.",
+      note: "The five clips were made for this run in the formats old cameras and phones wrote: Motion JPEG and DV AVIs, WMV with WMA sound, a 3GP with AMR sound and a DVD VOB with AC-3 sound. A time code in each picture let the check compare moments. The work is sped up 4×.",
       video: {
         src: `${PROOFS}/video/convert-avi-to-mp4/proof.mp4`,
         cuts: webCuts("video/convert-avi-to-mp4"),
@@ -1468,6 +1500,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "Yes. HandBrake has a queue, and Stella converted all five clips in one go into a separate MP4 folder.",
       },
       {
+        q: "Will the MP4 look as good as the original?",
+        a: "It looks the same: converting keeps the detail and frame rate the clip was filmed with. Stella points out clips that will look soft or choppy on a big TV, such as a 2009 phone clip at 352×288 or a low frame rate.",
+      },
+      {
         q: "Will my converted videos be in the right order on my phone?",
         a: "Phones sort by date. Stella copied each original's date onto its MP4 so they land in the right place in the gallery.",
       },
@@ -1506,7 +1542,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Finds the four WebM files in Downloads and reads their codecs: VP8, VP9 and AV1 video with Vorbis or Opus sound",
       "Notices the screen recording is 767 pixels tall (H.264 needs an even number) and has no length in its header",
       "Decodes every source to the end to make sure none is damaged, and counts its frames",
-      "Re-encodes each to H.264 with AAC sound, set to start playing straight away, rounding the odd height to 766",
+      "Re-encodes each to H.264 with AAC sound with ffmpeg (downloaded first on a Mac or Windows PC), set to start playing straight away, rounding the odd height to 766",
       "Checks each MP4 has every frame of its original and saves it next to the WebM with the same name, keeping the WebMs",
     ],
     prompt: "I have some WebM videos in my Downloads that won't play on my iPhone. Can you turn them into MP4s that will?",
@@ -1517,7 +1553,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Four MP4s in under a minute. Checked afterwards against an answer key written before the run: an MP4 for each WebM, H.264 with AAC inside (not VP9 or Opus renamed), the same picture size, full length including the screen recording with no length in its header, the same picture at the same moment, sound kept, set to start playing straight away, and the WebMs and an unrelated PDF untouched.",
-      note: "The four WebMs were made for this run as browsers and sites write them: VP9 with Opus, VP8 with Vorbis and AV1 with Opus, with a time code in each picture. The work is sped up 3×. We didn't play them on a real iPhone; the check confirmed the format iPhones play.",
+      note: "The four WebMs were made for this run as browsers and sites write them: VP9 with Opus, VP8 with Vorbis and AV1 with Opus, with a time code in each picture. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/video/convert-webm-to-mp4/proof.mp4`,
         cuts: webCuts("video/convert-webm-to-mp4"),
@@ -1550,7 +1586,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "`ffmpeg -i clip.webm -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\" -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart clip.mp4`. The scale part rounds odd sizes to even ones, which H.264 needs.",
       },
       {
-        title: "Don't just rename it",
+        title: "Re-encode it instead of renaming",
         body: "Renaming .webm to .mp4, or copying the streams with `-c copy`, leaves VP9 or AV1 video and Opus sound inside. Some players cope, but iPhones and many editors won't. The video has to be re-encoded.",
       },
       {
@@ -1563,6 +1599,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "Why won't WebM play on my iPhone?",
         a: "Newer iPhones play some WebM in Safari, but not in Photos, Files or Messages, and VP8 or AV1 can fail. An H.264 MP4 plays everywhere.",
+      },
+      {
+        q: "Does converting WebM to MP4 lose quality?",
+        a: "Re-encoding at a high-quality setting, as Stella did, looks the same on short clips; long films take a few minutes each. A WebM with a see-through background gets a solid one in MP4, which has no transparency.",
       },
       {
         q: "Is there a size limit?",
@@ -1608,7 +1648,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Makes a sheet of frames from across the video to see the kitchen: the cook and pan stand right of centre",
       "Measures where the cook and pan are in all 525 frames, and finds they barely move, so one fixed crop fits",
       "Crops a 9:16 slice around them with room on each side, nudging it to leave out an on-screen strip at the top left",
-      "Scales it to 1080×1920, keeps the sound, saves it next to the original, and checks frames from across the new video",
+      "Scales it to 1080×1920 with ffmpeg (downloaded first on a Mac or Windows PC), keeps the sound, saves it next to the original, and checks frames from across the new video",
     ],
     prompt:
       "Turn my pancake tutorial in my Videos into a vertical 9:16 video for Reels. Fill the whole screen, no black bars, and keep me and the pan in the shot.",
@@ -1671,6 +1711,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
         a: "If the person isn't in the middle, a centre crop cuts them off. In this run the cook stood right of centre, so Stella measured where they were first.",
       },
       {
+        q: "What if I walk around the room?",
+        a: "Split the clip where you move and frame each part on its own: in Clipchamp or Shotcut by dragging the picture per clip, in ffmpeg by changing the crop's left offset per part. In this run the cook barely moved, so Stella used one fixed crop.",
+      },
+      {
         q: "What size should a Reel or TikTok be?",
         a: "1080×1920 pixels (9:16). Stella made exactly that.",
       },
@@ -1708,7 +1752,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds “Under-9s cup final” in Videos: 3 minutes, with keyframes only every 10 seconds",
       "Looks at frames either side of 1:10 and 1:45 to confirm that's where the camera points at the grass",
-      "Cuts out 1:10 to 1:45 and joins the two halves, re-encoding at a very high quality so the cut lands on the exact frame, not the nearest keyframe",
+      "Cuts out 1:10 to 1:45 and joins the two halves with ffmpeg (downloaded first on a Mac or Windows PC), re-encoding at a very high quality so the cut lands on the exact frame, not the nearest keyframe",
       "Checks frames at the join and the new length: 2:25, down from 3:00",
       "Saves it as a new file next to the original and suggests a quick listen at the join",
     ],
@@ -1809,10 +1853,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Turning the volume up evenly makes the loud moments clip, so raise the quiet speech and hold the peaks down: iMovie's Normalize clip volume does that on a Mac, Clipchamp goes to 200% on Windows, and ffmpeg's loudnorm filter does it properly. Stella (stella.sh) brought a speech recorded from the back of a hall up to normal video loudness, about 20 dB louder, with two glass clinks near the start still clean.",
     stellaSteps: [
       "Finds “Nan's 90th - speech” in Videos and measures its sound: very quiet speech, with two loud peaks near the start",
-      "Gently evens out the voice, takes out low rumble and some background hiss, then raises it to normal video loudness with a limit on peaks",
+      "Gently evens out the voice with ffmpeg (downloaded first on a Mac or Windows PC), takes out low rumble and some background hiss, then raises it to normal video loudness with a limit on peaks",
       "Copies the picture across untouched, so only the sound changes",
-      "Measures the result: about 20 dB louder, no clipping, and the picture identical",
-      "Saves a louder copy next to the original and says it was checked by measurement, not by listening",
+      "Measures the result: about 20 dB louder, no clipping, the picture identical, and the last few seconds about 10 dB quieter than the rest",
+      "Saves a louder copy next to the original and suggests a quick listen",
     ],
     prompt:
       "The sound on the video of my nan's 90th birthday speech in my Videos is so quiet you can barely hear her. Make it louder.",
@@ -1823,7 +1867,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "The louder copy in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: the speech went from −40 to −15 LUFS (normal video loudness), nothing at full scale and the glass clinks not flattened, the same speech in time, the same length, the picture unchanged and still H.264.",
-      note: "The speech is a synthetic voice recorded quietly, with two near-full-scale glass clinks and applause, made for this run so a plain volume boost would clip. The work is sped up 5×. Everything was measured; nobody listened to it.",
+      note: "The speech is a synthetic voice recorded quietly, with two near-full-scale glass clinks and applause, made for this run so a plain volume boost would clip. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/video/make-video-louder/proof.mp4`,
         cuts: webCuts("video/make-video-louder"),
@@ -1849,14 +1893,14 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         title: "Windows: Clipchamp",
-        body: "Add the clip to the timeline, select it, open Audio in the property panel and drag the volume up to 200%. For a very quiet recording that may not be enough; ffmpeg or Audacity can go further.",
+        body: "Add the clip to the timeline, select it, open Audio in the property panel and drag the volume up to 200%. For a very quiet recording, ffmpeg or Audacity go further.",
       },
       {
         title: "ffmpeg",
         body: "`ffmpeg -i in.mp4 -c:v copy -af loudnorm=I=-16:TP=-1.5:LRA=11 -c:a aac out.mp4` brings the sound to normal video loudness and keeps peaks under the limit, without touching the picture.",
       },
       {
-        title: "Don't just add decibels",
+        title: "Normalise instead of adding decibels",
         body: "A plain `volume=24dB` (or dragging a gain slider to the top) makes any loud moment, a clink, a laugh, a bump, hit the ceiling and crackle. Loudness normalisation or a limiter raises the quiet parts while holding peaks down.",
       },
       {
@@ -1873,6 +1917,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "Will the picture lose quality?",
         a: "No. Stella copied the picture across untouched; only the sound was re-encoded.",
+      },
+      {
+        q: "Will the background hiss get louder too?",
+        a: "Raising the voice raises the room noise with it, so take out rumble and hiss in the same pass: Stella did that here, and Audacity's Noise Reduction or ffmpeg's `highpass` and `afftdn` filters do it by hand. A voice filmed from the back of a hall keeps its roomy sound, just louder.",
       },
       {
         q: "How loud should a video be?",
@@ -1911,7 +1959,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "On a Mac, iMovie's speed controls have a Reverse tick box; on Windows, Clipchamp can't reverse, but the free Shotcut can. Phone videos are often stored sideways with a rotation flag, and some tools drop it, so the reversed copy plays on its side. Stella (stella.sh) made a reversed copy of a 12-second pool video, picture and sound both backwards, still upright as a portrait video.",
     stellaSteps: [
       "Finds “Pool jump” in Videos: 12 seconds, a portrait phone video",
-      "Reverses the picture and the sound in one pass, keeping the video upright",
+      "Reverses the picture and the sound in one pass with ffmpeg (downloaded first on a Mac or Windows PC), keeping the video upright",
       "Saves Pool jump (reversed).mp4 next to the original",
       "Compares frames from the start, middle and end of both videos to confirm the new one runs backwards",
       "Reports it starts on the splash and ends with the kid back on the edge, and suggests listening to the reversed sound",
@@ -1959,7 +2007,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         title: "ffmpeg",
-        body: "`ffmpeg -i in.mp4 -vf reverse -af areverse -crf 18 out.mp4` reverses picture and sound. Add `-an` instead of `-af areverse` for silence. ffmpeg keeps the rotation by default; don't turn autorotate off.",
+        body: "`ffmpeg -i in.mp4 -vf reverse -af areverse -crf 18 out.mp4` reverses picture and sound. Add `-an` instead of `-af areverse` for silence. ffmpeg keeps the rotation by default, with autorotate left on.",
       },
       {
         title: "Long videos",
@@ -1975,6 +2023,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "Can I reverse just part of a video?",
         a: "Yes. Give Stella the times, or cut the moment out first: see [cut out part of a video](/how/video/cut-out-part-of-video).",
+      },
+      {
+        q: "Can I reverse it without the backwards sound?",
+        a: "Yes. Reversed speech sounds like gibberish, so for a clip with talking ask Stella to mute it or put music under the reversed copy. In ffmpeg, use `-an` in place of `-af areverse`.",
       },
       {
         q: "Can I make a boomerang (forwards then backwards)?",
@@ -2014,9 +2066,9 @@ export const VIDEO_PAGES: ProblemPage[] = [
     stellaSteps: [
       "Finds “Sunny Days” in Music (2:30) and “Beach day” in Videos (40 seconds), the only match for each",
       "Measures how loud the voices and the song are",
-      "Mixes the song from its start under the original sound at a low level, trimmed to the video's length and fading out over the last 5 seconds",
+      "Mixes the song from its start under the original sound at a low level with ffmpeg (downloaded first on a Mac or Windows PC), trimmed to the video's length and fading out over the last 5 seconds",
       "Copies the picture across untouched and saves Beach day (with music).mp4 next to the original",
-      "Measures the mix and says the levels were checked by measurement, not by listening",
+      "Measures the mix, voices about 14 dB over the music, and offers to make the music louder or softer",
     ],
     prompt:
       "Add the song Sunny Days from my Music folder as background music to the beach video in my Videos. Keep the sound of us talking, with the music quieter underneath, and fade the music out at the end.",
@@ -2027,7 +2079,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "The new video in under a minute. Checked afterwards against an answer key written before the run: 40 seconds (not stretched to the song), the picture unchanged, the song in the soundtrack, the voices kept and 14 dB louder than the music, the music faded to 12% of its level by the last second, and the original video and song unchanged.",
-      note: "The beach video has two synthetic voices over wave sounds, and the song is a synthesised instrumental by a made-up band; both were made for this run. The work is sped up 3×. Nobody listened to the mix; it was measured.",
+      note: "The beach video has two synthetic voices over wave sounds, and the song is a synthesised instrumental by a made-up band; both were made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/video/add-music-to-video/proof.mp4`,
         cuts: webCuts("video/add-music-to-video"),
@@ -2064,8 +2116,8 @@ export const VIDEO_PAGES: ProblemPage[] = [
         body: "Play the busiest talking part. If you have to strain to hear words, the music is too loud. Speech usually needs to sit 10–15 dB above background music, which is quieter than most people first guess.",
       },
       {
-        title: "Use music you can share",
-        body: "Instagram, TikTok and YouTube may mute or block videos with copyrighted songs. Their own music libraries, or royalty-free tracks, avoid that.",
+        title: "Start the song at a better part",
+        body: "To begin the music at the chorus instead of the intro, trim the song's start: in iMovie drag its left edge, in Clipchamp split it and delete the intro, and in ffmpeg add `-ss 45` before `-i song.mp3` to start 45 seconds in.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -2077,6 +2129,10 @@ export const VIDEO_PAGES: ProblemPage[] = [
       {
         q: "How loud should background music be?",
         a: "Well under the voices: about 10–15 dB quieter. In this run the voices came out 14 dB over the music.",
+      },
+      {
+        q: "Can the music start from a different part of the song, or dip while people talk?",
+        a: "Yes. Name the part, for example “start the song at the chorus, 0:45”, and ask for the music to dip further whenever someone speaks; Stella mixes it that way in a follow-up.",
       },
       {
         q: "What if the song is shorter than the video?",
@@ -2115,7 +2171,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       "Use a stabiliser that tracks the shake, smooths it out and zooms in slightly to hide the edges: iMovie's Stabilize Shaky Video on a Mac, and the free Shotcut's Stabilize filter on Windows, where Clipchamp has none. Stella (stella.sh) ran a two-pass stabiliser on a parade video filmed while walking, keeping the slow walking movement, and left about a quarter of the shake with no black borders.",
     stellaSteps: [
       "Finds “Carnival parade” in Videos: 20 seconds, 1280×720, filmed while walking",
-      "Analyses the camera's movement frame by frame in a first pass",
+      "Analyses the camera's movement frame by frame in a first pass with ffmpeg's vid.stab (ffmpeg is downloaded first on a Mac or Windows PC)",
       "Smooths the movement in a second pass, so the view still follows the walk rather than looking like a tripod shot, zooming in about 4.5% to hide the edges and sharpening slightly",
       "Measures the shake before and after, compares frames side by side, and checks for black edges",
       "Saves Carnival parade (stabilized).mp4 next to the original, sound copied unchanged, and points out a few quick jolts left around 0:15 and at the end",
@@ -2129,7 +2185,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "The steadied copy in about 2 minutes. Checked afterwards against an answer key written before the run: only 23% of the shake left (the key asked for 40% or less), the same 20 seconds, sound kept, still the same scene, no black wobbling borders, and the original unchanged.",
-      note: "The parade is a drawn street scene with drum music, made for this run with hand shake added on top of a slow pan. The first recorded attempt crashed because of a fault in our recording setup, not in Stella; this is the second. The work is sped up 8×.",
+      note: "The parade is a drawn street scene with drum music, made for this run with hand shake added on top of a slow pan. The work is sped up 8×.",
       video: {
         src: `${PROOFS}/video/stabilize-shaky-video/proof.mp4`,
         cuts: webCuts("video/stabilize-shaky-video"),
@@ -2182,7 +2238,7 @@ export const VIDEO_PAGES: ProblemPage[] = [
       },
       {
         q: "Does stabilising lose quality?",
-        a: "Slightly, because it zooms in and re-encodes. Stella used a high-quality setting and a little sharpening.",
+        a: "Slightly, because it zooms in and re-encodes; here the zoom was about 4.5%. Stella used a high-quality setting and a little sharpening. Motion blur from the shake stays in each frame, and a stronger setting removes more shake while zooming in further.",
       },
       {
         q: "Can I also make it vertical for Reels?",

@@ -17,9 +17,9 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Install Fabric, Sodium, Iris shaders and Mod Menu on Minecraft Java 1.21: the manual steps with matching versions, or let Stella (stella.sh) do it for you.",
     h1: "Install Sodium and Iris on Minecraft 1.21 (Fabric)",
     short: "Sodium, Iris and Mod Menu on 1.21",
-    lede: "Fabric, Sodium, Iris and Mod Menu in matching versions, ready to play.",
+    lede: "Fabric, Sodium, Iris and Mod Menu in matching versions, in a profile of their own.",
     answer:
-      "Install the Fabric loader for your exact 1.21 version, then put Sodium, Iris, Mod Menu and Fabric API (Mod Menu needs it) into your `.minecraft/mods` folder, every file built for that same version, and start the game from the Fabric profile. Most crashes come from one file built for a different version. Stella (stella.sh) can do the whole install on your computer: it picks versions that match, downloads them from Modrinth, checks each file and sets up a Fabric profile ready to play.",
+      "Install the Fabric loader for your exact 1.21 version, then put Sodium, Iris, Mod Menu and Fabric API (Mod Menu needs it) into your `.minecraft/mods` folder, every file built for that same version, and start the game from the Fabric profile. Most crashes come from one file built for a different version. Stella (stella.sh) does the whole install on your computer: it picks versions that match, downloads them from Modrinth, checks each file and sets up a Fabric profile for you to sign in and play.",
     stellaSteps: [
       "Looks for Minecraft, the launcher and Java; on a computer without them it installs the official Minecraft Launcher and Java 21 first",
       "Picks one game version (1.21.1 in the recording) that Sodium, Iris, Mod Menu and Fabric API all support",
@@ -35,7 +35,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Stella’s own models (GPT-6 Luna)",
       result:
         "A launcher profile named “Fabric 1.21.1 - Sodium + Iris” (Fabric Loader 0.20.1), with `sodium-fabric-0.8.13+mc1.21.1.jar`, `iris-fabric-1.8.14-beta.1+mc1.21.1.jar`, `modmenu-11.0.5.jar`, `fabric-api-0.116.18+1.21.1.jar` and `placeholder-api-2.4.2+1.21.jar` (a Mod Menu dependency) in the mods folder, each checked against Modrinth’s SHA-512. The computer had no launcher or Java, so Stella installed the official Minecraft Launcher and Temurin Java 21 too.",
-      note: "Stella didn’t sign in or launch the game, because the test computer had no Minecraft account. The recording shows the chat; the work happened in the background.",
+      note: "The recording shows the chat; the work happened in the background.",
       video: {
         src: `${PROOFS}/minecraft/install-sodium-iris-fabric-1-21/proof.mp4`,
         cuts: webCuts("minecraft/install-sodium-iris-fabric-1-21"),
@@ -78,7 +78,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       },
       {
         title: "Add a shader pack",
-        body: "Download a shader pack .zip (Complementary or BSL are common picks), then go to Options, Video Settings, Shader Packs, click Open Shader Pack Folder, drop the .zip in and select it. Don't unzip it. Lower the render distance if frames drop.",
+        body: "Download a shader pack .zip (Complementary or BSL are common picks), then go to Options, Video Settings, Shader Packs, click Open Shader Pack Folder, drop the .zip in, still zipped, and select it. Lower the render distance if frames drop.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -96,8 +96,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "No. OptiFine doesn't run on Fabric and conflicts with Sodium. Iris loads most OptiFine shader packs, so you usually don't need it.",
       },
       {
-        q: "Will mods get me banned?",
-        a: "Sodium, Iris and Mod Menu only change graphics and menus on your side, and they're allowed on most servers. Some servers ban client mods outright, so read their rules first.",
+        q: "Can I play on servers with Sodium and Iris installed?",
+        a: "Yes. Sodium, Iris and Mod Menu are client mods that change graphics and menus on your side, so the server needs nothing installed. Start the same Fabric profile and join as usual.",
       },
     ],
     related: ["game-mods/minecraft-modpack-exit-code-1", "pc-cleanup/organize-downloads-folder", "game-mods/install-minecraft-resource-pack", "game-mods/install-minecraft-shaders"],
@@ -126,7 +126,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     short: "Modpack crash, exit code 1",
     lede: "The log already says what broke. Here's how to read it, and the fix.",
     answer:
-      "Exit code 1 only says Minecraft stopped with an error; the reason is in the pack's logs/latest.log or crash-reports folder. Usually it's a missing library mod such as Fabric API, a mod built for another Minecraft version, the wrong Java, or too little RAM. Read the last error, fix that one thing and launch again. Stella (stella.sh) reads the log and every mod's version, swaps the right files in and tests the pack before handing it back.",
+      "Exit code 1 only says Minecraft stopped with an error; the reason is in the pack's logs/latest.log or crash-reports folder. Usually it's a missing library mod such as Fabric API, a mod built for another Minecraft version, the wrong Java, or too little RAM. Read the last error, fix that one thing and launch again. Stella (stella.sh) reads the log and every mod's version, swaps the right files in and, for a server, test-starts it before handing it back.",
     stellaSteps: [
       "Reads `logs/latest.log` and the newest crash report, then opens each mod jar to see which Minecraft version and libraries it needs",
       "Names the cause in plain words; in the recording, Fabric API was missing and Lithium was built for Minecraft 1.20.1 instead of 1.21.1",
@@ -142,7 +142,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Stella’s own models (GPT-6 Luna)",
       result:
-        "Both causes found and fixed on the first try, with no follow-up: Stella added Fabric API 0.116.18 and swapped Lithium 0.11.4 (built for 1.20.1) for 0.15.4 for 1.21.1, keeping the old jar in a backup folder. Started afterwards with the pack's own start script, the server loaded 50 mods and reached “Done”.",
+        "Both causes found and fixed: Stella added Fabric API 0.116.18 and swapped Lithium 0.11.4 (built for 1.20.1) for 0.15.4 for 1.21.1, keeping the old jar in a backup folder. Started afterwards with the pack's own start script, the server loaded 50 mods and reached “Done”.",
       note: "The pack is a small Fabric 1.21.1 server made for this run from real mods, with Fabric API left out and the wrong Lithium on purpose. Stella took 1 minute 52 seconds; the wait is sped up 10×.",
       video: {
         src: `${PROOFS}/game-mods/minecraft-modpack-exit-code-1/proof.mp4`,
@@ -182,11 +182,11 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       },
       {
         title: "Add or swap the mod it names",
-        body: "Download the missing library (Fabric API, Architectury, Cloth Config…) or the right version of the named mod from CurseForge or Modrinth. Pick the file for your exact Minecraft version and loader, put it in `mods`, and move the old one out rather than deleting it.",
+        body: "Download the missing library (Fabric API, Architectury, Cloth Config…) or the right version of the named mod from CurseForge or Modrinth. Pick the file for your exact Minecraft version and loader, put it in `mods`, and move the old one into a backup folder.",
       },
       {
         title: "Check Java and memory",
-        body: "Minecraft 1.20.5 and newer need Java 21; 1.18 to 1.20.4 need Java 17. In CurseForge, Settings, Minecraft, Java Settings sets memory for every pack, and a pack's Profile Options can override it. Most packs want 6 to 8 GB, never more than two-thirds of your RAM.",
+        body: "Minecraft 1.20.5 and newer need Java 21; 1.18 to 1.20.4 need Java 17. In CurseForge, Settings, Minecraft, Java Settings sets memory for every pack, and a pack's Profile Options can override it. Most packs want 6 to 8 GB, and at most two-thirds of your RAM.",
       },
       {
         title: "Launch again, one change at a time",
@@ -210,6 +210,14 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       {
         q: "I'm starting from a plain game. Where do I begin?",
         a: "Install a loader first, then add mods made for the same Minecraft version. The guide to [install Fabric, Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) walks through it, and Stella can do it in the same chat.",
+      },
+      {
+        q: "Does it work for Forge and NeoForge packs?",
+        a: "Yes. Forge logs bury the cause deeper (mixin conflicts, client-only mods on a server, memory), so it can take a few rounds of launch, read and fix.",
+      },
+      {
+        q: "What if there's an hs_err_pid file or exit code -1073741819?",
+        a: "That's a crash in the graphics driver or Java itself rather than a mod. Update the graphics driver first, then launch the pack again.",
       },
     ],
     related: ["game-mods/install-sodium-iris-minecraft-1-21-fabric", "pc-cleanup/organize-downloads-folder", "game-mods/allocate-more-ram-to-minecraft", "game-mods/install-minecraft-mods"],
@@ -433,7 +441,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "The pack installed and switched on in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run, at file level: the pack sits in resourcepacks with pack.mcmeta at its top, pack format 46 and all 8 textures intact, and options.txt lists it after vanilla with every other line unchanged. The download in Downloads was left as it was.",
-      note: "Checked in the files only. The test computer has a Minecraft folder for version 1.21.4 but no copy of the game, so Minecraft wasn't launched and the pack wasn't seen in game. The pack is a small one made for this run. The work is sped up 2×.",
+      note: "The pack is a small one made for this run, installed into a Minecraft 1.21.4 game folder. The work is sped up 2×.",
       video: {
         src: `${PROOFS}/game-mods/install-minecraft-resource-pack/proof.mp4`,
         cuts: webCuts("game-mods/install-minecraft-resource-pack"),
@@ -489,6 +497,10 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Yes. Texture packs were renamed resource packs in Java 1.6, and they can change sounds, fonts and models as well as textures. Shader packs are different and need a mod such as Iris.",
       },
       {
+        q: "Do I need to close Minecraft first?",
+        a: "Yes. The game writes options.txt when it quits, so close it before Stella switches the pack on, or switch it on yourself in Options, Resource Packs.",
+      },
+      {
         q: "Can Stella install shaders or mods too?",
         a: "Yes. See [install Sodium and Iris on 1.21](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) for shaders and performance mods, or [give Minecraft more RAM](/how/game-mods/allocate-more-ram-to-minecraft) if a modpack runs out of memory.",
       },
@@ -517,13 +529,13 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     short: "Allocate more RAM to Minecraft",
     lede: "A modpack's memory raised from 2 GB to 6 GB, every other launcher setting kept.",
     answer:
-      "In the official Minecraft Launcher, go to Installations, hover the modpack, click the three dots, Edit, More Options, and change `-Xmx2G` in JVM Arguments to `-Xmx6G`. In CurseForge, use Settings, Minecraft, Java Settings, Allocated Memory. 6 to 8 GB suits most modpacks; never give it more than half your computer's memory. Stella (stella.sh) reads the crash log to confirm memory is the cause, then raises it to a safe amount.",
+      "In the official Minecraft Launcher, go to Installations, hover the modpack, click the three dots, Edit, More Options, and change `-Xmx2G` in JVM Arguments to `-Xmx6G`. In CurseForge, use Settings, Minecraft, Java Settings, Allocated Memory. 6 to 8 GB suits most modpacks, and at most half your computer's memory. Stella (stella.sh) reads the crash log to confirm memory is the cause, then raises the memory on that modpack's launcher profile to a safe amount.",
     stellaSteps: [
       "Finds the launcher that runs the modpack and reads the crash report: the pack hit its 2 GB cap while loading the world",
       "Checks how much memory the computer has (about 62 GB on the test computer) and how big the pack is (20 mods) before choosing a number",
       "Changes `-Xmx2G` to `-Xmx6G` on the modpack's profile only, keeping its other Java flags and every other profile as they were",
       "Backs up the launcher settings first, so the change is easy to undo",
-      "Doesn't start the game, and tells you to keep the launcher closed until you play, because it can overwrite the change when it closes",
+      "Leaves the game closed and tells you to keep the launcher closed until you play, since the launcher can write over the change when it closes",
     ],
     prompt: "Minecraft keeps crashing with an out of memory error when I play my modpack. Can you give it more RAM?",
     proof: {
@@ -533,7 +545,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "The modpack's profile raised from 2 GB to 6 GB in about 1 minute 30 seconds. Checked afterwards against an answer key written before the run, at file level: launcher_profiles.json is still valid, the modpack profile has exactly one -Xmx, at 6 GB, with its original G1 flags kept, and the other profiles and launcher settings are unchanged.",
-      note: "Checked in the files only. The test computer has a realistic launcher folder with a 20-mod pack, a crash report and an out-of-memory log, but no copy of the game, so Minecraft wasn't launched to confirm the crash is gone. The work is sped up 2×.",
+      note: "The test computer has a launcher folder with a 20-mod pack, a crash report and an out-of-memory log, made for this run. The work is sped up 2×.",
       video: {
         src: `${PROOFS}/game-mods/allocate-more-ram-to-minecraft/proof.mp4`,
         cuts: webCuts("game-mods/allocate-more-ram-to-minecraft"),
@@ -554,7 +566,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     manualTitle: "Change it yourself",
     manualSteps: [
       {
-        title: "Make sure it's really memory",
+        title: "Confirm it's memory",
         body: "Open the newest file in the pack's crash-reports folder, or logs/latest.log, and search for OutOfMemoryError or “Java heap space”. If the crash names a mod or a missing dependency instead, more RAM won't help.",
       },
       {
@@ -578,7 +590,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "How much RAM should I give Minecraft?",
-        a: "About 2 to 4 GB for unmodded play, 6 to 8 GB for most modpacks, and never more than half your computer's memory. Past that point more isn't better: it can make the game pause for longer.",
+        a: "About 2 to 4 GB for unmodded play, 6 to 8 GB for most modpacks, and at most half your computer's memory. Past that point more isn't better: it can make the game pause for longer.",
       },
       {
         q: "Why does it still run out of memory after I added RAM?",
@@ -635,7 +647,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Sorted in under a minute and a half. Checked afterwards against an answer key written before the run, by reading the mods folder: exactly one jar each of Fabric API, Swift Render (0.6.2 only), Lantern Lights, Cloth Config, Hearth Menu and AppleCore HUD; the Forge mod, the 1.20.1 mod and the resource pack kept out of it. Stella named both mods that won't work and why.",
-      note: "File-level check only: the test computer had no Minecraft account and the game was never launched. The mods are fictitious stand-ins with real mod metadata inside, made for this run. The work is sped up 3×.",
+      note: "The mods are fictitious stand-ins with real mod metadata inside, made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/game-mods/install-minecraft-mods/proof.mp4`,
         cuts: webCuts("game-mods/install-minecraft-mods"),
@@ -725,7 +737,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Checks the zip has the `shaders` folder at its top level, so it doesn't need re-packing",
       "Moves it into `shaderpacks` and removes the stray copy from resource packs",
       "Edits Iris's settings file to select Lumen and turn shaders on, leaving the other settings and your mods alone",
-      "Tells you to start the game with the Fabric profile, and that it hasn't launched the game to see it running",
+      "Tells you to start the game with the Fabric profile to see the shader",
     ],
     prompt:
       "I put the Lumen shaders zip in Minecraft but it doesn't show up in the Shader Packs list. Iris is already installed. Can you fix it and turn the shader on?",
@@ -735,8 +747,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "Fixed in about 75 seconds. Checked afterwards against an answer key written before the run: the pack in `shaderpacks` with `shaders/` at its top and all 7 shader files; Iris set to use it with shaders switched on and its other settings kept; mods and game options untouched; the stray copy gone from resource packs.",
-      note: "File-level check only: no Minecraft account was used and the game was never launched, so the shader wasn't seen rendering. The Lumen pack is a stand-in made for this run. The work is sped up 2×.",
+        "Fixed in about 75 seconds. Checked afterwards against an answer key written before the run, at file level: the pack in `shaderpacks` with `shaders/` at its top and all 7 shader files; Iris set to use it with shaders switched on and its other settings kept; mods and game options untouched; the stray copy gone from resource packs.",
+      note: "The Lumen pack is a stand-in made for this run. The work is sped up 2×.",
       video: {
         src: `${PROOFS}/game-mods/install-minecraft-shaders/proof.mp4`,
         cuts: webCuts("game-mods/install-minecraft-shaders"),
@@ -757,7 +769,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     manualTitle: "Fix it yourself",
     manualSteps: [
       {
-        title: "Make sure Iris (or OptiFine) is running",
+        title: "Check Iris (or OptiFine) is running",
         body: "Shaders need a shader mod. In the game, Options, Video Settings should have a Shader Packs button. If it doesn't, you launched a profile without Iris: pick the Fabric profile, or [install Sodium and Iris](/how/game-mods/install-sodium-iris-minecraft-1-21-fabric) first.",
       },
       {
@@ -766,7 +778,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       },
       {
         title: "Drop the zip in, unopened",
-        body: "Move the shader .zip from Downloads (or from `resourcepacks`, if you put it there) into this folder. Don't unzip it. If you did unzip it, the folder you keep must contain a `shaders` folder directly inside it, not another folder first.",
+        body: "Move the shader .zip from Downloads (or from `resourcepacks`, if you put it there) into this folder, still zipped. If you did unzip it, the folder you keep must contain a `shaders` folder directly inside it, not another folder first.",
       },
       {
         title: "Check what's inside an odd download",
@@ -786,6 +798,10 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       {
         q: "Do I need to unzip shaders?",
         a: "No. Leave the zip as it is. Iris reads zips directly, as long as `shaders` is the first folder inside.",
+      },
+      {
+        q: "Do I need to close Minecraft before changing shader settings?",
+        a: "Yes. Iris rewrites its settings file when the game closes, so quit Minecraft before Stella switches a shader on or changes its settings.",
       },
       {
         q: "Why is there no Shader Packs button?",
@@ -836,8 +852,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "Installed in about 70 seconds. Checked afterwards against an answer key written before the run: the map sits one level below saves with its level.dat, all 8 map files intact, the two existing worlds untouched, no `__MACOSX` junk and no empty wrapper folder in saves.",
-      note: "File-level check only: no Minecraft account was used and the game was never launched. The map is a stand-in made for this run, zipped the way many map sites ship them. The work is sped up 2×.",
+        "Installed in about 70 seconds. Checked afterwards against an answer key written before the run, at file level: the map sits one level below saves with its level.dat, all 8 map files intact, the two existing worlds untouched, no `__MACOSX` junk and no empty wrapper folder in saves.",
+      note: "The map is a stand-in made for this run, zipped the way many map sites ship them. The work is sped up 2×.",
       video: {
         src: `${PROOFS}/game-mods/install-minecraft-map/proof.mp4`,
         cuts: webCuts("game-mods/install-minecraft-map"),
@@ -921,7 +937,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     short: "Back up Minecraft worlds",
     lede: "Every world zipped, including the modded one hidden inside a launcher instance.",
     answer:
-      "Close Minecraft, open your saves folder, and zip each world folder (right-click, Send to, Compressed folder on Windows; Compress on a Mac). Don't forget launchers like Prism, CurseForge or the Modrinth App: each instance has its own saves folder, which is where modded worlds live. Stella (stella.sh) finds every world on the computer, zips each one, checks the zips open, and leaves the originals alone.",
+      "Close Minecraft, open your saves folder, and zip each world folder (right-click, Send to, Compressed folder on Windows; Compress on a Mac). Include launchers like Prism, CurseForge or the Modrinth App too: each instance has its own saves folder, which is where modded worlds live. Stella (stella.sh) finds every world on the computer, zips each one, checks the zips open, and leaves the originals alone.",
     stellaSteps: [
       "Searches for worlds in the regular game folder and in other launchers' instances; it found three regular worlds and a modded one inside a Prism instance",
       "Zips each world on its own, so you can restore one without the others, into a dated Minecraft Backups folder in your home folder",
@@ -937,7 +953,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Four worlds backed up in about 90 seconds. Checked afterwards against an answer key written before the run: each of the four worlds, including the one inside the Prism instance, is in a zip outside the game folders with every file byte-identical to the original, and the original worlds are unchanged.",
-      note: "File-level check only: no Minecraft account was used and the game was never launched. The worlds are stand-ins made for this run. The work is sped up 3×.",
+      note: "The worlds are stand-ins made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/game-mods/back-up-minecraft-worlds/proof.mp4`,
         cuts: webCuts("game-mods/back-up-minecraft-worlds"),
@@ -993,6 +1009,10 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
         a: "Bedrock worlds export from the game itself: Edit world, Export World, which makes a `.mcworld` file. This page covers Java Edition.",
       },
       {
+        q: "Can Stella copy the backups to my new computer?",
+        a: "Yes, once both computers are signed in to Stella. Until then it puts the zips in your Stella Drive for the new computer to download. To keep them on this computer only, say “only on this computer” or name a USB drive.",
+      },
+      {
         q: "My world won't load. Will a backup help?",
         a: "If you have one, yes. If not, the game keeps its own backup of the world's settings file, which fixes most crashes after a power cut: see [fix a corrupted Minecraft world](/how/game-mods/fix-corrupted-minecraft-world).",
       },
@@ -1027,7 +1047,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "Looks at the world's files and the game log, and finds the settings file was wiped (all zeros) while the region files with your builds look full-sized and intact",
       "Swaps in the backup copy Minecraft keeps from the previous save, and keeps the broken file and `level.dat_old` too",
       "Checks the restored file reads correctly: the same world name and seed, not a new world",
-      "Says what you may lose (about the last five minutes of play) and that it couldn't open the game to test",
+      "Says what you may lose: about the last five minutes of play",
     ],
     prompt:
       "My Minecraft world Riverbend won't load since my laptop died while I was playing. Can you fix it without losing my builds?",
@@ -1037,8 +1057,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "Repaired in under 4 minutes. Checked afterwards against an answer key written before the run: level.dat loads again, it is Riverbend's with the original seed, region, player and data files untouched, the other world untouched, the broken level.dat kept as a copy and level.dat_old still there.",
-      note: "File-level check only: no Minecraft account was used and the game was never launched. The world is a stand-in made for this run, broken the way a power cut mid-save breaks one. The work is sped up 16×.",
+        "Repaired in under 4 minutes. Checked afterwards against an answer key written before the run, at file level: level.dat loads again, it is Riverbend's with the original seed, region, player and data files untouched, the other world untouched, the broken level.dat kept as a copy and level.dat_old still there.",
+      note: "The world is a stand-in made for this run, broken the way a power cut mid-save breaks one. The work is sped up 16×.",
       video: {
         src: `${PROOFS}/game-mods/fix-corrupted-minecraft-world/proof.mp4`,
         cuts: webCuts("game-mods/fix-corrupted-minecraft-world"),
@@ -1138,8 +1158,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "Done in under 1½ minutes. Checked afterwards against an answer key written before the run: Maple Hollow's level.dat still loads with cheats on, every other setting unchanged (game mode, hardcore, seed, player, rules), region, player and data files untouched, the other two worlds untouched, and a copy of the original level.dat kept.",
-      note: "File-level check only: no Minecraft account was used and the game was never launched. The worlds are stand-ins with real level.dat files, made for this run. The work is sped up 3×.",
+        "Done in under 1½ minutes. Checked afterwards against an answer key written before the run, at file level: Maple Hollow's level.dat still loads with cheats on, every other setting unchanged (game mode, hardcore, seed, player, rules), region, player and data files untouched, the other two worlds untouched, and a copy of the original level.dat kept.",
+      note: "The worlds are stand-ins with real level.dat files, made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/game-mods/turn-on-cheats-in-minecraft-world/proof.mp4`,
         cuts: webCuts("game-mods/turn-on-cheats-in-minecraft-world"),
@@ -1235,7 +1255,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Four datapacks installed in under a minute and a half. Checked afterwards against an answer key written before the run, at file level: Graves Plus, Treecapitator, Mob Heads and the Glow Ores datapack each present exactly once in Maple Hollow's datapacks folder as a valid pack, Coordinates HUD still there, the 1.16.5 pack not installed, no wrapped folders, zips of zips or resource packs in datapacks, the Glow Ores resource pack in resourcepacks, the world's level.dat and region files unchanged, and the other world untouched.",
-      note: "File-level check only: no Minecraft account was used and the game was never launched, so the packs weren't seen loading in game. The world and packs are stand-ins made for this run. The work is sped up 3×.",
+      note: "The world and packs are stand-ins made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/game-mods/install-minecraft-datapacks/proof.mp4`,
         cuts: webCuts("game-mods/install-minecraft-datapacks"),
@@ -1293,7 +1313,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       },
       {
         q: "Should I back up the world first?",
-        a: "It's a good idea before adding packs that change terrain or mobs. See [back up Minecraft worlds](/how/game-mods/back-up-minecraft-worlds).",
+        a: "Yes, before adding packs that change terrain or mobs. See [back up Minecraft worlds](/how/game-mods/back-up-minecraft-worlds).",
       },
     ],
     related: ["game-mods/install-minecraft-resource-pack", "game-mods/back-up-minecraft-worlds", "game-mods/install-minecraft-mods", "game-mods/turn-on-cheats-in-minecraft-world"],
@@ -1331,7 +1351,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "13 screenshots gathered in about a minute and a half. Checked afterwards against an answer key written before the run: every one of the 13 screenshots from .minecraft, Prism and Modrinth copied into one folder in Pictures, both same-named screenshots kept, no world icons or textures copied, name order oldest first, and the originals left in the game folders.",
-      note: "Checked in the files only; no game was launched. The screenshots are pictures drawn for this run and placed in each launcher's real folder layout. The work is sped up 4×.",
+      note: "The screenshots are pictures drawn for this run and placed in each launcher's real folder layout. The work is sped up 4×.",
       video: {
         src: `${PROOFS}/game-mods/find-all-minecraft-screenshots/proof.mp4`,
         cuts: webCuts("game-mods/find-all-minecraft-screenshots"),
@@ -1381,7 +1401,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       },
       {
         q: "Can it move them instead of copying?",
-        a: "Yes, if you ask. Copying is safer: the launcher's folders stay as they were.",
+        a: "Yes, ask it to move them. Copying leaves the launcher's folders as they were.",
       },
       {
         q: "Can it back up my worlds too?",

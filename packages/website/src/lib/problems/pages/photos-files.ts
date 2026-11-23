@@ -77,7 +77,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Unzip every part into one folder",
-        body: "Big Takeout exports come as several zip files, and a photo and its JSON can land in different parts. Extract all of them into the same folder, keep the original zips until you've checked the result, and don't delete any JSON yet: it's the only copy of the dates.",
+        body: "Big Takeout exports come as several zip files, and a photo and its JSON can land in different parts. Extract all of them into the same folder, and keep the original zips and every JSON file until you've checked the result: the JSON files hold the only copy of the dates.",
       },
       {
         title: "Run Google Photos Takeout Helper (GPTH)",
@@ -104,7 +104,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I delete the JSON files?",
-        a: "Only after the dates are in the photos. Before that, they're the only record of when each photo was taken. Afterwards they're safe to delete, unless you want the descriptions or GPS that a date-only fix leaves out.",
+        a: "Yes, once the dates are in the photos; until then they're the only record of when each photo was taken. To keep the descriptions and GPS that a date-only fix leaves out, move them to a folder of their own instead: tell Stella “move the JSON files to a folder” rather than “get rid of them”.",
       },
       {
         q: "Why do some JSON names look cut off?",
@@ -224,7 +224,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Or try a renaming app",
-        body: "Apps like renamer.ai read each file with AI and suggest a name. Its free plan covers 25 files a month, paid plans start at $9.95 for 200, and files go to its servers by default. Check a handful of names before you trust a whole batch.",
+        body: "Apps like renamer.ai read each file with AI and suggest a name. Its free plan covers 25 files a month, paid plans start at $9.95 for 200, and files go to its servers by default. Run it on a handful of files first, check the names, then do the whole batch.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -236,6 +236,14 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       {
         q: "Will it work on scanned documents?",
         a: "Yes, once they've been through OCR. In the recording, three of the 26 were image-only scans, grey and slightly crooked, and each got the right date and company.",
+      },
+      {
+        q: "Can I check the new names before the files are renamed?",
+        a: "Yes. Add “show me the new names before you rename” to the prompt and Stella lists every old and new name for you to approve. Ask for the same list afterwards and keep it: with it, any rename is easy to reverse.",
+      },
+      {
+        q: "Which date goes in the name?",
+        a: "One date per document. For a bank statement Stella used the first day of the period, and for a tenancy the date it was signed. Say which one you want (issue date, due date, period end) in the prompt and every file follows it.",
       },
       {
         q: "Can it put the files into folders too?",
@@ -343,7 +351,19 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         q: "Do online HEIC converters keep the date taken?",
-        a: "Some do and some strip all metadata, and you're uploading your photos to someone else's server. Check one converted file's Properties, Details tab before trusting a whole batch.",
+        a: "Some do and some strip all metadata. Convert one photo first and look for Date taken in its Properties, Details tab, then do the rest. A converter that runs on your computer, like XnConvert or ImageMagick, keeps the photos off other servers.",
+      },
+      {
+        q: "Why is the folder so much bigger after converting?",
+        a: "JPG needs more space than HEIC for the same picture: in the recording, 30 photos took 17 MB as HEIC and about 38 MB as JPG at high quality, and with the originals kept the folder roughly tripled. Once you've checked the JPGs, ask Stella to move the HEIC files to the Trash to get the space back.",
+      },
+      {
+        q: "Why does Date modified show the wrong day?",
+        a: "A new JPG's Date modified is the day it was made, or the day the photos were copied to the computer. Photos apps and Windows' Date taken column read the date inside the photo, which the conversion keeps. If you sort by Date modified, ask Stella to set each file's date to its date taken too.",
+      },
+      {
+        q: "What happens to Live Photos?",
+        a: "A Live Photo is a still photo plus a short .MOV clip. The still becomes a JPG and the clip stays as it is, next to it.",
       },
       {
         q: "Can Stella also sort the photos into folders by date?",
@@ -375,7 +395,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Find duplicate photos",
     lede: "Every copy found, the originals kept, and nothing deleted until you say so.",
     answer:
-      "Exact copies are easy to find by comparing file contents, but resized or re-saved copies (the ones WhatsApp and old phone backups make) need a tool that compares the pictures themselves, such as the free dupeGuru in Picture mode. Review every group before deleting. Stella (stella.sh) finds both kinds on your computer, shows each group side by side with the copy it would keep, and deletes nothing until you reply.",
+      "Exact copies are easy to find by comparing file contents, but resized or re-saved copies (the ones WhatsApp and old phone backups make) need a tool that compares the pictures themselves, such as the free dupeGuru in Picture mode. Then review each group and send the copies to the Trash. Stella (stella.sh) finds both kinds on your computer, and when you ask to see them first, it shows each group side by side with the copy it would keep and waits for your reply.",
     stellaSteps: [
       "Scans the folder you name, subfolders included, and tells you up front that nothing will be deleted",
       "Finds exact copies by their file contents, then resized, re-saved and converted copies by comparing the pictures themselves",
@@ -428,11 +448,11 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Back up first",
-        body: "Copy the folder to an external drive or cloud storage before deleting anything. Duplicate finders are good, not perfect, and a photo deleted outside the Recycle Bin or Trash is hard to get back.",
+        body: "Copy the folder to an external drive or cloud storage, so every photo has a second copy while you clear out the duplicates.",
       },
       {
         title: "Exact copies: any duplicate finder",
-        body: "Free tools like dupeGuru (Standard mode) or Czkawka compare file contents, so they only match byte-identical files: the `IMG_1234 (1).jpg` kind. They're fast and safe, but miss every resized or re-saved copy.",
+        body: "Free tools like dupeGuru (Standard mode) or Czkawka compare file contents, so they only match byte-identical files: the `IMG_1234 (1).jpg` kind. They're fast, and match only exact copies, not resized or re-saved ones.",
       },
       {
         title: "Resized copies: dupeGuru Picture mode",
@@ -440,7 +460,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Review every group, then delete to the Trash",
-        body: "Sort each group by size and keep the biggest, which is usually the original. Look at any pair with different names or dates before you mark it. In dupeGuru, use Send Marked to Trash (it goes to the Recycle Bin on Windows) rather than a permanent delete, so a mistake can be undone.",
+        body: "Sort each group by size and keep the biggest, which is usually the original. Look at any pair with different names or dates before you mark it. In dupeGuru, use Send Marked to Trash (it goes to the Recycle Bin on Windows) rather than a permanent delete, so any photo can be restored.",
       },
       {
         title: "Photos in Apple Photos? Use its Duplicates album",
@@ -462,8 +482,12 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, when they go to the Trash or Recycle Bin, which is what Stella did here: Restore puts each one back in its original folder. Emptying the Trash makes it permanent.",
       },
       {
-        q: "Are duplicate photo cleaner apps safe?",
-        a: "The open-source ones (dupeGuru, Czkawka) are. Be wary of “PC cleaner” apps that scan for free and then charge to delete. Whatever you use, review the groups and send deletions to the Trash.",
+        q: "Can it find duplicate videos too?",
+        a: "Yes, as a request of its own: ask for duplicate videos by name. Comparing videos takes longer than comparing photos. Free tools work too: Czkawka has a similar-videos mode.",
+      },
+      {
+        q: "Which free duplicate photo finder should I use?",
+        a: "dupeGuru and Czkawka are free and open source, and dupeGuru's Picture mode catches resized copies. On a Mac, the Duplicates album in Photos covers photos inside the library. With any of them, review the groups and send deletions to the Trash.",
       },
     ],
     related: ["photos-files/sort-photos-into-folders-by-date", "photos-files/convert-heic-to-jpg", "pc-cleanup/organize-downloads-folder", "photos-files/separate-screenshots-from-photos", "files-folders/compare-two-folders", "pc-cleanup/find-duplicate-files"],
@@ -493,7 +517,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     answer:
       "Use the date taken stored inside each photo (EXIF), not the file's modified date, which changes whenever photos are copied. ExifTool does it with one command, and digiKam or Lightroom can file photos into date folders as they import. Stella (stella.sh) reads each photo's date, files it under year and month, keeps clashing names apart and leaves a log so every move can be undone.",
     stellaSteps: [
-      "Reads the date taken stored inside every photo, the creation date inside videos, and ignores the misleading file dates and names",
+      "Reads the date taken stored inside every photo and the creation date inside videos, and ignores the misleading file dates and names; with no ExifTool on the test computer, it wrote its own small date reader",
       "Plans every move first, then files them into folders like 2024/03 - March",
       "Dates WhatsApp images and screenshots from the date in their names, which is where those apps keep it, and says so",
       "Puts photos with no date anywhere into an Undated folder instead of guessing",
@@ -508,7 +532,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "33 files were sorted into year and month folders from 2019 to 2026 in 47 seconds. Checked afterwards against the answer key written before the run: all 33 are there exactly once and byte-for-byte identical, all 26 photos with a date taken are in the right month (including four with misleading names, a leap day and a month boundary), both IMG_0001.JPG files survived, and the two with no date at all went to an Undated folder.",
-      note: "The 33 test files are generated pictures with dates written into them for this run, all with a file date of the day they were copied, plus one short video. The wait is sped up 8×. There was no ExifTool on the test computer, so Stella wrote its own small date reader.",
+      note: "The 33 test files are generated pictures with dates written into them for this run, all with a file date of the day they were copied, plus one short video. The wait is sped up 8×.",
       video: {
         src: `${PROOFS}/photos-files/sort-photos-into-folders-by-date/proof.mp4`,
         cuts: webCuts("photos-files/sort-photos-into-folders-by-date"),
@@ -531,7 +555,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Work on a copy first",
-        body: "Copy the folder somewhere else before you start, or make sure it's in your backup. Moving thousands of files by a rule is quick to do and slow to undo by hand.",
+        body: "Copy the folder somewhere else before you start, or check it's in your backup, so the original layout is there to go back to.",
       },
       {
         title: "With ExifTool (free, Windows, Mac and Linux)",
@@ -563,6 +587,14 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       {
         q: "What happens to videos?",
         a: "Videos keep their date in a different place (the QuickTime creation date). Stella read it and filed the test video under July 2024; the ExifTool command above covers it with the CreateDate fallback.",
+      },
+      {
+        q: "Can it copy the photos instead of moving them?",
+        a: "Yes. Moving is what “sort my photos” does, with a log that makes every move reversible; ask for copies and the originals stay where they are. Stella also removes the subfolders left empty and says so; add “keep the old folders” to the prompt to keep them.",
+      },
+      {
+        q: "How long does it take for a big library?",
+        a: "The 33 test files took under a minute. Tens of thousands take longer, mostly to read each file's date. Photos in OneDrive or iCloud that are only in the cloud download first, so set the folder to keep files on the computer before you start.",
       },
       {
         q: "Can it also find duplicates or fix wrong dates?",
@@ -633,7 +665,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Copy the folder first",
-        body: "Duplicate the folder (Option-drag on a Mac, copy and paste on Windows) and work on the copies. Preview saves over the files you open, so resizing the originals by mistake is easy.",
+        body: "Duplicate the folder (Option-drag on a Mac, copy and paste on Windows) and work on the copies. Preview saves over the files you open, so the copies are the ones you resize.",
       },
       {
         title: "On a Mac: Preview",
@@ -664,7 +696,11 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         q: "Will resizing remove the location from my photos?",
-        a: "Some tools keep it, some don't. Stella's copies had camera and location details removed. To remove only the location and keep the date taken, see [remove location from photos](/how/photos-files/remove-location-from-photos).",
+        a: "Some tools keep it, some don't. Stella's copies had camera and location details removed; to keep them, say so in the prompt. To remove only the location and keep the date taken, see [remove location from photos](/how/photos-files/remove-location-from-photos).",
+      },
+      {
+        q: "Can I keep more detail in the resized photos?",
+        a: "Yes. Stella aimed well under the limit, about 100 KB each, so the copies load fast. Ask for “as close to 300 KB as possible” and it uses a higher JPEG quality for each photo while staying under the limit.",
       },
       {
         q: "Can it convert iPhone HEIC photos too?",
@@ -701,7 +737,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       "Makes copies in a new Garden party (no location) folder with the GPS removed and the date and time taken kept",
       "Rewrites only the details, not the pictures, so nothing is re-compressed",
       "Checks that no copy has any location left and every date is intact",
-      "Reminds you the originals still contain your home location, and that the copies still name the camera",
+      "Leaves the originals as they were, and tells you they still hold the location and that the copies still name the camera",
     ],
     prompt:
       "I want to post the garden party photos online, but they have my home location in them. Remove the location but keep the dates they were taken.",
@@ -768,6 +804,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Not if only the metadata is rewritten: in the recording the pictures were pixel-for-pixel identical. Tools that re-save the JPEG lose a little quality. To make web-sized copies anyway, [resize them in bulk](/how/photos-files/resize-images-in-bulk).",
       },
       {
+        q: "Can it remove the camera details too?",
+        a: "Yes. Asked only for location, Stella kept the camera make and model. Ask for camera details, or all metadata, to be removed as well, and say whether the date taken stays.",
+      },
+      {
         q: "How do I stop my iPhone adding location?",
         a: "Go to Settings, Privacy & Security, Location Services, Camera and choose Never. New photos then have no location; older ones still do. For documents, [redact a PDF](/how/pdf-excel/redact-pdf) before you share it.",
       },
@@ -797,7 +837,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Combine photos into one PDF",
     lede: "12 phone photos of a contract as one 2.5 MB PDF, every page upright and in order.",
     answer:
-      "On a Mac, select the photos in Finder in page order, right-click and choose Quick Actions, Create PDF. On Windows, select them, right-click, Print, and choose Microsoft Print to PDF. Watch for sideways photos, iPhone HEIC files some tools reject, and a PDF too big to email. Stella (stella.sh) reads the page numbers to get the order right, turns sideways pages upright and makes one small PDF.",
+      "On a Mac, select the photos in Finder in page order, right-click and choose Quick Actions, Create PDF. On Windows, select them, right-click, Print, and choose Microsoft Print to PDF. Then turn any sideways pages upright, convert HEIC photos if your tool rejects them, and compress the PDF for email. Stella (stella.sh) reads the page numbers to get the order right, turns sideways pages upright and makes one small PDF.",
     stellaSteps: [
       "Finds the 12 page photos in Downloads, including two iPhone HEIC files mixed in with the JPGs",
       "Puts them in order by reading the “Page N of 12” printed on each page, rather than trusting the file names, and checks none are missing or repeated",
@@ -867,7 +907,11 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         q: "How small does the PDF need to be for email?",
-        a: "Under about 20 MB to be safe: Gmail allows 25 MB and Outlook suggests 20. For forms and portals with a 2 to 5 MB limit, see [compress a PDF](/how/pdf-excel/compress-pdf-too-large-to-email).",
+        a: "Under about 20 MB: Gmail allows 25 MB and Outlook suggests 20. For forms and portals with a 2 to 5 MB limit, see [compress a PDF](/how/pdf-excel/compress-pdf-too-large-to-email).",
+      },
+      {
+        q: "Can it crop and straighten the pages?",
+        a: "Yes, ask for it in the prompt: “crop each page to the paper and straighten it”. Left as photos, the pages show a little desk at the edges and some sit slightly tilted; Stella pointed that out in the recording and offered to fix it.",
       },
       {
         q: "Can I make the PDF searchable?",
@@ -898,7 +942,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Add a watermark to photos",
     lede: "Sixteen shop photos with your name in the bottom-right corner, originals untouched.",
     answer:
-      "For a whole folder, the free XnConvert (Windows, Mac, Linux) adds a Text action in a chosen corner to every photo and saves copies. Preview on a Mac does one photo at a time. Watch portrait phone photos: many tools draw on the sideways-stored picture, so the mark lands in the wrong corner. Stella (stella.sh) watermarked sixteen product photos in the bottom-right as you see them, sized to each photo, and saved copies in a new folder.",
+      "For a whole folder, the free XnConvert (Windows, Mac, Linux) adds a Text action in a chosen corner to every photo and saves copies. Preview on a Mac does one photo at a time. Turn portrait phone photos upright first: many tools draw on the sideways-stored picture, which moves the mark to another corner. Stella (stella.sh) watermarked sixteen product photos in the bottom-right as you see them, sized to each photo, and saved copies in a new folder.",
     stellaSteps: [
       "Finds the Shop photos folder in Pictures: 16 product photos, three of them stored sideways with a flag that turns them upright when shown",
       "Turns each photo upright first, so the watermark lands bottom-right as you see the picture",
@@ -971,6 +1015,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "JPG copies are re-saved once. At high quality (Stella used 92) the difference isn't visible; the check found the rest of each photo unchanged.",
       },
       {
+        q: "Can I use my logo instead of text?",
+        a: "Yes. In XnConvert, add Image, Watermark instead of Text and pick a PNG of your logo with a transparent background, then set the corner, size and opacity the same way. The recording used text.",
+      },
+      {
         q: "What else can it do before I upload them?",
         a: "Resize them for the shop: see [resize images in bulk](/how/photos-files/resize-images-in-bulk). And [remove the location from photos](/how/photos-files/remove-location-from-photos) before posting.",
       },
@@ -999,7 +1047,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Convert WebP to JPG",
     lede: "Fifteen WebP, AVIF and PNG pictures as full-size JPGs, transparent bits made white.",
     answer:
-      "On a Mac, open the pictures in Preview, select them all and use File, Export Selected Images as JPEG. On Windows, Paint saves one WebP as JPG; for many files and AVIF, use the free XnConvert. The usual snag is transparency: stickers and logos often come out on black. Stella (stella.sh) converted fifteen WebP, AVIF and PNG files to full-size JPGs in a new folder, with transparent areas white, and warned which would only print small.",
+      "On a Mac, open the pictures in Preview, select them all and use File, Export Selected Images as JPEG. On Windows, Paint saves one WebP as JPG; for many files and AVIF, use the free XnConvert. The usual snag is transparency: stickers and logos often come out on black. Stella (stella.sh) converted fifteen WebP, AVIF and PNG files to full-size JPGs in a new folder, with transparent areas white, and said which would only print small.",
     stellaSteps: [
       "Finds the pictures in Downloads: 8 WebP, 3 AVIF and 4 PNG files, plus a JPG and a PDF that don't need converting",
       "Checks each one's size and whether it has transparency or animation",
@@ -1069,7 +1117,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         q: "Will converting reduce quality?",
-        a: "Slightly, as JPG compresses. At quality 90 to 95 the difference isn't visible; the check found every JPG matching its original closely.",
+        a: "Slightly, as JPG compresses. At quality 90 to 95 the difference isn't visible; the check found every JPG matching its original closely. Keep the originals for any later editing, since each JPG re-save loses a little more.",
       },
       {
         q: "What about iPhone HEIC photos?",
@@ -1101,12 +1149,12 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Fix the wrong date on photos",
     lede: "24 camera photos moved from 2019 to the right afternoon, gaps between them kept.",
     answer:
-      "Don't set every photo to the same time: shift them all by the camera's clock error, using one photo whose real time you know. On a Mac, select the photos in Photos and choose Image, Adjust Date and Time, which shifts the rest by the same amount. ExifTool does it to the files on any computer. Stella (stella.sh) shifted 24 wedding photos from a camera stuck in 2019 to the right afternoon, left the phone photos alone and kept backups.",
+      "Shift every photo by the camera's clock error, worked out from one photo whose real time you know, so the gaps between shots stay the same. On a Mac, select the photos in Photos and choose Image, Adjust Date and Time, which shifts the rest by the same amount. ExifTool does it to the files on any computer. Stella (stella.sh) shifted 24 wedding photos from a camera stuck in 2019 to the right afternoon, left the phone photos alone and kept backups.",
     stellaSteps: [
       "Finds the wedding folder in Pictures: 24 camera photos dated 1 January 2019 and 8 phone photos with the right dates",
       "Tells them apart by the camera that took them, and works out the clock error from the first camera photo and the real time you gave, 2:15 pm on 5 September 2026",
       "Copies the camera photos into a backup folder, then shifts each one's date taken, date digitised and date modified by that same amount, so gaps between shots stay the same",
-      "Writes a list of every old and new time beside the backup, and doesn't re-save the pictures themselves",
+      "Writes a list of every old and new time beside the backup, and changes only the dates, leaving the pictures themselves as they are",
       "Checks the camera shots now run 2:15 to 4:51 pm among the phone shots, and notes they still group apart when sorted by name rather than date",
     ],
     prompt:
@@ -1172,6 +1220,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       {
         q: "Why do my photos still not line up when sorted by name?",
         a: "Camera files (DSC_…) and phone files (PXL_…) have different names, so name order groups them. Sort by date taken, or ask Stella to rename them all to start with the date.",
+      },
+      {
+        q: "What about videos from the same camera?",
+        a: "They need the same shift. ExifTool's `-AllDates+=` command shifts the dates inside MOV and MP4 files too; with Stella, mention the videos in the prompt so they're shifted along with the photos.",
       },
       {
         q: "My Google Photos download has wrong dates. Is that the same?",
@@ -1256,8 +1308,8 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         body: "iPhone and Android Photos apps keep a Screenshots album automatically. Delete or export screenshots there before syncing, so they don't mix into your photo folders.",
       },
       {
-        title: "Move, don't delete",
-        body: "Put screenshots in their own folder first and look through them later. Some hold receipts, tickets or confirmation numbers you may still need.",
+        title: "Move them to a folder first",
+        body: "Put screenshots in their own folder and look through them later. Some hold receipts, tickets or confirmation numbers you may still need.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -1269,6 +1321,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       {
         q: "Why didn't searching for “Screenshot” find them all?",
         a: "iPhone screenshots are named IMG_xxxx.PNG, just like photos. Stella found five of them by their screen-sized dimensions and missing camera details.",
+      },
+      {
+        q: "What about pictures saved from chat apps?",
+        a: "Chat apps strip camera details, so a photo saved from WhatsApp can look like a screenshot. Skim moved-files.txt for those names (IMG-…-WA…) and move any real photos back, or tell Stella to keep chat pictures with the photos.",
       },
       {
         q: "Can I undo the move?",
@@ -1410,8 +1466,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       "Finds the 30 photos in “Ellis family shoot”, reads their sizes and rotation flags, and checks none are duplicates",
       "Looks at a preview of them all, and at the ones stored sideways to see which way they belong",
       "Lays them out 12 to a Letter page in shooting order, about 2.3 inches wide, with each file name in bold underneath and space to circle",
-      "Saves “Ellis family shoot - contact sheet.pdf” in the same folder and renders the pages to check them",
-      "Points out the photos look like drawings rather than real photos, in case the real shoot is in another folder",
+      "Saves “Ellis family shoot - contact sheet.pdf” in the same folder and renders the pages to check every photo and name came out right",
     ],
     prompt:
       "I've got 30 photos from a family photo shoot in the Ellis family shoot folder in my Pictures. Make a contact sheet I can print, with each photo's file name under it, so we can circle the ones we want to order.",
@@ -1422,7 +1477,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "A 3-page PDF in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: all 30 photos on it, every one the right way up (including those stored sideways with a rotation flag), every file name readable, on three printable pages, and the photos unchanged.",
-      note: "The 30 photos are simple drawings of people with camera-style file names, made for this run. Stella noticed and said so, which is why its reply suggests the real photos might be elsewhere. The work is sped up 5×.",
+      note: "The 30 photos are simple drawings of people with camera-style file names, made for this run. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/photos-files/make-a-contact-sheet/proof.mp4`,
         cuts: webCuts("photos-files/make-a-contact-sheet"),
@@ -1478,6 +1533,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Phones and cameras often store photos sideways with a flag to turn them. Tools that ignore the flag print them on their side; Stella turned them upright.",
       },
       {
+        q: "Can I add the date or a caption under each photo?",
+        a: "Yes. In Photos on a Mac, tick Title or Description under Captions as well as Filename. With Stella, ask in the same chat for the date taken, or a caption, under each name, and it remakes the sheet.",
+      },
+      {
         q: "Can I put all the full-size photos in one PDF instead?",
         a: "Yes: see [combine photos into one PDF](/how/photos-files/combine-photos-into-one-pdf).",
       },
@@ -1507,7 +1566,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Put two photos side by side",
     lede: "Garden before and after photos joined side by side, both the right way up.",
     answer:
-      "Make both photos the same height, then place them next to each other on one canvas. Paint on Windows and Preview on a Mac can do it by hand, and collage apps do it with a template. Watch for a stretched photo, and a phone photo that shows upside down because its rotation flag was ignored. Stella (stella.sh) joined a garden's before and after photos, before on the left, at the same height with nothing stretched, and turned the upside-down after photo the right way up.",
+      "Make both photos the same height, then place them next to each other on one canvas. Paint on Windows and Preview on a Mac can do it by hand, and collage apps do it with a template. Scale by height so nothing stretches, and use a tool that reads each phone photo's rotation flag so it shows the right way up. Stella (stella.sh) joined a garden's before and after photos, before on the left, at the same height with nothing stretched, and turned the upside-down after photo the right way up.",
     stellaSteps: [
       "Finds the two photos in Pictures/Garden makeover: Garden before (3264×2448) and Garden after (4032×3024)",
       "Notices the after photo carries a flag saying it's stored upside down, and looks at both to confirm which way is up",
@@ -1562,7 +1621,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Check before posting",
-        body: "Look at the result at full size: neither photo should look squashed, the order should read before then after, and if the photos carry location data you may want to remove it.",
+        body: "Look at the result at full size: neither photo should look squashed, and the order should read before then after. If the photos carry location data, remove it from the new picture.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -1580,8 +1639,16 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes, ask for a grid. For many photos with names, see [make a contact sheet](/how/photos-files/make-a-contact-sheet).",
       },
       {
-        q: "Should I remove location data before posting?",
-        a: "It's wise for photos taken at home. Stella stripped it from the new picture; see [remove location from photos](/how/photos-files/remove-location-from-photos) for the originals.",
+        q: "Does the new picture keep the photos' location?",
+        a: "No. Stella removed the camera details, location included, from the combined picture. To clean the originals too, see [remove location from photos](/how/photos-files/remove-location-from-photos).",
+      },
+      {
+        q: "Can I add “Before” and “After” labels?",
+        a: "Yes, ask in the prompt or as a follow-up, and Stella writes them on each half. In Paint or Keynote, add a text box over each photo before saving.",
+      },
+      {
+        q: "How do I join a portrait photo and a landscape photo?",
+        a: "Matched in height, a portrait photo comes out much narrower than a landscape one. For two halves of the same width, crop one of them first, or ask Stella to crop both to the same shape.",
       },
     ],
     related: ["photos-files/make-a-contact-sheet", "photos-files/remove-location-from-photos", "photos-files/add-watermark-to-photos"],
@@ -1614,7 +1681,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       "Installs the free rembg tool in its own separate Python environment, which downloads a background-removal model of about 170 MB",
       "Cuts out every photo onto a transparent background at full size, on this computer",
       "Checks the cut-outs on a bright magenta background and zooms in on handles, spouts and rims, then counts stray specks and holes",
-      "Saves the PNGs in a new Transparent background folder with the same names, confirms the originals are unchanged, and flags that most file names don't match the colours shown",
+      "Saves the PNGs in a new Transparent background folder with the same names, and confirms the originals are unchanged",
     ],
     prompt:
       "I sell ceramics online. Remove the background from the product photos in the Shop photos folder in my Pictures so each one is on a transparent background, and keep the originals.",
@@ -1625,7 +1692,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Eight transparent PNGs in about 2½ minutes, including the model download. Checked afterwards against an answer key written before the run: a real transparent cut-out of every photo at the same size, the outline matching each product (99–100% overlap with the true shape), the gaps inside the mug and teapot handles see-through, the products' own colours untouched, and the originals unchanged.",
-      note: "The product photos are rendered ceramics on a studio backdrop, made for this run. Their colours didn't match their file names, which Stella pointed out. The work is sped up 12×.",
+      note: "The product photos are rendered ceramics on a studio backdrop, made for this run. The work is sped up 12×.",
       video: {
         src: `${PROOFS}/photos-files/remove-background-from-photos/proof.mp4`,
         cuts: webCuts("photos-files/remove-background-from-photos"),
@@ -1679,6 +1746,14 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       {
         q: "Will the photos lose quality?",
         a: "No. The cut-outs are full size, and the product pixels are unchanged; only the background became transparent.",
+      },
+      {
+        q: "Can the edges be softened?",
+        a: "Yes. Stella cut the ceramics with crisp edges, which look right at full size, and offered to soften them for small thumbnails on a dark background; ask for softer edges in the prompt or as a follow-up. Hair, fur and glass take more touching up than ceramics.",
+      },
+      {
+        q: "What happens to the drop shadow?",
+        a: "It goes with the background, so the product sits on clear transparency. Most shop editors and Canva can add a shadow back if you want one.",
       },
       {
         q: "Can I watermark the product photos too?",
@@ -1761,11 +1836,11 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Scanner software",
-        body: "Many Epson and HP scanner programs have a mode (often called thumbnail or multi-photo) that finds separate prints while scanning. Check before scanning a whole album.",
+        body: "Many Epson and HP scanner programs have a mode (often called thumbnail or multi-photo) that finds separate prints while scanning. Try it on one scan before doing a whole album.",
       },
       {
         title: "Scan for easy splitting",
-        body: "Leave space between prints, keep them away from the edge of the glass, and put a dark sheet behind pale or white-bordered prints so they stand out from the lid.",
+        body: "Leave a gap between prints so none touch or overlap, keep them away from the edge of the glass, and put a dark sheet behind pale or white-bordered prints so the border stands out from a white lid and the whole print is kept.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -1776,11 +1851,11 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         q: "Will the separated photos be straight?",
-        a: "Stella straightened each print; the check confirmed it for all 16, which lay up to 4° crooked.",
+        a: "Yes. Stella straightened each print; the check confirmed it for all 16, which lay up to 4° crooked.",
       },
       {
         q: "Do I lose resolution?",
-        a: "No. Each photo is cut from the full 300 dpi scan.",
+        a: "No. Each photo is cut from the full 300 dpi scan. Stella trims a thin strip from each edge so no scanner bed shows, and says so in its reply.",
       },
       {
         q: "What next for old scans?",
@@ -1829,7 +1904,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Twelve stamped copies in about 1 minute. Checked afterwards against an answer key written before the run: a stamped copy of every photo at the same size and the right way up (three portraits are stored sideways), the stamp in the bottom-right corner, showing the date each was taken from 14 to 25 August rather than the 2 October file date, the rest of each photo untouched, and the originals unchanged.",
-      note: "The holiday photos are drawings made for this run, with dates taken in August and file dates in October. Stella chose a film-style orange stamp written as year, month, day (’26 8 14). The work is sped up 5×.",
+      note: "The holiday photos are drawings made for this run, with dates taken in August and file dates in October. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/photos-files/add-date-stamp-to-photos/proof.mp4`,
         cuts: webCuts("photos-files/add-date-stamp-to-photos"),
@@ -1881,6 +1956,14 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
         a: "Yes. Ask for date and time; the camera saves both.",
       },
       {
+        q: "Can I choose the date format?",
+        a: "Yes. Stella went for the film look, year, month, day (’26 8 14); name another format, like 14/08/2026 or 14 Aug 2026, and a colour or corner, and it stamps them that way.",
+      },
+      {
+        q: "What if a photo has no date taken?",
+        a: "Photos sent through chat apps often lose it. Stella lists any photo without a date taken and says which date it used instead, so you can change it; in the recording all 12 had one.",
+      },
+      {
         q: "My photos' dates are wrong in the first place. What now?",
         a: "Fix them first: see [fix the wrong date on photos](/how/photos-files/fix-wrong-date-on-photos).",
       },
@@ -1907,7 +1990,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
     short: "Convert RAW to JPG",
     lede: "Six camera RAW photos as full-size JPGs, colours natural and the portrait shot upright.",
     answer:
-      "On a Mac, open the RAW files in Preview and use File › Export Selected Images as JPEG. On Windows, add Microsoft's free Raw Image Extension and save from Photos one at a time, or batch-export with the free darktable or XnConvert. Watch out for converters that only pull out the small preview stored inside the RAW file. Stella (stella.sh) developed six RAW photos to full-size JPGs on your own computer, with the camera's colours and the turned shot upright.",
+      "On a Mac, open the RAW files in Preview and use File › Export Selected Images as JPEG. On Windows, add Microsoft's free Raw Image Extension and save from Photos one at a time, or batch-export with the free darktable or XnConvert. Use one that develops the full RAW data rather than the small preview stored inside the file. Stella (stella.sh) developed six RAW photos to full-size JPGs on your own computer, with the camera's colours and the turned shot upright.",
     stellaSteps: [
       "Finds the six lake trip RAW files in Pictures (DNG, the open RAW format many cameras and phones use)",
       "Develops each one from the full sensor data with the camera's white balance, rather than taking the small preview inside the file",
@@ -1967,7 +2050,7 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       },
       {
         title: "Command line, tested",
-        body: "On a computer with ImageMagick, `magick HX2_1041.DNG -auto-orient -quality 92 HX2_1041.jpg` develops a RAW file through LibRaw and turns it upright. We ran it on the same test photos and it passed.",
+        body: "On a computer with ImageMagick, `magick HX2_1041.DNG -auto-orient -quality 92 HX2_1041.jpg` develops a RAW file through LibRaw and turns it upright. On the same test photos it passed the same checks as Stella's JPGs.",
       },
       {
         title: "Check what you got",
@@ -1983,6 +2066,10 @@ export const PHOTOS_FILES_PAGES: ProblemPage[] = [
       {
         q: "Why are my converted JPGs small?",
         a: "Many quick converters save the small preview the camera stores inside the RAW file. Use a tool that develops the full RAW, as Stella did here.",
+      },
+      {
+        q: "Does it work with Canon CR3, Nikon NEF or Sony ARW files?",
+        a: "Yes. They go through the same free LibRaw library as the DNG files in the recording, and LibRaw's supported-cameras list shows every model it reads. A camera released after your copy of the library needs an update to it.",
       },
       {
         q: "My photos are HEIC or TIFF, not RAW.",

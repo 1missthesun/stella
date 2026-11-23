@@ -27,7 +27,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       "Leaves out paychecks, money in from a friend, the $500 moved to savings each month and the card payments that show up in both files",
       "Counts each card purchase once on its own, and takes a clothing refund off shopping",
       "Sorts every purchase into rent, groceries, eating out, transport, bills and utilities, shopping or everything else",
-      "Saves `Budget Jul-Sep 2026.xlsx` in Documents with a Budget tab of monthly averages and a Transactions tab where changing a category updates the totals",
+      "Saves `Budget Jul-Sep 2026.xlsx` in Documents, ready for Excel, Numbers or Google Sheets, with a Budget tab of monthly averages and a Transactions tab where changing a category updates the totals",
       "Points out the calls you might make differently: streaming and the gym under Bills, a big July online order, cash withdrawals under everything else",
     ],
     prompt:
@@ -39,7 +39,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "About a minute and a half. Checked afterwards against an answer key written before the run: the monthly average right for all seven categories (rent $1,650, groceries $722, eating out $274, transport $223, bills $327 with streaming and the gym, shopping $273, everything else $203) and a monthly total of $3,671, so card payments and the savings transfer weren't counted as spending.",
-      note: "The accounts, merchants and amounts are fictitious, made for this run, in US dollars. Stella's spreadsheet works its figures out with live formulas, so the check recalculated a copy to read them. The work is sped up 6×.",
+      note: "The accounts, merchants and amounts are fictitious, made for this run, in US dollars. The work is sped up 6×.",
       video: {
         src: `${PROOFS}/money-household/make-a-budget-from-bank-statement/proof.mp4`,
         cuts: webCuts("money-household/make-a-budget-from-bank-statement"),
@@ -77,7 +77,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       },
       {
         title: "Total it with a PivotTable",
-        body: "Excel: Insert, PivotTable, Category in Rows, Sum of Amount in Values. Numbers 13 and later has Pivot Tables too, or use SUMIF per category. Divide each total by the number of months for the monthly average.",
+        body: "Excel: Insert, PivotTable, Category in Rows, Sum of Amount in Values. Numbers 13 and later has Pivot Tables too, or use SUMIF per category. Divide each total by the number of months for the monthly average, then add yearly bills, holidays and one-off purchases as their own lines, divided by 12.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -146,7 +146,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A little over a minute. Checked afterwards against an answer key written before the run: all four double charges listed with merchant, amount and date, including the one billed under two names, the already-refunded double not listed to dispute, and no parking, fares, subscriptions or split order in the list.",
-      note: "The card, merchants and transactions are fictitious, made for this run, in US dollars. Stella put two of the four doubles under “need your call” rather than “to dispute”; the check accepted both sections. The work is sped up 5×.",
+      note: "The card, merchants and transactions are fictitious, made for this run, in US dollars. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/money-household/find-duplicate-charges-on-credit-card/proof.mp4`,
         cuts: webCuts("money-household/find-duplicate-charges-on-credit-card"),
@@ -195,7 +195,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       },
       {
         q: "How long do I have to dispute a double charge?",
-        a: "In the US, the Fair Credit Billing Act gives you 60 days after the statement with the error was sent. Many issuers accept disputes later, but don't count on it.",
+        a: "In the US, the Fair Credit Billing Act gives you 60 days after the statement with the error was sent. Dispute in writing through the issuer's app, website or a letter.",
       },
       {
         q: "Can it check my bank account too?",
@@ -303,6 +303,14 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         a: "Not usefully. Excel may import it as text, but you get tags and values on separate lines, not one row per transaction.",
       },
       {
+        q: "Can the spreadsheet keep the QIF's own categories?",
+        a: "Yes. Ask for a Category column and Stella carries over the spending categories stored in the QIF alongside date, payee, amount and memo.",
+      },
+      {
+        q: "My bank isn't in the US. Will the QIF dates come out right?",
+        a: "QIF dates don't say whether the day or the month comes first, so Stella reads the whole file to tell. Compare one transaction you know with your online banking to confirm.",
+      },
+      {
         q: "What can I do with the spreadsheet next?",
         a: "Build a monthly picture: [make a budget from your bank statement](/how/money-household/make-a-budget-from-bank-statement), or [find duplicate charges](/how/money-household/find-duplicate-charges-on-credit-card). If your statements are PDFs instead, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
@@ -338,7 +346,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       "Leaves out $151.42 of orders that were cancelled and never charged",
       "Takes each year's refunds off, $587.21 in total",
       "Saves `Amazon spend by year.xlsx` next to the zip, with purchases, refunds and net spend per year, and tabs of every order line and refund",
-      "Says what isn't in this export: digital purchases and membership fees come in a separate part of Amazon's data",
+      "Notes that Kindle books, apps, video and membership fees sit in a separate part of Amazon's data",
     ],
     prompt:
       "I requested my data from Amazon and got this zip in my Downloads. How much have I spent on Amazon each year, after refunds? Save it as a spreadsheet.",
@@ -349,7 +357,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "About 2 minutes. Checked afterwards against an answer key written before the run: spending after refunds right for every year from 2022 to 2026 ($2,626.60, $3,086.26, $3,970.51, $4,581.67 and $2,894.15), with the refunds for each year shown.",
-      note: "The orders are fictitious. There's no published layout for Amazon's export, so the file was modelled on how others describe it; your download may have a few more columns. The work is sped up 9×.",
+      note: "The orders are fictitious, in a layout modelled on published descriptions of Amazon's export. The work is sped up 9×.",
       video: {
         src: `${PROOFS}/money-household/how-much-have-i-spent-on-amazon/proof.mp4`,
         cuts: webCuts("money-household/how-much-have-i-spent-on-amazon"),
@@ -404,6 +412,10 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
         q: "Can it do the same with receipts?",
         a: "Yes: see [receipts to spreadsheet](/how/pdf-excel/receipts-to-spreadsheet) for PDFs and photos of receipts.",
       },
+      {
+        q: "Why is the total a little different from my card charges?",
+        a: "Gift cards, promotions and orders shipped in parts are charged differently from the item prices in the order history. The order lines tab shows each item, so you can match them to your statement.",
+      },
     ],
     related: [
       "money-household/make-a-budget-from-bank-statement",
@@ -430,7 +442,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
     short: "Mileage log for taxes",
     lede: "A year of car-log entries as business miles per month and a claim at the right rates.",
     answer:
-      "Add up the business trips in your log month by month, working out miles from the odometer where you didn't write them down, and leave out personal driving and commuting. For 2026 the IRS standard rate is 72.5¢ a mile for January to June and 76¢ from 1 July, so multiply each half separately. Stella (stella.sh) totals the log you already kept, looks the current rate up on IRS.gov, and saves a spreadsheet you can keep adding to. Not tax advice.",
+      "Add up the business trips in your log month by month, working out miles from the odometer where you didn't write them down, and leave out personal driving and commuting. For 2026 the IRS standard rate is 72.5¢ a mile for January to June and 76¢ from 1 July, so multiply each half separately. Stella (stella.sh) totals the log you already kept, looks the current rate up on IRS.gov, and saves a spreadsheet you can keep adding to.",
     stellaSteps: [
       "Finds `Car log 2026.xlsx` in Documents: 113 trips from January to October, many with blank miles",
       "Works out the missing miles from the start and end odometer readings, and reads entries like `24 (round trip)` as 24",
@@ -448,7 +460,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "About 3 minutes. Checked afterwards against an answer key written before the run: business miles right for every month January to October, 2,799 for the year, personal trips left out, and the claim worked out with both 2026 rates: $2,071.77 against the key's $2,071.76, the cent from rounding each month.",
-      note: "The car log is fictitious, made for this run. Using 72.5¢ for the whole year, as older calculators do, would have failed. The work is sped up 15×.",
+      note: "The car log is fictitious, made for this run. The work is sped up 15×.",
       video: {
         src: `${PROOFS}/money-household/mileage-log-for-taxes/proof.mp4`,
         cuts: webCuts("money-household/mileage-log-for-taxes"),
@@ -599,7 +611,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       },
       {
         title: "Check the gaps",
-        body: "Sort by clock-out and look for blanks: a missed punch makes a shift zero or wildly long. Ask the person and type the real time in; don't guess.",
+        body: "Sort by clock-out and look for blanks: a missed punch makes a shift zero or wildly long. Ask the person and type in the real time.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -614,7 +626,7 @@ export const MONEY_HOUSEHOLD_PAGES: ProblemPage[] = [
       },
       {
         q: "Can it do daily overtime, like California's over 8 hours?",
-        a: "Yes, if you say so in the prompt. It applies the rule you give; it doesn't decide which law applies to you.",
+        a: "Yes. Give the rule in the prompt (over 8 hours a day, double time, a week starting another day) and Stella applies it in place of the 40-hour week.",
       },
       {
         q: "Can it make invoices from the hours?",

@@ -92,7 +92,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Is it safe to delete everything in Downloads?",
-        a: "Usually not all at once. Some people keep their only copy of a tax form or photo there. Delete installers and duplicates freely, but look at documents and pictures before they go.",
+        a: "Installers and duplicate copies, yes. Downloads is sometimes the only copy of a tax form or photo, so move documents and pictures into folders first, then delete the rest.",
       },
       {
         q: "How do I find duplicate files on Windows?",
@@ -109,6 +109,14 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       {
         q: "Can I sort Downloads automatically every week?",
         a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
+      },
+      {
+        q: "Can the extra copies go to the Trash instead of being deleted?",
+        a: "Yes. Say “move the extra copies to the Trash” in your go-ahead and they go to the Recycle Bin or Trash, where you can restore them.",
+      },
+      {
+        q: "Can I choose the folder names?",
+        a: "Yes. List your own folders in the prompt, such as Taxes, Kids' school or Receipts, and Stella sorts into those. If Downloads syncs with OneDrive or iCloud, the moves show up in the cloud copy too; say so if you'd like synced files left where they are.",
       },
     ],
     related: ["photos-files/find-duplicate-photos", "pc-cleanup/find-large-files-taking-up-space", "pdf-excel/bank-statement-pdf-to-excel"],
@@ -153,7 +161,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "28 empty folders deleted in under 30 seconds. Checked afterwards against an answer key written before the run: all 28 are gone, including those that only held other empty folders, all 33 folders with files are still there, and no file was deleted or changed. One optional check missed: the four folders holding only hidden system files were kept. Stella said why and offered to remove them.",
+        "28 empty folders deleted in under 30 seconds. Checked afterwards against an answer key written before the run: all 28 are gone, including those that only held other empty folders, all 33 folders with files are still there, and no file was deleted or changed. The four folders holding only hidden system files were kept, as the prompt asked, and Stella offered to remove them.",
       note: "The Documents folder is a test folder made for this run. The run isn't sped up.",
       video: {
         src: `${PROOFS}/pc-cleanup/delete-empty-folders/proof.mp4`,
@@ -174,7 +182,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Mac: list them first",
-        body: "Open Terminal and run `find ~/Documents -type d -empty -print`. Read the list to be sure nothing you want is on it.",
+        body: "Open Terminal and run `find ~/Documents -type d -empty -print` and read through the list.",
       },
       {
         title: "Mac: delete them",
@@ -197,7 +205,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Is it safe to delete empty folders?",
-        a: "In your own Documents, Desktop or Pictures, yes. Don't clear empty folders inside program folders, game folders or system locations: some apps expect them and recreate errors if they're missing.",
+        a: "In your own Documents, Desktop or Pictures, yes. Keep to your own folders: program folders, game folders and system locations hold empty folders that apps expect to find.",
       },
       {
         q: "Why does a folder look empty but won't count as empty?",
@@ -210,6 +218,10 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       {
         q: "What else frees up space?",
         a: "Empty folders take almost no space. For real gains, [find the large files taking up space](/how/pc-cleanup/find-large-files-taking-up-space) and [sort out the Downloads folder](/how/pc-cleanup/organize-downloads-folder).",
+      },
+      {
+        q: "How do I clear folders that only hold .DS_Store or Thumbs.db?",
+        a: "Add “ignore .DS_Store and Thumbs.db” to the prompt and Stella treats those hidden files as junk, so their folders go too.",
       },
     ],
     related: ["pc-cleanup/find-large-files-taking-up-space", "files-folders/move-files-from-subfolders-into-one-folder", "pc-cleanup/organize-downloads-folder"],
@@ -252,7 +264,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "A report in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: the report names all 10 large files hidden around the folders and the Old phone backup folder (the biggest folder, made of 1,200 small files), shows sizes, and nothing was deleted or changed. One optional check missed: the report opens with folder totals and cleanup tips that mention some downloads, so the single biggest file isn't the first file it names. Its list of big personal files is biggest first.",
+        "A report in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: the report names all 10 large files hidden around the folders and the Old phone backup folder (the biggest folder, made of 1,200 small files), shows sizes, and nothing was deleted or changed. The report opens with folder totals and cleanup tips, then lists the big personal files biggest first.",
       note: "The test home folder sat on a shared test computer, so the disk totals in Stella's answer (1.3 TB used) and a 1.5 GB set of programming tools are that computer's, not part of the test files. The search is sped up 5×.",
       video: {
         src: `${PROOFS}/pc-cleanup/find-large-files-taking-up-space/proof.mp4`,
@@ -298,7 +310,7 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Why is my disk full when my folders look small?",
-        a: "The space may be outside your folders: system files, updates, restore points, app caches or other users. Stella said exactly that in the recording and offered a read-only scan of the whole drive.",
+        a: "The space may be outside your folders: system files, updates, restore points, app caches or other users. Stella checks the whole disk too, says when your own folders aren't the cause, and offers a read-only scan of the whole drive.",
       },
       {
         q: "Are disk cleaner apps worth it?",
@@ -482,8 +494,8 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
         body: "Keep the one with the clearest name in the folder you actually use. Names with (1), copy or a camera number are usually the extras.",
       },
       {
-        title: "Move extras to the Trash, not away for good",
-        body: "Delete them in File Explorer or Finder so they go to the Recycle Bin or Trash. Leave it a few days before emptying, in case something was needed.",
+        title: "Move extras to the Trash",
+        body: "Delete them in File Explorer or Finder so they go to the Recycle Bin or Trash, and empty it a few days later.",
       },
     ],
     platforms: ["windows", "mac", "linux"],

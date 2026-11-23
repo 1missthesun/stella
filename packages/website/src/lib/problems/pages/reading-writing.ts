@@ -15,13 +15,13 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
     short: "PDF to EPUB",
     lede: "A 20-page novel PDF as a reflowable ebook with 8 chapters, no stray page numbers.",
     answer:
-      "Open the PDF in the free Calibre, fix the title and author, then Convert books with EPUB as the output and turn on header and footer removal, or the book's page numbers and running heads end up mid-sentence. Check the result in Calibre's viewer before copying it to your e-reader. Stella (stella.sh) does the conversion on your computer: it strips page furniture, rejoins split words, builds a chapter list and checks the file with the standard EPUB validator.",
+      "Open the PDF in the free Calibre, fix the title and author, then Convert books with EPUB as the output and turn on header and footer removal, or the book's page numbers and running heads end up mid-sentence. Check the result in Calibre's viewer before copying it to your e-reader. Stella (stella.sh) converts a text-based PDF on your computer: it strips page furniture, rejoins split words, builds a chapter list and checks the file with the standard EPUB validator.",
     stellaSteps: [
       "Finds `The Lantern Keeper's Daughter - Wren Alder.pdf` in Downloads and reads its text and layout, noticing the file's title is the leftover `Microsoft Word - LKD_final_v3.docx`",
       "Looks at a few page images to see where the running heads, page numbers and chapter openings sit",
       "Writes a small converter of its own that drops the heads and page numbers, joins words split across lines and starts a new section at each chapter",
       "Builds the EPUB with the real title and author, a contents page for all 8 chapters, and the PDF's title page as the cover",
-      "Downloads the W3C's EPUBCheck validator (and a Java runtime to run it) into a work folder, checks the book passes with no errors, and previews chapters in a browser",
+      "Downloads the W3C's EPUBCheck validator and a Java runtime to run it (about 200 MB) into a work folder, checks the book passes with no errors, and previews chapters in a browser",
       "Saves the EPUB next to the PDF, which it leaves untouched",
     ],
     prompt: "Convert the novel PDF in my Downloads to an EPUB so it reads properly on my e-reader.",
@@ -127,7 +127,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "Three PDFs in under 2 minutes. Checked afterwards against an answer key written before the run: one PDF per note with all the text there, no Markdown symbols left, headings larger than body text, bold and italic in bold and italic fonts, tables laid out in rows and columns, the map picture embedded, the link clickable, code in a monospace font, and the notes unchanged.",
-      note: "The notes were written for this run. The trip note runs to 2 pages because Stella moved the map to the top of page 2 rather than split it. The work is sped up 7×.",
+      note: "The notes were written for this run. The work is sped up 7×.",
       video: {
         src: `${PROOFS}/reading-writing/convert-markdown-to-pdf/proof.mp4`,
         cuts: webCuts("reading-writing/convert-markdown-to-pdf"),
@@ -177,7 +177,11 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       },
       {
         q: "Do tick-box lists work in a PDF?",
-        a: "They print as ticked and empty boxes; they aren't clickable in the PDF.",
+        a: "They print as ticked and empty boxes, the way a printed checklist looks.",
+      },
+      {
+        q: "Can I choose the font, page size or margins?",
+        a: "Yes. Name them in the prompt, or ask after the first round, and Stella redoes the PDFs with your font, paper size and margins.",
       },
       {
         q: "I need a Word file instead.",
@@ -266,7 +270,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I upload the EPUB to Kindle Direct Publishing?",
-        a: "KDP accepts EPUB and Word files. Check the result in Kindle Previewer before publishing, and add your ISBN and publisher details if you have them.",
+        a: "KDP accepts EPUB and Word files. Give Stella your ISBN, publisher and publication date and it adds them to the book; preview the result in Kindle Previewer before you publish.",
       },
       {
         q: "Does the cover need a particular size?",
@@ -357,7 +361,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I merge EPUBs on a phone?",
-        a: "Not easily. Do it on a computer, then copy the merged book to the phone or e-reader.",
+        a: "Merge them on a computer, then copy the merged book to the phone or e-reader.",
       },
       {
         q: "Can I split a big EPUB back into books?",
@@ -386,7 +390,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
     short: "CBR and CBZ to PDF",
     lede: "Two comic files as PDFs, every page in order and the double-page spread kept whole.",
     answer:
-      "A .cbz is a zip of page images and a .cbr is a RAR of them. The free Calibre converts both to PDF (Add books, Convert books, output PDF), or you can open the archive with 7-Zip and print the pages to PDF. Watch for page 10 sorting before page 2 and for junk files becoming pages. Stella (stella.sh) does both comics on your computer, in true page order, without shrinking the pictures.",
+      "A .cbz is a zip of page images and a .cbr is a RAR of them. The free Calibre converts both to PDF (Add books, Convert books, output PDF), or you can open the archive with 7-Zip and print the pages to PDF. Sort the pages by number, so page 10 follows page 9, and leave out junk files. Stella (stella.sh) does both comics on your computer, in true page order, without shrinking the pictures.",
     stellaSteps: [
       "Finds `Moth & Lantern 001 (2026).cbz` and `Moth & Lantern 002 (2026).cbr` in Downloads and opens both with the archive tool already on the computer, which reads RAR",
       "Sorts issue 1's pages by their number (p1, p2 … p10, not p1, p10, p2) and leaves out the `__MACOSX` and `Thumbs.db` leftovers",
@@ -493,7 +497,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "Three Word documents in about 5 minutes. Checked afterwards against an answer key written before the run: one .docx per note, headings in Word heading styles at the right levels, no Markdown symbols left, bold and italic kept, bullet and numbered lists as real Word lists, tables as Word tables with the right cells, the map picture embedded, the link clickable, code in a monospace font, and the notes unchanged.",
-      note: "The notes were written for this run. Stella spent most of the 5 minutes building and checking its converter; the recording is sped up 22×.",
+      note: "The notes were written for this run. The recording is sped up 22×.",
       video: {
         src: `${PROOFS}/reading-writing/convert-markdown-to-word/proof.mp4`,
         cuts: webCuts("reading-writing/convert-markdown-to-word"),
@@ -550,6 +554,10 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
         a: "Yes. Standard Markdown converts directly. Obsidian's `[[wiki links]]` and embeds aren't standard, so tell Stella to turn them into plain links or text.",
       },
       {
+        q: "What fonts do the Word documents use?",
+        a: "Calibri for the text and Consolas for code, Word's usual pair. Name another font in the prompt and Stella uses that instead.",
+      },
+      {
         q: "What about Word to Markdown, or an ebook?",
         a: "pandoc and Stella go the other way too. For an ebook, see [convert Word to EPUB](/how/reading-writing/convert-word-to-epub). For many Word files to PDF, see [convert Word documents to PDF in bulk](/how/documents/convert-word-documents-to-pdf-in-bulk).",
       },
@@ -579,7 +587,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       "Removes the blank lines and stray tabs and spaces, starts each chapter on a new page and turns the `***` scene breaks into a centred #",
       "Adds a title page with the contact details and a rounded word count, and a “Lindqvist / Glass Orchard / page” header on the following pages",
       "Renders the pages to images to check them, and saves `The Glass Orchard - manuscript format.docx` next to the draft, which it leaves untouched",
-      "Points out what it didn't change: the draft is only about 2,200 words, the email looks like a placeholder, and about ten sentences start with a lowercase letter",
+      "Lists things to look at in the text, which it leaves as written: the draft is only about 2,200 words, the email looks like a placeholder, and about ten sentences start with a lowercase letter",
     ],
     prompt:
       "Format my novel in Documents in standard manuscript format so I can send it to literary agents. Save it as a new Word file.",
@@ -636,7 +644,7 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Is standard manuscript format still Courier?",
-        a: "Times New Roman 12 pt is now the usual choice for novels. Courier is still accepted by many literary agents and some short-fiction markets ask for it.",
+        a: "Times New Roman 12 pt is now the usual choice for novels. Courier is still accepted by many literary agents and some short-fiction markets ask for it; ask Stella for Courier, all-caps chapter titles or no header when a submission page wants that.",
       },
       {
         q: "What goes in a manuscript header?",
@@ -645,6 +653,10 @@ export const READING_WRITING_PAGES: ProblemPage[] = [
       {
         q: "Do I need a title page?",
         a: "For a novel submission, usually yes: contact details at the top left, approximate word count at the top right, then the title and your name centred. Some literary agents only want the first page of chapter one; check their guidelines.",
+      },
+      {
+        q: "Will it fix my typos as well?",
+        a: "Ask for it. By default Stella changes the layout only, keeps every word as you wrote it and lists what it spotted, such as sentences starting with a lowercase letter.",
       },
       {
         q: "Can it make an ebook of the same book?",

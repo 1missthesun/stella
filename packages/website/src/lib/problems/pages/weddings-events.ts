@@ -91,7 +91,11 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
       },
       {
         q: "What if replies came by text or email instead of a form?",
-        a: "Paste or save them into a document and ask Stella to read them into the same summary; check its reading of anything ambiguous.",
+        a: "Paste or save them into a document and ask Stella to read them into the same summary. It matches replies by email and name, and lists any reply it couldn't match to an invitation so you can place it.",
+      },
+      {
+        q: "Can it write reminders for the guests who haven't replied?",
+        a: "Yes. Ask for reminder messages and Stella drafts one per household, with the emails from your invite list, ready to send from your own email.",
       },
     ],
     related: ["weddings-events/make-wedding-seating-chart", "weddings-events/make-place-cards-from-guest-list", "printing-labels/print-envelopes-from-excel", "pdf-excel/remove-duplicate-rows-in-excel"],
@@ -160,7 +164,7 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
       },
       {
         title: "Check the totals",
-        body: "Make sure the count of Yes guests equals the sum of the table counts, and look for anyone who said yes without a table before you print.",
+        body: "Check that the count of Yes guests equals the sum of the table counts, and look for anyone who said yes without a table before you print.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -180,6 +184,10 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
       {
         q: "My RSVPs aren't counted yet. Where do I start?",
         a: "See [count wedding RSVPs](/how/weddings-events/count-wedding-rsvps) for the headcount, meals and who hasn't replied.",
+      },
+      {
+        q: "Can it work out who sits where?",
+        a: "By default it uses the tables already in your guest list. To get a seating plan, ask for one with the number of tables, seats per table and who should sit together, and it fills in the table column for you to adjust.",
       },
     ],
     related: ["weddings-events/make-place-cards-from-guest-list", "weddings-events/count-wedding-rsvps", "printing-labels/print-poster-on-multiple-pages"],
@@ -250,7 +258,7 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
       },
       {
         title: "Print on card stock",
-        body: "Set the printer's paper type to card stock or heavy paper and print at 100%. Print one page on plain paper first and fold it to check the names sit the right way up.",
+        body: "Set the printer's paper type to card stock or heavy paper, within the printer's maximum paper weight, and print at 100%. Print one page on plain paper first and fold it to check the names sit the right way up.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -270,6 +278,10 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
       {
         q: "Can it do the seating chart too?",
         a: "Yes: see [make a wedding seating chart](/how/weddings-events/make-wedding-seating-chart).",
+      },
+      {
+        q: "Can the cards use our wedding font or motif?",
+        a: "Yes. Name the font or describe the motif, or give Stella a sample card, and it lays the names out in that style.",
       },
     ],
     related: ["weddings-events/make-wedding-seating-chart", "weddings-events/count-wedding-rsvps", "printing-labels/make-name-tags-from-a-list"],
@@ -338,7 +350,7 @@ export const WEDDINGS_EVENTS_PAGES: ProblemPage[] = [
       },
       {
         title: "Print and cut",
-        body: "Print a page on plain paper to check the numbers match, then the rest. Cut along the outlines and score or fold along the stub line so it tears cleanly.",
+        body: "Print a page on plain paper to check the numbers match, then the rest. Cut along the outlines (a paper trimmer makes 250 tickets quick work) and score or fold along the stub line so it tears cleanly.",
       },
     ],
     platforms: ["windows", "mac", "linux"],

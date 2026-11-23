@@ -93,6 +93,14 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         a: "Yes. See [open a RAR file](/how/files-folders/open-rar-file) and [open a split 7z file](/how/files-folders/open-7z-file). To go the other way, see [split a folder into zips small enough to email](/how/files-folders/zip-file-too-large-to-email).",
       },
       {
+        q: "What about password-protected zips?",
+        a: "Give Stella the password in the prompt and it opens them with the rest. Any zip that needs a password it doesn't have is named in its reply, so you know which ones to ask the sender about.",
+      },
+      {
+        q: "What if a zip has another zip inside?",
+        a: "The inner zip is unpacked as a file like any other. Add “and unzip any zips inside them too” to the prompt and Stella opens those into their own folders as well.",
+      },
+      {
         q: "Will it delete the zip files afterwards?",
         a: "Not unless you ask. In the recording all 12 zips stayed in Downloads, unchanged.",
       },
@@ -189,6 +197,14 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         a: "Not reliably. .docx and .xlsx are compressed zips inside, so the words aren't stored as plain text, and most PDFs are compressed too. You need a tool that opens each format.",
       },
       {
+        q: "Does it search scanned PDFs?",
+        a: "Yes. Stella runs text recognition on a scan before searching it, which takes longer than reading a PDF that already has text; in this run every file had text.",
+      },
+      {
+        q: "Can it include spelling variants?",
+        a: "Yes, say so in the prompt (“count Harbour View Lettings and HVL too”). Without that, Stella lists only exact matches and puts possible ones, like “Harbour Lettings”, at the bottom for you to decide.",
+      },
+      {
         q: "Does it change or move the files it finds?",
         a: "No. It only read them; the check confirmed every file was unchanged. Ask separately if you want the matches copied into one folder.",
       },
@@ -256,7 +272,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Back up first",
-        body: "Copy the whole Scans folder somewhere else before you start. If a name clash goes wrong, you can start again.",
+        body: "Copy the whole Scans folder somewhere else before you start, so you can go back to the original layout at any point.",
       },
       {
         title: "Windows: search, cut, paste",
@@ -264,7 +280,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       },
       {
         title: "Windows: handle the clashes",
-        body: "When Windows says files with the same name already exist, choose “Let me decide for each file”, tick both the source and destination boxes at the top, and continue. Windows keeps both and adds “(2)” to the name. Choosing Replace or Skip loses files.",
+        body: "When Windows says files with the same name already exist, choose “Let me decide for each file”, tick both the source and destination boxes at the top, and continue. Windows keeps both and adds “(2)” to the name. Replace overwrites a file and Skip leaves it in its subfolder.",
       },
       {
         title: "Mac: search, drag, Keep Both",
@@ -284,6 +300,10 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       {
         q: "Can I keep the year and month in the file names?",
         a: "Yes. That's what Stella did here: `2023 - 01 Jan - scan0001.pdf`. To rename by a pattern of your own, see [rename multiple files at once](/how/files-folders/rename-multiple-files-at-once).",
+      },
+      {
+        q: "Can I keep the original names and just add (2)?",
+        a: "Yes, say so in the prompt. Stella chose to put each file's old folder path in front of the name; ask for “(2)” on clashing names instead, or for exact copies to be kept only once, and it does that. In this run one file was an exact copy of another, and both were kept.",
       },
       {
         q: "Does moving files change their dates?",
@@ -353,7 +373,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Keep all the parts together",
-        body: "Put every part (.7z.001, .7z.002, .7z.003…) in the same folder with their names unchanged. One part on its own can't be opened, and a missing part means some files can't be recovered.",
+        body: "Put every part (.7z.001, .7z.002, .7z.003…) in the same folder with their names unchanged. The archive opens from all the parts together, so download each one in full before you start.",
       },
       {
         title: "Windows: 7-Zip",
@@ -383,8 +403,8 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         a: "Recent Windows 11 versions open a single .7z in File Explorer. Split parts and password-protected archives still need 7-Zip.",
       },
       {
-        q: "Is a 7z file safe to open?",
-        a: "Opening it only unpacks files; it doesn't run anything. Be careful with programs (.exe, .app, scripts) that come out of an archive from someone you don't know.",
+        q: "How do I open a password-protected 7z file?",
+        a: "7-Zip and The Unarchiver ask for the password as they open it. With Stella, give the password in the prompt and it unpacks the archive the same way.",
       },
       {
         q: "What about RAR and zip files?",
@@ -485,8 +505,8 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         a: "Archive Utility, which opens zips when you double-click, doesn't support RAR. Use The Unarchiver or `tar -xf` in Terminal.",
       },
       {
-        q: "Is it safe to use an online RAR extractor?",
-        a: "It means uploading the archive to someone else's server. For family photos or documents, opening it on your own computer is the safer choice.",
+        q: "How do I open a password-protected RAR?",
+        a: "7-Zip and The Unarchiver ask for the password as they open it; Windows 11's Extract All doesn't take one. With Stella, give the password in the prompt.",
       },
       {
         q: "What about 7z or many zip files?",
@@ -535,7 +555,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "All 14 renamed in about 15 seconds. Checked afterwards against an answer key written before the run, by file contents: every file is named `NN - Topic.pdf` with its correct lecture number (including 09, not 101, for `BIO101 L9 Inheritance.pdf`, and 13 and 14 for the two without numbers), renamed not copied, with lower-case `.pdf` and nothing else added to the folder.",
-      note: "The lecture PDFs were made for this run. Stella's first message is a terse working note (“Titles match filenames and are clean; renaming.”) rather than its usual plan. The run isn't sped up.",
+      note: "The lecture PDFs were made for this run. The run isn't sped up.",
       video: {
         src: `${PROOFS}/files-folders/rename-multiple-files-at-once/proof.mp4`,
         cuts: webCuts("files-folders/rename-multiple-files-at-once"),
@@ -586,7 +606,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I undo a bulk rename?",
-        a: "Windows' Ctrl+Z undoes a PowerRename batch right after. Otherwise you need a list of old names, so ask Stella to save one next to the files.",
+        a: "Windows' Ctrl+Z undoes a PowerRename batch right after. Otherwise you need a list of old names: add “keep a list of the old names” to the prompt and Stella saves one next to the files.",
       },
       {
         q: "Can it rename and gather files from subfolders at once?",
@@ -616,7 +636,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     short: "Zip too large to email",
     lede: "A 25 MB folder as two zips under 20 MB, each opening on its own.",
     answer:
-      "Group the files into two or three folders of about 18 MB each and zip each one: Compress on a Mac, Send to, Compressed (zipped) folder on Windows. Avoid “split to volumes” in 7-Zip or WinRAR for email: those .001 or .z01 parts only open when the person has every one. Photos barely shrink when zipped, so count on their full size. Stella (stella.sh) packs the folder into the fewest ordinary zips under your limit and checks that each one opens alone.",
+      "Group the files into two or three folders of about 18 MB each and zip each one: Compress on a Mac, Send to, Compressed (zipped) folder on Windows. Use ordinary zips rather than “split to volumes” in 7-Zip or WinRAR: those .001 or .z01 parts only open when the person has every one. Photos barely shrink when zipped, so count on their full size. Stella (stella.sh) packs the folder into the fewest ordinary zips under your limit and checks that each one opens alone.",
     stellaSteps: [
       "Measures the House sale folder: 22 files, about 25 MB, mostly photos that won't compress much",
       "Packs them into two ordinary zips under 20 MB, leaving room under the limit: all the documents and photos 1–8 in one, photos 9–16 in the other",
@@ -666,7 +686,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
         body: "Mac: Control-click each folder and choose Compress. Windows 11: right-click, Compress to, ZIP File (on Windows 10, Send to, Compressed (zipped) folder). Check each zip's size before attaching.",
       },
       {
-        title: "Don't use split volumes for email",
+        title: "Use ordinary zips, not split volumes",
         body: "7-Zip's “Split to volumes” and WinRAR's parts (.001, .z01, .part1.rar) only open when the recipient has every part and a tool that joins them. Ordinary zips open with a double-click on any computer.",
       },
       {
@@ -678,11 +698,15 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Why is my zip file almost the same size as the folder?",
-        a: "Photos, videos, music and PDFs with pictures are compressed already. Zipping squeezes text and Office files, not those. To shrink photos, [resize them in bulk](/how/photos-files/resize-images-in-bulk).",
+        a: "Photos, videos, music and PDFs with pictures are compressed already. Zipping squeezes text and Office files, not those. To shrink photos, [resize them in bulk](/how/photos-files/resize-images-in-bulk), or ask Stella to make smaller copies of the photos before it zips them.",
       },
       {
         q: "Can the recipient open just one of the zips?",
         a: "Yes. Each is an ordinary zip with whole files inside. That's the difference from split volumes, which open only all together.",
+      },
+      {
+        q: "What if one file is bigger than the limit?",
+        a: "An ordinary zip is always at least as big as its biggest file, so a large video goes better as a shared link from Google Drive, OneDrive or iCloud Drive. Stella names any file like that in its reply and zips the rest.",
       },
       {
         q: "What if it's one big PDF that's too large?",
@@ -716,7 +740,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     short: "Combine GPX files",
     lede: "Five recordings of a four-day hike as one GPX, in time order, heart rate kept.",
     answer:
-      "The free GPSBabel can merge GPX files and sort the points by time; gpx.studio in the browser lets you drop the files in and merge them by hand. Both work, but watch for two things: files merged in file-name order instead of time order, and times dropped in the merge. Stella (stella.sh) combines them on your computer in time order, keeps times, elevation and heart rate, and tells you which recording is which.",
+      "The free GPSBabel can merge GPX files and sort the points by time; gpx.studio in the browser lets you drop the files in and merge them by hand. Both work; check that the result runs in time order rather than file-name order, and that every point kept its time. Stella (stella.sh) combines them on your computer in time order, keeps times, elevation and heart rate, and tells you which recording is which.",
     stellaSteps: [
       "Finds five GPX files in the West Highland hike folder, not four: day 2 was recorded in two parts, one from a phone app with a different layout",
       "Orders them by their timestamps, not their file names (`Activity_20891.gpx` turned out to be day 4)",
@@ -821,7 +845,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "One KML in about 30 seconds. Checked afterwards against an answer key written before the run: 8 separate lines, one per track, each keeping all its points with coordinates in the right order, each labelled with its date, and the GPX files unchanged.",
-      note: "The eight tracks are synthetic test files made for this run, generated at a walking pace, so Stella's remark that they don't look like bike rides is it checking the data and flagging an oddity, not a comment on anyone's real rides. The run isn't sped up; a long idle stretch after the answer is cut.",
+      note: "The eight tracks are synthetic test files made for this run, generated at a walking pace. The run isn't sped up; a long idle stretch after the answer is cut.",
       video: {
         src: `${PROOFS}/files-folders/convert-gpx-to-kml/proof.mp4`,
         cuts: webCuts("files-folders/convert-gpx-to-kml"),
@@ -867,7 +891,11 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I open a GPX in Google Maps?",
-        a: "Not directly. Google My Maps imports KML (and GPX via some routes), then shows it on a map you can share. Convert to KML first for the most reliable import.",
+        a: "Not directly. Google My Maps imports KML (and GPX via some routes), then shows it on a map you can share. Convert to KML first for the most reliable import. My Maps limits how much each layer takes, so for a big archive use Google Earth Pro or save the file as KMZ.",
+      },
+      {
+        q: "Can I make the KML file smaller?",
+        a: "Yes. Stella kept every point here; ask it to simplify the lines and it drops points the eye can't see on the map. Saving as KMZ, a zipped KML, shrinks it further.",
       },
       {
         q: "Can it go back from KML to GPX?",
@@ -941,7 +969,7 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Back up first",
-        body: "Before merging, copy the newer folder somewhere safe, or make sure it's in your backup. A wrong copy command can overwrite photos, and an overwritten file doesn't go to the Trash.",
+        body: "Before merging, copy the newer folder somewhere else, or check it's in your backup. An overwritten file doesn't go to the Trash, so the backup is your way back.",
       },
       {
         title: "Windows: robocopy",
@@ -973,6 +1001,14 @@ export const FILES_FOLDERS_PAGES: ProblemPage[] = [
       {
         q: "Will it delete the old copy?",
         a: "No. It copies and leaves the old copy alone, and says when it looks safe to delete. For duplicates within one folder, see [find duplicate photos](/how/photos-files/find-duplicate-photos).",
+      },
+      {
+        q: "Can it keep the two folders in sync both ways?",
+        a: "Yes, as a different request: ask for a two-way sync, where files added or deleted on either side are mirrored to the other. The recording copies one way, from the old copy into the new.",
+      },
+      {
+        q: "What about a photo that was edited in one copy?",
+        a: "A rotated or cropped photo counts as a different file, so both versions are kept, the older one with “(old laptop)” in its name. Look through the saved list of added files and delete any versions you don't need.",
       },
       {
         q: "Can it put everything from many subfolders into one?",

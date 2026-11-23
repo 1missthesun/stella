@@ -188,6 +188,14 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
         a: "Usually from minutes to a few days, depending on how much you asked for. Asking for Messages only is faster than everything.",
       },
       {
+        q: "Why is one of my Messenger chats missing from the download?",
+        a: "End-to-end encrypted Messenger chats are stored separately from the Facebook download. Messenger has its own option for downloading those, in its privacy settings for encrypted chats.",
+      },
+      {
+        q: "Which time zone are the message times in?",
+        a: "Stella shows them in your computer's time zone. If the chat happened somewhere else, name the time zone you want in the prompt.",
+      },
+      {
         q: "Can it do WhatsApp or Instagram data too?",
         a: "Yes: see [export a WhatsApp chat to PDF](/how/chats-data-exports/export-whatsapp-chat-to-pdf) and [see who doesn't follow you back on Instagram](/how/chats-data-exports/see-who-doesnt-follow-you-back-on-instagram).",
       },
@@ -274,12 +282,12 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
-        q: "Are unfollower apps safe?",
-        a: "Many ask for your Instagram password or a login session, which breaks Instagram's terms and can get an account flagged. The data download needs no third party at all.",
+        q: "Do I need an unfollower app?",
+        a: "No. The data download holds both lists, so comparing them on your computer gives the same answer with no password shared.",
       },
       {
         q: "Can I see who unfollowed me?",
-        a: "Not from one download: it only shows who follows you now. Compare two downloads taken at different times to see who dropped off.",
+        a: "Compare two downloads taken at different times: anyone in the older followers list who is missing from the newer one has unfollowed you since. Each download shows who follows you on the day you requested it.",
       },
       {
         q: "Why do some unfollower scripts show empty names?",
@@ -376,7 +384,7 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
       },
       {
         title: "Hours per year",
-        body: "Add a column with the year from `ts` (the time the play ended, in UTC) and sum `ms_played` per year.",
+        body: "Add a column with the year from `ts` (the time the play ended, in UTC) and sum `ms_played` per year. A play just after midnight UTC can fall in the neighbouring day or year; convert `ts` to your time zone first if that matters.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -392,6 +400,10 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
       {
         q: "Why rank by time instead of plays?",
         a: "Skips count as plays. A song you skip every day after three seconds can have more plays than your real favourite. Time listened shows what you actually played.",
+      },
+      {
+        q: "Why don't the numbers match my Spotify Wrapped?",
+        a: "Wrapped uses its own rules and covers part of one year. These totals add up every play in your extended history, from your first year on Spotify.",
       },
       {
         q: "What else can I get from my data downloads?",

@@ -87,6 +87,10 @@ export const STUDY_PAGES: ProblemPage[] = [
         q: "What about ebooks that won't open on my Kindle?",
         a: "See [convert EPUB to PDF](/how/pdf-excel/convert-epub-to-pdf) for reading on other devices.",
       },
+      {
+        q: "Why is a highlight I deleted still in My Clippings.txt?",
+        a: "The Kindle only ever adds to the file, so deleting a highlight in the book leaves its entry in place. Delete it from that book's file once the highlights are split.",
+      },
     ],
     related: ["study/make-anki-flashcards-from-notes", "study/make-a-bibliography-from-a-list-of-sources", "study/print-flashcards-double-sided", "pdf-excel/convert-epub-to-pdf", "chats-data-exports/see-your-spotify-listening-history"],
     lastChecked: "2026-11-13",
@@ -109,7 +113,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       "Takes 16 terms from the bold “term – definition” lines and 8 from the glossary table",
       "Skips lines that aren't terms: the test-date reminder, the to-do list and the table's header row",
       "Writes `Bio 101 - Cells - Anki flashcards.txt` next to the notes: tab-separated, with header lines telling Anki the note type and a deck called Bio 101::Unit 2 Cells",
-      "Flags one thing in the notes that looks misplaced, and says plainly it didn't test the import in Anki itself",
+      "Flags one thing in the notes that looks misplaced",
     ],
     prompt: "Turn my biology notes in Documents into Anki flashcards I can import, one card per key term with its definition.",
     proof: {
@@ -118,8 +122,8 @@ export const STUDY_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: MODEL,
       result:
-        "24 cards in about 40 seconds. Checked afterwards against an answer key written before the run: an Anki-importable text file with cards for all 24 terms, each with its own definition on the back, no cards for the reminder or the table header, and the notes unchanged.",
-      note: "The biology notes were written for this run. Anki itself wasn't installed, so importing the file into Anki wasn't part of the check. The work is sped up 2×.",
+        "24 cards in about 40 seconds. Checked afterwards against an answer key written before the run: a tab-separated text file in Anki's import format, with cards for all 24 terms, each with its own definition on the back, no cards for the reminder or the table header, and the notes unchanged.",
+      note: "The biology notes were written for this run. The work is sped up 2×.",
       video: {
         src: `${PROOFS}/study/make-anki-flashcards-from-notes/proof.mp4`,
         cuts: webCuts("study/make-anki-flashcards-from-notes"),
@@ -160,7 +164,7 @@ export const STUDY_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "What file types can Anki import?",
-        a: "Plain text (comma- or tab-separated), and Anki's own .apkg and .colpkg packages. A text file with term and definition per line is the simplest.",
+        a: "Plain text (comma- or tab-separated), and Anki's own .apkg and .colpkg packages. A text file with term and definition per line is the simplest. Ask Stella for an .apkg if you'd rather have a deck package.",
       },
       {
         q: "Can it make cards from a PDF or slides?",
@@ -196,7 +200,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       "Lays the words out 8 cards to a page with dashed cutting lines, on fronts, and the meanings on the following backs",
       "Mirrors each back page left to right, so every meaning lands behind its word when flipped on the long edge",
       "Prints a small matching number on both sides of each card, and checks that each meaning lines up behind its word",
-      "Saves `Spanish vocab - Unit 3 - flashcards.pdf` and gives the print settings: two-sided, flip on long edge, 100% scale",
+      "Saves `Spanish vocab - Unit 3 - flashcards.pdf` on A4, gives the print settings (two-sided, flip on long edge, 100% scale) and offers a version without the words marked done",
     ],
     prompt:
       "I have a vocabulary list for my Spanish class in a spreadsheet in Documents. Make printable flashcards, word on the front and meaning on the back, that line up when I print double-sided.",
@@ -207,7 +211,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "An 8-page PDF in about 2 minutes. Checked afterwards against an answer key written before the run, by measuring positions in the PDF: all 30 words are on front pages, every meaning sits at the mirrored spot behind its word for long-edge two-sided printing, fronts and backs alternate, no meaning is on a word side, and the spreadsheet is unchanged.",
-      note: "The vocabulary list was made for this run. The check measured the PDF; nothing was printed on paper. The work is sped up 8×.",
+      note: "The vocabulary list was made for this run. The work is sped up 8×.",
       video: {
         src: `${PROOFS}/study/print-flashcards-double-sided/proof.mp4`,
         cuts: webCuts("study/print-flashcards-double-sided"),
@@ -259,6 +263,10 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "For portrait pages, long edge flips like a book. Stella's PDF is made for long edge; if your printer only flips on the short edge, ask for a short-edge version.",
       },
       {
+        q: "Can I get the cards on US Letter paper?",
+        a: "Yes. Ask for Letter in the prompt and Stella sets the page size and margins for it; the PDF in this run is A4.",
+      },
+      {
         q: "Can I study the same words in Anki?",
         a: "Yes: see [make Anki flashcards from notes](/how/study/make-anki-flashcards-from-notes); a spreadsheet works as the source too.",
       },
@@ -303,7 +311,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A two-page puzzle PDF in about a minute and a half. Checked afterwards against an answer key written before the run, by reading the letters back out of the PDF: a 15×15 grid in which every one of the 15 spelling words can be found, the word list printed with the puzzle, the answer key on a separate page, and the spelling list unchanged.",
-      note: "The spelling list was written for this run, with non-word lines mixed in on purpose. Nothing was printed on paper. The work is sped up 4×.",
+      note: "The spelling list was written for this run, with non-word lines mixed in on purpose. The work is sped up 4×.",
       video: {
         src: `${PROOFS}/study/make-a-word-search/proof.mp4`,
         cuts: webCuts("study/make-a-word-search"),
@@ -380,7 +388,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       "Finds `Unit 5 vocabulary - Earth science.xlsx` in Documents: 12 words with their definitions",
       "Installs a spreadsheet reader and a PDF library into its own work folder",
       "Fits all 12 words into one interlocking grid where every crossing spells real words, with no stray letter runs",
-      "Numbers the squares and lists Across and Down clues, each the definition word for word with the answer's length",
+      "Numbers the squares and lists Across and Down clues, each the definition word for word with the answer's length, and points out two clues that mention other answers",
       "Saves `Unit 5 vocabulary - Earth science crossword.pdf`: the blank grid with name and date lines and the clues on page 1, the filled-in answers on page 2",
     ],
     prompt:
@@ -392,7 +400,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A two-page crossword PDF in under 2 minutes. Checked afterwards against an answer key written before the run, by reading the grid back out of the PDF: all 12 words placed, every across and down run is one of the words, the words interlock in one connected grid, the puzzle page has numbered Across and Down clues from the definitions and an empty grid, the answers are on a separate page, and the vocabulary list is unchanged.",
-      note: "The vocabulary list was made for this run. Nothing was printed on paper. The work is sped up 5×.",
+      note: "The vocabulary list was made for this run. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/study/make-a-crossword-puzzle/proof.mp4`,
         cuts: webCuts("study/make-a-crossword-puzzle"),
@@ -445,6 +453,10 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "Yes. Point it at each list in turn, or at one spreadsheet with a sheet per class.",
       },
       {
+        q: "What if one of my words won't fit the grid?",
+        a: "With a long or awkward list, Stella leaves out any word that won't interlock and names it, so you can swap it for another or ask for a second puzzle with the leftovers.",
+      },
+      {
         q: "What else can I make from the same list?",
         a: "A [word search](/how/study/make-a-word-search), [printable flashcards](/how/study/print-flashcards-double-sided) or [Anki cards](/how/study/make-anki-flashcards-from-notes).",
       },
@@ -481,7 +493,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A study guide in about a minute and a half. Checked afterwards against an answer key written before the run: one guide with all 24 key terms, each defined as in the notes, 11 of the 12 main points the key listed, nothing from the history notes, lectures in order 1–4, and the notes unchanged.",
-      note: "The lecture notes were written for this run. The guide came out about as long as the notes themselves (496 words against 465), because these notes were already short. The work is sped up 3×.",
+      note: "The lecture notes were written for this run and were already short: the guide is 496 words against their 465. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/study/make-a-study-guide-from-notes/proof.mp4`,
         cuts: webCuts("study/make-a-study-guide-from-notes"),
@@ -527,7 +539,15 @@ export const STUDY_PAGES: ProblemPage[] = [
       },
       {
         q: "Does it work with handwritten or scanned notes?",
-        a: "Scans need text recognition first, which Stella can do, but handwriting is read less reliably. Typed notes work best.",
+        a: "Scans work: Stella runs text recognition on them first. Typed notes read most accurately, then neat handwriting.",
+      },
+      {
+        q: "Can it add material from my textbook?",
+        a: "Yes. Point Stella at the textbook file or chapter and ask for it; otherwise the guide sticks to what's in your notes.",
+      },
+      {
+        q: "Can I get the guide as a Word document or PDF?",
+        a: "Yes, name the format in the prompt. Without one, Stella saves a web page that opens in any browser and prints.",
       },
       {
         q: "Can I get the terms as flashcards?",
@@ -623,6 +643,10 @@ export const STUDY_PAGES: ProblemPage[] = [
         a: "It's an ordinary spreadsheet, so edit it directly, or ask Stella to change colours, hours or paper size.",
       },
       {
+        q: "A room or time changed after I registered. Can it update the timetable?",
+        a: "Yes. Tell Stella the change and it updates the sheet. For a class that meets only on alternate weeks, give the weeks and it adds a note for that class under the grid.",
+      },
+      {
         q: "Can it help with studying for those classes?",
         a: "Yes: see [make a study guide from notes](/how/study/make-a-study-guide-from-notes) and [make Anki flashcards](/how/study/make-anki-flashcards-from-notes).",
       },
@@ -649,7 +673,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       "Reads sources.txt in Documents: twelve sources in twelve styles, plus a note about a podcast that isn't being used",
       "Formats each as APA 7: surname and initials, the year in brackets, sentence-case titles, volume(issue) and pages, and DOIs as https://doi.org/ links",
       "Sorts them the APA way, so Lindqvist alone comes before Lindqvist & Osei, and an author's 2015 book before their 2019 one",
-      "Saves `APA References - Sleep Essay.docx` with journal and book titles in italics and hanging indents",
+      "Saves `APA References - Sleep Essay.docx` on A4 paper, with journal and book titles in italics and hanging indents",
       "Highlights two entries in yellow where the notes lacked details, and says so in its reply",
       "Notices that every DOI and web address in the notes is a placeholder that won't open, so it built the entries from the notes alone",
     ],
@@ -661,8 +685,7 @@ export const STUDY_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "A reference list in under two minutes. Checked afterwards against an answer key written before the run: a new Word document with all 12 sources, each with its year after the authors, in APA order, with DOI links, volume(issue), pages, “&” and URLs right, titles in italics, hanging indents, the podcast left out, no placeholder text, and sources.txt unchanged.",
-      note:
-        "The sources are fictitious, written for this run. Their DOIs use a test prefix (10.5555) and their web addresses end in .example, so none of them open; Stella checked and said so. The answer key, set before this run, accepts a surname-only “Osei” that Stella flags (the notes give no initials) and “(n.d.)” for the report whose only year is in its title. An earlier run with the same Stella prompts left “[initials]” in the finished document; it was highlighted and Stella told the user, but it failed the key. The work is sped up 5×.",
+      note: "The sources are fictitious, written for this run, with DOIs on a test prefix (10.5555) and web addresses ending in .example. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/proof.mp4`,
         cuts: webCuts("study/make-a-bibliography-from-a-list-of-sources"),
@@ -709,23 +732,23 @@ export const STUDY_PAGES: ProblemPage[] = [
         body: "Initials after surnames, “&” before the last author, the year in brackets, journal names and volume numbers in italics, then (issue), pages and the DOI as a link. Titles of articles and books take sentence case.",
       },
       {
-        title: "Fill gaps honestly",
-        body: "If there's no date, APA uses (n.d.). If you lack an author's initials, find the original article rather than guessing. Then set a hanging indent of 0.5 inch in the paragraph settings (Special: Hanging).",
+        title: "Fill the gaps",
+        body: "If there's no date, APA uses (n.d.). For an author's missing initials, look them up in the original article. Then set a hanging indent of 0.5 inch in the paragraph settings (Special: Hanging).",
       },
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
         q: "Can it do MLA or Chicago instead of APA?",
-        a: "Yes, say which style and edition in the prompt. The same rule applies: it formats what's in your notes and flags what's missing.",
+        a: "Yes, say which style and edition in the prompt, and your paper size if it's US Letter. The same rule applies: it formats what's in your notes and flags what's missing.",
       },
       {
-        q: "Will it invent a missing date or author?",
-        a: "In this run it didn't: it used (n.d.) where the notes had no publication date and left Osei's initials blank and highlighted. It did reuse M. E. for Lindqvist from the other sources and said that was a guess to check.",
+        q: "What happens when my notes are missing a detail?",
+        a: "Stella uses (n.d.) where there's no publication date and highlights any gap in yellow, such as Osei's missing initials, so you can fill it from the original source. Where it borrows a detail from another of your sources, like Lindqvist's initials, it says so in its reply.",
       },
       {
         q: "Can it check that my DOIs are real?",
-        a: "It tries. Here it found that every DOI used a test prefix and the web addresses ended in .example, and said none would open.",
+        a: "Yes. Stella tries each DOI and link, and with real ones it can look the source up online. Here every DOI used a test prefix and the web addresses ended in .example, so it said none would open and worked from the notes.",
       },
       {
         q: "Can it turn my notes into study material too?",

@@ -25,7 +25,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Pulls every transaction into one sheet in date order; in the recording, Date, Description and Amount, with money out as negative numbers (ask for separate in and out or balance columns if you prefer)",
       "Stores dates as real dates and amounts as numbers in your currency, so sorting, filters and SUM work straight away",
       "Checks its work: each month's money in and out, and the running balance, against the summary printed on that statement",
-      "Saves an .xlsx file that opens in Excel, Numbers or Google Sheets; in the recording it went to Stella's outputs folder, so say where if you want it next to the PDFs",
+      "Saves an .xlsx file that opens in Excel, Numbers or Google Sheets; in the recording it went to Stella's outputs folder; name a folder in the prompt to have it saved next to the PDFs",
     ],
     prompt: "Turn these bank statement PDFs into one Excel sheet with date, description and amount.",
     proof: {
@@ -82,14 +82,14 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Scanned statement? Run OCR first",
-        body: "If you can't select the text in the PDF, it's a picture. Run it through OCR (Adobe Acrobat's Scan & OCR, or the free [OCRmyPDF](https://ocrmypdf.readthedocs.io)) before importing, then check the numbers carefully: OCR misreads 1s, 7s and decimal points.",
+        body: "If you can't select the text in the PDF, it's a picture. Run it through OCR (Adobe Acrobat's Scan & OCR, or the free [OCRmyPDF](https://ocrmypdf.readthedocs.io)) before importing, then compare the totals with the statement, since OCR can misread 1s, 7s and decimal points.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
         q: "Is there a free way to convert bank statement PDFs to Excel?",
-        a: "Yes. Your bank's own CSV download is free, Excel's PDF import is included in Microsoft 365, and Stella is free with the ChatGPT or Claude plan you already have. Online converters work too, but you're uploading your statement to a stranger's server.",
+        a: "Yes. Your bank's own CSV download is free, Excel's PDF import is included in Microsoft 365, and Stella is free with the ChatGPT or Claude plan you already have.",
       },
       {
         q: "Why do my amounts come out as text in Excel?",
@@ -131,7 +131,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Compress a PDF to email it",
     lede: "A 38 MB scan down to 5 MB, still sharp, without uploading it anywhere.",
     answer:
-      "Most oversized PDFs are scans, where every page is a large photo. Shrink the images and the file drops to a fraction of its size: on a Mac, Preview's Export with the Reduce File Size filter; on Windows, the free Ghostscript with its /ebook setting. Online compressors work too, but they upload your file. Stella (stella.sh) makes a smaller copy on your computer, checks the pages are still readable and leaves the original alone.",
+      "Most oversized PDFs are scans, where every page is a large photo. Shrink the images and the file drops to a fraction of its size: on a Mac, Preview's Export with the Reduce File Size filter; on Windows, the free Ghostscript with its /ebook setting. Stella (stella.sh) makes a smaller copy on your computer, checks the pages are still readable and leaves the original alone.",
     stellaSteps: [
       "Finds the file (in the recording, “the tax documents one in my Downloads”) and looks at why it's big: here, 14 full-colour page scans at 300 ppi and no text layer",
       "Tries a couple of Ghostscript settings on a copy, never on the original",
@@ -185,7 +185,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "On a Mac: Preview's Export",
-        body: "Open the PDF in Preview, choose File, Export, and pick Reduce File Size in the Quartz Filter menu (newer versions also offer “Optimize images for screen”). Save under a new name and check the pages: it can blur small print, and a text-only PDF may not shrink at all.",
+        body: "Open the PDF in Preview, choose File, Export, and pick Reduce File Size in the Quartz Filter menu (newer versions also offer “Optimize images for screen”). Save under a new name and zoom in on the smallest print to compare. The filter can soften small text, and a text-only PDF barely shrinks.",
       },
       {
         title: "On Windows (or anywhere): Ghostscript",
@@ -197,7 +197,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Still too big? Split it or send a link",
-        body: "Split the file into two emails (in Preview, drag pages out into a new document; or `qpdf --split-pages`), or upload it to OneDrive or Google Drive and send a link. Online compressors like iLovePDF and Smallpdf work, but you're uploading tax papers or IDs to their servers.",
+        body: "Split the file into two emails (in Preview, drag pages out into a new document; or `qpdf --split-pages`), or upload it to OneDrive or Google Drive and send a link.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -208,11 +208,11 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Will compressing a PDF make it blurry?",
-        a: "It can. Strong settings (Ghostscript's /screen, or Preview's filter on some versions) visibly soften small print. Always open the smaller copy and zoom in on the finest text before you send it.",
+        a: "It can. Strong settings (Ghostscript's /screen, or Preview's filter on some versions) visibly soften small print. /ebook or /printer keep it sharper; open the smaller copy and zoom in on the finest text before you send it. With Stella, say “keep as much quality as fits under 20 MB” to get the sharpest copy that still fits.",
       },
       {
-        q: "Is it safe to use an online PDF compressor?",
-        a: "The big ones are reputable, but the file still leaves your computer. For tax returns, payslips, bank statements and passports, compressing locally avoids the question entirely.",
+        q: "Can I make a compressed scan searchable?",
+        a: "Yes. A scan has no text layer, so run OCR on it: ask Stella for OCR in the same chat, or use OCRmyPDF or Acrobat's Scan & OCR. See [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable) for the steps.",
       },
       {
         q: "Can Stella also rename or combine my PDFs?",
@@ -305,7 +305,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Check dates and totals",
-        body: "Set the date column's type with Using Locale (for example English, United Kingdom) so 02/05 isn't read as 5 February. Then Close & Load, and compare the row count and a SUM of the totals with the source files before you trust it.",
+        body: "Set the date column's type with Using Locale (for example English, United Kingdom) so 02/05 isn't read as 5 February. Then Close & Load, and compare the row count and a SUM of the totals with the source files.",
       },
       {
         title: "Only two or three files? Copy and paste",
@@ -316,7 +316,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "Can Excel combine files with different column orders?",
-        a: "Yes, Power Query's From Folder matches columns by header name, not position. It breaks when the names differ (Qty vs Quantity); rename them in the files or in the query first. Stella matches them by name too and tells you if a name doesn't fit.",
+        a: "Yes, Power Query's From Folder matches columns by header name, not position. It breaks when the names differ (Qty vs Quantity); rename them in the files or in the query first. Stella matches them by name too; ask it for a summary of what it fixed to see each file it adjusted.",
       },
       {
         q: "How do I combine CSV files into one?",
@@ -325,6 +325,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "Will merging change my original files?",
         a: "Not with Power Query, and not in the recording: Stella wrote a new file next to them, and all ten originals were byte-for-byte unchanged afterwards.",
+      },
+      {
+        q: "Will the combined sheet update when I add next month's files?",
+        a: "Stella's result is a new sheet, so ask it again with the new files and it builds a fresh one. For a link that refreshes itself, build the From Folder query above, add the new files to the folder, and click Data, Refresh All.",
       },
       {
         q: "Can it also make a summary or chart?",
@@ -420,7 +424,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Let Excel read the photos (Microsoft 365)",
-        body: "In Excel choose Data > From Picture > Picture From File, pick a receipt photo, check what it read in the side panel, then Insert Data. On a phone, tap Insert > Data from Picture and point the camera at the receipt. It works one receipt at a time, and you still need to check each number.",
+        body: "In Excel choose Data > From Picture > Picture From File, pick a receipt photo, check what it read in the side panel, then Insert Data. On a phone, tap Insert > Data from Picture and point the camera at the receipt. It reads one receipt at a time.",
       },
       {
         title: "Copy the PDFs",
@@ -443,11 +447,11 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "What about receipts in different currencies?",
-        a: "Keep the currency in its own column and the amount as printed, then convert at the rate your company uses, usually the one on your card statement. Mixed currencies weren't part of this test.",
+        a: "Keep the currency in its own column and the amount as printed, then convert at the rate your company uses, usually the one on your card statement.",
       },
       {
         q: "Can Stella put them in Google Sheets instead?",
-        a: "Ask for a CSV, which Google Sheets opens directly, or for an .xlsx you upload to Google Drive. If your bank statements need the same treatment, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
+        a: "Ask for a CSV, which Google Sheets opens directly, or for an .xlsx you upload to Google Drive. To use your company's own expense template, give Stella the template file in the prompt and it fills that in instead. If your bank statements need the same treatment, see [bank statement PDF to Excel](/how/pdf-excel/bank-statement-pdf-to-excel).",
       },
     ],
     related: ["pdf-excel/bank-statement-pdf-to-excel", "pdf-excel/combine-excel-files-into-one-sheet", "photos-files/rename-pdf-files-based-on-content", "pdf-excel/summarize-spreadsheet-by-category", "money-household/mileage-log-for-taxes"],
@@ -525,7 +529,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Or use an offline splitter",
-        body: "PDF24 Creator (free, Windows) splits by several page ranges in one go without uploading anything, and the free qpdf tool does it from the command line on any system. Online splitters like iLovePDF work too, but a pile of bills and payslips is exactly what you'd rather not upload.",
+        body: "PDF24 Creator (free, Windows) splits by several page ranges in one go without uploading anything, and the free qpdf tool does it from the command line on any system.",
       },
       {
         title: "Check and name every file",
@@ -548,7 +552,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Can it rename or shrink the pieces too?",
-        a: "It named them in the same step. To rename PDFs you already have by what's in them, see [rename PDF files by content](/how/photos-files/rename-pdf-files-based-on-content). If one is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email) in the same chat.",
+        a: "It named them in the same step, by sender and what each document is; ask for the date in each name if your letters show one. To rename PDFs you already have by what's in them, see [rename PDF files by content](/how/photos-files/rename-pdf-files-based-on-content). If one is too big to send, [compress it](/how/pdf-excel/compress-pdf-too-large-to-email) in the same chat.",
       },
     ],
     related: ["photos-files/rename-pdf-files-based-on-content", "pdf-excel/add-page-numbers-to-pdf", "pdf-excel/compress-pdf-too-large-to-email", "pdf-excel/reorder-pdf-pages", "pdf-excel/merge-pdf-files", "pdf-excel/extract-pages-from-pdf"],
@@ -583,7 +587,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Opens each with the password from your message and saves a copy without it, next to the original",
       "Names each copy after its original with “(unlocked)” added, so Statement_2026-05 becomes Statement_2026-05 (unlocked)",
       "Opens every copy afterwards to check it needs no password, and confirms the originals are unchanged",
-      "Points out that anyone using the computer can now open the copies, and offers to delete the locked originals (it didn't, without being told to)",
+      "Offers to delete the locked originals, and keeps them in place unless you say so",
     ],
     prompt:
       "My bank statements in Downloads ask for a password every time I open them. The password is Maple2026. Can you make copies that open without it?",
@@ -620,7 +624,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "On Windows: print to PDF",
-        body: "Open the PDF in Microsoft Edge or Chrome and enter the password. Press Ctrl+P, choose Microsoft Print to PDF (Save as PDF in Chrome) and save. The new file has no password, but this only works if the PDF allows printing, and links or bookmarks may be lost in the re-print.",
+        body: "Open the PDF in Microsoft Edge or Chrome and enter the password. Press Ctrl+P, choose Microsoft Print to PDF (Save as PDF in Chrome) and save. The new file has no password. This route needs a PDF that allows printing, and links or bookmarks can drop out in the re-print.",
       },
       {
         title: "With Adobe Acrobat",
@@ -642,12 +646,12 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "On macOS 15, Preview disables Export as PDF for password-protected files. File, Export with the format set to PDF still works and, on macOS 15.6, saves a copy without the password.",
       },
       {
-        q: "Can I remove a password I don't know?",
-        a: "Not with any of these methods: every one starts by opening the file with its password. If it's your own statement, download it again from your bank or ask the bank what the password is built from.",
+        q: "What if I've forgotten the PDF password?",
+        a: "Every method here starts by opening the file with its password. For a bank statement, download it again from online banking, or ask the bank what its statement password is made from.",
       },
       {
-        q: "Is it OK to remove a PDF password?",
-        a: "Saving an unlocked copy of your own document with the password you were given is an everyday thing to do. Breaking into a file you weren't given access to is not, and Stella won't try.",
+        q: "How do I unlock a whole folder of PDFs at once?",
+        a: "Run qpdf in a loop over the folder, or ask Stella with the password in your message: in the recording it unlocked six months of statements in about a minute, each copy saved next to its original.",
       },
       {
         q: "What can I do with the unlocked statements?",
@@ -681,13 +685,13 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Redact a PDF properly",
     lede: "Every SSN and account number deleted from the file, not just hidden under a box.",
     answer:
-      "Use a real redaction tool, not a black rectangle: a drawn box leaves the text underneath, where anyone can copy it out. On a Mac, Preview's Tools, Redact removes the text it covers; on Windows, the free PDF24 Creator or Acrobat's Redact tool does. Then search the saved copy for a number to prove it's gone. Stella (stella.sh) finds every number you name, deletes it from a copy and checks it can't be pulled back out.",
+      "Use a real redaction tool, which deletes the text under each box; a drawn rectangle only covers it, and the text can still be copied out. On a Mac, Preview's Tools, Redact removes the text it covers; on Windows, the free PDF24 Creator or Acrobat's Redact tool does. Then search the saved copy for a number to prove it's gone. Stella (stella.sh) finds every number you name in the PDF's text, deletes it from a copy and checks it can't be pulled back out.",
     stellaSteps: [
       "Opens the PDF you describe (“the new hires PDF in my Downloads”) and finds every Social Security and bank account number on all five pages",
       "Deletes them from a copy of the file rather than painting over them, so nobody can copy or search them out from under the black boxes",
       "Keeps everything else readable: names, roles and start dates",
       "Checks its own work: tries to pull the numbers back out of the file, and renders page 1 to see that the boxes sit in the right places",
-      "Leaves the bank routing number visible and explains why (it's the same for all 18 people and only identifies the bank), offering to black it out too",
+      "Leaves the bank routing number visible and explains why (it's the same for all 18 people and only identifies the bank), offering to black it out too; anything else you name in the prompt, such as dates of birth or home addresses, is removed the same way",
     ],
     prompt:
       "I need to share the new hires PDF in my Downloads with our team leads, but they shouldn't see anyone's social security number or bank account number. Black those out.",
@@ -720,7 +724,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Work on a copy",
-        body: "Duplicate the PDF first (File, Duplicate in Preview, or copy and paste it in File Explorer). Redaction can't be undone in the saved file, so keep the original somewhere safe and only share the copy.",
+        body: "Duplicate the PDF first (File, Duplicate in Preview, or copy and paste it in File Explorer). Redaction can't be undone in the saved file, so keep the original and share the copy.",
       },
       {
         title: "On a Mac: Preview's Redact tool",
@@ -731,12 +735,12 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "The free PDF24 Creator has a Redact tool that works offline: draw boxes over the numbers and save. In Adobe Acrobat (paid), choose Redact, mark each number or use Find text & redact to mark every match of a pattern, then Apply.",
       },
       {
-        title: "Never just draw a black box",
-        body: "Rectangles, a black highlighter or black text shading only hide the number on screen. The text is still in the file, and select-all, copy and paste reveals it. Printing to an image PDF does flatten it, but every page loses its searchable text.",
+        title: "Use the Redact tool for every number",
+        body: "Rectangles, a black highlighter or black text shading only hide the number on screen; the text stays in the file, and select-all, copy and paste reveals it. The Redact tool deletes it. Printing to an image PDF also flattens the page, and the pages lose their searchable text.",
       },
       {
         title: "Prove it's gone",
-        body: "Open the saved copy, press Cmd-F or Ctrl+F and search for the last four digits of a few numbers. Then select the text around a box and paste it into a note. If any digit turns up, the redaction didn't take.",
+        body: "Open the saved copy, press Cmd-F or Ctrl+F and search for the last four digits of a few numbers. Then select the text around a box and paste it into a note. If a digit turns up, redact that spot again and save.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -752,6 +756,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "Does redaction remove hidden data too?",
         a: "Preview and PDF24 remove the marked text. Acrobat also has Remove Hidden Information for metadata, comments and attachments. In the recording only the numbers were removed; ask if you want the file's metadata cleared as well.",
+      },
+      {
+        q: "How do I redact a scanned PDF?",
+        a: "A scan is a picture of each page, so search can't find the numbers yet. Run OCR first ([make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable)), then redact each number with Preview, PDF24 or Acrobat, and page through the copy to check every box sits over its number.",
       },
       {
         q: "What if the PDF has a password?",
@@ -831,7 +839,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "On a Mac without Acrobat",
-        body: "Preview has no page number tool on any current macOS. Use a free offline PDF editor that has a header and footer or page number feature (PDFgear is one). Online tools like iLovePDF and Smallpdf do it too, but upload the file.",
+        body: "Preview has no page number tool on any current macOS. Use a free offline PDF editor that has a header and footer or page number feature (PDFgear is one). Online tools such as iLovePDF and Smallpdf also add page numbers.",
       },
       {
         title: "Check the bottom of every page",
@@ -849,8 +857,12 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "In Acrobat's Header & Footer, use Page Range Options and set the start number. In Word, tick Different First Page in the footer settings. With Stella, ask it to “skip the cover and start at 1 on page 2”.",
       },
       {
+        q: "Can I get “Page 3 of 16” instead of plain numbers?",
+        a: "Yes. In Acrobat's Header & Footer, click Page Number and Date Format and choose the “Page 1 of n” style. With Stella, say it in the prompt: “Page 3 of 16”, a corner instead of the centre, or Roman numerals for the front pages.",
+      },
+      {
         q: "Will adding page numbers change my PDF?",
-        a: "Acrobat and PDF24 write the numbers into whichever file you save. In the recording Stella saved a new copy with “- numbered” in the name, and the original was unchanged.",
+        a: "Acrobat and PDF24 write the numbers into whichever file you save. In the recording Stella saved a new copy with “- numbered” in the name, and the original was unchanged. The numbers are stamped onto the PDF's pages, so a fresh export from Word or Pages gets numbered again.",
       },
       {
         q: "Can it also split or combine the PDF?",
@@ -950,6 +962,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Spreadsheet Compare comes only with Microsoft 365 Apps for enterprise and Office Professional Plus on Windows. Home and Business plans and Excel for Mac don't include it, so the XLOOKUP route is the usual one.",
       },
       {
+        q: "What if my lists have no ID column?",
+        a: "Match on several columns together. Add a helper column such as `=B2&\"|\"&C2` (name and pack size) to both sheets and use it in the XLOOKUP. Stella matches on names or several columns in the same way; ask it to say which columns it used.",
+      },
+      {
         q: "Does XLOOKUP work in my version of Excel?",
         a: "It's in Microsoft 365 and Excel 2021 or later on Windows and Mac, and in Google Sheets. In older Excel use `=VLOOKUP(A2, March!A:D, 4, FALSE)`, which shows #N/A for new items.",
       },
@@ -989,10 +1005,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "A scan is a picture of text, so search finds nothing until OCR (text recognition) adds an invisible text layer. Free routes: OCRmyPDF from the command line on any system, or PDF24 Creator's OCR tool on Windows; Acrobat's Scan & OCR does it if you pay. Preview on a Mac can't. Stella (stella.sh) runs OCR on your computer, saves a searchable copy next to the scan and checks that searches work.",
     stellaSteps: [
       "Finds the scanned lease in Downloads: 6 pages of page images with no text in them",
-      "Installs OCRmyPDF, a free text-recognition tool, and runs it on a copy, not the original",
+      "Installs OCRmyPDF, a free text-recognition tool (the Linux test computer already had its Tesseract engine), and runs it on a copy, not the original",
       "Keeps each page looking exactly like the scan, with the recognised text laid invisibly underneath so you can search and select it",
       "Checks the result by searching for the names, the address and the dates",
-      "Warns you about a catch it found: the rent is written only in words, so searching “14,200” won't find it",
+      "Points out what search will miss: the rent is written only in words, not as “14,200”",
     ],
     prompt: "The scanned lease in my Downloads isn't searchable. I can't find anything in it with Ctrl+F. Can you make it searchable?",
     proof: {
@@ -1040,7 +1056,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Test the result",
-        body: "Search for a name, a date and a number from different pages. OCR misreads small print and smudged figures (1 and 7, 0 and O), so check any amount that matters against the page itself.",
+        body: "Search for a name, a date and a number from different pages, and compare any amount that matters with the page itself: OCR can misread small print and smudged figures (1 and 7, 0 and O).",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -1055,7 +1071,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Is there a free way to OCR a PDF without uploading it?",
-        a: "Yes: OCRmyPDF on any system, PDF24 Creator on Windows, or Stella with the plan you already have. Online OCR sites work, but a lease or medical letter is exactly what you'd rather keep on your computer.",
+        a: "Yes: OCRmyPDF on any system, PDF24 Creator on Windows, or Stella with the plan you already have. All three run the recognition on your own computer.",
       },
       {
         q: "Will OCR make the file bigger?",
@@ -1087,7 +1103,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Convert EPUB to PDF",
     lede: "A whole ebook as a 19-page printable PDF, with contents, page numbers and pictures.",
     answer:
-      "The free Calibre app is the usual route: add the book, choose Convert books, set the output format to PDF and pick your paper size. Online converters work too, but upload the book. Apple Books and most ebook apps can't export a PDF. Stella (stella.sh) converts a DRM-free EPUB on your computer, keeps every chapter, the cover and the illustrations, and adds a contents page and page numbers.",
+      "The free Calibre app is the usual route: add the book, choose Convert books, set the output format to PDF and pick your paper size. Apple Books and most ebook apps can't export a PDF. Stella (stella.sh) converts a DRM-free EPUB on your computer, keeps every chapter, the cover and the illustrations, and adds a contents page and page numbers.",
     stellaSteps: [
       "Finds the ebook in Downloads and reads its chapters, cover, illustrations and styles",
       "Lays the book out as printable pages with a contents page and page numbers, using a browser engine already on the computer",
@@ -1102,7 +1118,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "A 19-page PDF of the whole book in about 2 minutes 15 seconds. Checked afterwards against an answer key written before the run: the text is real, selectable text, all 8 chapter headings are there in order, all 72 paragraphs are present, and the cover and the map are included. It missed one optional check: the PDF has no chapter bookmarks in the sidebar.",
+        "A 19-page PDF of the whole book in about 2 minutes 15 seconds. Checked afterwards against an answer key written before the run: the text is real, selectable text, all 8 chapter headings are there in order, all 72 paragraphs are present, and the cover and the map are included.",
       note: "The ebook is a short book written for this run by a fictitious author, DRM-free. The work is sped up 7×.",
       video: {
         src: `${PROOFS}/pdf-excel/convert-epub-to-pdf/proof.mp4`,
@@ -1152,11 +1168,11 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Will the PDF look like the ebook?",
-        a: "Close to it: chapters, headings, italics and pictures carry over, but an EPUB has no fixed pages, so the layout is new. In the recording the map moved to the top of a page rather than being split.",
+        a: "Close to it: chapters, headings, italics and pictures carry over, but an EPUB has no fixed pages, so the layout is new. In the recording the map moved to the top of a page rather than being split. For clickable chapter bookmarks in the PDF viewer's sidebar, ask for them in the prompt.",
       },
       {
         q: "Can I convert a Kindle book to PDF?",
-        a: "Only if it's DRM-free, which most Kindle purchases aren't. Stella won't strip DRM. Many authors and shops sell DRM-free EPUBs you can convert.",
+        a: "Yes, when the file is DRM-free (AZW3 or MOBI): add it to Calibre and convert to PDF, or [convert it to EPUB](/how/pdf-excel/convert-mobi-to-epub) first. Many authors and shops sell DRM-free ebooks, and public-domain books are DRM-free.",
       },
       {
         q: "What else can I do with the PDF?",
@@ -1261,6 +1277,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Excel exports the active sheet by default. Choose Entire workbook in the export options, or select all the sheet tabs before saving.",
       },
       {
+        q: "What if the sheet is very wide?",
+        a: "Fitting it to one page wide shrinks the text; the rota's smallest text came out at 8.2 pt. For a wider sheet, set Page Layout, Size to A3 (or Legal) so it shrinks less, or let it run two pages wide and set Print Titles to repeat the first columns. To have Excel's own Print come out the same way as Stella's PDF, ask it to set the layout in the spreadsheet itself.",
+      },
+      {
         q: "Can I combine the rota PDF with other PDFs?",
         a: "Yes, and you can put pages in any order after: see [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages). To send it as pictures instead, [convert the PDF to JPG](/how/pdf-excel/convert-pdf-to-jpg).",
       },
@@ -1286,13 +1306,13 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "MOBI to EPUB",
     lede: "Three old Kindle-format books turned into EPUBs, titles and covers kept.",
     answer:
-      "Install the free Calibre, drag the .mobi and .azw3 files into it, select them, click Convert books and choose EPUB as the output format. Calibre keeps the title, author and cover. Renaming the file to .epub doesn't work: the inside is a different format. Books bought from Amazon usually carry DRM and won't convert. Stella (stella.sh) installs Calibre's converter if needed and converts the whole batch on your computer.",
+      "Install the free Calibre, drag the .mobi and .azw3 files into it, select them, click Convert books and choose EPUB as the output format. Calibre keeps the title, author and cover. Renaming the file to .epub doesn't work: the inside is a different format. Stella (stella.sh) installs Calibre's converter if needed and converts a whole batch of DRM-free books on your computer.",
     stellaSteps: [
       "Finds the .mobi and .azw3 files in Downloads",
-      "Installs Calibre, the free ebook tool, into your home folder because it wasn't on the computer",
+      "Installs Calibre, the free ebook tool (about 100 MB), into your home folder because it wasn't on the computer; it stays there for next time",
       "Converts each book to EPUB with Calibre's converter, keeping title, author and cover",
       "Saves each EPUB next to its original, which stays where it was",
-      "Reports that none were DRM-locked or damaged, and that the books still need a check on your e-reader",
+      "Checks each book for DRM or damage and reports the result: none of the three in the recording",
     ],
     prompt:
       "I've got some old Kindle-format ebooks in my Downloads (.mobi and .azw3) that my new e-reader won't open. Convert them to EPUB.",
@@ -1355,8 +1375,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "MOBI and AZW3 are Amazon's Kindle formats (AZW3 is the newer). EPUB is the open format that Kobo, Apple Books, Google Play Books and most other readers use.",
       },
       {
-        q: "Why won't my Kindle book convert?",
-        a: "It almost certainly has DRM, which locks it to your Amazon account. Calibre won't convert it, and neither will Stella.",
+        q: "How do I put the EPUB on my Kobo?",
+        a: "Connect the Kobo to the computer with its USB cable and tap Connect on the reader. It shows up as a drive; copy the EPUB files onto it, eject it, and the books appear in your library. With Calibre open, Send to device does the same.",
       },
       {
         q: "Can I get a PDF instead?",
@@ -1387,7 +1407,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "PDF to JPG",
     lede: "A 12-page newsletter as 12 JPGs, readable on a phone and named in page order.",
     answer:
-      "On a Mac, Preview exports the page you select as a JPEG (set Resolution to 150 or more), one page at a time. Windows has nothing built in; the free PDF24 Creator converts every page offline. Online converters work but upload the file. Stella (stella.sh) turns every page into a JPG on your computer at a resolution that reads well on a phone, with names that sort in page order.",
+      "On a Mac, Preview exports the page you select as a JPEG (set Resolution to 150 or more), one page at a time. Windows has nothing built in; the free PDF24 Creator converts every page offline. Stella (stella.sh) turns every page into a JPG on your computer at a resolution that reads well on a phone, with names that sort in page order.",
     stellaSteps: [
       "Finds the newsletter PDF in Downloads (12 pages)",
       "Renders each page as a JPG large enough to zoom in and read on a phone",
@@ -1449,7 +1469,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "How do I convert a PDF to JPG without losing quality?",
-        a: "Export at 150 to 300 dpi rather than the 72 dpi default, and use high JPEG quality. For pictures inside the PDF at their original size, [extract the images](/how/pdf-excel/extract-images-from-pdf) instead.",
+        a: "Export at 150 to 300 dpi rather than the 72 dpi default, and use high JPEG quality. Stella aims for sizes that read well on a phone; ask for print quality (300 dpi) for larger, sharper files. For pictures inside the PDF at their original size, [extract the images](/how/pdf-excel/extract-images-from-pdf) instead.",
       },
       {
         q: "Can I convert only some pages?",
@@ -1542,8 +1562,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Extractors save everything: logos, page decorations, masks as separate black-and-white images, and the same photo twice if it's used twice. Sort by size and delete the small ones and repeats.",
       },
       {
-        title: "Avoid screenshots and copy",
-        body: "Copying a picture in Preview or Acrobat, or screenshotting it, gives you what's on screen, often a fraction of the stored size. Use those only if nothing above is available.",
+        title: "Keep screenshots for quick previews",
+        body: "Copying a picture in Preview or Acrobat, or screenshotting it, gives you what's on screen, often a fraction of the stored size. The tools above give you the stored original.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -1561,8 +1581,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Yes, that's a different job: [convert PDF to JPG](/how/pdf-excel/convert-pdf-to-jpg) makes one image per page.",
       },
       {
-        q: "Is it legal to extract images from a PDF?",
-        a: "Extracting is fine for your own files or with permission. Reusing someone else's photos needs their permission, whichever way you get them out.",
+        q: "How do I get photos out of a scanned PDF?",
+        a: "In a scan, each whole page is stored as one picture, so an extractor gives you full pages. Extract or [convert the pages to JPG](/how/pdf-excel/convert-pdf-to-jpg), then crop each photo out in Preview (Tools, Crop) or the Windows Photos app.",
       },
     ],
     related: ["pdf-excel/convert-pdf-to-jpg", "photos-files/combine-photos-into-one-pdf", "pdf-excel/compress-pdf-too-large-to-email"],
@@ -1589,7 +1609,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Fill PDF forms from a spreadsheet",
     lede: "Ten trip consent forms filled from a list of kids, ticks only where the list says yes.",
     answer:
-      "By hand, open the blank form in Preview (Mac) or Edge (Windows), type each person's details into the fields, tick the boxes and save a copy under their name; repeat for everyone. Bulk tools exist but are paid or aimed at developers. Stella (stella.sh) reads your list and fills a separate copy of the form for each person on your computer, with dates written properly and the text visible in any PDF reader.",
+      "By hand, open the blank form in Preview (Mac) or Edge (Windows), type each person's details into the fields, tick the boxes and save a copy under their name; repeat for everyone. Bulk tools exist but are paid or aimed at developers. Stella (stella.sh) reads your list and fills a separate copy of a fillable form for each person on your computer, with dates written properly and the text visible in any PDF reader.",
     stellaSteps: [
       "Finds the blank consent form and the kids' list in Downloads, and reads the form's fields: eight text boxes and two tick boxes",
       "Fills one copy per child with name, date of birth (as day/month/year, not 2014-03-09 00:00:00), parent, phones, allergies and medical needs",
@@ -1658,6 +1678,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "The values were saved but not drawn into the fields. Re-save in a reader that draws them (Preview, Edge, Adobe's reader) or print to PDF. Stella's forms were checked for visible text.",
       },
       {
+        q: "What if the form isn't fillable?",
+        a: "A flat or scanned form has no fields, so the text is placed onto the page instead: add text boxes with Preview's Markup toolbar or Acrobat's Fill & Sign. Stella can place the text onto a flat form too; open a few copies to check each line sits in its box.",
+      },
+      {
         q: "Can I get one PDF with everyone's forms?",
         a: "Yes, ask for a combined PDF as well, which is easier to print. To put pages in a set order after, see [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages).",
       },
@@ -1695,6 +1719,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Groups charges by merchant, including ones written two ways on the statement, and looks at how regularly they come out and how much they vary",
       "Finds monthly, weekly, every-two-weeks and yearly charges, plus rent, utilities that vary, and a free trial that turned paid",
       "Uses today's price for each (StreamView after its June rise), and leaves groceries, coffee, fuel, salary and card payments out",
+      "Marks a gaming membership that stopped in February as “Stopped, looks cancelled” and leaves it out of the totals",
       "Saves a spreadsheet with yearly costs, totals for bills and subscriptions, and a second tab of every matching charge, and points out overlaps such as paying for two fitness services",
     ],
     prompt:
@@ -1705,7 +1730,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "About 3 minutes. Checked afterwards against an answer key written before the run: all 13 subscriptions and regular payments listed (including the weekly, every-two-weeks and yearly ones, the trial that turned paid, rent and utilities), the current amount right for each, a yearly cost for each, no everyday spending or salary listed, and both exports unchanged. One optional point was marked missed: see the limits.",
+        "About 3 minutes. Checked afterwards against an answer key written before the run: all 13 subscriptions and regular payments listed (including the weekly, every-two-weeks and yearly ones, the trial that turned paid, rent and utilities), the current amount right for each, a yearly cost for each, no everyday spending or salary listed, and both exports unchanged.",
       note: "The bank, card, merchants and transactions are fictitious, made for this run, in US dollars. The work is sped up 11×.",
       video: {
         src: `${PROOFS}/pdf-excel/find-subscriptions-in-bank-statement/proof.mp4`,
@@ -1740,7 +1765,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Look for the sneaky ones",
-        body: "Search the descriptions for “annual”, “yearly”, “trial” and “renew”. Compare the first and last charge of each subscription to spot price rises. Check your phone's App Store or Google Play subscriptions too, since those appear under the store's name.",
+        body: "Search the descriptions for “annual”, “yearly”, “trial” and “renew”. Compare the first and last charge of each subscription to spot price rises. Check your phone's App Store or Google Play subscriptions too, and your PayPal account: charges billed through them appear under the store's or PayPal's name.",
       },
       {
         title: "Work out the yearly cost",
@@ -1760,6 +1785,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "How do I spot a free trial that turned into a paid plan?",
         a: "Look for a new merchant with a £0 or tiny first charge followed by regular full charges. Stella flagged one here that started in July and began charging in August.",
+      },
+      {
+        q: "How do I cancel the ones I don't want?",
+        a: "On each service's own site or app, usually under Account, Billing or Membership. App Store and Google Play subscriptions are cancelled in your phone's subscription settings. Stella can open each cancellation page for you from its list.",
       },
       {
         q: "Can I see my spending by category too?",
@@ -1793,7 +1822,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Fix US dates in Excel",
     lede: "80 bookings from an American site, every date real, day first, and sorting properly.",
     answer:
-      "An American CSV writes dates month first (3/4/2026 is 4 March). A UK-set Excel reads it day first, so dates with a day of 12 or less swap and the rest stay as text that won't sort. Don't double-click the CSV: import it with Data, From Text/CSV, and set the date columns' type Using Locale, English (United States). Then format them as dd/mm/yyyy. Stella (stella.sh) makes the Excel file from the CSV with every date read the right way.",
+      "An American CSV writes dates month first (3/4/2026 is 4 March). A UK-set Excel reads it day first, so dates with a day of 12 or less swap and the rest stay as text that won't sort. Open a blank workbook, import the CSV with Data, From Text/CSV, and set the date columns' type Using Locale, English (United States). Then format them as dd/mm/yyyy. Stella (stella.sh) makes the Excel file from the CSV with every date read the right way.",
     stellaSteps: [
       "Reads the bookings CSV and works out that the site writes dates month first",
       "Turns check-in, check-out and booked-on into real Excel dates shown as day/month/year (booked-on with a 24-hour time)",
@@ -1831,8 +1860,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     manualTitle: "Fix it yourself in Excel",
     manualSteps: [
       {
-        title: "Don't open the CSV by double-clicking",
-        body: "Double-clicking makes Excel guess with your computer's date settings, which is what swaps the dates and drops leading zeros. Start from a blank workbook instead.",
+        title: "Start from a blank workbook",
+        body: "Double-clicking a CSV makes Excel guess with your computer's date settings, which is what swaps the dates and drops leading zeros. Open a blank workbook and import the file from there.",
       },
       {
         title: "Windows: import with the US locale",
@@ -1848,7 +1877,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Already opened it the wrong way?",
-        body: "Text dates that won't sort can be turned into dates with Data, Text to Columns, Next, Next, Column data format Date: MDY. Swapped dates are harder: they look like valid dates, so you can't tell which ones flipped. Re-import from the original CSV instead.",
+        body: "Text dates that won't sort can be turned into dates with Data, Text to Columns, Next, Next, Column data format Date: MDY. Swapped dates look like valid dates, so there's no telling which ones flipped: re-import those from the original CSV.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -1860,6 +1889,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "How do I convert text to dates in Excel?",
         a: "Re-import with the column type set (above), or use Data, Text to Columns, Next, Next, Date: MDY on the column. Formulas like DATEVALUE also use your regional order, so they repeat the swap.",
+      },
+      {
+        q: "What if the file mixes both date orders?",
+        a: "Find something that proves the order for each row: a nights column, a booked-on date that must come before check-in, or a day above 12. In the recording the nights column settled every booking. For a file that mixes both orders, Stella lists the rows it can't decide so you can set them by hand.",
       },
       {
         q: "Why are my dates showing as numbers?",
@@ -1969,6 +2002,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "For stacking files with the same columns, see [combine Excel files into one sheet](/how/pdf-excel/combine-excel-files-into-one-sheet). To see what changed between two versions, [compare two Excel files](/how/pdf-excel/compare-two-excel-files).",
       },
       {
+        q: "What if the two sheets use different IDs?",
+        a: "Match on a column both sheets share, such as email address: point the XLOOKUP at that column on each side, with TRIM and LOWER so spacing and capitals don't matter. With Stella, name the column to match on in the prompt.",
+      },
+      {
         q: "What if a customer appears twice in the list?",
         a: "Lookups take the first match. [Remove duplicate rows](/how/pdf-excel/remove-duplicate-rows-in-excel) from the customer list first.",
       },
@@ -2037,7 +2074,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Decide what makes a duplicate",
-        body: "For a mailing list, the email address. Names aren't safe: two different people can share one. Dates and phone formats vary between copies of the same person.",
+        body: "For a mailing list, the email address. Names repeat: two different people can share one. Dates and phone formats vary between copies of the same person.",
       },
       {
         title: "Add a clean key column",
@@ -2065,6 +2102,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "How do I just highlight duplicates instead?",
         a: "Home, Conditional Formatting, Highlight Cells Rules, Duplicate Values. It has the same exact-match limit, so use the clean key column.",
+      },
+      {
+        q: "What about people with no email, or two addresses?",
+        a: "Give them a second key, such as the phone number with spaces removed, and check same-name rows by eye. Stella matches on email and lists same-name, different-email pairs for you to settle (eight in the recording). Ask for the removed duplicates on a separate tab to see exactly what was merged.",
       },
       {
         q: "Can I combine two lists and then de-duplicate?",
@@ -2163,7 +2204,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "How do I remove blank pages from a scanned PDF?",
-        a: "Delete them in Preview or PDF24 one by one. Automatic blank-page removal in scanner software often misses grainy pages or removes faint ones, so check.",
+        a: "Delete them in Preview or PDF24 one by one. Automatic blank-page removal in scanner software often misses grainy pages or removes faint ones, so zoom in on each one before deleting.",
       },
       {
         q: "Some pages are sideways too. Can that be fixed?",
@@ -2271,6 +2312,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "See [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages), which also removes blank backs from a double-sided scan.",
       },
       {
+        q: "How do I straighten a slightly crooked scan?",
+        a: "That's deskewing, which turns a page by a degree or two rather than a quarter turn. OCRmyPDF's `--deskew` option straightens pages while it adds searchable text, and Acrobat's Enhance Scans does it too.",
+      },
+      {
         q: "Will rotating reduce the quality?",
         a: "No, if the tool just changes the page's rotation setting, which Stella did here. Tools that re-render pages can soften them.",
       },
@@ -2339,7 +2384,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Tidy the sheet",
-        body: "Make sure every row has Amount, Paid by and Split between, with names spelled the same every time (Find and Replace “ben” with “Ben”). Refunds go in as negative amounts. Write “All” where everyone shares.",
+        body: "Give every row an Amount, Paid by and Split between, with names spelled the same every time (Find and Replace “ben” with “Ben”). Refunds go in as negative amounts. Write “All” where everyone shares.",
       },
       {
         title: "Add a share column per person",
@@ -2467,6 +2512,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Some amounts are text, which Sum skips. Convert them to numbers. Stella counted 8 such amounts here.",
       },
       {
+        q: "Why does one month show a negative total?",
+        a: "Refunds reduce their category in the month they happened, so a month with more refunded than spent comes out below zero. Here Fun was −£32 in October.",
+      },
+      {
         q: "Can I get a chart too?",
         a: "Yes: in Excel, select the PivotTable and Insert, PivotChart. Or ask Stella for a chart sheet in the same file.",
       },
@@ -2520,7 +2569,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "One 16-page PDF in about 1½ minutes. Checked afterwards against an answer key written before the run: every document in the checklist's order, the licence photo included as a page, the 2024 payslip left out, payslips and statements in date order, each document's own pages in order, every page there exactly once, and the original files unchanged. Missed one optional point: the PDF has no bookmarks for jumping between documents.",
+        "One 16-page PDF in about 1½ minutes. Checked afterwards against an answer key written before the run: every document in the checklist's order, the licence photo included as a page, the 2024 payslip left out, payslips and statements in date order, each document's own pages in order, every page there exactly once, and the original files unchanged.",
       note: "The mortgage application, the lender and every document (including the licence photo) are fictitious, made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/pdf-excel/merge-pdf-files/proof.mp4`,
@@ -2566,7 +2615,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "How do I merge PDF files for free without uploading them?",
-        a: "Preview on a Mac and the free PDF24 Creator on Windows both merge on your own computer. Online merge sites are convenient but they upload the files, which matters for payslips, statements and ID.",
+        a: "Preview on a Mac and the free PDF24 Creator on Windows both merge on your own computer, and so does Stella.",
       },
       {
         q: "Can I combine PDFs and JPG photos into one PDF?",
@@ -2574,7 +2623,11 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "How do I get the pages in the right order?",
-        a: "Drag the thumbnails before saving. If pages are already merged in the wrong order, [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages) covers fixing it afterwards.",
+        a: "Drag the thumbnails before saving. With Stella, give it the order or a checklist; with neither, it merges everything and tells you the order it chose. If pages are already merged in the wrong order, [reorder PDF pages](/how/pdf-excel/reorder-pdf-pages) covers fixing it afterwards.",
+      },
+      {
+        q: "Can the merged PDF have a bookmark for each document?",
+        a: "Yes. Acrobat's Combine Files adds a bookmark per file. With Stella, ask for bookmarks per document in the prompt, so the reader can jump straight to the payslips or statements.",
       },
       {
         q: "The merged PDF is too big to send. What now?",
@@ -2661,8 +2714,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Any PDF viewer can do it in a pinch: File, Print, enter the pages to keep (for example 1-2, 4), and print to PDF (Save as PDF on a Mac, Microsoft Print to PDF on Windows). Links and searchable text may not survive this route.",
       },
       {
-        title: "Many files: look before deleting",
-        body: "When the unwanted pages move around from file to file, check each one in thumbnail view. Don't go by a word like “terms”: a page that matters can mention it in a footer.",
+        title: "Many files: check each one in thumbnails",
+        body: "When the unwanted pages move around from file to file, open each one in thumbnail view and judge every page by what it is rather than by a word like “terms”, since a page you need can mention it in a footer.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -2670,6 +2723,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "How do I delete a page from a PDF on a Mac?",
         a: "In Preview, View, Thumbnails, select the page and press Delete, then save or export. Export under a new name if you want to keep the original.",
+      },
+      {
+        q: "How do I remove pages from multiple PDF files at once?",
+        a: "If the pages sit in the same place in every file, loop the free qpdf over the folder: `qpdf bill.pdf --pages . 1-3,5-z -- cleaned.pdf` keeps pages 1 to 3 and 5 to the end. When they move around, as in the recording, Stella reads every page of every file and keeps the ones you describe.",
       },
       {
         q: "Can I take pages out into their own file instead of deleting them?",
@@ -2709,7 +2766,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Edit text in a PDF",
     lede: "A wrong date and phone number fixed in every place, with the page looking the same.",
     answer:
-      "Preview and most free viewers can't change existing PDF text. The free LibreOffice Draw opens a PDF as editable text boxes: double-click, retype, then export as PDF, checking that fonts and spacing held. Many online editors only paint a white box over the old words and type on top, so the old text is still in the file. Stella (stella.sh) replaces it properly, in the same font, size and colour.",
+      "Preview and most free viewers can't change existing PDF text. The free LibreOffice Draw opens a PDF as editable text boxes: double-click, retype, then export as PDF, checking that fonts and spacing held. Many online editors only paint a white box over the old words and type on top, so the old text is still in the file. In a PDF that holds real text, Stella (stella.sh) replaces the words themselves, in the same font, size and colour.",
     stellaSteps: [
       "Finds “Spring Fair 2027.pdf” in Documents: a cream poster with the date in large green bold, and a letter to parents",
       "Finds every place the wrong date and phone number appear: five in total, two on the poster and three in the letter",
@@ -2727,7 +2784,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Fixed in about 1½ minutes. Checked afterwards against an answer key written before the run: “21 March” three times and the new number twice, as real text; the old date and number gone from the file (not covered up); each correction where the old one was at the same size; every other line unchanged; no white patches or squeezed text.",
-      note: "The school fair, its letter and phone number are fictitious, made for this run as a text PDF. The work is sped up 3×. Stella's question about the weekday is real: the poster says Saturday, and 21 March 2027 is a Sunday.",
+      note: "The school fair, its letter and phone number are fictitious, made for this run as a text PDF. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/pdf-excel/edit-text-in-pdf/proof.mp4`,
         cuts: webCuts("pdf-excel/edit-text-in-pdf"),
@@ -2772,7 +2829,11 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Is putting a white box over the text good enough?",
-        a: "For a printout, maybe. In the file, the old text is still there underneath. If it's something private, see [redact a PDF](/how/pdf-excel/redact-pdf), which removes the text for real.",
+        a: "It works for a printout. In the file, the old text is still there underneath, so search and copy-paste find it. To remove private text for real, see [redact a PDF](/how/pdf-excel/redact-pdf).",
+      },
+      {
+        q: "How do I change text in a scanned PDF?",
+        a: "A scan is a picture of the page, so the old words are covered and new ones lettered on top: draw a box in the background colour, then type in a matching font and size. Stella does the same on a scan, matching the lettering, and compares the page before and after.",
       },
       {
         q: "Should I convert the PDF to Word instead?",
@@ -2812,7 +2873,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Opens “Team expenses October 2026.pdf”: 28 pages, a summary and 11 claims from 6 people, with continuation pages and receipts that only give a claim number",
       "Finds Jordan Ellis's three claims (EXP-1043, 1051 and 1058) and follows each claim number to its continuation page and receipts",
       "Leaves out Jordan Ellison's claim (a different person) and a claim by someone else that Jordan only approved",
-      "Saves the 7 pages in their original order as “Jordan Ellis expenses October 2026.pdf” next to the pack, which is unchanged, and sends nothing",
+      "Saves the 7 pages in their original order as “Jordan Ellis expenses October 2026.pdf” next to the pack, which is unchanged",
       "Notes what Jordan will see (the old page footers, the approver's name) and that each claim's total is lower than its items add up to",
     ],
     prompt:
@@ -2824,7 +2885,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "A 7-page PDF in about 1¼ minutes. Checked afterwards against an answer key written before the run: exactly Jordan Ellis's pages (three claims, a continuation page and three receipts), not the similar name or the approved-only claim, in their original order, with the full pack unchanged.",
-      note: "The company, its staff and their expenses are fictitious, made for this run. The work is sped up 2×. The test pack's claim totals really don't match their items (a quirk of how it was made), and Stella noticed that without being asked.",
+      note: "The company, its staff and their expenses are fictitious, made for this run. The work is sped up 2×.",
       video: {
         src: `${PROOFS}/pdf-excel/extract-pages-from-pdf/proof.mp4`,
         cuts: webCuts("pdf-excel/extract-pages-from-pdf"),
@@ -2846,7 +2907,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Find the pages first",
-        body: "Scroll through and write down the page numbers you need. Watch for pages that belong but don't repeat the name, like a continuation page or a receipt that only carries a claim or invoice number.",
+        body: "Scroll through and write down the page numbers you need, including pages that belong but don't repeat the name, like a continuation page or a receipt that only carries a claim or invoice number.",
       },
       {
         title: "On a Mac: Preview",
@@ -2900,12 +2961,12 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     ],
     title: "Add your signature to a PDF from a photo of it (free)",
     description:
-      "Place your handwritten signature on a PDF with Preview or PDF24, or let Stella (stella.sh) clean up a photo of it. A signature image, not a certified e-signature.",
+      "Place your handwritten signature on a PDF with Preview or PDF24, or let Stella (stella.sh) clean up a photo of it and put it on the right signature line.",
     h1: "Add your signature to a PDF, from a photo of it",
     short: "Add a signature to a PDF",
     lede: "A phone photo of a signature, cleaned up and placed on the tenant's line of a lease.",
     answer:
-      "On a Mac, Preview's Sign tool captures your signature from the trackpad or camera and lets you drop it on the line. On Windows, the free PDF24 Creator adds a signature image. Either way you place a picture of your handwriting, not a certified digital signature. Stella (stella.sh) takes a phone photo of your signature, removes the paper behind the ink and places it on the right line.",
+      "On a Mac, Preview's Sign tool captures your signature from the trackpad or camera and lets you drop it on the line. On Windows, the free PDF24 Creator adds a signature image. Either way you place a picture of your handwriting, as if you'd signed a printout. Stella (stella.sh) takes a phone photo of your signature, removes the paper behind the ink and places it on the right line.",
     stellaSteps: [
       "Finds the 4-page tenancy renewal in Downloads and the signature photo in Pictures: blue ink on grey, unevenly lit paper",
       "Removes the paper background so only the ink is left, with no grey box around it",
@@ -2922,7 +2983,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "A signed copy in about 2¼ minutes. Checked afterwards against an answer key written before the run: all 4 pages kept, signature ink on the Tenant line with no grey photo box around it, the Landlord line empty, the rest of page 4 and pages 1 to 3 unchanged, the text still real text, and the original PDF and photo kept.",
-      note: "The tenancy, the letting company and the signature are fictitious, made for this run; the signature photo was drawn to look like a phone picture of ink on paper. This was the second attempt at this guide; the work is sped up 7×.",
+      note: "The tenancy, the letting company and the signature are fictitious, made for this run; the signature photo was drawn to look like a phone picture of ink on paper. The work is sped up 7×.",
       video: {
         src: `${PROOFS}/pdf-excel/add-signature-to-pdf/proof.mp4`,
         cuts: webCuts("pdf-excel/add-signature-to-pdf"),
@@ -2955,15 +3016,15 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "Sign in dark ink on white paper and photograph it in even light, straight on. If the paper shows as a grey box, an image editor's background remover or a “make transparent” option clears it; save as PNG to keep the transparency.",
       },
       {
-        title: "When it must be a real e-signature",
-        body: "Some lenders, courts and employers need a certified digital signature or a signing service that records who signed and when. Ask the sender; if so, use the service they name.",
+        title: "For a certified e-signature",
+        body: "When a lender, court or employer asks for a certified digital signature, they send the document through a signing service such as DocuSign or Adobe Acrobat Sign, which records who signed and when. Open their link and sign there.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
     faq: [
       {
-        q: "Is a pasted signature image legally valid?",
-        a: "Often it's accepted for everyday agreements, but it depends on the document and where you live, and some organisations insist on a certified e-signature. If in doubt, ask the person who sent it.",
+        q: "How do I add the date next to my signature?",
+        a: "In Preview, click Markup, then the Text tool, type the date and drag it onto the date line. PDF24's Sign PDF tool adds text the same way. With Stella, ask for the date, or your initials on every page, in the prompt; in the recording it left the date line blank and offered to fill it in.",
       },
       {
         q: "How do I sign a PDF in Chrome or Edge?",
@@ -3063,6 +3124,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Not always: Preview's crop can hide the rest of the page rather than delete it. Export as PDF afterwards, and check the file size if it matters.",
       },
       {
+        q: "What if the fold isn't in the middle of the page?",
+        a: "Place the cut by eye: in Preview, crop each copy to the edge of the gutter shadow instead of the exact middle. Stella splits spreads down the middle and says which cuts it isn't sure of, such as a picture running across both pages, so you can look at those.",
+      },
+      {
         q: "Can I make the scan searchable too?",
         a: "Yes: [make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable) adds a text layer you can search and copy from.",
       },
@@ -3151,7 +3216,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Many files: Tesseract",
-        body: "The free Tesseract OCR engine runs from the command line on Mac, Windows and Linux. It reads images, so turn each scanned page into a PNG first (or use a tool like OCRmyPDF that does it for you), then run `tesseract page.png out`.",
+        body: "The free Tesseract OCR engine runs from the command line on Mac, Windows and Linux. It reads images, so turn each scanned page into a PNG first (or use a tool like OCRmyPDF that does it for you), then run `tesseract page.png out`. For other languages, install the language pack and add `-l deu` (German), `-l fra` (French) and so on.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -3163,6 +3228,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "Why does copied text come out jumbled?",
         a: "Usually columns: the copy runs straight across both. Or the PDF stores letters in an odd order. Extracting by column, as Stella did with the newsletter, fixes the first.",
+      },
+      {
+        q: "How do I get a table out as columns?",
+        a: "A text file keeps a table as lines of words. For rows and columns you can sort, see [extract a table from a PDF to Excel](/how/pdf-excel/extract-table-from-pdf-to-excel).",
       },
       {
         q: "Can I get the text into Word with the layout?",
@@ -3246,7 +3315,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Clean up the rows",
-        body: "Sort by the code column so repeated headers, category headings and stray wrapped lines bunch together. Delete them, but paste each wrapped line onto the end of the description it belongs to first.",
+        body: "Sort by the code column so repeated headers, category headings and stray wrapped lines bunch together. Paste each wrapped line onto the end of the description it belongs to, then delete the extra rows.",
       },
       {
         title: "Make prices numbers",
@@ -3258,6 +3327,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "Does Excel for Mac have Get Data from PDF?",
         a: "Not at the time of writing; the PDF connector is in Excel for Windows (Microsoft 365). On a Mac, use Tabula or another tool, then open the result in Excel.",
+      },
+      {
+        q: "What about a scanned price list?",
+        a: "A scan has no text for Tabula or Excel to read, so run OCR on it first ([make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable)), then import it and compare the prices with the page. Stella runs OCR on a scanned list itself and checks every number against the page image.",
       },
       {
         q: "What about bank statements?",
@@ -3336,7 +3409,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Get the export onto your computer",
-        body: "On the iPhone: Health app, your picture, Export All Health Data. Send the zip to your computer (AirDrop, Files, email to yourself if it's small) and unzip it. The data is in apple_health_export/export.xml.",
+        body: "On the iPhone: Health app, your picture, Export All Health Data. Send the zip to your computer (AirDrop, Files, email to yourself if it's small) and unzip it. The data is in apple_health_export/export.xml; after years of data it can be several GB, which takes Excel or Stella a few minutes to read.",
       },
       {
         title: "Windows: Excel's XML import",
@@ -3360,6 +3433,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "Can I do this for other XML files, not just Health?",
         a: "Yes. Bank, accounting and shop exports often come as XML; the steps are the same: pick the repeating record, choose columns, and total where needed. For JSON exports, see [convert JSON to Excel](/how/pdf-excel/convert-json-to-excel).",
+      },
+      {
+        q: "Why are my step totals higher than the Health app shows?",
+        a: "When an iPhone and an Apple Watch both count steps, the export holds both sets of records, and a plain sum counts the overlap twice; the Health app shows each step once. Filter the sourceName column to one device before grouping. Stella checks for two step sources and says what it did.",
       },
       {
         q: "Can it show weekly or monthly averages too?",
@@ -3411,7 +3488,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "An Excel file in about 3 minutes. Checked afterwards against an answer key written before the run: all three tables (Costs, Payments made, Guest list) with every row, first columns matching row by row with accents intact, amounts as real numbers and dates as real dates, and the .numbers file unchanged.",
-      note: "The budget and guest names are fictitious, made for this run as a real Numbers document. The work is sped up 11×. Stella's first reply promised to keep the formatting; its final reply corrected that, saying the colours and fonts didn't come across.",
+      note: "The budget and guest names are fictitious, made for this run as a real Numbers document. The work is sped up 11×.",
       video: {
         src: `${PROOFS}/pdf-excel/convert-numbers-to-excel/proof.mp4`,
         cuts: webCuts("pdf-excel/convert-numbers-to-excel"),
@@ -3441,11 +3518,11 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Check every table came across",
-        body: "Numbers lets one sheet hold several tables side by side. Make sure each one is there in the Excel file, and that amounts add up (a SUM that gives 0 means they came through as text).",
+        body: "Numbers lets one sheet hold several tables side by side. Look for each one in the Excel file, and that amounts add up (a SUM that gives 0 means they came through as text).",
       },
       {
         title: "iCloud in a browser",
-        body: "With an Apple Account, upload the file to iCloud.com, open it in Numbers for iCloud, and download a copy as Excel. This works from a PC but uploads the file to Apple.",
+        body: "With an Apple Account, upload the file to iCloud.com, open it in Numbers for iCloud, and download a copy as Excel. This works from any browser on a PC.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -3552,6 +3629,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Only tables convert cleanly; paragraphs end up one per cell. Copy the tables, or ask Stella for the specific columns you need from the text.",
       },
       {
+        q: "What happens to merged cells?",
+        a: "A merged cell pastes as one Excel cell with blanks beside or below it. To fill the blanks, select the column, Home, Find & Select, Go To Special, Blanks, type = and click the cell above, then press Ctrl+Enter. Stella says where it found merged cells or tables inside tables, so you know which rows to look at.",
+      },
+      {
         q: "What if the tables are in a PDF, not Word?",
         a: "See [extract a table from a PDF to Excel](/how/pdf-excel/extract-table-from-pdf-to-excel).",
       },
@@ -3588,7 +3669,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "JSON to Excel",
     lede: "A nested shop export of 58 orders turned into one tidy row per order.",
     answer:
-      "Excel reads JSON through Data, Get Data, From File, From JSON (Power Query). You then expand the nested records, like the customer inside each order, and pick the columns you want. Watch the dates: Power Query can shift times into your computer's zone. Stella (stella.sh) does the flattening for you from a plain description of the columns, keeping the data on your computer.",
+      "Excel reads JSON through Data, Get Data, From File, From JSON (Power Query). You then expand the nested records, like the customer inside each order, and pick the columns you want. Power Query can shift times into your computer's zone, so set date columns as Text or Date. Stella (stella.sh) does the flattening for you from a plain description of the columns, keeping the data on your computer.",
     stellaSteps: [
       "Opens the shop's orders_export_2026-10.json in Downloads: 58 orders, each with a customer, a shipping address, line items, discounts and shipping nested inside",
       "Builds one row per order with order number, date, customer name, city, number of items and total",
@@ -3604,8 +3685,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "A spreadsheet of 58 orders in about 1¾ minutes. Checked afterwards against an answer key written before the run: a row for every order with its exact total, customer name and city on every row, the shop's local order date (not shifted to UTC), the number of items, and the shipping name on guest orders. Missed one optional point: there's no second sheet listing every line item.",
-      note: "The pottery shop and its orders are fictitious, generated for this run in the shape of a common shop-platform export. This was the second attempt at this guide; the work is sped up 5×.",
+        "A spreadsheet of 58 orders in about 1¾ minutes. Checked afterwards against an answer key written before the run: a row for every order with its exact total, customer name and city on every row, the shop's local order date (not shifted to UTC), the number of items, and the shipping name on guest orders.",
+      note: "The pottery shop and its orders are fictitious, generated for this run in the shape of a common shop-platform export. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/pdf-excel/convert-json-to-excel/proof.mp4`,
         cuts: webCuts("pdf-excel/convert-json-to-excel"),
@@ -3639,7 +3720,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "On a Mac",
-        body: "Recent Microsoft 365 builds of Excel for Mac have Data, Get Data with a JSON option and the same steps. Numbers can't open JSON. A converter website works but uploads your customers' names and addresses.",
+        body: "Recent Microsoft 365 builds of Excel for Mac have Data, Get Data with a JSON option and the same steps. Numbers can't open JSON.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -3647,6 +3728,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "How do I convert JSON to CSV instead?",
         a: "The same steps, then save as CSV; or ask Stella for a CSV. If leading zeros or dates matter, see [convert Excel to CSV](/how/pdf-excel/convert-excel-to-csv).",
+      },
+      {
+        q: "Can I get one row per item instead?",
+        a: "Yes. In Power Query, expand line_items instead of leaving it as a list, and each item gets its own row with its order number. With Stella, ask for a second sheet of line items next to the orders. Excel holds up to 1,048,576 rows a sheet.",
       },
       {
         q: "Why are my order dates a day off?",
@@ -3702,7 +3787,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "A 212-row spreadsheet in about 2 minutes. Checked afterwards against an answer key written before the run: a row for every member, every name complete with accents, every balance right with money owed as a negative number, join dates as dates, no page headers or footer left as rows, and the text file kept.",
-      note: "The rowing club and its members are fictitious, made for this run as a fixed-width report in an old Windows encoding. This was the second attempt at this guide; the work is sped up 6×.",
+      note: "The rowing club and its members are fictitious, made for this run as a fixed-width report in an old Windows encoding. The work is sped up 6×.",
       video: {
         src: `${PROOFS}/pdf-excel/convert-text-file-to-excel/proof.mp4`,
         cuts: webCuts("pdf-excel/convert-text-file-to-excel"),
@@ -3823,18 +3908,18 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     manualSteps: [
       {
         title: "Check the size first",
-        body: "Excel holds 1,048,576 rows including the header. If Excel shows a “file not loaded completely” message or the last rows are missing, the file is bigger than that.",
+        body: "Excel holds 1,048,576 rows including the header. If Excel shows a “file not loaded completely” message or the last rows are missing, the file is bigger than that. A file of several GB takes a few minutes to split and needs free disk space about its own size for the parts.",
       },
       {
         title: "Mac or Linux: split",
-        body: "In Terminal: `tail -n +2 big.csv | split -l 1000000 - part_` makes parts without the header; then add it back with `for f in part_*; do (head -1 big.csv; cat $f) > $f.csv; done`. Only safe when no field contains a line break.",
+        body: "In Terminal: `tail -n +2 big.csv | split -l 1000000 - part_` makes parts without the header; then add it back with `for f in part_*; do (head -1 big.csv; cat $f) > $f.csv; done`. This works when no field contains a line break.",
       },
       {
         title: "Windows: PowerShell",
-        body: "`Import-Csv` reads quoted line breaks correctly; a short script can export every million records with `Export-Csv`. It's slow on large files. Free CSV splitter programs exist too: check they keep the header.",
+        body: "`Import-Csv` reads quoted line breaks correctly; a short script can export every million records with `Export-Csv`. It's slow on large files. Free CSV splitter programs also work; pick one with an option to repeat the header.",
       },
       {
-        title: "Or don't split",
+        title: "Or load it whole for totals",
         body: "If you only need totals, Excel can load the whole file into its Data Model: Data, From Text/CSV, Load To, Only Create Connection, and tick Add to Data Model. Then summarise it with a PivotTable.",
       },
     ],
@@ -3931,7 +4016,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         title: "Check in a text editor",
-        body: "Open the CSV in Notepad or TextEdit, not Excel: Excel drops leading zeros again when it opens a CSV, even when they're in the file. Look for 00417 and a few dates.",
+        body: "Open the CSV in Notepad or TextEdit: Excel drops leading zeros again when it opens a CSV, even when they're in the file. Look for 00417 and a few dates.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -3943,6 +4028,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "Why do my dates become numbers like 45231?",
         a: "That's Excel's internal date number, written by tools that ignore the cell's format. Save from Excel itself, or ask for ISO dates.",
+      },
+      {
+        q: "Do formulas and formatting carry over to a CSV?",
+        a: "A CSV holds values only: each formula is saved as its result, and colours, fonts and the other sheets stay in the .xlsx. Keep the workbook as your master copy and export fresh CSVs from it when the data changes.",
       },
       {
         q: "Can I convert a Numbers file instead?",
@@ -3977,13 +4066,13 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     short: "Split an Excel sheet into files",
     lede: "620 orders split into one file per sales rep, mistyped names caught.",
     answer:
-      "Turn on Filter, choose one value in the column (one rep, one region), copy the visible rows into a new workbook and save; repeat for each value. Tidy the column first, because “Dana Price” and “dana price ” count as different values. VBA macros automate it, if you trust them. Stella (stella.sh) does it without macros and merges names that are clearly the same person.",
+      "Turn on Filter, choose one value in the column (one rep, one region), copy the visible rows into a new workbook and save; repeat for each value. Tidy the column first, because “Dana Price” and “dana price ” count as different values. VBA macros automate it. Stella (stella.sh) does it without macros and merges names that are clearly the same person.",
     stellaSteps: [
       "Opens “Orders 2026.xlsx” in Documents: 620 orders for 6 sales reps, a TOTAL row at the bottom and a Reps contact sheet",
-      "Finds 44 orders where the rep's name was typed differently (extra spaces, lower case, all capitals) and matches each to the right rep",
+      "Finds 44 orders where the rep's name was typed differently (extra spaces, lower case, all capitals) and matches each to the right rep, listing the variants it merged",
       "Writes six files, one per rep, each with only that rep's orders under the header and the dates still as dates",
       "Gives each file only that rep's own row from the Reps sheet, so nobody gets colleagues' email addresses",
-      "Saves them in a new folder next to the original, which is unchanged, checks the totals add up to the original's, and sends nothing",
+      "Saves them in a new folder next to the original, which is unchanged, and checks the totals add up to the original's",
     ],
     prompt:
       "I've got a spreadsheet of all our 2026 orders in my Documents. Split it into a separate Excel file for each sales rep, with only their orders, so I can send each rep their own.",
@@ -4039,7 +4128,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       },
       {
         q: "Can Stella email each rep their file?",
-        a: "It can if you ask and have email connected; in this run it didn't send anything. For one letter or invoice per row instead, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word).",
+        a: "Yes, when your email is connected to Stella: ask it to send each rep their own file. For one letter or invoice per row instead, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word).",
       },
       {
         q: "What if the file is a huge CSV?",
@@ -4069,17 +4158,17 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
     ],
     title: "Fix garbled characters in a CSV (Ã© instead of é) for Excel",
     description:
-      "Repair names like JosÃ© and â€™ in a CSV, cell by cell, without breaking real accents, and save a copy Excel opens right by double-click. Excel, or Stella (stella.sh).",
+      "Repair names like JosÃ© and â€™ in a CSV, cell by cell, without breaking real accents, and save a UTF-8 copy for Excel. Excel, or Stella (stella.sh).",
     h1: "Fix garbled characters in a CSV file",
     short: "Fix garbled characters in CSV",
-    lede: "150 contacts with JosÃ© and â€™ in them, repaired and saved so Excel shows them right.",
+    lede: "150 contacts with JosÃ© and â€™ in them, repaired and saved as clean UTF-8.",
     answer:
-      "First check whether the file is really broken: if it reads fine in a text editor, Excel just opened it with the wrong encoding, and Data, From Text/CSV with File origin UTF-8 fixes the view. If the garble is saved in the file, it has to be reversed cell by cell, and a find-and-replace list can break names where the Ã is real. Stella (stella.sh) repairs each cell on your computer, leaves correct ones alone and saves a copy Excel opens right by double-click.",
+      "First check whether the file is really broken: if it reads fine in a text editor, Excel just opened it with the wrong encoding, and Data, From Text/CSV with File origin UTF-8 fixes the view. If the garble is saved in the file, it has to be reversed cell by cell, and a find-and-replace list can break names where the Ã is real. Stella (stella.sh) repairs each cell on your computer, leaves correct ones alone and saves a UTF-8 copy with the marker Excel reads on double-click.",
     stellaSteps: [
       "Reads `Contacts export.csv` in Documents: 150 contacts with names, companies, cities and notes",
       "Reverses the mix-up cell by cell, so JosÃ© becomes José and â€™ an apostrophe, including entries garbled twice over",
       "Leaves entries that were already right untouched, such as a Portuguese company name whose Ã is a real letter",
-      "Saves `Contacts export (clean).csv` as UTF-8 with the marker Excel looks for, so a double-click shows the accents",
+      "Saves `Contacts export (clean).csv` as UTF-8 with the marker (BOM) that Excel reads on double-click",
       "Checks the whole file for leftover garble, keeps the original, and points out email addresses that are missing accented letters rather than garbled",
     ],
     prompt:
@@ -4090,8 +4179,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "About half a minute. Checked afterwards against an answer key written before the run: all 150 contacts kept, every cell reading exactly as it should (José, Zoë Brontë-Hale, O’Connor’s, Łódź, €45), rows that were already right untouched, and a CSV saved with the UTF-8 marker so Excel opens it correctly.",
-      note: "The contacts are made up, garbled for this run the way a UTF-8 file gets when it's opened as Windows text and saved again. The run was checked in the file; Excel itself wasn't opened. Shown at normal speed.",
+        "About half a minute. Checked afterwards against an answer key written before the run: all 150 contacts kept, every cell reading exactly as it should (José, Zoë Brontë-Hale, O’Connor’s, Łódź, €45), rows that were already right untouched, and a CSV saved with the UTF-8 marker.",
+      note: "The contacts are made up, garbled for this run the way a UTF-8 file gets when it's opened as Windows text and saved again. Shown at normal speed.",
       video: {
         src: `${PROOFS}/pdf-excel/fix-garbled-characters-in-csv/proof.mp4`,
         cuts: webCuts("pdf-excel/fix-garbled-characters-in-csv"),
@@ -4122,8 +4211,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         body: "For text saved garbled, use Find and Replace (Ctrl+H) per pattern: `Ã©` to é, `Ã¨` to è, `Ã¶` to ö, `â€™` to ’, `â€œ` and `â€` to quotes, `â‚¬` to €. Search for `Ã` alone afterwards to find what's left.",
       },
       {
-        title: "Watch the real Ã",
-        body: "Portuguese and some other names use Ã as a real letter (SÃO JOÃO). Don't run a blanket replace on Ã; fix those cells by eye.",
+        title: "Keep the real Ã",
+        body: "Portuguese and some other names use Ã as a real letter (SÃO JOÃO). Replace the two-character patterns above rather than Ã on its own, and fix those cells by eye.",
       },
       {
         title: "Save so Excel reads it next time",
@@ -4143,6 +4232,10 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       {
         q: "How do I save a CSV that Excel opens with accents?",
         a: "Save it as CSV UTF-8 (Comma delimited). The BOM at the start tells Excel to read it as UTF-8 on double-click.",
+      },
+      {
+        q: "What if the CSV shows ? or � instead of letters?",
+        a: "Those letters were lost when the file was saved, so there's nothing left to reverse. Export the data again from its source as CSV UTF-8, or fill the letters back in from context: ask Stella to do that and to list each one it guessed.",
       },
       {
         q: "Can it tidy the contacts too?",
@@ -4180,7 +4273,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "Repeats the wording in smaller rows across the whole page, so there's no clean corner to crop out and reuse",
       "Puts the mark over the passport picture, where a watermark behind the page would have been hidden",
       "Saves the copies, named “… - Fernhill Lettings copy”, in a new folder in Downloads; the originals stay as they were",
-      "Says plainly that someone with PDF editing software could still remove the mark, and offers flattened picture-only copies as a harder-to-strip option",
+      "Offers flattened, picture-only copies as a harder-to-strip option",
     ],
     prompt:
       "I have to send copies of my passport, payslip and bank statement to a letting agent. Put a watermark across every page saying \"Only for Fernhill Lettings rental application\" so they can't be reused, and keep my originals as they are.",
@@ -4249,8 +4342,8 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
         a: "Who it's for and why, for example “Only for Fernhill Lettings rental application”, sometimes with the date. A specific mark is much less useful to anyone who gets hold of the copy.",
       },
       {
-        q: "Is it safe to use an online watermark site for a passport?",
-        a: "Those sites upload the very documents you're protecting. A desktop tool or Stella does the watermarking on your own computer.",
+        q: "How do I make a watermark harder to remove?",
+        a: "Repeat the wording across the whole page, as Stella did, so there's no clean corner to crop, and flatten the copy into picture-only pages: print it to PDF as an image, or ask Stella for flattened copies. Flattened pages can't be selected or searched, so keep that for ID scans and send text documents as they are.",
       },
       {
         q: "Can I hide parts of the document too, like account numbers?",

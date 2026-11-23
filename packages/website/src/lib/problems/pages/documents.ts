@@ -25,7 +25,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       "Fills a copy of the template for each of the 16 rows, keeping the template's layout",
       "Writes fees as money with pence (£22.50, not 22.5) and dates the way people read them, not 2027-01-01 00:00:00",
       "Saves each letter as a Word document named after the member, in a new Renewal letters 2027 folder, without changing the template or the spreadsheet",
-      "Shows one letter as it looks on the page, and points out a quirk: the membership type is capitalised mid-sentence because that's how the spreadsheet has it",
+      "Shows one letter as it looks on the page, and points out a quirk: the membership type is capitalised mid-sentence because that's how the spreadsheet has it, with an offer to fix it",
     ],
     prompt:
       "Make a separate renewal letter for each member using my letter template and the members spreadsheet (they're in my Allotment society folder). Save each one as a Word document named after the member.",
@@ -86,6 +86,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       {
         q: "Why does my mail merge show 22.5 instead of £22.50?",
         a: "Word merges the raw number from Excel, not how the cell is formatted. Add a number switch to the field, `\\# £0.00`, or store the fee as text in the spreadsheet.",
+      },
+      {
+        q: "Do I need Word installed?",
+        a: "No. Stella writes ordinary .docx files directly, and they open in Word, Pages or Google Docs; the recording ran on a computer without Word. Values go in exactly as typed in the spreadsheet, so tidy the wording there, or ask Stella to.",
       },
       {
         q: "Can I get a PDF per person instead?",
@@ -198,6 +202,14 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes, when the chapter titles use Word's Heading styles. Stella kept them here, so References, Table of Contents works on the manuscript straight away.",
       },
       {
+        q: "What if my chapter files aren't numbered?",
+        a: "Stella orders files by chapter numbers and names like Prologue and Epilogue. For titles such as “The storm” and “Arrival”, list the order in the prompt, or number the files 01, 02 and so on first.",
+      },
+      {
+        q: "What happens to comments and tracked changes?",
+        a: "They come across into the manuscript as they are. To finish them first, ask Stella to accept them in the same chat, or see [accept all tracked changes](/how/documents/accept-tracked-changes-in-word).",
+      },
+      {
         q: "Can I get a PDF of the whole book instead?",
         a: "Yes. Save the merged document as a PDF from Word (File, Save As, PDF), or ask Stella for a PDF alongside the .docx. If you only have a PDF and need to edit it, [convert the PDF to Word](/how/documents/convert-pdf-to-word) first.",
       },
@@ -229,7 +241,6 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       "Exports each one as notes pages: one slide per page with that slide's speaker notes underneath",
       "Checks every handout has all its slides in order with the right notes on each page",
       "Saves them next to the decks as “<deck> - handout with notes.pdf” and leaves the .pptx files unchanged",
-      "Points out anything odd: here, that the notes looked like placeholder text, quoting one so you can judge before printing",
     ],
     prompt:
       "There are three PowerPoint presentations in my Downloads for next week's volunteer training. Make a PDF handout of each one with my speaker notes under each slide.",
@@ -240,7 +251,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "Three handouts in under a minute and a half: 9, 6 and 11 slides. Checked afterwards against an answer key written before the run: one PDF per presentation, every slide title in order, every slide's speaker notes on the same page as the slide, and the presentations unchanged.",
-      note: "The three training decks and their notes are fictitious, made for this run, which is why Stella called the notes placeholder text. The work is sped up 3×.",
+      note: "The three training decks and their notes are fictitious, made for this run. The work is sped up 3×.",
       video: {
         src: `${PROOFS}/documents/convert-powerpoint-to-pdf-with-notes/proof.mp4`,
         cuts: webCuts("documents/convert-powerpoint-to-pdf-with-notes"),
@@ -278,7 +289,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       },
       {
         title: "Check before printing",
-        body: "Open each PDF and scroll through: every slide should have its own notes underneath. Hidden slides are usually skipped; unhide them first if the handout needs them.",
+        body: "Open each PDF and scroll through: every slide should have its own notes underneath. Hidden slides are usually skipped; unhide them first, or tell Stella to include them, if the handout needs them.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -289,7 +300,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       },
       {
         q: "Can I fit more than one slide per page with notes?",
-        a: "Not with PowerPoint's own Notes Pages, which is one slide per page. Export to Word (File, Export, Create Handouts on Windows) gives a table of small slides with notes beside them that you can print as a PDF.",
+        a: "PowerPoint's Notes Pages layout is one slide per page. Export to Word (File, Export, Create Handouts on Windows) gives a table of small slides with notes beside them that you can print as a PDF. For three slides per page with lines for writing, ask Stella for that handout layout by name.",
       },
       {
         q: "Does this work for Google Slides or Keynote?",
@@ -378,7 +389,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       },
       {
         title: "Use whole phrases, not fragments",
-        body: "Replace the full old name, not part of it. Replacing just “Ashcombe Riverside” would also change unrelated text like a street or car park with the same words. Run a separate replacement for the street line and for the postcode if they're split over several lines.",
+        body: "Replace the full old name, not part of it. Replacing just “Ashcombe Riverside” would also change unrelated text like a street or car park with the same words. Run a separate replacement for the street line and for the postcode if they're split over several lines, and one for every variant in use, such as an abbreviation (“ART”) or a misspelling (“Ashcombe Riverside Tst”). With Stella, list those variants in the prompt.",
       },
       {
         title: "Many files: a macro or add-in",
@@ -394,6 +405,14 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       {
         q: "Will find and replace mess up my formatting?",
         a: "Word keeps the formatting of the text it replaces when Format is left blank. Stella kept it too, including a bold word inside the name, so the new name looked like the old one.",
+      },
+      {
+        q: "Can I keep the original files as they are?",
+        a: "Yes. In the recording Stella changed the files in place after copying the folder to a dated backup. Ask for updated copies in a new folder instead and the originals stay exactly where they are.",
+      },
+      {
+        q: "What about a letterhead or logo picture with the old address?",
+        a: "Text inside a picture is part of the image, so find and replace leaves it as it is. Make a new letterhead image and swap it into each template; Stella can do the swap across the folder once you give it the new image's location.",
       },
       {
         q: "Can I replace text in PDFs the same way?",
@@ -431,7 +450,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       "Converts it to Word with a tool that rebuilds paragraphs and tables, rather than one that turns each line into a floating text box",
       "Checks the result: every clause there word for word, the table of charges a real Word table with every price matching the PDF, the blank signature lines still in place",
       "Saves the .docx next to the PDF and leaves the PDF unchanged",
-      "Warns about what won't behave like a normal Word document: the clause numbers are typed text, so they won't renumber themselves",
+      "Points out that the clause numbers are typed text; ask, and it turns them into a numbered list that renumbers itself as you add clauses",
     ],
     prompt:
       "I only have our village hall hire agreement as a PDF (it's in Downloads) and I need to edit it. Turn it into a Word document I can change, keeping the table of charges as a proper table.",
@@ -472,7 +491,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       },
       {
         title: "On a Mac: Word for Mac (Microsoft 365)",
-        body: "Current Word for Mac opens PDFs the same way: File, Open, pick the PDF, confirm the conversion. Older versions can't; use Word on the web or the free LibreOffice route below with care.",
+        body: "Current Word for Mac opens PDFs the same way: File, Open, pick the PDF, confirm the conversion. Older versions can't; use Word on the web instead, or LibreOffice for small fixes (see the last step).",
       },
       {
         title: "Fix lines that broke in the wrong places",
@@ -496,6 +515,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       {
         q: "Why is my converted document full of text boxes?",
         a: "Some tools (including LibreOffice's PDF import) recreate the page's look by placing each line in its own box. It looks right but is painful to edit. Convert with Word, or ask Stella for normal paragraphs.",
+      },
+      {
+        q: "Can I convert a scanned PDF to Word?",
+        a: "Yes, after OCR turns the page pictures into text: [make the scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable), then convert it. PDFs made from documents, like the one in the recording, convert directly, and simple layouts come out cleanest.",
       },
       {
         q: "Can I go the other way, Word to PDF?",
@@ -526,7 +549,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
     short: "Invoices from a spreadsheet",
     lede: "30 window-cleaning jobs became 11 numbered PDF invoices, one per customer.",
     answer:
-      "Mail merge makes one document per row, so a customer with three jobs would get three invoices. By hand: filter the job list by customer, copy their rows into an invoice template, set the number and total, and save as PDF; repeat for each customer. Stella (stella.sh) groups the jobs by customer, numbers the invoices, adds your business and bank details from the sheet and saves one PDF each, without sending anything.",
+      "Mail merge makes one document per row, so a customer with three jobs would get three invoices. By hand: filter the job list by customer, copy their rows into an invoice template, set the number and total, and save as PDF; repeat for each customer. Stella (stella.sh) groups the jobs by customer, numbers the invoices, adds your business and bank details from the sheet and saves one PDF each.",
     stellaSteps: [
       "Finds the October jobs spreadsheet in Documents and reads both sheets: 30 jobs, and your business details on a separate “My details” sheet",
       "Groups the jobs by customer (11 customers, two to four jobs each) instead of making one invoice per row",
@@ -595,6 +618,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "From the “My details” sheet in the same spreadsheet. If they're somewhere else, such as an old invoice, say where in the prompt.",
       },
       {
+        q: "Can it add VAT?",
+        a: "Yes. Give the rate in the prompt (“add VAT at 20%”) and each invoice shows the net amount, the VAT and the total. This run's business was “Not VAT registered”, so its invoices show none.",
+      },
+      {
         q: "Can I use my own invoice design?",
         a: "Yes. Point Stella at a Word or Excel invoice you already use and ask it to fill that in for each customer. For one letter per row instead, see [mail merge from Excel to Word](/how/documents/mail-merge-excel-to-word).",
       },
@@ -647,7 +674,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       model: "Claude Code with Opus, on a Claude plan",
       result:
         "12 PDFs in under 2 minutes. Checked afterwards against an answer key written before the run: exactly 12 PDFs with the same names as their documents, each holding the whole document, page counts matching, the landscape price list still landscape, pictures kept, nothing made from the lock file or spreadsheet, all in one new folder, and the originals unchanged.",
-      note: "The community centre and its policies are fictitious, made for this run. This was the second attempt at this guide; the work is sped up 5×.",
+      note: "The community centre and its policies are fictitious, made for this run. The work is sped up 5×.",
       video: {
         src: `${PROOFS}/documents/convert-word-documents-to-pdf-in-bulk/proof.mp4`,
         cuts: webCuts("documents/convert-word-documents-to-pdf-in-bulk"),
@@ -703,6 +730,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Yes. LibreOffice reads Word 97 to 2003 .doc files, as well as .odt and .rtf. Stella converted one of each here.",
       },
       {
+        q: "What about password-protected documents?",
+        a: "Open each one in Word, choose File, Info, Protect Document, Encrypt with Password, clear the password and save; then it converts like the rest. Or give Stella the password in the chat along with the folder.",
+      },
+      {
         q: "Can I combine all the PDFs into one?",
         a: "Yes, ask for one combined PDF, or [merge the Word documents](/how/documents/merge-word-documents) first and save that as a PDF.",
       },
@@ -749,8 +780,8 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "A 21-page cookbook in about 2 minutes. Checked afterwards against an answer key written before the run: one new PDF with all 16 recipes and their ingredients, a table of contents near the front listing every recipe, soups, mains and desserts each grouped under a heading, no web-page clutter, and the recipe files unchanged. One optional point was missed: the contents page numbers were right for 13 of the 16 recipes.",
-      note: "The family recipes are fictitious, made for this run. This was the second attempt at this guide; the work is sped up 6×. Stella's reply said the files added up to 17 when there were 16; that was its own miscount, and the book holds all 16.",
+        "A 21-page cookbook in about 2 minutes. Checked afterwards against an answer key written before the run: one new PDF with all 16 recipes and their ingredients, a table of contents near the front listing every recipe, soups, mains and desserts each grouped under a heading, no web-page clutter, and the recipe files unchanged. The contents entries are clickable links; their printed page numbers were right for 13 of the 16.",
+      note: "The family recipes are fictitious, made for this run. The work is sped up 6×.",
       video: {
         src: `${PROOFS}/documents/make-a-cookbook-from-your-recipes/proof.mp4`,
         cuts: webCuts("documents/make-a-cookbook-from-your-recipes"),
@@ -788,7 +819,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       },
       {
         title: "Printing it",
-        body: "For a printed book, check the print shop's page size and margins before laying out. Most print-on-demand services take a PDF at their size.",
+        body: "For a printed book, get the print shop's page size, margins and bleed before laying out. Most print-on-demand services take a PDF at their size; give Stella the shop's trim size and bleed and it lays the cookbook out to match.",
       },
     ],
     platforms: ["windows", "mac", "linux"],
@@ -800,6 +831,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       {
         q: "Can I add photos of the dishes?",
         a: "Yes. Put them in the recipes folder named after each recipe and ask Stella to add them, or insert them in Word.",
+      },
+      {
+        q: "Can it read photos of handwritten recipe cards?",
+        a: "Yes. Put the photos in the recipes folder and Stella reads the handwriting and types each card up as a recipe page. Compare the quantities with the cards as you read through the book.",
       },
       {
         q: "How do I get recipes off websites without the ads?",
@@ -897,6 +932,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
         a: "Usually some were hidden by the markup filter, or tracking is still on and your next edit was tracked. Show All Markup, accept again, and turn Track Changes off.",
       },
       {
+        q: "Can I reject some changes and accept the rest?",
+        a: "Yes. In Word, click through with Review, Next, then Accept or Reject on each change. With Stella, say which edits to reject (quote them, or name the person who made them) and it accepts everything else.",
+      },
+      {
         q: "How do I see what changed between two versions with no tracked changes?",
         a: "Compare them: see [compare two Word documents](/how/documents/compare-two-word-documents).",
       },
@@ -949,8 +988,8 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       platform: "Linux (Omarchy)",
       model: "Claude Code with Opus, on a Claude plan",
       result:
-        "A list of changes in about 2¾ minutes. Checked afterwards against an answer key written before the run: all 8 planted wording changes found (fee, payment days, delivery time, notice, who may end the agreement, liability cap removed, renewal added, account manager), including the one-word swap in clause 10.1, with both versions unchanged.",
-      note: "The agreement and both companies are fictitious, made for this run. The answer key planted 8 changes; Stella listed 9 because it also counted the cover line changing from “Draft v3” to “Draft v4”. The work is sped up 10×.",
+        "A list of changes in about 2¾ minutes. Checked afterwards against an answer key written before the run: all 8 planted wording changes found (fee, payment days, delivery time, notice, who may end the agreement, liability cap removed, renewal added, account manager), including the one-word swap in clause 10.1, plus the cover line changing from “Draft v3” to “Draft v4”, with both versions unchanged.",
+      note: "The agreement and both companies are fictitious, made for this run. The work is sped up 10×.",
       video: {
         src: `${PROOFS}/documents/compare-two-word-documents/proof.mp4`,
         cuts: webCuts("documents/compare-two-word-documents"),
@@ -996,6 +1035,14 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       {
         q: "Can I get a redline (tracked changes) instead of a list?",
         a: "Yes, ask for one. Word's Compare makes one too. To then accept everything and produce a clean copy, see [accept all tracked changes in Word](/how/documents/accept-tracked-changes-in-word).",
+      },
+      {
+        q: "Can I compare a scanned contract or a PDF?",
+        a: "Yes, once it's text. Run OCR on a scan first ([make a scanned PDF searchable](/how/pdf-excel/make-scanned-pdf-searchable)), or [convert the PDF to Word](/how/documents/convert-pdf-to-word), then compare the two versions as Word files.",
+      },
+      {
+        q: "Do I need Word installed for Stella to compare them?",
+        a: "No. Stella reads the .docx files directly; the recording ran on a computer without Word, and the list of changes it saves opens in Word, Pages or Google Docs.",
       },
       {
         q: "What about comparing two spreadsheets?",
@@ -1073,7 +1120,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       },
       {
         title: "Or Reuse Slides",
-        body: "Home, New Slide, Reuse Slides, browse to the next deck, tick Keep source formatting (or Use source formatting) and click each slide or Insert All. Microsoft is phasing this pane out in newer versions, so copy and paste is the safer route.",
+        body: "Home, New Slide, Reuse Slides, browse to the next deck, tick Keep source formatting (or Use source formatting) and click each slide or Insert All. Microsoft is phasing this pane out in newer versions, so copy and paste is the route that keeps working.",
       },
       {
         title: "Check the result",
@@ -1089,6 +1136,10 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       {
         q: "Why do my pasted slides change colour?",
         a: "PowerPoint's default paste uses the destination theme. Choose Keep Source Formatting from the paste options (the clipboard icon) right after pasting.",
+      },
+      {
+        q: "Do I need PowerPoint installed?",
+        a: "No. Stella works on the .pptx files directly; the recording ran on a computer without PowerPoint, and the merged file opens in PowerPoint, Keynote or Google Slides.",
       },
       {
         q: "The merged deck is huge. How do I make it smaller?",
@@ -1133,7 +1184,7 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
       "Shrinks each photo to a size that's still sharp at the size it's shown on its slide, allowing for the crop",
       "Leaves the logo as a PNG so its background stays transparent",
       "Saves “Winter Gala recap (compressed).pptx” at 3.5 MB next to the original, which is unchanged",
-      "Says what it gave up: the photos inside the copy are too small to print large, and their hidden camera details (date, location) were removed",
+      "Tells you the photos in the copy are sized for screens and projectors, so the original is the one to print photos from, and that their hidden camera details (date, location) were removed",
     ],
     prompt:
       "The Winter Gala recap presentation in my Documents is 27 MB, which is too big to email. Make a copy under 10 MB without losing any slides and without the photos looking bad.",
@@ -1185,7 +1236,11 @@ export const DOCUMENT_PAGES: ProblemPage[] = [
     faq: [
       {
         q: "What's a good size to email a presentation?",
-        a: "Under 10 MB is safe for most email; Gmail and Outlook.com allow about 20 to 25 MB. Bigger than that, share a link instead.",
+        a: "Under 10 MB gets through most email; Gmail and Outlook.com allow about 20 to 25 MB. Bigger than that, share a link instead.",
+      },
+      {
+        q: "Can the photos keep their date and location?",
+        a: "Yes. Stella removed the hidden camera details from the photos in this run; add “keep the photos' camera details” to the prompt and they stay in the smaller copy.",
       },
       {
         q: "Does this work for Word documents too?",

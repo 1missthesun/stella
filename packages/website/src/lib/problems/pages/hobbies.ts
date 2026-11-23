@@ -15,10 +15,10 @@ export const HOBBIES_PAGES: ProblemPage[] = [
     short: "Transpose chords",
     lede: "Five songs moved down two half steps, every chord changed and every lyric left alone.",
     answer:
-      "Count each chord down (or up) the same number of half steps on the chromatic scale: C, C#/Db, D, D#/Eb, E, F, F#/Gb, G, G#/Ab, A, A#/Bb, B. Two half steps down turns G into F, D/F# into C/E and Em into Dm. Keep the chord type, move the bass note of slash chords too, and spell with flats in flat keys. Stella (stella.sh) rewrites a whole folder of chord sheets on your computer and saves new copies.",
+      "Count each chord down (or up) the same number of half steps on the chromatic scale: C, C#/Db, D, D#/Eb, E, F, F#/Gb, G, G#/Ab, A, A#/Bb, B. Two half steps down turns G into F, D/F# into C/E and Em into Dm. Keep the chord type, move the bass note of slash chords too, and spell with flats in flat keys. Stella (stella.sh) rewrites a whole folder of text and ChordPro chord sheets on your computer and saves new copies.",
     stellaSteps: [
       "Finds the five songs in `Documents/Chord Sheets`: four chord-over-lyrics text files and one ChordPro file with chords in square brackets",
-      "Writes a small transposer that only touches chord lines and bracketed chords, so lyric lines starting “Am I”, “A distant” or “E is for” stay as written",
+      "Writes a small Python transposer that only touches chord lines and bracketed chords, so lyric lines starting “Am I”, “A distant” or “E is for” stay as written",
       "Moves every chord down two half steps, keeping sevenths, minors, sus chords and slash bass notes, and spells them with flats where the new key uses flats (Ab, Db, Eb)",
       "Updates the key labels in the song titles (Willow Street goes from Bb to Ab) and keeps each chord over the same syllable",
       "Saves each song as a new file with “(-2)” in the name, leaves the originals as they were and ignores the Saturday setlist, which isn't a song",
@@ -66,8 +66,8 @@ export const HOBBIES_PAGES: ProblemPage[] = [
         body: "Change only the root letter (and accidental) of each chord, keeping the rest: Em7 becomes Dm7, Asus4 becomes Gsus4. For slash chords move both notes: D/F# becomes C/E. Keep each chord above the same word.",
       },
       {
-        title: "Don't use find and replace",
-        body: "Replacing every A with G also changes lyrics like “A distant train”, and changing chords one at a time with replace can move a chord twice. Go line by line, or use a transposer that only reads chord lines.",
+        title: "Go line by line",
+        body: "Work through the chord lines one at a time, or use a transposer that only reads chord lines. Find and replace changes lyrics too (every A becomes G in “A distant train”), and replacing chords one at a time can move a chord twice.",
       },
       {
         title: "ChordPro files",
@@ -117,7 +117,7 @@ export const HOBBIES_PAGES: ProblemPage[] = [
       "Works out each factor for 15: 2.5, 3.75 and 1.875",
       "Multiplies every ingredient and rounds to measures you'd use: 3¾ baguettes becomes 4, 1⅞ times the sugar becomes 1⅓ cups, “2 (28 oz) cans” becomes “5 (28 oz) cans”",
       "Keeps oven temperatures, and rewrites pan and timing notes for the bigger batch: two racks for the bread, a deeper dish and longer chilling for the tiramisu, extra dishes and 10–15 minutes more for the lasagna",
-      "Saves each as a new file with “(serves 15)” in the name, in the same format; the lasagna's Word formatting matches the original, which stays untouched",
+      "Saves each as a new file with “(serves 15)” in the name, in the same format; the lasagna's Word formatting, done with Stella's built-in document tool, matches the original, which stays untouched",
     ],
     prompt:
       "I'm cooking for 15 people. Scale the three recipes in the Recipes folder in my Documents to serve 15 and save the new versions.",
@@ -128,7 +128,7 @@ export const HOBBIES_PAGES: ProblemPage[] = [
       model: MODEL,
       result:
         "Three scaled recipes in about 2 minutes. Checked afterwards against an answer key written before the run: every ingredient of all three recipes scaled for 15 within kitchen rounding (lasagna ×2.5, garlic bread ×3.75, tiramisu ×1.875), the 28 oz can size kept with only the number of cans scaled, oven temperatures kept, cooking times not multiplied, and the originals unchanged.",
-      note: "The recipes were written for this run. Stella added its own advice on pans, racks and timing, which the check didn't grade. The work is sped up 6×.",
+      note: "The recipes were written for this run. The work is sped up 6×.",
       video: {
         src: `${PROOFS}/hobbies/scale-a-recipe/proof.mp4`,
         cuts: webCuts("hobbies/scale-a-recipe"),
@@ -158,8 +158,8 @@ export const HOBBIES_PAGES: ProblemPage[] = [
         body: "Multiply every amount by the factor and round to measures you can actually use: 2.81 cups is about 2¾ cups, 3.75 baguettes is 4. Round eggs to whole eggs. Converting cups to grams first makes odd amounts easier to weigh.",
       },
       {
-        title: "Leave these alone",
-        body: "Oven temperature stays the same. Can and packet sizes stay the same: scale how many you buy. Don't multiply cooking times; a deeper dish takes a little longer, so check for doneness instead.",
+        title: "Keep these the same",
+        body: "Oven temperature stays the same. Can and packet sizes stay the same: scale how many you buy. Cooking times stay close to the original; a deeper dish takes a little longer, so start checking for doneness at the original time.",
       },
       {
         title: "Think about pans",
@@ -187,6 +187,10 @@ export const HOBBIES_PAGES: ProblemPage[] = [
       {
         q: "Can it put my recipes into a cookbook?",
         a: "Yes: see [make a cookbook from your recipes](/how/documents/make-a-cookbook-from-your-recipes).",
+      },
+      {
+        q: "Should salt and baking powder be scaled the same way?",
+        a: "For a normal double or triple batch, yes. In very large batches, leavening, salt and spices often need a little less than the full multiple. Stella scales them evenly, so hold a little back on those and taste as you go.",
       },
     ],
     related: ["documents/make-a-cookbook-from-your-recipes", "hobbies/transpose-chords", "hobbies/make-a-family-tree-chart-from-gedcom", "pdf-excel/split-bills-with-roommates"],
@@ -273,8 +277,12 @@ export const HOBBIES_PAGES: ProblemPage[] = [
         a: "It goes by the GEDCOM's own record IDs, not names, and shows birth years so you can tell them apart on paper. In the test, two men called John Harrow were kept apart.",
       },
       {
-        q: "Can it make a family photo book or seating chart too?",
+        q: "Can it make a family photo book or a reunion cookbook too?",
         a: "For photos, see [combine photos into one PDF](/how/photos-files/combine-photos-into-one-pdf). For a reunion's recipes, see [make a cookbook from your recipes](/how/documents/make-a-cookbook-from-your-recipes).",
+      },
+      {
+        q: "How do I print a big tree with lots of people?",
+        a: "Ask Stella to split it by branch, one readable page each, or to lay it out on a poster-size page that a copy shop can print.",
       },
     ],
     related: ["documents/make-a-cookbook-from-your-recipes", "photos-files/combine-photos-into-one-pdf", "photos-files/fix-wrong-date-on-photos", "hobbies/scale-a-recipe"],

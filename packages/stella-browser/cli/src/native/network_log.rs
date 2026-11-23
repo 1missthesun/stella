@@ -817,6 +817,9 @@ fn request_sent(state: &mut LogState, source: &str, request_id: &str, params: &V
             ..stream_entry(source, request_id, String::new(), "")
         });
     }
+    if url.starts_with("data:") {
+        return;
+    }
     let (post_data, post_data_truncated) = match post_data {
         Some(body) => {
             let (body, truncated) = truncate_utf8(&body, MAX_TRACKED_REQUEST_BODY_BYTES);

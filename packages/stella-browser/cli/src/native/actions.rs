@@ -7039,6 +7039,9 @@ async fn handle_har_stop(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
 
     let har_str = serde_json::to_string_pretty(&har)
         .map_err(|e| format!("Failed to serialize HAR: {}", e))?;
+    if let Some(folder) = std::path::Path::new(&path).parent() {
+        let _ = std::fs::create_dir_all(folder);
+    }
     std::fs::write(&path, har_str).map_err(|e| format!("Failed to write HAR: {}", e))?;
 
     let mut result = json!({

@@ -175,7 +175,7 @@ await tab.goto("https://example.com/orders");
 await browser.chain([{ action: "har_stop", params: { tabId: tab.id, path: "~/.stella/tmp/orders.har" } }]);
 ```
 
-The second call's result names the saved file's `path`.
+The second call's result names the saved file's `path`. A HAR holds every request, with bodies for JSON and API calls only.
 
 ## Dialogs and Unresponsive Tabs
 
@@ -286,7 +286,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `playwright`                                                          | Frozen page facade, cached for this tab. |
 | `goto(url, { waitUntil?, timeout? })`                                 | Navigate the tab.                        |
 | `back({ timeout? })`, `forward({ timeout? })`, `reload({ timeout? })` | History navigation.                      |
-| `close()`                                                             | Close this tab.                          |
+| `close()`                                                             | Close this tab (Stella's browser keeps your only one until you finish). |
 | `leaveForUser()`, `markHandoff()`, `markDeliverable()`                | Keep open for the user; never closed.    |
 | `show()`                                                              | Bring this tab forward for the user.     |
 | `url()`, `title()`                                                    | Async methods, not strings: `(await tab.url()).includes(…)`. |

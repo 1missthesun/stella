@@ -19,12 +19,15 @@ import {
   NativeSyntheticEvent,
   Pressable,
   StyleSheet,
+  type StyleProp,
   type TextLayoutEventData,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from "react-native";
 import { Text } from "../Text";
 import { Image } from "expo-image";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { driveLinkPath, driveLinkTarget } from "@stella/contracts/cloud-world-paths";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
@@ -112,6 +115,47 @@ export type MessageRowActions = {
 const MESSAGE_HOLD_MS = 180;
 const MESSAGE_LONG_PRESS_MS = 420;
 const NO_UPLOAD_IDS: readonly string[] = [];
+const MESSAGE_ACCESSIBILITY_ACTIONS = [{ name: "messageActions", label: "Message actions" }];
+
+/**
+ * Long press for the message menu, through the gesture system rather than a
+ * JS touch responder: on iOS a JS responder stops every scroll view inside it
+ * from scrolling, which would freeze the sideways tables, code and media rows
+ * in a message.
+ */
+function MessageLongPress({
+  onLongPress,
+  onPressIn,
+  onPressOut,
+  style,
+  children,
+}: {
+  onLongPress: () => void;
+  onPressIn: () => void;
+  onPressOut: () => void;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  const gesture = Gesture.LongPress()
+    .minDuration(MESSAGE_LONG_PRESS_MS)
+    .runOnJS(true)
+    .onBegin(onPressIn)
+    .onStart(onLongPress)
+    .onFinalize(onPressOut);
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        style={style}
+        accessible
+        accessibilityHint="Long press for message actions"
+        accessibilityActions={MESSAGE_ACCESSIBILITY_ACTIONS}
+        onAccessibilityAction={onLongPress}
+      >
+        {children}
+      </View>
+    </GestureDetector>
+  );
+}
 
 function SendFailedMark({
   actions,
@@ -1017,16 +1061,14 @@ export const ChatMessageRow = memo(function ChatMessageRow({
                 ]}
               >
                 <Animated.View style={pressStyle}>
-                  <Pressable
+                  <MessageLongPress
                     onLongPress={openMenu}
                     onPressIn={pressIn}
                     onPressOut={pressOut}
-                    delayLongPress={MESSAGE_LONG_PRESS_MS}
-                    accessibilityHint="Long press for message actions"
                     style={styles.userBubble}
                   >
                     {userBubbleBody}
-                  </Pressable>
+                  </MessageLongPress>
                 </Animated.View>
                 {item.reaction ? (
                   <ReactionBadge
@@ -1190,15 +1232,13 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           ]}
         >
           <Animated.View style={pressStyle}>
-            <Pressable
+            <MessageLongPress
               onLongPress={openMenu}
               onPressIn={pressIn}
               onPressOut={pressOut}
-              delayLongPress={MESSAGE_LONG_PRESS_MS}
-              accessibilityHint="Long press for message actions"
             >
               {assistantBubble}
-            </Pressable>
+            </MessageLongPress>
           </Animated.View>
         </View>
       ) : null}

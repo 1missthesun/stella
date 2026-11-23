@@ -25,13 +25,14 @@ import { TaskTabs } from "../browser-use/task-tabs.js";
 import {
   buildAgentShellEnvironment,
   createShellState,
-  listRunningShellSessionsOwnedBy,
+  claimShellExit,
+  dropUntoldShellExits,
   listRunningTaskShells,
-  readShellExitSnapshot,
+  listUntoldTaskShells,
+  releaseShellExit,
   shutdownManagedShells,
   waitForShellExit,
   watchShellExit,
-  type ShellSessionAccess,
   type ShellState,
 } from "./shell.js";
 import { registerExtensionToolHandlers } from "./registry.js";
@@ -700,16 +701,16 @@ export const createToolHost = ({
       }
       return running;
     },
-    listRunningShellSessionsOwnedBy: (access: ShellSessionAccess) =>
-      listRunningShellSessionsOwnedBy(shellState, access),
     listRunningTaskShells: () => listRunningTaskShells(shellState),
     onTaskShellsChanged: (listener: (() => void) | undefined) => {
       shellState.onTaskShellsChanged = listener;
     },
     watchShellExit: (sessionId: string, listener: () => void) =>
       watchShellExit(shellState, sessionId, listener),
-    readShellExitSnapshot: (sessionId: string) =>
-      readShellExitSnapshot(shellState, sessionId),
+    listUntoldTaskShells: (agentId: string) => listUntoldTaskShells(shellState, agentId),
+    claimShellExit: (sessionId: string) => claimShellExit(shellState, sessionId),
+    releaseShellExit: (sessionId: string) => releaseShellExit(shellState, sessionId),
+    dropUntoldShellExits: (agentId: string) => dropUntoldShellExits(shellState, agentId),
     releaseAgentComputerSessions: (agentId: string) =>
       nodeReplRegistry.releaseAgentNativeSessions(agentId),
     browserTaskStarted: (agentId: string) =>

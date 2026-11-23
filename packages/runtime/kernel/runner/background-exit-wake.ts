@@ -1,14 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import type { ShellExitSnapshot } from "../tools/shell.js";
+import { redactSecureValuesInText } from "../shared/secure-value-redaction.js";
+import type { ShellExitSnapshot, UntoldTaskShell } from "../tools/shell.js";
 
+type WriteExitLog = (
+  sessionId: string,
+  contents: string,
+) => Promise<string | null> | string | null;
 type WakeOwner = { conversationId: string; agentId: string };
 type WakeIdentity = WakeOwner | string;
 type WakeBatch = { exits: ShellExitSnapshot[]; eventId: string };
 type WakeEntry = WakeOwner & {
   disposers: Map<string, () => void>;
-  collected: ShellExitSnapshot[];
+  collected: string[];
   timer: ReturnType<typeof setTimeout> | null;
   firstExitAt: number | null;
   deliveryFailures: number;
@@ -17,15 +22,15 @@ type WakeEntry = WakeOwner & {
 };
 export type BackgroundExitWakeDeps = {
   watchShellExit: (sessionId: string, listener: () => void) => () => void;
-  readShellExitSnapshot: (sessionId: string) => ShellExitSnapshot | null;
+  /** Takes a command's end to tell; null when its owner already knows. */
+  claimShellExit: (sessionId: string) => ShellExitSnapshot | null;
+  /** Puts back an end that could not be told. */
+  releaseShellExit: (sessionId: string) => void;
   getThreadStatus?: (
     agentId: string,
     conversationId: string,
   ) => Promise<string>;
-  writeExitLog?: (
-    sessionId: string,
-    contents: string,
-  ) => Promise<string | null>;
+  writeExitLog?: WriteExitLog;
   deliver: (
     args: WakeOwner & {
       eventId: string;
@@ -84,23 +89,55 @@ const describeExit = (exit: ShellExitSnapshot, logPath: string | null) => {
   }
   return lines.join("\n");
 };
-const buildWakeText = (
+const finishedLine = (exits: ShellExitSnapshot[]) =>
+  exits.length === 1
+    ? "a command you left running in the background has finished."
+    : `${exits.length} commands you left running in the background have finished.`;
+const describeExits = async (
   exits: ShellExitSnapshot[],
-  logPaths: Map<string, string | null>,
-) => {
-  const header =
-    exits.length === 1
-      ? "[wake: a command you left running in the background has finished.]"
-      : `[wake: ${exits.length} commands you left running in the background have finished.]`;
-  return [
-    header,
+  writeExitLog: WriteExitLog | undefined,
+): Promise<string> => {
+  const described: string[] = [];
+  for (const exit of exits) {
+    let logPath: string | null = null;
+    if (exit.output.length > INLINE_OUTPUT_CHARS && writeExitLog) {
+      try {
+        logPath = await writeExitLog(exit.sessionId, exit.output);
+      } catch {
+        logPath = null;
+      }
+    }
+    described.push(describeExit(exit, logPath));
+  }
+  return await redactSecureValuesInText(described.join("\n\n"));
+};
+const buildWakeText = async (
+  exits: ShellExitSnapshot[],
+  writeExitLog: WriteExitLog | undefined,
+) =>
+  [
+    `[wake: ${finishedLine(exits)}]`,
     "",
-    ...exits.map((exit) =>
-      describeExit(exit, logPaths.get(exit.sessionId) ?? null),
-    ),
+    await describeExits(exits, writeExitLog),
     "",
     "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
   ].join("\n");
+/** What a working agent is told, once, of its background commands that ended meanwhile. */
+export const takeEndedCommands = async (
+  shells: {
+    listUntoldTaskShells: (agentId: string) => UntoldTaskShell[];
+    claimShellExit: (sessionId: string) => ShellExitSnapshot | null;
+  },
+  agentId: string,
+  writeExitLog?: WriteExitLog,
+): Promise<string | undefined> => {
+  const exits = shells
+    .listUntoldTaskShells(agentId)
+    .filter((session) => session.ended)
+    .map((session) => shells.claimShellExit(session.sessionId))
+    .filter((exit) => exit !== null);
+  if (exits.length === 0) return undefined;
+  return `While you worked, ${finishedLine(exits)}\n\n${await describeExits(exits, writeExitLog)}`;
 };
 const buildWakeEventId = (entry: WakeOwner, exits: ShellExitSnapshot[]) => {
   const completionIdentity = exits
@@ -146,12 +183,6 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
   const armed = new Map<string, WakeEntry>();
   const ownerKey = (conversationId: string, agentId: string) =>
     JSON.stringify([conversationId, agentId]);
-  const ownerMatches = (
-    entry: WakeEntry,
-    owner: { conversationId?: string; agentId?: string } | undefined,
-  ) =>
-    owner?.conversationId === entry.conversationId &&
-    owner?.agentId === entry.agentId;
   const keysFor = (identity: WakeIdentity) => {
     if (typeof identity !== "string") {
       return [ownerKey(identity.conversationId, identity.agentId)];
@@ -167,6 +198,10 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = null;
     armed.delete(key);
+    // A delivery under way puts its own back when it fails.
+    if (!entry.flushPromise) {
+      for (const exit of entry.pendingDelivery?.exits ?? []) deps.releaseShellExit(exit.sessionId);
+    }
   };
   const disarm = (identity: WakeIdentity) => {
     for (const key of keysFor(identity)) {
@@ -195,7 +230,10 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
     const batch =
       entry.pendingDelivery ??
       ((): WakeBatch | null => {
-        const exits = entry.collected.splice(0);
+        const exits = entry.collected
+          .splice(0)
+          .map((sessionId) => deps.claimShellExit(sessionId))
+          .filter((exit) => exit !== null);
         if (exits.length === 0) return null;
         return {
           exits,
@@ -212,13 +250,20 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
       return;
     }
     const isCurrent = () => !disposed && armed.get(key) === entry;
+    // Disarmed before it was told (the agent started working again): that turn tells it.
+    const release = () => {
+      for (const exit of exits) deps.releaseShellExit(exit.sessionId);
+    };
     if (deps.getThreadStatus) {
       try {
         const status = await deps.getThreadStatus(
           entry.agentId,
           entry.conversationId,
         );
-        if (!isCurrent()) return;
+        if (!isCurrent()) {
+          release();
+          return;
+        }
         if (status === "canceled") {
           clearEntry(key, entry);
           return;
@@ -227,32 +272,27 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
         // Status is an optimization; deliver rather than drop the wake.
       }
     }
-    if (!isCurrent()) return;
-    const logPaths = new Map<string, string | null>();
-    for (const exit of exits) {
-      if (exit.output.length <= INLINE_OUTPUT_CHARS || !deps.writeExitLog) {
-        continue;
-      }
-      try {
-        logPaths.set(
-          exit.sessionId,
-          await deps.writeExitLog(exit.sessionId, exit.output),
-        );
-      } catch {
-        logPaths.set(exit.sessionId, null);
-      }
-      if (!isCurrent()) return;
+    if (!isCurrent()) {
+      release();
+      return;
     }
-    if (!isCurrent()) return;
+    const text = await buildWakeText(exits, deps.writeExitLog);
+    if (!isCurrent()) {
+      release();
+      return;
+    }
     try {
       const delivered = await deps.deliver({
         conversationId: entry.conversationId,
         agentId: entry.agentId,
         eventId: batch!.eventId,
         isCurrent,
-        text: buildWakeText(exits, logPaths),
+        text,
       });
-      if (!isCurrent()) return;
+      if (!isCurrent()) {
+        if (!delivered) release();
+        return;
+      }
       if (!delivered) {
         entry.deliveryFailures += 1;
         scheduleRetry(key, entry);
@@ -275,7 +315,7 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
       if (isCurrent()) {
         entry.deliveryFailures += 1;
         scheduleRetry(key, entry);
-      }
+      } else release();
       console.warn(
         `[background-wake] failed to deliver exit wake to ${entry.agentId}:`,
         error instanceof Error ? error.message : String(error),
@@ -305,7 +345,7 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
     arm: (args: {
       conversationId: string;
       agentId?: string | null;
-      runningSessionIds: string[];
+      sessionIds: string[];
       interrupted?: boolean;
     }): string[] => {
       const { agentId } = args;
@@ -318,7 +358,7 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
       };
       const key = ownerKey(identity.conversationId, identity.agentId);
       disarm(identity);
-      if (args.interrupted || args.runningSessionIds.length === 0) return [];
+      if (args.interrupted || args.sessionIds.length === 0) return [];
       const entry: WakeEntry = {
         conversationId: args.conversationId,
         agentId,
@@ -331,20 +371,14 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
         pendingDelivery: null,
       };
       armed.set(key, entry);
-      for (const sessionId of new Set(args.runningSessionIds)) {
+      for (const sessionId of new Set(args.sessionIds)) {
         try {
           const dispose = deps.watchShellExit(sessionId, () => {
             const live = armed.get(key);
             if (live !== entry) return;
             entry.disposers.delete(sessionId);
-            const snapshot = deps.readShellExitSnapshot(sessionId);
-            if (snapshot && ownerMatches(entry, snapshot.owner))
-              entry.collected.push(snapshot);
-            if (entry.collected.length > 0) {
-              scheduleFlush(key);
-            } else if (entry.disposers.size === 0) {
-              clearEntry(key, entry);
-            }
+            entry.collected.push(sessionId);
+            scheduleFlush(key);
           });
           entry.disposers.set(sessionId, dispose);
         } catch {

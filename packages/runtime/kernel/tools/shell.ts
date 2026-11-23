@@ -9,16 +9,18 @@ export {
 } from "./shell/launch.js";
 export {
   COMPLETED_SHELL_TTL_MS,
+  claimShellExit,
   cleanupShellSessions,
   createShellState,
-  listRunningShellSessionsOwnedBy,
+  dropUntoldShellExits,
   listRunningTaskShells,
+  listUntoldTaskShells,
   type RunningTaskShell,
-  readShellExitSnapshot,
+  type UntoldTaskShell,
+  releaseShellExit,
   shutdownManagedShells,
   waitForShellExit,
   watchShellExit,
   type ShellExitSnapshot,
-  type ShellSessionAccess,
   type ShellState,
 } from "./shell/sessions.js";

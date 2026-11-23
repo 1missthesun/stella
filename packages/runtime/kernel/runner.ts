@@ -1,4 +1,5 @@
 import { readAgentMessageDelivery, readAgentStopResult } from "@stella/contracts/backend/agent-threads";
+import { takeEndedCommands, writeBackgroundExitLog } from "./runner/background-exit-wake.js";
 import {
   createRunnerContext,
   getConfiguredModel,
@@ -358,10 +359,15 @@ export const createStellaHostRunner = (
     backgroundExits: {
       arm: (args) => context.state.backgroundExitWake?.arm(args) ?? [],
       disarm: (owner) => context.state.backgroundExitWake?.disarm(owner),
-      runningSessions: (owner) => context.toolHost.listRunningShellSessionsOwnedBy(owner),
+      untold: (agentId) => context.toolHost.listUntoldTaskShells(agentId),
+      takeEnded: async (agentId) =>
+        await takeEndedCommands(context.toolHost, agentId, (sessionId, contents) =>
+          writeBackgroundExitLog(context.stellaDataDir, sessionId, contents),
+        ),
       endAgentSessions: async (agentId) => {
         context.state.backgroundExitWake?.disarm(agentId);
         const owned = context.toolHost.listRunningTaskShells().filter((shell) => shell.agentId === agentId);
+        context.toolHost.dropUntoldShellExits(agentId);
         await Promise.all(owned.map((shell) => context.toolHost.killShell(shell.sessionId)));
         return owned.length;
       },

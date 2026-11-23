@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, unwatchFile, watchFile } from "node:fs";
 import { rm } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
@@ -37,6 +37,7 @@ const DISPLAY_ARGS = new Set(["toolSummary"]);
 export const ANTIGRAVITY_APP_DATA_DIR = "antigravity-acp";
 const TOOL_GROUP_SETTLE_MS = 250;
 const IDLE_CLOSE_MS = 20 * 60_000;
+const SIGN_OUT_CHECK_MS = 1_000;
 const START_TIMEOUT_MS = 60_000;
 
 export const ANTIGRAVITY_LOGIN_REQUIRED = "ANTIGRAVITY_CLI_LOGIN_REQUIRED";
@@ -530,9 +531,15 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     child.stderr?.on("data", (data: string) => {
       proc.stderr = `${proc.stderr}${data}`.slice(-4_000);
     });
+    const tokenFile = antigravityTokenFile(home);
+    // A process that outlived its sign-in would still hold it, and could store it again.
+    const closeOnSignOut = () => {
+      if (!antigravityCliSignedIn(home)) kill(proc, "This computer signed out of Google Antigravity.");
+    };
     const exited = (detail: string) => {
       if (proc.exited) return;
       proc.exited = true;
+      unwatchFile(tokenFile, closeOnSignOut);
       for (const waiting of pending.values()) waiting.reject(new Error(`Antigravity CLI exited (${detail}).`));
       pending.clear();
       kill(proc, `Antigravity CLI exited (${detail}).${proc.stderr.trim() ? ` ${proc.stderr.trim().slice(-500)}` : ""}`);
@@ -553,6 +560,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       return { models: [] };
     })();
     procs.set(key, proc);
+    watchFile(tokenFile, { interval: SIGN_OUT_CHECK_MS, persistent: false }, closeOnSignOut);
     return proc;
   };
 

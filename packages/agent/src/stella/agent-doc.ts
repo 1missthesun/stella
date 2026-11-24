@@ -9,8 +9,10 @@ export type StellaAgentRole = {
   parentConversationId?: number;
   startedBy?: { threadId: string; label: string };
   moving?: { deviceId: string; name: string; brief: string; key: string };
-  /** This turn ends waiting (end_turn_waiting): no report, and the next message resumes it. */
+  /** Set by older builds' end_turn_waiting; read only so a turn it marked still clears it. */
   waiting?: { waitingFor: string; afterEntry?: number };
+  /** Its finished report, sent with send_message `done: true`: filed as the report when the turn ends. */
+  done?: { text: string; callIds: string[] };
   notes?: StellaPendingNote[];
   /** Stella last answered this agent's ask_user or request_secure_input, which then goes straight to the user. */
   stellaReplied?: { tool: string; at: number };

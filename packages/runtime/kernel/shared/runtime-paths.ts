@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { isRuntimeBytecodeSnapshotFresh } from "./runtime-bytecode-stamp.js";
+import {
+  checkRuntimeBytecode,
+  runtimeSourceEntryPath,
+  type RuntimeBytecodeVerdict,
+} from "./runtime-bytecode.js";
 
 const moduleDir = import.meta.dirname;
 
@@ -53,25 +57,7 @@ export function resolveRuntimeSourceAsset(...segments: string[]): string {
 export function resolveBundledRuntimeFile(relativeToRuntimeRoot: string): string {
   const root = getStellaAppDir();
   const resourcesPath = process.env.STELLA_APP_RESOURCES_PATH?.trim();
-  const normalized = relativeToRuntimeRoot.replace(/\\/g, "/");
-  const segments = normalized.split("/");
-  if (
-    normalized === "worker/entry.js" &&
-    process.env.STELLA_RUNTIME_FROM_SOURCE !== "1"
-  ) {
-    const bytecodeEntry = path.join(
-      root,
-      "packages",
-      "desktop",
-      "dist-electron",
-      "runtime",
-      "worker",
-      "entry.js",
-    );
-    if (isRuntimeBytecodeSnapshotFresh(root, bytecodeEntry)) {
-      return bytecodeEntry;
-    }
-  }
+  const segments = relativeToRuntimeRoot.replace(/\\/g, "/").split("/");
   const sourceSegments = segments.map((segment, index) =>
     index === segments.length - 1 ? segment.replace(/\.js$/, ".ts") : segment,
   );
@@ -83,4 +69,23 @@ export function resolveBundledRuntimeFile(relativeToRuntimeRoot: string): string
     path.join(root, "packages", "desktop", "dist-electron", "runtime", ...segments),
   ];
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!;
+}
+
+/**
+ * The entry to spawn a runtime worker with. A source checkout runs the
+ * bytecode build of its worker when one matches the tree exactly (see
+ * `runtime-bytecode.ts`), else the TypeScript source; `bytecode` says which
+ * and why, so the caller can ask for a build. Other layouts resolve as
+ * `resolveBundledRuntimeFile("worker/entry.js")`.
+ */
+export function resolveRuntimeWorkerEntry(options?: {
+  bunBinaryPath?: string;
+}): { path: string; bytecode: RuntimeBytecodeVerdict | null } {
+  const root = getStellaAppDir();
+  const source = runtimeSourceEntryPath(root);
+  if (!existsSync(source)) {
+    return { path: resolveBundledRuntimeFile("worker/entry.js"), bytecode: null };
+  }
+  const bytecode = checkRuntimeBytecode(root, options?.bunBinaryPath);
+  return { path: bytecode.usable ? bytecode.loaderPath : source, bytecode };
 }

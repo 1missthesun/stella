@@ -167,7 +167,10 @@ class LineDelimitedHelperDaemon {
     }
   }
 
-  request(tokens: string[]): Promise<string | undefined> {
+  request(
+    tokens: string[],
+    timeoutMs: number = REQUEST_TIMEOUT_MS,
+  ): Promise<string | undefined> {
     if (!this.supportedPlatforms.has(process.platform)) {
       return Promise.resolve(undefined)
     }
@@ -191,7 +194,7 @@ class LineDelimitedHelperDaemon {
         this.noteFailure()
         this.kill()
         resolve(undefined)
-      }, REQUEST_TIMEOUT_MS)
+      }, timeoutMs)
 
       this.pending.set(id, { resolve, timer })
 
@@ -220,7 +223,8 @@ const windowInfoDaemon = new LineDelimitedHelperDaemon(
 
 export const requestWindowInfoDaemon = (
   tokens: string[],
-): Promise<string | undefined> => windowInfoDaemon.request(tokens)
+  timeoutMs?: number,
+): Promise<string | undefined> => windowInfoDaemon.request(tokens, timeoutMs)
 
 export const stopNativeHelperDaemons = (): void => {
   windowInfoDaemon.stop()

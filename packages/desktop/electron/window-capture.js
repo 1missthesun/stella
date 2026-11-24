@@ -158,10 +158,34 @@ export const captureWindowScreenshot = async (x, y, options) => {
     if (process.platform === 'win32') {
         return captureWindowScreenshotWin32(x, y, options);
     }
-    const tempPath = path.join(tmpdir(), `stella_cap_${randomBytes(8).toString('hex')}.png`);
-    const args = [String(x), String(y), `--screenshot=${tempPath}`];
-    args.push(...exclusionArgs(options));
-    return runWindowCapture(WINDOW_INFO_HELPER, args, tempPath);
+    const capturePath = () => path.join(tmpdir(), `stella_cap_${randomBytes(8).toString('hex')}.png`);
+    const captureArgs = (tempPath) => [
+        String(x),
+        String(y),
+        `--screenshot=${tempPath}`,
+        ...exclusionArgs(options),
+    ];
+    // Ask the long-lived window_info daemon first: macOS attributes each
+    // screen capture to the process that made it, and systemstatusd keeps
+    // failing to resolve capture processes that have already exited, so a
+    // process spawned per screenshot is what we avoid. A daemon from an older
+    // helper answers without writing the file; the one-shot covers that.
+    const daemonPath = capturePath();
+    const daemonCapture = await runWindowCaptureViaDaemon(captureArgs(daemonPath), daemonPath);
+    if (daemonCapture)
+        return daemonCapture;
+    const oneShotPath = capturePath();
+    return runWindowCapture(WINDOW_INFO_HELPER, captureArgs(oneShotPath), oneShotPath);
+};
+const WINDOW_SCREENSHOT_DAEMON_TIMEOUT_MS = 5000;
+const runWindowCaptureViaDaemon = async (tokens, tempPath) => {
+    const response = await requestWindowInfoDaemon(tokens, WINDOW_SCREENSHOT_DAEMON_TIMEOUT_MS);
+    if (response === undefined)
+        return null;
+    const info = parseWindowInfoJson(response);
+    if (!info)
+        return null;
+    return readWindowCaptureFile(info, tempPath);
 };
 export const captureRegionScreenshotNative = async (x, y, width, height) => {
     if (process.platform !== 'win32')
@@ -211,23 +235,7 @@ const runWindowCapture = async (helperName, args, tempPath) => {
         const info = JSON.parse(stdout);
         if (info.error)
             return null;
-        let pngBuffer;
-        try {
-            pngBuffer = await fs.readFile(tempPath);
-        }
-        catch {
-            return null;
-        }
-        const image = nativeImage.createFromBuffer(pngBuffer);
-        const size = image.getSize();
-        const dataUrl = image.toDataURL();
-        return {
-            windowInfo: info,
-            screenshot: { dataUrl, width: size.width, height: size.height },
-            axTree: typeof info.axTree === 'string' && info.axTree.trim()
-                ? info.axTree
-                : null,
-        };
+        return await readWindowCaptureFile(info, tempPath);
     }
     catch {
         return null;
@@ -235,4 +243,28 @@ const runWindowCapture = async (helperName, args, tempPath) => {
     finally {
         fs.unlink(tempPath).catch(() => { });
     }
+};
+const readWindowCaptureFile = async (info, tempPath) => {
+    let pngBuffer;
+    try {
+        pngBuffer = await fs.readFile(tempPath);
+    }
+    catch {
+        return null;
+    }
+    finally {
+        fs.unlink(tempPath).catch(() => { });
+    }
+    const image = nativeImage.createFromBuffer(pngBuffer);
+    if (image.isEmpty())
+        return null;
+    const size = image.getSize();
+    const dataUrl = image.toDataURL();
+    return {
+        windowInfo: info,
+        screenshot: { dataUrl, width: size.width, height: size.height },
+        axTree: typeof info.axTree === 'string' && info.axTree.trim()
+            ? info.axTree
+            : null,
+    };
 };

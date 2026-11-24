@@ -2,6 +2,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config({
   files: [
+    "workers/app-compiler/src/**/*.ts",
     "workers/apps-host/src/**/*.ts",
     "workers/cloud-builder/src/**/*.ts",
     "workers/browser-gateway/src/**/*.ts",

@@ -98,7 +98,7 @@ What a Preview cannot do yet (Cloudflare limits, 2026-10):
   route work. Anything that starts a container (background agents, cloud
   shell, app builds) still needs dev.
 - **Service bindings reach the dev Workers**: model gateway, browser gateway,
-  telemetry. A Preview can't bind to another Worker's Preview, so a change
+  app-compiler, telemetry. A Preview can't bind to another Worker's Preview, so a change
   that spans cloud-builder and the gateway still needs a dev gateway deploy.
   The gateway's calls back into cloud-builder (`BillingControl`: owner
   enforcement and usage) go to **dev** cloud-builder. For a Preview's owners,
@@ -166,7 +166,7 @@ a git checkout run from source by the native launchers.
 | Mobile OTA channel | `preview` | `production` |
 | Desktop | Source checkout / verify harness; dev-backend launchers read `stella-app-dev` | `stella-app-prod` upstream via launchers from R2 `launcher/stable/` |
 
-Other workers: `telemetry`, `browser-gateway`, `apps-host` (dev and prod envs),
+Other workers: `app-compiler`, `telemetry`, `browser-gateway`, `apps-host` (dev and prod envs),
 `canvas-share` (one deployment, `stellashare.app`). Which app-source namespace a
 launcher reads is set by the backend it talks to (`ARTIFACTS` binding in
 cloud-builder's `wrangler.jsonc`).
@@ -191,12 +191,24 @@ its patch or when workspaces link different copies of one patched package (two
 copies of `@earendil-works/pi-durable` in one bundle fail every cloud chat turn
 with "Not a Harness").
 
-Order: **D1 migrations → app-compiler → cloud-builder → model-gateway → the rest.** `app-compiler` is a private Service Binding worker (`workers_dev: false`) that owns `esbuild.wasm` for cloud app builds and must exist before `cloud-builder` deploys against its `APP_COMPILER` binding. The gateway
+Order: **D1 migrations → app-compiler → cloud-builder → model-gateway → the rest.** The gateway
 refuses any model it has no price for, and it prices models from
 cloud-builder's catalog. When a release adds or changes a model, deploy
 cloud-builder, wait a couple of minutes for the gateway to refresh its price
 list, then deploy the gateway; skipping the wait failed dev turns for 2–4
 minutes. A deploy kills in-flight container agent turns.
+
+`app-compiler` builds cloud apps (it holds esbuild) and has no public URL:
+cloud-builder calls it over its `APP_COMPILER` Service Binding. Wrangler refuses
+a cloud-builder deploy whose app-compiler doesn't exist, so deploy it first the
+first time, and afterwards whenever `workers/app-compiler`,
+`workers/shared/workspace-app-compiler.ts` or its dependencies change. The two
+run different versions during a deploy, so change the contract in that shared
+file only in ways both can read. Rolling back cloud-builder needs nothing from
+it. While it can't answer, apps that are already open keep working, opening
+another shows "try again in a moment", and a new revision is retried up to
+five times (`workspace_app_compiler_failed` in cloud-builder's logs,
+`app_compile_unavailable` in its own).
 
 ```bash
 # dev

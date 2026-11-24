@@ -141,11 +141,8 @@ const check = (worker, env) => {
 
   if (worker === "cloud-builder") {
     const appCompiler = envConfig(readConfig("app-compiler"), env);
-    if (appCompiler.workers_dev !== false) {
-      problems.push("workers/app-compiler must set workers_dev: false so it is not publicly routable.");
-    }
-    if (appCompiler.preview_urls !== false) {
-      problems.push("workers/app-compiler must set preview_urls: false so it is not publicly routable.");
+    if (appCompiler.workers_dev !== false || appCompiler.preview_urls !== false || appCompiler.routes || appCompiler.route) {
+      problems.push("workers/app-compiler must have no public URL: workers_dev and preview_urls false, no routes.");
     }
     const binding = (target.services ?? []).find((service) => service.binding === "APP_COMPILER");
     if (!binding || binding.service !== appCompiler.name) {

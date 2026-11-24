@@ -170,6 +170,8 @@ jobs:
         include:
           - name: Cloud Builder worker
             script: cloud-builder
+          - name: App Compiler worker
+            script: app-compiler
           - name: Apps Host worker
             script: apps-host
           - name: Browser Gateway worker

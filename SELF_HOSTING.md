@@ -313,7 +313,8 @@ exist yet. cloud-builder and model-gateway bind to each other, so the very
 first deploy needs one extra step:
 
 ```bash
-cd workers/browser-gateway && bun run deploy:dev
+cd workers/app-compiler    && bun run deploy:dev     # builds cloud apps; no public URL
+cd ../browser-gateway      && bun run deploy:dev
 # First time only: comment out the BILLING entry in model-gateway's "services",
 # deploy, then restore it.
 cd ../model-gateway        && bun run deploy:dev

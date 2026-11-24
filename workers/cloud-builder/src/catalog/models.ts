@@ -20,7 +20,10 @@ const CORS_HEADERS = {
   "access-control-max-age": "7200",
 };
 
-const renderedCatalogCache = new Map<string, { body: string; etag: string }>();
+// Rendered catalog per loaded price list, then per audience and gateway: the
+// body is a pure function of those and this build's catalog, and holds nothing
+// about the caller. A reload of prices (every few minutes) starts a new entry.
+const renderedCatalogs = new WeakMap<object, Map<string, { body: string; etag: string }>>();
 
 const reply = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
   new Response(body === null ? null : JSON.stringify(body), {
@@ -79,8 +82,13 @@ export async function handleStellaModelsRoute(request: Request, env: Cloudflare.
     ]);
     if (!resolved.ok) return resolved.response;
     const { audience } = resolved;
-    const cacheKey = `${audience}|${pricesUpdatedAt}|${gatewayOrigin}`;
-    let cached = renderedCatalogCache.get(cacheKey);
+    let rendered = renderedCatalogs.get(prices);
+    if (!rendered) {
+      rendered = new Map();
+      renderedCatalogs.set(prices, rendered);
+    }
+    const cacheKey = `${audience}|${gatewayOrigin}`;
+    let cached = rendered.get(cacheKey);
     if (!cached) {
       const priceByModel = new Map(prices.map((price) => [price.model, price]));
       const body = JSON.stringify({
@@ -109,9 +117,8 @@ export async function handleStellaModelsRoute(request: Request, env: Cloudflare.
         gateway: { origin: gatewayOrigin },
       });
       const etag = `"${(await sha256Hex(body)).slice(0, 32)}"`;
-      if (renderedCatalogCache.size > 16) renderedCatalogCache.clear();
       cached = { body, etag };
-      renderedCatalogCache.set(cacheKey, cached);
+      rendered.set(cacheKey, cached);
     }
     const { body, etag } = cached;
     const presented = request.headers.get("if-none-match") ?? "";

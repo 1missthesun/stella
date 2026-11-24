@@ -3,24 +3,43 @@ import { importJWK, SignJWT } from "jose";
 import { bearerCredential } from "../../../shared/bearer.js";
 import type { BetterAuthKeys } from "../secret-rotation.js";
 import { ownerModeRefusesAuthPath } from "../selfhost/owner-mode.js";
-import { backendUrl, testAccountsEnabled } from "./auth.js";
+import {
+  backendUrl,
+  SESSION_EXPIRES_IN_SECONDS,
+  SESSION_UPDATE_AGE_SECONDS,
+  STELLA_JWT_AUDIENCE,
+  STELLA_JWT_TTL_SECONDS,
+  stellaJwtClaims,
+} from "./auth.js";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const TOKEN_TTL_SECONDS = 15 * 60;
-const SIGNING_KEY_CACHE_MS = 5 * 60 * 1000;
-const TEST_ACCOUNT_EMAIL_SUFFIX = "@test.stella.local";
+/**
+ * `GET /api/auth/token` for a signed `Authorization: Bearer` session token,
+ * answered without building Better Auth: the same HMAC check as its bearer()
+ * plugin, one D1 round trip (session + user, and the JWKS rows), and the
+ * decrypted signing key kept in the isolate.
+ *
+ * It mints exactly the JWT Better Auth's jwt() plugin would (same key choice,
+ * header, claims and claim order; RS256 is deterministic, so the bytes match)
+ * and only for a session Better Auth would answer without writing. Anything
+ * else returns `null` and Better Auth answers: no or unsigned bearer, a bad
+ * signature, an unknown, expired or user-less session, a session due for its
+ * daily sliding refresh (Better Auth extends it and sends `set-auth-token`),
+ * and a JWKS with no live RS256 key (Better Auth mints one).
+ *
+ * The signing key is chosen from the rows read on every request, as Better
+ * Auth's resolveSigningKey does; only the decrypted CryptoKey is cached, keyed
+ * by key id, ciphertext and the secret, so a rotated, removed or re-encrypted
+ * key is never used after D1 changes.
+ *
+ * Unlike Better Auth's handler, the request is not counted by its per-IP
+ * limiter (100 per 10 s on /token). Only a caller holding a validly signed,
+ * live session reaches this path; everyone else still goes through it.
+ */
+
+const SESSION_EXPIRES_IN_MS = SESSION_EXPIRES_IN_SECONDS * 1000;
+const SESSION_UPDATE_AGE_MS = SESSION_UPDATE_AGE_SECONDS * 1000;
+const SIGNING_ALG = "RS256";
 const SIGNED_BEARER = /^([^.]+)\.([A-Za-z0-9+/]{43}=)$/u;
-
-type CachedSigningKey = {
-  kid: string;
-  alg: string;
-  privateKey: CryptoKey;
-  expiresAtMs: number | null;
-  secretFingerprint: string;
-  cachedAtMs: number;
-};
-
-let signingKeyCache: CachedSigningKey | null = null;
 
 const constantTimeEqual = (left: string, right: string): boolean => {
   if (left.length !== right.length) return false;
@@ -43,64 +62,79 @@ const decodeBearer = (value: string): string | null => {
 const parseDbTimeMs = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
-    const asNumber = Number(value);
-    if (Number.isFinite(asNumber)) return asNumber;
-    const parsed = Date.parse(value);
+    const parsed = new Date(value).getTime();
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
 };
 
-const buildSecretConfig = (keys: BetterAuthKeys): string | SecretConfig => {
+/** Better Auth's `secretConfig` for the options auth.ts passes (`secret` + versioned `secrets`). */
+const betterAuthSecretConfig = (keys: BetterAuthKeys): string | SecretConfig => {
   if (!keys.versioned) return keys.current;
   return {
-    currentVersion: 2,
     keys: new Map([[2, keys.current]]),
-    ...(keys.previous ? { legacySecret: keys.previous } : {}),
+    currentVersion: 2,
+    legacySecret: keys.previous ?? keys.current,
   };
 };
 
-const loadSigningKey = async (
-  db: D1Database,
-  keys: BetterAuthKeys,
-  nowMs: number,
-): Promise<CachedSigningKey | null> => {
-  const fingerprint = `${keys.versioned ? "v2" : "v1"}:${keys.current.length}:${keys.previous?.length ?? 0}`;
+type JwksRow = {
+  id: string;
+  privateKey: string;
+  alg: string | null;
+  createdAt: string | number | null;
+  expiresAt: string | number | null;
+};
+
+/** Better Auth's resolveSigningKey with no overrides: newest live RS256 (or alg-less) key. */
+const latestSigningRow = (rows: JwksRow[], nowMs: number): JwksRow | null => {
+  const live = rows.filter((row) => {
+    if (row.alg !== SIGNING_ALG && row.alg != null) return false;
+    if (row.expiresAt == null) return true;
+    const expiresAtMs = parseDbTimeMs(row.expiresAt);
+    return expiresAtMs !== null && expiresAtMs > nowMs;
+  });
+  const createdAt = (row: JwksRow) => parseDbTimeMs(row.createdAt) ?? Number.NaN;
+  if (live.some((row) => !Number.isFinite(createdAt(row)))) return null;
+  return [...live].sort((a, b) => createdAt(b) - createdAt(a))[0] ?? null;
+};
+
+type SigningKey = {
+  kid: string;
+  ciphertext: string;
+  current: string;
+  previous: string | undefined;
+  versioned: boolean;
+  privateKey: CryptoKey;
+};
+
+let signingKeyCache: SigningKey | null = null;
+
+const signingKeyFor = async (row: JwksRow, keys: BetterAuthKeys): Promise<SigningKey | null> => {
+  const cached = signingKeyCache;
   if (
-    signingKeyCache &&
-    signingKeyCache.secretFingerprint === fingerprint &&
-    nowMs - signingKeyCache.cachedAtMs < SIGNING_KEY_CACHE_MS &&
-    (signingKeyCache.expiresAtMs === null || signingKeyCache.expiresAtMs > nowMs)
+    cached &&
+    cached.kid === row.id &&
+    cached.ciphertext === row.privateKey &&
+    cached.current === keys.current &&
+    cached.previous === keys.previous &&
+    cached.versioned === keys.versioned
   ) {
-    return signingKeyCache;
+    return cached;
   }
-  const row = await db
-    .prepare(
-      'SELECT "id", "privateKey", "alg", "expiresAt" FROM "jwks" WHERE ("alg" = \'RS256\' OR "alg" IS NULL) ORDER BY "createdAt" DESC LIMIT 1',
-    )
-    .first<{
-      id: string;
-      privateKey: string;
-      alg: string | null;
-      expiresAt: string | number | null;
-    }>();
-  if (!row?.id || !row.privateKey) return null;
-  const expiresAtMs = row.expiresAt != null ? parseDbTimeMs(row.expiresAt) : null;
-  if (expiresAtMs !== null && expiresAtMs <= nowMs) return null;
-  const alg = row.alg || "RS256";
   const privateWebKey = await symmetricDecrypt({
-    key: buildSecretConfig(keys),
+    key: betterAuthSecretConfig(keys),
     data: JSON.parse(row.privateKey),
   });
-  const imported = await importJWK(JSON.parse(privateWebKey), alg);
+  const imported = await importJWK(JSON.parse(privateWebKey), SIGNING_ALG);
   if (!(imported instanceof CryptoKey)) return null;
-  const entry: CachedSigningKey = {
+  const entry: SigningKey = {
     kid: row.id,
-    alg,
+    ciphertext: row.privateKey,
+    current: keys.current,
+    previous: keys.previous,
+    versioned: keys.versioned,
     privateKey: imported,
-    expiresAtMs,
-    secretFingerprint: fingerprint,
-    cachedAtMs: nowMs,
   };
   signingKeyCache = entry;
   return entry;
@@ -109,20 +143,12 @@ const loadSigningKey = async (
 type SessionUserRow = {
   sessionId: string;
   expiresAt: string | number;
-  updatedAt: string | number;
   userId: string;
   email: string | null;
   isAnonymous: number | boolean | null;
   identityLevel: number | null;
 };
 
-/**
- * Fast path for `GET /api/auth/token` with a signed `Authorization: Bearer`
- * session token. Verifies the HMAC signature in-process, performs one D1 JOIN
- * for session+user, and signs with the in-isolate cached RS256 signing key.
- * Returns `null` for any case that should fall through to Better Auth
- * (cookies, missing/expired/stale sessions, uninitialized JWKS).
- */
 export const tryFastAuthToken = async (
   request: Request,
   env: Cloudflare.Env,
@@ -135,6 +161,9 @@ export const tryFastAuthToken = async (
   const issuer = backendUrl(env);
   if (!issuer) return null;
 
+  // Better Auth's bearer({ requireSignature: true }): `<token>.<HMAC-SHA256>`
+  // under its current secret. A bearer signed with the previous secret was
+  // re-signed by resignLegacySessionCredentials before this runs.
   const presented = bearerCredential(request.headers.get("authorization"));
   if (!presented) return null;
   const decoded = decodeBearer(presented);
@@ -145,52 +174,46 @@ export const tryFastAuthToken = async (
   const expectedSig = await makeSignature(sessionToken, keys.current);
   if (!constantTimeEqual(presentedSig, expectedSig)) return null;
 
-  const nowMs = Date.now();
-  const [row, signingKey] = await Promise.all([
+  const [sessionResult, jwksResult] = await env.DB.batch([
     env.DB.prepare(
-      'SELECT s."id" AS sessionId, s."expiresAt" AS expiresAt, s."updatedAt" AS updatedAt, u."id" AS userId, u."email" AS email, u."isAnonymous" AS isAnonymous, u."identityLevel" AS identityLevel FROM "session" s INNER JOIN "user" u ON u."id" = s."userId" WHERE s."token" = ? LIMIT 1',
-    )
-      .bind(sessionToken)
-      .first<SessionUserRow>(),
-    loadSigningKey(env.DB, keys, nowMs).catch(() => null),
+      'SELECT s."id" AS sessionId, s."expiresAt" AS expiresAt, u."id" AS userId, u."email" AS email, u."isAnonymous" AS isAnonymous, u."identityLevel" AS identityLevel FROM "session" s INNER JOIN "user" u ON u."id" = s."userId" WHERE s."token" = ? LIMIT 1',
+    ).bind(sessionToken),
+    env.DB.prepare('SELECT "id", "privateKey", "alg", "createdAt", "expiresAt" FROM "jwks"'),
   ]);
-  if (!row || !signingKey) return null;
+  const row = (sessionResult?.results?.[0] ?? null) as SessionUserRow | null;
+  if (!row) return null;
+  const nowMs = Date.now();
 
+  // Better Auth's getSession: an expired session is deleted and refused, and
+  // one past `updateAge` is extended (a write plus a new set-auth-token).
   const expiresAtMs = parseDbTimeMs(row.expiresAt);
-  const updatedAtMs = parseDbTimeMs(row.updatedAt);
-  if (expiresAtMs === null || expiresAtMs <= nowMs) return null;
-  // Let Better Auth handle the once-per-day sliding session expiry update.
-  if (updatedAtMs === null || nowMs - updatedAtMs >= DAY_MS) return null;
+  if (expiresAtMs === null || expiresAtMs < nowMs) return null;
+  if (expiresAtMs - SESSION_EXPIRES_IN_MS + SESSION_UPDATE_AGE_MS <= nowMs) return null;
 
-  const nowSeconds = Math.floor(nowMs / 1000);
-  const isAnonymous = row.isAnonymous === 1 || row.isAnonymous === true;
-  const identityLevel =
-    typeof row.identityLevel === "number" && Number.isFinite(row.identityLevel)
-      ? row.identityLevel
-      : 0;
-  const isTestAccount =
-    testAccountsEnabled(env) &&
-    typeof row.email === "string" &&
-    row.email.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX);
+  const signingRow = latestSigningRow((jwksResult?.results ?? []) as JwksRow[], nowMs);
+  if (!signingRow?.id || !signingRow.privateKey) return null;
+  const signingKey = await signingKeyFor(signingRow, keys);
+  if (!signingKey) return null;
 
-  const payload: Record<string, unknown> = {
-    sid: row.sessionId,
-    ...(isAnonymous ? { anon: true } : {}),
-    idl: identityLevel,
-    ...(isTestAccount ? { tst: true } : {}),
+  // Better Auth's getJwtToken + signJWT, claim for claim and in its order.
+  const iat = Math.floor(nowMs / 1000);
+  const user = {
+    isAnonymous: row.isAnonymous === 1 || row.isAnonymous === true,
+    identityLevel: row.identityLevel,
+    email: row.email,
   };
-
-  const token = await new SignJWT(payload)
-    .setProtectedHeader({ alg: signingKey.alg, kid: signingKey.kid })
-    .setIssuedAt(nowSeconds)
-    .setExpirationTime(nowSeconds + TOKEN_TTL_SECONDS)
+  const token = await new SignJWT({
+    iat,
+    ...stellaJwtClaims(env, user, { id: row.sessionId }),
+    sub: row.userId,
+  })
+    .setProtectedHeader({ alg: SIGNING_ALG, kid: signingKey.kid })
+    .setExpirationTime(iat + STELLA_JWT_TTL_SECONDS)
     .setIssuer(issuer)
-    .setAudience("stella")
+    .setAudience(STELLA_JWT_AUDIENCE)
+    .setIssuedAt(iat)
     .setSubject(row.userId)
     .sign(signingKey.privateKey);
 
-  return Response.json(
-    { token },
-    { status: 200, headers: { "cache-control": "no-store" } },
-  );
+  return Response.json({ token }, { status: 200, headers: { "cache-control": "no-store" } });
 };

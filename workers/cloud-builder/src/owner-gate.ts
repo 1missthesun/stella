@@ -1548,12 +1548,11 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           headers: { "sec-websocket-protocol": LIVE_SUBPROTOCOL },
         });
       }
-      const changes = this.sqlChanges();
       noteCallerIdentity(db, caller);
       const response = store.acceptLive(caller);
-      if (changes === null || this.sqlChanges() !== changes) {
-        await this.scheduleAlarm(Date.now());
-      }
+      // Always: the new socket's token expiry and re-auth deadline only reach
+      // the alarm through here, and nothing else closes it once its JWT ends.
+      await this.scheduleAlarm(Date.now());
       return response;
     }
     if (url.pathname === "/device-request") {

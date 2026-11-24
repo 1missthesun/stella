@@ -38,6 +38,12 @@ import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 type AuthEnv = Cloudflare.Env;
 
 const DAY_SECONDS = 24 * 60 * 60;
+/** Session lifetime and sliding-refresh age; `fast-token.ts` mirrors Better Auth's refresh rule with these. */
+export const SESSION_EXPIRES_IN_SECONDS = 7 * DAY_SECONDS;
+export const SESSION_UPDATE_AGE_SECONDS = DAY_SECONDS;
+export const STELLA_JWT_AUDIENCE = "stella";
+/** Better Auth's `jwt.expirationTime` ("15m"), in seconds for the fast path. */
+export const STELLA_JWT_TTL_SECONDS = 15 * 60;
 const APPLE_CLIENT_SECRET_TTL_SECONDS = 180 * DAY_SECONDS;
 const TEST_ACCOUNT_EMAIL_SUFFIX = "@test.stella.local";
 const DEFAULT_WEBSITE_URL = "https://stella.sh";
@@ -69,6 +75,22 @@ export const browserClientOrigins = (env: unknown): string[] => [
 ];
 
 export const testAccountsEnabled = (env: unknown): boolean => configured(env, "STELLA_TEST_ACCOUNTS") === "1";
+
+/**
+ * Stella's own claims in a user JWT. Better Auth's jwt() plugin and the
+ * `/api/auth/token` fast path (fast-token.ts) both build them here, so the two
+ * can never mint different tokens for the same session.
+ */
+export const stellaJwtClaims = (
+  env: unknown,
+  user: { isAnonymous?: unknown; identityLevel?: unknown; email?: string | null },
+  session: { id: string },
+): Record<string, unknown> => ({
+  sid: session.id,
+  ...(user.isAnonymous === true ? { anon: true } : {}),
+  idl: typeof user.identityLevel === "number" ? user.identityLevel : 0,
+  ...(testAccountsEnabled(env) && user.email?.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX) ? { tst: true } : {}),
+});
 
 export const trustedOrigins = (env: AuthEnv): string[] => {
   const scheme = configured(env, "STELLA_MOBILE_SCHEME") ?? "stella-mobile";
@@ -508,7 +530,7 @@ const buildOptions = (env: AuthEnv) => {
     database: env.DB,
     trustedOrigins: trustedOrigins(env),
     telemetry: { enabled: false },
-    session: { expiresIn: 7 * DAY_SECONDS, updateAge: DAY_SECONDS },
+    session: { expiresIn: SESSION_EXPIRES_IN_SECONDS, updateAge: SESSION_UPDATE_AGE_SECONDS },
     rateLimit: {
       enabled: true,
       storage: "database",
@@ -641,14 +663,9 @@ const buildOptions = (env: AuthEnv) => {
         jwks: { keyPairConfig: { alg: "RS256", modulusLength: 2048 } },
         jwt: {
           issuer: backend,
-          audience: "stella",
+          audience: STELLA_JWT_AUDIENCE,
           expirationTime: "15m",
-          definePayload: ({ user, session }) => ({
-            sid: session.id,
-            ...(user.isAnonymous === true ? { anon: true } : {}),
-            idl: typeof user.identityLevel === "number" ? user.identityLevel : 0,
-            ...(testAccountsEnabled(env) && user.email?.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX) ? { tst: true } : {}),
-          }),
+          definePayload: ({ user, session }) => stellaJwtClaims(env, user, session),
         },
       }),
       // Passkeys bind to the auth domain: enroll and sign in from the web

@@ -8,11 +8,6 @@ import { desktopSendOutbox, type QueuedSend } from "./desktop-send-outbox";
 const markOf = (entry: QueuedSend) =>
   entry.failed ? { sendFailed: entry.failed } : { sendPending: "sending" as const };
 
-/**
- * The chat's own sends as they show before the runtime has them: still
- * waiting ones (also those saved before a restart) say so under the bubble,
- * refused ones offer Retry and Remove.
- */
 export function useDesktopSendOutbox(args: {
   conversationId: string | null;
   enabled: boolean;

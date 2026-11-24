@@ -49,10 +49,6 @@ const reverted = (subject: string): { inner: string; depth: number } => {
   return { inner: deeper.inner, depth: deeper.depth + 1 };
 };
 
-/**
- * A change in words: Stella's own merges by what they brought, and an undo as
- * an undo, so taking another computer's Undo never looks like taking the change.
- */
 export const describeChange = (t: ReturnType<typeof useT>, subject: string): string => {
   const { inner, depth } = reverted(subject);
   const change = inner.startsWith(REMOTE_MERGE_SUBJECT)
@@ -74,7 +70,6 @@ const FAILURE_KEYS = {
   unexpected: "shell.appSource.failure.unexpected",
 } as const satisfies Record<AppSourceFailure, string>;
 
-/** What went wrong in a plain sentence; the main process's own words only when it gave no kind. */
 const failureSentence = (
   t: ReturnType<typeof useT>,
   result: Extract<AppSourceActionResult, { ok: false }>,
@@ -232,7 +227,6 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
 export const deviceLabel = (device: string) =>
   device.replace(/\.(local|localdomain|lan|home)$/i, "").replace(/[-_]+/g, " ").trim();
 
-/** `targets`: for a new version, the other computers it goes to as well (default: every one). */
 export const addOffer = (offer: AppSourceWaiting, targets: string[] | null = null) => {
   const api = appSourceApi();
   if (!api) return Promise.resolve<AppSourceActionResult>({ ok: false, error: "" });

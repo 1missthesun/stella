@@ -1,15 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 
-/**
- * The file viewer that replaced the right sidebar's file tabs.
- *
- * One file at a time: it floats over the chat (movable, resizable, never
- * over the composer) or fills the stage. The item itself lives in the
- * display tab registry (`displayTabs`); this store only says which one is
- * on screen, how, and where the floating panel sits.
- */
-
 export type FileViewerMode = "float" | "stage";
 
 export type FileViewerRect = {
@@ -23,7 +14,6 @@ export type FileViewerState = {
   fileId: string | null;
   mode: FileViewerMode;
   rect: FileViewerRect | null;
-  /** Sub-location shown on the composer chip, e.g. "p. 3". */
   detail: string | null;
 };
 
@@ -37,7 +27,6 @@ const readMode = (): FileViewerMode => {
   return uiState.getItem(STORAGE_KEY_MODE) === "stage" ? "stage" : "float";
 };
 
-/** The last size the user picked; the next file opens the same way. */
 let preferredMode: FileViewerMode = readMode();
 const rememberMode = (mode: FileViewerMode) => {
   preferredMode = mode;
@@ -89,7 +78,6 @@ export const fileViewer = {
   getSnapshot(): FileViewerState {
     return state;
   },
-  /** Show `fileId`, floating or expanded as the user last left it. */
   open(fileId: string) {
     if (state.fileId === fileId) return;
     emit({
@@ -141,18 +129,13 @@ export const useFileViewerStageOpen = (): boolean =>
     () => false,
   );
 
-/** Tabs whose content is drawn by a native view or must never sit under HTML. */
 export const isExclusiveStageSection = (section: string | null | undefined) =>
   section === "browser" || section === "apps" || section === "takeover";
 
-/** Display kinds that open as a top-bar tab rather than in the viewer. */
 export const opensAsStageTab = (kind: string): boolean => kind === "canvas";
 
-/** `ChatAppSelection.surface` marking the composer chip for the viewed item. */
 export const VIEWER_SELECTION_SURFACE = "stella-viewer";
 
-/** `ChatAppSelection.surface` marking the composer chip for what the Email tab shows. */
 export const EMAIL_SELECTION_SURFACE = "email";
 
-/** Fired when the user takes the email chip off the composer (its ✕), not when a send clears it. */
 export const EMAIL_CHIP_REMOVED_EVENT = "stella:email-chip-removed";

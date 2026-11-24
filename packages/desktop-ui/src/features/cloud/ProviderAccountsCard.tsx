@@ -32,7 +32,6 @@ export function ProviderAccountsCard() {
       .filter(isEngineConnectionUsable)
       .map((row) => row.provider),
   );
-  // The pick itself: `execution` is what the cloud falls back to when it can't run it.
   const chosen = connections?.selection ?? connections?.execution;
   const chatEngine = chosen?.engine ?? "stella";
   const refreshing = isAuthenticated && connections === undefined;

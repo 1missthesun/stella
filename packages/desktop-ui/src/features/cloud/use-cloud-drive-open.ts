@@ -17,7 +17,6 @@ export const conversationFileOpenKind = (
     : "cloud-signed-url";
 };
 
-/** Opens a chat's file in Stella's viewer, the way a file link in chat does. */
 export const openConversationFile = async (
   entry: ConversationFileEntry,
   onOpened?: () => void,

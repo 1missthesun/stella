@@ -10,10 +10,6 @@ import { transcribeCapture } from "./capture-transcript";
 
 const api = () => window.electronAPI?.showStella;
 
-/**
- * Recordings and sends this window has taken, so a re-sent one isn't done
- * twice. Kept on the page, not the module, so an in-place swap keeps it.
- */
 const taken: Set<string> = ((globalThis as { __stellaShowStellaTaken?: Set<string> })
   .__stellaShowStellaTaken ??= new Set<string>());
 
@@ -40,11 +36,6 @@ const prepare = async (captureId: string, hasAudio: boolean) => {
   });
 };
 
-/**
- * In the main window: a recording that has stopped gets its words from the
- * user's dictation engine, then the builder makes the capture. A window that
- * opened (hidden) for it asks what's waiting.
- */
 export function useShowStellaRecordings() {
   useEffect(() => {
     const showStella = api();
@@ -63,11 +54,6 @@ export function useShowStellaRecordings() {
 const SEND_ATTEMPTS = 40;
 const SEND_RETRY_MS = 500;
 
-/**
- * Sends a capture from the finish card as a message, with its note, without
- * bringing the window forward. A window still opening is retried until it
- * has a conversation to send to.
- */
 export function useShowStellaSends(
   send: (text: string, context: ChatContext) => Promise<boolean>,
 ) {
@@ -99,7 +85,6 @@ export function useShowStellaSends(
   }, []);
 }
 
-/** Whether Show Stella can run here, and its shortcut. Hidden where it can't. */
 export function useShowStellaStatus(): ShowStellaStatus | null {
   const [status, setStatus] = useState<ShowStellaStatus | null>(null);
   useEffect(() => {
@@ -119,11 +104,6 @@ export function useShowStellaStatus(): ShowStellaStatus | null {
 
 export const toggleShowStella = () => api()?.toggle();
 
-/**
- * What a capture sends: its contact sheet as an image, its moments and words
- * as text the task reads, and the recording only when the user chose to keep
- * it in Drive.
- */
 export const expandShowCaptures = (context: ChatContext | null | undefined): ChatContext | null => {
   if (!context) return null;
   const captures = context.showCaptures;

@@ -1,24 +1,8 @@
 /**
- * xAI Voice Agent WebSocket transport.
- *
- * xAI's Voice Agent API is OpenAI-Realtime-compatible at the event level but
- * uses a WebSocket (no WebRTC). That means we hand-roll what WebRTC was
- * doing for free: capture mic samples → resample to 24 kHz PCM16 → base64 →
- * `input_audio_buffer.append`; receive `response.output_audio.delta` →
- * decode PCM16 → schedule on AudioContext.
- *
- * Differences from OpenAI's event vocabulary that this transport
- * normalises before passing events upstream:
- *   - `response.text.delta` → `response.output_text.delta` (xAI uses the
- *     OpenAI beta event name).
- *   - Synthesises `output_audio.started` / `output_audio.done` from the
- *     PCM player's queue state so the session's echo guard works
- *     identically to the WebRTC path.
- *
- * Auth: WebSocket subprotocol `xai-client-secret.<token>` (browser
- * WebSocket can't send headers). The clientSecret is minted in main by
- * the xai-provider module; this transport just uses whatever was handed
- * to it.
+ * xAI's Voice Agent API is OpenAI-Realtime-compatible over a WebSocket only,
+ * sends the beta `response.text.delta` event name, and takes its auth as the
+ * `xai-client-secret.<token>` subprotocol because a browser WebSocket can't
+ * send headers.
  */
 
 import { z } from "zod";
@@ -328,9 +312,7 @@ export class XaiWebSocketTransport implements RealtimeTransport {
     if (this.ws === ws) this.ws = null;
     try {
       ws.close();
-    } catch {
-      // Already closed.
-    }
+    } catch {}
   }
 
   private handleRawMessage(data: unknown): void {

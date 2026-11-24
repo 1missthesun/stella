@@ -52,11 +52,6 @@ export const presentLatestTurnUsageLimit = (
 
 const shownPauses = new Map<string, string>();
 
-/**
- * The web chat's usage-limit card: what a limit paused in this chat (from
- * its journal cards), with Resume. The desktop shows the same card from its
- * own chat host, which also sees this computer's held work.
- */
 export const presentUsageLimitPauses = (
   conversationId: string,
   records: readonly JournalRecord[],
@@ -89,10 +84,6 @@ export const presentUsageLimitPauses = (
 
 const shownSafeguards = new Map<string, string>();
 
-/**
- * The web chat's safety-block card, from the chat's journal. The desktop
- * shows the same card from its own chat host.
- */
 export const presentSafeguardBlocks = (
   conversationId: string,
   records: readonly JournalRecord[],

@@ -13,7 +13,6 @@ const visibleText = (message: MessageRecord): boolean => {
   return typeof text === "string" && text.trim().length > 0;
 };
 
-/** A visible reply that came after something the user sent. */
 const hasAnsweredMessage = (messages: readonly MessageRecord[]): boolean => {
   let firstOwnAt: number | null = null;
   for (const message of messages) {
@@ -31,7 +30,6 @@ const hasAnsweredMessage = (messages: readonly MessageRecord[]): boolean => {
   );
 };
 
-/** Sends the anonymous "first successful reply" count once per install. */
 export function FirstReplyCounter() {
   const messages = useChatMessages();
   useEffect(() => {

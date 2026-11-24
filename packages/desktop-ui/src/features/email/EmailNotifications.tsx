@@ -28,7 +28,6 @@ export function EmailNotifications() {
   const tabs = useSidebarOpenTabs();
   useEffect(() => {
     if (!known || on) return;
-    // Email is off here: an Email tab kept from before goes.
     for (const tab of sidebarSections.getSnapshot().tabs) {
       if (tab.kind === "email") sidebarSections.closeTab(tab.id);
     }
@@ -36,7 +35,6 @@ export function EmailNotifications() {
   return on ? <UrgentEmailNotifications /> : null;
 }
 
-/** What Stella marked urgent on the Email page, in the bell (and as a toast) until the page is opened. */
 function UrgentEmailNotifications() {
   const { t } = useI18n();
   const page = useEmailPageView().value?.page;

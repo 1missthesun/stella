@@ -5,10 +5,8 @@ import {
 } from "@stella/contracts/claude-usage-limit";
 import { showToast } from "@/ui/toast";
 
-/** One usage-limit card per chat, the same on desktop and web. */
 export const usageLimitCardId = (conversationId: string) => `claude-usage-limit:${conversationId}`;
 
-/** What the chat's usage-limit card shows; it sits in the message list where the paused reply would be. */
 export type UsageLimitCardState = {
   title: string;
   description?: string;
@@ -39,7 +37,6 @@ export const useUsageLimitCard = (conversationId: string | null | undefined): Us
   return conversationId ? (snapshot.get(conversationId) ?? null) : null;
 };
 
-/** A chat timeline that shows the card; without one the pause falls back to a toast. */
 export const registerUsageLimitCardSurface = (): (() => void) => {
   mountedSurfaces += 1;
   return () => {
@@ -55,10 +52,6 @@ const resetTime = (until: number) => {
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
 };
 
-/**
- * Shows what a usage limit paused in a chat, with Resume. `resume` continues
- * it all; the card shows "Resumed" once it did (from `presentUsageLimitResumed`).
- */
 export const presentUsageLimitPaused = (
   conversationId: string,
   summary: UsageLimitSummary,

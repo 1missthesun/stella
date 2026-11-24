@@ -10,7 +10,6 @@ export type LocalMemoryPreferenceView = {
   setMemoryEnabled: (memoryEnabled: boolean) => Promise<boolean>;
 };
 
-/** Memory on this computer while signed out: the user's last choice, on until they make one. */
 export function useLocalMemoryPreference(active: boolean): LocalMemoryPreferenceView {
   const system = window.electronAPI?.system;
   const available = Boolean(

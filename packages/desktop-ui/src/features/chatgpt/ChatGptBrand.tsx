@@ -78,9 +78,7 @@ export const announceChatGptPlanUse = (): void => {
   try {
     if (window.localStorage.getItem(PLAN_WELCOME_KEY)) return;
     window.localStorage.setItem(PLAN_WELCOME_KEY, "1");
-  } catch {
-    // Storage unavailable: show it this time.
-  }
+  } catch {}
   showToast({
     title: "You're using your ChatGPT plan",
     description:

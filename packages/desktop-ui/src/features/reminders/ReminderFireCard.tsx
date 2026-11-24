@@ -26,7 +26,6 @@ const formatTime = (ms: number): string => {
       });
 };
 
-/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and "Reminder · 9:00 AM" on row 2; Done / Snooze in a row under it while open. */
 export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
   text,

@@ -8,7 +8,6 @@ import {
 } from "./usage-limit-card";
 import "@/features/schedule/schedule-card.css";
 
-/** The chat's usage-limit card, in the message list where the paused reply would be. */
 export function UsageLimitChatCard({ conversationId }: { conversationId: string | null | undefined }) {
   const t = useT();
   const card = useUsageLimitCard(conversationId);

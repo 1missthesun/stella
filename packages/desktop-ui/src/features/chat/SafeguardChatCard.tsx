@@ -2,7 +2,6 @@ import { AlertCircle } from "@/ui/icons";
 import { useSafeguardCard } from "./safeguard-card";
 import "@/features/schedule/schedule-card.css";
 
-/** The chat's safety-block card, in the message list where the stopped reply would be. */
 export function SafeguardChatCard({
   conversationId,
   replying,

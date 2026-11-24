@@ -17,15 +17,12 @@ export type ConversationFileEntry = {
   timestamp: number;
   payload: DisplayTabPayload;
   cloudDriveFile?: CloudDriveConversationFile;
-  /** The message it came with: the files one message brings form a set. */
   set?: ConversationFileSet;
 };
 
 export type ConversationFileSet = {
-  /** The message's event id. */
   key: string;
   from: "stella" | "user";
-  /** Position within the message, in the order it mentions them. */
   order: number;
 };
 

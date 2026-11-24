@@ -30,10 +30,6 @@ type Attention = {
   expiresAt?: number;
 };
 
-/**
- * The cloud's Claude login, when the cloud answers with Claude: its end as
- * the cloud last read it (after each sign-in and each Claude turn there).
- */
 const cloudAttention = (settings: EngineSettings | undefined, now: number): Attention | undefined => {
   if (settings?.selection?.engine !== "anthropic") return undefined;
   const inUse = settings.claude?.places.find((place) => place.kind === "cloud")?.inUse;
@@ -54,15 +50,6 @@ const cloudAttention = (settings: EngineSettings | undefined, now: number): Atte
   return undefined;
 };
 
-/**
- * Before the Claude login Stella answers with on this computer ends (a few
- * days ahead) and after it has ended: one notification in the bell whose Sign
- * in opens the sign-in card at the composer, until the person signs in or
- * dismisses it. Dismissing hides it for that login's current state only, so
- * an ended login still gets its notice after an "ends soon" one was
- * dismissed. The cloud's login gets the same notice when the cloud answers
- * with Claude; this computer's comes first.
- */
 export function useClaudeLoginHeadsUp(): void {
   const t = useT();
   const locale = useLocale();
@@ -82,7 +69,6 @@ export function useClaudeLoginHeadsUp(): void {
         }
       : undefined;
   const current = localAttention ?? cloudAttention(cloud, now);
-  // Compared by value: the notice is presented again only when it changes.
   const attentionJson = current ? JSON.stringify(current) : "";
 
   useEffect(() => {
@@ -155,7 +141,6 @@ export const rememberClaudeHeadsUpDismissed = (key: string): void => {
   uiState.setItem(DISMISSED_KEY, key);
 };
 
-/** The time, to the minute: an "ends soon" date is reached without a new read. */
 function useMinuteClock(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -165,7 +150,6 @@ function useMinuteClock(): number {
   return now;
 }
 
-/** True when Stella's own replies here run on Claude Code. */
 function useEngineUsesClaude(): boolean {
   const [value, setValue] = useState(false);
   useEffect(() => {

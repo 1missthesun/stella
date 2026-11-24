@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import type { SavedValuesSyncAction, SavedValuesSyncStatus } from "@stella/contracts/saved-values";
 import { getElectronApi } from "@/platform/electron/electron";
 
-/** This computer's sync of saved values, kept current as it changes. */
 export const useSavedValuesSync = () => {
   const [status, setStatus] = useState<SavedValuesSyncStatus | null>(null);
 

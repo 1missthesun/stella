@@ -1,26 +1,3 @@
-/**
- * Per-agent completion card derivation.
- *
- * A delegated agent's user-facing files are linked in the `result` of its
- * `agent-completed` event. The
- * background-task lifecycle selector folds that payload back onto the card
- * created by the matching `agent-started` occurrence, so completion enriches
- * the existing spawn-anchored card instead of inserting another timeline row.
- *
- * Two structural facts make this clean and append-only by construction:
- *   1. The response itself is the source of truth, so intermediate tool and
- *      scratch files never become completion-card artifacts unless the agent
- *      deliberately links them.
- *   2. Each `agent-completed` event attaches to exactly one message row (see
- *      `group-events-into-messages`) — though during the SQLite/stream
- *      handoff the same underlying event can briefly be projected onto both
- *      the user-message fallback row and the assistant row; the dedup pass in
- *      `use-event-rows` collapses that duplicate (keyed by `agentId` +
- *      `completedAtMs`).
- *
- * Kept as a pure module (no React) so the derivation is unit-testable,
- * mirroring the other extracted chat derivations.
- */
 import type { EventRecord } from "./event-transforms";
 import {
   fallbackTaskDescription,

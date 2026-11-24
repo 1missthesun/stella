@@ -108,9 +108,7 @@ export class PcmPlayer {
       try {
         node.stop();
         node.disconnect();
-      } catch {
-        // Already stopped.
-      }
+      } catch {}
     }
     this.pendingNodes.clear();
     this.scheduledEndSec = this.audioContext?.currentTime ?? 0;
@@ -142,18 +140,14 @@ export class PcmPlayer {
     if (this.destination) {
       try {
         this.destination.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.destination = null;
     }
     this.analyser = null;
     if (this.audioContext) {
       try {
         await this.audioContext.close();
-      } catch {
-        // Already closed.
-      }
+      } catch {}
       this.audioContext = null;
     }
   }

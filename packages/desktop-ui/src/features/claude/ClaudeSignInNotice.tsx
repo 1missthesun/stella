@@ -40,7 +40,6 @@ export function ClaudeSignInNotice({
     },
   });
   const email = notice.claudeSignIn?.email;
-  // The cloud's login is signed in through the cloud: nothing needed here.
   const cloud = notice.claudeSignIn?.place === "cloud";
   const missingCli = !cloud && local.available && local.loaded && !local.cliInstalled;
   const canSignIn = cloud || (local.available && (!local.loaded || local.cliInstalled));
@@ -54,7 +53,6 @@ export function ClaudeSignInNotice({
     return local.defaultSignedOut ? { place: "local", configId: "default" } : { place: "local" };
   };
 
-  // Claude Code isn't on this computer: install it here, then sign in.
   const install = useClaudeInstallThenSignIn({
     reload: local.reload,
     signIn: () =>

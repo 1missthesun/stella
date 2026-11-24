@@ -51,10 +51,6 @@ export type LineageSource = {
   hasOlder: boolean;
   isLoadingOlder?: boolean;
   loadOlder: () => void | boolean | Promise<unknown>;
-  /**
-   * Known tasks (thread id → description), used for legacy journals that
-   * predate structured lifecycle records.
-   */
   tasks?: ReadonlyArray<{ id: string; description: string }>;
 };
 const providedSources = new Map<string, LineageSource>();
@@ -75,12 +71,6 @@ const deriveLineage = (
   source: LineageSource,
   root: ConversationFocusRoot,
 ): { messages: MessageRecord[]; startLoaded: boolean } => {
-  // A message root's chain includes its own turn's replies and every update
-  // on the tasks that turn spawned; see `listLineageMessages` locally. The
-  // turn's tasks are known by thread id when the journal carries one, else
-  // by matching the spawn's description to a task title (the runtime's task
-  // list, a cited title, or the thread id's slug) — the same rule reply
-  // context applies, so the badge and this chain agree.
   const turnOf = (message: MessageRecord) =>
     root.kind === "message" && message.payload?.userMessageId === root.id;
   const ownAgentIds = new Set<string>();

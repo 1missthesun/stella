@@ -3,9 +3,7 @@ import { useSyncExternalStore } from "react";
 
 const KEY = "stella:chat-storage-mode";
 const EVENT = "stella:chat-storage-changed";
-// Set while chats are local only because there is no account yet; signing in asks what to do with them.
 const SIGNED_OUT_KEY = "stella:chat-storage-signed-out";
-// Set when the user kept signed-out work on this computer; memory stays local until chats sync again.
 const MEMORY_KEPT_LOCAL_KEY = "stella:memory-kept-local";
 export const isPrivateConversationId = (id: string | null | undefined) =>
   Boolean(id?.startsWith("local_"));
@@ -58,7 +56,6 @@ export const selectPrivateConversation = async (requested: string | null) => {
 const hasLocalChat = () =>
   typeof window !== "undefined" && Boolean(window.electronAPI?.localChat);
 
-/** No account: keep chats on this computer. A local choice the user made stays theirs. */
 export const enterSignedOutLocalMode = () => {
   if (!hasLocalChat() || uiState.getItem(KEY) === "local") return;
   uiState.setItem(SIGNED_OUT_KEY, "1");
@@ -72,7 +69,6 @@ export const isSignedOutLocalMode = () =>
 export const useSignedOutLocalMode = () =>
   useSyncExternalStore(subscribe, isSignedOutLocalMode, () => false);
 
-/** After sign-in: keep chats on this computer for good, or go back to synced chats. */
 export const settleSignedOutLocalMode = async (mode: "cloud" | "local") => {
   await setChatStorageMode(mode);
   if (mode === "local") uiState.setItem(MEMORY_KEPT_LOCAL_KEY, "1");
@@ -80,14 +76,12 @@ export const settleSignedOutLocalMode = async (mode: "cloud" | "local") => {
   window.dispatchEvent(new Event(EVENT));
 };
 
-/** Memory files stay on this computer until the signed-out keep-or-sync choice says sync. */
 export const isMemorySyncHeld = () =>
   isSignedOutLocalMode() || uiState.getItem(MEMORY_KEPT_LOCAL_KEY) === "1";
 
 export const useMemorySyncHeld = () =>
   useSyncExternalStore(subscribe, isMemorySyncHeld, () => false);
 
-// The local chat the user chose to sync at sign-in, copied once the account's chat is open.
 const SYNC_PENDING_KEY = "stella:chat-storage-sync-pending";
 export const pendingLocalChatSync = () => uiState.getItem(SYNC_PENDING_KEY);
 export const markLocalChatSync = (localConversationId: string) =>

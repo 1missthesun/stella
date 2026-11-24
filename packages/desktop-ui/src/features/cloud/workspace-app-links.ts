@@ -40,9 +40,7 @@ function refreshApps(): Promise<void> {
       const apps = parseWorkspaceApps((await response.json()).apps);
       fetchedAt = Date.now();
       setState({ apps });
-    } catch {
-      // The card keeps its loading look; the next mount retries.
-    } finally {
+    } catch {} finally {
       inflight = null;
       setState({ loading: false });
     }

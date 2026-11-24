@@ -44,16 +44,12 @@ import "./connect-plan.css";
 type OptionId = "chatgpt" | "claude" | "apikey";
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
 
-/** The model a cloud ChatGPT run starts on, as in Settings › Claude and ChatGPT. */
 const CLOUD_CHATGPT_MODEL = "gpt-6.1-sol";
 
 type KeptMessage =
-  /** The cloud refused it before it was sent; it waits in the chat as "Not sent". */
   | { kind: "unsent"; clientMsgId: string; text: string }
-  /** It was sent and the reply failed; send the same words again. */
   | { kind: "text"; text: string };
 
-/** The person's latest message in the chat on screen. */
 const lastOwnMessage = (messages: readonly MessageRecord[] | null): KeptMessage | null => {
   if (!messages) return null;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -68,17 +64,11 @@ const lastOwnMessage = (messages: readonly MessageRecord[] | null): KeptMessage 
   return null;
 };
 
-/**
- * Send the kept message on the plan just connected. A "Not sent" one is
- * replaced rather than retried: its retry would reuse the engine it was
- * first sent with, which is the one that ran out.
- */
 const sendKept = (kept: KeptMessage): void => {
   if (kept.kind === "unsent") cloudSendRecovery()?.dismiss(kept.clientMsgId);
   window.dispatchEvent(new CustomEvent(STELLA_SEND_MESSAGE_EVENT, { detail: { text: kept.text } }));
 };
 
-/** Point this computer's chat at an API key the person just saved. */
 const routeToApiKeyProvider = async (provider: string): Promise<boolean> => {
   const system = window.electronAPI?.system;
   const preferences = await system?.getLocalModelPreferences?.();
@@ -100,12 +90,6 @@ const routeToApiKeyProvider = async (provider: string): Promise<boolean> => {
   return true;
 };
 
-/**
- * The connect-your-plan card above the composer. First the offer (connect
- * your ChatGPT or Claude plan, plans second); then the plans that work on
- * this host; once one connects, Stella switches to it and sends the message
- * that didn't go through.
- */
 export function ConnectPlanNotice({
   notice,
   compact,
@@ -134,8 +118,6 @@ export function ConnectPlanNotice({
   const [keyDraft, setKeyDraft] = useState("");
   const finished = useRef(false);
 
-  // What to send once connected, taken when the card first shows so a
-  // later message can't take its place.
   const kept = useRef<KeptMessage | null | undefined>(undefined);
   if (kept.current === undefined) {
     kept.current =
@@ -179,7 +161,6 @@ export function ConnectPlanNotice({
     },
   });
 
-  // Claude Code isn't on this computer: install it, then sign in.
   const claudeInstall = useClaudeInstallThenSignIn({
     reload: reloadClaudeLocal,
     signIn: () => void claudeLogin.start({ place: "local", configId: "default" }),
@@ -219,7 +200,6 @@ export function ConnectPlanNotice({
       setPending("chatgpt");
       try {
         if (chatgpt.available) {
-          // This computer's own ChatGPT sign-in.
           const ready = chatgpt.usable || Boolean((await chatgpt.signIn())?.planUsage);
           if (!ready) return;
           if (!chatgpt.usable) announceChatGptPlanUse();
@@ -227,7 +207,6 @@ export function ConnectPlanNotice({
           else setError(COPY.failed);
           return;
         }
-        // The web chat: the account's cloud ChatGPT connection.
         const ready = cloudChatGptConnected || (await connect.start());
         if (!ready) return;
         if (!cloudChatGptConnected) announceChatGptPlanUse();

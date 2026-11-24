@@ -11,7 +11,6 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** Open the Schedule view with one schedule scrolled into view and marked. */
 export const openScheduleFocused = (scheduleId: string): void => {
   focus = { scheduleId, at: Date.now() };
   for (const listener of listeners) listener();

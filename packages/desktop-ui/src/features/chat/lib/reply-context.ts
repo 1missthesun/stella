@@ -13,11 +13,6 @@ import {
 import { assistantRowHasOwnContent } from "./assistant-row-content";
 
 export type ReplyContextOptions = {
-  /**
-   * Task titles by thread id from the runtime's Activity list. The
-   * authoritative source when the transcript itself carries no title for a
-   * spawn (a locally executed turn mirrored into the cloud journal).
-   */
   agentTitles?: ReadonlyMap<string, string>;
   agentParents?: ReadonlyMap<string, string>;
 };
@@ -35,9 +30,6 @@ export function withReplyContext(
   rows: EventRowViewModel[],
   options: ReplyContextOptions = {},
 ): EventRowViewModel[] {
-  // Task titles the timeline knows, so a spawn that only recorded its
-  // description (a local turn mirrored to the cloud journal) still owns the
-  // thread a later report cites by that same title.
   const threadIdsByTitle = new Map<string, string[]>();
   const citedThreadIds = new Set<string>();
   const learn = (title: string | undefined, threadId: string) => {
@@ -65,7 +57,6 @@ export function withReplyContext(
       for (const threadId of threadIdsByTitle.get(title.trim()) ?? []) {
         if (!owned.includes(threadId)) owned.push(threadId);
       }
-      // Last resort: the thread id is the description's slug.
       for (const threadId of citedThreadIds) {
         if (!owned.includes(threadId) && titleNamesThread(title, threadId)) owned.push(threadId);
       }

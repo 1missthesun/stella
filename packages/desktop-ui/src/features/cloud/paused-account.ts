@@ -3,13 +3,6 @@ import { uiState } from "@/platform/ui-state";
 import { pendingPrompts } from "./conversation-outbox";
 import { cloudConversationCacheClient } from "./cloud-conversation-cache-client";
 
-/**
- * While an account's session has ended on its own, its chat stays on screen
- * from this computer's copy, and new messages wait here until that same
- * account signs back in. Everything is keyed by account scope, so another
- * account never reads it.
- */
-
 const GENERATION_PREFIX = "stella:cloudOwnerGeneration:";
 const OUTBOX_PREFIX = "stella:paused-outbox:";
 const ACTIVE_CONVERSATION_PREFIX = "stella:activeCloudConversationId:";
@@ -121,7 +114,6 @@ export const useWaitingMessages = (accountScope: string | null) =>
     () => EMPTY,
   );
 
-/** The account whose chat this computer last showed; read before another account's chat loads. */
 export const lastAccountScope = (): string | null => {
   const value = uiState.getItem(LAST_ACCOUNT_SCOPE_KEY);
   return isAccountScope(value) ? value : null;
@@ -146,10 +138,6 @@ const removeScopedKeys = (keep: string | null) => {
   }
 };
 
-/**
- * Removes every account's chat copy and waiting messages from this computer,
- * except `keep`. With no `keep`, also forgets which account was here.
- */
 export const wipeAccountsFromThisComputer = async (
   keep: string | null,
 ): Promise<void> => {

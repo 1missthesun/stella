@@ -44,7 +44,6 @@ export class PcmRecording {
     this.samples += take;
   }
 
-  /** Whether anything clearly louder than the room was recorded. */
   hasSpeech(): boolean {
     const pcm = new Int16Array(this.buffer, HEADER_BYTES, this.samples);
     const levels: number[] = [];

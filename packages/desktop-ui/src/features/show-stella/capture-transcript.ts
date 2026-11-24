@@ -5,29 +5,16 @@ import {
 } from "@/features/dictation/services/dictation-transcriber";
 import { transcribeOnDevice } from "@/features/dictation/services/on-device-dictation";
 
-/**
- * A capture's words, with times on the capture's clock, from whichever
- * dictation engine the user is on. Apple's on-device recognizer measures each
- * word. The cloud engines return text only, so the sound is cut at its pauses
- * and each stretch of speech is transcribed on its own: every stretch then
- * starts and ends where the speech did, and its words are spread over the
- * speech inside it (`estimated`).
- */
-
 const SAMPLE_RATE = 16_000;
 const HEADER_BYTES = 44;
 const FRAME_MS = 20;
 const FRAME_SAMPLES = (SAMPLE_RATE * FRAME_MS) / 1000;
-/** Silence this long ends a stretch of speech. */
 const PAUSE_MS = 550;
-/** A pause this long inside a stretch doesn't hold words. */
 const INNER_PAUSE_MS = 240;
 const MIN_SPEECH_MS = 220;
 const PAD_MS = 160;
-/** Stretches longer than this are cut at their quietest moment. */
 const MAX_CLIP_MS = 20_000;
 const MIN_CLIP_MS = 6_000;
-/** Speech is this far above the quietest stretch of the recording, and at least -50 dBFS. */
 const NOISE_PERCENTILE = 0.15;
 const NOISE_FACTOR = 3;
 const MIN_LEVEL = 100;
@@ -79,7 +66,6 @@ const frameLevels = (pcm: Int16Array): Float32Array => {
   return levels;
 };
 
-/** Stretches of speech, in ms, with the speech runs inside each. */
 export const speechClips = (pcm: Int16Array): Clip[] => {
   const levels = frameLevels(pcm);
   if (levels.length === 0) return [];
@@ -98,7 +84,6 @@ export const speechClips = (pcm: Int16Array): Clip[] => {
   }
   if (open !== null) runs.push({ start: open * FRAME_MS, end: levels.length * FRAME_MS });
 
-  // Close gaps between runs that are shorter than a breath.
   const merged: Run[] = [];
   for (const run of runs) {
     const last = merged[merged.length - 1];
@@ -133,7 +118,6 @@ export const speechClips = (pcm: Int16Array): Clip[] => {
   }));
 };
 
-/** Cuts a stretch longer than MAX_CLIP_MS at its quietest gap, recursively. */
 const splitLong = (clip: Clip, levels: Float32Array): Clip[] => {
   if (clip.end - clip.start <= MAX_CLIP_MS || clip.speech.length < 2) return [clip];
   let best = -1;
@@ -148,7 +132,6 @@ const splitLong = (clip: Clip, levels: Float32Array): Clip[] => {
     }
   }
   if (best < 0) {
-    // One unbroken run: cut at the quietest frame in its middle.
     const from = Math.floor((clip.start + MIN_CLIP_MS) / FRAME_MS);
     const to = Math.floor((clip.end - MIN_CLIP_MS / 2) / FRAME_MS);
     let quiet = from;
@@ -178,10 +161,6 @@ const splitLong = (clip: Clip, levels: Float32Array): Clip[] => {
   ];
 };
 
-/**
- * Spreads a stretch's words over the speech inside it, in proportion to their
- * length, skipping the pauses between runs.
- */
 const spreadWords = (text: string, clip: Clip) => {
   const tokens = text.split(/\s+/).filter(Boolean);
   const weights = tokens.map((token) => token.length + 2);
@@ -219,7 +198,6 @@ const mapLimit = async <T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 };
 
-/** Sentences, or runs of words split at long pauses. */
 const segmentsOf = (words: ShowStellaTranscript["words"]) => {
   const segments: ShowStellaTranscript["segments"] = [];
   let current: typeof words = [];
@@ -270,7 +248,6 @@ export const transcribeCapture = async (wav: ArrayBuffer | null): Promise<ShowSt
       return { source: "on-device", text: result.text, segments: segmentsOf(words), words };
     }
     if (!result.text.trim()) return { source: "on-device", text: "", segments: [], words: [] };
-    // Text without times: spread it like the cloud engines' answers.
     const whole: Clip = { start: clips[0]!.start, end: clips[clips.length - 1]!.end, speech: clips.flatMap((c) => c.speech) };
     const spread = spreadWords(result.text, whole);
     return { source: "on-device", text: result.text, segments: segmentsOf(spread), words: spread, estimated: true };

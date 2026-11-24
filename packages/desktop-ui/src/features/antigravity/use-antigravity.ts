@@ -42,7 +42,6 @@ export function useAntigravity() {
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
-  /** Resolves true once signed in, false when the person canceled it. Throws nothing: a failure shows in `signIn`. */
   const start = useCallback(async (): Promise<boolean> => {
     const system = window.electronAPI?.system;
     if (!system?.signInAntigravity) return false;

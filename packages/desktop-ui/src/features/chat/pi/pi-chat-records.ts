@@ -107,7 +107,6 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" 
       records.push({ ...base, role: "toolResult", hidden: false, payload: message as unknown as Record<string, unknown> });
     }
   }
-  // A failed attempt is not the turn's end while the run goes on: it is tried again.
   if (ending && !state.running) records.push(ending);
   return {
     records,

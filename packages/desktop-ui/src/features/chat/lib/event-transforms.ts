@@ -97,15 +97,10 @@ export type TaskItem = {
   assistantMessages?: string[]
   assistantMessagesUpdatedAtMs?: number
   assistantMessagesUpdatedSequence?: number
-  /** Ended its turn waiting for this: live but nothing running, no report yet. */
   waitingFor?: string
-  /** Its own turn is over and its report waits for its helpers. */
   waitingForHelpers?: boolean
-  /** Not ended but held, so nothing of it runs now. */
   paused?: AgentPause
-  /** A helper of this top-level task runs now. */
   helpersWorking?: boolean
-  /** Running, and on one tool call past every time limit. */
   longCall?: CurrentToolCall
 }
 
@@ -237,18 +232,6 @@ export function isGenericTaskDescription(
   )
 }
 
-/**
- * Best-effort display name for a task whose spawn description is missing
- * (e.g. a resumed legacy thread rebuilt from reasoning-only events). Thread
- * ids are slugs of the original spawn description (`compare-flight-prices`),
- * so de-slugging the id recovers a meaningful label. Ordinal ids
- * (`task-7`, `legacy-…`) carry no words, so they fall back to plain "Task".
- */
-// Spawn-thread ids are minted by `slugify()` (runtime/kernel/shared/slug.ts):
-// lowercase a-z0-9 words joined by single dashes, no leading/trailing dash,
-// capped at 48 chars. Ids from any other generator (uppercase, underscores,
-// other alphabets, overlong) may embed text that was never meant as a display
-// label — treat those as opaque and keep the generic "Task".
 const SPAWN_SLUG_MAX_LENGTH = 48
 const SPAWN_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -260,8 +243,6 @@ export function fallbackTaskDescription(agentId: string | undefined): string {
   }
   const words = slug.split('-')
   const letterCount = (words.join('').match(/[a-z]/gi) ?? []).length
-  // Short single-token ids ("a1", "x7f3") are opaque junk, not slugged
-  // descriptions — keep the generic label for those.
   if (words.length < 2 && letterCount < 4) return 'Task'
   if (letterCount === 0) return 'Task'
   const text = words.join(' ')

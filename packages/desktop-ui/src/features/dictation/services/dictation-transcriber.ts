@@ -147,10 +147,6 @@ const transcribeWithOwnKey = async (wav: ArrayBuffer, signal?: AbortSignal): Pro
   }
 };
 
-/**
- * On a Mac, Apple's on-device recognizer stands in whenever the route the
- * user has fails (signed out, usage limit, no service, offline, a bad key).
- */
 const transcribeWithFallback = async (
   wav: ArrayBuffer,
   error: unknown,
@@ -161,7 +157,6 @@ const transcribeWithFallback = async (
   return (await transcribeOnDevice(wav)).text;
 };
 
-/** A recognizer that hears no words can describe the sound: "[music]". */
 const spokenWords = (text: string): string =>
   /^\s*(?:[[(][^\])]*[\])][\s.]*)+$/.test(text) ? "" : text;
 

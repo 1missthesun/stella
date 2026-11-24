@@ -19,7 +19,6 @@ import {
 } from "./app-source-store";
 import { addOffer, describeChange, deviceLabel, useNow } from "./AppSourceCards";
 
-/** How long the note that a version arrived by itself stays in the bell. */
 const ARRIVED_SHOWN_MS = 12 * 60 * 60_000;
 
 type Translate = ReturnType<typeof useT>;
@@ -35,12 +34,6 @@ const conflictDetail = (t: Translate, conflicts: AppSourceConflicts) => {
   return files ? `${files} · ${how}` : how;
 };
 
-/**
- * Changes waiting to be added (from the person's other computers, a version
- * that needs a merge, a finished change whose task isn't in this chat) and the
- * note that a version arrived by itself, as notifications in the bell. They
- * all stay in Updates too.
- */
 export const AppSourceNotifications = memo(function AppSourceNotifications({
   conversationId,
 }: {

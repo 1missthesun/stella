@@ -2,19 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { openExternalUrl } from "@/platform/electron/open-external";
 
-/**
- * Signing the owner's cloud in to ChatGPT (Sign in with ChatGPT; the cloud
- * is its own host). Claude sign-in is Claude Code's own and lives in
- * `features/claude/use-claude-login`.
- *
- * In the desktop app Electron main runs the browser round trip and catches
- * the 127.0.0.1 redirect on its loopback listener; this window only waits.
- * The redirect URL goes to the server, which exchanges the code and keeps
- * the cloud's credentials. In a browser nothing can listen on 127.0.0.1, so
- * the authorization page opens and the user pastes back the address the
- * browser landed on.
- */
-
 export type EngineConnectFlow =
   | { kind: "browser"; provider: "chatgpt" }
   | {

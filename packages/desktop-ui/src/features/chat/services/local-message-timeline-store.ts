@@ -483,9 +483,6 @@ async function readNewer(entry: TimelineEntry) {
   try {
     const result = await api.listMessagesAfter({
       conversationId: entry.conversationId,
-      // Start one loaded row behind the live edge. The strictly-after storage
-      // contract then returns the newest row itself if streaming or tool
-      // artifacts replaced it, followed by a full page plus look-ahead.
       afterTimestampMs: queryCursor.timestamp,
       afterId: queryCursor._id,
       afterSequence: queryCursor.sequence,
@@ -882,11 +879,6 @@ function handleLocalUpdate(payload: LocalChatUpdatedPayload | null) {
   if (!payload?.conversationId) return;
   const entry = entries.get(payload.conversationId);
   if (!entry || entry.listeners.size === 0) return;
-  // Update without an event (welcome persisted, store reset): no appended
-  // event exists, and an incremental tail read keys strictly AFTER the newest
-  // loaded row — it can never observe rows that changed or were REMOVED.
-  // Re-read the latest page instead. Append notifications always carry their
-  // event and keep using the cheap incremental path below.
   if (!payload.event) {
     if (entry.inFlight) entry.queuedLatestRefresh = true;
     else void readInitial(entry, "latest");
@@ -897,10 +889,6 @@ function handleLocalUpdate(payload: LocalChatUpdatedPayload | null) {
     if (entry.inFlight) {
       entry.pendingEventsDuringRead.set(payload.event._id, payload.event);
       entry.queuedTailRefresh = true;
-      // A tail read is fetching a message that was just written; an event
-      // after it belongs to that message, which is not here yet. Patched now,
-      // it would land on the previous message and the timeline would pin it
-      // there. It is replayed once the read brings the message in.
       if (entry.inFlight === "tail") return;
     }
     const patched = patchNotifiedEvent(entry, payload.event);
@@ -913,9 +901,6 @@ function handleLocalUpdate(payload: LocalChatUpdatedPayload | null) {
     if (entry.inFlight) return;
     if (!authored && patched) return;
     if (atOrBeforeDurableCursor) {
-      // A failed patch below the durable high-water mark cannot be recovered by
-      // a strictly-after query. Reconcile the bounded latest window instead of
-      // silently dropping an out-of-order authored notification.
       if (!patched) void readInitial(entry, "latest");
       return;
     }
@@ -952,8 +937,7 @@ export function subscribeToLocalMessageTimeline(
   return () => {
     entry.listeners.delete(listener);
     if (entry.listeners.size === 0) {
-      // Logical cancellation: IPC itself is not abortable, so invalidate the
-      // completion and retain the last settled window for tab restoration.
+      // Electron IPC can't be aborted, so the stale completion is ignored instead.
       entry.requestId += 1;
       entry.inFlight = null;
       entry.queuedTailRefresh = false;

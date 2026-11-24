@@ -19,12 +19,10 @@ const drivePathFor = (documentPath: string, filePath: string): string => {
 
 type DriveRead = { bytes: Uint8Array; truncated: boolean; mimeType: string };
 
-/** A signed link is reused while it has this long left to run. */
 const LINK_MARGIN_MS = 60_000;
 const KEPT_READS = 16;
 const KEPT_READ_BYTES = 128 * 1024 * 1024;
 
-/** A link this fresh is reused even before the version watch has answered. */
 const JUST_FETCHED_MS = 10_000;
 
 // @reloadable signed links and downloads; a newer copy asks again
@@ -32,13 +30,6 @@ const links = new Map<string, { at: number; value: Promise<DriveFileUrl> }>();
 // @reloadable see above
 const reads = new Map<string, { value: Promise<DriveRead>; bytes: number }>();
 
-/**
- * The file's signed link. One already in hand is reused while the live
- * version watch says the Drive still holds that version (or it was only
- * just asked for) and the link has time left, so reopening a file costs no
- * round trip. A path nobody watches gets a fresh link each time (its bytes
- * are still kept per version).
- */
 export const driveFileLink = async (path: string): Promise<DriveFileUrl> => {
   const pending = links.get(path);
   if (pending) {
@@ -112,7 +103,6 @@ const keepRead = (key: string, value: Promise<DriveRead>) => {
   );
 };
 
-/** A Drive file's bytes, downloaded once per version. */
 export const readDriveFile = async (path: string, maxBytes: number): Promise<DriveRead> => {
   const link = await driveFileLink(path);
   const key = `${path}\0${link.version}\0${maxBytes}`;
@@ -130,9 +120,6 @@ export const readDriveFile = async (path: string, maxBytes: number): Promise<Dri
 export function CloudFileSource({ path, children }: { path: string; children: ReactNode }) {
   const id = useId();
   const revision = useDriveFileRevision(path);
-  // Reads are cached under the file's version, so a file opened again finds
-  // what was read last time. The version comes from the live watch or, the
-  // first time, from the link the read needs anyway.
   const [base, setBase] = useState<{ path: string; tag: string | null }>(() => ({
     path,
     tag: driveFileVersions.version(path) ?? null,
@@ -154,7 +141,6 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
       live = false;
     };
   }, [current.tag, id, path]);
-  // Keep watching the file's version after this closes, for the next open.
   useEffect(() => {
     driveFileVersions.track(path);
   }, [path]);

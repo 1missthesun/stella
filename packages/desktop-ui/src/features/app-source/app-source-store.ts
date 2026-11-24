@@ -117,7 +117,6 @@ const subscribeRelayed = (listener: () => void) => {
   };
 };
 
-/** Agents whose completion is a row in the conversation's loaded messages: their change shows on that row. */
 export const publishRelayedAgents = (conversationId: string, agentIds: string[]) => {
   const known = relayedAgents.get(conversationId) ?? EMPTY_AGENTS;
   if (known.size === agentIds.length && agentIds.every((id) => known.has(id))) return;

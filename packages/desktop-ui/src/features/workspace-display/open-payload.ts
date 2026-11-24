@@ -74,10 +74,6 @@ const rebuildOpenItems = (from: WorkspaceDisplayPayloadAdapter) => {
   }
 };
 
-/**
- * The first adapter reopens what was on screen before the window loaded; a
- * later one (the interface changed in place) redraws what is open with it.
- */
 export const registerWorkspaceDisplayPayloadAdapter = (
   nextAdapter: WorkspaceDisplayPayloadAdapter,
 ): void => {
@@ -92,7 +88,6 @@ export const registerWorkspaceDisplayPayloadAdapter = (
   fileViewer.subscribe(rememberOpenItems);
 };
 
-/** Put away every item on screen: they belong to whoever opened them. */
 export const closeOpenItems = (): void => {
   fileViewer.close();
   for (const tab of displayTabs.getTabListSnapshot().tabs) {
@@ -109,11 +104,6 @@ const getAdapter = (): WorkspaceDisplayPayloadAdapter => {
   return adapter;
 };
 
-/**
- * Open a payload the user asked for. Files show in the floating viewer over
- * the chat; canvases open as a top-bar tab on the stage. `activate: false`
- * only registers the item (restores, prefetch) without showing it.
- */
 export const openDisplayPayloadTab = (
   payload: DisplayTabPayload,
   opts?: OpenTabOptions,
@@ -135,7 +125,6 @@ export const openDisplayPayloadTab = (
   return spec.id;
 };
 
-/** Show an already registered display item in the floating viewer. */
 export const showInViewer = (id: string): void => {
   const active = sidebarSections.getActiveTab();
   if (
@@ -144,7 +133,6 @@ export const showInViewer = (id: string): void => {
       active?.kind === "apps" ||
       active?.kind === "takeover")
   ) {
-    // Native and app surfaces can't sit under the viewer: go back to chat.
     displayTabs.setPanelOpen(false);
   }
   fileViewer.open(id);
@@ -160,10 +148,6 @@ export const openSourceDiffBatch = (batch: SourceDiffBatch): void => {
   showInViewer(spec.id);
 };
 
-/**
- * Something the agent put on screen: register it and add a quiet top-bar tab
- * with a dot, without opening anything.
- */
 export const addAgentDisplayPayload = (
   payload: DisplayTabPayload,
   opts: { tab: boolean },

@@ -20,13 +20,6 @@ type UseConversationDisplayMessagesOptions = {
   streamingAssistants: StreamingAssistantOverlay[];
 };
 
-/**
- * Resolves the timestamp a message sorts by. Defaults to the message's own
- * `timestamp`, but the hook overrides it for assistant slots seen live this
- * session so the streaming overlay and its eventual persisted twin sort to
- * the SAME position — see `useConversationDisplayMessages` for why the raw
- * timestamps differ across that handoff and cause card reorders.
- */
 export type SortTimestampResolver = (message: MessageRecord) => number;
 
 export const getMessageChronologicalTimestamp: SortTimestampResolver = (
@@ -50,11 +43,6 @@ export const getMessageChronologicalTimestamp: SortTimestampResolver = (
 const defaultSortTimestamp: SortTimestampResolver =
   getMessageChronologicalTimestamp;
 
-/**
- * Floors every assistant chronological anchor one logical tick after the user
- * turn it answers. Worker/renderer clocks can tie or move backward; the turn
- * relationship is authoritative when wall-clock timestamps disagree.
- */
 export const createOwningUserClampedSortTimestampResolver = (
   messages: readonly MessageRecord[],
   baseResolver: SortTimestampResolver = defaultSortTimestamp,
@@ -159,12 +147,6 @@ const isUserTurnAssistant = (message: MessageRecord): boolean => {
   return targetType === undefined || targetType === "user_turn";
 };
 
-/**
- * Timestamp ordering alone cannot represent a queued send: its click time is
- * inside the preceding assistant run, before a later post-tool assistant slot
- * receives its first chunk. Move only those late slots back across the first
- * following user boundary, keeping the rest of the timestamp order intact.
- */
 export const keepAssistantTurnsContiguous = (
   messages: MessageRecord[],
 ): MessageRecord[] => {
@@ -309,13 +291,6 @@ export const mergeConversationDisplayMessageSources = (args: {
   overlayMessages: MessageRecord[];
   streamingAssistants: StreamingAssistantOverlay[];
   persistedAssistantSlots: Map<string, MessageRecord[]>;
-  /**
-   * Optional stable sort-timestamp resolver. When omitted, messages sort by
-   * their own `timestamp` (unchanged behavior). The hook passes one only when
-   * at least one assistant slot was seen live this session, so a persisted
-   * twin inherits the sort position its streaming overlay first held instead
-   * of hopping to the runtime's (different) message timestamp.
-   */
   getSortTimestamp?: SortTimestampResolver;
 }): MessageRecord[] => {
   const {
@@ -353,9 +328,6 @@ export const mergeConversationDisplayMessageSources = (args: {
   );
   if (streamingAssistants.length === 0) {
     if (overlayMessages.length === 0) {
-      // SQLite is ordered by persistence time. Assistant rows with a captured
-      // `streamStartedAtMs` sort by when their text became visible instead, so
-      // a queued user send cannot jump above an assistant it followed.
       return orderByResolver(persistedMessages, effectiveSortTimestamp);
     }
     return mergeMessageSources(
@@ -417,23 +389,6 @@ export const useConversationDisplayMessages = ({
     [persistedMessages],
   );
 
-  /**
-   * Per-slot frozen sort timestamps (`userMessageId:indexInTurn` -> ts).
-   *
-   * A streaming assistant overlay sorts by a renderer `Date.now()` captured at
-   * its first chunk (message START), while the persisted twin that later
-   * replaces it sorts by the runtime's `message.timestamp` (message END). Those
-   * two values differ, so at the overlay -> persisted handoff (message
-   * finalizes, or the next run drops the prior-run overlay) the row's sort key
-   * changes. If any adjacent row's timestamp falls between the two, the row
-   * re-sorts across it and its card/artifact visibly hops before/after the
-   * neighbor.
-   *
-   * We freeze the FIRST sort timestamp observed for each slot (the overlay's
-   * value) and reuse it for the persisted twin for the rest of this session, so
-   * the position a card first rendered at never changes. Reset per conversation;
-   * a reload starts empty and falls back to canonical persisted timestamps.
-   */
   const frozenSlotSortTsRef = useRef<Map<string, number>>(new Map());
   const sentAnchorsRef = useRef(new SentMessageAnchors());
   const frozenConversationIdRef = useRef<string | null>(conversationId);
@@ -454,9 +409,6 @@ export const useConversationDisplayMessages = ({
     }
   }
 
-  // Map each persisted assistant twin whose slot was seen live this session to
-  // its frozen sort timestamp. Recomputed only when the persisted slots change
-  // or a new overlay appears — i.e. exactly the handoff frames that matter.
   const sortTimestampByMessageId = useMemo(() => {
     const map = new Map<string, number>();
     const frozen = frozenSlotSortTsRef.current;
@@ -545,14 +497,6 @@ export const useConversationDisplayMessages = ({
     streamingAssistants,
   ]);
 
-  /**
-   * Arrival-order anchoring for agent lifecycle events (see
-   * `routeLifecycleEvents`). Runs on the merged timeline so cards routed
-   * mid-stream can target the streaming overlay row itself; the sticky map
-   * pins every decision for the session so the overlay -> persisted handoff
-   * can never move an already-painted card. Reset per conversation, like the
-   * frozen sort timestamps above.
-   */
   const lifecycleRoutingRef = useRef<LifecycleRoutingState>(
     createLifecycleRoutingState(),
   );

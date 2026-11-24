@@ -5,11 +5,6 @@ import "./claude-cli-install.css";
 
 const CLAUDE_CODE_SETUP_URL = "https://code.claude.com/docs/en/setup";
 
-/**
- * Progress while Claude Code installs (getting ready, downloading N%,
- * setting up), or a plain failure with Try again and Install it yourself.
- * Renders nothing before an install starts and after it succeeds.
- */
 export function ClaudeCliInstallStatus({
   state,
   onRetry,

@@ -27,10 +27,6 @@ export type PendingCloudTurnSubmission = {
   imagePaths: readonly string[];
   context?: CloudTurnContext;
   attachments: readonly CloudAttachment[];
-  /**
-   * Browser uploads still landing when the message was sent. The turn is
-   * dispatched once they finish, with their files added to `attachments`.
-   */
   uploadIds?: readonly string[];
   locale: string | null;
   execution: CloudExecutionSelection | null;
@@ -143,7 +139,6 @@ const isNullableBoundedString = (
 ): value is string | null => value === null || isBoundedString(value, maximum);
 
 const EXECUTION_ENGINES = new Set(["stella", "anthropic", "chatgpt"]);
-/** Queued items written before the current ladder still carry legacy values. */
 const REASONING_EFFORTS = new Set<string>([
   "none",
   ...REASONING_EFFORT_LEVELS,
@@ -288,10 +283,6 @@ const persistedEntry = (entry: PendingPrompt): PersistedPendingPrompt => ({
 
 const encodedKeyPart = (value: string): string => encodeURIComponent(value);
 
-/**
- * One record per localStorage key prevents two browser tabs from losing each
- * other's sends through a read/modify/write of one shared JSON array.
- */
 export const cloudConversationOutboxStorageKey = (
   entry: Pick<
     PendingPrompt,
@@ -582,13 +573,6 @@ const emitPending = (next: readonly PendingPrompt[]): void => {
   for (const listener of pendingListeners) listener();
 };
 
-/**
- * Optimistic prompts. A prompt is echoed the instant the user sends it and
- * replaced by the canonical journal row when it arrives — resolved on either
- * `clientMsgId` (the key the mutation threads to the DO) or `turnId` (which
- * the mutation returns directly). Two keys because either one alone leaves a
- * ghost bubble if a link in the chain drops its field.
- */
 export const pendingPrompts = {
   subscribe(listener: () => void): () => void {
     pendingListeners.add(listener);
@@ -763,10 +747,7 @@ export const pendingPrompts = {
           removed.add(entry.clientMsgId);
           inFlightPending.delete(pendingKey(authority, entry.clientMsgId));
         }
-      } catch {
-        // Keep the durable row. Exact backend dedupe makes a later replay safe,
-        // while deleting it only in memory could lose the required retry.
-      }
+      } catch {}
     }
     const next = pending.filter(
       (entry) =>
@@ -780,9 +761,7 @@ export const pendingPrompts = {
     inFlightPending.clear();
     try {
       cloudConversationOutbox.purgeOtherAccounts(accountScope);
-    } catch {
-      // Generation activation retries the synchronous purge before any send.
-    }
+    } catch {}
     const next = pending.filter((entry) => entry.accountScope === accountScope);
     if (next.length !== pending.length) emitPending(next);
   },
@@ -800,9 +779,7 @@ export const pendingPrompts = {
     if (!isWebShell()) {
       try {
         cloudConversationOutbox.clear();
-      } catch {
-        // The desktop never sends through this outbox; leftover rows stay inert.
-      }
+      } catch {}
       activePendingAuthorityReady = true;
       emitPending(EMPTY_PENDING);
       return true;

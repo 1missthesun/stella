@@ -21,13 +21,6 @@ export const isSidebarSection = (value: unknown): value is SidebarSection =>
   typeof value === "string" &&
   (SIDEBAR_SECTIONS as readonly string[]).includes(value);
 
-/**
- * Older builds persisted section ids that no longer exist: `tasks` was renamed
- * to `home`, `search` folded into it, `settings` dissolved into dialogs, and
- * `quickchat` (the ephemeral side conversation) was removed outright. They all
- * resolve to the Home launcher so a restored layout keeps the tab — and its
- * place in the strip — instead of silently losing it.
- */
 const LEGACY_SECTION_ALIASES: Readonly<Record<string, SidebarSection>> = {
   tasks: "home",
   search: "home",
@@ -53,10 +46,6 @@ const restoreTabKind = (
 
 const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates", "email", "schedule"]);
 
-/**
- * Surfaces that may hold several tabs, one per specific item (an app, a file),
- * but at most one "empty" tab: the Apps list, the Browser, the Files root.
- */
 const SINGLE_EMPTY_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set([
   "apps",
   "browser",
@@ -66,11 +55,9 @@ const SINGLE_EMPTY_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set([
 const isSingleEmptyTab = (kind: SidebarSection, location: string | null) =>
   location === null && SINGLE_EMPTY_TAB_SECTIONS.has(kind);
 
-/** Whether a tab of `kind` at `location` may exist only once. */
 const isSingletonTab = (kind: SidebarSection, location: string | null) =>
   SINGLE_TAB_SECTIONS.has(kind) || isSingleEmptyTab(kind, location);
 
-/** Drop repeats of a single-tab surface (layouts saved before the rule). */
 const withoutRepeats = (tabs: SidebarTab[]): SidebarTab[] => {
   const seen = new Set<SidebarSection>();
   return tabs.filter((tab) => {
@@ -92,7 +79,6 @@ export type SidebarTab = {
   kind: SidebarSection;
   location: string | null;
   file?: SidebarFileRecord;
-  /** Added by an agent and not looked at yet (shows a dot on the tab). */
   unread?: boolean;
 };
 
@@ -103,11 +89,8 @@ export type SidebarSectionsSnapshot = {
 
 type Listener = () => void;
 
-// Top-bar tabs. The right sidebar's tabs lived under the older key and are
-// migrated once (see `readPersistedState`).
 const STORAGE_KEY_TABS = "stella.topbar.tabs";
 const STORAGE_KEY_SIDEBAR_TABS = "stella.sidebar.tabs";
-// Legacy keys used only to migrate a pre-per-item layout on first load.
 const STORAGE_KEY_SECTION = "stella.sidebar.activeSection";
 const STORAGE_KEY_LOCATIONS = "stella.sidebar.sectionLocations";
 const STORAGE_KEY_OPEN_TABS = "stella.sidebar.openTabs";
@@ -126,7 +109,6 @@ const makeTab = (
   location: location ?? null,
 });
 
-// The top bar's Chat tab stands in when nothing else is open.
 const defaultTabs = (): SidebarTab[] => [];
 
 const MAX_PERSISTED_FILE_PAYLOAD_CHARS = 32_000;
@@ -203,7 +185,6 @@ const withActive = (
   return tabs[tabs.length - 1]?.id ?? null;
 };
 
-/** Migrate the previous section-keyed layout into per-item tabs, once. */
 const migrateLegacyTabs = (): PersistedState | null => {
   if (typeof window === "undefined") return null;
   const rawOpenTabs = uiState.getItem(STORAGE_KEY_OPEN_TABS);
@@ -236,12 +217,6 @@ const migrateLegacyTabs = (): PersistedState | null => {
   }
 };
 
-/**
- * What the right sidebar's saved tabs keep when they move to the top bar:
- * the browser, cloud apps and canvases. Home and the old places (Files,
- * Schedule, Email, Updates) live on the New tab page now, and single files
- * open in the viewer, so those tabs are dropped rather than left behind.
- */
 const keptFromSidebar = (tab: SidebarTab): boolean => {
   if (tab.kind === "browser") return true;
   if (tab.kind === "apps") return tab.location !== null;
@@ -256,7 +231,6 @@ const fromSidebarLayout = (
 ): PersistedState | null => {
   if (!state) return null;
   const tabs = state.tabs.filter(keptFromSidebar);
-  // The stage starts closed, so nothing is active until a tab is clicked.
   return { tabs, activeTabId: withActive(tabs, state.activeTabId) };
 };
 
@@ -292,7 +266,6 @@ const readSavedTabs = (key: string): PersistedState | null => {
             const restored = restoreTabKind(candidate.kind);
             if (!restored) continue;
             if (restored.kind === "takeover") continue;
-            // The New tab page is gone; + opens a menu instead.
             if (restored.kind === "home") continue;
             const location =
               restored.keepLocation &&
@@ -320,9 +293,7 @@ const readSavedTabs = (key: string): PersistedState | null => {
           }
         }
       }
-    } catch {
-      // fall through to the default
-    }
+    } catch {}
   }
   return null;
 };
@@ -399,11 +370,6 @@ export const sidebarSections = {
     return activeTabOf(snapshot);
   },
 
-  /**
-   * Open a place (Files, Apps, Browser, …) as its own tab, as the top bar's
-   * + menu does: an existing tab for it comes forward, otherwise a new tab
-   * opens beside the others rather than replacing the one on screen.
-   */
   openSectionTab(section: SidebarSection): void {
     const kind = resolveSidebarSection(section);
     const existing = isSingletonTab(kind, null)
@@ -445,8 +411,6 @@ export const sidebarSections = {
     }
 
     const active = activeTabOf(snapshot);
-    // Only a tab that's on screen is reused; one waiting behind the chat
-    // keeps what it shows, like a background browser tab.
     if (
       active &&
       isReusableNavTab(active) &&
@@ -482,10 +446,6 @@ export const sidebarSections = {
     });
   },
 
-  /**
-   * Add a tab for something an agent put on screen, without switching to it.
-   * It carries a dot until it is looked at.
-   */
   addInBackground(section: SidebarSection, location: string): void {
     const kind = resolveSidebarSection(section);
     const existing = snapshot.tabs.find(
@@ -513,7 +473,6 @@ export const sidebarSections = {
     });
   },
 
-  /** Move a tab to `toIndex` in the strip (drag to reorder). */
   moveTab(tabId: string, toIndex: number): void {
     const from = snapshot.tabs.findIndex((tab) => tab.id === tabId);
     if (from === -1) return;
@@ -555,8 +514,6 @@ export const sidebarSections = {
     if (active.location === (location ?? null)) return;
     const tabs = snapshot.tabs
       .filter(
-        // Going back to the empty view keeps this tab and drops any other
-        // empty tab of the same kind, so there is still only one.
         (tab) =>
           tab.id === active.id ||
           tab.kind !== kind ||

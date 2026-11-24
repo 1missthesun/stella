@@ -5,13 +5,6 @@ import type {
 import { PcmRecording } from "@/features/dictation/services/pcm-recording";
 import { resolveDictationPcmWorkletUrl } from "@/features/dictation/services/dictation-session";
 
-/**
- * Records the screen in the overlay renderer: a video for the user, a few
- * frames a second for the capture's moments and zoom, and the microphone as
- * 16 kHz PCM for the transcript. Everything goes to the main process, which
- * writes it into the capture's folder.
- */
-
 const PCM_WORKLET_NAME = "stella-dictation-pcm-capture";
 const SAMPLE_RATE = 16_000;
 const VIDEO_TIMESLICE_MS = 1_000;
@@ -106,7 +99,6 @@ export class ShowStellaRecorder {
       await context.audioWorklet.addModule(resolveDictationPcmWorkletUrl(window.location.href));
       if (context.state === "suspended") await context.resume();
       const pcm = new PcmRecording();
-      // The sound lines up with the capture's clock: silence until the mic started.
       const lead = Math.max(0, Math.round((this.now() * SAMPLE_RATE) / 1000));
       if (lead > 0) pcm.append(new Int16Array(lead));
       const source = context.createMediaStreamSource(mic);
@@ -206,9 +198,7 @@ export class ShowStellaRecorder {
     if (this.recorder && this.recorder.state !== "inactive") {
       try {
         this.recorder.requestData();
-      } catch {
-        // Stopping flushes the rest.
-      }
+      } catch {}
       this.recorder.stop();
     }
     await this.recorderDone;

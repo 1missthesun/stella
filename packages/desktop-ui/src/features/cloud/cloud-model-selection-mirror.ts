@@ -78,8 +78,6 @@ export function cloudExecutionFromLocal(
         const slash = model.indexOf("/");
         const provider = slash > 0 ? model.slice(0, slash) : "";
         const modelId = slash > 0 ? model.slice(slash + 1).trim() : "";
-        // A computer-only plan (Google Antigravity) is mirrored too, so the phone
-        // shows and can change it; the cloud runs its default meanwhile.
         if (!modelId || !(accountProviders.has(provider) || isComputerOnlyProviderId(provider))) return null;
         return {
           engine: "provider",

@@ -99,28 +99,6 @@ const asNonEmptyString = (value: unknown): string | undefined =>
     ? value.trim()
     : undefined;
 
-/**
- * Background-work threads kicked off (or re-activated) on this assistant
- * turn, read from the `agent-started` lifecycle events attached to the turn
- * — the same canonical source the sidebar Activity surface and live task
- * list use.
- *
- * Why the lifecycle event and not the `spawn_agent` tool_result: the spawn
- * handler returns its `thread_id` under `result`, which the runtime persists
- * only as a preview *string* (the structured object never lands on the
- * tool_result event payload), so the id isn't reliably recoverable there.
- * `agent-started` carries `agentId` directly. It also fires on `send_message`
- * re-activation (so updating a thread drops a fresh card lower in the chat)
- * and for agents spawned via `multi_tool_use_parallel`, and never fires for
- * a failed spawn (so no phantom card).
- *
- * Only user-facing *delegated* work earns a card: `general` and any custom
- * user-installed subagent. A denylist (rather than an allowlist of only
- * known agent types) means legitimate custom subagents still surface while
- * future internal builtins remain excluded automatically. Tool-internal
- * one-shot helpers like HTML/canvas and Recall never emit `agent-started`, so
- * they cannot produce a card regardless.
- */
 export const getBackgroundWork = (
   events: readonly EventRecord[],
 ):
@@ -243,13 +221,6 @@ export const getSpawnedThreadIds = (
   return ids;
 };
 
-/**
- * Descriptions of the tasks a set of tool events spawned. A locally executed
- * turn mirrored into the cloud journal keeps neither a lifecycle card nor a
- * structured spawn result, so the `spawn_agent` request's description is the
- * only durable handle; reply context matches it against the task titles that
- * later reports cite (the same match the focus lineage uses).
- */
 export const getSpawnedDescriptions = (
   events: readonly EventRecord[],
 ): string[] => {
@@ -314,19 +285,6 @@ export const assistantRowHasNonBackgroundContent = (
   Boolean(row.reminder) ||
   (row.agentCompletion?.sections.length ?? 0) > 0;
 
-/**
- * Reconcile a completion that surfaces on more than one row. During the
- * SQLite/stream handoff the same `agent-completed` event can briefly be
- * projected onto both the user-message fallback row and the assistant row,
- * drawing two identical completion cards. Key each section by `agentId` +
- * `completedAtMs`: the same pair on two rows is the same completion (the
- * latest row wins, mirroring the background-work `latestOwnerByThread`
- * duplicated handling); a different `completedAtMs` is a genuine `send_message`
- * re-run's later completion and both stay. Redundant copies strip their
- * duplicated sections and the row is marked dropped when nothing else
- * remains. Mutates `rows` / `droppedRowIndices` in place (same contract as
- * the background-work pass it sits beside).
- */
 export const dedupeAgentCompletionRows = (
   rows: EventRowViewModel[],
   droppedRowIndices: Set<number>,
@@ -355,8 +313,6 @@ export const dedupeAgentCompletionRows = (
     if (assistantRowHasNonBackgroundContent(rest) || rest.backgroundWork) {
       rows[index] = rest;
     } else {
-      // Synthetic row whose sole content was the duplicated completion —
-      // drop it so the canonical copy is the only render.
       droppedRowIndices.add(index);
     }
   });
@@ -505,11 +461,6 @@ const isScheduleNoticeOnlyRow = (row: EventRowViewModel): row is AssistantRowVie
   !row.askRecords?.length &&
   !row.reminder;
 
-/**
- * Schedule notices in a row (nothing visible between them) become one row
- * holding the whole run, keyed by its first notice so it stays put as more
- * arrive. Rows that draw nothing don't break a run.
- */
 const coalesceScheduleNoticeRows = (
   rows: EventRowViewModel[],
 ): EventRowViewModel[] => {
@@ -575,24 +526,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
     return result;
   }, [messages]);
 
-  /**
-   * Per-message projection cache. Finalized messages keep a stable object
-   * identity across stream deltas (see `stabilizeMessageList`), so their
-   * already-projected rows are reused instead of being re-derived on every
-   * streamed delta — only the live overlay (whose identity changes per
-   * delta) re-projects. Without this the whole list re-derives each frame,
-   * O(messages) work that grows with conversation length.
-   *
-   * Excluded from the cache: rows carrying a background-work card. Those are
-   * mutated in place by the dedup/supersede pass below and their
-   * `completedThreadIds` depend on the per-frame completion map, so they are
-   * rebuilt every frame (they are rare — only turns that spawned agents).
-   *
-   * Keyed by message identity and invalidated wholesale when the
-   * developer-resource-preview flag flips (the only non-message-intrinsic
-   * input to a row's content; the per-frame completion map only feeds the
-   * uncached background-work rows).
-   */
   const projectionCacheRef = useRef<{
     devFlag: boolean;
     byMessage: WeakMap<
@@ -686,8 +619,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           contextMetadata.windowPreviewImageUrl.trim()
             ? contextMetadata.windowPreviewImageUrl.trim()
             : undefined;
-        // Prefer the per-selection list; older messages persisted a
-        // single (possibly joined) label.
         const appSelectionLabels = (() => {
           const plural = Array.isArray(contextMetadata?.appSelectionLabels)
             ? contextMetadata.appSelectionLabels
@@ -880,11 +811,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         );
       }
 
-      // Cache the projection for reuse on the next delta, EXCEPT rows that
-      // carry an agent activity card: those are mutated by the dedup passes
-      // below and depend on per-frame cross-row lifecycle state, so they must be rebuilt
-      // each frame. Everything else is a pure function of the (stable)
-      // message identity + dev flag.
       const hasAgentActivityCard = produced.some(
         (producedRow) =>
           producedRow.kind === "assistant" &&
@@ -899,23 +825,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
       for (const producedRow of produced) computed.push(producedRow);
     }
 
-    // Reconcile a thread that surfaces on more than one row. Exact duplicate
-    // copies share the canonical `agent-started` event id. A different start
-    // id is a genuine later activation of the durable thread.
-    //
-    //  - Follow-up while active: the newer card replaces the predecessor.
-    //    There is no synthetic completed breadcrumb for the interrupted
-    //    occurrence; only the current follow-up remains visible.
-    //
-    //  - Follow-up after settlement: both cards remain. The predecessor keeps
-    //    its real terminal state/prose and the follow-up owns its own status.
-    //
-    //  - Exact duplicate: the SAME `agent-started` event (identical
-    //    `spawnedAtMs`) projected onto two rows — e.g. a fire-and-forget
-    //    spawn briefly anchored on both the user-message fallback row and the
-    //    assistant row during the SQLite/stream handoff. Rendering both draws
-    //    two identical "Started in background" receipts, so the redundant
-    //    (non-canonical) copy drops the thread entirely. One spawn = one card.
     const latestOwnerByThread = new Map<string, number>();
     computed.forEach((row, index) => {
       if (row.kind !== "assistant" || !row.backgroundWork) return;
@@ -982,8 +891,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           const { backgroundWork: _omit, ...rest } = row;
           computed[index] = rest;
         } else {
-          // Synthetic card-only row whose sole receipt was duplicated or
-          // replaced by an in-flight follow-up — keep only the current card.
           droppedRowIndices.add(index);
         }
         return;

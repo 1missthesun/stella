@@ -1,28 +1,9 @@
 /**
- * WebRTC transport for OpenAI GPT-Live.
- *
- * GPT-Live is not the Realtime API. The differences that shape this file:
- *
- *   - **The session is created by an HTTP POST, not by a data-channel event.**
- *     Stella's backend performs that POST with its org key and stores the
- *     session config (instructions, voice, startup history) against a lease.
- *     The renderer only posts its SDP offer to `VOICE_LIVE_SDP_PATH` under
- *     that lease and receives the SDP answer.
- *   - **Nothing is sent until `session.started` arrives.** There is no
- *     `session.start` to send, and `session.update` rejects the startup-only
- *     fields (instructions, voice, tools), so none of them are sent here.
- *   - **`audio.format` is omitted** — WebRTC negotiates the codec, and audio
- *     never crosses the data channel in either direction.
- *   - **Transcripts are fragments.** `session.input_transcript.delta` and
- *     `session.output_transcript.delta` carry a `delta` plus `start_ms` /
- *     `end_ms`; a fragment is not a turn. The session layer accumulates them.
- *   - **Closing is a conversation.** We send `session.close`, keep receiving
- *     until `session.closed` lands (bounded), and only then tear down the
- *     peer connection and release the microphone.
- *
- * Reasoning and tool use are not this model's job: it delegates them through
- * `session.delegation.created`, which the session layer answers with
- * `session.commentary.append` / `session.thinking.append`.
+ * GPT-Live is not the Realtime API: nothing is sent until `session.started`
+ * arrives (there is no `session.start`, and `session.update` rejects
+ * instructions, voice and tools); `audio.format` is left out because WebRTC
+ * negotiates the codec; transcripts arrive as fragments, not turns; and
+ * closing is `session.close`, then waiting for `session.closed`.
  */
 
 import type {

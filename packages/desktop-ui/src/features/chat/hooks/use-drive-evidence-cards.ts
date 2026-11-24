@@ -86,12 +86,6 @@ const loadCards = async (
 export const evidenceCardDrivePath = (card: EvidenceCard): string | null =>
   card.sourcePaths[0] ? driveLinkPath(card.sourcePaths[0]) : null;
 
-/**
- * Cards for the Drive files a message links. They are cached by path and
- * shown at once, and rebuilt when the Drive reports a different version of
- * any of those files, so a file replaced under the same name shows its new
- * content wherever it is linked.
- */
 export const useDriveEvidenceCards = (
   drivePaths: readonly string[],
 ): readonly EvidenceCard[] => {

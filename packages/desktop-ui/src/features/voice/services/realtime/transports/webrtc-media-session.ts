@@ -155,17 +155,13 @@ export class WebRTCMediaSession {
     if (this.dc) {
       try {
         this.dc.close();
-      } catch {
-        // Already closed.
-      }
+      } catch {}
       this.dc = null;
     }
     if (this.pc) {
       try {
         this.pc.close();
-      } catch {
-        // Already closed.
-      }
+      } catch {}
       this.pc = null;
     }
 
@@ -181,9 +177,7 @@ export class WebRTCMediaSession {
     if (this.outputMonitorSource) {
       try {
         this.outputMonitorSource.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.outputMonitorSource = null;
     }
     this.outputAnalyser = null;
@@ -192,9 +186,7 @@ export class WebRTCMediaSession {
     if (this.audioContext) {
       try {
         await this.audioContext.close();
-      } catch {
-        // Already closed.
-      }
+      } catch {}
       this.audioContext = null;
       this.analyser = null;
       this.inputGateNode = null;
@@ -299,9 +291,7 @@ export class WebRTCMediaSession {
     if (this.inputSourceNode) {
       try {
         this.inputSourceNode.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.inputSourceNode = null;
     }
     const source = this.audioContext.createMediaStreamSource(stream);
@@ -315,9 +305,7 @@ export class WebRTCMediaSession {
     if (this.outputMonitorSource) {
       try {
         this.outputMonitorSource.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.outputMonitorSource = null;
     }
     this.outputAnalyser = this.audioContext.createAnalyser();
@@ -407,9 +395,7 @@ export class WebRTCMediaSession {
     if (this.inputSourceNode) {
       try {
         this.inputSourceNode.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.inputSourceNode = null;
     }
     if (this.localStream) {

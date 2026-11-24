@@ -1,6 +1,7 @@
 import { APP_INTEGRITY_HEADER } from "@stella/contracts/app-integrity";
 import { AUTH_CAPTCHA_HEADER } from "@stella/contracts/auth-challenge";
 import { createAuth, trustedOrigins } from "./auth.js";
+import { tryFastAuthToken } from "./fast-token.js";
 import { resignLegacySessionCredentials, withMigratedBearer } from "./legacy-session-signature.js";
 import { betterAuthKeys } from "../secret-rotation.js";
 
@@ -25,7 +26,7 @@ export const handleAuthRoute = async (request: Request, env: Cloudflare.Env): Pr
         ...corsHeaders(origin),
         "access-control-allow-methods": "GET, POST, OPTIONS",
         "access-control-allow-headers": ALLOWED_HEADERS,
-        "access-control-max-age": "600",
+        "access-control-max-age": "7200",
       },
     });
   }
@@ -35,11 +36,16 @@ export const handleAuthRoute = async (request: Request, env: Cloudflare.Env): Pr
     const resigned = keys ? await resignLegacySessionCredentials(request, keys) : { request, bearer: null };
     const deleting =
       request.method === "POST" && new URL(request.url).pathname === "/api/auth/delete-user";
+    const fastToken =
+      !deleting && keys
+        ? await tryFastAuthToken(resigned.request, env, keys).catch(() => null)
+        : null;
     response = withMigratedBearer(
       request,
-      deleting
-        ? await (await import("./account-deletion.js")).requestAccountDeletion(resigned.request, env)
-        : await createAuth(env).handler(resigned.request),
+      fastToken ??
+        (deleting
+          ? await (await import("./account-deletion.js")).requestAccountDeletion(resigned.request, env)
+          : await createAuth(env).handler(resigned.request)),
       resigned.bearer,
     );
   } catch (error) {

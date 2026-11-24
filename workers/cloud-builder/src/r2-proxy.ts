@@ -101,7 +101,7 @@ const CORS: Record<string, string> = {
   "access-control-allow-methods": "GET, HEAD, PUT, OPTIONS",
   "access-control-allow-headers": "content-type, range",
   "access-control-expose-headers": "content-length, content-range, content-type, etag, accept-ranges",
-  "access-control-max-age": "600",
+  "access-control-max-age": "7200",
 };
 
 const problem = (status: number, message: string): Response =>

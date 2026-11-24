@@ -21,8 +21,7 @@ import {
 } from "../conversation-types.js";
 import { readJsonObject } from "../http/body.js";
 import { clientIp } from "../http/client-ip.js";
-import { requireCaller, verifyCaller } from "../http/caller.js";
-import { admitSession, ownerGateRevocations } from "../session-revocation.js";
+import { requireCaller, requireSignedCaller, verifySignedCaller } from "../http/caller.js";
 import { ownerRegistry } from "./domains.js";
 import { RpcError, toBackendError } from "./errors.js";
 import type { CallName } from "@stella/contracts/backend/api";
@@ -141,7 +140,10 @@ export const handleRpc = async (
     return rpcJson({ ok: false, error: toBackendError(new RpcError("NOT_FOUND", `Unknown function ${name}.`)) });
   }
   if (def.scope === "public") return rpcJson(await runPublicCall(request, env, name, def));
-  const verified = await requireCaller(request, env);
+  const verified =
+    def.scope === "owner" && name !== "claudeSessions.append"
+      ? await requireSignedCaller(request, env)
+      : await requireCaller(request, env);
   if (!verified.ok) return rpcJson({ ok: false, error: toBackendError(verified.error) });
   const { caller } = verified;
   let args: unknown;
@@ -200,8 +202,8 @@ const liveOffer = (
 const verifyLiveCaller = async (
   env: RouteEnv,
   offer: { token: string; ticket: string },
-): ReturnType<typeof verifyCaller> => {
-  if (!offer.ticket) return await verifyCaller(env, offer.token);
+): ReturnType<typeof verifySignedCaller> => {
+  if (!offer.ticket) return await verifySignedCaller(env, offer.token);
   const caller = await verifySocketTicket({
     secret: builderServiceSecrets(env),
     ticket: offer.ticket,
@@ -209,13 +211,10 @@ const verifyLiveCaller = async (
     resource: "",
     now: Date.now(),
   }).catch(() => null);
-  const admitted = caller ? await admitSession(caller, ownerGateRevocations(env)) : null;
-  if (admitted?.ok) return { ok: true, caller: admitted.token };
+  if (caller) return { ok: true, caller };
   return {
     ok: false,
-    error: admitted?.retryable
-      ? new RpcError("UNAVAILABLE", "Stella couldn't check your sign-in. Try again shortly.")
-      : new RpcError("UNAUTHENTICATED", "Your sign-in expired. Sign in again to continue."),
+    error: new RpcError("UNAUTHENTICATED", "Your sign-in expired. Sign in again to continue."),
   };
 };
 

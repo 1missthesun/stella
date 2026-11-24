@@ -1,5 +1,5 @@
 import { bearerCredential } from "../../../shared/bearer.js";
-import { verifyUserToken } from "../auth-jwt.js";
+import { verifySignedUserToken, verifyUserToken } from "../auth-jwt.js";
 import { RpcError } from "../owner-store/errors.js";
 import type { OwnerCaller } from "../owner-store/registry.js";
 
@@ -7,11 +7,9 @@ type CallerEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL"
 
 export type VerifiedCaller = { ok: true; caller: OwnerCaller } | { ok: false; error: RpcError };
 
-export const verifyCaller = async (env: CallerEnv, token: string): Promise<VerifiedCaller> => {
-  if (!token) {
-    return { ok: false, error: new RpcError("UNAUTHENTICATED", "Sign in to continue.") };
-  }
-  const verified = await verifyUserToken(token, env as unknown as Cloudflare.Env);
+const toVerifiedCaller = (
+  verified: Awaited<ReturnType<typeof verifyUserToken>>,
+): VerifiedCaller => {
   if (verified.ok) return { ok: true, caller: verified.token };
   return {
     ok: false,
@@ -21,5 +19,27 @@ export const verifyCaller = async (env: CallerEnv, token: string): Promise<Verif
   };
 };
 
+export const verifyCaller = async (env: CallerEnv, token: string): Promise<VerifiedCaller> => {
+  if (!token) {
+    return { ok: false, error: new RpcError("UNAUTHENTICATED", "Sign in to continue.") };
+  }
+  return toVerifiedCaller(await verifyUserToken(token, env as unknown as Cloudflare.Env));
+};
+
 export const requireCaller = (request: Request, env: CallerEnv): Promise<VerifiedCaller> =>
   verifyCaller(env, bearerCredential(request.headers.get("authorization")) ?? "");
+
+/**
+ * Verifies the JWT signature and claims locally without a remote revocation
+ * lookup. Use only when the very next hop is the caller's own OwnerGate DO,
+ * which enforces `callerSessionRevoked` authoritatively against local SQLite.
+ */
+export const verifySignedCaller = async (env: CallerEnv, token: string): Promise<VerifiedCaller> => {
+  if (!token) {
+    return { ok: false, error: new RpcError("UNAUTHENTICATED", "Sign in to continue.") };
+  }
+  return toVerifiedCaller(await verifySignedUserToken(token, env as unknown as Cloudflare.Env));
+};
+
+export const requireSignedCaller = (request: Request, env: CallerEnv): Promise<VerifiedCaller> =>
+  verifySignedCaller(env, bearerCredential(request.headers.get("authorization")) ?? "");

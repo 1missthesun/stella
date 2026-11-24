@@ -21,7 +21,11 @@ import { RpcError, toBackendError } from "./owner-store/errors.js";
 import { crewRefusal } from "./owner-store/crew-scope.js";
 import type { OwnerCrewScope } from "./owner-store/registry.js";
 import { applyOwnerEventsToStore } from "./owner-store/owner-events.js";
-import type { RpcResponse } from "@stella/contracts/backend/protocol";
+import {
+  LIVE_CLOSE,
+  LIVE_SUBPROTOCOL,
+  type RpcResponse,
+} from "@stella/contracts/backend/protocol";
 import {
   GATEWAY_CAPABILITY_ISSUERS,
   GATEWAY_BUDGET_UNLIMITED,
@@ -773,6 +777,16 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return billingAccess(this.ownerStore().context(null));
   }
 
+  async billingAccessForCaller(
+    caller: OwnerCaller,
+  ): Promise<{ ok: true; access: BillingAccess } | { ok: false; revoked: true }> {
+    const ctx = this.ownerStore().context(caller);
+    if (callerSessionRevoked(ctx.db, caller)) {
+      return { ok: false, revoked: true };
+    }
+    return { ok: true, access: billingAccess(ctx) };
+  }
+
   async reserveSpend(
     input: Parameters<typeof reserveSpend>[1] & { requireCloudSandbox?: boolean },
   ): Promise<SpendReservation & { cloudSandbox: boolean }> {
@@ -1520,13 +1534,24 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       const store = this.ownerStore();
       const { db } = store.context(caller);
       if (callerSessionRevoked(db, caller)) {
-        return Response.json(
-          { error: "You were signed out." },
-          { status: 401 },
-        );
+        const pair = new WebSocketPair();
+        const server = pair[1]!;
+        server.accept();
+        try {
+          server.close(LIVE_CLOSE.unauthenticated, "unauthenticated");
+        } catch {
+          // Peer already gone.
+        }
+        return new Response(null, {
+          status: 101,
+          webSocket: pair[0]!,
+          headers: { "sec-websocket-protocol": LIVE_SUBPROTOCOL },
+        });
       }
       noteCallerIdentity(db, caller);
       const response = store.acceptLive(caller);
+      // Always: the new socket's token expiry and re-auth deadline only reach
+      // the alarm through here, and nothing else closes it once its JWT ends.
       await this.scheduleAlarm(Date.now());
       return response;
     }

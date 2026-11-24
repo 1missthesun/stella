@@ -404,7 +404,7 @@ const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, OPTIONS",
   "access-control-allow-headers": "authorization, content-type",
-  "access-control-max-age": "600",
+  "access-control-max-age": "7200",
 };
 
 export const handleDevicePairingRoute = async (request: Request, env: Cloudflare.Env): Promise<Response> => {

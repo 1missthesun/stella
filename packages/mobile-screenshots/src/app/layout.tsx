@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Manrope, Mona_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Inter, Manrope, Mona_Sans } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -9,6 +9,11 @@ const manrope = Manrope({
 
 const display = Mona_Sans({
   variable: "--font-display",
+  subsets: ["latin"],
+});
+
+const system = Inter({
+  variable: "--font-system",
   subsets: ["latin"],
 });
 
@@ -32,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${display.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${display.variable} ${system.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

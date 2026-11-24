@@ -1,120 +1,44 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { devices, slides, type Device } from "@/store/slides";
-import { supportingArtifacts } from "@/store/supporting";
+import { CANVAS, devices, slides, type Device, type Frame } from "@/store/slides";
+import { SCENES } from "@/components/store/scenes";
+import { SetAura } from "@/components/store/SetAura";
 import "./store.css";
-import { CapabilityComposition } from "@/components/CapabilityComposition";
-import { StoreAura } from "@/components/StoreAura";
-import { BrandCharacter } from "@/components/BrandCharacter";
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+/** Headline and device placement per device family, in canvas units (1320 wide). */
+const LAYOUT: Record<Frame, { copyTop: number; size: number; top: number; bottom: number }> = {
+  iphone: { copyTop: 168, size: 176, top: 664, bottom: 150 },
+  android: { copyTop: 96, size: 152, top: 478, bottom: 84 },
+  ipad: { copyTop: 78, size: 116, top: 372, bottom: 74 },
+  androidTablet: { copyTop: 96, size: 152, top: 478, bottom: 90 },
+};
+
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
-  const device: Device =
-    typeof query.device === "string" && Object.hasOwn(devices, query.device)
-      ? (query.device as Device)
-      : "iphone";
+  const device: Device = typeof query.device === "string" && Object.hasOwn(devices, query.device) ? (query.device as Device) : "iphone";
   const size = devices[device];
+  const layout = LAYOUT[size.frame];
+  const scale = size.width / CANVAS;
+  const height = size.height / scale;
+  const tablet = size.frame === "ipad" || size.frame === "androidTablet";
   const exportMode = query.export === "1";
-  const requestedSlugs = typeof query.slides === "string" ? query.slides.split(",") : null;
-  const activeSlides = requestedSlugs ? requestedSlugs.flatMap(slug => slides.filter(slide => slide.slug === slug)) : slides;
   return (
     <main className={`store-studio ${exportMode ? "export-mode" : ""}`}>
       {!exportMode && (
         <header className="studio-toolbar">
-          <div>
-            <strong>Stella / Store images</strong>
-            <p>Real app captures. Ready for review before export.</p>
-          </div>
-          <nav>
-            {Object.entries(devices).map(([id, value]) => (
-              <a
-                key={id}
-                aria-current={id === device ? "page" : undefined}
-                href={`/?device=${id}`}
-              >
-                {value.label}
-              </a>
-            ))}
-            <a href="/animation">Icon studio</a>
-          </nav>
+          <strong>Stella store set</strong>
+          <nav>{Object.entries(devices).map(([id, value]) => <a key={id} aria-current={id === device ? "page" : undefined} href={`/?device=${id}`}>{value.label}</a>)}</nav>
         </header>
       )}
       <div className="store-gallery">
-        {activeSlides.map((slide, slideIndex) => {
-          const captureSlug = "captureSlug" in slide ? slide.captureSlug : slide.slug;
-          const source = `/captures/${device}/${captureSlug}.png`;
-          const available = existsSync(
-            path.join(process.cwd(), "public", source),
-          );
-          const supporting = supportingArtifacts[slide.slug];
-          const hasSupporting =
-            supporting &&
-            existsSync(path.join(process.cwd(), "public", supporting.source));
+        {slides.map((slide, index) => {
+          const Scene = SCENES[slide.slug];
+          const title = tablet && "tabletTitle" in slide ? slide.tabletTitle : slide.title;
           return (
-            <section
-              key={slide.slug}
-              className="slide-preview"
-              style={{ aspectRatio: `${size.width}/${size.height}` }}
-            >
-              <article
-                data-export-slide={slide.slug}
-                data-capture-ready={available ? "true" : "false"}
-                className={`store-slide scene-${slide.slug} device-${device} ${hasSupporting ? "has-supporting" : ""}`}
-                style={
-                  {
-                    width: size.width,
-                    height: size.height,
-                    background: slide.background,
-                    color: slide.ink,
-                    "--accent": slide.accent,
-                    "--canvas-width": `${size.width}px`,
-                  } as React.CSSProperties
-                }
-              >
-                <StoreAura index={slideIndex} count={activeSlides.length} className="slide-aura" />
-                <div className="slide-wordmark">Stella</div>
-                <BrandCharacter shape="blob" className="slide-mascot" eyeColor={slide.background} />
-                <div className="slide-copy">
-                  <h1>{slide.title.split("\n").map((line, index) => <span key={line} className={index === 1 ? "headline-accent" : undefined}>{line}</span>)}</h1>
-                  {slide.subtitle && <p>{slide.subtitle}</p>}
-                </div>
-                {slide.slug === "assistant" && <CapabilityComposition />}
-                {hasSupporting && (
-                  <figure className="supporting-artifact">
-                    <img
-                      data-supporting-artifact
-                      src={supporting.source}
-                      alt={supporting.alt}
-                    />
-                    {(slide.slug === "computer" || slide.slug === "browser") && <BrandCharacter shape="cursor" className="artifact-cursor" />}
-                  </figure>
-                )}
-                <div className="screen-stage">
-                  <div className="capture-frame">
-                    {device === "iphone" && <img className="iphone-hardware" data-device-frame src="/devices/iphone-17.png" alt="" />}
-                    {available ? (
-                      <img
-                        data-native-capture
-                        src={source}
-                        alt={`Stella ${size.label} — ${slide.slug}`}
-                      />
-                    ) : (
-                      <div className="capture-missing">
-                        <strong>Native capture pending</strong>
-                        <p>
-                          {size.label} / {slide.slug}
-                        </p>
-                        <small>
-                          Export stays blocked until the current app is
-                          captured.
-                        </small>
-                      </div>
-                    )}
-                  </div>
+            <section key={slide.slug} className="slide-preview" style={{ aspectRatio: `${size.width}/${size.height}`, "--fit": `calc(100cqw / ${size.width}px)` } as React.CSSProperties}>
+              <article data-export-slide={slide.slug} className="store-slide" style={{ width: size.width, height: size.height }}>
+                <div className={`slide-canvas frame-${size.frame}`} style={{ width: CANVAS, height, transform: `scale(${scale})` }}>
+                  <SetAura index={index} count={slides.length} />
+                  <h1 style={{ top: layout.copyTop, fontSize: layout.size }}>{title.map((line) => <span key={line}>{line}</span>)}</h1>
+                  <Scene frame={size.frame} height={height} top={layout.top} bottom={layout.bottom} />
                 </div>
               </article>
             </section>

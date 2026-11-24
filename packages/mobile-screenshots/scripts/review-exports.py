@@ -23,7 +23,7 @@ for entry in manifest["exports"]:
 for group, items in groups.items():
     cell_width = 430
     height = max(image.height for _, image in items) + 65
-    sheet = Image.new("RGB", (cell_width * len(items), height), "#e4e2dd")
+    sheet = Image.new("RGB", (cell_width * len(items), height), "#d4d4d8")
     draw = ImageDraw.Draw(sheet)
     for index, (name, image) in enumerate(items):
         x = index * cell_width + (cell_width - image.width) // 2

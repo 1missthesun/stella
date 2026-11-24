@@ -1,0 +1,31 @@
+{
+  "source": "packages/mobile-screenshots/scripts/store-aura-shader.ts",
+  "sourceSha256": "066849c6b1e4ca9d50f04c26a059a845c5613258b885be17129eedc16fd400cc",
+  "vertexSha256": "c612649da0cc371ed3e75af67b9cd6b5de6278aa9300ed5c0d93523dd64550b7",
+  "fragmentSha256": "b1e5ad99617d203f55b7cacb48e186d64176a6b3ba4119f805bd06642ff7edfa",
+  "shaderChanged": false,
+  "frozenTime": "Website reduced-motion still:8seconds",
+  "width": 8192,
+  "height": 2224,
+  "domain": {
+    "x": [
+      0.75,
+      1.75
+    ],
+    "y": [
+      0,
+      1
+    ]
+  },
+  "uniforms": {
+    "uTime": 8,
+    "uAspect": 10,
+    "uStrength": 1,
+    "uScale": 1
+  },
+  "washLiftedTowardWhite": true,
+  "alpha": "Transparent straight-alpha shader output, composited over white by store layout",
+  "continuity": "One shared panorama; adjacent index/count segments, no per-slide shader reset",
+  "renderer": "WebKit WebGL",
+  "outputSha256": "b5043d14998895a10a827231b7f3d08e6a992732a87ef406860de841bab02844"
+}

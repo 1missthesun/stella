@@ -57,9 +57,7 @@ export const REVERSE_ENGINEERING_PAGES: ProblemPage[] = [
     niche: "reverse-engineering",
     searchPhrases: [
       "ghidra mcp",
-      "ai reverse engineering",
       "ghidra ai",
-      "best ai for reverse engineering",
       "ghidra tutorial",
       "ida pro mcp",
     ],

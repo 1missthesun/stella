@@ -9,6 +9,10 @@ export const MOVED_FIX_PAGES: Record<string, string> = {
   "minecraft-modpack-crash": "/how/game-mods/minecraft-modpack-exit-code-1",
   "merge-excel-files": "/how/pdf-excel/combine-excel-files-into-one-sheet",
   "convert-mkv-to-mp4": "/how/video/convert-mkv-to-mp4",
+  // Cannibalization audit 2026-11-24: newer /how guides target the same searches.
+  "comfyui-broken-after-update": "/how/local-ai/comfyui-missing-custom-nodes",
+  "c-drive-full": "/how/pc-cleanup/free-up-space-on-c-drive",
+  "sims-4-mods-broken": "/how/game-mods/find-broken-sims-4-mods",
   // Retired (audit 2026-11-10): developer topics are the wrong audience, and the
   // DLSS 5 page promised a "leaked build". They redirect to the how-to index.
   "setup-dlss-5-one-click": "/how",

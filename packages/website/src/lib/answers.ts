@@ -612,7 +612,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       faq("Does Stella work on Linux, Arch or Omarchy?"),
     ],
   },
-  ...MODEL_PAGES.map((page) => ({ ...page, questions: [...page.questions, faq("Is Stella free?")] })),
+  ...MODEL_PAGES.map((page) => ({ ...page, questions: [...page.questions, { q: "Is Stella free?", a: `Yes. ${PRICE_LINE}` }] })),
   {
     slug: "ai-assistant-for-windows",
     kind: "answer",
@@ -620,7 +620,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       "AI assistant for Windows 11 that does tasks for you",
       "AI assistant that can control my Windows PC",
       "free AI agent for Windows 11",
-      "Copilot alternative that does tasks",
+      
       "AI that uses apps on Windows",
     ],
     metaTitle: "An AI assistant for Windows 11 that does tasks for you",

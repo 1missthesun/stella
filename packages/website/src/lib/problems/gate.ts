@@ -87,6 +87,31 @@ export type GateReport = {
   errors: string[];
 };
 
+const PHRASE_STOP = new Set(["a", "an", "the", "to", "how", "my", "your", "in", "on", "for", "of", "i", "do", "can", "you", "is", "it", "with"]);
+
+/** A search phrase reduced to its meaningful words, in order ("PDF to Excel" and "Excel to PDF" stay apart). */
+export const phraseKey = (phrase: string) =>
+  (phrase.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => !PHRASE_STOP.has(w)).join(" ");
+
+/**
+ * Each search a page targets belongs to one page on the site: two pages listing the same
+ * search compete for it. `others` are the site's other pages (/ai, /fix) and their searches.
+ */
+export function checkSearchOwnership(pages: ProblemPage[], others: { url: string; queries: string[] }[] = []): string[] {
+  const owner = new Map<string, string>();
+  const problems: string[] = [];
+  const claim = (url: string, phrase: string) => {
+    const key = phraseKey(phrase);
+    if (!key) return;
+    const other = owner.get(key);
+    if (other && other !== url) problems.push(`${url}: search “${phrase}” is also targeted by ${other}`);
+    else owner.set(key, url);
+  };
+  for (const other of others) for (const q of other.queries) claim(other.url, q);
+  for (const page of pages.filter((p) => !p.draft)) for (const q of page.searchPhrases) claim(`/how/${page.niche}/${page.slug}`, q);
+  return problems;
+}
+
 export function checkProblemPages(
   pages: ProblemPage[],
   niches: Niche[],
@@ -112,6 +137,8 @@ export function checkProblemPages(
       else seen.set(key, id);
     }
   }
+
+  global.push(...checkSearchOwnership(live));
 
   for (const niche of niches) {
     for (const section of niche.sections ?? []) {

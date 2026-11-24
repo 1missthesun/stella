@@ -19,11 +19,12 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Copy rules from the brief, enforced so they hold at a few hundred pages. */
-const BANNED: { pattern: RegExp; why: string }[] = [
+const BANNED: { pattern: RegExp; why: string; except?: string[] }[] = [
   // “letting agent”, “estate agent” and “literary agent” are trades, not the product.
   { pattern: /(?<!\b(?:letting|estate|literary) )\bagents?\b/i, why: "say “tasks”, not “agents”" },
   { pattern: /\brahul\b/i, why: "no personal names" },
-  { pattern: /\b(flights?|restaurants?)\b/i, why: "demo tasks are never flights or restaurants" },
+  // Alerts for flight prices and restaurant tables were asked for (2026-11-24); elsewhere they stay out.
+  { pattern: /\b(flights?|restaurants?)\b/i, why: "demo tasks are never flights or restaurants", except: ["watches"] },
   { pattern: /free forever|actually free|try stella/i, why: "banned price wording" },
   { pattern: /log ?in with claude|sign in with claude/i, why: "say “use your Claude plan”" },
   // “Seamless Co-op” is the name of a mod.
@@ -220,6 +221,7 @@ export function checkProblemPages(
 
     const text = [page.title, page.h1, page.description, page.lede, uniqueText(page)].join(" ");
     for (const rule of BANNED) {
+      if (rule.except?.includes(page.niche)) continue;
       const match = text.match(rule.pattern);
       if (match) errors.push(`“${match[0]}”: ${rule.why}`);
     }

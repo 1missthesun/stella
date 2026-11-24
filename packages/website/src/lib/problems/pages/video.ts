@@ -881,4 +881,707 @@ export const VIDEO_PAGES: ProblemPage[] = [
     platforms: ["windows", "mac", "linux"],
     lastChecked: "2026-11-24",
   }),
+  shortGuide({
+    slug: "edit-raw-footage-into-youtube-video",
+    niche: "video",
+    searchPhrases: [
+      "how to edit a youtube video",
+      "how to edit raw footage",
+      "edit my youtube video for me",
+      "auto edit my youtube video",
+      "best way to edit youtube videos for beginners",
+    ],
+    title: "How to edit a YouTube video from raw footage",
+    description:
+      "Sitting on an hour of raw footage? Ask Stella (stella.sh) to edit it into a finished YouTube video with tight cuts, music, titles and chapters.",
+    h1: "How to edit a YouTube video from raw footage",
+    short: "Raw footage to a YouTube video",
+    lede: "A folder of messy takes turned into a video you can upload tonight.",
+    answer:
+      "Editing a YouTube video means keeping the best takes, opening strong, trimming the waffle and adding titles and music. Stella (stella.sh) does the whole edit from your folder and hands you the finished file.",
+    gets: [
+      "The best take of every line",
+      "A strong opening, titles and quiet music",
+      "Chapters and a description to paste in",
+    ],
+    prompt:
+      "Edit the footage in Videos/Desk build into a YouTube video of about 10 minutes. Open with the finished desk, add a title for each step and some calm music.",
+    demo: {
+      ack: "On it. Watching through everything first.",
+      task: "Editing your desk build video",
+      rows: ["Going through 34 clips", "Choosing the best takes", "Cutting it down to 10 minutes", "Adding titles and music"],
+      reply:
+        "Your desk build video is ready: 10:12, opening on the finished desk, with five step titles and music under your voice. Chapters are beside it.",
+      files: ["Desk build.mp4", "Desk build chapters.txt"],
+    },
+    faq: [
+      ["How long does editing a YouTube video usually take?", "By hand, often several hours for ten finished minutes, mostly spent sorting takes."],
+      ["Can I change the edit afterwards?", "Yes. Say “make the middle faster” or “swap the song” and you get a new version."],
+    ],
+    byHand: [
+      "In the free [DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve), drop the clips on the Cut page and trim the takes.",
+      "Add music from YouTube's Audio Library, well below your voice.",
+      "List chapter times in the description, starting at 0:00.",
+    ],
+    related: ["video/remove-filler-words-from-video", "video/add-b-roll-to-video", "video/turn-long-video-into-shorts"],
+    platforms: ["windows", "mac", "linux"],
+    costNote:
+      "Yes for cutting, titles and music from free libraries. Music made just for you comes with Stella plans from $20 a month.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "turn-long-video-into-shorts",
+    niche: "video",
+    searchPhrases: [
+      "turn long video into shorts",
+      "turn podcast into clips",
+      "how to make tiktok clips from youtube videos",
+      "cut long video into shorts free",
+      "podcast clips for social media",
+    ],
+    title: "Turn a long video or podcast into Shorts and TikToks",
+    description:
+      "One long episode, a week of posts. Ask Stella (stella.sh) to find the best moments and turn them into vertical Shorts and TikToks with captions.",
+    h1: "Turn a long video into Shorts and TikTok clips",
+    short: "Long video or podcast to Shorts",
+    lede: "One long episode becomes a week of clips ready to post.",
+    answer:
+      "To turn a long video into shorts, find the moments that stand alone, start each on its best line and make it vertical with captions. Stella (stella.sh) picks them, makes them and names each one.",
+    gets: [
+      "The moments worth posting, picked for you",
+      "Vertical clips that start on the hook",
+      "Captions, plus a title for each post",
+    ],
+    prompt:
+      "Turn my latest podcast episode into 6 vertical clips for TikTok and Shorts, under 45 seconds each, with captions. Pick the funniest and most surprising bits.",
+    demo: {
+      ack: "Sure. Reading through the episode for good moments.",
+      task: "Making 6 clips from your podcast",
+      rows: ["Writing down everything that's said", "Picking 6 moments that stand alone", "Framing whoever is talking", "Adding captions"],
+      reply:
+        "Six clips are in Videos/Episode 12 clips, all vertical and captioned, between 22 and 43 seconds. The lost passport story is first.",
+      files: ["01 lost passport.mp4", "02 worst job.mp4", "post titles.txt"],
+    },
+    faq: [
+      ["How long can a YouTube Short be?", "Up to 3 minutes. Clips of 20 to 45 seconds that make one point work well."],
+      ["Does it work with an audio-only podcast?", "Yes. Each clip gets your cover art or a photo behind the captions."],
+    ],
+    byHand: [
+      "Note the times of each surprise, story or good question.",
+      "Cut each one in CapCut on a 9:16 canvas, starting on the strongest sentence.",
+      "For a video already on your channel, the YouTube phone app has Remix, Edit into a Short.",
+    ],
+    related: ["video/word-by-word-captions", "video/auto-reframe-video", "video/twitch-clips-to-tiktok"],
+    platforms: ["windows", "mac", "linux"],
+    costNote: "Yes. A free speech tool on your computer writes the captions, and the cutting runs on your own plan.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-travel-video-from-clips",
+    niche: "video",
+    searchPhrases: [
+      "how to make a travel video",
+      "travel video maker",
+      "how to make a travel tiktok video",
+      "vacation video maker",
+      "how to make a travel video with iphone",
+    ],
+    title: "How to make a travel video from your holiday clips",
+    description:
+      "Hundreds of trip clips and no video? Ask Stella (stella.sh) to turn the folder into a finished travel TikTok with music, place names and quick cuts.",
+    h1: "How to make a travel video from your trip clips",
+    short: "Travel video from trip clips",
+    lede: "Your whole holiday in half a minute, ready for TikTok.",
+    answer:
+      "A good travel video uses a second or two of the best shots, changes place often and ends on a wow. Stella (stella.sh) goes through your trip folder, chooses the shots and makes the video.",
+    gets: [
+      "The prettiest seconds of every clip",
+      "Place names in clean text",
+      "Music, or space for a trending sound",
+    ],
+    prompt:
+      "Make a 30 second TikTok from the clips in Videos/Greece. Start with the cliff jump, put the island names on screen, and cut it to an upbeat song. End on the sunset.",
+    demo: {
+      ack: "Lovely trip. Picking the best shots.",
+      task: "Making your Greece TikTok",
+      rows: ["Looking through 118 clips", "Choosing 19 shots", "Adding the island names", "Cutting to the song"],
+      reply:
+        "Your Greece TikTok is 30 seconds, vertical, and goes from the cliff jump to the Oia sunset across four islands. There's a second copy with no music for a trending sound.",
+      files: ["Greece TikTok.mp4", "Greece TikTok (no music).mp4"],
+    },
+    faq: [
+      ["How long should a travel TikTok be?", "15 to 30 seconds suits a quick montage."],
+      ["Can it mix photos with clips?", "Yes. Photos get a slow zoom so they don't sit still between moving shots."],
+    ],
+    byHand: [
+      "Pick 15 to 20 clips and keep the best second or two of each.",
+      "In CapCut, add them in travel order, put a song underneath and cut on the beat.",
+      "Add the place name the first time each place appears.",
+    ],
+    related: ["video/sync-video-to-music-beat", "video/color-match-clips", "video/make-recap-video"],
+    platforms: ["windows", "mac", "linux"],
+    costNote:
+      "Yes with your own song or one from a free library. A brand-new song made for the trip comes with Stella plans from $20 a month.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "sync-video-to-music-beat",
+    niche: "video",
+    searchPhrases: [
+      "sync video to music beat",
+      "sync video to music",
+      "cut video to beat",
+      "beat sync video",
+      "how to edit clips to the beat of a song",
+    ],
+    title: "Sync video clips to the beat of a song",
+    description:
+      "Want cuts that land on the beat? Ask Stella (stella.sh) to sync your clips to any song so every cut hits, with the biggest moment on the drop.",
+    h1: "Sync your video to the beat of the music",
+    short: "Sync clips to the beat",
+    lede: "Every cut lands on the beat, and the best shot lands on the drop.",
+    answer:
+      "To sync video to music, mark where the beats fall and change shot exactly there. Stella (stella.sh) finds the beats in your song, fits your clips between them and saves your best moment for the drop.",
+    gets: [
+      "Cuts exactly on the beat",
+      "Slow shots for the verse, fast ones for the chorus",
+      "Your best moment on the drop",
+    ],
+    prompt:
+      "Cut my skate clips to the song in this folder. Change clip on every second beat, go faster at the chorus, and put the kickflip right on the drop.",
+    demo: {
+      ack: "Got it. Listening for the beats.",
+      task: "Cutting your skate clips to the song",
+      rows: ["Marking every beat and the drop", "Matching clips to the music's energy", "Putting the kickflip on the drop"],
+      reply:
+        "Your skate edit is 48 seconds with 37 cuts on the beat. The kickflip lands on the drop at 0:31, in slow motion until the board touches down.",
+      files: ["Skate edit.mp4"],
+    },
+    faq: [
+      ["Should I cut on every beat?", "Every second or fourth beat feels natural. Save every-beat cutting for the chorus."],
+      ["Can my clips keep their own sound?", "Yes. Board noise, cheers or a laugh can come through where the music dips."],
+    ],
+    byHand: [
+      "In CapCut on a computer, select the song, turn on beat markers and drag each clip's edge to a marker.",
+      "In DaVinci Resolve, play the song and tap M on each beat to leave a marker.",
+      "Look for the tallest spikes in the sound wave: those are usually the drums.",
+    ],
+    related: ["video/make-travel-video-from-clips", "video/make-gaming-montage", "video/add-music-to-video"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "add-b-roll-to-video",
+    niche: "video",
+    searchPhrases: [
+      "add b roll to video",
+      "how to add b roll",
+      "add b roll automatically",
+      "talking head video editing",
+      "free b roll for youtube videos",
+    ],
+    title: "Add B-roll to a talking video automatically",
+    description:
+      "Just you talking for eight minutes? Ask Stella (stella.sh) to add B-roll that matches what you say, from your own clips or free stock footage.",
+    h1: "Add B-roll to a video where you just talk",
+    short: "Add B-roll to a talking video",
+    lede: "Cutaways that show what you're talking about, right as you say it.",
+    answer:
+      "B-roll is the footage shown while you keep talking. Stella (stella.sh) reads what you say, finds shots to match in your own folder or free stock sites, and lays them over the right sentences.",
+    gets: [
+      "Shots matched to your words",
+      "Your own clips first, free stock for the rest",
+      "Your voice running underneath, untouched",
+    ],
+    prompt:
+      "Add B-roll to my coffee video. Use my Cafe folder where it fits and free stock clips for the rest. Keep my face on screen at the start and end.",
+    demo: {
+      ack: "Sure. Noting what you talk about first.",
+      task: "Adding B-roll to your coffee video",
+      rows: ["Reading what you say", "Matching shots from your Cafe folder", "Finding free clips for the gaps", "Laying them over your voice"],
+      reply:
+        "Your coffee video now has 14 cutaways: nine from your Cafe folder, five free stock clips. You're on screen for the opening and the sign-off.",
+      files: ["Coffee video with B-roll.mp4"],
+    },
+    faq: [
+      ["How much B-roll should a video have?", "A cutaway of 2 to 5 seconds whenever you name something people could see."],
+      ["Where can I get free B-roll?", "[Pexels](https://www.pexels.com/videos/) and [Pixabay](https://pixabay.com/videos/) have free clips you can use on YouTube."],
+    ],
+    byHand: [
+      "Write down each thing you mention and its time in the video.",
+      "Film it on your phone or download a clip from Pexels.",
+      "In any editor, put the clip on the track above yours, muted.",
+    ],
+    related: ["video/edit-raw-footage-into-youtube-video", "video/remove-filler-words-from-video", "video/color-match-clips"],
+    platforms: ["windows", "mac", "linux"],
+    costNote:
+      "Yes with your own shots and free stock footage. Shots invented by AI come with Stella plans from $20 a month.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-gaming-montage",
+    niche: "video",
+    searchPhrases: [
+      "how to make a gaming montage",
+      "gaming montage maker",
+      "valorant montage maker",
+      "fortnite montage maker",
+      "highlight reel maker for games",
+    ],
+    title: "Make a gaming montage from your recordings",
+    description:
+      "Hours of recordings, a handful of great plays. Ask Stella (stella.sh) to find your best moments and make a gaming montage cut to your song.",
+    h1: "How to make a gaming montage from your recordings",
+    short: "Gaming highlight montage",
+    lede: "Your best plays pulled out of hours of footage and set to music.",
+    answer:
+      "To make a gaming montage, pull the best plays from your recordings, trim the run-up and cut them to a song. Stella (stella.sh) goes through the files, finds the big moments and builds it.",
+    gets: [
+      "Clutches and kills found for you",
+      "Slow motion on the best shot",
+      "Cuts that hit with your song",
+      "A list of where each play came from",
+    ],
+    prompt:
+      "Go through my Valorant recordings from this month and make a 90 second montage of my best kills, cut to the song in my Downloads. Save the ace for last.",
+    demo: {
+      ack: "Nice. Hunting for the good rounds.",
+      task: "Making your Valorant montage",
+      rows: ["Checking 22 recordings", "Spotting kills, clutches and the ace", "Cutting to your song", "Slowing down the final shot"],
+      reply:
+        "Your montage is in Videos: 1:30, 17 plays, with the Ascent ace last in slow motion. I also kept the 17 plays as separate clips for posting.",
+      files: ["Valorant montage.mp4"],
+    },
+    faq: [
+      ["How long should a gaming montage be?", "One to two minutes, about one song. Put a great play first and the best one last."],
+      ["Where does Windows save game clips?", "Xbox Game Bar saves to Videos, Captures. The NVIDIA app and Medal use the folder chosen in their settings."],
+    ],
+    byHand: [
+      "Scrub through each recording and cut out every play with two seconds before it.",
+      "Line the kills up with the drums of your song in CapCut or DaVinci Resolve.",
+      "Slow the best shot to half speed for a second before the hit.",
+    ],
+    related: ["video/twitch-clips-to-tiktok", "video/sync-video-to-music-beat", "video/make-youtube-intro"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "word-by-word-captions",
+    niche: "video",
+    searchPhrases: [
+      "word by word captions",
+      "animated captions",
+      "captions one word at a time",
+      "hormozi style captions",
+      "tiktok style captions free",
+    ],
+    title: "Word-by-word animated captions, TikTok style",
+    description:
+      "Want captions that pop one word at a time? Ask Stella (stella.sh) for animated captions in your colours and font, timed to every word you say.",
+    h1: "Word-by-word captions that pop as you speak",
+    short: "Word-by-word animated captions",
+    lede: "Big captions that light up each word the moment you say it.",
+    answer:
+      "Word-by-word captions time every single word, so each one pops or changes colour as it's spoken. Stella (stella.sh) times them to your voice and styles them with your font and colours.",
+    gets: [
+      "Each word timed to your voice",
+      "Your font, colours and emphasis words",
+      "The same look ready for your next video",
+    ],
+    prompt:
+      "Put word by word captions on my gym tips video, big bold white text with the key words in yellow, a little bounce on each word, in the middle of the screen.",
+    demo: {
+      ack: "Sure. Timing every word now.",
+      task: "Adding pop captions to your gym video",
+      rows: ["Timing each word you say", "Picking the key words", "Animating the text", "Checking names are spelled right"],
+      reply:
+        "Your gym tips video now has bouncing captions, three words at a time, with 16 key words in yellow. I saved the style, so next time just say “same captions”.",
+      files: ["Gym tips captioned.mp4"],
+    },
+    faq: [
+      ["What font do Hormozi captions use?", "A heavy, all-capitals font. Montserrat Black is a popular free choice."],
+      ["One word at a time or a few?", "One word feels punchy for fast talkers. Three at a time, with the current word coloured, is easier to read."],
+    ],
+    byHand: [
+      "In CapCut, make auto captions, then pick a caption template that highlights the spoken word.",
+      "In Premiere Pro, transcribe, create captions and set the maximum length low so one word shows.",
+      "Read it through on your phone; mistakes hide in names and numbers.",
+    ],
+    related: ["video/make-instagram-reel", "video/turn-long-video-into-shorts", "video/make-srt-subtitle-file"],
+    platforms: ["windows", "mac", "linux"],
+    costNote: "Yes. The words are timed by a free speech tool that runs on your computer.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "remove-filler-words-from-video",
+    niche: "video",
+    searchPhrases: [
+      "remove filler words from video",
+      "remove ums from video",
+      "remove ums and ahs",
+      "remove filler words from video free",
+      "cut out mistakes and repeated takes from video",
+    ],
+    title: "Remove filler words (ums and ahs) from a video",
+    description:
+      "Too many ums in your video? Ask Stella (stella.sh) to remove filler words, restarts and repeated lines so you sound sharp and still like yourself.",
+    h1: "Remove filler words, ums and restarts from a video",
+    short: "Remove ums and filler words",
+    lede: "You, talking clearly: no ums, no false starts, no line said twice.",
+    answer:
+      "To remove filler words, find every um, uh, “you know” and false start, then cut them and smooth each join. Stella (stella.sh) does it from what you said and keeps the version of each line that came out best.",
+    gets: [
+      "Ums, ahs and “you know” gone",
+      "Only the good take of a repeated line",
+      "Small zooms that hide the cuts",
+    ],
+    prompt:
+      "Clean up my course video. Take out the ums, the bits where I mess up and start again, and the long thinking pauses, but keep it sounding natural.",
+    demo: {
+      ack: "Sure. Going through it word by word.",
+      task: "Cleaning up your course video",
+      rows: ["Finding ums, ahs and false starts", "Keeping your best take of each line", "Smoothing the joins"],
+      reply:
+        "Your course video is tidy: 63 ums and 9 restarts came out, and it runs 11:40 instead of 14:05. I left the laugh at 6:20 because it's nice.",
+      files: ["Course video clean.mp4"],
+    },
+    faq: [
+      ["How do I hide the jump after an um is cut?", "Zoom in slightly on the next line, or cover the join with another shot."],
+      ["Does it work in languages other than English?", "Yes. Say which language and which habits to listen for, such as “euh” in French."],
+    ],
+    byHand: [
+      "In Premiere Pro, transcribe the clip, filter the transcript by filler words and delete them together.",
+      "In [Descript](https://www.descript.com), use Remove filler words and review the list.",
+      "Leave a few in: a talk with none at all can sound robotic.",
+    ],
+    related: ["video/cut-silences-from-video", "video/add-b-roll-to-video", "video/edit-raw-footage-into-youtube-video"],
+    platforms: ["windows", "mac", "linux"],
+    costNote: "Yes. Finding the ums uses free speech software running on your computer.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-youtube-intro",
+    niche: "video",
+    searchPhrases: [
+      "make youtube intro",
+      "youtube intro maker free no watermark",
+      "make youtube intro and outro",
+      "how to make an intro for youtube videos",
+      "youtube intro with logo animation",
+    ],
+    title: "Make a YouTube intro and outro with your logo",
+    description:
+      "Need an intro for your channel? Ask Stella (stella.sh) to make a YouTube intro and matching end screen from your logo, with sound and no watermark.",
+    h1: "Make a YouTube intro and outro for your channel",
+    short: "Make a YouTube intro",
+    lede: "A short, sharp intro with your logo and a matching end screen.",
+    answer:
+      "To make a YouTube intro, animate your channel name or logo for a few seconds with a sound. Stella (stella.sh) designs it, matches your colours and gives you an outro with space for YouTube's end-screen links.",
+    gets: [
+      "An animated intro with your logo",
+      "An outro with room for next-video links",
+      "Files you drop into every video",
+    ],
+    prompt:
+      "Make a 4 second intro for my channel Slow Garden using my logo, with leaves growing around the name and a soft chime, plus a matching 15 second outro.",
+    demo: {
+      ack: "Lovely. Starting with your logo's colours.",
+      task: "Making the Slow Garden intro",
+      rows: ["Taking the greens from your logo", "Animating the leaves and name", "Adding a soft chime", "Making the matching outro"],
+      reply:
+        "Your intro is 4 seconds: the leaves grow in, the name settles, then the chime. The 15-second outro leaves two video spots and a subscribe circle. No watermark.",
+      files: ["Slow Garden intro.mp4", "Slow Garden outro.mp4"],
+    },
+    faq: [
+      ["How long should a YouTube intro be?", "3 to 5 seconds. Many channels open with a hook and play the intro after it."],
+      ["How long can a YouTube end screen be?", "5 to 20 seconds, on videos at least 25 seconds long."],
+    ],
+    byHand: [
+      "In [Canva](https://www.canva.com), search YouTube intro, change the name and colours, and download as MP4.",
+      "Get a short sound from YouTube's Audio Library.",
+      "Set up end-screen links in YouTube Studio, in the video's End screen editor.",
+    ],
+    related: ["video/edit-raw-footage-into-youtube-video", "video/make-gaming-montage", "video/add-b-roll-to-video"],
+    platforms: ["windows", "mac", "linux"],
+    costNote:
+      "Yes with your own logo and a free sound. Artwork or a jingle created from nothing comes with Stella plans from $20 a month.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-instagram-reel",
+    niche: "video",
+    searchPhrases: [
+      "how to make a reel with multiple videos",
+      "how to edit reels",
+      "how to make a reel with photos and videos",
+      "instagram reel editor desktop",
+      "reels hook and text on screen",
+    ],
+    title: "Make an Instagram Reel from multiple videos and photos",
+    description:
+      "Got clips but no Reel? Ask Stella (stella.sh) to edit them into one with a hook, text on screen and quick cuts, ready to post from your phone.",
+    h1: "How to make a Reel with multiple videos and photos",
+    short: "Make an Instagram Reel",
+    lede: "A post-ready Reel with a hook in the first second and clean text.",
+    answer:
+      "A Reel that holds people opens with a hook, changes shot often and says the point in text. Stella (stella.sh) builds one from your videos and photos and writes a few hooks to choose from.",
+    gets: [
+      "A hook line in the first second",
+      "Text kept clear of Instagram's buttons",
+      "A cover picture and a caption to paste",
+    ],
+    prompt:
+      "Make a 20 second Reel from the videos and photos in my Bakery folder about our new cinnamon buns. Start with a hook, add short text for each step, end with our opening hours.",
+    demo: {
+      ack: "Yum. Picking shots and writing hooks.",
+      task: "Making your cinnamon bun Reel",
+      rows: ["Choosing 11 shots", "Writing three opening hooks", "Adding text for each step", "Making the cover picture"],
+      reply:
+        "Your Reel opens on the icing pour with “We sell out by 9am”, shows four steps and ends on your opening hours. Two other hooks are saved as separate versions.",
+      files: ["Cinnamon bun Reel.mp4", "cover.jpg", "caption.txt"],
+    },
+    faq: [
+      ["Where should text go on a Reel?", "In the middle. The top strip and roughly the bottom third get covered by Instagram's own buttons and caption."],
+      ["How do I get it onto my phone?", "Send it by AirDrop, cloud storage or a message to yourself, then pick it in Instagram as a new Reel."],
+    ],
+    byHand: [
+      "In Instagram's free Edits app, add your clips in order and trim each to a second or two.",
+      "Write the hook as the first text layer; say what they'll get.",
+      "Add the song inside Instagram so it links to the sound.",
+    ],
+    related: ["video/word-by-word-captions", "video/sync-video-to-music-beat", "video/make-travel-video-from-clips"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-wedding-video-from-phone-clips",
+    niche: "video",
+    searchPhrases: [
+      "edit your own wedding video",
+      "wedding video maker free",
+      "how to edit wedding videos",
+      "wedding highlight video",
+      "make a wedding video from guests' phone clips",
+    ],
+    title: "Make your own wedding video from phone clips",
+    description:
+      "No videographer? Ask Stella (stella.sh) to edit guests' phone clips into a wedding highlight film, with the vows clear and your first dance song.",
+    h1: "Edit your own wedding video from guests' phone clips",
+    short: "Wedding video from phone clips",
+    lede: "A wedding film made from everyone's phones, vows and all.",
+    answer:
+      "A wedding video made from phones needs one timeline, one look and clear sound for the vows. Stella (stella.sh) sorts everyone's clips by time of day, tells the story in order and sets it to your song.",
+    gets: [
+      "Clips from every guest in one story",
+      "Vows and speeches you can hear",
+      "A short film, plus a long one to keep",
+    ],
+    prompt:
+      "Make our wedding video from all the clips and photos in the Wedding folder. Four minutes, starting with getting ready, the vows in full, then our first dance song for the party.",
+    demo: {
+      ack: "Congratulations! Putting the day in order.",
+      task: "Making your wedding film",
+      rows: ["Sorting 264 clips from 13 phones", "Choosing the clearest vows", "Matching the look between phones", "Adding your first dance song"],
+      reply:
+        "Your wedding film runs 4:06: getting ready, the full vows in Nina's recording (the clearest), then the party. A 25-minute version has the speeches uncut.",
+      files: ["Wedding film.mp4", "Wedding long version.mp4"],
+    },
+    faq: [
+      ["How long should a wedding highlight video be?", "Three to five minutes is easy to share. Keep the vows and speeches whole in a longer version."],
+      ["How do I collect clips from guests?", "Share one Google Drive, Dropbox or iCloud folder link and ask for the original files. Messaging apps squash the quality."],
+    ],
+    byHand: [
+      "Gather the originals in one folder and sort by date taken.",
+      "In iMovie or DaVinci Resolve, lay the vows down first and place everything else around them.",
+      "Keep the song low under voices and bring it up for dancing.",
+    ],
+    related: ["video/color-match-clips", "video/make-recap-video", "video/make-slideshow-with-music"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "color-match-clips",
+    niche: "video",
+    searchPhrases: [
+      "color match clips",
+      "color grade video",
+      "color correct video free",
+      "fix dark video",
+      "make clips from different cameras match",
+    ],
+    title: "Color match clips so they look like one video",
+    description:
+      "One clip orange, the next one blue? Ask Stella (stella.sh) to color match your clips, fix dark shots and give the video one consistent look.",
+    h1: "Color match clips from different cameras",
+    short: "Color match your clips",
+    lede: "Every clip with the same light and colour, like one camera shot it.",
+    answer:
+      "To color match clips, pick the best-looking one and bring the others' brightness, warmth and contrast to it. Stella (stella.sh) does that shot by shot, with natural skin, then adds a look you like.",
+    gets: [
+      "One consistent look all the way through",
+      "Dark shots brightened, orange shots cooled",
+      "Skin that still looks like skin",
+    ],
+    prompt:
+      "My vlog clips are from my iPhone and a GoPro and the colours don't match. Make them all look like the iPhone beach shot, brighten the dark evening ones, and give it a warm film look.",
+    demo: {
+      ack: "Sure. Using the beach shot as the guide.",
+      task: "Matching the colours in your vlog",
+      rows: ["Comparing 41 shots to the beach one", "Warming the GoPro clips", "Lifting the dark evening shots", "Adding a soft film look"],
+      reply:
+        "All 41 shots now match the beach clip, the six evening ones are brighter, and the warm film look is on top. There's a before and after picture so you can compare.",
+      files: ["Vlog graded.mp4", "before and after.jpg"],
+    },
+    faq: [
+      ["What's the difference between color correction and color grading?", "Correction makes shots look true and alike. Grading comes after and gives them a mood, like warm, faded or cinematic."],
+      ["Can a really dark video be saved?", "Often. Brightening brings back faces; cleaning up the grain afterwards keeps it watchable."],
+    ],
+    byHand: [
+      "In the free DaVinci Resolve, on the Color page, right-click your best shot's thumbnail while another is selected and choose Shot Match.",
+      "In Premiere Pro, open Lumetri Color, Color Wheels, Comparison View, then Apply Match.",
+      "Match brightness first, then warmth.",
+    ],
+    related: ["video/stabilize-shaky-video", "video/make-travel-video-from-clips", "video/edit-raw-footage-into-youtube-video"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "auto-reframe-video",
+    niche: "video",
+    searchPhrases: [
+      "auto reframe video",
+      "auto reframe video free",
+      "auto crop video ai",
+      "smart reframe davinci resolve free",
+      "reframe video to follow the speaker",
+    ],
+    title: "Auto reframe a video so it follows whoever's talking",
+    description:
+      "Two people on screen, one tall frame? Ask Stella (stella.sh) to auto reframe your video so the shot follows whoever is talking, shot by shot.",
+    h1: "Auto reframe a video to follow the face",
+    short: "Auto reframe to follow faces",
+    lede: "A wide interview turned tall, with the shot always on the right person.",
+    answer:
+      "Auto reframe moves the frame through the video so the face that matters stays in it. Stella (stella.sh) tracks every face, works out who's speaking and glides or cuts between them.",
+    gets: [
+      "The frame follows the speaker",
+      "Split screen when two people talk at once",
+      "Tall, square and wide copies from one file",
+    ],
+    prompt:
+      "Reframe my two person interview for Shorts. Follow whoever is talking, stack us on top of each other when we talk over each other, and make a square copy for LinkedIn too.",
+    demo: {
+      ack: "Sure. Finding both faces first.",
+      task: "Reframing your interview",
+      rows: ["Tracking both faces", "Working out who speaks when", "Moving the frame smoothly", "Saving tall and square copies"],
+      reply:
+        "Your interview follows the speaker in 58 switches and goes to a stacked split when you laugh together at 3:14. The tall and square versions are ready.",
+      files: ["Interview tall.mp4", "Interview square.mp4"],
+    },
+    faq: [
+      ["Is Smart Reframe in the free DaVinci Resolve?", "No, it's in the paid Studio version. In the free one you move the frame with keyframes."],
+      ["Does it work for sport or pets?", "Yes. Say what to follow, such as the ball, the dog or the player in red."],
+    ],
+    byHand: [
+      "In Premiere Pro, right-click the sequence and choose Auto Reframe Sequence.",
+      "In CapCut on a computer, select the clip and look under Video, Basic, for Auto reframe.",
+      "Check any moment where people cross over; that's where tracking swaps faces.",
+    ],
+    related: ["video/crop-video-to-vertical", "video/turn-long-video-into-shorts", "video/word-by-word-captions"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-recap-video",
+    niche: "video",
+    searchPhrases: [
+      "recap video maker",
+      "make a year recap video",
+      "year in review video maker",
+      "how to make a recap video",
+      "photo dump video with clips",
+    ],
+    title: "Make a year recap video from your photos and clips",
+    description:
+      "A whole year on your phone, one video to show for it. Ask Stella (stella.sh) to make a recap video month by month, with clips, photos and music.",
+    h1: "Make a year recap video from your photos and clips",
+    short: "Year or month recap video",
+    lede: "Your year in two minutes, picked from everything on your camera roll.",
+    answer:
+      "A recap video takes the best few seconds of each month and runs them in order to one song. Stella (stella.sh) goes through your photos and clips, skips the duplicates and blurry ones, and makes it.",
+    gets: [
+      "The best of each month, chosen for you",
+      "Everyone important in it",
+      "Month titles, music and a proper ending",
+    ],
+    prompt:
+      "Make a recap video of our year from the 2026 folder in Pictures. Two minutes, month by month, plenty of the baby and Grandma, and finish on the snowy garden photo.",
+    demo: {
+      ack: "What a year. Looking through it all.",
+      task: "Making your 2026 recap",
+      rows: ["Sorting 3,140 photos and clips by month", "Skipping blurry shots and duplicates", "Choosing 96 moments", "Adding month titles and music"],
+      reply:
+        "Your 2026 recap is 2:04 with 96 moments across twelve months. Grandma is in nine of them, and it ends on the snowy garden with a slow fade.",
+      files: ["Our 2026.mp4"],
+    },
+    faq: [
+      ["How many photos and clips fit in a recap?", "About 45 a minute, with photos on screen for a second and clips for two."],
+      ["Can I do a monthly recap instead?", "Yes. Ask at the end of each month, and join the twelve in December."],
+    ],
+    byHand: [
+      "Go month by month in your photo app and favourite eight moments from each.",
+      "Put them in date order in iMovie, Clipchamp or CapCut and trim the clips short.",
+      "Mix in moving clips every few photos so it doesn't feel still.",
+    ],
+    related: ["video/make-slideshow-with-music", "video/make-travel-video-from-clips", "video/make-wedding-video-from-phone-clips"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "twitch-clips-to-tiktok",
+    niche: "video",
+    searchPhrases: [
+      "twitch clips to tiktok",
+      "twitch clips to tiktok format",
+      "twitch clips to youtube shorts",
+      "make tiktok clips from twitch",
+      "stream highlights maker",
+    ],
+    title: "Turn Twitch clips into TikToks and Shorts",
+    description:
+      "Streaming but not posting? Ask Stella (stella.sh) to turn your Twitch clips into TikToks, facecam on top, gameplay below, captions included.",
+    h1: "Turn Twitch clips into TikToks and Shorts",
+    short: "Twitch clips to TikTok",
+    lede: "Last night's stream as posts: facecam on top, gameplay underneath.",
+    answer:
+      "Twitch clips look best on TikTok with your facecam on top and the game below. Stella (stella.sh) takes your clips or a whole stream recording, stacks them that way and captions what you say.",
+    gets: [
+      "Facecam above, gameplay below",
+      "The funniest moments of a whole stream",
+      "Your captions, name and emotes on top",
+    ],
+    prompt:
+      "Take the recording of last night's Twitch stream and make 5 TikToks from the funniest moments, my facecam on top, the game underneath, with captions and my username.",
+    demo: {
+      ack: "On it. Finding where you lost it laughing.",
+      task: "Making TikToks from your stream",
+      rows: ["Listening for laughs and shouting", "Picking five moments", "Stacking facecam over gameplay", "Adding captions and your username"],
+      reply:
+        "Five TikToks are in Videos/Stream clips, 18 to 40 seconds each. The boss fight scream is number one. I remembered your facecam's spot for next time.",
+      files: ["01 boss scream.mp4", "02 chat dared me.mp4"],
+    },
+    faq: [
+      ["What size should a Twitch clip be for TikTok?", "1080×1920. A third of the height for your face and two thirds for the game works well."],
+      ["How long does Twitch keep past streams?", "From 7 to 60 days, depending on your account. Download the ones you want to keep."],
+    ],
+    byHand: [
+      "In Twitch's Creator Dashboard, open the clip in the Clips Manager, choose Edit Layout for the portrait version and download it.",
+      "[StreamLadder](https://streamladder.com) has ready-made facecam layouts.",
+      "Recording with OBS? Keep the facecam in the same corner so every crop lines up.",
+    ],
+    related: ["video/make-gaming-montage", "video/word-by-word-captions", "video/turn-long-video-into-shorts"],
+    platforms: ["windows", "mac", "linux"],
+    costNote: "Yes. Your own stream recordings, a free speech tool for the captions, and your own AI plan are enough.",
+    lastChecked: "2026-11-24",
+  }),
 ];

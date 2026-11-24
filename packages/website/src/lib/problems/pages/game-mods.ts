@@ -1915,6 +1915,230 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     lastChecked: "2026-11-24",
   }),
   shortGuide({
+    slug: "install-stardew-valley-expanded",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install stardew valley expanded",
+      "stardew valley expanded mod",
+      "stardew valley expanded not working",
+      "stardew valley expanded frontier farm not showing up",
+    ],
+    title: "How to install Stardew Valley Expanded (PC, Mac, Deck)",
+    description:
+      "Install Stardew Valley Expanded with Stella (stella.sh): SMAPI, the mod and every helper it needs, plus Frontier Farm if you want it. Your saves are copied first.",
+    h1: "How to install Stardew Valley Expanded",
+    short: "Install Stardew Valley Expanded",
+    lede: "New villagers, new places and a bigger valley to farm.",
+    answer:
+      "Stella (stella.sh) installs SMAPI if it's missing, then Stardew Valley Expanded and the helper mods it lists, like Content Patcher and Farm Type Manager. Your farms are copied before anything changes.",
+    gets: [
+      "Expanded and its helpers, in matching versions",
+      "Frontier Farm ready for your next new game",
+      "Your current farm still loading, with the new valley",
+    ],
+    prompt:
+      "Install Stardew Valley Expanded for me. I want the Frontier Farm too, but don't lose my current farm.",
+    demo: {
+      ack: "Copying your farms, then setting up Expanded.",
+      task: "Installing Stardew Valley Expanded",
+      rows: ["Backing up 2 farms", "Updating SMAPI", "Adding Expanded and the mods it needs", "Adding Frontier Farm"],
+      reply:
+        "Stardew Valley Expanded is in, with Content Patcher and Farm Type Manager. Your current farm opens into the bigger valley. For Frontier Farm, start a new game and pick it from the farm types. Backups are in Stardew Backups.",
+    },
+    faq: [
+      ["Can I add Expanded to an existing save?", "Yes, most of it works on a farm you already have. Frontier Farm needs a new game, since the farm map is chosen at the start."],
+      ["Stardew Valley Expanded not working?", "Usually a helper mod is missing or outdated. The SMAPI window names it; Stella reads that and adds the right version."],
+      ["Frontier Farm not showing up?", "It's a separate download from Expanded and only appears when you start a new game. Stella adds it for you."],
+    ],
+    byHand: [
+      "Install SMAPI from [smapi.io](https://smapi.io).",
+      "Download Stardew Valley Expanded from Nexus Mods, plus every required mod its page lists.",
+      "Unzip each into the game's Mods folder and start the game through SMAPI.",
+    ],
+    related: ["game-mods/mod-stardew-valley", "game-mods/stardew-valley-recolor-mods", "game-mods/stardew-valley-mods-not-working"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "stardew-valley-recolor-mods",
+    niche: "game-mods",
+    searchPhrases: [
+      "stardew valley recolor mods",
+      "vibrant pastoral recolor",
+      "earthy recolor stardew valley",
+      "stardew valley recolor not working",
+    ],
+    title: "Stardew Valley recolor mods: Vibrant Pastoral, Earthy and more",
+    description:
+      "Give Stardew Valley a new look. Stella (stella.sh) installs a recolor like Vibrant Pastoral or Earthy, with matching buildings and the patches for Expanded.",
+    h1: "Stardew Valley recolor mods, installed",
+    short: "Stardew Valley recolor mods",
+    lede: "Your whole valley in a softer, cosier palette.",
+    answer:
+      "Describe the look you want. Stella (stella.sh) installs a recolor like Vibrant Pastoral or Earthy, adds buildings and animals in colours to match, and turns on the settings that make it fit Expanded or other map mods.",
+    gets: [
+      "One matching palette across the whole valley",
+      "Buildings, animals and furniture to fit",
+      "Settings for Expanded and your other mods",
+    ],
+    prompt:
+      "Make my Stardew Valley look pastel and cosy, like the screenshots on Pinterest. I already have Expanded installed.",
+    demo: {
+      ack: "Pastel it is. Setting up Vibrant Pastoral.",
+      task: "Recoloring your Stardew Valley",
+      rows: ["Adding Vibrant Pastoral Recolor", "Adding Elle's seasonal buildings to match", "Switching on its Expanded support"],
+      reply:
+        "Your valley now uses Vibrant Pastoral, with Elle's seasonal buildings set to the same colours and the Expanded areas recoloured too. Fancy something warmer later? Ask for Earthy and I'll swap them.",
+    },
+    faq: [
+      ["Which recolor should I pick?", "Vibrant Pastoral is bright and soft; Earthy is warmer and muted. Stella sets up one and swaps to the other whenever you ask."],
+      ["Stardew Valley recolor not working?", "Content Patcher is usually missing or old, or two recolors are fighting. Stella reads the SMAPI log and fixes it."],
+      ["Can I use two recolors at once?", "Keep one for the map. Buildings, animals and portraits from other creators can sit on top of it."],
+    ],
+    byHand: [
+      "Install SMAPI and Content Patcher.",
+      "Download a recolor from Nexus Mods and unzip it into Mods.",
+      "Check its page for Expanded settings and set them in Generic Mod Config Menu or its settings file.",
+    ],
+    related: ["game-mods/install-stardew-valley-expanded", "game-mods/mod-stardew-valley", "game-mods/cozy-minecraft-texture-packs"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "cozy-minecraft-texture-packs",
+    niche: "game-mods",
+    searchPhrases: [
+      "cozy minecraft texture packs",
+      "minecraft cozy shaders",
+      "cozy minecraft mods",
+      "cozy minecraft modpacks",
+    ],
+    title: "Make Minecraft cozy: texture packs, shaders and mods",
+    description:
+      "Make your Minecraft cozy. Stella (stella.sh) sets up soft shaders, a warm texture pack and furniture and cooking mods that all fit your game version.",
+    h1: "Cozy Minecraft texture packs, shaders and mods",
+    short: "A cozy Minecraft look",
+    lede: "Soft light, warm colours and cute furniture in your world.",
+    answer:
+      "Tell Stella (stella.sh) the vibe. It picks a soft shader like Complementary Reimagined, a warm texture pack and cozy mods such as Farmer's Delight, installs them for your Minecraft version and switches them on.",
+    gets: [
+      "Shaders, textures and mods that work together",
+      "Everything matched to your Minecraft version",
+      "Your worlds copied before anything changes",
+    ],
+    prompt:
+      "Make my Minecraft look cozy like those TikTok cottage builds: soft lighting, warm textures, furniture and cooking mods.",
+    demo: {
+      ack: "Putting together a cozy setup that all fits.",
+      task: "Making your Minecraft cozy",
+      rows: ["Installing Sodium and Iris for shaders", "Adding a soft shader pack", "Adding a warm texture pack", "Adding furniture and cooking mods"],
+      reply:
+        "A Cozy profile is ready in your launcher: Complementary Reimagined with softer light, a warm texture pack, Farmer's Delight and Macaw's Furniture. Open Minecraft, pick Cozy and play.",
+    },
+    faq: [
+      ["Will cozy shaders run on my laptop?", "Stella can pick a lighter shader for slower computers, or keep the cozy textures and skip shaders."],
+      ["Can I keep my old worlds?", "Yes. Stella copies them first, and the new look works on old worlds too. Furniture mods only add new blocks."],
+      ["Is there a ready-made cozy modpack?", "A few exist on CurseForge and Modrinth. Stella can install one, or build yours from the pieces you like."],
+    ],
+    byHand: [
+      "Install Fabric, then Sodium and Iris from Modrinth.",
+      "Put a shader such as Complementary Reimagined in shaderpacks and a texture pack in resourcepacks.",
+      "Add cozy mods like Farmer's Delight that match your Minecraft version.",
+    ],
+    related: ["game-mods/install-minecraft-shaders", "game-mods/install-minecraft-resource-pack", "game-mods/install-minecraft-mods"],
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "disney-dreamlight-valley-mods",
+    niche: "game-mods",
+    searchPhrases: [
+      "disney dreamlight valley mods",
+      "disney dreamlight valley mods pc",
+      "how to install mods disney dreamlight valley",
+      "disney dreamlight valley mods nexus",
+    ],
+    title: "Disney Dreamlight Valley mods: how to install them on PC",
+    description:
+      "Mod Disney Dreamlight Valley on PC. Stella (stella.sh) sets up BepInEx, adds the Nexus mods you pick and checks each one fits the current game version.",
+    h1: "How to install Disney Dreamlight Valley mods",
+    short: "Disney Dreamlight Valley mods",
+    lede: "More room to decorate and less grinding in your valley.",
+    answer:
+      "Stella (stella.sh) installs BepInEx in your Steam copy of Disney Dreamlight Valley, adds the mods you pick from Nexus, like one that lifts the furniture limit, and copies your saves first.",
+    gets: [
+      "BepInEx set up in the game folder",
+      "Your chosen mods, each checked against the current update",
+      "Saves copied before the first modded start",
+    ],
+    prompt:
+      "Add mods to my Disney Dreamlight Valley on Steam so I can place way more furniture around the valley.",
+    demo: {
+      ack: "Setting up mods for Dreamlight Valley.",
+      task: "Modding Disney Dreamlight Valley",
+      rows: ["Copying your saves", "Installing BepInEx in the game folder", "Adding the object limit mod from Nexus"],
+      reply:
+        "Done. BepInEx is in the game folder with the mod that removes the village object limit. Launch from Steam as usual; the first start takes longer while it sets itself up.",
+    },
+    faq: [
+      ["Can I mod Dreamlight Valley from Game Pass?", "Mods go in the Steam version, where the game files are open. Stella sets them up there."],
+      ["Why did my mods stop after a game update?", "Updates often break them. Stella checks each mod page for a fix and sets aside the ones still waiting."],
+      ["Will mods affect my save?", "Stella copies your save first, so you can go back to it any time."],
+    ],
+    byHand: [
+      "Download BepInEx (the IL2CPP build) and unzip it into the game's Steam folder.",
+      "Start the game once to the main screen, then close it.",
+      "Put each mod's files in BepInEx, plugins, and start again.",
+    ],
+    related: ["game-mods/coral-island-mods", "game-mods/install-bepinex", "game-mods/mod-stardew-valley"],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "coral-island-mods",
+    niche: "game-mods",
+    searchPhrases: [
+      "coral island mods",
+      "coral island mods nexus",
+      "coral island mods not working",
+      "how to install coral island mods",
+    ],
+    title: "Coral Island mods: how to install and fix them",
+    description:
+      "Install Coral Island mods with Stella (stella.sh): files from Nexus put in the game's Paks folder, named so they load, and sorted out when an update breaks them.",
+    h1: "How to install Coral Island mods",
+    short: "Coral Island mods",
+    lede: "A wider camera, new outfits and easier farm days.",
+    answer:
+      "Most Coral Island mods are single files the game picks up from its Paks folder. Stella (stella.sh) downloads the ones you choose from Nexus, puts them there named so they load, and copies your saves first.",
+    gets: [
+      "Your picks from Nexus in the right folder",
+      "Old ones pulled out after a game update",
+      "Saves copied before anything changes",
+    ],
+    prompt:
+      "Install some Coral Island mods for me: more camera zoom and the cute outfit mods on Nexus. I play on Steam.",
+    demo: {
+      ack: "Picking those up from Nexus now.",
+      task: "Modding Coral Island",
+      rows: ["Copying your saves", "Downloading three mods from Nexus", "Placing them in the Paks folder"],
+      reply:
+        "Three mods are in: camera zoom and two outfit packs, all in the game's Paks folder. Start Coral Island from Steam as usual. Your saves are copied to Coral Island Backups.",
+    },
+    faq: [
+      ["Coral Island mods not working?", "After a game update, older mods can stop loading or crash the game. Stella checks each mod page, updates what has a fix and moves the rest aside."],
+      ["Why does a mod's file name end in _P?", "The game only loads extra files whose names end that way. Stella keeps the names right."],
+    ],
+    byHand: [
+      "Download a mod from [Nexus Mods](https://www.nexusmods.com/coralisland).",
+      "Unzip the .pak file into Coral Island, ProjectCoral, Content, Paks.",
+      "Keep _P at the end of the file name, then start the game.",
+    ],
+    related: ["game-mods/disney-dreamlight-valley-mods", "game-mods/mod-stardew-valley", "game-mods/install-nexus-mods"],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "mod-terraria",
     niche: "game-mods",
     searchPhrases: [
@@ -2269,6 +2493,317 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "In the game: Options, Game Options, Other, tick both mod boxes and restart.",
     ],
     related: ["game-mods/find-broken-sims-4-mods", "game-mods/mod-stardew-valley", "game-mods/mod-cities-skylines-2"],
+    platforms: ["windows", "mac"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "install-sims-4-cc",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install sims 4 cc",
+      "how to install sims 4 cc package files",
+      "how to install sims 4 cc zip files",
+      "how to install sims 4 cc from pinterest",
+    ],
+    title: "How to install Sims 4 CC: hair, clothes and furniture",
+    description:
+      "Install Sims 4 CC from the links you saved or your Downloads. Stella (stella.sh) fetches the free files, unzips them and puts each where the game finds it.",
+    h1: "How to install Sims 4 CC",
+    short: "Install Sims 4 CC",
+    lede: "The hair, outfits and furniture you saved, in your game.",
+    answer:
+      "Send Stella (stella.sh) the CC links you saved, or point it at your Downloads. It fetches the free files, unzips them, puts package files in Mods and whole lots in Tray, then turns custom content on.",
+    gets: [
+      "Hair and outfits in Create a Sim, furniture in Build",
+      "Zip, rar and 7z downloads unpacked",
+      "Folders by type, so you can find things later",
+    ],
+    prompt:
+      "Here are 15 CC links I saved on Pinterest, mostly hair and clothes from TSR and Patreon. Get the free ones into my Sims 4.",
+    demo: {
+      ack: "Opening your 15 links and fetching the free files.",
+      task: "Installing your Sims 4 CC",
+      rows: ["Following each link to its download", "Unzipping 15 files", "Sorting into Hair, Clothes and Build"],
+      reply:
+        "13 items are in Mods, sorted into Hair, Clothes and Build, and one house went to Tray. Two links were early-access posts, listed for later.",
+    },
+    faq: [
+      ["What's the difference between CC and mods?", "CC adds things: hair, clothes, furniture. Mods change how the game plays. CC rarely breaks after a patch; script mods often do."],
+      ["What's a .package file?", "The format nearly all Sims 4 CC comes in. It goes in Mods and still works up to five folders deep."],
+    ],
+    byHand: [
+      "Unzip each download and keep the .package files.",
+      "Move them into Documents, Electronic Arts, The Sims 4, Mods. Lots and households go in Tray instead.",
+      "In Game Options, Other, tick Enable Custom Content and Mods, then restart.",
+    ],
+    related: ["game-mods/sims-4-cc-not-showing-up", "game-mods/install-sims-4-mods", "game-mods/sims-4-tray-files"],
+    platforms: ["windows", "mac"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "sims-4-cc-not-showing-up",
+    niche: "game-mods",
+    searchPhrases: [
+      "sims 4 cc not showing up in game",
+      "sims 4 cc not showing up in cas",
+      "sims 4 cc not showing up in build mode",
+      "sims 4 cc not showing up after update",
+    ],
+    title: "Sims 4 CC not showing up in CAS or Build mode? Fixed",
+    description:
+      "Sims 4 CC not showing up in Create a Sim or Build mode? Stella (stella.sh) finds why: zipped files, the wrong folder, CC switched off or a missing piece.",
+    h1: "Sims 4 CC not showing up in game",
+    short: "Sims 4 CC not showing up",
+    lede: "Every hair, outfit and sofa you downloaded, back in the game.",
+    answer:
+      "Usually the files are still zipped, buried too deep, in the wrong Documents folder, or a patch switched custom content off. Stella (stella.sh) checks each of these, fixes them and clears the cache so it all loads.",
+    gets: [
+      "The reason, in one plain line",
+      "Files moved to the folder the game really reads",
+      "Pieces an item needs from its creator, added",
+    ],
+    prompt:
+      "I downloaded loads of hair and furniture CC but none of it shows up in my Sims 4. Find out why and fix it.",
+    demo: {
+      ack: "Checking your Mods folder and game settings.",
+      task: "Finding your missing Sims 4 CC",
+      rows: ["Looking for zipped or buried files", "Checking which Documents folder the game uses", "Turning custom content back on"],
+      reply:
+        "Found it. Your game reads the Mods folder inside OneDrive, but your CC sat in the other Documents. I moved 212 items over, unzipped 9 more, ticked custom content back on and cleared the cache.",
+    },
+    faq: [
+      ["Why does CC show in CAS but not Build mode?", "Build items often need a matching file from the creator, or a pack you don't own. Stella reads the item page and fetches what's missing."],
+      ["Why is my CC off after an update?", "Most patches untick custom content in the game options. Ticking it back on in Game Options, Other brings everything back."],
+    ],
+    byHand: [
+      "In Game Options, Other, check both mod boxes are ticked.",
+      "Unzip anything still zipped; keep package files no more than five folders deep.",
+      "If your Documents folder is in OneDrive, use the Mods folder there.",
+    ],
+    related: ["game-mods/install-sims-4-cc", "game-mods/find-broken-sims-4-mods", "game-mods/sims-4-duplicate-cc"],
+    platforms: ["windows", "mac"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "install-mc-command-center",
+    niche: "game-mods",
+    searchPhrases: [
+      "mc command center sims 4",
+      "how to install mc command center",
+      "mc command center not showing up",
+      "mc command center download",
+    ],
+    title: "Install MC Command Center (MCCC) for Sims 4",
+    description:
+      "Install MC Command Center for Sims 4 with Stella (stella.sh): the newest version from Deaderpool's site, in your Mods folder, switched on and set your way.",
+    h1: "Install MC Command Center for Sims 4",
+    short: "Install MC Command Center",
+    lede: "Your neighbourhood's story under your control, set up and working.",
+    answer:
+      "Stella (stella.sh) downloads the newest MC Command Center from Deaderpool's site, keeps all its files together in Mods, turns script mods on and sets the options you describe, like aging or who moves into town.",
+    gets: [
+      "The version made for your game patch",
+      "Every MCCC file in one folder",
+      "Your story choices set, kept through updates",
+    ],
+    prompt:
+      "Install MC Command Center in my Sims 4 and set it so townies don't get married or have babies without me.",
+    demo: {
+      ack: "Getting the latest MC Command Center now.",
+      task: "Setting up MC Command Center",
+      rows: ["Downloading from Deaderpool's site", "Placing it one folder inside Mods", "Turning script mods on", "Saving your story choices"],
+      reply:
+        "MC Command Center is in a folder called MCCC inside Mods, with script mods on. Townies won't marry or have babies on their own now. Click any computer in game and pick MC Command Center to change more.",
+    },
+    faq: [
+      ["MC Command Center not showing up?", "Usually script mods are off, the files sit two folders deep, or it's older than your patch. Stella fixes all three."],
+      ["Do I update MCCC after every patch?", "Often, yes. Ask Stella after a patch: it fetches the matching version and keeps your settings file, so your choices stay."],
+    ],
+    byHand: [
+      "Download the newest version from [deaderpool-mccc.com](https://deaderpool-mccc.com).",
+      "Unzip every file into one folder directly inside Mods, never deeper.",
+      "Tick Script Mods Allowed in Game Options, Other, and restart.",
+      "Keep mc_settings.cfg when you update.",
+    ],
+    related: ["game-mods/install-wickedwhims", "game-mods/find-broken-sims-4-mods", "game-mods/install-sims-4-mods"],
+    platforms: ["windows", "mac"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "install-wickedwhims",
+    niche: "game-mods",
+    searchPhrases: [
+      "how to install wickedwhims",
+      "how to install wickedwhims on mac",
+      "how to add wickedwhims animations",
+      "wickedwhims not working after update",
+    ],
+    title: "How to install WickedWhims for Sims 4 (PC and Mac)",
+    description:
+      "Install WickedWhims for Sims 4 with Stella (stella.sh): the newest version from its official site, your animation packs added and script mods switched on.",
+    h1: "How to install WickedWhims",
+    short: "Install WickedWhims",
+    lede: "WickedWhims and its animation packs, set up and working.",
+    answer:
+      "Stella (stella.sh) gets the newest WickedWhims from its official site, puts it no more than one folder inside Mods, adds the animation packs you downloaded and switches script mods on, on PC or Mac.",
+    gets: [
+      "The current WickedWhims, matched to your game patch",
+      "Animation packs gathered in their own folder",
+      "Older copies cleared out so only one loads",
+    ],
+    prompt:
+      "Install WickedWhims in my Sims 4 and add the animation packs sitting in my Downloads folder.",
+    demo: {
+      ack: "Fetching WickedWhims and looking at your downloads.",
+      task: "Installing WickedWhims",
+      rows: ["Downloading the newest WickedWhims", "Removing an older copy from Mods", "Sorting 8 animation packs", "Turning script mods on"],
+      reply:
+        "WickedWhims is in its own folder in Mods, and the old copy is gone. Your 8 animation packs are together in a WW Animations folder. Start the game and click any Sim to see the WickedWhims menu.",
+    },
+    faq: [
+      ["How do I install WickedWhims on Mac?", "The same way as on PC: it goes in Mods inside Documents. Stella sets it up identically on a Mac."],
+      ["WickedWhims not working after an update?", "Its creator, TURBODRIVER, usually releases a fix soon after each patch. Stella swaps in the new version and removes the old one."],
+      ["Where do the animations go?", "Anywhere in Mods, since they're package files. Stella keeps them in one folder so they're easy to update."],
+    ],
+    byHand: [
+      "Download the newest version from [wickedwhimsmod.com](https://wickedwhimsmod.com).",
+      "Unzip it into Mods, at most one folder deep, and delete any older copy.",
+      "Put animation packs anywhere in Mods.",
+      "Tick Script Mods Allowed in Game Options, Other, and restart.",
+    ],
+    related: ["game-mods/install-mc-command-center", "game-mods/install-sims-4-cc", "game-mods/find-broken-sims-4-mods"],
+    platforms: ["windows", "mac"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "sims-4-reshade-presets",
+    niche: "game-mods",
+    searchPhrases: [
+      "sims 4 reshade presets",
+      "how to install reshade sims 4",
+      "sims 4 reshade",
+      "sims 4 reshade tutorial",
+    ],
+    title: "Sims 4 ReShade presets: install ReShade and a preset",
+    description:
+      "Install ReShade for Sims 4 and the preset you like. Stella (stella.sh) sets it up for the EA app or Steam and adds the preset with the effects it needs.",
+    h1: "Install Sims 4 ReShade presets",
+    short: "Sims 4 ReShade presets",
+    lede: "Soft, cinematic light in your game, like the screenshots you love.",
+    answer:
+      "Send Stella (stella.sh) the preset you like. It installs ReShade on your Sims 4, adds the preset and every effect it uses, and sets one key to switch the look on and off while you play.",
+    gets: [
+      "ReShade on the right game, EA app or Steam",
+      "Your preset with all of its effects",
+      "One key to flip the look on and off",
+    ],
+    prompt:
+      "Install ReShade on my Sims 4 with the soft pastel preset I got from Patreon. The zip is in my Downloads.",
+    demo: {
+      ack: "Setting up ReShade with your pastel preset.",
+      task: "Adding ReShade to Sims 4",
+      rows: ["Finding Sims 4 in the EA app folder", "Installing ReShade for DirectX 11", "Adding the preset and its effects", "Setting a key to toggle it"],
+      reply:
+        "ReShade is on Sims 4 with your pastel preset loaded. Press Home in game to open its menu, and Scroll Lock turns the look on or off. The preset sits beside the game in its Bin folder.",
+    },
+    faq: [
+      ["Will ReShade slow my game down?", "Heavy presets can. Stella can switch off the costliest effects, like depth of field, for everyday play and keep them for screenshots."],
+      ["What about GShade presets?", "GShade stopped being updated in 2023. Most GShade presets work in ReShade, and Stella moves yours across."],
+    ],
+    byHand: [
+      "Download ReShade from [reshade.me](https://reshade.me) and run it.",
+      "Pick TS4_x64.exe in the game's Game, Bin folder, then choose DirectX 10/11/12.",
+      "Put the preset file in that Bin folder, install the effects it lists, then pick it in the Home menu.",
+    ],
+    related: ["game-mods/install-sims-4-cc", "game-mods/sims-4-tray-files", "game-mods/install-minecraft-shaders"],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "sims-4-tray-files",
+    niche: "game-mods",
+    searchPhrases: [
+      "sims 4 tray files",
+      "how to download sims 4 lots",
+      "sims 4 tray files not showing up in gallery",
+      "how to download sims 4 lots from patreon",
+    ],
+    title: "Sims 4 Tray files: add downloaded lots, houses and Sims",
+    description:
+      "Downloaded a Sims 4 house or Sim? Stella (stella.sh) puts its Tray files and the CC it uses in place, so it shows in your Gallery library ready to place.",
+    h1: "Sims 4 Tray files: put downloaded lots in your game",
+    short: "Sims 4 Tray files and lots",
+    lede: "Downloaded houses and Sims, ready in your library.",
+    answer:
+      "A downloaded lot or Sim comes as Tray files, usually with CC it needs. Stella (stella.sh) puts the Tray files in Tray and the CC in Mods, fetches anything missing from the creator's list, and it appears in your library.",
+    gets: [
+      "Houses, rooms and Sims in My Library",
+      "The CC each lot uses, added alongside",
+      "Anything paid or gone, listed with its link",
+    ],
+    prompt:
+      "I downloaded three houses and a family from Patreon for Sims 4. Put them in my game with all the CC they need.",
+    demo: {
+      ack: "Sorting those downloads into Tray and Mods.",
+      task: "Adding lots to your Sims 4",
+      rows: ["Unzipping four downloads", "Moving Tray files into Tray", "Fetching CC from each creator's list"],
+      reply:
+        "Your three houses and the family are in the Gallery under My Library. 41 CC items went into Mods, one folder per lot. Tick Include Custom Content in the Gallery, then place a house from Manage Worlds.",
+    },
+    faq: [
+      ["Sims 4 Tray files not showing up in the Gallery?", "Tick Include Custom Content in My Library. Tray files inside subfolders don't show either; Stella keeps them at the top of Tray."],
+      ["Where is the Tray folder?", "Beside Mods, in Documents, Electronic Arts, The Sims 4, Tray."],
+    ],
+    byHand: [
+      "Unzip the download. Files ending in .trayitem, .blueprint, .bpi, .hhi and .sgi go straight into Tray.",
+      "Put any .package files into Mods.",
+      "In the game, open the Gallery, My Library, and tick Include Custom Content.",
+    ],
+    related: ["game-mods/install-sims-4-cc", "game-mods/sims-4-cc-not-showing-up", "game-mods/install-sims-4-mods"],
+    platforms: ["windows", "mac"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "sims-4-duplicate-cc",
+    niche: "game-mods",
+    searchPhrases: [
+      "sims 4 duplicate cc finder",
+      "sims 4 merge cc",
+      "sims 4 delete duplicate cc",
+      "sims 4 cc merged or unmerged",
+    ],
+    title: "Sims 4 duplicate CC finder: clean up and merge your CC",
+    description:
+      "Clean up a huge Sims 4 CC folder. Stella (stella.sh) finds duplicate CC, moves the doubles to the Trash and merges the rest so the game loads faster.",
+    h1: "Find duplicate CC in Sims 4 and speed up loading",
+    short: "Find and merge duplicate Sims 4 CC",
+    lede: "A lighter CC folder that loads faster and never doubles up.",
+    answer:
+      "Stella (stella.sh) goes through your whole CC collection, finds files that are the same item twice, moves the extras to the Trash and, if you like, merges thousands of small files into a few, so the game loads sooner.",
+    gets: [
+      "Exact and renamed duplicates found",
+      "Extras in the Trash, easy to restore",
+      "Merged files by category, with a list of what's inside",
+    ],
+    prompt:
+      "My Sims 4 Mods folder is 40 GB and takes forever to load. Find the duplicate CC, remove it and merge what's left.",
+    demo: {
+      ack: "Scanning your Mods folder for doubles first.",
+      task: "Cleaning up your Sims 4 CC",
+      rows: ["Comparing 18,400 package files", "Moving 1,260 duplicates to the Trash", "Merging the rest by category"],
+      reply:
+        "Your Mods folder went from 18,400 files to 34 merged ones, with script mods left as they were. The 1,260 doubles are in the Trash, and Merged CC list.txt says what's inside each merged file.",
+    },
+    faq: [
+      ["Should Sims 4 CC be merged or unmerged?", "Merged loads faster and stays tidy; unmerged is easier to update item by item. Stella keeps a list, so any merged item is still easy to find."],
+      ["Can script mods be merged?", "No. Files ending in .ts4script stay as they are; Stella merges only CC."],
+    ],
+    byHand: [
+      "Run the Sims 4 Mod Conflict Detector or Sims 4 Studio to list duplicates.",
+      "Delete the extra copies, keeping the newest.",
+      "Merge with Sims 4 Studio's Merge Packages tool, one category at a time, and keep the originals as a backup.",
+    ],
+    related: ["game-mods/sims-4-cc-not-showing-up", "game-mods/install-sims-4-cc", "pc-cleanup/find-duplicate-files"],
     platforms: ["windows", "mac"],
     lastChecked: "2026-11-24",
   }),

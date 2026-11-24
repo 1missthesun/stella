@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "Laat Stella op je telefoon of andere computers taken starten op deze computer.",
       "title": "Werk vanaf je andere apparaten"
+    },
+    "modelPlace": {
+      "runsOn": "Stella draait op {place}.",
+      "runsInCloud": "Stella draait in de cloud.",
+      "signInThere": "Log in op die computer, in {settings}.",
+      "computersOnly": "Werkt alleen op je computers, niet in de cloud.",
+      "signedInElsewhere": "Ingelogd op {places}. Verplaats Stella daarheen om het te gebruiken, of log in op deze computer.",
+      "onlyHere": "{place} kan dit niet gebruiken. Het is alleen op deze computer ingesteld.",
+      "currentElsewhere": "{place} kan het hier gekozen model niet gebruiken en antwoordt dus met het eigen model.",
+      "usedThere": "Wordt gebruikt als Stella daar draait"
     }
   },
   "shell": {

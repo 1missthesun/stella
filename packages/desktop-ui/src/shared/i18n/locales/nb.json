@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "La Stella på telefonen eller andre datamaskiner starte oppgaver på denne datamaskinen.",
       "title": "Arbeid fra de andre enhetene dine"
+    },
+    "modelPlace": {
+      "runsOn": "Stella kjører på {place}.",
+      "runsInCloud": "Stella kjører i skyen.",
+      "signInThere": "Logg på på den datamaskinen, i {settings}.",
+      "computersOnly": "Kjører bare på datamaskinene dine, ikke i skyen.",
+      "signedInElsewhere": "Pålogget på {places}. Flytt Stella dit for å bruke det, eller logg på på denne datamaskinen.",
+      "onlyHere": "{place} kan ikke bruke dette. Det er bare satt opp på denne datamaskinen.",
+      "currentElsewhere": "{place} kan ikke bruke modellen som er valgt her, så den svarer med sin egen.",
+      "usedThere": "Brukes når Stella kjører der"
     }
   },
   "shell": {

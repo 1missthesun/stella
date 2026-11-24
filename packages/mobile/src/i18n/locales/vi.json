@@ -2597,6 +2597,16 @@
     "thisComputerWork": {
       "description": "Cho phép Stella trên điện thoại hoặc máy tính khác bắt đầu tác vụ trên máy tính này.",
       "title": "Công việc từ các thiết bị khác"
+    },
+    "modelPlace": {
+      "runsOn": "Stella chạy trên {place}.",
+      "runsInCloud": "Stella chạy trên đám mây.",
+      "signInThere": "Đăng nhập trên máy tính đó, trong {settings}.",
+      "computersOnly": "Chỉ chạy trên máy tính của bạn, không chạy trên đám mây.",
+      "signedInElsewhere": "Đã đăng nhập trên {places}. Chuyển Stella đến đó để dùng, hoặc đăng nhập trên máy tính này.",
+      "onlyHere": "{place} không thể dùng mục này. Mục này chỉ được thiết lập trên máy tính này.",
+      "currentElsewhere": "{place} không thể dùng mô hình được chọn ở đây nên trả lời bằng mô hình riêng.",
+      "usedThere": "Được dùng khi Stella chạy ở đó"
     }
   },
   "shell": {

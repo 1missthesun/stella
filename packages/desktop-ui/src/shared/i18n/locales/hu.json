@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "A telefonodon vagy más számítógépeken futó Stella feladatokat indíthat ezen a számítógépen.",
       "title": "Munka a többi eszközödről"
+    },
+    "modelPlace": {
+      "runsOn": "A Stella itt fut: {place}.",
+      "runsInCloud": "A Stella a felhőben fut.",
+      "signInThere": "Jelentkezz be azon a számítógépen, itt: {settings}.",
+      "computersOnly": "Csak a számítógépeiden fut, a felhőben nem.",
+      "signedInElsewhere": "Bejelentkezve itt: {places}. A használatához vidd oda a Stellát, vagy jelentkezz be ezen a számítógépen.",
+      "onlyHere": "{place}: ezt nem tudja használni. Csak ezen a számítógépen van beállítva.",
+      "currentElsewhere": "{place}: nem tudja használni az itt választott modellt, ezért a sajátjával válaszol.",
+      "usedThere": "Akkor használatos, amikor a Stella ott fut"
     }
   },
   "shell": {

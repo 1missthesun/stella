@@ -50,7 +50,8 @@ export const createKnownModelIdPredicate = (
     if (catalogModelIds.size === 0) return true;
     if (
       modelId.startsWith("claude-code/") ||
-      modelId.startsWith("codex-cli/")
+      modelId.startsWith("codex-cli/") ||
+      modelId.startsWith("antigravity/")
     ) {
       return true;
     }

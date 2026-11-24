@@ -186,7 +186,11 @@
 }
 
 .mini-model-picker-row-note {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-weaker);
   font-size: var(--font-size-2xs);
 }

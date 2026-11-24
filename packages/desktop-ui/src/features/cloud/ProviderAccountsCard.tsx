@@ -32,7 +32,9 @@ export function ProviderAccountsCard() {
       .filter(isEngineConnectionUsable)
       .map((row) => row.provider),
   );
-  const chatEngine = connections?.execution.engine ?? "stella";
+  // The pick itself: `execution` is what the cloud falls back to when it can't run it.
+  const chosen = connections?.selection ?? connections?.execution;
+  const chatEngine = chosen?.engine ?? "stella";
   const refreshing = isAuthenticated && connections === undefined;
 
   const chooseEngine = async (engine: LegacyCloudExecutionSelection["engine"]) => {
@@ -89,7 +91,9 @@ export function ProviderAccountsCard() {
         engineInUse={isAuthenticated && chatEngine === "chatgpt"}
         {...engineChoice("chatgpt")}
       />
-      <AntigravityAccountSection />
+      <AntigravityAccountSection
+        engineInUse={chosen?.engine === "provider" && chosen.provider === "antigravity"}
+      />
       {isAuthenticated && managedModels ? (
         <section className="settings-card ai-provider ai-provider--plain" data-ai-provider="stella">
           <AiPrimaryAccount

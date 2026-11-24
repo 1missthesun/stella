@@ -17,6 +17,8 @@ import { listReasoningEffortOptions, type ReasoningEffortOptionId, } from "@/glo
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { recordRecentModel } from "@/global/settings/lib/recent-models";
 import { getPlanLabel, isRestrictedModelOverrideAudience, } from "@/global/billing/audience";
+import { EnginePlace, enginePlaceBadge } from "@/features/execution-placement/EnginePlace";
+import { modelBlockedAt, planSignedInAt, useModelDestination } from "@/features/execution-placement/use-model-destination";
 import { AntigravityModelSection } from "@/features/antigravity/AntigravityModelSection";
 import { ANTIGRAVITY_ENGINE_MODELS } from "@stella/contracts/engine-model-catalog";
 import { announceChatGptPlanUse, ChatGptPlanInUse } from "@/features/chatgpt/ChatGptBrand";
@@ -144,6 +146,8 @@ export function AgentModelPicker(props: AgentModelPickerProps) {
 
 function DesktopAgentModelPicker({ active = true, onSelected, className, surface = "sidebar", focusSection = null, }: AgentModelPickerProps) {
     const t = useT();
+    const { destination, computers } = useModelDestination();
+    const runsElsewhere = destination.kind !== "here";
     const askToSignInForStella = useStellaModelsSignIn();
     const imageProviderOptions = useByokProviderOptions(IMAGE_PROVIDER_OPTIONS);
     const voiceProviderOptions = useByokProviderOptions(VOICE_PROVIDER_OPTIONS);
@@ -444,7 +448,8 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         try {
             if (engine === "codex_cli") {
                 const selectedModel = modelId?.trim() || preferences.codexModel;
-                if (chatGptConnection !== "connected") {
+                // Elsewhere it runs on the sign-in there, not on one here.
+                if (chatGptConnection !== "connected" && !runsElsewhere) {
                     setOauthPendingProvider(CHATGPT_PROVIDER);
                     const profile = await signInChatGpt().finally(() => setOauthPendingProvider(null));
                     if (!profile) {
@@ -512,6 +517,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         signInChatGpt,
         pendingAgent,
         preferences,
+        runsElsewhere,
         setPreferences,
         t,
     ]);
@@ -780,7 +786,12 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const reasoningEffortOptions = listReasoningEffortOptions();
     const reasoningDisabled = pendingAgent !== null ||
         (committedEngine === "codex_cli" &&
-            chatGptConnection !== "connected");
+            chatGptConnection !== "connected" &&
+            !planSignedInAt(destination, "chatgpt"));
+    // The place falls back to a model of its own for a pick it never holds.
+    const currentBlock = modelBlockedAt(destination, current);
+    const currentAnsweredElsewhere = currentBlock === "only-here" ||
+        (currentBlock !== undefined && destination.kind === "cloud" && current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`));
     const reasoningControl = (<div className="agent-model-picker-reasoning">
         <Lightbulb size={14} strokeWidth={1.75} className="agent-model-picker-reasoning-icon" aria-hidden/>
         <div className="agent-model-picker-reasoning-options" role="radiogroup" aria-label={t("settings.modelPicker.reasoning.label")}>
@@ -797,7 +808,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
       </div>);
     const chatGptSelectionControls = (<div className="agent-model-picker-selected-controls">
         {reasoningControl}
-        {chatGptConnection === "connected" ? (<ChatGptPlanInUse label={t("settings.agentModelPicker.chatGptPlanInUse")} manageLabel={t("settings.agentModelPicker.chatGptManageUsage")}/>) : null}
+        {chatGptConnection === "connected" && !runsElsewhere ? (<ChatGptPlanInUse label={t("settings.agentModelPicker.chatGptPlanInUse")} manageLabel={t("settings.agentModelPicker.chatGptManageUsage")}/>) : null}
       </div>);
     const handleExtraSectionExpanded = useCallback((key: string, expanded: boolean) => {
         if (key === CHATGPT_SECTION_KEY) {
@@ -864,28 +875,38 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             <ProviderOnlyPicker providers={voiceProviderOptions} value={current || "stella"} onSelect={(key) => void handleVoiceProviderSelect(key)} disabled={!preferences || pendingAgent !== null} ariaLabel={t("settings.agentModelPicker.voiceProviderAriaLabel")}/>
             <VoiceCatalogPicker voiceProvider={voicePreferences.provider} selectedVoices={voicePreferences.voices} readAloudProvider={voicePreferences.readAloudProvider} onSelectVoice={(underlyingProvider, voiceId) => void handleVoiceSelect(underlyingProvider, voiceId)} onSelectReadAloudProvider={(provider) => void handleReadAloudProviderSelect(provider)} onSelectReadAloudVoice={(voiceId) => void handleReadAloudVoiceSelect(voiceId)} disabled={!preferences || pendingAgent !== null}/>
           </>) : (<>
-            <ProviderModelPanel value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={reasoningControl} collapsibleGroups activeSectionKey={activeSectionKey} focusSection={focusSection} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
+            {destination.kind === "here" ? null : (<p className="engine-place-line" role="note">
+                {destination.kind === "cloud"
+                    ? t("settings.modelPlace.runsInCloud")
+                    : t("settings.modelPlace.runsOn", { place: destination.place })}
+                {currentAnsweredElsewhere
+                    ? ` ${t("settings.modelPlace.currentElsewhere", { place: destination.placeStart })}`
+                    : ""}
+              </p>)}
+            <ProviderModelPanel destination={destination} value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={reasoningControl} collapsibleGroups activeSectionKey={activeSectionKey} focusSection={focusSection} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
                 ((claudeCodeSectionOpen || committedEngine === "claude_code_local") &&
                     claudeCodeModelsLoading)} extraSections={[
                 {
                     key: CLAUDE_CODE_SECTION_KEY,
                     label: "Claude Code",
                     brandKey: "anthropic",
+                    badge: enginePlaceBadge(t, destination, "claude-code"),
                     selected: committedEngine === "claude_code_local",
-                    content: () => (claudeCodeCatalog.error && !claudeCodeModelsLoading
+                    content: () => (<EnginePlace destination={destination} plan="claude-code" selected={committedEngine === "claude_code_local"}>{claudeCodeCatalog.error && !claudeCodeModelsLoading
                         ? engineCatalogError(() => void claudeCodeCatalog.refresh())
                         : (<>
                         <EngineScopedModelList engineLabel="Claude Code" hideHead selectedRowExtra={claudeCodeSelectionControls} models={claudeCodeModelsWithCurrent} value={committedEngine === "claude_code_local"
                                 ? selectedClaudeCodeModel
                                 : ""} onSelect={(modelId) => void handleEngineModelSelect("claude_code_local", modelId)} loading={claudeCodeModelsLoading} disabled={!preferences || pendingAgent !== null}/>
-                      </>)),
+                      </>)}</EnginePlace>),
                 },
                 {
                     key: ANTIGRAVITY_SECTION_KEY,
                     label: "Google Antigravity",
                     brandKey: "antigravity",
+                    badge: enginePlaceBadge(t, destination, "antigravity"),
                     selected: current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`),
-                    content: () => (<AntigravityModelSection>
+                    content: () => (<AntigravityModelSection destination={destination} computers={computers} selected={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`)}>
                         <EngineScopedModelList engineLabel="Google Antigravity" hideHead selectedRowExtra={reasoningControl} models={ANTIGRAVITY_MODELS} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? current.slice(ANTIGRAVITY_SECTION_KEY.length + 1) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>
                       </AntigravityModelSection>),
                 },
@@ -893,8 +914,9 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                     key: CHATGPT_SECTION_KEY,
                     label: "ChatGPT",
                     brandKey: "openai",
+                    badge: enginePlaceBadge(t, destination, "chatgpt"),
                     selected: committedEngine === "codex_cli",
-                    content: () => (<>
+                    content: () => (<EnginePlace destination={destination} plan="chatgpt" selected={committedEngine === "codex_cli"}>
                         {chatGptDisplayModels.length === 0 ? (<p className="agent-model-picker-connection" role="status">
                             {t("settings.agentModelPicker.noChatGptModels")}
                           </p>) : chatGptRoutedNotice ? (<p className="agent-model-picker-connection" role="status">
@@ -902,7 +924,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                           </p>) : null}
                         <EngineScopedModelList engineLabel="ChatGPT" hideHead selectedRowExtra={chatGptSelectionControls} models={chatGptDisplayModels} value={committedEngine === "codex_cli" ? selectedChatGptModel : ""} onSelect={(modelId) => void handleEngineModelSelect("codex_cli", modelId)} emptyMessage={null} disabled={!preferences ||
                             pendingAgent !== null}/>
-                      </>),
+                      </EnginePlace>),
                 },
             ]}/>
           </>)}

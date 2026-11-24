@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "Salli Stellan puhelimessasi tai muilla tietokoneilla aloittaa tehtäviä tällä tietokoneella.",
       "title": "Työt muilta laitteiltasi"
+    },
+    "modelPlace": {
+      "runsOn": "Stella toimii kohteessa {place}.",
+      "runsInCloud": "Stella toimii pilvessä.",
+      "signInThere": "Kirjaudu sisään siinä tietokoneessa kohdassa {settings}.",
+      "computersOnly": "Toimii vain tietokoneillasi, ei pilvessä.",
+      "signedInElsewhere": "Kirjautunut: {places}. Siirrä Stella sinne käyttääksesi sitä tai kirjaudu sisään tässä tietokoneessa.",
+      "onlyHere": "{place} ei voi käyttää tätä. Se on määritetty vain tässä tietokoneessa.",
+      "currentElsewhere": "{place} ei voi käyttää tässä valittua mallia, joten se vastaa omallaan.",
+      "usedThere": "Käytetään, kun Stella toimii siellä"
     }
   },
   "shell": {

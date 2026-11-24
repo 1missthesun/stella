@@ -27,6 +27,7 @@ import { findApiKey, findOauthCredential, findOauthProvider, useLlmCredentials, 
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import { useAccountProviders } from "@/features/cloud/cloud-engines-api";
 import { backendClient } from "@/platform/backend/backend-client";
+import { providerOnlyHere, type ModelDestination } from "@/features/execution-placement/use-model-destination";
 import { useT } from "@/shared/i18n";
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_LEVELS, type ReasoningEffortLevel, } from "@stella/contracts/reasoning-effort";
 import "./ProviderModelPicker.css";
@@ -115,6 +116,8 @@ export interface ProviderModelPanelProps {
   refreshing?: boolean;
   catalogError?: string | null;
   selectedRowExtra?: ReactNode;
+  /** Where the chat runs: a provider set up only on this computer can't be picked for another place. */
+  destination?: ModelDestination;
 }
 
 const normalizeResolvedModelId = (modelId: string): string => modelId.trim().replace(/^stella\//, "").toLowerCase();
@@ -179,7 +182,7 @@ export function buildProviderTabs(groups: readonly ProviderGroup[], visibleProvi
     }
     return Array.from(tabs.values()).sort((a, b) => compareProviderRailOrder(a.key, b.key, a.label, b.label));
 }
-export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, onSelect, disabled = false, reasoningEffort, onSelectReasoning, restrictStellaPicks = false, restrictedPlanLabel, ariaLabel, hideDefaultRow = false, selectedHeaderKicker, hideSelectedTitle = false, hideSearch = false, hideSelectionCheck = false, disableNonStellaProviders = false, disabledProviderReason, hideProviderLabel = false, visibleProviders, hiddenProviders, favoriteScope, hideGroupHead = false, headerActionsTarget, authOpenRequest = 0, onRequestSearchClose, collapsibleGroups = false, activeSectionKey = null, focusSection = null, extraSections = [], sectionOrder = null, onExtraSectionExpanded, onRefresh, refreshing = false, catalogError = null, selectedRowExtra = null, }: ProviderModelPanelProps) {
+export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, onSelect, disabled = false, reasoningEffort, onSelectReasoning, restrictStellaPicks = false, restrictedPlanLabel, ariaLabel, hideDefaultRow = false, selectedHeaderKicker, hideSelectedTitle = false, hideSearch = false, hideSelectionCheck = false, disableNonStellaProviders = false, disabledProviderReason, hideProviderLabel = false, visibleProviders, hiddenProviders, favoriteScope, hideGroupHead = false, headerActionsTarget, authOpenRequest = 0, onRequestSearchClose, collapsibleGroups = false, activeSectionKey = null, focusSection = null, extraSections = [], sectionOrder = null, onExtraSectionExpanded, onRefresh, refreshing = false, catalogError = null, selectedRowExtra = null, destination, }: ProviderModelPanelProps) {
     const t = useT();
     const credentials = useLlmCredentials();
     const { isAuthenticated } = useAuthState();
@@ -501,7 +504,8 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         const supportsApiKey = Boolean(llmEntry) &&
             !isApiKeyOnlyPlaceholder(llmEntry?.placeholder ?? "");
         const supportsOAuth = Boolean(oauthEntry);
-        const sectionDisabled = disabled || disabledProviderSet.has(tab.key);
+        const onlyHere = Boolean(destination) && !requiresAuth && providerOnlyHere(destination!, tab.key);
+        const sectionDisabled = disabled || onlyHere || disabledProviderSet.has(tab.key);
         const removable = Boolean(apiKey) || Boolean(oauthCred) || (isAuthenticated && accountHolds.has(tab.key));
         const armed = signOutArmed === tab.key;
         const isSigningOut = signingOut === tab.key;
@@ -532,6 +536,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             hasCustomInputs,
             authDescription,
             onAccount,
+            onlyHere,
         };
     };
     const renderGroupActions = ({ tab, requiresAuth, supportsOAuth, sectionDisabled, removable, armed, isSigningOut, expanded, hasCustomInputs, }: ReturnType<typeof getSectionContext>) => requiresAuth ? (<button type="button" className="model-picker-group-connect" data-open={expanded || undefined} onClick={() => toggleExpanded(expanded ? null : tab.key)} disabled={sectionDisabled}>
@@ -668,6 +673,8 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
               <span className="model-picker-group-label">{tab.label}</span>
               {section.onAccount ? (<span className="model-picker-group-note" title={t("settings.modelPicker.accountKeyTitle")}>
                   {t("settings.modelPicker.accountKey")}
+                </span>) : section.onlyHere ? (<span className="model-picker-group-note">
+                  {t("settings.engineAccounts.whereComputer")}
                 </span>) : null}
               {!open && sectionHoldsSelection ? (<Check size={12} strokeWidth={2} className="model-picker-group-check" aria-hidden/>) : null}
               <ChevronDown size={13} strokeWidth={1.75} className="model-picker-group-chevron" data-open={open || undefined} aria-hidden/>
@@ -678,6 +685,8 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
               <span className="model-picker-group-label">{tab.label}</span>
               {section.onAccount ? (<span className="model-picker-group-note" title={t("settings.modelPicker.accountKeyTitle")}>
                   {t("settings.modelPicker.accountKey")}
+                </span>) : section.onlyHere ? (<span className="model-picker-group-note">
+                  {t("settings.engineAccounts.whereComputer")}
                 </span>) : null}
             </>)}
           {/* Overlay, not a column: the actions are absolutely positioned
@@ -714,6 +723,9 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                 {authError}
               </p>) : null}
           </div>) : null}
+        {open && section.onlyHere && destination && destination.kind !== "here" ? (<p className="engine-place-line" role="note">
+            {t("settings.modelPlace.onlyHere", { place: destination.placeStart })}
+          </p>) : null}
         {!open ? null : <>
           {isLocal && expanded ? (<div className="model-picker-connect">
               <p className="model-picker-connect-hint">

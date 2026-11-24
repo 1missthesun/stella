@@ -2597,6 +2597,16 @@
     "thisComputerWork": {
       "description": "휴대폰이나 다른 컴퓨터의 Stella가 이 컴퓨터에서 작업을 시작할 수 있게 합니다.",
       "title": "다른 기기에서 보낸 작업"
+    },
+    "modelPlace": {
+      "runsOn": "Stella가 {place}에서 실행됩니다.",
+      "runsInCloud": "Stella가 클라우드에서 실행됩니다.",
+      "signInThere": "해당 컴퓨터의 {settings}에서 로그인하세요.",
+      "computersOnly": "클라우드가 아닌 내 컴퓨터에서만 실행됩니다.",
+      "signedInElsewhere": "{places}에서 로그인되어 있습니다. 사용하려면 Stella를 그곳으로 옮기거나 이 컴퓨터에서 로그인하세요.",
+      "onlyHere": "{place}에서는 사용할 수 없습니다. 이 컴퓨터에만 설정되어 있습니다.",
+      "currentElsewhere": "{place}에서는 여기서 선택한 모델을 사용할 수 없어 해당 위치의 모델로 응답합니다.",
+      "usedThere": "Stella가 그곳에서 실행될 때 사용됩니다"
     }
   },
   "shell": {

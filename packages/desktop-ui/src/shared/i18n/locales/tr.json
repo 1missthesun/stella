@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "Telefonunuzdaki veya diğer bilgisayarlardaki Stella bu bilgisayarda görev başlatabilsin.",
       "title": "Diğer cihazlarınızdan gelen işler"
+    },
+    "modelPlace": {
+      "runsOn": "Stella şurada çalışıyor: {place}.",
+      "runsInCloud": "Stella bulutta çalışıyor.",
+      "signInThere": "O bilgisayarda {settings} bölümünden oturum açın.",
+      "computersOnly": "Yalnızca bilgisayarlarınızda çalışır, bulutta çalışmaz.",
+      "signedInElsewhere": "Oturum açılan yer: {places}. Kullanmak için Stella'yı oraya taşıyın veya bu bilgisayarda oturum açın.",
+      "onlyHere": "{place} bunu kullanamaz. Yalnızca bu bilgisayarda ayarlı.",
+      "currentElsewhere": "{place} burada seçilen modeli kullanamadığı için kendi modeliyle yanıt verir.",
+      "usedThere": "Stella orada çalışırken kullanılır"
     }
   },
   "shell": {

@@ -2617,6 +2617,16 @@
     "thisComputerWork": {
       "description": "לאפשר ל-Stella בטלפון או במחשבים אחרים להתחיל משימות במחשב הזה.",
       "title": "עבודה מהמכשירים האחרים שלך"
+    },
+    "modelPlace": {
+      "runsOn": "Stella פועלת ב-{place}.",
+      "runsInCloud": "Stella פועלת בענן.",
+      "signInThere": "יש להתחבר במחשב ההוא, ב-{settings}.",
+      "computersOnly": "פועל רק במחשבים שלך, לא בענן.",
+      "signedInElsewhere": "מחובר ב-{places}. אפשר להעביר את Stella לשם כדי להשתמש בו, או להתחבר במחשב הזה.",
+      "onlyHere": "לא ניתן להשתמש בזה ב-{place}. זה מוגדר רק במחשב הזה.",
+      "currentElsewhere": "לא ניתן להשתמש ב-{place} במודל שנבחר כאן, ולכן התשובה תינתן עם המודל שם.",
+      "usedThere": "בשימוש כש-Stella פועלת שם"
     }
   },
   "shell": {

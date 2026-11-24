@@ -2597,6 +2597,16 @@
     "thisComputerWork": {
       "description": "允许手机或其他电脑上的 Stella 在这台电脑上开始任务。",
       "title": "来自其他设备的工作"
+    },
+    "modelPlace": {
+      "runsOn": "Stella 在 {place} 上运行。",
+      "runsInCloud": "Stella 在云端运行。",
+      "signInThere": "请在那台电脑的{settings}中登录。",
+      "computersOnly": "只能在你的电脑上运行，不能在云端运行。",
+      "signedInElsewhere": "已在 {places} 上登录。将 Stella 移到那里即可使用，或在这台电脑上登录。",
+      "onlyHere": "{place} 无法使用此项。它只在这台电脑上设置过。",
+      "currentElsewhere": "{place} 无法使用在此选择的模型，因此会用自己的模型回答。",
+      "usedThere": "Stella 在那里运行时使用"
     }
   },
   "shell": {

@@ -2617,6 +2617,16 @@
     "thisComputerWork": {
       "description": "Permite ca Stella de pe telefon sau de pe alte computere să pornească sarcini pe acest computer.",
       "title": "Lucru de pe celelalte dispozitive"
+    },
+    "modelPlace": {
+      "runsOn": "Stella rulează pe {place}.",
+      "runsInCloud": "Stella rulează în cloud.",
+      "signInThere": "Conectează-te pe acel computer, în {settings}.",
+      "computersOnly": "Rulează doar pe computerele tale, nu în cloud.",
+      "signedInElsewhere": "Conectat pe {places}. Mută Stella acolo ca să-l folosești sau conectează-te pe acest computer.",
+      "onlyHere": "{place} nu poate folosi asta. Este configurat doar pe acest computer.",
+      "currentElsewhere": "{place} nu poate folosi modelul ales aici, așa că răspunde cu al său.",
+      "usedThere": "Folosit când Stella rulează acolo"
     }
   },
   "shell": {

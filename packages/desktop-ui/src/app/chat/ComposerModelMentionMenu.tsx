@@ -15,6 +15,13 @@ import {
   readRecentModels,
   recordRecentModel,
 } from "@/global/settings/lib/recent-models";
+import { useAntigravity } from "@/features/antigravity/use-antigravity";
+import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
+import { useClaudeLocalAccounts } from "@/features/claude/use-claude-local-accounts";
+import {
+  planSignedInAt,
+  useModelDestination,
+} from "@/features/execution-placement/use-model-destination";
 import { useT } from "@/shared/i18n";
 import "./composer-model-mention-menu.css";
 
@@ -257,6 +264,50 @@ export function filterComposerModelMentionOptions(
     });
 }
 
+/**
+ * Where a mentioned engine's plan is signed in, when that isn't this computer:
+ * the place the chat runs on, or another of the user's computers that has it.
+ */
+function useEnginePlaceNotes(): (
+  option: ComposerModelMentionOption,
+) => string | undefined {
+  const t = useT();
+  const { destination, computers } = useModelDestination();
+  const antigravity = useAntigravity().status?.signedIn;
+  const chatGpt = useChatGptProfiles();
+  const claude = useClaudeLocalAccounts();
+  return (option) => {
+    const plan =
+      option.value === "stella" || option.value === "xai" ? undefined : option.value;
+    if (!plan) return undefined;
+    const here =
+      plan === "antigravity"
+        ? antigravity
+        : plan === "chatgpt"
+          ? !chatGpt.loaded || chatGpt.usable
+          : !claude.loaded || claude.signedIn;
+    if (destination.kind === "here" && here !== false) return undefined;
+    const usedOn = (places: string) =>
+      t("settings.engineAccounts.claude.usedOn", { places });
+    if (destination.kind !== "here" && planSignedInAt(destination, plan)) {
+      return destination.kind === "device" ? usedOn(destination.place) : undefined;
+    }
+    if (destination.kind !== "here" && planSignedInAt(destination, plan) === undefined) {
+      return undefined;
+    }
+    const others = computers
+      .filter((computer) => computer.signedIn.includes(plan))
+      .map((computer) => computer.label);
+    if (destination.kind !== "here" && here) {
+      others.unshift(t("settings.engineAccounts.claude.thisComputerInline"));
+    }
+    if (others.length > 0) return usedOn(others.join(", "));
+    return destination.kind === "here"
+      ? undefined
+      : t("settings.engineAccounts.claude.notSignedIn");
+  };
+}
+
 export const ComposerModelMentionMenu = forwardRef<
   ComposerModelMentionMenuHandle,
   ComposerModelMentionMenuProps
@@ -302,6 +353,7 @@ export const ComposerModelMentionMenu = forwardRef<
     };
   }, []);
 
+  const placeNote = useEnginePlaceNotes();
   const currentValue = resolveCurrentModelMentionValue(preferences);
   const filteredOptions = useMemo(
     () =>
@@ -345,7 +397,7 @@ export const ComposerModelMentionMenu = forwardRef<
     const updatePosition = () => {
       const rect = textarea.getBoundingClientRect();
       const viewportPadding = 12;
-      const width = Math.min(184, window.innerWidth - viewportPadding * 2);
+      const width = Math.min(300, window.innerWidth - viewportPadding * 2);
       const left = Math.min(
         Math.max(viewportPadding, rect.left),
         window.innerWidth - width - viewportPadding,
@@ -440,6 +492,11 @@ export const ComposerModelMentionMenu = forwardRef<
             <span className="composer-model-mention-menu__label">
               {option.label}
             </span>
+            {placeNote(option) ? (
+              <span className="composer-model-mention-menu__note" title={placeNote(option)}>
+                {placeNote(option)}
+              </span>
+            ) : null}
           </button>
         ))}
         {filteredOptions.length === 0 && (

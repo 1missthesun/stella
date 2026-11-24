@@ -12,6 +12,8 @@ import { buildEngineReasoningPatch, buildRecentModelSelectionPatch, getActiveEng
 import { listReasoningEffortOptions, } from "@/global/settings/lib/reasoning-effort-options";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { buildRecentModelRows, createKnownModelIdPredicate, readRecentModels, recordRecentModel, } from "@/global/settings/lib/recent-models";
+import { modelBlockedAt, planOfModel, useModelDestination, } from "@/features/execution-placement/use-model-destination";
+import { enginePlaceBadge } from "@/features/execution-placement/EnginePlace";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
 import "./mini-model-picker.css";
@@ -28,6 +30,7 @@ const getModelBrandKey = (modelId, providersById) => {
 let cachedMiniPickerPreferences = null;
 export function MiniModelPicker() {
     const t = useT();
+    const { destination } = useModelDestination();
     const askToSignInForStella = useStellaModelsSignIn();
     const { allModels, defaults: stellaDefaultModels } = useModelCatalog();
     const [preferences, setPreferencesRaw] = useState(cachedMiniPickerPreferences);
@@ -152,7 +155,7 @@ export function MiniModelPicker() {
         if (!preferences)
             return;
         setOpen(false);
-        if (row.id === currentId || row.unavailable)
+        if (row.id === currentId || row.unavailable || modelBlockedAt(destination, row.id))
             return;
         const target = { assistant: true, configurableAgentKeys };
         if (isStellaModelId(row.id) && askToSignInForStella(() => void saveModelSelection(row.id, target)))
@@ -160,7 +163,7 @@ export function MiniModelPicker() {
         const patch = buildRecentModelSelectionPatch(preferences, row.id, target);
         setRecentIds(recordRecentModel(row.id));
         void applyPreferencesPatch(patch, t("app.chat.miniModelPicker.modelUpdateFailed"));
-    }, [applyPreferencesPatch, askToSignInForStella, configurableAgentKeys, currentId, preferences, t]);
+    }, [applyPreferencesPatch, askToSignInForStella, configurableAgentKeys, currentId, destination, preferences, t]);
     const handleOpenFullPicker = useCallback(() => {
         setOpen(false);
         openModelPicker();
@@ -185,13 +188,24 @@ export function MiniModelPicker() {
         {recentRows.length > 0 ? (<div className="mini-model-picker-rows" role="listbox" aria-label={t("app.chat.miniModelPicker.modelsLabel")}>
             {recentRows.map((row) => {
                 const selected = row.id === currentId;
-                return (<button key={row.id} type="button" role="option" aria-selected={selected} aria-disabled={row.unavailable || undefined} data-selected={selected || undefined} disabled={pending || row.unavailable} onClick={() => handleRecentSelect(row)}>
+                const blocked = modelBlockedAt(destination, row.id);
+                const plan = planOfModel(row.id);
+                const note = blocked === "only-here"
+                    ? t("settings.engineAccounts.whereComputer")
+                    : blocked
+                        ? t("settings.engineAccounts.claude.noteSignedOut", { place: destination.placeStart })
+                        : plan
+                            ? enginePlaceBadge(t, destination, plan)
+                            : undefined;
+                return (<button key={row.id} type="button" role="option" aria-selected={selected} aria-disabled={row.unavailable || Boolean(blocked) || undefined} data-selected={selected || undefined} disabled={pending || row.unavailable || Boolean(blocked)} onClick={() => handleRecentSelect(row)}>
                 <BrandIcon brand={getModelBrandKey(row.id, modelProvidersById)} size={14} className="mini-model-picker-row-brand"/>
                 <span className="mini-model-picker-row-name">
                   {getModelPickerDisplayLabel(row.id, modelNamesById)}
                 </span>
                 {row.unavailable ? (<span className="mini-model-picker-row-note">
                     {t("app.chat.miniModelPicker.unavailable")}
+                  </span>) : note ? (<span className="mini-model-picker-row-note" title={note}>
+                    {note}
                   </span>) : null}
               </button>);
             })}

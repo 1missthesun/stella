@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "Let Stella on your phone or other computers start tasks on this computer.",
       "title": "Work from your other devices"
+    },
+    "modelPlace": {
+      "runsOn": "Stella runs on {place}.",
+      "runsInCloud": "Stella runs in the cloud.",
+      "signInThere": "Sign in on that computer, in {settings}.",
+      "computersOnly": "Runs only on your computers, not in the cloud.",
+      "signedInElsewhere": "Signed in on {places}. Move Stella there to use it, or sign in on this computer.",
+      "onlyHere": "{place} can't use this. It's set up only on this computer.",
+      "currentElsewhere": "{place} can't use the model picked here, so it answers with its own.",
+      "usedThere": "Used when Stella runs there"
     }
   },
   "shell": {

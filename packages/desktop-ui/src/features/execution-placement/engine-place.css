@@ -1,0 +1,24 @@
+.engine-place-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 10px;
+}
+
+.engine-place-note p,
+.engine-place-line {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  color: var(--text-weak);
+}
+
+.engine-place-note .pill-btn {
+  flex: none;
+}
+
+.engine-place-line {
+  padding: 2px 10px 8px;
+}

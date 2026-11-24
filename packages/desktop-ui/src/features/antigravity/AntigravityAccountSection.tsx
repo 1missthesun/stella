@@ -3,16 +3,18 @@ import { Button } from "@/ui/button";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
 import { AiPrimaryAccount, AiProviderSection, AiRow } from "@/features/cloud/AiProviderSection";
+import { useOtherComputers } from "@/features/execution-placement/use-model-destination";
 import { AntigravitySignInPrompt } from "./AntigravitySignInPrompt";
 import { useAntigravity } from "./use-antigravity";
 
 const K = "settings.engineAccounts";
 
-/** Google Antigravity on this computer: Gemini on the user's own Google plan, run inside Google's own CLI. */
-export function AntigravityAccountSection() {
+/** Google Antigravity on this computer, and which of the others are signed in to it: Gemini on the user's own Google plan, run inside Google's own CLI. */
+export function AntigravityAccountSection({ engineInUse = false }: { engineInUse?: boolean }) {
   const t = useT();
   const antigravity = useAntigravity();
   const { status, signIn, start, signOut } = antigravity;
+  const { computers } = useOtherComputers();
   const [busy, setBusy] = useState(false);
 
   const onStart = useCallback(() => {
@@ -37,6 +39,7 @@ export function AntigravityAccountSection() {
   }, [signOut, t]);
 
   if (!status) return null;
+  const elsewhere = computers.filter((computer) => computer.signedIn.includes("antigravity"));
 
   return (
     <AiProviderSection
@@ -49,13 +52,20 @@ export function AntigravityAccountSection() {
       {status.signedIn ? (
         <AiRow
           name={t(`${K}.placeSignedIn`, { place: t(`${K}.placeComputer`) })}
+          {...(engineInUse ? { inUseLabel: t(`${K}.inUse`) } : {})}
           menuLabel={t(`${K}.moreLabel`, { name: t(`${K}.antigravityTitle`) })}
           menu={[{ key: "out", label: t(`${K}.signOutComputer`), onSelect: () => void onSignOut() }]}
           busy={busy}
         />
       ) : (
         <AiPrimaryAccount
-          name={<span data-empty>{t(`${K}.notConnected`)}</span>}
+          name={
+            <span data-empty>
+              {elsewhere.length > 0
+                ? t(`${K}.placeSignedOut`, { place: t(`${K}.placeComputer`) })
+                : t(`${K}.notConnected`)}
+            </span>
+          }
           meta={t(`${K}.antigravityHint`)}
           trailing={
             <Button
@@ -65,11 +75,19 @@ export function AntigravityAccountSection() {
               disabled={signIn.state === "running"}
               onClick={onStart}
             >
-              {t(`${K}.antigravitySignIn`)}
+              {elsewhere.length > 0 ? t(`${K}.signInComputer`) : t(`${K}.antigravitySignIn`)}
             </Button>
           }
         />
       )}
+      {elsewhere.map((computer, index) => (
+        <AiRow
+          key={computer.deviceId}
+          name={t(`${K}.placeSignedIn`, { place: computer.label })}
+          meta={t("settings.modelPlace.usedThere")}
+          {...(engineInUse && !status.signedIn && index === 0 ? { inUseLabel: t(`${K}.inUse`) } : {})}
+        />
+      ))}
     </AiProviderSection>
   );
 }

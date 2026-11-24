@@ -16,6 +16,7 @@ import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
 import { cloudEnginesApi } from "@/features/cloud/cloud-engines-api";
 import { EngineConnectPrompt } from "@/features/cloud/EngineConnectPrompt";
+import { useOtherComputers } from "@/features/execution-placement/use-model-destination";
 import { useEngineConnect } from "@/features/cloud/use-engine-connect";
 import { formatPlan } from "@/features/cloud/EngineAccountRow";
 import {
@@ -137,6 +138,7 @@ export function ChatGptAccountsSection({
   ) : null;
   const chatgpt = useChatGptProfiles();
   const connect = useEngineConnect();
+  const { computers } = useOtherComputers();
   const [busy, setBusy] = useState(false);
   const { signIn } = chatgpt;
   const { start } = connect;
@@ -368,8 +370,18 @@ export function ChatGptAccountsSection({
   const primary = views.find((view) => view.active) ?? views.find((view) => view.pick) ?? views[0];
   const connected = Boolean(primary && (primary.account.local || primary.account.cloud));
 
+  const elsewhere = computers.filter((computer) => computer.signedIn.includes("chatgpt"));
+  const otherComputers = elsewhere.map((computer) => (
+    <AiRow
+      key={computer.deviceId}
+      name={t(`${K}.placeSignedIn`, { place: computer.label })}
+      meta={t("settings.modelPlace.usedThere")}
+    />
+  ));
+
   const details =
     views.length > 0 ? (
+      <>
       <AiDetailsGroup label={t(`${K}.accountsLabel`)}>
         {views.map((view) => (
           <AiRow
@@ -384,6 +396,10 @@ export function ChatGptAccountsSection({
           />
         ))}
       </AiDetailsGroup>
+      {otherComputers.length > 0 ? (
+        <AiDetailsGroup label={t(`${K}.computersLabel`)}>{otherComputers}</AiDetailsGroup>
+      ) : null}
+      </>
     ) : undefined;
 
   return (
@@ -433,6 +449,7 @@ export function ChatGptAccountsSection({
             trailing={addChatGpt()}
           />
         )}
+        {connected ? null : otherComputers}
       </AiProviderSection>
     </>
   );

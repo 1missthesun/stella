@@ -2597,6 +2597,16 @@
     "thisComputerWork": {
       "description": "Izinkan Stella di ponsel atau komputer lain memulai tugas di komputer ini.",
       "title": "Pekerjaan dari perangkat Anda yang lain"
+    },
+    "modelPlace": {
+      "runsOn": "Stella berjalan di {place}.",
+      "runsInCloud": "Stella berjalan di cloud.",
+      "signInThere": "Masuk di komputer tersebut, di {settings}.",
+      "computersOnly": "Hanya berjalan di komputer Anda, tidak di cloud.",
+      "signedInElsewhere": "Sudah masuk di {places}. Pindahkan Stella ke sana untuk memakainya, atau masuk di komputer ini.",
+      "onlyHere": "{place} tidak dapat memakai ini. Ini hanya disiapkan di komputer ini.",
+      "currentElsewhere": "{place} tidak dapat memakai model yang dipilih di sini, jadi menjawab dengan modelnya sendiri.",
+      "usedThere": "Dipakai saat Stella berjalan di sana"
     }
   },
   "shell": {

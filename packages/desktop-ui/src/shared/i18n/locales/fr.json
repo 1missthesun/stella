@@ -2617,6 +2617,16 @@
     "thisComputerWork": {
       "description": "Autoriser Stella sur votre téléphone ou vos autres ordinateurs à lancer des tâches sur cet ordinateur.",
       "title": "Travail depuis vos autres appareils"
+    },
+    "modelPlace": {
+      "runsOn": "Stella s’exécute sur {place}.",
+      "runsInCloud": "Stella s’exécute dans le cloud.",
+      "signInThere": "Connectez-vous sur cet ordinateur, dans {settings}.",
+      "computersOnly": "Fonctionne uniquement sur vos ordinateurs, pas dans le cloud.",
+      "signedInElsewhere": "Connecté sur {places}. Déplacez Stella là-bas pour l’utiliser, ou connectez-vous sur cet ordinateur.",
+      "onlyHere": "{place} ne peut pas l’utiliser. C’est configuré uniquement sur cet ordinateur.",
+      "currentElsewhere": "{place} ne peut pas utiliser le modèle choisi ici et répond donc avec le sien.",
+      "usedThere": "Utilisé quand Stella s’exécute là-bas"
     }
   },
   "shell": {

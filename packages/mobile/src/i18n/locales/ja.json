@@ -2597,6 +2597,16 @@
     "thisComputerWork": {
       "description": "スマートフォンやほかのコンピュータの Stella が、このコンピュータでタスクを始められるようにします。",
       "title": "ほかのデバイスからの作業"
+    },
+    "modelPlace": {
+      "runsOn": "Stella は {place} で動作しています。",
+      "runsInCloud": "Stella はクラウドで動作しています。",
+      "signInThere": "そのコンピュータの{settings}でサインインしてください。",
+      "computersOnly": "お使いのコンピュータでのみ動作し、クラウドでは動作しません。",
+      "signedInElsewhere": "{places} でサインイン済みです。使うには Stella をそちらに移すか、このコンピュータでサインインしてください。",
+      "onlyHere": "{place} では使えません。このコンピュータにのみ設定されています。",
+      "currentElsewhere": "{place} ではここで選んだモデルを使えないため、そちらのモデルで応答します。",
+      "usedThere": "Stella がそこで動作しているときに使われます"
     }
   },
   "shell": {

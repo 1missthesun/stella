@@ -55,12 +55,24 @@
 }
 
 .composer-model-mention-menu__label {
+  flex: none;
+  max-width: 60%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
   font-weight: var(--weight-medium);
+}
+
+.composer-model-mention-menu__note {
+  min-width: 0;
+  margin-inline-start: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-weak);
+  font-size: var(--font-size-2xs);
 }
 
 .composer-model-mention-menu__empty {

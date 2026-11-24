@@ -2617,6 +2617,16 @@
     "thisComputerWork": {
       "description": "Consenti a Stella sul telefono o su altri computer di avviare attività su questo computer.",
       "title": "Lavoro dagli altri tuoi dispositivi"
+    },
+    "modelPlace": {
+      "runsOn": "Stella è in esecuzione su {place}.",
+      "runsInCloud": "Stella è in esecuzione nel cloud.",
+      "signInThere": "Accedi su quel computer, in {settings}.",
+      "computersOnly": "Funziona solo sui tuoi computer, non nel cloud.",
+      "signedInElsewhere": "Accesso effettuato su {places}. Sposta Stella lì per usarlo o accedi su questo computer.",
+      "onlyHere": "{place} non può usarlo. È configurato solo su questo computer.",
+      "currentElsewhere": "{place} non può usare il modello scelto qui, quindi risponde con il proprio.",
+      "usedThere": "Usato quando Stella è in esecuzione lì"
     }
   },
   "shell": {

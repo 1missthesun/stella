@@ -2607,6 +2607,16 @@
     "thisComputerWork": {
       "description": "Stella auf deinem Handy oder anderen Computern darf Aufgaben auf diesem Computer starten.",
       "title": "Arbeit von deinen anderen Geräten"
+    },
+    "modelPlace": {
+      "runsOn": "Stella läuft auf {place}.",
+      "runsInCloud": "Stella läuft in der Cloud.",
+      "signInThere": "Melde dich auf dem Computer an, unter {settings}.",
+      "computersOnly": "Läuft nur auf deinen Computern, nicht in der Cloud.",
+      "signedInElsewhere": "Angemeldet auf {places}. Verschiebe Stella dorthin, um es zu nutzen, oder melde dich auf diesem Computer an.",
+      "onlyHere": "{place} kann das nicht nutzen. Es ist nur auf diesem Computer eingerichtet.",
+      "currentElsewhere": "{place} kann das hier gewählte Modell nicht nutzen und antwortet mit dem eigenen.",
+      "usedThere": "Wird genutzt, wenn Stella dort läuft"
     }
   },
   "shell": {

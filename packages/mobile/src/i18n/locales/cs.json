@@ -2627,6 +2627,16 @@
     "thisComputerWork": {
       "description": "Povolit Stelle na telefonu nebo jiných počítačích spouštět úkoly na tomto počítači.",
       "title": "Práce z vašich dalších zařízení"
+    },
+    "modelPlace": {
+      "runsOn": "Stella běží na: {place}.",
+      "runsInCloud": "Stella běží v cloudu.",
+      "signInThere": "Přihlaste se na tom počítači, v {settings}.",
+      "computersOnly": "Běží jen na vašich počítačích, ne v cloudu.",
+      "signedInElsewhere": "Přihlášeno: {places}. Přesuňte tam Stellu, nebo se přihlaste na tomto počítači.",
+      "onlyHere": "{place}: toto nelze použít. Je to nastavené jen na tomto počítači.",
+      "currentElsewhere": "{place}: zde vybraný model nelze použít, odpovídá se vlastním.",
+      "usedThere": "Používá se, když tam Stella běží"
     }
   },
   "shell": {

@@ -1,20 +1,3 @@
-// dictation_bridge.exe - Native Windows helpers for dictation paste/routing.
-//
-// Usage:
-//   dictation_bridge.exe probe
-//   dictation_bridge.exe paste <text>
-//   dictation_bridge.exe mute-output
-//   dictation_bridge.exe restore-output <previousVolume> [previousMuted]
-//
-// probe output:
-//   {"ok":true,"frontmostBundleId":"chrome.exe","frontmostPid":123,"focusedEditable":true}
-//
-// Compile (MSVC):
-//   cl /O2 /EHsc dictation_bridge.cpp /link ole32.lib oleaut32.lib uuid.lib user32.lib shell32.lib /OUT:dictation_bridge.exe
-// Compile (mingw-w64):
-//   x86_64-w64-mingw32-g++ -O2 -static dictation_bridge.cpp
-//       -o dictation_bridge.exe -lole32 -loleaut32 -luuid -luser32 -lshell32
-
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 
@@ -80,10 +63,6 @@ static void emitRaw(const char* s)
 {
     fwrite(s, 1, strlen(s), stdout);
 }
-
-// ---------------------------------------------------------------------------
-// Probe: foreground window + UIA-focused-element editable check.
-// ---------------------------------------------------------------------------
 
 struct ForegroundInfo {
     DWORD pid;
@@ -238,10 +217,6 @@ static void doProbe()
     fwrite(out.data(), 1, out.size(), stdout);
 }
 
-// ---------------------------------------------------------------------------
-// Paste: snapshot clipboard, write text, send Ctrl+V, restore.
-// ---------------------------------------------------------------------------
-
 struct ClipboardEntry {
     UINT format;
     std::vector<unsigned char> data;
@@ -340,10 +315,6 @@ static void doPaste(const std::wstring& text)
         emitRaw("{\"ok\":false,\"error\":\"SendInput failed\"}");
     }
 }
-
-// ---------------------------------------------------------------------------
-// Audio mute/restore via Core Audio (WASAPI).
-// ---------------------------------------------------------------------------
 
 static IAudioEndpointVolume* openEndpointVolume()
 {
@@ -454,10 +425,6 @@ static void doRestoreOutput(const char* prevVolStr, const char* prevMutedStr)
     }
     emitRaw("{\"ok\":true}");
 }
-
-// ---------------------------------------------------------------------------
-// Entry point.
-// ---------------------------------------------------------------------------
 
 static std::wstring joinWideArgs(int wArgc, LPWSTR* wArgv, int startIndex)
 {

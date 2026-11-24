@@ -1,8 +1,9 @@
 import type {
   AppCompilerRpc,
   CompiledWorkspaceApp,
-  CompiledWorkspaceAssetMetadata,
 } from "../../shared/workspace-app-compiler.js";
+import { log, withInfrastructureDeadline } from "./build-session/shared/keys.js";
+import { released } from "./rpc-release.js";
 import type { WorldSqlStore } from "./world/store.js";
 
 const SLUG = /^[a-z][a-z0-9-]{0,31}$/;
@@ -12,6 +13,22 @@ const decoder = new TextDecoder();
 import type { WorkspaceApp } from "@stella/contracts/workspace-apps";
 export type { WorkspaceApp } from "@stella/contracts/workspace-apps";
 type Release = { app: WorkspaceApp; chunks: number };
+/** The compiler, not the app, failed this many times: `at` is the next try. */
+type Attempt = WorkspaceApp & { retry?: { failures: number; at: number } };
+
+// Longer than the compiler's own limit, so its answer arrives first.
+const COMPILE_DEADLINE_MS = 75_000;
+const COMPILER_QUICK_FAILURE_MS = 15_000;
+const COMPILER_RETRY_MS = 60_000;
+const COMPILER_TRIES = 5;
+
+/** What the app's author has to fix; its message is shown to them. */
+class AppBuildError extends Error {}
+/** The compiler gave out; the same files may build later. */
+class AppCompilerUnavailable extends Error {}
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : "App build failed.";
 
 export function parseAppManifest(text: string, slug: string) {
   const value = JSON.parse(text);
@@ -44,105 +61,95 @@ export function parseAppManifest(text: string, slug: string) {
 const MAX_PREVIEW_BYTES = 1_500_000;
 type StoredPreview = { revision: string; bytes: Uint8Array };
 
-type CachedBundle = {
-  revision: string;
-  result: CompiledWorkspaceApp;
-  manifest: Map<string, CompiledWorkspaceAssetMetadata>;
-};
+type Bundle = { revision: string; result: CompiledWorkspaceApp };
 
-const decodePathname = (pathname: string): string =>
-  pathname
-    .split("/")
-    .map((segment) => {
-      try {
-        return decodeURIComponent(segment);
-      } catch {
-        return segment;
-      }
-    })
-    .join("/");
-
-const resolveAssetPath = (
-  decodedPathname: string,
-  manifest: Map<string, CompiledWorkspaceAssetMetadata>,
-): { pathname: string; meta: CompiledWorkspaceAssetMetadata } | null => {
-  const direct = manifest.get(decodedPathname);
-  if (direct) return { pathname: decodedPathname, meta: direct };
-  if (decodedPathname.endsWith("/")) {
-    const indexPath = `${decodedPathname}index.html`;
-    const meta = manifest.get(indexPath);
-    if (meta) return { pathname: indexPath, meta };
-  } else {
-    const htmlPath = `${decodedPathname}.html`;
-    const htmlMeta = manifest.get(htmlPath);
-    if (htmlMeta) return { pathname: htmlPath, meta: htmlMeta };
-    const indexPath = `${decodedPathname}/index.html`;
-    const indexMeta = manifest.get(indexPath);
-    if (indexMeta) return { pathname: indexPath, meta: indexMeta };
+const decodeSegment = (segment: string): string => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
   }
-  return null;
 };
 
-const serveCompiledAsset = (
-  request: Request,
-  cached: CachedBundle,
-): Response | null => {
-  const method = request.method.toUpperCase();
-  if (method !== "GET" && method !== "HEAD") return null;
-  const url = new URL(request.url);
-  const decoded = decodePathname(url.pathname);
-  const matched = resolveAssetPath(decoded, cached.manifest);
-  if (!matched) return null;
-
-  const { pathname: assetPath, meta } = matched;
-  const strongETag = `"${meta.etag}"`;
-  const weakETag = `W/${strongETag}`;
-  const ifNoneMatch = request.headers.get("If-None-Match") || "";
-  const eTags = new Set(ifNoneMatch.split(",").map((tag) => tag.trim()));
-  const headers = new Headers();
-  headers.set("ETag", strongETag);
-  if (meta.contentType) headers.set("Content-Type", meta.contentType);
-  headers.set(
-    "Cache-Control",
-    assetPath.endsWith(".html")
-      ? "no-cache"
-      : "public, max-age=0, must-revalidate",
+// An app is served below its signed URL's path, so a redirect to a canonical
+// path would leave it: each form of a page's path answers with the page.
+const findAsset = (assets: CompiledWorkspaceApp["assets"], pathname: string) => {
+  const path = pathname.split("/").map(decodeSegment).join("/").replaceAll(/\/+/g, "/");
+  const bare = path.replace(/\/$/, "");
+  return (
+    assets[path] ??
+    (path === bare
+      ? assets[`${path}.html`] ?? assets[`${path}/index.html`]
+      : assets[`${path}index.html`] ?? assets[`${bare}.html`])
   );
-  if (eTags.has(weakETag) || eTags.has(strongETag)) {
-    return new Response(null, { status: 304, headers });
-  }
-  const body = method === "HEAD" ? null : (cached.result.assets[assetPath] ?? null);
-  return new Response(body, { status: 200, headers });
 };
 
-type WorkspaceAppsEnv = Env;
+const assetResponse = (
+  request: Request,
+  assets: CompiledWorkspaceApp["assets"],
+): Response | null => {
+  if (request.method !== "GET" && request.method !== "HEAD") return null;
+  const asset = findAsset(assets, new URL(request.url).pathname);
+  if (!asset) return null;
+  return new Response(request.method === "HEAD" ? null : asset.body, {
+    headers: asset.contentType ? { "content-type": asset.contentType } : {},
+  });
+};
 
 export class WorkspaceApps {
-  private bundles = new Map<string, CachedBundle>();
+  private bundles = new Map<string, Bundle>();
+  private loading = new Map<string, Promise<Bundle>>();
   private queue: Promise<unknown> = Promise.resolve();
   constructor(
     private world: WorldSqlStore,
     private ctx: DurableObjectState,
-    private env: WorkspaceAppsEnv,
+    private env: Env,
   ) {}
 
-  private async bundle(files: Record<string, string>): Promise<CompiledWorkspaceApp> {
-    const compiler = this.env.APP_COMPILER as unknown as AppCompilerRpc | undefined;
-    if (!compiler) {
-      throw new Error("App compiler service binding is not configured.");
-    }
-    return await compiler.compileWorkspaceApp(files);
+  private async compileOnce(
+    files: Record<string, string>,
+  ): Promise<CompiledWorkspaceApp> {
+    const compiler = this.env.APP_COMPILER as unknown as
+      | AppCompilerRpc
+      | undefined;
+    if (!compiler) throw new Error("The APP_COMPILER binding is missing.");
+    const result = released(
+      await withInfrastructureDeadline(
+        compiler.compileWorkspaceApp(files),
+        COMPILE_DEADLINE_MS,
+        "The app compiler did not answer in time.",
+      ),
+    );
+    if (result.ok) return result.app;
+    if (typeof result.error === "string" && result.error)
+      throw new AppBuildError(result.error);
+    throw new Error("The app compiler runs a version this one can't read.");
   }
 
-  private toCachedBundle(
-    revision: string,
-    result: CompiledWorkspaceApp,
-  ): CachedBundle {
-    return {
-      revision,
-      result,
-      manifest: new Map(result.assetManifest),
-    };
+  private async compile(
+    files: Record<string, string>,
+  ): Promise<CompiledWorkspaceApp> {
+    const startedAt = Date.now();
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.compileOnce(files);
+      } catch (error) {
+        if (error instanceof AppBuildError) throw error;
+        const message = errorMessage(error).slice(0, 300);
+        log("error", "workspace_app_compiler_failed", { attempt, message });
+        // A compiler isolate that dies takes its builds with it, so a quick
+        // failure gets one more try on a new one.
+        if (attempt > 1 || Date.now() - startedAt > COMPILER_QUICK_FAILURE_MS)
+          throw new AppCompilerUnavailable(message);
+      }
+    }
+  }
+
+  private keep(slug: string, bundle: Bundle): Bundle {
+    if (this.bundles.size >= 8)
+      this.bundles.delete(this.bundles.keys().next().value!);
+    this.bundles.set(slug, bundle);
+    return bundle;
   }
 
   reconcile(): Promise<WorkspaceApp[]> {
@@ -178,19 +185,22 @@ export class WorkspaceApps {
       const key = `workspace-app:${slug}`;
       const old = await this.ctx.storage.get<Release>(key);
       const attemptKey = `workspace-app-attempt:${slug}`;
-      const attempted = await this.ctx.storage.get<WorkspaceApp>(attemptKey);
-      if (attempted?.revision === manifest.revision) {
+      const attempted = await this.ctx.storage.get<Attempt>(attemptKey);
+      const now = Date.now();
+      const same =
+        attempted?.revision === manifest.revision ? attempted : undefined;
+      if (same && !(same.retry && same.retry.at <= now)) {
+        const { retry: _retry, ...app } = same;
         apps.push(
           old
             ? {
                 ...old.app,
-                ...(attempted?.error ? { error: attempted.error } : {}),
+                ...(app.error ? { error: app.error } : {}),
               }
-            : attempted!,
+            : app,
         );
         continue;
       }
-      const now = Date.now();
       const app: WorkspaceApp = {
         appId: slug,
         slug,
@@ -201,6 +211,7 @@ export class WorkspaceApps {
         createdAt: old?.app.createdAt ?? now,
         updatedAt: now,
       };
+      let retry: Attempt["retry"];
       try {
         const prefix = `apps/${slug}/revisions/${manifest.revision}/`;
         const entries = listing.entries.filter((e) =>
@@ -220,7 +231,7 @@ export class WorkspaceApps {
             (await this.world.readFile(file.path))!,
           );
         }
-        const result = await this.bundle(files);
+        const result = await this.compile(files);
         const current = decoder.decode(
           (await this.world.readFile(entry.path))!,
         );
@@ -241,16 +252,27 @@ export class WorkspaceApps {
             );
         }
         this.ctx.facets.abort(`app:${slug}`, new Error("App updated"));
-        if (this.bundles.size >= 8)
-          this.bundles.delete(this.bundles.keys().next().value!);
-        this.bundles.set(slug, this.toCachedBundle(app.revision, result));
+        this.keep(slug, { revision: app.revision, result });
       } catch (error) {
         app.status = "error";
-        app.error = (
-          error instanceof Error ? error.message : "App build failed."
-        ).slice(0, 2000);
+        app.error = errorMessage(error).slice(0, 2000);
+        if (error instanceof AppCompilerUnavailable) {
+          const failures = (same?.retry?.failures ?? 0) + 1;
+          if (failures < COMPILER_TRIES) {
+            app.error = "Stella couldn't build this app just now and will try again shortly.";
+            retry = {
+              failures,
+              at: Date.now() + COMPILER_RETRY_MS * 2 ** (failures - 1),
+            };
+          } else {
+            app.error = "Stella couldn't build this app. Publish a smaller or simpler revision.";
+          }
+        }
       }
-      await this.ctx.storage.put(attemptKey, app);
+      await this.ctx.storage.put(attemptKey, {
+        ...app,
+        ...(retry ? { retry } : {}),
+      } satisfies Attempt);
       await this.world.writeFile(
         `apps/${slug}/build-status.json`,
         new TextEncoder().encode(JSON.stringify(app, null, 2)),
@@ -286,6 +308,22 @@ export class WorkspaceApps {
     return JSON.parse(decoder.decode(bytes));
   }
 
+  private async bundle(slug: string, release: Release): Promise<Bundle> {
+    const { revision } = release.app;
+    const cached = this.bundles.get(slug);
+    if (cached?.revision === revision) return cached;
+    const key = `${slug}:${revision}`;
+    let loading = this.loading.get(key);
+    if (!loading) {
+      loading = this.readReleaseFiles(slug, release)
+        .then((files) => this.compile(files))
+        .then((result) => this.keep(slug, { revision, result }))
+        .finally(() => this.loading.delete(key));
+      this.loading.set(key, loading);
+    }
+    return await loading;
+  }
+
   async preview(slug: string, revision: string): Promise<Uint8Array | null> {
     const stored = await this.ctx.storage.get<StoredPreview>(
       `workspace-app-preview:${slug}`,
@@ -312,19 +350,20 @@ export class WorkspaceApps {
     );
     if (!release)
       return new Response("App has not built successfully.", { status: 409 });
-    let cached = this.bundles.get(slug);
-    if (!cached || cached.revision !== release.app.revision) {
-      cached = this.toCachedBundle(
-        release.app.revision,
-        await this.bundle(await this.readReleaseFiles(slug, release)),
-      );
-      if (this.bundles.size >= 8)
-        this.bundles.delete(this.bundles.keys().next().value!);
-      this.bundles.set(slug, cached);
+    let cached: Bundle;
+    try {
+      cached = await this.bundle(slug, release);
+    } catch (error) {
+      log("error", "workspace_app_open_failed", {
+        message: errorMessage(error).slice(0, 300),
+      });
+      return new Response("This app couldn't be opened just now. Try again in a moment.", {
+        status: 503,
+      });
     }
-    const asset = serveCompiledAsset(request, cached);
-    if (asset) return asset;
     const { result } = cached;
+    const asset = assetResponse(request, result.assets);
+    if (asset) return asset;
     const worker = this.env.LOADER.get(
       `app:${this.ctx.id}:${slug}:${cached.revision}`,
       () => ({

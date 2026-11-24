@@ -1,4 +1,7 @@
-export type CompiledWorkspaceModule = {
+// The contract between cloud-builder and the private app-compiler Worker. The
+// two deploy separately, so change it only in ways both versions can read.
+
+type CompiledWorkspaceModule = {
   js?: string;
   cjs?: string;
   text?: string;
@@ -6,30 +9,24 @@ export type CompiledWorkspaceModule = {
   json?: object;
 };
 
-export type CompiledWorkspaceAssetMetadata = {
-  contentType: string | undefined;
-  etag: string;
-};
-
-export type CompiledWorkspaceAssetConfig = {
-  html_handling?:
-    | "auto-trailing-slash"
-    | "force-trailing-slash"
-    | "drop-trailing-slash"
-    | "none";
-  not_found_handling?: "single-page-application" | "404-page" | "none";
-};
-
 export type CompiledWorkspaceApp = {
   mainModule: string;
   modules: Record<string, string | CompiledWorkspaceModule>;
-  assets: Record<string, string | ArrayBuffer>;
-  assetManifest: Array<[string, CompiledWorkspaceAssetMetadata]>;
-  assetConfig?: CompiledWorkspaceAssetConfig;
+  /** Static files by absolute path, with the content type to serve. */
+  assets: Record<string, { body: string | ArrayBuffer; contentType?: string }>;
 };
+
+/**
+ * `ok: false` is the app's own problem (a build error to show its author).
+ * Anything else (the compiler is missing, out of memory, or took too long)
+ * rejects, and the same files may build later.
+ */
+export type CompileWorkspaceAppResult =
+  | { ok: true; app: CompiledWorkspaceApp }
+  | { ok: false; error: string };
 
 export type AppCompilerRpc = {
   compileWorkspaceApp(
     files: Record<string, string>,
-  ): Promise<CompiledWorkspaceApp>;
+  ): Promise<CompileWorkspaceAppResult>;
 };

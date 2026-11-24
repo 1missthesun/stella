@@ -370,7 +370,8 @@
       "name": "@stella/app-compiler",
       "version": "0.0.0",
       "dependencies": {
-        "@cloudflare/worker-bundler": "^0.2.5",
+        "@cloudflare/worker-bundler": "0.2.5",
+        "esbuild-wasm": "0.28.1",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "5.20261004.1",

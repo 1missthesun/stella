@@ -1,5 +1,8 @@
 import { Context, Effect, Layer } from "effect";
-import type { RuntimeModelCatalogSnapshot } from "@stella/contracts/model-catalog";
+import type {
+  RuntimeModelCatalogRow,
+  RuntimeModelCatalogSnapshot,
+} from "@stella/contracts/model-catalog";
 import { NOTIFICATION_NAMES } from "@stella/contracts/protocol";
 import type { ModelRuntimeSnapshot } from "../../kernel/model-runtime.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
@@ -8,27 +11,42 @@ import * as HostBus from "./host-bus.js";
 import type { RuntimeRunner } from "./types.js";
 
 /**
- * The catalog as the host receives it: the picker's fields only. A composed
- * model also carries transport details (compat, prices, thinking maps) that
- * would double what every boot pushes to each window.
+ * The catalog as the host receives it: the picker's fields only, as one
+ * compact row per model grouped by provider (`modelsByProvider`; see
+ * `RuntimeModelCatalogRow`). A composed model also carries transport details
+ * (compat, prices, thinking maps) that would double what every boot pushes to
+ * each window. Windows read it with `expandRuntimeModelCatalogModels`, which
+ * also reads the older `models` array: an Update swaps the windows before it
+ * restarts the runtime, so a new window briefly talks to the old runtime.
  */
 export const toCatalogWire = ({
   models,
   ...rest
-}: ModelRuntimeSnapshot): RuntimeModelCatalogSnapshot => ({
-  ...rest,
-  models: models.map((model) => ({
-    id: model.id,
-    name: model.name,
-    provider: model.provider,
-    api: model.api,
-    baseUrl: model.baseUrl,
-    reasoning: model.reasoning,
-    input: model.input,
-    contextWindow: model.contextWindow,
-    maxTokens: model.maxTokens,
-  })),
-});
+}: ModelRuntimeSnapshot): RuntimeModelCatalogSnapshot => {
+  // Provider ids come from users' models.json too, so a Map, not `obj[id]`
+  // (an id like "constructor" would hit Object.prototype). Stella's own
+  // models are left out: the renderer lists them from the backend and drops
+  // them from this catalog anyway.
+  const byProvider = new Map<string, RuntimeModelCatalogRow[]>();
+  for (const model of models) {
+    if (model.api === "stella" || model.provider === "stella") continue;
+    const flags =
+      (model.reasoning ? 1 : 0) | (model.input.includes("image") ? 2 : 0);
+    let list = byProvider.get(model.provider);
+    if (!list) byProvider.set(model.provider, (list = []));
+    list.push([
+      model.id,
+      model.name && model.name !== model.id ? model.name : 0,
+      model.contextWindow,
+      model.maxTokens,
+      flags,
+    ]);
+  }
+  return {
+    ...rest,
+    modelsByProvider: Object.fromEntries(byProvider),
+  };
+};
 
 export interface Interface {
   readonly ensureSubscription: () => Promise<

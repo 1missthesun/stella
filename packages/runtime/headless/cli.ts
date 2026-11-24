@@ -1,6 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import "@stella/node-shared/shared/http-proxy.js";
+import {
+  expandRuntimeModelCatalogModels,
+  type RuntimeModelCatalogSnapshot,
+} from "@stella/contracts/model-catalog";
 
 type CliMode = "chat" | "completion" | "list-models";
 
@@ -268,8 +272,13 @@ const main = async (): Promise<void> => {
   log(`worker ready (pid=${health.workerPid})`);
 
   if (options.mode === "list-models") {
-    const snapshot = await host.listModels({});
-    emit({ kind: "models", snapshot });
+    // Printed as one model object per entry, as before the wire went compact.
+    const listed = (await host.listModels({})) as RuntimeModelCatalogSnapshot;
+    const { modelsByProvider: _compact, ...snapshot } = listed;
+    emit({
+      kind: "models",
+      snapshot: { ...snapshot, models: expandRuntimeModelCatalogModels(listed) },
+    });
     emit({ kind: "cli.result", ok: true });
     clearTimeout(timeout);
     await shutdown(0);

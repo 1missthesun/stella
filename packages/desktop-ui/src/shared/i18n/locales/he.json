@@ -1081,6 +1081,21 @@
       "later": "לא עכשיו",
       "note": "אפשר לשנות זאת בכל עת בהגדרות › פרטיות.",
       "title": "לאפשר ל-Stella במכשירים האחרים שלך להתחיל עבודה במחשב הזה?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "לאפשר את {name}?",
+      "allowCheck": "ודא שמוצג הקוד הזה.",
+      "notNow": "לא עכשיו",
+      "allow": "לאפשר",
+      "failed": "זה לא עבר. נסה שוב.",
+      "matchTitle": "ודא ש-{name} מציג את הקוד הזה",
+      "otherDevice": "המכשיר השני שלך",
+      "useAnother": "מכשיר אחר",
+      "matches": "תואם",
+      "getTitle": "קבל לכאן את הכניסות שלך",
+      "getBody": "פתח את Stella במכשיר אחר.",
+      "ok": "אישור",
+      "cloudUsed": "משימת ענן השתמשה ב-{label}"
     }
   },
   "mobile": {
@@ -2625,7 +2640,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "לא ניתן לשנות את שם הערך. נסה שוב."
+        "rename": "לא ניתן לשנות את שם הערך. נסה שוב.",
+        "devices": "זה לא עבר. נסה שוב."
       },
       "lastUsed": "שימוש אחרון {used}",
       "neverUsed": "עדיין לא בשימוש",
@@ -2634,7 +2650,19 @@
       "renameCancel": "ביטול",
       "renameLabel": "שם",
       "sync": "סנכרון למכשירים האחרים שלך",
-      "syncHint": "מוצפן מקצה לקצה: רק המחשבים והטלפון שלך יכולים לפתוח אותם, לא השרתים של Stella. כשכבוי, הם נשארים רק במחשב הזה."
+      "syncHint": "מוצפן מקצה לקצה: רק המחשבים והטלפון שלך יכולים לפתוח אותם, לא השרתים של Stella. כשכבוי, הם נשארים רק במחשב הזה.",
+      "devices": "מכשירים",
+      "thisComputer": "המחשב הזה",
+      "quiet": "לא נראה לאחרונה",
+      "removeDevice": "הסר",
+      "problem": "אי אפשר לבדוק את המכשירים",
+      "startOver": "להתחיל מחדש",
+      "removedHere": "הוסר מהמכשירים שלך",
+      "declined": "לא אושר",
+      "askAgain": "לבקש שוב",
+      "waitingFor": "ממתין ל-{name}…",
+      "cloudUses": "בשימוש משימות ענן",
+      "refused": "לא נמסר"
     },
     "googleComposio": {
       "title": "שימוש ב-Composio עבור Google",

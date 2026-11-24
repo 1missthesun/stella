@@ -2,9 +2,11 @@ import { randomInt, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { spawn } from "node:child_process";
+import { powerMonitor } from "electron";
 import {
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_OPENED,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED,
   IPC_USER_ASK_UPDATED,
 } from "@stella/contracts/desktop/ipc-channels";
 import { leaseBackendClient } from "@stella/contracts/backend/shared-client";
@@ -70,6 +72,12 @@ import {
 const KEYCHAIN_FALLBACK_FILE = "user-ask-keychain.json";
 /** How many saved records a task is shown, by name, when its lookup found nothing. */
 const SAVED_SUMMARY_LIMIT = 60;
+/** A cloud task gets a saved value from this computer by itself at most this often; past it, the user answers a card. */
+const RELEASES_PER_HOUR = 20;
+const RELEASE_LOG_FILE = "saved-value-releases.json";
+const RELEASE_LOG_LIMIT = 50;
+/** The user counts as at this computer when its keyboard or mouse was used this recently. */
+const USER_ACTIVE_IDLE_SECONDS = 120;
 const KEYCHAIN_SCOPE_PREFIX = "user-ask-keychain";
 const COMMAND_PLACEHOLDER = "{{secret}}";
 const sharedHandles = (handles) => {
@@ -348,6 +356,16 @@ export class UserAskService {
             onSyncedChange: () => {
                 this.fingerprintCache = null;
             },
+            onStatus: (status) => this.broadcast(IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED, status),
+            isUserActive: () => {
+                try {
+                    return powerMonitor.getSystemIdleTime() < USER_ACTIVE_IDLE_SECONDS;
+                }
+                catch {
+                    return true;
+                }
+            },
+            getReleaseLog: () => this.releaseLog(),
         });
         this.escalation = new UserAskEscalationEngine({
             getAsk: (askId) => this.asks.get(askId)?.ask ?? null,
@@ -755,6 +773,18 @@ export class UserAskService {
             return { found: false, reason: "not_saved", savedHere: await this.savedSummaries() };
         }
         const whole = found.whole;
+        const taskName = typeof params.taskName === "string" ? params.taskName.trim().slice(0, 240) : "";
+        const use = {
+            at: Date.now(),
+            label: whole.saved.label,
+            service: whole.saved.service || save.service,
+            ...(taskName ? { taskName } : {}),
+        };
+        if (this.releasesInLastHour() >= RELEASES_PER_HOUR) {
+            // Past the hourly cap this computer stops answering by itself: the task asks the user.
+            this.logRelease({ ...use, refused: true });
+            return { found: false, reason: "limit", savedHere: [] };
+        }
         const requester = ownerOfRequest(owner);
         const sealed = {};
         for (const field of fields) {
@@ -773,6 +803,7 @@ export class UserAskService {
             sealed[field.id] = sealUserAskValue({ askId: releaseId, fieldId: field.id, value, recipientKey });
         }
         const { label, account, savedAt, service, askedService } = whole.saved;
+        this.logRelease(use);
         return {
             found: true,
             sealed,
@@ -784,6 +815,37 @@ export class UserAskService {
             },
             deviceId: this.options.getDeviceId() ?? "",
         };
+    }
+    releaseLogPath() {
+        const dir = this.options.getStellaAppDir();
+        return dir ? path.join(dir, RELEASE_LOG_FILE) : null;
+    }
+    /** Cloud tasks' uses of saved values on this computer, newest first, for Settings and the bell. */
+    releaseLog() {
+        const file = this.releaseLogPath();
+        if (!file) {
+            return [];
+        }
+        try {
+            const stored = readPrivateJsonValueSync(file);
+            return Array.isArray(stored?.entries) ? stored.entries.slice(0, RELEASE_LOG_LIMIT) : [];
+        }
+        catch {
+            return [];
+        }
+    }
+    releasesInLastHour() {
+        const since = Date.now() - 60 * 60_000;
+        return this.releaseLog().filter((entry) => !entry.refused && entry.at >= since).length;
+    }
+    logRelease(entry) {
+        const file = this.releaseLogPath();
+        if (!file) {
+            return;
+        }
+        const entries = [entry, ...this.releaseLog()].slice(0, RELEASE_LOG_LIMIT);
+        writePrivateFileSync(file, JSON.stringify({ v: 1, entries }, null, 2));
+        this.sync.noteReleaseLogChanged();
     }
     /** What is saved on this computer, by name only (never a value), for a task that found nothing under the name it tried. */
     async savedSummaries() {
@@ -1358,6 +1420,29 @@ export class UserAskService {
     }
     async setSavedValuesSync(payload) {
         return await this.sync.setEnabled(payload?.enabled !== false);
+    }
+    async savedValuesSyncAction(payload) {
+        switch (payload?.action) {
+            case "allow":
+            case "decline":
+                return typeof payload.joinId === "string"
+                    ? await this.sync.decideJoin(payload.joinId, payload.action === "allow")
+                    : { ok: false, error: "No request named." };
+            case "confirm":
+                this.sync.confirmJoin();
+                return { ok: true };
+            case "askAgain":
+                this.sync.askAgain();
+                return { ok: true };
+            case "startOver":
+                return await this.sync.startOver();
+            case "remove":
+                return typeof payload.deviceId === "string"
+                    ? await this.sync.removeListedDevice(payload.deviceId)
+                    : { ok: false, error: "No device named." };
+            default:
+                return { ok: false, error: "Unknown action." };
+        }
     }
     async listStoredSecureValues() {
         return await this.saved.list();

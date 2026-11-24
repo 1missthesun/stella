@@ -316,6 +316,8 @@ import {
   IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_USER_ASK_SECURE_VALUES_SYNC_GET,
   IPC_USER_ASK_SECURE_VALUES_SYNC_SET,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED,
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_OPENED,
@@ -702,6 +704,8 @@ export const createElectronApi = (
       secureValuesRename: invoker(IPC_USER_ASK_SECURE_VALUES_RENAME),
       secureValuesSyncGet: invoker(IPC_USER_ASK_SECURE_VALUES_SYNC_GET),
       secureValuesSyncSet: invoker(IPC_USER_ASK_SECURE_VALUES_SYNC_SET),
+      secureValuesSyncAction: invoker(IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION),
+      onSecureValuesSyncChanged: on(IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED),
     },
 
     system: {

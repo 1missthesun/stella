@@ -1111,6 +1111,21 @@
       "later": "ليس الآن",
       "note": "يمكنك تغيير ذلك في أي وقت من الإعدادات › الخصوصية.",
       "title": "هل تسمح لـ Stella على أجهزتك الأخرى ببدء العمل على هذا الكمبيوتر؟"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "السماح لـ {name}؟",
+      "allowCheck": "تأكد من أنه يعرض هذا الرمز.",
+      "notNow": "ليس الآن",
+      "allow": "السماح",
+      "failed": "لم يتم ذلك. حاول مرة أخرى.",
+      "matchTitle": "تأكد من أن {name} يعرض هذا الرمز",
+      "otherDevice": "جهازك الآخر",
+      "useAnother": "جهاز آخر",
+      "matches": "متطابق",
+      "getTitle": "احصل على تسجيلات دخولك هنا",
+      "getBody": "افتح Stella على جهاز آخر.",
+      "ok": "حسنًا",
+      "cloudUsed": "استخدمت مهمة سحابية {label}"
     }
   },
   "mobile": {
@@ -2655,7 +2670,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "تعذّرت إعادة تسمية هذه القيمة. حاول مرة أخرى."
+        "rename": "تعذّرت إعادة تسمية هذه القيمة. حاول مرة أخرى.",
+        "devices": "لم يتم ذلك. حاول مرة أخرى."
       },
       "lastUsed": "آخر استخدام {used}",
       "neverUsed": "لم تُستخدم بعد",
@@ -2664,7 +2680,19 @@
       "renameCancel": "إلغاء",
       "renameLabel": "الاسم",
       "sync": "المزامنة مع أجهزتك الأخرى",
-      "syncHint": "مشفّرة من طرف إلى طرف: لا يفتحها إلا حواسيبك وهاتفك، وليس خوادم Stella. عند الإيقاف تبقى على هذا الحاسوب فقط."
+      "syncHint": "مشفّرة من طرف إلى طرف: لا يفتحها إلا حواسيبك وهاتفك، وليس خوادم Stella. عند الإيقاف تبقى على هذا الحاسوب فقط.",
+      "devices": "الأجهزة",
+      "thisComputer": "هذا الحاسوب",
+      "quiet": "لم يظهر مؤخرًا",
+      "removeDevice": "إزالة",
+      "problem": "تعذّر التحقق من أجهزتك",
+      "startOver": "البدء من جديد",
+      "removedHere": "أُزيل من أجهزتك",
+      "declined": "غير مسموح",
+      "askAgain": "اطلب مجددًا",
+      "waitingFor": "بانتظار {name}…",
+      "cloudUses": "استخدمتها مهام سحابية",
+      "refused": "لم يُمنح"
     },
     "googleComposio": {
       "title": "استخدام Composio مع Google",

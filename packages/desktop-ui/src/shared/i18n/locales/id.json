@@ -1061,6 +1061,21 @@
       "later": "Jangan sekarang",
       "note": "Anda bisa mengubahnya kapan saja di Pengaturan › Privasi.",
       "title": "Izinkan Stella di perangkat Anda yang lain memulai pekerjaan di komputer ini?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Izinkan {name}?",
+      "allowCheck": "Pastikan kode ini yang tampil.",
+      "notNow": "Jangan sekarang",
+      "allow": "Izinkan",
+      "failed": "Gagal. Coba lagi.",
+      "matchTitle": "Pastikan {name} menampilkan kode ini",
+      "otherDevice": "perangkat Anda yang lain",
+      "useAnother": "Perangkat lain",
+      "matches": "Cocok",
+      "getTitle": "Bawa login Anda ke sini",
+      "getBody": "Buka Stella di perangkat lain.",
+      "ok": "OK",
+      "cloudUsed": "Tugas cloud memakai {label}"
     }
   },
   "mobile": {
@@ -2605,7 +2620,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Tidak dapat mengganti nama nilai itu. Coba lagi."
+        "rename": "Tidak dapat mengganti nama nilai itu. Coba lagi.",
+        "devices": "Gagal. Coba lagi."
       },
       "lastUsed": "Terakhir dipakai {used}",
       "neverUsed": "Belum pernah dipakai",
@@ -2614,7 +2630,19 @@
       "renameCancel": "Batal",
       "renameLabel": "Nama",
       "sync": "Sinkronkan ke perangkat Anda yang lain",
-      "syncHint": "Terenkripsi end-to-end: hanya komputer dan ponsel Anda sendiri yang bisa membukanya, bukan server Stella. Jika mati, nilai tetap hanya di komputer ini."
+      "syncHint": "Terenkripsi end-to-end: hanya komputer dan ponsel Anda sendiri yang bisa membukanya, bukan server Stella. Jika mati, nilai tetap hanya di komputer ini.",
+      "devices": "Perangkat",
+      "thisComputer": "Komputer ini",
+      "quiet": "Lama tidak terlihat",
+      "removeDevice": "Hapus",
+      "problem": "Tidak bisa memeriksa perangkat Anda",
+      "startOver": "Mulai ulang",
+      "removedHere": "Dihapus dari perangkat Anda",
+      "declined": "Tidak diizinkan",
+      "askAgain": "Minta lagi",
+      "waitingFor": "Menunggu {name}…",
+      "cloudUses": "Dipakai tugas cloud",
+      "refused": "Tidak diberikan"
     },
     "googleComposio": {
       "title": "Gunakan Composio untuk Google",

@@ -1061,6 +1061,21 @@
       "later": "暂不",
       "note": "你可以随时在“设置 › 隐私”中更改。",
       "title": "允许你其他设备上的 Stella 在这台电脑上开始工作吗？"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "允许 {name}？",
+      "allowCheck": "确认它显示的是这个代码。",
+      "notNow": "暂不",
+      "allow": "允许",
+      "failed": "没有成功，请重试。",
+      "matchTitle": "确认 {name} 显示的是这个代码",
+      "otherDevice": "你的另一台设备",
+      "useAnother": "换一台设备",
+      "matches": "一致",
+      "getTitle": "在这里获取登录信息",
+      "getBody": "在另一台设备上打开 Stella。",
+      "ok": "好",
+      "cloudUsed": "云端任务使用了 {label}"
     }
   },
   "mobile": {
@@ -2605,7 +2620,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "无法重命名该值，请重试。"
+        "rename": "无法重命名该值，请重试。",
+        "devices": "没有成功，请重试。"
       },
       "lastUsed": "上次使用 {used}",
       "neverUsed": "尚未使用",
@@ -2614,7 +2630,19 @@
       "renameCancel": "取消",
       "renameLabel": "名称",
       "sync": "同步到你的其他设备",
-      "syncHint": "端到端加密：只有你自己的电脑和手机能打开，Stella 的服务器无法打开。关闭后只保存在这台电脑上。"
+      "syncHint": "端到端加密：只有你自己的电脑和手机能打开，Stella 的服务器无法打开。关闭后只保存在这台电脑上。",
+      "devices": "设备",
+      "thisComputer": "这台电脑",
+      "quiet": "最近未出现",
+      "removeDevice": "移除",
+      "problem": "无法核对你的设备",
+      "startOver": "重新开始",
+      "removedHere": "已从你的设备中移除",
+      "declined": "未获允许",
+      "askAgain": "再次请求",
+      "waitingFor": "正在等待 {name}…",
+      "cloudUses": "云端任务的使用",
+      "refused": "未提供"
     },
     "googleComposio": {
       "title": "Google 使用 Composio",

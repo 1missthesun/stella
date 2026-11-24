@@ -1071,6 +1071,21 @@
       "later": "Ei nyt",
       "note": "Voit muuttaa tätä milloin tahansa kohdassa Asetukset › Tietosuoja.",
       "title": "Saako Stella muilla laitteillasi aloittaa töitä tällä tietokoneella?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Sallitaanko {name}?",
+      "allowCheck": "Tarkista, että siinä näkyy tämä koodi.",
+      "notNow": "Ei nyt",
+      "allow": "Salli",
+      "failed": "Se ei onnistunut. Yritä uudelleen.",
+      "matchTitle": "Tarkista, että {name} näyttää tämän koodin",
+      "otherDevice": "toinen laitteesi",
+      "useAnother": "Toinen laite",
+      "matches": "Täsmää",
+      "getTitle": "Hae kirjautumisesi tänne",
+      "getBody": "Avaa Stella toisella laitteella.",
+      "ok": "OK",
+      "cloudUsed": "Pilvitehtävä käytti: {label}"
     }
   },
   "mobile": {
@@ -2615,7 +2630,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Arvon nimeäminen uudelleen epäonnistui. Yritä uudelleen."
+        "rename": "Arvon nimeäminen uudelleen epäonnistui. Yritä uudelleen.",
+        "devices": "Se ei onnistunut. Yritä uudelleen."
       },
       "lastUsed": "Viimeksi käytetty {used}",
       "neverUsed": "Ei vielä käytetty",
@@ -2624,7 +2640,19 @@
       "renameCancel": "Peruuta",
       "renameLabel": "Nimi",
       "sync": "Synkronoi muihin laitteisiisi",
-      "syncHint": "Päästä päähän salattu: vain omat tietokoneesi ja puhelimesi voivat avata ne, eivät Stellan palvelimet. Pois päältä ne pysyvät vain tässä tietokoneessa."
+      "syncHint": "Päästä päähän salattu: vain omat tietokoneesi ja puhelimesi voivat avata ne, eivät Stellan palvelimet. Pois päältä ne pysyvät vain tässä tietokoneessa.",
+      "devices": "Laitteet",
+      "thisComputer": "Tämä tietokone",
+      "quiet": "Ei näkynyt hetkeen",
+      "removeDevice": "Poista",
+      "problem": "Laitteitasi ei voi tarkistaa",
+      "startOver": "Aloita alusta",
+      "removedHere": "Poistettu laitteistasi",
+      "declined": "Ei sallittu",
+      "askAgain": "Pyydä uudelleen",
+      "waitingFor": "Odotetaan: {name}…",
+      "cloudUses": "Pilvitehtävien käyttämät",
+      "refused": "Ei annettu"
     },
     "googleComposio": {
       "title": "Käytä Composiota Googlelle",

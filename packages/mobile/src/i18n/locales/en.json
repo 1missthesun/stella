@@ -1071,6 +1071,21 @@
       "later": "Not now",
       "note": "You can change this anytime in Settings › Privacy.",
       "title": "Let Stella on your other devices start work on this computer?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Allow {name}?",
+      "allowCheck": "Check it shows this code.",
+      "notNow": "Not now",
+      "allow": "Allow",
+      "failed": "That didn't go through. Try again.",
+      "matchTitle": "Check {name} shows this code",
+      "otherDevice": "your other device",
+      "useAnother": "Use another device",
+      "matches": "It matches",
+      "getTitle": "Get your logins here",
+      "getBody": "Open Stella on another device.",
+      "ok": "OK",
+      "cloudUsed": "Cloud task used {label}"
     }
   },
   "mobile": {
@@ -2615,7 +2630,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Couldn’t rename that value. Try again."
+        "rename": "Couldn’t rename that value. Try again.",
+        "devices": "That didn't go through. Try again."
       },
       "lastUsed": "Last used {used}",
       "neverUsed": "Not used yet",
@@ -2624,7 +2640,19 @@
       "renameCancel": "Cancel",
       "renameLabel": "Name",
       "sync": "Sync to your other devices",
-      "syncHint": "End-to-end encrypted: only your own computers and phone can open them, not Stella’s servers. Off keeps them on this computer only."
+      "syncHint": "End-to-end encrypted: only your own computers and phone can open them, not Stella’s servers. Off keeps them on this computer only.",
+      "devices": "Devices",
+      "thisComputer": "This computer",
+      "quiet": "Not seen lately",
+      "removeDevice": "Remove",
+      "problem": "Can't check your devices",
+      "startOver": "Start over",
+      "removedHere": "Removed from your devices",
+      "declined": "Not allowed",
+      "askAgain": "Ask again",
+      "waitingFor": "Waiting for {name}…",
+      "cloudUses": "Used by cloud tasks",
+      "refused": "Not given"
     },
     "googleComposio": {
       "title": "Use Composio for Google",

@@ -41,7 +41,6 @@ export const SAVED_VALUES_QUIET_MS = 14 * 24 * 60 * 60_000;
 export const SAVED_VALUES_MAX_ROSTER_ENTRIES = 500;
 
 const ROSTER_CONTEXT = "stella-saved-values-roster\n";
-const CARRY_CONTEXT = "stella-saved-values-carry\n";
 const RECORD_CONTEXT = "stella-saved-value-record\n";
 const DELETE_CONTEXT = "stella-saved-value-delete\n";
 const CODE_CONTEXT = "stella-saved-values-code\n";

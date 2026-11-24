@@ -1081,6 +1081,21 @@
       "later": "Ahora no",
       "note": "Puedes cambiarlo cuando quieras en Ajustes › Privacidad.",
       "title": "¿Permitir que Stella en tus otros dispositivos inicie trabajo en este ordenador?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "¿Permitir {name}?",
+      "allowCheck": "Comprueba que muestra este código.",
+      "notNow": "Ahora no",
+      "allow": "Permitir",
+      "failed": "No se ha podido completar. Inténtalo de nuevo.",
+      "matchTitle": "Comprueba que {name} muestra este código",
+      "otherDevice": "tu otro dispositivo",
+      "useAnother": "Usar otro dispositivo",
+      "matches": "Coincide",
+      "getTitle": "Trae aquí tus inicios de sesión",
+      "getBody": "Abre Stella en otro dispositivo.",
+      "ok": "Aceptar",
+      "cloudUsed": "Una tarea en la nube usó {label}"
     }
   },
   "mobile": {
@@ -2625,7 +2640,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "No se pudo cambiar el nombre de ese valor. Inténtalo de nuevo."
+        "rename": "No se pudo cambiar el nombre de ese valor. Inténtalo de nuevo.",
+        "devices": "No se ha podido completar. Inténtalo de nuevo."
       },
       "lastUsed": "Último uso {used}",
       "neverUsed": "Aún sin usar",
@@ -2634,7 +2650,19 @@
       "renameCancel": "Cancelar",
       "renameLabel": "Nombre",
       "sync": "Sincronizar con tus otros dispositivos",
-      "syncHint": "Cifrado de extremo a extremo: solo tus ordenadores y tu teléfono pueden abrirlos, no los servidores de Stella. Desactivado, se quedan solo en este ordenador."
+      "syncHint": "Cifrado de extremo a extremo: solo tus ordenadores y tu teléfono pueden abrirlos, no los servidores de Stella. Desactivado, se quedan solo en este ordenador.",
+      "devices": "Dispositivos",
+      "thisComputer": "Este ordenador",
+      "quiet": "Sin actividad reciente",
+      "removeDevice": "Quitar",
+      "problem": "No se pueden comprobar tus dispositivos",
+      "startOver": "Empezar de nuevo",
+      "removedHere": "Quitado de tus dispositivos",
+      "declined": "No permitido",
+      "askAgain": "Volver a pedir",
+      "waitingFor": "Esperando a {name}…",
+      "cloudUses": "Usados por tareas en la nube",
+      "refused": "No entregado"
     },
     "googleComposio": {
       "title": "Usar Composio para Google",

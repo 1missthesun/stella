@@ -1061,6 +1061,21 @@
       "later": "暫不",
       "note": "你可以隨時在「設定 › 隱私權」中更改。",
       "title": "允許你其他裝置上的 Stella 在這台電腦上開始工作嗎？"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "允許 {name}？",
+      "allowCheck": "確認它顯示的是這個代碼。",
+      "notNow": "暫不",
+      "allow": "允許",
+      "failed": "沒有成功，請再試一次。",
+      "matchTitle": "確認 {name} 顯示的是這個代碼",
+      "otherDevice": "你的另一台裝置",
+      "useAnother": "換一台裝置",
+      "matches": "一致",
+      "getTitle": "在這裡取得登入資訊",
+      "getBody": "在另一台裝置上開啟 Stella。",
+      "ok": "好",
+      "cloudUsed": "雲端任務使用了 {label}"
     }
   },
   "mobile": {
@@ -2605,7 +2620,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "無法重新命名該值，請再試一次。"
+        "rename": "無法重新命名該值，請再試一次。",
+        "devices": "沒有成功，請再試一次。"
       },
       "lastUsed": "上次使用 {used}",
       "neverUsed": "尚未使用",
@@ -2614,7 +2630,19 @@
       "renameCancel": "取消",
       "renameLabel": "名稱",
       "sync": "同步到你的其他裝置",
-      "syncHint": "端對端加密：只有你自己的電腦和手機能打開，Stella 的伺服器無法打開。關閉後只保存在這台電腦上。"
+      "syncHint": "端對端加密：只有你自己的電腦和手機能打開，Stella 的伺服器無法打開。關閉後只保存在這台電腦上。",
+      "devices": "裝置",
+      "thisComputer": "這台電腦",
+      "quiet": "最近未出現",
+      "removeDevice": "移除",
+      "problem": "無法核對你的裝置",
+      "startOver": "重新開始",
+      "removedHere": "已從你的裝置中移除",
+      "declined": "未獲允許",
+      "askAgain": "再次請求",
+      "waitingFor": "正在等待 {name}…",
+      "cloudUses": "雲端任務的使用",
+      "refused": "未提供"
     },
     "googleComposio": {
       "title": "Google 使用 Composio",

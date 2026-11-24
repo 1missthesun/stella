@@ -298,6 +298,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         renameStoredSecureValue: (payload) => services.userAskService.renameStoredSecureValue(payload),
         getSavedValuesSync: () => services.userAskService.getSavedValuesSync(),
         setSavedValuesSync: (payload) => services.userAskService.setSavedValuesSync(payload),
+        savedValuesSyncAction: (payload) => services.userAskService.savedValuesSyncAction(payload),
         respondConnectorConnect: (payload) => services.connectorConnectService.respond(payload),
         onPermissionGranted: (kind) => {
             if (kind === "accessibility") {

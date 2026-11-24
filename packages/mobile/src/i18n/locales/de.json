@@ -1071,6 +1071,21 @@
       "later": "Nicht jetzt",
       "note": "Du kannst das jederzeit unter Einstellungen › Datenschutz ändern.",
       "title": "Darf Stella auf deinen anderen Geräten Arbeit auf diesem Computer starten?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "{name} erlauben?",
+      "allowCheck": "Prüf, ob dort dieser Code steht.",
+      "notNow": "Nicht jetzt",
+      "allow": "Erlauben",
+      "failed": "Das hat nicht geklappt. Versuch es noch einmal.",
+      "matchTitle": "Prüf, ob {name} diesen Code zeigt",
+      "otherDevice": "dein anderes Gerät",
+      "useAnother": "Anderes Gerät",
+      "matches": "Stimmt überein",
+      "getTitle": "Deine Logins hierher holen",
+      "getBody": "Öffne Stella auf einem anderen Gerät.",
+      "ok": "OK",
+      "cloudUsed": "Cloud-Aufgabe hat {label} verwendet"
     }
   },
   "mobile": {
@@ -2615,7 +2630,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Der Wert konnte nicht umbenannt werden. Versuch es noch einmal."
+        "rename": "Der Wert konnte nicht umbenannt werden. Versuch es noch einmal.",
+        "devices": "Das hat nicht geklappt. Versuch es noch einmal."
       },
       "lastUsed": "Zuletzt verwendet {used}",
       "neverUsed": "Noch nicht verwendet",
@@ -2624,7 +2640,19 @@
       "renameCancel": "Abbrechen",
       "renameLabel": "Name",
       "sync": "Mit deinen anderen Geräten synchronisieren",
-      "syncHint": "Ende-zu-Ende-verschlüsselt: Nur deine eigenen Computer und dein Handy können sie öffnen, nicht die Server von Stella. Aus bleiben sie nur auf diesem Computer."
+      "syncHint": "Ende-zu-Ende-verschlüsselt: Nur deine eigenen Computer und dein Handy können sie öffnen, nicht die Server von Stella. Aus bleiben sie nur auf diesem Computer.",
+      "devices": "Geräte",
+      "thisComputer": "Dieser Computer",
+      "quiet": "Länger nicht gesehen",
+      "removeDevice": "Entfernen",
+      "problem": "Geräte können nicht geprüft werden",
+      "startOver": "Neu beginnen",
+      "removedHere": "Von deinen Geräten entfernt",
+      "declined": "Nicht erlaubt",
+      "askAgain": "Erneut fragen",
+      "waitingFor": "Warte auf {name}…",
+      "cloudUses": "Von Cloud-Aufgaben verwendet",
+      "refused": "Nicht freigegeben"
     },
     "googleComposio": {
       "title": "Composio für Google verwenden",

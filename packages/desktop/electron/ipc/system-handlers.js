@@ -78,6 +78,7 @@ import {
   IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_USER_ASK_SECURE_VALUES_SYNC_GET,
   IPC_USER_ASK_SECURE_VALUES_SYNC_SET,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION,
   IPC_DEVICE_GET_ID,
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
@@ -547,6 +548,12 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted saved value sync change.");
         }
         return options.setSavedValuesSync({ enabled: payload?.enabled !== false });
+    });
+    handleIpc(IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION, (event, payload) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION)) {
+            throw new Error("Blocked untrusted saved value device change.");
+        }
+        return options.savedValuesSyncAction(payload);
     });
     handleIpc(IPC_CONNECTOR_CONNECT_RESPOND, (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CONNECT_RESPOND)) {

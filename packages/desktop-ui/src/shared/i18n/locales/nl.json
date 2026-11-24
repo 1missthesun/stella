@@ -1071,6 +1071,21 @@
       "later": "Niet nu",
       "note": "Je kunt dit altijd wijzigen via Instellingen › Privacy.",
       "title": "Mag Stella op je andere apparaten werk starten op deze computer?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "{name} toestaan?",
+      "allowCheck": "Controleer of deze code daar staat.",
+      "notNow": "Niet nu",
+      "allow": "Toestaan",
+      "failed": "Dat is niet gelukt. Probeer het opnieuw.",
+      "matchTitle": "Controleer of {name} deze code toont",
+      "otherDevice": "je andere apparaat",
+      "useAnother": "Ander apparaat",
+      "matches": "Klopt",
+      "getTitle": "Haal je logins hierheen",
+      "getBody": "Open Stella op een ander apparaat.",
+      "ok": "OK",
+      "cloudUsed": "Cloudtaak gebruikte {label}"
     }
   },
   "mobile": {
@@ -2615,7 +2630,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Kan de naam van die waarde niet wijzigen. Probeer het opnieuw."
+        "rename": "Kan de naam van die waarde niet wijzigen. Probeer het opnieuw.",
+        "devices": "Dat is niet gelukt. Probeer het opnieuw."
       },
       "lastUsed": "Laatst gebruikt {used}",
       "neverUsed": "Nog niet gebruikt",
@@ -2624,7 +2640,19 @@
       "renameCancel": "Annuleren",
       "renameLabel": "Naam",
       "sync": "Synchroniseren met je andere apparaten",
-      "syncHint": "End-to-end versleuteld: alleen je eigen computers en telefoon kunnen ze openen, niet de servers van Stella. Uit houdt ze alleen op deze computer."
+      "syncHint": "End-to-end versleuteld: alleen je eigen computers en telefoon kunnen ze openen, niet de servers van Stella. Uit houdt ze alleen op deze computer.",
+      "devices": "Apparaten",
+      "thisComputer": "Deze computer",
+      "quiet": "Lang niet gezien",
+      "removeDevice": "Verwijderen",
+      "problem": "Kan je apparaten niet controleren",
+      "startOver": "Opnieuw beginnen",
+      "removedHere": "Verwijderd uit je apparaten",
+      "declined": "Niet toegestaan",
+      "askAgain": "Opnieuw vragen",
+      "waitingFor": "Wachten op {name}…",
+      "cloudUses": "Gebruikt door cloudtaken",
+      "refused": "Niet gegeven"
     },
     "googleComposio": {
       "title": "Composio gebruiken voor Google",

@@ -1061,6 +1061,21 @@
       "later": "今はしない",
       "note": "設定 › プライバシー でいつでも変更できます。",
       "title": "ほかのデバイスの Stella がこのコンピュータで作業を始めることを許可しますか？"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "{name} を許可しますか？",
+      "allowCheck": "このコードが表示されているか確認してください。",
+      "notNow": "今はしない",
+      "allow": "許可",
+      "failed": "うまくいきませんでした。もう一度お試しください。",
+      "matchTitle": "{name} にこのコードが表示されているか確認",
+      "otherDevice": "ほかのデバイス",
+      "useAnother": "別のデバイス",
+      "matches": "一致しています",
+      "getTitle": "ログイン情報をここで使う",
+      "getBody": "ほかのデバイスで Stella を開いてください。",
+      "ok": "OK",
+      "cloudUsed": "クラウドタスクが {label} を使用"
     }
   },
   "mobile": {
@@ -2605,7 +2620,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "値の名前を変更できませんでした。もう一度お試しください。"
+        "rename": "値の名前を変更できませんでした。もう一度お試しください。",
+        "devices": "うまくいきませんでした。もう一度お試しください。"
       },
       "lastUsed": "最終使用 {used}",
       "neverUsed": "未使用",
@@ -2614,7 +2630,19 @@
       "renameCancel": "キャンセル",
       "renameLabel": "名前",
       "sync": "ほかのデバイスと同期",
-      "syncHint": "エンドツーエンドで暗号化されます。開けるのはあなた自身のコンピューターとスマートフォンだけで、Stella のサーバーは開けません。オフにすると、このコンピューターにだけ保存されます。"
+      "syncHint": "エンドツーエンドで暗号化されます。開けるのはあなた自身のコンピューターとスマートフォンだけで、Stella のサーバーは開けません。オフにすると、このコンピューターにだけ保存されます。",
+      "devices": "デバイス",
+      "thisComputer": "このコンピューター",
+      "quiet": "しばらく未接続",
+      "removeDevice": "削除",
+      "problem": "デバイスを確認できません",
+      "startOver": "やり直す",
+      "removedHere": "デバイスから削除されました",
+      "declined": "許可されませんでした",
+      "askAgain": "もう一度依頼",
+      "waitingFor": "{name} を待っています…",
+      "cloudUses": "クラウドタスクでの使用",
+      "refused": "渡していません"
     },
     "googleComposio": {
       "title": "Google に Composio を使う",

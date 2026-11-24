@@ -102,7 +102,7 @@ import type {
   UserAskState,
   UserAskStoredSecureValue,
 } from "../user-ask.js";
-import type { SavedValuesSyncStatus } from "../saved-values.js";
+import type { SavedValuesSyncAction, SavedValuesSyncStatus } from "../saved-values.js";
 import type { AppSourceActionResult, AppSourceState } from "./app-source.js";
 import type {
   BrowserExtensionClientsState,
@@ -434,6 +434,8 @@ import {
   IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_USER_ASK_SECURE_VALUES_SYNC_GET,
   IPC_USER_ASK_SECURE_VALUES_SYNC_SET,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED,
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_OPENED,
@@ -1375,6 +1377,10 @@ export type IpcInvokeContract = {
     OkErrorResult
   >;
   [IPC_USER_ASK_SECURE_VALUES_SYNC_GET]: Invoke<[], SavedValuesSyncStatus>;
+  [IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION]: Invoke<
+    [payload: SavedValuesSyncAction],
+    { ok: boolean; error?: string }
+  >;
   [IPC_USER_ASK_SECURE_VALUES_SYNC_SET]: Invoke<
     [payload: { enabled: boolean }],
     SavedValuesSyncStatus
@@ -1746,6 +1752,7 @@ export type IpcEventContract = {
   [IPC_CHATGPT_PROFILES_CHANGED]: void;
   [IPC_USER_ASK_OPENED]: UserAsk;
   [IPC_USER_ASK_UPDATED]: UserAsk;
+  [IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED]: SavedValuesSyncStatus;
   [IPC_USER_ASK_CLOSED]: { askId: string; state: UserAskState };
   [IPC_CONNECTOR_CONNECT_REQUEST]: ConnectorConnectRequest;
   [IPC_CONNECTOR_CONNECT_UPDATE]: ConnectorConnectUpdate;

@@ -1081,6 +1081,21 @@
       "later": "Pas maintenant",
       "note": "Vous pouvez changer cela à tout moment dans Réglages › Confidentialité.",
       "title": "Autoriser Stella sur vos autres appareils à lancer du travail sur cet ordinateur ?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Autoriser {name} ?",
+      "allowCheck": "Vérifiez qu’il affiche ce code.",
+      "notNow": "Pas maintenant",
+      "allow": "Autoriser",
+      "failed": "Ça n'a pas abouti. Réessayez.",
+      "matchTitle": "Vérifiez que {name} affiche ce code",
+      "otherDevice": "votre autre appareil",
+      "useAnother": "Autre appareil",
+      "matches": "Ça correspond",
+      "getTitle": "Récupérer vos identifiants ici",
+      "getBody": "Ouvrez Stella sur un autre appareil.",
+      "ok": "OK",
+      "cloudUsed": "Une tâche cloud a utilisé {label}"
     }
   },
   "mobile": {
@@ -2625,7 +2640,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Impossible de renommer cette valeur. Réessayez."
+        "rename": "Impossible de renommer cette valeur. Réessayez.",
+        "devices": "Ça n'a pas abouti. Réessayez."
       },
       "lastUsed": "Dernière utilisation {used}",
       "neverUsed": "Pas encore utilisée",
@@ -2634,7 +2650,19 @@
       "renameCancel": "Annuler",
       "renameLabel": "Nom",
       "sync": "Synchroniser avec vos autres appareils",
-      "syncHint": "Chiffré de bout en bout : seuls vos ordinateurs et votre téléphone peuvent les ouvrir, pas les serveurs de Stella. Désactivé, elles restent uniquement sur cet ordinateur."
+      "syncHint": "Chiffré de bout en bout : seuls vos ordinateurs et votre téléphone peuvent les ouvrir, pas les serveurs de Stella. Désactivé, elles restent uniquement sur cet ordinateur.",
+      "devices": "Appareils",
+      "thisComputer": "Cet ordinateur",
+      "quiet": "Pas vu récemment",
+      "removeDevice": "Retirer",
+      "problem": "Impossible de vérifier vos appareils",
+      "startOver": "Recommencer",
+      "removedHere": "Retiré de vos appareils",
+      "declined": "Non autorisé",
+      "askAgain": "Redemander",
+      "waitingFor": "En attente de {name}…",
+      "cloudUses": "Utilisés par des tâches cloud",
+      "refused": "Non fourni"
     },
     "googleComposio": {
       "title": "Utiliser Composio pour Google",

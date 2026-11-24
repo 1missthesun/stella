@@ -1081,6 +1081,21 @@
       "later": "Non ora",
       "note": "Puoi cambiarlo in qualsiasi momento in Impostazioni › Privacy.",
       "title": "Consentire a Stella sui tuoi altri dispositivi di avviare lavoro su questo computer?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Consentire {name}?",
+      "allowCheck": "Controlla che mostri questo codice.",
+      "notNow": "Non ora",
+      "allow": "Consenti",
+      "failed": "Non è andato a buon fine. Riprova.",
+      "matchTitle": "Controlla che {name} mostri questo codice",
+      "otherDevice": "il tuo altro dispositivo",
+      "useAnother": "Usa un altro dispositivo",
+      "matches": "Corrisponde",
+      "getTitle": "Porta qui i tuoi accessi",
+      "getBody": "Apri Stella su un altro dispositivo.",
+      "ok": "OK",
+      "cloudUsed": "Un'attività cloud ha usato {label}"
     }
   },
   "mobile": {
@@ -2625,7 +2640,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Impossibile rinominare il valore. Riprova."
+        "rename": "Impossibile rinominare il valore. Riprova.",
+        "devices": "Non è andato a buon fine. Riprova."
       },
       "lastUsed": "Ultimo utilizzo {used}",
       "neverUsed": "Non ancora usato",
@@ -2634,7 +2650,19 @@
       "renameCancel": "Annulla",
       "renameLabel": "Nome",
       "sync": "Sincronizza con gli altri tuoi dispositivi",
-      "syncHint": "Crittografia end-to-end: solo i tuoi computer e il tuo telefono possono aprirli, non i server di Stella. Se disattivato, restano solo su questo computer."
+      "syncHint": "Crittografia end-to-end: solo i tuoi computer e il tuo telefono possono aprirli, non i server di Stella. Se disattivato, restano solo su questo computer.",
+      "devices": "Dispositivi",
+      "thisComputer": "Questo computer",
+      "quiet": "Non visto di recente",
+      "removeDevice": "Rimuovi",
+      "problem": "Impossibile verificare i tuoi dispositivi",
+      "startOver": "Ricomincia",
+      "removedHere": "Rimosso dai tuoi dispositivi",
+      "declined": "Non consentito",
+      "askAgain": "Chiedi di nuovo",
+      "waitingFor": "In attesa di {name}…",
+      "cloudUses": "Usati da attività cloud",
+      "refused": "Non fornito"
     },
     "googleComposio": {
       "title": "Usa Composio per Google",

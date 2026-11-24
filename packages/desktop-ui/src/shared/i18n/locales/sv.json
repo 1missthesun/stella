@@ -1071,6 +1071,21 @@
       "later": "Inte nu",
       "note": "Du kan ändra det när som helst under Inställningar › Integritet.",
       "title": "Vill du låta Stella på dina andra enheter starta arbete på den här datorn?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Tillåta {name}?",
+      "allowCheck": "Kontrollera att den visar den här koden.",
+      "notNow": "Inte nu",
+      "allow": "Tillåt",
+      "failed": "Det gick inte. Försök igen.",
+      "matchTitle": "Kontrollera att {name} visar den här koden",
+      "otherDevice": "din andra enhet",
+      "useAnother": "Annan enhet",
+      "matches": "Det stämmer",
+      "getTitle": "Hämta dina inloggningar hit",
+      "getBody": "Öppna Stella på en annan enhet.",
+      "ok": "OK",
+      "cloudUsed": "Molnuppgift använde {label}"
     }
   },
   "mobile": {
@@ -2615,7 +2630,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Det gick inte att byta namn på värdet. Försök igen."
+        "rename": "Det gick inte att byta namn på värdet. Försök igen.",
+        "devices": "Det gick inte. Försök igen."
       },
       "lastUsed": "Senast använt {used}",
       "neverUsed": "Inte använt än",
@@ -2624,7 +2640,19 @@
       "renameCancel": "Avbryt",
       "renameLabel": "Namn",
       "sync": "Synka till dina andra enheter",
-      "syncHint": "Krypterat från början till slut: bara dina egna datorer och din telefon kan öppna dem, inte Stellas servrar. Av behåller dem bara på den här datorn."
+      "syncHint": "Krypterat från början till slut: bara dina egna datorer och din telefon kan öppna dem, inte Stellas servrar. Av behåller dem bara på den här datorn.",
+      "devices": "Enheter",
+      "thisComputer": "Den här datorn",
+      "quiet": "Inte sedd på länge",
+      "removeDevice": "Ta bort",
+      "problem": "Kan inte kontrollera dina enheter",
+      "startOver": "Börja om",
+      "removedHere": "Borttagen från dina enheter",
+      "declined": "Inte tillåten",
+      "askAgain": "Fråga igen",
+      "waitingFor": "Väntar på {name}…",
+      "cloudUses": "Använda av molnuppgifter",
+      "refused": "Inte utlämnad"
     },
     "googleComposio": {
       "title": "Använd Composio för Google",
